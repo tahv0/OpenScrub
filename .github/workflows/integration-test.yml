@@ -12,8 +12,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      OPENSCRUB_TEST_MEDIA_DIR: ${{ runner.temp }}/openscrub-media
-      OPENSCRUB_TEST_DATA_DIR: ${{ runner.temp }}/openscrub-data
+      OPENSCRUB_TEST_MEDIA_DIR: /tmp/openscrub-integration-media
+      OPENSCRUB_TEST_DATA_DIR: /tmp/openscrub-integration-data
       ORT_DISABLE_TELEMETRY: '1'
       HF_HUB_DISABLE_TELEMETRY: '1'
       OPENSCRUB_NO_AUTOFETCH: '1'
