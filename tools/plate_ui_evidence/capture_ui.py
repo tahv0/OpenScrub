@@ -194,6 +194,9 @@ try:
             page.locator('#review').screenshot(path=str(ROOT/'narrow-mask-review-desktop.png'))
             page.locator('#beT').press('Home')
             page.wait_for_function('!BE.pending && BE.frame===0 && BE.maskFrame===0')
+            # Slow only the 0.4-second fixture so the test can observe playback.
+            # Source frame rate and exact paused frame checks remain 120 fps.
+            page.eval_on_selector('#beVid','v => {v.playbackRate=0.1}')
             page.locator('#bePlay').click()
             try:
                 page.wait_for_function('BE.playing && document.getElementById("beVid").currentTime>0',timeout=5000)

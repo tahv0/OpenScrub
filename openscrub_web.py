@@ -2282,7 +2282,8 @@ async function beTogglePlay(){
  try{
   if(v.readyState<1)await new Promise((res,rej)=>{
    v.onloadedmetadata=res;
-   v.onerror=()=>rej(new Error("the browser cannot decode this file"));});
+   v.onerror=()=>rej(new Error("the browser cannot decode this file"));
+   v.load();});
   v.currentTime=BE.t||0;
   await v.play();
  }catch(e){
