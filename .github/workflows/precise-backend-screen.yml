@@ -1,0 +1,39 @@
+name: Precise plate backend rejection screen
+
+on:
+  push:
+    branches: ['research/precise-backend-candidates']
+
+permissions:
+  contents: read
+
+jobs:
+  hq-screen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      ORT_DISABLE_TELEMETRY: '1'
+      HF_HUB_DISABLE_TELEMETRY: '1'
+      OPENSCRUB_NO_AUTOFETCH: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.11'
+      - name: Install research-only CPU inference dependencies
+        run: |
+          python -m pip install torch==2.5.1 torchvision==0.20.1 --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install numpy==1.26.4 Pillow==10.4.0 timm==0.9.16 opencv-python-headless==4.10.0.84
+      - name: Fetch pinned official source
+        run: |
+          git clone --filter=blob:none https://github.com/SysCV/sam-hq.git "$RUNNER_TEMP/sam-hq"
+          git -C "$RUNNER_TEMP/sam-hq" checkout e696978d60352dc9a26b12631cd91781502c6546
+      - name: Evaluate fixed box-prompt policies
+        run: |
+          python experiments/precise_plate_masks/evaluate_hq.py --source "$RUNNER_TEMP/sam-hq" --checkpoint "$RUNNER_TEMP/sam_hq_vit_tiny.pth" --out hq-evidence
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: precise-hq-synthetic-evidence
+          path: hq-evidence/
+          retention-days: 30
