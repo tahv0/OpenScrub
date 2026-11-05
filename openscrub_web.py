@@ -35,6 +35,7 @@ import time
 import uuid
 
 import cv2
+import numpy as np
 from flask import (Flask, Response, abort, jsonify, redirect, request,
                    send_file)
 
@@ -941,6 +942,41 @@ def job_detections(jid):
                                 doc["render_state"]["fps"]})
 
 
+def _review_mask_data(d, ox, oy, shape, job):
+    """Rasterize the effective mask at the review frame coordinates."""
+    if not d.get("poly"):
+        return None
+    box = [d["cbox"][0] + ox, d["cbox"][1] + oy,
+           d["cbox"][2] + ox, d["cbox"][3] + oy]
+    base = d.get("mask_pad", -1)
+    try:
+        base = float(base)
+        if not np.isfinite(base) or base < 0:
+            raise ValueError()
+    except (ValueError, TypeError):
+        base = float(doc_pad(job))
+    anchor = d.get("aoff", (0, 0))
+    pad = base + min(24.0, 0.05 * (abs(ox-anchor[0]) + abs(oy-anchor[1])))
+    region, mask = openscrub.rasterize_mask(
+        shape, (box[0]-pad, box[1]-pad, box[2]+pad, box[3]+pad),
+        d["poly"], box, pad, d.get("poly_holes") or ())
+    return region, mask
+
+
+def _review_mask(d, ox, oy, shape, job):
+    data = _review_mask_data(d, ox, oy, shape, job)
+    if data is None:
+        return []
+    region, mask = data
+    contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    return [[[int(pt[0][0] + region[0]), int(pt[0][1] + region[1])]
+             for pt in contour] for contour in contours]
+
+
+def doc_pad(job):
+    return job.get("options", {}).get("pad", 8)
+
+
 @app.route("/api/jobs/<jid>/detframe/<int:i>")
 def job_detframe(jid, i):
     """Full video frame at a real sighting of detection i, with its box
@@ -957,7 +993,20 @@ def job_detframe(jid, i):
         abort(404)
     x1, y1 = int(d["cbox"][0] + ox), int(d["cbox"][1] + oy)
     x2, y2 = int(d["cbox"][2] + ox), int(d["cbox"][3] + oy)
-    cv2.rectangle(frame, (x1 - 4, y1 - 4), (x2 + 4, y2 + 4), (0, 0, 255), 3)
+    data = _review_mask_data(d, ox, oy, frame.shape, job)
+    if data is not None:
+        region, mask = data
+        xlo, ylo, xhi, yhi = region
+        roi = frame[ylo:yhi, xlo:xhi]
+        if mask.size:
+            tint = np.full_like(roi, (0, 0, 255))
+            blended = cv2.addWeighted(roi, 0.75, tint, 0.25, 0)
+            cv2.copyTo(blended, mask, roi)
+            contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+            cv2.drawContours(frame, contours, -1, (0, 0, 255), 2,
+                             offset=(xlo, ylo))
+    else:
+        cv2.rectangle(frame, (x1 - 4, y1 - 4), (x2 + 4, y2 + 4), (0, 0, 255), 3)
     ok, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 84])
     from flask import Response
     return Response(buf.tobytes(), mimetype="image/jpeg")
@@ -974,6 +1023,10 @@ def job_boxes_at(jid):
     fidx = min(int(t * rs["fps"]), len(rs["cum"]) - 1)
     ox, oy = rs["cum"][fidx]
     boxes = []
+    cap = cv2.VideoCapture(job["video"])
+    shape = (int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)),
+             int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)))
+    cap.release()
     want_all = request.args.get("all") == "1"
     for i, d in enumerate(doc["detections"]):
         if not (d["t_start"] - 0.01 <= t <= d["t_end"] + 0.01):
@@ -984,6 +1037,8 @@ def job_boxes_at(jid):
             boxes.append({"i": i, "category": d["category"],
                           "enabled": d.get("enabled", True),
                           "text": d.get("text", ""),
+                          "shaped": bool(d.get("poly")),
+                          "mask_contours": _review_mask(d, ox, oy, shape, job),
                           "t_start": d["t_start"], "t_end": d["t_end"],
                           "box": [d["cbox"][0] + ox, d["cbox"][1] + oy,
                                   d["cbox"][2] + ox, d["cbox"][3] + oy]})
@@ -1093,7 +1148,13 @@ def job_save_edits(jid):
     for i, box in (edits.get("box_overrides") or {}).items():
         i = int(i)
         if 0 <= i < len(doc["detections"]) and len(box) == 4:
-            doc["detections"][i]["cbox"] = [float(v) for v in box]
+            d = doc["detections"][i]
+            new_box = [float(v) for v in box]
+            if new_box != d["cbox"]:
+                d["cbox"] = new_box
+                d["poly"] = []
+                d["poly_holes"] = []
+                d["mask_pad"] = -1
     for i, span in (edits.get("time_overrides") or {}).items():
         i = int(i)
         if 0 <= i < len(doc["detections"]) and len(span) == 2:
@@ -2042,6 +2103,7 @@ async function loadBoxEdit(fromReview){
    <button class="danger" id="beARm" style="display:none" onclick="beAudioRm()">Delete span</button></div>
   <div id="beASugg" style="display:none;margin-top:6px"></div>
   <div id="beATx" style="display:none;margin-top:6px"></div>
+  <div style="font-size:12px;color:#94a3b8">Moving or resizing a shaped mask converts it to a full box mask.</div>
   <div class="row" style="margin-top:6px">
    <button class="tog" id="beAdd" onclick="beAddMode()">&#65291; Add box</button>
    <button class="tog" id="beTrk" onclick="beTrackMode()">&#8857; Track object</button>
@@ -2292,7 +2354,7 @@ function beFilter(){
  }).map(b=>{
   let bb=b;
   if(BE.ov[b.i]){const o=BE.ov[b.i];
-   bb={...b,box:[o[0]+BE.ox,o[1]+BE.oy,o[2]+BE.ox,o[3]+BE.oy]};}
+   bb={...b,shaped:false,mask_contours:[],box:[o[0]+BE.ox,o[1]+BE.oy,o[2]+BE.ox,o[3]+BE.oy]};}
   if(BE.times[b.i]){bb={...bb,t_start:BE.times[b.i][0],t_end:BE.times[b.i][1]};}
   return bb;
  });
@@ -2317,7 +2379,15 @@ function beDraw(){
   const[a1,b1,a2,b2]=b.box.map(v=>v*s);
   x.fillStyle=b.i===BE.sel?"rgba(37,99,235,.25)":"rgba(220,38,38,.22)";
   x.strokeStyle=b.i===BE.sel?"#2563eb":"#dc2626";x.lineWidth=2;
-  x.fillRect(a1,b1,a2-a1,b2-b1);x.strokeRect(a1,b1,a2-a1,b2-b1);
+  if(b.shaped && b.mask_contours.length){
+   x.beginPath();
+   for(const ring of b.mask_contours){if(!ring.length)continue;
+    x.moveTo(ring[0][0]*s,ring[0][1]*s);
+    for(const p of ring.slice(1))x.lineTo(p[0]*s,p[1]*s);
+    x.closePath();}
+   x.fill("evenodd");x.stroke();
+   x.setLineDash([4,4]);x.strokeRect(a1,b1,a2-a1,b2-b1);x.setLineDash([]);
+  }else{x.fillRect(a1,b1,a2-a1,b2-b1);x.strokeRect(a1,b1,a2-a1,b2-b1);}
   if(b.i===BE.sel)for(const[hx,hy] of [[a1,b1],[a2,b1],[a1,b2],[a2,b2]]){
    x.fillStyle="#fff";x.fillRect(hx-5,hy-5,10,10);
    x.strokeRect(hx-5,hy-5,10,10);}
@@ -2422,6 +2492,7 @@ function beHook(){
    if(BE.drag.ci===3){a2=p[0];b2=p[1];}
   }
   b.box=[Math.min(a1,a2),Math.min(b1,b2),Math.max(a1,a2),Math.max(b1,b2)];
+  b.shaped=false;b.mask_contours=[];
   BE.ov[BE.sel]=[b.box[0]-BE.ox,b.box[1]-BE.oy,b.box[2]-BE.ox,b.box[3]-BE.oy];
   beDraw();
  });

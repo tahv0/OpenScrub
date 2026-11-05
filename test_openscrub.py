@@ -3366,3 +3366,110 @@ def test_registry_doc_fields_refresh_but_pins_stay(monkeypatch, tmp_path):
     assert got["sha256"] == "ab" * 32
     assert got["download_url"] == "https://example.com/pinned.onnx"
     assert got["recommended"] == m0["recommended"]
+
+
+def test_compound_mask_holes_islands_padding_and_invalid():
+    outer = ((0, 0), (1, 0), (1, 1), (0, 1))
+    hole = ((.25, .25), (.75, .25), (.75, .75), (.25, .75))
+    island = ((.45, .45), (.55, .45), (.55, .55), (.45, .55))
+    frame = np.full((24, 24, 3), 255, np.uint8)
+    openscrub.blur_silhouette(frame, 0, 0, 24, 24, 'box', (outer, island),
+                              (2, 2, 22, 22), pad_px=1,
+                              poly_holes=((hole,), ()))
+    assert frame[4, 4, 0] == 0
+    assert frame[8, 8, 0] == 255
+    assert frame[12, 12, 0] == 0
+    frame[:] = 255
+    openscrub.blur_silhouette(frame, 2, 2, 22, 22, 'box',
+                              (((float('nan'), 0), (1, 0), (1, 1)),),
+                              (2, 2, 22, 22))
+    assert frame[10, 10, 0] == 0
+
+
+def test_compound_report_roundtrip(tmp_path):
+    from dataclasses import asdict
+    d = openscrub.Detection(0, 1, (0, 0, 10, 10), 'plate', '', 1,
+        poly=(((0, 0), (1, 0), (1, 1)),),
+        poly_holes=((((.1, .1), (.2, .1), (.2, .2)),),), mask_pad=0)
+    p = tmp_path / 'r.json'
+    p.write_text(json.dumps([asdict(d)]))
+    back, _, _ = openscrub.load_report(p)
+    assert back[0].mask_pad == 0 and back[0].poly_holes == d.poly_holes
+
+
+def test_hdr_odd_origin_covers_every_touched_chroma_cell():
+    y = np.full((8, 8), 900, np.uint16)
+    u = np.full((4, 4), 800, np.uint16)
+    v = u.copy()
+    square = ((0, 0), (1, 0), (1, 1), (0, 1))
+    openscrub._blur_silhouette_yuv10(y, u, v, 1, 1, 5, 5, 'box',
+                                    (square,), (1, 1, 5, 5))
+    assert u[:3, :3].tolist() == [[512] * 3] * 3
+    assert u[3, 3] == 800
+
+
+def test_review_shape_edit_converts_only_changed_box(tmp_path):
+    import openscrub_web as web
+    outer = [[[0, 0], [1, 0], [1, 1], [0, 1]]]
+    row = {'t_start': 0, 't_end': 1, 'cbox': [2, 2, 20, 20],
+           'aoff': [0, 0], 'category': 'plate', 'text': '', 'poly': outer,
+           'poly_holes': [[[[.25,.25], [.75,.25], [.75,.75], [.25,.75]]]], 'mask_pad': 0}
+    doc = {'detections': [row], 'render_state': {'fps': 1, 'cum': [[0, 0]], 'bands': []}}
+    (tmp_path / 'report.json').write_text(json.dumps(doc))
+    video = str(tmp_path / 'v.mp4')
+    out = cv2.VideoWriter(video, cv2.VideoWriter_fourcc(*'mp4v'), 1, (24, 24))
+    out.write(np.full((24, 24, 3), 200, np.uint8)); out.release()
+    web.JOBS['compound-test'] = {'dir': str(tmp_path), 'video': video, 'options': {'pad': 8}}
+    try:
+        c = web.app.test_client()
+        box = c.get('/api/jobs/compound-test/boxes_at?t=0').get_json()['boxes'][0]
+        assert box['mask_contours'] and box['shaped']
+        c.post('/api/jobs/compound-test/detections', json={'box_overrides': {'0': [2, 2, 20, 20]}})
+        assert json.loads((tmp_path / 'report.json').read_text())['detections'][0]['poly'] == outer
+        c.post('/api/jobs/compound-test/detections', json={'box_overrides': {'0': [3, 2, 20, 20]}})
+        changed = json.loads((tmp_path / 'report.json').read_text())['detections'][0]
+        assert not changed['poly'] and not changed['poly_holes'] and changed['mask_pad'] == -1
+    finally:
+        del web.JOBS['compound-test']
+
+
+def test_generated_compound_track_samples_use_box():
+    outer = (((0, 0), (1, 0), (1, 1), (0, 1)),)
+    holes = ((( (.2, .2), (.8, .2), (.8, .8), (.2, .8) ),),)
+    samples = [openscrub.Detection(t, t + .01, (10, 10, 30, 30), 'plate', '', 1,
+                dense=True, track=5, poly=outer, poly_holes=holes, mask_pad=0)
+               for t in (0, .3)]
+    openscrub.smooth_dense_tracks(samples, 30, video=None)
+    generated = [d for d in samples if d.t_start not in (0, .3)]
+    assert generated and all(not d.poly and not d.poly_holes and d.mask_pad == -1 for d in generated)
+    assert all(d.poly == outer and d.poly_holes == holes for d in samples if d.t_start in (0, .3))
+
+
+def test_malformed_report_geometry_reaches_fail_closed_renderer(tmp_path):
+    row = {'t_start': 0, 't_end': 1, 'cbox': [2, 2, 18, 18],
+           'category': 'plate', 'text': '', 'poly': [[[0, 0], [1, 0], [1, 1]]],
+           'poly_holes': [None]}
+    p = tmp_path / 'broken.json'; p.write_text(json.dumps([row]))
+    dets, _, _ = openscrub.load_report(p)
+    frame = np.full((20, 20, 3), 255, np.uint8)
+    openscrub.blur_silhouette(frame, 2, 2, 18, 18, 'box', dets[0].poly,
+                              dets[0].cbox, poly_holes=dets[0].poly_holes)
+    assert frame[15, 3, 0] == 0
+
+
+def test_generated_legacy_silhouette_retains_its_padding_override():
+    outer = (((0, 0), (1, 0), (1, 1), (0, 1)),)
+    samples = [openscrub.Detection(t, t + .01, (10, 10, 30, 30), 'person', '', 1,
+                dense=True, track=5, poly=outer, mask_pad=0) for t in (0, .3)]
+    openscrub.smooth_dense_tracks(samples, 30, video=None)
+    generated = [d for d in samples if d.t_start not in (0, .3)]
+    assert generated and all(d.poly == outer and d.mask_pad == 0 for d in generated)
+
+
+def test_component_completely_erased_by_hole_fails_closed():
+    outer = ((0, 0), (.5, 0), (.5, 1), (0, 1))
+    island = ((.7, .2), (.9, .2), (.9, .8), (.7, .8))
+    frame = np.full((20, 20, 3), 255, np.uint8)
+    openscrub.blur_silhouette(frame, 0, 0, 20, 20, 'box', (outer, island),
+                              (0, 0, 20, 20), poly_holes=((outer,), ()))
+    assert frame[5, 3, 0] == 0

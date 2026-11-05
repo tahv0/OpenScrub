@@ -723,6 +723,8 @@ class Detection:
                                # model, points NORMALIZED to cbox (0..1) —
                                # render blurs ONLY inside them (person
                                # category); empty = plain box redaction
+    poly_holes: tuple = ()     # exclusion rings per outer component
+    mask_pad: float = -1       # pixels; -1 inherits global padding
 
 
 class PhiMemory:
@@ -1265,7 +1267,9 @@ def smooth_dense_tracks(dets, fps, video, cum=None, win_start=0.0, cb=None):
                          (int(sbox[0] - o[0]), int(sbox[1] - o[1]),
                           int(sbox[2] - o[0]), int(sbox[3] - o[1])),
                          ref.category, ref.text, ref.confidence, o,
-                         last_seen=t0, dense=True, track=tid, poly=ref.poly)
+                         last_seen=t0, dense=True, track=tid,
+                         poly=(() if ref.poly_holes else ref.poly),
+                         mask_pad=(-1 if ref.poly_holes else ref.mask_pad))
 
     cap = cv2.VideoCapture(video) if video else None
     if cap is not None and not cap.isOpened():
@@ -3008,41 +3012,69 @@ def blur_region(frame, x1, y1, x2, y2, mode, shape="rect"):
         frame[y1:y2, x1:x2] = filled
 
 
-def blur_silhouette(frame, x1, y1, x2, y2, mode, polys, poly_box,
-                    pad_px=0):
-    """Redact ONLY the pixels inside a detection's silhouette polygon(s) —
-    the segmentation-model equivalent of blur_region, so a walking person's
-    body is masked without a box of blurred background around them.
+def effective_mask_pad(override, default):
+    try:
+        value = float(override)
+        return value if np.isfinite(value) and value >= 0 else default
+    except (TypeError, ValueError, OverflowError):
+        return default
 
-    (x1..y2) is the PADDED region to operate in; poly points are normalized
-    to poly_box (the unpadded detection box). pad_px dilates the mask
-    outward — the silhouette version of the box pad: over-blur beats
-    under-blur. Any degenerate mask falls back to the full box redaction
-    (fail closed), never to nothing."""
-    h, w = frame.shape[:2]
+
+def rasterize_mask(shape, region, polys, poly_box, pad_px=0, poly_holes=()):
+    """Return clipped region and its mask. Invalid geometry covers the region."""
+    h, w = shape[:2]
+    x1, y1, x2, y2 = region
     x1i, y1i = max(0, int(x1)), max(0, int(y1))
     x2i, y2i = min(w, int(x2)), min(h, int(y2))
-    if x2i <= x1i or y2i <= y1i:
-        return
-    if not polys:
-        blur_region(frame, x1, y1, x2, y2, mode)
-        return
-    pbx1, pby1, pbx2, pby2 = poly_box
-    pbw, pbh = max(1.0, pbx2 - pbx1), max(1.0, pby2 - pby1)
-    rw, rh = x2i - x1i, y2i - y1i
+    rw, rh = max(0, x2i - x1i), max(0, y2i - y1i)
     mask = np.zeros((rh, rw), np.uint8)
-    for pts in polys:
-        arr = np.array([[int(round(float(qx) * pbw + pbx1)) - x1i,
-                         int(round(float(qy) * pbh + pby1)) - y1i]
-                        for qx, qy in pts], np.int32)
-        if len(arr) >= 3:
-            cv2.fillPoly(mask, [arr], 255)
-    if not mask.any():
-        blur_region(frame, x1, y1, x2, y2, mode)   # fail closed
+    if not rw or not rh:
+        return (x1i, y1i, x2i, y2i), mask
+    try:
+        pbx1, pby1, pbx2, pby2 = map(float, poly_box)
+        if (not all(np.isfinite([pbx1, pby1, pbx2, pby2])) or
+            max(abs(pbx1), abs(pby1), abs(pbx2), abs(pby2)) > 10000000 or
+            pbx2 <= pbx1 or pby2 <= pby1):
+            raise ValueError('invalid box')
+        if not polys or (poly_holes and len(poly_holes) != len(polys)):
+            raise ValueError('invalid components')
+        def ring(points):
+            a = np.asarray(points, dtype=float)
+            if (a.ndim != 2 or a.shape[1] != 2 or len(a) < 3 or
+                not np.isfinite(a).all() or (a < 0).any() or (a > 1).any()):
+                raise ValueError('invalid ring')
+            a = np.rint(a * [pbx2-pbx1, pby2-pby1] + [pbx1-x1i, pby1-y1i]).astype(np.int32)
+            if abs(cv2.contourArea(a)) < 0.5:
+                raise ValueError('degenerate ring')
+            return a
+        pad = max(0, int(pad_px))
+        # Limit kernel to the region dimensions; larger padding is equivalent.
+        pad = min(pad, max(rw, rh))
+        for i, points in enumerate(polys):
+            component = np.zeros_like(mask)
+            cv2.fillPoly(component, [ring(points)], 255)
+            if pad:
+                component = cv2.dilate(component, None, iterations=pad)
+            for hole in (poly_holes[i] if poly_holes else ()):
+                cv2.fillPoly(component, [ring(hole)], 0)
+            if not component.any():
+                raise ValueError("empty component")
+            mask = cv2.bitwise_or(mask, component)
+        if not mask.any():
+            raise ValueError('empty mask')
+    except (ValueError, TypeError, OverflowError, IndexError, cv2.error):
+        mask[:] = 255
+    return (x1i, y1i, x2i, y2i), mask
+
+
+def blur_silhouette(frame, x1, y1, x2, y2, mode, polys, poly_box,
+                    pad_px=0, poly_holes=()):
+    """Redact a compound silhouette, falling back to its box on invalid input."""
+    (x1i, y1i, x2i, y2i), mask = rasterize_mask(
+        frame.shape, (x1, y1, x2, y2), polys, poly_box, pad_px, poly_holes)
+    rw, rh = x2i-x1i, y2i-y1i
+    if not rw or not rh:
         return
-    if pad_px > 0:
-        k = 2 * int(pad_px) + 1
-        mask = cv2.dilate(mask, np.ones((k, k), np.uint8))
     roi = frame[y1i:y2i, x1i:x2i]
     if mode == "box":
         filled = np.zeros_like(roi)
@@ -3395,36 +3427,17 @@ def _blur_yuv10(y, u, v, x1, y1, x2, y2, mode, shape="rect"):
 
 
 def _blur_silhouette_yuv10(y, u, v, x1, y1, x2, y2, mode, polys,
-                           poly_box, pad_px=0):
-    """blur_silhouette for the 10-bit planar HDR path: rasterize the
-    silhouette at luma resolution and redact each plane only inside the
-    (dilated) mask — untouched pixels never leave the native YUV domain.
-    Degenerate masks fall back to the full box (fail closed), exactly
-    like the SDR version."""
-    h, w = y.shape
-    x1i, y1i = max(0, int(x1)), max(0, int(y1))
-    x2i, y2i = min(w, int(x2)), min(h, int(y2))
-    if x2i <= x1i or y2i <= y1i:
+                           poly_box, pad_px=0, poly_holes=()):
+    """Apply the shared luma mask to native 10-bit planes."""
+    (x1i, y1i, x2i, y2i), mask = rasterize_mask(
+        y.shape, (x1, y1, x2, y2), polys, poly_box, pad_px, poly_holes)
+    if not mask.size:
         return
-    if not polys:
-        _blur_yuv10(y, u, v, x1, y1, x2, y2, mode)
-        return
-    pbx1, pby1, pbx2, pby2 = poly_box
-    pbw, pbh = max(1.0, pbx2 - pbx1), max(1.0, pby2 - pby1)
-    rw, rh = x2i - x1i, y2i - y1i
-    mask = np.zeros((rh, rw), np.uint8)
-    for pts in polys:
-        arr = np.array([[int(round(float(qx) * pbw + pbx1)) - x1i,
-                         int(round(float(qy) * pbh + pby1)) - y1i]
-                        for qx, qy in pts], np.int32)
-        if len(arr) >= 3:
-            cv2.fillPoly(mask, [arr], 255)
-    if not mask.any():
-        _blur_yuv10(y, u, v, x1, y1, x2, y2, mode)     # fail closed
-        return
-    if pad_px > 0:
-        k = 2 * int(pad_px) + 1
-        mask = cv2.dilate(mask, np.ones((k, k), np.uint8))
+    # Map luma pixels to their actual 2x2 chroma cells, including odd origins.
+    aligned = np.zeros((2*((y2i+1)//2-y1i//2),
+                        2*((x2i+1)//2-x1i//2)), np.uint8)
+    aligned[y1i%2:y1i%2+mask.shape[0], x1i%2:x1i%2+mask.shape[1]] = mask
+    cmask = aligned.reshape(aligned.shape[0]//2, 2, aligned.shape[1]//2, 2).max(axis=(1, 3))
 
     def _fill_masked(plane, px1, py1, px2, py2, black, kmin):
         if px2 <= px1 or py2 <= py1:
@@ -3446,8 +3459,7 @@ def _blur_silhouette_yuv10(y, u, v, x1, y1, x2, y2, mode, polys,
             filled = _gauss_big(roi, k)
         m = mask
         if m.shape != roi.shape:            # chroma planes are half-res
-            m = cv2.resize(mask, (roi.shape[1], roi.shape[0]),
-                           interpolation=cv2.INTER_NEAREST)
+            m = cmask
         cv2.copyTo(filled, m, roi)
 
     _fill_masked(y, x1i, y1i, x2i, y2i, 64, 31)
@@ -3480,6 +3492,8 @@ def apply_coverage(dets, coverage, cb=None):
         if getattr(d, "dense", False) and d.category in ("person", "manual"):
             c = copy.copy(d)
             c.poly = ()
+            c.poly_holes = ()
+            c.mask_pad = -1
             out.append(c)
             if coverage == "concealed" and getattr(d, "track", -1) >= 0:
                 per_track.setdefault(c.track, []).append(c)
@@ -3711,14 +3725,15 @@ def render_hdr(src, dst, detections, cum, bands, fps, pad, mode,
                if d.t_start - 0.01 <= t <= d.t_end + 0.01]
         for d in _dedupe_dense(act):
             drift = min(24.0, 0.05 * (abs(ox - d.aoff[0]) + abs(oy - d.aoff[1])))
-            px = pad + drift
+            px = effective_mask_pad(d.mask_pad, pad) + drift
             if d.poly:
                 _blur_silhouette_yuv10(
                     y, u, v, d.cbox[0] + ox - px, d.cbox[1] + oy - px,
                     d.cbox[2] + ox + px, d.cbox[3] + oy + px,
                     _mode_for(d.category), d.poly,
                     (d.cbox[0] + ox, d.cbox[1] + oy,
-                     d.cbox[2] + ox, d.cbox[3] + oy), pad_px=px)
+                     d.cbox[2] + ox, d.cbox[3] + oy), pad_px=px,
+                    poly_holes=d.poly_holes)
             else:
                 _blur_yuv10(y, u, v, d.cbox[0] + ox - px, d.cbox[1] + oy - px,
                             d.cbox[2] + ox + px, d.cbox[3] + oy + px,
@@ -3905,7 +3920,7 @@ def render(src, dst, detections, cum, bands, fps, pad, mode, preview,
             # drift allowance: residual tracking error grows (slowly) with
             # distance scrolled since detection — expand the box to cover it
             drift = min(24.0, 0.05 * (abs(ox - d.aoff[0]) + abs(oy - d.aoff[1])))
-            px = pad + drift
+            px = effective_mask_pad(d.mask_pad, pad) + drift
             x1 = d.cbox[0] + ox - px
             y1 = d.cbox[1] + oy - px
             x2 = d.cbox[2] + ox + px
@@ -3915,13 +3930,12 @@ def render(src, dst, detections, cum, bands, fps, pad, mode, preview,
             if preview:
                 cv2.rectangle(frame, (int(max(0, x1)), int(max(0, y1))),
                               (int(min(w, x2)), int(min(h, y2))), (0, 0, 255), 2)
-                for pts in (d.poly or ()):
-                    arr = np.array(
-                        [[int(float(qx) * (pbox[2] - pbox[0]) + pbox[0]),
-                          int(float(qy) * (pbox[3] - pbox[1]) + pbox[1])]
-                         for qx, qy in pts], np.int32)
-                    if len(arr) >= 3:
-                        cv2.polylines(frame, [arr], True, (0, 0, 255), 2)
+                if d.poly:
+                    region, mask = rasterize_mask(frame.shape, (x1, y1, x2, y2),
+                                                  d.poly, pbox, px, d.poly_holes)
+                    contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+                    cv2.drawContours(frame, contours, -1, (0, 0, 255), 2,
+                                     offset=(region[0], region[1]))
                 label = d.category
                 if draw_scores and d.category == "face":
                     label = f"face {d.confidence:.2f}"
@@ -3931,7 +3945,7 @@ def render(src, dst, detections, cum, bands, fps, pad, mode, preview,
                 # segmentation silhouette: mask only the body, not the box —
                 # px (pad+drift) becomes an outward mask dilation
                 blur_silhouette(frame, x1, y1, x2, y2, _mode_for(d.category),
-                                d.poly, pbox, pad_px=px)
+                                d.poly, pbox, pad_px=px, poly_holes=d.poly_holes)
             else:
                 blur_region(frame, x1, y1, x2, y2, _mode_for(d.category),
                             shape=("ellipse" if d.category == "face"
@@ -5972,6 +5986,8 @@ def load_report(path):
     else:
         rows, state, prov = doc.get("detections", []), doc.get("render_state"), \
             doc.get("provenance", {})
+    def _tuples(value):
+        return tuple(_tuples(v) for v in value) if isinstance(value, list) else value
     dets = []
     for r in rows:
         if not r.get("enabled", True):
@@ -5988,7 +6004,9 @@ def load_report(path):
             dense=bool(r.get("dense", False)),
             track=int(r.get("track", -1)),
             person=int(r.get("person", -1)),
-            poly=tuple(r.get("poly") or ())))
+            poly=tuple(r.get("poly") or ()),
+            poly_holes=_tuples(r.get("poly_holes") or ()),
+            mask_pad=r.get("mask_pad", -1)))
     return dets, state, prov
 
 
