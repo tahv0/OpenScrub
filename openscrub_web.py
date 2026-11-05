@@ -980,8 +980,6 @@ def _review_detections(job, doc):
 
 def _review_mask_data(d, ox, oy, shape, job, doc):
     """Rasterize the effective mask at the review frame coordinates."""
-    if not d.get("poly") and not d.get("_coverage_box"):
-        return None
     box = [d["cbox"][0] + ox, d["cbox"][1] + oy,
            d["cbox"][2] + ox, d["cbox"][3] + oy]
     base = d.get("mask_pad", -1)
@@ -993,10 +991,13 @@ def _review_mask_data(d, ox, oy, shape, job, doc):
         base = float(_review_setting(job, doc, "pad", 8))
     anchor = d.get("aoff", (0, 0))
     pad = base + min(24.0, 0.05 * (abs(ox-anchor[0]) + abs(oy-anchor[1])))
-    region, mask = openscrub.rasterize_mask(
-        shape, (box[0]-pad, box[1]-pad, box[2]+pad, box[3]+pad),
-        d.get("poly") or (), box, pad, d.get("poly_holes") or ())
-    return region, mask
+    region = (box[0]-pad, box[1]-pad, box[2]+pad, box[3]+pad)
+    if d.get("poly"):
+        return openscrub.rasterize_mask(
+            shape, region, d["poly"], box, pad, d.get("poly_holes") or ())
+    face_shape = _review_setting(job, doc, "face_shape", "ellipse")
+    kind = "ellipse" if d["category"] == "face" and face_shape != "rect" else "rect"
+    return openscrub.rasterize_region_mask(shape, region, kind)
 
 
 def _review_mask(d, ox, oy, shape, job, doc):
