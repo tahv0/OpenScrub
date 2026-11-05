@@ -4171,3 +4171,29 @@ def test_narrow_synthesized_frame_uses_exact_scroll_offset():
     openscrub.smooth_dense_tracks(rows,fps,None,cum=cum,max_frame_index=129)
     gap=next(d for d in rows if d.frame_index==123)
     assert gap.aoff==(123,0)
+
+
+def test_review_playback_starts_loading_metadata_with_preload_none(tmp_path):
+    import shutil, openscrub_web as web
+    if not shutil.which('node'):
+        pytest.skip('node required for evaluated PAGE behavior')
+    page=web.PAGE
+    script=page[page.index('async function beTogglePlay(){'):page.index('const TLC=')]
+    harness=r'''
+const assert=require('assert');let loaded=0,played=0;
+const video={src:'',style:{},readyState:0,clientWidth:0,currentTime:0,
+ load(){loaded++;assert.equal(typeof this.onloadedmetadata,'function');queueMicrotask(()=>{this.readyState=1;this.onloadedmetadata()})},
+ async play(){played++},pause(){}};
+const els={beVid:video,beImg:{style:{}},beCv:{style:{}},bePlay:{}};
+let document={getElementById:id=>els[id]},BE={playing:false,indexed:true,t:0},CUR='test';
+function beDraw(){};function requestAnimationFrame(){};function alert(s){throw Error(s)}
+''' + script + r'''
+(async()=>{
+ await Promise.race([beTogglePlay(),new Promise((_,reject)=>setTimeout(()=>reject(Error('metadata loading never started')),100))]);
+ assert.equal(loaded,1);assert.equal(played,1);assert.equal(BE.playing,true);
+ console.log('PASS');
+})().catch(e=>{console.error(e);process.exitCode=1});
+'''
+    file=tmp_path/'preload.js';file.write_text(harness)
+    result=subprocess.run(['node',str(file)],capture_output=True,text=True,timeout=5)
+    assert result.returncode==0,result.stderr
