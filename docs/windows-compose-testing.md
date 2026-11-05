@@ -1,10 +1,10 @@
 # Test all four PRs with Docker Compose on Windows
 
 The `integration/all-prs` branch combines PRs #1–#4. This setup builds its
-local checkout with the CPU `Dockerfile`, so you test the combined code
-rather than a published release image. It works without GPU passthrough;
-CPU scans and renders can take longer. GPU configuration is outside this
-test setup.
+local checkout, so you test the combined code rather than a published
+release image. The base Compose file uses the CPU `Dockerfile`. For an
+NVIDIA GPU, add `compose.windows-cuda.yml` to build `Dockerfile.cuda` and
+expose the GPU. GPU passthrough alone does not add CUDA to the CPU image.
 
 Included PR snapshots:
 
@@ -16,7 +16,7 @@ Included PR snapshots:
 | #4 | `2900930` | Browser Save As for video and audit report |
 
 Automatic precise segmentation with a small model is deferred and is not
-included in this CPU test setup. Compound shapes can be displayed and
+included in this test setup. Compound shapes can be displayed and
 rendered when their geometry is supplied; that does not imply automatic
 segmentation of arbitrary objects.
 
@@ -35,11 +35,13 @@ Set-Location OpenScrubTest
 git status --short --branch
 git rev-parse --short HEAD
 
+# CPU setup. For NVIDIA CUDA, use the CUDA section below instead of up.
+$composeFiles = @('-f', 'compose.windows-test.yml')
 New-Item -ItemType Directory -Force -Path D:\OpenScrubTest\data | Out-Null
-docker compose -f compose.windows-test.yml config --quiet
-docker compose -f compose.windows-test.yml up --build -d
-docker compose -f compose.windows-test.yml ps
-docker compose -f compose.windows-test.yml logs --tail 100 openscrub
+docker compose @composeFiles config --quiet
+docker compose @composeFiles up --build -d
+docker compose @composeFiles ps
+docker compose @composeFiles logs --tail 100 openscrub
 ```
 
 The first build downloads Python packages and detection models and can
@@ -53,6 +55,59 @@ The published port is bound to `127.0.0.1`, so this setup is for local
 testing. The app runs HTTP to use the browser's trusted localhost context
 without a self-signed certificate prompt. Keep this loopback binding when
 using HTTP.
+
+## Use NVIDIA CUDA, including switching an existing CPU setup
+
+Use Docker Desktop's **WSL 2 backend** and Linux containers, with a current
+NVIDIA Windows driver that supports WSL GPU access. CUDA requires an
+NVIDIA GPU. Run `nvidia-smi` in PowerShell first; it should identify it.
+
+In the existing `OpenScrubTest` checkout, pull the branch update. Build the
+GPU image from the same combined source and keep the same data/source
+mounts:
+
+```powershell
+git pull --ff-only origin integration/all-prs
+$composeFiles = @('-f', 'compose.windows-test.yml', '-f', 'compose.windows-cuda.yml')
+New-Item -ItemType Directory -Force -Path D:\OpenScrubTest\data | Out-Null
+docker compose @composeFiles config --quiet
+docker compose @composeFiles build openscrub
+```
+
+The first CUDA build downloads several GB of CUDA/Paddle dependencies.
+The existing CUDA base supplies CUDA 12.6/cuDNN 9; both GPU runtime
+installs are pinned to ONNX Runtime 1.20.2, which supports that pair.
+Newer unpinned wheels require newer CUDA libraries and can fall back to
+CPU even when a GPU provider appears in their available-provider list.
+
+Before recreating a running CPU container, **cancel its active scan in the
+UI or wait for it to finish**. A running scan cannot be moved to CUDA;
+start a new scan after switching. Bind-mounted job files stay on D:.
+
+```powershell
+docker compose @composeFiles up -d --force-recreate --wait --wait-timeout 180
+docker compose @composeFiles exec openscrub nvidia-smi
+Get-Content -Raw tools/check_cuda.py | docker compose @composeFiles exec -T openscrub python -
+```
+
+The final command runs a blank inference through the resolved plate model
+and checks its execution profile for CUDA nodes. Expect
+`PASS: real plate inference executed ... CUDA node events.` It exits with
+an error if GPU initialization fails or all model work runs on CPU. This
+checks execution, not plate-detection accuracy. Some shape/NMS nodes on
+CPU are normal. A real scan should log the plate model with
+`(onnxruntime, CUDAExecutionProvider)` after initialization.
+
+If the check fails, inspect its preceding errors before starting a long
+scan. Remove any `OPENSCRUB_CPU_DNN=1` setting, which forces CPU execution.
+A successful `nvidia-smi` alone proves device access, not CUDA inference.
+Actual GPU execution must be verified on the Windows host; CPU-only CI
+validates Compose configuration and the CPU application path.
+
+Keep `$composeFiles` set to **both files** for later commands below. In a
+new PowerShell session, set it again. Omitting the CUDA file from an
+`up --build` command rebuilds the CPU variant. Both variants use the same
+Compose project and replace the same service.
 
 ## Read a video directly from D:
 
@@ -78,7 +133,7 @@ To check one known test filename without listing other drive contents,
 change `Videos` and `clip.mp4` below to match your test clip:
 
 ```powershell
-docker compose -f compose.windows-test.yml exec -T openscrub python -c "from pathlib import Path; print([p.name for p in Path('/media/d/Videos').glob('clip.mp4') if p.is_file()]); p = Path('/media/d/Videos/clip.mp4'); print('Readable:', bool(p.open('rb').read(1)))"
+docker compose @composeFiles exec -T openscrub python -c "from pathlib import Path; print([p.name for p in Path('/media/d/Videos').glob('clip.mp4') if p.is_file()]); p = Path('/media/d/Videos/clip.mp4'); print('Readable:', bool(p.open('rb').read(1)))"
 ```
 
 It should print `['clip.mp4']` and `Readable: True` for a nonempty readable
@@ -86,7 +141,7 @@ file. If it fails, check the Windows filename, Docker Desktop drive
 access, and the resolved mount sources:
 
 ```powershell
-docker compose -f compose.windows-test.yml config
+docker compose @composeFiles config
 ```
 
 Both bind mounts use `create_host_path: false`: a misspelled or missing
@@ -134,7 +189,11 @@ the commit printed by `git rev-parse` alongside any findings.
 
 Full-plate coverage remains the default. Narrow coverage is opt-in and
 uses a conservative fallback, often masking the full plate when lettering
-cannot be localized confidently. Narrow HDR output is rejected: for an
+cannot be localized confidently. Narrow detects plates and localizes
+lettering **every frame**, including with Balanced scan speed; it is more
+expensive than full-plate Balanced, which detects every second frame.
+Automatic 4K tiling adds nine overlapping tile passes to each full-frame
+plate pass in either mode. Narrow HDR output is rejected: for an
 HDR input, explicitly choose **HDR output → tone-map to SDR** before testing Narrow.
 It does not switch to SDR automatically. Full-plate HDR behavior is
 unchanged.
@@ -158,11 +217,11 @@ Wait for active scans/renders to finish before stopping or updating.
 
 ```powershell
 # Stop the existing container; restart it later with the same data.
-docker compose -f compose.windows-test.yml stop
-docker compose -f compose.windows-test.yml start
+docker compose @composeFiles stop
+docker compose @composeFiles start
 
 # Or remove this test container/network. Bind-mounted data stays on D:.
-docker compose -f compose.windows-test.yml down
+docker compose @composeFiles down
 ```
 
 After all scans/renders have finished, update the checkout and rebuild:
@@ -172,8 +231,8 @@ git fetch origin
 git switch integration/all-prs
 git pull --ff-only origin integration/all-prs
 git rev-parse --short HEAD
-docker compose -f compose.windows-test.yml up --build -d --force-recreate
-docker compose -f compose.windows-test.yml logs --tail 100 openscrub
+docker compose @composeFiles up --build -d --force-recreate
+docker compose @composeFiles logs --tail 100 openscrub
 ```
 
 The in-app updater does not update a container image. A rebuild and
@@ -192,7 +251,7 @@ Videos folder and put data on the C: drive:
 $env:OPENSCRUB_TEST_MEDIA_DIR = 'D:/Videos'
 $env:OPENSCRUB_TEST_DATA_DIR = 'C:/OpenScrubTest/data'
 New-Item -ItemType Directory -Force -Path $env:OPENSCRUB_TEST_DATA_DIR | Out-Null
-docker compose -f compose.windows-test.yml up --build -d
+docker compose @composeFiles up --build -d
 ```
 
 With this source override, `D:\Videos\clip.mp4` becomes
@@ -217,6 +276,9 @@ verify Windows drive sharing, native picker behavior, or real GPU paths.
 ## References
 
 - [Docker Desktop WSL 2 backend](https://docs.docker.com/desktop/features/wsl/)
+- [Docker Desktop NVIDIA GPU prerequisites](https://docs.docker.com/desktop/features/gpu/)
+- [Compose GPU reservations](https://docs.docker.com/compose/how-tos/gpu-support/)
+- [ONNX Runtime CUDA/cuDNN compatibility](https://onnxruntime.ai/docs/execution-providers/CUDA-ExecutionProvider.html#requirements)
 - [Compose build configuration](https://docs.docker.com/reference/compose-file/build/)
 - [Compose bind mounts](https://docs.docker.com/reference/compose-file/services/#volumes)
 - [Compose variable interpolation](https://docs.docker.com/compose/how-tos/environment-variables/variable-interpolation/)

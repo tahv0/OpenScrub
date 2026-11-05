@@ -1,0 +1,13 @@
+# Add to compose.windows-test.yml to build this branch with NVIDIA CUDA.
+# Keep both -f arguments on subsequent build/up/run commands.
+services:
+  openscrub:
+    build:
+      dockerfile: Dockerfile.cuda
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

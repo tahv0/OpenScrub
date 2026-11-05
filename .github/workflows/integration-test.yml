@@ -33,6 +33,7 @@ jobs:
           python tools/integration_smoke.py --prepare
           docker compose version
           docker compose -f compose.windows-test.yml config --quiet
+          docker compose -f compose.windows-test.yml -f compose.windows-cuda.yml config --quiet
       - name: Build the combined source image
         run: docker compose -f compose.windows-test.yml build
       - name: Start the actual Compose service

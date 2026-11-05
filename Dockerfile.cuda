@@ -34,7 +34,13 @@ FROM ghcr.io/austinmabry/opencv-cuda:4.10.0-cu126
 
 ENV DEBIAN_FRONTEND=noninteractive \
     NVIDIA_VISIBLE_DEVICES=all \
-    NVIDIA_DRIVER_CAPABILITIES=compute,utility,video
+    NVIDIA_DRIVER_CAPABILITIES=compute,utility,video \
+    ORT_DISABLE_TELEMETRY=1
+
+# This base provides CUDA 12.6 and cuDNN 9. ORT 1.20.x supports that pair;
+# newer wheels require CUDA 12.8 or 13 and can silently initialize on CPU.
+# Keep both installs on the same version when restoring the GPU wheel.
+ARG ONNXRUNTIME_GPU_VERSION=1.20.2
 
 # dist-upgrade pulls the latest Ubuntu security patches even when the base
 # image lags. This layer is cached across builds; the weekly security
@@ -68,7 +74,7 @@ RUN grep -viE '^(opencv|numpy|onnxruntime)' requirements.txt > /tmp/req.nocv \
  # site-packages, which would shadow the base image's cuDNN and re-trigger the
  # Paddle CUDNN 5003 failure documented below. onnxruntime then loads CUDA/
  # cuDNN from the cudnn-runtime base image, the same copy Paddle uses.
- && pip install --no-cache-dir --no-deps onnxruntime-gpu \
+ && pip install --no-cache-dir --no-deps "onnxruntime-gpu==${ONNXRUNTIME_GPU_VERSION}" \
  && pip install --no-cache-dir coloredlogs flatbuffers sympy humanfriendly \
  && pip install --no-cache-dir paddleocr \
       paddlepaddle-gpu==3.2.2 \
@@ -82,7 +88,7 @@ RUN grep -viE '^(opencv|numpy|onnxruntime)' requirements.txt > /tmp/req.nocv \
  && pip install --no-cache-dir faster-whisper \
  && (pip uninstall -y onnxruntime || true) \
  && pip install --no-cache-dir --force-reinstall --no-deps \
-      onnxruntime-gpu \
+      "onnxruntime-gpu==${ONNXRUNTIME_GPU_VERSION}" \
  # NOTE: no pip cuDNN here — the cudnn-runtime base image ships the
  # matched version; a second, newer pip copy caused CUDNN error 5003
  # (EXECUTION_FAILED) at the first Paddle-GPU inference.
