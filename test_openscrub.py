@@ -3988,7 +3988,7 @@ function fetch(url){calls.push(url);return new Promise(resolve=>queue.push(resol
  elements.beImg.currentSrc='http://host/api/jobs/job/frame_at?frame=2'; elements.beImg.onload(); assert(!BE.pending); assert.equal(BE.boxes[0].i,2);
  queue[0]({ok:true,json:async()=>({frame:1,ox:0,oy:0,boxes:[{i:1,enabled:true,box:[0,0,1,1],mask_contours:[]}]})});
  await p1; assert.equal(BE.boxes[0].i,2);
- await beTogglePlay(); fills=0;elements.beVid.currentTime=.05;animation.shift()(); assert.equal(fills,0); assert.equal(calls.length,2);
+ BE.addAnchor=[4,4];BE.addFloat=[4,4];await beTogglePlay(); assert.equal(BE.addAnchor,null); assert.equal(BE.addFloat,null);fills=0;elements.beVid.currentTime=.05;animation.shift()(); assert.equal(fills,0); assert.equal(calls.length,2);
  elements.beVid.currentTime=7/120; bePlayStop(); assert(calls[2].includes('frame=7')); queue[2]({ok:true,json:async()=>({frame:7,ox:0,oy:0,boxes:[]})}); await Promise.resolve(); await Promise.resolve(); elements.beImg.currentSrc='http://host/api/jobs/job/frame_at?frame=7'; elements.beImg.onload();
  elements.beT.value='2'; beStepFrame(1); assert.equal(elements.beT.value,3); assert(calls[3].includes('frame=3'));
  console.log('PASS');
@@ -4039,3 +4039,48 @@ def test_indexed_review_detection_image_uses_sample_frame(tmp_path):
         assert abs(float(thumb_image[0,0].mean())-120)<8
     finally:
         del web.JOBS['indexed-detframe']
+
+
+def test_indexed_review_pointer_edits_wait_for_matched_frame(tmp_path):
+    import shutil
+    import openscrub_web as web
+    if not shutil.which('node'):
+        pytest.skip('node required for evaluated PAGE behavior')
+    page=web.PAGE
+    script=page[page.index('async function beScrub(){'):page.index('function zoomDet(')]
+    harness=r'''
+const assert=require('assert');let handlers={},captures=0,prompts=0,tracks=0,queue=[];
+const ctx={clearRect(){},fillRect(){},strokeRect(){},beginPath(){},moveTo(){},lineTo(){},closePath(){},fill(){},stroke(){},setLineDash(){}};
+const canvas={addEventListener(n,f){handlers[n]=f},setPointerCapture(){captures++},getBoundingClientRect(){return {left:0,top:0}},getContext(){return ctx}};
+const elements={beCv:canvas,beT:{value:2},beL:{},beImg:{clientWidth:80,naturalWidth:80,clientHeight:80},beRm:{style:{}},beTimes:{style:{}},beT0:{},beT1:{},beTrk:{classList:{remove(){}}}};
+const document={getElementById(id){return elements[id]||null}};let EN={},CUR='job';
+let BE={indexed:true,frame:1,imageFrame:1,maskFrame:1,pending:false,playing:false,fps:120,frameCount:5,t:2/120,scale:1,sel:-1,boxes:[{i:3,box:[10,10,40,40],t_start:0,t_end:1,mask_contours:[]}],ov:{},times:{},adds:[],add:false,addAnchor:null,addFloat:null,trk:false,drag:null,ox:0,oy:0,dur:1,seq:0};
+function beTLDraw(){};function prompt(){prompts++;return '0'};function beTrackGo(){tracks++};
+function fetch(){return new Promise(resolve=>queue.push(resolve))};
+''' + script + r'''
+(async()=>{
+const e=(x=20,y=20)=>({clientX:x,clientY:y,pointerId:1});beHook();
+const change=beScrub(); // both image and mask responses delayed
+handlers.pointerdown(e());assert.equal(BE.sel,-1);assert.equal(captures,0);
+BE.add=true;handlers.pointerdown(e());assert.equal(BE.addAnchor,null);assert.equal(prompts,0);
+BE.add=false;BE.trk=true;handlers.pointerdown(e());assert.equal(BE.addAnchor,null);assert.equal(tracks,0);
+elements.beImg.currentSrc='http://host/api/jobs/job/frame_at?frame=2';elements.beImg.onload();
+handlers.pointerdown(e());assert.equal(BE.addAnchor,null); // image arrived, mask delayed
+queue[0]({ok:true,json:async()=>({frame:2,ox:0,oy:0,boxes:[{i:3,enabled:true,box:[10,10,40,40],t_start:0,t_end:1,mask_contours:[]}]})});await change;
+BE.imageFrame=1;handlers.pointerdown(e());assert.equal(BE.addAnchor,null); // unmatched image and mask
+BE.imageFrame=2;BE.maskFrame=2;BE.playing=true;handlers.pointerdown(e());assert.equal(BE.addAnchor,null);
+BE.playing=false;BE.trk=false;handlers.pointerdown(e());assert.equal(BE.sel,3); // fresh hit now works
+handlers.pointerdown(e(25,25));assert(BE.drag);handlers.pointermove(e(28,28));assert(BE.pending);
+const afterFirst=BE.boxes[0].box[0];handlers.pointermove(e(31,31));assert(BE.boxes[0].box[0]>afterFirst); // valid drag continues
+BE.drag=null;BE.pending=false;BE.imageFrame=2;BE.maskFrame=2;BE.add=true;BE.sel=-1;
+handlers.pointerdown(e(12,12));assert(BE.addAnchor);elements.beT.value=3;const next=beScrub();assert.equal(BE.addAnchor,null);
+queue[1]({ok:true,json:async()=>({frame:3,ox:0,oy:0,boxes:[]})});await next;
+handlers.pointerdown(e(15,15));assert.equal(BE.addAnchor,null); // mask arrived, image delayed
+elements.beImg.currentSrc='http://host/api/jobs/job/frame_at?frame=3';elements.beImg.onload();
+handlers.pointerdown(e(15,15));assert.deepEqual(BE.addAnchor,[15,15]);
+console.log('PASS');
+})().catch(e=>{console.error(e);process.exitCode=1});
+'''
+    js=tmp_path/'pointer-harness.js';js.write_text(harness)
+    result=subprocess.run(['node',str(js)],capture_output=True,text=True,timeout=10)
+    assert result.returncode==0,result.stderr
