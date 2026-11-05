@@ -42,6 +42,7 @@ jobs:
           retention-days: 30
 
   segmentation-research:
+    if: github.run_number == 1 || contains(github.event.head_commit.message, '[model]')
     runs-on: ubuntu-latest
     timeout-minutes: 8
     env:
