@@ -1220,7 +1220,8 @@ def assign_dense_tracks(dets, max_gap=0.6, reach=1.6):
     return next_id
 
 
-def smooth_dense_tracks(dets, fps, video, cum=None, win_start=0.0, cb=None):
+def smooth_dense_tracks(dets, fps, video, cum=None, win_start=0.0, cb=None,
+                        max_frame_index=None, plate_frame_allowed=None):
     """Make each dense track leak-free from true first appearance to exit.
 
     Dense samples are instantaneous per-frame boxes; three gaps remain
@@ -1264,8 +1265,9 @@ def smooth_dense_tracks(dets, fps, video, cum=None, win_start=0.0, cb=None):
                 d.cbox[2] + d.aoff[0], d.cbox[3] + d.aoff[1])
 
     def _mk(t0, t1, sbox, ref, tid):
-        o = _off(t0)
         narrow = ref.category == "plate" and ref.frame_index >= 0
+        o = (cum[min(int(round(t0 * fps)), len(cum) - 1)]
+             if narrow and cum else _off(t0))
         return Detection(t0, t1,
                          (int(sbox[0] - o[0]), int(sbox[1] - o[1]),
                           int(sbox[2] - o[0]), int(sbox[3] - o[1])),
@@ -1366,7 +1368,12 @@ def smooth_dense_tracks(dets, fps, video, cum=None, win_start=0.0, cb=None):
         if samples[0].category == "plate" and samples[0].frame_index >= 0:
             first, last = samples[0], samples[-1]
             grace = int(round(GRACE * fps))
+            def permitted(fi):
+                return ((max_frame_index is None or fi <= max_frame_index)
+                        and (plate_frame_allowed is None or plate_frame_allowed(fi)))
             for fi in range(max(int(round(win_start * fps)), first.frame_index - grace), first.frame_index):
+                if not permitted(fi):
+                    continue
                 added.append(_mk(fi / fps, fi / fps, _screen(first), first, tid))
                 n_lead += 1
             for a, b in zip(samples, samples[1:]):
@@ -1376,9 +1383,13 @@ def smooth_dense_tracks(dets, fps, video, cum=None, win_start=0.0, cb=None):
                 A, B = _screen(a), _screen(b)
                 union = tuple(min(A[k], B[k]) if k < 2 else max(A[k], B[k]) for k in range(4))
                 for fi in range(a.frame_index + 1, b.frame_index):
+                    if not permitted(fi):
+                        continue
                     added.append(_mk(fi / fps, fi / fps, union, a, tid))
                 n_gaps += 1
             for fi in range(last.frame_index + 1, last.frame_index + grace + 1):
+                if not permitted(fi):
+                    continue
                 added.append(_mk(fi / fps, fi / fps, _screen(last), last, tid))
             continue
 
@@ -5092,18 +5103,15 @@ def _narrow_from_probability(crop, prob):
             if (missing >= 8 and cw < .5 * w and (cw > 1.5 * nominal or ch > 1.4 * nominal)
                     and any(y <= center[1] <= y + ch for center, _, _ in rows)):
                 return [], "ambiguous_text"
-            if not (2 <= cw <= 1.5 * nominal and .25 * nominal <= ch <= 1.4 * nominal and area >= 8):
+            if not (2 <= cw < .5 * w and 2 <= ch < .8 * h and area >= 8):
                 continue
             if missing < 8 or missing <= area * .15:
                 continue
             if x == 0 or y == 0 or x + cw >= w or y + ch >= h:
                 return [], "invalid_crop"
-            for center, size, angle in rows:
-                theta = np.deg2rad(angle + (90 if size[0] < size[1] else 0))
-                normal = np.array([-np.sin(theta), np.cos(theta)])
-                if (abs(np.dot(centers[i] - center, normal)) < .65 * min(size)
-                        or abs(centers[i][1] - center[1]) < .65 * min(size)):
-                    return [], "residual_text_evidence"
+            # A character-sized uncovered component anywhere in the plate
+            # can be an independent row; alignment to known rows is not proof.
+            return [], "residual_text_evidence"
     return polys, ""
 
 
@@ -7370,6 +7378,7 @@ def run_scan(args, cb=None):
                   "review the output carefully." if dense_stride > 2
                   or detect_scale < 1.0 else "."))
     idx = 0
+    last_decoded_frame = -1
     dense_now = []
     # Fast-skip: when scroll tracking is off (camera footage, face/plate/
     # manual jobs — exactly the "one person 16 minutes in" case), frames
@@ -7397,6 +7406,7 @@ def run_scan(args, cb=None):
         ok, frame = cap.read()
         if not ok:
             break
+        last_decoded_frame = idx
         cx, cy = tracker.step(frame) if track_on else (0.0, 0.0)
         cum.append((cx, cy))
 
@@ -8100,7 +8110,8 @@ def run_scan(args, cb=None):
                "through the video (the slow part of a dense scan)…")
         n_gaps, n_lead, lead_s = smooth_dense_tracks(
             detections, fps, args.video, cum=cum, win_start=win_start,
-            cb=cb)
+            cb=cb, max_frame_index=last_decoded_frame,
+            plate_frame_allowed=lambda fi: "plate" in _scope_at(fi / fps))
         if n_gaps or n_lead or lead_s:
             cb.log(f"      dense continuity: {n_gaps} flicker gap(s) "
                    f"interpolated; onsets walked back {lead_s:.2f}s total "

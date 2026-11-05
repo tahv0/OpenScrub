@@ -923,10 +923,25 @@ def _load_job_report(job):
         return json.load(f)
 
 
+def _read_exact_frame(path, index):
+    """Decode from a freshly opened stream so a misleading seek cannot shift a mask."""
+    cap = cv2.VideoCapture(path)
+    try:
+        for _ in range(index + 1):
+            ok, frame = cap.read()
+            if not ok:
+                return None
+        return frame
+    finally:
+        cap.release()
+
+
 def _frame_at(job, t, rstate, frame_index=None):
+    if frame_index is not None:
+        return _read_exact_frame(job["video"], frame_index)
     cap = cv2.VideoCapture(job["video"])
     fps = rstate["fps"]
-    cap.set(cv2.CAP_PROP_POS_FRAMES, frame_index if frame_index is not None else int(t * fps))
+    cap.set(cv2.CAP_PROP_POS_FRAMES, int(t * fps))
     ok, frame = cap.read()
     cap.release()
     return frame if ok else None
@@ -1061,11 +1076,14 @@ def _apply_detection_edits(doc, edits):
         if 0 <= i < len(doc["detections"]) and len(span) == 2:
             t0, t1 = float(span[0]), float(span[1])
             if t1 > t0 >= 0:
-                doc["detections"][i]["frame_index"] = -1
-                doc["detections"][i]["fallback_reason"] = ""
-                doc["detections"][i]["poly"] = []
-                doc["detections"][i]["poly_holes"] = []
-                doc["detections"][i]["mask_pad"] = -1
+                d = doc["detections"][i]
+                if (d.get("category") == "plate" and d.get("frame_index", -1) >= 0
+                        and (t0 != d["t_start"] or t1 != d["t_end"])):
+                    d["frame_index"] = -1
+                    d["fallback_reason"] = ""
+                    d["poly"] = []
+                    d["poly_holes"] = []
+                    d["mask_pad"] = -1
                 doc["detections"][i]["t_start"] = t0
                 doc["detections"][i]["t_end"] = t1
                 doc["detections"][i]["last_seen"] = min(
@@ -1226,19 +1244,17 @@ def job_frame_at(jid):
     t = max(0.0, float(request.args.get("t", 0)))
     path = (job["output"] if request.args.get("src") == "output"
             and job.get("output") else job["video"])
-    cap = cv2.VideoCapture(path)
     if request.args.get("frame") is not None:
         rs = _load_job_report(job)["render_state"]
         fidx = _requested_review_frame(rs)
-        cap.set(cv2.CAP_PROP_POS_FRAMES, fidx)
-        ok, frame = cap.read()
-        cap.release()
-        if not ok:
+        frame = _read_exact_frame(path, fidx)
+        if frame is None:
             abort(404)
         ok, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 82])
         if not ok:
             abort(500)
         return Response(buf.tobytes(), mimetype="image/jpeg")
+    cap = cv2.VideoCapture(path)
     # seek by TIMESTAMP, not frame index: the original upload is often VFR
     # (iPhone), where index = t*fps drifts out of sync with the CFR output
     # and can overshoot the file entirely (broken compare pane)
@@ -2574,8 +2590,8 @@ function beApplyTimes(){
 function beShowTimes(b){
  const el=document.getElementById("beTimes");
  el.style.display="inline-flex";
- document.getElementById("beT0").value=b.t_start.toFixed(1);
- document.getElementById("beT1").value=b.t_end.toFixed(1);
+ document.getElementById("beT0").value=BE.indexed?String(b.t_start):b.t_start.toFixed(1);
+ document.getElementById("beT1").value=BE.indexed?String(b.t_end):b.t_end.toFixed(1);
 }
 function beHook(){
  const cv=document.getElementById("beCv");

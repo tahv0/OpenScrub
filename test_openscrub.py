@@ -3871,6 +3871,7 @@ def test_narrow_plate_scans_every_frame_at_full_resolution(tmp_path, monkeypatch
     rows = [d for d in state['detections'] if d.category == 'plate' and d.fallback_reason == 'inference_error']
     assert [d.frame_index for d in rows] == list(range(6))
     assert len(calls) == 6 and all(shape[:2] == (80, 160) and scale == 1 for shape, scale in calls)
+    assert all(0 <= d.frame_index < 6 for d in state['detections'] if d.category == 'plate')
 
 
 def test_narrow_keeps_two_unequal_rows_and_a_hyphen():
@@ -4084,3 +4085,89 @@ console.log('PASS');
     js=tmp_path/'pointer-harness.js';js.write_text(harness)
     result=subprocess.run(['node',str(js)],capture_output=True,text=True,timeout=10)
     assert result.returncode==0,result.stderr
+
+
+def test_narrow_falls_back_for_entirely_undetected_second_row():
+    frame=np.full((120,240,3),240,np.uint8)
+    for x in (40,75,110):cv2.rectangle(frame,(x,20),(x+20,45),(20,20,20),-1)
+    prob=np.zeros((120,240),np.float32);prob[21:45,41:130]=.9
+    assert openscrub._narrow_from_probability(frame,prob)[1]==''
+    for x in (50,80,110):cv2.rectangle(frame,(x,88),(x+13,103),(20,20,20),-1)
+    polys,reason=openscrub._narrow_from_probability(frame,prob)
+    assert not polys and reason in ('residual_text_evidence','ambiguous_text')
+
+
+def test_review_time_edit_preserves_legacy_shape_and_unchanged_indexed_shape():
+    import openscrub_web as web
+    poly=[[[0,0],[1,0],[1,1]]]; holes=[[[[.2,.2],[.3,.2],[.3,.3]]]]
+    rows=[{'category':'person','t_start':0.,'t_end':1.,'poly':poly,'poly_holes':holes,'mask_pad':2},
+          {'category':'plate','frame_index':3,'fallback_reason':'','t_start':.1,'t_end':.2,'poly':poly,'poly_holes':holes,'mask_pad':0}]
+    doc={'detections':rows};web._apply_detection_edits(doc,{'time_overrides':{'0':[0,2],'1':[.1,.2]}})
+    assert rows[0]['poly']==poly and rows[0]['poly_holes']==holes and rows[0]['mask_pad']==2
+    assert rows[1]['frame_index']==3 and rows[1]['poly']==poly and rows[1]['mask_pad']==0
+    web._apply_detection_edits(doc,{'time_overrides':{'1':[.1,.5]}})
+    assert rows[1]['frame_index']==-1 and not rows[1]['poly'] and not rows[1]['poly_holes'] and rows[1]['mask_pad']==-1
+
+
+@pytest.mark.parametrize('seek_result',[True,False])
+def test_indexed_review_repairs_unreliable_seek(tmp_path,monkeypatch,seek_result):
+    import openscrub_web as web
+    video=str(tmp_path/'snap.mp4');writer=cv2.VideoWriter(video,cv2.VideoWriter_fourcc(*'mp4v'),120,(80,80))
+    for i in range(5):writer.write(np.full((80,80,3),20+i*40,np.uint8))
+    writer.release(); real=cv2.VideoCapture
+    class Unreliable:
+        def __init__(self,path):self.cap=real(path)
+        def set(self,prop,value):
+            if prop==cv2.CAP_PROP_POS_FRAMES:
+                self.cap.set(prop,0)
+                return seek_result
+            return self.cap.set(prop,value)
+        def __getattr__(self,name):return getattr(self.cap,name)
+    monkeypatch.setattr(web.cv2,'VideoCapture',Unreliable)
+    d={'t_start':3/120,'t_end':3/120,'cbox':[25,25,45,45],'category':'plate','text':'plate','frame_index':3}
+    (tmp_path/'report.json').write_text(json.dumps({'detections':[d],'render_state':{'fps':120,'cum':[[0,0]]*5,'bands':[]}}))
+    web.JOBS['snap-test']={'dir':str(tmp_path),'video':video,'options':{}}
+    try:
+        client=web.app.test_client()
+        for endpoint in ('frame_at?frame=3','detframe/0','thumb/0'):
+            response=client.get('/api/jobs/snap-test/'+endpoint); assert response.status_code==200
+            img=cv2.imdecode(np.frombuffer(response.data,np.uint8),cv2.IMREAD_COLOR)
+            assert abs(float(img[0,0].mean())-140)<8
+    finally:del web.JOBS['snap-test']
+
+
+def test_narrow_rejects_small_unobserved_row_beside_large_detected_row():
+    frame=np.full((200,300,3),240,np.uint8)
+    cv2.rectangle(frame,(70,35),(190,85),(20,20,20),-1)
+    prob=np.zeros((200,300),np.float32);prob[37:84,72:189]=.9
+    assert openscrub._narrow_from_probability(frame,prob)[1]==''
+    for x in (75,100,125):cv2.rectangle(frame,(x,160),(x+6,168),(20,20,20),-1)
+    assert openscrub._narrow_from_probability(frame,prob)[1] in ('ambiguous_text','residual_text_evidence')
+
+
+def test_narrow_tail_samples_respect_active_scan_window():
+    rows=[openscrub.Detection(2/30,2/30,(10,10,30,30),'plate','plate',1,dense=True,track=1,frame_index=2)]
+    openscrub.smooth_dense_tracks(rows,30,None,max_frame_index=5,plate_frame_allowed=lambda frame: frame<=2)
+    assert all(d.frame_index<=2 for d in rows)
+
+
+def test_indexed_review_time_fields_preserve_exact_span(tmp_path):
+    import shutil, openscrub_web as web
+    if not shutil.which('node'):pytest.skip('node required')
+    page=web.PAGE;script=page[page.index('function beShowTimes(b){'):page.index('function beHook(){')]
+    harness='''const assert=require('assert'); let BE={indexed:true};
+let els={beTimes:{style:{}},beT0:{},beT1:{}};let document={getElementById:id=>els[id]};
+'''+script+'''\nbeShowTimes({t_start:1/120,t_end:2/120});\nassert.equal(Number(els.beT0.value),1/120);assert.equal(Number(els.beT1.value),2/120);\n'''
+    file=tmp_path/'time.js';file.write_text(harness)
+    result=subprocess.run(['node',str(file)],capture_output=True,text=True,timeout=10)
+    assert result.returncode==0,result.stderr
+
+
+def test_narrow_synthesized_frame_uses_exact_scroll_offset():
+    fps=30
+    rows=[openscrub.Detection(i/fps,i/fps,(0,0,20,20),'plate','plate',1,
+                              aoff=(0,0),dense=True,track=1,frame_index=i) for i in (122,124)]
+    cum=[(i,0) for i in range(130)]
+    openscrub.smooth_dense_tracks(rows,fps,None,cum=cum,max_frame_index=129)
+    gap=next(d for d in rows if d.frame_index==123)
+    assert gap.aoff==(123,0)
