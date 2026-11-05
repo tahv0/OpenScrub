@@ -1,0 +1,64 @@
+name: Synthetic mask UI evidence
+
+on:
+  push:
+    branches: ['validation/plate-ui-evidence-*']
+  pull_request:
+    branches: ['feature/compound-redaction-masks']
+    paths: ['.github/workflows/ui-evidence.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  screenshots:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      ORT_DISABLE_TELEMETRY: '1'
+      OPENSCRUB_NO_AUTOFETCH: '1'
+      HF_HUB_DISABLE_TELEMETRY: '1'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Install browser test dependencies
+        run: |
+          python -m pip install numpy opencv-python-headless flask pytesseract rapidfuzz onnxruntime pyyaml cryptography cheroot playwright
+          python -m playwright install --with-deps chromium
+      - name: Capture upstream and feature UI
+        run: |
+          git worktree add /tmp/openscrub-before 0852b127e4beea73e5ee3973f7268c08707afcc9
+          python tools/plate_ui_evidence/capture_ui.py --repo /tmp/openscrub-before --out evidence/before
+          python tools/plate_ui_evidence/capture_ui.py --repo . --out evidence/after
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: synthetic-ui-screenshots
+          path: evidence/
+          retention-days: 30
+
+  segmentation-research:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      ORT_DISABLE_TELEMETRY: '1'
+      HF_HUB_DISABLE_TELEMETRY: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.11'
+      - name: Install lightweight inference runtime
+        run: python -m pip install 'numpy==1.26.4' 'opencv-python-headless==4.10.0.84' 'ai-edge-litert==1.4.0'
+      - name: Evaluate official pinned model on synthetic fixtures
+        run: python tools/plate_ui_evidence/validate_tflite.py --model /tmp/plate-seg.tflite --output model-evidence --threads 2
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: synthetic-segmentation-evidence
+          path: model-evidence/
+          retention-days: 30
