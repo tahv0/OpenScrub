@@ -335,7 +335,18 @@ def new_job(video_path, options, name):
     return job
 
 
+def export_filenames(job):
+    """Names used by both Save As and the regular download endpoints.
+
+    Use the actual rendered container suffix (e.g. MKV instead of MP4).
+    """
+    stem = os.path.splitext(job["name"])[0]
+    ext = os.path.splitext(job.get("output") or "")[1] or ".mp4"
+    return stem + "_redacted" + ext, stem + "_audit.json"
+
+
 def job_public(job):
+    video_name, report_name = export_filenames(job)
     return {k: job[k] for k in ("id", "name", "phase", "progress", "error",
                                 "stats")} | {
         "eta": job.get("eta"),      # .get(): jobs rehydrated from disk lack it
@@ -346,6 +357,8 @@ def job_public(job):
         "log_tail": job["log"][-30:],
         "log_len": len(job["log"]),
         "has_output": bool(job["output"] and os.path.exists(job["output"])),
+        "download_name": video_name,
+        "report_name": report_name,
     }
 
 
@@ -1690,12 +1703,8 @@ def job_download(jid):
     job = JOBS.get(jid) or abort(404)
     if not job["output"] or not os.path.exists(job["output"]):
         abort(404)
-    # download name must carry the REAL container extension: a .mkv render
-    # saved as "_redacted.mp4" looks like the format choice was ignored
-    ext = os.path.splitext(job["output"])[1] or ".mp4"
     return send_file(job["output"], as_attachment=True,
-                     download_name=os.path.splitext(job["name"])[0]
-                     + "_redacted" + ext)
+                     download_name=export_filenames(job)[0])
 
 
 @app.route("/api/jobs/<jid>/report")
@@ -1703,8 +1712,7 @@ def job_report(jid):
     job = JOBS.get(jid) or abort(404)
     return send_file(os.path.join(job["dir"], "report.json"),
                      as_attachment=True,
-                     download_name=os.path.splitext(job["name"])[0]
-                     + "_audit.json")
+                     download_name=export_filenames(job)[1])
 
 
 # ----------------------------------------------------------------------------
@@ -2066,6 +2074,9 @@ async function applyTier(id){
 }
 refreshModelPanel();renderTiers();
 let CUR=null, EN={}, MAN=[], DUR=0, POLL=null, PHIST=[], PHPH="", LOGN=0, SHELLPH=null, JOBSJSON="";
+let EXPORT_NAMES={video:null,report:null};
+// Browsers without a native file picker still get the direct download links.
+const CAN_SAVE_AS=!!(window.isSecureContext&&window.showSaveFilePicker);
 
 async function loadJobs(){
  const r=await fetch("api/jobs");
@@ -2119,9 +2130,38 @@ function shellHtml(j){
  </div>`;
 }
 
+// Open the picker before any network await: it needs a direct user gesture.
+// Stream the response to disk instead of buffering multi-GB videos in RAM.
+async function saveExportAs(kind, btn){
+ const id=CUR, name=EXPORT_NAMES[kind];
+ if(!id||!name)return;
+ let handle;
+ try{
+  handle=await window.showSaveFilePicker({suggestedName:name});
+ }catch(e){
+  if(e.name!=="AbortError")alert("Could not open Save As: "+(e.message||e));
+  return; // cancel must never start an automatic download
+ }
+ const previous=btn.textContent;
+ btn.disabled=true;btn.textContent="Saving…";
+ try{
+  const path=kind==="video"?"download":"report";
+  const response=await fetch(`api/jobs/${encodeURIComponent(id)}/${path}`);
+  if(!response.ok)throw new Error(response.status===423
+   ?"encryption vault is locked":`server returned HTTP ${response.status}`);
+  if(!response.body)throw new Error("browser did not provide a file stream");
+  await response.body.pipeTo(await handle.createWritable());
+  btn.textContent="Saved ✓";
+ }catch(e){
+  btn.textContent=previous;
+  alert("Could not save file: "+(e.message||e));
+ }finally{btn.disabled=false;}
+}
+
 async function refresh(){
  if(!CUR)return;
  const j=await (await fetch("api/jobs/"+CUR)).json();
+ EXPORT_NAMES={video:j.download_name,report:j.report_name};
  if(SHELLPH===null){
   detail.insertAdjacentHTML("afterbegin",shellHtml(j));SHELLPH="";
   const im=document.getElementById("pimg");
@@ -2188,9 +2228,22 @@ async function refresh(){
    a="";
    loadReview();
   }
-  if(j.phase=="done"&&j.has_output)
-   a=`<a href="api/jobs/${CUR}/download"><button>Download redacted video</button></a>
-    <a href="api/jobs/${CUR}/report"><button class="sec">Download audit report</button></a>
+  if(j.phase=="done"&&j.has_output){
+   const video=CAN_SAVE_AS
+    ?`<button onclick="saveExportAs('video',this)">Save redacted video as…</button>`
+    :`<a href="api/jobs/${CUR}/download"><button>Download redacted video</button></a>`;
+   const report=CAN_SAVE_AS
+    ?`<button class="sec" onclick="saveExportAs('report',this)">Save audit report as…</button>`
+    :`<a href="api/jobs/${CUR}/report"><button class="sec">Download audit report</button></a>`;
+   const downloadHint=CAN_SAVE_AS
+    ?`<div style="width:100%;font-size:12px;color:#94a3b8">
+       Download directly to your browser folder instead:
+       <a href="api/jobs/${CUR}/download">video</a> ·
+       <a href="api/jobs/${CUR}/report">audit report</a></div>`
+    :`<div style="width:100%;font-size:12px;color:#94a3b8">
+       To choose a location, enable "Ask where to save each file"
+       in your browser's download settings.</div>`;
+   a=`${video}${report}${downloadHint}
     <button class="sec" onclick="loadReview()">Re-open review</button>
     <button class="sec" onclick="loadCompare()">Compare before/after</button>
     <button class="sec" onclick="loadBoxEdit()">Preview &amp; edit blur boxes</button>
@@ -2198,6 +2251,7 @@ async function refresh(){
     sharing. This tool is best-effort, not a compliance guarantee.</div>
     <div id="compare" style="width:100%"></div>
     <div id="beslot_done" style="width:100%"></div>`;
+  }
   document.getElementById("actions").innerHTML=a;
   if(j.phase!="scanning")img.style.display="none";
  }
