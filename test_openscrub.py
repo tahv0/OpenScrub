@@ -3668,3 +3668,532 @@ def test_pending_review_masks_and_dense_selection_match_saved_state(tmp_path):
         assert not stored['poly'] and not stored['poly_holes'] and stored['mask_pad'] == -1
     finally:
         del web.JOBS['pending-test']
+def test_narrow_plate_options_validate_and_default():
+    parser = openscrub.build_parser()
+    args = openscrub._prep_args(parser.parse_args(['input.mp4']), parser)
+    assert args.plate_coverage == 'full'
+    assert args.plate_narrow_margin == 0
+    args = openscrub._prep_args(parser.parse_args(['input.mp4', '--plate-coverage', 'narrow', '--plate-narrow-margin', '1.5']), parser)
+    assert (args.plate_coverage, args.plate_narrow_margin) == ('narrow', 1.5)
+    for value in ('-1', 'nan', 'inf'):
+        with pytest.raises(SystemExit):
+            openscrub._prep_args(parser.parse_args(['input.mp4', '--plate-narrow-margin', value]), parser)
+
+
+def test_narrow_frame_identity_roundtrips_and_selects_exact_frame(tmp_path):
+    from dataclasses import asdict
+    d = openscrub.Detection(1, 1.1, (10, 10, 20, 20), 'plate', 'plate', 1,
+                            dense=True, frame_index=120, fallback_reason='inference_error')
+    p = tmp_path / 'report.json'
+    p.write_text(json.dumps([asdict(d)]))
+    loaded, _, _ = openscrub.load_report(p)
+    assert loaded[0].fallback_reason == 'inference_error'
+    assert openscrub._sample_active(loaded[0], 120, 1.0)
+    assert not openscrub._sample_active(loaded[0], 121, 121/120)
+
+
+def test_narrow_plate_detector_preserves_disconnected_regions_and_zero_margin():
+    frame = np.full((80, 220, 3), 240, np.uint8)
+    cv2.rectangle(frame, (35, 25), (55, 55), (20, 20, 20), -1)
+    cv2.rectangle(frame, (145, 25), (165, 55), (20, 20, 20), -1)
+    prob = np.zeros((80, 220), np.float32)
+    prob[27:54, 37:54] = 0.9
+    prob[27:54, 147:164] = 0.9
+    polys, reason = openscrub._narrow_from_probability(frame, prob)
+    assert not reason
+    assert len(polys) == 2
+    mask = np.zeros(frame.shape[:2], np.uint8)
+    cv2.fillPoly(mask, [np.rint(p).astype(np.int32) for p in polys], 255)
+    assert mask[40, 45] and mask[40, 155]
+    assert not mask[40, 105]
+
+
+def test_narrow_plate_detector_rejects_unverifiable_contrast():
+    frame = np.full((80, 220, 3), 240, np.uint8)
+    prob = np.zeros((80, 220), np.float32)
+    prob[27:54, 37:54] = 0.9
+    polys, reason = openscrub._narrow_from_probability(frame, prob)
+    assert not polys
+    assert reason == 'unverifiable_contrast'
+
+
+def test_narrow_localization_falls_back_on_model_failure_and_clipped_crop():
+    frame = np.full((80, 220, 3), 240, np.uint8)
+    det = openscrub.TextRegionDetector.__new__(openscrub.TextRegionDetector)
+    det.sess = None
+    assert det.find_plate(frame, (10, 10, 180, 70))[1] == 'model_unavailable'
+    assert det.find_plate(frame, (-1, 10, 180, 70))[1] == 'invalid_crop'
+    assert det.find_plate(frame, (float('nan'), 10, 180, 70))[1] == 'invalid_crop'
+
+
+def test_narrow_rejects_uncovered_glyph_and_crop_edge():
+    frame = np.full((80, 220, 3), 240, np.uint8)
+    cv2.rectangle(frame, (35, 25), (55, 55), (20, 20, 20), -1)
+    cv2.rectangle(frame, (145, 25), (165, 55), (20, 20, 20), -1)
+    prob = np.zeros((80, 220), np.float32)
+    prob[27:54, 37:54] = 0.9
+    assert openscrub._narrow_from_probability(frame, prob)[1] == 'residual_text_evidence'
+    cv2.rectangle(frame, (0, 25), (10, 55), (20, 20, 20), -1)
+    assert openscrub._narrow_from_probability(frame, prob)[1] in ('residual_text_evidence', 'invalid_crop')
+
+
+def test_narrow_gap_smoothing_never_copies_polygon():
+    square = (((0.2, .2), (.8, .2), (.8, .8), (.2, .8)),)
+    rows = [openscrub.Detection(i / 30, i / 30, (10+i, 10, 70+i, 40), 'plate', 'plate', 1,
+                                dense=True, track=5, poly=square, mask_pad=0, frame_index=i)
+            for i in (0, 3)]
+    openscrub.smooth_dense_tracks(rows, 30, None)
+    gap = [d for d in rows if d.frame_index in (1, 2)]
+    assert gap
+    assert all(not d.poly and d.mask_pad == -1 and d.fallback_reason == 'interpolated_sample' for d in gap)
+
+
+def test_narrow_review_selection_uses_frame_identity(tmp_path):
+    import openscrub_web as web
+    rows = [dict(t_start=i/120, t_end=i/120+.1, cbox=[10+i, 10, 30+i, 30],
+                 category='plate', text='plate', dense=True, track=1,
+                 frame_index=i, fallback_reason='inference_error') for i in (1, 2)]
+    (tmp_path / 'report.json').write_text(json.dumps({'detections': rows, 'render_state': {'fps': 120, 'cum': [[0, 0]] * 4, 'bands': []}}))
+    video = str(tmp_path/'review.mp4')
+    out = cv2.VideoWriter(video, cv2.VideoWriter_fourcc(*'mp4v'), 120, (80, 80))
+    for _ in range(4): out.write(np.full((80, 80, 3), 200, np.uint8))
+    out.release()
+    web.JOBS['narrow-review'] = {'dir': str(tmp_path), 'video': video, 'options': {}}
+    try:
+        boxes = web.app.test_client().get('/api/jobs/narrow-review/boxes_at?t=0.008333333333').get_json()['boxes']
+        assert [b['i'] for b in boxes] == [0]
+        assert boxes[0]['fallback_reason'] == 'inference_error'
+        items = web.app.test_client().get('/api/jobs/narrow-review/detections').get_json()['detections']
+        assert items[0]['fallback_reason'] == 'inference_error'
+    finally:
+        del web.JOBS['narrow-review']
+
+
+def test_web_narrow_settings_validate_and_forward(tmp_path):
+    import openscrub_web as web
+    job = {'video': 'input.mp4', 'dir': str(tmp_path), 'options': {'plate_coverage': 'narrow', 'plate_narrow_margin': 0}}
+    argv = web.build_args(job)
+    assert argv.plate_coverage == 'narrow'
+    assert argv.plate_narrow_margin == 0.0
+    for value in (-1, 'nan', 'inf'):
+        job['options']['plate_narrow_margin'] = value
+        with pytest.raises(ValueError):
+            web.build_args(job)
+
+
+def test_narrow_guard_rejects_low_local_contrast_despite_dark_border():
+    frame = np.full((80, 220, 3), 200, np.uint8)
+    cv2.rectangle(frame, (0, 0), (219, 79), (20, 20, 20), 2)
+    cv2.rectangle(frame, (35, 25), (55, 55), (190, 190, 190), -1)
+    frame[35, 40] = 0  # glare/noise outlier must not establish usable contrast
+    prob = np.zeros((80, 220), np.float32); prob[27:54, 37:54] = .9
+    assert openscrub._narrow_from_probability(frame, prob)[1] == 'unverifiable_contrast'
+
+
+@pytest.mark.parametrize('fps', [24, 30, 60, 120])
+def test_narrow_samples_select_current_frame_after_motion(fps):
+    previous = openscrub.Detection(10/fps, 11/fps, (0, 0, 20, 20), 'plate', 'plate', 1, dense=True, track=1, frame_index=10)
+    current = openscrub.Detection(11/fps, 12/fps, (50, 0, 70, 20), 'plate', 'plate', 1, dense=True, track=1, frame_index=11)
+    active = [d for d in (previous, current) if openscrub._sample_active(d, 11, 11/fps)]
+    assert [d.cbox for d in openscrub._dedupe_dense(active)] == [(50, 0, 70, 20)]
+
+
+def test_narrow_rejects_glyph_connected_to_occluder():
+    frame = np.full((80, 220, 3), 240, np.uint8)
+    cv2.rectangle(frame, (35, 25), (55, 55), (20, 20, 20), -1)
+    cv2.rectangle(frame, (145, 25), (155, 55), (20, 20, 20), -1)
+    cv2.rectangle(frame, (155, 0), (175, 79), (20, 20, 20), -1)
+    prob = np.zeros((80, 220), np.float32); prob[27:54, 37:54] = .9
+    assert openscrub._narrow_from_probability(frame, prob)[1] in ('residual_text_evidence', 'ambiguous_text', 'invalid_crop')
+
+
+def test_narrow_mask_padding_ignores_global_padding_and_scroll_drift():
+    square = (((0, 0), (1, 0), (1, 1), (0, 1)),)
+    d = openscrub.Detection(0, 0, (20, 20, 40, 40), 'plate', 'plate', 1, (0, 0), poly=square, mask_pad=0, frame_index=0)
+    assert openscrub._detection_pad(d, 8, (10, 10)) == 0
+    d.poly = (); d.mask_pad = -1
+    assert openscrub._detection_pad(d, 8, (10, 10)) == 9
+
+
+def test_report_summarizes_narrow_fallbacks(tmp_path):
+    parser = openscrub.build_parser()
+    args = openscrub._prep_args(parser.parse_args(['in.mp4', '--plate-coverage', 'narrow']), parser)
+    det = openscrub.Detection(0, 0, (1, 1, 8, 8), 'plate', 'plate', 1, frame_index=0, fallback_reason='model_unavailable')
+    path = tmp_path/'out.json'
+    openscrub.write_report(path, args, {'fps': 30, 'cum': [(0, 0)], 'bands': [(0, 0)], 'detections': [det]})
+    doc = json.loads(path.read_text())
+    assert doc['plate_fallbacks'] == {'model_unavailable': 1}
+    assert doc['provenance']['settings']['plate_narrow_margin'] == 0
+
+
+def test_narrow_hdr_rejected_even_when_frame_counts_match(monkeypatch):
+    class Args:
+        plate_coverage = 'narrow'
+        video = 'sdr.mp4'
+        hdr_source = 'hdr.mp4'
+    monkeypatch.setattr(openscrub, '_count_video_frames', lambda p: 99 if p == 'sdr.mp4' else 100)
+    with pytest.raises(ValueError, match='HDR'):
+        openscrub._validate_narrow_frame_alignment(Args())
+    monkeypatch.setattr(openscrub, '_count_video_frames', lambda p: 100)
+    with pytest.raises(ValueError, match='HDR'):
+        openscrub._validate_narrow_frame_alignment(Args())
+
+
+@pytest.mark.parametrize('speed', ['thorough', 'balanced', 'fast', 'fastest'])
+def test_narrow_plate_scans_every_frame_at_full_resolution(tmp_path, monkeypatch, speed):
+    path = str(tmp_path/'moving.mp4')
+    out = cv2.VideoWriter(path, cv2.VideoWriter_fourcc(*'mp4v'), 30, (160, 80))
+    for i in range(6):
+        frame = np.full((80, 160, 3), 200, np.uint8)
+        cv2.rectangle(frame, (10+i*3, 20), (70+i*3, 50), (0, 0, 0), -1)
+        out.write(frame)
+    out.release()
+    calls = []
+    class Plate:
+        INPUT = 640
+        def __init__(self, *a, **k): pass
+        def available(self): return True
+        def find(self, frame, scale):
+            calls.append((frame.shape, scale))
+            i = len(calls)-1
+            return [(10+i*3, 20, 70+i*3, 50, .9)]
+    class Text:
+        def __init__(self, *a, **k): pass
+        def available(self): return True
+        def find_plate(self, frame, box): return [], 'inference_error'
+    monkeypatch.setattr(openscrub, 'PlateDetector', Plate)
+    monkeypatch.setattr(openscrub, 'TextRegionDetector', Text)
+    parser = openscrub.build_parser()
+    args = openscrub._prep_args(parser.parse_args([path, '--categories', 'plate', '--plate-coverage', 'narrow', '--scan-speed', speed, '--tile', 'off', '--no-backtrack']), parser)
+    class CB(openscrub.Callbacks):
+        def log(self, m): pass
+    state = openscrub.run_scan(args, CB())
+    rows = [d for d in state['detections'] if d.category == 'plate' and d.fallback_reason == 'inference_error']
+    assert [d.frame_index for d in rows] == list(range(6))
+    assert len(calls) == 6 and all(shape[:2] == (80, 160) and scale == 1 for shape, scale in calls)
+    assert all(0 <= d.frame_index < 6 for d in state['detections'] if d.category == 'plate')
+
+
+def test_narrow_keeps_two_unequal_rows_and_a_hyphen():
+    frame = np.full((100, 240, 3), 240, np.uint8)
+    prob = np.zeros((100, 240), np.float32)
+    for (x1, y1, x2, y2) in [(40, 20, 60, 45), (80, 29, 91, 33), (110, 20, 130, 45), (55, 65, 68, 80)]:
+        cv2.rectangle(frame, (x1, y1), (x2, y2), (20, 20, 20), -1)
+        prob[y1+1:y2, x1+1:x2] = .9
+    polys, reason = openscrub._narrow_from_probability(frame, prob)
+    assert reason == ''
+    assert len(polys) == 4
+
+
+def test_narrow_rejects_vfr_hdr_even_when_reloading_full_default(monkeypatch):
+    class Args:
+        plate_coverage = 'full'
+        video = 'sdr.mp4'
+        original_video = 'vfr-hdr.mp4'
+        hdr_source = 'hdr.mp4'
+    monkeypatch.setattr(openscrub, '_count_video_frames', lambda _: 100)
+    monkeypatch.setattr(openscrub, 'probe_vfr', lambda _: (True, 30))
+    with pytest.raises(ValueError, match='HDR'):
+        openscrub._validate_narrow_frame_alignment(Args(), has_narrow_samples=True)
+
+
+def test_narrow_accepts_sparse_high_contrast_strokes_on_uniform_background():
+    frame = np.full((80, 220, 3), 240, np.uint8)
+    cv2.putText(frame, 'A1', (40, 53), FONT, 1.0, (20, 20, 20), 1, cv2.LINE_AA)
+    prob = np.zeros((80, 220), np.float32); prob[30:50, 43:75] = .9
+    polys, reason = openscrub._narrow_from_probability(frame, prob)
+    assert not reason
+    assert len(polys) == 1
+
+
+def test_narrow_report_settings_restore_after_reload():
+    parser = openscrub.build_parser()
+    args = parser.parse_args(['input.mp4'])
+    openscrub._restore_plate_settings(args, {'settings': {'plate_coverage': 'narrow', 'plate_narrow_margin': 1.5}})
+    assert (args.plate_coverage, args.plate_narrow_margin) == ('narrow', 1.5)
+    legacy = parser.parse_args(['input.mp4'])
+    openscrub._restore_plate_settings(legacy, {})
+    assert (legacy.plate_coverage, legacy.plate_narrow_margin) == ('full', 0)
+
+
+def test_narrow_rejects_corrupt_cached_model(tmp_path, monkeypatch):
+    (tmp_path/'text_detection_ppocrv5_mobile.onnx').write_bytes(b'x' * 10001)
+    monkeypatch.setattr(openscrub, '_model_dir', lambda: str(tmp_path))
+    detector = openscrub.TextRegionDetector(verify_hash=True)
+    assert not detector.available()
+    frame = np.full((60, 120, 3), 240, np.uint8)
+    assert detector.find_plate(frame, (10, 10, 100, 50))[1] == 'model_unavailable'
+
+
+def test_narrow_rejects_nonfinite_model_output():
+    class Session:
+        def run(self, outputs, inputs): return [np.full((1, 1, 32, 32), np.nan, np.float32)]
+    det = openscrub.TextRegionDetector.__new__(openscrub.TextRegionDetector)
+    det.sess, det._in = Session(), 'input'
+    frame = np.full((60, 120, 3), 240, np.uint8)
+    assert det.find_plate(frame, (10, 10, 100, 50))[1] == 'inference_error'
+
+
+def test_indexed_review_image_and_masks_use_same_integer_frame(tmp_path):
+    import openscrub_web as web
+    video = str(tmp_path/'indexed.mp4')
+    writer = cv2.VideoWriter(video, cv2.VideoWriter_fourcc(*'mp4v'), 120, (80, 80))
+    rows = []
+    for i in range(5):
+        writer.write(np.full((80, 80, 3), 20 + i * 40, np.uint8))
+        rows.append(dict(t_start=i/120, t_end=i/120+.1, cbox=[5+i*10, 10, 12+i*10, 20],
+                         category='plate', text='plate', dense=True, track=1, frame_index=i))
+    writer.release()
+    (tmp_path/'report.json').write_text(json.dumps({'detections':rows,'render_state':{'fps':120,'cum':[[0,0]]*5,'bands':[]}}))
+    web.JOBS['frame-index-test']={'dir':str(tmp_path),'video':video,'options':{}}
+    try:
+        client=web.app.test_client()
+        info=client.get('/api/jobs/frame-index-test/detections').get_json()
+        assert info['indexed_frames'] is True and info['frame_count']==5
+        for i in range(5):
+            response=client.get(f'/api/jobs/frame-index-test/frame_at?frame={i}')
+            image=cv2.imdecode(np.frombuffer(response.data,np.uint8),cv2.IMREAD_COLOR)
+            assert abs(float(image.mean())-(20+i*40)) < 8
+            boxes=client.post(f'/api/jobs/frame-index-test/boxes_at?frame={i}&all=1',json={}).get_json()
+            assert boxes['frame']==i and boxes['boxes'][0]['box'][0]==5+i*10
+        assert client.get('/api/jobs/frame-index-test/frame_at?frame=5').status_code==400
+        assert client.get('/api/jobs/frame-index-test/boxes_at?frame=-1').status_code==400
+    finally:
+        del web.JOBS['frame-index-test']
+
+
+def test_indexed_review_javascript_steps_and_discards_stale_masks(tmp_path):
+    import re, shutil
+    import openscrub_web as web
+    if not shutil.which('node'):
+        pytest.skip('node required for evaluated PAGE behavior')
+    page = web.PAGE
+    script = (page[page.index('async function beTogglePlay(){'):page.index('const TLC=')] +
+              page[page.index('async function beScrub(){'):page.index('function beAddMode(){')])
+    harness = r'''
+const assert=require('assert');
+let calls=[], queue=[], fills=0;
+const ctx={clearRect(){},fillRect(){fills++},strokeRect(){},beginPath(){},moveTo(){},lineTo(){},closePath(){},fill(){fills++},stroke(){},setLineDash(){}};
+let elements={beT:{value:'1'},beL:{},beRm:{style:{}},beTimes:{style:{}},beImg:{style:{}},beCv:{style:{},getContext(){return ctx}},bePlay:{},beVid:{style:{},readyState:1,clientWidth:80,videoWidth:80,currentTime:0,play:async()=>{},pause(){}}};
+let animation=[];function requestAnimationFrame(fn){animation.push(fn)};let performance={now:()=>1000};function alert(s){throw Error(s)}
+let document={getElementById(id){return elements[id]||null}}, CUR='job', EN={};
+let BE={indexed:true,fps:120,frameCount:8,frame:0,t:0,seq:0,pending:false,boxes:[],raw:[],ov:{},times:{},adds:[],scale:1,playing:false,drag:null};
+function beTLDraw(){}
+function fetch(url){calls.push(url);return new Promise(resolve=>queue.push(resolve));}
+''' + script + r'''
+(async()=>{
+ const p1=beScrub(); assert(calls[0].includes('frame=1'));
+ elements.beT.value='2'; const p2=beScrub(); assert(calls[1].includes('frame=2'));
+ queue[1]({ok:true,json:async()=>({frame:2,ox:0,oy:0,boxes:[{i:2,enabled:true,box:[20,0,30,10],mask_contours:[[[20,0],[30,0],[30,10]]]}]})});
+ await p2; assert(BE.pending); elements.beImg.currentSrc='http://host/api/jobs/job/frame_at?frame=1'; elements.beImg.onload(); assert(BE.pending);
+ elements.beImg.currentSrc='http://host/api/jobs/job/frame_at?frame=2'; elements.beImg.onload(); assert(!BE.pending); assert.equal(BE.boxes[0].i,2);
+ queue[0]({ok:true,json:async()=>({frame:1,ox:0,oy:0,boxes:[{i:1,enabled:true,box:[0,0,1,1],mask_contours:[]}]})});
+ await p1; assert.equal(BE.boxes[0].i,2);
+ BE.addAnchor=[4,4];BE.addFloat=[4,4];await beTogglePlay(); assert.equal(BE.addAnchor,null); assert.equal(BE.addFloat,null);fills=0;elements.beVid.currentTime=.05;animation.shift()(); assert.equal(fills,0); assert.equal(calls.length,2);
+ elements.beVid.currentTime=7/120; bePlayStop(); assert(calls[2].includes('frame=7')); queue[2]({ok:true,json:async()=>({frame:7,ox:0,oy:0,boxes:[]})}); await Promise.resolve(); await Promise.resolve(); elements.beImg.currentSrc='http://host/api/jobs/job/frame_at?frame=7'; elements.beImg.onload();
+ elements.beT.value='2'; beStepFrame(1); assert.equal(elements.beT.value,3); assert(calls[3].includes('frame=3'));
+ console.log('PASS');
+})().catch(e=>{console.error(e);process.exitCode=1});
+'''
+    js=tmp_path/'review-harness.js';js.write_text(harness)
+    result=subprocess.run(['node',str(js)],capture_output=True,text=True,timeout=10)
+    assert result.returncode==0, result.stderr
+
+
+def test_indexed_report_rejects_hdr_export_with_legacy_settings(tmp_path, monkeypatch):
+    from dataclasses import asdict
+    d=openscrub.Detection(0, 0, (1, 1, 10, 10), 'plate', 'plate', 1, frame_index=0)
+    report=tmp_path/'report.json'
+    report.write_text(json.dumps({'detections':[asdict(d)],'render_state':{'fps':30,'cum':[[0,0]],'bands':[]},'provenance':{}}))
+    parser=openscrub.build_parser()
+    args=openscrub._prep_args(parser.parse_args(['input.mp4','--from-report',str(report)]),parser)
+    monkeypatch.setattr(openscrub,'normalize_vfr',lambda a,cb:setattr(a,'hdr_source','hdr.mp4'))
+    with pytest.raises(ValueError,match='HDR output'):
+        openscrub.run_pipeline(args)
+
+
+def test_narrow_sdr_and_full_plate_hdr_are_allowed():
+    class Args:
+        plate_coverage='narrow'
+        video='sdr.mp4'
+        hdr_source=None
+    openscrub._validate_narrow_frame_alignment(Args())
+    Args.plate_coverage='full';Args.hdr_source='hdr.mp4'
+    openscrub._validate_narrow_frame_alignment(Args())
+
+
+def test_indexed_review_detection_image_uses_sample_frame(tmp_path):
+    import openscrub_web as web
+    video=str(tmp_path/'indexed.mp4')
+    writer=cv2.VideoWriter(video,cv2.VideoWriter_fourcc(*'mp4v'),120,(80,80))
+    for i in range(4): writer.write(np.full((80,80,3),20+i*50,np.uint8))
+    writer.release()
+    d=dict(t_start=0,t_end=.1,last_seen=0,cbox=[25,25,45,45],category='plate',text='plate',frame_index=2)
+    (tmp_path/'report.json').write_text(json.dumps({'detections':[d],'render_state':{'fps':120,'cum':[[0,0]]*4,'bands':[]}}))
+    web.JOBS['indexed-detframe']={'dir':str(tmp_path),'video':video,'options':{}}
+    try:
+        response=web.app.test_client().get('/api/jobs/indexed-detframe/detframe/0')
+        image=cv2.imdecode(np.frombuffer(response.data,np.uint8),cv2.IMREAD_COLOR)
+        assert abs(float(image[0,0].mean())-120)<8
+        thumb=web.app.test_client().get('/api/jobs/indexed-detframe/thumb/0')
+        thumb_image=cv2.imdecode(np.frombuffer(thumb.data,np.uint8),cv2.IMREAD_COLOR)
+        assert abs(float(thumb_image[0,0].mean())-120)<8
+    finally:
+        del web.JOBS['indexed-detframe']
+
+
+def test_indexed_review_pointer_edits_wait_for_matched_frame(tmp_path):
+    import shutil
+    import openscrub_web as web
+    if not shutil.which('node'):
+        pytest.skip('node required for evaluated PAGE behavior')
+    page=web.PAGE
+    script=page[page.index('async function beScrub(){'):page.index('function zoomDet(')]
+    harness=r'''
+const assert=require('assert');let handlers={},captures=0,prompts=0,tracks=0,queue=[];
+const ctx={clearRect(){},fillRect(){},strokeRect(){},beginPath(){},moveTo(){},lineTo(){},closePath(){},fill(){},stroke(){},setLineDash(){}};
+const canvas={addEventListener(n,f){handlers[n]=f},setPointerCapture(){captures++},getBoundingClientRect(){return {left:0,top:0}},getContext(){return ctx}};
+const elements={beCv:canvas,beT:{value:2},beL:{},beImg:{clientWidth:80,naturalWidth:80,clientHeight:80},beRm:{style:{}},beTimes:{style:{}},beT0:{},beT1:{},beTrk:{classList:{remove(){}}}};
+const document={getElementById(id){return elements[id]||null}};let EN={},CUR='job';
+let BE={indexed:true,frame:1,imageFrame:1,maskFrame:1,pending:false,playing:false,fps:120,frameCount:5,t:2/120,scale:1,sel:-1,boxes:[{i:3,box:[10,10,40,40],t_start:0,t_end:1,mask_contours:[]}],ov:{},times:{},adds:[],add:false,addAnchor:null,addFloat:null,trk:false,drag:null,ox:0,oy:0,dur:1,seq:0};
+function beTLDraw(){};function prompt(){prompts++;return '0'};function beTrackGo(){tracks++};
+function fetch(){return new Promise(resolve=>queue.push(resolve))};
+''' + script + r'''
+(async()=>{
+const e=(x=20,y=20)=>({clientX:x,clientY:y,pointerId:1});beHook();
+const change=beScrub(); // both image and mask responses delayed
+handlers.pointerdown(e());assert.equal(BE.sel,-1);assert.equal(captures,0);
+BE.add=true;handlers.pointerdown(e());assert.equal(BE.addAnchor,null);assert.equal(prompts,0);
+BE.add=false;BE.trk=true;handlers.pointerdown(e());assert.equal(BE.addAnchor,null);assert.equal(tracks,0);
+elements.beImg.currentSrc='http://host/api/jobs/job/frame_at?frame=2';elements.beImg.onload();
+handlers.pointerdown(e());assert.equal(BE.addAnchor,null); // image arrived, mask delayed
+queue[0]({ok:true,json:async()=>({frame:2,ox:0,oy:0,boxes:[{i:3,enabled:true,box:[10,10,40,40],t_start:0,t_end:1,mask_contours:[]}]})});await change;
+BE.imageFrame=1;handlers.pointerdown(e());assert.equal(BE.addAnchor,null); // unmatched image and mask
+BE.imageFrame=2;BE.maskFrame=2;BE.playing=true;handlers.pointerdown(e());assert.equal(BE.addAnchor,null);
+BE.playing=false;BE.trk=false;handlers.pointerdown(e());assert.equal(BE.sel,3); // fresh hit now works
+handlers.pointerdown(e(25,25));assert(BE.drag);handlers.pointermove(e(28,28));assert(BE.pending);
+const afterFirst=BE.boxes[0].box[0];handlers.pointermove(e(31,31));assert(BE.boxes[0].box[0]>afterFirst); // valid drag continues
+BE.drag=null;BE.pending=false;BE.imageFrame=2;BE.maskFrame=2;BE.add=true;BE.sel=-1;
+handlers.pointerdown(e(12,12));assert(BE.addAnchor);elements.beT.value=3;const next=beScrub();assert.equal(BE.addAnchor,null);
+queue[1]({ok:true,json:async()=>({frame:3,ox:0,oy:0,boxes:[]})});await next;
+handlers.pointerdown(e(15,15));assert.equal(BE.addAnchor,null); // mask arrived, image delayed
+elements.beImg.currentSrc='http://host/api/jobs/job/frame_at?frame=3';elements.beImg.onload();
+handlers.pointerdown(e(15,15));assert.deepEqual(BE.addAnchor,[15,15]);
+console.log('PASS');
+})().catch(e=>{console.error(e);process.exitCode=1});
+'''
+    js=tmp_path/'pointer-harness.js';js.write_text(harness)
+    result=subprocess.run(['node',str(js)],capture_output=True,text=True,timeout=10)
+    assert result.returncode==0,result.stderr
+
+
+def test_narrow_falls_back_for_entirely_undetected_second_row():
+    frame=np.full((120,240,3),240,np.uint8)
+    for x in (40,75,110):cv2.rectangle(frame,(x,20),(x+20,45),(20,20,20),-1)
+    prob=np.zeros((120,240),np.float32);prob[21:45,41:130]=.9
+    assert openscrub._narrow_from_probability(frame,prob)[1]==''
+    for x in (50,80,110):cv2.rectangle(frame,(x,88),(x+13,103),(20,20,20),-1)
+    polys,reason=openscrub._narrow_from_probability(frame,prob)
+    assert not polys and reason in ('residual_text_evidence','ambiguous_text')
+
+
+def test_review_time_edit_preserves_legacy_shape_and_unchanged_indexed_shape():
+    import openscrub_web as web
+    poly=[[[0,0],[1,0],[1,1]]]; holes=[[[[.2,.2],[.3,.2],[.3,.3]]]]
+    rows=[{'category':'person','t_start':0.,'t_end':1.,'poly':poly,'poly_holes':holes,'mask_pad':2},
+          {'category':'plate','frame_index':3,'fallback_reason':'','t_start':.1,'t_end':.2,'poly':poly,'poly_holes':holes,'mask_pad':0}]
+    doc={'detections':rows};web._apply_detection_edits(doc,{'time_overrides':{'0':[0,2],'1':[.1,.2]}})
+    assert rows[0]['poly']==poly and rows[0]['poly_holes']==holes and rows[0]['mask_pad']==2
+    assert rows[1]['frame_index']==3 and rows[1]['poly']==poly and rows[1]['mask_pad']==0
+    web._apply_detection_edits(doc,{'time_overrides':{'1':[.1,.5]}})
+    assert rows[1]['frame_index']==-1 and not rows[1]['poly'] and not rows[1]['poly_holes'] and rows[1]['mask_pad']==-1
+
+
+@pytest.mark.parametrize('seek_result',[True,False])
+def test_indexed_review_repairs_unreliable_seek(tmp_path,monkeypatch,seek_result):
+    import openscrub_web as web
+    video=str(tmp_path/'snap.mp4');writer=cv2.VideoWriter(video,cv2.VideoWriter_fourcc(*'mp4v'),120,(80,80))
+    for i in range(5):writer.write(np.full((80,80,3),20+i*40,np.uint8))
+    writer.release(); real=cv2.VideoCapture
+    class Unreliable:
+        def __init__(self,path):self.cap=real(path)
+        def set(self,prop,value):
+            if prop==cv2.CAP_PROP_POS_FRAMES:
+                self.cap.set(prop,0)
+                return seek_result
+            return self.cap.set(prop,value)
+        def __getattr__(self,name):return getattr(self.cap,name)
+    monkeypatch.setattr(web.cv2,'VideoCapture',Unreliable)
+    d={'t_start':3/120,'t_end':3/120,'cbox':[25,25,45,45],'category':'plate','text':'plate','frame_index':3}
+    (tmp_path/'report.json').write_text(json.dumps({'detections':[d],'render_state':{'fps':120,'cum':[[0,0]]*5,'bands':[]}}))
+    web.JOBS['snap-test']={'dir':str(tmp_path),'video':video,'options':{}}
+    try:
+        client=web.app.test_client()
+        for endpoint in ('frame_at?frame=3','detframe/0','thumb/0'):
+            response=client.get('/api/jobs/snap-test/'+endpoint); assert response.status_code==200
+            img=cv2.imdecode(np.frombuffer(response.data,np.uint8),cv2.IMREAD_COLOR)
+            assert abs(float(img[0,0].mean())-140)<8
+    finally:del web.JOBS['snap-test']
+
+
+def test_narrow_rejects_small_unobserved_row_beside_large_detected_row():
+    frame=np.full((200,300,3),240,np.uint8)
+    cv2.rectangle(frame,(70,35),(190,85),(20,20,20),-1)
+    prob=np.zeros((200,300),np.float32);prob[37:84,72:189]=.9
+    assert openscrub._narrow_from_probability(frame,prob)[1]==''
+    for x in (75,100,125):cv2.rectangle(frame,(x,160),(x+6,168),(20,20,20),-1)
+    assert openscrub._narrow_from_probability(frame,prob)[1] in ('ambiguous_text','residual_text_evidence')
+
+
+def test_narrow_tail_samples_respect_active_scan_window():
+    rows=[openscrub.Detection(2/30,2/30,(10,10,30,30),'plate','plate',1,dense=True,track=1,frame_index=2)]
+    openscrub.smooth_dense_tracks(rows,30,None,max_frame_index=5,plate_frame_allowed=lambda frame: frame<=2)
+    assert all(d.frame_index<=2 for d in rows)
+
+
+def test_indexed_review_time_fields_preserve_exact_span(tmp_path):
+    import shutil, openscrub_web as web
+    if not shutil.which('node'):pytest.skip('node required')
+    page=web.PAGE;script=page[page.index('function beShowTimes(b){'):page.index('function beHook(){')]
+    harness='''const assert=require('assert'); let BE={indexed:true};
+let els={beTimes:{style:{}},beT0:{},beT1:{}};let document={getElementById:id=>els[id]};
+'''+script+'''\nbeShowTimes({t_start:1/120,t_end:2/120});\nassert.equal(Number(els.beT0.value),1/120);assert.equal(Number(els.beT1.value),2/120);\n'''
+    file=tmp_path/'time.js';file.write_text(harness)
+    result=subprocess.run(['node',str(file)],capture_output=True,text=True,timeout=10)
+    assert result.returncode==0,result.stderr
+
+
+def test_narrow_synthesized_frame_uses_exact_scroll_offset():
+    fps=30
+    rows=[openscrub.Detection(i/fps,i/fps,(0,0,20,20),'plate','plate',1,
+                              aoff=(0,0),dense=True,track=1,frame_index=i) for i in (122,124)]
+    cum=[(i,0) for i in range(130)]
+    openscrub.smooth_dense_tracks(rows,fps,None,cum=cum,max_frame_index=129)
+    gap=next(d for d in rows if d.frame_index==123)
+    assert gap.aoff==(123,0)
+
+
+def test_review_playback_starts_loading_metadata_with_preload_none(tmp_path):
+    import shutil, openscrub_web as web
+    if not shutil.which('node'):
+        pytest.skip('node required for evaluated PAGE behavior')
+    page=web.PAGE
+    script=page[page.index('async function beTogglePlay(){'):page.index('const TLC=')]
+    harness=r'''
+const assert=require('assert');let loaded=0,played=0;
+const video={src:'',style:{},readyState:0,clientWidth:0,currentTime:0,
+ load(){loaded++;assert.equal(typeof this.onloadedmetadata,'function');queueMicrotask(()=>{this.readyState=1;this.onloadedmetadata()})},
+ async play(){played++},pause(){}};
+const els={beVid:video,beImg:{style:{}},beCv:{style:{}},bePlay:{}};
+let document={getElementById:id=>els[id]},BE={playing:false,indexed:true,t:0},CUR='test';
+function beDraw(){};function requestAnimationFrame(){};function alert(s){throw Error(s)}
+''' + script + r'''
+(async()=>{
+ await Promise.race([beTogglePlay(),new Promise((_,reject)=>setTimeout(()=>reject(Error('metadata loading never started')),100))]);
+ assert.equal(loaded,1);assert.equal(played,1);assert.equal(BE.playing,true);
+ console.log('PASS');
+})().catch(e=>{console.error(e);process.exitCode=1});
+'''
+    file=tmp_path/'preload.js';file.write_text(harness)
+    result=subprocess.run(['node',str(file)],capture_output=True,text=True,timeout=5)
+    assert result.returncode==0,result.stderr
