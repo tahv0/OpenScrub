@@ -116,3 +116,6 @@ Narrow mode requires constant-frame-rate alignment. Variable-frame-rate input
 is normalized before scanning. Lettering-only mode does not support HDR output;
 choose SDR output for HDR input. Pause review to inspect a specific frame and
 its mask; masks are hidden during playback.
+
+Frame-accurate review decodes from the start to verify the requested frame;
+seeking late in a long video can take longer.

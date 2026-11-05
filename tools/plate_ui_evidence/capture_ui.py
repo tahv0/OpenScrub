@@ -80,12 +80,14 @@ thread.start()
 from playwright.sync_api import sync_playwright
 
 errors=[]
+dialogs=[]
 checks={}
 try:
     with sync_playwright() as pw:
         browser=pw.chromium.launch()
         page=browser.new_page(viewport=dict(width=1440,height=1100),device_scale_factor=1)
         page.on('pageerror',lambda error:errors.append(str(error)))
+        page.on('dialog',lambda dialog:(dialogs.append(dialog.message),dialog.dismiss()))
         page.goto('http://127.0.0.1:%d/'%server.server_port,wait_until='networkidle')
         checks['title']=page.title()
         if 'OpenScrub' not in checks['title']:
@@ -155,6 +157,7 @@ try:
         page.close()
         page=browser.new_page(viewport=dict(width=390,height=844),device_scale_factor=1)
         page.on('pageerror',lambda error:errors.append(str(error)))
+        page.on('dialog',lambda dialog:(dialogs.append(dialog.message),dialog.dismiss()))
         page.goto('http://127.0.0.1:%d/'%server.server_port,wait_until='networkidle')
         page.get_by_role('link',name='synthetic-mask-review.mp4',exact=True).click()
         page.locator('#review').wait_for(state='visible')
@@ -169,6 +172,7 @@ try:
             page.close()
             page=browser.new_page(viewport=dict(width=1440,height=1100),device_scale_factor=1)
             page.on('pageerror',lambda error:errors.append(str(error)))
+            page.on('dialog',lambda dialog:(dialogs.append(dialog.message),dialog.dismiss()))
             page.goto('http://127.0.0.1:%d/'%server.server_port,wait_until='networkidle')
             page.get_by_role('link',name='synthetic-lettering.webm',exact=True).click()
             page.locator('#review').wait_for(state='visible')
@@ -191,7 +195,16 @@ try:
             page.locator('#beT').press('Home')
             page.wait_for_function('!BE.pending && BE.frame===0 && BE.maskFrame===0')
             page.locator('#bePlay').click()
-            page.wait_for_function('BE.playing && document.getElementById("beVid").currentTime>0')
+            try:
+                page.wait_for_function('BE.playing && document.getElementById("beVid").currentTime>0',timeout=5000)
+            except Exception:
+                checks['playback_failure']=page.evaluate('(()=>{const v=document.getElementById("beVid");return {playing:BE.playing,time:v.currentTime,duration:v.duration,paused:v.paused,ended:v.ended,ready:v.readyState,error:v.error?{code:v.error.code,message:v.error.message}:null,canPlay:v.canPlayType("video/webm; codecs=vp9")};})()')
+                checks['dialogs']=dialogs
+                checks['page_errors']=errors
+                (ROOT/'ui-checks.json').write_text(json.dumps(checks,indent=2))
+                page.screenshot(path=str(ROOT/'playback-failure.png'))
+                print(json.dumps(checks))
+                raise
             assert page.evaluate('(()=>{const c=document.getElementById("beCv");return c.getContext("2d").getImageData(0,0,c.width,c.height).data.some((v,i)=>i%4===3 && v>0)})()') is False
             page.locator('#bePlay').click()
             page.wait_for_function('!BE.playing && !BE.pending && BE.imageFrame===BE.frame && BE.maskFrame===BE.frame')
