@@ -3611,3 +3611,60 @@ def test_invalid_render_options_do_not_yield_a_review_mask(tmp_path, options):
         assert response.status_code >= 400
     finally:
         del web.JOBS['invalid-options-test']
+
+
+@pytest.mark.parametrize('region', [(90, 10, 110, 30), (-30, 10, -10, 30),
+                                      (10, 90, 30, 110), (10, -30, 30, -10)])
+@pytest.mark.parametrize('mode', ['box', 'blur', 'mosaic', 'inpaint'])
+def test_offscreen_silhouette_is_noop(region, mode):
+    frame = np.full((80, 80, 3), 200, np.uint8)
+    square = (((0, 0), (1, 0), (1, 1), (0, 1)),)
+    openscrub.blur_silhouette(frame, *region, mode, square, region)
+    assert np.all(frame == 200)
+
+
+def test_pending_review_masks_and_dense_selection_match_saved_state(tmp_path):
+    import openscrub_web as web
+    outer = [[[0, 0], [1, 0], [1, 1], [0, 1]]]
+    hole = [[[[.25, .25], [.75, .25], [.75, .75], [.25, .75]]]]
+    rows = [
+        {'t_start': 0, 't_end': .3, 'cbox': [10, 10, 30, 30], 'aoff': [0, 0],
+         'category': 'plate', 'text': '', 'dense': True, 'track': 3,
+         'poly': outer, 'poly_holes': hole, 'mask_pad': 0},
+        {'t_start': .2, 't_end': .5, 'cbox': [40, 10, 60, 30], 'aoff': [0, 0],
+         'category': 'face', 'text': '', 'dense': True, 'track': 3,
+         'poly': outer, 'poly_holes': hole, 'mask_pad': 0}]
+    doc = {'detections': rows, 'render_state': {'fps': 10, 'cum': [[2, 0]] * 10, 'bands': []}}
+    report = tmp_path / 'report.json'; report.write_text(json.dumps(doc))
+    video = str(tmp_path / 'pending.mp4')
+    out = cv2.VideoWriter(video, cv2.VideoWriter_fourcc(*'mp4v'), 10, (80, 80))
+    for _ in range(10): out.write(np.full((80, 80, 3), 200, np.uint8))
+    out.release()
+    web.JOBS['pending-test'] = {'dir': str(tmp_path), 'video': video,
+                                'options': {'pad': 3, 'face_shape': 'ellipse'}}
+    try:
+        c = web.app.test_client(); url = '/api/jobs/pending-test/boxes_at?t=.2&all=1'
+        initial = c.post(url, json={}).get_json()['boxes']
+        assert [b['i'] for b in initial if b['enabled']] == [1]
+        edited = c.post(url, json={'box_overrides': {'1': [45, 10, 65, 30]}}).get_json()['boxes']
+        face = next(b for b in edited if b['i'] == 1)
+        assert not face['shaped']
+        face_before_save = face['mask_contours']
+        contour = np.asarray(face['mask_contours'][0], np.int32)
+        assert min(p[0] for p in contour) == 43  # shifted 45 + scroll 2 - pad/drift 3.1
+        assert cv2.pointPolygonTest(contour, (44, 8), False) < 0  # ellipse corner
+        restored = c.post(url, json={'box_overrides': {'1': [40, 10, 60, 30]}}).get_json()['boxes']
+        face = next(b for b in restored if b['i'] == 1)
+        assert face['shaped'] and len(face['mask_contours']) == 2
+        toggled = c.post(url, json={'enabled': {'1': False}}).get_json()['boxes']
+        assert [b['i'] for b in toggled if b['enabled']] == [0]
+        assert json.loads(report.read_text()) == doc
+        c.post('/api/jobs/pending-test/detections', json={'box_overrides': {'1': [40, 10, 60, 30]}})
+        assert json.loads(report.read_text())['detections'][1]['poly_holes'] == hole
+        c.post('/api/jobs/pending-test/detections', json={'box_overrides': {'1': [45, 10, 65, 30]}})
+        saved = c.get(url).get_json()['boxes']
+        assert next(b for b in saved if b['i'] == 1)['mask_contours'] == face_before_save
+        stored = json.loads(report.read_text())['detections'][1]
+        assert not stored['poly'] and not stored['poly_holes'] and stored['mask_pad'] == -1
+    finally:
+        del web.JOBS['pending-test']

@@ -93,15 +93,48 @@ try:
             coverage.select_option('narrow')
             page.screenshot(path=str(ROOT/'narrow-settings-desktop.png'),full_page=True)
             checks['narrow_control_value']=coverage.input_value()
+            group=page.locator('#plateCoverageControls')
+            if group.count():
+                group.screenshot(path=str(ROOT/'narrow-controls.png'))
         page.get_by_role('link',name='synthetic-mask-review.mp4',exact=True).click()
         page.locator('#review').wait_for(state='visible')
         page.wait_for_function('SHELLPH === "review"')
         page.get_by_role('button',name='▶ Preview video & edit boxes (before rendering)',exact=True).click()
         page.locator('#beImg').wait_for(state='visible')
-        page.wait_for_function('document.getElementById("beImg") && document.getElementById("beImg").naturalWidth > 0 && BE.boxes.length===3')
+        page.wait_for_function('document.getElementById("beImg") && document.getElementById("beImg").naturalWidth > 0 && BE.boxes.length===3 && !BE.pending')
         checks['box_count']=page.evaluate('BE.boxes.length')
         checks['shape_contours']=page.evaluate('BE.boxes.map(x=>(x.mask_contours||[]).length)')
         page.locator('#review').screenshot(path=str(ROOT/'mask-review-desktop.png'))
+        if page.evaluate('typeof beRefresh === "function"'):
+            # Exercise actual pointer gestures and the actual read-only API.
+            report_before=page.request.get('http://127.0.0.1:%d/api/jobs/synthetic-masks/report'%server.server_port).json()
+            original=page.evaluate('BE.boxes.find(x=>x.i===2).box')
+            def drag_third(dx):
+                cv=page.locator('#beCv')
+                cv.scroll_into_view_if_needed()
+                at=cv.bounding_box()
+                p=page.evaluate('(()=>{const b=BE.boxes.find(x=>x.i===2);return {x:(b.box[0]+b.box[2])/2*BE.scale,y:(b.box[1]+b.box[3])/2*BE.scale,s:BE.scale};})()')
+                page.mouse.move(at['x']+p['x'],at['y']+p['y'])
+                page.mouse.down()
+                page.mouse.move(at['x']+p['x']+dx*p['s'],at['y']+p['y'],steps=5)
+                page.mouse.up()
+                page.wait_for_function('!BE.pending && !BE.drag')
+            drag_third(20)
+            edited=page.evaluate('BE.boxes.find(x=>x.i===2)')
+            assert not edited['shaped'] and len(edited['mask_contours'])==1
+            assert min(p[0] for ring in edited['mask_contours'] for p in ring)<edited['box'][0]
+            page.locator('#beslot').screenshot(path=str(ROOT/'edited-box-preview-desktop.png'))
+            drag_third(-20)
+            restored=page.evaluate('BE.boxes.find(x=>x.i===2)')
+            assert restored['box']==original and restored['shaped']
+            assert len(restored['mask_contours'])==3
+            report_after=page.request.get('http://127.0.0.1:%d/api/jobs/synthetic-masks/report'%server.server_port).json()
+            assert report_before==report_after
+            page.locator('#bb2').click()
+            page.wait_for_function('!BE.pending && BE.boxes.length===2')
+            page.locator('#bb2').click()
+            page.wait_for_function('!BE.pending && BE.boxes.length===3')
+            checks['pending_edits']={'changed_box_padded':True,'return_restores_hole':True,'report_unchanged':True,'toggle_refresh':True}
         canvas=page.locator('#beCv').bounding_box()
         point=page.evaluate('({x:(BE.boxes[0].box[0]+BE.boxes[0].box[2])/2*BE.scale,y:(BE.boxes[0].box[1]+BE.boxes[0].box[3])/2*BE.scale})')
         page.mouse.click(canvas['x']+point['x'],canvas['y']+point['y'])
@@ -118,7 +151,7 @@ try:
         page.wait_for_function('SHELLPH === "review"')
         page.get_by_role('button',name='▶ Preview video & edit boxes (before rendering)',exact=True).click()
         page.locator('#beImg').wait_for(state='visible')
-        page.wait_for_function('document.getElementById("beImg") && document.getElementById("beImg").naturalWidth > 0 && BE.boxes.length===3')
+        page.wait_for_function('document.getElementById("beImg") && document.getElementById("beImg").naturalWidth > 0 && BE.boxes.length===3 && !BE.pending')
         page.locator('#review').screenshot(path=str(ROOT/'mask-review-mobile.png'))
         checks['mobile_body_width']=page.evaluate('document.body.scrollWidth')
         checks['mobile_viewport_width']=390
