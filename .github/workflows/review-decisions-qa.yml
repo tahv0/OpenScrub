@@ -11,6 +11,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -40,6 +42,8 @@ jobs:
           ln -s "$GITHUB_WORKSPACE" "$RUNNER_TEMP/OpenScrub-review-ux"
           cp openscrub_web.py "$RUNNER_TEMP/redesigned_web.py"
           git show 0852b127e4beea73e5ee3973f7268c08707afcc9:openscrub_web.py > openscrub_web.py
+          python -m pytest -q -k 'not review_choices_apply_the_named_action' --junitxml="$RUNNER_TEMP/review-ux-evidence/baseline.xml" > "$RUNNER_TEMP/review-ux-evidence/baseline.log" 2>&1 || true
+          python -c 'import os,xml.etree.ElementTree as E,json,pathlib; p=pathlib.Path(os.environ["RUNNER_TEMP"])/"review-ux-evidence"; failed=lambda name:sorted(t.attrib["name"] for t in E.parse(p/name).iter("testcase") if t.find("failure") is not None or t.find("error") is not None); b,a=failed("baseline.xml"),failed("pytest.xml"); (p/"suite-comparison.json").write_text(json.dumps({"baseline_failures":b,"updated_failures":a,"new_failures":sorted(set(a)-set(b))},indent=2)); print("Baseline failures:",b); print("Updated failures:",a); assert not set(a)-set(b), "New test failures introduced"'
           python "$RUNNER_TEMP/review_ux_server.py" > "$RUNNER_TEMP/review-ux-evidence/server-before.log" 2>&1 &
           qa_server=$!
           trap 'kill "$qa_server" 2>/dev/null || true' EXIT
