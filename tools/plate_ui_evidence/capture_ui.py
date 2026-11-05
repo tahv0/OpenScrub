@@ -10,6 +10,7 @@ from pathlib import Path
 import sys
 import threading
 import time
+from urllib.parse import urljoin
 import cv2
 import numpy as np
 
@@ -64,6 +65,10 @@ if not video.exists():
         detections.append(dict(t_start=0,t_end=1.9,cbox=bx,category='plate',text='plate',confidence=1,aoff=[0,0],last_seen=0,dense=False,track=-1,person=-1,poly=poly,poly_holes=holes,mask_pad=0,enabled=True))
     doc=dict(provenance=dict(input=str(video),original_input='synthetic-mask-review.mp4',settings=dict(pad=8,mode='box')),render_state=dict(fps=10,cum=[[0,0]]*20,bands=[[0,0]]*20),detections=detections)
     (jdir/'report.json').write_text(json.dumps(doc))
+
+if hasattr(web.openscrub.TextRegionDetector,'find_plate'):
+    from narrow_ui_fixture import make_narrow_job
+    make_narrow_job(ROOT,web)
 
 web.JOBS_DIR=str(jobs)
 web.openscrub_update=None
@@ -160,6 +165,37 @@ try:
         page.locator('#review').screenshot(path=str(ROOT/'mask-review-mobile.png'))
         checks['mobile_body_width']=page.evaluate('document.body.scrollWidth')
         checks['mobile_viewport_width']=390
+        if hasattr(web.openscrub.TextRegionDetector,'find_plate'):
+            page.close()
+            page=browser.new_page(viewport=dict(width=1440,height=1100),device_scale_factor=1)
+            page.on('pageerror',lambda error:errors.append(str(error)))
+            page.goto('http://127.0.0.1:%d/'%server.server_port,wait_until='networkidle')
+            page.get_by_role('link',name='synthetic-lettering.webm',exact=True).click()
+            page.locator('#review').wait_for(state='visible')
+            page.wait_for_function('SHELLPH==="review"')
+            page.get_by_role('button',name='▶ Preview video & edit boxes (before rendering)',exact=True).click()
+            page.wait_for_function('BE.indexed && !BE.pending && BE.imageFrame===0 && BE.maskFrame===0 && BE.boxes.length===1')
+            assert page.locator('#beT').get_attribute('step')=='1'
+            page.locator('#beNext').click()
+            page.wait_for_function('!BE.pending && BE.imageFrame===1 && BE.maskFrame===1 && BE.boxes[0].box[0]===183')
+            image=page.request.get(urljoin('http://127.0.0.1:%d/'%server.server_port,page.locator('#beImg').get_attribute('src'))).body()
+            decoded=cv2.imdecode(np.frombuffer(image,np.uint8),cv2.IMREAD_COLOR)
+            assert abs(float(decoded[13:23,13:23].mean())-20)<6
+            page.locator('#beNext').click()
+            page.wait_for_function('!BE.pending && BE.imageFrame===2 && BE.maskFrame===2 && BE.boxes[0].box[0]===186')
+            page.locator('#bePrev').click()
+            page.wait_for_function('!BE.pending && BE.frame===1 && BE.maskFrame===1')
+            page.locator('#beT').press('End')
+            page.wait_for_function('!BE.pending && BE.frame===47 && BE.maskFrame===47')
+            page.locator('#review').screenshot(path=str(ROOT/'narrow-mask-review-desktop.png'))
+            page.locator('#beT').press('Home')
+            page.wait_for_function('!BE.pending && BE.frame===0 && BE.maskFrame===0')
+            page.locator('#bePlay').click()
+            page.wait_for_function('BE.playing && document.getElementById("beVid").currentTime>0')
+            assert page.evaluate('(()=>{const c=document.getElementById("beCv");return c.getContext("2d").getImageData(0,0,c.width,c.height).data.some((v,i)=>i%4===3 && v>0)})()') is False
+            page.locator('#bePlay').click()
+            page.wait_for_function('!BE.playing && !BE.pending && BE.imageFrame===BE.frame && BE.maskFrame===BE.frame')
+            checks['indexed_review']={'fps':120,'next_previous_frames':True,'image_pixel_matches_frame':True,'end_frame':47,'playback_hides_masks':True,'pause_restores_matching_mask':True}
         checks['page_errors']=errors
         (ROOT/'ui-checks.json').write_text(json.dumps(checks,indent=2))
         if errors:

@@ -199,6 +199,13 @@ details .inner .full{grid-column:1/-1}
   </div>
  </div></details>
 
+ <div id="plateCoverageControls" style="margin:8px 0">
+  <label for="plateCoverage">Plate coverage</label>
+  <select id="plateCoverage" onchange="plateCoverageChanged()"><option value="full">Full plate</option><option value="narrow">Lettering only</option></select>
+  <div id="plateMarginRow" hidden><label for="plateMargin">Extra margin (source pixels)</label>
+   <input id="plateMargin" type="number" value="0" min="0" step="any"></div>
+  <div class="mutd" style="font-size:11.5px">Lettering-only detection runs every frame and may be slower. Uncertain regions fall back to the full plate. Review all results; a missed plate cannot be protected. HDR input requires SDR output in lettering-only mode.</div>
+ </div>
  <div style="margin:8px 0 6px">
   <label for="sspeed" style="font-size:12.5px;font-weight:600">Scan speed</label>
   <select id="sspeed" onchange="speedHint()" style="width:100%;margin-top:3px">
@@ -1101,7 +1108,16 @@ const FREEDISK=+"%%FREEDISK%%"||0; // server free disk at page load (bytes,
 let MS={plate:true,person:true,plate_autofetch:true};
 fetch("/api/model_status").then(r=>r.json())
  .then(d=>{MS=Object.assign(MS,d);if(S.dur)renderCats();}).catch(()=>{});
+function plateCoverageChanged(){
+ const narrow=$("plateCoverage").value==="narrow";
+ $("plateMarginRow").hidden=!narrow; $("plateMargin").disabled=!narrow;
+}
+plateCoverageChanged();
 async function startScan(){
+ const margin=Number($("plateMargin").value);
+ if(!Number.isFinite(margin)||margin<0||$("plateMargin").value.trim()===""){
+  alert("Plate margin must be a finite, nonnegative number.");return;
+ }
  if(!S.dur){alert("Load a video first.");return;}
  if(!S.file&&!$("spath").value.trim()){alert("Choose a file or server path.");return;}
  if(S.file&&MAXUP>0&&S.file.size>MAXUP){
@@ -1151,6 +1167,7 @@ async function startScan(){
    +"NOTHING this scan.\n\nDownload one in Settings → Detection "
    +"models.\n\nStart anyway?"))return;
  const o={
+  plate_coverage:$("plateCoverage").value,plate_narrow_margin:margin,
   engine:$("engine").value,device:$("device").value,encoder:$("encoder").value,
   mode:$("mode").value,coverage:$("coverage").value,sample_interval:+$("si").value,scan_trigger:+$("st").value,
   pad:+$("pad").value,bridge_gap:+$("bgap").value,
