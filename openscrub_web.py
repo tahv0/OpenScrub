@@ -414,19 +414,28 @@ class WebCallbacks(openscrub.Callbacks):
         return self.job["cancel"].is_set()
 
 
+def _job_mask_options(job):
+    """Return the exact option values passed to the render command."""
+    options = job.get("options") or {}
+    face = options.get("face_shape")
+    return (options.get("coverage", "tight"), options.get("pad", 8),
+            face if face in ("ellipse", "rect") else "ellipse")
+
+
 def build_args(job, for_render=False):
     o = job["options"]
     jdir = job["dir"]
+    coverage, pad, face_shape = _job_mask_options(job)
     argv = [job["video"],
             "--engine", o.get("engine", "auto"),
             "--device", o.get("device", "auto"),
             "--encoder", o.get("encoder", "auto"),
             "--mode", o.get("mode", "blur"),
-            "--coverage", o.get("coverage", "tight"),
+            "--coverage", coverage,
             "--mode-map", o.get("mode_map", ""),
             "--sample-interval", str(o.get("sample_interval", 0.5)),
             "--scan-trigger", str(o.get("scan_trigger", 60)),
-            "--pad", str(o.get("pad", 8)),
+            "--pad", str(pad),
             "--bridge-gap", str(o.get("bridge_gap", 4.0)),
             "--face-expand", str(o.get("face_expand", 0.15)),
             "--face-threshold", str(o.get("face_threshold", 0.6)),
@@ -446,9 +455,7 @@ def build_args(job, for_render=False):
                               if o.get("out_quality") in
                               ("archival", "balanced", "share")
                               else "archival"),
-            "--face-shape", (o.get("face_shape")
-                             if o.get("face_shape") in ("ellipse", "rect")
-                             else "ellipse"),
+            "--face-shape", face_shape,
             "--scan-speed", (o.get("scan_speed")
                              if o.get("scan_speed") in openscrub.SCAN_SPEEDS
                              else "thorough"),
@@ -942,12 +949,6 @@ def job_detections(jid):
                                 doc["render_state"]["fps"]})
 
 
-def _review_setting(job, doc, key, default):
-    options = job.get("options") or {}
-    settings = (doc.get("provenance") or {}).get("settings") or {}
-    return options.get(key, settings.get(key, default))
-
-
 def _review_detections(job, doc):
     """Compute rendered coverage while retaining all report row indices."""
     rows = doc["detections"]
@@ -958,7 +959,13 @@ def _review_detections(job, doc):
         track=r.get("track", -1), poly=r.get("poly") or (),
         poly_holes=r.get("poly_holes") or (), mask_pad=r.get("mask_pad", -1))
         for r in rows]
-    coverage = _review_setting(job, doc, "coverage", "tight")
+    coverage, pad, _ = _job_mask_options(job)
+    if coverage not in ("tight", "box", "concealed"):
+        abort(400, description="invalid coverage option")
+    try:
+        int(str(pad))
+    except ValueError:
+        abort(400, description="invalid padding option")
     enabled_indices = [i for i, row in enumerate(rows) if row.get("enabled", True)]
     enabled = openscrub.apply_coverage([dets[i] for i in enabled_indices], coverage)
     effective = list(dets)
@@ -988,14 +995,14 @@ def _review_mask_data(d, ox, oy, shape, job, doc):
         if not np.isfinite(base) or base < 0:
             raise ValueError()
     except (ValueError, TypeError):
-        base = float(_review_setting(job, doc, "pad", 8))
+        base = int(str(_job_mask_options(job)[1]))
     anchor = d.get("aoff", (0, 0))
     pad = base + min(24.0, 0.05 * (abs(ox-anchor[0]) + abs(oy-anchor[1])))
     region = (box[0]-pad, box[1]-pad, box[2]+pad, box[3]+pad)
     if d.get("poly"):
         return openscrub.rasterize_mask(
             shape, region, d["poly"], box, pad, d.get("poly_holes") or ())
-    face_shape = _review_setting(job, doc, "face_shape", "ellipse")
+    face_shape = _job_mask_options(job)[2]
     kind = "ellipse" if d["category"] == "face" and face_shape != "rect" else "rect"
     return openscrub.rasterize_region_mask(shape, region, kind)
 
