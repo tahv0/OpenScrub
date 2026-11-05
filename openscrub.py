@@ -3077,7 +3077,7 @@ def blur_silhouette(frame, x1, y1, x2, y2, mode, polys, poly_box,
     (x1i, y1i, x2i, y2i), mask = rasterize_mask(
         frame.shape, (x1, y1, x2, y2), polys, poly_box, pad_px, poly_holes)
     rw, rh = x2i-x1i, y2i-y1i
-    if not rw or not rh:
+    if rw <= 0 or rh <= 0 or not mask.size:
         return
     roi = frame[y1i:y2i, x1i:x2i]
     if mode == "box":
