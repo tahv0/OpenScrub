@@ -12,7 +12,7 @@ Included PR snapshots:
 |---|---|---|
 | #1 | `4a6675f` | Mask review display, including supplied compound geometry |
 | #2 | `39b4ed8` | Explicit, idempotent Blur and Keep actions |
-| #3 | `77755f0` | Opt-in Narrow plate coverage with zero extra margin |
+| #3 | `a6419cc` | Opt-in Narrow plate coverage with zero extra margin |
 | #4 | `2900930` | Browser Save As for video and audit report |
 
 Automatic precise segmentation with a small model is deferred and is not
