@@ -1,0 +1,83 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const {chromium} = require(process.env.OPENSCRUB_PLAYWRIGHT || './browser-deps/node_modules/playwright');
+const root = __dirname;
+const evidence = path.join(root, 'review-ux-evidence');
+fs.mkdirSync(evidence, {recursive:true});
+
+(async () => {
+  const browser = await chromium.launch({headless:true});
+  const page = await browser.newPage({viewport:{width:1280,height:900}});
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  page.on('console', msg => {if(msg.type()==='error') errors.push(msg.text());});
+  try {
+    await page.goto('http://127.0.0.1:8384/');
+    assert.match(await page.title(), /OpenScrub/);
+    await page.getByRole('link', {name:'sample-recording.mp4', exact:true}).click();
+    await page.locator('#det0').waitFor();
+    await page.locator('#det0 img').evaluate(img => img.decode());
+    const before = process.argv.includes('--before');
+    await page.locator('#review').screenshot({path:path.join(evidence,before?'before.png':'after.png')});
+    // Regression: clicking the visible Blur action must enable blurring,
+    // including every sighting represented by this dense-track card.
+    await page.locator('#det0').getByRole('button', {name:'Blur',exact:true}).click();
+    assert.equal(await page.evaluate(()=>EN[0]), true, 'Clicking Blur must enable blurring');
+    if(before) throw new Error('Baseline unexpectedly passed the regression');
+    assert.equal(await page.evaluate(()=>EN[6]), true);
+    const card = page.locator('#det0');
+    assert.equal(await card.getByRole('button',{name:'Blur',exact:true}).getAttribute('aria-pressed'),'true');
+    assert.match(await card.innerText(), /Will be blurred/);
+    await card.getByRole('button',{name:'Blur',exact:true}).click();
+    assert.equal(await page.evaluate(()=>EN[0]), true, 'Repeated Blur is idempotent');
+    for(let i=0;i<2;i++) await card.getByRole('button',{name:'Keep visible',exact:true}).click();
+    assert.deepEqual(await page.evaluate(()=>[EN[0],EN[6]]),[false,false]);
+    assert.match(await card.innerText(), /Will stay visible/);
+    assert.equal(await card.getByRole('button',{name:'Keep visible',exact:true}).getAttribute('aria-pressed'),'true');
+    assert.equal(await card.evaluate(el=>getComputedStyle(el).opacity),'1','Kept cards remain readable');
+    await card.getByRole('button',{name:'Blur',exact:true}).focus();
+    await page.keyboard.press('Space');
+    assert.deepEqual(await page.evaluate(()=>[EN[0],EN[6]]),[true,true]);
+    assert.equal(await page.evaluate(()=>document.activeElement.getAttribute('aria-label')),'Blur','Keep focus on the activated choice');
+    assert.equal(await page.locator('#det1').getByRole('button',{name:'Keep visible',exact:true}).getAttribute('aria-pressed'),'true');
+    await page.getByRole('button',{name:'Keep all visible',exact:true}).click();
+    assert.deepEqual(await page.evaluate(()=>Object.values(EN)),[false,false,false,false,false,false,false]);
+    await page.getByRole('button',{name:'Blur all',exact:true}).click();
+    assert.deepEqual(await page.evaluate(()=>Object.values(EN)),[true,true,true,true,true,false,true]);
+    await page.locator('#det1').getByRole('button',{name:'Keep visible',exact:true}).click();
+    await page.locator('#det4').getByRole('button',{name:'Keep visible',exact:true}).click();
+    await page.locator('#review details summary').click();
+    const zone = page.locator('#det5');
+    await zone.getByRole('button',{name:'Blur',exact:true}).click();
+    assert.equal(await page.evaluate(()=>EN[5]),true);
+    await page.getByRole('button',{name:'Keep all of these visible',exact:true}).click();
+    assert.equal(await page.evaluate(()=>EN[5]),false);
+    await page.getByRole('button',{name:'Blur all of these',exact:true}).click();
+    assert.equal(await page.evaluate(()=>EN[5]),true);
+    await zone.getByRole('button',{name:'Keep visible',exact:true}).click();
+    await page.locator('#review details summary').click();
+    // Exercise the same bulk action menu used by the drag selection.
+    await page.evaluate(()=>{selSet.add(0);selSet.add(1);showSelMenu(80,window.scrollY+180);});
+    await page.locator('.selmenu').getByRole('button',{name:'Keep visible',exact:true}).click();
+    assert.deepEqual(await page.evaluate(()=>[EN[0],EN[1],EN[6]]),[false,false,false]);
+    await card.getByRole('button',{name:'Blur',exact:true}).click();
+    await page.locator('#review').screenshot({path:path.join(evidence,'after.png')});
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+    await page.setViewportSize({width:390,height:844});
+    await page.locator('#review').scrollIntoViewIfNeeded();
+    await page.evaluate(()=>window.scrollTo(0,document.getElementById('review').getBoundingClientRect().top+scrollY-10));
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'No mobile horizontal overflow');
+    await page.screenshot({path:path.join(evidence,'mobile.png')});
+    await page.setViewportSize({width:1280,height:900});
+    const expected = [true,false,true,true,false,false,true];
+    await page.getByRole('button',{name:'Save edits & render',exact:true}).click();
+    await page.waitForFunction(()=>!document.getElementById('review'));
+    const saved = JSON.parse(fs.readFileSync(path.join(root,'review-ux-fixture','report.json'),'utf8'));
+    assert.deepEqual(saved.detections.map(d=>d.enabled),expected,'Saved report must match explicit decisions');
+    assert.equal((await page.request.get('http://127.0.0.1:8384/api/jobs/review-demo')).status(),200);
+    assert.deepEqual(errors,[], 'No JavaScript or console errors');
+    fs.writeFileSync(path.join(evidence,'checks.json'),JSON.stringify({url:page.url(),viewports:['1280x900','390x844'],saved:expected,errors,passed:true},null,2));
+    console.log('PASS: direct choices, repeated clicks, grouped sightings, initial Keep, category/zone/selection bulk actions, keyboard activation, readability, mobile overflow, saved report, page identity, no browser errors.');
+  } finally { await browser.close(); }
+})().catch(error=>{console.error(error);process.exitCode=1;});

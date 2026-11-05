@@ -1,0 +1,75 @@
+name: Review decision controls QA
+on:
+  push:
+    branches: [review/decision-controls-evidence]
+    paths: [openscrub_web.py, test_openscrub.py, qa/review_ux_server.py, qa/review_ux_browser.cjs, .github/workflows/review-decisions-qa.yml]
+permissions:
+  contents: write
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install test dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg tesseract-ocr
+          python -m pip install pytest==8.3.5 flask==3.1.0 opencv-python-headless==4.11.0.86 rapidfuzz==3.12.2 pytesseract==0.3.13 pyyaml==6.0.2 'numpy<2.3' onnxruntime==1.21.0 cryptography pillow
+          npm install --no-save playwright@1.51.1
+          npx playwright install --with-deps chromium
+      - name: Run Python regression suite
+        id: suite
+        continue-on-error: true
+        run: |
+          mkdir -p "$RUNNER_TEMP/review-ux-evidence"
+          python -m pytest -q --junitxml="$RUNNER_TEMP/review-ux-evidence/pytest.xml" > "$RUNNER_TEMP/review-ux-evidence/pytest.log" 2>&1
+          cat "$RUNNER_TEMP/review-ux-evidence/pytest.log"
+      - name: Verify original failure and redesigned UI
+        env:
+          OPENSCRUB_NO_AUTOFETCH: '1'
+          OPENSCRUB_PLAYWRIGHT: ${{ github.workspace }}/node_modules/playwright
+        run: |
+          cp qa/review_ux_server.py qa/review_ux_browser.cjs "$RUNNER_TEMP/"
+          ln -s "$GITHUB_WORKSPACE" "$RUNNER_TEMP/OpenScrub-review-ux"
+          cp openscrub_web.py "$RUNNER_TEMP/redesigned_web.py"
+          git show 0852b127e4beea73e5ee3973f7268c08707afcc9:openscrub_web.py > openscrub_web.py
+          python "$RUNNER_TEMP/review_ux_server.py" > "$RUNNER_TEMP/review-ux-evidence/server-before.log" 2>&1 &
+          qa_server=$!
+          trap 'kill "$qa_server" 2>/dev/null || true' EXIT
+          for n in $(seq 1 30); do curl -fsS http://127.0.0.1:8384/ > /dev/null && break || sleep 1; done
+          if node "$RUNNER_TEMP/review_ux_browser.cjs" --before > "$RUNNER_TEMP/review-ux-evidence/before-check.log" 2>&1; then
+            echo "Expected the original UI to fail the Blur action regression"; exit 1
+          fi
+          grep -F 'Clicking Blur must enable blurring' "$RUNNER_TEMP/review-ux-evidence/before-check.log"
+          kill "$qa_server"
+          wait "$qa_server" || true
+          cp "$RUNNER_TEMP/redesigned_web.py" openscrub_web.py
+          python "$RUNNER_TEMP/review_ux_server.py" > "$RUNNER_TEMP/review-ux-evidence/server-after.log" 2>&1 &
+          qa_server=$!
+          for n in $(seq 1 30); do curl -fsS http://127.0.0.1:8384/ > /dev/null && break || sleep 1; done
+          node "$RUNNER_TEMP/review_ux_browser.cjs" | tee "$RUNNER_TEMP/review-ux-evidence/after-check.log"
+      - name: Preserve screenshots on the evidence branch
+        if: always()
+        run: |
+          mkdir -p docs/pr-evidence/review-decisions
+          cp "$RUNNER_TEMP"/review-ux-evidence/*.png docs/pr-evidence/review-decisions/ || true
+          cp "$RUNNER_TEMP"/review-ux-evidence/checks.json docs/pr-evidence/review-decisions/ || true
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add docs/pr-evidence/review-decisions
+          if ! git diff --cached --quiet; then
+            git commit -m "Capture review decision controls browser evidence"
+            git push origin HEAD:review/decision-controls-evidence
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: review-decision-controls-evidence
+          path: ${{ runner.temp }}/review-ux-evidence
