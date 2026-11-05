@@ -942,9 +942,45 @@ def job_detections(jid):
                                 doc["render_state"]["fps"]})
 
 
-def _review_mask_data(d, ox, oy, shape, job):
+def _review_setting(job, doc, key, default):
+    options = job.get("options") or {}
+    settings = (doc.get("provenance") or {}).get("settings") or {}
+    return options.get(key, settings.get(key, default))
+
+
+def _review_detections(job, doc):
+    """Compute rendered coverage while retaining all report row indices."""
+    rows = doc["detections"]
+    dets = [openscrub.Detection(
+        r["t_start"], r["t_end"], tuple(r["cbox"]), r["category"],
+        r.get("text", ""), r.get("confidence", 1.0),
+        tuple(r.get("aoff", (0, 0))), dense=r.get("dense", False),
+        track=r.get("track", -1), poly=r.get("poly") or (),
+        poly_holes=r.get("poly_holes") or (), mask_pad=r.get("mask_pad", -1))
+        for r in rows]
+    coverage = _review_setting(job, doc, "coverage", "tight")
+    enabled_indices = [i for i, row in enumerate(rows) if row.get("enabled", True)]
+    enabled = openscrub.apply_coverage([dets[i] for i in enabled_indices], coverage)
+    effective = list(dets)
+    for i, det in zip(enabled_indices, enabled):
+        effective[i] = det
+    for i, row in enumerate(rows):
+        if not row.get("enabled", True):
+            effective[i] = openscrub.apply_coverage([dets[i]], coverage)[0]
+    result = []
+    for row, det in zip(rows, effective):
+        copy = dict(row)
+        copy.update(cbox=det.cbox, poly=det.poly, poly_holes=det.poly_holes,
+                    mask_pad=det.mask_pad)
+        copy["_coverage_box"] = (coverage in ("box", "concealed") and
+                                  det.dense and det.category in ("person", "manual"))
+        result.append(copy)
+    return result
+
+
+def _review_mask_data(d, ox, oy, shape, job, doc):
     """Rasterize the effective mask at the review frame coordinates."""
-    if not d.get("poly"):
+    if not d.get("poly") and not d.get("_coverage_box"):
         return None
     box = [d["cbox"][0] + ox, d["cbox"][1] + oy,
            d["cbox"][2] + ox, d["cbox"][3] + oy]
@@ -954,17 +990,17 @@ def _review_mask_data(d, ox, oy, shape, job):
         if not np.isfinite(base) or base < 0:
             raise ValueError()
     except (ValueError, TypeError):
-        base = float(doc_pad(job))
+        base = float(_review_setting(job, doc, "pad", 8))
     anchor = d.get("aoff", (0, 0))
     pad = base + min(24.0, 0.05 * (abs(ox-anchor[0]) + abs(oy-anchor[1])))
     region, mask = openscrub.rasterize_mask(
         shape, (box[0]-pad, box[1]-pad, box[2]+pad, box[3]+pad),
-        d["poly"], box, pad, d.get("poly_holes") or ())
+        d.get("poly") or (), box, pad, d.get("poly_holes") or ())
     return region, mask
 
 
-def _review_mask(d, ox, oy, shape, job):
-    data = _review_mask_data(d, ox, oy, shape, job)
+def _review_mask(d, ox, oy, shape, job, doc):
+    data = _review_mask_data(d, ox, oy, shape, job, doc)
     if data is None:
         return []
     region, mask = data
@@ -973,17 +1009,13 @@ def _review_mask(d, ox, oy, shape, job):
              for pt in contour] for contour in contours]
 
 
-def doc_pad(job):
-    return job.get("options", {}).get("pad", 8)
-
-
 @app.route("/api/jobs/<jid>/detframe/<int:i>")
 def job_detframe(jid, i):
     """Full video frame at a real sighting of detection i, with its box
     outlined — the review lightbox."""
     job = JOBS.get(jid) or abort(404)
     doc = _load_job_report(job)
-    d = doc["detections"][i]
+    d = _review_detections(job, doc)[i]
     rs = doc["render_state"]
     tref = min(max(d.get("last_seen", d["t_start"]), d["t_start"]), d["t_end"])
     fidx = min(int(tref * rs["fps"]), len(rs["cum"]) - 1)
@@ -993,7 +1025,7 @@ def job_detframe(jid, i):
         abort(404)
     x1, y1 = int(d["cbox"][0] + ox), int(d["cbox"][1] + oy)
     x2, y2 = int(d["cbox"][2] + ox), int(d["cbox"][3] + oy)
-    data = _review_mask_data(d, ox, oy, frame.shape, job)
+    data = _review_mask_data(d, ox, oy, frame.shape, job, doc)
     if data is not None:
         region, mask = data
         xlo, ylo, xhi, yhi = region
@@ -1028,7 +1060,7 @@ def job_boxes_at(jid):
              int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)))
     cap.release()
     want_all = request.args.get("all") == "1"
-    for i, d in enumerate(doc["detections"]):
+    for i, d in enumerate(_review_detections(job, doc)):
         if not (d["t_start"] - 0.01 <= t <= d["t_end"] + 0.01):
             continue
         if not want_all and not d.get("enabled", True):
@@ -1038,7 +1070,7 @@ def job_boxes_at(jid):
                           "enabled": d.get("enabled", True),
                           "text": d.get("text", ""),
                           "shaped": bool(d.get("poly")),
-                          "mask_contours": _review_mask(d, ox, oy, shape, job),
+                          "mask_contours": _review_mask(d, ox, oy, shape, job, doc),
                           "t_start": d["t_start"], "t_end": d["t_end"],
                           "box": [d["cbox"][0] + ox, d["cbox"][1] + oy,
                                   d["cbox"][2] + ox, d["cbox"][3] + oy]})
@@ -2379,7 +2411,7 @@ function beDraw(){
   const[a1,b1,a2,b2]=b.box.map(v=>v*s);
   x.fillStyle=b.i===BE.sel?"rgba(37,99,235,.25)":"rgba(220,38,38,.22)";
   x.strokeStyle=b.i===BE.sel?"#2563eb":"#dc2626";x.lineWidth=2;
-  if(b.shaped && b.mask_contours.length){
+  if(b.mask_contours.length){
    x.beginPath();
    for(const ring of b.mask_contours){if(!ring.length)continue;
     x.moveTo(ring[0][0]*s,ring[0][1]*s);

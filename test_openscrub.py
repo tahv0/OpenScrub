@@ -3473,3 +3473,44 @@ def test_component_completely_erased_by_hole_fails_closed():
     openscrub.blur_silhouette(frame, 0, 0, 20, 20, 'box', (outer, island),
                               (0, 0, 20, 20), poly_holes=((outer,), ()))
     assert frame[5, 3, 0] == 0
+
+
+@pytest.mark.parametrize('coverage,expected_box', [
+    ('box', [10, 10, 30, 30]),
+    ('concealed', [7, 7, 32, 32]),
+])
+def test_review_uses_selected_person_coverage_without_mutating_report(tmp_path, coverage, expected_box):
+    import openscrub_web as web
+    poly = [[[0, 0], [.5, 0], [.5, 1], [0, 1]]]
+    rows = [
+        {'t_start': 0, 't_end': .1, 'cbox': [10, 10, 30, 30], 'aoff': [0, 0],
+         'category': 'person', 'text': '', 'poly': poly, 'dense': True, 'track': 1},
+        {'t_start': .2, 't_end': .3, 'cbox': [20, 10, 40, 30], 'aoff': [0, 0],
+         'category': 'person', 'text': '', 'poly': poly, 'dense': True, 'track': 1,
+         'enabled': False},
+    ]
+    doc = {'detections': rows, 'render_state': {'fps': 10, 'cum': [[0, 0]] * 4, 'bands': []},
+           'provenance': {'settings': {'coverage': coverage, 'pad': 0}}}
+    report = tmp_path / 'report.json'; report.write_text(json.dumps(doc))
+    video = str(tmp_path / 'coverage.mp4')
+    out = cv2.VideoWriter(video, cv2.VideoWriter_fourcc(*'mp4v'), 10, (64, 64))
+    for _ in range(4): out.write(np.full((64, 64, 3), 200, np.uint8))
+    out.release()
+    web.JOBS['coverage-test'] = {'dir': str(tmp_path), 'video': video, 'options': {}}
+    try:
+        client = web.app.test_client()
+        box = client.get('/api/jobs/coverage-test/boxes_at?t=0').get_json()['boxes'][0]
+        assert box['box'] == expected_box and not box['shaped']
+        assert min(p[0] for c in box['mask_contours'] for p in c) == expected_box[0]
+        response = client.get('/api/jobs/coverage-test/detframe/0')
+        assert response.status_code == 200
+        image = cv2.imdecode(np.frombuffer(response.data, np.uint8), cv2.IMREAD_COLOR)
+        assert int(image[20, 25, 2]) > int(image[20, 25, 0]) + 20
+        assert json.loads(report.read_text()) == doc
+        disabled = client.get('/api/jobs/coverage-test/boxes_at?t=.2&all=1').get_json()['boxes'][0]
+        assert disabled['i'] == 1 and not disabled['enabled']
+        web.JOBS['coverage-test']['options'] = {'coverage': 'tight', 'pad': 3}
+        override = client.get('/api/jobs/coverage-test/boxes_at?t=0').get_json()['boxes'][0]
+        assert override['shaped'] and min(p[0] for c in override['mask_contours'] for p in c) == 7
+    finally:
+        del web.JOBS['coverage-test']
