@@ -1,0 +1,18 @@
+{
+  "url": "http://127.0.0.1:8384/",
+  "viewports": [
+    "1280x900",
+    "390x844"
+  ],
+  "saved": [
+    true,
+    false,
+    true,
+    true,
+    false,
+    false,
+    true
+  ],
+  "errors": [],
+  "passed": true
+}
