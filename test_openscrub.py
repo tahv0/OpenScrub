@@ -3496,7 +3496,8 @@ def test_review_uses_selected_person_coverage_without_mutating_report(tmp_path, 
     out = cv2.VideoWriter(video, cv2.VideoWriter_fourcc(*'mp4v'), 10, (64, 64))
     for _ in range(4): out.write(np.full((64, 64, 3), 200, np.uint8))
     out.release()
-    web.JOBS['coverage-test'] = {'dir': str(tmp_path), 'video': video, 'options': {}}
+    web.JOBS['coverage-test'] = {'dir': str(tmp_path), 'video': video,
+                                 'options': {'coverage': coverage, 'pad': 0}}
     try:
         client = web.app.test_client()
         box = client.get('/api/jobs/coverage-test/boxes_at?t=0').get_json()['boxes'][0]
@@ -3540,7 +3541,8 @@ def test_review_displays_padded_box_and_face_masks(tmp_path, category, face_shap
     video = str(tmp_path / 'review.mp4')
     out = cv2.VideoWriter(video, cv2.VideoWriter_fourcc(*'mp4v'), 1, (80, 80))
     out.write(np.full((80, 80, 3), 200, np.uint8)); out.release()
-    web.JOBS['ordinary-mask-test'] = {'dir': str(tmp_path), 'video': video, 'options': {}}
+    web.JOBS['ordinary-mask-test'] = {'dir': str(tmp_path), 'video': video,
+                                      'options': {'pad': 3, 'face_shape': face_shape}}
     try:
         client = web.app.test_client()
         b = client.get('/api/jobs/ordinary-mask-test/boxes_at?t=0').get_json()['boxes'][0]
@@ -3553,3 +3555,59 @@ def test_review_displays_padded_box_and_face_masks(tmp_path, category, face_shap
         assert int(img[35, 38, 2]) > int(img[35, 38, 0]) + 20
     finally:
         del web.JOBS['ordinary-mask-test']
+
+
+@pytest.mark.parametrize('options', [{}, {'face_shape': None},
+    {'face_shape': 'invalid'}, {'face_shape': 'rect', 'pad': 2, 'coverage': 'box'}])
+def test_review_matches_render_options_despite_conflicting_provenance(tmp_path, options):
+    import openscrub_web as web
+    row = {'t_start': 0, 't_end': 1, 'cbox': [20, 20, 50, 50],
+           'aoff': [0, 0], 'category': 'face', 'text': ''}
+    person = {'t_start': 0, 't_end': 1, 'cbox': [20, 20, 50, 50], 'aoff': [0, 0],
+              'category': 'person', 'text': '', 'dense': True, 'track': 1,
+              'poly': [[[0, 0], [.5, 0], [.5, 1], [0, 1]]]}
+    doc = {'detections': [row, person], 'render_state': {'fps': 1, 'cum': [[0, 0]], 'bands': []},
+           'provenance': {'settings': {'pad': 0, 'coverage': 'concealed', 'face_shape': 'rect'}}}
+    (tmp_path / 'report.json').write_text(json.dumps(doc))
+    video = str(tmp_path / 'opts.mp4')
+    out = cv2.VideoWriter(video, cv2.VideoWriter_fourcc(*'mp4v'), 1, (80, 80))
+    out.write(np.full((80, 80, 3), 200, np.uint8)); out.release()
+    job = {'dir': str(tmp_path), 'video': video, 'options': options}
+    args = web.build_args(job, for_render=True)
+    web.JOBS['settings-test'] = job
+    try:
+        client = web.app.test_client()
+        boxes = client.get('/api/jobs/settings-test/boxes_at?t=0').get_json()['boxes']
+        b = boxes[0]
+        assert boxes[1]['shaped'] == (args.coverage == 'tight')
+        contour = np.asarray(b['mask_contours'][0], np.int32)
+        left = 20 - args.pad
+        assert min(p[0] for p in contour) == left
+        inside_corner = cv2.pointPolygonTest(contour, (left + 1, left + 1), False) >= 0
+        assert inside_corner == (args.face_shape == 'rect')
+        assert args.coverage == options.get('coverage', 'tight')
+    finally:
+        del web.JOBS['settings-test']
+
+
+@pytest.mark.parametrize('options', [
+    {'coverage': None}, {'coverage': 'invalid'}, {'pad': None}, {'pad': 'invalid'},
+])
+def test_invalid_render_options_do_not_yield_a_review_mask(tmp_path, options):
+    import openscrub_web as web
+    row = {'t_start': 0, 't_end': 1, 'cbox': [5, 5, 15, 15],
+           'category': 'face', 'text': '', 'mask_pad': 0}
+    doc = {'detections': [row], 'render_state': {'fps': 1, 'cum': [[0, 0]], 'bands': []}}
+    (tmp_path / 'report.json').write_text(json.dumps(doc))
+    video = str(tmp_path / 'invalid.mp4')
+    out = cv2.VideoWriter(video, cv2.VideoWriter_fourcc(*'mp4v'), 1, (24, 24))
+    out.write(np.full((24, 24, 3), 200, np.uint8)); out.release()
+    job = {'dir': str(tmp_path), 'video': video, 'options': options}
+    with pytest.raises((SystemExit, TypeError)):
+        web.build_args(job, for_render=True)
+    web.JOBS['invalid-options-test'] = job
+    try:
+        response = web.app.test_client().get('/api/jobs/invalid-options-test/boxes_at?t=0')
+        assert response.status_code >= 400
+    finally:
+        del web.JOBS['invalid-options-test']
