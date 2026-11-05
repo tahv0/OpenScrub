@@ -114,8 +114,13 @@ try:
                 cv.scroll_into_view_if_needed()
                 at=cv.bounding_box()
                 p=page.evaluate('(()=>{const b=BE.boxes.find(x=>x.i===2);return {x:(b.box[0]+b.box[2])/2*BE.scale,y:(b.box[1]+b.box[3])/2*BE.scale,s:BE.scale};})()')
+                # The editor selects on the first click; dragging starts
+                # on a subsequent pointerdown inside the selected guide.
+                page.mouse.click(at['x']+p['x'],at['y']+p['y'])
+                page.wait_for_function('BE.sel===2 && !BE.pending')
                 page.mouse.move(at['x']+p['x'],at['y']+p['y'])
                 page.mouse.down()
+                assert page.evaluate('BE.drag && BE.drag.kind')=='move'
                 page.mouse.move(at['x']+p['x']+dx*p['s'],at['y']+p['y'],steps=5)
                 page.mouse.up()
                 page.wait_for_function('!BE.pending && !BE.drag')
