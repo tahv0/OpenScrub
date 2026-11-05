@@ -7,6 +7,7 @@ import json
 import os
 import subprocess
 
+
 # the plate category self-heals by DOWNLOADING its model (issue #18) —
 # never from inside the test suite: e2e runs with default categories
 # would otherwise hit the network and change later tests' model state
@@ -3366,3 +3367,69 @@ def test_registry_doc_fields_refresh_but_pins_stay(monkeypatch, tmp_path):
     assert got["sha256"] == "ab" * 32
     assert got["download_url"] == "https://example.com/pinned.onnx"
     assert got["recommended"] == m0["recommended"]
+
+
+def test_review_choices_apply_the_named_action():
+    """A review action must be idempotent and update every grouped sighting.
+
+    Run the production review renderer and its emitted click handlers in
+    Node. Only the browser DOM and detection HTTP response are substituted.
+    """
+    import shutil
+    import openscrub_web as w
+
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("Node is needed to execute the review JavaScript")
+    review_js = w.APP_JS[w.APP_JS.index("async function loadReview()"):
+                         w.APP_JS.index("function thumbRetry")]
+    harness = r'''
+const assert = require('node:assert/strict');
+const vm = require('node:vm');
+const source = require('node:fs').readFileSync(0, 'utf8');
+const elements = {};
+const rows = [
+  {i:0,enabled:true,track:7,person:-1,category:'plate',text:'plate',t_start:0,t_end:1},
+  {i:1,enabled:true,track:7,person:-1,category:'plate',text:'plate',t_start:1,t_end:2},
+  {i:2,enabled:false,track:-1,person:-1,category:'plate',text:'plate',t_start:0,t_end:2}
+];
+const context = vm.createContext({assert, EN:{}, CUR:'test', DUR:0, CATDN:{},
+  fetch:async()=>({json:async()=>({duration:2,detections:rows})}),
+  showPanel(){}, initMarquee(){},
+  document:{getElementById(id){
+    if(!/^bb\d+$|^det\d+$/.test(id)) return null;
+    return elements[id] ||= {classList:{toggle(){}},querySelector(){return {};},
+      querySelectorAll(){return [{setAttribute(){}},{setAttribute(){}}];}};
+  }},
+  detail:{insertAdjacentHTML(position,html){context.html=html;}}
+});
+vm.runInContext(source, context);
+vm.runInContext(`(async()=>{
+  await loadReview();
+  const actions = [...html.matchAll(/<button\\b([^>]*)>([\\s\\S]*?)<\\/button>/g)];
+  function click(label, i){
+    const match=actions.find(([,attrs,text])=>text.replace(/<[^>]*>/g,'').trim()===label
+      && new RegExp('\\\\b(?:applyDet|toggleDet)\\\\('+i+'(?:,|\\\\))').test(attrs));
+    assert.ok(match, 'Missing '+label+' action for finding '+i);
+    const handler=match[1].match(/onclick="([^"]+)"/)[1];
+    eval(handler);
+  }
+  click('Blur',0);
+  assert.strictEqual(EN[0],true,'Clicking Blur must enable blurring');
+  assert.strictEqual(EN[1],true,'Grouped sightings must be blurred together');
+  click('Blur',0);
+  assert.strictEqual(EN[0],true,'Repeated Blur must keep blurring enabled');
+  click('Keep visible',0);
+  assert.strictEqual(EN[0],false);
+  assert.strictEqual(EN[1],false,'Grouped sightings must stay visible together');
+  click('Keep visible',0);
+  assert.strictEqual(EN[0],false,'Repeated Keep visible must keep blurring disabled');
+  click('Keep visible',2);
+  assert.strictEqual(EN[2],false,'An initially kept finding must stay visible');
+  click('Blur',2);
+  assert.strictEqual(EN[2],true,'An initially kept finding must be blur-able');
+})()`,context).catch(error=>{console.error(error);process.exitCode=1;});
+'''
+    result = subprocess.run([node, "-e", harness], input=review_js,
+                            text=True, capture_output=True)
+    assert result.returncode == 0, result.stdout + result.stderr

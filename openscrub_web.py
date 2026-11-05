@@ -1564,14 +1564,20 @@ progress{width:100%;height:12px;accent-color:var(--acc)}
 .det{background:var(--panel);border:1px solid #334155;border-radius:8px;
  padding:6px;text-align:center;font-size:12px;color:#cbd5e1}
 .det img{max-width:100%;border-radius:5px}
-.det.off{opacity:.4}
 .det.selected{outline:2px dashed #60a5fa;outline-offset:2px}
-#appzone .blurbtn{width:100%;padding:8px 0;margin-top:4px;font-weight:700;
- font-size:13px;border-radius:8px;letter-spacing:.3px;
- transition:background .15s,transform .05s}
-.blurbtn:active{transform:scale(.97)}
-#appzone .blurbtn.blur{background:#dc2626}
-#appzone .blurbtn.keep{background:#16a34a}
+.review-copy{font-size:13px;color:#cbd5e1;line-height:1.5;margin:0 0 10px}
+.det-status{font-weight:600;margin:7px 0 5px}
+.det-status.blur{color:#fca5a5}
+.det-status.keep{color:#6ee7b7}
+.det-choices{display:grid;grid-template-columns:.85fr 1.4fr;gap:4px}
+#appzone .det-choice{padding:7px 3px;min-height:34px;font-size:12px;
+ font-weight:600;border:1px solid #475569;border-radius:6px;
+ background:#1e293b;color:#cbd5e1;white-space:nowrap}
+#appzone .det-choice::before{content:"";display:inline-block;width:11px;margin-right:2px}
+#appzone .det-choice[aria-pressed="true"]::before{content:"✓"}
+#appzone .det-choice.blur[aria-pressed="true"]{background:#7f1d1d;border-color:#f87171;color:#fff}
+#appzone .det-choice.keep[aria-pressed="true"]{background:#064e3b;border-color:#34d399;color:#fff}
+#appzone .det-choice:focus-visible{outline:2px solid #60a5fa;outline-offset:2px}
 .marq{position:absolute;border:1.5px dashed #60a5fa;
  background:rgba(96,165,250,.12);z-index:50;pointer-events:none}
 .selmenu{position:absolute;z-index:60;background:#0f172a;border-radius:10px;
@@ -2506,8 +2512,10 @@ async function loadReview(){
   EN[x.i]=x.enabled;
   if(x.zone_dropped){zdrop.push(x);return;}
   (groups[x.category]=groups[x.category]||[]).push(x);});
- let html=`<div class="card" id="review"><h2>Review — red = will be blurred,
- green = kept visible. Drag a box around several to bulk-set.</h2>
+ let html=`<div class="card" id="review"><h2>Review findings</h2>
+ <p class="review-copy">Choose what happens in the output. Thumbnails show the original video;
+ boxes mark detections.<br>Changes apply after <b>Save edits &amp; render</b>.
+ Drag across cards to select several.</p>
  <div class="row" style="margin:0 0 8px">
   <button class="sec" onclick="loadBoxEdit(1)">▶ Preview video &amp; edit boxes
   (before rendering)</button></div>
@@ -2520,16 +2528,15 @@ async function loadReview(){
     (mostly logos/labels by design; open only if something real was zoned out)
    </summary>
    <div class="row" style="margin:8px 0 4px">
-    <button class="sec" onclick="setAllZd(true)">blur all of these</button>
-    <button class="sec" onclick="setAllZd(false)">keep all</button></div>
+    <button class="sec" onclick="setAllZd(true)">Blur all of these</button>
+    <button class="sec" onclick="setAllZd(false)">Keep all of these visible</button></div>
    <div class="grid3">`;
   for(const x of zdrop){
    html+=`<div class="det ${EN[x.i]?'':'off'}" id="det${x.i}" data-cat="zdrop">
     <img src="api/jobs/${CUR}/thumb/${x.i}" loading="lazy"
      style="cursor:zoom-in" onclick="zoomDet(${x.i})" onerror="thumbRetry(this)">
     <div>"${x.text}" <br>${x.t_start.toFixed(1)}–${x.t_end.toFixed(1)}s</div>
-    <button class="blurbtn ${EN[x.i]?"blur":"keep"}" id="bb${x.i}"
-     onclick="toggleDet(${x.i})">${EN[x.i]?"Blur":"Keep"}</button>
+    <div id="bb${x.i}">${detChoices(x.i)}</div>
    </div>`;
   }
   html+=`</div></details>`;
@@ -2559,18 +2566,17 @@ async function loadReview(){
   // person cards first, then everything else chronologically
   items.sort((a,b)=>((b.personcard?1:0)-(a.personcard?1:0))||a.t_start-b.t_start);
   html+=`<h3 style="margin:10px 0 6px">${CATDN[cat]||cat} <span class="badge">${items.length}</span>
-  <button class="sec" style="padding:3px 8px;font-size:12px"
-   onclick="setAll('${cat}',true)">all on</button>
-  <button class="sec" style="padding:3px 8px;font-size:12px"
-   onclick="setAll('${cat}',false)">all off</button></h3><div class="grid3">`;
+   <button class="sec" style="padding:3px 8px;font-size:12px"
+    onclick="setAll('${cat}',true)">Blur all</button>
+   <button class="sec" style="padding:3px 8px;font-size:12px"
+    onclick="setAll('${cat}',false)">Keep all visible</button></h3><div class="grid3">`;
   for(const x of items){
    html+=`<div class="det ${EN[x.i]?'':'off'}" id="det${x.i}" data-cat="${cat}">
     <img src="api/jobs/${CUR}/thumb/${x.i}"
      style="cursor:zoom-in" onclick="zoomDet(${x.i})"
      onerror="thumbRetry(this)">
     <div>${x.personcard?`<b>Person ${x.person+1}</b> — one decision for ALL their appearances`:`"${x.text}"`}${x.frames?` <span class="badge">×${x.frames} frames</span>`:""}${x.confidence?` <span class="badge" title="detector confidence — low values on a non-face thumbnail usually mean a false detection">${Math.round(x.confidence*100)}%</span>`:""} <br>${x.t_start.toFixed(1)}–${x.t_end.toFixed(1)}s</div>
-    <button class="blurbtn ${EN[x.i]?"blur":"keep"}" id="bb${x.i}"
-     onclick="toggleDet(${x.i})">${EN[x.i]?"Blur":"Keep"}</button>
+    <div id="bb${x.i}">${detChoices(x.i)}</div>
    </div>`}
   html+=`</div>`}
  html+=`</div>
@@ -2584,16 +2590,30 @@ async function loadReview(){
  initMarquee();
 }
 
+function detChoices(i){
+ const blur=!!EN[i];
+ return `<div class="det-status ${blur?"blur":"keep"}">${blur?"Will be blurred":"Will stay visible"}</div>
+  <div class="det-choices" role="group" aria-label="Output for this finding">
+   <button class="det-choice blur" aria-label="Blur" aria-pressed="${blur}"
+    onclick="applyDet(${i},true)">Blur</button>
+   <button class="det-choice keep" aria-label="Keep visible" aria-pressed="${!blur}"
+    onclick="applyDet(${i},false)">Keep visible</button>
+  </div>`;
+}
 let TRKMEM={};
 function applyDet(i,blur){
  for(const m of (TRKMEM[i]||[i]))EN[m]=blur;
  const b=document.getElementById("bb"+i),t=document.getElementById("det"+i);
- if(b){b.className="blurbtn "+(blur?"blur":"keep");
-       b.textContent=blur?"Blur":"Keep";}
+ if(b){
+  const status=b.querySelector(".det-status"),choices=b.querySelectorAll("button");
+  status.className="det-status "+(blur?"blur":"keep");
+  status.textContent=blur?"Will be blurred":"Will stay visible";
+  choices[0].setAttribute("aria-pressed",blur);
+  choices[1].setAttribute("aria-pressed",!blur);
+ }
  if(t)t.classList.toggle("off",!blur);
  if(document.getElementById("beCv")){beFilter();beDraw();}   // live sync
 }
-function toggleDet(i){applyDet(i,!EN[i]);}
 function setAll(cat,on){document.querySelectorAll(`.det[data-cat=${cat}]`)
  .forEach(el=>applyDet(+el.id.slice(3),on));}
 function thumbRetry(img){
@@ -2650,7 +2670,7 @@ function initMarquee(){
 function showSelMenu(x,y){
  menuEl=document.createElement("div");menuEl.className="selmenu";
  menuEl.innerHTML=`<span>${selSet.size} selected</span>
-  <button class="mkeep" onclick="bulkSet(false)">Keep</button>
+   <button class="mkeep" onclick="bulkSet(false)">Keep visible</button>
   <button class="mblur" onclick="bulkSet(true)">Blur</button>`;
  Object.assign(menuEl.style,{left:x+"px",top:(y+10)+"px"});
  document.body.appendChild(menuEl);
