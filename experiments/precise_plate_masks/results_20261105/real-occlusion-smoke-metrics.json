@@ -1,0 +1,242 @@
+{
+  "scope": "One independently annotated genuine physical-occlusion still; no enclosed hole or temporal validation",
+  "source_image_sha256": "f0ff367638f798308709b269c81b9323b2a9f825679a0a09e152ec0558b25058",
+  "annotation_sha256": "171a0f8f36921d5cd57439f5571c6766e1b60c7877f679060406c3da105854cb",
+  "annotation_method": "Manual visual annotation of source photograph and coordinate grid, before viewing any model output",
+  "boundary_uncertainty_radius_pixels": 14,
+  "python": "3.12.14",
+  "torch": "2.5.1+cpu",
+  "opencv": "4.10.0",
+  "cpu_threads": 2,
+  "no_real_pixels_saved": true,
+  "cases": [
+    {
+      "variant": "box_default",
+      "input_scale": 1.0,
+      "input_dimensions": [
+        2816,
+        2112
+      ],
+      "score": 0.9864234924316406,
+      "certain_visible_pixels": 2528609,
+      "certain_visible_pixels_missed": 72361,
+      "visible_patch_coverage": [
+        {
+          "id": "glyph_patch_a",
+          "pixels": 6250,
+          "masked_pixels": 6250
+        },
+        {
+          "id": "glyph_patch_b",
+          "pixels": 17100,
+          "masked_pixels": 17100
+        },
+        {
+          "id": "glyph_patch_c",
+          "pixels": 6666,
+          "masked_pixels": 6666
+        },
+        {
+          "id": "glyph_patch_d",
+          "pixels": 5460,
+          "masked_pixels": 5460
+        },
+        {
+          "id": "partial_glyph_left_sliver",
+          "pixels": 2200,
+          "masked_pixels": 0
+        }
+      ],
+      "occluder_patch_coverage": [
+        {
+          "id": "pole_upper",
+          "pixels": 14000,
+          "masked_pixels": 0
+        },
+        {
+          "id": "pole_lower",
+          "pixels": 12150,
+          "masked_pixels": 0
+        },
+        {
+          "id": "curtain_upper",
+          "pixels": 7200,
+          "masked_pixels": 0
+        }
+      ],
+      "milliseconds": 4931.573690000732,
+      "api_verified": true
+    },
+    {
+      "variant": "model_score_alternate",
+      "input_scale": 1.0,
+      "input_dimensions": [
+        2816,
+        2112
+      ],
+      "score": 0.9986560344696045,
+      "certain_visible_pixels": 2528609,
+      "certain_visible_pixels_missed": 73290,
+      "visible_patch_coverage": [
+        {
+          "id": "glyph_patch_a",
+          "pixels": 6250,
+          "masked_pixels": 6250
+        },
+        {
+          "id": "glyph_patch_b",
+          "pixels": 17100,
+          "masked_pixels": 17100
+        },
+        {
+          "id": "glyph_patch_c",
+          "pixels": 6666,
+          "masked_pixels": 6666
+        },
+        {
+          "id": "glyph_patch_d",
+          "pixels": 5460,
+          "masked_pixels": 5460
+        },
+        {
+          "id": "partial_glyph_left_sliver",
+          "pixels": 2200,
+          "masked_pixels": 0
+        }
+      ],
+      "occluder_patch_coverage": [
+        {
+          "id": "pole_upper",
+          "pixels": 14000,
+          "masked_pixels": 0
+        },
+        {
+          "id": "pole_lower",
+          "pixels": 12150,
+          "masked_pixels": 0
+        },
+        {
+          "id": "curtain_upper",
+          "pixels": 7200,
+          "masked_pixels": 0
+        }
+      ],
+      "milliseconds": 4931.573690000732,
+      "api_verified": true
+    },
+    {
+      "variant": "box_default",
+      "input_scale": 0.125,
+      "input_dimensions": [
+        352,
+        264
+      ],
+      "score": 0.9889988303184509,
+      "certain_visible_pixels": 2528609,
+      "certain_visible_pixels_missed": 72874,
+      "visible_patch_coverage": [
+        {
+          "id": "glyph_patch_a",
+          "pixels": 6250,
+          "masked_pixels": 6250
+        },
+        {
+          "id": "glyph_patch_b",
+          "pixels": 17100,
+          "masked_pixels": 17100
+        },
+        {
+          "id": "glyph_patch_c",
+          "pixels": 6666,
+          "masked_pixels": 6666
+        },
+        {
+          "id": "glyph_patch_d",
+          "pixels": 5460,
+          "masked_pixels": 5460
+        },
+        {
+          "id": "partial_glyph_left_sliver",
+          "pixels": 2200,
+          "masked_pixels": 0
+        }
+      ],
+      "occluder_patch_coverage": [
+        {
+          "id": "pole_upper",
+          "pixels": 14000,
+          "masked_pixels": 0
+        },
+        {
+          "id": "pole_lower",
+          "pixels": 12150,
+          "masked_pixels": 0
+        },
+        {
+          "id": "curtain_upper",
+          "pixels": 7200,
+          "masked_pixels": 0
+        }
+      ],
+      "milliseconds": 2972.004750999986,
+      "api_verified": true
+    },
+    {
+      "variant": "model_score_alternate",
+      "input_scale": 0.125,
+      "input_dimensions": [
+        352,
+        264
+      ],
+      "score": 1.000616192817688,
+      "certain_visible_pixels": 2528609,
+      "certain_visible_pixels_missed": 73557,
+      "visible_patch_coverage": [
+        {
+          "id": "glyph_patch_a",
+          "pixels": 6250,
+          "masked_pixels": 6250
+        },
+        {
+          "id": "glyph_patch_b",
+          "pixels": 17100,
+          "masked_pixels": 17100
+        },
+        {
+          "id": "glyph_patch_c",
+          "pixels": 6666,
+          "masked_pixels": 6666
+        },
+        {
+          "id": "glyph_patch_d",
+          "pixels": 5460,
+          "masked_pixels": 5460
+        },
+        {
+          "id": "partial_glyph_left_sliver",
+          "pixels": 2200,
+          "masked_pixels": 0
+        }
+      ],
+      "occluder_patch_coverage": [
+        {
+          "id": "pole_upper",
+          "pixels": 14000,
+          "masked_pixels": 0
+        },
+        {
+          "id": "pole_lower",
+          "pixels": 12150,
+          "masked_pixels": 0
+        },
+        {
+          "id": "curtain_upper",
+          "pixels": 7200,
+          "masked_pixels": 0
+        }
+      ],
+      "milliseconds": 2972.004750999986,
+      "api_verified": true
+    }
+  ]
+}

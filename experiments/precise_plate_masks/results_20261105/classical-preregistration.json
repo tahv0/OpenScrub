@@ -1,0 +1,39 @@
+{
+  "status": "frozen before first evaluation; no tuning against fixture truth",
+  "baseline": "OpenCV rectangular GrabCut; all FGD and PR_FGD pixels retained",
+  "candidate": "same GrabCut + one closing + bounded thin-hole recovery",
+  "grabcut_iterations": 5,
+  "rng_seed_each_inference": 1729,
+  "opencv_threads": 1,
+  "closing_radius": "max(1, round(0.0125 * min(detector_width, detector_height)))",
+  "closing_kernel": "elliptical; 2*radius+1; one closing",
+  "thin_hole_max_radius": "max(1.5, 0.04 * min(detector_width, detector_height))",
+  "hole_connectivity": 8,
+  "distance_transform": "DIST_L2 / DIST_MASK_PRECISE",
+  "components": "all retained; no largest-component filtering; closing can merge thin gaps",
+  "inference_inputs": [
+    "BGR frame",
+    "exclusive integer detector bounding box"
+  ],
+  "truth_use": "evaluation and synthetic fixture construction only",
+  "stress_variants": [
+    "original twelve fixtures",
+    "global Gaussian blur sigma=1.5, unchanged truth",
+    "global contrast x0.35 about 128, unchanged truth",
+    "detector box expanded 25% each side, unchanged image and truth",
+    "small dark occluder: circle at bbox-relative (0.72, 0.42), radius=max(2,round(0.045*short_dimension)); color=15th percentile of bbox BGR; truth updated by known synthetic disk"
+  ],
+  "timing": "one untimed warmup, one inference per input, process CPU and wall ms, one OpenCV thread",
+  "success_check": "strict visible-only objective: zero missed visible glyph/plate pixels, zero predicted background/occluder pixels, exact component/hole counts",
+  "limits": [
+    "Entirely synthetic geometry tests, not real-world validation.",
+    "Correct detector boxes isolate segmentation; no detector recall test.",
+    "No threshold sweep, validation split, oracle prompt or per-case selection.",
+    "Thin-hole rule can erase a true small occluder or narrow foreground gap.",
+    "A large enclosed occluder can be modeled as foreground by GrabCut.",
+    "Foreground/background color statistics can discard dark plate glyphs.",
+    "Temporal frames run independently; no propagation or tracking claim."
+  ],
+  "primary_reference": "https://docs.opencv.org/4.13.0/d8/d83/tutorial_py_grabcut.html",
+  "script_sha256": "8635d68062e8829fa068d3bb6a8fa10fe086142f0a42d250f77f5c4ff97d518c"
+}

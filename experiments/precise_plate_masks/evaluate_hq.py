@@ -114,10 +114,11 @@ def main():
                         for key in rows[0]["variants"][name] if key not in ("components", "holes")}
     times = [row["milliseconds"]["total"] for row in rows]
     summary = dict(scope="Synthetic rejection screen, supplied locator boxes; not real-world validation",
-                   model="Light HQ-SAM vit_tiny", source_revision=adapter.predictor.model.__class__.__name__,
-                   source_pin=result["source_revision"], checkpoint_sha256=CHECKPOINT_SHA256,
+                   model="Light HQ-SAM vit_tiny", model_class=adapter.predictor.model.__class__.__name__,
+                   source_revision=result["source_revision"], checkpoint_sha256=CHECKPOINT_SHA256,
                    checkpoint_bytes=args.checkpoint.stat().st_size,
                    python=platform.python_version(), torch=torch.__version__,
+                   opencv=cv2.__version__, numpy=np.__version__,
                    cpu_threads=2, warmup_frames=1, cases=len(rows),
                    p50_milliseconds=statistics.median(times),
                    p95_milliseconds=float(np.percentile(times, 95)),

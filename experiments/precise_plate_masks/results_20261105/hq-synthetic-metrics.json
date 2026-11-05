@@ -1,0 +1,712 @@
+{
+  "summary": {
+    "scope": "Synthetic rejection screen, supplied locator boxes; not real-world validation",
+    "model": "Light HQ-SAM vit_tiny",
+    "source_revision": "Sam",
+    "source_pin": "e696978d60352dc9a26b12631cd91781502c6546",
+    "checkpoint_sha256": "0f32c075ccdd870ae54db2f7630e7a0878ede5a2b06d05d6fe02c65a82fb7196",
+    "checkpoint_bytes": 42526881,
+    "python": "3.11.18",
+    "torch": "2.5.1+cpu",
+    "cpu_threads": 2,
+    "warmup_frames": 1,
+    "cases": 12,
+    "p50_milliseconds": 1762.8595,
+    "p95_milliseconds": 1815.3535,
+    "totals": {
+      "box_default": {
+        "visible_pixels": 126352,
+        "missed_visible_pixels": 4247,
+        "glyph_pixels": 21081,
+        "missed_glyph_pixels": 12,
+        "unwanted_pixels": 2597,
+        "occluder_pixels": 8846,
+        "occluder_pixels_redacted": 669
+      },
+      "model_score_alternate": {
+        "visible_pixels": 126352,
+        "missed_visible_pixels": 5401,
+        "glyph_pixels": 21081,
+        "missed_glyph_pixels": 13,
+        "unwanted_pixels": 1638,
+        "occluder_pixels": 8846,
+        "occluder_pixels_redacted": 489
+      },
+      "box_default_dilate3": {
+        "visible_pixels": 126352,
+        "missed_visible_pixels": 0,
+        "glyph_pixels": 21081,
+        "missed_glyph_pixels": 0,
+        "unwanted_pixels": 20983,
+        "occluder_pixels": 8846,
+        "occluder_pixels_redacted": 3409
+      }
+    },
+    "load_info": {
+      "missing_keys": [],
+      "unexpected_keys": []
+    }
+  },
+  "cases": [
+    {
+      "case": "frontal",
+      "variants": {
+        "box_default": {
+          "visible_pixels": 12610,
+          "missed_visible_pixels": 433,
+          "glyph_pixels": 2316,
+          "missed_glyph_pixels": 0,
+          "unwanted_pixels": 72,
+          "occluder_pixels": 0,
+          "occluder_pixels_redacted": 0,
+          "components": 1,
+          "holes": 0
+        },
+        "model_score_alternate": {
+          "visible_pixels": 12610,
+          "missed_visible_pixels": 574,
+          "glyph_pixels": 2316,
+          "missed_glyph_pixels": 0,
+          "unwanted_pixels": 0,
+          "occluder_pixels": 0,
+          "occluder_pixels_redacted": 0,
+          "components": 1,
+          "holes": 0
+        },
+        "box_default_dilate3": {
+          "visible_pixels": 12610,
+          "missed_visible_pixels": 0,
+          "glyph_pixels": 2316,
+          "missed_glyph_pixels": 0,
+          "unwanted_pixels": 1304,
+          "occluder_pixels": 0,
+          "occluder_pixels_redacted": 0,
+          "components": 1,
+          "holes": 0
+        }
+      },
+      "model_scores": [
+        0.9828349947929382,
+        0.9894182682037354,
+        1.0027567148208618,
+        0.9743224382400513
+      ],
+      "alternate_index": 2,
+      "milliseconds": {
+        "encode": 1528.799,
+        "decode_and_postprocess": 290.201,
+        "total": 1819.0
+      },
+      "api_verified": true,
+      "expected_topology": {
+        "components": 1,
+        "holes": 0
+      }
+    },
+    {
+      "case": "rotated",
+      "variants": {
+        "box_default": {
+          "visible_pixels": 12687,
+          "missed_visible_pixels": 42,
+          "glyph_pixels": 2353,
+          "missed_glyph_pixels": 0,
+          "unwanted_pixels": 1650,
+          "occluder_pixels": 0,
+          "occluder_pixels_redacted": 0,
+          "components": 10,
+          "holes": 0
+        },
+        "model_score_alternate": {
+          "visible_pixels": 12687,
+          "missed_visible_pixels": 111,
+          "glyph_pixels": 2353,
+          "missed_glyph_pixels": 0,
+          "unwanted_pixels": 1122,
+          "occluder_pixels": 0,
+          "occluder_pixels_redacted": 0,
+          "components": 1,
+          "holes": 0
+        },
+        "box_default_dilate3": {
+          "visible_pixels": 12687,
+          "missed_visible_pixels": 0,
+          "glyph_pixels": 2353,
+          "missed_glyph_pixels": 0,
+          "unwanted_pixels": 5251,
+          "occluder_pixels": 0,
+          "occluder_pixels_redacted": 0,
+          "components": 2,
+          "holes": 1
+        }
+      },
+      "model_scores": [
+        0.865400493144989,
+        0.8972620368003845,
+        0.868628978729248,
+        0.8683806657791138
+      ],
+      "alternate_index": 1,
+      "milliseconds": {
+        "encode": 1450.918,
+        "decode_and_postprocess": 340.491,
+        "total": 1791.409
+      },
+      "api_verified": true,
+      "expected_topology": {
+        "components": 1,
+        "holes": 0
+      }
+    },
+    {
+      "case": "perspective",
+      "variants": {
+        "box_default": {
+          "visible_pixels": 9937,
+          "missed_visible_pixels": 172,
+          "glyph_pixels": 1890,
+          "missed_glyph_pixels": 0,
+          "unwanted_pixels": 0,
+          "occluder_pixels": 0,
+          "occluder_pixels_redacted": 0,
+          "components": 1,
+          "holes": 0
+        },
+        "model_score_alternate": {
+          "visible_pixels": 9937,
+          "missed_visible_pixels": 247,
+          "glyph_pixels": 1890,
+          "missed_glyph_pixels": 0,
+          "unwanted_pixels": 0,
+          "occluder_pixels": 0,
+          "occluder_pixels_redacted": 0,
+          "components": 1,
+          "holes": 0
+        },
+        "box_default_dilate3": {
+          "visible_pixels": 9937,
+          "missed_visible_pixels": 0,
+          "glyph_pixels": 1890,
+          "missed_glyph_pixels": 0,
+          "unwanted_pixels": 1419,
+          "occluder_pixels": 0,
+          "occluder_pixels_redacted": 0,
+          "components": 1,
+          "holes": 0
+        }
+      },
+      "model_scores": [
+        0.9868868589401245,
+        0.9909086227416992,
+        1.0036559104919434,
+        0.9651442766189575
+      ],
+      "alternate_index": 2,
+      "milliseconds": {
+        "encode": 1544.962,
+        "decode_and_postprocess": 267.408,
+        "total": 1812.37
+      },
+      "api_verified": true,
+      "expected_topology": {
+        "components": 1,
+        "holes": 0
+      }
+    },
+    {
+      "case": "disconnected_cross_occlusion",
+      "variants": {
+        "box_default": {
+          "visible_pixels": 9275,
+          "missed_visible_pixels": 743,
+          "glyph_pixels": 1320,
+          "missed_glyph_pixels": 12,
+          "unwanted_pixels": 82,
+          "occluder_pixels": 3335,
+          "occluder_pixels_redacted": 79,
+          "components": 5,
+          "holes": 0
+        },
+        "model_score_alternate": {
+          "visible_pixels": 9275,
+          "missed_visible_pixels": 788,
+          "glyph_pixels": 1320,
+          "missed_glyph_pixels": 13,
+          "unwanted_pixels": 33,
+          "occluder_pixels": 3335,
+          "occluder_pixels_redacted": 32,
+          "components": 5,
+          "holes": 0
+        },
+        "box_default_dilate3": {
+          "visible_pixels": 9275,
+          "missed_visible_pixels": 0,
+          "glyph_pixels": 1320,
+          "missed_glyph_pixels": 0,
+          "unwanted_pixels": 2317,
+          "occluder_pixels": 3335,
+          "occluder_pixels_redacted": 1544,
+          "components": 5,
+          "holes": 0
+        }
+      },
+      "model_scores": [
+        0.9795130491256714,
+        0.9396557211875916,
+        0.9862949848175049,
+        0.9631433486938477
+      ],
+      "alternate_index": 2,
+      "milliseconds": {
+        "encode": 1470.273,
+        "decode_and_postprocess": 260.083,
+        "total": 1730.356
+      },
+      "api_verified": true,
+      "expected_topology": {
+        "components": 4,
+        "holes": 0
+      }
+    },
+    {
+      "case": "interior_occluder_hole",
+      "variants": {
+        "box_default": {
+          "visible_pixels": 12169,
+          "missed_visible_pixels": 422,
+          "glyph_pixels": 2037,
+          "missed_glyph_pixels": 0,
+          "unwanted_pixels": 516,
+          "occluder_pixels": 441,
+          "occluder_pixels_redacted": 441,
+          "components": 1,
+          "holes": 0
+        },
+        "model_score_alternate": {
+          "visible_pixels": 12169,
+          "missed_visible_pixels": 581,
+          "glyph_pixels": 2037,
+          "missed_glyph_pixels": 0,
+          "unwanted_pixels": 443,
+          "occluder_pixels": 441,
+          "occluder_pixels_redacted": 441,
+          "components": 1,
+          "holes": 0
+        },
+        "box_default_dilate3": {
+          "visible_pixels": 12169,
+          "missed_visible_pixels": 0,
+          "glyph_pixels": 2037,
+          "missed_glyph_pixels": 0,
+          "unwanted_pixels": 1754,
+          "occluder_pixels": 441,
+          "occluder_pixels_redacted": 441,
+          "components": 1,
+          "holes": 0
+        }
+      },
+      "model_scores": [
+        0.980999231338501,
+        0.9866210222244263,
+        1.000801920890808,
+        0.9750657081604004
+      ],
+      "alternate_index": 2,
+      "milliseconds": {
+        "encode": 1483.521,
+        "decode_and_postprocess": 288.138,
+        "total": 1771.66
+      },
+      "api_verified": true,
+      "expected_topology": {
+        "components": 1,
+        "holes": 1
+      }
+    },
+    {
+      "case": "low_contrast_glare",
+      "variants": {
+        "box_default": {
+          "visible_pixels": 9937,
+          "missed_visible_pixels": 76,
+          "glyph_pixels": 1890,
+          "missed_glyph_pixels": 0,
+          "unwanted_pixels": 28,
+          "occluder_pixels": 0,
+          "occluder_pixels_redacted": 0,
+          "components": 1,
+          "holes": 0
+        },
+        "model_score_alternate": {
+          "visible_pixels": 9937,
+          "missed_visible_pixels": 89,
+          "glyph_pixels": 1890,
+          "missed_glyph_pixels": 0,
+          "unwanted_pixels": 14,
+          "occluder_pixels": 0,
+          "occluder_pixels_redacted": 0,
+          "components": 1,
+          "holes": 0
+        },
+        "box_default_dilate3": {
+          "visible_pixels": 9937,
+          "missed_visible_pixels": 0,
+          "glyph_pixels": 1890,
+          "missed_glyph_pixels": 0,
+          "unwanted_pixels": 1556,
+          "occluder_pixels": 0,
+          "occluder_pixels_redacted": 0,
+          "components": 1,
+          "holes": 0
+        }
+      },
+      "model_scores": [
+        0.9910604357719421,
+        1.0026639699935913,
+        1.0097836256027222,
+        0.960716724395752
+      ],
+      "alternate_index": 2,
+      "milliseconds": {
+        "encode": 1478.2,
+        "decode_and_postprocess": 264.096,
+        "total": 1742.296
+      },
+      "api_verified": true,
+      "expected_topology": {
+        "components": 1,
+        "holes": 0
+      }
+    },
+    {
+      "case": "small_plate",
+      "variants": {
+        "box_default": {
+          "visible_pixels": 1263,
+          "missed_visible_pixels": 37,
+          "glyph_pixels": 223,
+          "missed_glyph_pixels": 0,
+          "unwanted_pixels": 0,
+          "occluder_pixels": 0,
+          "occluder_pixels_redacted": 0,
+          "components": 1,
+          "holes": 0
+        },
+        "model_score_alternate": {
+          "visible_pixels": 1263,
+          "missed_visible_pixels": 60,
+          "glyph_pixels": 223,
+          "missed_glyph_pixels": 0,
+          "unwanted_pixels": 0,
+          "occluder_pixels": 0,
+          "occluder_pixels_redacted": 0,
+          "components": 1,
+          "holes": 0
+        },
+        "box_default_dilate3": {
+          "visible_pixels": 1263,
+          "missed_visible_pixels": 0,
+          "glyph_pixels": 223,
+          "missed_glyph_pixels": 0,
+          "unwanted_pixels": 511,
+          "occluder_pixels": 0,
+          "occluder_pixels_redacted": 0,
+          "components": 1,
+          "holes": 0
+        }
+      },
+      "model_scores": [
+        0.9895353317260742,
+        0.9893413186073303,
+        1.004501223564148,
+        0.9913390874862671
+      ],
+      "alternate_index": 2,
+      "milliseconds": {
+        "encode": 1468.741,
+        "decode_and_postprocess": 286.537,
+        "total": 1755.279
+      },
+      "api_verified": true,
+      "expected_topology": {
+        "components": 1,
+        "holes": 0
+      }
+    },
+    {
+      "case": "moving_occluder_00",
+      "variants": {
+        "box_default": {
+          "visible_pixels": 10920,
+          "missed_visible_pixels": 602,
+          "glyph_pixels": 1873,
+          "missed_glyph_pixels": 0,
+          "unwanted_pixels": 116,
+          "occluder_pixels": 1690,
+          "occluder_pixels_redacted": 116,
+          "components": 3,
+          "holes": 3
+        },
+        "model_score_alternate": {
+          "visible_pixels": 10920,
+          "missed_visible_pixels": 773,
+          "glyph_pixels": 1873,
+          "missed_glyph_pixels": 0,
+          "unwanted_pixels": 15,
+          "occluder_pixels": 1690,
+          "occluder_pixels_redacted": 15,
+          "components": 2,
+          "holes": 0
+        },
+        "box_default_dilate3": {
+          "visible_pixels": 10920,
+          "missed_visible_pixels": 0,
+          "glyph_pixels": 1873,
+          "missed_glyph_pixels": 0,
+          "unwanted_pixels": 1444,
+          "occluder_pixels": 1690,
+          "occluder_pixels_redacted": 561,
+          "components": 2,
+          "holes": 0
+        }
+      },
+      "model_scores": [
+        0.9764609336853027,
+        0.8943236470222473,
+        0.9843928813934326,
+        0.9746586084365845
+      ],
+      "alternate_index": 2,
+      "milliseconds": {
+        "encode": 1478.377,
+        "decode_and_postprocess": 292.063,
+        "total": 1770.44
+      },
+      "api_verified": true,
+      "expected_topology": {
+        "components": 2,
+        "holes": 0
+      }
+    },
+    {
+      "case": "moving_occluder_01",
+      "variants": {
+        "box_default": {
+          "visible_pixels": 10920,
+          "missed_visible_pixels": 639,
+          "glyph_pixels": 1855,
+          "missed_glyph_pixels": 0,
+          "unwanted_pixels": 33,
+          "occluder_pixels": 1690,
+          "occluder_pixels_redacted": 33,
+          "components": 5,
+          "holes": 0
+        },
+        "model_score_alternate": {
+          "visible_pixels": 10920,
+          "missed_visible_pixels": 723,
+          "glyph_pixels": 1855,
+          "missed_glyph_pixels": 0,
+          "unwanted_pixels": 1,
+          "occluder_pixels": 1690,
+          "occluder_pixels_redacted": 1,
+          "components": 2,
+          "holes": 0
+        },
+        "box_default_dilate3": {
+          "visible_pixels": 10920,
+          "missed_visible_pixels": 0,
+          "glyph_pixels": 1855,
+          "missed_glyph_pixels": 0,
+          "unwanted_pixels": 1340,
+          "occluder_pixels": 1690,
+          "occluder_pixels_redacted": 473,
+          "components": 2,
+          "holes": 0
+        }
+      },
+      "model_scores": [
+        0.9786292314529419,
+        0.9364619851112366,
+        0.9931317567825317,
+        0.9678410291671753
+      ],
+      "alternate_index": 2,
+      "milliseconds": {
+        "encode": 1446.376,
+        "decode_and_postprocess": 338.868,
+        "total": 1785.244
+      },
+      "api_verified": true,
+      "expected_topology": {
+        "components": 2,
+        "holes": 0
+      }
+    },
+    {
+      "case": "moving_occluder_02",
+      "variants": {
+        "box_default": {
+          "visible_pixels": 10920,
+          "missed_visible_pixels": 649,
+          "glyph_pixels": 1836,
+          "missed_glyph_pixels": 0,
+          "unwanted_pixels": 0,
+          "occluder_pixels": 1690,
+          "occluder_pixels_redacted": 0,
+          "components": 2,
+          "holes": 0
+        },
+        "model_score_alternate": {
+          "visible_pixels": 10920,
+          "missed_visible_pixels": 782,
+          "glyph_pixels": 1836,
+          "missed_glyph_pixels": 0,
+          "unwanted_pixels": 0,
+          "occluder_pixels": 1690,
+          "occluder_pixels_redacted": 0,
+          "components": 2,
+          "holes": 0
+        },
+        "box_default_dilate3": {
+          "visible_pixels": 10920,
+          "missed_visible_pixels": 0,
+          "glyph_pixels": 1836,
+          "missed_glyph_pixels": 0,
+          "unwanted_pixels": 1231,
+          "occluder_pixels": 1690,
+          "occluder_pixels_redacted": 390,
+          "components": 2,
+          "holes": 0
+        }
+      },
+      "model_scores": [
+        0.9807944297790527,
+        0.9708492159843445,
+        0.9960206747055054,
+        0.9658104181289673
+      ],
+      "alternate_index": 2,
+      "milliseconds": {
+        "encode": 1465.723,
+        "decode_and_postprocess": 264.695,
+        "total": 1730.418
+      },
+      "api_verified": true,
+      "expected_topology": {
+        "components": 2,
+        "holes": 0
+      }
+    },
+    {
+      "case": "narrow_two_rows",
+      "variants": {
+        "box_default": {
+          "visible_pixels": 13104,
+          "missed_visible_pixels": 5,
+          "glyph_pixels": 1246,
+          "missed_glyph_pixels": 0,
+          "unwanted_pixels": 0,
+          "occluder_pixels": 0,
+          "occluder_pixels_redacted": 0,
+          "components": 1,
+          "holes": 0
+        },
+        "model_score_alternate": {
+          "visible_pixels": 13104,
+          "missed_visible_pixels": 104,
+          "glyph_pixels": 1246,
+          "missed_glyph_pixels": 0,
+          "unwanted_pixels": 0,
+          "occluder_pixels": 0,
+          "occluder_pixels_redacted": 0,
+          "components": 1,
+          "holes": 0
+        },
+        "box_default_dilate3": {
+          "visible_pixels": 13104,
+          "missed_visible_pixels": 0,
+          "glyph_pixels": 1246,
+          "missed_glyph_pixels": 0,
+          "unwanted_pixels": 1508,
+          "occluder_pixels": 0,
+          "occluder_pixels_redacted": 0,
+          "components": 1,
+          "holes": 0
+        }
+      },
+      "model_scores": [
+        0.9937350749969482,
+        1.0001015663146973,
+        1.0082602500915527,
+        0.992913007736206
+      ],
+      "alternate_index": 2,
+      "milliseconds": {
+        "encode": 1341.882,
+        "decode_and_postprocess": 328.653,
+        "total": 1670.535
+      },
+      "api_verified": true,
+      "expected_topology": {
+        "components": 1,
+        "holes": 0
+      }
+    },
+    {
+      "case": "narrow_hyphen",
+      "variants": {
+        "box_default": {
+          "visible_pixels": 12610,
+          "missed_visible_pixels": 427,
+          "glyph_pixels": 2242,
+          "missed_glyph_pixels": 0,
+          "unwanted_pixels": 100,
+          "occluder_pixels": 0,
+          "occluder_pixels_redacted": 0,
+          "components": 1,
+          "holes": 0
+        },
+        "model_score_alternate": {
+          "visible_pixels": 12610,
+          "missed_visible_pixels": 569,
+          "glyph_pixels": 2242,
+          "missed_glyph_pixels": 0,
+          "unwanted_pixels": 10,
+          "occluder_pixels": 0,
+          "occluder_pixels_redacted": 0,
+          "components": 1,
+          "holes": 0
+        },
+        "box_default_dilate3": {
+          "visible_pixels": 12610,
+          "missed_visible_pixels": 0,
+          "glyph_pixels": 2242,
+          "missed_glyph_pixels": 0,
+          "unwanted_pixels": 1348,
+          "occluder_pixels": 0,
+          "occluder_pixels_redacted": 0,
+          "components": 1,
+          "holes": 0
+        }
+      },
+      "model_scores": [
+        0.9817080497741699,
+        0.9899060130119324,
+        1.0020252466201782,
+        0.9758690595626831
+      ],
+      "alternate_index": 2,
+      "milliseconds": {
+        "encode": 1423.748,
+        "decode_and_postprocess": 244.985,
+        "total": 1668.733
+      },
+      "api_verified": true,
+      "expected_topology": {
+        "components": 1,
+        "holes": 0
+      }
+    }
+  ]
+}

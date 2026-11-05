@@ -1,0 +1,4372 @@
+{
+  "preregistration": {
+    "status": "frozen before first evaluation; no tuning against fixture truth",
+    "baseline": "OpenCV rectangular GrabCut; all FGD and PR_FGD pixels retained",
+    "candidate": "same GrabCut + one closing + bounded thin-hole recovery",
+    "grabcut_iterations": 5,
+    "rng_seed_each_inference": 1729,
+    "opencv_threads": 1,
+    "closing_radius": "max(1, round(0.0125 * min(detector_width, detector_height)))",
+    "closing_kernel": "elliptical; 2*radius+1; one closing",
+    "thin_hole_max_radius": "max(1.5, 0.04 * min(detector_width, detector_height))",
+    "hole_connectivity": 8,
+    "distance_transform": "DIST_L2 / DIST_MASK_PRECISE",
+    "components": "all retained; no largest-component filtering; closing can merge thin gaps",
+    "inference_inputs": [
+      "BGR frame",
+      "exclusive integer detector bounding box"
+    ],
+    "truth_use": "evaluation and synthetic fixture construction only",
+    "stress_variants": [
+      "original twelve fixtures",
+      "global Gaussian blur sigma=1.5, unchanged truth",
+      "global contrast x0.35 about 128, unchanged truth",
+      "detector box expanded 25% each side, unchanged image and truth",
+      "small dark occluder: circle at bbox-relative (0.72, 0.42), radius=max(2,round(0.045*short_dimension)); color=15th percentile of bbox BGR; truth updated by known synthetic disk"
+    ],
+    "timing": "one untimed warmup, one inference per input, process CPU and wall ms, one OpenCV thread",
+    "success_check": "strict visible-only objective: zero missed visible glyph/plate pixels, zero predicted background/occluder pixels, exact component/hole counts",
+    "limits": [
+      "Entirely synthetic geometry tests, not real-world validation.",
+      "Correct detector boxes isolate segmentation; no detector recall test.",
+      "No threshold sweep, validation split, oracle prompt or per-case selection.",
+      "Thin-hole rule can erase a true small occluder or narrow foreground gap.",
+      "A large enclosed occluder can be modeled as foreground by GrabCut.",
+      "Foreground/background color statistics can discard dark plate glyphs.",
+      "Temporal frames run independently; no propagation or tracking claim."
+    ],
+    "primary_reference": "https://docs.opencv.org/4.13.0/d8/d83/tutorial_py_grabcut.html",
+    "script_sha256": "8635d68062e8829fa068d3bb6a8fa10fe086142f0a42d250f77f5c4ff97d518c"
+  },
+  "environment": {
+    "python": "3.12.14",
+    "opencv": "5.0.0",
+    "numpy": "2.3.5",
+    "platform": "Linux-6.18.57-x86_64-with-glibc2.39"
+  },
+  "summary": {
+    "original": {
+      "grabcut": {
+        "visible_plate_pixels": 126352,
+        "missed_visible_plate_pixels": 10,
+        "visible_glyph_pixels": 21015,
+        "missed_visible_glyph_pixels": 0,
+        "unwanted_background_pixels": 17177,
+        "occluder_pixels_over_plate": 8846,
+        "occluder_pixels_covered": 7156,
+        "cases": 12,
+        "missed_visible_plate_pct": 0.007914397872609853,
+        "missed_visible_glyph_pct": 0.0,
+        "occluder_covered_pct": 80.89531991860729,
+        "cases_with_glyph_miss": 0,
+        "cases_with_plate_miss": 1,
+        "topology_exact_cases": 7,
+        "strict_visible_only_pass_cases": 1,
+        "median_cpu_ms": 247.7249804999999,
+        "median_wall_ms": 248.6040034996222
+      },
+      "thin_hole_refinement": {
+        "visible_plate_pixels": 126352,
+        "missed_visible_plate_pixels": 8,
+        "visible_glyph_pixels": 21015,
+        "missed_visible_glyph_pixels": 0,
+        "unwanted_background_pixels": 17386,
+        "occluder_pixels_over_plate": 8846,
+        "occluder_pixels_covered": 7156,
+        "cases": 12,
+        "missed_visible_plate_pct": 0.006331518298087881,
+        "missed_visible_glyph_pct": 0.0,
+        "occluder_covered_pct": 80.89531991860729,
+        "cases_with_glyph_miss": 0,
+        "cases_with_plate_miss": 1,
+        "topology_exact_cases": 8,
+        "strict_visible_only_pass_cases": 1,
+        "median_cpu_ms": 251.10564450000018,
+        "median_wall_ms": 251.98234599929492
+      }
+    },
+    "blur_sigma_1p5": {
+      "grabcut": {
+        "visible_plate_pixels": 126352,
+        "missed_visible_plate_pixels": 8516,
+        "visible_glyph_pixels": 21015,
+        "missed_visible_glyph_pixels": 124,
+        "unwanted_background_pixels": 7167,
+        "occluder_pixels_over_plate": 8846,
+        "occluder_pixels_covered": 4042,
+        "cases": 12,
+        "missed_visible_plate_pct": 6.73990122831455,
+        "missed_visible_glyph_pct": 0.5900547228170354,
+        "occluder_covered_pct": 45.69296857336649,
+        "cases_with_glyph_miss": 3,
+        "cases_with_plate_miss": 12,
+        "topology_exact_cases": 10,
+        "strict_visible_only_pass_cases": 0,
+        "median_cpu_ms": 238.53747199999998,
+        "median_wall_ms": 238.56365700021342
+      },
+      "thin_hole_refinement": {
+        "visible_plate_pixels": 126352,
+        "missed_visible_plate_pixels": 8486,
+        "visible_glyph_pixels": 21015,
+        "missed_visible_glyph_pixels": 105,
+        "unwanted_background_pixels": 7168,
+        "occluder_pixels_over_plate": 8846,
+        "occluder_pixels_covered": 4042,
+        "cases": 12,
+        "missed_visible_plate_pct": 6.71615803469672,
+        "missed_visible_glyph_pct": 0.49964311206281226,
+        "occluder_covered_pct": 45.69296857336649,
+        "cases_with_glyph_miss": 3,
+        "cases_with_plate_miss": 12,
+        "topology_exact_cases": 10,
+        "strict_visible_only_pass_cases": 0,
+        "median_cpu_ms": 241.36085100000003,
+        "median_wall_ms": 241.39083850013776
+      }
+    },
+    "contrast_0p35": {
+      "grabcut": {
+        "visible_plate_pixels": 126352,
+        "missed_visible_plate_pixels": 1196,
+        "visible_glyph_pixels": 21015,
+        "missed_visible_glyph_pixels": 0,
+        "unwanted_background_pixels": 15814,
+        "occluder_pixels_over_plate": 8846,
+        "occluder_pixels_covered": 5466,
+        "cases": 12,
+        "missed_visible_plate_pct": 0.9465619855641383,
+        "missed_visible_glyph_pct": 0.0,
+        "occluder_covered_pct": 61.79063983721456,
+        "cases_with_glyph_miss": 0,
+        "cases_with_plate_miss": 3,
+        "topology_exact_cases": 2,
+        "strict_visible_only_pass_cases": 1,
+        "median_cpu_ms": 249.7416344999994,
+        "median_wall_ms": 249.8046840000825
+      },
+      "thin_hole_refinement": {
+        "visible_plate_pixels": 126352,
+        "missed_visible_plate_pixels": 1187,
+        "visible_glyph_pixels": 21015,
+        "missed_visible_glyph_pixels": 0,
+        "unwanted_background_pixels": 15961,
+        "occluder_pixels_over_plate": 8846,
+        "occluder_pixels_covered": 5466,
+        "cases": 12,
+        "missed_visible_plate_pct": 0.9394390274787894,
+        "missed_visible_glyph_pct": 0.0,
+        "occluder_covered_pct": 61.79063983721456,
+        "cases_with_glyph_miss": 0,
+        "cases_with_plate_miss": 2,
+        "topology_exact_cases": 3,
+        "strict_visible_only_pass_cases": 1,
+        "median_cpu_ms": 254.68517250000033,
+        "median_wall_ms": 254.73830150031063
+      }
+    },
+    "box_expand_25pct": {
+      "grabcut": {
+        "visible_plate_pixels": 126352,
+        "missed_visible_plate_pixels": 158,
+        "visible_glyph_pixels": 21015,
+        "missed_visible_glyph_pixels": 138,
+        "unwanted_background_pixels": 181951,
+        "occluder_pixels_over_plate": 8846,
+        "occluder_pixels_covered": 7156,
+        "cases": 12,
+        "missed_visible_plate_pct": 0.12504748638723565,
+        "missed_visible_glyph_pct": 0.6566738044254105,
+        "occluder_covered_pct": 80.89531991860729,
+        "cases_with_glyph_miss": 6,
+        "cases_with_plate_miss": 7,
+        "topology_exact_cases": 1,
+        "strict_visible_only_pass_cases": 1,
+        "median_cpu_ms": 463.6366809999996,
+        "median_wall_ms": 464.02020649975384
+      },
+      "thin_hole_refinement": {
+        "visible_plate_pixels": 126352,
+        "missed_visible_plate_pixels": 0,
+        "visible_glyph_pixels": 21015,
+        "missed_visible_glyph_pixels": 0,
+        "unwanted_background_pixels": 182922,
+        "occluder_pixels_over_plate": 8846,
+        "occluder_pixels_covered": 7156,
+        "cases": 12,
+        "missed_visible_plate_pct": 0.0,
+        "missed_visible_glyph_pct": 0.0,
+        "occluder_covered_pct": 80.89531991860729,
+        "cases_with_glyph_miss": 0,
+        "cases_with_plate_miss": 0,
+        "topology_exact_cases": 6,
+        "strict_visible_only_pass_cases": 1,
+        "median_cpu_ms": 468.3568185000002,
+        "median_wall_ms": 468.7383350001255
+      }
+    },
+    "small_ink_like_occluder": {
+      "grabcut": {
+        "visible_plate_pixels": 125904,
+        "missed_visible_plate_pixels": 4,
+        "visible_glyph_pixels": 21015,
+        "missed_visible_glyph_pixels": 0,
+        "unwanted_background_pixels": 17570,
+        "occluder_pixels_over_plate": 9294,
+        "occluder_pixels_covered": 7604,
+        "cases": 12,
+        "missed_visible_plate_pct": 0.003177023764137756,
+        "missed_visible_glyph_pct": 0.0,
+        "occluder_covered_pct": 81.81622552184204,
+        "cases_with_glyph_miss": 0,
+        "cases_with_plate_miss": 1,
+        "topology_exact_cases": 0,
+        "strict_visible_only_pass_cases": 0,
+        "median_cpu_ms": 280.763361,
+        "median_wall_ms": 280.81055199982075
+      },
+      "thin_hole_refinement": {
+        "visible_plate_pixels": 125904,
+        "missed_visible_plate_pixels": 4,
+        "visible_glyph_pixels": 21015,
+        "missed_visible_glyph_pixels": 0,
+        "unwanted_background_pixels": 17762,
+        "occluder_pixels_over_plate": 9294,
+        "occluder_pixels_covered": 7604,
+        "cases": 12,
+        "missed_visible_plate_pct": 0.003177023764137756,
+        "missed_visible_glyph_pct": 0.0,
+        "occluder_covered_pct": 81.81622552184204,
+        "cases_with_glyph_miss": 0,
+        "cases_with_plate_miss": 1,
+        "topology_exact_cases": 0,
+        "strict_visible_only_pass_cases": 0,
+        "median_cpu_ms": 284.1773545000006,
+        "median_wall_ms": 284.221834499931
+      }
+    },
+    "all": {
+      "grabcut": {
+        "visible_plate_pixels": 631312,
+        "missed_visible_plate_pixels": 9884,
+        "visible_glyph_pixels": 105075,
+        "missed_visible_glyph_pixels": 262,
+        "unwanted_background_pixels": 239679,
+        "occluder_pixels_over_plate": 44678,
+        "occluder_pixels_covered": 31424,
+        "cases": 60,
+        "missed_visible_plate_pct": 1.565628405606103,
+        "missed_visible_glyph_pct": 0.24934570544848916,
+        "occluder_covered_pct": 70.33439276601459,
+        "cases_with_glyph_miss": 9,
+        "cases_with_plate_miss": 24,
+        "topology_exact_cases": 20,
+        "strict_visible_only_pass_cases": 3,
+        "median_cpu_ms": 254.08092499999935,
+        "median_wall_ms": 254.11627950006732
+      },
+      "thin_hole_refinement": {
+        "visible_plate_pixels": 631312,
+        "missed_visible_plate_pixels": 9685,
+        "visible_glyph_pixels": 105075,
+        "missed_visible_glyph_pixels": 105,
+        "unwanted_background_pixels": 241199,
+        "occluder_pixels_over_plate": 44678,
+        "occluder_pixels_covered": 31424,
+        "cases": 60,
+        "missed_visible_plate_pct": 1.5341067491192943,
+        "missed_visible_glyph_pct": 0.09992862241256245,
+        "occluder_covered_pct": 70.33439276601459,
+        "cases_with_glyph_miss": 3,
+        "cases_with_plate_miss": 16,
+        "topology_exact_cases": 27,
+        "strict_visible_only_pass_cases": 3,
+        "median_cpu_ms": 261.1962134999999,
+        "median_wall_ms": 261.24686949970055
+      }
+    }
+  },
+  "cases": [
+    {
+      "variant": "original",
+      "name": "frontal",
+      "detector_box": [
+        128,
+        196,
+        354,
+        273
+      ],
+      "grabcut": {
+        "visible_plate_pixels": 12610,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 2405,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 853,
+        "occluder_pixels_over_plate": 0,
+        "occluder_pixels_covered": 0,
+        "occluder_covered_pct": null,
+        "iou_visible_plate": 0.9366411646735497,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "topology_exact": true,
+        "strict_visible_only_pass": false
+      },
+      "thin_hole_refinement": {
+        "visible_plate_pixels": 12610,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 2405,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 857,
+        "occluder_pixels_over_plate": 0,
+        "occluder_pixels_covered": 0,
+        "occluder_covered_pct": null,
+        "iou_visible_plate": 0.9363629613128388,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "topology_exact": true,
+        "strict_visible_only_pass": false
+      },
+      "timing": {
+        "grabcut_cpu_ms": 241.95841899999994,
+        "grabcut_wall_ms": 243.70748699948308,
+        "candidate_cpu_ms": 245.46881099999985,
+        "candidate_wall_ms": 247.21780299933016,
+        "refinement_cpu_ms": 3.510391999999918,
+        "recovered_thin_holes": 0,
+        "recovered_thin_hole_pixels": 0,
+        "preserved_large_holes": 0,
+        "closing_radius_pixels": 1,
+        "thin_hole_radius_limit_pixels": 3.08
+      }
+    },
+    {
+      "variant": "original",
+      "name": "rotated",
+      "detector_box": [
+        121,
+        161,
+        360,
+        300
+      ],
+      "grabcut": {
+        "visible_plate_pixels": 12687,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 2431,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 6356,
+        "occluder_pixels_over_plate": 0,
+        "occluder_pixels_covered": 0,
+        "occluder_covered_pct": null,
+        "iou_visible_plate": 0.6662290605471827,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "topology_exact": true,
+        "strict_visible_only_pass": false
+      },
+      "thin_hole_refinement": {
+        "visible_plate_pixels": 12687,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 2431,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 6432,
+        "occluder_pixels_over_plate": 0,
+        "occluder_pixels_covered": 0,
+        "occluder_covered_pct": null,
+        "iou_visible_plate": 0.6635807312097913,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "topology_exact": true,
+        "strict_visible_only_pass": false
+      },
+      "timing": {
+        "grabcut_cpu_ms": 401.3640019999998,
+        "grabcut_wall_ms": 405.1804970004014,
+        "candidate_cpu_ms": 408.4577839999999,
+        "candidate_wall_ms": 412.2744380001677,
+        "refinement_cpu_ms": 7.093782000000104,
+        "recovered_thin_holes": 0,
+        "recovered_thin_hole_pixels": 0,
+        "preserved_large_holes": 0,
+        "closing_radius_pixels": 2,
+        "thin_hole_radius_limit_pixels": 5.5600000000000005
+      }
+    },
+    {
+      "variant": "original",
+      "name": "perspective",
+      "detector_box": [
+        128,
+        191,
+        354,
+        271
+      ],
+      "grabcut": {
+        "visible_plate_pixels": 9937,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 1965,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 2085,
+        "occluder_pixels_over_plate": 0,
+        "occluder_pixels_covered": 0,
+        "occluder_covered_pct": null,
+        "iou_visible_plate": 0.8265679587423058,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "topology_exact": true,
+        "strict_visible_only_pass": false
+      },
+      "thin_hole_refinement": {
+        "visible_plate_pixels": 9937,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 1965,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 2089,
+        "occluder_pixels_over_plate": 0,
+        "occluder_pixels_covered": 0,
+        "occluder_covered_pct": null,
+        "iou_visible_plate": 0.8262930317645102,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "topology_exact": true,
+        "strict_visible_only_pass": false
+      },
+      "timing": {
+        "grabcut_cpu_ms": 306.03546999999986,
+        "grabcut_wall_ms": 306.1149410004873,
+        "candidate_cpu_ms": 309.627753,
+        "candidate_wall_ms": 309.7057559998575,
+        "refinement_cpu_ms": 3.5922830000001404,
+        "recovered_thin_holes": 0,
+        "recovered_thin_hole_pixels": 0,
+        "preserved_large_holes": 0,
+        "closing_radius_pixels": 1,
+        "thin_hole_radius_limit_pixels": 3.2
+      }
+    },
+    {
+      "variant": "original",
+      "name": "disconnected_cross_occlusion",
+      "detector_box": [
+        128,
+        196,
+        354,
+        273
+      ],
+      "grabcut": {
+        "visible_plate_pixels": 9275,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 1176,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 1389,
+        "occluder_pixels_over_plate": 3335,
+        "occluder_pixels_covered": 3335,
+        "occluder_covered_pct": 100.0,
+        "iou_visible_plate": 0.6625473248089149,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 4,
+          "holes": 0
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "thin_hole_refinement": {
+        "visible_plate_pixels": 9275,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 1176,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 1401,
+        "occluder_pixels_over_plate": 3335,
+        "occluder_pixels_covered": 3335,
+        "occluder_covered_pct": 100.0,
+        "iou_visible_plate": 0.6619798729569624,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 4,
+          "holes": 0
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "timing": {
+        "grabcut_cpu_ms": 228.2150900000004,
+        "grabcut_wall_ms": 228.56691200013302,
+        "candidate_cpu_ms": 231.74647199999976,
+        "candidate_wall_ms": 232.093180999982,
+        "refinement_cpu_ms": 3.531381999999361,
+        "recovered_thin_holes": 0,
+        "recovered_thin_hole_pixels": 0,
+        "preserved_large_holes": 0,
+        "closing_radius_pixels": 1,
+        "thin_hole_radius_limit_pixels": 3.08
+      }
+    },
+    {
+      "variant": "original",
+      "name": "interior_occluder_hole",
+      "detector_box": [
+        128,
+        196,
+        354,
+        273
+      ],
+      "grabcut": {
+        "visible_plate_pixels": 12169,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 2074,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 853,
+        "occluder_pixels_over_plate": 441,
+        "occluder_pixels_covered": 441,
+        "occluder_covered_pct": 100.0,
+        "iou_visible_plate": 0.9038847210874248,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 1
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "thin_hole_refinement": {
+        "visible_plate_pixels": 12169,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 2074,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 857,
+        "occluder_pixels_over_plate": 441,
+        "occluder_pixels_covered": 441,
+        "occluder_covered_pct": 100.0,
+        "iou_visible_plate": 0.903616247122596,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 1
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "timing": {
+        "grabcut_cpu_ms": 212.0827510000005,
+        "grabcut_wall_ms": 212.0871339993755,
+        "candidate_cpu_ms": 215.58146500000052,
+        "candidate_wall_ms": 215.5815870000879,
+        "refinement_cpu_ms": 3.498714000000014,
+        "recovered_thin_holes": 0,
+        "recovered_thin_hole_pixels": 0,
+        "preserved_large_holes": 0,
+        "closing_radius_pixels": 1,
+        "thin_hole_radius_limit_pixels": 3.08
+      }
+    },
+    {
+      "variant": "original",
+      "name": "low_contrast_glare",
+      "detector_box": [
+        128,
+        191,
+        354,
+        271
+      ],
+      "grabcut": {
+        "visible_plate_pixels": 9937,
+        "missed_visible_plate_pixels": 10,
+        "missed_visible_plate_pct": 0.10063399416322834,
+        "visible_glyph_pixels": 1965,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 1133,
+        "occluder_pixels_over_plate": 0,
+        "occluder_pixels_covered": 0,
+        "occluder_covered_pct": null,
+        "iou_visible_plate": 0.8967479674796748,
+        "predicted_topology": {
+          "components": 2,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "thin_hole_refinement": {
+        "visible_plate_pixels": 9937,
+        "missed_visible_plate_pixels": 8,
+        "missed_visible_plate_pct": 0.08050719533058268,
+        "visible_glyph_pixels": 1965,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 1216,
+        "occluder_pixels_over_plate": 0,
+        "occluder_pixels_covered": 0,
+        "occluder_covered_pct": null,
+        "iou_visible_plate": 0.8902537433874294,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "topology_exact": true,
+        "strict_visible_only_pass": false
+      },
+      "timing": {
+        "grabcut_cpu_ms": 265.11262999999997,
+        "grabcut_wall_ms": 265.1268660001733,
+        "candidate_cpu_ms": 269.1691330000001,
+        "candidate_wall_ms": 269.1799300000639,
+        "refinement_cpu_ms": 4.056503000000156,
+        "recovered_thin_holes": 1,
+        "recovered_thin_hole_pixels": 17,
+        "preserved_large_holes": 0,
+        "closing_radius_pixels": 1,
+        "thin_hole_radius_limit_pixels": 3.2
+      }
+    },
+    {
+      "variant": "original",
+      "name": "small_plate",
+      "detector_box": [
+        211,
+        219,
+        280,
+        248
+      ],
+      "grabcut": {
+        "visible_plate_pixels": 1263,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 240,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 0,
+        "occluder_pixels_over_plate": 0,
+        "occluder_pixels_covered": 0,
+        "occluder_covered_pct": null,
+        "iou_visible_plate": 1.0,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "topology_exact": true,
+        "strict_visible_only_pass": true
+      },
+      "thin_hole_refinement": {
+        "visible_plate_pixels": 1263,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 240,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 0,
+        "occluder_pixels_over_plate": 0,
+        "occluder_pixels_covered": 0,
+        "occluder_covered_pct": null,
+        "iou_visible_plate": 1.0,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "topology_exact": true,
+        "strict_visible_only_pass": true
+      },
+      "timing": {
+        "grabcut_cpu_ms": 185.7096880000002,
+        "grabcut_wall_ms": 185.70880200059037,
+        "candidate_cpu_ms": 188.475414,
+        "candidate_wall_ms": 188.46780600051716,
+        "refinement_cpu_ms": 2.765725999999802,
+        "recovered_thin_holes": 0,
+        "recovered_thin_hole_pixels": 0,
+        "preserved_large_holes": 0,
+        "closing_radius_pixels": 1,
+        "thin_hole_radius_limit_pixels": 1.5
+      }
+    },
+    {
+      "variant": "original",
+      "name": "moving_occluder_00",
+      "detector_box": [
+        119,
+        196,
+        345,
+        273
+      ],
+      "grabcut": {
+        "visible_plate_pixels": 10920,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 1876,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 1061,
+        "occluder_pixels_over_plate": 1690,
+        "occluder_pixels_covered": 1690,
+        "occluder_covered_pct": 100.0,
+        "iou_visible_plate": 0.7987711213517665,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 2,
+          "holes": 0
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "thin_hole_refinement": {
+        "visible_plate_pixels": 10920,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 1876,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 1069,
+        "occluder_pixels_over_plate": 1690,
+        "occluder_pixels_covered": 1690,
+        "occluder_covered_pct": 100.0,
+        "iou_visible_plate": 0.7983039695884202,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 2,
+          "holes": 0
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "timing": {
+        "grabcut_cpu_ms": 227.8157470000002,
+        "grabcut_wall_ms": 227.90715900009673,
+        "candidate_cpu_ms": 230.86478399999953,
+        "candidate_wall_ms": 230.9489979998034,
+        "refinement_cpu_ms": 3.049036999999366,
+        "recovered_thin_holes": 0,
+        "recovered_thin_hole_pixels": 0,
+        "preserved_large_holes": 0,
+        "closing_radius_pixels": 1,
+        "thin_hole_radius_limit_pixels": 3.08
+      }
+    },
+    {
+      "variant": "original",
+      "name": "moving_occluder_01",
+      "detector_box": [
+        128,
+        196,
+        354,
+        273
+      ],
+      "grabcut": {
+        "visible_plate_pixels": 10920,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 1954,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 749,
+        "occluder_pixels_over_plate": 1690,
+        "occluder_pixels_covered": 0,
+        "occluder_covered_pct": 0.0,
+        "iou_visible_plate": 0.9358128374325135,
+        "predicted_topology": {
+          "components": 2,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 2,
+          "holes": 0
+        },
+        "topology_exact": true,
+        "strict_visible_only_pass": false
+      },
+      "thin_hole_refinement": {
+        "visible_plate_pixels": 10920,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 1954,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 753,
+        "occluder_pixels_over_plate": 1690,
+        "occluder_pixels_covered": 0,
+        "occluder_covered_pct": 0.0,
+        "iou_visible_plate": 0.9354921613980982,
+        "predicted_topology": {
+          "components": 2,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 2,
+          "holes": 0
+        },
+        "topology_exact": true,
+        "strict_visible_only_pass": false
+      },
+      "timing": {
+        "grabcut_cpu_ms": 201.6419300000001,
+        "grabcut_wall_ms": 201.71770700017078,
+        "candidate_cpu_ms": 204.6539919999999,
+        "candidate_wall_ms": 204.7245350004232,
+        "refinement_cpu_ms": 3.0120619999998155,
+        "recovered_thin_holes": 0,
+        "recovered_thin_hole_pixels": 0,
+        "preserved_large_holes": 0,
+        "closing_radius_pixels": 1,
+        "thin_hole_radius_limit_pixels": 3.08
+      }
+    },
+    {
+      "variant": "original",
+      "name": "moving_occluder_02",
+      "detector_box": [
+        137,
+        196,
+        363,
+        273
+      ],
+      "grabcut": {
+        "visible_plate_pixels": 10920,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 1912,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 1061,
+        "occluder_pixels_over_plate": 1690,
+        "occluder_pixels_covered": 1690,
+        "occluder_covered_pct": 100.0,
+        "iou_visible_plate": 0.7987711213517665,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 2,
+          "holes": 0
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "thin_hole_refinement": {
+        "visible_plate_pixels": 10920,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 1912,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 1069,
+        "occluder_pixels_over_plate": 1690,
+        "occluder_pixels_covered": 1690,
+        "occluder_covered_pct": 100.0,
+        "iou_visible_plate": 0.7983039695884202,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 2,
+          "holes": 0
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "timing": {
+        "grabcut_cpu_ms": 253.4915419999999,
+        "grabcut_wall_ms": 253.5005199997613,
+        "candidate_cpu_ms": 256.7424780000005,
+        "candidate_wall_ms": 256.7468889992597,
+        "refinement_cpu_ms": 3.2509360000005927,
+        "recovered_thin_holes": 0,
+        "recovered_thin_hole_pixels": 0,
+        "preserved_large_holes": 0,
+        "closing_radius_pixels": 1,
+        "thin_hole_radius_limit_pixels": 3.08
+      }
+    },
+    {
+      "variant": "original",
+      "name": "narrow_two_rows",
+      "detector_box": [
+        143,
+        182,
+        339,
+        274
+      ],
+      "grabcut": {
+        "visible_plate_pixels": 13104,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 1151,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 784,
+        "occluder_pixels_over_plate": 0,
+        "occluder_pixels_covered": 0,
+        "occluder_covered_pct": null,
+        "iou_visible_plate": 0.9435483870967742,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "topology_exact": true,
+        "strict_visible_only_pass": false
+      },
+      "thin_hole_refinement": {
+        "visible_plate_pixels": 13104,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 1151,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 786,
+        "occluder_pixels_over_plate": 0,
+        "occluder_pixels_covered": 0,
+        "occluder_covered_pct": null,
+        "iou_visible_plate": 0.9434125269978402,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "topology_exact": true,
+        "strict_visible_only_pass": false
+      },
+      "timing": {
+        "grabcut_cpu_ms": 253.76386699999998,
+        "grabcut_wall_ms": 253.7775069995405,
+        "candidate_cpu_ms": 258.65750200000014,
+        "candidate_wall_ms": 258.66856399989047,
+        "refinement_cpu_ms": 4.893635000000174,
+        "recovered_thin_holes": 0,
+        "recovered_thin_hole_pixels": 0,
+        "preserved_large_holes": 0,
+        "closing_radius_pixels": 1,
+        "thin_hole_radius_limit_pixels": 3.68
+      }
+    },
+    {
+      "variant": "original",
+      "name": "narrow_hyphen",
+      "detector_box": [
+        128,
+        196,
+        354,
+        273
+      ],
+      "grabcut": {
+        "visible_plate_pixels": 12610,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 1866,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 853,
+        "occluder_pixels_over_plate": 0,
+        "occluder_pixels_covered": 0,
+        "occluder_covered_pct": null,
+        "iou_visible_plate": 0.9366411646735497,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "topology_exact": true,
+        "strict_visible_only_pass": false
+      },
+      "thin_hole_refinement": {
+        "visible_plate_pixels": 12610,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 1866,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 857,
+        "occluder_pixels_over_plate": 0,
+        "occluder_pixels_covered": 0,
+        "occluder_covered_pct": null,
+        "iou_visible_plate": 0.9363629613128388,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "topology_exact": true,
+        "strict_visible_only_pass": false
+      },
+      "timing": {
+        "grabcut_cpu_ms": 287.37771499999985,
+        "grabcut_wall_ms": 289.0205670000796,
+        "candidate_cpu_ms": 290.77457799999974,
+        "candidate_wall_ms": 292.41278100016643,
+        "refinement_cpu_ms": 3.396862999999861,
+        "recovered_thin_holes": 0,
+        "recovered_thin_hole_pixels": 0,
+        "preserved_large_holes": 0,
+        "closing_radius_pixels": 1,
+        "thin_hole_radius_limit_pixels": 3.08
+      }
+    },
+    {
+      "variant": "blur_sigma_1p5",
+      "name": "frontal",
+      "detector_box": [
+        128,
+        196,
+        354,
+        273
+      ],
+      "grabcut": {
+        "visible_plate_pixels": 12610,
+        "missed_visible_plate_pixels": 842,
+        "missed_visible_plate_pct": 6.677240285487708,
+        "visible_glyph_pixels": 2405,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 0,
+        "occluder_pixels_over_plate": 0,
+        "occluder_pixels_covered": 0,
+        "occluder_covered_pct": null,
+        "iou_visible_plate": 0.9332275971451229,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "topology_exact": true,
+        "strict_visible_only_pass": false
+      },
+      "thin_hole_refinement": {
+        "visible_plate_pixels": 12610,
+        "missed_visible_plate_pixels": 842,
+        "missed_visible_plate_pct": 6.677240285487708,
+        "visible_glyph_pixels": 2405,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 0,
+        "occluder_pixels_over_plate": 0,
+        "occluder_pixels_covered": 0,
+        "occluder_covered_pct": null,
+        "iou_visible_plate": 0.9332275971451229,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "topology_exact": true,
+        "strict_visible_only_pass": false
+      },
+      "timing": {
+        "grabcut_cpu_ms": 234.3885520000004,
+        "grabcut_wall_ms": 234.40624300019408,
+        "candidate_cpu_ms": 237.11843500000018,
+        "candidate_wall_ms": 237.12899400015885,
+        "refinement_cpu_ms": 2.7298829999997665,
+        "recovered_thin_holes": 0,
+        "recovered_thin_hole_pixels": 0,
+        "preserved_large_holes": 0,
+        "closing_radius_pixels": 1,
+        "thin_hole_radius_limit_pixels": 3.08
+      }
+    },
+    {
+      "variant": "blur_sigma_1p5",
+      "name": "rotated",
+      "detector_box": [
+        121,
+        161,
+        360,
+        300
+      ],
+      "grabcut": {
+        "visible_plate_pixels": 12687,
+        "missed_visible_plate_pixels": 810,
+        "missed_visible_plate_pct": 6.384488058642705,
+        "visible_glyph_pixels": 2431,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 6562,
+        "occluder_pixels_over_plate": 0,
+        "occluder_pixels_covered": 0,
+        "occluder_covered_pct": null,
+        "iou_visible_plate": 0.6170190659255026,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "topology_exact": true,
+        "strict_visible_only_pass": false
+      },
+      "thin_hole_refinement": {
+        "visible_plate_pixels": 12687,
+        "missed_visible_plate_pixels": 808,
+        "missed_visible_plate_pct": 6.368723890596674,
+        "visible_glyph_pixels": 2431,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 6563,
+        "occluder_pixels_over_plate": 0,
+        "occluder_pixels_covered": 0,
+        "occluder_covered_pct": null,
+        "iou_visible_plate": 0.6170909090909091,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "topology_exact": true,
+        "strict_visible_only_pass": false
+      },
+      "timing": {
+        "grabcut_cpu_ms": 445.66502699999955,
+        "grabcut_wall_ms": 445.80066000071383,
+        "candidate_cpu_ms": 449.60010899999946,
+        "candidate_wall_ms": 449.61016700017353,
+        "refinement_cpu_ms": 3.935081999999923,
+        "recovered_thin_holes": 0,
+        "recovered_thin_hole_pixels": 0,
+        "preserved_large_holes": 0,
+        "closing_radius_pixels": 2,
+        "thin_hole_radius_limit_pixels": 5.5600000000000005
+      }
+    },
+    {
+      "variant": "blur_sigma_1p5",
+      "name": "perspective",
+      "detector_box": [
+        128,
+        191,
+        354,
+        271
+      ],
+      "grabcut": {
+        "visible_plate_pixels": 9937,
+        "missed_visible_plate_pixels": 735,
+        "missed_visible_plate_pct": 7.396598570997283,
+        "visible_glyph_pixels": 1965,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 0,
+        "occluder_pixels_over_plate": 0,
+        "occluder_pixels_covered": 0,
+        "occluder_covered_pct": null,
+        "iou_visible_plate": 0.9260340142900272,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "topology_exact": true,
+        "strict_visible_only_pass": false
+      },
+      "thin_hole_refinement": {
+        "visible_plate_pixels": 9937,
+        "missed_visible_plate_pixels": 735,
+        "missed_visible_plate_pct": 7.396598570997283,
+        "visible_glyph_pixels": 1965,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 0,
+        "occluder_pixels_over_plate": 0,
+        "occluder_pixels_covered": 0,
+        "occluder_covered_pct": null,
+        "iou_visible_plate": 0.9260340142900272,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "topology_exact": true,
+        "strict_visible_only_pass": false
+      },
+      "timing": {
+        "grabcut_cpu_ms": 252.74956500000025,
+        "grabcut_wall_ms": 252.77942500088102,
+        "candidate_cpu_ms": 255.8595119999998,
+        "candidate_wall_ms": 255.88617000084923,
+        "refinement_cpu_ms": 3.1099469999995577,
+        "recovered_thin_holes": 0,
+        "recovered_thin_hole_pixels": 0,
+        "preserved_large_holes": 0,
+        "closing_radius_pixels": 1,
+        "thin_hole_radius_limit_pixels": 3.2
+      }
+    },
+    {
+      "variant": "blur_sigma_1p5",
+      "name": "disconnected_cross_occlusion",
+      "detector_box": [
+        128,
+        196,
+        354,
+        273
+      ],
+      "grabcut": {
+        "visible_plate_pixels": 9275,
+        "missed_visible_plate_pixels": 907,
+        "missed_visible_plate_pct": 9.778975741239892,
+        "visible_glyph_pixels": 1176,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 605,
+        "occluder_pixels_over_plate": 3335,
+        "occluder_pixels_covered": 3335,
+        "occluder_covered_pct": 100.0,
+        "iou_visible_plate": 0.6332198259553538,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 1
+        },
+        "truth_topology": {
+          "components": 4,
+          "holes": 0
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "thin_hole_refinement": {
+        "visible_plate_pixels": 9275,
+        "missed_visible_plate_pixels": 898,
+        "missed_visible_plate_pct": 9.681940700808624,
+        "visible_glyph_pixels": 1176,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 605,
+        "occluder_pixels_over_plate": 3335,
+        "occluder_pixels_covered": 3335,
+        "occluder_covered_pct": 100.0,
+        "iou_visible_plate": 0.6339008702232312,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 4,
+          "holes": 0
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "timing": {
+        "grabcut_cpu_ms": 217.21110399999955,
+        "grabcut_wall_ms": 217.2140769998805,
+        "candidate_cpu_ms": 220.28833300000005,
+        "candidate_wall_ms": 220.28713200052152,
+        "refinement_cpu_ms": 3.0772290000005142,
+        "recovered_thin_holes": 0,
+        "recovered_thin_hole_pixels": 0,
+        "preserved_large_holes": 0,
+        "closing_radius_pixels": 1,
+        "thin_hole_radius_limit_pixels": 3.08
+      }
+    },
+    {
+      "variant": "blur_sigma_1p5",
+      "name": "interior_occluder_hole",
+      "detector_box": [
+        128,
+        196,
+        354,
+        273
+      ],
+      "grabcut": {
+        "visible_plate_pixels": 12169,
+        "missed_visible_plate_pixels": 840,
+        "missed_visible_plate_pct": 6.902785767113157,
+        "visible_glyph_pixels": 2074,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 0,
+        "occluder_pixels_over_plate": 441,
+        "occluder_pixels_covered": 441,
+        "occluder_covered_pct": 100.0,
+        "iou_visible_plate": 0.8984139571768438,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 1
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "thin_hole_refinement": {
+        "visible_plate_pixels": 12169,
+        "missed_visible_plate_pixels": 840,
+        "missed_visible_plate_pct": 6.902785767113157,
+        "visible_glyph_pixels": 2074,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 0,
+        "occluder_pixels_over_plate": 441,
+        "occluder_pixels_covered": 441,
+        "occluder_covered_pct": 100.0,
+        "iou_visible_plate": 0.8984139571768438,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 1
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "timing": {
+        "grabcut_cpu_ms": 218.6622190000005,
+        "grabcut_wall_ms": 218.6728899996524,
+        "candidate_cpu_ms": 221.57801800000067,
+        "candidate_wall_ms": 221.58241499982978,
+        "refinement_cpu_ms": 2.9157990000001632,
+        "recovered_thin_holes": 0,
+        "recovered_thin_hole_pixels": 0,
+        "preserved_large_holes": 0,
+        "closing_radius_pixels": 1,
+        "thin_hole_radius_limit_pixels": 3.08
+      }
+    },
+    {
+      "variant": "blur_sigma_1p5",
+      "name": "low_contrast_glare",
+      "detector_box": [
+        128,
+        191,
+        354,
+        271
+      ],
+      "grabcut": {
+        "visible_plate_pixels": 9937,
+        "missed_visible_plate_pixels": 266,
+        "missed_visible_plate_pct": 2.676864244741874,
+        "visible_glyph_pixels": 1965,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 0,
+        "occluder_pixels_over_plate": 0,
+        "occluder_pixels_covered": 0,
+        "occluder_covered_pct": null,
+        "iou_visible_plate": 0.9732313575525813,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "topology_exact": true,
+        "strict_visible_only_pass": false
+      },
+      "thin_hole_refinement": {
+        "visible_plate_pixels": 9937,
+        "missed_visible_plate_pixels": 266,
+        "missed_visible_plate_pct": 2.676864244741874,
+        "visible_glyph_pixels": 1965,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 0,
+        "occluder_pixels_over_plate": 0,
+        "occluder_pixels_covered": 0,
+        "occluder_covered_pct": null,
+        "iou_visible_plate": 0.9732313575525813,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "topology_exact": true,
+        "strict_visible_only_pass": false
+      },
+      "timing": {
+        "grabcut_cpu_ms": 286.37499700000023,
+        "grabcut_wall_ms": 286.389269999745,
+        "candidate_cpu_ms": 289.77045799999956,
+        "candidate_wall_ms": 289.77906099953543,
+        "refinement_cpu_ms": 3.3954609999993224,
+        "recovered_thin_holes": 0,
+        "recovered_thin_hole_pixels": 0,
+        "preserved_large_holes": 0,
+        "closing_radius_pixels": 1,
+        "thin_hole_radius_limit_pixels": 3.2
+      }
+    },
+    {
+      "variant": "blur_sigma_1p5",
+      "name": "small_plate",
+      "detector_box": [
+        211,
+        219,
+        280,
+        248
+      ],
+      "grabcut": {
+        "visible_plate_pixels": 1263,
+        "missed_visible_plate_pixels": 21,
+        "missed_visible_plate_pct": 1.66270783847981,
+        "visible_glyph_pixels": 240,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 0,
+        "occluder_pixels_over_plate": 0,
+        "occluder_pixels_covered": 0,
+        "occluder_covered_pct": null,
+        "iou_visible_plate": 0.9833729216152018,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "topology_exact": true,
+        "strict_visible_only_pass": false
+      },
+      "thin_hole_refinement": {
+        "visible_plate_pixels": 1263,
+        "missed_visible_plate_pixels": 21,
+        "missed_visible_plate_pct": 1.66270783847981,
+        "visible_glyph_pixels": 240,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 0,
+        "occluder_pixels_over_plate": 0,
+        "occluder_pixels_covered": 0,
+        "occluder_covered_pct": null,
+        "iou_visible_plate": 0.9833729216152018,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "topology_exact": true,
+        "strict_visible_only_pass": false
+      },
+      "timing": {
+        "grabcut_cpu_ms": 201.1866049999993,
+        "grabcut_wall_ms": 202.74730500022997,
+        "candidate_cpu_ms": 204.8290820000007,
+        "candidate_wall_ms": 206.38754399988102,
+        "refinement_cpu_ms": 3.6424770000014206,
+        "recovered_thin_holes": 0,
+        "recovered_thin_hole_pixels": 0,
+        "preserved_large_holes": 0,
+        "closing_radius_pixels": 1,
+        "thin_hole_radius_limit_pixels": 1.5
+      }
+    },
+    {
+      "variant": "blur_sigma_1p5",
+      "name": "moving_occluder_00",
+      "detector_box": [
+        119,
+        196,
+        345,
+        273
+      ],
+      "grabcut": {
+        "visible_plate_pixels": 10920,
+        "missed_visible_plate_pixels": 821,
+        "missed_visible_plate_pct": 7.518315018315018,
+        "visible_glyph_pixels": 1876,
+        "missed_visible_glyph_pixels": 55,
+        "missed_visible_glyph_pct": 2.931769722814499,
+        "unwanted_background_pixels": 0,
+        "occluder_pixels_over_plate": 1690,
+        "occluder_pixels_covered": 80,
+        "occluder_covered_pct": 4.733727810650888,
+        "iou_visible_plate": 0.9180909090909091,
+        "predicted_topology": {
+          "components": 2,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 2,
+          "holes": 0
+        },
+        "topology_exact": true,
+        "strict_visible_only_pass": false
+      },
+      "thin_hole_refinement": {
+        "visible_plate_pixels": 10920,
+        "missed_visible_plate_pixels": 807,
+        "missed_visible_plate_pct": 7.3901098901098905,
+        "visible_glyph_pixels": 1876,
+        "missed_visible_glyph_pixels": 41,
+        "missed_visible_glyph_pct": 2.185501066098081,
+        "unwanted_background_pixels": 0,
+        "occluder_pixels_over_plate": 1690,
+        "occluder_pixels_covered": 80,
+        "occluder_covered_pct": 4.733727810650888,
+        "iou_visible_plate": 0.9193636363636364,
+        "predicted_topology": {
+          "components": 2,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 2,
+          "holes": 0
+        },
+        "topology_exact": true,
+        "strict_visible_only_pass": false
+      },
+      "timing": {
+        "grabcut_cpu_ms": 242.68639199999953,
+        "grabcut_wall_ms": 242.72107100023277,
+        "candidate_cpu_ms": 245.70152799999966,
+        "candidate_wall_ms": 245.7316850004645,
+        "refinement_cpu_ms": 3.0151360000001404,
+        "recovered_thin_holes": 0,
+        "recovered_thin_hole_pixels": 0,
+        "preserved_large_holes": 0,
+        "closing_radius_pixels": 1,
+        "thin_hole_radius_limit_pixels": 3.08
+      }
+    },
+    {
+      "variant": "blur_sigma_1p5",
+      "name": "moving_occluder_01",
+      "detector_box": [
+        128,
+        196,
+        354,
+        273
+      ],
+      "grabcut": {
+        "visible_plate_pixels": 10920,
+        "missed_visible_plate_pixels": 803,
+        "missed_visible_plate_pct": 7.353479853479853,
+        "visible_glyph_pixels": 1954,
+        "missed_visible_glyph_pixels": 31,
+        "missed_visible_glyph_pct": 1.586489252814739,
+        "unwanted_background_pixels": 0,
+        "occluder_pixels_over_plate": 1690,
+        "occluder_pixels_covered": 0,
+        "occluder_covered_pct": 0.0,
+        "iou_visible_plate": 0.9264652014652015,
+        "predicted_topology": {
+          "components": 2,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 2,
+          "holes": 0
+        },
+        "topology_exact": true,
+        "strict_visible_only_pass": false
+      },
+      "thin_hole_refinement": {
+        "visible_plate_pixels": 10920,
+        "missed_visible_plate_pixels": 798,
+        "missed_visible_plate_pct": 7.3076923076923075,
+        "visible_glyph_pixels": 1954,
+        "missed_visible_glyph_pixels": 26,
+        "missed_visible_glyph_pct": 1.330603889457523,
+        "unwanted_background_pixels": 0,
+        "occluder_pixels_over_plate": 1690,
+        "occluder_pixels_covered": 0,
+        "occluder_covered_pct": 0.0,
+        "iou_visible_plate": 0.926923076923077,
+        "predicted_topology": {
+          "components": 2,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 2,
+          "holes": 0
+        },
+        "topology_exact": true,
+        "strict_visible_only_pass": false
+      },
+      "timing": {
+        "grabcut_cpu_ms": 242.80339999999967,
+        "grabcut_wall_ms": 242.8600200000801,
+        "candidate_cpu_ms": 245.6032669999999,
+        "candidate_wall_ms": 245.65268300011667,
+        "refinement_cpu_ms": 2.7998670000002335,
+        "recovered_thin_holes": 0,
+        "recovered_thin_hole_pixels": 0,
+        "preserved_large_holes": 0,
+        "closing_radius_pixels": 1,
+        "thin_hole_radius_limit_pixels": 3.08
+      }
+    },
+    {
+      "variant": "blur_sigma_1p5",
+      "name": "moving_occluder_02",
+      "detector_box": [
+        137,
+        196,
+        363,
+        273
+      ],
+      "grabcut": {
+        "visible_plate_pixels": 10920,
+        "missed_visible_plate_pixels": 804,
+        "missed_visible_plate_pct": 7.362637362637362,
+        "visible_glyph_pixels": 1912,
+        "missed_visible_glyph_pixels": 38,
+        "missed_visible_glyph_pct": 1.9874476987447698,
+        "unwanted_background_pixels": 0,
+        "occluder_pixels_over_plate": 1690,
+        "occluder_pixels_covered": 186,
+        "occluder_covered_pct": 11.005917159763314,
+        "iou_visible_plate": 0.9108589951377634,
+        "predicted_topology": {
+          "components": 2,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 2,
+          "holes": 0
+        },
+        "topology_exact": true,
+        "strict_visible_only_pass": false
+      },
+      "thin_hole_refinement": {
+        "visible_plate_pixels": 10920,
+        "missed_visible_plate_pixels": 804,
+        "missed_visible_plate_pct": 7.362637362637362,
+        "visible_glyph_pixels": 1912,
+        "missed_visible_glyph_pixels": 38,
+        "missed_visible_glyph_pct": 1.9874476987447698,
+        "unwanted_background_pixels": 0,
+        "occluder_pixels_over_plate": 1690,
+        "occluder_pixels_covered": 186,
+        "occluder_covered_pct": 11.005917159763314,
+        "iou_visible_plate": 0.9108589951377634,
+        "predicted_topology": {
+          "components": 2,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 2,
+          "holes": 0
+        },
+        "topology_exact": true,
+        "strict_visible_only_pass": false
+      },
+      "timing": {
+        "grabcut_cpu_ms": 209.94414600000155,
+        "grabcut_wall_ms": 209.96565499990538,
+        "candidate_cpu_ms": 212.93866200000087,
+        "candidate_wall_ms": 212.95300500059966,
+        "refinement_cpu_ms": 2.9945159999993365,
+        "recovered_thin_holes": 0,
+        "recovered_thin_hole_pixels": 0,
+        "preserved_large_holes": 0,
+        "closing_radius_pixels": 1,
+        "thin_hole_radius_limit_pixels": 3.08
+      }
+    },
+    {
+      "variant": "blur_sigma_1p5",
+      "name": "narrow_two_rows",
+      "detector_box": [
+        143,
+        182,
+        339,
+        274
+      ],
+      "grabcut": {
+        "visible_plate_pixels": 13104,
+        "missed_visible_plate_pixels": 819,
+        "missed_visible_plate_pct": 6.25,
+        "visible_glyph_pixels": 1151,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 0,
+        "occluder_pixels_over_plate": 0,
+        "occluder_pixels_covered": 0,
+        "occluder_covered_pct": null,
+        "iou_visible_plate": 0.9375,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "topology_exact": true,
+        "strict_visible_only_pass": false
+      },
+      "thin_hole_refinement": {
+        "visible_plate_pixels": 13104,
+        "missed_visible_plate_pixels": 819,
+        "missed_visible_plate_pct": 6.25,
+        "visible_glyph_pixels": 1151,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 0,
+        "occluder_pixels_over_plate": 0,
+        "occluder_pixels_covered": 0,
+        "occluder_covered_pct": null,
+        "iou_visible_plate": 0.9375,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "topology_exact": true,
+        "strict_visible_only_pass": false
+      },
+      "timing": {
+        "grabcut_cpu_ms": 253.00312299999916,
+        "grabcut_wall_ms": 253.0949199999668,
+        "candidate_cpu_ms": 256.33697299999983,
+        "candidate_wall_ms": 256.42641500053287,
+        "refinement_cpu_ms": 3.3338500000006377,
+        "recovered_thin_holes": 0,
+        "recovered_thin_hole_pixels": 0,
+        "preserved_large_holes": 0,
+        "closing_radius_pixels": 1,
+        "thin_hole_radius_limit_pixels": 3.68
+      }
+    },
+    {
+      "variant": "blur_sigma_1p5",
+      "name": "narrow_hyphen",
+      "detector_box": [
+        128,
+        196,
+        354,
+        273
+      ],
+      "grabcut": {
+        "visible_plate_pixels": 12610,
+        "missed_visible_plate_pixels": 848,
+        "missed_visible_plate_pct": 6.724821570182395,
+        "visible_glyph_pixels": 1866,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 0,
+        "occluder_pixels_over_plate": 0,
+        "occluder_pixels_covered": 0,
+        "occluder_covered_pct": null,
+        "iou_visible_plate": 0.9327517842981761,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "topology_exact": true,
+        "strict_visible_only_pass": false
+      },
+      "thin_hole_refinement": {
+        "visible_plate_pixels": 12610,
+        "missed_visible_plate_pixels": 848,
+        "missed_visible_plate_pct": 6.724821570182395,
+        "visible_glyph_pixels": 1866,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 0,
+        "occluder_pixels_over_plate": 0,
+        "occluder_pixels_covered": 0,
+        "occluder_covered_pct": null,
+        "iou_visible_plate": 0.9327517842981761,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "topology_exact": true,
+        "strict_visible_only_pass": false
+      },
+      "timing": {
+        "grabcut_cpu_ms": 226.59485600000016,
+        "grabcut_wall_ms": 226.62379299981694,
+        "candidate_cpu_ms": 230.18094000000033,
+        "candidate_wall_ms": 230.20330300005298,
+        "refinement_cpu_ms": 3.586084000000156,
+        "recovered_thin_holes": 0,
+        "recovered_thin_hole_pixels": 0,
+        "preserved_large_holes": 0,
+        "closing_radius_pixels": 1,
+        "thin_hole_radius_limit_pixels": 3.08
+      }
+    },
+    {
+      "variant": "contrast_0p35",
+      "name": "frontal",
+      "detector_box": [
+        128,
+        196,
+        354,
+        273
+      ],
+      "grabcut": {
+        "visible_plate_pixels": 12610,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 2405,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 226,
+        "occluder_pixels_over_plate": 0,
+        "occluder_pixels_covered": 0,
+        "occluder_covered_pct": null,
+        "iou_visible_plate": 0.9823932689311312,
+        "predicted_topology": {
+          "components": 2,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "thin_hole_refinement": {
+        "visible_plate_pixels": 12610,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 2405,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 226,
+        "occluder_pixels_over_plate": 0,
+        "occluder_pixels_covered": 0,
+        "occluder_covered_pct": null,
+        "iou_visible_plate": 0.9823932689311312,
+        "predicted_topology": {
+          "components": 2,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "timing": {
+        "grabcut_cpu_ms": 231.88390299999995,
+        "grabcut_wall_ms": 231.94723100004921,
+        "candidate_cpu_ms": 235.30045500000085,
+        "candidate_wall_ms": 235.35890400034987,
+        "refinement_cpu_ms": 3.4165520000009053,
+        "recovered_thin_holes": 0,
+        "recovered_thin_hole_pixels": 0,
+        "preserved_large_holes": 0,
+        "closing_radius_pixels": 1,
+        "thin_hole_radius_limit_pixels": 3.08
+      }
+    },
+    {
+      "variant": "contrast_0p35",
+      "name": "rotated",
+      "detector_box": [
+        121,
+        161,
+        360,
+        300
+      ],
+      "grabcut": {
+        "visible_plate_pixels": 12687,
+        "missed_visible_plate_pixels": 1,
+        "missed_visible_plate_pct": 0.007882084023015686,
+        "visible_glyph_pixels": 2431,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 11298,
+        "occluder_pixels_over_plate": 0,
+        "occluder_pixels_covered": 0,
+        "occluder_covered_pct": null,
+        "iou_visible_plate": 0.5289139045236606,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "topology_exact": true,
+        "strict_visible_only_pass": false
+      },
+      "thin_hole_refinement": {
+        "visible_plate_pixels": 12687,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 2431,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 11347,
+        "occluder_pixels_over_plate": 0,
+        "occluder_pixels_covered": 0,
+        "occluder_covered_pct": null,
+        "iou_visible_plate": 0.5278771740034951,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "topology_exact": true,
+        "strict_visible_only_pass": false
+      },
+      "timing": {
+        "grabcut_cpu_ms": 380.29435199999995,
+        "grabcut_wall_ms": 380.41796299967245,
+        "candidate_cpu_ms": 383.5464700000006,
+        "candidate_wall_ms": 383.66528500046115,
+        "refinement_cpu_ms": 3.252118000000692,
+        "recovered_thin_holes": 0,
+        "recovered_thin_hole_pixels": 0,
+        "preserved_large_holes": 0,
+        "closing_radius_pixels": 2,
+        "thin_hole_radius_limit_pixels": 5.5600000000000005
+      }
+    },
+    {
+      "variant": "contrast_0p35",
+      "name": "perspective",
+      "detector_box": [
+        128,
+        191,
+        354,
+        271
+      ],
+      "grabcut": {
+        "visible_plate_pixels": 9937,
+        "missed_visible_plate_pixels": 1120,
+        "missed_visible_plate_pct": 11.271007346281573,
+        "visible_glyph_pixels": 1965,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 226,
+        "occluder_pixels_over_plate": 0,
+        "occluder_pixels_covered": 0,
+        "occluder_covered_pct": null,
+        "iou_visible_plate": 0.8675587916953655,
+        "predicted_topology": {
+          "components": 7,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "thin_hole_refinement": {
+        "visible_plate_pixels": 9937,
+        "missed_visible_plate_pixels": 1119,
+        "missed_visible_plate_pct": 11.26094394686525,
+        "visible_glyph_pixels": 1965,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 226,
+        "occluder_pixels_over_plate": 0,
+        "occluder_pixels_covered": 0,
+        "occluder_covered_pct": null,
+        "iou_visible_plate": 0.8676571878382368,
+        "predicted_topology": {
+          "components": 7,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "timing": {
+        "grabcut_cpu_ms": 235.38676500000122,
+        "grabcut_wall_ms": 237.6515570003903,
+        "candidate_cpu_ms": 238.7712300000011,
+        "candidate_wall_ms": 241.03054199986218,
+        "refinement_cpu_ms": 3.384464999999892,
+        "recovered_thin_holes": 0,
+        "recovered_thin_hole_pixels": 0,
+        "preserved_large_holes": 0,
+        "closing_radius_pixels": 1,
+        "thin_hole_radius_limit_pixels": 3.2
+      }
+    },
+    {
+      "variant": "contrast_0p35",
+      "name": "disconnected_cross_occlusion",
+      "detector_box": [
+        128,
+        196,
+        354,
+        273
+      ],
+      "grabcut": {
+        "visible_plate_pixels": 9275,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 1176,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 1389,
+        "occluder_pixels_over_plate": 3335,
+        "occluder_pixels_covered": 3335,
+        "occluder_covered_pct": 100.0,
+        "iou_visible_plate": 0.6625473248089149,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 4,
+          "holes": 0
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "thin_hole_refinement": {
+        "visible_plate_pixels": 9275,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 1176,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 1401,
+        "occluder_pixels_over_plate": 3335,
+        "occluder_pixels_covered": 3335,
+        "occluder_covered_pct": 100.0,
+        "iou_visible_plate": 0.6619798729569624,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 4,
+          "holes": 0
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "timing": {
+        "grabcut_cpu_ms": 249.2657119999997,
+        "grabcut_wall_ms": 249.31395299972792,
+        "candidate_cpu_ms": 252.6433069999996,
+        "candidate_wall_ms": 252.687249999326,
+        "refinement_cpu_ms": 3.3775949999999,
+        "recovered_thin_holes": 0,
+        "recovered_thin_hole_pixels": 0,
+        "preserved_large_holes": 0,
+        "closing_radius_pixels": 1,
+        "thin_hole_radius_limit_pixels": 3.08
+      }
+    },
+    {
+      "variant": "contrast_0p35",
+      "name": "interior_occluder_hole",
+      "detector_box": [
+        128,
+        196,
+        354,
+        273
+      ],
+      "grabcut": {
+        "visible_plate_pixels": 12169,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 2074,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 226,
+        "occluder_pixels_over_plate": 441,
+        "occluder_pixels_covered": 441,
+        "occluder_covered_pct": 100.0,
+        "iou_visible_plate": 0.9480367715799315,
+        "predicted_topology": {
+          "components": 2,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 1
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "thin_hole_refinement": {
+        "visible_plate_pixels": 12169,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 2074,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 226,
+        "occluder_pixels_over_plate": 441,
+        "occluder_pixels_covered": 441,
+        "occluder_covered_pct": 100.0,
+        "iou_visible_plate": 0.9480367715799315,
+        "predicted_topology": {
+          "components": 2,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 1
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "timing": {
+        "grabcut_cpu_ms": 277.45559799999955,
+        "grabcut_wall_ms": 277.50408000065363,
+        "candidate_cpu_ms": 281.79416899999944,
+        "candidate_wall_ms": 281.8411620000916,
+        "refinement_cpu_ms": 4.338570999999902,
+        "recovered_thin_holes": 0,
+        "recovered_thin_hole_pixels": 0,
+        "preserved_large_holes": 0,
+        "closing_radius_pixels": 1,
+        "thin_hole_radius_limit_pixels": 3.08
+      }
+    },
+    {
+      "variant": "contrast_0p35",
+      "name": "low_contrast_glare",
+      "detector_box": [
+        128,
+        191,
+        354,
+        271
+      ],
+      "grabcut": {
+        "visible_plate_pixels": 9937,
+        "missed_visible_plate_pixels": 75,
+        "missed_visible_plate_pct": 0.7547549562242125,
+        "visible_glyph_pixels": 1965,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 1115,
+        "occluder_pixels_over_plate": 0,
+        "occluder_pixels_covered": 0,
+        "occluder_covered_pct": null,
+        "iou_visible_plate": 0.8923271806007962,
+        "predicted_topology": {
+          "components": 2,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "thin_hole_refinement": {
+        "visible_plate_pixels": 9937,
+        "missed_visible_plate_pixels": 68,
+        "missed_visible_plate_pct": 0.6843111603099526,
+        "visible_glyph_pixels": 1965,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 1193,
+        "occluder_pixels_over_plate": 0,
+        "occluder_pixels_covered": 0,
+        "occluder_covered_pct": null,
+        "iou_visible_plate": 0.88670260557053,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "topology_exact": true,
+        "strict_visible_only_pass": false
+      },
+      "timing": {
+        "grabcut_cpu_ms": 306.6691349999999,
+        "grabcut_wall_ms": 306.856945000618,
+        "candidate_cpu_ms": 309.9366760000013,
+        "candidate_wall_ms": 310.11964900062594,
+        "refinement_cpu_ms": 3.2675410000013727,
+        "recovered_thin_holes": 1,
+        "recovered_thin_hole_pixels": 29,
+        "preserved_large_holes": 0,
+        "closing_radius_pixels": 1,
+        "thin_hole_radius_limit_pixels": 3.2
+      }
+    },
+    {
+      "variant": "contrast_0p35",
+      "name": "small_plate",
+      "detector_box": [
+        211,
+        219,
+        280,
+        248
+      ],
+      "grabcut": {
+        "visible_plate_pixels": 1263,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 240,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 0,
+        "occluder_pixels_over_plate": 0,
+        "occluder_pixels_covered": 0,
+        "occluder_covered_pct": null,
+        "iou_visible_plate": 1.0,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "topology_exact": true,
+        "strict_visible_only_pass": true
+      },
+      "thin_hole_refinement": {
+        "visible_plate_pixels": 1263,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 240,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 0,
+        "occluder_pixels_over_plate": 0,
+        "occluder_pixels_covered": 0,
+        "occluder_covered_pct": null,
+        "iou_visible_plate": 1.0,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "topology_exact": true,
+        "strict_visible_only_pass": true
+      },
+      "timing": {
+        "grabcut_cpu_ms": 238.21738600000054,
+        "grabcut_wall_ms": 238.2648020002307,
+        "candidate_cpu_ms": 241.74055699999997,
+        "candidate_wall_ms": 241.78383300022688,
+        "refinement_cpu_ms": 3.5231709999994365,
+        "recovered_thin_holes": 0,
+        "recovered_thin_hole_pixels": 0,
+        "preserved_large_holes": 0,
+        "closing_radius_pixels": 1,
+        "thin_hole_radius_limit_pixels": 1.5
+      }
+    },
+    {
+      "variant": "contrast_0p35",
+      "name": "moving_occluder_00",
+      "detector_box": [
+        119,
+        196,
+        345,
+        273
+      ],
+      "grabcut": {
+        "visible_plate_pixels": 10920,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 1876,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 512,
+        "occluder_pixels_over_plate": 1690,
+        "occluder_pixels_covered": 1690,
+        "occluder_covered_pct": 100.0,
+        "iou_visible_plate": 0.8321902149062643,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 2,
+          "holes": 0
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "thin_hole_refinement": {
+        "visible_plate_pixels": 10920,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 1876,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 520,
+        "occluder_pixels_over_plate": 1690,
+        "occluder_pixels_covered": 1690,
+        "occluder_covered_pct": 100.0,
+        "iou_visible_plate": 0.8316831683168316,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 2,
+          "holes": 0
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "timing": {
+        "grabcut_cpu_ms": 218.8024479999999,
+        "grabcut_wall_ms": 218.83033199992497,
+        "candidate_cpu_ms": 221.69813699999884,
+        "candidate_wall_ms": 221.73293700052454,
+        "refinement_cpu_ms": 2.8956889999989244,
+        "recovered_thin_holes": 0,
+        "recovered_thin_hole_pixels": 0,
+        "preserved_large_holes": 0,
+        "closing_radius_pixels": 1,
+        "thin_hole_radius_limit_pixels": 3.08
+      }
+    },
+    {
+      "variant": "contrast_0p35",
+      "name": "moving_occluder_01",
+      "detector_box": [
+        128,
+        196,
+        354,
+        273
+      ],
+      "grabcut": {
+        "visible_plate_pixels": 10920,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 1954,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 200,
+        "occluder_pixels_over_plate": 1690,
+        "occluder_pixels_covered": 0,
+        "occluder_covered_pct": 0.0,
+        "iou_visible_plate": 0.9820143884892086,
+        "predicted_topology": {
+          "components": 4,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 2,
+          "holes": 0
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "thin_hole_refinement": {
+        "visible_plate_pixels": 10920,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 1954,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 200,
+        "occluder_pixels_over_plate": 1690,
+        "occluder_pixels_covered": 0,
+        "occluder_covered_pct": 0.0,
+        "iou_visible_plate": 0.9820143884892086,
+        "predicted_topology": {
+          "components": 4,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 2,
+          "holes": 0
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "timing": {
+        "grabcut_cpu_ms": 246.7028280000001,
+        "grabcut_wall_ms": 246.75575400033267,
+        "candidate_cpu_ms": 268.4901400000008,
+        "candidate_wall_ms": 268.5424620003687,
+        "refinement_cpu_ms": 21.787312000000725,
+        "recovered_thin_holes": 0,
+        "recovered_thin_hole_pixels": 0,
+        "preserved_large_holes": 0,
+        "closing_radius_pixels": 1,
+        "thin_hole_radius_limit_pixels": 3.08
+      }
+    },
+    {
+      "variant": "contrast_0p35",
+      "name": "moving_occluder_02",
+      "detector_box": [
+        137,
+        196,
+        363,
+        273
+      ],
+      "grabcut": {
+        "visible_plate_pixels": 10920,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 1912,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 200,
+        "occluder_pixels_over_plate": 1690,
+        "occluder_pixels_covered": 0,
+        "occluder_covered_pct": 0.0,
+        "iou_visible_plate": 0.9820143884892086,
+        "predicted_topology": {
+          "components": 4,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 2,
+          "holes": 0
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "thin_hole_refinement": {
+        "visible_plate_pixels": 10920,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 1912,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 200,
+        "occluder_pixels_over_plate": 1690,
+        "occluder_pixels_covered": 0,
+        "occluder_covered_pct": 0.0,
+        "iou_visible_plate": 0.9820143884892086,
+        "predicted_topology": {
+          "components": 4,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 2,
+          "holes": 0
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "timing": {
+        "grabcut_cpu_ms": 250.58665999999974,
+        "grabcut_wall_ms": 250.61954700049682,
+        "candidate_cpu_ms": 255.65517500000112,
+        "candidate_wall_ms": 255.68648300031782,
+        "refinement_cpu_ms": 5.068515000001383,
+        "recovered_thin_holes": 0,
+        "recovered_thin_hole_pixels": 0,
+        "preserved_large_holes": 0,
+        "closing_radius_pixels": 1,
+        "thin_hole_radius_limit_pixels": 3.08
+      }
+    },
+    {
+      "variant": "contrast_0p35",
+      "name": "narrow_two_rows",
+      "detector_box": [
+        143,
+        182,
+        339,
+        274
+      ],
+      "grabcut": {
+        "visible_plate_pixels": 13104,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 1151,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 196,
+        "occluder_pixels_over_plate": 0,
+        "occluder_pixels_covered": 0,
+        "occluder_covered_pct": null,
+        "iou_visible_plate": 0.9852631578947368,
+        "predicted_topology": {
+          "components": 2,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "thin_hole_refinement": {
+        "visible_plate_pixels": 13104,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 1151,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 196,
+        "occluder_pixels_over_plate": 0,
+        "occluder_pixels_covered": 0,
+        "occluder_covered_pct": null,
+        "iou_visible_plate": 0.9852631578947368,
+        "predicted_topology": {
+          "components": 2,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "timing": {
+        "grabcut_cpu_ms": 250.21755699999915,
+        "grabcut_wall_ms": 250.29541500043706,
+        "candidate_cpu_ms": 253.71516999999955,
+        "candidate_wall_ms": 253.79012000030343,
+        "refinement_cpu_ms": 3.497613000000399,
+        "recovered_thin_holes": 0,
+        "recovered_thin_hole_pixels": 0,
+        "preserved_large_holes": 0,
+        "closing_radius_pixels": 1,
+        "thin_hole_radius_limit_pixels": 3.68
+      }
+    },
+    {
+      "variant": "contrast_0p35",
+      "name": "narrow_hyphen",
+      "detector_box": [
+        128,
+        196,
+        354,
+        273
+      ],
+      "grabcut": {
+        "visible_plate_pixels": 12610,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 1866,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 226,
+        "occluder_pixels_over_plate": 0,
+        "occluder_pixels_covered": 0,
+        "occluder_covered_pct": null,
+        "iou_visible_plate": 0.9823932689311312,
+        "predicted_topology": {
+          "components": 2,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "thin_hole_refinement": {
+        "visible_plate_pixels": 12610,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 1866,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 226,
+        "occluder_pixels_over_plate": 0,
+        "occluder_pixels_covered": 0,
+        "occluder_covered_pct": null,
+        "iou_visible_plate": 0.9823932689311312,
+        "predicted_topology": {
+          "components": 2,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "timing": {
+        "grabcut_cpu_ms": 254.11401600000084,
+        "grabcut_wall_ms": 254.1786259998844,
+        "candidate_cpu_ms": 259.144354,
+        "candidate_wall_ms": 259.2084159996375,
+        "refinement_cpu_ms": 5.03033799999919,
+        "recovered_thin_holes": 0,
+        "recovered_thin_hole_pixels": 0,
+        "preserved_large_holes": 0,
+        "closing_radius_pixels": 1,
+        "thin_hole_radius_limit_pixels": 3.08
+      }
+    },
+    {
+      "variant": "box_expand_25pct",
+      "name": "frontal",
+      "detector_box": [
+        72,
+        177,
+        410,
+        292
+      ],
+      "grabcut": {
+        "visible_plate_pixels": 12610,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 2405,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 6197,
+        "occluder_pixels_over_plate": 0,
+        "occluder_pixels_covered": 0,
+        "occluder_covered_pct": null,
+        "iou_visible_plate": 0.6704950284468549,
+        "predicted_topology": {
+          "components": 3,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "thin_hole_refinement": {
+        "visible_plate_pixels": 12610,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 2405,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 6202,
+        "occluder_pixels_over_plate": 0,
+        "occluder_pixels_covered": 0,
+        "occluder_covered_pct": null,
+        "iou_visible_plate": 0.6703168190516692,
+        "predicted_topology": {
+          "components": 3,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "timing": {
+        "grabcut_cpu_ms": 516.667077000001,
+        "grabcut_wall_ms": 520.4045889995541,
+        "candidate_cpu_ms": 521.3174610000007,
+        "candidate_wall_ms": 525.020286999279,
+        "refinement_cpu_ms": 4.650383999999619,
+        "recovered_thin_holes": 0,
+        "recovered_thin_hole_pixels": 0,
+        "preserved_large_holes": 0,
+        "closing_radius_pixels": 1,
+        "thin_hole_radius_limit_pixels": 4.6000000000000005
+      }
+    },
+    {
+      "variant": "box_expand_25pct",
+      "name": "rotated",
+      "detector_box": [
+        61,
+        126,
+        420,
+        320
+      ],
+      "grabcut": {
+        "visible_plate_pixels": 12687,
+        "missed_visible_plate_pixels": 7,
+        "missed_visible_plate_pct": 0.055174588161109796,
+        "visible_glyph_pixels": 2431,
+        "missed_visible_glyph_pixels": 7,
+        "missed_visible_glyph_pct": 0.2879473467708762,
+        "unwanted_background_pixels": 36738,
+        "occluder_pixels_over_plate": 0,
+        "occluder_pixels_covered": 0,
+        "occluder_covered_pct": null,
+        "iou_visible_plate": 0.2565503287809813,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 7
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "thin_hole_refinement": {
+        "visible_plate_pixels": 12687,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 2431,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 36885,
+        "occluder_pixels_over_plate": 0,
+        "occluder_pixels_covered": 0,
+        "occluder_covered_pct": null,
+        "iou_visible_plate": 0.25593076736867587,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "topology_exact": true,
+        "strict_visible_only_pass": false
+      },
+      "timing": {
+        "grabcut_cpu_ms": 365.36101999999994,
+        "grabcut_wall_ms": 366.54883899973356,
+        "candidate_cpu_ms": 370.1917510000001,
+        "candidate_wall_ms": 371.37657899984333,
+        "refinement_cpu_ms": 4.830731000000199,
+        "recovered_thin_holes": 0,
+        "recovered_thin_hole_pixels": 0,
+        "preserved_large_holes": 0,
+        "closing_radius_pixels": 2,
+        "thin_hole_radius_limit_pixels": 7.76
+      }
+    },
+    {
+      "variant": "box_expand_25pct",
+      "name": "perspective",
+      "detector_box": [
+        72,
+        171,
+        410,
+        291
+      ],
+      "grabcut": {
+        "visible_plate_pixels": 9937,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 1965,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 20134,
+        "occluder_pixels_over_plate": 0,
+        "occluder_pixels_covered": 0,
+        "occluder_covered_pct": null,
+        "iou_visible_plate": 0.3304512653386984,
+        "predicted_topology": {
+          "components": 2,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "thin_hole_refinement": {
+        "visible_plate_pixels": 9937,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 1965,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 20154,
+        "occluder_pixels_over_plate": 0,
+        "occluder_pixels_covered": 0,
+        "occluder_covered_pct": null,
+        "iou_visible_plate": 0.3302316307201489,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "topology_exact": true,
+        "strict_visible_only_pass": false
+      },
+      "timing": {
+        "grabcut_cpu_ms": 550.115645,
+        "grabcut_wall_ms": 550.3423230002227,
+        "candidate_cpu_ms": 553.697733,
+        "candidate_wall_ms": 553.9228480001839,
+        "refinement_cpu_ms": 3.5820879999999278,
+        "recovered_thin_holes": 0,
+        "recovered_thin_hole_pixels": 0,
+        "preserved_large_holes": 0,
+        "closing_radius_pixels": 2,
+        "thin_hole_radius_limit_pixels": 4.8
+      }
+    },
+    {
+      "variant": "box_expand_25pct",
+      "name": "disconnected_cross_occlusion",
+      "detector_box": [
+        72,
+        177,
+        410,
+        292
+      ],
+      "grabcut": {
+        "visible_plate_pixels": 9275,
+        "missed_visible_plate_pixels": 103,
+        "missed_visible_plate_pct": 1.110512129380054,
+        "visible_glyph_pixels": 1176,
+        "missed_visible_glyph_pixels": 86,
+        "missed_visible_glyph_pct": 7.312925170068027,
+        "unwanted_background_pixels": 7555,
+        "occluder_pixels_over_plate": 3335,
+        "occluder_pixels_covered": 3335,
+        "occluder_covered_pct": 100.0,
+        "iou_visible_plate": 0.45484750805851726,
+        "predicted_topology": {
+          "components": 3,
+          "holes": 28
+        },
+        "truth_topology": {
+          "components": 4,
+          "holes": 0
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "thin_hole_refinement": {
+        "visible_plate_pixels": 9275,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 1176,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 7568,
+        "occluder_pixels_over_plate": 3335,
+        "occluder_pixels_covered": 3335,
+        "occluder_covered_pct": 100.0,
+        "iou_visible_plate": 0.45965903459213003,
+        "predicted_topology": {
+          "components": 3,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 4,
+          "holes": 0
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "timing": {
+        "grabcut_cpu_ms": 411.1652819999989,
+        "grabcut_wall_ms": 411.25189600006706,
+        "candidate_cpu_ms": 414.7779659999991,
+        "candidate_wall_ms": 414.86310600066645,
+        "refinement_cpu_ms": 3.6126840000001437,
+        "recovered_thin_holes": 0,
+        "recovered_thin_hole_pixels": 0,
+        "preserved_large_holes": 0,
+        "closing_radius_pixels": 1,
+        "thin_hole_radius_limit_pixels": 4.6000000000000005
+      }
+    },
+    {
+      "variant": "box_expand_25pct",
+      "name": "interior_occluder_hole",
+      "detector_box": [
+        72,
+        177,
+        410,
+        292
+      ],
+      "grabcut": {
+        "visible_plate_pixels": 12169,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 2074,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 6197,
+        "occluder_pixels_over_plate": 441,
+        "occluder_pixels_covered": 441,
+        "occluder_covered_pct": 100.0,
+        "iou_visible_plate": 0.647046312543202,
+        "predicted_topology": {
+          "components": 3,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 1
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "thin_hole_refinement": {
+        "visible_plate_pixels": 12169,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 2074,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 6202,
+        "occluder_pixels_over_plate": 441,
+        "occluder_pixels_covered": 441,
+        "occluder_covered_pct": 100.0,
+        "iou_visible_plate": 0.6468743355305124,
+        "predicted_topology": {
+          "components": 3,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 1
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "timing": {
+        "grabcut_cpu_ms": 510.1719539999987,
+        "grabcut_wall_ms": 510.3350629997294,
+        "candidate_cpu_ms": 514.0440829999999,
+        "candidate_wall_ms": 514.2054239995559,
+        "refinement_cpu_ms": 3.872129000001223,
+        "recovered_thin_holes": 0,
+        "recovered_thin_hole_pixels": 0,
+        "preserved_large_holes": 0,
+        "closing_radius_pixels": 1,
+        "thin_hole_radius_limit_pixels": 4.6000000000000005
+      }
+    },
+    {
+      "variant": "box_expand_25pct",
+      "name": "low_contrast_glare",
+      "detector_box": [
+        72,
+        171,
+        410,
+        291
+      ],
+      "grabcut": {
+        "visible_plate_pixels": 9937,
+        "missed_visible_plate_pixels": 3,
+        "missed_visible_plate_pct": 0.0301901982489685,
+        "visible_glyph_pixels": 1965,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 28199,
+        "occluder_pixels_over_plate": 0,
+        "occluder_pixels_covered": 0,
+        "occluder_covered_pct": null,
+        "iou_visible_plate": 0.2604887770086008,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 2
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "thin_hole_refinement": {
+        "visible_plate_pixels": 9937,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 1965,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 28516,
+        "occluder_pixels_over_plate": 0,
+        "occluder_pixels_covered": 0,
+        "occluder_covered_pct": null,
+        "iou_visible_plate": 0.2584193690999402,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "topology_exact": true,
+        "strict_visible_only_pass": false
+      },
+      "timing": {
+        "grabcut_cpu_ms": 447.935953,
+        "grabcut_wall_ms": 447.9975599997488,
+        "candidate_cpu_ms": 453.0650170000001,
+        "candidate_wall_ms": 453.12403899970377,
+        "refinement_cpu_ms": 5.1290640000001275,
+        "recovered_thin_holes": 0,
+        "recovered_thin_hole_pixels": 0,
+        "preserved_large_holes": 0,
+        "closing_radius_pixels": 2,
+        "thin_hole_radius_limit_pixels": 4.8
+      }
+    },
+    {
+      "variant": "box_expand_25pct",
+      "name": "small_plate",
+      "detector_box": [
+        194,
+        212,
+        297,
+        255
+      ],
+      "grabcut": {
+        "visible_plate_pixels": 1263,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 240,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 0,
+        "occluder_pixels_over_plate": 0,
+        "occluder_pixels_covered": 0,
+        "occluder_covered_pct": null,
+        "iou_visible_plate": 1.0,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "topology_exact": true,
+        "strict_visible_only_pass": true
+      },
+      "thin_hole_refinement": {
+        "visible_plate_pixels": 1263,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 240,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 0,
+        "occluder_pixels_over_plate": 0,
+        "occluder_pixels_covered": 0,
+        "occluder_covered_pct": null,
+        "iou_visible_plate": 1.0,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "topology_exact": true,
+        "strict_visible_only_pass": true
+      },
+      "timing": {
+        "grabcut_cpu_ms": 248.66015399999952,
+        "grabcut_wall_ms": 249.31544799983385,
+        "candidate_cpu_ms": 252.32532600000113,
+        "candidate_wall_ms": 252.98006699995312,
+        "refinement_cpu_ms": 3.665172000001604,
+        "recovered_thin_holes": 0,
+        "recovered_thin_hole_pixels": 0,
+        "preserved_large_holes": 0,
+        "closing_radius_pixels": 1,
+        "thin_hole_radius_limit_pixels": 1.72
+      }
+    },
+    {
+      "variant": "box_expand_25pct",
+      "name": "moving_occluder_00",
+      "detector_box": [
+        63,
+        177,
+        401,
+        292
+      ],
+      "grabcut": {
+        "visible_plate_pixels": 10920,
+        "missed_visible_plate_pixels": 3,
+        "missed_visible_plate_pct": 0.027472527472527472,
+        "visible_glyph_pixels": 1876,
+        "missed_visible_glyph_pixels": 3,
+        "missed_visible_glyph_pct": 0.15991471215351813,
+        "unwanted_background_pixels": 11163,
+        "occluder_pixels_over_plate": 1690,
+        "occluder_pixels_covered": 1690,
+        "occluder_covered_pct": 100.0,
+        "iou_visible_plate": 0.45921844108862997,
+        "predicted_topology": {
+          "components": 3,
+          "holes": 3
+        },
+        "truth_topology": {
+          "components": 2,
+          "holes": 0
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "thin_hole_refinement": {
+        "visible_plate_pixels": 10920,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 1876,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 11173,
+        "occluder_pixels_over_plate": 1690,
+        "occluder_pixels_covered": 1690,
+        "occluder_covered_pct": 100.0,
+        "iou_visible_plate": 0.4591514947651684,
+        "predicted_topology": {
+          "components": 3,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 2,
+          "holes": 0
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "timing": {
+        "grabcut_cpu_ms": 400.5403920000017,
+        "grabcut_wall_ms": 404.8827839997102,
+        "candidate_cpu_ms": 403.8434960000021,
+        "candidate_wall_ms": 408.18338799999765,
+        "refinement_cpu_ms": 3.3031040000004452,
+        "recovered_thin_holes": 0,
+        "recovered_thin_hole_pixels": 0,
+        "preserved_large_holes": 0,
+        "closing_radius_pixels": 1,
+        "thin_hole_radius_limit_pixels": 4.6000000000000005
+      }
+    },
+    {
+      "variant": "box_expand_25pct",
+      "name": "moving_occluder_01",
+      "detector_box": [
+        72,
+        177,
+        410,
+        292
+      ],
+      "grabcut": {
+        "visible_plate_pixels": 10920,
+        "missed_visible_plate_pixels": 3,
+        "missed_visible_plate_pct": 0.027472527472527472,
+        "visible_glyph_pixels": 1954,
+        "missed_visible_glyph_pixels": 3,
+        "missed_visible_glyph_pct": 0.1535312180143296,
+        "unwanted_background_pixels": 9988,
+        "occluder_pixels_over_plate": 1690,
+        "occluder_pixels_covered": 0,
+        "occluder_covered_pct": 0.0,
+        "iou_visible_plate": 0.5221446336330591,
+        "predicted_topology": {
+          "components": 4,
+          "holes": 3
+        },
+        "truth_topology": {
+          "components": 2,
+          "holes": 0
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "thin_hole_refinement": {
+        "visible_plate_pixels": 10920,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 1954,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 9993,
+        "occluder_pixels_over_plate": 1690,
+        "occluder_pixels_covered": 0,
+        "occluder_covered_pct": 0.0,
+        "iou_visible_plate": 0.5221632477406398,
+        "predicted_topology": {
+          "components": 4,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 2,
+          "holes": 0
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "timing": {
+        "grabcut_cpu_ms": 479.3374089999993,
+        "grabcut_wall_ms": 480.0428529997589,
+        "candidate_cpu_ms": 483.6486200000003,
+        "candidate_wall_ms": 484.35263100054726,
+        "refinement_cpu_ms": 4.311211000000981,
+        "recovered_thin_holes": 0,
+        "recovered_thin_hole_pixels": 0,
+        "preserved_large_holes": 0,
+        "closing_radius_pixels": 1,
+        "thin_hole_radius_limit_pixels": 4.6000000000000005
+      }
+    },
+    {
+      "variant": "box_expand_25pct",
+      "name": "moving_occluder_02",
+      "detector_box": [
+        81,
+        177,
+        419,
+        292
+      ],
+      "grabcut": {
+        "visible_plate_pixels": 10920,
+        "missed_visible_plate_pixels": 32,
+        "missed_visible_plate_pct": 0.29304029304029305,
+        "visible_glyph_pixels": 1912,
+        "missed_visible_glyph_pixels": 32,
+        "missed_visible_glyph_pct": 1.6736401673640167,
+        "unwanted_background_pixels": 19020,
+        "occluder_pixels_over_plate": 1690,
+        "occluder_pixels_covered": 1690,
+        "occluder_covered_pct": 100.0,
+        "iou_visible_plate": 0.34423016123932976,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 7
+        },
+        "truth_topology": {
+          "components": 2,
+          "holes": 0
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "thin_hole_refinement": {
+        "visible_plate_pixels": 10920,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 1912,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 19029,
+        "occluder_pixels_over_plate": 1690,
+        "occluder_pixels_covered": 1690,
+        "occluder_covered_pct": 100.0,
+        "iou_visible_plate": 0.34514365182211826,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 2,
+          "holes": 0
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "timing": {
+        "grabcut_cpu_ms": 633.8752419999985,
+        "grabcut_wall_ms": 634.0275330003351,
+        "candidate_cpu_ms": 638.7952259999992,
+        "candidate_wall_ms": 638.944908000667,
+        "refinement_cpu_ms": 4.91998400000071,
+        "recovered_thin_holes": 0,
+        "recovered_thin_hole_pixels": 0,
+        "preserved_large_holes": 0,
+        "closing_radius_pixels": 1,
+        "thin_hole_radius_limit_pixels": 4.6000000000000005
+      }
+    },
+    {
+      "variant": "box_expand_25pct",
+      "name": "narrow_two_rows",
+      "detector_box": [
+        94,
+        159,
+        388,
+        297
+      ],
+      "grabcut": {
+        "visible_plate_pixels": 13104,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 1151,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 22705,
+        "occluder_pixels_over_plate": 0,
+        "occluder_pixels_covered": 0,
+        "occluder_covered_pct": null,
+        "iou_visible_plate": 0.36594152308078975,
+        "predicted_topology": {
+          "components": 2,
+          "holes": 2
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "thin_hole_refinement": {
+        "visible_plate_pixels": 13104,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 1151,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 23141,
+        "occluder_pixels_over_plate": 0,
+        "occluder_pixels_covered": 0,
+        "occluder_covered_pct": null,
+        "iou_visible_plate": 0.3615395226927852,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "topology_exact": true,
+        "strict_visible_only_pass": false
+      },
+      "timing": {
+        "grabcut_cpu_ms": 443.54779300000047,
+        "grabcut_wall_ms": 443.6656840007345,
+        "candidate_cpu_ms": 447.2323329999988,
+        "candidate_wall_ms": 447.348755999883,
+        "refinement_cpu_ms": 3.684539999998293,
+        "recovered_thin_holes": 0,
+        "recovered_thin_hole_pixels": 0,
+        "preserved_large_holes": 0,
+        "closing_radius_pixels": 2,
+        "thin_hole_radius_limit_pixels": 5.5200000000000005
+      }
+    },
+    {
+      "variant": "box_expand_25pct",
+      "name": "narrow_hyphen",
+      "detector_box": [
+        72,
+        177,
+        410,
+        292
+      ],
+      "grabcut": {
+        "visible_plate_pixels": 12610,
+        "missed_visible_plate_pixels": 7,
+        "missed_visible_plate_pct": 0.05551149881046788,
+        "visible_glyph_pixels": 1866,
+        "missed_visible_glyph_pixels": 7,
+        "missed_visible_glyph_pct": 0.37513397642015006,
+        "unwanted_background_pixels": 14055,
+        "occluder_pixels_over_plate": 0,
+        "occluder_pixels_covered": 0,
+        "occluder_covered_pct": null,
+        "iou_visible_plate": 0.472642040127508,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 7
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "thin_hole_refinement": {
+        "visible_plate_pixels": 12610,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 1866,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 14059,
+        "occluder_pixels_over_plate": 0,
+        "occluder_pixels_covered": 0,
+        "occluder_covered_pct": null,
+        "iou_visible_plate": 0.47283362705763243,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "topology_exact": true,
+        "strict_visible_only_pass": false
+      },
+      "timing": {
+        "grabcut_cpu_ms": 606.9908780000013,
+        "grabcut_wall_ms": 607.1793759992943,
+        "candidate_cpu_ms": 610.0831190000022,
+        "candidate_wall_ms": 610.2661519998946,
+        "refinement_cpu_ms": 3.0922410000009393,
+        "recovered_thin_holes": 0,
+        "recovered_thin_hole_pixels": 0,
+        "preserved_large_holes": 0,
+        "closing_radius_pixels": 1,
+        "thin_hole_radius_limit_pixels": 4.6000000000000005
+      }
+    },
+    {
+      "variant": "small_ink_like_occluder",
+      "name": "frontal",
+      "detector_box": [
+        128,
+        196,
+        354,
+        273
+      ],
+      "grabcut": {
+        "visible_plate_pixels": 12581,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 2405,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 853,
+        "occluder_pixels_over_plate": 29,
+        "occluder_pixels_covered": 29,
+        "occluder_covered_pct": 100.0,
+        "iou_visible_plate": 0.9344871128277501,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 1
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "thin_hole_refinement": {
+        "visible_plate_pixels": 12581,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 2405,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 857,
+        "occluder_pixels_over_plate": 29,
+        "occluder_pixels_covered": 29,
+        "occluder_covered_pct": 100.0,
+        "iou_visible_plate": 0.9342095492685825,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 1
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "timing": {
+        "grabcut_cpu_ms": 280.82411699999807,
+        "grabcut_wall_ms": 280.8968179997464,
+        "candidate_cpu_ms": 284.4007570000002,
+        "candidate_wall_ms": 284.47042900006636,
+        "refinement_cpu_ms": 3.5766400000021292,
+        "recovered_thin_holes": 0,
+        "recovered_thin_hole_pixels": 0,
+        "preserved_large_holes": 0,
+        "closing_radius_pixels": 1,
+        "thin_hole_radius_limit_pixels": 3.08
+      }
+    },
+    {
+      "variant": "small_ink_like_occluder",
+      "name": "rotated",
+      "detector_box": [
+        121,
+        161,
+        360,
+        300
+      ],
+      "grabcut": {
+        "visible_plate_pixels": 12574,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 2431,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 6356,
+        "occluder_pixels_over_plate": 113,
+        "occluder_pixels_covered": 113,
+        "occluder_covered_pct": 100.0,
+        "iou_visible_plate": 0.66029512156698,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 1
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "thin_hole_refinement": {
+        "visible_plate_pixels": 12574,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 2431,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 6432,
+        "occluder_pixels_over_plate": 113,
+        "occluder_pixels_covered": 113,
+        "occluder_covered_pct": 100.0,
+        "iou_visible_plate": 0.6576703802500131,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 1
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "timing": {
+        "grabcut_cpu_ms": 457.3857409999995,
+        "grabcut_wall_ms": 457.4771850002435,
+        "candidate_cpu_ms": 461.963726999997,
+        "candidate_wall_ms": 462.0562730005986,
+        "refinement_cpu_ms": 4.57798599999748,
+        "recovered_thin_holes": 0,
+        "recovered_thin_hole_pixels": 0,
+        "preserved_large_holes": 0,
+        "closing_radius_pixels": 2,
+        "thin_hole_radius_limit_pixels": 5.5600000000000005
+      }
+    },
+    {
+      "variant": "small_ink_like_occluder",
+      "name": "perspective",
+      "detector_box": [
+        128,
+        191,
+        354,
+        271
+      ],
+      "grabcut": {
+        "visible_plate_pixels": 9888,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 1965,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 2085,
+        "occluder_pixels_over_plate": 49,
+        "occluder_pixels_covered": 49,
+        "occluder_covered_pct": 100.0,
+        "iou_visible_plate": 0.8224920978206621,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 1
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "thin_hole_refinement": {
+        "visible_plate_pixels": 9888,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 1965,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 2089,
+        "occluder_pixels_over_plate": 49,
+        "occluder_pixels_covered": 49,
+        "occluder_covered_pct": 100.0,
+        "iou_visible_plate": 0.8222185265258606,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 1
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "timing": {
+        "grabcut_cpu_ms": 321.6550050000002,
+        "grabcut_wall_ms": 321.6650429994843,
+        "candidate_cpu_ms": 326.5849339999995,
+        "candidate_wall_ms": 326.5942259995427,
+        "refinement_cpu_ms": 4.929928999999333,
+        "recovered_thin_holes": 0,
+        "recovered_thin_hole_pixels": 0,
+        "preserved_large_holes": 0,
+        "closing_radius_pixels": 1,
+        "thin_hole_radius_limit_pixels": 3.2
+      }
+    },
+    {
+      "variant": "small_ink_like_occluder",
+      "name": "disconnected_cross_occlusion",
+      "detector_box": [
+        128,
+        196,
+        354,
+        273
+      ],
+      "grabcut": {
+        "visible_plate_pixels": 9274,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 1176,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 1344,
+        "occluder_pixels_over_plate": 3336,
+        "occluder_pixels_covered": 3336,
+        "occluder_covered_pct": 100.0,
+        "iou_visible_plate": 0.6646122975490899,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 4,
+          "holes": 0
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "thin_hole_refinement": {
+        "visible_plate_pixels": 9274,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 1176,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 1354,
+        "occluder_pixels_over_plate": 3336,
+        "occluder_pixels_covered": 3336,
+        "occluder_covered_pct": 100.0,
+        "iou_visible_plate": 0.6641363506158694,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 4,
+          "holes": 0
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "timing": {
+        "grabcut_cpu_ms": 241.25388500000255,
+        "grabcut_wall_ms": 241.32218300019304,
+        "candidate_cpu_ms": 245.07599900000088,
+        "candidate_wall_ms": 245.14114399971731,
+        "refinement_cpu_ms": 3.8221139999983222,
+        "recovered_thin_holes": 0,
+        "recovered_thin_hole_pixels": 0,
+        "preserved_large_holes": 0,
+        "closing_radius_pixels": 1,
+        "thin_hole_radius_limit_pixels": 3.08
+      }
+    },
+    {
+      "variant": "small_ink_like_occluder",
+      "name": "interior_occluder_hole",
+      "detector_box": [
+        128,
+        196,
+        354,
+        273
+      ],
+      "grabcut": {
+        "visible_plate_pixels": 12140,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 2074,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 829,
+        "occluder_pixels_over_plate": 470,
+        "occluder_pixels_covered": 470,
+        "occluder_covered_pct": 100.0,
+        "iou_visible_plate": 0.9033410223974998,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 2
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "thin_hole_refinement": {
+        "visible_plate_pixels": 12140,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 2074,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 832,
+        "occluder_pixels_over_plate": 470,
+        "occluder_pixels_covered": 470,
+        "occluder_covered_pct": 100.0,
+        "iou_visible_plate": 0.9031394137777117,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 2
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "timing": {
+        "grabcut_cpu_ms": 280.7026050000019,
+        "grabcut_wall_ms": 280.7242859998951,
+        "candidate_cpu_ms": 283.953952000001,
+        "candidate_wall_ms": 283.9732399997956,
+        "refinement_cpu_ms": 3.251346999999072,
+        "recovered_thin_holes": 0,
+        "recovered_thin_hole_pixels": 0,
+        "preserved_large_holes": 0,
+        "closing_radius_pixels": 1,
+        "thin_hole_radius_limit_pixels": 3.08
+      }
+    },
+    {
+      "variant": "small_ink_like_occluder",
+      "name": "low_contrast_glare",
+      "detector_box": [
+        128,
+        191,
+        354,
+        271
+      ],
+      "grabcut": {
+        "visible_plate_pixels": 9888,
+        "missed_visible_plate_pixels": 4,
+        "missed_visible_plate_pct": 0.040453074433656956,
+        "visible_glyph_pixels": 1965,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 1895,
+        "occluder_pixels_over_plate": 49,
+        "occluder_pixels_covered": 49,
+        "occluder_covered_pct": 100.0,
+        "iou_visible_plate": 0.8353617308992562,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 1
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "thin_hole_refinement": {
+        "visible_plate_pixels": 9888,
+        "missed_visible_plate_pixels": 4,
+        "missed_visible_plate_pct": 0.040453074433656956,
+        "visible_glyph_pixels": 1965,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 1969,
+        "occluder_pixels_over_plate": 49,
+        "occluder_pixels_covered": 49,
+        "occluder_covered_pct": 100.0,
+        "iou_visible_plate": 0.830169662355115,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 1
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "timing": {
+        "grabcut_cpu_ms": 412.8710290000015,
+        "grabcut_wall_ms": 419.6812959999079,
+        "candidate_cpu_ms": 416.58333100000175,
+        "candidate_wall_ms": 423.3937139997579,
+        "refinement_cpu_ms": 3.712302000000278,
+        "recovered_thin_holes": 0,
+        "recovered_thin_hole_pixels": 0,
+        "preserved_large_holes": 0,
+        "closing_radius_pixels": 1,
+        "thin_hole_radius_limit_pixels": 3.2
+      }
+    },
+    {
+      "variant": "small_ink_like_occluder",
+      "name": "small_plate",
+      "detector_box": [
+        211,
+        219,
+        280,
+        248
+      ],
+      "grabcut": {
+        "visible_plate_pixels": 1250,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 240,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 0,
+        "occluder_pixels_over_plate": 13,
+        "occluder_pixels_covered": 13,
+        "occluder_covered_pct": 100.0,
+        "iou_visible_plate": 0.9897070467141726,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 1
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "thin_hole_refinement": {
+        "visible_plate_pixels": 1250,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 240,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 0,
+        "occluder_pixels_over_plate": 13,
+        "occluder_pixels_covered": 13,
+        "occluder_covered_pct": 100.0,
+        "iou_visible_plate": 0.9897070467141726,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 1
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "timing": {
+        "grabcut_cpu_ms": 260.828146999998,
+        "grabcut_wall_ms": 260.930376000033,
+        "candidate_cpu_ms": 266.49045299999943,
+        "candidate_wall_ms": 266.592149000644,
+        "refinement_cpu_ms": 5.662306000001394,
+        "recovered_thin_holes": 0,
+        "recovered_thin_hole_pixels": 0,
+        "preserved_large_holes": 0,
+        "closing_radius_pixels": 1,
+        "thin_hole_radius_limit_pixels": 1.5
+      }
+    },
+    {
+      "variant": "small_ink_like_occluder",
+      "name": "moving_occluder_00",
+      "detector_box": [
+        119,
+        196,
+        345,
+        273
+      ],
+      "grabcut": {
+        "visible_plate_pixels": 10891,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 1876,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 704,
+        "occluder_pixels_over_plate": 1719,
+        "occluder_pixels_covered": 29,
+        "occluder_covered_pct": 1.6870273414776034,
+        "iou_visible_plate": 0.93694081211287,
+        "predicted_topology": {
+          "components": 2,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 2,
+          "holes": 1
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "thin_hole_refinement": {
+        "visible_plate_pixels": 10891,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 1876,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 706,
+        "occluder_pixels_over_plate": 1719,
+        "occluder_pixels_covered": 29,
+        "occluder_covered_pct": 1.6870273414776034,
+        "iou_visible_plate": 0.936779631859625,
+        "predicted_topology": {
+          "components": 2,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 2,
+          "holes": 1
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "timing": {
+        "grabcut_cpu_ms": 328.68374399999925,
+        "grabcut_wall_ms": 328.8180209992788,
+        "candidate_cpu_ms": 333.02335700000185,
+        "candidate_wall_ms": 333.1564989994149,
+        "refinement_cpu_ms": 4.339613000002629,
+        "recovered_thin_holes": 0,
+        "recovered_thin_hole_pixels": 0,
+        "preserved_large_holes": 0,
+        "closing_radius_pixels": 1,
+        "thin_hole_radius_limit_pixels": 3.08
+      }
+    },
+    {
+      "variant": "small_ink_like_occluder",
+      "name": "moving_occluder_01",
+      "detector_box": [
+        128,
+        196,
+        354,
+        273
+      ],
+      "grabcut": {
+        "visible_plate_pixels": 10891,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 1954,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 1016,
+        "occluder_pixels_over_plate": 1719,
+        "occluder_pixels_covered": 1719,
+        "occluder_covered_pct": 100.0,
+        "iou_visible_plate": 0.7992807867312491,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 2,
+          "holes": 1
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "thin_hole_refinement": {
+        "visible_plate_pixels": 10891,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 1954,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 1022,
+        "occluder_pixels_over_plate": 1719,
+        "occluder_pixels_covered": 1719,
+        "occluder_covered_pct": 100.0,
+        "iou_visible_plate": 0.7989289906103286,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 2,
+          "holes": 1
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "timing": {
+        "grabcut_cpu_ms": 254.04783399999786,
+        "grabcut_wall_ms": 254.05393300025025,
+        "candidate_cpu_ms": 257.0130259999992,
+        "candidate_wall_ms": 257.02567099961016,
+        "refinement_cpu_ms": 2.9651920000013376,
+        "recovered_thin_holes": 0,
+        "recovered_thin_hole_pixels": 0,
+        "preserved_large_holes": 0,
+        "closing_radius_pixels": 1,
+        "thin_hole_radius_limit_pixels": 3.08
+      }
+    },
+    {
+      "variant": "small_ink_like_occluder",
+      "name": "moving_occluder_02",
+      "detector_box": [
+        137,
+        196,
+        363,
+        273
+      ],
+      "grabcut": {
+        "visible_plate_pixels": 10891,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 1912,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 851,
+        "occluder_pixels_over_plate": 1719,
+        "occluder_pixels_covered": 1719,
+        "occluder_covered_pct": 100.0,
+        "iou_visible_plate": 0.8090780774088107,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 2,
+          "holes": 1
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "thin_hole_refinement": {
+        "visible_plate_pixels": 10891,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 1912,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 858,
+        "occluder_pixels_over_plate": 1719,
+        "occluder_pixels_covered": 1719,
+        "occluder_covered_pct": 100.0,
+        "iou_visible_plate": 0.8086575586575586,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 2,
+          "holes": 1
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "timing": {
+        "grabcut_cpu_ms": 242.75767199999976,
+        "grabcut_wall_ms": 242.83534200003487,
+        "candidate_cpu_ms": 246.917818,
+        "candidate_wall_ms": 246.99359399983223,
+        "refinement_cpu_ms": 4.160146000000253,
+        "recovered_thin_holes": 0,
+        "recovered_thin_hole_pixels": 0,
+        "preserved_large_holes": 0,
+        "closing_radius_pixels": 1,
+        "thin_hole_radius_limit_pixels": 3.08
+      }
+    },
+    {
+      "variant": "small_ink_like_occluder",
+      "name": "narrow_two_rows",
+      "detector_box": [
+        143,
+        182,
+        339,
+        274
+      ],
+      "grabcut": {
+        "visible_plate_pixels": 13055,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 1151,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 784,
+        "occluder_pixels_over_plate": 49,
+        "occluder_pixels_covered": 49,
+        "occluder_covered_pct": 100.0,
+        "iou_visible_plate": 0.9400201612903226,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 1
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "thin_hole_refinement": {
+        "visible_plate_pixels": 13055,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 1151,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 786,
+        "occluder_pixels_over_plate": 49,
+        "occluder_pixels_covered": 49,
+        "occluder_covered_pct": 100.0,
+        "iou_visible_plate": 0.9398848092152627,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 1
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "timing": {
+        "grabcut_cpu_ms": 260.1897320000006,
+        "grabcut_wall_ms": 260.2297309995265,
+        "candidate_cpu_ms": 263.24807299999975,
+        "candidate_wall_ms": 263.2853229997636,
+        "refinement_cpu_ms": 3.058340999999132,
+        "recovered_thin_holes": 0,
+        "recovered_thin_hole_pixels": 0,
+        "preserved_large_holes": 0,
+        "closing_radius_pixels": 1,
+        "thin_hole_radius_limit_pixels": 3.68
+      }
+    },
+    {
+      "variant": "small_ink_like_occluder",
+      "name": "narrow_hyphen",
+      "detector_box": [
+        128,
+        196,
+        354,
+        273
+      ],
+      "grabcut": {
+        "visible_plate_pixels": 12581,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 1866,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 853,
+        "occluder_pixels_over_plate": 29,
+        "occluder_pixels_covered": 29,
+        "occluder_covered_pct": 100.0,
+        "iou_visible_plate": 0.9344871128277501,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 1
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "thin_hole_refinement": {
+        "visible_plate_pixels": 12581,
+        "missed_visible_plate_pixels": 0,
+        "missed_visible_plate_pct": 0.0,
+        "visible_glyph_pixels": 1866,
+        "missed_visible_glyph_pixels": 0,
+        "missed_visible_glyph_pct": 0.0,
+        "unwanted_background_pixels": 857,
+        "occluder_pixels_over_plate": 29,
+        "occluder_pixels_covered": 29,
+        "occluder_covered_pct": 100.0,
+        "iou_visible_plate": 0.9342095492685825,
+        "predicted_topology": {
+          "components": 1,
+          "holes": 0
+        },
+        "truth_topology": {
+          "components": 1,
+          "holes": 1
+        },
+        "topology_exact": false,
+        "strict_visible_only_pass": false
+      },
+      "timing": {
+        "grabcut_cpu_ms": 289.84002600000025,
+        "grabcut_wall_ms": 289.8914800007333,
+        "candidate_cpu_ms": 293.66884999999957,
+        "candidate_wall_ms": 293.71708300004684,
+        "refinement_cpu_ms": 3.828823999999287,
+        "recovered_thin_holes": 0,
+        "recovered_thin_hole_pixels": 0,
+        "preserved_large_holes": 0,
+        "closing_radius_pixels": 1,
+        "thin_hole_radius_limit_pixels": 3.08
+      }
+    }
+  ],
+  "conclusion": "Report observed failures without a tuning loop. Synthetic success cannot establish generalization or production readiness."
+}
