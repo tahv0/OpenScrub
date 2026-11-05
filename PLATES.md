@@ -95,3 +95,24 @@ the frame stays covered.
 - OpenScrub blurs the plate; it does **not** read it. That's deliberate — for
   redaction you only need to cover it, and not reading avoids a whole class of
   OCR-accuracy problems.
+
+## Lettering-only coverage
+
+Full-plate redaction is the default. The web scan settings and CLI offer a
+lettering-only option (`--plate-coverage narrow`); `--plate-narrow-margin`
+adds a finite nonnegative margin in source pixels and defaults to zero. This
+option runs both plate location and text-region detection on every frame at
+full resolution, which can substantially increase scan time. The detector
+locates text regions without reading or recording the characters.
+
+Uncertain localization falls back to the padded full plate and reports a reason.
+Review the actual masks and output: the image heuristic cannot guarantee that
+all lettering is found, and a plate missed by the plate locator is not rescued
+by this stage. Extra margin can help but does not guarantee coverage. The
+legacy desktop GUI uses full-plate coverage; use the web interface or CLI for
+lettering-only coverage.
+
+Narrow mode requires constant-frame-rate alignment. Variable-frame-rate input
+is normalized before scanning. Lettering-only mode does not support HDR output;
+choose SDR output for HDR input. Pause review to inspect a specific frame and
+its mask; masks are hidden during playback.

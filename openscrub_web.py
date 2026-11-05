@@ -426,7 +426,18 @@ def build_args(job, for_render=False):
     o = job["options"]
     jdir = job["dir"]
     coverage, pad, face_shape = _job_mask_options(job)
+    plate_coverage = o.get("plate_coverage", "full")
+    if plate_coverage not in ("full", "narrow"):
+        raise ValueError("invalid plate coverage")
+    try:
+        plate_margin = float(o.get("plate_narrow_margin", 0))
+        if not np.isfinite(plate_margin) or plate_margin < 0:
+            raise ValueError()
+    except (ValueError, TypeError):
+        raise ValueError("invalid narrow plate margin")
     argv = [job["video"],
+            "--plate-coverage", plate_coverage,
+            "--plate-narrow-margin", str(plate_margin),
             "--engine", o.get("engine", "auto"),
             "--device", o.get("device", "auto"),
             "--encoder", o.get("encoder", "auto"),
@@ -727,6 +738,12 @@ def set_cookie(resp):
 @app.route("/api/jobs", methods=["POST"])
 def create_job():
     options = json.loads(request.form.get("options", "{}"))
+    try:
+        margin = float(options.get("plate_narrow_margin", 0))
+        if not np.isfinite(margin) or margin < 0 or options.get("plate_coverage", "full") not in ("full", "narrow"):
+            raise ValueError()
+    except (ValueError, TypeError):
+        abort(400, description="invalid plate coverage or margin")
     jobs = []
     files = request.files.getlist("video")
     if files and files[0].filename:
@@ -906,10 +923,10 @@ def _load_job_report(job):
         return json.load(f)
 
 
-def _frame_at(job, t, rstate):
+def _frame_at(job, t, rstate, frame_index=None):
     cap = cv2.VideoCapture(job["video"])
     fps = rstate["fps"]
-    cap.set(cv2.CAP_PROP_POS_FRAMES, int(t * fps))
+    cap.set(cv2.CAP_PROP_POS_FRAMES, frame_index if frame_index is not None else int(t * fps))
     ok, frame = cap.read()
     cap.release()
     return frame if ok else None
@@ -942,9 +959,12 @@ def job_detections(jid):
                       "track": d.get("track", -1),
                       "person": d.get("person", -1),
                       "confidence": d.get("confidence", 0),
+                      "fallback_reason": d.get("fallback_reason", ""),
                       "zone_dropped": bool(d.get("zone_dropped")),
                       "shaped": bool(d.get("poly"))})
     return jsonify({"detections": items,
+                    "indexed_frames": any(d.get("frame_index", -1) >= 0 for d in doc["detections"]),
+                    "frame_count": len(doc["render_state"]["cum"]),
                     "fps": doc["render_state"]["fps"],
                     "duration": len(doc["render_state"]["cum"]) /
                                 doc["render_state"]["fps"]})
@@ -998,7 +1018,8 @@ def _review_mask_data(d, ox, oy, shape, job, doc):
     except (ValueError, TypeError):
         base = int(str(_job_mask_options(job)[1]))
     anchor = d.get("aoff", (0, 0))
-    pad = base + min(24.0, 0.05 * (abs(ox-anchor[0]) + abs(oy-anchor[1])))
+    drift = 0 if d.get("category") == "plate" and d.get("frame_index", -1) >= 0 and d.get("poly") else min(24.0, 0.05 * (abs(ox-anchor[0]) + abs(oy-anchor[1])))
+    pad = base + drift
     region = (box[0]-pad, box[1]-pad, box[2]+pad, box[3]+pad)
     if d.get("poly"):
         return openscrub.rasterize_mask(
@@ -1034,11 +1055,17 @@ def _apply_detection_edits(doc, edits):
                 d["poly"] = []
                 d["poly_holes"] = []
                 d["mask_pad"] = -1
+                d["fallback_reason"] = ""
     for i, span in (edits.get("time_overrides") or {}).items():
         i = int(i)
         if 0 <= i < len(doc["detections"]) and len(span) == 2:
             t0, t1 = float(span[0]), float(span[1])
             if t1 > t0 >= 0:
+                doc["detections"][i]["frame_index"] = -1
+                doc["detections"][i]["fallback_reason"] = ""
+                doc["detections"][i]["poly"] = []
+                doc["detections"][i]["poly_holes"] = []
+                doc["detections"][i]["mask_pad"] = -1
                 doc["detections"][i]["t_start"] = t0
                 doc["detections"][i]["t_end"] = t1
                 doc["detections"][i]["last_seen"] = min(
@@ -1054,9 +1081,10 @@ def job_detframe(jid, i):
     d = _review_detections(job, doc)[i]
     rs = doc["render_state"]
     tref = min(max(d.get("last_seen", d["t_start"]), d["t_start"]), d["t_end"])
-    fidx = min(int(tref * rs["fps"]), len(rs["cum"]) - 1)
+    exact = d.get("frame_index", -1)
+    fidx = min(exact if exact >= 0 else int(tref * rs["fps"]), len(rs["cum"]) - 1)
     ox, oy = rs["cum"][fidx]
-    frame = _frame_at(job, tref, rs)
+    frame = _frame_at(job, tref, rs, exact if exact >= 0 else None)
     if frame is None:
         abort(404)
     x1, y1 = int(d["cbox"][0] + ox), int(d["cbox"][1] + oy)
@@ -1080,6 +1108,19 @@ def job_detframe(jid, i):
     return Response(buf.tobytes(), mimetype="image/jpeg")
 
 
+def _requested_review_frame(rstate):
+    raw = request.args.get("frame")
+    if raw is None:
+        return None
+    try:
+        index = int(raw)
+    except (TypeError, ValueError):
+        abort(400, description="invalid frame index")
+    if index < 0 or index >= len(rstate["cum"]):
+        abort(400, description="frame index out of range")
+    return index
+
+
 @app.route("/api/jobs/<jid>/boxes_at", methods=["GET", "POST"])
 def job_boxes_at(jid):
     """Active blur boxes (screen coords) at time t, plus the scroll offset so
@@ -1089,8 +1130,10 @@ def job_boxes_at(jid):
     if request.method == "POST":
         _apply_detection_edits(doc, request.get_json(silent=True) or {})
     rs = doc["render_state"]
-    t = float(request.args.get("t", 0))
-    fidx = min(int(t * rs["fps"]), len(rs["cum"]) - 1)
+    fidx = _requested_review_frame(rs)
+    t = float(request.args.get("t", 0)) if fidx is None else fidx / rs["fps"]
+    if fidx is None:
+        fidx = min(max(0, int(round(t * rs["fps"]))), len(rs["cum"]) - 1)
     ox, oy = rs["cum"][fidx]
     boxes = []
     cap = cv2.VideoCapture(job["video"])
@@ -1100,7 +1143,8 @@ def job_boxes_at(jid):
     want_all = request.args.get("all") == "1"
     rows = _review_detections(job, doc)
     active = [(i, d) for i, d in enumerate(rows)
-              if d["t_start"] - 0.01 <= t <= d["t_end"] + 0.01]
+              if (d.get("frame_index", -1) == fidx if d.get("frame_index", -1) >= 0
+                  else d["t_start"] - 0.01 <= t <= d["t_end"] + 0.01)]
     # Use the renderer's identity-based selector and retain report indices.
     from types import SimpleNamespace
     candidates = [(i, d, SimpleNamespace(t_start=d["t_start"],
@@ -1115,12 +1159,13 @@ def job_boxes_at(jid):
             boxes.append({"i": i, "category": d["category"],
                           "enabled": d.get("enabled", True),
                           "text": d.get("text", ""),
+                          "fallback_reason": d.get("fallback_reason", ""),
                           "shaped": bool(d.get("poly")),
                           "mask_contours": _review_mask(d, ox, oy, shape, job, doc),
                           "t_start": d["t_start"], "t_end": d["t_end"],
                           "box": [d["cbox"][0] + ox, d["cbox"][1] + oy,
                                   d["cbox"][2] + ox, d["cbox"][3] + oy]})
-    return jsonify({"t": t, "ox": ox, "oy": oy, "boxes": boxes})
+    return jsonify({"t": t, "frame": fidx, "ox": ox, "oy": oy, "boxes": boxes})
 
 
 @app.route("/api/jobs/<jid>/thumb/<int:i>")
@@ -1149,9 +1194,10 @@ def job_thumb(jid, i):
         crop = None
         pad = 24
         for tref in (ls, mid, min(d["t_start"] + 0.2, d["t_end"])):
-            fidx = min(int(tref * rs["fps"]), len(rs["cum"]) - 1)
+            exact = d.get("frame_index", -1)
+            fidx = min(exact if exact >= 0 else int(tref * rs["fps"]), len(rs["cum"]) - 1)
             ox, oy = rs["cum"][fidx]
-            frame = _frame_at(job, tref, rs)
+            frame = _frame_at(job, tref, rs, exact if exact >= 0 else None)
             if frame is None:
                 continue
             h, w = frame.shape[:2]
@@ -1181,6 +1227,18 @@ def job_frame_at(jid):
     path = (job["output"] if request.args.get("src") == "output"
             and job.get("output") else job["video"])
     cap = cv2.VideoCapture(path)
+    if request.args.get("frame") is not None:
+        rs = _load_job_report(job)["render_state"]
+        fidx = _requested_review_frame(rs)
+        cap.set(cv2.CAP_PROP_POS_FRAMES, fidx)
+        ok, frame = cap.read()
+        cap.release()
+        if not ok:
+            abort(404)
+        ok, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 82])
+        if not ok:
+            abort(500)
+        return Response(buf.tobytes(), mimetype="image/jpeg")
     # seek by TIMESTAMP, not frame index: the original upload is often VFR
     # (iPhone), where index = t*fps drifts out of sync with the CFR output
     # and can overshoot the file entirely (broken compare pane)
@@ -2129,6 +2187,7 @@ let BE={t:0,ox:0,oy:0,boxes:[],sel:-1,ov:{},dis:{},times:{},adds:[],
 async function loadBoxEdit(fromReview){
  showPanel(fromReview?"boxedit_rev":"boxedit");
  const mi=await (await fetch(`api/jobs/${CUR}/mediainfo`)).json();
+ const ri=await (await fetch(`api/jobs/${CUR}/detections`)).json();
  // in review: the slot right under the Preview button; on done: the actions slot
  let c=document.getElementById("beslot")||document.getElementById("beslot_done");
  if(!c){c=document.createElement("div");c.id="beslot";c.style.width="100%";
@@ -2137,11 +2196,15 @@ async function loadBoxEdit(fromReview){
  BE={t:0,ox:0,oy:0,boxes:[],sel:-1,ov:{},dis:{},times:{},adds:[],
      add:false,addAnchor:null,drag:null,scale:1,dur:mi.duration,
      win:[0,mi.duration],trk:false,muteArm:false,tlDrag:null,
-     tlspans:[],audio:[],audioSel:-1};
+     tlspans:[],audio:[],audioSel:-1,indexed:!!ri.indexed_frames,
+     fps:ri.fps,frameCount:ri.frame_count,frame:0,imageFrame:-1,maskFrame:-1};
  c.innerHTML=`<div class="row" style="margin-top:8px">
-  <button class="sec" id="bePlay" style="padding:3px 11px" title="Play the video with live boxes — pause to edit them" onclick="beTogglePlay()">&#9654;</button>t=
-  <input type="range" id="beT" min="0" max="${Math.max(0.2,mi.duration-0.1).toFixed(1)}"
-   step="0.1" value="0" style="flex:1" oninput="beScrub()"><span id="beL">0s</span></div>
+  <button class="sec" id="bePlay" style="padding:3px 11px" title="${BE.indexed?'Play video; pause for precise masks':'Play the video with live boxes — pause to edit them'}" onclick="beTogglePlay()">&#9654;</button>t=
+  ${BE.indexed?'<button class="sec" id="bePrev" onclick="beStepFrame(-1)" title="Previous frame">&#9664; frame</button>':''}
+  <input type="range" id="beT" min="0" max="${BE.indexed?Math.max(0,BE.frameCount-1):Math.max(0.2,mi.duration-0.1).toFixed(1)}"
+   step="${BE.indexed?'1':'0.1'}" value="0" style="flex:1" oninput="beScrub()"><span id="beL">0s</span>
+  ${BE.indexed?'<button class="sec" id="beNext" onclick="beStepFrame(1)" title="Next frame">frame &#9654;</button>':''}</div>
+  ${BE.indexed?'<div style="font-size:12px;color:#94a3b8">Pause to inspect the exact frame and mask; masks are hidden during playback.</div>':''}
   <div style="position:relative;display:inline-block;max-width:100%">
    <img id="beImg" style="max-width:100%;border-radius:8px">
    <video id="beVid" style="max-width:100%;border-radius:8px;display:none" playsinline preload="none"></video>
@@ -2170,8 +2233,7 @@ async function loadBoxEdit(fromReview){
     <button class="sec" onclick="beApplyTimes()">Apply times</button></span>
    <span id="beTrkSt" style="display:none;font-size:13px;color:#fbbf24">tracking&#8230;</span>
    <button onclick="beSave()">Save changes &amp; re-render</button></div>
-  <p style="font-size:12px;color:#94a3b8;margin:4px 0 0">&#9654; plays the
-   video with the boxes moving live (pause to edit). Click a red box to
+  <p style="font-size:12px;color:#94a3b8;margin:4px 0 0">&#9654; ${BE.indexed?"plays the video without masks; pause to inspect a frame.":"plays the video with the boxes moving live (pause to edit)."} Click a red box to
    select — drag inside to move, a corner to resize, edit its from/to times,
    or remove its blur. &#65291; Add box: drag a static region. &#8857; Track object:
    drag the timeline handles to the part of the video you care about, scrub
@@ -2195,6 +2257,7 @@ async function beTogglePlay(){
  if(BE.playing){v.pause();return;}          // the pause handler cleans up
  if(!v.src)v.src=`api/jobs/${CUR}/video`;
  BE.playing=true;
+ if(BE.indexed){BE.seq=(BE.seq||0)+1;BE.pending=true;BE.imageFrame=-1;BE.maskFrame=-1;beDraw();}
  v.style.display="block";img.style.display="none";
  // boxes are view-only while playing: freeze pointer edits so a moving
  // box can't be grabbed mid-flight
@@ -2220,12 +2283,12 @@ async function beTogglePlay(){
  const step=()=>{
   if(!BE.playing)return;
   BE.t=v.currentTime;
-  document.getElementById("beT").value=BE.t;
+  document.getElementById("beT").value=BE.indexed?Math.max(0,Math.min(BE.frameCount-1,Math.round(BE.t*BE.fps))):BE.t;
   document.getElementById("beL").textContent=BE.t.toFixed(1)+"s";
   const now=performance.now();
-  if(!inFlight&&now-lastQ>150){
+  if(!BE.indexed&&!inFlight&&now-lastQ>150){
    inFlight=true;lastQ=now;
-   beRefresh(BE.t.toFixed(2)).finally(()=>{inFlight=false;});
+   beRefresh(BE.t).finally(()=>{inFlight=false;});
   }
   beDraw();beTLDraw();
   requestAnimationFrame(step);
@@ -2235,6 +2298,9 @@ async function beTogglePlay(){
 function bePlayStop(){
  BE.playing=false;
  const v=document.getElementById("beVid");
+ if(BE.indexed){if(v&&Number.isFinite(v.currentTime))BE.t=v.currentTime;
+  BE.frame=Math.max(0,Math.min(BE.frameCount-1,Math.round(BE.t*BE.fps)));
+  const slider=document.getElementById("beT");if(slider)slider.value=BE.frame;}
  if(v){try{v.pause();}catch(e){}v.style.display="none";}
  const img=document.getElementById("beImg");if(img)img.style.display="";
  const b=document.getElementById("bePlay");if(b)b.innerHTML="&#9654;";
@@ -2323,7 +2389,7 @@ function tlHook(){
    beTLDraw();return;
   }
   BE.tlDrag={k:"seek"};
-  document.getElementById("beT").value=t.toFixed(1);beScrub();
+  document.getElementById("beT").value=BE.indexed?Math.round(t*BE.fps):t.toFixed(1);beScrub();
  });
  cv.addEventListener("pointermove",e=>{
   if(!BE.tlDrag)return;
@@ -2334,7 +2400,7 @@ function tlHook(){
    const s=BE.audio[BE.audioSel];
    s.t0=Math.min(BE.tlDrag.t0,t);s.t1=Math.max(BE.tlDrag.t0,t);
   }else if(BE.tlDrag.k==="seek"){
-   document.getElementById("beT").value=t.toFixed(1);beScrub();}
+   document.getElementById("beT").value=BE.indexed?Math.round(t*BE.fps):t.toFixed(1);beScrub();}
   beTLDraw();
  });
  cv.addEventListener("pointerup",()=>{
@@ -2385,33 +2451,59 @@ async function beTrackGo(box){
  },1500);
 }
 async function beScrub(){
- const sl=document.getElementById("beT");if(!sl)return; // editor was closed
- if(BE.playing){               // dragging the slider while playing = seek
+ const sl=document.getElementById("beT");if(!sl)return;
+ if(BE.playing){
   const v=document.getElementById("beVid");
-  if(v)v.currentTime=+sl.value;
-  return;                      // the rAF loop keeps label/boxes in sync
+  if(v)v.currentTime=BE.indexed?(+sl.value/BE.fps):+sl.value;
+  return;
  }
  BE.sel=-1;document.getElementById("beRm").style.display="none";
  document.getElementById("beTimes").style.display="none";
- BE.t=+document.getElementById("beT").value;
- document.getElementById("beL").textContent=BE.t.toFixed(1)+"s";
- document.getElementById("beImg").src=`api/jobs/${CUR}/frame_at?t=${BE.t}`;
+ const img=document.getElementById("beImg");
+ if(BE.indexed){
+  const owner=BE,frame=Math.max(0,Math.min(owner.frameCount-1,Math.round(+sl.value)));
+  owner.frame=frame;sl.value=frame;owner.t=frame/owner.fps;
+  owner.imageFrame=-1;owner.maskFrame=-1;owner.pending=true;
+  document.getElementById("beL").textContent=`Frame ${frame} (${owner.t.toFixed(3)}s)`;
+  const imageUrl=`api/jobs/${CUR}/frame_at?frame=${frame}`;
+  img.onload=()=>{
+   if(BE!==owner||owner.playing||owner.frame!==frame||
+      (img.currentSrc&&!img.currentSrc.endsWith('/'+imageUrl)))return;
+   owner.imageFrame=frame;
+   const cv=document.getElementById("beCv");if(cv){cv.width=img.clientWidth;cv.height=img.clientHeight;owner.scale=img.clientWidth/(img.naturalWidth||1);}
+   owner.pending=owner.maskFrame!==frame;beDraw();
+  };
+  img.onerror=()=>{if(BE===owner&&owner.frame===frame){owner.imageFrame=-1;owner.pending=true;beDraw();}};
+  img.src=imageUrl;
+ }else{
+  BE.t=+sl.value;document.getElementById("beL").textContent=BE.t.toFixed(1)+"s";
+  img.src=`api/jobs/${CUR}/frame_at?t=${BE.t}`;
+ }
  await beRefresh();beTLDraw();
 }
+function beStepFrame(delta){
+ if(!BE.indexed||BE.playing)return;
+ const sl=document.getElementById("beT");
+ sl.value=Math.max(0,Math.min(BE.frameCount-1,Number(sl.value)+delta));
+ beScrub();
+}
 // Server computes the same pending edits, coverage and dense winner as render.
-// Sequence numbers reject stale responses after a drag, toggle, or seek.
 async function beRefresh(t=BE.t){
- const owner=BE,seq=owner.seq=(owner.seq||0)+1;
+ const owner=BE,seq=owner.seq=(owner.seq||0)+1,frame=owner.frame;
+ if(owner.indexed&&owner.playing)return false;
  owner.pending=true;beDraw();
  try{
-  const r=await fetch(`api/jobs/${CUR}/boxes_at?t=${t}&all=1`,{
+  const query=owner.indexed?`frame=${frame}`:`t=${t}`;
+  const r=await fetch(`api/jobs/${CUR}/boxes_at?${query}&all=1`,{
    method:"POST",headers:{"Content-Type":"application/json"},
    body:JSON.stringify({enabled:EN,box_overrides:owner.ov,time_overrides:owner.times})});
   if(!r.ok)throw new Error("mask preview failed");
   const d=await r.json();
-  if(BE!==owner||owner.seq!==seq||owner.drag)return false;
-  owner.ox=d.ox;owner.oy=d.oy;owner.raw=d.boxes;owner.pending=false;
-  beFilter();beDraw();return true;
+  if(BE!==owner||owner.seq!==seq||owner.drag||(owner.indexed&&(owner.playing||owner.frame!==frame||d.frame!==frame)))return false;
+  owner.ox=d.ox;owner.oy=d.oy;owner.raw=d.boxes;
+  if(owner.indexed){owner.maskFrame=frame;owner.pending=owner.imageFrame!==frame;}
+  else owner.pending=false;
+  beFilter();beDraw();return !owner.pending;
  }catch(e){
   if(BE===owner&&owner.seq===seq){owner.pending=true;beDraw();}
   return false;
@@ -2427,6 +2519,7 @@ function beDraw(){
  const cv=document.getElementById("beCv");if(!cv)return;
  const x=cv.getContext("2d"),s=BE.scale;
  x.clearRect(0,0,cv.width,cv.height);
+ if(BE.indexed&&(BE.playing||BE.pending))return;
  for(const a of BE.adds){
   if(BE.t<a.t0-0.01||BE.t>a.t1+0.01)continue;
   const[a1,b1,a2,b2]=a.box.map(v=>v*s);
@@ -2632,6 +2725,20 @@ function cmpShow(){
  document.getElementById("cmpR").src=`api/jobs/${CUR}/frame_at?t=${t}&src=output`;
 }
 
+const plateFallbackLabels={
+ model_unavailable:"localizer unavailable", inference_error:"localizer error",
+ invalid_crop:"plate crop unclear", no_text_detected:"lettering not found",
+ invalid_geometry:"uncertain lettering shape", ambiguous_text:"possible occlusion",
+ residual_text_evidence:"possible missed lettering", unverifiable_contrast:"uncertain contrast",
+ interpolated_sample:"missing sample"
+};
+function plateFallbackText(x){
+ const reasons=(x.fallbacks||[x.fallback_reason]).filter(Boolean);
+ if(!reasons.length)return "";
+ const prefix=x.fallbackCount && x.fallbackCount<x.frames ? "Some frames use full plate" : "Full plate fallback";
+ const labels=[...new Set(reasons.map(r=>plateFallbackLabels[r]||"uncertain lettering"))];
+ return prefix+": "+labels.join(", ");
+}
 async function loadReview(){
  showPanel("review");
  const d=await (await fetch(`api/jobs/${CUR}/detections`)).json();
@@ -2688,6 +2795,8 @@ async function loadReview(){
    rep.t_start=members[0].t_start;
    rep.t_end=members[members.length-1].t_end;
    rep.frames=members.length;
+   rep.fallbacks=[...new Set(members.map(m=>m.fallback_reason).filter(Boolean))];
+   rep.fallbackCount=members.filter(m=>m.fallback_reason).length;
    rep.personcard=key[0]==="p";
    TRKMEM[rep.i]=members.map(m=>m.i);
    items.push(rep);
@@ -2704,7 +2813,7 @@ async function loadReview(){
     <img src="api/jobs/${CUR}/thumb/${x.i}"
      style="cursor:zoom-in" onclick="zoomDet(${x.i})"
      onerror="thumbRetry(this)">
-    <div>${x.shaped?'<span class="badge" title="Thumbnail rectangle is a selection guide; open to inspect the mask and any exclusions">shaped mask</span> ':""}${x.personcard?`<b>Person ${x.person+1}</b> — one decision for ALL their appearances`:`"${x.text}"`}${x.frames?` <span class="badge">×${x.frames} frames</span>`:""}${x.confidence?` <span class="badge" title="detector confidence — low values on a non-face thumbnail usually mean a false detection">${Math.round(x.confidence*100)}%</span>`:""} <br>${x.t_start.toFixed(1)}–${x.t_end.toFixed(1)}s</div>
+    <div>${plateFallbackText(x)?`<span class="badge" style="white-space:normal">${plateFallbackText(x)}</span> `:""}${x.shaped?'<span class="badge" title="Thumbnail rectangle is a selection guide; open to inspect the mask and any exclusions">shaped mask</span> ':""}${x.personcard?`<b>Person ${x.person+1}</b> — one decision for ALL their appearances`:`"${x.text}"`}${x.frames?` <span class="badge">×${x.frames} frames</span>`:""}${x.confidence?` <span class="badge" title="detector confidence — low values on a non-face thumbnail usually mean a false detection">${Math.round(x.confidence*100)}%</span>`:""} <br>${x.t_start.toFixed(1)}–${x.t_end.toFixed(1)}s</div>
     <button class="blurbtn ${EN[x.i]?"blur":"keep"}" id="bb${x.i}"
      onclick="toggleDet(${x.i})">${EN[x.i]?"Blur":"Keep"}</button>
    </div>`}
