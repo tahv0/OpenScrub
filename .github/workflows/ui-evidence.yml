@@ -29,6 +29,7 @@ jobs:
         run: |
           python -m pip install numpy opencv-python-headless flask pytesseract rapidfuzz onnxruntime pyyaml cryptography cheroot playwright
           python -m playwright install --with-deps chromium
+          sudo apt-get install -y ffmpeg
       - name: Capture upstream and feature UI
         run: |
           git worktree add /tmp/openscrub-before 0852b127e4beea73e5ee3973f7268c08707afcc9
