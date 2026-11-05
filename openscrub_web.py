@@ -35,6 +35,7 @@ import time
 import uuid
 
 import cv2
+import numpy as np
 from flask import (Flask, Response, abort, jsonify, redirect, request,
                    send_file)
 
@@ -413,19 +414,28 @@ class WebCallbacks(openscrub.Callbacks):
         return self.job["cancel"].is_set()
 
 
+def _job_mask_options(job):
+    """Return the exact option values passed to the render command."""
+    options = job.get("options") or {}
+    face = options.get("face_shape")
+    return (options.get("coverage", "tight"), options.get("pad", 8),
+            face if face in ("ellipse", "rect") else "ellipse")
+
+
 def build_args(job, for_render=False):
     o = job["options"]
     jdir = job["dir"]
+    coverage, pad, face_shape = _job_mask_options(job)
     argv = [job["video"],
             "--engine", o.get("engine", "auto"),
             "--device", o.get("device", "auto"),
             "--encoder", o.get("encoder", "auto"),
             "--mode", o.get("mode", "blur"),
-            "--coverage", o.get("coverage", "tight"),
+            "--coverage", coverage,
             "--mode-map", o.get("mode_map", ""),
             "--sample-interval", str(o.get("sample_interval", 0.5)),
             "--scan-trigger", str(o.get("scan_trigger", 60)),
-            "--pad", str(o.get("pad", 8)),
+            "--pad", str(pad),
             "--bridge-gap", str(o.get("bridge_gap", 4.0)),
             "--face-expand", str(o.get("face_expand", 0.15)),
             "--face-threshold", str(o.get("face_threshold", 0.6)),
@@ -445,9 +455,7 @@ def build_args(job, for_render=False):
                               if o.get("out_quality") in
                               ("archival", "balanced", "share")
                               else "archival"),
-            "--face-shape", (o.get("face_shape")
-                             if o.get("face_shape") in ("ellipse", "rect")
-                             else "ellipse"),
+            "--face-shape", face_shape,
             "--scan-speed", (o.get("scan_speed")
                              if o.get("scan_speed") in openscrub.SCAN_SPEEDS
                              else "thorough"),
@@ -934,11 +942,107 @@ def job_detections(jid):
                       "track": d.get("track", -1),
                       "person": d.get("person", -1),
                       "confidence": d.get("confidence", 0),
-                      "zone_dropped": bool(d.get("zone_dropped"))})
+                      "zone_dropped": bool(d.get("zone_dropped")),
+                      "shaped": bool(d.get("poly"))})
     return jsonify({"detections": items,
                     "fps": doc["render_state"]["fps"],
                     "duration": len(doc["render_state"]["cum"]) /
                                 doc["render_state"]["fps"]})
+
+
+def _review_detections(job, doc):
+    """Compute rendered coverage while retaining all report row indices."""
+    rows = doc["detections"]
+    dets = [openscrub.Detection(
+        r["t_start"], r["t_end"], tuple(r["cbox"]), r["category"],
+        r.get("text", ""), r.get("confidence", 1.0),
+        tuple(r.get("aoff", (0, 0))), dense=r.get("dense", False),
+        track=r.get("track", -1), poly=r.get("poly") or (),
+        poly_holes=r.get("poly_holes") or (), mask_pad=r.get("mask_pad", -1))
+        for r in rows]
+    coverage, pad, _ = _job_mask_options(job)
+    if coverage not in ("tight", "box", "concealed"):
+        abort(400, description="invalid coverage option")
+    try:
+        int(str(pad))
+    except ValueError:
+        abort(400, description="invalid padding option")
+    enabled_indices = [i for i, row in enumerate(rows) if row.get("enabled", True)]
+    enabled = openscrub.apply_coverage([dets[i] for i in enabled_indices], coverage)
+    effective = list(dets)
+    for i, det in zip(enabled_indices, enabled):
+        effective[i] = det
+    for i, row in enumerate(rows):
+        if not row.get("enabled", True):
+            effective[i] = openscrub.apply_coverage([dets[i]], coverage)[0]
+    result = []
+    for row, det in zip(rows, effective):
+        copy = dict(row)
+        copy.update(cbox=det.cbox, poly=det.poly, poly_holes=det.poly_holes,
+                    mask_pad=det.mask_pad)
+        copy["_coverage_box"] = (coverage in ("box", "concealed") and
+                                  det.dense and det.category in ("person", "manual"))
+        result.append(copy)
+    return result
+
+
+def _review_mask_data(d, ox, oy, shape, job, doc):
+    """Rasterize the effective mask at the review frame coordinates."""
+    box = [d["cbox"][0] + ox, d["cbox"][1] + oy,
+           d["cbox"][2] + ox, d["cbox"][3] + oy]
+    base = d.get("mask_pad", -1)
+    try:
+        base = float(base)
+        if not np.isfinite(base) or base < 0:
+            raise ValueError()
+    except (ValueError, TypeError):
+        base = int(str(_job_mask_options(job)[1]))
+    anchor = d.get("aoff", (0, 0))
+    pad = base + min(24.0, 0.05 * (abs(ox-anchor[0]) + abs(oy-anchor[1])))
+    region = (box[0]-pad, box[1]-pad, box[2]+pad, box[3]+pad)
+    if d.get("poly"):
+        return openscrub.rasterize_mask(
+            shape, region, d["poly"], box, pad, d.get("poly_holes") or ())
+    face_shape = _job_mask_options(job)[2]
+    kind = "ellipse" if d["category"] == "face" and face_shape != "rect" else "rect"
+    return openscrub.rasterize_region_mask(shape, region, kind)
+
+
+def _review_mask(d, ox, oy, shape, job, doc):
+    data = _review_mask_data(d, ox, oy, shape, job, doc)
+    if data is None:
+        return []
+    region, mask = data
+    contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    return [[[int(pt[0][0] + region[0]), int(pt[0][1] + region[1])]
+             for pt in contour] for contour in contours]
+
+
+def _apply_detection_edits(doc, edits):
+    """Apply the same pending changes for preview and save, in memory."""
+    enabled = edits.get("enabled", {})
+    for i, d in enumerate(doc["detections"]):
+        if str(i) in enabled:
+            d["enabled"] = bool(enabled[str(i)])
+    for i, box in (edits.get("box_overrides") or {}).items():
+        i = int(i)
+        if 0 <= i < len(doc["detections"]) and len(box) == 4:
+            d = doc["detections"][i]
+            new_box = [float(v) for v in box]
+            if new_box != d["cbox"]:
+                d["cbox"] = new_box
+                d["poly"] = []
+                d["poly_holes"] = []
+                d["mask_pad"] = -1
+    for i, span in (edits.get("time_overrides") or {}).items():
+        i = int(i)
+        if 0 <= i < len(doc["detections"]) and len(span) == 2:
+            t0, t1 = float(span[0]), float(span[1])
+            if t1 > t0 >= 0:
+                doc["detections"][i]["t_start"] = t0
+                doc["detections"][i]["t_end"] = t1
+                doc["detections"][i]["last_seen"] = min(
+                    max(doc["detections"][i].get("last_seen", t0), t0), t1)
 
 
 @app.route("/api/jobs/<jid>/detframe/<int:i>")
@@ -947,7 +1051,7 @@ def job_detframe(jid, i):
     outlined — the review lightbox."""
     job = JOBS.get(jid) or abort(404)
     doc = _load_job_report(job)
-    d = doc["detections"][i]
+    d = _review_detections(job, doc)[i]
     rs = doc["render_state"]
     tref = min(max(d.get("last_seen", d["t_start"]), d["t_start"]), d["t_end"])
     fidx = min(int(tref * rs["fps"]), len(rs["cum"]) - 1)
@@ -957,33 +1061,62 @@ def job_detframe(jid, i):
         abort(404)
     x1, y1 = int(d["cbox"][0] + ox), int(d["cbox"][1] + oy)
     x2, y2 = int(d["cbox"][2] + ox), int(d["cbox"][3] + oy)
-    cv2.rectangle(frame, (x1 - 4, y1 - 4), (x2 + 4, y2 + 4), (0, 0, 255), 3)
+    data = _review_mask_data(d, ox, oy, frame.shape, job, doc)
+    if data is not None:
+        region, mask = data
+        xlo, ylo, xhi, yhi = region
+        roi = frame[ylo:yhi, xlo:xhi]
+        if mask.size:
+            tint = np.full_like(roi, (0, 0, 255))
+            blended = cv2.addWeighted(roi, 0.75, tint, 0.25, 0)
+            cv2.copyTo(blended, mask, roi)
+            contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+            cv2.drawContours(frame, contours, -1, (0, 0, 255), 2,
+                             offset=(xlo, ylo))
+    else:
+        cv2.rectangle(frame, (x1 - 4, y1 - 4), (x2 + 4, y2 + 4), (0, 0, 255), 3)
     ok, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 84])
     from flask import Response
     return Response(buf.tobytes(), mimetype="image/jpeg")
 
 
-@app.route("/api/jobs/<jid>/boxes_at")
+@app.route("/api/jobs/<jid>/boxes_at", methods=["GET", "POST"])
 def job_boxes_at(jid):
     """Active blur boxes (screen coords) at time t, plus the scroll offset so
     the client can convert edited boxes back to content coordinates."""
     job = JOBS.get(jid) or abort(404)
     doc = _load_job_report(job)
+    if request.method == "POST":
+        _apply_detection_edits(doc, request.get_json(silent=True) or {})
     rs = doc["render_state"]
     t = float(request.args.get("t", 0))
     fidx = min(int(t * rs["fps"]), len(rs["cum"]) - 1)
     ox, oy = rs["cum"][fidx]
     boxes = []
+    cap = cv2.VideoCapture(job["video"])
+    shape = (int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)),
+             int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)))
+    cap.release()
     want_all = request.args.get("all") == "1"
-    for i, d in enumerate(doc["detections"]):
-        if not (d["t_start"] - 0.01 <= t <= d["t_end"] + 0.01):
-            continue
-        if not want_all and not d.get("enabled", True):
+    rows = _review_detections(job, doc)
+    active = [(i, d) for i, d in enumerate(rows)
+              if d["t_start"] - 0.01 <= t <= d["t_end"] + 0.01]
+    # Use the renderer's identity-based selector and retain report indices.
+    from types import SimpleNamespace
+    candidates = [(i, d, SimpleNamespace(t_start=d["t_start"],
+                   dense=d.get("dense", False), track=d.get("track", -1)))
+                  for i, d in active if d.get("enabled", True)]
+    winners = {id(x) for x in openscrub._dedupe_dense([c[2] for c in candidates])}
+    selected = {i for i, _, obj in candidates if id(obj) in winners}
+    for i, d in active:
+        if i not in selected and (d.get("enabled", True) or not want_all):
             continue
         if True:
             boxes.append({"i": i, "category": d["category"],
                           "enabled": d.get("enabled", True),
                           "text": d.get("text", ""),
+                          "shaped": bool(d.get("poly")),
+                          "mask_contours": _review_mask(d, ox, oy, shape, job, doc),
                           "t_start": d["t_start"], "t_end": d["t_end"],
                           "box": [d["cbox"][0] + ox, d["cbox"][1] + oy,
                                   d["cbox"][2] + ox, d["cbox"][3] + oy]})
@@ -1086,23 +1219,7 @@ def job_save_edits(jid):
     edits = request.get_json(force=True)
     path = os.path.join(job["dir"], "report.json")
     doc = _load_job_report(job)
-    enabled = edits.get("enabled", {})
-    for i, d in enumerate(doc["detections"]):
-        if str(i) in enabled:
-            d["enabled"] = bool(enabled[str(i)])
-    for i, box in (edits.get("box_overrides") or {}).items():
-        i = int(i)
-        if 0 <= i < len(doc["detections"]) and len(box) == 4:
-            doc["detections"][i]["cbox"] = [float(v) for v in box]
-    for i, span in (edits.get("time_overrides") or {}).items():
-        i = int(i)
-        if 0 <= i < len(doc["detections"]) and len(span) == 2:
-            t0, t1 = float(span[0]), float(span[1])
-            if t1 > t0 >= 0:
-                doc["detections"][i]["t_start"] = t0
-                doc["detections"][i]["t_end"] = t1
-                doc["detections"][i]["last_seen"] = min(
-                    max(doc["detections"][i].get("last_seen", t0), t0), t1)
+    _apply_detection_edits(doc, edits)
     rs = doc["render_state"]
     for m in edits.get("manual", []):
         t0 = float(m["t_start"]); t1 = float(m["t_end"])
@@ -2042,6 +2159,7 @@ async function loadBoxEdit(fromReview){
    <button class="danger" id="beARm" style="display:none" onclick="beAudioRm()">Delete span</button></div>
   <div id="beASugg" style="display:none;margin-top:6px"></div>
   <div id="beATx" style="display:none;margin-top:6px"></div>
+  <div style="font-size:12px;color:#94a3b8">Moving or resizing a shaped mask removes its shape; faces follow the selected face shape, other detections use a box. Outlines without fill mean the preview is updating.</div>
   <div class="row" style="margin-top:6px">
    <button class="tog" id="beAdd" onclick="beAddMode()">&#65291; Add box</button>
    <button class="tog" id="beTrk" onclick="beTrackMode()">&#8857; Track object</button>
@@ -2107,10 +2225,7 @@ async function beTogglePlay(){
   const now=performance.now();
   if(!inFlight&&now-lastQ>150){
    inFlight=true;lastQ=now;
-   fetch(`api/jobs/${CUR}/boxes_at?t=${BE.t.toFixed(2)}&all=1`)
-    .then(r=>r.json())
-    .then(d=>{BE.ox=d.ox;BE.oy=d.oy;BE.raw=d.boxes;beFilter();})
-    .catch(()=>{}).finally(()=>{inFlight=false;});
+   beRefresh(BE.t.toFixed(2)).finally(()=>{inFlight=false;});
   }
   beDraw();beTLDraw();
   requestAnimationFrame(step);
@@ -2281,20 +2396,31 @@ async function beScrub(){
  BE.t=+document.getElementById("beT").value;
  document.getElementById("beL").textContent=BE.t.toFixed(1)+"s";
  document.getElementById("beImg").src=`api/jobs/${CUR}/frame_at?t=${BE.t}`;
- const d=await (await fetch(`api/jobs/${CUR}/boxes_at?t=${BE.t}&all=1`)).json();
- BE.ox=d.ox;BE.oy=d.oy;BE.raw=d.boxes;
- beFilter();beDraw();beTLDraw();
+ await beRefresh();beTLDraw();
+}
+// Server computes the same pending edits, coverage and dense winner as render.
+// Sequence numbers reject stale responses after a drag, toggle, or seek.
+async function beRefresh(t=BE.t){
+ const owner=BE,seq=owner.seq=(owner.seq||0)+1;
+ owner.pending=true;beDraw();
+ try{
+  const r=await fetch(`api/jobs/${CUR}/boxes_at?t=${t}&all=1`,{
+   method:"POST",headers:{"Content-Type":"application/json"},
+   body:JSON.stringify({enabled:EN,box_overrides:owner.ov,time_overrides:owner.times})});
+  if(!r.ok)throw new Error("mask preview failed");
+  const d=await r.json();
+  if(BE!==owner||owner.seq!==seq||owner.drag)return false;
+  owner.ox=d.ox;owner.oy=d.oy;owner.raw=d.boxes;owner.pending=false;
+  beFilter();beDraw();return true;
+ }catch(e){
+  if(BE===owner&&owner.seq===seq){owner.pending=true;beDraw();}
+  return false;
+ }
 }
 function beFilter(){
  BE.boxes=(BE.raw||[]).filter(b=>{
   const on=(b.i in EN)?EN[b.i]:b.enabled;   // live: review toggles apply here
   return on;
- }).map(b=>{
-  let bb=b;
-  if(BE.ov[b.i]){const o=BE.ov[b.i];
-   bb={...b,box:[o[0]+BE.ox,o[1]+BE.oy,o[2]+BE.ox,o[3]+BE.oy]};}
-  if(BE.times[b.i]){bb={...bb,t_start:BE.times[b.i][0],t_end:BE.times[b.i][1]};}
-  return bb;
  });
 }
 function beDraw(){
@@ -2317,7 +2443,15 @@ function beDraw(){
   const[a1,b1,a2,b2]=b.box.map(v=>v*s);
   x.fillStyle=b.i===BE.sel?"rgba(37,99,235,.25)":"rgba(220,38,38,.22)";
   x.strokeStyle=b.i===BE.sel?"#2563eb":"#dc2626";x.lineWidth=2;
-  x.fillRect(a1,b1,a2-a1,b2-b1);x.strokeRect(a1,b1,a2-a1,b2-b1);
+  if(!BE.pending&&!BE.drag&&b.mask_contours.length){
+   x.beginPath();
+   for(const ring of b.mask_contours){if(!ring.length)continue;
+    x.moveTo(ring[0][0]*s,ring[0][1]*s);
+    for(const p of ring.slice(1))x.lineTo(p[0]*s,p[1]*s);
+    x.closePath();}
+   x.fill("evenodd");x.stroke();
+   x.setLineDash([4,4]);x.strokeRect(a1,b1,a2-a1,b2-b1);x.setLineDash([]);
+  }else{x.setLineDash([4,4]);x.strokeRect(a1,b1,a2-a1,b2-b1);x.setLineDash([]);}
   if(b.i===BE.sel)for(const[hx,hy] of [[a1,b1],[a2,b1],[a1,b2],[a2,b2]]){
    x.fillStyle="#fff";x.fillRect(hx-5,hy-5,10,10);
    x.strokeRect(hx-5,hy-5,10,10);}
@@ -2341,7 +2475,7 @@ function beApplyTimes(){
  BE.times[BE.sel]=[t0,Math.min(t1,BE.dur)];
  const b=BE.boxes.find(x=>x.i===BE.sel);
  if(b){b.t_start=t0;b.t_end=t1;}
- beDraw();
+ beRefresh();
 }
 function beShowTimes(b){
  const el=document.getElementById("beTimes");
@@ -2422,10 +2556,11 @@ function beHook(){
    if(BE.drag.ci===3){a2=p[0];b2=p[1];}
   }
   b.box=[Math.min(a1,a2),Math.min(b1,b2),Math.max(a1,a2),Math.max(b1,b2)];
+  BE.seq=(BE.seq||0)+1;BE.pending=true;
   BE.ov[BE.sel]=[b.box[0]-BE.ox,b.box[1]-BE.oy,b.box[2]-BE.ox,b.box[3]-BE.oy];
   beDraw();
  });
- cv.addEventListener("pointerup",()=>{BE.drag=null;});
+ cv.addEventListener("pointerup",()=>{if(BE.drag){BE.drag=null;beRefresh();}});
 }
 function zoomDet(i){
  let ov=document.getElementById("lb");
@@ -2449,7 +2584,7 @@ function beRemove(){
  document.getElementById("beTimes").style.display="none";
 }
 async function beSave(){
- await saveAndRender();
+ if(!await saveAndRender())return;
  const c=document.querySelector("#beslot");
  if(c)c.innerHTML="rendering with your edits…";
 }
@@ -2508,6 +2643,7 @@ async function loadReview(){
   (groups[x.category]=groups[x.category]||[]).push(x);});
  let html=`<div class="card" id="review"><h2>Review — red = will be blurred,
  green = kept visible. Drag a box around several to bulk-set.</h2>
+ <p>Thumbnail rectangles are selection guides. Open shaped masks to inspect their coverage and exclusions.</p>
  <div class="row" style="margin:0 0 8px">
   <button class="sec" onclick="loadBoxEdit(1)">▶ Preview video &amp; edit boxes
   (before rendering)</button></div>
@@ -2568,7 +2704,7 @@ async function loadReview(){
     <img src="api/jobs/${CUR}/thumb/${x.i}"
      style="cursor:zoom-in" onclick="zoomDet(${x.i})"
      onerror="thumbRetry(this)">
-    <div>${x.personcard?`<b>Person ${x.person+1}</b> — one decision for ALL their appearances`:`"${x.text}"`}${x.frames?` <span class="badge">×${x.frames} frames</span>`:""}${x.confidence?` <span class="badge" title="detector confidence — low values on a non-face thumbnail usually mean a false detection">${Math.round(x.confidence*100)}%</span>`:""} <br>${x.t_start.toFixed(1)}–${x.t_end.toFixed(1)}s</div>
+    <div>${x.shaped?'<span class="badge" title="Thumbnail rectangle is a selection guide; open to inspect the mask and any exclusions">shaped mask</span> ':""}${x.personcard?`<b>Person ${x.person+1}</b> — one decision for ALL their appearances`:`"${x.text}"`}${x.frames?` <span class="badge">×${x.frames} frames</span>`:""}${x.confidence?` <span class="badge" title="detector confidence — low values on a non-face thumbnail usually mean a false detection">${Math.round(x.confidence*100)}%</span>`:""} <br>${x.t_start.toFixed(1)}–${x.t_end.toFixed(1)}s</div>
     <button class="blurbtn ${EN[x.i]?"blur":"keep"}" id="bb${x.i}"
      onclick="toggleDet(${x.i})">${EN[x.i]?"Blur":"Keep"}</button>
    </div>`}
@@ -2591,7 +2727,7 @@ function applyDet(i,blur){
  if(b){b.className="blurbtn "+(blur?"blur":"keep");
        b.textContent=blur?"Blur":"Keep";}
  if(t)t.classList.toggle("off",!blur);
- if(document.getElementById("beCv")){beFilter();beDraw();}   // live sync
+ if(document.getElementById("beCv")){beRefresh();}   // live sync
 }
 function toggleDet(i){applyDet(i,!EN[i]);}
 function setAll(cat,on){document.querySelectorAll(`.det[data-cat=${cat}]`)
@@ -2668,6 +2804,15 @@ document.addEventListener("keydown",e=>{
   const lb=document.getElementById("lb");if(lb)lb.remove();}});
 
 async function saveAndRender(){
+ // Do not render until the server has confirmed the latest pending preview.
+ if(document.getElementById("beCv")){
+  if(BE.drag||BE.pending){
+   alert("Wait for the mask preview to finish updating before saving.");return false;
+  }
+  if(!await beRefresh()){
+   alert("Could not update the mask preview. Finish editing and try again.");return false;
+  }
+ }
  const manual=[...MAN,...BE.adds.map(a=>({t_start:a.t0,t_end:a.t1,
   t_ref:a.tref,screen_box:a.box}))];
  const payload={enabled:EN,manual,box_overrides:BE.ov,
@@ -2688,6 +2833,7 @@ async function saveAndRender(){
  MAN=[];
  await fetch(`api/jobs/${CUR}/render`,{method:"POST"});
  const rv=document.getElementById("review"); if(rv)rv.remove();
+ return true;
 }
 async function loadPersist(){
  const a=await (await fetch("api/allowlist")).json();

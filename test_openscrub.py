@@ -3366,3 +3366,305 @@ def test_registry_doc_fields_refresh_but_pins_stay(monkeypatch, tmp_path):
     assert got["sha256"] == "ab" * 32
     assert got["download_url"] == "https://example.com/pinned.onnx"
     assert got["recommended"] == m0["recommended"]
+
+
+def test_compound_mask_holes_islands_padding_and_invalid():
+    outer = ((0, 0), (1, 0), (1, 1), (0, 1))
+    hole = ((.25, .25), (.75, .25), (.75, .75), (.25, .75))
+    island = ((.45, .45), (.55, .45), (.55, .55), (.45, .55))
+    frame = np.full((24, 24, 3), 255, np.uint8)
+    openscrub.blur_silhouette(frame, 0, 0, 24, 24, 'box', (outer, island),
+                              (2, 2, 22, 22), pad_px=1,
+                              poly_holes=((hole,), ()))
+    assert frame[4, 4, 0] == 0
+    assert frame[8, 8, 0] == 255
+    assert frame[12, 12, 0] == 0
+    frame[:] = 255
+    openscrub.blur_silhouette(frame, 2, 2, 22, 22, 'box',
+                              (((float('nan'), 0), (1, 0), (1, 1)),),
+                              (2, 2, 22, 22))
+    assert frame[10, 10, 0] == 0
+
+
+def test_compound_report_roundtrip(tmp_path):
+    from dataclasses import asdict
+    d = openscrub.Detection(0, 1, (0, 0, 10, 10), 'plate', '', 1,
+        poly=(((0, 0), (1, 0), (1, 1)),),
+        poly_holes=((((.1, .1), (.2, .1), (.2, .2)),),), mask_pad=0)
+    p = tmp_path / 'r.json'
+    p.write_text(json.dumps([asdict(d)]))
+    back, _, _ = openscrub.load_report(p)
+    assert back[0].mask_pad == 0 and back[0].poly_holes == d.poly_holes
+
+
+def test_hdr_odd_origin_covers_every_touched_chroma_cell():
+    y = np.full((8, 8), 900, np.uint16)
+    u = np.full((4, 4), 800, np.uint16)
+    v = u.copy()
+    square = ((0, 0), (1, 0), (1, 1), (0, 1))
+    openscrub._blur_silhouette_yuv10(y, u, v, 1, 1, 5, 5, 'box',
+                                    (square,), (1, 1, 5, 5))
+    assert u[:3, :3].tolist() == [[512] * 3] * 3
+    assert u[3, 3] == 800
+
+
+def test_review_shape_edit_converts_only_changed_box(tmp_path):
+    import openscrub_web as web
+    outer = [[[0, 0], [1, 0], [1, 1], [0, 1]]]
+    row = {'t_start': 0, 't_end': 1, 'cbox': [2, 2, 20, 20],
+           'aoff': [0, 0], 'category': 'plate', 'text': '', 'poly': outer,
+           'poly_holes': [[[[.25,.25], [.75,.25], [.75,.75], [.25,.75]]]], 'mask_pad': 0}
+    doc = {'detections': [row], 'render_state': {'fps': 1, 'cum': [[0, 0]], 'bands': []}}
+    (tmp_path / 'report.json').write_text(json.dumps(doc))
+    video = str(tmp_path / 'v.mp4')
+    out = cv2.VideoWriter(video, cv2.VideoWriter_fourcc(*'mp4v'), 1, (24, 24))
+    out.write(np.full((24, 24, 3), 200, np.uint8)); out.release()
+    web.JOBS['compound-test'] = {'dir': str(tmp_path), 'video': video, 'options': {'pad': 8}}
+    try:
+        c = web.app.test_client()
+        box = c.get('/api/jobs/compound-test/boxes_at?t=0').get_json()['boxes'][0]
+        assert box['mask_contours'] and box['shaped']
+        c.post('/api/jobs/compound-test/detections', json={'box_overrides': {'0': [2, 2, 20, 20]}})
+        assert json.loads((tmp_path / 'report.json').read_text())['detections'][0]['poly'] == outer
+        c.post('/api/jobs/compound-test/detections', json={'box_overrides': {'0': [3, 2, 20, 20]}})
+        changed = json.loads((tmp_path / 'report.json').read_text())['detections'][0]
+        assert not changed['poly'] and not changed['poly_holes'] and changed['mask_pad'] == -1
+    finally:
+        del web.JOBS['compound-test']
+
+
+def test_generated_compound_track_samples_use_box():
+    outer = (((0, 0), (1, 0), (1, 1), (0, 1)),)
+    holes = ((( (.2, .2), (.8, .2), (.8, .8), (.2, .8) ),),)
+    samples = [openscrub.Detection(t, t + .01, (10, 10, 30, 30), 'plate', '', 1,
+                dense=True, track=5, poly=outer, poly_holes=holes, mask_pad=0)
+               for t in (0, .3)]
+    openscrub.smooth_dense_tracks(samples, 30, video=None)
+    generated = [d for d in samples if d.t_start not in (0, .3)]
+    assert generated and all(not d.poly and not d.poly_holes and d.mask_pad == -1 for d in generated)
+    assert all(d.poly == outer and d.poly_holes == holes for d in samples if d.t_start in (0, .3))
+
+
+def test_malformed_report_geometry_reaches_fail_closed_renderer(tmp_path):
+    row = {'t_start': 0, 't_end': 1, 'cbox': [2, 2, 18, 18],
+           'category': 'plate', 'text': '', 'poly': [[[0, 0], [1, 0], [1, 1]]],
+           'poly_holes': [None]}
+    p = tmp_path / 'broken.json'; p.write_text(json.dumps([row]))
+    dets, _, _ = openscrub.load_report(p)
+    frame = np.full((20, 20, 3), 255, np.uint8)
+    openscrub.blur_silhouette(frame, 2, 2, 18, 18, 'box', dets[0].poly,
+                              dets[0].cbox, poly_holes=dets[0].poly_holes)
+    assert frame[15, 3, 0] == 0
+
+
+def test_generated_legacy_silhouette_retains_its_padding_override():
+    outer = (((0, 0), (1, 0), (1, 1), (0, 1)),)
+    samples = [openscrub.Detection(t, t + .01, (10, 10, 30, 30), 'person', '', 1,
+                dense=True, track=5, poly=outer, mask_pad=0) for t in (0, .3)]
+    openscrub.smooth_dense_tracks(samples, 30, video=None)
+    generated = [d for d in samples if d.t_start not in (0, .3)]
+    assert generated and all(d.poly == outer and d.mask_pad == 0 for d in generated)
+
+
+def test_component_completely_erased_by_hole_fails_closed():
+    outer = ((0, 0), (.5, 0), (.5, 1), (0, 1))
+    island = ((.7, .2), (.9, .2), (.9, .8), (.7, .8))
+    frame = np.full((20, 20, 3), 255, np.uint8)
+    openscrub.blur_silhouette(frame, 0, 0, 20, 20, 'box', (outer, island),
+                              (0, 0, 20, 20), poly_holes=((outer,), ()))
+    assert frame[5, 3, 0] == 0
+
+
+@pytest.mark.parametrize('coverage,expected_box', [
+    ('box', [10, 10, 30, 30]),
+    ('concealed', [7, 7, 32, 32]),
+])
+def test_review_uses_selected_person_coverage_without_mutating_report(tmp_path, coverage, expected_box):
+    import openscrub_web as web
+    poly = [[[0, 0], [.5, 0], [.5, 1], [0, 1]]]
+    rows = [
+        {'t_start': 0, 't_end': .1, 'cbox': [10, 10, 30, 30], 'aoff': [0, 0],
+         'category': 'person', 'text': '', 'poly': poly, 'dense': True, 'track': 1},
+        {'t_start': .2, 't_end': .3, 'cbox': [20, 10, 40, 30], 'aoff': [0, 0],
+         'category': 'person', 'text': '', 'poly': poly, 'dense': True, 'track': 1,
+         'enabled': False},
+    ]
+    doc = {'detections': rows, 'render_state': {'fps': 10, 'cum': [[0, 0]] * 4, 'bands': []},
+           'provenance': {'settings': {'coverage': coverage, 'pad': 0}}}
+    report = tmp_path / 'report.json'; report.write_text(json.dumps(doc))
+    video = str(tmp_path / 'coverage.mp4')
+    out = cv2.VideoWriter(video, cv2.VideoWriter_fourcc(*'mp4v'), 10, (64, 64))
+    for _ in range(4): out.write(np.full((64, 64, 3), 200, np.uint8))
+    out.release()
+    web.JOBS['coverage-test'] = {'dir': str(tmp_path), 'video': video,
+                                 'options': {'coverage': coverage, 'pad': 0}}
+    try:
+        client = web.app.test_client()
+        box = client.get('/api/jobs/coverage-test/boxes_at?t=0').get_json()['boxes'][0]
+        assert box['box'] == expected_box and not box['shaped']
+        assert min(p[0] for c in box['mask_contours'] for p in c) == expected_box[0]
+        response = client.get('/api/jobs/coverage-test/detframe/0')
+        assert response.status_code == 200
+        image = cv2.imdecode(np.frombuffer(response.data, np.uint8), cv2.IMREAD_COLOR)
+        assert int(image[20, 25, 2]) > int(image[20, 25, 0]) + 20
+        assert json.loads(report.read_text()) == doc
+        disabled = client.get('/api/jobs/coverage-test/boxes_at?t=.2&all=1').get_json()['boxes'][0]
+        assert disabled['i'] == 1 and not disabled['enabled']
+        web.JOBS['coverage-test']['options'] = {'coverage': 'tight', 'pad': 3}
+        override = client.get('/api/jobs/coverage-test/boxes_at?t=0').get_json()['boxes'][0]
+        assert override['shaped'] and min(p[0] for c in override['mask_contours'] for p in c) == 7
+    finally:
+        del web.JOBS['coverage-test']
+
+
+def test_nonsequence_report_polygon_fails_closed(tmp_path):
+    row = {'t_start': 0, 't_end': 1, 'cbox': [2, 2, 18, 18],
+           'category': 'plate', 'text': '', 'poly': 1}
+    report = tmp_path / 'scalar.json'; report.write_text(json.dumps([row]))
+    dets, _, _ = openscrub.load_report(report)
+    frame = np.full((20, 20, 3), 255, np.uint8)
+    openscrub.blur_silhouette(frame, 2, 2, 18, 18, 'box', dets[0].poly, dets[0].cbox)
+    assert frame[10, 10, 0] == 0 and frame[1, 1, 0] == 255
+
+
+@pytest.mark.parametrize('category,face_shape,corner_red', [
+    ('plate', 'ellipse', True), ('face', 'ellipse', False), ('face', 'rect', True),
+    ('face', None, False),
+])
+def test_review_displays_padded_box_and_face_masks(tmp_path, category, face_shape, corner_red):
+    import openscrub_web as web
+    row = {'t_start': 0, 't_end': 1, 'cbox': [20, 20, 50, 50],
+           'aoff': [0, 0], 'category': category, 'text': ''}
+    doc = {'detections': [row], 'render_state': {'fps': 1, 'cum': [[4, 0]], 'bands': []},
+           'provenance': {'settings': {'pad': 3, 'face_shape': face_shape}}}
+    (tmp_path / 'report.json').write_text(json.dumps(doc))
+    video = str(tmp_path / 'review.mp4')
+    out = cv2.VideoWriter(video, cv2.VideoWriter_fourcc(*'mp4v'), 1, (80, 80))
+    out.write(np.full((80, 80, 3), 200, np.uint8)); out.release()
+    web.JOBS['ordinary-mask-test'] = {'dir': str(tmp_path), 'video': video,
+                                      'options': {'pad': 3, 'face_shape': face_shape}}
+    try:
+        client = web.app.test_client()
+        b = client.get('/api/jobs/ordinary-mask-test/boxes_at?t=0').get_json()['boxes'][0]
+        points = [p for contour in b['mask_contours'] for p in contour]
+        assert min(p[0] for p in points) == 20 and min(p[1] for p in points) == 16
+        assert b['box'] == [24, 20, 54, 50]
+        response = client.get('/api/jobs/ordinary-mask-test/detframe/0')
+        img = cv2.imdecode(np.frombuffer(response.data, np.uint8), cv2.IMREAD_COLOR)
+        assert (int(img[18, 22, 2]) > int(img[18, 22, 0]) + 20) == corner_red
+        assert int(img[35, 38, 2]) > int(img[35, 38, 0]) + 20
+    finally:
+        del web.JOBS['ordinary-mask-test']
+
+
+@pytest.mark.parametrize('options', [{}, {'face_shape': None},
+    {'face_shape': 'invalid'}, {'face_shape': 'rect', 'pad': 2, 'coverage': 'box'}])
+def test_review_matches_render_options_despite_conflicting_provenance(tmp_path, options):
+    import openscrub_web as web
+    row = {'t_start': 0, 't_end': 1, 'cbox': [20, 20, 50, 50],
+           'aoff': [0, 0], 'category': 'face', 'text': ''}
+    person = {'t_start': 0, 't_end': 1, 'cbox': [20, 20, 50, 50], 'aoff': [0, 0],
+              'category': 'person', 'text': '', 'dense': True, 'track': 1,
+              'poly': [[[0, 0], [.5, 0], [.5, 1], [0, 1]]]}
+    doc = {'detections': [row, person], 'render_state': {'fps': 1, 'cum': [[0, 0]], 'bands': []},
+           'provenance': {'settings': {'pad': 0, 'coverage': 'concealed', 'face_shape': 'rect'}}}
+    (tmp_path / 'report.json').write_text(json.dumps(doc))
+    video = str(tmp_path / 'opts.mp4')
+    out = cv2.VideoWriter(video, cv2.VideoWriter_fourcc(*'mp4v'), 1, (80, 80))
+    out.write(np.full((80, 80, 3), 200, np.uint8)); out.release()
+    job = {'dir': str(tmp_path), 'video': video, 'options': options}
+    args = web.build_args(job, for_render=True)
+    web.JOBS['settings-test'] = job
+    try:
+        client = web.app.test_client()
+        boxes = client.get('/api/jobs/settings-test/boxes_at?t=0').get_json()['boxes']
+        b = boxes[0]
+        assert boxes[1]['shaped'] == (args.coverage == 'tight')
+        contour = np.asarray(b['mask_contours'][0], np.int32)
+        left = 20 - args.pad
+        assert min(p[0] for p in contour) == left
+        inside_corner = cv2.pointPolygonTest(contour, (left + 1, left + 1), False) >= 0
+        assert inside_corner == (args.face_shape == 'rect')
+        assert args.coverage == options.get('coverage', 'tight')
+    finally:
+        del web.JOBS['settings-test']
+
+
+@pytest.mark.parametrize('options', [
+    {'coverage': None}, {'coverage': 'invalid'}, {'pad': None}, {'pad': 'invalid'},
+])
+def test_invalid_render_options_do_not_yield_a_review_mask(tmp_path, options):
+    import openscrub_web as web
+    row = {'t_start': 0, 't_end': 1, 'cbox': [5, 5, 15, 15],
+           'category': 'face', 'text': '', 'mask_pad': 0}
+    doc = {'detections': [row], 'render_state': {'fps': 1, 'cum': [[0, 0]], 'bands': []}}
+    (tmp_path / 'report.json').write_text(json.dumps(doc))
+    video = str(tmp_path / 'invalid.mp4')
+    out = cv2.VideoWriter(video, cv2.VideoWriter_fourcc(*'mp4v'), 1, (24, 24))
+    out.write(np.full((24, 24, 3), 200, np.uint8)); out.release()
+    job = {'dir': str(tmp_path), 'video': video, 'options': options}
+    with pytest.raises((SystemExit, TypeError)):
+        web.build_args(job, for_render=True)
+    web.JOBS['invalid-options-test'] = job
+    try:
+        response = web.app.test_client().get('/api/jobs/invalid-options-test/boxes_at?t=0')
+        assert response.status_code >= 400
+    finally:
+        del web.JOBS['invalid-options-test']
+
+
+@pytest.mark.parametrize('region', [(90, 10, 110, 30), (-30, 10, -10, 30),
+                                      (10, 90, 30, 110), (10, -30, 30, -10)])
+@pytest.mark.parametrize('mode', ['box', 'blur', 'mosaic', 'inpaint'])
+def test_offscreen_silhouette_is_noop(region, mode):
+    frame = np.full((80, 80, 3), 200, np.uint8)
+    square = (((0, 0), (1, 0), (1, 1), (0, 1)),)
+    openscrub.blur_silhouette(frame, *region, mode, square, region)
+    assert np.all(frame == 200)
+
+
+def test_pending_review_masks_and_dense_selection_match_saved_state(tmp_path):
+    import openscrub_web as web
+    outer = [[[0, 0], [1, 0], [1, 1], [0, 1]]]
+    hole = [[[[.25, .25], [.75, .25], [.75, .75], [.25, .75]]]]
+    rows = [
+        {'t_start': 0, 't_end': .3, 'cbox': [10, 10, 30, 30], 'aoff': [0, 0],
+         'category': 'plate', 'text': '', 'dense': True, 'track': 3,
+         'poly': outer, 'poly_holes': hole, 'mask_pad': 0},
+        {'t_start': .2, 't_end': .5, 'cbox': [40, 10, 60, 30], 'aoff': [0, 0],
+         'category': 'face', 'text': '', 'dense': True, 'track': 3,
+         'poly': outer, 'poly_holes': hole, 'mask_pad': 0}]
+    doc = {'detections': rows, 'render_state': {'fps': 10, 'cum': [[2, 0]] * 10, 'bands': []}}
+    report = tmp_path / 'report.json'; report.write_text(json.dumps(doc))
+    video = str(tmp_path / 'pending.mp4')
+    out = cv2.VideoWriter(video, cv2.VideoWriter_fourcc(*'mp4v'), 10, (80, 80))
+    for _ in range(10): out.write(np.full((80, 80, 3), 200, np.uint8))
+    out.release()
+    web.JOBS['pending-test'] = {'dir': str(tmp_path), 'video': video,
+                                'options': {'pad': 3, 'face_shape': 'ellipse'}}
+    try:
+        c = web.app.test_client(); url = '/api/jobs/pending-test/boxes_at?t=.2&all=1'
+        initial = c.post(url, json={}).get_json()['boxes']
+        assert [b['i'] for b in initial if b['enabled']] == [1]
+        edited = c.post(url, json={'box_overrides': {'1': [45, 10, 65, 30]}}).get_json()['boxes']
+        face = next(b for b in edited if b['i'] == 1)
+        assert not face['shaped']
+        face_before_save = face['mask_contours']
+        contour = np.asarray(face['mask_contours'][0], np.int32)
+        assert min(p[0] for p in contour) == 43  # shifted 45 + scroll 2 - pad/drift 3.1
+        assert cv2.pointPolygonTest(contour, (44, 8), False) < 0  # ellipse corner
+        restored = c.post(url, json={'box_overrides': {'1': [40, 10, 60, 30]}}).get_json()['boxes']
+        face = next(b for b in restored if b['i'] == 1)
+        assert face['shaped'] and len(face['mask_contours']) == 2
+        toggled = c.post(url, json={'enabled': {'1': False}}).get_json()['boxes']
+        assert [b['i'] for b in toggled if b['enabled']] == [0]
+        assert json.loads(report.read_text()) == doc
+        c.post('/api/jobs/pending-test/detections', json={'box_overrides': {'1': [40, 10, 60, 30]}})
+        assert json.loads(report.read_text())['detections'][1]['poly_holes'] == hole
+        c.post('/api/jobs/pending-test/detections', json={'box_overrides': {'1': [45, 10, 65, 30]}})
+        saved = c.get(url).get_json()['boxes']
+        assert next(b for b in saved if b['i'] == 1)['mask_contours'] == face_before_save
+        stored = json.loads(report.read_text())['detections'][1]
+        assert not stored['poly'] and not stored['poly_holes'] and stored['mask_pad'] == -1
+    finally:
+        del web.JOBS['pending-test']
