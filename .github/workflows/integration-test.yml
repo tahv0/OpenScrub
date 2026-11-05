@@ -1,0 +1,63 @@
+name: Combined PR Docker and browser smoke test
+
+on:
+  push:
+    branches: ['integration/all-prs']
+
+permissions:
+  contents: read
+
+jobs:
+  compose-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      OPENSCRUB_TEST_MEDIA_DIR: ${{ runner.temp }}/openscrub-media
+      OPENSCRUB_TEST_DATA_DIR: ${{ runner.temp }}/openscrub-data
+      ORT_DISABLE_TELEMETRY: '1'
+      HF_HUB_DISABLE_TELEMETRY: '1'
+      OPENSCRUB_NO_AUTOFETCH: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Install synthetic fixture and browser tooling
+        run: |
+          python -m pip install -e . playwright
+          python -m playwright install --with-deps chromium
+          sudo apt-get install -y ffmpeg
+      - name: Prepare isolated bind mounts and synthetic fixture
+        run: |
+          mkdir -p "$OPENSCRUB_TEST_MEDIA_DIR" "$OPENSCRUB_TEST_DATA_DIR"
+          python tools/integration_smoke.py --prepare
+          docker compose version
+          docker compose -f compose.windows-test.yml config --quiet
+      - name: Build the combined source image
+        run: docker compose -f compose.windows-test.yml build
+      - name: Start the actual Compose service
+        run: docker compose -f compose.windows-test.yml up -d --wait --wait-timeout 180
+      - name: Verify installed app and mounted paths
+        run: |
+          docker compose -f compose.windows-test.yml exec -T -w / openscrub python -c "import openscrub_web as w; assert w.JOBS_DIR.startswith('/root/.local/share/OpenScrub/'); print(w.JOBS_DIR)"
+          python tools/integration_smoke.py --verify
+      - name: Verify MP4 job survives container recreation
+        run: |
+          docker compose -f compose.windows-test.yml down
+          docker compose -f compose.windows-test.yml up -d --wait --wait-timeout 180
+          python -c "import json,urllib.request; j=json.load(urllib.request.urlopen('http://localhost:8384/api/jobs/integration-fixture')); assert j['phase']=='done' and j['has_output']; print('Rendered job recovered from bind-mounted data')"
+      - name: Capture container diagnostics
+        if: always()
+        run: |
+          mkdir -p integration-evidence
+          docker compose -f compose.windows-test.yml ps > integration-evidence/compose-ps.txt
+          docker compose -f compose.windows-test.yml logs --no-color > integration-evidence/compose.log
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: combined-pr-docker-browser-evidence
+          path: integration-evidence/
+          retention-days: 30
+      - name: Stop disposable test container
+        if: always()
+        run: docker compose -f compose.windows-test.yml down

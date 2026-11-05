@@ -4252,7 +4252,7 @@ def test_review_choices_apply_the_named_action():
     node = shutil.which("node")
     if not node:
         pytest.skip("Node is needed to execute the review JavaScript")
-    review_js = w.APP_JS[w.APP_JS.index("async function loadReview()"):
+    review_js = w.APP_JS[w.APP_JS.index("const plateFallbackLabels"):
                          w.APP_JS.index("function thumbRetry")]
     harness = r'''
 const assert = require('node:assert/strict');
@@ -4260,7 +4260,7 @@ const vm = require('node:vm');
 const source = require('node:fs').readFileSync(0, 'utf8');
 const elements = {};
 const rows = [
-  {i:0,enabled:true,track:7,person:-1,category:'plate',text:'plate',t_start:0,t_end:1},
+  {i:0,enabled:true,track:7,person:-1,category:'plate',text:'plate',t_start:0,t_end:1,shaped:true,fallback_reason:'ambiguous_text'},
   {i:1,enabled:true,track:7,person:-1,category:'plate',text:'plate',t_start:1,t_end:2},
   {i:2,enabled:false,track:-1,person:-1,category:'plate',text:'plate',t_start:0,t_end:2}
 ];
@@ -4277,6 +4277,8 @@ const context = vm.createContext({assert, EN:{}, CUR:'test', DUR:0, CATDN:{},
 vm.runInContext(source, context);
 vm.runInContext(`(async()=>{
   await loadReview();
+  assert.ok(html.includes('shaped mask'),'Keep shaped-mask guidance beside the explicit actions');
+  assert.ok(html.includes('possible occlusion'),'Keep narrow-mode fallback explanations beside the explicit actions');
   const actions = [...html.matchAll(/<button\\b([^>]*)>([\\s\\S]*?)<\\/button>/g)];
   function click(label, i){
     const match=actions.find(([,attrs,text])=>text.replace(/<[^>]*>/g,'').trim()===label

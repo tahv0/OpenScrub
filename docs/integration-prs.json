@@ -1,0 +1,26 @@
+{
+  "branch": "integration/all-prs",
+  "base": "0852b127e4beea73e5ee3973f7268c08707afcc9",
+  "prs": [
+    {
+      "number": 1,
+      "head": "4a6675f63ac466172c90e5ab4283d24f054eb7ed",
+      "title": "Compound masks"
+    },
+    {
+      "number": 2,
+      "head": "39b4ed830b4cbc60c50876c4a6c3a12645a7090f",
+      "title": "Explicit review decisions"
+    },
+    {
+      "number": 3,
+      "head": "77755f075425331081d7f2b747f803f5dbf02131",
+      "title": "Narrow lettering mode"
+    },
+    {
+      "number": 4,
+      "head": "2900930f41805cae3f38eab10f56347cd79f8a08",
+      "title": "Save As exports"
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+name: openscrub-windows-test
+
+services:
+  openscrub:
+    # Build this checkout, including the integration branch's changes.
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "127.0.0.1:8384:8384"
+    command:
+      - openscrub-web
+      - --host
+      - 0.0.0.0
+      - --http
+      - --retain-days
+      - "0"
+    environment:
+      OPENSCRUB_MEDIA_ROOT: /media/d
+      ORT_DISABLE_TELEMETRY: "1"
+    volumes:
+      - type: bind
+        source: "${OPENSCRUB_TEST_MEDIA_DIR:-D:/}"
+        target: /media/d
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: "${OPENSCRUB_TEST_DATA_DIR:-D:/OpenScrubTest/data}"
+        target: /root/.local/share/OpenScrub
+        bind:
+          create_host_path: false
+    # Allow the app's vault shutdown handler time to finish.
+    stop_grace_period: 120s
