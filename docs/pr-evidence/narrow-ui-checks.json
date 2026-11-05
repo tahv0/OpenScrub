@@ -1,0 +1,28 @@
+{
+  "title": "OpenScrub",
+  "narrow_control_value": "narrow",
+  "box_count": 3,
+  "shape_contours": [
+    1,
+    1,
+    3
+  ],
+  "pending_edits": {
+    "changed_box_padded": true,
+    "return_restores_hole": true,
+    "report_unchanged": true,
+    "toggle_refresh": true
+  },
+  "selected": 0,
+  "mobile_body_width": 390,
+  "mobile_viewport_width": 390,
+  "indexed_review": {
+    "fps": 120,
+    "next_previous_frames": true,
+    "image_pixel_matches_frame": true,
+    "end_frame": 47,
+    "playback_hides_masks": true,
+    "pause_restores_matching_mask": true
+  },
+  "page_errors": []
+}

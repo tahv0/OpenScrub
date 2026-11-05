@@ -1,0 +1,346 @@
+{
+  "scope": "Synthetic localizer with supplied plate boxes; not plate locator recall",
+  "model_sha256": "a431985659dc921974177a95adcfbb90fd9e51989a5e04d70d0b75f597b6e61d",
+  "frames": 48,
+  "fps": 120,
+  "accepted": 48,
+  "fallbacks": {},
+  "cases": [
+    {
+      "frame": 0,
+      "groups": 1,
+      "fallback": "",
+      "missed_glyph_pixels": 0,
+      "milliseconds": 62.13
+    },
+    {
+      "frame": 1,
+      "groups": 1,
+      "fallback": "",
+      "missed_glyph_pixels": 0,
+      "milliseconds": 54.47
+    },
+    {
+      "frame": 2,
+      "groups": 1,
+      "fallback": "",
+      "missed_glyph_pixels": 0,
+      "milliseconds": 48.09
+    },
+    {
+      "frame": 3,
+      "groups": 1,
+      "fallback": "",
+      "missed_glyph_pixels": 0,
+      "milliseconds": 47.86
+    },
+    {
+      "frame": 4,
+      "groups": 1,
+      "fallback": "",
+      "missed_glyph_pixels": 0,
+      "milliseconds": 48.16
+    },
+    {
+      "frame": 5,
+      "groups": 1,
+      "fallback": "",
+      "missed_glyph_pixels": 0,
+      "milliseconds": 47.67
+    },
+    {
+      "frame": 6,
+      "groups": 1,
+      "fallback": "",
+      "missed_glyph_pixels": 0,
+      "milliseconds": 48.28
+    },
+    {
+      "frame": 7,
+      "groups": 1,
+      "fallback": "",
+      "missed_glyph_pixels": 0,
+      "milliseconds": 48.09
+    },
+    {
+      "frame": 8,
+      "groups": 1,
+      "fallback": "",
+      "missed_glyph_pixels": 0,
+      "milliseconds": 47.4
+    },
+    {
+      "frame": 9,
+      "groups": 1,
+      "fallback": "",
+      "missed_glyph_pixels": 0,
+      "milliseconds": 48.05
+    },
+    {
+      "frame": 10,
+      "groups": 1,
+      "fallback": "",
+      "missed_glyph_pixels": 0,
+      "milliseconds": 48.55
+    },
+    {
+      "frame": 11,
+      "groups": 1,
+      "fallback": "",
+      "missed_glyph_pixels": 0,
+      "milliseconds": 49.19
+    },
+    {
+      "frame": 12,
+      "groups": 1,
+      "fallback": "",
+      "missed_glyph_pixels": 0,
+      "milliseconds": 48.23
+    },
+    {
+      "frame": 13,
+      "groups": 1,
+      "fallback": "",
+      "missed_glyph_pixels": 0,
+      "milliseconds": 48.59
+    },
+    {
+      "frame": 14,
+      "groups": 1,
+      "fallback": "",
+      "missed_glyph_pixels": 0,
+      "milliseconds": 48.28
+    },
+    {
+      "frame": 15,
+      "groups": 1,
+      "fallback": "",
+      "missed_glyph_pixels": 0,
+      "milliseconds": 48.08
+    },
+    {
+      "frame": 16,
+      "groups": 1,
+      "fallback": "",
+      "missed_glyph_pixels": 0,
+      "milliseconds": 48.09
+    },
+    {
+      "frame": 17,
+      "groups": 1,
+      "fallback": "",
+      "missed_glyph_pixels": 0,
+      "milliseconds": 48.25
+    },
+    {
+      "frame": 18,
+      "groups": 1,
+      "fallback": "",
+      "missed_glyph_pixels": 0,
+      "milliseconds": 48.34
+    },
+    {
+      "frame": 19,
+      "groups": 1,
+      "fallback": "",
+      "missed_glyph_pixels": 0,
+      "milliseconds": 48.19
+    },
+    {
+      "frame": 20,
+      "groups": 1,
+      "fallback": "",
+      "missed_glyph_pixels": 0,
+      "milliseconds": 47.98
+    },
+    {
+      "frame": 21,
+      "groups": 1,
+      "fallback": "",
+      "missed_glyph_pixels": 0,
+      "milliseconds": 48.15
+    },
+    {
+      "frame": 22,
+      "groups": 1,
+      "fallback": "",
+      "missed_glyph_pixels": 0,
+      "milliseconds": 47.68
+    },
+    {
+      "frame": 23,
+      "groups": 1,
+      "fallback": "",
+      "missed_glyph_pixels": 0,
+      "milliseconds": 47.94
+    },
+    {
+      "frame": 24,
+      "groups": 2,
+      "fallback": "",
+      "missed_glyph_pixels": 0,
+      "milliseconds": 48.45
+    },
+    {
+      "frame": 25,
+      "groups": 2,
+      "fallback": "",
+      "missed_glyph_pixels": 0,
+      "milliseconds": 47.95
+    },
+    {
+      "frame": 26,
+      "groups": 2,
+      "fallback": "",
+      "missed_glyph_pixels": 0,
+      "milliseconds": 47.8
+    },
+    {
+      "frame": 27,
+      "groups": 2,
+      "fallback": "",
+      "missed_glyph_pixels": 0,
+      "milliseconds": 47.71
+    },
+    {
+      "frame": 28,
+      "groups": 2,
+      "fallback": "",
+      "missed_glyph_pixels": 0,
+      "milliseconds": 47.62
+    },
+    {
+      "frame": 29,
+      "groups": 2,
+      "fallback": "",
+      "missed_glyph_pixels": 0,
+      "milliseconds": 48.0
+    },
+    {
+      "frame": 30,
+      "groups": 2,
+      "fallback": "",
+      "missed_glyph_pixels": 0,
+      "milliseconds": 48.72
+    },
+    {
+      "frame": 31,
+      "groups": 2,
+      "fallback": "",
+      "missed_glyph_pixels": 0,
+      "milliseconds": 48.71
+    },
+    {
+      "frame": 32,
+      "groups": 2,
+      "fallback": "",
+      "missed_glyph_pixels": 0,
+      "milliseconds": 48.25
+    },
+    {
+      "frame": 33,
+      "groups": 2,
+      "fallback": "",
+      "missed_glyph_pixels": 0,
+      "milliseconds": 48.37
+    },
+    {
+      "frame": 34,
+      "groups": 2,
+      "fallback": "",
+      "missed_glyph_pixels": 0,
+      "milliseconds": 48.07
+    },
+    {
+      "frame": 35,
+      "groups": 2,
+      "fallback": "",
+      "missed_glyph_pixels": 0,
+      "milliseconds": 47.77
+    },
+    {
+      "frame": 36,
+      "groups": 2,
+      "fallback": "",
+      "missed_glyph_pixels": 0,
+      "milliseconds": 47.68
+    },
+    {
+      "frame": 37,
+      "groups": 2,
+      "fallback": "",
+      "missed_glyph_pixels": 0,
+      "milliseconds": 48.08
+    },
+    {
+      "frame": 38,
+      "groups": 2,
+      "fallback": "",
+      "missed_glyph_pixels": 0,
+      "milliseconds": 48.4
+    },
+    {
+      "frame": 39,
+      "groups": 2,
+      "fallback": "",
+      "missed_glyph_pixels": 0,
+      "milliseconds": 48.62
+    },
+    {
+      "frame": 40,
+      "groups": 2,
+      "fallback": "",
+      "missed_glyph_pixels": 0,
+      "milliseconds": 47.88
+    },
+    {
+      "frame": 41,
+      "groups": 2,
+      "fallback": "",
+      "missed_glyph_pixels": 0,
+      "milliseconds": 48.64
+    },
+    {
+      "frame": 42,
+      "groups": 2,
+      "fallback": "",
+      "missed_glyph_pixels": 0,
+      "milliseconds": 48.29
+    },
+    {
+      "frame": 43,
+      "groups": 2,
+      "fallback": "",
+      "missed_glyph_pixels": 0,
+      "milliseconds": 48.26
+    },
+    {
+      "frame": 44,
+      "groups": 2,
+      "fallback": "",
+      "missed_glyph_pixels": 0,
+      "milliseconds": 48.36
+    },
+    {
+      "frame": 45,
+      "groups": 2,
+      "fallback": "",
+      "missed_glyph_pixels": 0,
+      "milliseconds": 48.15
+    },
+    {
+      "frame": 46,
+      "groups": 2,
+      "fallback": "",
+      "missed_glyph_pixels": 0,
+      "milliseconds": 48.33
+    },
+    {
+      "frame": 47,
+      "groups": 2,
+      "fallback": "",
+      "missed_glyph_pixels": 0,
+      "milliseconds": 48.09
+    }
+  ]
+}
