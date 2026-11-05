@@ -2948,6 +2948,34 @@ def _gauss_big(roi, k):
     return cv2.resize(small, (w, h), interpolation=cv2.INTER_LINEAR)
 
 
+def rasterize_region_mask(shape, region, kind="rect"):
+    """Rasterize a clipped box or the border-extended face ellipse."""
+    h, w = shape[:2]
+    x1, y1, x2, y2 = region
+    x1, y1 = max(0, int(x1)), max(0, int(y1))
+    x2, y2 = min(w, int(x2)), min(h, int(y2))
+    rw, rh = max(0, x2 - x1), max(0, y2 - y1)
+    mask = np.zeros((rh, rw), np.uint8)
+    if not rw or not rh:
+        return (x1, y1, x2, y2), mask
+    if kind != "ellipse":
+        mask[:] = 255
+        return (x1, y1, x2, y2), mask
+    cv2.ellipse(mask, (rw // 2, rh // 2),
+                (max(1, rw // 2), max(1, rh // 2)), 0, 0, 360, 255, -1)
+    # Extend the ellipse beyond touched frame edges to cover clipped faces.
+    vx1, vy1, vx2, vy2 = 0, 0, rw, rh
+    if x1 <= 1: vx1 = -rw
+    if y1 <= 1: vy1 = -rh
+    if x2 >= w - 1: vx2 = 2 * rw
+    if y2 >= h - 1: vy2 = 2 * rh
+    if (vx1, vy1, vx2, vy2) != (0, 0, rw, rh):
+        cv2.ellipse(mask, ((vx1 + vx2) // 2, (vy1 + vy2) // 2),
+                    (max(1, (vx2 - vx1) // 2), max(1, (vy2 - vy1) // 2)),
+                    0, 0, 360, 255, -1)
+    return (x1, y1, x2, y2), mask
+
+
 def blur_region(frame, x1, y1, x2, y2, mode, shape="rect"):
     h, w = frame.shape[:2]
     x1 = max(0, int(x1)); y1 = max(0, int(y1))
@@ -2982,31 +3010,7 @@ def blur_region(frame, x1, y1, x2, y2, mode, shape="rect"):
         k = max(31, ((2 * max(x2 - x1, y2 - y1) // 3) | 1))
         filled = _gauss_big(roi, k)
     if shape == "ellipse":
-        # elliptical mask hugs a face: no smeared background corners, which
-        # is most of why box-blurred faces read as "whole body blurred"
-        rw, rh = x2 - x1, y2 - y1
-        mask = np.zeros(roi.shape[:2], np.uint8)
-        cv2.ellipse(mask, (rw // 2, rh // 2),
-                    (max(1, rw // 2), max(1, rh // 2)),
-                    0, 0, 360, 255, -1)
-        # A face cut off by the frame border continues PAST that border, but
-        # the inscribed ellipse above pulls AWAY from it — leaving the
-        # region's border-side corners unblurred (the boat-video top-of-frame
-        # face leak). For every border the region touches, union in a second
-        # ellipse whose virtual box mirrors past that border: its visible
-        # part is a half-ellipse that stays full-size AT the border. The
-        # union only ever adds coverage — fail closed.
-        vx1, vy1, vx2, vy2 = 0, 0, rw, rh
-        if x1 <= 1: vx1 = -rw
-        if y1 <= 1: vy1 = -rh
-        if x2 >= w - 1: vx2 = 2 * rw
-        if y2 >= h - 1: vy2 = 2 * rh
-        if (vx1, vy1, vx2, vy2) != (0, 0, rw, rh):
-            cv2.ellipse(mask, ((vx1 + vx2) // 2, (vy1 + vy2) // 2),
-                        (max(1, (vx2 - vx1) // 2), max(1, (vy2 - vy1) // 2)),
-                        0, 0, 360, 255, -1)
-        # cv2.copyTo: same result as boolean fancy-indexing, ~28x faster
-        # on 4K person-sized regions (writes in place through the view)
+        _, mask = rasterize_region_mask(frame.shape, (x1, y1, x2, y2), shape)
         cv2.copyTo(filled, mask, roi)
     else:
         frame[y1:y2, x1:x2] = filled
@@ -6004,7 +6008,7 @@ def load_report(path):
             dense=bool(r.get("dense", False)),
             track=int(r.get("track", -1)),
             person=int(r.get("person", -1)),
-            poly=tuple(r.get("poly") or ()),
+            poly=_tuples(r.get("poly") or ()),
             poly_holes=_tuples(r.get("poly_holes") or ()),
             mask_pad=r.get("mask_pad", -1)))
     return dets, state, prov

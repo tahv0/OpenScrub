@@ -3514,3 +3514,42 @@ def test_review_uses_selected_person_coverage_without_mutating_report(tmp_path, 
         assert override['shaped'] and min(p[0] for c in override['mask_contours'] for p in c) == 7
     finally:
         del web.JOBS['coverage-test']
+
+
+def test_nonsequence_report_polygon_fails_closed(tmp_path):
+    row = {'t_start': 0, 't_end': 1, 'cbox': [2, 2, 18, 18],
+           'category': 'plate', 'text': '', 'poly': 1}
+    report = tmp_path / 'scalar.json'; report.write_text(json.dumps([row]))
+    dets, _, _ = openscrub.load_report(report)
+    frame = np.full((20, 20, 3), 255, np.uint8)
+    openscrub.blur_silhouette(frame, 2, 2, 18, 18, 'box', dets[0].poly, dets[0].cbox)
+    assert frame[10, 10, 0] == 0 and frame[1, 1, 0] == 255
+
+
+@pytest.mark.parametrize('category,face_shape,corner_red', [
+    ('plate', 'ellipse', True), ('face', 'ellipse', False), ('face', 'rect', True),
+    ('face', None, False),
+])
+def test_review_displays_padded_box_and_face_masks(tmp_path, category, face_shape, corner_red):
+    import openscrub_web as web
+    row = {'t_start': 0, 't_end': 1, 'cbox': [20, 20, 50, 50],
+           'aoff': [0, 0], 'category': category, 'text': ''}
+    doc = {'detections': [row], 'render_state': {'fps': 1, 'cum': [[4, 0]], 'bands': []},
+           'provenance': {'settings': {'pad': 3, 'face_shape': face_shape}}}
+    (tmp_path / 'report.json').write_text(json.dumps(doc))
+    video = str(tmp_path / 'review.mp4')
+    out = cv2.VideoWriter(video, cv2.VideoWriter_fourcc(*'mp4v'), 1, (80, 80))
+    out.write(np.full((80, 80, 3), 200, np.uint8)); out.release()
+    web.JOBS['ordinary-mask-test'] = {'dir': str(tmp_path), 'video': video, 'options': {}}
+    try:
+        client = web.app.test_client()
+        b = client.get('/api/jobs/ordinary-mask-test/boxes_at?t=0').get_json()['boxes'][0]
+        points = [p for contour in b['mask_contours'] for p in contour]
+        assert min(p[0] for p in points) == 20 and min(p[1] for p in points) == 16
+        assert b['box'] == [24, 20, 54, 50]
+        response = client.get('/api/jobs/ordinary-mask-test/detframe/0')
+        img = cv2.imdecode(np.frombuffer(response.data, np.uint8), cv2.IMREAD_COLOR)
+        assert (int(img[18, 22, 2]) > int(img[18, 22, 0]) + 20) == corner_red
+        assert int(img[35, 38, 2]) > int(img[35, 38, 0]) + 20
+    finally:
+        del web.JOBS['ordinary-mask-test']
