@@ -1,0 +1,66 @@
+{
+  "scope": "synthetic CPU guard only; no model inference",
+  "baseline_ref": "77755f075425331081d7f2b747f803f5dbf02131",
+  "equivalent_variants": 48,
+  "iterations": 7,
+  "opencv": "5.0.0",
+  "numpy": "2.3.5",
+  "cases": [
+    {
+      "case": "clean-disconnected",
+      "baseline_ms": 1.616,
+      "candidate_ms": 1.453,
+      "speedup": 1.112,
+      "fallback": "",
+      "polygons": 2
+    },
+    {
+      "case": "uncovered-letter-fallback",
+      "baseline_ms": 0.91,
+      "candidate_ms": 0.944,
+      "speedup": 0.964,
+      "fallback": "residual_text_evidence",
+      "polygons": 0
+    },
+    {
+      "case": "low-contrast-fallback",
+      "baseline_ms": 0.013,
+      "candidate_ms": 0.013,
+      "speedup": 0.99,
+      "fallback": "unverifiable_contrast",
+      "polygons": 0
+    },
+    {
+      "case": "occlusion-fallback",
+      "baseline_ms": 0.9,
+      "candidate_ms": 0.949,
+      "speedup": 0.948,
+      "fallback": "ambiguous_text",
+      "polygons": 0
+    },
+    {
+      "case": "noisy-240x80",
+      "baseline_ms": 4.379,
+      "candidate_ms": 1.777,
+      "speedup": 2.464,
+      "fallback": "",
+      "polygons": 1
+    },
+    {
+      "case": "noisy-640x160",
+      "baseline_ms": 51.278,
+      "candidate_ms": 5.675,
+      "speedup": 9.036,
+      "fallback": "",
+      "polygons": 1
+    },
+    {
+      "case": "noisy-1280x320",
+      "baseline_ms": 723.073,
+      "candidate_ms": 17.887,
+      "speedup": 40.423,
+      "fallback": "",
+      "polygons": 1
+    }
+  ]
+}

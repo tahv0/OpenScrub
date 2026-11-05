@@ -5093,10 +5093,12 @@ def _narrow_from_probability(crop, prob):
     # join a detected region to an occluder cannot be assessed reliably.
     for evidence in (ink, (contrast > 20).astype(np.uint8)):
         n, labels, stats, centers = cv2.connectedComponentsWithStats(evidence, 8)
+        # Count covered pixels for every component in one pass. Comparing
+        # the full crop separately for each tiny noise component is quadratic.
+        overlaps = np.bincount(labels[covered != 0], minlength=n)
         for i in range(1, n):
             x, y, cw, ch, area = stats[i]
-            component = labels == i
-            overlap = np.count_nonzero(component & (covered != 0))
+            overlap = int(overlaps[i])
             missing = area - overlap
             if overlap and missing >= 8 and missing > area * .10:
                 return [], "ambiguous_text"
