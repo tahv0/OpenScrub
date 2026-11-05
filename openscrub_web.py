@@ -2257,7 +2257,7 @@ async function beTogglePlay(){
  if(BE.playing){v.pause();return;}          // the pause handler cleans up
  if(!v.src)v.src=`api/jobs/${CUR}/video`;
  BE.playing=true;
- if(BE.indexed){BE.seq=(BE.seq||0)+1;BE.pending=true;BE.imageFrame=-1;BE.maskFrame=-1;beDraw();}
+ if(BE.indexed){BE.seq=(BE.seq||0)+1;BE.pending=true;BE.imageFrame=-1;BE.maskFrame=-1;BE.addAnchor=null;BE.addFloat=null;BE.drag=null;beDraw();}
  v.style.display="block";img.style.display="none";
  // boxes are view-only while playing: freeze pointer edits so a moving
  // box can't be grabbed mid-flight
@@ -2299,8 +2299,8 @@ function bePlayStop(){
  BE.playing=false;
  const v=document.getElementById("beVid");
  if(BE.indexed){if(v&&Number.isFinite(v.currentTime))BE.t=v.currentTime;
-  BE.frame=Math.max(0,Math.min(BE.frameCount-1,Math.round(BE.t*BE.fps)));
-  const slider=document.getElementById("beT");if(slider)slider.value=BE.frame;}
+  const frame=Math.max(0,Math.min(BE.frameCount-1,Math.round(BE.t*BE.fps)));
+  const slider=document.getElementById("beT");if(slider)slider.value=frame;}
  if(v){try{v.pause();}catch(e){}v.style.display="none";}
  const img=document.getElementById("beImg");if(img)img.style.display="";
  const b=document.getElementById("bePlay");if(b)b.innerHTML="&#9654;";
@@ -2462,6 +2462,7 @@ async function beScrub(){
  const img=document.getElementById("beImg");
  if(BE.indexed){
   const owner=BE,frame=Math.max(0,Math.min(owner.frameCount-1,Math.round(+sl.value)));
+  if(frame!==owner.frame){owner.addAnchor=null;owner.addFloat=null;owner.drag=null;}
   owner.frame=frame;sl.value=frame;owner.t=frame/owner.fps;
   owner.imageFrame=-1;owner.maskFrame=-1;owner.pending=true;
   document.getElementById("beL").textContent=`Frame ${frame} (${owner.t.toFixed(3)}s)`;
@@ -2581,6 +2582,7 @@ function beHook(){
  const pt=e=>{const r=cv.getBoundingClientRect();
   return[(e.clientX-r.left)/BE.scale,(e.clientY-r.top)/BE.scale];};
  cv.addEventListener("pointerdown",e=>{
+  if(BE.indexed&&(BE.playing||BE.pending||BE.imageFrame!==BE.frame||BE.maskFrame!==BE.frame))return;
   const p=pt(e);cv.setPointerCapture(e.pointerId);
   if(BE.trk){
    // Track object: same two-click box draw as Add box, but on completion

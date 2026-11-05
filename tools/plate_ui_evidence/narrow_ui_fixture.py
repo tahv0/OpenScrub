@@ -52,7 +52,7 @@ def make_narrow_job(root, web):
         t=time.perf_counter();polys,reason=localizer.find_plate(frame,box);ms=(time.perf_counter()-t)*1000
         x,y,x2,y2=box
         normalized=tuple(tuple(((float(a)-x)/(x2-x),(float(b)-y)/(y2-y)) for a,b in poly) for poly in polys)
-        d=engine.Detection(fi/fps,(fi+1)/fps,box,'plate','plate',1.0,last_seen=fi/fps,dense=True,track=17,poly=normalized,mask_pad=0 if polys else -1,frame_index=fi,fallback_reason=reason)
+        d=engine.Detection(fi/fps,(fi+1)/fps,box,'plate','plate',0.0,last_seen=fi/fps,dense=True,track=17,poly=normalized,mask_pad=0 if polys else -1,frame_index=fi,fallback_reason=reason)
         detections.append(dict(asdict(d),enabled=True))
         mask=np.zeros((360,640),np.uint8)
         if polys:cv2.fillPoly(mask,[np.rint(a).astype(np.int32)for a in polys],1)
