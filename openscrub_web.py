@@ -2421,7 +2421,13 @@ function beDraw(){
   const[a1,b1,a2,b2]=b.box.map(v=>v*s);
   x.fillStyle=b.i===BE.sel?"rgba(37,99,235,.25)":"rgba(220,38,38,.22)";
   x.strokeStyle=b.i===BE.sel?"#2563eb":"#dc2626";x.lineWidth=2;
-  x.fillRect(a1,b1,a2-a1,b2-b1);x.strokeRect(a1,b1,a2-a1,b2-b1);
+  if(b.category==="plate"&&b.plate_quad&&b.plate_quad.length===4){
+   x.beginPath();b.plate_quad.forEach((p,k)=>{
+    const px=(b.box[0]+p[0]*(b.box[2]-b.box[0]))*s;
+    const py=(b.box[1]+p[1]*(b.box[3]-b.box[1]))*s;
+    if(k)x.lineTo(px,py);else x.moveTo(px,py);
+   });x.closePath();x.fill();x.stroke();
+  }else{x.fillRect(a1,b1,a2-a1,b2-b1);x.strokeRect(a1,b1,a2-a1,b2-b1);}
   if(b.i===BE.sel)for(const[hx,hy] of [[a1,b1],[a2,b1],[a1,b2],[a2,b2]]){
    x.fillStyle="#fff";x.fillRect(hx-5,hy-5,10,10);
    x.strokeRect(hx-5,hy-5,10,10);}
@@ -2531,19 +2537,106 @@ function beHook(){
  });
  cv.addEventListener("pointerup",()=>{BE.drag=null;});
 }
-function zoomDet(i){
- let ov=document.getElementById("lb");
- if(!ov){
-  ov=document.createElement("div");ov.id="lb";
+
+let QEDIT=null;
+async function zoomDet(i){
+ const el=document.getElementById("det"+i);
+ if(!el||el.dataset.cat!=="plate"){
+  let ov=document.getElementById("lb");
+  if(!ov){ov=document.createElement("div");ov.id="lb";document.body.appendChild(ov);}
   ov.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.82);"+
    "z-index:100;display:flex;align-items:center;justify-content:center;"+
    "cursor:zoom-out;padding:18px";
   ov.onclick=()=>ov.remove();
-  document.body.appendChild(ov);
+  ov.innerHTML='<img src="api/jobs/'+CUR+'/detframe/'+i+
+   '" style="max-width:96%;max-height:96%;border-radius:8px">';
+  return;
  }
- ov.innerHTML=`<img src="api/jobs/${CUR}/detframe/${i}"
-  style="max-width:96%;max-height:96%;border-radius:8px;
-  box-shadow:0 12px 50px rgba(0,0,0,.6)">`;
+ const r=await fetch("api/jobs/"+CUR+"/plate_quad/"+i);
+ if(!r.ok){alert("Could not load plate annotation");return;}
+ const d=await r.json();
+ const ov=document.getElementById("lb")||document.createElement("div");
+ ov.id="lb";ov.style.cssText="position:fixed;inset:0;z-index:100;"+
+  "background:rgba(0,0,0,.92);display:flex;align-items:center;"+
+  "justify-content:center;padding:12px";
+ ov.onclick=null;
+ ov.innerHTML='<div style="max-width:96vw;max-height:96vh;overflow:auto;'+
+  'background:#0f172a;padding:12px;border-radius:10px;color:#e2e8f0">'+
+  '<div style="display:flex;justify-content:space-between;gap:12px;margin-bottom:8px">'+
+  '<b>Plate: adjust four corners</b>'+
+  '<button id="qClose" class="sec">Close</button></div>'+
+  '<div style="position:relative;display:inline-block;max-width:100%">'+
+  '<img id="qImg" style="display:block;max-width:100%;max-height:70vh" src="api/jobs/'+
+   CUR+'/frame_at?t='+encodeURIComponent(d.t)+'">'+
+  '<canvas id="qCv" style="position:absolute;inset:0;touch-action:none;cursor:crosshair"></canvas></div>'+
+  '<p style="font-size:12px;color:#94a3b8">Drag each numbered corner to the exact plate edge. '+
+  'The quadrilateral can be skewed; it does not need right angles.</p>'+
+  '<label style="font-size:12px"><input id="qTrack" type="checkbox"> '+
+  'Apply this shape to the full detected track (approximate; review the result)</label>'+
+  '<div style="display:flex;gap:8px;align-items:center;margin-top:8px">'+
+  '<button id="qSave">Save corners & local training sample</button>'+
+  '<span id="qStatus" style="font-size:12px;color:#94a3b8"></span></div></div>';
+ if(!ov.parentNode)document.body.appendChild(ov);
+ document.getElementById("qClose").onclick=()=>{ov.remove();QEDIT=null;};
+ QEDIT={i,points:d.points.map(p=>p.slice()),width:d.width,height:d.height};
+ const img=document.getElementById("qImg"),cv=document.getElementById("qCv");
+ function draw(){
+  if(!QEDIT)return;
+  cv.width=img.clientWidth;cv.height=img.clientHeight;
+  const x=cv.getContext("2d"),sx=cv.width/QEDIT.width,sy=cv.height/QEDIT.height;
+  const p=QEDIT.points;
+  x.beginPath();p.forEach((v,k)=>{if(k)x.lineTo(v[0]*sx,v[1]*sy);
+    else x.moveTo(v[0]*sx,v[1]*sy);});x.closePath();
+  x.fillStyle="rgba(34,197,94,.20)";x.fill();
+  x.lineWidth=2;x.strokeStyle="#4ade80";x.stroke();
+  for(let k=0;k<4;k++){
+   const a=p[k][0]*sx,b=p[k][1]*sy;
+   x.beginPath();x.arc(a,b,9,0,Math.PI*2);x.fillStyle="#0f172a";x.fill();
+   x.lineWidth=2;x.strokeStyle="#4ade80";x.stroke();
+   x.fillStyle="#fff";x.font="bold 12px sans-serif";x.textAlign="center";
+   x.fillText(String(k+1),a,b+4);
+  }
+ }
+ img.onload=draw;if(img.complete)draw();
+ let dragging=-1;
+ const point=e=>{const r=cv.getBoundingClientRect();
+  return [(e.clientX-r.left)/Math.max(1,r.width)*d.width,
+          (e.clientY-r.top)/Math.max(1,r.height)*d.height];};
+ cv.addEventListener("pointerdown",e=>{
+  const p=point(e);
+  let best=1e12,which=-1;
+  QEDIT.points.forEach((v,k)=>{
+   const dist=Math.hypot(v[0]-p[0],v[1]-p[1]);
+   if(dist<best){best=dist;which=k;}
+  });
+  if(best>28*d.width/Math.max(1,cv.width))return;
+  dragging=which;cv.setPointerCapture(e.pointerId);e.preventDefault();
+ });
+ cv.addEventListener("pointermove",e=>{
+  if(dragging<0||!QEDIT)return;
+  const p=point(e);
+  QEDIT.points[dragging]=[Math.max(0,Math.min(d.width-1,p[0])),
+                         Math.max(0,Math.min(d.height-1,p[1]))];
+  draw();
+ });
+ cv.addEventListener("pointerup",()=>{dragging=-1;});
+ cv.addEventListener("pointercancel",()=>{dragging=-1;});
+ document.getElementById("qSave").onclick=async()=>{
+  const btn=document.getElementById("qSave"),st=document.getElementById("qStatus");
+  btn.disabled=true;st.textContent="Saving…";
+  try{
+   const r=await fetch("api/jobs/"+CUR+"/plate_quad/"+i,{method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({points:QEDIT.points,
+     apply_track:document.getElementById("qTrack").checked})});
+   const data=await r.json();
+   if(!r.ok)throw new Error(data.error||"Could not save corners");
+   st.textContent="Saved "+data.applied+" box(es); 1 verified training sample. "+
+    "Save edits & render to apply.";
+   if(document.getElementById("beCv"))beScrub();
+  }catch(e){st.textContent="Error: "+e.message;}
+  finally{btn.disabled=false;}
+ };
 }
 function beRemove(){
  if(BE.sel<0)return;
@@ -2670,11 +2763,13 @@ async function loadReview(){
   for(const x of items){
    html+=`<div class="det ${EN[x.i]?'':'off'}" id="det${x.i}" data-cat="${cat}">
     <img src="api/jobs/${CUR}/thumb/${x.i}"
+     title="${x.category==="plate"?"Adjust four plate corners":"Enlarge detection"}"
      style="cursor:zoom-in" onclick="zoomDet(${x.i})"
      onerror="thumbRetry(this)">
     <div>${x.personcard?`<b>Person ${x.person+1}</b> — one decision for ALL their appearances`:`"${x.text}"`}${x.frames?` <span class="badge">×${x.frames} frames</span>`:""}${x.confidence?` <span class="badge" title="detector confidence — low values on a non-face thumbnail usually mean a false detection">${Math.round(x.confidence*100)}%</span>`:""} <br>${x.t_start.toFixed(1)}–${x.t_end.toFixed(1)}s</div>
     <button class="blurbtn ${EN[x.i]?"blur":"keep"}" id="bb${x.i}"
      onclick="toggleDet(${x.i})">${EN[x.i]?"Blur":"Keep"}</button>
+    ${x.category==="plate"?`<button class="sec" onclick="zoomDet(${x.i})">Edit 4 corners</button>`:""}
    </div>`}
   html+=`</div>`}
  html+=`</div>
