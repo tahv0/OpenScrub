@@ -40,6 +40,7 @@ from flask import (Flask, Response, abort, jsonify, redirect, request,
                    send_file)
 
 import openscrub
+import stop_review
 import zones_ui
 
 
@@ -328,7 +329,8 @@ def new_job(video_path, options, name):
         "options": options, "phase": "queued", "progress": 0.0,
         "eta": None, "size": 0,
         "log": [], "error": None, "output": None, "created": time.time(),
-        "cancel": threading.Event(), "stats": {},
+        "cancel": threading.Event(), "stop": threading.Event(),
+        "stats": {},
     }
     with JOBS_LOCK:
         JOBS[jid] = job
@@ -346,6 +348,9 @@ def job_public(job):
         "log_tail": job["log"][-30:],
         "log_len": len(job["log"]),
         "has_output": bool(job["output"] and os.path.exists(job["output"])),
+        "stop_pending": bool(job.get("stop") and job["stop"].is_set()),
+        "checkpoint_frame": job.get("checkpoint_frame"),
+        "checkpoint_total": job.get("checkpoint_total"),
     }
 
 
@@ -412,6 +417,9 @@ class WebCallbacks(openscrub.Callbacks):
 
     def cancelled(self):
         return self.job["cancel"].is_set()
+
+    def stop_requested(self):
+        return self.job["stop"].is_set()
 
 
 def build_args(job, for_render=False):
@@ -542,13 +550,67 @@ def worker():
             continue
         cb = WebCallbacks(job)
         try:
-            if action == "scan":
+            if action in ("scan", "resume"):
+                resuming = action == "resume"
                 job["phase"] = "scanning"
                 args = build_args(job)
+                previous = None
+                old_frame = 0
+                if resuming:
+                    previous = _load_job_report(job)
+                    meta = stop_review.validate_resume(previous)
+                    old_frame = int(meta["next_frame"])
+                    if previous["provenance"]["input_sha256"] != openscrub.sha256_file(
+                            job["video"]):
+                        raise stop_review.CheckpointError(
+                            "Video changed after checkpoint; resume refused")
+                    # Re-scan only a one-second overlap for onset continuity.
+                    # Already reviewed findings win on the older side.
+                    args.resume_start = max(0.0, old_frame / float(meta["fps"]) - 1.0)
+                    job["log"].append("      resuming near %.2fs (1s overlap)"
+                                      % (old_frame / float(meta["fps"])))
                 state = openscrub.run_scan(args, cb)
-                openscrub.write_report(os.path.join(job["dir"], "report.json"),
-                                      args, state)
+                report_path = os.path.join(job["dir"], "report.json")
+                staging_path = os.path.join(job["dir"], ".scan-chunk.json")
+                try:
+                    openscrub.write_report(staging_path, args, state)
+                    with open(staging_path, encoding="utf-8") as f:
+                        chunk = json.load(f)
+                    end_frame = state.get("stop_at_frame")
+                    total_frames = int(state["total_frames"])
+                    if resuming:
+                        if end_frame is not None and end_frame <= old_frame:
+                            combined = previous  # stop request before new work
+                        else:
+                            combined = stop_review.join_reports(
+                                previous, chunk,
+                                int(end_frame) if end_frame is not None
+                                else len(state["cum"]),
+                                total_frames, completed=end_frame is None)
+                    elif end_frame is not None:
+                        combined = stop_review.with_checkpoint(
+                            chunk, end_frame, total_frames, job["options"])
+                    else:
+                        combined = chunk
+                    # Never replace the last good checkpoint until the
+                    # continuation scan AND postprocessing have both passed.
+                    stop_review.atomic_report(report_path, combined)
+                finally:
+                    if os.path.exists(staging_path):
+                        os.remove(staging_path)
+                job["stop"].clear()
+                meta = combined.get("stop_review")
+                job["checkpoint_frame"] = (meta or {}).get("next_frame")
+                job["checkpoint_total"] = (meta or {}).get("total_frames")
                 job["stats"] = state["stats"]
+                if meta:
+                    job["log"].append(
+                        "      saved checkpoint %d/%d frames; prior decisions "
+                        "and four-corner polygons retained" %
+                        (meta["next_frame"], meta["total_frames"]))
+                else:
+                    job["log"].append(
+                        "      full scan complete; prior review edits retained")
                 def _pregen(jid=jid):
                     """One pass through the video with a single decoder:
                     thumbnails come out in seconds instead of minutes.
@@ -617,14 +679,16 @@ def worker():
                 threading.Thread(target=_pregen, daemon=True).start()
                 try:
                     prov = _load_job_report(job).get("provenance", {})
-                    if (prov.get("vfr_normalized")
+                    if ((prov.get("vfr_normalized") or meta)
                             and os.path.exists(prov.get("input", ""))):
                         job["video"] = prov["input"]
                         job["log"].append(
                             "using CFR-normalized file for previews/thumbnails")
                 except Exception:
                     pass
-                if job["options"].get("skip_review"):
+                if meta:
+                    job["phase"] = "paused"
+                elif (not resuming and job["options"].get("skip_review")):
                     job["log"].append("review skipped — rendering all detections")
                     job["phase"] = "review"
                     WORK_Q.put((jid, "render"))
@@ -644,10 +708,15 @@ def worker():
                 job["progress"] = 1.0
                 job["eta"] = None
         except openscrub.PipelineCancelled:
+            job["stop"].clear()
             job["phase"] = "cancelled"
             job["error"] = "cancelled by user"
         except Exception as e:
-            job["phase"] = "error"
+            job["stop"].clear()
+            # The prior report is untouched if a resumed scan fails.
+            job["phase"] = ("paused" if action == "resume"
+                            and os.path.isfile(os.path.join(
+                                job["dir"], "report.json")) else "error")
             job["error"] = str(e)
             job["log"].append(f"ERROR: {e}")
         finally:
@@ -902,6 +971,47 @@ def job_preview(jid):
     return send_file(p, mimetype="image/jpeg", max_age=0)
 
 
+@app.route("/api/jobs/<jid>/stop", methods=["POST"])
+def job_stop(jid):
+    """Request a cooperative scan stop; Cancel keeps its old meaning."""
+    job = JOBS.get(jid) or abort(404)
+    with JOBS_LOCK:
+        if job["phase"] != "scanning":
+            return jsonify({"error": "Stop & Review is available only "
+                                     "during scanning"}), 409
+        job["stop"].set()
+    return jsonify({"ok": True, "message": "Finishing a whole frame and "
+                    "finalizing the checkpoint before Review"})
+
+
+@app.route("/api/jobs/<jid>/resume", methods=["POST"])
+def job_resume(jid):
+    """Resume from a saved checkpoint without re-scanning its prefix."""
+    job = JOBS.get(jid) or abort(404)
+    with JOBS_LOCK:
+        if job["phase"] != "paused":
+            return jsonify({"error": "Only paused scans can resume"}), 409
+        if job.get("trackbg", {}).get("state") == "running":
+            return jsonify({"error": "Finish tracking the selected object "
+                                     "before resuming the scan"}), 409
+        report = _load_job_report(job)
+        try:
+            meta = stop_review.validate_resume(report)
+        except (stop_review.CheckpointError, TypeError, KeyError,
+                ValueError) as exc:
+            return jsonify({"error": str(exc)}), 409
+        # Persist the initial settings as part of the checkpoint, so a
+        # restart cannot silently resume with unrelated default settings.
+        job["options"] = meta["options"]
+        job["stop"].clear()
+        job["cancel"].clear()
+        job["error"] = None
+        job["phase"] = "queued"
+        job["eta"] = None
+    WORK_Q.put((jid, "resume"))
+    return jsonify({"ok": True, "next_frame": meta["next_frame"]})
+
+
 @app.route("/api/jobs/<jid>/cancel", methods=["POST"])
 def job_cancel(jid):
     job = JOBS.get(jid) or abort(404)
@@ -1033,6 +1143,9 @@ def job_plate_quad(jid, i):
     Propagated shapes affect rendering but are NOT verified training labels.
     """
     job = JOBS.get(jid) or abort(404)
+    if request.method == "POST" and job["phase"] not in (
+            "paused", "review", "done"):
+        return jsonify({"error": "Cannot edit plates while scanning"}), 409
     doc = _load_job_report(job)
     rows = doc.get("detections", [])
     if i < 0 or i >= len(rows) or rows[i].get("category") != "plate":
@@ -1093,9 +1206,8 @@ def job_plate_quad(jid, i):
         changed += 1
     # Only the exact manually edited frame is verified ground truth.
     _save_verified_plate_sample(job, frame, p, i, tref)
-    with open(os.path.join(job["dir"], "report.json"),
-              "w", encoding="utf-8") as out:
-        json.dump(doc, out, indent=1)
+    stop_review.atomic_report(
+        os.path.join(job["dir"], "report.json"), doc)
     return jsonify({"ok": True, "applied": changed,
                     "verified_samples_added": 1})
 
@@ -1221,9 +1333,22 @@ def job_video_stream(jid):
 @app.route("/api/jobs/<jid>/detections", methods=["POST"])
 def job_save_edits(jid):
     job = JOBS.get(jid) or abort(404)
+    if job["phase"] not in ("paused", "review", "done"):
+        return jsonify({"error": "Review edits require a paused or "
+                                 "finished scan"}), 409
     edits = request.get_json(force=True)
     path = os.path.join(job["dir"], "report.json")
     doc = _load_job_report(job)
+    stop_meta = doc.get("stop_review") or {}
+    cutoff = (stop_meta["next_frame"] / stop_meta["fps"]
+              if stop_meta.get("state") == "paused" else None)
+    if cutoff is not None:
+        # Paused jobs only contain verified footage up to this boundary.
+        # Do not let a manual UI box implicitly mark the unscanned tail.
+        for m in edits.get("manual", []):
+            if float(m.get("t_start", 0)) >= cutoff:
+                return jsonify({"error": "Manual boxes must be inside the "
+                                        "scanned portion while paused"}), 400
     enabled = edits.get("enabled", {})
     # Only an explicit reviewer judgement is training evidence.
     # Keep-visible is NOT a negative label: a user may intentionally keep
@@ -1253,6 +1378,10 @@ def job_save_edits(jid):
         if 0 <= i < len(doc["detections"]) and len(span) == 2:
             t0, t1 = float(span[0]), float(span[1])
             if t1 > t0 >= 0:
+                if cutoff is not None:
+                    t1 = min(t1, cutoff)
+                    if t1 <= t0:
+                        continue
                 doc["detections"][i]["t_start"] = t0
                 doc["detections"][i]["t_end"] = t1
                 doc["detections"][i]["last_seen"] = min(
@@ -1261,6 +1390,8 @@ def job_save_edits(jid):
     for m in edits.get("manual", []):
         t0 = float(m["t_start"]); t1 = float(m["t_end"])
         tref = float(m.get("t_ref", t0))
+        if cutoff is not None:
+            t1 = min(t1, cutoff)
         fidx = min(int(tref * rs["fps"]), len(rs["cum"]) - 1)
         ox, oy = rs["cum"][fidx]
         b = m["screen_box"]
@@ -1279,8 +1410,7 @@ def job_save_edits(jid):
                       else "mute")}
             for s in (edits.get("audio") or [])
             if float(s.get("t1", 0)) > float(s.get("t0", 0)) >= 0]
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(doc, f, indent=1)
+    stop_review.atomic_report(path, doc)
     # suggest allowlisting any string whose EVERY instance was disabled —
     # the review just taught us it's a recurring false positive
     per = {}
@@ -1311,6 +1441,13 @@ def job_track_object(jid):
         abort(400)
     if len(box) != 4 or not (t1 > t0 >= 0) or not (t0 <= t_ref <= t1):
         abort(400)
+    if job["phase"] == "paused":
+        saved = stop_review.validate_resume(_load_job_report(job))
+        until = saved["next_frame"] / saved["fps"]
+        if t_ref >= until or t0 >= until:
+            return jsonify({"error": "Track seed is outside the scanned "
+                                     "portion"}), 400
+        t1 = min(t1, until)
     # Optional manually drawn 4-corner license plate (TL, TR, BR, BL).
     # These points are relative to the submitted seed box, not the frame.
     quad_req = None
@@ -1403,8 +1540,7 @@ def job_track_object(jid):
                     _save_verified_plate_sample(job, frame, points,
                                                 seed_index, t_ref)
             path = os.path.join(job["dir"], "report.json")
-            with open(path, "w", encoding="utf-8") as f:
-                json.dump(doc, f, indent=1)
+            stop_review.atomic_report(path, doc)
             job["log"].append(
                 "      tracked object: %d position(s), %.1f-%.1fs "
                 "(review card added)" % (len(new),
@@ -2163,14 +2299,27 @@ async function refresh(){
  if(SHELLPH!==j.phase){
   SHELLPH=j.phase;
   let a="";
-  if(j.phase=="scanning"||j.phase=="rendering")
-   a=`<button class="danger" onclick="cancelJob()">Cancel</button>`;
+  if(j.phase=="scanning")
+   a=`<button class="sec" id="stopReviewBtn" onclick="stopReview()">&#9632; Stop &amp; Review</button>
+    <button class="danger" onclick="cancelJob()">Cancel (discard scan)</button>
+    <span style="font-size:12px;color:#94a3b8">Stop saves a reviewable checkpoint; Cancel discards this run.</span>`;
+  if(j.phase=="rendering")
+   a=`<button class="danger" onclick="cancelJob()">Cancel render</button>`;
   if(j.phase=="error"||j.phase=="cancelled")
    a=`<button onclick="retryJob(CUR)">Retry scan (no re-upload)</button>
     <div style="width:100%;font-size:12px;color:#9ca3af">The uploaded file
     is still on the server — Retry re-runs the scan without uploading it
     again. Delete the job (&#128465;&#65039; in the list) to free its disk
     space.</div>`;
+  if(j.phase=="paused"){
+   const f=j.checkpoint_frame||0,t=j.checkpoint_total||1;
+   a=`<button onclick="resumeJob()">&#9654; Save edits &amp; resume</button>
+    <button class="sec" onclick="saveAndRender(true)">Save review edits only</button>
+    <div class="warn" style="width:100%">INCOMPLETE: ${(f/t*100).toFixed(1)}%
+    scanned (${f}/${t} frames). Do not publish as redacted video.
+    Existing review decisions and plate corners remain saved on resume.</div>`;
+   loadReview();
+  }
   if(j.phase=="review"){
    // no interstitial button: review is the ONLY next step after a scan,
    // so open it directly — both on a live scan finishing and on
@@ -2777,9 +2926,34 @@ function beRemove(){
  document.getElementById("beTimes").style.display="none";
 }
 async function beSave(){
- await saveAndRender();
+ const ok=await saveAndRender(SHELLPH==="paused");
+ if(!ok)return;
  const c=document.querySelector("#beslot");
- if(c)c.innerHTML="rendering with your edits…";
+ if(c)c.innerHTML=SHELLPH==="paused"
+   ?"Review edits saved; resume when ready.":"rendering with your edits…";
+}
+async function stopReview(){
+ const btn=document.getElementById("stopReviewBtn");
+ if(btn)btn.disabled=true;
+ const response=await fetch("api/jobs/"+CUR+"/stop",{method:"POST"});
+ if(!response.ok){
+  if(btn)btn.disabled=false;
+  alert("Stop request failed");return;
+ }
+ if(btn)btn.textContent="Finishing scan & preparing Review…";
+}
+async function resumeJob(){
+ if(document.getElementById("review")){
+  const saved=await saveAndRender(true);
+  if(!saved)return;
+ }
+ const response=await fetch("api/jobs/"+CUR+"/resume",{method:"POST"});
+ if(!response.ok){
+  let data={};try{data=await response.json();}catch(_){}
+  alert(data.error||"Unable to resume scan");return;
+ }
+ const rv=document.getElementById("review");if(rv)rv.remove();
+ SHELLPH=null;await refresh();
 }
 async function cancelJob(){await fetch("api/jobs/"+CUR+"/cancel",{method:"POST"})}
 
@@ -2911,7 +3085,7 @@ async function loadReview(){
   html+=`</div>`}
  html+=`</div>
  <div class="row" style="margin-top:12px">
- <button onclick="saveAndRender()">Save edits &amp; render</button>
+ <button onclick="saveAndRender()">${SHELLPH==="paused"?"Save review edits":"Save edits &amp; render"}</button>
  <span style="font-size:12px;color:#94a3b8">missed something? use
   ▶ Preview video &amp; edit boxes above — its ＋ Add box replaces the old
   add-region tool</span></div></div>`;
@@ -3023,7 +3197,7 @@ document.addEventListener("keydown",e=>{
  if(e.key==="Escape"){clearSel();
   const lb=document.getElementById("lb");if(lb)lb.remove();}});
 
-async function saveAndRender(){
+async function saveAndRender(saveOnly=false){
  const manual=[...MAN,...BE.adds.map(a=>({t_start:a.t0,t_end:a.t1,
   t_ref:a.tref,screen_box:a.box}))];
  const payload={enabled:EN,manual,box_overrides:BE.ov,
@@ -3031,9 +3205,11 @@ async function saveAndRender(){
  // only send audio spans when the box editor actually loaded them —
  // otherwise a save from plain review would wipe stored spans with []
  if(Array.isArray(BE.audio)&&BE.tlspans!==undefined)payload.audio=BE.audio;
- const r=await (await fetch(`api/jobs/${CUR}/detections`,{method:"POST",
+ const response=await fetch(`api/jobs/${CUR}/detections`,{method:"POST",
   headers:{"Content-Type":"application/json"},
-  body:JSON.stringify(payload)})).json();
+  body:JSON.stringify(payload)});
+ if(!response.ok){alert("Review edits were not saved");return false;}
+ const r=await response.json();
  BE.adds=[];BE.ov={};BE.times={};
  if(r.suggest_allowlist&&r.suggest_allowlist.length){
   if(confirm("You disabled every instance of: "+r.suggest_allowlist.join(", ")+". Add these to the permanent allow-list so future scans skip them?"))
@@ -3042,8 +3218,15 @@ async function saveAndRender(){
     body:JSON.stringify({words:r.suggest_allowlist})});
     loadPersist();}}
  MAN=[];
- await fetch(`api/jobs/${CUR}/render`,{method:"POST"});
+ if(saveOnly||SHELLPH==="paused"){
+  const note=document.getElementById("savedCheckpointNote");
+  if(note)note.textContent="Review edits saved locally.";
+  return true;
+ }
+ const render=await fetch(`api/jobs/${CUR}/render`,{method:"POST"});
+ if(!render.ok){alert("Could not start render");return false;}
  const rv=document.getElementById("review"); if(rv)rv.remove();
+ return true;
 }
 async function loadPersist(){
  const a=await (await fetch("api/allowlist")).json();
@@ -3876,7 +4059,8 @@ def rehydrate_jobs():
                          "settings (the uploaded file was kept), or "
                          "Delete frees its disk space",
                 "output": None, "created": os.path.getmtime(jdir),
-                "cancel": threading.Event(), "stats": {},
+                "cancel": threading.Event(), "stop": threading.Event(),
+                "stats": {},
             }
             with JOBS_LOCK:
                 JOBS[jid] = job
@@ -3884,7 +4068,9 @@ def rehydrate_jobs():
             continue
         try:
             with open(rep, encoding="utf-8") as f:
-                prov = json.load(f).get("provenance", {})
+                report_doc = json.load(f)
+            prov = report_doc.get("provenance", {})
+            checkpoint = report_doc.get("stop_review") or {}
             video = prov.get("input")
             if not video or not os.path.exists(video):
                 continue
@@ -3895,13 +4081,21 @@ def rehydrate_jobs():
                 "name": os.path.basename(prov.get("original_input")
                                           or video),
                 "options": prov.get("settings", {}) or {},
-                "phase": "done" if has_out else "review",
+                "phase": ("paused" if checkpoint.get("state") == "paused"
+                          else "done" if has_out else "review"),
                 "progress": 1.0 if has_out else 0.5,
                 "log": ["(recovered after server restart)"],
                 "error": None, "output": out if has_out else None,
                 "created": os.path.getmtime(jdir),
-                "cancel": threading.Event(), "stats": {},
+                "cancel": threading.Event(), "stop": threading.Event(),
+                "checkpoint_frame": checkpoint.get("next_frame"),
+                "checkpoint_total": checkpoint.get("total_frames"),
+                "stats": {},
             }
+            if checkpoint.get("state") == "paused":
+                job["options"] = checkpoint.get("options") or {}
+                job["log"].append("Stop & Review checkpoint recovered; "
+                                  "resume starts from saved frame")
             try:
                 # original upload size, for the editor's duplicate-upload
                 # warning (prov input may be the normalized scan copy)
