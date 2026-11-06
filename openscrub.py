@@ -1298,6 +1298,16 @@ def smooth_dense_tracks(dets, fps, video, cum=None, win_start=0.0, cb=None):
             for k in range(lo, hi + 1):
                 _span_lo[k] = min(_span_lo.get(k, lo), lo)
 
+    # When a resumed chunk starts several minutes into a long recording,
+    # avoid re-decoding the entire prefix just to populate onset grays.
+    # A single verified seek is safe; the original sequential path remains
+    # as a fallback for files that refuse accurate seeking.
+    if cap is not None and _span_lo:
+        first_needed = min(_span_lo)
+        if first_needed > int(2 * _fps_g) and _seek_cap(
+                cap, first_needed, _fps_g):
+            _seq["pos"] = first_needed
+
     def _fill_to(k_end):
         # sequential read, caching grays for needed frames; never seeks
         while _seq["pos"] <= k_end:
@@ -6582,6 +6592,10 @@ def build_parser():
     ap.add_argument("--no-backtrack", action="store_true",
                     help="disable onset backtracking (finding the exact frame "
                          "where newly detected PII first appeared)")
+    ap.add_argument("--resume-start", type=float, default=0.0,
+                    help="internal Stop & Review scan resume position in seconds; "
+                         "the scanner skips earlier frames but retains the "
+                         "full source timeline")
     ap.add_argument("--skip-start", type=float, default=0.0,
                     help="don't detect anything during the first N seconds")
     ap.add_argument("--skip-end", type=float, default=0.0,
@@ -7042,6 +7056,20 @@ def run_scan(args, cb=None):
         else:
             dwin.append(tuple(w))
     win_start, win_end = dwin[0][0], dwin[-1][1]
+    resume_at = float(getattr(args, "resume_start", 0.0) or 0.0)
+    if resume_at:
+        if not math.isfinite(resume_at) or resume_at < 0 or resume_at >= duration:
+            raise ValueError("invalid resume-start position")
+        windows_px = [(max(t0, resume_at), t1, wc, zp)
+                      for t0, t1, wc, zp in windows_px if t1 > resume_at]
+        dwin = [(max(t0, resume_at), t1) for t0, t1 in dwin
+                if t1 > resume_at]
+        if not dwin:
+            raise ValueError("nothing remains in the selected detection windows")
+        win_start, win_end = dwin[0][0], dwin[-1][1]
+        track_jobs = [t for t in track_jobs if t[3] >= resume_at]
+        cb.log(f"      Stop & Review resume: scanning from {resume_at:.2f}s "
+               "(previously reviewed findings are loaded separately)")
     if len(windows_px) > 1 or win_start > 0 or win_end < duration:
         cb.log("      detection windows: "
                + ", ".join(
@@ -7177,7 +7205,9 @@ def run_scan(args, cb=None):
     # them instead of decoding them. cum/bands get zero rows for the skipped
     # indices (render min-guards its lookups). With tracking ON the frames
     # must be decoded sequentially — offsets accumulate — so no skip there.
-    if win_start > 1.0 and not track_on:
+    if win_start > 1.0 and (not track_on or resume_at > 0):
+        # On resume, independent tracking starts from the overlap boundary;
+        # no previous scroll offsets are applied to this suffix.
         skip_n = max(0, int(win_start * fps) - 1)
         if _seek_cap(cap, skip_n, fps):
             cum.extend([(0.0, 0.0)] * skip_n)
@@ -7190,10 +7220,20 @@ def run_scan(args, cb=None):
             cap = cv2.VideoCapture(args.video)  # unseekable: decode it all
             cb.log("      fast-skip unavailable on this file — decoding "
                    "from the start")
+    stopped_at = None
     while True:
         if idx % 30 == 0 and cb.cancelled():
             cap.release()
             raise PipelineCancelled()
+        # Stop differs from Cancel: finish the preceding whole frame, then
+        # run the regular merge/smoothing passes and publish a report.
+        # A minimum of one second avoids a zero-frame invalid checkpoint.
+        if (idx >= max(1, min(int(fps), total - 1))
+                and getattr(cb, "stop_requested", lambda: False)()):
+            stopped_at = idx
+            cb.log(f"      Stop & Review: safe scan boundary at "
+                   f"{idx / fps:.2f}s; finalizing findings for review")
+            break
         ok, frame = cap.read()
         if not ok:
             break
@@ -8013,7 +8053,10 @@ def run_scan(args, cb=None):
                "text) could only be camera-motion artifacts")
 
     audio_sugg, audio_tx = [], []
-    if getattr(args, "audio_pii", False):
+    if stopped_at is not None and getattr(args, "audio_pii", False):
+        cb.log("      Stop & Review: audio transcription deferred; "
+               "partial video/audio must not be published")
+    if getattr(args, "audio_pii", False) and stopped_at is None:
         # spoken names/numbers/addresses leak PII no matter how good the
         # visual blur is — transcribe locally and suggest mute spans
         audio_sugg, audio_tx = transcribe_audio_pii(
@@ -8023,6 +8066,7 @@ def run_scan(args, cb=None):
             custom_res=custom_res)
 
     return {"fps": fps, "cum": cum, "bands": bands, "detections": detections,
+            "stop_at_frame": stopped_at, "total_frames": total,
             "zdropped": zdropped, "audio_suggestions": audio_sugg,
             "audio_transcript": audio_tx,
             "input_sha256": sha256_file(args.video),
