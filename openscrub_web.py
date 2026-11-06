@@ -675,7 +675,7 @@ def worker():
                 threading.Thread(target=_pregen, daemon=True).start()
                 try:
                     prov = _load_job_report(job).get("provenance", {})
-                    if (prov.get("vfr_normalized")
+                    if ((prov.get("vfr_normalized") or meta)
                             and os.path.exists(prov.get("input", ""))):
                         job["video"] = prov["input"]
                         job["log"].append(
@@ -976,6 +976,9 @@ def job_resume(jid):
     with JOBS_LOCK:
         if job["phase"] != "paused":
             return jsonify({"error": "Only paused scans can resume"}), 409
+        if job.get("trackbg", {}).get("state") == "running":
+            return jsonify({"error": "Finish tracking the selected object "
+                                     "before resuming the scan"}), 409
         report = _load_job_report(job)
         try:
             meta = stop_review.validate_resume(report)
@@ -1125,6 +1128,9 @@ def job_plate_quad(jid, i):
     Propagated shapes affect rendering but are NOT verified training labels.
     """
     job = JOBS.get(jid) or abort(404)
+    if request.method == "POST" and job["phase"] not in (
+            "paused", "review", "done"):
+        return jsonify({"error": "Cannot edit plates while scanning"}), 409
     doc = _load_job_report(job)
     rows = doc.get("detections", [])
     if i < 0 or i >= len(rows) or rows[i].get("category") != "plate":
@@ -1313,6 +1319,9 @@ def job_video_stream(jid):
 @app.route("/api/jobs/<jid>/detections", methods=["POST"])
 def job_save_edits(jid):
     job = JOBS.get(jid) or abort(404)
+    if job["phase"] not in ("paused", "review", "done"):
+        return jsonify({"error": "Review edits require a paused or "
+                                 "finished scan"}), 409
     edits = request.get_json(force=True)
     path = os.path.join(job["dir"], "report.json")
     doc = _load_job_report(job)
