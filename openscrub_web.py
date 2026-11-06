@@ -1220,8 +1220,8 @@ def job_save_edits(jid):
             continue
         if 0 <= i < len(doc["detections"]):
             d = doc["detections"][i]
-            if d.get("category") == "plate" and label in ("plate", "not_plate"):
-                d["verified_label"] = label
+            if d.get("category") == "plate" and label in ("plate", "not_plate", "clear"):
+                d["verified_label"] = "" if label == "clear" else label
     for i, d in enumerate(doc["detections"]):
         if str(i) in enabled:
             d["enabled"] = bool(enabled[str(i)])
@@ -2746,6 +2746,7 @@ async function zoomDet(i){
      apply_track:document.getElementById("qTrack").checked})});
    const data=await r.json();
    if(!r.ok)throw new Error(data.error||"Could not save corners");
+   VLBL[i]="plate";
    st.textContent="Saved "+data.applied+" box(es); 1 verified training sample. "+
     "Save edits & render to apply.";
    if(document.getElementById("beCv"))beScrub();
@@ -2914,7 +2915,7 @@ function labelPlate(i,label){
 }
 function applyDet(i,blur,preserveLabel=false){
  if(!preserveLabel){
-  delete VLBL[i];
+  VLBL[i]="clear";
   const el=document.getElementById("vlabel"+i);if(el)el.textContent="";
  }
  for(const m of (TRKMEM[i]||[i]))EN[m]=blur;
