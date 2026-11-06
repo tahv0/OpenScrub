@@ -965,6 +965,50 @@ def job_detframe(jid, i):
 
 
 
+def _save_verified_plate_sample(job, frame, points, index, tref):
+    """Store ONE reviewer-verified plate crop; never promote track guesses.
+
+    Data stays inside the job directory so it inherits the job vault's
+    encryption-at-rest lifecycle and is deleted with the job.
+    """
+    from uuid import uuid4
+    p = np.asarray(points, dtype=np.float64)
+    h, w = frame.shape[:2]
+    margin = max(12, int(0.15 * max(
+        np.ptp(p[:, 0]), np.ptp(p[:, 1]))))
+    x1 = max(0, int(np.floor(p[:, 0].min())) - margin)
+    y1 = max(0, int(np.floor(p[:, 1].min())) - margin)
+    x2 = min(w, int(np.ceil(p[:, 0].max())) + margin)
+    y2 = min(h, int(np.ceil(p[:, 1].max())) + margin)
+    if x2 <= x1 or y2 <= y1:
+        raise ValueError("empty plate annotation crop")
+    sample_dir = os.path.join(job["dir"], "plate_annotations")
+    os.makedirs(sample_dir, mode=0o700, exist_ok=True)
+    filename = uuid4().hex + ".jpg"
+    filepath = os.path.join(sample_dir, filename)
+    if not cv2.imwrite(filepath, frame[y1:y2, x1:x2],
+                       [cv2.IMWRITE_JPEG_QUALITY, 95]):
+        raise OSError("could not write training sample")
+    try:
+        os.chmod(filepath, 0o600)
+    except OSError:
+        pass
+    entry = {"image": filename, "category": "plate",
+             "verified_by_user": True, "frame_time": tref,
+             "detection_index": index,
+             "corners": [[round((float(x)-x1)/(x2-x1), 7),
+                          round((float(y)-y1)/(y2-y1), 7)]
+                         for x, y in p],
+             "source": "four-corner-review"}
+    manifest = os.path.join(sample_dir, "annotations.jsonl")
+    with open(manifest, "a", encoding="utf-8") as out:
+        out.write(json.dumps(entry) + "\n")
+    try:
+        os.chmod(manifest, 0o600)
+    except OSError:
+        pass
+
+
 @app.route("/api/jobs/<jid>/plate_quad/<int:i>", methods=["GET", "POST"])
 def job_plate_quad(jid, i):
     """Review a plate with four free corners; keep verified samples local.
@@ -1030,36 +1074,8 @@ def job_plate_quad(jid, i):
             continue
         r["plate_quad"] = q
         changed += 1
-    # Only the actual manually edited frame is ground truth. Track siblings
-    # are geometric proposals and must never silently join the train set.
-    from uuid import uuid4
-    sample_dir = os.path.join(job["dir"], "plate_annotations")
-    os.makedirs(sample_dir, mode=0o700, exist_ok=True)
-    margin = max(12, int(0.15 * max(bw, bh)))
-    x1 = max(0, int(np.floor(p[:, 0].min())) - margin)
-    y1 = max(0, int(np.floor(p[:, 1].min())) - margin)
-    x2 = min(w, int(np.ceil(p[:, 0].max())) + margin)
-    y2 = min(h, int(np.ceil(p[:, 1].max())) + margin)
-    crop = frame[y1:y2, x1:x2]
-    stem = uuid4().hex
-    image_file = stem + ".jpg"
-    path = os.path.join(sample_dir, image_file)
-    if not cv2.imwrite(path, crop, [cv2.IMWRITE_JPEG_QUALITY, 95]):
-        return jsonify({"error": "could not store training sample"}), 500
-    try:
-        os.chmod(path, 0o600)
-    except OSError:
-        pass
-    entry = {"image": image_file, "category": "plate",
-             "verified_by_user": True, "frame_time": tref,
-             "detection_index": i,
-             "corners": [[round((float(x) - x1) / (x2 - x1), 7),
-                          round((float(y) - y1) / (y2 - y1), 7)]
-                         for x, y in p],
-             "source": "four-corner-review"}
-    with open(os.path.join(sample_dir, "annotations.jsonl"),
-              "a", encoding="utf-8") as out:
-        out.write(json.dumps(entry) + "\n")
+    # Only the exact manually edited frame is verified ground truth.
+    _save_verified_plate_sample(job, frame, p, i, tref)
     with open(os.path.join(job["dir"], "report.json"),
               "w", encoding="utf-8") as out:
         json.dump(doc, out, indent=1)
