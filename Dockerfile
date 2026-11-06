@@ -58,7 +58,7 @@ RUN python prefetch_models.py yunet sface vittrack ppdet pprec pprec_yml plate_t
 
 # ---- app layers: tiny, change every release
 COPY pyproject.toml README.md LICENSE NOTICE THIRD_PARTY_NOTICES.md plate_models.json face_models.json person_models.json ./
-COPY openscrub.py openscrub_web.py openscrub_setup.py openscrub_update.py \
+COPY openscrub.py openscrub_web.py stop_review.py openscrub_setup.py openscrub_update.py \
      openscrub_vault.py zones_ui.py install.py test_openscrub.py ./
 COPY assets/openscrub.ico assets/
 RUN pip install --no-cache-dir --no-deps .
