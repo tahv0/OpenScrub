@@ -3432,7 +3432,8 @@ def test_review_shape_edit_converts_only_changed_box(tmp_path):
     video = str(tmp_path / 'v.mp4')
     out = cv2.VideoWriter(video, cv2.VideoWriter_fourcc(*'mp4v'), 1, (24, 24))
     out.write(np.full((24, 24, 3), 200, np.uint8)); out.release()
-    web.JOBS['compound-test'] = {'dir': str(tmp_path), 'video': video, 'options': {'pad': 8}}
+    web.JOBS['compound-test'] = {'dir': str(tmp_path), 'video': video, 'phase': 'review',
+                                 'options': {'pad': 8}}
     try:
         c = web.app.test_client()
         box = c.get('/api/jobs/compound-test/boxes_at?t=0').get_json()['boxes'][0]
@@ -3653,7 +3654,7 @@ def test_pending_review_masks_and_dense_selection_match_saved_state(tmp_path):
     out = cv2.VideoWriter(video, cv2.VideoWriter_fourcc(*'mp4v'), 10, (80, 80))
     for _ in range(10): out.write(np.full((80, 80, 3), 200, np.uint8))
     out.release()
-    web.JOBS['pending-test'] = {'dir': str(tmp_path), 'video': video,
+    web.JOBS['pending-test'] = {'dir': str(tmp_path), 'video': video, 'phase': 'review',
                                 'options': {'pad': 3, 'face_shape': 'ellipse'}}
     try:
         c = web.app.test_client(); url = '/api/jobs/pending-test/boxes_at?t=.2&all=1'
@@ -4061,7 +4062,7 @@ def test_indexed_review_pointer_edits_wait_for_matched_frame(tmp_path):
     if not shutil.which('node'):
         pytest.skip('node required for evaluated PAGE behavior')
     page=web.PAGE
-    script=page[page.index('async function beScrub(){'):page.index('function zoomDet(')]
+    script=page[page.index('async function beScrub(){'):page.index('async function zoomDet(')]
     harness=r'''
 const assert=require('assert');let handlers={},captures=0,prompts=0,tracks=0,queue=[];
 const ctx={clearRect(){},fillRect(){},strokeRect(){},beginPath(){},moveTo(){},lineTo(){},closePath(){},fill(){},stroke(){},setLineDash(){}};
@@ -4236,7 +4237,7 @@ const rows = [
   {i:1,enabled:true,track:7,person:-1,category:'plate',text:'plate',t_start:1,t_end:2},
   {i:2,enabled:false,track:-1,person:-1,category:'plate',text:'plate',t_start:0,t_end:2}
 ];
-const context = vm.createContext({assert, EN:{}, CUR:'test', DUR:0, CATDN:{},
+const context = vm.createContext({assert, EN:{}, CUR:'test', DUR:0, CATDN:{}, SHELLPH:'review',
   fetch:async()=>({json:async()=>({duration:2,detections:rows})}),
   showPanel(){}, initMarquee(){},
   document:{getElementById(id){

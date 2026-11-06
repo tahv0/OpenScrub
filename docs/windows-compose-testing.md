@@ -1,12 +1,12 @@
-# Test all four PRs with Docker Compose on Windows
+# Test the combined branch with Docker Compose on Windows
 
-The `integration/all-prs` branch combines PRs #1–#4. This setup builds its
-local checkout, so you test the combined code rather than a published
-release image. The base Compose file uses the CPU `Dockerfile`. For an
-NVIDIA GPU, add `compose.windows-cuda.yml` to build `Dockerfile.cuda` and
-expose the GPU. GPU passthrough alone does not add CUDA to the CPU image.
+The `integration/all-prs-stop-review-cuda` branch includes the original
+four PRs, plate feedback, local training tools, and Stop & Review. This
+setup builds the source in your checkout. The base Compose file uses the
+CPU `Dockerfile`. Add `compose.windows-cuda.yml` to build `Dockerfile.cuda`
+and expose an NVIDIA GPU.
 
-Included PR snapshots:
+Original PR snapshots
 
 | PR | Head commit | Included change |
 |---|---|---|
@@ -15,10 +15,9 @@ Included PR snapshots:
 | #3 | `a6419cc` | Opt-in Narrow plate coverage with zero extra margin |
 | #4 | `2900930` | Browser Save As for video and audit report |
 
-Automatic precise segmentation with a small model is deferred and is not
-included in this test setup. Compound shapes can be displayed and
-rendered when their geometry is supplied; that does not imply automatic
-segmentation of arbitrary objects.
+The [Stop & Review guide](STOP_REVIEW.md) covers partial scans and resume.
+The [plate training guide](PLATE_TRAINING.md) covers running the trainer
+in its own Python environment.
 
 Use Docker Desktop in **Linux containers** mode with its WSL 2 engine,
 Git for Windows, and a current Docker Compose v2. Run the commands below
@@ -30,7 +29,7 @@ remote Docker context.
 ## Get the branch and start
 
 ```powershell
-git clone --branch integration/all-prs https://github.com/tahv0/OpenScrub.git OpenScrubTest
+git clone --branch integration/all-prs-stop-review-cuda https://github.com/tahv0/OpenScrub.git OpenScrubTest
 Set-Location OpenScrubTest
 git status --short --branch
 git rev-parse --short HEAD
@@ -67,7 +66,9 @@ GPU image from the same combined source and keep the same data/source
 mounts:
 
 ```powershell
-git pull --ff-only origin integration/all-prs
+git fetch origin
+git switch integration/all-prs-stop-review-cuda
+git pull --ff-only origin integration/all-prs-stop-review-cuda
 $composeFiles = @('-f', 'compose.windows-test.yml', '-f', 'compose.windows-cuda.yml')
 New-Item -ItemType Directory -Force -Path D:\OpenScrubTest\data | Out-Null
 docker compose @composeFiles config --quiet
@@ -85,7 +86,7 @@ UI or wait for it to finish**. A running scan cannot be moved to CUDA;
 start a new scan after switching. Bind-mounted job files stay on D:.
 
 ```powershell
-docker compose @composeFiles up -d --force-recreate --wait --wait-timeout 180
+docker compose @composeFiles up -d --no-build --force-recreate --wait --wait-timeout 180
 docker compose @composeFiles exec openscrub nvidia-smi
 Get-Content -Raw tools/check_cuda.py | docker compose @composeFiles exec -T openscrub python -
 ```
@@ -228,8 +229,8 @@ After all scans/renders have finished, update the checkout and rebuild:
 
 ```powershell
 git fetch origin
-git switch integration/all-prs
-git pull --ff-only origin integration/all-prs
+git switch integration/all-prs-stop-review-cuda
+git pull --ff-only origin integration/all-prs-stop-review-cuda
 git rev-parse --short HEAD
 docker compose @composeFiles up --build -d --force-recreate
 docker compose @composeFiles logs --tail 100 openscrub

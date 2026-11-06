@@ -2982,13 +2982,6 @@ function beDraw(){
   const[a1,b1,a2,b2]=b.box.map(v=>v*s);
   x.fillStyle=b.i===BE.sel?"rgba(37,99,235,.25)":"rgba(220,38,38,.22)";
   x.strokeStyle=b.i===BE.sel?"#2563eb":"#dc2626";x.lineWidth=2;
-  if(b.category==="plate"&&b.plate_quad&&b.plate_quad.length===4){
-   x.beginPath();b.plate_quad.forEach((p,k)=>{
-    const px=(b.box[0]+p[0]*(b.box[2]-b.box[0]))*s;
-    const py=(b.box[1]+p[1]*(b.box[3]-b.box[1]))*s;
-    if(k)x.lineTo(px,py);else x.moveTo(px,py);
-   });x.closePath();x.fill();x.stroke();
-  }else{x.fillRect(a1,b1,a2-a1,b2-b1);x.strokeRect(a1,b1,a2-a1,b2-b1);}
   if(!BE.pending&&!BE.drag&&b.mask_contours.length){
    x.beginPath();
    for(const ring of b.mask_contours){if(!ring.length)continue;

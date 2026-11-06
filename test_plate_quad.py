@@ -4,6 +4,7 @@ Run: pytest -q test_plate_quad.py
 """
 import json
 
+import cv2
 import numpy as np
 import openscrub
 
