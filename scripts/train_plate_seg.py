@@ -50,16 +50,6 @@ def _private_dir(path):
         os.chmod(path, 0o700)
 
 
-def _safe_image(root, value):
-    if not isinstance(value, str) or Path(value).is_absolute():
-        raise DataError("Manifest image must be a relative filename")
-    root = root.resolve()
-    image = (root / value).resolve()
-    if not image.is_relative_to(root):  # replaced below for Python 3.9
-        raise DataError("Manifest image escapes the dataset directory")
-    return image
-
-
 def _is_bounded(path, root):
     try:
         path.relative_to(root)
