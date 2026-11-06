@@ -956,6 +956,44 @@ def job_preview(jid):
     return send_file(p, mimetype="image/jpeg", max_age=0)
 
 
+@app.route("/api/jobs/<jid>/stop", methods=["POST"])
+def job_stop(jid):
+    """Request a cooperative scan stop; Cancel keeps its old meaning."""
+    job = JOBS.get(jid) or abort(404)
+    with JOBS_LOCK:
+        if job["phase"] != "scanning":
+            return jsonify({"error": "Stop & Review is available only "
+                                     "during scanning"}), 409
+        job["stop"].set()
+    return jsonify({"ok": True, "message": "Finishing a whole frame and "
+                    "finalizing the checkpoint before Review"})
+
+
+@app.route("/api/jobs/<jid>/resume", methods=["POST"])
+def job_resume(jid):
+    """Resume from a saved checkpoint without re-scanning its prefix."""
+    job = JOBS.get(jid) or abort(404)
+    with JOBS_LOCK:
+        if job["phase"] != "paused":
+            return jsonify({"error": "Only paused scans can resume"}), 409
+        report = _load_job_report(job)
+        try:
+            meta = stop_review.validate_resume(report)
+        except (stop_review.CheckpointError, TypeError, KeyError,
+                ValueError) as exc:
+            return jsonify({"error": str(exc)}), 409
+        # Persist the initial settings as part of the checkpoint, so a
+        # restart cannot silently resume with unrelated default settings.
+        job["options"] = meta["options"]
+        job["stop"].clear()
+        job["cancel"].clear()
+        job["error"] = None
+        job["phase"] = "queued"
+        job["eta"] = None
+    WORK_Q.put((jid, "resume"))
+    return jsonify({"ok": True, "next_frame": meta["next_frame"]})
+
+
 @app.route("/api/jobs/<jid>/cancel", methods=["POST"])
 def job_cancel(jid):
     job = JOBS.get(jid) or abort(404)
