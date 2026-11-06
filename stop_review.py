@@ -137,10 +137,7 @@ def join_reports(previous, continuation, next_frame, total_frames,
         merged["audio_transcript"] = copy.deepcopy(previous["audio_transcript"])
     # Custom provenance options are captured once, not replaced with the
     # resume-only CLI flags.
-    merged["provenance"]["settings"] = copy.deepcopy(
-        previous.get("provenance", {}).get("settings", {}))
-    merged["provenance"]["windows"] = copy.deepcopy(
-        previous.get("provenance", {}).get("windows"))
+    merged["provenance"] = copy.deepcopy(previous.get("provenance", {}))
     if completed:
         merged.pop("stop_review", None)
     else:
