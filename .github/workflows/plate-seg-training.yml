@@ -1,0 +1,30 @@
+name: Plate segmentation training checks
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/train_plate_seg.py'
+      - 'test_plate_seg_training.py'
+      - '.github/workflows/plate-seg-training.yml'
+  workflow_dispatch:
+
+jobs:
+  offline-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.9', '3.11', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install offline test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "numpy<3" "opencv-python-headless<5" "pytest>=8"
+      - name: Compile training code and tests
+        run: python -m py_compile scripts/train_plate_seg.py test_plate_seg_training.py
+      - name: Run dataset, CUDA guard and version-registry unit tests
+        run: python -m pytest -q test_plate_seg_training.py
