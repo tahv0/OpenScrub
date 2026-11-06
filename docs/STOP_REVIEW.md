@@ -57,6 +57,10 @@ moving license plates, screen recordings, and very short appearances.
 The actual video frames before the checkpoint are **not scanned again**;
 the one-second overlap is deliberate. Some post-processing operations
 (e.g., confirming object onset) can still seek earlier in the source.
+Manual tracking in a paused job is limited to the scanned portion only:
+a manually drawn plate cannot automatically follow the yet-unscanned
+25 minutes. After resuming and reviewing the next chunk, re-seed the
+track if it continues beyond the boundary.
 
 Because continuity and original/current scan masks can differ, the
 feature needs field validation on long videos and variable-frame-rate
