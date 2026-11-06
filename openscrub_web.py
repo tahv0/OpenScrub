@@ -2612,7 +2612,6 @@ async function loadBoxEdit(fromReview){
      add:false,addAnchor:null,drag:null,scale:1,dur:mi.duration,
      win:[0,mi.duration],trk:false,muteArm:false,tlDrag:null,
      plateMode:false,platePoints:[],
-     tlspans:[],audio:[],audioSel:-1};
      tlspans:[],audio:[],audioSel:-1,indexed:!!ri.indexed_frames,
      fps:ri.fps,frameCount:ri.frame_count,frame:0,imageFrame:-1,maskFrame:-1};
  c.innerHTML=`<div class="row" style="margin-top:8px">
