@@ -25,6 +25,7 @@ import copy
 import datetime
 import hashlib
 import json
+import math
 import os
 import re
 import shutil
@@ -719,6 +720,8 @@ class Detection:
     person: int = -1           # face tracks clustered by facial IDENTITY
                                # (SFace embeddings): one review decision per
                                # PERSON, applied to all their appearances
+    verified_label: str = ""  # explicit 'plate' or 'not_plate' review, not a default
+    plate_quad: tuple = ()    # four normalized plate corners, ordered clockwise
     poly: tuple = ()           # silhouette contour(s) from a segmentation
                                # model, points NORMALIZED to cbox (0..1) —
                                # render blurs ONLY inside them (person
@@ -1306,6 +1309,16 @@ def smooth_dense_tracks(dets, fps, video, cum=None, win_start=0.0, cb=None,
             hi = int(round(t0 * _fps_g)) + 2
             for k in range(lo, hi + 1):
                 _span_lo[k] = min(_span_lo.get(k, lo), lo)
+
+    # When a resumed chunk starts several minutes into a long recording,
+    # avoid re-decoding the entire prefix just to populate onset grays.
+    # A single verified seek is safe; the original sequential path remains
+    # as a fallback for files that refuse accurate seeking.
+    if cap is not None and _span_lo:
+        first_needed = min(_span_lo)
+        if first_needed > int(2 * _fps_g) and _seek_cap(
+                cap, first_needed, _fps_g):
+            _seq["pos"] = first_needed
 
     def _fill_to(k_end):
         # sequential read, caching grays for needed frames; never seeks
@@ -3057,6 +3070,19 @@ def effective_mask_pad(override, default):
     except (TypeError, ValueError, OverflowError):
         return default
 
+def _plate_quad_pixels(box, quad):
+    """Map relative plate corners to pixels, including skew outside the bbox."""
+    x1, y1, x2, y2 = box
+    return tuple((x1 + float(p[0]) * (x2 - x1),
+                  y1 + float(p[1]) * (y2 - y1)) for p in quad)
+
+
+def blur_silhouette(frame, x1, y1, x2, y2, mode, polys, poly_box,
+                    pad_px=0):
+    """Redact ONLY the pixels inside a detection's silhouette polygon(s) —
+    the segmentation-model equivalent of blur_region, so a walking person's
+    body is masked without a box of blurred background around them.
+
 
 def rasterize_mask(shape, region, polys, poly_box, pad_px=0, poly_holes=()):
     """Return clipped region and its mask. Invalid geometry covers the region."""
@@ -3763,7 +3789,19 @@ def render_hdr(src, dst, detections, cum, bands, fps, pad, mode,
                if _sample_active(d, idx, t)]
         for d in _dedupe_dense(act):
             px = _detection_pad(d, pad, (ox, oy))
-            if d.poly:
+            if d.category == "plate" and len(d.plate_quad) == 4:
+                # Use four human-adjusted corners, not the oversized bbox.
+                base = (d.cbox[0] + ox, d.cbox[1] + oy,
+                        d.cbox[2] + ox, d.cbox[3] + oy)
+                quad = _plate_quad_pixels(base, d.plate_quad)
+                _blur_silhouette_yuv10(
+                    y, u, v, min(p[0] for p in quad) - 2,
+                    min(p[1] for p in quad) - 2,
+                    max(p[0] for p in quad) + 2,
+                    max(p[1] for p in quad) + 2,
+                    _mode_for(d.category), (d.plate_quad,),
+                    base, pad_px=1)
+            elif d.poly:
                 _blur_silhouette_yuv10(
                     y, u, v, d.cbox[0] + ox - px, d.cbox[1] + oy - px,
                     d.cbox[2] + ox + px, d.cbox[3] + oy + px,
@@ -3964,8 +4002,14 @@ def render(src, dst, detections, cum, bands, fps, pad, mode, preview,
             pbox = (d.cbox[0] + ox, d.cbox[1] + oy,
                     d.cbox[2] + ox, d.cbox[3] + oy)
             if preview:
-                cv2.rectangle(frame, (int(max(0, x1)), int(max(0, y1))),
-                              (int(min(w, x2)), int(min(h, y2))), (0, 0, 255), 2)
+                if d.category == "plate" and len(d.plate_quad) == 4:
+                    vertices = np.asarray(
+                        _plate_quad_pixels(pbox, d.plate_quad), dtype=np.int32)
+                    cv2.polylines(frame, [vertices], True, (0, 0, 255), 2)
+                else:
+                    cv2.rectangle(frame, (int(max(0, x1)), int(max(0, y1))),
+                                  (int(min(w, x2)), int(min(h, y2))),
+                                  (0, 0, 255), 2)
                 if d.poly:
                     region, mask = rasterize_mask(frame.shape, (x1, y1, x2, y2),
                                                   d.poly, pbox, px, d.poly_holes)
@@ -3977,6 +4021,15 @@ def render(src, dst, detections, cum, bands, fps, pad, mode, preview,
                     label = f"face {d.confidence:.2f}"
                 cv2.putText(frame, label, (int(max(0, x1)), int(max(12, y1 - 4))),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
+            elif d.category == "plate" and len(d.plate_quad) == 4:
+                # Tight skewed mask: ignore the global box padding.
+                quad = _plate_quad_pixels(pbox, d.plate_quad)
+                blur_silhouette(frame, min(p[0] for p in quad)-2,
+                                min(p[1] for p in quad)-2,
+                                max(p[0] for p in quad)+2,
+                                max(p[1] for p in quad)+2,
+                                _mode_for(d.category), (d.plate_quad,),
+                                pbox, pad_px=1)
             elif d.poly:
                 # segmentation silhouette: mask only the body, not the box —
                 # px (pad+drift) becomes an outward mask dilation
@@ -6206,6 +6259,11 @@ def load_report(path):
             dense=bool(r.get("dense", False)),
             track=int(r.get("track", -1)),
             person=int(r.get("person", -1)),
+            plate_quad=tuple(tuple(pt) for pt in (r.get("plate_quad") or ())),
+            verified_label=(r.get("verified_label")
+                            if r.get("verified_label") in ("plate", "not_plate")
+                            else ""),
+            poly=tuple(r.get("poly") or ())))
             poly=_tuples(r.get("poly") or ()),
             poly_holes=_tuples(r.get("poly_holes") or ()),
             mask_pad=r.get("mask_pad", -1),
@@ -6780,6 +6838,10 @@ def build_parser():
     ap.add_argument("--no-backtrack", action="store_true",
                     help="disable onset backtracking (finding the exact frame "
                          "where newly detected PII first appeared)")
+    ap.add_argument("--resume-start", type=float, default=0.0,
+                    help="internal Stop & Review scan resume position in seconds; "
+                         "the scanner skips earlier frames but retains the "
+                         "full source timeline")
     ap.add_argument("--skip-start", type=float, default=0.0,
                     help="don't detect anything during the first N seconds")
     ap.add_argument("--skip-end", type=float, default=0.0,
@@ -7252,6 +7314,20 @@ def run_scan(args, cb=None):
         else:
             dwin.append(tuple(w))
     win_start, win_end = dwin[0][0], dwin[-1][1]
+    resume_at = float(getattr(args, "resume_start", 0.0) or 0.0)
+    if resume_at:
+        if not math.isfinite(resume_at) or resume_at < 0 or resume_at >= duration:
+            raise ValueError("invalid resume-start position")
+        windows_px = [(max(t0, resume_at), t1, wc, zp)
+                      for t0, t1, wc, zp in windows_px if t1 > resume_at]
+        dwin = [(max(t0, resume_at), t1) for t0, t1 in dwin
+                if t1 > resume_at]
+        if not dwin:
+            raise ValueError("nothing remains in the selected detection windows")
+        win_start, win_end = dwin[0][0], dwin[-1][1]
+        track_jobs = [t for t in track_jobs if t[3] >= resume_at]
+        cb.log(f"      Stop & Review resume: scanning from {resume_at:.2f}s "
+               "(previously reviewed findings are loaded separately)")
     if len(windows_px) > 1 or win_start > 0 or win_end < duration:
         cb.log("      detection windows: "
                + ", ".join(
@@ -7388,7 +7464,9 @@ def run_scan(args, cb=None):
     # them instead of decoding them. cum/bands get zero rows for the skipped
     # indices (render min-guards its lookups). With tracking ON the frames
     # must be decoded sequentially — offsets accumulate — so no skip there.
-    if win_start > 1.0 and not track_on:
+    if win_start > 1.0 and (not track_on or resume_at > 0):
+        # On resume, independent tracking starts from the overlap boundary;
+        # no previous scroll offsets are applied to this suffix.
         skip_n = max(0, int(win_start * fps) - 1)
         if _seek_cap(cap, skip_n, fps):
             cum.extend([(0.0, 0.0)] * skip_n)
@@ -7398,13 +7476,26 @@ def run_scan(args, cb=None):
                    f"{skip_n} frame(s) before the window are not decoded")
         else:
             cap.release()
+            if resume_at > 0:
+                raise RuntimeError("Cannot verify frame seek to resumed scan "
+                                   "boundary; original checkpoint is intact")
             cap = cv2.VideoCapture(args.video)  # unseekable: decode it all
             cb.log("      fast-skip unavailable on this file — decoding "
                    "from the start")
+    stopped_at = None
     while True:
         if idx % 30 == 0 and cb.cancelled():
             cap.release()
             raise PipelineCancelled()
+        # Stop differs from Cancel: finish the preceding whole frame, then
+        # run the regular merge/smoothing passes and publish a report.
+        # A minimum of one second avoids a zero-frame invalid checkpoint.
+        if (total > 1 and idx >= max(1, min(int(fps), total - 1))
+                and getattr(cb, "stop_requested", lambda: False)()):
+            stopped_at = idx
+            cb.log(f"      Stop & Review: safe scan boundary at "
+                   f"{idx / fps:.2f}s; finalizing findings for review")
+            break
         ok, frame = cap.read()
         if not ok:
             break
@@ -7935,6 +8026,18 @@ def run_scan(args, cb=None):
         idx += 1
     cap.release()
 
+    if stopped_at is not None:
+        # Do not let post-scan manual tracking decode the unscanned tail:
+        # a user may have scheduled a full-clip tracked object in the editor.
+        # Track only the confirmed scanned interval. It can be re-seeded
+        # and reviewed after the next chunk completes.
+        safe_end = stopped_at / fps
+        track_jobs = [
+            (t0, min(t1, safe_end), box, tref)
+            for t0, t1, box, tref in track_jobs
+            if t0 < safe_end and tref < safe_end and min(t1, safe_end) > t0
+        ]
+
     if memory is not None:
         extra = reverse_pass(scans, memory, cats, namer,
                              lenient=72 if getattr(args, "paranoid", False) else 76)
@@ -8231,7 +8334,10 @@ def run_scan(args, cb=None):
                "text) could only be camera-motion artifacts")
 
     audio_sugg, audio_tx = [], []
-    if getattr(args, "audio_pii", False):
+    if stopped_at is not None and getattr(args, "audio_pii", False):
+        cb.log("      Stop & Review: audio transcription deferred; "
+               "partial video/audio must not be published")
+    if getattr(args, "audio_pii", False) and stopped_at is None:
         # spoken names/numbers/addresses leak PII no matter how good the
         # visual blur is — transcribe locally and suggest mute spans
         audio_sugg, audio_tx = transcribe_audio_pii(
@@ -8241,6 +8347,7 @@ def run_scan(args, cb=None):
             custom_res=custom_res)
 
     return {"fps": fps, "cum": cum, "bands": bands, "detections": detections,
+            "stop_at_frame": stopped_at, "total_frames": total,
             "zdropped": zdropped, "audio_suggestions": audio_sugg,
             "audio_transcript": audio_tx,
             "input_sha256": sha256_file(args.video),
