@@ -3968,7 +3968,8 @@ def rehydrate_jobs():
                          "settings (the uploaded file was kept), or "
                          "Delete frees its disk space",
                 "output": None, "created": os.path.getmtime(jdir),
-                "cancel": threading.Event(), "stats": {},
+                "cancel": threading.Event(), "stop": threading.Event(),
+                "stats": {},
             }
             with JOBS_LOCK:
                 JOBS[jid] = job
@@ -3976,7 +3977,9 @@ def rehydrate_jobs():
             continue
         try:
             with open(rep, encoding="utf-8") as f:
-                prov = json.load(f).get("provenance", {})
+                report_doc = json.load(f)
+            prov = report_doc.get("provenance", {})
+            checkpoint = report_doc.get("stop_review") or {}
             video = prov.get("input")
             if not video or not os.path.exists(video):
                 continue
@@ -3987,13 +3990,21 @@ def rehydrate_jobs():
                 "name": os.path.basename(prov.get("original_input")
                                           or video),
                 "options": prov.get("settings", {}) or {},
-                "phase": "done" if has_out else "review",
+                "phase": ("paused" if checkpoint.get("state") == "paused"
+                          else "done" if has_out else "review"),
                 "progress": 1.0 if has_out else 0.5,
                 "log": ["(recovered after server restart)"],
                 "error": None, "output": out if has_out else None,
                 "created": os.path.getmtime(jdir),
-                "cancel": threading.Event(), "stats": {},
+                "cancel": threading.Event(), "stop": threading.Event(),
+                "checkpoint_frame": checkpoint.get("next_frame"),
+                "checkpoint_total": checkpoint.get("total_frames"),
+                "stats": {},
             }
+            if checkpoint.get("state") == "paused":
+                job["options"] = checkpoint.get("options") or {}
+                job["log"].append("Stop & Review checkpoint recovered; "
+                                  "resume starts from saved frame")
             try:
                 # original upload size, for the editor's duplicate-upload
                 # warning (prov input may be the normalized scan copy)
