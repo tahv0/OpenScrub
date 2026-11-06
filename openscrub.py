@@ -3934,8 +3934,14 @@ def render(src, dst, detections, cum, bands, fps, pad, mode, preview,
             pbox = (d.cbox[0] + ox, d.cbox[1] + oy,
                     d.cbox[2] + ox, d.cbox[3] + oy)
             if preview:
-                cv2.rectangle(frame, (int(max(0, x1)), int(max(0, y1))),
-                              (int(min(w, x2)), int(min(h, y2))), (0, 0, 255), 2)
+                if d.category == "plate" and len(d.plate_quad) == 4:
+                    vertices = np.asarray(
+                        _plate_quad_pixels(pbox, d.plate_quad), dtype=np.int32)
+                    cv2.polylines(frame, [vertices], True, (0, 0, 255), 2)
+                else:
+                    cv2.rectangle(frame, (int(max(0, x1)), int(max(0, y1))),
+                                  (int(min(w, x2)), int(min(h, y2))),
+                                  (0, 0, 255), 2)
                 for pts in (d.poly or ()):
                     arr = np.array(
                         [[int(float(qx) * (pbox[2] - pbox[0]) + pbox[0]),
