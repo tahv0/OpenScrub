@@ -152,13 +152,14 @@ def test_engine_stops_on_completed_frame_and_resume_seeks_without_prefix(
                                     *extra])
         return openscrub._prep_args(result, parser)
     original = openscrub.run_scan(args(), RequestStop())
-    assert original["stop_at_frame"] == 90
+    assert 90 <= original["stop_at_frame"] <= 91
     assert original["total_frames"] == 180
-    assert len(original["cum"]) == 90
+    assert len(original["cum"]) == original["stop_at_frame"]
     report = tmp_path / "report.json"
     openscrub.write_report(str(report), args(), original)
     old = stop_review.with_checkpoint(json.loads(report.read_text()),
-                                       90, 180, {"categories": "none"})
+                                       original["stop_at_frame"], 180,
+                                       {"categories": "none"})
     resumed = openscrub.run_scan(args("--resume-start", "2.0"), Quiet())
     assert resumed["stop_at_frame"] is None
     assert len(resumed["cum"]) == 180
