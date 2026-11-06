@@ -306,10 +306,10 @@ def train(args, report):
     weights = Path(args.weights).expanduser().resolve()
     if not weights.is_file() or weights.suffix.lower() != ".pt":
         raise DataError("Supply an already downloaded local *-seg.pt checkpoint")
-    if args.epochs < 1 or args.batch < 1 or args.imgsz < 128 or (
-            args.imgsz % 32 != 0):
+    if (args.epochs < 1 or args.batch < 1 or args.imgsz < 128 or
+            args.imgsz % 32 != 0 or args.workers < 0 or args.patience < 0):
         raise DataError("epochs/batch must be positive; imgsz >=128 and "
-                        "divisible by 32")
+                        "divisible by 32; workers/patience nonnegative")
     cuda = _cuda_info(args.device)
     try:
         import ultralytics
@@ -355,6 +355,14 @@ def train(args, report):
             if not exported.is_file():
                 raise RuntimeError("ONNX export did not create a model file")
             onnx_check = _smoke_onnx(exported, args.imgsz)
+            # The dataset may have been edited while GPU training was
+            # running. Never publish metadata for a different dataset.
+            latest = validate_dataset(
+                args.dataset, args.min_train_positive, args.min_val_positive,
+                args.min_negative_per_split)
+            if latest["dataset_sha256"] != report["dataset_sha256"]:
+                raise RuntimeError("Training dataset changed during the run; "
+                                   "candidate not published")
             shutil.copy2(best, stage / "weights.pt")
             shutil.copy2(exported, stage / "model.onnx")
             version = "v" + dt.datetime.now(dt.timezone.utc).strftime(
