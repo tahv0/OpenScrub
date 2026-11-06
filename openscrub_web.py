@@ -35,6 +35,7 @@ import time
 import uuid
 
 import cv2
+import numpy as np
 from flask import (Flask, Response, abort, jsonify, redirect, request,
                    send_file)
 
