@@ -2882,9 +2882,11 @@ function beRemove(){
  document.getElementById("beTimes").style.display="none";
 }
 async function beSave(){
- await saveAndRender();
+ const ok=await saveAndRender(SHELLPH==="paused");
+ if(!ok)return;
  const c=document.querySelector("#beslot");
- if(c)c.innerHTML="rendering with your edits…";
+ if(c)c.innerHTML=SHELLPH==="paused"
+   ?"Review edits saved; resume when ready.":"rendering with your edits…";
 }
 async function cancelJob(){await fetch("api/jobs/"+CUR+"/cancel",{method:"POST"})}
 
@@ -3016,7 +3018,7 @@ async function loadReview(){
   html+=`</div>`}
  html+=`</div>
  <div class="row" style="margin-top:12px">
- <button onclick="saveAndRender()">Save edits &amp; render</button>
+ <button onclick="saveAndRender()">${SHELLPH==="paused"?"Save review edits":"Save edits &amp; render"}</button>
  <span style="font-size:12px;color:#94a3b8">missed something? use
   ▶ Preview video &amp; edit boxes above — its ＋ Add box replaces the old
   add-region tool</span></div></div>`;
@@ -3128,7 +3130,7 @@ document.addEventListener("keydown",e=>{
  if(e.key==="Escape"){clearSel();
   const lb=document.getElementById("lb");if(lb)lb.remove();}});
 
-async function saveAndRender(){
+async function saveAndRender(saveOnly=false){
  const manual=[...MAN,...BE.adds.map(a=>({t_start:a.t0,t_end:a.t1,
   t_ref:a.tref,screen_box:a.box}))];
  const payload={enabled:EN,manual,box_overrides:BE.ov,
@@ -3136,9 +3138,11 @@ async function saveAndRender(){
  // only send audio spans when the box editor actually loaded them —
  // otherwise a save from plain review would wipe stored spans with []
  if(Array.isArray(BE.audio)&&BE.tlspans!==undefined)payload.audio=BE.audio;
- const r=await (await fetch(`api/jobs/${CUR}/detections`,{method:"POST",
+ const response=await fetch(`api/jobs/${CUR}/detections`,{method:"POST",
   headers:{"Content-Type":"application/json"},
-  body:JSON.stringify(payload)})).json();
+  body:JSON.stringify(payload)});
+ if(!response.ok){alert("Review edits were not saved");return false;}
+ const r=await response.json();
  BE.adds=[];BE.ov={};BE.times={};
  if(r.suggest_allowlist&&r.suggest_allowlist.length){
   if(confirm("You disabled every instance of: "+r.suggest_allowlist.join(", ")+". Add these to the permanent allow-list so future scans skip them?"))
@@ -3147,8 +3151,15 @@ async function saveAndRender(){
     body:JSON.stringify({words:r.suggest_allowlist})});
     loadPersist();}}
  MAN=[];
- await fetch(`api/jobs/${CUR}/render`,{method:"POST"});
+ if(saveOnly||SHELLPH==="paused"){
+  const note=document.getElementById("savedCheckpointNote");
+  if(note)note.textContent="Review edits saved locally.";
+  return true;
+ }
+ const render=await fetch(`api/jobs/${CUR}/render`,{method:"POST"});
+ if(!render.ok){alert("Could not start render");return false;}
  const rv=document.getElementById("review"); if(rv)rv.remove();
+ return true;
 }
 async function loadPersist(){
  const a=await (await fetch("api/allowlist")).json();
