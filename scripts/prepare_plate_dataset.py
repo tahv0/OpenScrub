@@ -188,7 +188,7 @@ def export(jobs_dir, out_dir, task, val_ratio=0.2, negative_ratio=2.0,
         if task == "segment" and polarity == "positive" and item["kind"] != "quad":
             return False
         key = dhash(image)
-        if any((key ^ old).bit_count() <= dedup_hamming
+        if any(bin(key ^ old).count("1") <= dedup_hamming
                for old in seen[polarity]):
             stats["duplicate"] += 1
             return False
