@@ -682,7 +682,9 @@ def worker():
                             "using CFR-normalized file for previews/thumbnails")
                 except Exception:
                     pass
-                if job["options"].get("skip_review"):
+                if meta:
+                    job["phase"] = "paused"
+                elif job["options"].get("skip_review"):
                     job["log"].append("review skipped — rendering all detections")
                     job["phase"] = "review"
                     WORK_Q.put((jid, "render"))
@@ -702,10 +704,15 @@ def worker():
                 job["progress"] = 1.0
                 job["eta"] = None
         except openscrub.PipelineCancelled:
+            job["stop"].clear()
             job["phase"] = "cancelled"
             job["error"] = "cancelled by user"
         except Exception as e:
-            job["phase"] = "error"
+            job["stop"].clear()
+            # The prior report is untouched if a resumed scan fails.
+            job["phase"] = ("paused" if action == "resume"
+                            and os.path.isfile(os.path.join(
+                                job["dir"], "report.json")) else "error")
             job["error"] = str(e)
             job["log"].append(f"ERROR: {e}")
         finally:
