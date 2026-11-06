@@ -2983,11 +2983,20 @@ function showSelMenu(x,y){
  menuEl=document.createElement("div");menuEl.className="selmenu";
  menuEl.innerHTML=`<span>${selSet.size} selected</span>
   <button class="mkeep" onclick="bulkSet(false)">Keep</button>
-  <button class="mblur" onclick="bulkSet(true)">Blur</button>`;
+  <button class="mblur" onclick="bulkSet(true)">Blur</button>
+  <button class="sec" onclick="bulkLabelPlate('plate')">Confirm plates</button>
+  <button class="sec" onclick="bulkLabelPlate('not_plate')">Not plates</button>`;
  Object.assign(menuEl.style,{left:x+"px",top:(y+10)+"px"});
  document.body.appendChild(menuEl);
 }
 function bulkSet(blur){selSet.forEach(i=>applyDet(i,blur));clearSel();}
+function bulkLabelPlate(label){
+ selSet.forEach(i=>{
+  const el=document.getElementById("det"+i);
+  if(el&&el.dataset.cat==="plate")labelPlate(i,label);
+ });
+ clearSel();
+}
 document.addEventListener("pointerdown",e=>{
  if(menuEl&&!e.target.closest(".selmenu")
     &&!e.target.closest("#detwrap"))clearSel();});
