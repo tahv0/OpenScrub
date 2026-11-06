@@ -40,6 +40,7 @@ from flask import (Flask, Response, abort, jsonify, redirect, request,
                    send_file)
 
 import openscrub
+import stop_review
 import zones_ui
 
 
@@ -328,7 +329,8 @@ def new_job(video_path, options, name):
         "options": options, "phase": "queued", "progress": 0.0,
         "eta": None, "size": 0,
         "log": [], "error": None, "output": None, "created": time.time(),
-        "cancel": threading.Event(), "stats": {},
+        "cancel": threading.Event(), "stop": threading.Event(),
+        "stats": {},
     }
     with JOBS_LOCK:
         JOBS[jid] = job
@@ -359,6 +361,9 @@ def job_public(job):
         "has_output": bool(job["output"] and os.path.exists(job["output"])),
         "download_name": video_name,
         "report_name": report_name,
+        "stop_pending": bool(job.get("stop") and job["stop"].is_set()),
+        "checkpoint_frame": job.get("checkpoint_frame"),
+        "checkpoint_total": job.get("checkpoint_total"),
     }
 
 
@@ -426,6 +431,8 @@ class WebCallbacks(openscrub.Callbacks):
     def cancelled(self):
         return self.job["cancel"].is_set()
 
+    def stop_requested(self):
+        return self.job["stop"].is_set()
 
 def _job_mask_options(job):
     """Return the exact option values passed to the render command."""
@@ -573,13 +580,67 @@ def worker():
             continue
         cb = WebCallbacks(job)
         try:
-            if action == "scan":
+            if action in ("scan", "resume"):
+                resuming = action == "resume"
                 job["phase"] = "scanning"
                 args = build_args(job)
+                previous = None
+                old_frame = 0
+                if resuming:
+                    previous = _load_job_report(job)
+                    meta = stop_review.validate_resume(previous)
+                    old_frame = int(meta["next_frame"])
+                    if previous["provenance"]["input_sha256"] != openscrub.sha256_file(
+                            job["video"]):
+                        raise stop_review.CheckpointError(
+                            "Video changed after checkpoint; resume refused")
+                    # Re-scan only a one-second overlap for onset continuity.
+                    # Already reviewed findings win on the older side.
+                    args.resume_start = max(0.0, old_frame / float(meta["fps"]) - 1.0)
+                    job["log"].append("      resuming near %.2fs (1s overlap)"
+                                      % (old_frame / float(meta["fps"])))
                 state = openscrub.run_scan(args, cb)
-                openscrub.write_report(os.path.join(job["dir"], "report.json"),
-                                      args, state)
+                report_path = os.path.join(job["dir"], "report.json")
+                staging_path = os.path.join(job["dir"], ".scan-chunk.json")
+                try:
+                    openscrub.write_report(staging_path, args, state)
+                    with open(staging_path, encoding="utf-8") as f:
+                        chunk = json.load(f)
+                    end_frame = state.get("stop_at_frame")
+                    total_frames = int(state["total_frames"])
+                    if resuming:
+                        if end_frame is not None and end_frame <= old_frame:
+                            combined = previous  # stop request before new work
+                        else:
+                            combined = stop_review.join_reports(
+                                previous, chunk,
+                                int(end_frame) if end_frame is not None
+                                else len(state["cum"]),
+                                total_frames, completed=end_frame is None)
+                    elif end_frame is not None:
+                        combined = stop_review.with_checkpoint(
+                            chunk, end_frame, total_frames, job["options"])
+                    else:
+                        combined = chunk
+                    # Never replace the last good checkpoint until the
+                    # continuation scan AND postprocessing have both passed.
+                    stop_review.atomic_report(report_path, combined)
+                finally:
+                    if os.path.exists(staging_path):
+                        os.remove(staging_path)
+                job["stop"].clear()
+                meta = combined.get("stop_review")
+                job["checkpoint_frame"] = (meta or {}).get("next_frame")
+                job["checkpoint_total"] = (meta or {}).get("total_frames")
                 job["stats"] = state["stats"]
+                if meta:
+                    job["log"].append(
+                        "      saved checkpoint %d/%d frames; prior decisions "
+                        "and four-corner polygons retained" %
+                        (meta["next_frame"], meta["total_frames"]))
+                else:
+                    job["log"].append(
+                        "      full scan complete; prior review edits retained")
                 def _pregen(jid=jid):
                     """One pass through the video with a single decoder:
                     thumbnails come out in seconds instead of minutes.
@@ -648,14 +709,16 @@ def worker():
                 threading.Thread(target=_pregen, daemon=True).start()
                 try:
                     prov = _load_job_report(job).get("provenance", {})
-                    if (prov.get("vfr_normalized")
+                    if ((prov.get("vfr_normalized") or meta)
                             and os.path.exists(prov.get("input", ""))):
                         job["video"] = prov["input"]
                         job["log"].append(
                             "using CFR-normalized file for previews/thumbnails")
                 except Exception:
                     pass
-                if job["options"].get("skip_review"):
+                if meta:
+                    job["phase"] = "paused"
+                elif (not resuming and job["options"].get("skip_review")):
                     job["log"].append("review skipped — rendering all detections")
                     job["phase"] = "review"
                     WORK_Q.put((jid, "render"))
@@ -675,10 +738,15 @@ def worker():
                 job["progress"] = 1.0
                 job["eta"] = None
         except openscrub.PipelineCancelled:
+            job["stop"].clear()
             job["phase"] = "cancelled"
             job["error"] = "cancelled by user"
         except Exception as e:
-            job["phase"] = "error"
+            job["stop"].clear()
+            # The prior report is untouched if a resumed scan fails.
+            job["phase"] = ("paused" if action == "resume"
+                            and os.path.isfile(os.path.join(
+                                job["dir"], "report.json")) else "error")
             job["error"] = str(e)
             job["log"].append(f"ERROR: {e}")
         finally:
@@ -939,6 +1007,47 @@ def job_preview(jid):
     return send_file(p, mimetype="image/jpeg", max_age=0)
 
 
+@app.route("/api/jobs/<jid>/stop", methods=["POST"])
+def job_stop(jid):
+    """Request a cooperative scan stop; Cancel keeps its old meaning."""
+    job = JOBS.get(jid) or abort(404)
+    with JOBS_LOCK:
+        if job["phase"] != "scanning":
+            return jsonify({"error": "Stop & Review is available only "
+                                     "during scanning"}), 409
+        job["stop"].set()
+    return jsonify({"ok": True, "message": "Finishing a whole frame and "
+                    "finalizing the checkpoint before Review"})
+
+
+@app.route("/api/jobs/<jid>/resume", methods=["POST"])
+def job_resume(jid):
+    """Resume from a saved checkpoint without re-scanning its prefix."""
+    job = JOBS.get(jid) or abort(404)
+    with JOBS_LOCK:
+        if job["phase"] != "paused":
+            return jsonify({"error": "Only paused scans can resume"}), 409
+        if job.get("trackbg", {}).get("state") == "running":
+            return jsonify({"error": "Finish tracking the selected object "
+                                     "before resuming the scan"}), 409
+        report = _load_job_report(job)
+        try:
+            meta = stop_review.validate_resume(report)
+        except (stop_review.CheckpointError, TypeError, KeyError,
+                ValueError) as exc:
+            return jsonify({"error": str(exc)}), 409
+        # Persist the initial settings as part of the checkpoint, so a
+        # restart cannot silently resume with unrelated default settings.
+        job["options"] = meta["options"]
+        job["stop"].clear()
+        job["cancel"].clear()
+        job["error"] = None
+        job["phase"] = "queued"
+        job["eta"] = None
+    WORK_Q.put((jid, "resume"))
+    return jsonify({"ok": True, "next_frame": meta["next_frame"]})
+
+
 @app.route("/api/jobs/<jid>/cancel", methods=["POST"])
 def job_cancel(jid):
     job = JOBS.get(jid) or abort(404)
@@ -1002,6 +1111,7 @@ def job_detections(jid):
                       "track": d.get("track", -1),
                       "person": d.get("person", -1),
                       "confidence": d.get("confidence", 0),
+                      "verified_label": d.get("verified_label", ""),
                       "fallback_reason": d.get("fallback_reason", ""),
                       "zone_dropped": bool(d.get("zone_dropped")),
                       "shaped": bool(d.get("poly"))})
@@ -1021,7 +1131,8 @@ def _review_detections(job, doc):
         r.get("text", ""), r.get("confidence", 1.0),
         tuple(r.get("aoff", (0, 0))), dense=r.get("dense", False),
         track=r.get("track", -1), poly=r.get("poly") or (),
-        poly_holes=r.get("poly_holes") or (), mask_pad=r.get("mask_pad", -1))
+        poly_holes=r.get("poly_holes") or (), mask_pad=r.get("mask_pad", -1),
+        plate_quad=tuple(tuple(pt) for pt in (r.get("plate_quad") or ())))
         for r in rows]
     coverage, pad, _ = _job_mask_options(job)
     if coverage not in ("tight", "box", "concealed"):
@@ -1064,6 +1175,12 @@ def _review_mask_data(d, ox, oy, shape, job, doc):
     drift = 0 if d.get("category") == "plate" and d.get("frame_index", -1) >= 0 and d.get("poly") else min(24.0, 0.05 * (abs(ox-anchor[0]) + abs(oy-anchor[1])))
     pad = base + drift
     region = (box[0]-pad, box[1]-pad, box[2]+pad, box[3]+pad)
+    if d.get("category") == "plate" and len(d.get("plate_quad") or ()) == 4:
+        quad = openscrub._plate_quad_pixels(box, d["plate_quad"])
+        tight = (min(p[0] for p in quad)-2, min(p[1] for p in quad)-2,
+                 max(p[0] for p in quad)+2, max(p[1] for p in quad)+2)
+        return openscrub.rasterize_mask(
+            shape, tight, (d["plate_quad"],), box, 1, ())
     if d.get("poly"):
         return openscrub.rasterize_mask(
             shape, region, d["poly"], box, pad, d.get("poly_holes") or ())
@@ -1082,7 +1199,7 @@ def _review_mask(d, ox, oy, shape, job, doc):
              for pt in contour] for contour in contours]
 
 
-def _apply_detection_edits(doc, edits):
+def _apply_detection_edits(doc, edits, cutoff=None):
     """Apply the same pending changes for preview and save, in memory."""
     enabled = edits.get("enabled", {})
     for i, d in enumerate(doc["detections"]):
@@ -1099,16 +1216,20 @@ def _apply_detection_edits(doc, edits):
                 d["poly_holes"] = []
                 d["mask_pad"] = -1
                 d["fallback_reason"] = ""
+                d["plate_quad"] = []
     for i, span in (edits.get("time_overrides") or {}).items():
         i = int(i)
         if 0 <= i < len(doc["detections"]) and len(span) == 2:
             t0, t1 = float(span[0]), float(span[1])
+            if cutoff is not None:
+                t1 = min(t1, cutoff)
             if t1 > t0 >= 0:
                 d = doc["detections"][i]
                 if (d.get("category") == "plate" and d.get("frame_index", -1) >= 0
                         and (t0 != d["t_start"] or t1 != d["t_end"])):
                     d["frame_index"] = -1
                     d["fallback_reason"] = ""
+                    d["plate_quad"] = []
                     d["poly"] = []
                     d["poly_holes"] = []
                     d["mask_pad"] = -1
@@ -1152,6 +1273,129 @@ def job_detframe(jid, i):
     ok, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 84])
     from flask import Response
     return Response(buf.tobytes(), mimetype="image/jpeg")
+
+
+
+def _save_verified_plate_sample(job, frame, points, index, tref):
+    """Store ONE reviewer-verified plate crop; never promote track guesses.
+
+    Data stays inside the job directory so it inherits the job vault's
+    encryption-at-rest lifecycle and is deleted with the job.
+    """
+    from uuid import uuid4
+    p = np.asarray(points, dtype=np.float64)
+    h, w = frame.shape[:2]
+    margin = max(12, int(0.15 * max(
+        np.ptp(p[:, 0]), np.ptp(p[:, 1]))))
+    x1 = max(0, int(np.floor(p[:, 0].min())) - margin)
+    y1 = max(0, int(np.floor(p[:, 1].min())) - margin)
+    x2 = min(w, int(np.ceil(p[:, 0].max())) + margin)
+    y2 = min(h, int(np.ceil(p[:, 1].max())) + margin)
+    if x2 <= x1 or y2 <= y1:
+        raise ValueError("empty plate annotation crop")
+    sample_dir = os.path.join(job["dir"], "plate_annotations")
+    os.makedirs(sample_dir, mode=0o700, exist_ok=True)
+    filename = uuid4().hex + ".jpg"
+    filepath = os.path.join(sample_dir, filename)
+    if not cv2.imwrite(filepath, frame[y1:y2, x1:x2],
+                       [cv2.IMWRITE_JPEG_QUALITY, 95]):
+        raise OSError("could not write training sample")
+    try:
+        os.chmod(filepath, 0o600)
+    except OSError:
+        pass
+    entry = {"image": filename, "category": "plate",
+             "verified_by_user": True, "frame_time": tref,
+             "detection_index": index,
+             "corners": [[round((float(x)-x1)/(x2-x1), 7),
+                          round((float(y)-y1)/(y2-y1), 7)]
+                         for x, y in p],
+             "source": "four-corner-review"}
+    manifest = os.path.join(sample_dir, "annotations.jsonl")
+    with open(manifest, "a", encoding="utf-8") as out:
+        out.write(json.dumps(entry) + "\n")
+    try:
+        os.chmod(manifest, 0o600)
+    except OSError:
+        pass
+
+
+@app.route("/api/jobs/<jid>/plate_quad/<int:i>", methods=["GET", "POST"])
+def job_plate_quad(jid, i):
+    """Review a plate with four free corners; keep verified samples local.
+
+    Quadrilaterals are normalized to each detection's *un-padded* bbox.
+    Propagated shapes affect rendering but are NOT verified training labels.
+    """
+    job = JOBS.get(jid) or abort(404)
+    if request.method == "POST" and job["phase"] not in (
+            "paused", "review", "done"):
+        return jsonify({"error": "Cannot edit plates while scanning"}), 409
+    doc = _load_job_report(job)
+    rows = doc.get("detections", [])
+    if i < 0 or i >= len(rows) or rows[i].get("category") != "plate":
+        abort(404)
+    d = rows[i]
+    rs = doc["render_state"]
+    fps = float(rs["fps"])
+    tref = min(max(float(d.get("last_seen", d["t_start"])),
+                   float(d["t_start"])), float(d["t_end"]))
+    fidx = min(max(0, int(tref * fps)), len(rs["cum"]) - 1)
+    ox, oy = rs["cum"][fidx]
+    box = [float(d["cbox"][0]) + ox, float(d["cbox"][1]) + oy,
+           float(d["cbox"][2]) + ox, float(d["cbox"][3]) + oy]
+    bw, bh = box[2] - box[0], box[3] - box[1]
+    if bw <= 0 or bh <= 0:
+        abort(400)
+    default = [[0., 0.], [1., 0.], [1., 1.], [0., 1.]]
+    if request.method == "GET":
+        q = d.get("plate_quad") or default
+        frame = _frame_at(job, tref, rs)
+        if frame is None:
+            abort(404)
+        return jsonify({"i": i, "t": tref, "width": frame.shape[1],
+                        "height": frame.shape[0], "box": box,
+                        "points": [[box[0] + x * bw, box[1] + y * bh]
+                                   for x, y in q],
+                        "track": d.get("track", -1)})
+    payload = request.get_json(force=True)
+    try:
+        p = np.asarray(payload["points"], dtype=np.float64)
+    except (KeyError, TypeError, ValueError):
+        return jsonify({"error": "four corner points required"}), 400
+    if p.shape != (4, 2) or not np.isfinite(p).all():
+        return jsonify({"error": "invalid corner coordinates"}), 400
+    frame = _frame_at(job, tref, rs)
+    if frame is None:
+        abort(404)
+    h, w = frame.shape[:2]
+    if (np.any(p[:, 0] < 0) or np.any(p[:, 0] >= w) or
+            np.any(p[:, 1] < 0) or np.any(p[:, 1] >= h)):
+        return jsonify({"error": "corners must be inside the video frame"}), 400
+    contour = p.astype(np.float32).reshape((-1, 1, 2))
+    if (not cv2.isContourConvex(contour) or
+            cv2.contourArea(contour) < 8.0):
+        return jsonify({"error": "corners must form a convex quadrilateral"}), 400
+    q = [[round((float(x) - box[0]) / bw, 6),
+          round((float(y) - box[1]) / bh, 6)] for x, y in p]
+    d["verified_label"] = "plate"
+    apply_track = payload.get("apply_track") is True
+    tid = d.get("track", -1)
+    changed = 0
+    for j, r in enumerate(rows):
+        if j != i and not (apply_track and tid >= 0 and
+                           r.get("track", -1) == tid and
+                           r.get("category") == "plate"):
+            continue
+        r["plate_quad"] = q
+        changed += 1
+    # Only the exact manually edited frame is verified ground truth.
+    _save_verified_plate_sample(job, frame, p, i, tref)
+    stop_review.atomic_report(
+        os.path.join(job["dir"], "report.json"), doc)
+    return jsonify({"ok": True, "applied": changed,
+                    "verified_samples_added": 1})
+
 
 
 def _requested_review_frame(rstate):
@@ -1205,6 +1449,7 @@ def job_boxes_at(jid):
             boxes.append({"i": i, "category": d["category"],
                           "enabled": d.get("enabled", True),
                           "text": d.get("text", ""),
+                          "plate_quad": d.get("plate_quad") or [],
                           "fallback_reason": d.get("fallback_reason", ""),
                           "shaped": bool(d.get("poly")),
                           "mask_contours": _review_mask(d, ox, oy, shape, job, doc),
@@ -1318,14 +1563,41 @@ def job_video_stream(jid):
 @app.route("/api/jobs/<jid>/detections", methods=["POST"])
 def job_save_edits(jid):
     job = JOBS.get(jid) or abort(404)
+    if job["phase"] not in ("paused", "review", "done"):
+        return jsonify({"error": "Review edits require a paused or "
+                                 "finished scan"}), 409
     edits = request.get_json(force=True)
     path = os.path.join(job["dir"], "report.json")
     doc = _load_job_report(job)
-    _apply_detection_edits(doc, edits)
+    stop_meta = doc.get("stop_review") or {}
+    cutoff = (stop_meta["next_frame"] / stop_meta["fps"]
+              if stop_meta.get("state") == "paused" else None)
+    if cutoff is not None:
+        # Paused jobs only contain verified footage up to this boundary.
+        # Do not let a manual UI box implicitly mark the unscanned tail.
+        for m in edits.get("manual", []):
+            if float(m.get("t_start", 0)) >= cutoff:
+                return jsonify({"error": "Manual boxes must be inside the "
+                                        "scanned portion while paused"}), 400
+    # Only an explicit reviewer judgement is training evidence.
+    # Keep-visible is NOT a negative label: a user may intentionally keep
+    # a real plate unredacted. Nor is default enabled a positive label.
+    for key, label in (edits.get("verified_labels") or {}).items():
+        try:
+            i = int(key)
+        except (ValueError, TypeError):
+            continue
+        if 0 <= i < len(doc["detections"]):
+            d = doc["detections"][i]
+            if d.get("category") == "plate" and label in ("plate", "not_plate", "clear"):
+                d["verified_label"] = "" if label == "clear" else label
+    _apply_detection_edits(doc, edits, cutoff=cutoff)
     rs = doc["render_state"]
     for m in edits.get("manual", []):
         t0 = float(m["t_start"]); t1 = float(m["t_end"])
         tref = float(m.get("t_ref", t0))
+        if cutoff is not None:
+            t1 = min(t1, cutoff)
         fidx = min(int(tref * rs["fps"]), len(rs["cum"]) - 1)
         ox, oy = rs["cum"][fidx]
         b = m["screen_box"]
@@ -1344,8 +1616,7 @@ def job_save_edits(jid):
                       else "mute")}
             for s in (edits.get("audio") or [])
             if float(s.get("t1", 0)) > float(s.get("t0", 0)) >= 0]
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(doc, f, indent=1)
+    stop_review.atomic_report(path, doc)
     # suggest allowlisting any string whose EVERY instance was disabled —
     # the review just taught us it's a recurring false positive
     per = {}
@@ -1376,6 +1647,27 @@ def job_track_object(jid):
         abort(400)
     if len(box) != 4 or not (t1 > t0 >= 0) or not (t0 <= t_ref <= t1):
         abort(400)
+    if job["phase"] == "paused":
+        saved = stop_review.validate_resume(_load_job_report(job))
+        until = saved["next_frame"] / saved["fps"]
+        if t_ref >= until or t0 >= until:
+            return jsonify({"error": "Track seed is outside the scanned "
+                                     "portion"}), 400
+        t1 = min(t1, until)
+    # Optional manually drawn 4-corner license plate (TL, TR, BR, BL).
+    # These points are relative to the submitted seed box, not the frame.
+    quad_req = None
+    if "plate_quad" in p:
+        try:
+            q = np.asarray(p["plate_quad"], dtype=np.float64)
+        except (TypeError, ValueError):
+            abort(400)
+        if (q.shape != (4, 2) or not np.isfinite(q).all() or
+                np.any(q < -0.5) or np.any(q > 1.5) or
+                not cv2.isContourConvex(q.astype(np.float32).reshape((-1, 1, 2))) or
+                cv2.contourArea(q.astype(np.float32)) < 0.002):
+            abort(400)
+        quad_req = [[round(float(v), 6) for v in pt] for pt in q]
     st = {"state": "running", "added": 0, "error": None}
     job["trackbg"] = st
 
@@ -1397,7 +1689,8 @@ def job_track_object(jid):
             except Exception:
                 det = None
             samples = openscrub.track_manual_region(
-                job["video"], box, t_ref, t0, t1, cb=L(), person_det=det)
+                job["video"], box, t_ref, t0, t1, cb=L(),
+                person_det=(det if quad_req is None else None))
             if not samples:
                 st.update(state="done", added=0,
                           error="could not track that region — try a "
@@ -1415,6 +1708,8 @@ def job_track_object(jid):
                      if tcls is not None
                      and 0 <= tcls < len(openscrub.COCO_NAMES)
                      else "tracked object")
+            if quad_req is not None:
+                label = "manually drawn plate"
             for s in samples:
                 t, b, score = s[0], s[1], s[2]
                 poly = s[3] if len(s) > 3 and s[3] else ()
@@ -1424,19 +1719,34 @@ def job_track_object(jid):
                     "t_start": t, "t_end": t + step * 1.2,
                     "cbox": [int(b[0] - ox), int(b[1] - oy),
                              int(b[2] - ox), int(b[3] - oy)],
-                    "category": "manual", "text": label,
+                    "category": ("plate" if quad_req is not None else "manual"),
+                    "text": label,
                     "confidence": round(float(score), 3),
                     "aoff": [ox, oy], "last_seen": t,
                     "dense": True, "track": tid, "enabled": True,
-                    "poly": [[[float(x), float(y)] for x, y in c]
-                             for c in poly]})
+                    "plate_quad": (quad_req or []),
+                    "poly": ([[[float(x), float(y)] for x, y in c]
+                              for c in poly] if quad_req is None else [])})
             # grace pads: cover the sub-sample sliver at both ends
             new[0]["t_start"] = max(0.0, new[0]["t_start"] - 0.25)
             new[-1]["t_end"] += 0.25
+            seed_index = len(doc["detections"])
             doc["detections"].extend(new)
+            if quad_req is not None:
+                # The drawn reference is reviewed; propagated frames aren't.
+                nearest = min(range(len(new)),
+                              key=lambda k: abs(new[k]["t_start"]-t_ref))
+                new[nearest]["verified_label"] = "plate"
+            if quad_req is not None:
+                frame = _frame_at(job, t_ref, rs)
+                if frame is not None:
+                    points = [[box[0] + qx*(box[2]-box[0]),
+                               box[1] + qy*(box[3]-box[1])]
+                              for qx, qy in quad_req]
+                    _save_verified_plate_sample(job, frame, points,
+                                                seed_index, t_ref)
             path = os.path.join(job["dir"], "report.json")
-            with open(path, "w", encoding="utf-8") as f:
-                json.dump(doc, f, indent=1)
+            stop_review.atomic_report(path, doc)
             job["log"].append(
                 "      tracked object: %d position(s), %.1f-%.1fs "
                 "(review card added)" % (len(new),
@@ -2228,14 +2538,27 @@ async function refresh(){
  if(SHELLPH!==j.phase){
   SHELLPH=j.phase;
   let a="";
-  if(j.phase=="scanning"||j.phase=="rendering")
-   a=`<button class="danger" onclick="cancelJob()">Cancel</button>`;
+  if(j.phase=="scanning")
+   a=`<button class="sec" id="stopReviewBtn" onclick="stopReview()">&#9632; Stop &amp; Review</button>
+    <button class="danger" onclick="cancelJob()">Cancel (discard scan)</button>
+    <span style="font-size:12px;color:#94a3b8">Stop saves a reviewable checkpoint; Cancel discards this run.</span>`;
+  if(j.phase=="rendering")
+   a=`<button class="danger" onclick="cancelJob()">Cancel render</button>`;
   if(j.phase=="error"||j.phase=="cancelled")
    a=`<button onclick="retryJob(CUR)">Retry scan (no re-upload)</button>
     <div style="width:100%;font-size:12px;color:#9ca3af">The uploaded file
     is still on the server — Retry re-runs the scan without uploading it
     again. Delete the job (&#128465;&#65039; in the list) to free its disk
     space.</div>`;
+  if(j.phase=="paused"){
+   const f=j.checkpoint_frame||0,t=j.checkpoint_total||1;
+   a=`<button onclick="resumeJob()">&#9654; Save edits &amp; resume</button>
+    <button class="sec" onclick="saveAndRender(true)">Save review edits only</button>
+    <div class="warn" style="width:100%">INCOMPLETE: ${(f/t*100).toFixed(1)}%
+    scanned (${f}/${t} frames). Do not publish as redacted video.
+    Existing review decisions and plate corners remain saved on resume.</div>`;
+   loadReview();
+  }
   if(j.phase=="review"){
    // no interstitial button: review is the ONLY next step after a scan,
    // so open it directly — both on a live scan finishing and on
@@ -2274,7 +2597,8 @@ async function refresh(){
 }
 
 let BE={t:0,ox:0,oy:0,boxes:[],sel:-1,ov:{},dis:{},times:{},adds:[],
-        add:false,addAnchor:null,drag:null,scale:1,dur:10};
+        add:false,addAnchor:null,drag:null,scale:1,dur:10,
+        plateMode:false,platePoints:[]};
 async function loadBoxEdit(fromReview){
  showPanel(fromReview?"boxedit_rev":"boxedit");
  const mi=await (await fetch(`api/jobs/${CUR}/mediainfo`)).json();
@@ -2287,6 +2611,7 @@ async function loadBoxEdit(fromReview){
  BE={t:0,ox:0,oy:0,boxes:[],sel:-1,ov:{},dis:{},times:{},adds:[],
      add:false,addAnchor:null,drag:null,scale:1,dur:mi.duration,
      win:[0,mi.duration],trk:false,muteArm:false,tlDrag:null,
+     plateMode:false,platePoints:[],
      tlspans:[],audio:[],audioSel:-1,indexed:!!ri.indexed_frames,
      fps:ri.fps,frameCount:ri.frame_count,frame:0,imageFrame:-1,maskFrame:-1};
  c.innerHTML=`<div class="row" style="margin-top:8px">
@@ -2317,6 +2642,7 @@ async function loadBoxEdit(fromReview){
   <div class="row" style="margin-top:6px">
    <button class="tog" id="beAdd" onclick="beAddMode()">&#65291; Add box</button>
    <button class="tog" id="beTrk" onclick="beTrackMode()">&#8857; Track object</button>
+   <button class="tog" id="bePlate" onclick="bePlateMode()">&#9645; Draw plate (4 corners)</button>
    <button class="danger" id="beRm" style="display:none" onclick="beRemove()">Remove blur</button>
    <span id="beTimes" style="display:none;align-items:center;gap:4px;font-size:13px">
     from <input type="number" id="beT0" step="0.1" min="0" style="width:74px">
@@ -2329,8 +2655,11 @@ async function loadBoxEdit(fromReview){
    or remove its blur. &#65291; Add box: drag a static region. &#8857; Track object:
    drag the timeline handles to the part of the video you care about, scrub
    to a frame where the object is clear, draw a box around it — it will be
-   followed and blurred through the window. &#128263; Audio span: drag on the
-   timeline's bottom lane to silence (or bleep) that stretch of sound.</p>`;
+   followed and blurred through the window. &#9645; Draw plate: choose the
+   time window, then click its four corners clockwise (top-left, top-right,
+   bottom-right, bottom-left) to create a tracked, perspective-tight plate
+   mask and a local verified training sample. &#128263; Audio span: drag
+   on the timeline's bottom lane to silence (or bleep) that stretch of sound.</p>`;
  const img=document.getElementById("beImg");
  img.onload=()=>{if(BE.playing)return;const cv=document.getElementById("beCv");
   cv.width=img.clientWidth;cv.height=img.clientHeight;
@@ -2509,6 +2838,8 @@ function tlHook(){
 function beWinReset(){BE.win=[0,BE.dur];beTLDraw();}
 function beMuteMode(){
  BE.muteArm=!BE.muteArm;BE.trk=false;BE.add=false;BE.addAnchor=null;
+ BE.plateMode=false;BE.platePoints=[];
+ const pb=document.getElementById("bePlate");if(pb)pb.classList.remove("on");
  document.getElementById("beMute").classList.toggle("on",BE.muteArm);
  document.getElementById("beTrk").classList.remove("on");
  document.getElementById("beAdd").classList.remove("on");
@@ -2520,16 +2851,28 @@ function beAudioRm(){
 }
 function beTrackMode(){
  BE.trk=!BE.trk;BE.add=false;BE.addAnchor=null;BE.muteArm=false;
+ BE.plateMode=false;BE.platePoints=[];
+ const pb=document.getElementById("bePlate");if(pb)pb.classList.remove("on");
  document.getElementById("beTrk").classList.toggle("on",BE.trk);
  document.getElementById("beAdd").classList.remove("on");
  document.getElementById("beMute").classList.remove("on");
 }
-async function beTrackGo(box){
+function bePlateMode(){
+ BE.plateMode=!BE.plateMode;BE.platePoints=[];BE.add=false;
+ BE.addAnchor=null;BE.trk=false;BE.muteArm=false;BE.sel=-1;
+ document.getElementById("bePlate").classList.toggle("on",BE.plateMode);
+ document.getElementById("beAdd").classList.remove("on");
+ document.getElementById("beTrk").classList.remove("on");
+ document.getElementById("beMute").classList.remove("on");
+ beDraw();
+}
+async function beTrackGo(box,quad=null){
  const st=document.getElementById("beTrkSt");st.style.display="inline";
  st.textContent=`tracking ${BE.win[0].toFixed(1)}–${BE.win[1].toFixed(1)}s…`;
  const r=await fetch(`api/jobs/${CUR}/track_object`,{method:"POST",
   headers:{"Content-Type":"application/json"},
-  body:JSON.stringify({box,t_ref:BE.t,t0:BE.win[0],t1:BE.win[1]})});
+  body:JSON.stringify({box,t_ref:BE.t,t0:BE.win[0],t1:BE.win[1],
+   ...(quad?{plate_quad:quad}:{})})});
  if(!r.ok){st.textContent="tracking failed to start";return;}
  const poll=setInterval(async()=>{
   const d=await (await fetch(`api/jobs/${CUR}/track_status`)).json();
@@ -2625,10 +2968,27 @@ function beDraw(){
   x.strokeRect(Math.min(p[0],q[0])*s,Math.min(p[1],q[1])*s,
    Math.abs(q[0]-p[0])*s,Math.abs(q[1]-p[1])*s);x.setLineDash([]);
  }
+ if(BE.platePoints&&BE.platePoints.length){
+  x.beginPath();BE.platePoints.forEach((p,k)=>{
+   if(k)x.lineTo(p[0]*s,p[1]*s);else x.moveTo(p[0]*s,p[1]*s);
+  });
+  x.strokeStyle="#4ade80";x.lineWidth=2;x.stroke();
+  for(const p of BE.platePoints){
+   x.beginPath();x.arc(p[0]*s,p[1]*s,5,0,Math.PI*2);
+   x.fillStyle="#4ade80";x.fill();
+  }
+ }
  for(const b of BE.boxes){
   const[a1,b1,a2,b2]=b.box.map(v=>v*s);
   x.fillStyle=b.i===BE.sel?"rgba(37,99,235,.25)":"rgba(220,38,38,.22)";
   x.strokeStyle=b.i===BE.sel?"#2563eb":"#dc2626";x.lineWidth=2;
+  if(b.category==="plate"&&b.plate_quad&&b.plate_quad.length===4){
+   x.beginPath();b.plate_quad.forEach((p,k)=>{
+    const px=(b.box[0]+p[0]*(b.box[2]-b.box[0]))*s;
+    const py=(b.box[1]+p[1]*(b.box[3]-b.box[1]))*s;
+    if(k)x.lineTo(px,py);else x.moveTo(px,py);
+   });x.closePath();x.fill();x.stroke();
+  }else{x.fillRect(a1,b1,a2-a1,b2-b1);x.strokeRect(a1,b1,a2-a1,b2-b1);}
   if(!BE.pending&&!BE.drag&&b.mask_contours.length){
    x.beginPath();
    for(const ring of b.mask_contours){if(!ring.length)continue;
@@ -2645,6 +3005,8 @@ function beDraw(){
 }
 function beAddMode(){
  BE.add=!BE.add;BE.addAnchor=null;BE.sel=-1;
+ BE.plateMode=false;BE.platePoints=[];
+ const pb=document.getElementById("bePlate");if(pb)pb.classList.remove("on");
  BE.trk=false;BE.muteArm=false;
  document.getElementById("beAdd").classList.toggle("on",BE.add);
  const tb=document.getElementById("beTrk");if(tb)tb.classList.remove("on");
@@ -2676,6 +3038,21 @@ function beHook(){
  cv.addEventListener("pointerdown",e=>{
   if(BE.indexed&&(BE.playing||BE.pending||BE.imageFrame!==BE.frame||BE.maskFrame!==BE.frame))return;
   const p=pt(e);cv.setPointerCapture(e.pointerId);
+  if(BE.plateMode){
+   BE.platePoints.push(p);
+   if(BE.platePoints.length===4){
+    const pts=BE.platePoints.slice();BE.platePoints=[];
+    BE.plateMode=false;document.getElementById("bePlate").classList.remove("on");
+    const xs=pts.map(v=>v[0]),ys=pts.map(v=>v[1]);
+    const box=[Math.min(...xs),Math.min(...ys),Math.max(...xs),Math.max(...ys)];
+    if(box[2]-box[0]>5&&box[3]-box[1]>3){
+     const quad=pts.map(v=>[(v[0]-box[0])/(box[2]-box[0]),
+                            (v[1]-box[1])/(box[3]-box[1])]);
+     beTrackGo(box,quad);
+    }else alert("Plate corners are too close together.");
+   }
+   beDraw();return;
+  }
   if(BE.trk){
    // Track object: same two-click box draw as Add box, but on completion
    // the region is template-tracked through the active timeline window
@@ -2749,19 +3126,107 @@ function beHook(){
  });
  cv.addEventListener("pointerup",()=>{if(BE.drag){BE.drag=null;beRefresh();}});
 }
-function zoomDet(i){
- let ov=document.getElementById("lb");
- if(!ov){
-  ov=document.createElement("div");ov.id="lb";
+
+let QEDIT=null;
+async function zoomDet(i){
+ const el=document.getElementById("det"+i);
+ if(!el||el.dataset.cat!=="plate"){
+  let ov=document.getElementById("lb");
+  if(!ov){ov=document.createElement("div");ov.id="lb";document.body.appendChild(ov);}
   ov.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.82);"+
    "z-index:100;display:flex;align-items:center;justify-content:center;"+
    "cursor:zoom-out;padding:18px";
   ov.onclick=()=>ov.remove();
-  document.body.appendChild(ov);
+  ov.innerHTML='<img src="api/jobs/'+CUR+'/detframe/'+i+
+   '" style="max-width:96%;max-height:96%;border-radius:8px">';
+  return;
  }
- ov.innerHTML=`<img src="api/jobs/${CUR}/detframe/${i}"
-  style="max-width:96%;max-height:96%;border-radius:8px;
-  box-shadow:0 12px 50px rgba(0,0,0,.6)">`;
+ const r=await fetch("api/jobs/"+CUR+"/plate_quad/"+i);
+ if(!r.ok){alert("Could not load plate annotation");return;}
+ const d=await r.json();
+ const ov=document.getElementById("lb")||document.createElement("div");
+ ov.id="lb";ov.style.cssText="position:fixed;inset:0;z-index:100;"+
+  "background:rgba(0,0,0,.92);display:flex;align-items:center;"+
+  "justify-content:center;padding:12px";
+ ov.onclick=null;
+ ov.innerHTML='<div style="max-width:96vw;max-height:96vh;overflow:auto;'+
+  'background:#0f172a;padding:12px;border-radius:10px;color:#e2e8f0">'+
+  '<div style="display:flex;justify-content:space-between;gap:12px;margin-bottom:8px">'+
+  '<b>Plate: adjust four corners</b>'+
+  '<button id="qClose" class="sec">Close</button></div>'+
+  '<div style="position:relative;display:inline-block;max-width:100%">'+
+  '<img id="qImg" style="display:block;max-width:100%;max-height:70vh" src="api/jobs/'+
+   CUR+'/frame_at?t='+encodeURIComponent(d.t)+'">'+
+  '<canvas id="qCv" style="position:absolute;inset:0;touch-action:none;cursor:crosshair"></canvas></div>'+
+  '<p style="font-size:12px;color:#94a3b8">Drag each numbered corner to the exact plate edge. '+
+  'The quadrilateral can be skewed; it does not need right angles.</p>'+
+  '<label style="font-size:12px"><input id="qTrack" type="checkbox"> '+
+  'Apply this shape to the full detected track (approximate; review the result)</label>'+
+  '<div style="display:flex;gap:8px;align-items:center;margin-top:8px">'+
+  '<button id="qSave">Save corners & local training sample</button>'+
+  '<span id="qStatus" style="font-size:12px;color:#94a3b8"></span></div></div>';
+ if(!ov.parentNode)document.body.appendChild(ov);
+ document.getElementById("qClose").onclick=()=>{ov.remove();QEDIT=null;};
+ QEDIT={i,points:d.points.map(p=>p.slice()),width:d.width,height:d.height};
+ const img=document.getElementById("qImg"),cv=document.getElementById("qCv");
+ function draw(){
+  if(!QEDIT)return;
+  cv.width=img.clientWidth;cv.height=img.clientHeight;
+  const x=cv.getContext("2d"),sx=cv.width/QEDIT.width,sy=cv.height/QEDIT.height;
+  const p=QEDIT.points;
+  x.beginPath();p.forEach((v,k)=>{if(k)x.lineTo(v[0]*sx,v[1]*sy);
+    else x.moveTo(v[0]*sx,v[1]*sy);});x.closePath();
+  x.fillStyle="rgba(34,197,94,.20)";x.fill();
+  x.lineWidth=2;x.strokeStyle="#4ade80";x.stroke();
+  for(let k=0;k<4;k++){
+   const a=p[k][0]*sx,b=p[k][1]*sy;
+   x.beginPath();x.arc(a,b,9,0,Math.PI*2);x.fillStyle="#0f172a";x.fill();
+   x.lineWidth=2;x.strokeStyle="#4ade80";x.stroke();
+   x.fillStyle="#fff";x.font="bold 12px sans-serif";x.textAlign="center";
+   x.fillText(String(k+1),a,b+4);
+  }
+ }
+ img.onload=draw;if(img.complete)draw();
+ let dragging=-1;
+ const point=e=>{const r=cv.getBoundingClientRect();
+  return [(e.clientX-r.left)/Math.max(1,r.width)*d.width,
+          (e.clientY-r.top)/Math.max(1,r.height)*d.height];};
+ cv.addEventListener("pointerdown",e=>{
+  const p=point(e);
+  let best=1e12,which=-1;
+  QEDIT.points.forEach((v,k)=>{
+   const dist=Math.hypot(v[0]-p[0],v[1]-p[1]);
+   if(dist<best){best=dist;which=k;}
+  });
+  if(best>28*d.width/Math.max(1,cv.width))return;
+  dragging=which;cv.setPointerCapture(e.pointerId);e.preventDefault();
+ });
+ cv.addEventListener("pointermove",e=>{
+  if(dragging<0||!QEDIT)return;
+  const p=point(e);
+  QEDIT.points[dragging]=[Math.max(0,Math.min(d.width-1,p[0])),
+                         Math.max(0,Math.min(d.height-1,p[1]))];
+  draw();
+ });
+ cv.addEventListener("pointerup",()=>{dragging=-1;});
+ cv.addEventListener("pointercancel",()=>{dragging=-1;});
+ document.getElementById("qSave").onclick=async()=>{
+  const btn=document.getElementById("qSave"),st=document.getElementById("qStatus");
+  btn.disabled=true;st.textContent="Saving…";
+  try{
+   const r=await fetch("api/jobs/"+CUR+"/plate_quad/"+i,{method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({points:QEDIT.points,
+     apply_track:document.getElementById("qTrack").checked})});
+   const data=await r.json();
+   if(!r.ok)throw new Error(data.error||"Could not save corners");
+   VLBL[i]="plate";
+   st.textContent="Saved "+data.applied+" box(es); 1 verified training sample. "+
+    "Save edits & render to apply.";
+   if(document.getElementById("beCv"))beScrub();
+  }catch(e){st.textContent="Error: "+e.message;}
+  finally{btn.disabled=false;}
+ };
 }
 function beRemove(){
  if(BE.sel<0)return;
@@ -2771,9 +3236,34 @@ function beRemove(){
  document.getElementById("beTimes").style.display="none";
 }
 async function beSave(){
- if(!await saveAndRender())return;
+ const ok=await saveAndRender(SHELLPH==="paused");
+ if(!ok)return;
  const c=document.querySelector("#beslot");
- if(c)c.innerHTML="rendering with your edits…";
+ if(c)c.innerHTML=SHELLPH==="paused"
+   ?"Review edits saved; resume when ready.":"rendering with your edits…";
+}
+async function stopReview(){
+ const btn=document.getElementById("stopReviewBtn");
+ if(btn)btn.disabled=true;
+ const response=await fetch("api/jobs/"+CUR+"/stop",{method:"POST"});
+ if(!response.ok){
+  if(btn)btn.disabled=false;
+  alert("Stop request failed");return;
+ }
+ if(btn)btn.textContent="Finishing scan & preparing Review…";
+}
+async function resumeJob(){
+ if(document.getElementById("review")){
+  const saved=await saveAndRender(true);
+  if(!saved)return;
+ }
+ const response=await fetch("api/jobs/"+CUR+"/resume",{method:"POST"});
+ if(!response.ok){
+  let data={};try{data=await response.json();}catch(_){}
+  alert(data.error||"Unable to resume scan");return;
+ }
+ const rv=document.getElementById("review");if(rv)rv.remove();
+ SHELLPH=null;await refresh();
 }
 async function cancelJob(){await fetch("api/jobs/"+CUR+"/cancel",{method:"POST"})}
 
@@ -2833,13 +3323,16 @@ function plateFallbackText(x){
  const labels=[...new Set(reasons.map(r=>plateFallbackLabels[r]||"uncertain lettering"))];
  return prefix+": "+labels.join(", ");
 }
+let VLBL={},VLBLJOB=null;  // explicit human labels; never infer from default blur state
 async function loadReview(){
  showPanel("review");
+ if(VLBLJOB!==CUR){VLBL={};VLBLJOB=CUR;}
  const d=await (await fetch(`api/jobs/${CUR}/detections`)).json();
  DUR=d.duration;
  const groups={}; const zdrop=[]; TRKMEM={};
  d.detections.forEach(x=>{
   EN[x.i]=x.enabled;
+  if(!(x.i in VLBL)&&x.verified_label)VLBL[x.i]=x.verified_label;
   if(x.zone_dropped){zdrop.push(x);return;}
   (groups[x.category]=groups[x.category]||[]).push(x);});
  let html=`<div class="card" id="review"><h2>Review findings</h2>
@@ -2906,15 +3399,20 @@ async function loadReview(){
   for(const x of items){
    html+=`<div class="det ${EN[x.i]?'':'off'}" id="det${x.i}" data-cat="${cat}">
     <img src="api/jobs/${CUR}/thumb/${x.i}"
+     title="${x.category==="plate"?"Adjust four plate corners":"Enlarge detection"}"
      style="cursor:zoom-in" onclick="zoomDet(${x.i})"
      onerror="thumbRetry(this)">
     <div>${plateFallbackText(x)?`<span class="badge" style="white-space:normal">${plateFallbackText(x)}</span> `:""}${x.shaped?'<span class="badge" title="Thumbnail rectangle is a selection guide; open to inspect the mask and any exclusions">shaped mask</span> ':""}${x.personcard?`<b>Person ${x.person+1}</b> — one decision for ALL their appearances`:`"${x.text}"`}${x.frames?` <span class="badge">×${x.frames} frames</span>`:""}${x.confidence?` <span class="badge" title="detector confidence — low values on a non-face thumbnail usually mean a false detection">${Math.round(x.confidence*100)}%</span>`:""} <br>${x.t_start.toFixed(1)}–${x.t_end.toFixed(1)}s</div>
     <div id="bb${x.i}">${detChoices(x.i)}</div>
+    ${x.category==="plate"?`<button class="sec" onclick="zoomDet(${x.i})">Edit 4 corners</button>
+     <button class="sec" onclick="labelPlate(${x.i},'plate')">✓ Confirm plate</button>
+     <button class="sec" onclick="labelPlate(${x.i},'not_plate')">✕ Not a plate</button>
+     <small id="vlabel${x.i}" style="color:#93c5fd">${VLBL[x.i]==="plate"?"Confirmed plate":VLBL[x.i]==="not_plate"?"Hard negative":""}</small>`:""}
    </div>`}
   html+=`</div>`}
  html+=`</div>
  <div class="row" style="margin-top:12px">
- <button onclick="saveAndRender()">Save edits &amp; render</button>
+ <button onclick="saveAndRender()">${SHELLPH==="paused"?"Save review edits":"Save edits &amp; render"}</button>
  <span style="font-size:12px;color:#94a3b8">missed something? use
   ▶ Preview video &amp; edit boxes above — its ＋ Add box replaces the old
   add-region tool</span></div></div>`;
@@ -2934,7 +3432,18 @@ function detChoices(i){
   </div>`;
 }
 let TRKMEM={};
-function applyDet(i,blur){
+function labelPlate(i,label){
+ if(label!=="plate"&&label!=="not_plate")return;
+ VLBL[i]=label;
+ applyDet(i,label==="plate",true);
+ const el=document.getElementById("vlabel"+i);
+ if(el)el.textContent=label==="plate"?"Confirmed plate":"Hard negative";
+}
+function applyDet(i,blur,preserveLabel=false){
+ if(!preserveLabel){
+  VLBL[i]="clear";
+  const el=document.getElementById("vlabel"+i);if(el)el.textContent="";
+ }
  for(const m of (TRKMEM[i]||[i]))EN[m]=blur;
  const b=document.getElementById("bb"+i),t=document.getElementById("det"+i);
  if(b){
@@ -3004,11 +3513,20 @@ function showSelMenu(x,y){
  menuEl=document.createElement("div");menuEl.className="selmenu";
  menuEl.innerHTML=`<span>${selSet.size} selected</span>
    <button class="mkeep" onclick="bulkSet(false)">Keep visible</button>
-  <button class="mblur" onclick="bulkSet(true)">Blur</button>`;
+  <button class="mblur" onclick="bulkSet(true)">Blur</button>
+  <button class="sec" onclick="bulkLabelPlate('plate')">Confirm plates</button>
+  <button class="sec" onclick="bulkLabelPlate('not_plate')">Not plates</button>`;
  Object.assign(menuEl.style,{left:x+"px",top:(y+10)+"px"});
  document.body.appendChild(menuEl);
 }
 function bulkSet(blur){selSet.forEach(i=>applyDet(i,blur));clearSel();}
+function bulkLabelPlate(label){
+ selSet.forEach(i=>{
+  const el=document.getElementById("det"+i);
+  if(el&&el.dataset.cat==="plate")labelPlate(i,label);
+ });
+ clearSel();
+}
 document.addEventListener("pointerdown",e=>{
  if(menuEl&&!e.target.closest(".selmenu")
     &&!e.target.closest("#detwrap"))clearSel();});
@@ -3020,7 +3538,7 @@ document.addEventListener("keydown",e=>{
  if(e.key==="Escape"){clearSel();
   const lb=document.getElementById("lb");if(lb)lb.remove();}});
 
-async function saveAndRender(){
+async function saveAndRender(saveOnly=false){
  // Do not render until the server has confirmed the latest pending preview.
  if(document.getElementById("beCv")){
   if(BE.drag||BE.pending){
@@ -3033,13 +3551,15 @@ async function saveAndRender(){
  const manual=[...MAN,...BE.adds.map(a=>({t_start:a.t0,t_end:a.t1,
   t_ref:a.tref,screen_box:a.box}))];
  const payload={enabled:EN,manual,box_overrides:BE.ov,
-   time_overrides:BE.times};
+   time_overrides:BE.times,verified_labels:VLBL};
  // only send audio spans when the box editor actually loaded them —
  // otherwise a save from plain review would wipe stored spans with []
  if(Array.isArray(BE.audio)&&BE.tlspans!==undefined)payload.audio=BE.audio;
- const r=await (await fetch(`api/jobs/${CUR}/detections`,{method:"POST",
+ const response=await fetch(`api/jobs/${CUR}/detections`,{method:"POST",
   headers:{"Content-Type":"application/json"},
-  body:JSON.stringify(payload)})).json();
+  body:JSON.stringify(payload)});
+ if(!response.ok){alert("Review edits were not saved");return false;}
+ const r=await response.json();
  BE.adds=[];BE.ov={};BE.times={};
  if(r.suggest_allowlist&&r.suggest_allowlist.length){
   if(confirm("You disabled every instance of: "+r.suggest_allowlist.join(", ")+". Add these to the permanent allow-list so future scans skip them?"))
@@ -3048,7 +3568,13 @@ async function saveAndRender(){
     body:JSON.stringify({words:r.suggest_allowlist})});
     loadPersist();}}
  MAN=[];
- await fetch(`api/jobs/${CUR}/render`,{method:"POST"});
+ if(saveOnly||SHELLPH==="paused"){
+  const note=document.getElementById("savedCheckpointNote");
+  if(note)note.textContent="Review edits saved locally.";
+  return true;
+ }
+ const render=await fetch(`api/jobs/${CUR}/render`,{method:"POST"});
+ if(!render.ok){alert("Could not start render");return false;}
  const rv=document.getElementById("review"); if(rv)rv.remove();
  return true;
 }
@@ -3883,7 +4409,8 @@ def rehydrate_jobs():
                          "settings (the uploaded file was kept), or "
                          "Delete frees its disk space",
                 "output": None, "created": os.path.getmtime(jdir),
-                "cancel": threading.Event(), "stats": {},
+                "cancel": threading.Event(), "stop": threading.Event(),
+                "stats": {},
             }
             with JOBS_LOCK:
                 JOBS[jid] = job
@@ -3891,7 +4418,9 @@ def rehydrate_jobs():
             continue
         try:
             with open(rep, encoding="utf-8") as f:
-                prov = json.load(f).get("provenance", {})
+                report_doc = json.load(f)
+            prov = report_doc.get("provenance", {})
+            checkpoint = report_doc.get("stop_review") or {}
             video = prov.get("input")
             if not video or not os.path.exists(video):
                 continue
@@ -3902,13 +4431,21 @@ def rehydrate_jobs():
                 "name": os.path.basename(prov.get("original_input")
                                           or video),
                 "options": prov.get("settings", {}) or {},
-                "phase": "done" if has_out else "review",
+                "phase": ("paused" if checkpoint.get("state") == "paused"
+                          else "done" if has_out else "review"),
                 "progress": 1.0 if has_out else 0.5,
                 "log": ["(recovered after server restart)"],
                 "error": None, "output": out if has_out else None,
                 "created": os.path.getmtime(jdir),
-                "cancel": threading.Event(), "stats": {},
+                "cancel": threading.Event(), "stop": threading.Event(),
+                "checkpoint_frame": checkpoint.get("next_frame"),
+                "checkpoint_total": checkpoint.get("total_frames"),
+                "stats": {},
             }
+            if checkpoint.get("state") == "paused":
+                job["options"] = checkpoint.get("options") or {}
+                job["log"].append("Stop & Review checkpoint recovered; "
+                                  "resume starts from saved frame")
             try:
                 # original upload size, for the editor's duplicate-upload
                 # warning (prov input may be the normalized scan copy)

@@ -157,6 +157,75 @@ faces are stationary or scroll with the page rather than moving rapidly
 across the frame. In all cases this is a **best-effort assistive tool:
 review the output before publishing.**
 
+## Stop & Review: process long videos in chunks (experimental)
+
+During a long video scan, choose **Stop & Review** instead of Cancel.
+OpenScrub finalizes the current whole-frame boundary, processes the
+detections collected so far, saves a reviewable partial report and opens
+Review. You can confirm or reject plate detections, edit four-corner plate
+masks and **save** the review decisions without rendering an incomplete
+video. The **Save edits & resume** action verifies the video and seeks to
+the checkpoint with a short overlap; it does not run the initial minutes
+through the detector again. Jobs remain paused across server restarts.
+
+A paused video **cannot be rendered or downloaded as if fully redacted**.
+The whole recording must be scanned and the final output reviewed before
+publishing. See [Stop & Review](docs/STOP_REVIEW.md) for the complete
+workflow, limitations and tests.
+
+## Four-corner plate review (experimental)
+
+For plates seen at an angle, an axis-aligned rectangle can hide much more
+of the car than necessary. OpenScrub can instead render a four-point,
+perspective-skewed plate mask. This first step also collects **local,
+human-verified** examples for future model training.
+
+1. Scan a clip with the plate category enabled. In **Review**, click
+   **Edit 4 corners** on a detected plate and drag the numbered points to
+   the plate's physical corners. Save the shape, then render the video.
+   Optionally apply the same *relative shape* to other positions of that
+   detection track; review the result, especially if the perspective changes.
+2. If the detector **missed a plate entirely**, open **Preview video & edit
+   boxes**, select the relevant time window on the timeline, click
+   **Draw plate (4 corners)** and click its corners in order: upper left,
+   upper right, lower right, lower left. OpenScrub follows the seed region
+   with the existing local tracker and creates a plate review card.
+3. An edited/drawn plate saves **one manually confirmed sample** as a JPEG
+   crop plus a four-corner polygon in
+   `openscrub_jobs/<job-id>/plate_annotations/annotations.jsonl`. Other
+   automatically tracked frames are **not** verified training labels.
+4. Review cards provide explicit **Confirm plate** and **Not a plate**
+   judgements. Both are saved in the job's report. The normal
+   **Keep visible** decision is *not* assumed to mean a false positive
+   because real plates may intentionally be kept.
+
+To export a deduplicated dataset from the **existing reviewed detections**,
+without sampling the video at fixed time intervals:
+
+```sh
+python scripts/prepare_plate_dataset.py --jobs-dir openscrub_jobs --out ./plate-detection-data --task detect
+python scripts/prepare_plate_dataset.py --jobs-dir openscrub_jobs --out ./plate-segmentation-data --task segment
+```
+
+The exporter uses human-corrected quadrilaterals as strong polygon
+labels, explicit Confirm plate findings without a polygon as **weak bounding
+box labels** (detection export only), and explicit Not a plate findings
+as hard-negative images with empty YOLO labels. Duplicate-looking samples
+are filtered using image hashes, and a track is assigned wholly to one
+train/validation partition. False positives are capped relative to positive
+examples (default: 2:1), avoiding a dataset overwhelmed by negatives.
+Training on a single video can easily overfit to its cars, cameras and
+lighting. Validate on a different recording before deploying a model.
+
+The saved polygons are suitable for a future local **segmentation**
+fine-tuning workflow. This experimental feature does **not** yet fine-tune
+or reload an ONNX model automatically. It already improves the rendered
+mask geometry, but it cannot guarantee full coverage of missed plates.
+Scrutinize the final exported video before publication. If you delete the
+job, its training samples are deleted with it; keep backups if you intend
+to train across multiple jobs. Full-resolution crops contain original,
+unredacted pixels and need the same care as the source recordings.
+
 ## Choosing a redaction mode
 
 Not all redactions are equally irreversible. Modern ML can partially
