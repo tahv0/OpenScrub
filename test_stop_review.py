@@ -207,3 +207,68 @@ def test_web_stop_and_resume_routes_preserve_job_state(tmp_path, monkeypatch):
     assert client.post("/api/jobs/" + jid + "/stop").status_code == 200
     assert job["stop"].is_set()
     assert json.loads((job_dir / "report.json").read_text()) == old
+
+
+
+def test_web_server_rehydrates_paused_checkpoint(tmp_path, monkeypatch):
+    import openscrub_web as web
+    root = tmp_path / "jobs"
+    jdir = root / "recoveredjob"
+    jdir.mkdir(parents=True)
+    src = jdir / "input.mp4"
+    src.write_bytes(b"sample-video")
+    original = doc_from(45, hash_value=openscrub.sha256_file(str(src)))
+    original["provenance"]["input"] = str(src)
+    paused = stop_review.with_checkpoint(
+        original, 45, 150,
+        {"categories": "plate", "scan_speed": "thorough"})
+    stop_review.atomic_report(str(jdir / "report.json"), paused)
+    monkeypatch.setattr(web, "JOBS_DIR", str(root))
+    with web.JOBS_LOCK:
+        web.JOBS.pop("recoveredjob", None)
+    web.rehydrate_jobs()
+    try:
+        job = web.JOBS["recoveredjob"]
+        assert job["phase"] == "paused"
+        assert job["options"]["scan_speed"] == "thorough"
+        assert job["checkpoint_frame"] == 45
+        assert job["checkpoint_total"] == 150
+        assert isinstance(job["stop"], threading.Event().__class__)
+        assert job["output"] is None
+    finally:
+        web.JOBS.pop("recoveredjob", None)
+
+
+def test_paused_edits_cannot_mark_the_unscanned_tail(tmp_path, monkeypatch):
+    import openscrub_web as web
+    jid = "boundedreview"
+    jdir = tmp_path / jid
+    jdir.mkdir()
+    src = jdir / "input.mp4"
+    src.write_bytes(b"source")
+    doc = doc_from(60, [sample_plate()],
+                   hash_value=openscrub.sha256_file(str(src)))
+    doc["provenance"]["input"] = str(src)
+    paused = stop_review.with_checkpoint(doc, 60, 120, {})
+    stop_review.atomic_report(str(jdir / "report.json"), paused)
+    job = {"id": jid, "dir": str(jdir), "video": str(src),
+           "phase": "paused", "stop": threading.Event(),
+           "cancel": threading.Event(), "trackbg": {},
+           "stats": {}, "options": {}}
+    monkeypatch.setitem(web.JOBS, jid, job)
+    monkeypatch.setattr(web, "TOKEN", None)
+    client = web.app.test_client()
+    bad = client.post("/api/jobs/" + jid + "/detections",
+                      json={"manual": [{
+                          "t_start": 4.0, "t_end": 5.0, "t_ref": 4.0,
+                          "screen_box": [1, 1, 4, 4]}]})
+    assert bad.status_code == 400
+    assert json.loads((jdir / "report.json").read_text()) == paused
+    allowed = client.post("/api/jobs/" + jid + "/detections",
+                          json={"manual": [{
+                              "t_start": 1.0, "t_end": 7.0, "t_ref": 1.0,
+                              "screen_box": [1, 1, 4, 4]}]})
+    assert allowed.status_code == 200
+    saved = json.loads((jdir / "report.json").read_text())
+    assert saved["detections"][-1]["t_end"] == 2.0
+    assert saved["stop_review"]["next_frame"] == 60
