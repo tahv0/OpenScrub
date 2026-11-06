@@ -34,6 +34,12 @@ jobs:
           docker compose version
           docker compose -f compose.windows-test.yml config --quiet
           docker compose -f compose.windows-test.yml -f compose.windows-cuda.yml config --quiet
+      - name: Fail early on Python syntax, module packaging and Docker COPY
+        run: |
+          python -m py_compile openscrub.py openscrub_web.py stop_review.py
+          python -c "import openscrub_web, stop_review; assert callable(openscrub_web.job_detections)"
+          python -c "from pathlib import Path; assert all('COPY openscrub.py openscrub_web.py stop_review.py' in Path(name).read_text() for name in ('Dockerfile','Dockerfile.cuda')), 'stop_review.py missing from Docker COPY'"
+          python -m pytest -q test_stop_review.py
       - name: Build the combined source image
         run: docker compose -f compose.windows-test.yml build
       - name: Start the actual Compose service

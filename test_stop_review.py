@@ -348,3 +348,35 @@ def test_web_worker_end_to_end_pause_edit_resume(tmp_path, monkeypatch):
     finally:
         with web.JOBS_LOCK:
             web.JOBS.pop(jid, None)
+
+
+
+def test_review_detection_response_has_all_merged_fields(monkeypatch):
+    """Regression: conflict resolution must leave exactly one valid item dict."""
+    import openscrub_web as web
+    jid = "response-dict-check"
+    job = {"id": jid, "phase": "review"}
+    doc = {
+        "render_state": {"fps": 30, "cum": [[0, 0], [0, 0]]},
+        "detections": [{
+            "category": "plate", "text": "plate", "t_start": 0.0,
+            "t_end": 0.04, "enabled": True, "track": 3, "person": -1,
+            "confidence": 0.93, "verified_label": "plate",
+            "fallback_reason": "uncertain lettering", "zone_dropped": False,
+            "poly": [[[0, 0], [1, 0], [1, 1], [0, 1]]],
+            "frame_index": 1
+        }]
+    }
+    monkeypatch.setitem(web.JOBS, jid, job)
+    monkeypatch.setattr(web, "TOKEN", None)
+    monkeypatch.setattr(web, "_load_job_report", lambda job: doc)
+    response = web.app.test_client().get("/api/jobs/" + jid + "/detections")
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert len(payload["detections"]) == 1
+    item = payload["detections"][0]
+    assert item["verified_label"] == "plate"
+    assert item["fallback_reason"] == "uncertain lettering"
+    assert item["shaped"] is True
+    assert item["zone_dropped"] is False
+    assert payload["indexed_frames"] is True
