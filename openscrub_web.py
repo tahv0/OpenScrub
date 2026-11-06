@@ -546,13 +546,67 @@ def worker():
             continue
         cb = WebCallbacks(job)
         try:
-            if action == "scan":
+            if action in ("scan", "resume"):
+                resuming = action == "resume"
                 job["phase"] = "scanning"
                 args = build_args(job)
+                previous = None
+                old_frame = 0
+                if resuming:
+                    previous = _load_job_report(job)
+                    meta = stop_review.validate_resume(previous)
+                    old_frame = int(meta["next_frame"])
+                    if previous["provenance"]["input_sha256"] != openscrub.sha256_file(
+                            job["video"]):
+                        raise stop_review.CheckpointError(
+                            "Video changed after checkpoint; resume refused")
+                    # Re-scan only a one-second overlap for onset continuity.
+                    # Already reviewed findings win on the older side.
+                    args.resume_start = max(0.0, old_frame / float(meta["fps"]) - 1.0)
+                    job["log"].append("      resuming near %.2fs (1s overlap)"
+                                      % (old_frame / float(meta["fps"])))
                 state = openscrub.run_scan(args, cb)
-                openscrub.write_report(os.path.join(job["dir"], "report.json"),
-                                      args, state)
+                report_path = os.path.join(job["dir"], "report.json")
+                staging_path = os.path.join(job["dir"], ".scan-chunk.json")
+                try:
+                    openscrub.write_report(staging_path, args, state)
+                    with open(staging_path, encoding="utf-8") as f:
+                        chunk = json.load(f)
+                    end_frame = state.get("stop_at_frame")
+                    total_frames = int(state["total_frames"])
+                    if resuming:
+                        if end_frame is not None and end_frame <= old_frame:
+                            combined = previous  # stop request before new work
+                        else:
+                            combined = stop_review.join_reports(
+                                previous, chunk,
+                                int(end_frame) if end_frame is not None
+                                else len(state["cum"]),
+                                total_frames, completed=end_frame is None)
+                    elif end_frame is not None:
+                        combined = stop_review.with_checkpoint(
+                            chunk, end_frame, total_frames, job["options"])
+                    else:
+                        combined = chunk
+                    # Never replace the last good checkpoint until the
+                    # continuation scan AND postprocessing have both passed.
+                    stop_review.atomic_report(report_path, combined)
+                finally:
+                    if os.path.exists(staging_path):
+                        os.remove(staging_path)
+                job["stop"].clear()
+                meta = combined.get("stop_review")
+                job["checkpoint_frame"] = (meta or {}).get("next_frame")
+                job["checkpoint_total"] = (meta or {}).get("total_frames")
                 job["stats"] = state["stats"]
+                if meta:
+                    job["log"].append(
+                        "      saved checkpoint %d/%d frames; prior decisions "
+                        "and four-corner polygons retained" %
+                        (meta["next_frame"], meta["total_frames"]))
+                else:
+                    job["log"].append(
+                        "      full scan complete; prior review edits retained")
                 def _pregen(jid=jid):
                     """One pass through the video with a single decoder:
                     thumbnails come out in seconds instead of minutes.
