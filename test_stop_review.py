@@ -272,3 +272,79 @@ def test_paused_edits_cannot_mark_the_unscanned_tail(tmp_path, monkeypatch):
     saved = json.loads((jdir / "report.json").read_text())
     assert saved["detections"][-1]["t_end"] == 2.0
     assert saved["stop_review"]["next_frame"] == 60
+
+
+
+def test_web_worker_end_to_end_pause_edit_resume(tmp_path, monkeypatch):
+    """A real worker processes both queue actions without losing a plate edit."""
+    import time
+    import openscrub_web as web
+    src = tmp_path / "recording.mp4"
+    make_video(src)
+    job = web.new_job(str(src), {"categories": "plate"}, "recording.mp4")
+    job["stop"].set()
+    jid = job["id"]
+    calls = []
+
+    def fake_scan(args, cb):
+        continued = bool(getattr(args, "resume_start", 0.0))
+        calls.append(("resume" if continued else "first",
+                      float(getattr(args, "resume_start", 0.0))))
+        frames = 180 if continued else 90
+        # No detector download: isolate the actual worker/report lifecycle.
+        detections = ([openscrub.Detection(
+            3.1, 4.4, (24, 23, 60, 38), "plate", "plate", 0.95,
+            (0, 0), dense=True, track=0)]
+            if continued else [])
+        return {
+            "fps": 30.0, "cum": [(0., 0.)] * frames,
+            "bands": [(0., 0.)] * frames,
+            "detections": detections, "zdropped": [],
+            "stop_at_frame": None if continued else 90,
+            "total_frames": 180,
+            "input_sha256": openscrub.sha256_file(args.video),
+            "stats": {"scans": frames, "raw_hits": len(detections),
+                      "regions": len(detections), "recalls": 0,
+                      "remembered": 0, "zone_dropped": {}}}
+
+    monkeypatch.setattr(web.openscrub, "run_scan", fake_scan)
+    monkeypatch.setattr(web, "TOKEN", None)
+    background = threading.Thread(target=web.worker, daemon=True)
+    background.start()
+    client = web.app.test_client()
+    def until(phase, timeout=8):
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            if job["phase"] == phase:
+                return
+            if job["phase"] == "error":
+                pytest.fail(job["error"])
+            time.sleep(.02)
+        pytest.fail("worker did not reach %s: %s" % (phase, job["phase"]))
+
+    try:
+        web.WORK_Q.put((jid, "scan"))
+        until("paused")
+        report_path = os.path.join(job["dir"], "report.json")
+        saved = json.loads(open(report_path, encoding="utf-8").read())
+        assert saved["stop_review"]["next_frame"] == 90
+        assert saved["stop_review"]["options"]["categories"] == "plate"
+        # Simulate a user-confirmed quadrilateral and disabled false positive
+        # saved during the paused review. This is *not* a generated AI label.
+        edited = sample_plate()
+        saved["detections"].append(edited)
+        stop_review.atomic_report(report_path, saved)
+        response = client.post("/api/jobs/" + jid + "/resume")
+        assert response.status_code == 200
+        until("review")
+        final = json.loads(open(report_path, encoding="utf-8").read())
+        assert "stop_review" not in final
+        assert final["detections"][0] == edited
+        assert len(final["detections"]) == 2
+        assert final["detections"][1]["track"] != edited["track"]
+        assert calls[0][0] == "first" and calls[1][0] == "resume"
+        assert calls[1][1] >= 1.9
+        assert job["output"] is None
+    finally:
+        with web.JOBS_LOCK:
+            web.JOBS.pop(jid, None)
