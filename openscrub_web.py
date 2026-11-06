@@ -40,6 +40,7 @@ from flask import (Flask, Response, abort, jsonify, redirect, request,
                    send_file)
 
 import openscrub
+import stop_review
 import zones_ui
 
 
@@ -328,7 +329,8 @@ def new_job(video_path, options, name):
         "options": options, "phase": "queued", "progress": 0.0,
         "eta": None, "size": 0,
         "log": [], "error": None, "output": None, "created": time.time(),
-        "cancel": threading.Event(), "stats": {},
+        "cancel": threading.Event(), "stop": threading.Event(),
+        "stats": {},
     }
     with JOBS_LOCK:
         JOBS[jid] = job
@@ -346,6 +348,9 @@ def job_public(job):
         "log_tail": job["log"][-30:],
         "log_len": len(job["log"]),
         "has_output": bool(job["output"] and os.path.exists(job["output"])),
+        "stop_pending": bool(job.get("stop") and job["stop"].is_set()),
+        "checkpoint_frame": job.get("checkpoint_frame"),
+        "checkpoint_total": job.get("checkpoint_total"),
     }
 
 
@@ -412,6 +417,9 @@ class WebCallbacks(openscrub.Callbacks):
 
     def cancelled(self):
         return self.job["cancel"].is_set()
+
+    def stop_requested(self):
+        return self.job["stop"].is_set()
 
 
 def build_args(job, for_render=False):
