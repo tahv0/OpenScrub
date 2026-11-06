@@ -1324,6 +1324,16 @@ def job_save_edits(jid):
     edits = request.get_json(force=True)
     path = os.path.join(job["dir"], "report.json")
     doc = _load_job_report(job)
+    stop_meta = doc.get("stop_review") or {}
+    cutoff = (stop_meta["next_frame"] / stop_meta["fps"]
+              if stop_meta.get("state") == "paused" else None)
+    if cutoff is not None:
+        # Paused jobs only contain verified footage up to this boundary.
+        # Do not let a manual UI box implicitly mark the unscanned tail.
+        for m in edits.get("manual", []):
+            if float(m.get("t_start", 0)) >= cutoff:
+                return jsonify({"error": "Manual boxes must be inside the "
+                                        "scanned portion while paused"}), 400
     enabled = edits.get("enabled", {})
     # Only an explicit reviewer judgement is training evidence.
     # Keep-visible is NOT a negative label: a user may intentionally keep
@@ -1353,6 +1363,10 @@ def job_save_edits(jid):
         if 0 <= i < len(doc["detections"]) and len(span) == 2:
             t0, t1 = float(span[0]), float(span[1])
             if t1 > t0 >= 0:
+                if cutoff is not None:
+                    t1 = min(t1, cutoff)
+                    if t1 <= t0:
+                        continue
                 doc["detections"][i]["t_start"] = t0
                 doc["detections"][i]["t_end"] = t1
                 doc["detections"][i]["last_seen"] = min(
@@ -1361,6 +1375,8 @@ def job_save_edits(jid):
     for m in edits.get("manual", []):
         t0 = float(m["t_start"]); t1 = float(m["t_end"])
         tref = float(m.get("t_ref", t0))
+        if cutoff is not None:
+            t1 = min(t1, cutoff)
         fidx = min(int(tref * rs["fps"]), len(rs["cum"]) - 1)
         ox, oy = rs["cum"][fidx]
         b = m["screen_box"]
@@ -1410,6 +1426,13 @@ def job_track_object(jid):
         abort(400)
     if len(box) != 4 or not (t1 > t0 >= 0) or not (t0 <= t_ref <= t1):
         abort(400)
+    if job["phase"] == "paused":
+        saved = stop_review.validate_resume(_load_job_report(job))
+        until = saved["next_frame"] / saved["fps"]
+        if t_ref >= until or t0 >= until:
+            return jsonify({"error": "Track seed is outside the scanned "
+                                     "portion"}), 400
+        t1 = min(t1, until)
     # Optional manually drawn 4-corner license plate (TL, TR, BR, BL).
     # These points are relative to the submitted seed box, not the frame.
     quad_req = None
