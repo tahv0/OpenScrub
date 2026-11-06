@@ -6415,7 +6415,6 @@ def load_report(path):
             verified_label=(r.get("verified_label")
                             if r.get("verified_label") in ("plate", "not_plate")
                             else ""),
-            poly=tuple(r.get("poly") or ())))
             poly=_tuples(r.get("poly") or ()),
             poly_holes=_tuples(r.get("poly_holes") or ()),
             mask_pad=r.get("mask_pad", -1),
