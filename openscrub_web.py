@@ -1112,7 +1112,6 @@ def job_detections(jid):
                       "person": d.get("person", -1),
                       "confidence": d.get("confidence", 0),
                       "verified_label": d.get("verified_label", ""),
-                      "zone_dropped": bool(d.get("zone_dropped"))})
                       "fallback_reason": d.get("fallback_reason", ""),
                       "zone_dropped": bool(d.get("zone_dropped")),
                       "shaped": bool(d.get("poly"))})
