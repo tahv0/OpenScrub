@@ -2888,6 +2888,29 @@ async function beSave(){
  if(c)c.innerHTML=SHELLPH==="paused"
    ?"Review edits saved; resume when ready.":"rendering with your edits…";
 }
+async function stopReview(){
+ const btn=document.getElementById("stopReviewBtn");
+ if(btn)btn.disabled=true;
+ const response=await fetch("api/jobs/"+CUR+"/stop",{method:"POST"});
+ if(!response.ok){
+  if(btn)btn.disabled=false;
+  alert("Stop request failed");return;
+ }
+ if(btn)btn.textContent="Finishing scan & preparing Review…";
+}
+async function resumeJob(){
+ if(document.getElementById("review")){
+  const saved=await saveAndRender(true);
+  if(!saved)return;
+ }
+ const response=await fetch("api/jobs/"+CUR+"/resume",{method:"POST"});
+ if(!response.ok){
+  let data={};try{data=await response.json();}catch(_){}
+  alert(data.error||"Unable to resume scan");return;
+ }
+ const rv=document.getElementById("review");if(rv)rv.remove();
+ SHELLPH=null;await refresh();
+}
 async function cancelJob(){await fetch("api/jobs/"+CUR+"/cancel",{method:"POST"})}
 
 // the three post-render views (compare, review, box editor) are mutually
