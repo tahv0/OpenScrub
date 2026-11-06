@@ -3380,34 +3380,6 @@ def test_third_party_notices_cover_every_baked_model():
     assert '"THIRD_PARTY_NOTICES.md"' in spec_src
 
 
-def test_registry_doc_fields_refresh_but_pins_stay(monkeypatch, tmp_path):
-    """Read-only installs keep a per-user registry copy. A release that
-    corrects an entry's documentation (a wrong training-data attribution
-    once shipped) must reach existing copies — but a user's sha256 pin,
-    download_url, input_size and recommended flag are never touched."""
-    monkeypatch.setattr(openscrub, "install_is_readonly", lambda: True)
-    monkeypatch.setattr(openscrub, "user_data_dir", lambda: str(tmp_path))
-    shipped = json.load(open(os.path.join(
-        os.path.dirname(os.path.abspath(openscrub.__file__)),
-        "plate_models.json"), encoding="utf-8"))
-    mine = json.loads(json.dumps(shipped))
-    m0 = mine["models"][0]
-    m0["attribution"] = "stale text"
-    m0["notes"] = "stale notes"
-    m0["sha256"] = "ab" * 32                 # the user's own TOFU pin
-    m0["download_url"] = "https://example.com/pinned.onnx"
-    m0["recommended"] = not m0.get("recommended", False)
-    (tmp_path / "plate_models.json").write_text(json.dumps(mine),
-                                                encoding="utf-8")
-    p = openscrub.model_registry_path("plate")
-    got = json.load(open(p, encoding="utf-8"))["models"][0]
-    s0 = shipped["models"][0]
-    assert got["attribution"] == s0["attribution"]
-    assert got["notes"] == s0["notes"]
-    assert got["sha256"] == "ab" * 32
-    assert got["download_url"] == "https://example.com/pinned.onnx"
-    assert got["recommended"] == m0["recommended"]
-
 
 def test_compound_mask_holes_islands_padding_and_invalid():
     outer = ((0, 0), (1, 0), (1, 1), (0, 1))
@@ -4306,6 +4278,35 @@ vm.runInContext(`(async()=>{
     result = subprocess.run([node, "-e", harness], input=review_js,
                             text=True, capture_output=True)
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_registry_doc_fields_refresh_but_pins_stay(monkeypatch, tmp_path):
+    """Read-only installs keep a per-user registry copy. A release that
+    corrects an entry's documentation (a wrong training-data attribution
+    once shipped) must reach existing copies — but a user's sha256 pin,
+    download_url, input_size and recommended flag are never touched."""
+    monkeypatch.setattr(openscrub, "install_is_readonly", lambda: True)
+    monkeypatch.setattr(openscrub, "user_data_dir", lambda: str(tmp_path))
+    shipped = json.load(open(os.path.join(
+        os.path.dirname(os.path.abspath(openscrub.__file__)),
+        "plate_models.json"), encoding="utf-8"))
+    mine = json.loads(json.dumps(shipped))
+    m0 = mine["models"][0]
+    m0["attribution"] = "stale text"
+    m0["notes"] = "stale notes"
+    m0["sha256"] = "ab" * 32                 # the user's own TOFU pin
+    m0["download_url"] = "https://example.com/pinned.onnx"
+    m0["recommended"] = not m0.get("recommended", False)
+    (tmp_path / "plate_models.json").write_text(json.dumps(mine),
+                                                encoding="utf-8")
+    p = openscrub.model_registry_path("plate")
+    got = json.load(open(p, encoding="utf-8"))["models"][0]
+    s0 = shipped["models"][0]
+    assert got["attribution"] == s0["attribution"]
+    assert got["notes"] == s0["notes"]
+    assert got["sha256"] == "ab" * 32
+    assert got["download_url"] == "https://example.com/pinned.onnx"
+    assert got["recommended"] == m0["recommended"]
 
 
 def test_server_path_intake_guard_precedes_size_lookup(monkeypatch, tmp_path):
