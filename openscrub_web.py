@@ -1278,6 +1278,20 @@ def job_track_object(jid):
         abort(400)
     if len(box) != 4 or not (t1 > t0 >= 0) or not (t0 <= t_ref <= t1):
         abort(400)
+    # Optional manually drawn 4-corner license plate (TL, TR, BR, BL).
+    # These points are relative to the submitted seed box, not the frame.
+    quad_req = None
+    if "plate_quad" in p:
+        try:
+            q = np.asarray(p["plate_quad"], dtype=np.float64)
+        except (TypeError, ValueError):
+            abort(400)
+        if (q.shape != (4, 2) or not np.isfinite(q).all() or
+                np.any(q < -0.5) or np.any(q > 1.5) or
+                not cv2.isContourConvex(q.astype(np.float32).reshape((-1, 1, 2))) or
+                cv2.contourArea(q.astype(np.float32)) < 0.002):
+            abort(400)
+        quad_req = [[round(float(v), 6) for v in pt] for pt in q]
     st = {"state": "running", "added": 0, "error": None}
     job["trackbg"] = st
 
@@ -1299,7 +1313,8 @@ def job_track_object(jid):
             except Exception:
                 det = None
             samples = openscrub.track_manual_region(
-                job["video"], box, t_ref, t0, t1, cb=L(), person_det=det)
+                job["video"], box, t_ref, t0, t1, cb=L(),
+                person_det=(det if quad_req is None else None))
             if not samples:
                 st.update(state="done", added=0,
                           error="could not track that region — try a "
@@ -1317,6 +1332,8 @@ def job_track_object(jid):
                      if tcls is not None
                      and 0 <= tcls < len(openscrub.COCO_NAMES)
                      else "tracked object")
+            if quad_req is not None:
+                label = "manually drawn plate"
             for s in samples:
                 t, b, score = s[0], s[1], s[2]
                 poly = s[3] if len(s) > 3 and s[3] else ()
@@ -1326,16 +1343,27 @@ def job_track_object(jid):
                     "t_start": t, "t_end": t + step * 1.2,
                     "cbox": [int(b[0] - ox), int(b[1] - oy),
                              int(b[2] - ox), int(b[3] - oy)],
-                    "category": "manual", "text": label,
+                    "category": ("plate" if quad_req is not None else "manual"),
+                    "text": label,
                     "confidence": round(float(score), 3),
                     "aoff": [ox, oy], "last_seen": t,
                     "dense": True, "track": tid, "enabled": True,
-                    "poly": [[[float(x), float(y)] for x, y in c]
-                             for c in poly]})
+                    "plate_quad": (quad_req or []),
+                    "poly": ([[[float(x), float(y)] for x, y in c]
+                              for c in poly] if quad_req is None else [])})
             # grace pads: cover the sub-sample sliver at both ends
             new[0]["t_start"] = max(0.0, new[0]["t_start"] - 0.25)
             new[-1]["t_end"] += 0.25
+            seed_index = len(doc["detections"])
             doc["detections"].extend(new)
+            if quad_req is not None:
+                frame = _frame_at(job, t_ref, rs)
+                if frame is not None:
+                    points = [[box[0] + qx*(box[2]-box[0]),
+                               box[1] + qy*(box[3]-box[1])]
+                              for qx, qy in quad_req]
+                    _save_verified_plate_sample(job, frame, points,
+                                                seed_index, t_ref)
             path = os.path.join(job["dir"], "report.json")
             with open(path, "w", encoding="utf-8") as f:
                 json.dump(doc, f, indent=1)
