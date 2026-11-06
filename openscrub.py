@@ -719,6 +719,7 @@ class Detection:
     person: int = -1           # face tracks clustered by facial IDENTITY
                                # (SFace embeddings): one review decision per
                                # PERSON, applied to all their appearances
+    plate_quad: tuple = ()    # four normalized plate corners, ordered clockwise
     poly: tuple = ()           # silhouette contour(s) from a segmentation
                                # model, points NORMALIZED to cbox (0..1) —
                                # render blurs ONLY inside them (person
@@ -3712,7 +3713,15 @@ def render_hdr(src, dst, detections, cum, bands, fps, pad, mode,
         for d in _dedupe_dense(act):
             drift = min(24.0, 0.05 * (abs(ox - d.aoff[0]) + abs(oy - d.aoff[1])))
             px = pad + drift
-            if d.poly:
+            if d.category == "plate" and len(d.plate_quad) == 4:
+                # Use four human-adjusted corners, not the oversized bbox.
+                _blur_silhouette_yuv10(
+                    y, u, v, d.cbox[0] + ox - 2, d.cbox[1] + oy - 2,
+                    d.cbox[2] + ox + 2, d.cbox[3] + oy + 2,
+                    _mode_for(d.category), (d.plate_quad,),
+                    (d.cbox[0] + ox, d.cbox[1] + oy,
+                     d.cbox[2] + ox, d.cbox[3] + oy), pad_px=1)
+            elif d.poly:
                 _blur_silhouette_yuv10(
                     y, u, v, d.cbox[0] + ox - px, d.cbox[1] + oy - px,
                     d.cbox[2] + ox + px, d.cbox[3] + oy + px,
@@ -3927,6 +3936,12 @@ def render(src, dst, detections, cum, bands, fps, pad, mode, preview,
                     label = f"face {d.confidence:.2f}"
                 cv2.putText(frame, label, (int(max(0, x1)), int(max(12, y1 - 4))),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
+            elif d.category == "plate" and len(d.plate_quad) == 4:
+                # Tight skewed mask: ignore the global box padding.
+                blur_silhouette(frame, pbox[0]-2, pbox[1]-2,
+                                pbox[2]+2, pbox[3]+2,
+                                _mode_for(d.category), (d.plate_quad,),
+                                pbox, pad_px=1)
             elif d.poly:
                 # segmentation silhouette: mask only the body, not the box —
                 # px (pad+drift) becomes an outward mask dilation
@@ -5988,6 +6003,7 @@ def load_report(path):
             dense=bool(r.get("dense", False)),
             track=int(r.get("track", -1)),
             person=int(r.get("person", -1)),
+            plate_quad=tuple(tuple(pt) for pt in (r.get("plate_quad") or ())),
             poly=tuple(r.get("poly") or ())))
     return dets, state, prov
 
