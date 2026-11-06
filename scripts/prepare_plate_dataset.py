@@ -83,6 +83,9 @@ def gather(jobs_dir, task):
         # Human-corrected quadrilateral crops are strong segmentation labels.
         manifest = job / "plate_annotations" / "annotations.jsonl"
         if manifest.exists():
+            # Reviewers can readjust corners several times. Keep the LAST
+            # confirmed geometry per object/frame, never an obsolete shape.
+            latest = {}
             for line in manifest.read_text(encoding="utf-8").splitlines():
                 try:
                     item = json.loads(line)
@@ -96,11 +99,13 @@ def gather(jobs_dir, task):
                     if not image_path.is_file():
                         continue
                     row = rows[i] if 0 <= i < len(rows) else {}
-                    positives.append({"job": job.name, "index": i,
+                    key = (i, round(float(item.get("frame_time", 0)), 3))
+                    latest[key] = {"job": job.name, "index": i,
                          "track": int(row.get("track", -1)), "kind": "quad",
-                         "image": image_path, "points": corners.tolist()})
+                         "image": image_path, "points": corners.tolist()}
                 except (KeyError, ValueError, TypeError):
                     continue
+            positives.extend(latest.values())
         src = Path(doc.get("provenance", {}).get("input") or "")
         if not src.is_file():
             # The job may have been moved. Its verified quad crops can still
