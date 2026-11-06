@@ -3009,6 +3009,13 @@ def blur_region(frame, x1, y1, x2, y2, mode, shape="rect"):
         frame[y1:y2, x1:x2] = filled
 
 
+def _plate_quad_pixels(box, quad):
+    """Map relative plate corners to pixels, including skew outside the bbox."""
+    x1, y1, x2, y2 = box
+    return tuple((x1 + float(p[0]) * (x2 - x1),
+                  y1 + float(p[1]) * (y2 - y1)) for p in quad)
+
+
 def blur_silhouette(frame, x1, y1, x2, y2, mode, polys, poly_box,
                     pad_px=0):
     """Redact ONLY the pixels inside a detection's silhouette polygon(s) —
@@ -3715,12 +3722,16 @@ def render_hdr(src, dst, detections, cum, bands, fps, pad, mode,
             px = pad + drift
             if d.category == "plate" and len(d.plate_quad) == 4:
                 # Use four human-adjusted corners, not the oversized bbox.
+                base = (d.cbox[0] + ox, d.cbox[1] + oy,
+                        d.cbox[2] + ox, d.cbox[3] + oy)
+                quad = _plate_quad_pixels(base, d.plate_quad)
                 _blur_silhouette_yuv10(
-                    y, u, v, d.cbox[0] + ox - 2, d.cbox[1] + oy - 2,
-                    d.cbox[2] + ox + 2, d.cbox[3] + oy + 2,
+                    y, u, v, min(p[0] for p in quad) - 2,
+                    min(p[1] for p in quad) - 2,
+                    max(p[0] for p in quad) + 2,
+                    max(p[1] for p in quad) + 2,
                     _mode_for(d.category), (d.plate_quad,),
-                    (d.cbox[0] + ox, d.cbox[1] + oy,
-                     d.cbox[2] + ox, d.cbox[3] + oy), pad_px=1)
+                    base, pad_px=1)
             elif d.poly:
                 _blur_silhouette_yuv10(
                     y, u, v, d.cbox[0] + ox - px, d.cbox[1] + oy - px,
@@ -3938,8 +3949,11 @@ def render(src, dst, detections, cum, bands, fps, pad, mode, preview,
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
             elif d.category == "plate" and len(d.plate_quad) == 4:
                 # Tight skewed mask: ignore the global box padding.
-                blur_silhouette(frame, pbox[0]-2, pbox[1]-2,
-                                pbox[2]+2, pbox[3]+2,
+                quad = _plate_quad_pixels(pbox, d.plate_quad)
+                blur_silhouette(frame, min(p[0] for p in quad)-2,
+                                min(p[1] for p in quad)-2,
+                                max(p[0] for p in quad)+2,
+                                max(p[1] for p in quad)+2,
                                 _mode_for(d.category), (d.plate_quad,),
                                 pbox, pad_px=1)
             elif d.poly:
