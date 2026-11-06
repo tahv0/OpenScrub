@@ -2255,14 +2255,27 @@ async function refresh(){
  if(SHELLPH!==j.phase){
   SHELLPH=j.phase;
   let a="";
-  if(j.phase=="scanning"||j.phase=="rendering")
-   a=`<button class="danger" onclick="cancelJob()">Cancel</button>`;
+  if(j.phase=="scanning")
+   a=`<button class="sec" id="stopReviewBtn" onclick="stopReview()">&#9632; Stop &amp; Review</button>
+    <button class="danger" onclick="cancelJob()">Cancel (discard scan)</button>
+    <span style="font-size:12px;color:#94a3b8">Stop saves a reviewable checkpoint; Cancel discards this run.</span>`;
+  if(j.phase=="rendering")
+   a=`<button class="danger" onclick="cancelJob()">Cancel render</button>`;
   if(j.phase=="error"||j.phase=="cancelled")
    a=`<button onclick="retryJob(CUR)">Retry scan (no re-upload)</button>
     <div style="width:100%;font-size:12px;color:#9ca3af">The uploaded file
     is still on the server — Retry re-runs the scan without uploading it
     again. Delete the job (&#128465;&#65039; in the list) to free its disk
     space.</div>`;
+  if(j.phase=="paused"){
+   const f=j.checkpoint_frame||0,t=j.checkpoint_total||1;
+   a=`<button onclick="resumeJob()">&#9654; Save edits &amp; resume</button>
+    <button class="sec" onclick="saveAndRender(true)">Save review edits only</button>
+    <div class="warn" style="width:100%">INCOMPLETE: ${(f/t*100).toFixed(1)}%
+    scanned (${f}/${t} frames). Do not publish as redacted video.
+    Existing review decisions and plate corners remain saved on resume.</div>`;
+   loadReview();
+  }
   if(j.phase=="review"){
    // no interstitial button: review is the ONLY next step after a scan,
    // so open it directly — both on a live scan finishing and on
