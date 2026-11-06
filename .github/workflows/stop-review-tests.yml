@@ -29,5 +29,9 @@ jobs:
           python -m pip install "numpy<3" "opencv-python-headless<5" pytest flask rapidfuzz pyyaml cryptography
       - name: Compile modified modules
         run: python -m py_compile openscrub.py openscrub_web.py stop_review.py test_stop_review.py
+      - name: Validate review JavaScript syntax
+        run: |
+          python -c 'import openscrub_web; open("_stop_review_js.js", "w", encoding="utf-8").write(openscrub_web.APP_JS)'
+          node --check _stop_review_js.js
       - name: Stop, resume, checkpoint and review regression suite
         run: python -m pytest -q test_stop_review.py
