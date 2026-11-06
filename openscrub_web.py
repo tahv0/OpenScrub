@@ -684,7 +684,7 @@ def worker():
                     pass
                 if meta:
                     job["phase"] = "paused"
-                elif job["options"].get("skip_review"):
+                elif (not resuming and job["options"].get("skip_review")):
                     job["log"].append("review skipped — rendering all detections")
                     job["phase"] = "review"
                     WORK_Q.put((jid, "render"))
@@ -1191,9 +1191,8 @@ def job_plate_quad(jid, i):
         changed += 1
     # Only the exact manually edited frame is verified ground truth.
     _save_verified_plate_sample(job, frame, p, i, tref)
-    with open(os.path.join(job["dir"], "report.json"),
-              "w", encoding="utf-8") as out:
-        json.dump(doc, out, indent=1)
+    stop_review.atomic_report(
+        os.path.join(job["dir"], "report.json"), doc)
     return jsonify({"ok": True, "applied": changed,
                     "verified_samples_added": 1})
 
@@ -1380,8 +1379,7 @@ def job_save_edits(jid):
                       else "mute")}
             for s in (edits.get("audio") or [])
             if float(s.get("t1", 0)) > float(s.get("t0", 0)) >= 0]
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(doc, f, indent=1)
+    stop_review.atomic_report(path, doc)
     # suggest allowlisting any string whose EVERY instance was disabled —
     # the review just taught us it's a recurring false positive
     per = {}
@@ -1504,8 +1502,7 @@ def job_track_object(jid):
                     _save_verified_plate_sample(job, frame, points,
                                                 seed_index, t_ref)
             path = os.path.join(job["dir"], "report.json")
-            with open(path, "w", encoding="utf-8") as f:
-                json.dump(doc, f, indent=1)
+            stop_review.atomic_report(path, doc)
             job["log"].append(
                 "      tracked object: %d position(s), %.1f-%.1fs "
                 "(review card added)" % (len(new),
