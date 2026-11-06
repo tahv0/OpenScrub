@@ -2809,13 +2809,16 @@ function cmpShow(){
  document.getElementById("cmpR").src=`api/jobs/${CUR}/frame_at?t=${t}&src=output`;
 }
 
+let VLBL={},VLBLJOB=null;  // explicit human labels; never infer from default blur state
 async function loadReview(){
  showPanel("review");
+ if(VLBLJOB!==CUR){VLBL={};VLBLJOB=CUR;}
  const d=await (await fetch(`api/jobs/${CUR}/detections`)).json();
  DUR=d.duration;
  const groups={}; const zdrop=[]; TRKMEM={};
  d.detections.forEach(x=>{
   EN[x.i]=x.enabled;
+  if(!(x.i in VLBL)&&x.verified_label)VLBL[x.i]=x.verified_label;
   if(x.zone_dropped){zdrop.push(x);return;}
   (groups[x.category]=groups[x.category]||[]).push(x);});
  let html=`<div class="card" id="review"><h2>Review — red = will be blurred,
@@ -2884,7 +2887,10 @@ async function loadReview(){
     <div>${x.personcard?`<b>Person ${x.person+1}</b> — one decision for ALL their appearances`:`"${x.text}"`}${x.frames?` <span class="badge">×${x.frames} frames</span>`:""}${x.confidence?` <span class="badge" title="detector confidence — low values on a non-face thumbnail usually mean a false detection">${Math.round(x.confidence*100)}%</span>`:""} <br>${x.t_start.toFixed(1)}–${x.t_end.toFixed(1)}s</div>
     <button class="blurbtn ${EN[x.i]?"blur":"keep"}" id="bb${x.i}"
      onclick="toggleDet(${x.i})">${EN[x.i]?"Blur":"Keep"}</button>
-    ${x.category==="plate"?`<button class="sec" onclick="zoomDet(${x.i})">Edit 4 corners</button>`:""}
+    ${x.category==="plate"?`<button class="sec" onclick="zoomDet(${x.i})">Edit 4 corners</button>
+     <button class="sec" onclick="labelPlate(${x.i},'plate')">✓ Confirm plate</button>
+     <button class="sec" onclick="labelPlate(${x.i},'not_plate')">✕ Not a plate</button>
+     <small id="vlabel${x.i}" style="color:#93c5fd">${VLBL[x.i]==="plate"?"Confirmed plate":VLBL[x.i]==="not_plate"?"Hard negative":""}</small>`:""}
    </div>`}
   html+=`</div>`}
  html+=`</div>
@@ -2899,7 +2905,18 @@ async function loadReview(){
 }
 
 let TRKMEM={};
-function applyDet(i,blur){
+function labelPlate(i,label){
+ if(label!=="plate"&&label!=="not_plate")return;
+ VLBL[i]=label;
+ applyDet(i,label==="plate",true);
+ const el=document.getElementById("vlabel"+i);
+ if(el)el.textContent=label==="plate"?"Confirmed plate":"Hard negative";
+}
+function applyDet(i,blur,preserveLabel=false){
+ if(!preserveLabel){
+  delete VLBL[i];
+  const el=document.getElementById("vlabel"+i);if(el)el.textContent="";
+ }
  for(const m of (TRKMEM[i]||[i]))EN[m]=blur;
  const b=document.getElementById("bb"+i),t=document.getElementById("det"+i);
  if(b){b.className="blurbtn "+(blur?"blur":"keep");
@@ -2985,7 +3002,7 @@ async function saveAndRender(){
  const manual=[...MAN,...BE.adds.map(a=>({t_start:a.t0,t_end:a.t1,
   t_ref:a.tref,screen_box:a.box}))];
  const payload={enabled:EN,manual,box_overrides:BE.ov,
-   time_overrides:BE.times};
+   time_overrides:BE.times,verified_labels:VLBL};
  // only send audio spans when the box editor actually loaded them —
  // otherwise a save from plain review would wipe stored spans with []
  if(Array.isArray(BE.audio)&&BE.tlspans!==undefined)payload.audio=BE.audio;
