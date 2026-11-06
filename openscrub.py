@@ -719,6 +719,7 @@ class Detection:
     person: int = -1           # face tracks clustered by facial IDENTITY
                                # (SFace embeddings): one review decision per
                                # PERSON, applied to all their appearances
+    verified_label: str = ""  # explicit 'plate' or 'not_plate' review, not a default
     plate_quad: tuple = ()    # four normalized plate corners, ordered clockwise
     poly: tuple = ()           # silhouette contour(s) from a segmentation
                                # model, points NORMALIZED to cbox (0..1) —
@@ -6018,6 +6019,9 @@ def load_report(path):
             track=int(r.get("track", -1)),
             person=int(r.get("person", -1)),
             plate_quad=tuple(tuple(pt) for pt in (r.get("plate_quad") or ())),
+            verified_label=(r.get("verified_label")
+                            if r.get("verified_label") in ("plate", "not_plate")
+                            else ""),
             poly=tuple(r.get("poly") or ())))
     return dets, state, prov
 
