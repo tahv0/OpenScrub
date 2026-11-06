@@ -2157,7 +2157,8 @@ async function refresh(){
 }
 
 let BE={t:0,ox:0,oy:0,boxes:[],sel:-1,ov:{},dis:{},times:{},adds:[],
-        add:false,addAnchor:null,drag:null,scale:1,dur:10};
+        add:false,addAnchor:null,drag:null,scale:1,dur:10,
+        plateMode:false,platePoints:[]};
 async function loadBoxEdit(fromReview){
  showPanel(fromReview?"boxedit_rev":"boxedit");
  const mi=await (await fetch(`api/jobs/${CUR}/mediainfo`)).json();
@@ -2169,6 +2170,7 @@ async function loadBoxEdit(fromReview){
  BE={t:0,ox:0,oy:0,boxes:[],sel:-1,ov:{},dis:{},times:{},adds:[],
      add:false,addAnchor:null,drag:null,scale:1,dur:mi.duration,
      win:[0,mi.duration],trk:false,muteArm:false,tlDrag:null,
+     plateMode:false,platePoints:[],
      tlspans:[],audio:[],audioSel:-1};
  c.innerHTML=`<div class="row" style="margin-top:8px">
   <button class="sec" id="bePlay" style="padding:3px 11px" title="Play the video with live boxes — pause to edit them" onclick="beTogglePlay()">&#9654;</button>t=
@@ -2194,6 +2196,7 @@ async function loadBoxEdit(fromReview){
   <div class="row" style="margin-top:6px">
    <button class="tog" id="beAdd" onclick="beAddMode()">&#65291; Add box</button>
    <button class="tog" id="beTrk" onclick="beTrackMode()">&#8857; Track object</button>
+   <button class="tog" id="bePlate" onclick="bePlateMode()">&#9645; Draw plate (4 corners)</button>
    <button class="danger" id="beRm" style="display:none" onclick="beRemove()">Remove blur</button>
    <span id="beTimes" style="display:none;align-items:center;gap:4px;font-size:13px">
     from <input type="number" id="beT0" step="0.1" min="0" style="width:74px">
@@ -2207,8 +2210,11 @@ async function loadBoxEdit(fromReview){
    or remove its blur. &#65291; Add box: drag a static region. &#8857; Track object:
    drag the timeline handles to the part of the video you care about, scrub
    to a frame where the object is clear, draw a box around it — it will be
-   followed and blurred through the window. &#128263; Audio span: drag on the
-   timeline's bottom lane to silence (or bleep) that stretch of sound.</p>`;
+   followed and blurred through the window. &#9645; Draw plate: choose the
+   time window, then click its four corners clockwise (top-left, top-right,
+   bottom-right, bottom-left) to create a tracked, perspective-tight plate
+   mask and a local verified training sample. &#128263; Audio span: drag
+   on the timeline's bottom lane to silence (or bleep) that stretch of sound.</p>`;
  const img=document.getElementById("beImg");
  img.onload=()=>{if(BE.playing)return;const cv=document.getElementById("beCv");
   cv.width=img.clientWidth;cv.height=img.clientHeight;
@@ -2385,6 +2391,8 @@ function tlHook(){
 function beWinReset(){BE.win=[0,BE.dur];beTLDraw();}
 function beMuteMode(){
  BE.muteArm=!BE.muteArm;BE.trk=false;BE.add=false;BE.addAnchor=null;
+ BE.plateMode=false;BE.platePoints=[];
+ const pb=document.getElementById("bePlate");if(pb)pb.classList.remove("on");
  document.getElementById("beMute").classList.toggle("on",BE.muteArm);
  document.getElementById("beTrk").classList.remove("on");
  document.getElementById("beAdd").classList.remove("on");
@@ -2396,16 +2404,28 @@ function beAudioRm(){
 }
 function beTrackMode(){
  BE.trk=!BE.trk;BE.add=false;BE.addAnchor=null;BE.muteArm=false;
+ BE.plateMode=false;BE.platePoints=[];
+ const pb=document.getElementById("bePlate");if(pb)pb.classList.remove("on");
  document.getElementById("beTrk").classList.toggle("on",BE.trk);
  document.getElementById("beAdd").classList.remove("on");
  document.getElementById("beMute").classList.remove("on");
 }
-async function beTrackGo(box){
+function bePlateMode(){
+ BE.plateMode=!BE.plateMode;BE.platePoints=[];BE.add=false;
+ BE.addAnchor=null;BE.trk=false;BE.muteArm=false;BE.sel=-1;
+ document.getElementById("bePlate").classList.toggle("on",BE.plateMode);
+ document.getElementById("beAdd").classList.remove("on");
+ document.getElementById("beTrk").classList.remove("on");
+ document.getElementById("beMute").classList.remove("on");
+ beDraw();
+}
+async function beTrackGo(box,quad=null){
  const st=document.getElementById("beTrkSt");st.style.display="inline";
  st.textContent=`tracking ${BE.win[0].toFixed(1)}–${BE.win[1].toFixed(1)}s…`;
  const r=await fetch(`api/jobs/${CUR}/track_object`,{method:"POST",
   headers:{"Content-Type":"application/json"},
-  body:JSON.stringify({box,t_ref:BE.t,t0:BE.win[0],t1:BE.win[1]})});
+  body:JSON.stringify({box,t_ref:BE.t,t0:BE.win[0],t1:BE.win[1],
+   ...(quad?{plate_quad:quad}:{})})});
  if(!r.ok){st.textContent="tracking failed to start";return;}
  const poll=setInterval(async()=>{
   const d=await (await fetch(`api/jobs/${CUR}/track_status`)).json();
@@ -2462,6 +2482,16 @@ function beDraw(){
   x.strokeRect(Math.min(p[0],q[0])*s,Math.min(p[1],q[1])*s,
    Math.abs(q[0]-p[0])*s,Math.abs(q[1]-p[1])*s);x.setLineDash([]);
  }
+ if(BE.platePoints&&BE.platePoints.length){
+  x.beginPath();BE.platePoints.forEach((p,k)=>{
+   if(k)x.lineTo(p[0]*s,p[1]*s);else x.moveTo(p[0]*s,p[1]*s);
+  });
+  x.strokeStyle="#4ade80";x.lineWidth=2;x.stroke();
+  for(const p of BE.platePoints){
+   x.beginPath();x.arc(p[0]*s,p[1]*s,5,0,Math.PI*2);
+   x.fillStyle="#4ade80";x.fill();
+  }
+ }
  for(const b of BE.boxes){
   const[a1,b1,a2,b2]=b.box.map(v=>v*s);
   x.fillStyle=b.i===BE.sel?"rgba(37,99,235,.25)":"rgba(220,38,38,.22)";
@@ -2480,6 +2510,8 @@ function beDraw(){
 }
 function beAddMode(){
  BE.add=!BE.add;BE.addAnchor=null;BE.sel=-1;
+ BE.plateMode=false;BE.platePoints=[];
+ const pb=document.getElementById("bePlate");if(pb)pb.classList.remove("on");
  BE.trk=false;BE.muteArm=false;
  document.getElementById("beAdd").classList.toggle("on",BE.add);
  const tb=document.getElementById("beTrk");if(tb)tb.classList.remove("on");
@@ -2510,6 +2542,21 @@ function beHook(){
   return[(e.clientX-r.left)/BE.scale,(e.clientY-r.top)/BE.scale];};
  cv.addEventListener("pointerdown",e=>{
   const p=pt(e);cv.setPointerCapture(e.pointerId);
+  if(BE.plateMode){
+   BE.platePoints.push(p);
+   if(BE.platePoints.length===4){
+    const pts=BE.platePoints.slice();BE.platePoints=[];
+    BE.plateMode=false;document.getElementById("bePlate").classList.remove("on");
+    const xs=pts.map(v=>v[0]),ys=pts.map(v=>v[1]);
+    const box=[Math.min(...xs),Math.min(...ys),Math.max(...xs),Math.max(...ys)];
+    if(box[2]-box[0]>5&&box[3]-box[1]>3){
+     const quad=pts.map(v=>[(v[0]-box[0])/(box[2]-box[0]),
+                            (v[1]-box[1])/(box[3]-box[1])]);
+     beTrackGo(box,quad);
+    }else alert("Plate corners are too close together.");
+   }
+   beDraw();return;
+  }
   if(BE.trk){
    // Track object: same two-click box draw as Add box, but on completion
    // the region is template-tracked through the active timeline window
