@@ -3077,13 +3077,6 @@ def _plate_quad_pixels(box, quad):
                   y1 + float(p[1]) * (y2 - y1)) for p in quad)
 
 
-def blur_silhouette(frame, x1, y1, x2, y2, mode, polys, poly_box,
-                    pad_px=0):
-    """Redact ONLY the pixels inside a detection's silhouette polygon(s) —
-    the segmentation-model equivalent of blur_region, so a walking person's
-    body is masked without a box of blurred background around them.
-
-
 def rasterize_mask(shape, region, polys, poly_box, pad_px=0, poly_holes=()):
     """Return clipped region and its mask. Invalid geometry covers the region."""
     h, w = shape[:2]
