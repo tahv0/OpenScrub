@@ -963,6 +963,109 @@ def job_detframe(jid, i):
     return Response(buf.tobytes(), mimetype="image/jpeg")
 
 
+
+@app.route("/api/jobs/<jid>/plate_quad/<int:i>", methods=["GET", "POST"])
+def job_plate_quad(jid, i):
+    """Review a plate with four free corners; keep verified samples local.
+
+    Quadrilaterals are normalized to each detection's *un-padded* bbox.
+    Propagated shapes affect rendering but are NOT verified training labels.
+    """
+    job = JOBS.get(jid) or abort(404)
+    doc = _load_job_report(job)
+    rows = doc.get("detections", [])
+    if i < 0 or i >= len(rows) or rows[i].get("category") != "plate":
+        abort(404)
+    d = rows[i]
+    rs = doc["render_state"]
+    fps = float(rs["fps"])
+    tref = min(max(float(d.get("last_seen", d["t_start"])),
+                   float(d["t_start"])), float(d["t_end"]))
+    fidx = min(max(0, int(tref * fps)), len(rs["cum"]) - 1)
+    ox, oy = rs["cum"][fidx]
+    box = [float(d["cbox"][0]) + ox, float(d["cbox"][1]) + oy,
+           float(d["cbox"][2]) + ox, float(d["cbox"][3]) + oy]
+    bw, bh = box[2] - box[0], box[3] - box[1]
+    if bw <= 0 or bh <= 0:
+        abort(400)
+    default = [[0., 0.], [1., 0.], [1., 1.], [0., 1.]]
+    if request.method == "GET":
+        q = d.get("plate_quad") or default
+        frame = _frame_at(job, tref, rs)
+        if frame is None:
+            abort(404)
+        return jsonify({"i": i, "t": tref, "width": frame.shape[1],
+                        "height": frame.shape[0], "box": box,
+                        "points": [[box[0] + x * bw, box[1] + y * bh]
+                                   for x, y in q],
+                        "track": d.get("track", -1)})
+    payload = request.get_json(force=True)
+    try:
+        p = np.asarray(payload["points"], dtype=np.float64)
+    except (KeyError, TypeError, ValueError):
+        return jsonify({"error": "four corner points required"}), 400
+    if p.shape != (4, 2) or not np.isfinite(p).all():
+        return jsonify({"error": "invalid corner coordinates"}), 400
+    frame = _frame_at(job, tref, rs)
+    if frame is None:
+        abort(404)
+    h, w = frame.shape[:2]
+    if (np.any(p[:, 0] < 0) or np.any(p[:, 0] >= w) or
+            np.any(p[:, 1] < 0) or np.any(p[:, 1] >= h)):
+        return jsonify({"error": "corners must be inside the video frame"}), 400
+    contour = p.astype(np.float32).reshape((-1, 1, 2))
+    if (not cv2.isContourConvex(contour) or
+            cv2.contourArea(contour) < 8.0):
+        return jsonify({"error": "corners must form a convex quadrilateral"}), 400
+    q = [[round((float(x) - box[0]) / bw, 6),
+          round((float(y) - box[1]) / bh, 6)] for x, y in p]
+    apply_track = payload.get("apply_track") is True
+    tid = d.get("track", -1)
+    changed = 0
+    for j, r in enumerate(rows):
+        if j != i and not (apply_track and tid >= 0 and
+                           r.get("track", -1) == tid and
+                           r.get("category") == "plate"):
+            continue
+        r["plate_quad"] = q
+        changed += 1
+    # Only the actual manually edited frame is ground truth. Track siblings
+    # are geometric proposals and must never silently join the train set.
+    from uuid import uuid4
+    sample_dir = os.path.join(job["dir"], "plate_annotations")
+    os.makedirs(sample_dir, mode=0o700, exist_ok=True)
+    margin = max(12, int(0.15 * max(bw, bh)))
+    x1 = max(0, int(np.floor(p[:, 0].min())) - margin)
+    y1 = max(0, int(np.floor(p[:, 1].min())) - margin)
+    x2 = min(w, int(np.ceil(p[:, 0].max())) + margin)
+    y2 = min(h, int(np.ceil(p[:, 1].max())) + margin)
+    crop = frame[y1:y2, x1:x2]
+    stem = uuid4().hex
+    image_file = stem + ".jpg"
+    path = os.path.join(sample_dir, image_file)
+    if not cv2.imwrite(path, crop, [cv2.IMWRITE_JPEG_QUALITY, 95]):
+        return jsonify({"error": "could not store training sample"}), 500
+    try:
+        os.chmod(path, 0o600)
+    except OSError:
+        pass
+    entry = {"image": image_file, "category": "plate",
+             "verified_by_user": True, "frame_time": tref,
+             "detection_index": i,
+             "corners": [[round((float(x) - x1) / (x2 - x1), 7),
+                          round((float(y) - y1) / (y2 - y1), 7)]
+                         for x, y in p],
+             "source": "four-corner-review"}
+    with open(os.path.join(sample_dir, "annotations.jsonl"),
+              "a", encoding="utf-8") as out:
+        out.write(json.dumps(entry) + "\n")
+    with open(os.path.join(job["dir"], "report.json"),
+              "w", encoding="utf-8") as out:
+        json.dump(doc, out, indent=1)
+    return jsonify({"ok": True, "applied": changed,
+                    "verified_samples_added": 1})
+
+
 @app.route("/api/jobs/<jid>/boxes_at")
 def job_boxes_at(jid):
     """Active blur boxes (screen coords) at time t, plus the scroll offset so
@@ -984,6 +1087,7 @@ def job_boxes_at(jid):
             boxes.append({"i": i, "category": d["category"],
                           "enabled": d.get("enabled", True),
                           "text": d.get("text", ""),
+                          "plate_quad": d.get("plate_quad") or [],
                           "t_start": d["t_start"], "t_end": d["t_end"],
                           "box": [d["cbox"][0] + ox, d["cbox"][1] + oy,
                                   d["cbox"][2] + ox, d["cbox"][3] + oy]})
