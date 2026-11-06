@@ -7218,6 +7218,9 @@ def run_scan(args, cb=None):
                    f"{skip_n} frame(s) before the window are not decoded")
         else:
             cap.release()
+            if resume_at > 0:
+                raise RuntimeError("Cannot verify frame seek to resumed scan "
+                                   "boundary; original checkpoint is intact")
             cap = cv2.VideoCapture(args.video)  # unseekable: decode it all
             cb.log("      fast-skip unavailable on this file — decoding "
                    "from the start")
@@ -7229,7 +7232,7 @@ def run_scan(args, cb=None):
         # Stop differs from Cancel: finish the preceding whole frame, then
         # run the regular merge/smoothing passes and publish a report.
         # A minimum of one second avoids a zero-frame invalid checkpoint.
-        if (idx >= max(1, min(int(fps), total - 1))
+        if (total > 1 and idx >= max(1, min(int(fps), total - 1))
                 and getattr(cb, "stop_requested", lambda: False)()):
             stopped_at = idx
             cb.log(f"      Stop & Review: safe scan boundary at "
