@@ -42,7 +42,7 @@ def test_plate_corners_survive_report_roundtrip(tmp_path):
         "detections": [
             {"t_start": 0, "t_end": 1, "cbox": [10, 10, 60, 25],
              "category": "plate", "text": "plate", "confidence": 1,
-             "plate_quad": quad, "enabled": True},
+             "plate_quad": quad, "verified_label": "plate", "enabled": True},
             {"t_start": 0, "t_end": 1, "cbox": [70, 10, 120, 25],
              "category": "plate", "text": "plate", "confidence": 1,
              "enabled": False}
@@ -50,3 +50,55 @@ def test_plate_corners_survive_report_roundtrip(tmp_path):
     detections, _, _ = openscrub.load_report(str(path))
     assert len(detections) == 1
     assert detections[0].plate_quad == tuple(tuple(p) for p in quad)
+    assert detections[0].verified_label == "plate"
+
+
+def test_local_export_uses_review_labels_not_time_sampling(tmp_path):
+    from scripts.prepare_plate_dataset import export
+    jobs = tmp_path / "jobs"
+    job = jobs / "job1"
+    job.mkdir(parents=True)
+    video = job / "input.mp4"
+    out = cv2.VideoWriter(str(video), cv2.VideoWriter_fourcc(*"mp4v"),
+                          5, (120, 80))
+    for i in range(15):
+        frame = np.full((80, 120, 3), 90+i, np.uint8)
+        cv2.rectangle(frame, (20, 30), (60, 39), (225, 200, 195), -1)
+        out.write(frame)
+    out.release()
+    ann = job / "plate_annotations"
+    ann.mkdir()
+    crop = np.full((40, 80, 3), 180, np.uint8)
+    cv2.rectangle(crop, (12, 14), (65, 25), (255, 255, 255), -1)
+    assert cv2.imwrite(str(ann / "quad.jpg"), crop)
+    (ann / "annotations.jsonl").write_text(json.dumps({
+        "verified_by_user": True, "image": "quad.jpg", "detection_index": 0,
+        "corners": [[.15,.35],[.81,.35],[.81,.63],[.15,.63]]
+    }) + "\n", encoding="utf-8")
+    detections = [
+        {"category": "plate", "t_start": 0, "last_seen": 0.2,
+         "cbox": [20,30,60,40], "verified_label": "plate",
+         "plate_quad": [[0,0],[1,0],[1,1],[0,1]], "track": 1},
+        {"category": "plate", "t_start": 1, "last_seen": 1.1,
+         "cbox": [20,30,60,40], "verified_label": "not_plate",
+         "track": 2, "confidence": .98},
+        {"category": "plate", "t_start": 2, "last_seen": 2.1,
+         "cbox": [20,30,60,40], "enabled": True, "track": 3}
+    ]
+    (job / "report.json").write_text(json.dumps({
+        "provenance": {"input": str(video)},
+        "render_state": {"fps": 5, "cum": [[0,0]]*15},
+        "detections": detections
+    }), encoding="utf-8")
+    target = tmp_path / "exported"
+    stats = export(jobs, target, "segment", val_ratio=0,
+                   negative_ratio=2, dedup_hamming=0)
+    assert stats["positive"] == 1
+    assert stats["negative"] == 1
+    manifest = [json.loads(s) for s in
+                (target / "manifest.jsonl").read_text().splitlines()]
+    assert {s["quality"] for s in manifest} == {
+        "human_quad", "human_hard_negative"}
+    labels = list((target / "labels" / "train").glob("*.txt"))
+    assert len(labels) == 2
+    assert len([p for p in labels if p.read_text().strip()]) == 1
