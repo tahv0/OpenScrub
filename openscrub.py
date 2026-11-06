@@ -720,6 +720,8 @@ class Detection:
     person: int = -1           # face tracks clustered by facial IDENTITY
                                # (SFace embeddings): one review decision per
                                # PERSON, applied to all their appearances
+    verified_label: str = ""  # explicit 'plate' or 'not_plate' review, not a default
+    plate_quad: tuple = ()    # four normalized plate corners, ordered clockwise
     poly: tuple = ()           # silhouette contour(s) from a segmentation
                                # model, points NORMALIZED to cbox (0..1) —
                                # render blurs ONLY inside them (person
@@ -3009,6 +3011,13 @@ def blur_region(frame, x1, y1, x2, y2, mode, shape="rect"):
         frame[y1:y2, x1:x2] = filled
 
 
+def _plate_quad_pixels(box, quad):
+    """Map relative plate corners to pixels, including skew outside the bbox."""
+    x1, y1, x2, y2 = box
+    return tuple((x1 + float(p[0]) * (x2 - x1),
+                  y1 + float(p[1]) * (y2 - y1)) for p in quad)
+
+
 def blur_silhouette(frame, x1, y1, x2, y2, mode, polys, poly_box,
                     pad_px=0):
     """Redact ONLY the pixels inside a detection's silhouette polygon(s) —
@@ -3833,7 +3842,19 @@ def render_hdr(src, dst, detections, cum, bands, fps, pad, mode,
         for d in _dedupe_dense(act):
             drift = min(24.0, 0.05 * (abs(ox - d.aoff[0]) + abs(oy - d.aoff[1])))
             px = pad + drift
-            if d.poly:
+            if d.category == "plate" and len(d.plate_quad) == 4:
+                # Use four human-adjusted corners, not the oversized bbox.
+                base = (d.cbox[0] + ox, d.cbox[1] + oy,
+                        d.cbox[2] + ox, d.cbox[3] + oy)
+                quad = _plate_quad_pixels(base, d.plate_quad)
+                _blur_silhouette_yuv10(
+                    y, u, v, min(p[0] for p in quad) - 2,
+                    min(p[1] for p in quad) - 2,
+                    max(p[0] for p in quad) + 2,
+                    max(p[1] for p in quad) + 2,
+                    _mode_for(d.category), (d.plate_quad,),
+                    base, pad_px=1)
+            elif d.poly:
                 _blur_silhouette_yuv10(
                     y, u, v, d.cbox[0] + ox - px, d.cbox[1] + oy - px,
                     d.cbox[2] + ox + px, d.cbox[3] + oy + px,
@@ -4053,8 +4074,14 @@ def render(src, dst, detections, cum, bands, fps, pad, mode, preview,
             pbox = (d.cbox[0] + ox, d.cbox[1] + oy,
                     d.cbox[2] + ox, d.cbox[3] + oy)
             if preview:
-                cv2.rectangle(frame, (int(max(0, x1)), int(max(0, y1))),
-                              (int(min(w, x2)), int(min(h, y2))), (0, 0, 255), 2)
+                if d.category == "plate" and len(d.plate_quad) == 4:
+                    vertices = np.asarray(
+                        _plate_quad_pixels(pbox, d.plate_quad), dtype=np.int32)
+                    cv2.polylines(frame, [vertices], True, (0, 0, 255), 2)
+                else:
+                    cv2.rectangle(frame, (int(max(0, x1)), int(max(0, y1))),
+                                  (int(min(w, x2)), int(min(h, y2))),
+                                  (0, 0, 255), 2)
                 for pts in (d.poly or ()):
                     arr = np.array(
                         [[int(float(qx) * (pbox[2] - pbox[0]) + pbox[0]),
@@ -4067,6 +4094,15 @@ def render(src, dst, detections, cum, bands, fps, pad, mode, preview,
                     label = f"face {d.confidence:.2f}"
                 cv2.putText(frame, label, (int(max(0, x1)), int(max(12, y1 - 4))),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
+            elif d.category == "plate" and len(d.plate_quad) == 4:
+                # Tight skewed mask: ignore the global box padding.
+                quad = _plate_quad_pixels(pbox, d.plate_quad)
+                blur_silhouette(frame, min(p[0] for p in quad)-2,
+                                min(p[1] for p in quad)-2,
+                                max(p[0] for p in quad)+2,
+                                max(p[1] for p in quad)+2,
+                                _mode_for(d.category), (d.plate_quad,),
+                                pbox, pad_px=1)
             elif d.poly:
                 # segmentation silhouette: mask only the body, not the box —
                 # px (pad+drift) becomes an outward mask dilation
@@ -6147,6 +6183,10 @@ def load_report(path):
             dense=bool(r.get("dense", False)),
             track=int(r.get("track", -1)),
             person=int(r.get("person", -1)),
+            plate_quad=tuple(tuple(pt) for pt in (r.get("plate_quad") or ())),
+            verified_label=(r.get("verified_label")
+                            if r.get("verified_label") in ("plate", "not_plate")
+                            else ""),
             poly=tuple(r.get("poly") or ())))
     return dets, state, prov
 
