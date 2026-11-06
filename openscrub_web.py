@@ -935,6 +935,7 @@ def job_detections(jid):
                       "track": d.get("track", -1),
                       "person": d.get("person", -1),
                       "confidence": d.get("confidence", 0),
+                      "verified_label": d.get("verified_label", ""),
                       "zone_dropped": bool(d.get("zone_dropped"))})
     return jsonify({"detections": items,
                     "fps": doc["render_state"]["fps"],
@@ -1064,6 +1065,7 @@ def job_plate_quad(jid, i):
         return jsonify({"error": "corners must form a convex quadrilateral"}), 400
     q = [[round((float(x) - box[0]) / bw, 6),
           round((float(y) - box[1]) / bh, 6)] for x, y in p]
+    d["verified_label"] = "plate"
     apply_track = payload.get("apply_track") is True
     tid = d.get("track", -1)
     changed = 0
@@ -1208,6 +1210,18 @@ def job_save_edits(jid):
     path = os.path.join(job["dir"], "report.json")
     doc = _load_job_report(job)
     enabled = edits.get("enabled", {})
+    # Only an explicit reviewer judgement is training evidence.
+    # Keep-visible is NOT a negative label: a user may intentionally keep
+    # a real plate unredacted. Nor is default enabled a positive label.
+    for key, label in (edits.get("verified_labels") or {}).items():
+        try:
+            i = int(key)
+        except (ValueError, TypeError):
+            continue
+        if 0 <= i < len(doc["detections"]):
+            d = doc["detections"][i]
+            if d.get("category") == "plate" and label in ("plate", "not_plate"):
+                d["verified_label"] = label
     for i, d in enumerate(doc["detections"]):
         if str(i) in enabled:
             d["enabled"] = bool(enabled[str(i)])
@@ -1215,6 +1229,10 @@ def job_save_edits(jid):
         i = int(i)
         if 0 <= i < len(doc["detections"]) and len(box) == 4:
             doc["detections"][i]["cbox"] = [float(v) for v in box]
+            # A hand-adjusted bbox invalidates the relative quad; otherwise
+            # the polygon shifts/scales unexpectedly at re-render time.
+            if doc["detections"][i].get("plate_quad"):
+                doc["detections"][i]["plate_quad"] = []
     for i, span in (edits.get("time_overrides") or {}).items():
         i = int(i)
         if 0 <= i < len(doc["detections"]) and len(span) == 2:
@@ -1356,6 +1374,11 @@ def job_track_object(jid):
             new[-1]["t_end"] += 0.25
             seed_index = len(doc["detections"])
             doc["detections"].extend(new)
+            if quad_req is not None:
+                # The drawn reference is reviewed; propagated frames aren't.
+                nearest = min(range(len(new)),
+                              key=lambda k: abs(new[k]["t_start"]-t_ref))
+                new[nearest]["verified_label"] = "plate"
             if quad_req is not None:
                 frame = _frame_at(job, t_ref, rs)
                 if frame is not None:
