@@ -239,7 +239,9 @@ def test_training_orchestrates_local_cuda_export_and_keeps_candidate(
     args = argparse.Namespace(
         weights=weights, accept_ultralytics_license=True,
         epochs=2, batch=2, imgsz=640, workers=0, patience=1, seed=42,
-        device=0, min_mask_map50=0.25, versions_dir=versions, dataset=root)
+        device=0, min_mask_map50=0.25, versions_dir=versions, dataset=root,
+        min_train_positive=12, min_val_positive=4,
+        min_negative_per_split=1)
     meta = training.train(args, training.validate_dataset(root))
     assert meta["status"] == "candidate"
     assert meta["deployment"] == "not_activated"
@@ -257,3 +259,69 @@ def test_training_requires_license_acknowledgement(tmp_path):
     args = argparse.Namespace(accept_ultralytics_license=False)
     with pytest.raises(RuntimeError, match="AGPL"):
         training.train(args, {})
+
+
+def test_dataset_mutation_during_training_rejected(dataset, tmp_path,
+                                                    monkeypatch):
+    root, _ = dataset
+    report = training.validate_dataset(root)
+    # Mutated after the first validation, before train() obtains the GPU.
+    sample = next((root / "images" / "train").glob("*.jpg"))
+    image = cv2.imread(str(sample))
+    image[0:10, 0:10] = 0
+    cv2.imwrite(str(sample), image)
+    assert training.validate_dataset(root)["dataset_sha256"] != report[
+        "dataset_sha256"]
+
+
+def test_onnx_smoke_requires_segmentation_outputs(monkeypatch, tmp_path):
+    path = tmp_path / "dummy.onnx"
+    path.write_bytes(b"mock-checker-inference")
+    validated = []
+
+    class Input:
+        name = "images"
+        shape = [1, 3, 640, 640]
+
+    class Session:
+        def __init__(self, path, providers):
+            assert providers == ["CPUExecutionProvider"]
+
+        def get_inputs(self):
+            return [Input()]
+
+        def run(self, output_names, inputs):
+            assert inputs["images"].shape == (1, 3, 640, 640)
+            return [np.zeros((1, 37, 8400), dtype=np.float32),
+                    np.zeros((1, 32, 160, 160), dtype=np.float32)]
+
+    monkeypatch.setitem(sys.modules, "onnx", types.SimpleNamespace(
+        checker=types.SimpleNamespace(
+            check_model=lambda path: validated.append(path))))
+    monkeypatch.setitem(sys.modules, "onnxruntime",
+                        types.SimpleNamespace(InferenceSession=Session))
+    info = training._smoke_onnx(path, 640)
+    assert validated == [str(path)]
+    assert len(info["outputs"]) == 2
+    assert info["outputs"][1] == [1, 32, 160, 160]
+
+
+def test_onnx_smoke_rejects_non_segment_model(monkeypatch, tmp_path):
+    path = tmp_path / "detect.onnx"
+    path.write_bytes(b"mock")
+    class Input:
+        name = "images"
+        shape = [1, 3, 640, 640]
+    class Session:
+        def __init__(self, *args, **kwargs):
+            pass
+        def get_inputs(self):
+            return [Input()]
+        def run(self, *args, **kwargs):
+            return [np.zeros((1, 5, 8400), dtype=np.float32)]
+    monkeypatch.setitem(sys.modules, "onnx", types.SimpleNamespace(
+        checker=types.SimpleNamespace(check_model=lambda path: None)))
+    monkeypatch.setitem(sys.modules, "onnxruntime",
+                        types.SimpleNamespace(InferenceSession=Session))
+    with pytest.raises(RuntimeError, match="not a segmentation model"):
+        training._smoke_onnx(path, 640)
