@@ -157,6 +157,22 @@ faces are stationary or scroll with the page rather than moving rapidly
 across the frame. In all cases this is a **best-effort assistive tool:
 review the output before publishing.**
 
+## Stop & Review: process long videos in chunks (experimental)
+
+During a long video scan, choose **Stop & Review** instead of Cancel.
+OpenScrub finalizes the current whole-frame boundary, processes the
+detections collected so far, saves a reviewable partial report and opens
+Review. You can confirm or reject plate detections, edit four-corner plate
+masks and **save** the review decisions without rendering an incomplete
+video. The **Save edits & resume** action verifies the video and seeks to
+the checkpoint with a short overlap; it does not run the initial minutes
+through the detector again. Jobs remain paused across server restarts.
+
+A paused video **cannot be rendered or downloaded as if fully redacted**.
+The whole recording must be scanned and the final output reviewed before
+publishing. See [Stop & Review](docs/STOP_REVIEW.md) for the complete
+workflow, limitations and tests.
+
 ## Four-corner plate review (experimental)
 
 For plates seen at an angle, an axis-aligned rectangle can hide much more
