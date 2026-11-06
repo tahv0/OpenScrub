@@ -7762,6 +7762,18 @@ def run_scan(args, cb=None):
         idx += 1
     cap.release()
 
+    if stopped_at is not None:
+        # Do not let post-scan manual tracking decode the unscanned tail:
+        # a user may have scheduled a full-clip tracked object in the editor.
+        # Track only the confirmed scanned interval. It can be re-seeded
+        # and reviewed after the next chunk completes.
+        safe_end = stopped_at / fps
+        track_jobs = [
+            (t0, min(t1, safe_end), box, tref)
+            for t0, t1, box, tref in track_jobs
+            if t0 < safe_end and tref < safe_end and min(t1, safe_end) > t0
+        ]
+
     if memory is not None:
         extra = reverse_pass(scans, memory, cats, namer,
                              lenient=72 if getattr(args, "paranoid", False) else 76)
