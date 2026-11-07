@@ -363,6 +363,33 @@ def verify(args):
                            not card.evaluate("(node)=>node.classList.contains('selected')") and
                            page.locator(".marq").count() == 0,
                            {"before": before_point, "after": moved_point})
+            # Rotation is a rigid transform: all four corners move,
+            # while opposite edges keep their lengths and skew.
+            before_rotate = page.evaluate("() => QEDIT.points.map(p=>p.slice())")
+            page.locator("#qRotateRight").click()
+            after_rotate = page.evaluate("() => QEDIT.points.map(p=>p.slice())")
+            evidence.check("5 degree button rotates entire plate around its center",
+                           all(after_rotate[k] != before_rotate[k] for k in range(4)))
+            page.locator("#qRotateLeft").click()
+            restored = page.evaluate("() => QEDIT.points.map(p=>p.slice())")
+            evidence.check("reverse rotation restores corners without geometry drift",
+                           max(abs(restored[k][j]-before_rotate[k][j])
+                               for k in range(4) for j in range(2)) < 1e-6)
+            rotation = page.evaluate("""() => {
+                const r=QEDIT.rotateHandle,b=document.getElementById('qCv').getBoundingClientRect();
+                return {x:b.left+r.x,y:b.top+r.y,exists:!!r};
+            }""")
+            before_drag_rotate = page.evaluate("() => QEDIT.points.map(p=>p.slice())")
+            page.mouse.move(rotation["x"], rotation["y"])
+            page.mouse.down()
+            page.mouse.move(rotation["x"]+15,rotation["y"]+13,steps=6)
+            page.mouse.up()
+            after_drag_rotate = page.evaluate("() => QEDIT.points.map(p=>p.slice())")
+            evidence.check("dragging orange rotation handle turns all four corners",
+                           rotation["exists"] and
+                           all(after_drag_rotate[k] != before_drag_rotate[k]
+                               for k in range(4)) and
+                           not card.evaluate("(node)=>node.classList.contains('selected')"))
             page.locator("#qRedraw").click()
             canvas = page.locator("#qCv").bounding_box()
             for xx, yy in ((.30,.35),(.70,.33),(.72,.64),(.28,.67)):
