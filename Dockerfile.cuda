@@ -123,6 +123,21 @@ provs = ort.get_available_providers(); \
 assert 'CUDAExecutionProvider' in provs, ('onnxruntime CUDA provider missing: %r' % provs); \
 print('onnxruntime', ort.__version__, '| providers', provs)"
 
+# Optional training lives in a SEPARATE venv: pip OpenCV/PyTorch must never
+# replace the base image's CUDA cv2, numpy, ORT or Paddle libraries.
+ARG OPENSCRUB_ENABLE_TRAINING=0
+COPY requirements.training.txt /tmp/requirements.training.txt
+RUN if [ "$OPENSCRUB_ENABLE_TRAINING" = "1" ]; then \
+      apt-get update && apt-get install -y --no-install-recommends python3-venv && \
+      python3 -m venv /opt/openscrub-training && \
+      /opt/openscrub-training/bin/python -m pip install --no-cache-dir --upgrade pip && \
+      /opt/openscrub-training/bin/python -m pip install --no-cache-dir \
+        torch==2.10.0 torchvision==0.25.0 --index-url https://download.pytorch.org/whl/cu126 && \
+      /opt/openscrub-training/bin/python -m pip install --no-cache-dir -r /tmp/requirements.training.txt && \
+      /opt/openscrub-training/bin/python -c "import torch,ultralytics,onnx,onnxruntime; assert torch.version.cuda is not None" && \
+      rm -rf /var/lib/apt/lists/*; \
+    fi
+
 # ---- model layer: pre-fetched detection models so first run works
 # offline. In its OWN cached layer ABOVE the app code (standalone script,
 # no openscrub import): a release that only changes code no longer
@@ -136,9 +151,10 @@ RUN python prefetch_models.py yunet sface vittrack ppdet plate_t640
 
 # ---- app layers: tiny, change every release
 COPY pyproject.toml README.md LICENSE NOTICE THIRD_PARTY_NOTICES.md plate_models.json face_models.json person_models.json ./
-COPY openscrub.py openscrub_web.py stop_review.py openscrub_setup.py openscrub_update.py \
+COPY openscrub.py openscrub_web.py stop_review.py learning_session.py video_learning.py openscrub_setup.py openscrub_update.py \
      openscrub_vault.py zones_ui.py install.py test_openscrub.py ./
 COPY assets/openscrub.ico assets/
+COPY scripts/ scripts/
 RUN pip install --no-cache-dir --no-deps .
 
 # ---- security refresh layer: the ONLY layer the weekly scheduled rebuild

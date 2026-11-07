@@ -1,5 +1,10 @@
 # Local CUDA plate segmentation training (experimental)
 
+**Connected web workflow:** see [Video-specific learning and full rescans](VIDEO_LEARNING.md)
+for **Train & rescan this video**, optional Docker training setup, validation,
+correction preservation and rollback. The standalone commands below still create
+candidates; they do not replace the global full-frame detector.
+
 This is an **opt-in, offline-data** workflow built on the four-corner
 annotation and verified review labels of [PR #5](https://github.com/tahv0/OpenScrub/pull/5).
 No frame is sampled at a fixed time interval. It trains only on **explicitly
@@ -127,14 +132,12 @@ unique and are never overwritten. The old built-in model remains unchanged;
 an explicit future integration/selection step is required to deploy a
 candidate. To roll back later, select the previous verified version.
 
-**Important compatibility limit:** OpenScrub's current \`PlateDetector\`
-expects 5/6/7-column **detection** output. YOLO-seg ONNX returns mask
-prototypes and coefficients. Even a successfully exported segmentation
-graph **cannot** be dropped into the current PlateDetector and expected to
-work. A separate ONNX segmentation decoder/registration PR is required,
-including CPU/CUDA inference tests, mask geometry and temporal tracking
-checks. Until then every trained version is deliberately
-\`status=candidate\`, \`deployment=not_activated\`.
+**Compatibility:** a crop-trained YOLO-seg ONNX model is not a drop-in
+replacement for the full-frame PlateDetector. The video-learning workflow uses
+`video_learning.CropRefiner`, tests held-out coverage, and applies accepted
+refinements alongside original detector proposals. Standalone CLI training still
+publishes `status=candidate`, `deployment=not_activated`; use the connected
+workflow for job-local validation and rescan activation.
 
 ## 5. Evaluation before activation
 

@@ -54,6 +54,7 @@ def test_plate_corners_survive_report_roundtrip(tmp_path):
 
 
 def test_local_export_uses_review_labels_not_time_sampling(tmp_path):
+    import cv2  # Used to write the synthetic annotation crop below.
     from scripts.prepare_plate_dataset import export
     jobs = tmp_path / "jobs"
     job = jobs / "job1"

@@ -41,6 +41,8 @@ from flask import (Flask, Response, abort, jsonify, redirect, request,
 
 import openscrub
 import stop_review
+import learning_session
+import video_learning
 import zones_ui
 
 
@@ -364,6 +366,7 @@ def job_public(job):
         "stop_pending": bool(job.get("stop") and job["stop"].is_set()),
         "checkpoint_frame": job.get("checkpoint_frame"),
         "checkpoint_total": job.get("checkpoint_total"),
+        "learning": job.get("learning"),
     }
 
 
@@ -580,7 +583,9 @@ def worker():
             continue
         cb = WebCallbacks(job)
         try:
-            if action in ("scan", "resume"):
+            if action == "learn":
+                perform_learning(job)
+            elif action in ("scan", "resume"):
                 resuming = action == "resume"
                 job["phase"] = "scanning"
                 args = build_args(job)
@@ -729,7 +734,17 @@ def worker():
             elif action == "render":
                 job["phase"] = "rendering"
                 args = build_args(job, for_render=True)
-                res = openscrub.run_pipeline(args, cb)
+                review_doc = _load_job_report(job)
+                try:
+                    res = openscrub.run_pipeline(args, cb)
+                    rendered_doc = learning_session.preserve_render_review(
+                        review_doc, _load_job_report(job))
+                    stop_review.atomic_report(os.path.join(job["dir"], "report.json"), rendered_doc)
+                except Exception:
+                    # Render may already have rewritten its audit. Annotation
+                    # rows (including rejected findings) remain authoritative.
+                    stop_review.atomic_report(os.path.join(job["dir"], "report.json"), review_doc)
+                    raise
                 job["output"] = res["output"]
                 # refresh report with output hash
                 dets, rstate, prov = openscrub.load_report(
@@ -923,7 +938,7 @@ def job_delete(jid):
         if job is None:
             abort(404)
         if job.get("phase") in ("queued", "scanning", "rendering",
-                                "queued_render"):
+                                "queued_render", "learning"):
             abort(409, "job is queued or running — cancel it first")
     if _reap_job_dir(job["dir"], jid):
         with JOBS_LOCK:
@@ -1053,6 +1068,145 @@ def job_cancel(jid):
     job = JOBS.get(jid) or abort(404)
     job["cancel"].set()
     return jsonify({"ok": True})
+
+
+def perform_learning(job):
+    """Worker-only operation. Failed training/rescans leave the old report intact."""
+    previous = job.get("learning_previous_phase", "review")
+    cb = WebCallbacks(job)
+    job["phase"] = "learning"
+    try:
+        job["learning"] = {"stage": "preflight", "message": "Checking the local CUDA training environment"}
+        ready = learning_session.preflight()
+        if not ready["ready"]:
+            raise ValueError("; ".join(ready["problems"]))
+        def scan(destination):
+            args = build_args(job)
+            args.resume_start = 0.0
+            args.plate_learning_exact = True
+            state = openscrub.run_scan(args, cb)
+            if state.get("stop_at_frame") is not None:
+                raise ValueError("Learning rescan stopped before completion; previous review retained")
+            openscrub.write_report(str(destination), args, state)
+            with open(destination, encoding="utf-8") as source:
+                return json.load(source)
+        def publish(doc):
+            with _REVIEW_WORK_LOCK:
+                stop_review.atomic_report(os.path.join(job["dir"], "report.json"), doc)
+                # Current thumbnails are indexed by row; a full rescan changes IDs.
+                for name in os.listdir(job["dir"]):
+                    if re.fullmatch(r"(?:thumb2_\d+\.jpg|plate_preview_\d+\.npz)", name):
+                        try:
+                            os.unlink(os.path.join(job["dir"], name))
+                        except OSError:
+                            pass
+        result = learning_session.run_session(
+            job, lambda index: _read_exact_frame(job["video"], index),
+            scan, publish, cb.log)
+        job["phase"] = "review"
+        job["error"] = None
+        job["output"] = None  # Old output may exist, but does not represent this pass.
+        job["checkpoint_frame"] = job["checkpoint_total"] = None
+        job["progress"] = 0.5
+        job["learning"]["inference"] = result["learning"]["inference"]
+    except Exception as error:
+        job["phase"] = previous
+        job["error"] = str(error)
+        job["learning"] = {"stage": "failed", "message": str(error)}
+        cb.log("Learning stopped: " + str(error))
+    finally:
+        job["cancel"].clear()
+        job["stop"].clear()
+        job["eta"] = None
+
+
+@app.route("/api/jobs/<jid>/learning", methods=["GET", "POST"])
+def job_learning(jid):
+    job = JOBS.get(jid) or abort(404)
+    if request.method == "GET":
+        return jsonify({"status": job.get("learning"),
+            "weights_configured": os.path.isfile(os.environ.get("OPENSCRUB_TRAIN_WEIGHTS", "")),
+            "note": "Training is local and video-specific. Empty model predictions are not automatic permission to leave a plate visible."})
+    payload = request.get_json(silent=True) or {}
+    if not isinstance(payload, dict) or payload.get("license_accepted") is not True:
+        return jsonify({"error": "Acknowledge the locally installed training framework's terms before training."}), 400
+    weights = os.environ.get("OPENSCRUB_TRAIN_WEIGHTS", "")
+    if not os.path.isfile(weights):
+        return jsonify({"error": "Training setup needed: set OPENSCRUB_TRAIN_WEIGHTS to a trusted local segmentation .pt checkpoint and install the training environment. Your saved annotations are unchanged."}), 503
+    with JOBS_LOCK:
+        if job["phase"] not in ("paused", "review", "done"):
+            return jsonify({"error": "Pause or complete the scan before training."}), 409
+        if job.get("trackbg", {}).get("state") == "running":
+            return jsonify({"error": "Finish the current tracking operation before training."}), 409
+        prior = _load_job_report(job)
+        if prior.get("provenance", {}).get("hdr_output"):
+            return jsonify({"error": "This learning path currently requires SDR output. HDR-match learning is not supported; the existing HDR report and edits are unchanged."}), 409
+        job["learning_previous_phase"] = job["phase"]
+        job["learning_request"] = {"license_accepted": True, "epochs": 40, "batch": 8}
+        job["phase"] = "learning"
+        job["learning"] = {"stage": "queued", "message": "Learning pass queued"}
+        job["cancel"].clear()
+        job["stop"].clear()
+        job["error"] = None
+    WORK_Q.put((jid, "learn"))
+    return jsonify({"ok": True})
+
+
+@app.route("/api/jobs/<jid>/learning/rollback", methods=["POST"])
+def job_learning_rollback(jid):
+    from pathlib import Path
+    job = JOBS.get(jid) or abort(404)
+    with JOBS_LOCK:
+        if job["phase"] not in ("paused", "review", "done"):
+            return jsonify({"error": "Finish or cancel the active pass before restoring."}), 409
+        with _REVIEW_WORK_LOCK:
+            current = _load_job_report(job)
+            root = (Path(job["dir"]) / "learning" / "passes").resolve()
+            previous = (current.get("learning") or {}).get("previous_report")
+            if not previous:
+                return jsonify({"error": "There is no previous learning pass to restore."}), 409
+            archived = Path(previous).resolve()
+            if root not in archived.parents or archived.name != "before-report.json":
+                return jsonify({"error": "Invalid archived report location."}), 400
+            try:
+                doc = json.loads(archived.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                return jsonify({"error": "Previous report could not be read; current review kept."}), 409
+            if (doc.get("provenance", {}).get("input_sha256") !=
+                    current.get("provenance", {}).get("input_sha256")):
+                return jsonify({"error": "Archived report belongs to another source."}), 409
+            meta = doc.setdefault("learning", {})
+            meta["needs_render"] = True
+            meta.setdefault("active", {})
+            stop_review.atomic_report(os.path.join(job["dir"], "report.json"), doc)
+            # Source annotations and all versioned model files remain intact.
+            try:
+                learning_session.atomic_json(Path(job["dir"]) / "learning" / "active.json", meta["active"])
+            except OSError:
+                pass  # Report remains the authority for version selection.
+            for name in os.listdir(job["dir"]):
+                if re.fullmatch(r"(?:thumb2_\d+\.jpg|plate_preview_\d+\.npz)", name):
+                    try:
+                        os.unlink(os.path.join(job["dir"], name))
+                    except OSError:
+                        pass
+            checkpoint = doc.get("stop_review") or {}
+            job["phase"] = "paused" if checkpoint.get("state") == "paused" else "review"
+            job["output"] = None
+            job["learning"] = {"stage": "restored", "message": "Previous review restored; training examples retained."}
+            job["error"] = None
+    return jsonify({"ok": True})
+
+
+@app.route("/api/jobs/<jid>/learning/review")
+def job_learning_review(jid):
+    job = JOBS.get(jid) or abort(404)
+    try:
+        fraction = float(request.args.get("fraction", ".1"))
+        indices = video_learning.review_sample(_load_job_report(job), fraction)
+    except (ValueError, TypeError) as error:
+        return jsonify({"error": str(error)}), 400
+    return jsonify({"indices": indices, "fraction": fraction})
 
 
 def _load_job_report(job):
@@ -1240,10 +1394,13 @@ def job_detections(jid):
                       "person": d.get("person", -1),
                       "confidence": d.get("confidence", 0),
                       "verified_label": d.get("verified_label", ""),
+                      "learning_conflict": d.get("learning_conflict", ""),
+                      "learning_score": d.get("learning_score"),
                       "fallback_reason": d.get("fallback_reason", ""),
                       "zone_dropped": bool(d.get("zone_dropped")),
                       "shaped": bool(d.get("poly"))})
     return jsonify({"detections": items,
+                    "learning": doc.get("learning"),
                     "indexed_frames": any(d.get("frame_index", -1) >= 0 for d in doc["detections"]),
                     "frame_count": len(doc["render_state"]["cum"]),
                     "fps": doc["render_state"]["fps"],
@@ -2346,6 +2503,8 @@ def allowlist():
 @app.route("/api/jobs/<jid>/render", methods=["POST"])
 def job_render(jid):
     job = JOBS.get(jid) or abort(404)
+    if job["phase"] == "learning":
+        return jsonify({"error": "Finish or cancel learning before rendering."}), 409
     if job["phase"] in ("rendering", "queued_render"):
         return jsonify({"ok": True, "note": "render already in progress"})
     if job["phase"] not in ("review", "done", "error", "cancelled"):
@@ -2360,6 +2519,8 @@ def job_render(jid):
 @app.route("/api/jobs/<jid>/download")
 def job_download(jid):
     job = JOBS.get(jid) or abort(404)
+    if (_load_job_report(job).get("learning") or {}).get("needs_render"):
+        return jsonify({"error": "Render this learning pass before downloading; the previous video does not contain these changes."}), 409
     if not job["output"] or not os.path.exists(job["output"]):
         abort(404)
     return send_file(job["output"], as_attachment=True,
@@ -2920,6 +3081,9 @@ async function refreshJob(id,view,signal){
  if(j.error){wb.style.display="block";wb.textContent=j.error;}
  else wb.style.display="none";
 
+ const learningProgress=document.getElementById("learningProgress");
+ if(learningProgress&&j.learning)learningProgress.textContent=j.learning.message||j.learning.stage;
+
  // action buttons rebuilt ONLY when the phase changes
  if(SHELLPH!==j.phase){
   SHELLPH=j.phase;
@@ -2928,6 +3092,10 @@ async function refreshJob(id,view,signal){
    a=`<button class="sec" id="stopReviewBtn" onclick="stopReview()">&#9632; Stop &amp; Review</button>
     <button class="danger" onclick="cancelJob()">Cancel (discard scan)</button>
     <span style="font-size:12px;color:#94a3b8">Stop saves a reviewable checkpoint; Cancel discards this run.</span>`;
+  if(j.phase=="learning")
+   a=`<button class="danger" onclick="cancelJob()">Cancel learning pass</button>
+    <div id="learningProgress" role="status">Training and full rescan queued</div>
+    <div class="warn">The previous reviewed result is retained until this pass succeeds. New output still requires review and rendering.</div>`;
   if(j.phase=="rendering")
    a=`<button class="danger" onclick="cancelJob()">Cancel render</button>`;
   if(j.phase=="error"||j.phase=="cancelled")
@@ -3933,6 +4101,41 @@ function plateFallbackText(x){
  const labels=[...new Set(reasons.map(r=>plateFallbackLabels[r]||"uncertain lettering"))];
  return prefix+": "+labels.join(", ");
 }
+let LEARNING_SELECTION=null,LEARNING_SELECTION_JOB=null,LEARNING_TERMS=false;
+async function reviewUncertain(){
+ if(!await saveAndRender(true))return;
+ try{
+  const {data}=await reviewRequest(`api/jobs/${CUR}/learning/review?fraction=0.1`);
+  LEARNING_SELECTION=new Set(data.indices);LEARNING_SELECTION_JOB=CUR;
+  await loadReview();
+ }catch(error){alert(error.message);}
+}
+async function reviewAllFindings(){
+ if(!await saveAndRender(true))return;
+ LEARNING_SELECTION=null;await loadReview();
+}
+async function rollbackLearning(){
+ if(!await saveAndRender(true))return;
+ if(!confirm("Restore the previous pass? Your saved training examples and model versions will be kept."))return;
+ try{
+  await reviewRequest(`api/jobs/${CUR}/learning/rollback`,{method:"POST"});
+  LEARNING_SELECTION=null;VLBL={};VLBLJOB=null;await loadReview();await refresh();
+ }catch(error){alert(error.message);}
+}
+async function trainAndRescan(){
+ if(!await saveAndRender(true))return;
+ if(!LEARNING_TERMS){
+  if(!confirm("Train locally from your reviewed examples and rescan this video from the beginning? The training environment uses Ultralytics; review its AGPL/Enterprise terms in docs/PLATE_TRAINING.md. Previous review is retained if training or validation fails."))return;
+  LEARNING_TERMS=true;
+ }
+ try{
+  await reviewRequest(`api/jobs/${CUR}/learning`,{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({license_accepted:true})});
+  LEARNING_SELECTION=null;clearReviewPreviews();
+  const panel=document.getElementById("review");if(panel)panel.remove();
+  await refresh();
+ }catch(error){alert(error.message);}
+}
 let VLBL={},VLBLJOB=null;  // explicit human labels; never infer from default blur state
 async function loadReview(){
  if(!await flushPlateSaves())return;
@@ -3948,6 +4151,7 @@ async function loadReview(){
  }
  if(CUR!==job||view!==JOBVIEW)return;
  DUR=d.duration;
+ if(LEARNING_SELECTION_JOB!==CUR)LEARNING_SELECTION=null;
  const groups={}; const zdrop=[]; TRKMEM={};
  d.detections.forEach(x=>{
   EN[x.i]=x.enabled;
@@ -3958,6 +4162,12 @@ async function loadReview(){
  <p class="review-copy">Choose what happens in the output. Thumbnails show the original video;
  boxes mark detections.<br>Drag plate corners to autosave their shape to the track. Output choices apply after <b>Save edits &amp; render</b>.
  Drag across cards to select several.</p>
+ <div class="row" style="margin-bottom:10px">
+  <button type="button" onclick="trainAndRescan()">Train &amp; rescan this video</button>
+  <button type="button" class="sec" onclick="reviewUncertain()">Review uncertain examples (10%)</button>
+  ${LEARNING_SELECTION?'<button type="button" class="sec" onclick="reviewAllFindings()">Show all findings</button>':""}
+ </div>
+ <p class="review-copy">Training uses saved corrections and the original detectors. It does not guarantee that undetected plates have been found. Review the output.</p>
  <p class="review-copy">Thumbnail rectangles are selection guides. Open shaped masks to inspect their coverage and exclusions.</p>
  <div class="row" style="margin:0 0 8px">
   <button class="sec" onclick="loadBoxEdit(1)">▶ Preview video &amp; edit boxes
@@ -3988,7 +4198,14 @@ async function loadReview(){
  for(const[cat,rawItems] of Object.entries(groups)){
   // collapse dense tracks: one card per physical object, not per frame
   const byGroup={},items=[];
-  for(const x of rawItems){
+  if(LEARNING_SELECTION){
+   for(const x of rawItems){
+    if(!LEARNING_SELECTION.has(x.i))continue;
+    TRKMEM[x.i]=x.track>=0?rawItems.filter(m=>m.track===x.track).map(m=>m.i):[x.i];
+    items.push(x);
+   }
+  }
+  for(const x of (LEARNING_SELECTION?[]:rawItems)){
    // identity first: one card per PERSON (all their tracks); then per
    // track; ungrouped detections stand alone
    const key=x.person>=0?("p"+x.person):(x.track>=0?("t"+x.track):null);
@@ -4000,6 +4217,7 @@ async function loadReview(){
    let best=members[0];             // clearest thumbnail = highest-confidence
    for(const m of members)if((m.confidence||0)>(best.confidence||0))best=m;
    const rep={...best};
+   rep.learning_conflict=members.some(m=>m.learning_conflict)?"Model disagreement — review this track":"";
    rep.t_start=members[0].t_start;
    rep.t_end=members[members.length-1].t_end;
    rep.frames=members.length;
@@ -4011,6 +4229,7 @@ async function loadReview(){
   }
   // person cards first, then everything else chronologically
   items.sort((a,b)=>((b.personcard?1:0)-(a.personcard?1:0))||a.t_start-b.t_start);
+  if(!items.length)continue;
   html+=`<h3 style="margin:10px 0 6px">${CATDN[cat]||cat} <span class="badge">${items.length}</span>
    <button class="sec" style="padding:3px 8px;font-size:12px"
     onclick="setAll('${cat}',true)">Blur all</button>
@@ -4030,7 +4249,7 @@ async function loadReview(){
     <small class="preview-status" role="status">Preview not loaded</small>
     <button class="sec preview-retry" hidden onclick="retryReviewPreview(this)">Retry preview</button>
     ${x.category==="plate"?'<small class="quad-status" role="status" title="Corners apply to this detected track. Review changing perspective. Keyboard: select corner 1–4, use arrows; Ctrl+Z undoes.">Corners autosave to track</small><button type="button" class="sec quad-retry" hidden>Retry save</button>':""}
-    <div>${plateFallbackText(x)?`<span class="badge" style="white-space:normal">${plateFallbackText(x)}</span> `:""}${x.shaped?'<span class="badge" title="Thumbnail rectangle is a selection guide; open to inspect the mask and any exclusions">shaped mask</span> ':""}${x.personcard?`<b>Person ${x.person+1}</b> — one decision for ALL their appearances`:`"${x.text}"`}${x.frames?` <span class="badge">×${x.frames} frames</span>`:""}${x.confidence?` <span class="badge" title="detector confidence — low values on a non-face thumbnail usually mean a false detection">${Math.round(x.confidence*100)}%</span>`:""} <br>${x.t_start.toFixed(1)}–${x.t_end.toFixed(1)}s</div>
+    <div>${x.learning_conflict?'<span class="badge" title="The original coverage was retained where the learned model could not make a reliable refinement">Model disagreement — review</span> ':""}${plateFallbackText(x)?`<span class="badge" style="white-space:normal">${plateFallbackText(x)}</span> `:""}${x.shaped?'<span class="badge" title="Thumbnail rectangle is a selection guide; open to inspect the mask and any exclusions">shaped mask</span> ':""}${x.personcard?`<b>Person ${x.person+1}</b> — one decision for ALL their appearances`:`"${x.text}"`}${x.frames?` <span class="badge">×${x.frames} frames</span>`:""}${x.confidence?` <span class="badge" title="detector confidence — low values on a non-face thumbnail usually mean a false detection">${Math.round(x.confidence*100)}%</span>`:""} <br>${x.t_start.toFixed(1)}–${x.t_end.toFixed(1)}s</div>
     <div id="bb${x.i}">${detChoices(x.i)}</div>
     ${x.category==="plate"?`<button class="sec" onclick="labelPlate(${x.i},'plate')">✓ Confirm plate</button>
      <button class="sec" onclick="labelPlate(${x.i},'not_plate')">✕ Not a plate</button>
@@ -4449,7 +4668,7 @@ def update_run():
         abort(400, "updater module not available")
     with JOBS_LOCK:
         busy = any(j.get("phase") in ("queued", "scanning", "rendering",
-                                      "queued_render")
+                                      "queued_render", "learning")
                    for j in JOBS.values())
     if busy:
         abort(409, "a job is queued or running — update after it finishes")
@@ -4523,7 +4742,7 @@ def _autolock_watcher():
                 continue
             with JOBS_LOCK:
                 busy = any(j.get("phase") in ("queued", "scanning",
-                                              "rendering", "queued_render")
+                                              "rendering", "queued_render", "learning")
                            for j in JOBS.values())
             if busy:
                 continue
@@ -4563,7 +4782,7 @@ def _vault_lock_atexit():
     try:
         if vault_enabled() and VAULT["key"] is not None:
             busy = any(j.get("phase") in ("queued", "scanning", "rendering",
-                                          "queued_render") for j in JOBS.values())
+                                          "queued_render", "learning") for j in JOBS.values())
             if busy:
                 print("vault: NOT locking on exit — a job was still running; "
                       "job files remain in plaintext. Restart and lock.")
@@ -4785,7 +5004,7 @@ def vault_autolock():
 def vault_lock_route():
     with JOBS_LOCK:
         busy = any(j.get("phase") in ("queued", "scanning", "rendering",
-                                      "queued_render")
+                                      "queued_render", "learning")
                    for j in JOBS.values())
     if busy:
         abort(409, "a job is queued or running — lock after it finishes")
@@ -5069,7 +5288,7 @@ def rehydrate_jobs():
             if not video or not os.path.exists(video):
                 continue
             out = os.path.join(jdir, "output.mp4")
-            has_out = os.path.exists(out)
+            has_out = os.path.exists(out) and not (report_doc.get("learning") or {}).get("needs_render")
             job = {
                 "id": jid, "dir": jdir, "video": video,
                 "name": os.path.basename(prov.get("original_input")
