@@ -327,6 +327,59 @@ def verify(args):
             cards = page.locator("#review .det[data-cat='plate']")
             evidence.check("dense track collapses to one review card", cards.count() == 1)
             card = cards.first
+            # A plate preview is an editor launcher, not a draggable card.
+            # Reproduce the user's report with real Chromium pointer events.
+            editor_button = card.get_by_role("button", name="Edit 4 corners", exact=True)
+            editor_button.click()
+            dialog = page.locator("#plateQuadOverlay")
+            dialog.wait_for(timeout=15000)
+            page.wait_for_function(
+                "() => !!window.QEDIT || (typeof QEDIT!=='undefined' && QEDIT!==null)"
+                " && document.getElementById('qCv').width > 0"
+            )
+            page.wait_for_function(
+                "() => document.getElementById('qImg').naturalWidth > 0 && "
+                "document.getElementById('qCv').width > 0")
+            evidence.check("four-corner editor opens a magnified draggable preview",
+                           dialog.is_visible() and
+                           page.locator("#qRedraw").is_visible() and
+                           page.locator("#qCv").bounding_box()["width"] > 0 and
+                           not card.evaluate("(node)=>node.classList.contains('selected')"))
+            before_point = page.evaluate("() => QEDIT.points[0].slice()")
+            handle = page.evaluate("""() => {
+                const q=QEDIT,c=q.crop,box=document.getElementById('qCv').getBoundingClientRect();
+                const p=q.points[0];return {
+                  x:box.left+(p[0]-c[0])/(c[2]-c[0])*box.width,
+                  y:box.top+(p[1]-c[1])/(c[3]-c[1])*box.height
+                };
+            }""")
+            page.mouse.move(handle["x"], handle["y"])
+            page.mouse.down()
+            page.mouse.move(handle["x"]+18, handle["y"]+8, steps=5)
+            page.mouse.up()
+            moved_point = page.evaluate("() => QEDIT.points[0].slice()")
+            evidence.check("dragging one plate corner moves a handle, not the card",
+                           moved_point != before_point and
+                           not card.evaluate("(node)=>node.classList.contains('selected')") and
+                           page.locator(".marq").count() == 0,
+                           {"before": before_point, "after": moved_point})
+            page.locator("#qRedraw").click()
+            canvas = page.locator("#qCv").bounding_box()
+            for xx, yy in ((.30,.35),(.70,.33),(.72,.64),(.28,.67)):
+                page.mouse.click(canvas["x"]+canvas["width"]*xx,
+                                 canvas["y"]+canvas["height"]*yy)
+            evidence.check("redraw accepts four independent perspective corners",
+                           page.evaluate("() => QEDIT.points.length===4 && !QEDIT.drawing") and
+                           page.locator("#qSave").is_enabled())
+            page.locator("#qClose").click()
+            evidence.check("closing plate editor returns to normal review",
+                           page.locator("#plateQuadOverlay").count() == 0)
+            card.locator("img.plate-edit-thumb").click()
+            dialog.wait_for(timeout=10000)
+            evidence.check("thumbnail also opens editing instead of a zoom-only cursor",
+                           page.locator("#qRedraw").is_visible() and
+                           page.locator(".marq").count() == 0)
+            page.locator("#qClose").click()
             evidence.check("review identifies compound shaped mask",
                            card.get_by_text("shaped mask", exact=True).is_visible())
             blur = card.get_by_role("button", name="Blur", exact=True)
