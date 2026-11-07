@@ -112,40 +112,17 @@ def test_plate_editor_requires_plate_category(plate_job):
 
 
 
-def test_rotation_helpers_preserve_shape_and_reject_off_frame():
-    """Run the actual browser geometry helpers in Node; no DOM or GPU."""
-    if shutil.which("node") is None:
-        pytest.skip("Node.js is not installed")
+def test_corner_validation_accepts_perspective_but_rejects_crossing():
+    if not shutil.which("node"):
+        pytest.skip("Node required")
     source = web.APP_JS
-    start = source.index("function plateQuadRotate(")
-    end = source.index("let QEDIT=null;", start)
-    helpers = source[start:end]
-    script = helpers + """
-const assert = require('node:assert/strict');
-const original = [[40,40],[100,40],[100,60],[40,60]];
-const rotated = plateQuadRotate(original, Math.PI/2, 140,140);
-assert.ok(rotated && rotated.length===4);
-const center = q=>q.reduce((p,c)=>[p[0]+c[0],p[1]+c[1]],[0,0]).map(v=>v/4);
-const span = (q,i,j)=>Math.hypot(q[i][0]-q[j][0],q[i][1]-q[j][1]);
-for(const pair of [[0,1],[1,2],[2,3],[3,0],[0,2]]) {
-  assert.ok(Math.abs(span(original,...pair)-span(rotated,...pair))<1e-8);
-}
-assert.ok(center(original).every((v,i)=>Math.abs(v-center(rotated)[i])<1e-8));
-assert.ok(Math.abs(rotated[0][0]-80)<1e-8);
-assert.ok(Math.abs(rotated[0][1]-20)<1e-8);
-const restored=plateQuadRotate(rotated,-Math.PI/2,140,140);
-assert.ok(restored.every((p,k)=>p.every((v,j)=>Math.abs(v-original[k][j])<1e-8)));
-const skewed=[[40,39],[102,35],[96,62],[38,64]];
-const angled=plateQuadRotate(skewed,0.22,140,140);
-assert.ok(angled && angled.length===4);
-assert.ok(angled.some((p,k)=>Math.abs(p[0]-skewed[k][0])>1));
-assert.equal(plateQuadRotate(original,Math.PI/2,70,70),null);
-assert.equal(plateQuadRotate([[1,2]],.1,140,140),null);
-assert.equal(plateQuadRotate(original,Infinity,140,140),null);
-const h=plateQuadRotationHandle(original,[0,0,140,140],
-                                {width:560,height:560});
-assert.ok(h && h.x>=20 && h.x<=540 && h.y>=20 && h.y<=540);
-console.log('rotation geometry OK');
+    start = source.index("function plateQuadValid(")
+    end = source.index("function plateEditsPending(", start)
+    script = "const assert=require('node:assert/strict');\n" + source[start:end] + r"""
+assert.equal(plateQuadValid([[10,10],[90,13],[85,40],[12,42]]),true);
+assert.equal(plateQuadValid([[10,10],[85,40],[90,13],[12,42]]),false);
+assert.equal(plateQuadValid([[0,0],[1,0],[1,1],[0,1]]),false);
+assert.equal(plateQuadValid([[0,0],[NaN,0],[1,10],[0,10]]),false);
 """
     result = subprocess.run(["node", "-e", script], capture_output=True,
                             text=True, timeout=15)

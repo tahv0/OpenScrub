@@ -1404,7 +1404,8 @@ def job_detframe(jid, i):
 
 
 
-def _save_verified_plate_sample(job, frame, points, index, tref, origin=(0, 0)):
+def _save_verified_plate_sample(job, frame, points, index, tref, origin=(0, 0),
+                                sample_key=None):
     """Store ONE reviewer-verified plate crop; never promote track guesses.
 
     Data stays inside the job directory so it inherits the job vault's
@@ -1440,8 +1441,43 @@ def _save_verified_plate_sample(job, frame, points, index, tref, origin=(0, 0)):
                          for x, y in p],
              "source": "four-corner-review"}
     manifest = os.path.join(sample_dir, "annotations.jsonl")
-    with open(manifest, "a", encoding="utf-8") as out:
-        out.write(json.dumps(entry) + "\n")
+    if sample_key is None:
+        with open(manifest, "a", encoding="utf-8") as out:
+            out.write(json.dumps(entry) + "\n")
+    else:
+        # Autosave replaces only this manually edited source frame's sample.
+        # Immutable image + atomic manifest avoids mismatched pixels/labels.
+        entry["sample_key"] = sample_key
+        previous = []
+        temp_manifest = None
+        try:
+            if os.path.exists(manifest):
+                with open(manifest, encoding="utf-8") as source:
+                    previous = [json.loads(line) for line in source if line.strip()]
+            kept = [row for row in previous if row.get("sample_key") != sample_key]
+            with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8",
+                    dir=sample_dir, delete=False) as out:
+                temp_manifest = out.name
+                for row in kept + [entry]:
+                    out.write(json.dumps(row) + "\n")
+            os.replace(temp_manifest, manifest)
+        except Exception:
+            if os.path.exists(filepath):
+                os.unlink(filepath)
+            raise
+        finally:
+            if temp_manifest and os.path.exists(temp_manifest):
+                os.unlink(temp_manifest)
+        retained = {row.get("image") for row in kept}
+        for row in previous:
+            old = row.get("image", "")
+            if (row.get("sample_key") == sample_key and old not in retained
+                    and re.fullmatch(r"[a-f0-9]{32}\.jpg", old)):
+                try:
+                    os.unlink(os.path.join(sample_dir, old))
+                except OSError:
+                    pass
+
     try:
         os.chmod(manifest, 0o600)
     except OSError:
@@ -1605,9 +1641,11 @@ def job_plate_quad(jid, i):
     try:
         doc, d, meta, pixels = _plate_preview(job, i)
         payload = request.get_json(silent=True) or {}
-        if (payload.get("preview_token") is not None and
-                payload["preview_token"] != meta["preview_token"]):
-            return jsonify({"error": "This finding changed. Reload its preview before saving."}), 409
+        autosave = payload.get("autosave") is True
+        edit_id = payload.get("edit_id") if autosave else None
+        if autosave and (not isinstance(edit_id, str) or
+                         not re.fullmatch(r"[A-Za-z0-9_.:-]{1,120}", edit_id)):
+            return jsonify({"error": "Autosave requires a valid edit identifier"}), 400
         try:
             p = np.asarray(payload["points"], dtype=np.float64)
         except (KeyError, TypeError, ValueError):
@@ -1624,29 +1662,54 @@ def job_plate_quad(jid, i):
         box = meta["box"]
         bw, bh = box[2]-box[0], box[3]-box[1]
         q = [[round((float(x)-box[0])/bw, 6), round((float(y)-box[1])/bh, 6)] for x, y in p]
+        apply_track, tid = autosave or payload.get("apply_track") is True, d.get("track", -1)
+        applied = sum(1 for j, row in enumerate(doc["detections"])
+                      if j == i or (apply_track and tid >= 0 and row.get("track", -1) == tid
+                                    and row.get("category") == "plate"))
+        sample_key = (hashlib.sha256(json.dumps([
+            _video_identity(job["video"]), i, meta["frame"]]).encode()).hexdigest()
+                      if autosave else None)
+        receipt = d.get("plate_edit_receipt") or {}
+        if autosave and receipt.get("id") == edit_id:
+            if (d.get("plate_quad") != q or receipt.get("source") != sample_key
+                    or receipt.get("token") != payload.get("preview_token")):
+                return jsonify({"error": "Edit identifier belongs to different corners"}), 409
+            return jsonify({"ok": True, "applied": applied,
+                            "verified_samples_added": 0, "preview": meta})
+        if (payload.get("preview_token") is not None and
+                payload["preview_token"] != meta["preview_token"]):
+            return jsonify({"error": "This finding changed. Reload its preview before saving."}), 409
+        if autosave and np.allclose(p, meta["points"], rtol=0, atol=1e-5):
+            return jsonify({"ok": True, "applied": 0,
+                            "verified_samples_added": 0, "preview": meta})
         x1, y1, x2, y2 = meta["crop"]
         # The inline editor constrains edits to its visible source crop. Older
         # clients may submit a wider polygon; decode once only for that case.
         if (np.all(p[:, 0] >= x1) and np.all(p[:, 0] < x2) and
                 np.all(p[:, 1] >= y1) and np.all(p[:, 1] < y2)):
-            _save_verified_plate_sample(job, pixels, p, i, meta["t"], origin=(x1, y1))
+            _save_verified_plate_sample(job, pixels, p, i, meta["t"],
+                                        origin=(x1, y1), sample_key=sample_key)
         else:
             frame = _frame_at(job, meta["t"], doc["render_state"],
                               meta["frame"] if d.get("frame_index", -1) >= 0 else None)
             if frame is None:
                 abort(404)
-            _save_verified_plate_sample(job, frame, p, i, meta["t"])
+            _save_verified_plate_sample(job, frame, p, i, meta["t"],
+                                        sample_key=sample_key)
             meta["crop"] = _plate_editor_crop(box, p, w, h)
             x1, y1, x2, y2 = meta["crop"]
             pixels = frame[y1:y2, x1:x2].copy()
         d["verified_label"] = "plate"
-        apply_track, tid = payload.get("apply_track") is True, d.get("track", -1)
         changed = 0
         for j, row in enumerate(doc["detections"]):
             if j == i or (apply_track and tid >= 0 and row.get("track", -1) == tid
                           and row.get("category") == "plate"):
                 row["plate_quad"] = q
+                row.pop("plate_edit_receipt", None)
                 changed += 1
+        if autosave:
+            d["plate_edit_receipt"] = {"id": edit_id, "source": sample_key,
+                                       "token": payload.get("preview_token")}
         stop_review.atomic_report(os.path.join(job["dir"], "report.json"), doc)
         # Reuse the exact source pixels after saving; round-trip the stored
         # geometry/token so reopening doesn't fetch/decode the video again.
@@ -2360,15 +2423,13 @@ progress{width:100%;height:12px;accent-color:var(--acc)}
  padding:6px;text-align:center;font-size:12px;color:#cbd5e1}
 .det img{max-width:100%;border-radius:5px}
 
-.det.editing{grid-column:1/-1;width:min(100%,720px);justify-self:center;text-align:left;padding:14px;border-color:#4ade80}
 .plate-preview{position:relative;width:100%;min-height:90px;margin:0 auto;touch-action:none}
 .plate-preview img{display:block;width:100%;min-height:90px;object-fit:contain}
-.det.editing .plate-preview{max-width:560px}
 .plate-outline{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;touch-action:none}
 .preview-status{display:block;font-size:11px;color:#94a3b8;margin:5px 0}
-.preview-retry[hidden]{display:none!important}
-#plateQuadEditor{padding:12px 0;margin:8px 0;border-top:1px solid #334155;border-bottom:1px solid #334155}
-#qHint,#qStatus{font-size:12px;color:#cbd5e1}
+.preview-retry[hidden],.quad-retry[hidden]{display:none!important}
+.quad-status{display:block;min-height:2.5em;margin:4px 0;font-size:11px;color:#94a3b8}
+.plate-outline:focus-visible{outline:2px solid #60a5fa;outline-offset:2px}
 
 .det.selected{outline:2px dashed #60a5fa;outline-offset:2px}
 .review-copy{font-size:13px;color:#cbd5e1;line-height:1.5;margin:0 0 10px}
@@ -2718,6 +2779,7 @@ async function retryJob(id){
  JOBSJSON="";loadJobs();if(typeof openJob==="function")openJob(id);
 }
 async function delJob(id){
+ if(CUR===id&&!await flushPlateSaves())return;
  if(!confirm("Delete this job and ALL of its files — upload, report, and rendered output?\\n\\nThis cannot be undone."))return;
  const r=await fetch("api/jobs/"+id,{method:"DELETE"});
  if(!r.ok){
@@ -2729,7 +2791,7 @@ async function delJob(id){
  JOBSJSON="";loadJobs();
 }
 async function openJob(id){
- if(QEDIT&&QEDIT.dirty&&!confirm("Discard unsaved corner edits?"))return;
+ if(!await flushPlateSaves())return;
  if(!closePlateQuad())return;
  clearReviewPreviews();JOBVIEW++;REFRESHFAILURES=0;
  if(REFRESHCTRL)REFRESHCTRL.abort();
@@ -2926,7 +2988,7 @@ let BE={t:0,ox:0,oy:0,boxes:[],sel:-1,ov:{},dis:{},times:{},adds:[],
         add:false,addAnchor:null,drag:null,scale:1,dur:10,
         plateMode:false,platePoints:[]};
 async function loadBoxEdit(fromReview){
- showPanel(fromReview?"boxedit_rev":"boxedit");
+ if(!await showPanel(fromReview?"boxedit_rev":"boxedit"))return;
  const mi=await (await fetch(`api/jobs/${CUR}/mediainfo`)).json();
  const ri=await (await fetch(`api/jobs/${CUR}/detections`)).json();
  // in review: the slot right under the Preview button; on done: the actions slot
@@ -3453,39 +3515,6 @@ function beHook(){
  cv.addEventListener("pointerup",()=>{if(BE.drag){BE.drag=null;beRefresh();}});
 }
 
-// Pure rigid-body rotation of a perspective quadrilateral. Rotating a
-// polygon must preserve its skew and all edge lengths; it must never
-// silently clamp individual corners and distort the plate.
-function plateQuadRotate(points, radians, width, height){
- if(!Array.isArray(points)||points.length!==4||!Number.isFinite(radians))
-  return null;
- const center=[points.reduce((n,p)=>n+p[0],0)/4,
-               points.reduce((n,p)=>n+p[1],0)/4];
- const sn=Math.sin(radians),cs=Math.cos(radians);
- const result=points.map(p=>{
-  const x=p[0]-center[0],y=p[1]-center[1];
-  return [center[0]+x*cs-y*sn,center[1]+x*sn+y*cs];
- });
- return result.every(p=>Number.isFinite(p[0])&&Number.isFinite(p[1])&&
-  p[0]>=0&&p[0]<width&&p[1]>=0&&p[1]<height)?result:null;
-}
-function plateQuadRotationHandle(points,crop,cv){
- if(!points||points.length!==4)return null;
- const sx=cv.width/(crop[2]-crop[0]),sy=cv.height/(crop[3]-crop[1]);
- const a=points[0],b=points[1],mx=((a[0]+b[0])/2-crop[0])*sx,
-       my=((a[1]+b[1])/2-crop[1])*sy;
- const dx=(b[0]-a[0])*sx,dy=(b[1]-a[1])*sy;
- const length=Math.hypot(dx,dy);
- if(length<1)return null;
- const nx=dy/length,ny=-dx/length;
- let x=mx+nx*34,y=my+ny*34;
- // Keep the rotate handle within the actual interactive canvas.
- if(x<20||x>cv.width-20||y<20||y>cv.height-20){
-  x=mx-nx*34;y=my-ny*34;
- }
- return {x:Math.max(20,Math.min(cv.width-20,x)),
-         y:Math.max(20,Math.min(cv.height-20,y)),mx,my};
-}
 // Only visible finding previews are requested. Editing reuses the same image
 // and geometry; it never starts a second video/image request.
 let REVIEW_MEDIA=null;
@@ -3513,16 +3542,8 @@ function clearReviewPreviews(){
  old.urls.forEach(url=>URL.revokeObjectURL(url));
 }
 function drawPlateThumbnail(img){
- if(!img._plateMeta||!img.naturalWidth||(QEDIT&&QEDIT.img===img))return;
- const stage=img.closest(".plate-preview"),cv=stage&&stage.querySelector("canvas");
- if(!cv)return;
- const r=img.getBoundingClientRect(),d=img._plateMeta,c=d.crop;
- cv.width=Math.max(1,Math.round(r.width));cv.height=Math.max(1,Math.round(r.height));
- const ctx=cv.getContext("2d");ctx.clearRect(0,0,cv.width,cv.height);
- ctx.beginPath();d.points.forEach((p,k)=>{
-  const x=(p[0]-c[0])*cv.width/(c[2]-c[0]),y=(p[1]-c[1])*cv.height/(c[3]-c[1]);
-  if(k)ctx.lineTo(x,y);else ctx.moveTo(x,y);
- });ctx.closePath();ctx.strokeStyle="#4ade80";ctx.lineWidth=2;ctx.stroke();
+ if(!img._plateMeta||!img.naturalWidth)return;
+ const state=initPlateCorners(img);if(state)state.draw();
 }
 function queueReviewPreview(img, priority=false){
  const state=REVIEW_MEDIA;
@@ -3570,7 +3591,7 @@ async function loadReviewPreview(state,task,cacheOnly){
   url=null;
   if(REVIEW_MEDIA!==state||!img.isConnected)return;
   drawPlateThumbnail(img);
-  if(status)status.textContent=raw?"Original frame · click Edit 4 corners to adjust":"";
+  if(status)status.textContent="";
   ok=true;
  }catch(error){
   if(REVIEW_MEDIA===state&&img.isConnected){
@@ -3620,248 +3641,197 @@ function retryReviewPreview(button){
 }
 
 let QEDIT=null;
-function closePlateQuad(){
- const state=QEDIT;if(!state)return true;
- if(state.saving)return false;
- QEDIT=null;
- if(state.resizeObserver)state.resizeObserver.disconnect();
- if(state.events)state.events.abort();
- const editor=document.getElementById("plateQuadEditor");if(editor)editor.remove();
- if(state.card)state.card.classList.remove("editing");
- if(state.img){state.img.id="thumb"+state.i;drawPlateThumbnail(state.img);}
- const cv=document.getElementById("qCv");if(cv){cv.removeAttribute("id");cv.style.pointerEvents="none";cv.style.cursor="";cv.style.width="100%";cv.style.height="100%";}
+const PLATE_EDITS=new Map();
+let PLATE_SAVE=null,PLATE_TIMER=null,PLATE_SERIAL=0,PLATE_REVIEW_BUSY=false;
+const plateCopy=points=>points.map(p=>p.slice());
+const plateSame=(a,b)=>a.length===b.length&&a.every((p,k)=>p.every((v,j)=>Math.abs(v-b[k][j])<1e-5));
+function plateQuadValid(points){
+ if(points.length!==4||points.some(p=>p.length!==2||p.some(v=>!Number.isFinite(v))))return false;
+ const cross=points.map((a,k)=>{const b=points[(k+1)%4],c=points[(k+2)%4];
+  return (b[0]-a[0])*(c[1]-b[1])-(b[1]-a[1])*(c[0]-b[0]);});
+ const area=Math.abs(points.reduce((n,p,k)=>{const q=points[(k+1)%4];return n+p[0]*q[1]-q[0]*p[1];},0))/2;
+ return area>=8&&(cross.every(v=>v>0)||cross.every(v=>v<0));
+}
+function plateEditsPending(){return [...PLATE_EDITS.values()].some(s=>s.dirty||s.pending||s.drag);}
+function plateUnloadWarning(e){if(plateEditsPending()){e.preventDefault();e.returnValue="";}}
+function plateUnloadGuard(){
+ window.removeEventListener("beforeunload",plateUnloadWarning);
+ if(plateEditsPending())window.addEventListener("beforeunload",plateUnloadWarning);
+}
+function plateStatus(s,text,retry=false){
+ s.status.textContent=text;s.retry.hidden=!retry;
+ s.retry.textContent=s.conflict?"Reload preview":"Retry save";
+}
+function schedulePlateSaves(){
+ clearTimeout(PLATE_TIMER);PLATE_TIMER=null;plateUnloadGuard();
+ if(PLATE_SAVE)return;
+ const pending=[...PLATE_EDITS.values()].filter(s=>s.dirty&&!s.drag&&!s.error);
+ if(pending.length)PLATE_TIMER=setTimeout(pumpPlateSaves,
+  Math.max(0,Math.min(...pending.map(s=>s.readyAt))-Date.now()));
+}
+function commitPlateGesture(s,before){
+ if(plateSame(s.points,before))return;
+ if(!plateQuadValid(s.points)){
+  s.points=before;s.draw();plateStatus(s,"Corners cannot cross; adjustment reverted.");return;
+ }
+ s.undo=before;s.version++;s.dirty=true;s.error=null;s.conflict=false;s.failures=0;
+ s.readyAt=Date.now()+450;
+ plateStatus(s,"Saving…");schedulePlateSaves();
+}
+function pumpPlateSaves(){
+ if(PLATE_SAVE)return PLATE_SAVE;
+ const s=[...PLATE_EDITS.values()].find(s=>s.dirty&&!s.drag&&!s.error&&s.readyAt<=Date.now());
+ if(!s){schedulePlateSaves();return Promise.resolve();}
+ // Keep the same request/ID after a lost response. First recover its receipt,
+ // then send the latest gesture; an older response never replaces newer points.
+ if(!s.pending)s.pending={points:plateCopy(s.points),preview_token:s.meta.preview_token,
+  apply_track:true,autosave:true,edit_id:Date.now().toString(36)+"-"+(++PLATE_SERIAL)+"-"+Math.random().toString(36).slice(2),
+  version:s.version,label:VLBL[s.i]};
+ const pending=s.pending;
+ plateStatus(s,"Saving…");
+ PLATE_SAVE=(async()=>{
+  try{
+   const {data}=await reviewRequest("api/jobs/"+s.job+"/plate_quad/"+s.i,{method:"POST",
+    headers:{"Content-Type":"application/json"},body:JSON.stringify(pending)});
+   Object.assign(s.meta,data.preview);s.img._plateMeta=s.meta;
+   s.saved=plateCopy(s.meta.points);s.pending=null;s.failures=0;
+   if(s.version===pending.version&&!s.drag)s.points=plateCopy(s.saved);
+   s.dirty=s.version!==pending.version;
+   // Do not undo a newer Blur/Keep/Not-a-plate decision made during this save.
+   if(VLBL[s.i]===pending.label){
+    VLBL[s.i]="plate";const label=document.getElementById("vlabel"+s.i);
+    if(label)label.textContent="Confirmed plate";
+   }
+   s.draw();plateStatus(s,s.dirty?"Saving…":s.meta.track>=0?"Saved to track":"Saved");
+   if(!s.dirty&&CUR===s.job&&document.getElementById("beCv"))beRefresh();
+  }catch(error){
+   if(error.status===503&&++s.failures<=3){
+    s.readyAt=Date.now()+1000*2**s.failures;plateStatus(s,"Waiting to save…");
+   }else{
+    s.error=error;s.conflict=error.status===409;
+    plateStatus(s,s.conflict?"Finding changed — not saved.":"Not saved — retry.",true);
+   }
+  }finally{PLATE_SAVE=null;schedulePlateSaves();}
+ })();
+ return PLATE_SAVE;
+}
+async function flushPlateSaves(){
+ if([...PLATE_EDITS.values()].some(s=>s.drag))return false;
+ for(const s of PLATE_EDITS.values())if(s.dirty&&!s.error)s.readyAt=0;
+ while([...PLATE_EDITS.values()].some(s=>s.dirty&&!s.error)||PLATE_SAVE){
+  await (PLATE_SAVE||pumpPlateSaves());
+  if([...PLATE_EDITS.values()].some(s=>s.dirty&&!s.error))
+   await new Promise(resolve=>setTimeout(resolve,100));
+ }
+ const failed=[...PLATE_EDITS.values()].find(s=>s.dirty||s.pending||s.drag);
+ if(failed){failed.status.scrollIntoView({block:"nearest"});return false;}
  return true;
 }
-function openPlateQuad(e,i){
- if(e){e.preventDefault();e.stopPropagation();}
- clearSel();return zoomDet(i,true);
+async function retryPlateSave(s){
+ if(s.conflict){
+  if(!confirm("Reload this finding and discard its unsaved corner adjustment?"))return;
+  s.events.abort();if(s.observer)s.observer.disconnect();
+  PLATE_EDITS.delete(s.i);delete s.img._quadEdit;s.img._plateMeta=null;
+  if(QEDIT===s)QEDIT=null;schedulePlateSaves();
+  await queueReviewPreview(s.img,true);return;
+ }
+ s.error=null;s.failures=0;s.readyAt=0;
+ plateStatus(s,"Saving…");schedulePlateSaves();
 }
-async function zoomDet(i,forcePlate=false){
- const el=document.getElementById("det"+i);
- if(!forcePlate&&(!el||el.dataset.cat!=="plate")){
-  let ov=document.getElementById("lb");
-  if(!ov){ov=document.createElement("div");ov.id="lb";document.body.appendChild(ov);}
-  ov.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.82);"+
-   "z-index:100;display:flex;align-items:center;justify-content:center;cursor:zoom-out;padding:18px";
-  ov.onclick=()=>ov.remove();
-  ov.innerHTML='<img src="api/jobs/'+CUR+'/detframe/'+i+'" style="max-width:96%;max-height:96%;border-radius:8px">';
-  return;
+function closePlateQuad(){
+ if(plateEditsPending())return false;
+ clearTimeout(PLATE_TIMER);PLATE_TIMER=null;
+ for(const s of PLATE_EDITS.values()){
+  s.events.abort();if(s.observer)s.observer.disconnect();delete s.img._quadEdit;
  }
- if(!el||(QEDIT&&QEDIT.i===i))return;
- if(QEDIT&&QEDIT.dirty&&!confirm("Discard unsaved corner edits?"))return;
- if(!closePlateQuad())return;
- const img=el.querySelector("img[data-preview-url]"),stage=el.querySelector(".plate-preview");
- if(!img||!stage)return;
- const cv=stage.querySelector("canvas"),ov=document.createElement("div");
- ov.id="plateQuadEditor";ov.setAttribute("role","region");
- ov.setAttribute("aria-label","Inline plate corner editor");
- ov.innerHTML='<p>Loading the finding preview…</p><button type="button" id="qClose" class="sec">Cancel editing</button>';
- stage.after(ov);el.classList.add("editing");
- const state=QEDIT={i,job:CUR,card:el,img,loading:true,dirty:false,saving:false,events:new AbortController()};
- ov.querySelector("#qClose").onclick=closePlateQuad;
- // Already visible image = no fetch. A pending thumbnail is joined, not duplicated.
- const ready=await queueReviewPreview(img,true);
- if(QEDIT!==state||!el.isConnected)return;
- if(!ready||!img._plateMeta){
-  ov.querySelector("p").textContent="Preview unavailable. Use Retry preview, then cancel and edit again.";
-  return;
- }
- const d=img._plateMeta,crop=d.crop,cw=crop[2]-crop[0],ch=crop[3]-crop[1];
- img.id="qImg";cv.id="qCv";cv.style.pointerEvents="auto";cv.style.cursor="crosshair";
- cv.setAttribute("aria-label","Drag plate corners or the orange rotation handle");
- ov.innerHTML=
-  '<b id="qHeading">Edit four corners</b><p class="review-copy">Drag green handles for perspective, or orange ↻ to rotate. Changes stay local until Save.</p>'+
-  '<div class="row">'+
-  '<button type="button" id="qRotateLeft" class="sec">↶ Rotate −5°</button>'+
-  '<button type="button" id="qRotateRight" class="sec">↷ Rotate +5°</button>'+
-  '<button type="button" id="qRedraw" class="sec">Redraw 4 corners</button>'+
-  '<button type="button" id="qReset" class="sec">Reset</button></div>'+
-  '<p id="qHint" role="status"></p>'+
-  '<label style="display:flex;gap:8px;align-items:center;text-align:left">'+
-  '<input id="qTrack" type="checkbox"> Apply shape to this detection track (approximate — verify changing perspective)</label>'+
-  '<div class="row" style="margin-top:10px">'+
-  '<button type="button" id="qSave">Save four corners</button>'+
-  '<button type="button" id="qClose" class="sec">Cancel editing</button>'+
-  '<span id="qStatus" role="status"></span></div>';
- const hint=ov.querySelector("#qHint"),save=ov.querySelector("#qSave");
- const starting=d.points.map(p=>p.slice());
- Object.assign(state,{points:starting.map(p=>p.slice()),starting,crop,
-  width:d.width,height:d.height,drawing:false,dragging:-1,rotation:null,rotateHandle:null,loading:false});
- const imageReady=true;
- function viewSize(){
-  // Make canvas pixels match the *displayed* photo (including max-height).
-  // A fullscreen video frame here previously made 8px-high plates impossible to edit.
-  const rect=img.getBoundingClientRect();
-  if(rect.width<1||rect.height<1)return false;
-  const rw=Math.max(1,Math.round(rect.width)),rh=Math.max(1,Math.round(rect.height));
-  if(cv.width!==rw)cv.width=rw;
-  if(cv.height!==rh)cv.height=rh;
-  cv.style.width=rect.width+"px";cv.style.height=rect.height+"px";
-  return true;
- }
- function draw(){
-  if(QEDIT!==state||!viewSize())return;
-  const x=cv.getContext("2d"),sx=cv.width/cw,sy=cv.height/ch;
-  const p=QEDIT.points;
-  x.clearRect(0,0,cv.width,cv.height);
-  if(p.length){
-   x.beginPath();
-   p.forEach((v,k)=>{const px=(v[0]-crop[0])*sx,py=(v[1]-crop[1])*sy;
-    if(k)x.lineTo(px,py);else x.moveTo(px,py);});
-   if(p.length===4)x.closePath();
-   x.fillStyle="rgba(34,197,94,.18)";
-   if(p.length===4)x.fill();
-   x.lineWidth=2;x.strokeStyle="#4ade80";x.stroke();
-   p.forEach((v,k)=>{
-    const px=(v[0]-crop[0])*sx,py=(v[1]-crop[1])*sy;
-    x.beginPath();x.arc(px,py,11,0,Math.PI*2);
-    x.fillStyle="#0f172a";x.fill();
-    x.lineWidth=3;x.strokeStyle="#4ade80";x.stroke();
-    x.fillStyle="#fff";x.font="bold 13px sans-serif";x.textAlign="center";
-    x.fillText(String(k+1),px,py+4);
-   });
-   const handle=plateQuadRotationHandle(p,crop,cv);
-   QEDIT.rotateHandle=handle;
-   if(handle){
-    x.beginPath();x.moveTo(handle.mx,handle.my);x.lineTo(handle.x,handle.y);
-    x.strokeStyle="#f59e0b";x.lineWidth=2;x.stroke();
-    x.beginPath();x.arc(handle.x,handle.y,13,0,Math.PI*2);
-    x.fillStyle="#92400e";x.fill();x.lineWidth=3;
-    x.strokeStyle="#fbbf24";x.stroke();
-    x.fillStyle="#fff";x.font="bold 20px sans-serif";x.textAlign="center";
-    x.fillText("↻",handle.x,handle.y+7);
-   }
-  }else QEDIT.rotateHandle=null;
- }
- function point(e){
-  const r=cv.getBoundingClientRect();
-  return [
-   Math.max(crop[0],Math.min(crop[2]-1,crop[0]+(e.clientX-r.left)/Math.max(1,r.width)*cw)),
-   Math.max(crop[1],Math.min(crop[3]-1,crop[1]+(e.clientY-r.top)/Math.max(1,r.height)*ch))
-  ];
- }
- function updateHint(){
-  if(QEDIT!==state||state.saving)return;
-  hint.textContent=QEDIT.drawing
-   ?"Click corner "+(QEDIT.points.length+1)+" of 4 on the plate preview"
-   :"Drag orange ↻ to rotate the whole plate; drag green handles for perspective.";
-  save.disabled=!imageReady||QEDIT.points.length!==4;
- }
- const onResize=()=>draw();
- const resizeObserver=typeof ResizeObserver!=="undefined"?new ResizeObserver(onResize):null;
- if(resizeObserver)resizeObserver.observe(img);
- // Observe rendered dimensions so the overlay follows responsive scaling.
- state.resizeObserver=resizeObserver;
- ov.querySelector("#qClose").onclick=closePlateQuad;
- ov.querySelector("#qRedraw").onclick=()=>{
-  if(QEDIT!==state||state.saving)return;
-  QEDIT.drawing=true;QEDIT.dragging=-1;QEDIT.rotation=null;
-  QEDIT.rotateHandle=null;QEDIT.points=[];state.dirty=true;
-  updateHint();draw();
- };
- ov.querySelector("#qReset").onclick=()=>{
-  if(QEDIT!==state||state.saving)return;
-  QEDIT.drawing=false;QEDIT.dragging=-1;QEDIT.rotation=null;
-  QEDIT.points=starting.map(p=>p.slice());state.dirty=false;
-  updateHint();draw();
- };
- function insideCrop(points){return points&&points.every(p=>p[0]>=crop[0]&&p[0]<crop[2]&&p[1]>=crop[1]&&p[1]<crop[3]);}
- function rotateStep(degrees){
-  if(QEDIT!==state||state.saving||QEDIT.drawing||QEDIT.points.length!==4)return;
-  const turned=plateQuadRotate(QEDIT.points,degrees*Math.PI/180,
-                              d.width,d.height);
-  if(!insideCrop(turned)){
-   hint.textContent="Rotation would leave the visible preview. Adjust the corners inward first.";
-   return;
-  }
-  QEDIT.points=turned;state.dirty=true;draw();
-  hint.textContent="Plate rotated "+(degrees>0?"+":"")+degrees+"°.";
- }
- ov.querySelector("#qRotateLeft").onclick=()=>rotateStep(-5);
- ov.querySelector("#qRotateRight").onclick=()=>rotateStep(5);
- cv.addEventListener("pointerdown",e=>{
-  if(QEDIT!==state||state.saving)return;
-  e.preventDefault();e.stopPropagation();
-  const p=point(e);
-  if(QEDIT.drawing){
-   QEDIT.points.push(p);state.dirty=true;
-   if(QEDIT.points.length===4)QEDIT.drawing=false;
-   updateHint();draw();return;
-  }
-  const r=cv.getBoundingClientRect();
-  const handle=QEDIT.rotateHandle;
-  if(handle&&Math.hypot(e.clientX-r.left-handle.x,
-                        e.clientY-r.top-handle.y)<=26){
-   const center=[QEDIT.points.reduce((n,v)=>n+v[0],0)/4,
-                 QEDIT.points.reduce((n,v)=>n+v[1],0)/4];
-   QEDIT.rotation={base:QEDIT.points.map(v=>v.slice()),center,
-      start:Math.atan2(p[1]-center[1],p[0]-center[0]),
-      pointerId:e.pointerId};
-   cv.setPointerCapture(e.pointerId);
-   hint.textContent="Rotating the whole plate; release to finish.";
-   return;
-  }
-  const dsx=r.width/cw,dsy=r.height/ch;
-  let nearest=-1,best=Infinity;
-  QEDIT.points.forEach((v,k)=>{
-   const dist=Math.hypot((v[0]-p[0])*dsx,(v[1]-p[1])*dsy);
-   if(dist<best){nearest=k;best=dist;}
+ PLATE_EDITS.clear();QEDIT=null;plateUnloadGuard();return true;
+}
+function initPlateCorners(img){
+ const meta=img._plateMeta,card=img.closest(".det"),stage=img.closest(".plate-preview");
+ if(!meta||!stage)return null;
+ if(img._quadEdit)return img._quadEdit;
+ const cv=stage.querySelector("canvas"),status=card.querySelector(".quad-status"),retry=card.querySelector(".quad-retry");
+ const s={i:meta.i,job:CUR,img,cv,meta,card,status,retry,points:plateCopy(meta.points),
+  saved:plateCopy(meta.points),version:0,dirty:false,pending:null,drag:null,error:null,
+  failures:0,readyAt:0,selected:0,events:new AbortController()};
+ img._quadEdit=s;PLATE_EDITS.set(s.i,s);const options={signal:s.events.signal};
+ cv.style.pointerEvents="auto";cv.tabIndex=0;
+ cv.setAttribute("aria-label","Plate corners: drag a numbered handle. Keyboard: 1–4 selects a corner, arrows adjust, Ctrl+Z undoes. Autosaves to this track.");
+ retry.onclick=()=>retryPlateSave(s);
+ s.draw=()=>{
+  const r=img.getBoundingClientRect(),c=s.meta.crop;
+  if(r.width<1||r.height<1)return;
+  cv.width=Math.max(1,Math.round(r.width));cv.height=Math.max(1,Math.round(r.height));
+  const x=cv.getContext("2d"),sx=cv.width/(c[2]-c[0]),sy=cv.height/(c[3]-c[1]);
+  x.clearRect(0,0,cv.width,cv.height);x.beginPath();
+  s.points.forEach((p,k)=>{const px=(p[0]-c[0])*sx,py=(p[1]-c[1])*sy;
+   if(k)x.lineTo(px,py);else x.moveTo(px,py);});
+  x.closePath();x.strokeStyle=plateQuadValid(s.points)?"#4ade80":"#f87171";x.lineWidth=2;x.stroke();
+  s.points.forEach((p,k)=>{const px=(p[0]-c[0])*sx,py=(p[1]-c[1])*sy;
+   x.beginPath();x.arc(px,py,8,0,Math.PI*2);x.fillStyle="#0f172a";x.fill();x.stroke();
+   x.fillStyle="#fff";x.font="bold 10px sans-serif";x.textAlign="center";x.fillText(String(k+1),px,py+3);
   });
-  if(best<=36){
-   QEDIT.dragging=nearest;
-   cv.setPointerCapture(e.pointerId);
-  }else{
-   hint.textContent="Select a green numbered handle, or click Redraw 4 corners.";
-  }
- },{signal:state.events.signal});
- cv.addEventListener("pointermove",e=>{
-  if(QEDIT!==state||state.saving)return;
-  if(QEDIT.rotation&&QEDIT.rotation.pointerId===e.pointerId){
-   e.preventDefault();e.stopPropagation();
-   const p=point(e),r=QEDIT.rotation,
-         angle=Math.atan2(p[1]-r.center[1],p[0]-r.center[0])-r.start;
-   const rotated=plateQuadRotate(r.base,angle,d.width,d.height);
-   if(insideCrop(rotated)){QEDIT.points=rotated;state.dirty=true;draw();}
-   else hint.textContent="Rotation would move the plate outside the visible preview.";
-   return;
-  }
-  if(QEDIT.dragging<0)return;
-  e.preventDefault();e.stopPropagation();
-  QEDIT.points[QEDIT.dragging]=point(e);state.dirty=true;
-  draw();
- },{signal:state.events.signal});
- function endDrag(){
-  if(QEDIT===state){QEDIT.dragging=-1;QEDIT.rotation=null;}
- }
- cv.addEventListener("pointerup",endDrag,{signal:state.events.signal});
- cv.addEventListener("pointercancel",endDrag,{signal:state.events.signal});
- cv.addEventListener("lostpointercapture",endDrag,{signal:state.events.signal});
- save.onclick=async()=>{
-  if(QEDIT!==state||state.saving||QEDIT.points.length!==4)return;
-  state.saving=true;save.disabled=true;
-  const status=ov.querySelector("#qStatus");
-  status.textContent="Saving four corners…";
-  try{
-   const {data}=await reviewRequest("api/jobs/"+state.job+"/plate_quad/"+i,{method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({points:state.points,preview_token:d.preview_token,
-     apply_track:ov.querySelector("#qTrack").checked})});
-   if(QEDIT!==state||CUR!==state.job)return;
-   Object.assign(d,data.preview);img._plateMeta=d;
-   starting.splice(0,starting.length,...d.points.map(p=>p.slice()));
-   state.points=starting.map(p=>p.slice());state.dirty=false;draw();
-   ov.querySelector("#qClose").textContent="Done editing";
-   VLBL[i]="plate";
-   const label=document.getElementById("vlabel"+i);
-   if(label)label.textContent="Confirmed plate";
-   status.textContent="Saved "+data.applied+
-    " box(es); 1 verified training sample stored locally.";
-   if(document.getElementById("beCv"))beScrub();
-  }catch(error){
-   status.textContent="Save failed: "+error.message;
-  }finally{state.saving=false;save.disabled=false;}
  };
- updateHint();draw();
+ function point(e){const r=cv.getBoundingClientRect(),c=s.meta.crop;
+  return [Math.max(c[0],Math.min(c[2]-1,c[0]+(e.clientX-r.left)/r.width*(c[2]-c[0]))),
+          Math.max(c[1],Math.min(c[3]-1,c[1]+(e.clientY-r.top)/r.height*(c[3]-c[1])))];}
+ function nearest(e){const r=cv.getBoundingClientRect(),c=s.meta.crop,p=point(e);
+  let index=-1,best=e.pointerType==="touch"?26:18;
+  s.points.forEach((v,k)=>{const distance=Math.hypot((v[0]-p[0])*r.width/(c[2]-c[0]),(v[1]-p[1])*r.height/(c[3]-c[1]));
+   if(distance<best){index=k;best=distance;}});return index;}
+ function finish(e,cancel=false){
+  if(!s.drag||(e&&e.pointerId!==s.drag.id))return;
+  const drag=s.drag;s.drag=null;
+  if(cancel)s.points=drag.before;else commitPlateGesture(s,drag.before);
+  if(cv.hasPointerCapture(drag.id))cv.releasePointerCapture(drag.id);
+  s.draw();schedulePlateSaves();
+ }
+ s.cancelDrag=()=>finish(null,true);
+ cv.addEventListener("pointerdown",e=>{
+  e.stopPropagation();if(e.button!==0||s.drag||PLATE_REVIEW_BUSY)return;
+  const k=nearest(e);if(k<0)return;
+  e.preventDefault();QEDIT=s;s.selected=k;s.drag={id:e.pointerId,before:plateCopy(s.points)};
+  cv.focus({preventScroll:true});cv.setPointerCapture(e.pointerId);plateUnloadGuard();
+ },options);
+ cv.addEventListener("pointermove",e=>{
+  if(!s.drag){cv.style.cursor=nearest(e)>=0?"grab":"default";return;}
+  if(e.pointerId!==s.drag.id)return;
+  e.preventDefault();e.stopPropagation();s.points[s.selected]=point(e);cv.style.cursor="grabbing";s.draw();
+ },options);
+ cv.addEventListener("pointerup",e=>finish(e),options);
+ cv.addEventListener("pointercancel",e=>finish(e,true),options);
+ cv.addEventListener("lostpointercapture",e=>finish(e,true),options);
+ cv.addEventListener("click",e=>e.stopPropagation(),options);
+ cv.addEventListener("keydown",e=>{
+  QEDIT=s;
+  if(e.key==="Escape"){s.cancelDrag();return;}
+  if(s.drag||PLATE_REVIEW_BUSY)return;
+  if(/^[1-4]$/.test(e.key)){s.selected=Number(e.key)-1;e.preventDefault();return;}
+  const before=plateCopy(s.points),c=s.meta.crop;
+  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="z"&&s.undo){s.points=plateCopy(s.undo);}
+  else{
+   const delta={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]}[e.key];
+   if(!delta)return;
+   const p=s.points[s.selected],step=e.shiftKey?10:1;
+   s.points[s.selected]=[Math.max(c[0],Math.min(c[2]-1,p[0]+delta[0]*step)),
+                         Math.max(c[1],Math.min(c[3]-1,p[1]+delta[1]*step))];
+  }
+  e.preventDefault();commitPlateGesture(s,before);s.draw();
+ },options);
+ s.observer=typeof ResizeObserver!=="undefined"?new ResizeObserver(s.draw):null;
+ if(s.observer)s.observer.observe(img);
+ plateStatus(s,"Drag corners · autosaves");s.draw();return s;
+}
+document.addEventListener("visibilitychange",()=>{
+ if(document.hidden){for(const s of PLATE_EDITS.values())if(s.dirty&&!s.error)s.readyAt=0;pumpPlateSaves();}
+});
+async function zoomDet(i){
+ const el=document.getElementById("det"+i);if(el&&el.dataset.cat==="plate")return;
+ let ov=document.getElementById("lb");
+ if(!ov){ov=document.createElement("div");ov.id="lb";document.body.appendChild(ov);}
+ ov.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:100;display:flex;align-items:center;justify-content:center;cursor:zoom-out;padding:18px";
+ ov.onclick=()=>ov.remove();
+ ov.innerHTML='<img src="api/jobs/'+CUR+'/detframe/'+i+'" style="max-width:96%;max-height:96%;border-radius:8px">';
 }
 function beRemove(){
  if(BE.sel<0)return;
@@ -3897,6 +3867,7 @@ async function resumeJob(){
   let data={};try{data=await response.json();}catch(_){}
   alert(data.error||"Unable to resume scan");return;
  }
+ closePlateQuad();clearReviewPreviews();
  const rv=document.getElementById("review");if(rv)rv.remove();
  SHELLPH=null;await refresh();
 }
@@ -3904,9 +3875,9 @@ async function cancelJob(){await fetch("api/jobs/"+CUR+"/cancel",{method:"POST"}
 
 // the three post-render views (compare, review, box editor) are mutually
 // exclusive: opening one closes the others instead of stacking them
-function showPanel(which){
+async function showPanel(which){
  if(which!=="boxedit_rev"&&which!=="review"){
-  if(!closePlateQuad())return;clearReviewPreviews();
+  if(!await flushPlateSaves()||!closePlateQuad())return false;clearReviewPreviews();
  }
  // a playing box-editor video must be PAUSED before its DOM is wiped —
  // an element removed via innerHTML can keep its audio running
@@ -3926,10 +3897,11 @@ function showPanel(which){
   if(which!=="review"){
    const rev=document.getElementById("review");if(rev)rev.remove();}
  }
+ return true;
 }
 
 async function loadCompare(){
- showPanel("compare");
+ if(!await showPanel("compare"))return;
  const d=await (await fetch(`api/jobs/${CUR}/detections`)).json();
  const c=document.getElementById("compare");
  c.innerHTML=`<div class="row" style="margin-top:8px">t=
@@ -3963,11 +3935,11 @@ function plateFallbackText(x){
 }
 let VLBL={},VLBLJOB=null;  // explicit human labels; never infer from default blur state
 async function loadReview(){
- if(QEDIT&&QEDIT.dirty&&!confirm("Discard unsaved corner edits?"))return;
+ if(!await flushPlateSaves())return;
  if(!closePlateQuad())return;
  clearReviewPreviews();
  const job=CUR,view=JOBVIEW;
- showPanel("review");
+ if(!await showPanel("review"))return;
  if(VLBLJOB!==CUR){VLBL={};VLBLJOB=CUR;}
  let d;
  try{d=(await reviewRequest(`api/jobs/${job}/detections`)).data;}catch(error){
@@ -3984,7 +3956,7 @@ async function loadReview(){
   (groups[x.category]=groups[x.category]||[]).push(x);});
  let html=`<div class="card" id="review"><h2>Review findings</h2>
  <p class="review-copy">Choose what happens in the output. Thumbnails show the original video;
- boxes mark detections.<br>Changes apply after <b>Save edits &amp; render</b>.
+ boxes mark detections.<br>Drag plate corners to autosave their shape to the track. Output choices apply after <b>Save edits &amp; render</b>.
  Drag across cards to select several.</p>
  <p class="review-copy">Thumbnail rectangles are selection guides. Open shaped masks to inspect their coverage and exclusions.</p>
  <div class="row" style="margin:0 0 8px">
@@ -4049,18 +4021,18 @@ async function loadReview(){
     <div class="${x.category==="plate"?"plate-preview":"finding-preview"}">
     <img id="thumb${x.i}" data-preview-url="api/jobs/${job}/thumb/${x.i}" alt="Original detection preview"
      class="${x.category==="plate"?"plate-edit-thumb":""}"
-     title="${x.category==="plate"?"Click to edit the plate corners":"Enlarge detection"}"
+     title="${x.category==="plate"?"Drag numbered corners; autosaved to this track":"Enlarge detection"}"
      style="cursor:${x.category==="plate"?"pointer":"zoom-in"}"
-     onclick="${x.category==="plate"?"openPlateQuad(event,"+x.i+")":"zoomDet("+x.i+")"}"
+     onclick="${x.category==="plate"?"":"zoomDet("+x.i+")"}"
      onpointerdown="${x.category==="plate"?"event.stopPropagation()":""}"
      draggable="false" ondragstart="return false"
-     >${x.category==="plate"?'<canvas class="plate-outline" aria-hidden="true"></canvas>':""}</div>
+     >${x.category==="plate"?'<canvas class="plate-outline"></canvas>':""}</div>
     <small class="preview-status" role="status">Preview not loaded</small>
     <button class="sec preview-retry" hidden onclick="retryReviewPreview(this)">Retry preview</button>
+    ${x.category==="plate"?'<small class="quad-status" role="status" title="Corners apply to this detected track. Review changing perspective. Keyboard: select corner 1–4, use arrows; Ctrl+Z undoes.">Corners autosave to track</small><button type="button" class="sec quad-retry" hidden>Retry save</button>':""}
     <div>${plateFallbackText(x)?`<span class="badge" style="white-space:normal">${plateFallbackText(x)}</span> `:""}${x.shaped?'<span class="badge" title="Thumbnail rectangle is a selection guide; open to inspect the mask and any exclusions">shaped mask</span> ':""}${x.personcard?`<b>Person ${x.person+1}</b> — one decision for ALL their appearances`:`"${x.text}"`}${x.frames?` <span class="badge">×${x.frames} frames</span>`:""}${x.confidence?` <span class="badge" title="detector confidence — low values on a non-face thumbnail usually mean a false detection">${Math.round(x.confidence*100)}%</span>`:""} <br>${x.t_start.toFixed(1)}–${x.t_end.toFixed(1)}s</div>
     <div id="bb${x.i}">${detChoices(x.i)}</div>
-    ${x.category==="plate"?`<button type="button" class="sec" onclick="openPlateQuad(event,${x.i})">Edit 4 corners</button>
-     <button class="sec" onclick="labelPlate(${x.i},'plate')">✓ Confirm plate</button>
+    ${x.category==="plate"?`<button class="sec" onclick="labelPlate(${x.i},'plate')">✓ Confirm plate</button>
      <button class="sec" onclick="labelPlate(${x.i},'not_plate')">✕ Not a plate</button>
      <small id="vlabel${x.i}" style="color:#93c5fd">${VLBL[x.i]==="plate"?"Confirmed plate":VLBL[x.i]==="not_plate"?"Hard negative":""}</small>`:""}
    </div>`}
@@ -4191,11 +4163,18 @@ document.addEventListener("click",e=>{
  document.querySelectorAll(".qm.open").forEach(x=>{if(x!==q)x.classList.remove("open");});
  if(q)q.classList.toggle("open");});
 document.addEventListener("keydown",e=>{
- if(e.key==="Escape"){clearSel();closePlateQuad();
+ if(e.key==="Escape"){clearSel();if(QEDIT)QEDIT.cancelDrag();
   const lb=document.getElementById("lb");if(lb)lb.remove();}});
 
 async function saveAndRender(saveOnly=false){
- if(QEDIT&&(QEDIT.dirty||QEDIT.saving)){alert("Save or cancel the corner edits first.");return false;}
+ if(PLATE_REVIEW_BUSY)return false;
+ PLATE_REVIEW_BUSY=true;
+ try{
+  if(!await flushPlateSaves())return false;
+  return await persistReview(saveOnly);
+ }finally{PLATE_REVIEW_BUSY=false;}
+}
+async function persistReview(saveOnly=false){
  // Do not render until the server has confirmed the latest pending preview.
  if(document.getElementById("beCv")){
   if(BE.drag||BE.pending){
@@ -4232,6 +4211,7 @@ async function saveAndRender(saveOnly=false){
  }
  const render=await fetch(`api/jobs/${CUR}/render`,{method:"POST"});
  if(!render.ok){alert("Could not start render");return false;}
+ closePlateQuad();clearReviewPreviews();
  const rv=document.getElementById("review"); if(rv)rv.remove();
  return true;
 }
@@ -4358,6 +4338,7 @@ async function vaultAutolockSave(){
  vaultStatus();
 }
 async function vaultDoLock(){
+ if(!await flushPlateSaves())return;
  if(!confirm("Encrypt all job files now?\\n\\nYou will need the password to access them again."))return;
  const r=await fetch("/api/vault/lock",{method:"POST"});
  alert(r.ok?("Locked — "+(await r.json()).encrypted+" file(s) encrypted."):await r.text());

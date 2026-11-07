@@ -4061,7 +4061,7 @@ def test_indexed_review_pointer_edits_wait_for_matched_frame(tmp_path):
     if not shutil.which('node'):
         pytest.skip('node required for evaluated PAGE behavior')
     page=web.PAGE
-    script=page[page.index('async function beScrub(){'):page.index('// Pure rigid-body rotation')]
+    script=page[page.index('async function beScrub(){'):page.index('// Only visible finding previews')]
     harness=r'''
 const assert=require('assert');let handlers={},captures=0,prompts=0,tracks=0,queue=[];
 const ctx={clearRect(){},fillRect(){},strokeRect(){},beginPath(){},moveTo(){},lineTo(){},closePath(){},fill(){},stroke(){},setLineDash(){}};
@@ -4237,10 +4237,10 @@ const rows = [
   {i:2,enabled:false,track:-1,person:-1,category:'plate',text:'plate',t_start:0,t_end:2}
 ];
 const context = vm.createContext({assert, EN:{}, CUR:'test', DUR:0, CATDN:{}, QEDIT:null, JOBVIEW:0, SHELLPH:'review',
-  closePlateQuad(){return true;}, clearReviewPreviews(){}, initReviewPreviews(){},
+  closePlateQuad(){return true;}, flushPlateSaves:async()=>true, clearReviewPreviews(){}, initReviewPreviews(){},
   reviewRequest:async()=>({data:{duration:2,detections:rows}}),
   fetch:async()=>({json:async()=>({duration:2,detections:rows})}),
-  showPanel(){}, initMarquee(){},
+  showPanel(){return true;}, initMarquee(){},
   document:{getElementById(id){
     if(!/^bb\d+$|^det\d+$/.test(id)) return null;
     return elements[id] ||= {classList:{toggle(){}},querySelector(){return {};},
