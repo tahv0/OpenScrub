@@ -86,7 +86,7 @@ def test_real_inline_edit_save_cancel_and_lazy_loading(review_server, viewport, 
             page.expose_function('__flaskFetch', serve)
             page.evaluate("""() => {window.fetch=async(url,options={})=>{
               const r=await window.__flaskFetch(String(url),{method:options.method,body:options.body,headers:options.headers});
-              return new Response(Uint8Array.from(atob(r.body),c=>c.charCodeAt(0)),{status:r.status,headers:r.headers});
+              return new Response(r.status===204?null:Uint8Array.from(atob(r.body),c=>c.charCodeAt(0)),{status:r.status,headers:r.headers});
             };}""")
             with web.app.test_client() as client:
                 page.set_content(client.get('/').get_data(as_text=True), wait_until='domcontentloaded')
@@ -154,3 +154,51 @@ def test_real_inline_edit_save_cancel_and_lazy_loading(review_server, viewport, 
         assert max(abs(a-b) for p,q in zip(reopened,before_save) for a,b in zip(p,q)) < .001
         assert not errors, errors
         browser.close()
+
+
+def test_cached_card_loads_while_another_preview_is_decoding(review_server, monkeypatch, tmp_path):
+    """A cold card must not block a ready card behind it in browser or server."""
+    sync_api = pytest.importorskip('playwright.sync_api')
+    url, _ = review_server
+    with web.app.test_client() as client:
+        assert client.get('/api/jobs/inline-fixture/thumb/1').status_code == 200
+    entered, release = threading.Event(), threading.Event()
+    original = web._frame_at
+    calls = []
+    def slow(*args, **kwargs):
+        calls.append(True)
+        entered.set()
+        assert release.wait(15), 'test failed to release the decoder'
+        return original(*args, **kwargs)
+    monkeypatch.setattr(web, '_frame_at', slow)
+    try:
+        with sync_api.sync_playwright() as pw:
+            browser = browser_instance(pw)
+            page = browser.new_page(viewport={'width': 1440, 'height': 1000})
+            errors = []
+            page.on('pageerror', lambda e: errors.append(str(e)))
+            page.goto(url)
+            page.get_by_role('link', name='Synthetic review fixture', exact=True).click()
+            page.locator('#review').wait_for()
+            page.locator('#det0').scroll_into_view_if_needed()
+            page.wait_for_function(
+                "document.querySelector('#det1 img').naturalWidth > 0", timeout=5000)
+            assert entered.wait(2)
+            assert not release.is_set()
+            assert page.locator('#det0 img').evaluate('(img)=>img.naturalWidth') == 0
+            card = page.locator('#det1')
+            card.get_by_role('button', name='Edit 4 corners', exact=True).click()
+            page.locator('#qSave').wait_for(timeout=2000)
+            before = page.evaluate('QEDIT.points.map(p=>p.slice())')
+            page.locator('#qRotateRight').click()
+            assert page.evaluate('QEDIT.points') != before
+            assert len(calls) == 1
+            assert not errors
+            evidence = Path(os.environ.get('REVIEW_EVIDENCE_DIR', str(tmp_path)))
+            evidence.mkdir(parents=True, exist_ok=True)
+            page.locator('#review').screenshot(path=str(evidence/'cached-while-decoding.png'))
+            release.set()
+            page.wait_for_function("document.querySelector('#det0 img').naturalWidth > 0")
+            browser.close()
+    finally:
+        release.set()
