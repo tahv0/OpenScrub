@@ -331,7 +331,7 @@ def verify(args):
             # Reproduce the user's report with real Chromium pointer events.
             editor_button = card.get_by_role("button", name="Edit 4 corners", exact=True)
             editor_button.click()
-            dialog = page.locator("#plateQuadOverlay")
+            dialog = page.locator("#plateQuadEditor")
             dialog.wait_for(timeout=15000)
             page.wait_for_function(
                 "() => !!window.QEDIT || (typeof QEDIT!=='undefined' && QEDIT!==null)"
@@ -340,7 +340,7 @@ def verify(args):
             page.wait_for_function(
                 "() => document.getElementById('qImg').naturalWidth > 0 && "
                 "document.getElementById('qCv').width > 0")
-            evidence.check("four-corner editor opens a magnified draggable preview",
+            evidence.check("four-corner editor opens inline with a reusable draggable preview",
                            dialog.is_visible() and
                            page.locator("#qRedraw").is_visible() and
                            page.locator("#qCv").bounding_box()["width"] > 0 and
@@ -400,7 +400,7 @@ def verify(args):
                            page.locator("#qSave").is_enabled())
             page.locator("#qClose").click()
             evidence.check("closing plate editor returns to normal review",
-                           page.locator("#plateQuadOverlay").count() == 0)
+                           page.locator("#plateQuadEditor").count() == 0)
             card.locator("img.plate-edit-thumb").click()
             dialog.wait_for(timeout=10000)
             evidence.check("thumbnail also opens editing instead of a zoom-only cursor",

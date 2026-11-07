@@ -5,6 +5,8 @@ on:
     paths:
       - 'openscrub_web.py'
       - 'test_plate_quad_editor.py'
+      - 'test_review_performance.py'
+      - 'test_review_browser.py'
       - 'tools/integration_smoke.py'
       - '.github/workflows/plate-quad-editor.yml'
   workflow_dispatch:
@@ -21,14 +23,33 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+      - name: Install video preview tools
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
       - name: Install isolated test dependencies
         run: |
           python -m pip install --upgrade pip
           python -m pip install "numpy<3" "opencv-python-headless<5" pytest flask rapidfuzz pyyaml cryptography
       - name: Check syntax, embedded UI and browser test harness
         run: |
-          python -m py_compile openscrub_web.py test_plate_quad_editor.py tools/integration_smoke.py
+          python -m py_compile openscrub_web.py test_plate_quad_editor.py test_review_performance.py test_review_browser.py tools/integration_smoke.py
           python -c 'import openscrub_web; open("_plate_editor.js","w",encoding="utf-8").write(openscrub_web.APP_JS)'
           node --check _plate_editor.js
       - name: Test editor crop, persisted four-corner samples and validation
-        run: python -m pytest -q test_plate_quad_editor.py
+        run: python -m pytest -q test_plate_quad_editor.py test_review_performance.py
+      - name: Install browser test dependencies
+        if: matrix.python-version == '3.12'
+        run: |
+          python -m pip install playwright
+          python -m playwright install --with-deps chromium
+      - name: Test real HTTP inline review on desktop and mobile
+        if: matrix.python-version == '3.12'
+        env:
+          REVIEW_EVIDENCE_DIR: review-evidence
+        run: python -m pytest -q test_review_browser.py
+      - uses: actions/upload-artifact@v4
+        if: always() && matrix.python-version == '3.12'
+        with:
+          name: inline-review-browser-evidence
+          path: review-evidence/
+          if-no-files-found: ignore
+          retention-days: 7
