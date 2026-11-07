@@ -1320,24 +1320,38 @@ def _save_verified_plate_sample(job, frame, points, index, tref):
         pass
 
 
-@app.route("/api/jobs/<jid>/plate_quad/<int:i>", methods=["GET", "POST"])
-def job_plate_quad(jid, i):
-    """Review a plate with four free corners; keep verified samples local.
+def _plate_editor_crop(box, points, width, height):
+    """View-sized crop around an editable plate, including skewed corners.
 
-    Quadrilaterals are normalized to each detection's *un-padded* bbox.
-    Propagated shapes affect rendering but are NOT verified training labels.
+    Keep enough context to find the edges of a narrow/distant plate, while
+    magnifying it instead of showing the full video frame at 4K scale.
     """
-    job = JOBS.get(jid) or abort(404)
-    if request.method == "POST" and job["phase"] not in (
-            "paused", "review", "done"):
-        return jsonify({"error": "Cannot edit plates while scanning"}), 409
+    xs = [float(box[0]), float(box[2])] + [float(p[0]) for p in points]
+    ys = [float(box[1]), float(box[3])] + [float(p[1]) for p in points]
+    xmin, xmax = min(xs), max(xs)
+    ymin, ymax = min(ys), max(ys)
+    pad_x = max(32.0, 0.40 * (xmax - xmin))
+    pad_y = max(28.0, 1.50 * (ymax - ymin))
+    x1 = max(0, int(np.floor(xmin - pad_x)))
+    y1 = max(0, int(np.floor(ymin - pad_y)))
+    x2 = min(width, int(np.ceil(xmax + pad_x)))
+    y2 = min(height, int(np.ceil(ymax + pad_y)))
+    if x2 <= x1 or y2 <= y1:
+        abort(400, description="Plate is outside the video frame")
+    return [x1, y1, x2, y2]
+
+
+def _plate_editor_snapshot(job, index):
+    """One consistent source frame and crop for GET, image and POST."""
     doc = _load_job_report(job)
     rows = doc.get("detections", [])
-    if i < 0 or i >= len(rows) or rows[i].get("category") != "plate":
+    if not (0 <= index < len(rows)) or rows[index].get("category") != "plate":
         abort(404)
-    d = rows[i]
+    d = rows[index]
     rs = doc["render_state"]
     fps = float(rs["fps"])
+    if not rs.get("cum") or fps <= 0:
+        abort(400, description="Review timeline not available")
     tref = min(max(float(d.get("last_seen", d["t_start"])),
                    float(d["t_start"])), float(d["t_end"]))
     fidx = min(max(0, int(tref * fps)), len(rs["cum"]) - 1)
@@ -1346,56 +1360,79 @@ def job_plate_quad(jid, i):
            float(d["cbox"][2]) + ox, float(d["cbox"][3]) + oy]
     bw, bh = box[2] - box[0], box[3] - box[1]
     if bw <= 0 or bh <= 0:
-        abort(400)
-    default = [[0., 0.], [1., 0.], [1., 1.], [0., 1.]]
+        abort(400, description="Invalid plate detection box")
+    frame = _frame_at(job, tref, rs)
+    if frame is None:
+        abort(404, description="Could not decode plate frame")
+    q = d.get("plate_quad") or ((0., 0.), (1., 0.), (1., 1.), (0., 1.))
+    points = [[box[0] + float(x) * bw, box[1] + float(y) * bh]
+              for x, y in q]
+    crop = _plate_editor_crop(box, points, frame.shape[1], frame.shape[0])
+    return doc, d, frame, tref, box, points, crop
+
+
+@app.route("/api/jobs/<jid>/plate_quad/<int:i>/frame")
+def job_plate_quad_frame(jid, i):
+    """Unredacted close-up used only by the authenticated review editor."""
+    job = JOBS.get(jid) or abort(404)
+    _, _, frame, _, _, _, crop = _plate_editor_snapshot(job, i)
+    x1, y1, x2, y2 = crop
+    success, encoded = cv2.imencode(
+        ".jpg", frame[y1:y2, x1:x2], [cv2.IMWRITE_JPEG_QUALITY, 95])
+    if not success:
+        abort(500, description="Could not encode the review frame")
+    response = Response(encoded.tobytes(), mimetype="image/jpeg")
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@app.route("/api/jobs/<jid>/plate_quad/<int:i>", methods=["GET", "POST"])
+def job_plate_quad(jid, i):
+    """Drag/re-draw four plate corners; save only user-verified geometry."""
+    job = JOBS.get(jid) or abort(404)
+    if request.method == "POST" and job["phase"] not in (
+            "paused", "review", "done"):
+        return jsonify({"error": "Cannot edit plates while scanning"}), 409
+    doc, d, frame, tref, box, points, crop = _plate_editor_snapshot(job, i)
     if request.method == "GET":
-        q = d.get("plate_quad") or default
-        frame = _frame_at(job, tref, rs)
-        if frame is None:
-            abort(404)
         return jsonify({"i": i, "t": tref, "width": frame.shape[1],
                         "height": frame.shape[0], "box": box,
-                        "points": [[box[0] + x * bw, box[1] + y * bh]
-                                   for x, y in q],
+                        "crop": crop, "points": points,
                         "track": d.get("track", -1)})
-    payload = request.get_json(force=True)
+    payload = request.get_json(silent=True) or {}
     try:
         p = np.asarray(payload["points"], dtype=np.float64)
     except (KeyError, TypeError, ValueError):
-        return jsonify({"error": "four corner points required"}), 400
+        return jsonify({"error": "Four corner points required"}), 400
     if p.shape != (4, 2) or not np.isfinite(p).all():
-        return jsonify({"error": "invalid corner coordinates"}), 400
-    frame = _frame_at(job, tref, rs)
-    if frame is None:
-        abort(404)
+        return jsonify({"error": "Invalid corner coordinates"}), 400
     h, w = frame.shape[:2]
     if (np.any(p[:, 0] < 0) or np.any(p[:, 0] >= w) or
             np.any(p[:, 1] < 0) or np.any(p[:, 1] >= h)):
-        return jsonify({"error": "corners must be inside the video frame"}), 400
+        return jsonify({"error": "Corners must be inside the video frame"}), 400
     contour = p.astype(np.float32).reshape((-1, 1, 2))
     if (not cv2.isContourConvex(contour) or
             cv2.contourArea(contour) < 8.0):
-        return jsonify({"error": "corners must form a convex quadrilateral"}), 400
+        return jsonify({"error": "Corners must form a convex quadrilateral"}), 400
+    bw, bh = box[2] - box[0], box[3] - box[1]
     q = [[round((float(x) - box[0]) / bw, 6),
           round((float(y) - box[1]) / bh, 6)] for x, y in p]
     d["verified_label"] = "plate"
     apply_track = payload.get("apply_track") is True
     tid = d.get("track", -1)
     changed = 0
-    for j, r in enumerate(rows):
+    for j, r in enumerate(doc["detections"]):
         if j != i and not (apply_track and tid >= 0 and
                            r.get("track", -1) == tid and
                            r.get("category") == "plate"):
             continue
         r["plate_quad"] = q
         changed += 1
-    # Only the exact manually edited frame is verified ground truth.
     _save_verified_plate_sample(job, frame, p, i, tref)
     stop_review.atomic_report(
         os.path.join(job["dir"], "report.json"), doc)
     return jsonify({"ok": True, "applied": changed,
                     "verified_samples_added": 1})
-
 
 
 def _requested_review_frame(rstate):
