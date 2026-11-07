@@ -1496,14 +1496,40 @@ def _store_plate_preview(job, index, meta, pixels):
         with tempfile.NamedTemporaryFile(dir=job["dir"], suffix=".npz", delete=False) as out:
             temp = out.name
             np.savez_compressed(out, pixels=pixels, metadata=json.dumps(meta))
-        os.replace(temp, destination)
+        with _REVIEW_CACHE_LOCK:
+            if vault_locked():
+                abort(423)
+            os.replace(temp, destination)
     finally:
         if temp and os.path.exists(temp):
             os.unlink(temp)
 
 
-def _plate_preview(job, index):
-    doc = _load_job_report(job)
+def _cached_plate_preview(job, index, key):
+    """Read a valid published crop without occupying the video decoder.
+
+    The cache gate also protects reads from vault encryption. Never acquire
+    the work/decoder gate while holding this lock (lock order: work -> cache).
+    Atomic publication means readers see either complete version, never half
+    a crop. A mismatching token is a miss, not an editable stale fallback.
+    """
+    cache = os.path.join(job["dir"], "plate_preview_%d.npz" % int(index))
+    with _REVIEW_CACHE_LOCK:
+        if vault_locked():
+            abort(423)
+        try:
+            with np.load(cache, allow_pickle=False) as stored:
+                meta = json.loads(str(stored["metadata"]))
+                if meta.get("preview_token") == key:
+                    return meta, stored["pixels"].copy()
+        except (OSError, ValueError, KeyError, EOFError, zipfile.BadZipFile):
+            pass
+    return None
+
+
+def _plate_preview(job, index, doc=None, cache_only=False):
+    if doc is None:
+        doc = _load_job_report(job)
     rows = doc.get("detections", [])
     if not (0 <= index < len(rows)) or rows[index].get("category") != "plate":
         abort(404)
@@ -1511,21 +1537,19 @@ def _plate_preview(job, index):
     if not rs.get("cum") or float(rs["fps"]) <= 0:
         abort(400, description="Review timeline not available")
     key, fidx, tref = _plate_preview_key(job, index, d, rs)
-    cache = os.path.join(job["dir"], "plate_preview_%d.npz" % int(index))
-    # A single gate covers both decoding and cache publication, so concurrent
-    # requests do not duplicate work or race the vault's encryption pass.
+    cached = _cached_plate_preview(job, index, key)
+    if cached is not None:
+        return doc, d, *cached
+    if cache_only:
+        return None
+    # Cold generation stays bounded. Warm reads above never wait for it.
     if not _REVIEW_WORK_LOCK.acquire(blocking=False):
         abort(503, description="Another preview is decoding. Retry this finding.")
     try:
-        if vault_locked():
-            abort(423)
-        try:
-            with np.load(cache, allow_pickle=False) as stored:
-                meta = json.loads(str(stored["metadata"]))
-                if meta.get("preview_token") == key:
-                    return doc, d, meta, stored["pixels"].copy()
-        except (OSError, ValueError, KeyError, EOFError, zipfile.BadZipFile):
-            pass
+        # Another request may have published the crop before we got the gate.
+        cached = _cached_plate_preview(job, index, key)
+        if cached is not None:
+            return doc, d, *cached
         ox, oy = rs["cum"][fidx]
         box = [float(d["cbox"][0])+ox, float(d["cbox"][1])+oy,
                float(d["cbox"][2])+ox, float(d["cbox"][3])+oy]
@@ -1572,13 +1596,14 @@ def job_plate_quad(jid, i):
     job = JOBS.get(jid) or abort(404)
     if request.method == "POST" and job["phase"] not in ("paused", "review", "done"):
         return jsonify({"error": "Cannot edit plates while scanning"}), 409
+    if request.method == "GET":
+        _, _, meta, _ = _plate_preview(job, i)
+        return jsonify(meta)
     # Serialize save/cache writes, but do not park a queue of HTTP workers.
     if not _REVIEW_WORK_LOCK.acquire(blocking=False):
         abort(503, description="Another preview is decoding. Retry this finding.")
     try:
         doc, d, meta, pixels = _plate_preview(job, i)
-        if request.method == "GET":
-            return jsonify(meta)
         payload = request.get_json(silent=True) or {}
         if (payload.get("preview_token") is not None and
                 payload["preview_token"] != meta["preview_token"]):
@@ -1701,8 +1726,12 @@ def job_thumb(jid, i):
     doc = _load_job_report(job)
     if not (0 <= i < len(doc["detections"])):
         abort(404)
+    cache_only = request.args.get("cache_only") == "1"
     if doc["detections"][i].get("category") == "plate":
-        _, _, meta, pixels = _plate_preview(job, i)
+        preview = _plate_preview(job, i, doc=doc, cache_only=cache_only)
+        if preview is None:
+            return Response(status=204, headers={"Cache-Control": "no-store"})
+        _, _, meta, pixels = preview
         return _plate_preview_response(meta, pixels)
     # i is already a Flask <int:> route var, but CodeQL doesn't trust the
     # converter — format it as an explicit non-negative integer so the
@@ -1712,9 +1741,8 @@ def job_thumb(jid, i):
         abort(404)
     cache = os.path.join(job["dir"], "thumb2_%d.jpg" % i)
     if not os.path.exists(cache):
-        doc = _load_job_report(job)
-        if i >= len(doc["detections"]):
-            abort(404)
+        if cache_only:
+            return Response(status=204, headers={"Cache-Control": "no-store"})
         d = doc["detections"][i]
         rs = doc["render_state"]
         # cut the thumbnail at a moment the detector actually SAW the object.
@@ -3481,7 +3509,7 @@ function clearReviewPreviews(){
  const old=REVIEW_MEDIA;REVIEW_MEDIA=null;
  if(old.observer)old.observer.disconnect();
  old.controllers.forEach(c=>c.abort());
- old.queue.splice(0).forEach(task=>task.resolve(false));
+ [...old.queue.splice(0),...old.cacheQueue.splice(0)].forEach(task=>task.resolve(false));
  old.urls.forEach(url=>URL.revokeObjectURL(url));
 }
 function drawPlateThumbnail(img){
@@ -3501,55 +3529,82 @@ function queueReviewPreview(img, priority=false){
  if(!state||!img||!img.isConnected)return Promise.resolve(false);
  if(img._plateMeta&&img.naturalWidth)return Promise.resolve(true);
  if(img._previewTask){
-  if(priority){const n=state.queue.indexOf(img._previewTask);
-   if(n>=0)state.queue.unshift(...state.queue.splice(n,1));}
+  if(priority){
+   img._previewTask.priority=true;
+   for(const queue of [state.cacheQueue,state.queue]){
+    const n=queue.indexOf(img._previewTask);
+    if(n>=0)queue.unshift(...queue.splice(n,1));
+   }
+  }
   return img._previewTask.promise;
  }
- const task={img,resolve:null,promise:null};
+ const task={img,priority,resolve:null,promise:null};
  task.promise=new Promise(resolve=>task.resolve=resolve);
  img._previewTask=task;
- if(priority)state.queue.unshift(task);else state.queue.push(task);
+ if(priority)state.cacheQueue.unshift(task);else state.cacheQueue.push(task);
  pumpReviewPreviews(state);return task.promise;
 }
-async function pumpReviewPreviews(state){
+async function loadReviewPreview(state,task,cacheOnly){
+ const img=task.img, counter=cacheOnly?"cacheActive":"active";
+ state[counter]++;
+ const ctl=new AbortController();state.controllers.add(ctl);
+ const card=img.closest(".det"),status=card.querySelector(".preview-status"),retry=card.querySelector(".preview-retry");
+ if(status)status.textContent="Loading preview…";
+ if(retry)retry.hidden=true;
+ let missing=false,ok=false,url=null;
+ try{
+  const base=img.dataset.previewUrl;
+  const target=cacheOnly?base+(base.includes("?")?"&":"?")+"cache_only=1":base;
+  const {response,data}=await reviewRequest(target,{signal:ctl.signal},"blob");
+  if(REVIEW_MEDIA!==state||!img.isConnected)return;
+  if(cacheOnly&&response.status===204){missing=true;return;}
+  const raw=response.headers.get("X-Plate-Geometry"),meta=raw?JSON.parse(raw):null;
+  // Decode a replacement off-DOM first. A failed/aborted refresh must leave
+  // the usable old image in place rather than turn the finding blank.
+  url=URL.createObjectURL(data);state.urls.add(url);
+  const candidate=new Image();candidate.src=url;await candidate.decode();
+  if(REVIEW_MEDIA!==state||!img.isConnected)return;
+  const previous=img.src;
+  img.src=url;img._plateMeta=meta;await img.decode();
+  if(state.urls.delete(previous))URL.revokeObjectURL(previous);
+  url=null;
+  if(REVIEW_MEDIA!==state||!img.isConnected)return;
+  drawPlateThumbnail(img);
+  if(status)status.textContent=raw?"Original frame · click Edit 4 corners to adjust":"";
+  ok=true;
+ }catch(error){
+  if(REVIEW_MEDIA===state&&img.isConnected){
+   if(status)status.textContent=error.name==="AbortError"
+    ?"Preview timed out. Retry when ready.":"Preview unavailable: "+error.message;
+   if(retry)retry.hidden=false;
+  }
+ }finally{
+  if(url){state.urls.delete(url);URL.revokeObjectURL(url);}
+  state[counter]--;state.controllers.delete(ctl);
+  if(missing&&REVIEW_MEDIA===state&&img.isConnected){
+   if(status)status.textContent="Waiting to generate preview…";
+   if(task.priority)state.queue.unshift(task);else state.queue.push(task);
+  }else{img._previewTask=null;task.resolve(ok);}
+  pumpReviewPreviews(state);
+ }
+}
+function pumpReviewPreviews(state){
  if(REVIEW_MEDIA!==state)return;
- while(state.active<1&&state.queue.length){
-  const task=state.queue.shift(),img=task.img;
-  if(!img.isConnected){task.resolve(false);continue;}
-  state.active++;
-  const ctl=new AbortController();state.controllers.add(ctl);
-  const card=img.closest(".det"),status=card.querySelector(".preview-status"),retry=card.querySelector(".preview-retry");
-  if(status)status.textContent="Loading preview…";
-  if(retry)retry.hidden=true;
-  (async()=>{
-   try{
-    const {response,data}=await reviewRequest(img.dataset.previewUrl,{signal:ctl.signal},"blob");
-    if(REVIEW_MEDIA!==state||!img.isConnected)return false;
-    const raw=response.headers.get("X-Plate-Geometry");
-    if(raw)img._plateMeta=JSON.parse(raw);
-    const url=URL.createObjectURL(data);state.urls.add(url);
-    img.src=url;await img.decode();
-    if(REVIEW_MEDIA!==state||!img.isConnected)return false;
-    drawPlateThumbnail(img);
-    if(status)status.textContent=raw?"Original frame · click Edit 4 corners to adjust":"";
-    return true;
-   }catch(error){
-    if(REVIEW_MEDIA===state&&img.isConnected){
-     if(status)status.textContent=error.name==="AbortError"
-      ?"Preview timed out. Retry when ready.":"Preview unavailable: "+error.message;
-     if(retry)retry.hidden=false;
-    }
-    return false;
-   }finally{
-    state.active--;state.controllers.delete(ctl);img._previewTask=null;
-    pumpReviewPreviews(state);
-   }
-  })().then(task.resolve);
+ // Cheap cache reads overtake cold decoding without increasing the decoder
+ // budget. No interval retries or unbounded worker/request queues.
+ for(const [queue,counter,limit,cached] of [
+  [state.cacheQueue,"cacheActive",3,true],[state.queue,"active",1,false]]){
+  while(state[counter]<limit&&queue.length){
+   const task=queue.shift();
+   if(!task.img.isConnected){task.img._previewTask=null;task.resolve(false);continue;}
+   loadReviewPreview(state,task,cached);
+  }
  }
 }
 function initReviewPreviews(){
  clearReviewPreviews();
- const state=REVIEW_MEDIA={queue:[],active:0,controllers:new Set(),urls:new Set(),observer:null};
+ const state=REVIEW_MEDIA={queue:[],cacheQueue:[],active:0,cacheActive:0,
+  controllers:new Set(),urls:new Set(),observer:null};
  const images=document.querySelectorAll("#review img[data-preview-url]");
  if(typeof IntersectionObserver!=="undefined"){
   state.observer=new IntersectionObserver(entries=>{
@@ -4516,8 +4571,10 @@ def _vault_lock_now():
             with _REVIEW_CACHE_LOCK:
                 _REVIEW_FRAMES.clear()
                 _REVIEW_PROBES.clear()
-            n = vault.encrypt_tree(key, JOBS_DIR)
-            VAULT["key"] = None
+                # Cached crop readers do not take the decoder gate. Keep their
+                # cache gate held until encryption and the locked state agree.
+                n = vault.encrypt_tree(key, JOBS_DIR)
+                VAULT["key"] = None
         return n
 
 

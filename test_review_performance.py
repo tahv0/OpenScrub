@@ -206,3 +206,174 @@ def test_corrupt_cached_preview_is_rebuilt(plate_job):
     response = client.get('/api/jobs/%s/thumb/0' % jid)
     assert response.status_code == 200
     assert response.headers.get('X-Plate-Geometry')
+
+
+@pytest.mark.parametrize('path', ['thumb/0', 'plate_quad/0', 'plate_quad/0/frame'])
+def test_cached_preview_bypasses_busy_decoder(plate_job, monkeypatch, path):
+    import threading
+    client, jid, _, _ = plate_job
+    assert client.get('/api/jobs/%s/thumb/0' % jid).status_code == 200
+    monkeypatch.setattr(web, '_frame_at', lambda *a, **k: pytest.fail('cache hit decoded video'))
+    entered, release = threading.Event(), threading.Event()
+    def occupy():
+        with web._REVIEW_WORK_LOCK:
+            entered.set()
+            release.wait(10)
+    worker = threading.Thread(target=occupy)
+    worker.start()
+    assert entered.wait(2)
+    try:
+        response = client.get('/api/jobs/%s/%s' % (jid, path))
+        assert response.status_code == 200, response.get_data(as_text=True)
+    finally:
+        release.set()
+        worker.join(2)
+
+
+def test_cache_only_miss_does_not_decode_or_publish(plate_job, monkeypatch):
+    client, jid, _, job_dir = plate_job
+    calls = []
+    def decoder(*a, **k):
+        calls.append(True)
+        return np.zeros((160, 240, 3), np.uint8)
+    monkeypatch.setattr(web, '_frame_at', decoder)
+    response = client.get('/api/jobs/%s/thumb/0?cache_only=1' % jid)
+    assert response.status_code == 204
+    assert response.cache_control.no_store
+    assert not calls
+    assert not list(job_dir.glob('plate_preview_*.npz'))
+
+
+def test_plate_thumbnail_reads_report_only_once(plate_job, monkeypatch):
+    client, jid, _, _ = plate_job
+    original = web._load_job_report
+    calls = []
+    def counted(*a, **k):
+        calls.append(True)
+        return original(*a, **k)
+    monkeypatch.setattr(web, '_load_job_report', counted)
+    assert client.get('/api/jobs/%s/thumb/0' % jid).status_code == 200
+    assert len(calls) == 1
+
+
+def test_cache_only_refuses_stale_geometry_and_recovers(plate_job, monkeypatch):
+    client, jid, report, _ = plate_job
+    endpoint = '/api/jobs/%s/thumb/0' % jid
+    old = client.get(endpoint)
+    assert old.status_code == 200
+    doc = json.loads(report.read_text())
+    doc['detections'][0]['cbox'] = [50, 70, 140, 105]
+    report.write_text(json.dumps(doc))
+    with patch.object(web, '_frame_at', side_effect=AssertionError('cache-only decoded video')):
+        assert client.get(endpoint+'?cache_only=1').status_code == 204
+    new = client.get(endpoint)
+    assert new.status_code == 200
+    assert new.headers['X-Plate-Geometry'] != old.headers['X-Plate-Geometry']
+    with patch.object(web, '_frame_at', side_effect=AssertionError('warm hit decoded video')):
+        assert client.get(endpoint+'?cache_only=1').status_code == 200
+
+
+def test_cache_only_corruption_falls_back_to_bounded_generation(plate_job):
+    client, jid, _, job_dir = plate_job
+    endpoint = '/api/jobs/%s/thumb/0' % jid
+    cache = job_dir / 'plate_preview_0.npz'
+    cache.write_bytes(b'PK\x03\x04broken zip')
+    assert client.get(endpoint+'?cache_only=1').status_code == 204
+    assert client.get(endpoint).status_code == 200
+    assert client.get(endpoint+'?cache_only=1').status_code == 200
+
+
+def test_cached_preview_is_not_served_when_vault_is_locked(plate_job, monkeypatch):
+    client, jid, _, _ = plate_job
+    endpoint = '/api/jobs/%s/thumb/0' % jid
+    assert client.get(endpoint).status_code == 200
+    monkeypatch.setattr(web, 'vault_locked', lambda: True)
+    assert client.get(endpoint+'?cache_only=1').status_code == 423
+
+
+def test_browser_cached_previews_do_not_wait_for_cold_generation():
+    import shutil
+    if not shutil.which('node'):
+        pytest.skip('Node required')
+    source = web.APP_JS
+    helpers = source[source.index('let REVIEW_MEDIA=null;'):source.index('let QEDIT=null;')]
+    harness = r'''
+const assert=require('node:assert/strict');
+let QEDIT=null,requests=[],badImage=false,activeCache=0,maxCache=0,activeCold=0,maxCold=0;
+const images=Array.from({length:8},(_,i)=>({
+ isConnected:true,naturalWidth:0,dataset:{previewUrl:'/thumb/'+i},src:'',
+ closest(){return {querySelector(){return {textContent:'',hidden:false}}}},
+ async decode(){this.naturalWidth=100;}
+}));
+const document={querySelectorAll(){return images}};
+let next=0;URL.createObjectURL=()=> 'blob:'+ ++next;URL.revokeObjectURL=()=>{};
+global.Image=class {async decode(){if(badImage)throw new Error('corrupt image');}};
+''' + helpers + r'''
+reviewRequest=async (url,options)=>{
+ requests.push(url);
+ if(url.includes('cache_only=1')){
+  activeCache++;maxCache=Math.max(maxCache,activeCache);
+  await new Promise(resolve=>setImmediate(resolve));activeCache--;
+  return {response:{status:url.startsWith('/thumb/1?')?200:204,headers:{get(){return null}}},data:{}};
+ }
+ activeCold++;maxCold=Math.max(maxCold,activeCold);
+ return new Promise((resolve,reject)=>options.signal.addEventListener('abort',()=>{
+  activeCold--;reject(new DOMException('aborted','AbortError'));
+ },{once:true}));
+};
+(async()=>{
+ initReviewPreviews();
+ const pending=images.map(img=>img._previewTask.promise);
+ for(let i=0;i<20;i++)await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(images[1].naturalWidth,100,'warm preview is blocked behind cold decoder');
+ assert.equal(images[0].naturalWidth,0);
+ assert.equal(maxCold,1);assert.ok(maxCache<=3);
+ const old=images[1].src;badImage=true;
+ const failed=queueReviewPreview(images[1],true);
+ assert.equal(await failed,false);
+ assert.equal(images[1].src,old,'failed refresh discarded the usable image');
+ assert.equal(images[1].naturalWidth,100);
+ clearReviewPreviews();
+ await Promise.all(pending);
+ assert.equal(REVIEW_MEDIA,null);assert.equal(activeCold,0);
+ console.log('cached preview overtakes cold work; limits, fallback and cancellation OK');
+})().catch(e=>{console.error(e);process.exitCode=1;});
+'''
+    result = subprocess.run(['node','-e',harness],capture_output=True,text=True,timeout=10)
+    assert result.returncode == 0, result.stdout+result.stderr
+
+
+def test_cache_only_rejects_replaced_source(plate_job):
+    import os
+    client, jid, _, _ = plate_job
+    endpoint = '/api/jobs/%s/thumb/0' % jid
+    assert client.get(endpoint).status_code == 200
+    path = web.JOBS[jid]['video']
+    stat = os.stat(path)
+    os.utime(path, ns=(stat.st_atime_ns, stat.st_mtime_ns+1000000000))
+    with patch.object(web, '_frame_at', side_effect=AssertionError('cache-only decoded')):
+        assert client.get(endpoint+'?cache_only=1').status_code == 204
+
+
+def test_cache_only_nonplate_does_not_start_decoder(plate_job, monkeypatch):
+    client, jid, report, job_dir = plate_job
+    doc = json.loads(report.read_text())
+    doc['detections'][0]['category'] = 'face'
+    report.write_text(json.dumps(doc))
+    endpoint = '/api/jobs/%s/thumb/0?cache_only=1' % jid
+    monkeypatch.setattr(web, '_frame_at', lambda *a, **k: pytest.fail('cache-only decoded'))
+    assert client.get(endpoint).status_code == 204
+    assert cv2.imwrite(str(job_dir/'thumb2_0.jpg'), np.full((16, 16, 3), 88, np.uint8))
+    assert client.get(endpoint).status_code == 200
+
+
+def test_vault_encryption_excludes_cache_readers(monkeypatch):
+    monkeypatch.setitem(web.VAULT, 'key', b'test-key')
+    calls = []
+    def encrypt(*args):
+        assert web._REVIEW_CACHE_LOCK.locked()
+        calls.append(True)
+        return 0
+    monkeypatch.setattr(web.vault, 'encrypt_tree', encrypt)
+    assert web._vault_lock_now() == 0
+    assert calls and web.VAULT['key'] is None
