@@ -3165,9 +3165,20 @@ function beHook(){
 }
 
 let QEDIT=null;
-async function zoomDet(i){
+function closePlateQuad(){
+ const ov=document.getElementById("plateQuadOverlay");
+ if(ov)ov.remove();
+ QEDIT=null;
+}
+function openPlateQuad(e,i){
+ // Editing an individual plate must never start the card marquee.
+ if(e){e.preventDefault();e.stopPropagation();}
+ clearSel();
+ return zoomDet(i,true);
+}
+async function zoomDet(i,forcePlate=false){
  const el=document.getElementById("det"+i);
- if(!el||el.dataset.cat!=="plate"){
+ if(!forcePlate&&(!el||el.dataset.cat!=="plate")){
   let ov=document.getElementById("lb");
   if(!ov){ov=document.createElement("div");ov.id="lb";document.body.appendChild(ov);}
   ov.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.82);"+
@@ -3178,92 +3189,206 @@ async function zoomDet(i){
    '" style="max-width:96%;max-height:96%;border-radius:8px">';
   return;
  }
- const r=await fetch("api/jobs/"+CUR+"/plate_quad/"+i);
- if(!r.ok){alert("Could not load plate annotation");return;}
- const d=await r.json();
- const ov=document.getElementById("lb")||document.createElement("div");
- ov.id="lb";ov.style.cssText="position:fixed;inset:0;z-index:100;"+
-  "background:rgba(0,0,0,.92);display:flex;align-items:center;"+
-  "justify-content:center;padding:12px";
- ov.onclick=null;
- ov.innerHTML='<div style="max-width:96vw;max-height:96vh;overflow:auto;'+
-  'background:#0f172a;padding:12px;border-radius:10px;color:#e2e8f0">'+
-  '<div style="display:flex;justify-content:space-between;gap:12px;margin-bottom:8px">'+
-  '<b>Plate: adjust four corners</b>'+
-  '<button id="qClose" class="sec">Close</button></div>'+
-  '<div style="position:relative;display:inline-block;max-width:100%">'+
-  '<img id="qImg" style="display:block;max-width:100%;max-height:70vh" src="api/jobs/'+
-   CUR+'/frame_at?t='+encodeURIComponent(d.t)+'">'+
-  '<canvas id="qCv" style="position:absolute;inset:0;touch-action:none;cursor:crosshair"></canvas></div>'+
-  '<p style="font-size:12px;color:#94a3b8">Drag each numbered corner to the exact plate edge. '+
-  'The quadrilateral can be skewed; it does not need right angles.</p>'+
-  '<label style="font-size:12px"><input id="qTrack" type="checkbox"> '+
-  'Apply this shape to the full detected track (approximate; review the result)</label>'+
-  '<div style="display:flex;gap:8px;align-items:center;margin-top:8px">'+
-  '<button id="qSave">Save corners & local training sample</button>'+
-  '<span id="qStatus" style="font-size:12px;color:#94a3b8"></span></div></div>';
- if(!ov.parentNode)document.body.appendChild(ov);
- document.getElementById("qClose").onclick=()=>{ov.remove();QEDIT=null;};
- QEDIT={i,points:d.points.map(p=>p.slice()),width:d.width,height:d.height};
- const img=document.getElementById("qImg"),cv=document.getElementById("qCv");
+ let d;
+ try{
+  const res=await fetch("api/jobs/"+CUR+"/plate_quad/"+i);
+  if(!res.ok){
+   let details={};try{details=await res.json();}catch(_){}
+   throw new Error(details.error||"HTTP "+res.status);
+  }
+  d=await res.json();
+  if(!d.crop||d.crop.length!==4||!d.points||d.points.length!==4)
+   throw new Error("Invalid plate editor geometry");
+ }catch(error){
+  alert("Could not open four-corner editor: "+error.message);
+  return;
+ }
+ closePlateQuad();
+ const ov=document.createElement("div");
+ ov.id="plateQuadOverlay";
+ ov.setAttribute("role","dialog");
+ ov.setAttribute("aria-modal","true");
+ ov.setAttribute("aria-labelledby","qHeading");
+ ov.style.cssText="position:fixed;inset:0;z-index:1500;"+
+  "background:rgba(2,6,23,.96);display:flex;align-items:center;"+
+  "justify-content:center;padding:12px;overflow:auto";
+ const crop=d.crop,cw=crop[2]-crop[0],ch=crop[3]-crop[1];
+ const viewWidth=Math.max(280,Math.min(900,cw*4));
+ ov.innerHTML=
+  '<div id="qDialog" style="width:min(94vw,980px);max-height:95vh;'+
+   'overflow:auto;background:#0f172a;border:1px solid #475569;'+
+   'padding:14px;border-radius:12px;color:#e2e8f0" role="document">'+
+  '<div style="display:flex;justify-content:space-between;gap:12px;align-items:center">'+
+  '<b id="qHeading">Edit license plate — four corners</b>'+
+  '<button type="button" id="qClose" class="sec">Close</button></div>'+
+  '<p style="font-size:12px;color:#cbd5e1;margin:8px 0">'+
+   'Zoomed plate preview. Drag a numbered handle, or choose Redraw to click '+
+   'the 4 actual plate corners clockwise (top-left → top-right → bottom-right → bottom-left).'+
+  '</p>'+
+  '<div id="qStage" style="position:relative;width:'+viewWidth+
+   'px;max-width:100%;margin:0 auto;user-select:none;touch-action:none">'+
+  '<img id="qImg" draggable="false" alt="Magnified unredacted plate frame" '+
+   'style="display:block;width:100%;height:auto;max-height:64vh;'+
+   'object-fit:contain;user-select:none;pointer-events:none" />'+
+  '<canvas id="qCv" aria-label="Drag plate corners or click four new ones" '+
+   'style="position:absolute;inset:0;display:block;touch-action:none;'+
+   'cursor:crosshair;width:100%;height:100%"></canvas></div>'+
+  '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:10px 0">'+
+   '<button type="button" id="qRedraw" class="sec">Redraw 4 corners</button>'+
+   '<button type="button" id="qReset" class="sec">Reset</button>'+
+   '<span id="qHint" style="font-size:12px;color:#4ade80">'+
+    'Drag the green numbered handles on the preview</span></div>'+
+  '<label style="font-size:12px;display:flex;gap:8px;align-items:center">'+
+   '<input id="qTrack" type="checkbox"> Apply the shape to this detection track '+
+   '(approximate — verify changing perspective)</label>'+
+  '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px">'+
+   '<button type="button" id="qSave">Save four corners</button>'+
+   '<span id="qStatus" role="status" style="font-size:12px;color:#cbd5e1"></span>'+
+   '</div></div>';
+ document.body.appendChild(ov); // Attach before looking up controls.
+ ov.onclick=e=>{if(e.target===ov)closePlateQuad();};
+ ov.onpointerdown=e=>e.stopPropagation();
+ const img=ov.querySelector("#qImg"),cv=ov.querySelector("#qCv");
+ const hint=ov.querySelector("#qHint"),save=ov.querySelector("#qSave");
+ const starting=d.points.map(p=>p.slice());
+ QEDIT={i,points:starting.map(p=>p.slice()),starting,
+        crop,width:d.width,height:d.height,drawing:false,dragging:-1};
+ let imageReady=false;
+ function viewSize(){
+  // Make canvas pixels match the *displayed* photo (including max-height).
+  // A fullscreen video frame here previously made 8px-high plates impossible to edit.
+  const rect=img.getBoundingClientRect();
+  if(rect.width<1||rect.height<1)return false;
+  const rw=Math.max(1,Math.round(rect.width)),rh=Math.max(1,Math.round(rect.height));
+  if(cv.width!==rw)cv.width=rw;
+  if(cv.height!==rh)cv.height=rh;
+  cv.style.width=rect.width+"px";cv.style.height=rect.height+"px";
+  return true;
+ }
  function draw(){
-  if(!QEDIT)return;
-  cv.width=img.clientWidth;cv.height=img.clientHeight;
-  const x=cv.getContext("2d"),sx=cv.width/QEDIT.width,sy=cv.height/QEDIT.height;
+  if(!QEDIT||!imageReady||!viewSize())return;
+  const x=cv.getContext("2d"),sx=cv.width/cw,sy=cv.height/ch;
   const p=QEDIT.points;
-  x.beginPath();p.forEach((v,k)=>{if(k)x.lineTo(v[0]*sx,v[1]*sy);
-    else x.moveTo(v[0]*sx,v[1]*sy);});x.closePath();
-  x.fillStyle="rgba(34,197,94,.20)";x.fill();
-  x.lineWidth=2;x.strokeStyle="#4ade80";x.stroke();
-  for(let k=0;k<4;k++){
-   const a=p[k][0]*sx,b=p[k][1]*sy;
-   x.beginPath();x.arc(a,b,9,0,Math.PI*2);x.fillStyle="#0f172a";x.fill();
+  x.clearRect(0,0,cv.width,cv.height);
+  if(p.length){
+   x.beginPath();
+   p.forEach((v,k)=>{const px=(v[0]-crop[0])*sx,py=(v[1]-crop[1])*sy;
+    if(k)x.lineTo(px,py);else x.moveTo(px,py);});
+   if(p.length===4)x.closePath();
+   x.fillStyle="rgba(34,197,94,.18)";
+   if(p.length===4)x.fill();
    x.lineWidth=2;x.strokeStyle="#4ade80";x.stroke();
-   x.fillStyle="#fff";x.font="bold 12px sans-serif";x.textAlign="center";
-   x.fillText(String(k+1),a,b+4);
+   p.forEach((v,k)=>{
+    const px=(v[0]-crop[0])*sx,py=(v[1]-crop[1])*sy;
+    x.beginPath();x.arc(px,py,11,0,Math.PI*2);
+    x.fillStyle="#0f172a";x.fill();
+    x.lineWidth=3;x.strokeStyle="#4ade80";x.stroke();
+    x.fillStyle="#fff";x.font="bold 13px sans-serif";x.textAlign="center";
+    x.fillText(String(k+1),px,py+4);
+   });
   }
  }
- img.onload=draw;if(img.complete)draw();
- let dragging=-1;
- const point=e=>{const r=cv.getBoundingClientRect();
-  return [(e.clientX-r.left)/Math.max(1,r.width)*d.width,
-          (e.clientY-r.top)/Math.max(1,r.height)*d.height];};
+ function point(e){
+  const r=cv.getBoundingClientRect();
+  return [
+   Math.max(0,Math.min(d.width-1,crop[0]+(e.clientX-r.left)/Math.max(1,r.width)*cw)),
+   Math.max(0,Math.min(d.height-1,crop[1]+(e.clientY-r.top)/Math.max(1,r.height)*ch))
+  ];
+ }
+ function updateHint(){
+  if(!QEDIT)return;
+  hint.textContent=QEDIT.drawing
+   ?"Click corner "+(QEDIT.points.length+1)+" of 4 on the plate preview"
+   :"Drag green handles. Redraw lets you place all four corners again.";
+  save.disabled=!imageReady||QEDIT.points.length!==4;
+ }
+ img.onload=()=>{
+  imageReady=true;
+  img.removeAttribute("aria-busy");
+  draw();updateHint();
+ };
+ img.onerror=()=>{
+  imageReady=false;save.disabled=true;
+  hint.textContent="Could not load the plate image. Close and retry.";
+ };
+ img.setAttribute("aria-busy","true");
+ img.src="api/jobs/"+CUR+"/plate_quad/"+i+"/frame";
+ if(img.complete&&img.naturalWidth)img.onload();
+ const onResize=()=>draw();
+ const resizeObserver=typeof ResizeObserver!=="undefined"?new ResizeObserver(onResize):null;
+ if(resizeObserver)resizeObserver.observe(img);
+ const oldClose=closePlateQuad;
+ // The observation must be disposed when the modal is removed.
+ ov.querySelector("#qClose").onclick=()=>{
+  if(resizeObserver)resizeObserver.disconnect();
+  closePlateQuad();
+ };
+ ov.querySelector("#qRedraw").onclick=()=>{
+  if(!QEDIT)return;
+  QEDIT.drawing=true;QEDIT.dragging=-1;QEDIT.points=[];
+  updateHint();draw();
+ };
+ ov.querySelector("#qReset").onclick=()=>{
+  if(!QEDIT)return;
+  QEDIT.drawing=false;QEDIT.dragging=-1;
+  QEDIT.points=starting.map(p=>p.slice());
+  updateHint();draw();
+ };
  cv.addEventListener("pointerdown",e=>{
+  if(!QEDIT||!imageReady)return;
+  e.preventDefault();e.stopPropagation();
   const p=point(e);
-  let best=1e12,which=-1;
+  if(QEDIT.drawing){
+   QEDIT.points.push(p);
+   if(QEDIT.points.length===4)QEDIT.drawing=false;
+   updateHint();draw();return;
+  }
+  const r=cv.getBoundingClientRect();
+  const dsx=r.width/cw,dsy=r.height/ch;
+  let nearest=-1,best=Infinity;
   QEDIT.points.forEach((v,k)=>{
-   const dist=Math.hypot(v[0]-p[0],v[1]-p[1]);
-   if(dist<best){best=dist;which=k;}
+   const dist=Math.hypot((v[0]-p[0])*dsx,(v[1]-p[1])*dsy);
+   if(dist<best){nearest=k;best=dist;}
   });
-  if(best>28*d.width/Math.max(1,cv.width))return;
-  dragging=which;cv.setPointerCapture(e.pointerId);e.preventDefault();
+  if(best<=36){
+   QEDIT.dragging=nearest;
+   cv.setPointerCapture(e.pointerId);
+  }else{
+   hint.textContent="Select a green numbered handle, or click Redraw 4 corners.";
+  }
  });
  cv.addEventListener("pointermove",e=>{
-  if(dragging<0||!QEDIT)return;
-  const p=point(e);
-  QEDIT.points[dragging]=[Math.max(0,Math.min(d.width-1,p[0])),
-                         Math.max(0,Math.min(d.height-1,p[1]))];
+  if(!QEDIT||QEDIT.dragging<0)return;
+  e.preventDefault();e.stopPropagation();
+  QEDIT.points[QEDIT.dragging]=point(e);
   draw();
  });
- cv.addEventListener("pointerup",()=>{dragging=-1;});
- cv.addEventListener("pointercancel",()=>{dragging=-1;});
- document.getElementById("qSave").onclick=async()=>{
-  const btn=document.getElementById("qSave"),st=document.getElementById("qStatus");
-  btn.disabled=true;st.textContent="Saving…";
+ function endDrag(){if(QEDIT)QEDIT.dragging=-1;}
+ cv.addEventListener("pointerup",endDrag);
+ cv.addEventListener("pointercancel",endDrag);
+ save.onclick=async()=>{
+  if(!QEDIT||QEDIT.points.length!==4||!imageReady)return;
+  save.disabled=true;
+  const status=ov.querySelector("#qStatus");
+  status.textContent="Saving four corners…";
   try{
-   const r=await fetch("api/jobs/"+CUR+"/plate_quad/"+i,{method:"POST",
+   const res=await fetch("api/jobs/"+CUR+"/plate_quad/"+i,{method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({points:QEDIT.points,
-     apply_track:document.getElementById("qTrack").checked})});
-   const data=await r.json();
-   if(!r.ok)throw new Error(data.error||"Could not save corners");
+     apply_track:ov.querySelector("#qTrack").checked})});
+   let data={};try{data=await res.json();}catch(_){}
+   if(!res.ok)throw new Error(data.error||"HTTP "+res.status);
    VLBL[i]="plate";
-   st.textContent="Saved "+data.applied+" box(es); 1 verified training sample. "+
-    "Save edits & render to apply.";
+   const label=document.getElementById("vlabel"+i);
+   if(label)label.textContent="Confirmed plate";
+   status.textContent="Saved "+data.applied+
+    " box(es); 1 verified training sample stored locally.";
    if(document.getElementById("beCv"))beScrub();
-  }catch(e){st.textContent="Error: "+e.message;}
-  finally{btn.disabled=false;}
+  }catch(error){
+   status.textContent="Save failed: "+error.message;
+  }finally{save.disabled=false;}
  };
+ updateHint();
 }
 function beRemove(){
  if(BE.sel<0)return;
