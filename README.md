@@ -458,6 +458,18 @@ a before/after box editor to resize, move, add, or time-bound any blur,
 range, and audio mute/bleep spans. Then render and download the redacted
 video plus the audit report.
 
+**Choosing the export location:** After rendering, **Save redacted video
+as…** and **Save audit report as…** open your device's Save As dialog so you
+can pick the folder and filename. This uses the browser's File System
+Access API (available in supported Chromium-based browsers on secure
+origins, including localhost); large video files stream directly to disk
+without buffering the entire file in browser memory. Direct download
+links are still available. If your browser does not support the picker,
+the buttons stay as regular **Download** links. Enable **Ask where to
+save each file** in your browser's download settings to choose a
+destination instead. The chosen folder is on the device running the
+browser, not inside the OpenScrub server or Docker container.
+
 **Settings** (gear icon): detection model pickers for **Face**,
 **License-plate**, and **Person (full-body blur)** — optional models are
 downloaded on demand with SHA-256 verification and license badges —

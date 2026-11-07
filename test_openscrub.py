@@ -2872,6 +2872,46 @@ def test_index_injects_upload_cap_for_preflight():
     assert 'const FREEDISK=+"' in html
 
 
+def test_web_save_as_exports_keep_original_filenames_and_direct_downloads():
+    """Save As suggests the normal download names, including real MKV suffix.
+    Both endpoints remain usable when the browser has no native save picker."""
+    import shutil
+    import openscrub_web as w
+
+    job = w.new_job("", {}, "road.cam.mp4")
+    job["phase"] = "done"
+    job["output"] = os.path.join(job["dir"], "result.mkv")
+    try:
+        with open(job["output"], "wb") as f:
+            f.write(b"video-bytes")
+        with open(os.path.join(job["dir"], "report.json"), "w") as f:
+            f.write("{}")
+        client = w.app.test_client()
+        status = client.get(f"/api/jobs/{job['id']}").get_json()
+        assert status["download_name"] == "road.cam_redacted.mkv"
+        assert status["report_name"] == "road.cam_audit.json"
+
+        video = client.get(f"/api/jobs/{job['id']}/download")
+        report = client.get(f"/api/jobs/{job['id']}/report")
+        assert video.status_code == report.status_code == 200
+        assert video.data == b"video-bytes"
+        assert report.data == b"{}"
+        assert "road.cam_redacted.mkv" in video.headers["Content-Disposition"]
+        assert "road.cam_audit.json" in report.headers["Content-Disposition"]
+
+        page = client.get("/").data.decode()
+        assert "showSaveFilePicker" in page
+        assert "response.body.pipeTo(await handle.createWritable())" in page
+        assert "Save redacted video as" in page
+        assert "Save audit report as" in page
+        assert "Ask where to save each file" in page
+        assert 'href="api/jobs/${CUR}/download"' in page
+        assert 'href="api/jobs/${CUR}/report"' in page
+    finally:
+        shutil.rmtree(job["dir"], ignore_errors=True)
+        w.JOBS.pop(job["id"], None)
+
+
 class _FakeOrtTensor:
     def __init__(self, name):
         self.name = name
