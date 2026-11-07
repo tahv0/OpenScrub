@@ -3561,12 +3561,16 @@ async function loadReview(){
   for(const x of items){
    html+=`<div class="det ${EN[x.i]?'':'off'}" id="det${x.i}" data-cat="${cat}">
     <img src="api/jobs/${CUR}/thumb/${x.i}"
-     title="${x.category==="plate"?"Adjust four plate corners":"Enlarge detection"}"
-     style="cursor:zoom-in" onclick="zoomDet(${x.i})"
+     class="${x.category==="plate"?"plate-edit-thumb":""}"
+     title="${x.category==="plate"?"Click to edit the plate corners":"Enlarge detection"}"
+     style="cursor:${x.category==="plate"?"crosshair":"zoom-in"}"
+     onclick="${x.category==="plate"?"openPlateQuad(event,"+x.i+")":"zoomDet("+x.i+")"}"
+     onpointerdown="${x.category==="plate"?"event.stopPropagation()":""}"
+     draggable="false" ondragstart="return false"
      onerror="thumbRetry(this)">
     <div>${plateFallbackText(x)?`<span class="badge" style="white-space:normal">${plateFallbackText(x)}</span> `:""}${x.shaped?'<span class="badge" title="Thumbnail rectangle is a selection guide; open to inspect the mask and any exclusions">shaped mask</span> ':""}${x.personcard?`<b>Person ${x.person+1}</b> — one decision for ALL their appearances`:`"${x.text}"`}${x.frames?` <span class="badge">×${x.frames} frames</span>`:""}${x.confidence?` <span class="badge" title="detector confidence — low values on a non-face thumbnail usually mean a false detection">${Math.round(x.confidence*100)}%</span>`:""} <br>${x.t_start.toFixed(1)}–${x.t_end.toFixed(1)}s</div>
     <div id="bb${x.i}">${detChoices(x.i)}</div>
-    ${x.category==="plate"?`<button class="sec" onclick="zoomDet(${x.i})">Edit 4 corners</button>
+    ${x.category==="plate"?`<button type="button" class="sec" onclick="openPlateQuad(event,${x.i})">Edit 4 corners</button>
      <button class="sec" onclick="labelPlate(${x.i},'plate')">✓ Confirm plate</button>
      <button class="sec" onclick="labelPlate(${x.i},'not_plate')">✕ Not a plate</button>
      <small id="vlabel${x.i}" style="color:#93c5fd">${VLBL[x.i]==="plate"?"Confirmed plate":VLBL[x.i]==="not_plate"?"Hard negative":""}</small>`:""}
@@ -3643,7 +3647,8 @@ function initMarquee(){
  wrap.dataset.mq=1;
  wrap.addEventListener("pointerdown",e=>{
   if(e.pointerType==="touch")return;         // touch keeps normal scrolling
-  if(e.target.closest("button"))return;      // button clicks stay clicks
+  if(e.target.closest("button,a,input,select,textarea,img,.plate-edit-thumb"))return;
+  // Dragging a plate thumbnail edits its preview, never selects a card.
   clearSel();
   mStart=[e.pageX,e.pageY];
   marqEl=document.createElement("div");marqEl.className="marq";
@@ -3697,7 +3702,7 @@ document.addEventListener("click",e=>{
  document.querySelectorAll(".qm.open").forEach(x=>{if(x!==q)x.classList.remove("open");});
  if(q)q.classList.toggle("open");});
 document.addEventListener("keydown",e=>{
- if(e.key==="Escape"){clearSel();
+ if(e.key==="Escape"){clearSel();closePlateQuad();
   const lb=document.getElementById("lb");if(lb)lb.remove();}});
 
 async function saveAndRender(saveOnly=false){
