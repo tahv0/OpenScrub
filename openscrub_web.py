@@ -3166,6 +3166,7 @@ function beHook(){
 
 let QEDIT=null;
 function closePlateQuad(){
+ if(QEDIT&&QEDIT.resizeObserver)QEDIT.resizeObserver.disconnect();
  const ov=document.getElementById("plateQuadOverlay");
  if(ov)ov.remove();
  QEDIT=null;
@@ -3213,7 +3214,8 @@ async function zoomDet(i,forcePlate=false){
   "background:rgba(2,6,23,.96);display:flex;align-items:center;"+
   "justify-content:center;padding:12px;overflow:auto";
  const crop=d.crop,cw=crop[2]-crop[0],ch=crop[3]-crop[1];
- const viewWidth=Math.max(280,Math.min(900,cw*4));
+ const viewWidth=Math.max(130,Math.floor(Math.min(
+  900,innerWidth*.88,cw*5,Math.max(160,innerHeight*.60)*cw/ch)));
  ov.innerHTML=
   '<div id="qDialog" style="width:min(94vw,980px);max-height:95vh;'+
    'overflow:auto;background:#0f172a;border:1px solid #475569;'+
@@ -3228,8 +3230,8 @@ async function zoomDet(i,forcePlate=false){
   '<div id="qStage" style="position:relative;width:'+viewWidth+
    'px;max-width:100%;margin:0 auto;user-select:none;touch-action:none">'+
   '<img id="qImg" draggable="false" alt="Magnified unredacted plate frame" '+
-   'style="display:block;width:100%;height:auto;max-height:64vh;'+
-   'object-fit:contain;user-select:none;pointer-events:none" />'+
+   'style="display:block;width:100%;height:auto;'+
+   'user-select:none;pointer-events:none" />'+
   '<canvas id="qCv" aria-label="Drag plate corners or click four new ones" '+
    'style="position:absolute;inset:0;display:block;touch-action:none;'+
    'cursor:crosshair;width:100%;height:100%"></canvas></div>'+
@@ -3317,12 +3319,9 @@ async function zoomDet(i,forcePlate=false){
  const onResize=()=>draw();
  const resizeObserver=typeof ResizeObserver!=="undefined"?new ResizeObserver(onResize):null;
  if(resizeObserver)resizeObserver.observe(img);
- const oldClose=closePlateQuad;
- // The observation must be disposed when the modal is removed.
- ov.querySelector("#qClose").onclick=()=>{
-  if(resizeObserver)resizeObserver.disconnect();
-  closePlateQuad();
- };
+ // Observe rendered dimensions so the overlay follows responsive scaling.
+ if(QEDIT)QEDIT.resizeObserver=resizeObserver;
+ ov.querySelector("#qClose").onclick=closePlateQuad;
  ov.querySelector("#qRedraw").onclick=()=>{
   if(!QEDIT)return;
   QEDIT.drawing=true;QEDIT.dragging=-1;QEDIT.points=[];
