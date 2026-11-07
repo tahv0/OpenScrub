@@ -7293,6 +7293,7 @@ def run_scan(args, cb=None):
                     or (getattr(args, "face_heads", False)
                         and "face" in cats)) else None)
     qrer = QRDetector(cb) if "qrcode" in cats else None
+    learning_exact = bool(getattr(args, "plate_learning_exact", False))
     narrow_plate = getattr(args, "plate_coverage", "full") == "narrow" and "plate" in cats
     texter = TextRegionDetector(cb, verify_hash=narrow_plate) if "anytext" in cats or narrow_plate else None
     if narrow_plate:
@@ -7738,7 +7739,7 @@ def run_scan(args, cb=None):
         # fast, so (like dense faces) we re-detect every frame at the true
         # position rather than tracking. Only runs if a plate model is loaded.
         if (plater is not None and plater.available() and "plate" in cats
-                and (narrow_plate or idx % max(1, dense_stride) == 0)):
+                and (narrow_plate or learning_exact or idx % max(1, dense_stride) == 0)):
             phold = 0.3 * max(1, dense_stride) / fps
             _psc = _scope_at(t_now)
             _pzr = _psc.get("plate")
@@ -7761,7 +7762,7 @@ def run_scan(args, cb=None):
                     "plate", "plate", round(pconf, 3), (cx, cy),
                     dense=True, poly=normalized,
                     mask_pad=(args.plate_narrow_margin if normalized else -1),
-                    frame_index=(idx if narrow_plate else -1), fallback_reason=reason))
+                    frame_index=(idx if narrow_plate or learning_exact else -1), fallback_reason=reason))
                 dense_now.append((px1, py1, px2, py2))
         # per-frame full-body person detection: bodies move like faces do, so
         # (like dense faces/plates) re-detect every frame at the true

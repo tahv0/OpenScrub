@@ -1,0 +1,12 @@
+# Optional local training, layered over windows-test + windows-cuda.
+# Reuse the same data/media mounts. No GPU or Docker socket exposed to HTTP.
+services:
+  openscrub:
+    build:
+      args:
+        OPENSCRUB_ENABLE_TRAINING: "1"
+    environment:
+      OPENSCRUB_TRAIN_PYTHON: /opt/openscrub-training/bin/python
+      OPENSCRUB_TRAIN_WEIGHTS: /root/.local/share/OpenScrub/training/yolo11n-seg.pt
+      YOLO_AUTOINSTALL: "false"
+      YOLO_CONFIG_DIR: /root/.local/share/OpenScrub/training/ultralytics

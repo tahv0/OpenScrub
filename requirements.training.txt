@@ -1,0 +1,10 @@
+# Optional isolated training venv ONLY. Never install into CUDA OpenCV runtime.
+# Install torch==2.10.0 torchvision==0.25.0 from the official cu126 index first.
+ultralytics==8.4.207
+onnx==1.23.2
+onnxruntime==1.20.1
+onnxscript==0.7.2
+opencv-python==4.11.0.86
+numpy==1.26.4
+polars==1.35.2
+PyYAML>=6,<7

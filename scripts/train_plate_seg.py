@@ -349,7 +349,7 @@ def train(args, report):
                                    (results["mask_map50"], args.min_mask_map50))
             result = trained.export(format="onnx", imgsz=args.imgsz,
                                     dynamic=False, half=False,
-                                    simplify=False, nms=False,
+                                    simplify=False, nms=False, opset=17,
                                     device="cpu")
             exported = Path(result).resolve()
             if not exported.is_file():
@@ -382,9 +382,8 @@ def train(args, report):
                 "validation": results, "onnx_smoke": onnx_check,
                 "artifacts": {"weights.pt": sha256_file(stage / "weights.pt"),
                               "model.onnx": sha256_file(stage / "model.onnx")},
-                "notes": "Raw YOLO-seg ONNX output is not compatible with the "
-                         "current OpenScrub PlateDetector decoder. Do not "
-                         "select it as a plate model before adding an adapter.",
+                "notes": "Crop-trained segmentation candidate. Use the video-learning "
+                         "refiner and its held-out coverage gate, not the full-frame PlateDetector.",
             }
             _atomic_json(stage / "manifest.json", meta)
             destination = versions / version

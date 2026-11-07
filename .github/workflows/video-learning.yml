@@ -1,0 +1,77 @@
+name: Video learning loop
+on:
+  pull_request:
+    paths:
+      - 'video_learning.py'
+      - 'learning_session.py'
+      - 'openscrub.py'
+      - 'openscrub_web.py'
+      - 'scripts/train_plate_seg.py'
+      - 'scripts/download_training_checkpoint.py'
+      - 'test*learning*.py'
+      - 'tools/smoke_learning_cpu.py'
+      - 'requirements.training.txt'
+      - 'Dockerfile*'
+      - 'compose.windows-training.yml'
+      - 'pyproject.toml'
+      - '.github/workflows/video-learning.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  connected-loop:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      OPENSCRUB_NO_AUTOFETCH: '1'
+      YOLO_AUTOINSTALL: 'false'
+      YOLO_CONFIG_DIR: /tmp/learning-yolo-settings
+      REVIEW_EVIDENCE_DIR: /tmp/learning-evidence
+    steps:
+      - uses: actions/checkout@v4
+      # Match the Python minor in the CUDA Ubuntu 22.04 runtime.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Install CPU validation environment
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg
+          python -m pip install torch==2.10.0 torchvision==0.25.0 --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install -r requirements.training.txt pytest flask rapidfuzz cryptography playwright build hatchling
+          python -m playwright install --with-deps chromium
+      - name: Syntax and learning/regression tests
+        run: |
+          set -o pipefail
+          python -m compileall -q openscrub.py openscrub_web.py video_learning.py learning_session.py scripts tools/smoke_learning_cpu.py
+          python -c 'import openscrub_web;open("/tmp/learning-app.js","w").write(openscrub_web.APP_JS)'
+          node --check /tmp/learning-app.js
+          python -m pytest -q test_plate_quad.py test_plate_quad_editor.py test_plate_quad_autosave.py test_review_performance.py test_stop_review.py test_plate_seg_training.py test_learning_session.py test_video_learning.py test_learning_packaging.py | tee /tmp/learning-unit.txt
+          python -m pytest -q test_openscrub.py -k 'review or indexed or plate_quad or rotation or four_corner or late_frame' | tee /tmp/learning-related.txt
+      - name: Real HTTP desktop/mobile learning and editing
+        run: |
+          set -o pipefail
+          python -m pytest -q test_review_browser.py test_learning_browser.py | tee /tmp/learning-browser.txt
+      - name: Actual synthetic CPU training, inference, scan and render
+        run: |
+          python scripts/download_training_checkpoint.py --accept-ultralytics-license --destination /tmp/yolo11n-seg.pt
+          python tools/smoke_learning_cpu.py --checkpoint /tmp/yolo11n-seg.pt --output /tmp/learning-smoke > /tmp/learning-training.txt 2>&1
+          cat /tmp/learning-smoke/result.json
+      - name: Build and installed-wheel import smoke
+        run: |
+          set -o pipefail
+          python -m build --no-isolation | tee /tmp/learning-build.txt
+          python -m venv --system-site-packages /tmp/learning-package-test
+          /tmp/learning-package-test/bin/python -m pip install --no-deps dist/*.whl
+          cd /tmp
+          /tmp/learning-package-test/bin/python -c 'import openscrub_web, learning_session, video_learning, openscrub_train_plate_seg; print("Installed learning modules import successfully")'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: video-learning-loop-validation
+          path: |
+            /tmp/learning-*.txt
+            /tmp/learning-smoke/result.json
+            /tmp/learning-evidence/*.png
+          if-no-files-found: ignore
+          retention-days: 7
