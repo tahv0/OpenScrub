@@ -1060,28 +1060,156 @@ def _load_job_report(job):
         return json.load(f)
 
 
-def _read_exact_frame(path, index):
-    """Decode from a freshly opened stream so a misleading seek cannot shift a mask."""
-    cap = cv2.VideoCapture(path)
+# Review work is deliberately bounded. Never replay a long video's prefix for
+# every HTTP thumbnail request, or let each request start an all-core decoder.
+from collections import OrderedDict
+from fractions import Fraction
+import hashlib
+import re
+import subprocess
+import tempfile
+import zipfile
+
+_REVIEW_WORK_LOCK = threading.RLock()
+_REVIEW_CACHE_LOCK = threading.Lock()
+_REVIEW_FRAMES = OrderedDict()
+_REVIEW_PROBES = OrderedDict()
+_REVIEW_FRAME_BYTES = 64 * 1024 * 1024
+_REVIEW_TIMEOUT = 10
+
+
+def _video_identity(path):
+    st = os.stat(path)
+    return (os.path.realpath(path), st.st_size, st.st_mtime_ns)
+
+
+@app.errorhandler(422)
+@app.errorhandler(503)
+@app.errorhandler(504)
+def review_error(error):
+    response = jsonify({"error": error.description})
+    response.status_code = error.code
+    if error.code == 503:
+        response.headers["Retry-After"] = "2"
+    return response
+
+
+def _review_process(command):
     try:
-        for _ in range(index + 1):
-            ok, frame = cap.read()
-            if not ok:
-                return None
-        return frame
+        result = subprocess.run(command, capture_output=True,
+                                timeout=_REVIEW_TIMEOUT)
+    except subprocess.TimeoutExpired:
+        abort(504, description="Preview decoding timed out. Retry this finding; "
+              "a video with very sparse keyframes may need a seekable scan copy.")
+    except OSError:
+        abort(503, description="FFmpeg and ffprobe are required for review previews.")
+    if result.returncode:
+        abort(422, description="Could not decode this video preview.")
+    return result
+
+
+def _review_probe(path, identity):
+    with _REVIEW_CACHE_LOCK:
+        info = _REVIEW_PROBES.get(identity)
+        if info is not None:
+            _REVIEW_PROBES.move_to_end(identity)
+            return info
+    result = _review_process([
+        "ffprobe", "-v", "error", "-select_streams", "v:0",
+        "-show_entries", "stream=avg_frame_rate,r_frame_rate,start_time,width,height",
+        "-of", "json", path])
+    try:
+        stream = json.loads(result.stdout)["streams"][0]
+        fps = float(Fraction(stream["avg_frame_rate"]))
+        nominal = float(Fraction(stream["r_frame_rate"]))
+        info = {"fps": fps, "start": float(stream.get("start_time", 0)),
+                "width": int(stream["width"]), "height": int(stream["height"]),
+                "cfr": abs(fps-nominal) <= max(.001, fps*.0001)}
+        if not np.isfinite(fps) or fps <= 0:
+            raise ValueError()
+    except (ValueError, KeyError, IndexError, ZeroDivisionError):
+        abort(422, description="Cannot establish the preview frame rate.")
+    with _REVIEW_CACHE_LOCK:
+        _REVIEW_PROBES[identity] = info
+        while len(_REVIEW_PROBES) > 16:
+            _REVIEW_PROBES.popitem(last=False)
+    return info
+
+
+def _read_review_frame(path, index, exact=True):
+    """Accurate seek on the CFR scan video, verified by the decoded frame PTS.
+
+    Indexed/narrow review requires normalized CFR input. Refuse unverifiable
+    input rather than substituting a nearby frame or replaying from frame zero.
+    FFmpeg's input seek decodes from the preceding keyframe, not the beginning;
+    a hard process deadline also bounds pathological single-keyframe footage.
+    """
+    index = int(index) if exact else float(index)
+    if index < 0:
+        return None
+    if vault_locked():
+        abort(423)
+    identity = _video_identity(path)
+    key = identity + ("frame" if exact else "time", index)
+    with _REVIEW_CACHE_LOCK:
+        cached = _REVIEW_FRAMES.get(key)
+        if cached is not None:
+            _REVIEW_FRAMES.move_to_end(key)
+            return cached.copy()  # callers may paint a mask on their image
+    if not _REVIEW_WORK_LOCK.acquire(blocking=False):
+        abort(503, description="Another preview is decoding. Retry this finding.")
+    try:
+        if vault_locked():
+            abort(423)
+        with _REVIEW_CACHE_LOCK:
+            cached = _REVIEW_FRAMES.get(key)
+            if cached is not None:
+                return cached.copy()
+        info = _review_probe(path, identity)
+        if exact and not info["cfr"]:
+            abort(422, description="Exact review needs a constant-frame-rate scan copy.")
+        # Seek slightly before the target to avoid rounding it to the next frame.
+        target = max(0.0, (index-.1) / info["fps"]) if exact else index
+        result = _review_process([
+            "ffmpeg", "-hide_banner", "-loglevel", "info", "-nostdin",
+            "-threads", "1", "-filter_threads", "1", "-copyts", "-ss", "%.9f" % target,
+            "-i", path, "-map", "0:v:0", "-an", "-sn",
+            "-vf", "showinfo", "-frames:v", "1", "-vsync", "0",
+            "-threads", "1", "-f", "image2pipe", "-vcodec", "png", "pipe:1"])
+        log = result.stderr.decode("utf-8", errors="replace")
+        match = re.search(r"\bn:\s*0\s+pts:\s*(-?\d+)\s+pts_time:", log)
+        timebase = re.search(r"config in time_base:\s*(\d+/\d+)", log)
+        if not match or not timebase:
+            return None
+        # pts_time is printed with limited precision: at long durations it
+        # rounds by more than a high-FPS frame. Integer PTS retains precision.
+        timestamp = float(int(match.group(1)) * Fraction(timebase.group(1)))
+        got = (timestamp-info["start"]) * info["fps"]
+        if exact and abs(got-index) > .15:
+            abort(422, description="Preview frame identity could not be verified.")
+        frame = cv2.imdecode(np.frombuffer(result.stdout, np.uint8), cv2.IMREAD_COLOR)
+        if frame is None:
+            return None
+        with _REVIEW_CACHE_LOCK:
+            if frame.nbytes <= _REVIEW_FRAME_BYTES:
+                _REVIEW_FRAMES[key] = frame
+                while sum(f.nbytes for f in _REVIEW_FRAMES.values()) > _REVIEW_FRAME_BYTES:
+                    _REVIEW_FRAMES.popitem(last=False)
+        return frame.copy()
     finally:
-        cap.release()
+        _REVIEW_WORK_LOCK.release()
+
+
+def _read_exact_frame(path, index):
+    return _read_review_frame(path, index, exact=True)
 
 
 def _frame_at(job, t, rstate, frame_index=None):
     if frame_index is not None:
         return _read_exact_frame(job["video"], frame_index)
-    cap = cv2.VideoCapture(job["video"])
-    fps = rstate["fps"]
-    cap.set(cv2.CAP_PROP_POS_FRAMES, int(t * fps))
-    ok, frame = cap.read()
-    cap.release()
-    return frame if ok else None
+    # Legacy, time-based findings may come from deliberately unnormalized VFR.
+    # Keep that path timestamp-based; indexed review remains strictly verified.
+    return _read_review_frame(job["video"], max(0.0, float(t)), exact=False)
 
 
 @app.route("/api/jobs/<jid>/mediainfo")
@@ -1276,14 +1404,14 @@ def job_detframe(jid, i):
 
 
 
-def _save_verified_plate_sample(job, frame, points, index, tref):
+def _save_verified_plate_sample(job, frame, points, index, tref, origin=(0, 0)):
     """Store ONE reviewer-verified plate crop; never promote track guesses.
 
     Data stays inside the job directory so it inherits the job vault's
     encryption-at-rest lifecycle and is deleted with the job.
     """
     from uuid import uuid4
-    p = np.asarray(points, dtype=np.float64)
+    p = np.asarray(points, dtype=np.float64) - np.asarray(origin, dtype=np.float64)
     h, w = frame.shape[:2]
     margin = max(12, int(0.15 * max(
         np.ptp(p[:, 0]), np.ptp(p[:, 1]))))
@@ -1344,98 +1472,166 @@ def _plate_editor_crop(box, points, width, height):
     return [x1, y1, x2, y2]
 
 
-def _plate_editor_snapshot(job, index):
-    """One consistent source frame and crop for GET, image and POST."""
+def _plate_preview_key(job, index, d, rs):
+    exact = d.get("frame_index", -1)
+    tref = min(max(float(d.get("last_seen", d["t_start"])),
+                   float(d["t_start"])), float(d["t_end"]))
+    fidx = exact if exact >= 0 else int(tref * float(rs["fps"]))
+    if exact >= len(rs["cum"]):
+        abort(400, description="Plate frame is outside the review timeline")
+    fidx = min(max(0, fidx), len(rs["cum"])-1)
+    if exact >= 0:
+        tref = fidx / float(rs["fps"])
+    payload = [_video_identity(job["video"]), index, fidx, rs["cum"][fidx],
+               d["cbox"], d.get("plate_quad") or [], float(rs["fps"]), tref]
+    key = hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
+    return key, fidx, tref
+
+
+def _store_plate_preview(job, index, meta, pixels):
+    """One atomically replaced, lossless crop per finding, inside the job vault."""
+    destination = os.path.join(job["dir"], "plate_preview_%d.npz" % int(index))
+    temp = None
+    try:
+        with tempfile.NamedTemporaryFile(dir=job["dir"], suffix=".npz", delete=False) as out:
+            temp = out.name
+            np.savez_compressed(out, pixels=pixels, metadata=json.dumps(meta))
+        os.replace(temp, destination)
+    finally:
+        if temp and os.path.exists(temp):
+            os.unlink(temp)
+
+
+def _plate_preview(job, index):
     doc = _load_job_report(job)
     rows = doc.get("detections", [])
     if not (0 <= index < len(rows)) or rows[index].get("category") != "plate":
         abort(404)
-    d = rows[index]
-    rs = doc["render_state"]
-    fps = float(rs["fps"])
-    if not rs.get("cum") or fps <= 0:
+    d, rs = rows[index], doc["render_state"]
+    if not rs.get("cum") or float(rs["fps"]) <= 0:
         abort(400, description="Review timeline not available")
-    tref = min(max(float(d.get("last_seen", d["t_start"])),
-                   float(d["t_start"])), float(d["t_end"]))
-    fidx = min(max(0, int(tref * fps)), len(rs["cum"]) - 1)
-    ox, oy = rs["cum"][fidx]
-    box = [float(d["cbox"][0]) + ox, float(d["cbox"][1]) + oy,
-           float(d["cbox"][2]) + ox, float(d["cbox"][3]) + oy]
-    bw, bh = box[2] - box[0], box[3] - box[1]
-    if bw <= 0 or bh <= 0:
-        abort(400, description="Invalid plate detection box")
-    frame = _frame_at(job, tref, rs)
-    if frame is None:
-        abort(404, description="Could not decode plate frame")
-    q = d.get("plate_quad") or ((0., 0.), (1., 0.), (1., 1.), (0., 1.))
-    points = [[box[0] + float(x) * bw, box[1] + float(y) * bh]
-              for x, y in q]
-    crop = _plate_editor_crop(box, points, frame.shape[1], frame.shape[0])
-    return doc, d, frame, tref, box, points, crop
+    key, fidx, tref = _plate_preview_key(job, index, d, rs)
+    cache = os.path.join(job["dir"], "plate_preview_%d.npz" % int(index))
+    # A single gate covers both decoding and cache publication, so concurrent
+    # requests do not duplicate work or race the vault's encryption pass.
+    if not _REVIEW_WORK_LOCK.acquire(blocking=False):
+        abort(503, description="Another preview is decoding. Retry this finding.")
+    try:
+        if vault_locked():
+            abort(423)
+        try:
+            with np.load(cache, allow_pickle=False) as stored:
+                meta = json.loads(str(stored["metadata"]))
+                if meta.get("preview_token") == key:
+                    return doc, d, meta, stored["pixels"].copy()
+        except (OSError, ValueError, KeyError, EOFError, zipfile.BadZipFile):
+            pass
+        ox, oy = rs["cum"][fidx]
+        box = [float(d["cbox"][0])+ox, float(d["cbox"][1])+oy,
+               float(d["cbox"][2])+ox, float(d["cbox"][3])+oy]
+        bw, bh = box[2]-box[0], box[3]-box[1]
+        if bw <= 0 or bh <= 0:
+            abort(400, description="Invalid plate detection box")
+        frame = _frame_at(job, tref, rs, fidx if d.get("frame_index", -1) >= 0 else None)
+        if frame is None:
+            abort(404, description="Could not decode plate frame")
+        q = d.get("plate_quad") or ((0., 0.), (1., 0.), (1., 1.), (0., 1.))
+        points = [[box[0]+float(x)*bw, box[1]+float(y)*bh] for x, y in q]
+        h, w = frame.shape[:2]
+        crop = _plate_editor_crop(box, points, w, h)
+        x1, y1, x2, y2 = crop
+        meta = {"i": index, "t": tref, "frame": fidx, "width": w, "height": h,
+                "box": box, "crop": crop, "points": points,
+                "track": d.get("track", -1), "preview_token": key}
+        pixels = frame[y1:y2, x1:x2].copy()
+        _store_plate_preview(job, index, meta, pixels)
+        return doc, d, meta, pixels
+    finally:
+        _REVIEW_WORK_LOCK.release()
 
 
-@app.route("/api/jobs/<jid>/plate_quad/<int:i>/frame")
-def job_plate_quad_frame(jid, i):
-    """Unredacted close-up used only by the authenticated review editor."""
-    job = JOBS.get(jid) or abort(404)
-    _, _, frame, _, _, _, crop = _plate_editor_snapshot(job, i)
-    x1, y1, x2, y2 = crop
-    success, encoded = cv2.imencode(
-        ".jpg", frame[y1:y2, x1:x2], [cv2.IMWRITE_JPEG_QUALITY, 95])
+def _plate_preview_response(meta, pixels):
+    success, encoded = cv2.imencode(".jpg", pixels, [cv2.IMWRITE_JPEG_QUALITY, 95])
     if not success:
         abort(500, description="Could not encode the review frame")
     response = Response(encoded.tobytes(), mimetype="image/jpeg")
     response.headers["Cache-Control"] = "no-store"
+    response.headers["X-Plate-Geometry"] = json.dumps(meta, separators=(",", ":"))
     return response
+
+
+@app.route("/api/jobs/<jid>/plate_quad/<int:i>/frame")
+def job_plate_quad_frame(jid, i):
+    job = JOBS.get(jid) or abort(404)
+    _, _, meta, pixels = _plate_preview(job, i)
+    return _plate_preview_response(meta, pixels)
 
 
 @app.route("/api/jobs/<jid>/plate_quad/<int:i>", methods=["GET", "POST"])
 def job_plate_quad(jid, i):
-    """Drag/re-draw four plate corners; save only user-verified geometry."""
     job = JOBS.get(jid) or abort(404)
-    if request.method == "POST" and job["phase"] not in (
-            "paused", "review", "done"):
+    if request.method == "POST" and job["phase"] not in ("paused", "review", "done"):
         return jsonify({"error": "Cannot edit plates while scanning"}), 409
-    doc, d, frame, tref, box, points, crop = _plate_editor_snapshot(job, i)
-    if request.method == "GET":
-        return jsonify({"i": i, "t": tref, "width": frame.shape[1],
-                        "height": frame.shape[0], "box": box,
-                        "crop": crop, "points": points,
-                        "track": d.get("track", -1)})
-    payload = request.get_json(silent=True) or {}
+    # Serialize save/cache writes, but do not park a queue of HTTP workers.
+    if not _REVIEW_WORK_LOCK.acquire(blocking=False):
+        abort(503, description="Another preview is decoding. Retry this finding.")
     try:
-        p = np.asarray(payload["points"], dtype=np.float64)
-    except (KeyError, TypeError, ValueError):
-        return jsonify({"error": "Four corner points required"}), 400
-    if p.shape != (4, 2) or not np.isfinite(p).all():
-        return jsonify({"error": "Invalid corner coordinates"}), 400
-    h, w = frame.shape[:2]
-    if (np.any(p[:, 0] < 0) or np.any(p[:, 0] >= w) or
-            np.any(p[:, 1] < 0) or np.any(p[:, 1] >= h)):
-        return jsonify({"error": "Corners must be inside the video frame"}), 400
-    contour = p.astype(np.float32).reshape((-1, 1, 2))
-    if (not cv2.isContourConvex(contour) or
-            cv2.contourArea(contour) < 8.0):
-        return jsonify({"error": "Corners must form a convex quadrilateral"}), 400
-    bw, bh = box[2] - box[0], box[3] - box[1]
-    q = [[round((float(x) - box[0]) / bw, 6),
-          round((float(y) - box[1]) / bh, 6)] for x, y in p]
-    d["verified_label"] = "plate"
-    apply_track = payload.get("apply_track") is True
-    tid = d.get("track", -1)
-    changed = 0
-    for j, r in enumerate(doc["detections"]):
-        if j != i and not (apply_track and tid >= 0 and
-                           r.get("track", -1) == tid and
-                           r.get("category") == "plate"):
-            continue
-        r["plate_quad"] = q
-        changed += 1
-    _save_verified_plate_sample(job, frame, p, i, tref)
-    stop_review.atomic_report(
-        os.path.join(job["dir"], "report.json"), doc)
-    return jsonify({"ok": True, "applied": changed,
-                    "verified_samples_added": 1})
+        doc, d, meta, pixels = _plate_preview(job, i)
+        if request.method == "GET":
+            return jsonify(meta)
+        payload = request.get_json(silent=True) or {}
+        if (payload.get("preview_token") is not None and
+                payload["preview_token"] != meta["preview_token"]):
+            return jsonify({"error": "This finding changed. Reload its preview before saving."}), 409
+        try:
+            p = np.asarray(payload["points"], dtype=np.float64)
+        except (KeyError, TypeError, ValueError):
+            return jsonify({"error": "Four corner points required"}), 400
+        if p.shape != (4, 2) or not np.isfinite(p).all():
+            return jsonify({"error": "Invalid corner coordinates"}), 400
+        h, w = meta["height"], meta["width"]
+        if (np.any(p[:, 0] < 0) or np.any(p[:, 0] >= w) or
+                np.any(p[:, 1] < 0) or np.any(p[:, 1] >= h)):
+            return jsonify({"error": "Corners must be inside the video frame"}), 400
+        contour = p.astype(np.float32).reshape((-1, 1, 2))
+        if not cv2.isContourConvex(contour) or cv2.contourArea(contour) < 8.0:
+            return jsonify({"error": "Corners must form a convex quadrilateral"}), 400
+        box = meta["box"]
+        bw, bh = box[2]-box[0], box[3]-box[1]
+        q = [[round((float(x)-box[0])/bw, 6), round((float(y)-box[1])/bh, 6)] for x, y in p]
+        x1, y1, x2, y2 = meta["crop"]
+        # The inline editor constrains edits to its visible source crop. Older
+        # clients may submit a wider polygon; decode once only for that case.
+        if (np.all(p[:, 0] >= x1) and np.all(p[:, 0] < x2) and
+                np.all(p[:, 1] >= y1) and np.all(p[:, 1] < y2)):
+            _save_verified_plate_sample(job, pixels, p, i, meta["t"], origin=(x1, y1))
+        else:
+            frame = _frame_at(job, meta["t"], doc["render_state"],
+                              meta["frame"] if d.get("frame_index", -1) >= 0 else None)
+            if frame is None:
+                abort(404)
+            _save_verified_plate_sample(job, frame, p, i, meta["t"])
+            meta["crop"] = _plate_editor_crop(box, p, w, h)
+            x1, y1, x2, y2 = meta["crop"]
+            pixels = frame[y1:y2, x1:x2].copy()
+        d["verified_label"] = "plate"
+        apply_track, tid = payload.get("apply_track") is True, d.get("track", -1)
+        changed = 0
+        for j, row in enumerate(doc["detections"]):
+            if j == i or (apply_track and tid >= 0 and row.get("track", -1) == tid
+                          and row.get("category") == "plate"):
+                row["plate_quad"] = q
+                changed += 1
+        stop_review.atomic_report(os.path.join(job["dir"], "report.json"), doc)
+        # Reuse the exact source pixels after saving; round-trip the stored
+        # geometry/token so reopening doesn't fetch/decode the video again.
+        meta["points"] = [[box[0]+x*bw, box[1]+y*bh] for x, y in q]
+        meta["preview_token"] = _plate_preview_key(job, i, d, doc["render_state"])[0]
+        _store_plate_preview(job, i, meta, pixels)
+        return jsonify({"ok": True, "applied": changed,
+                        "verified_samples_added": 1, "preview": meta})
+    finally:
+        _REVIEW_WORK_LOCK.release()
 
 
 def _requested_review_frame(rstate):
@@ -1502,6 +1698,12 @@ def job_boxes_at(jid):
 @app.route("/api/jobs/<jid>/thumb/<int:i>")
 def job_thumb(jid, i):
     job = JOBS.get(jid) or abort(404)
+    doc = _load_job_report(job)
+    if not (0 <= i < len(doc["detections"])):
+        abort(404)
+    if doc["detections"][i].get("category") == "plate":
+        _, _, meta, pixels = _plate_preview(job, i)
+        return _plate_preview_response(meta, pixels)
     # i is already a Flask <int:> route var, but CodeQL doesn't trust the
     # converter — format it as an explicit non-negative integer so the
     # cache filename can never carry anything but digits.
@@ -1524,7 +1726,8 @@ def job_thumb(jid, i):
         mid = (d["t_start"] + d["t_end"]) / 2
         crop = None
         pad = 24
-        for tref in (ls, mid, min(d["t_start"] + 0.2, d["t_end"])):
+        times = (ls,) if d.get("frame_index", -1) >= 0 else (ls, mid, min(d["t_start"] + 0.2, d["t_end"]))
+        for tref in times:
             exact = d.get("frame_index", -1)
             fidx = min(exact if exact >= 0 else int(tref * rs["fps"]), len(rs["cum"]) - 1)
             ox, oy = rs["cum"][fidx]
@@ -2128,6 +2331,17 @@ progress{width:100%;height:12px;accent-color:var(--acc)}
 .det{background:var(--panel);border:1px solid #334155;border-radius:8px;
  padding:6px;text-align:center;font-size:12px;color:#cbd5e1}
 .det img{max-width:100%;border-radius:5px}
+
+.det.editing{grid-column:1/-1;width:min(100%,720px);justify-self:center;text-align:left;padding:14px;border-color:#4ade80}
+.plate-preview{position:relative;width:100%;min-height:90px;margin:0 auto;touch-action:none}
+.plate-preview img{display:block;width:100%;min-height:90px;object-fit:contain}
+.det.editing .plate-preview{max-width:560px}
+.plate-outline{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;touch-action:none}
+.preview-status{display:block;font-size:11px;color:#94a3b8;margin:5px 0}
+.preview-retry[hidden]{display:none!important}
+#plateQuadEditor{padding:12px 0;margin:8px 0;border-top:1px solid #334155;border-bottom:1px solid #334155}
+#qHint,#qStatus{font-size:12px;color:#cbd5e1}
+
 .det.selected{outline:2px dashed #60a5fa;outline-offset:2px}
 .review-copy{font-size:13px;color:#cbd5e1;line-height:1.5;margin:0 0 10px}
 .det-status{font-weight:600;margin:7px 0 5px}
@@ -2186,7 +2400,7 @@ footer{text-align:center;color:#64748b;font-size:12px;padding:18px 12px 26px}
 @media(max-width:640px){.grid2{grid-template-columns:minmax(0,1fr)}}
 """
 
-JOBS_HTML = """<div class="card"><h2>Jobs</h2><div class="joblist" id="jobs">loading…</div></div>
+JOBS_HTML = """<div class="card"><h2>Jobs</h2><div class="joblist" id="jobs">loading…</div><small id="jobsLoadStatus" role="status"></small></div>
 <div id="detail"></div>"""
 
 SETTINGS_HTML = """<div id="settingsview" style="display:none">
@@ -2439,14 +2653,19 @@ async function applyTier(id){
 }
 refreshModelPanel();renderTiers();
 let CUR=null, EN={}, MAN=[], DUR=0, POLL=null, PHIST=[], PHPH="", LOGN=0, SHELLPH=null, JOBSJSON="";
+let JOBVIEW=0,JOBSFLIGHT=null,JOBSRETRYAT=0,JOBSFAILURES=0;
+let REFRESHFLIGHT=null,REFRESHCTRL=null,REFRESHFAILURES=0;
 let EXPORT_NAMES={video:null,report:null};
 // Browsers without a native file picker still get the direct download links.
 const CAN_SAVE_AS=!!(window.isSecureContext&&window.showSaveFilePicker);
 
 async function loadJobs(){
- const r=await fetch("api/jobs");
- if(r.status===423){jobs.innerHTML='<span style="color:#f87171">&#128274; locked — unlock in the Encryption panel below</span>';JOBSJSON="";return;}
- const js=await r.json();
+ if(JOBSFLIGHT)return JOBSFLIGHT;
+ if(Date.now()<JOBSRETRYAT||(document.hidden&&JOBSJSON))return;
+ JOBSFLIGHT=(async()=>{try{
+ const {data:js}=await reviewRequest("api/jobs");
+ JOBSFAILURES=0;JOBSRETRYAT=0;
+ const note=document.getElementById("jobsLoadStatus");if(note)note.textContent="";
  const s=JSON.stringify(js);
  if(s===JOBSJSON)return;
  JOBSJSON=s;
@@ -2456,6 +2675,12 @@ async function loadJobs(){
    <span style="display:flex;gap:10px;align-items:center"><span class="badge">${j.phase}</span>
    ${(j.phase=="error"||j.phase=="cancelled")?`<a href="#" title="Retry the scan — reuses the file already on the server, nothing is re-uploaded" style="text-decoration:none;font-size:15px" onclick="retryJob('${j.id}');return false">&#8635;</a>`:""}
    <a href="#" title="Delete this job and all of its files" style="text-decoration:none;font-size:15px" onclick="delJob('${j.id}');return false">&#128465;&#65039;</a></span></div>`).join(""):"none yet";
+ }catch(error){
+  JOBSFAILURES++;JOBSRETRYAT=Date.now()+Math.min(30000,2000*2**Math.min(4,JOBSFAILURES-1));
+  const note=document.getElementById("jobsLoadStatus");
+  if(note)note.textContent=error.status===423?"Vault locked — unlock in Settings.":"Connection interrupted; retrying with backoff.";
+ }finally{JOBSFLIGHT=null;}})();
+ return JOBSFLIGHT;
 }
 
 async function retryJob(id){
@@ -2472,14 +2697,18 @@ async function delJob(id){
   try{const e=await r.json();m=e.error||e.description||m;}catch(_){}
   alert(m);return;
  }
- if(CUR===id){CUR=null;if(POLL)clearInterval(POLL);detail.innerHTML="";}
+ if(CUR===id){CUR=null;if(POLL)clearTimeout(POLL);detail.innerHTML="";}
  JOBSJSON="";loadJobs();
 }
 async function openJob(id){
+ if(QEDIT&&QEDIT.dirty&&!confirm("Discard unsaved corner edits?"))return;
+ if(!closePlateQuad())return;
+ clearReviewPreviews();JOBVIEW++;REFRESHFAILURES=0;
+ if(REFRESHCTRL)REFRESHCTRL.abort();
  CUR=id; EN={}; MAN=[]; PHIST=[]; PHPH=""; LOGN=0; SHELLPH=null;
  detail.innerHTML="";
- if(POLL)clearInterval(POLL);
- POLL=setInterval(refresh,900); refresh();
+ if(POLL)clearTimeout(POLL);
+ refresh();
 }
 
 function shellHtml(j){
@@ -2524,8 +2753,34 @@ async function saveExportAs(kind, btn){
 }
 
 async function refresh(){
- if(!CUR)return;
- const j=await (await fetch("api/jobs/"+CUR)).json();
+ if(REFRESHFLIGHT)return REFRESHFLIGHT;
+ if(POLL)clearTimeout(POLL);
+ const id=CUR,view=JOBVIEW;if(!id)return;
+ const ctl=REFRESHCTRL=new AbortController();
+ REFRESHFLIGHT=(async()=>{try{
+  if(!document.hidden)await refreshJob(id,view,ctl.signal);
+  REFRESHFAILURES=0;
+ }catch(error){
+  if(error.name!=="AbortError"||!ctl.signal.aborted){
+   REFRESHFAILURES++;
+   const note=document.getElementById("jobsLoadStatus");
+   if(note)note.textContent="Connection interrupted; retrying with backoff.";
+  }
+ }finally{
+  REFRESHFLIGHT=null;if(REFRESHCTRL===ctl)REFRESHCTRL=null;
+  if(CUR){
+   const idle=document.hidden||["review","paused","done","error","cancelled"].includes(SHELLPH);
+   const delay=CUR!==id||JOBVIEW!==view?0:REFRESHFAILURES
+    ?Math.min(30000,2000*2**Math.min(4,REFRESHFAILURES-1)):(idle?5000:900);
+   POLL=setTimeout(refresh,delay);
+  }
+ }})();return REFRESHFLIGHT;
+}
+
+async function refreshJob(id,view,signal){
+ const {data:j}=await reviewRequest("api/jobs/"+id,{signal});
+ if(CUR!==id||JOBVIEW!==view)return;
+
  EXPORT_NAMES={video:j.download_name,report:j.report_name};
  if(SHELLPH===null){
   detail.insertAdjacentHTML("afterbegin",shellHtml(j));SHELLPH="";
@@ -2555,7 +2810,8 @@ async function refresh(){
  // incremental log append with stick-to-bottom (respects manual scroll-up)
  const lg=document.getElementById("log");
  const stick=lg.scrollTop+lg.clientHeight>=lg.scrollHeight-40;
- const nl=await (await fetch(`api/jobs/${CUR}/log?from=${LOGN}`)).json();
+ const {data:nl}=await reviewRequest(`api/jobs/${id}/log?from=${LOGN}`,{signal});
+ if(CUR!==id||JOBVIEW!==view)return;
  if(LOGN===0&&nl.len>400){LOGN=nl.len-400;nl.lines=nl.lines.slice(-400);}
  if(nl.lines.length){
   const NL=String.fromCharCode(10);
@@ -2597,14 +2853,16 @@ async function refresh(){
     <div class="warn" style="width:100%">INCOMPLETE: ${(f/t*100).toFixed(1)}%
     scanned (${f}/${t} frames). Do not publish as redacted video.
     Existing review decisions and plate corners remain saved on resume.</div>`;
-   loadReview();
+   await loadReview();
+   if(CUR!==id||JOBVIEW!==view)return;
   }
   if(j.phase=="review"){
    // no interstitial button: review is the ONLY next step after a scan,
    // so open it directly — both on a live scan finishing and on
    // selecting a job that is already waiting in review
    a="";
-   loadReview();
+   await loadReview();
+   if(CUR!==id||JOBVIEW!==view)return;
   }
   if(j.phase=="done"&&j.has_output){
    const video=CAN_SAVE_AS
@@ -2633,7 +2891,7 @@ async function refresh(){
   document.getElementById("actions").innerHTML=a;
   if(j.phase!="scanning")img.style.display="none";
  }
- loadJobs();
+ await loadJobs();
 }
 
 let BE={t:0,ox:0,oy:0,boxes:[],sel:-1,ov:{},dis:{},times:{},adds:[],
@@ -3200,18 +3458,128 @@ function plateQuadRotationHandle(points,crop,cv){
  return {x:Math.max(20,Math.min(cv.width-20,x)),
          y:Math.max(20,Math.min(cv.height-20,y)),mx,my};
 }
+// Only visible finding previews are requested. Editing reuses the same image
+// and geometry; it never starts a second video/image request.
+let REVIEW_MEDIA=null;
+async function reviewRequest(url, options={}, type="json"){
+ const ctl=new AbortController(),parent=options.signal;
+ const abort=()=>ctl.abort();
+ if(parent){if(parent.aborted)ctl.abort();else parent.addEventListener("abort",abort,{once:true});}
+ const timer=setTimeout(abort,15000);
+ try{
+  const response=await fetch(url,{...options,signal:ctl.signal});
+  if(!response.ok){
+   let message="Server returned HTTP "+response.status;
+   try{const d=await response.json();message=d.error||message;}catch(_){}
+   const error=new Error(message);error.status=response.status;throw error;
+  }
+  return {response,data:await response[type]()};
+ }finally{clearTimeout(timer);if(parent)parent.removeEventListener("abort",abort);}
+}
+function clearReviewPreviews(){
+ if(!REVIEW_MEDIA)return;
+ const old=REVIEW_MEDIA;REVIEW_MEDIA=null;
+ if(old.observer)old.observer.disconnect();
+ old.controllers.forEach(c=>c.abort());
+ old.queue.splice(0).forEach(task=>task.resolve(false));
+ old.urls.forEach(url=>URL.revokeObjectURL(url));
+}
+function drawPlateThumbnail(img){
+ if(!img._plateMeta||!img.naturalWidth||(QEDIT&&QEDIT.img===img))return;
+ const stage=img.closest(".plate-preview"),cv=stage&&stage.querySelector("canvas");
+ if(!cv)return;
+ const r=img.getBoundingClientRect(),d=img._plateMeta,c=d.crop;
+ cv.width=Math.max(1,Math.round(r.width));cv.height=Math.max(1,Math.round(r.height));
+ const ctx=cv.getContext("2d");ctx.clearRect(0,0,cv.width,cv.height);
+ ctx.beginPath();d.points.forEach((p,k)=>{
+  const x=(p[0]-c[0])*cv.width/(c[2]-c[0]),y=(p[1]-c[1])*cv.height/(c[3]-c[1]);
+  if(k)ctx.lineTo(x,y);else ctx.moveTo(x,y);
+ });ctx.closePath();ctx.strokeStyle="#4ade80";ctx.lineWidth=2;ctx.stroke();
+}
+function queueReviewPreview(img, priority=false){
+ const state=REVIEW_MEDIA;
+ if(!state||!img||!img.isConnected)return Promise.resolve(false);
+ if(img._plateMeta&&img.naturalWidth)return Promise.resolve(true);
+ if(img._previewTask){
+  if(priority){const n=state.queue.indexOf(img._previewTask);
+   if(n>=0)state.queue.unshift(...state.queue.splice(n,1));}
+  return img._previewTask.promise;
+ }
+ const task={img,resolve:null,promise:null};
+ task.promise=new Promise(resolve=>task.resolve=resolve);
+ img._previewTask=task;
+ if(priority)state.queue.unshift(task);else state.queue.push(task);
+ pumpReviewPreviews(state);return task.promise;
+}
+async function pumpReviewPreviews(state){
+ if(REVIEW_MEDIA!==state)return;
+ while(state.active<1&&state.queue.length){
+  const task=state.queue.shift(),img=task.img;
+  if(!img.isConnected){task.resolve(false);continue;}
+  state.active++;
+  const ctl=new AbortController();state.controllers.add(ctl);
+  const card=img.closest(".det"),status=card.querySelector(".preview-status"),retry=card.querySelector(".preview-retry");
+  if(status)status.textContent="Loading preview…";
+  if(retry)retry.hidden=true;
+  (async()=>{
+   try{
+    const {response,data}=await reviewRequest(img.dataset.previewUrl,{signal:ctl.signal},"blob");
+    if(REVIEW_MEDIA!==state||!img.isConnected)return false;
+    const raw=response.headers.get("X-Plate-Geometry");
+    if(raw)img._plateMeta=JSON.parse(raw);
+    const url=URL.createObjectURL(data);state.urls.add(url);
+    img.src=url;await img.decode();
+    if(REVIEW_MEDIA!==state||!img.isConnected)return false;
+    drawPlateThumbnail(img);
+    if(status)status.textContent=raw?"Original frame · click Edit 4 corners to adjust":"";
+    return true;
+   }catch(error){
+    if(REVIEW_MEDIA===state&&img.isConnected){
+     if(status)status.textContent=error.name==="AbortError"
+      ?"Preview timed out. Retry when ready.":"Preview unavailable: "+error.message;
+     if(retry)retry.hidden=false;
+    }
+    return false;
+   }finally{
+    state.active--;state.controllers.delete(ctl);img._previewTask=null;
+    pumpReviewPreviews(state);
+   }
+  })().then(task.resolve);
+ }
+}
+function initReviewPreviews(){
+ clearReviewPreviews();
+ const state=REVIEW_MEDIA={queue:[],active:0,controllers:new Set(),urls:new Set(),observer:null};
+ const images=document.querySelectorAll("#review img[data-preview-url]");
+ if(typeof IntersectionObserver!=="undefined"){
+  state.observer=new IntersectionObserver(entries=>{
+   for(const e of entries)if(e.isIntersecting){
+    state.observer.unobserve(e.target);queueReviewPreview(e.target);
+   }
+  },{rootMargin:"120px"});images.forEach(img=>state.observer.observe(img));
+ }else images.forEach(img=>queueReviewPreview(img));
+}
+function retryReviewPreview(button){
+ const img=button.closest(".det").querySelector("img[data-preview-url]");
+ if(img){img._plateMeta=null;queueReviewPreview(img,true);}
+}
+
 let QEDIT=null;
 function closePlateQuad(){
- if(QEDIT&&QEDIT.resizeObserver)QEDIT.resizeObserver.disconnect();
- const ov=document.getElementById("plateQuadOverlay");
- if(ov)ov.remove();
+ const state=QEDIT;if(!state)return true;
+ if(state.saving)return false;
  QEDIT=null;
+ if(state.resizeObserver)state.resizeObserver.disconnect();
+ if(state.events)state.events.abort();
+ const editor=document.getElementById("plateQuadEditor");if(editor)editor.remove();
+ if(state.card)state.card.classList.remove("editing");
+ if(state.img){state.img.id="thumb"+state.i;drawPlateThumbnail(state.img);}
+ const cv=document.getElementById("qCv");if(cv){cv.removeAttribute("id");cv.style.pointerEvents="none";cv.style.cursor="";cv.style.width="100%";cv.style.height="100%";}
+ return true;
 }
 function openPlateQuad(e,i){
- // Editing an individual plate must never start the card marquee.
  if(e){e.preventDefault();e.stopPropagation();}
- clearSel();
- return zoomDet(i,true);
+ clearSel();return zoomDet(i,true);
 }
 async function zoomDet(i,forcePlate=false){
  const el=document.getElementById("det"+i);
@@ -3219,82 +3587,52 @@ async function zoomDet(i,forcePlate=false){
   let ov=document.getElementById("lb");
   if(!ov){ov=document.createElement("div");ov.id="lb";document.body.appendChild(ov);}
   ov.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.82);"+
-   "z-index:100;display:flex;align-items:center;justify-content:center;"+
-   "cursor:zoom-out;padding:18px";
+   "z-index:100;display:flex;align-items:center;justify-content:center;cursor:zoom-out;padding:18px";
   ov.onclick=()=>ov.remove();
-  ov.innerHTML='<img src="api/jobs/'+CUR+'/detframe/'+i+
-   '" style="max-width:96%;max-height:96%;border-radius:8px">';
+  ov.innerHTML='<img src="api/jobs/'+CUR+'/detframe/'+i+'" style="max-width:96%;max-height:96%;border-radius:8px">';
   return;
  }
- let d;
- try{
-  const res=await fetch("api/jobs/"+CUR+"/plate_quad/"+i);
-  if(!res.ok){
-   let details={};try{details=await res.json();}catch(_){}
-   throw new Error(details.error||"HTTP "+res.status);
-  }
-  d=await res.json();
-  if(!d.crop||d.crop.length!==4||!d.points||d.points.length!==4)
-   throw new Error("Invalid plate editor geometry");
- }catch(error){
-  alert("Could not open four-corner editor: "+error.message);
+ if(!el||(QEDIT&&QEDIT.i===i))return;
+ if(QEDIT&&QEDIT.dirty&&!confirm("Discard unsaved corner edits?"))return;
+ if(!closePlateQuad())return;
+ const img=el.querySelector("img[data-preview-url]"),stage=el.querySelector(".plate-preview");
+ if(!img||!stage)return;
+ const cv=stage.querySelector("canvas"),ov=document.createElement("div");
+ ov.id="plateQuadEditor";ov.setAttribute("role","region");
+ ov.setAttribute("aria-label","Inline plate corner editor");
+ ov.innerHTML='<p>Loading the finding preview…</p><button type="button" id="qClose" class="sec">Cancel editing</button>';
+ stage.after(ov);el.classList.add("editing");
+ const state=QEDIT={i,job:CUR,card:el,img,loading:true,dirty:false,saving:false,events:new AbortController()};
+ ov.querySelector("#qClose").onclick=closePlateQuad;
+ // Already visible image = no fetch. A pending thumbnail is joined, not duplicated.
+ const ready=await queueReviewPreview(img,true);
+ if(QEDIT!==state||!el.isConnected)return;
+ if(!ready||!img._plateMeta){
+  ov.querySelector("p").textContent="Preview unavailable. Use Retry preview, then cancel and edit again.";
   return;
  }
- closePlateQuad();
- const ov=document.createElement("div");
- ov.id="plateQuadOverlay";
- ov.setAttribute("role","dialog");
- ov.setAttribute("aria-modal","true");
- ov.setAttribute("aria-labelledby","qHeading");
- ov.style.cssText="position:fixed;inset:0;z-index:1500;"+
-  "background:rgba(2,6,23,.96);display:flex;align-items:center;"+
-  "justify-content:center;padding:12px;overflow:auto";
- const crop=d.crop,cw=crop[2]-crop[0],ch=crop[3]-crop[1];
- const viewWidth=Math.max(130,Math.floor(Math.min(
-  900,innerWidth*.88,cw*5,Math.max(160,innerHeight*.60)*cw/ch)));
+ const d=img._plateMeta,crop=d.crop,cw=crop[2]-crop[0],ch=crop[3]-crop[1];
+ img.id="qImg";cv.id="qCv";cv.style.pointerEvents="auto";cv.style.cursor="crosshair";
+ cv.setAttribute("aria-label","Drag plate corners or the orange rotation handle");
  ov.innerHTML=
-  '<div id="qDialog" style="width:min(94vw,980px);max-height:95vh;'+
-   'overflow:auto;background:#0f172a;border:1px solid #475569;'+
-   'padding:14px;border-radius:12px;color:#e2e8f0" role="document">'+
-  '<div style="display:flex;justify-content:space-between;gap:12px;align-items:center">'+
-  '<b id="qHeading">Edit license plate — four corners</b>'+
-  '<button type="button" id="qClose" class="sec">Close</button></div>'+
-  '<p style="font-size:12px;color:#cbd5e1;margin:8px 0">'+
-   'Drag the orange rotate handle to turn the entire plate, or use the ±5° buttons. '+
-   'Drag green numbered handles to adjust perspective, or Redraw the four corners clockwise.'+
-  '</p>'+
-  '<div id="qStage" style="position:relative;width:'+viewWidth+
-   'px;max-width:100%;margin:0 auto;user-select:none;touch-action:none">'+
-  '<img id="qImg" draggable="false" alt="Magnified unredacted plate frame" '+
-   'style="display:block;width:100%;height:auto;'+
-   'user-select:none;pointer-events:none" />'+
-  '<canvas id="qCv" aria-label="Drag the orange rotation handle, plate corners, or click four new ones" '+
-   'style="position:absolute;inset:0;display:block;touch-action:none;'+
-   'cursor:crosshair;width:100%;height:100%"></canvas></div>'+
-  '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:10px 0">'+
-   '<button type="button" id="qRotateLeft" class="sec" title="Rotate whole plate counterclockwise 5 degrees">↶ Rotate −5°</button>'+
-   '<button type="button" id="qRotateRight" class="sec" title="Rotate whole plate clockwise 5 degrees">↷ Rotate +5°</button>'+
-   '<button type="button" id="qRedraw" class="sec">Redraw 4 corners</button>'+
-   '<button type="button" id="qReset" class="sec">Reset</button>'+
-   '<span id="qHint" style="font-size:12px;color:#4ade80">'+
-    'Orange = rotate whole shape; green = adjust individual corners</span></div>'+
-  '<label style="font-size:12px;display:flex;gap:8px;align-items:center">'+
-   '<input id="qTrack" type="checkbox"> Apply the shape to this detection track '+
-   '(approximate — verify changing perspective)</label>'+
-  '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px">'+
-   '<button type="button" id="qSave">Save four corners</button>'+
-   '<span id="qStatus" role="status" style="font-size:12px;color:#cbd5e1"></span>'+
-   '</div></div>';
- document.body.appendChild(ov); // Attach before looking up controls.
- ov.onclick=e=>{if(e.target===ov)closePlateQuad();};
- ov.onpointerdown=e=>e.stopPropagation();
- const img=ov.querySelector("#qImg"),cv=ov.querySelector("#qCv");
+  '<b id="qHeading">Edit four corners</b><p class="review-copy">Drag green handles for perspective, or orange ↻ to rotate. Changes stay local until Save.</p>'+
+  '<div class="row">'+
+  '<button type="button" id="qRotateLeft" class="sec">↶ Rotate −5°</button>'+
+  '<button type="button" id="qRotateRight" class="sec">↷ Rotate +5°</button>'+
+  '<button type="button" id="qRedraw" class="sec">Redraw 4 corners</button>'+
+  '<button type="button" id="qReset" class="sec">Reset</button></div>'+
+  '<p id="qHint" role="status"></p>'+
+  '<label style="display:flex;gap:8px;align-items:center;text-align:left">'+
+  '<input id="qTrack" type="checkbox"> Apply shape to this detection track (approximate — verify changing perspective)</label>'+
+  '<div class="row" style="margin-top:10px">'+
+  '<button type="button" id="qSave">Save four corners</button>'+
+  '<button type="button" id="qClose" class="sec">Cancel editing</button>'+
+  '<span id="qStatus" role="status"></span></div>';
  const hint=ov.querySelector("#qHint"),save=ov.querySelector("#qSave");
  const starting=d.points.map(p=>p.slice());
- QEDIT={i,points:starting.map(p=>p.slice()),starting,
-        crop,width:d.width,height:d.height,drawing:false,
-        dragging:-1,rotation:null,rotateHandle:null};
- let imageReady=false;
+ Object.assign(state,{points:starting.map(p=>p.slice()),starting,crop,
+  width:d.width,height:d.height,drawing:false,dragging:-1,rotation:null,rotateHandle:null,loading:false});
+ const imageReady=true;
  function viewSize(){
   // Make canvas pixels match the *displayed* photo (including max-height).
   // A fullscreen video frame here previously made 8px-high plates impossible to edit.
@@ -3307,7 +3645,7 @@ async function zoomDet(i,forcePlate=false){
   return true;
  }
  function draw(){
-  if(!QEDIT||!imageReady||!viewSize())return;
+  if(QEDIT!==state||!viewSize())return;
   const x=cv.getContext("2d"),sx=cv.width/cw,sy=cv.height/ch;
   const p=QEDIT.points;
   x.clearRect(0,0,cv.width,cv.height);
@@ -3343,66 +3681,55 @@ async function zoomDet(i,forcePlate=false){
  function point(e){
   const r=cv.getBoundingClientRect();
   return [
-   Math.max(0,Math.min(d.width-1,crop[0]+(e.clientX-r.left)/Math.max(1,r.width)*cw)),
-   Math.max(0,Math.min(d.height-1,crop[1]+(e.clientY-r.top)/Math.max(1,r.height)*ch))
+   Math.max(crop[0],Math.min(crop[2]-1,crop[0]+(e.clientX-r.left)/Math.max(1,r.width)*cw)),
+   Math.max(crop[1],Math.min(crop[3]-1,crop[1]+(e.clientY-r.top)/Math.max(1,r.height)*ch))
   ];
  }
  function updateHint(){
-  if(!QEDIT)return;
+  if(QEDIT!==state||state.saving)return;
   hint.textContent=QEDIT.drawing
    ?"Click corner "+(QEDIT.points.length+1)+" of 4 on the plate preview"
    :"Drag orange ↻ to rotate the whole plate; drag green handles for perspective.";
   save.disabled=!imageReady||QEDIT.points.length!==4;
  }
- img.onload=()=>{
-  imageReady=true;
-  img.removeAttribute("aria-busy");
-  draw();updateHint();
- };
- img.onerror=()=>{
-  imageReady=false;save.disabled=true;
-  hint.textContent="Could not load the plate image. Close and retry.";
- };
- img.setAttribute("aria-busy","true");
- img.src="api/jobs/"+CUR+"/plate_quad/"+i+"/frame";
- if(img.complete&&img.naturalWidth)img.onload();
  const onResize=()=>draw();
  const resizeObserver=typeof ResizeObserver!=="undefined"?new ResizeObserver(onResize):null;
  if(resizeObserver)resizeObserver.observe(img);
  // Observe rendered dimensions so the overlay follows responsive scaling.
- if(QEDIT)QEDIT.resizeObserver=resizeObserver;
+ state.resizeObserver=resizeObserver;
  ov.querySelector("#qClose").onclick=closePlateQuad;
  ov.querySelector("#qRedraw").onclick=()=>{
-  if(!QEDIT)return;
+  if(QEDIT!==state||state.saving)return;
   QEDIT.drawing=true;QEDIT.dragging=-1;QEDIT.rotation=null;
-  QEDIT.rotateHandle=null;QEDIT.points=[];
+  QEDIT.rotateHandle=null;QEDIT.points=[];state.dirty=true;
   updateHint();draw();
  };
  ov.querySelector("#qReset").onclick=()=>{
-  if(!QEDIT)return;
+  if(QEDIT!==state||state.saving)return;
   QEDIT.drawing=false;QEDIT.dragging=-1;QEDIT.rotation=null;
-  QEDIT.points=starting.map(p=>p.slice());
+  QEDIT.points=starting.map(p=>p.slice());state.dirty=false;
   updateHint();draw();
  };
+ function insideCrop(points){return points&&points.every(p=>p[0]>=crop[0]&&p[0]<crop[2]&&p[1]>=crop[1]&&p[1]<crop[3]);}
  function rotateStep(degrees){
-  if(!QEDIT||QEDIT.drawing||QEDIT.points.length!==4)return;
+  if(QEDIT!==state||state.saving||QEDIT.drawing||QEDIT.points.length!==4)return;
   const turned=plateQuadRotate(QEDIT.points,degrees*Math.PI/180,
                               d.width,d.height);
-  if(!turned){
-   hint.textContent="Cannot rotate beyond the video frame; move the plate inward first.";
+  if(!insideCrop(turned)){
+   hint.textContent="Rotation would leave the visible preview. Adjust the corners inward first.";
    return;
   }
-  QEDIT.points=turned;draw();
+  QEDIT.points=turned;state.dirty=true;draw();
   hint.textContent="Plate rotated "+(degrees>0?"+":"")+degrees+"°.";
  }
  ov.querySelector("#qRotateLeft").onclick=()=>rotateStep(-5);
  ov.querySelector("#qRotateRight").onclick=()=>rotateStep(5);
  cv.addEventListener("pointerdown",e=>{
-  if(!QEDIT||!imageReady)return;
+  if(QEDIT!==state||state.saving)return;
   e.preventDefault();e.stopPropagation();
   const p=point(e);
   if(QEDIT.drawing){
-   QEDIT.points.push(p);
+   QEDIT.points.push(p);state.dirty=true;
    if(QEDIT.points.length===4)QEDIT.drawing=false;
    updateHint();draw();return;
   }
@@ -3431,40 +3758,44 @@ async function zoomDet(i,forcePlate=false){
   }else{
    hint.textContent="Select a green numbered handle, or click Redraw 4 corners.";
   }
- });
+ },{signal:state.events.signal});
  cv.addEventListener("pointermove",e=>{
-  if(!QEDIT)return;
+  if(QEDIT!==state||state.saving)return;
   if(QEDIT.rotation&&QEDIT.rotation.pointerId===e.pointerId){
    e.preventDefault();e.stopPropagation();
    const p=point(e),r=QEDIT.rotation,
          angle=Math.atan2(p[1]-r.center[1],p[0]-r.center[0])-r.start;
    const rotated=plateQuadRotate(r.base,angle,d.width,d.height);
-   if(rotated){QEDIT.points=rotated;draw();}
-   else hint.textContent="Rotation would move the plate outside the video frame.";
+   if(insideCrop(rotated)){QEDIT.points=rotated;state.dirty=true;draw();}
+   else hint.textContent="Rotation would move the plate outside the visible preview.";
    return;
   }
   if(QEDIT.dragging<0)return;
   e.preventDefault();e.stopPropagation();
-  QEDIT.points[QEDIT.dragging]=point(e);
+  QEDIT.points[QEDIT.dragging]=point(e);state.dirty=true;
   draw();
- });
+ },{signal:state.events.signal});
  function endDrag(){
-  if(QEDIT){QEDIT.dragging=-1;QEDIT.rotation=null;}
+  if(QEDIT===state){QEDIT.dragging=-1;QEDIT.rotation=null;}
  }
- cv.addEventListener("pointerup",endDrag);
- cv.addEventListener("pointercancel",endDrag);
+ cv.addEventListener("pointerup",endDrag,{signal:state.events.signal});
+ cv.addEventListener("pointercancel",endDrag,{signal:state.events.signal});
+ cv.addEventListener("lostpointercapture",endDrag,{signal:state.events.signal});
  save.onclick=async()=>{
-  if(!QEDIT||QEDIT.points.length!==4||!imageReady)return;
-  save.disabled=true;
+  if(QEDIT!==state||state.saving||QEDIT.points.length!==4)return;
+  state.saving=true;save.disabled=true;
   const status=ov.querySelector("#qStatus");
   status.textContent="Saving four corners…";
   try{
-   const res=await fetch("api/jobs/"+CUR+"/plate_quad/"+i,{method:"POST",
+   const {data}=await reviewRequest("api/jobs/"+state.job+"/plate_quad/"+i,{method:"POST",
     headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({points:QEDIT.points,
+    body:JSON.stringify({points:state.points,preview_token:d.preview_token,
      apply_track:ov.querySelector("#qTrack").checked})});
-   let data={};try{data=await res.json();}catch(_){}
-   if(!res.ok)throw new Error(data.error||"HTTP "+res.status);
+   if(QEDIT!==state||CUR!==state.job)return;
+   Object.assign(d,data.preview);img._plateMeta=d;
+   starting.splice(0,starting.length,...d.points.map(p=>p.slice()));
+   state.points=starting.map(p=>p.slice());state.dirty=false;draw();
+   ov.querySelector("#qClose").textContent="Done editing";
    VLBL[i]="plate";
    const label=document.getElementById("vlabel"+i);
    if(label)label.textContent="Confirmed plate";
@@ -3473,9 +3804,9 @@ async function zoomDet(i,forcePlate=false){
    if(document.getElementById("beCv"))beScrub();
   }catch(error){
    status.textContent="Save failed: "+error.message;
-  }finally{save.disabled=false;}
+  }finally{state.saving=false;save.disabled=false;}
  };
- updateHint();
+ updateHint();draw();
 }
 function beRemove(){
  if(BE.sel<0)return;
@@ -3519,6 +3850,9 @@ async function cancelJob(){await fetch("api/jobs/"+CUR+"/cancel",{method:"POST"}
 // the three post-render views (compare, review, box editor) are mutually
 // exclusive: opening one closes the others instead of stacking them
 function showPanel(which){
+ if(which!=="boxedit_rev"&&which!=="review"){
+  if(!closePlateQuad())return;clearReviewPreviews();
+ }
  // a playing box-editor video must be PAUSED before its DOM is wiped —
  // an element removed via innerHTML can keep its audio running
  try{const v=document.getElementById("beVid");
@@ -3574,9 +3908,18 @@ function plateFallbackText(x){
 }
 let VLBL={},VLBLJOB=null;  // explicit human labels; never infer from default blur state
 async function loadReview(){
+ if(QEDIT&&QEDIT.dirty&&!confirm("Discard unsaved corner edits?"))return;
+ if(!closePlateQuad())return;
+ clearReviewPreviews();
+ const job=CUR,view=JOBVIEW;
  showPanel("review");
  if(VLBLJOB!==CUR){VLBL={};VLBLJOB=CUR;}
- const d=await (await fetch(`api/jobs/${CUR}/detections`)).json();
+ let d;
+ try{d=(await reviewRequest(`api/jobs/${job}/detections`)).data;}catch(error){
+  if(CUR===job&&view===JOBVIEW){const w=document.getElementById("warnbox");if(w){w.style.display="block";w.textContent="Review could not load: "+error.message;}}
+  return;
+ }
+ if(CUR!==job||view!==JOBVIEW)return;
  DUR=d.duration;
  const groups={}; const zdrop=[]; TRKMEM={};
  d.detections.forEach(x=>{
@@ -3606,8 +3949,9 @@ async function loadReview(){
    <div class="grid3">`;
   for(const x of zdrop){
    html+=`<div class="det ${EN[x.i]?'':'off'}" id="det${x.i}" data-cat="zdrop">
-    <img src="api/jobs/${CUR}/thumb/${x.i}" loading="lazy"
-     style="cursor:zoom-in" onclick="zoomDet(${x.i})" onerror="thumbRetry(this)">
+    <img data-preview-url="api/jobs/${job}/thumb/${x.i}" alt="Original detection preview"
+     style="cursor:zoom-in" onclick="zoomDet(${x.i})">
+    <small class="preview-status" role="status">Preview not loaded</small><button class="sec preview-retry" hidden onclick="retryReviewPreview(this)">Retry preview</button>
     <div>"${x.text}" <br>${x.t_start.toFixed(1)}–${x.t_end.toFixed(1)}s</div>
     <div id="bb${x.i}">${detChoices(x.i)}</div>
    </div>`;
@@ -3647,14 +3991,17 @@ async function loadReview(){
     onclick="setAll('${cat}',false)">Keep all visible</button></h3><div class="grid3">`;
   for(const x of items){
    html+=`<div class="det ${EN[x.i]?'':'off'}" id="det${x.i}" data-cat="${cat}">
-    <img src="api/jobs/${CUR}/thumb/${x.i}"
+    <div class="${x.category==="plate"?"plate-preview":"finding-preview"}">
+    <img id="thumb${x.i}" data-preview-url="api/jobs/${job}/thumb/${x.i}" alt="Original detection preview"
      class="${x.category==="plate"?"plate-edit-thumb":""}"
      title="${x.category==="plate"?"Click to edit the plate corners":"Enlarge detection"}"
-     style="cursor:${x.category==="plate"?"crosshair":"zoom-in"}"
+     style="cursor:${x.category==="plate"?"pointer":"zoom-in"}"
      onclick="${x.category==="plate"?"openPlateQuad(event,"+x.i+")":"zoomDet("+x.i+")"}"
      onpointerdown="${x.category==="plate"?"event.stopPropagation()":""}"
      draggable="false" ondragstart="return false"
-     onerror="thumbRetry(this)">
+     >${x.category==="plate"?'<canvas class="plate-outline" aria-hidden="true"></canvas>':""}</div>
+    <small class="preview-status" role="status">Preview not loaded</small>
+    <button class="sec preview-retry" hidden onclick="retryReviewPreview(this)">Retry preview</button>
     <div>${plateFallbackText(x)?`<span class="badge" style="white-space:normal">${plateFallbackText(x)}</span> `:""}${x.shaped?'<span class="badge" title="Thumbnail rectangle is a selection guide; open to inspect the mask and any exclusions">shaped mask</span> ':""}${x.personcard?`<b>Person ${x.person+1}</b> — one decision for ALL their appearances`:`"${x.text}"`}${x.frames?` <span class="badge">×${x.frames} frames</span>`:""}${x.confidence?` <span class="badge" title="detector confidence — low values on a non-face thumbnail usually mean a false detection">${Math.round(x.confidence*100)}%</span>`:""} <br>${x.t_start.toFixed(1)}–${x.t_end.toFixed(1)}s</div>
     <div id="bb${x.i}">${detChoices(x.i)}</div>
     ${x.category==="plate"?`<button type="button" class="sec" onclick="openPlateQuad(event,${x.i})">Edit 4 corners</button>
@@ -3671,7 +4018,7 @@ async function loadReview(){
   add-region tool</span></div></div>`;
  const old=document.getElementById("review"); if(old)old.remove();
  detail.insertAdjacentHTML("beforeend",html);
- initMarquee();
+ initMarquee();initReviewPreviews();
 }
 
 function detChoices(i){
@@ -3793,6 +4140,7 @@ document.addEventListener("keydown",e=>{
   const lb=document.getElementById("lb");if(lb)lb.remove();}});
 
 async function saveAndRender(saveOnly=false){
+ if(QEDIT&&(QEDIT.dirty||QEDIT.saving)){alert("Save or cancel the corner edits first.");return false;}
  // Do not render until the server has confirmed the latest pending preview.
  if(document.getElementById("beCv")){
   if(BE.drag||BE.pending){
@@ -4164,8 +4512,12 @@ def _vault_lock_now():
         key = VAULT["key"]
         if key is None:
             return 0
-        n = vault.encrypt_tree(key, JOBS_DIR)
-        VAULT["key"] = None
+        with _REVIEW_WORK_LOCK:
+            with _REVIEW_CACHE_LOCK:
+                _REVIEW_FRAMES.clear()
+                _REVIEW_PROBES.clear()
+            n = vault.encrypt_tree(key, JOBS_DIR)
+            VAULT["key"] = None
         return n
 
 
