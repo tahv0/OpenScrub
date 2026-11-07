@@ -1330,12 +1330,15 @@ def _plate_editor_crop(box, points, width, height):
     ys = [float(box[1]), float(box[3])] + [float(p[1]) for p in points]
     xmin, xmax = min(xs), max(xs)
     ymin, ymax = min(ys), max(ys)
-    pad_x = max(32.0, 0.40 * (xmax - xmin))
-    pad_y = max(28.0, 1.50 * (ymax - ymin))
-    x1 = max(0, int(np.floor(xmin - pad_x)))
-    y1 = max(0, int(np.floor(ymin - pad_y)))
-    x2 = min(width, int(np.ceil(xmax + pad_x)))
-    y2 = min(height, int(np.ceil(ymax + pad_y)))
+    # Leave a square working area containing the plate's rotation
+    # envelope. Rectangular crops clip the plate when turned 45–90°.
+    cx, cy = (xmin + xmax) / 2.0, (ymin + ymax) / 2.0
+    radius = max(38.0, 0.5 * np.hypot(xmax - xmin, ymax - ymin)
+                 + max(28.0, 0.15 * (xmax - xmin)))
+    x1 = max(0, int(np.floor(cx - radius)))
+    y1 = max(0, int(np.floor(cy - radius)))
+    x2 = min(width, int(np.ceil(cx + radius)))
+    y2 = min(height, int(np.ceil(cy + radius)))
     if x2 <= x1 or y2 <= y1:
         abort(400, description="Plate is outside the video frame")
     return [x1, y1, x2, y2]
@@ -3164,6 +3167,39 @@ function beHook(){
  cv.addEventListener("pointerup",()=>{if(BE.drag){BE.drag=null;beRefresh();}});
 }
 
+// Pure rigid-body rotation of a perspective quadrilateral. Rotating a
+// polygon must preserve its skew and all edge lengths; it must never
+// silently clamp individual corners and distort the plate.
+function plateQuadRotate(points, radians, width, height){
+ if(!Array.isArray(points)||points.length!==4||!Number.isFinite(radians))
+  return null;
+ const center=[points.reduce((n,p)=>n+p[0],0)/4,
+               points.reduce((n,p)=>n+p[1],0)/4];
+ const sn=Math.sin(radians),cs=Math.cos(radians);
+ const result=points.map(p=>{
+  const x=p[0]-center[0],y=p[1]-center[1];
+  return [center[0]+x*cs-y*sn,center[1]+x*sn+y*cs];
+ });
+ return result.every(p=>Number.isFinite(p[0])&&Number.isFinite(p[1])&&
+  p[0]>=0&&p[0]<width&&p[1]>=0&&p[1]<height)?result:null;
+}
+function plateQuadRotationHandle(points,crop,cv){
+ if(!points||points.length!==4)return null;
+ const sx=cv.width/(crop[2]-crop[0]),sy=cv.height/(crop[3]-crop[1]);
+ const a=points[0],b=points[1],mx=((a[0]+b[0])/2-crop[0])*sx,
+       my=((a[1]+b[1])/2-crop[1])*sy;
+ const dx=(b[0]-a[0])*sx,dy=(b[1]-a[1])*sy;
+ const length=Math.hypot(dx,dy);
+ if(length<1)return null;
+ const nx=dy/length,ny=-dx/length;
+ let x=mx+nx*34,y=my+ny*34;
+ // Keep the rotate handle within the actual interactive canvas.
+ if(x<20||x>cv.width-20||y<20||y>cv.height-20){
+  x=mx-nx*34;y=my-ny*34;
+ }
+ return {x:Math.max(20,Math.min(cv.width-20,x)),
+         y:Math.max(20,Math.min(cv.height-20,y)),mx,my};
+}
 let QEDIT=null;
 function closePlateQuad(){
  if(QEDIT&&QEDIT.resizeObserver)QEDIT.resizeObserver.disconnect();
@@ -3224,22 +3260,24 @@ async function zoomDet(i,forcePlate=false){
   '<b id="qHeading">Edit license plate — four corners</b>'+
   '<button type="button" id="qClose" class="sec">Close</button></div>'+
   '<p style="font-size:12px;color:#cbd5e1;margin:8px 0">'+
-   'Zoomed plate preview. Drag a numbered handle, or choose Redraw to click '+
-   'the 4 actual plate corners clockwise (top-left → top-right → bottom-right → bottom-left).'+
+   'Drag the orange rotate handle to turn the entire plate, or use the ±5° buttons. '+
+   'Drag green numbered handles to adjust perspective, or Redraw the four corners clockwise.'+
   '</p>'+
   '<div id="qStage" style="position:relative;width:'+viewWidth+
    'px;max-width:100%;margin:0 auto;user-select:none;touch-action:none">'+
   '<img id="qImg" draggable="false" alt="Magnified unredacted plate frame" '+
    'style="display:block;width:100%;height:auto;'+
    'user-select:none;pointer-events:none" />'+
-  '<canvas id="qCv" aria-label="Drag plate corners or click four new ones" '+
+  '<canvas id="qCv" aria-label="Drag the orange rotation handle, plate corners, or click four new ones" '+
    'style="position:absolute;inset:0;display:block;touch-action:none;'+
    'cursor:crosshair;width:100%;height:100%"></canvas></div>'+
   '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:10px 0">'+
+   '<button type="button" id="qRotateLeft" class="sec" title="Rotate whole plate counterclockwise 5 degrees">↶ Rotate −5°</button>'+
+   '<button type="button" id="qRotateRight" class="sec" title="Rotate whole plate clockwise 5 degrees">↷ Rotate +5°</button>'+
    '<button type="button" id="qRedraw" class="sec">Redraw 4 corners</button>'+
    '<button type="button" id="qReset" class="sec">Reset</button>'+
    '<span id="qHint" style="font-size:12px;color:#4ade80">'+
-    'Drag the green numbered handles on the preview</span></div>'+
+    'Orange = rotate whole shape; green = adjust individual corners</span></div>'+
   '<label style="font-size:12px;display:flex;gap:8px;align-items:center">'+
    '<input id="qTrack" type="checkbox"> Apply the shape to this detection track '+
    '(approximate — verify changing perspective)</label>'+
@@ -3254,7 +3292,8 @@ async function zoomDet(i,forcePlate=false){
  const hint=ov.querySelector("#qHint"),save=ov.querySelector("#qSave");
  const starting=d.points.map(p=>p.slice());
  QEDIT={i,points:starting.map(p=>p.slice()),starting,
-        crop,width:d.width,height:d.height,drawing:false,dragging:-1};
+        crop,width:d.width,height:d.height,drawing:false,
+        dragging:-1,rotation:null,rotateHandle:null};
  let imageReady=false;
  function viewSize(){
   // Make canvas pixels match the *displayed* photo (including max-height).
@@ -3288,7 +3327,18 @@ async function zoomDet(i,forcePlate=false){
     x.fillStyle="#fff";x.font="bold 13px sans-serif";x.textAlign="center";
     x.fillText(String(k+1),px,py+4);
    });
-  }
+   const handle=plateQuadRotationHandle(p,crop,cv);
+   QEDIT.rotateHandle=handle;
+   if(handle){
+    x.beginPath();x.moveTo(handle.mx,handle.my);x.lineTo(handle.x,handle.y);
+    x.strokeStyle="#f59e0b";x.lineWidth=2;x.stroke();
+    x.beginPath();x.arc(handle.x,handle.y,13,0,Math.PI*2);
+    x.fillStyle="#92400e";x.fill();x.lineWidth=3;
+    x.strokeStyle="#fbbf24";x.stroke();
+    x.fillStyle="#fff";x.font="bold 20px sans-serif";x.textAlign="center";
+    x.fillText("↻",handle.x,handle.y+7);
+   }
+  }else QEDIT.rotateHandle=null;
  }
  function point(e){
   const r=cv.getBoundingClientRect();
@@ -3301,7 +3351,7 @@ async function zoomDet(i,forcePlate=false){
   if(!QEDIT)return;
   hint.textContent=QEDIT.drawing
    ?"Click corner "+(QEDIT.points.length+1)+" of 4 on the plate preview"
-   :"Drag green handles. Redraw lets you place all four corners again.";
+   :"Drag orange ↻ to rotate the whole plate; drag green handles for perspective.";
   save.disabled=!imageReady||QEDIT.points.length!==4;
  }
  img.onload=()=>{
@@ -3324,15 +3374,29 @@ async function zoomDet(i,forcePlate=false){
  ov.querySelector("#qClose").onclick=closePlateQuad;
  ov.querySelector("#qRedraw").onclick=()=>{
   if(!QEDIT)return;
-  QEDIT.drawing=true;QEDIT.dragging=-1;QEDIT.points=[];
+  QEDIT.drawing=true;QEDIT.dragging=-1;QEDIT.rotation=null;
+  QEDIT.rotateHandle=null;QEDIT.points=[];
   updateHint();draw();
  };
  ov.querySelector("#qReset").onclick=()=>{
   if(!QEDIT)return;
-  QEDIT.drawing=false;QEDIT.dragging=-1;
+  QEDIT.drawing=false;QEDIT.dragging=-1;QEDIT.rotation=null;
   QEDIT.points=starting.map(p=>p.slice());
   updateHint();draw();
  };
+ function rotateStep(degrees){
+  if(!QEDIT||QEDIT.drawing||QEDIT.points.length!==4)return;
+  const turned=plateQuadRotate(QEDIT.points,degrees*Math.PI/180,
+                              d.width,d.height);
+  if(!turned){
+   hint.textContent="Cannot rotate beyond the video frame; move the plate inward first.";
+   return;
+  }
+  QEDIT.points=turned;draw();
+  hint.textContent="Plate rotated "+(degrees>0?"+":"")+degrees+"°.";
+ }
+ ov.querySelector("#qRotateLeft").onclick=()=>rotateStep(-5);
+ ov.querySelector("#qRotateRight").onclick=()=>rotateStep(5);
  cv.addEventListener("pointerdown",e=>{
   if(!QEDIT||!imageReady)return;
   e.preventDefault();e.stopPropagation();
@@ -3343,6 +3407,18 @@ async function zoomDet(i,forcePlate=false){
    updateHint();draw();return;
   }
   const r=cv.getBoundingClientRect();
+  const handle=QEDIT.rotateHandle;
+  if(handle&&Math.hypot(e.clientX-r.left-handle.x,
+                        e.clientY-r.top-handle.y)<=26){
+   const center=[QEDIT.points.reduce((n,v)=>n+v[0],0)/4,
+                 QEDIT.points.reduce((n,v)=>n+v[1],0)/4];
+   QEDIT.rotation={base:QEDIT.points.map(v=>v.slice()),center,
+      start:Math.atan2(p[1]-center[1],p[0]-center[0]),
+      pointerId:e.pointerId};
+   cv.setPointerCapture(e.pointerId);
+   hint.textContent="Rotating the whole plate; release to finish.";
+   return;
+  }
   const dsx=r.width/cw,dsy=r.height/ch;
   let nearest=-1,best=Infinity;
   QEDIT.points.forEach((v,k)=>{
@@ -3357,12 +3433,24 @@ async function zoomDet(i,forcePlate=false){
   }
  });
  cv.addEventListener("pointermove",e=>{
-  if(!QEDIT||QEDIT.dragging<0)return;
+  if(!QEDIT)return;
+  if(QEDIT.rotation&&QEDIT.rotation.pointerId===e.pointerId){
+   e.preventDefault();e.stopPropagation();
+   const p=point(e),r=QEDIT.rotation,
+         angle=Math.atan2(p[1]-r.center[1],p[0]-r.center[0])-r.start;
+   const rotated=plateQuadRotate(r.base,angle,d.width,d.height);
+   if(rotated){QEDIT.points=rotated;draw();}
+   else hint.textContent="Rotation would move the plate outside the video frame.";
+   return;
+  }
+  if(QEDIT.dragging<0)return;
   e.preventDefault();e.stopPropagation();
   QEDIT.points[QEDIT.dragging]=point(e);
   draw();
  });
- function endDrag(){if(QEDIT)QEDIT.dragging=-1;}
+ function endDrag(){
+  if(QEDIT){QEDIT.dragging=-1;QEDIT.rotation=null;}
+ }
  cv.addEventListener("pointerup",endDrag);
  cv.addEventListener("pointercancel",endDrag);
  save.onclick=async()=>{
