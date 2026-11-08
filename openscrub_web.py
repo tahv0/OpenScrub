@@ -428,8 +428,7 @@ class WebCallbacks(openscrub.Callbacks):
         h, w = frame.shape[:2]
         scale = 720 / w
         small = cv2.resize(frame, (720, int(h * scale)))
-        cv2.imwrite(os.path.join(self.job["dir"], "preview.jpg"), small,
-                    [cv2.IMWRITE_JPEG_QUALITY, 70])
+        _publish_preview_jpeg(os.path.join(self.job["dir"], "preview.jpg"), small, 70)
 
     def cancelled(self):
         return self.job["cancel"].is_set()
@@ -1013,13 +1012,48 @@ def job_log(jid):
                     "len": len(job["log"])})
 
 
+def _snapshot_response(path, mimetype, **options):
+    """Pin response bytes, not a mutable filename and its earlier stat size."""
+    from io import BytesIO
+    with _REVIEW_CACHE_LOCK:
+        if vault_locked():
+            abort(423)
+        try:
+            with open(path, "rb") as stream:
+                data = stream.read()
+        except FileNotFoundError:
+            abort(404)
+    return send_file(BytesIO(data), mimetype=mimetype, **options)
+
+
+def _publish_preview_jpeg(path, image, quality):
+    """Publish a complete JPEG atomically; readers never observe a truncation."""
+    ok, encoded = cv2.imencode(".jpg", image, [cv2.IMWRITE_JPEG_QUALITY, quality])
+    if not ok:
+        raise OSError("Could not encode preview")
+    temp = None
+    try:
+        with tempfile.NamedTemporaryFile(dir=os.path.dirname(path), delete=False) as out:
+            temp = out.name
+            out.write(encoded.tobytes())
+        with _REVIEW_CACHE_LOCK:
+            if vault_locked():
+                abort(423)
+            os.replace(temp, path)
+    finally:
+        if temp and os.path.exists(temp):
+            os.unlink(temp)
+
+
 @app.route("/api/jobs/<jid>/preview.jpg")
 def job_preview(jid):
     job = JOBS.get(jid) or abort(404)
     p = os.path.join(job["dir"], "preview.jpg")
     if not os.path.exists(p):
         abort(404)
-    return send_file(p, mimetype="image/jpeg", max_age=0)
+    response = _snapshot_response(p, "image/jpeg", max_age=0)
+    response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 @app.route("/api/jobs/<jid>/stop", methods=["POST"])
@@ -1384,6 +1418,27 @@ def job_mediainfo(jid):
                     "width": w_, "height": h_})
 
 
+def _review_identity(job, doc):
+    """Bind browser drafts to this source and ordered coordinate timeline.
+
+    Decisions and corner edits do not change identity; rescans, changed media,
+    row reordering or coordinate changes do. This is not a model confidence.
+    """
+    fields = ("category", "cbox", "aoff", "frame_index", "t_start", "t_end",
+              "last_seen", "track", "person", "dense")
+    try:
+        video = _video_identity(job["video"])
+    except (KeyError, OSError):
+        # A report can still be inspected when its source is unavailable, but
+        # never restore an old browser draft without a verifiable source.
+        return None
+    identity = [video, doc.get("provenance", {}).get("input_sha256"),
+                (doc.get("learning") or {}).get("pass_id"), doc["render_state"]["fps"],
+                doc["render_state"]["cum"],
+                [[r.get(k) for k in fields] for r in doc["detections"]]]
+    return hashlib.sha256(json.dumps(identity, separators=(",", ":")).encode()).hexdigest()
+
+
 @app.route("/api/jobs/<jid>/detections")
 def job_detections(jid):
     job = JOBS.get(jid) or abort(404)
@@ -1403,6 +1458,7 @@ def job_detections(jid):
                       "zone_dropped": bool(d.get("zone_dropped")),
                       "shaped": bool(d.get("poly"))})
     return jsonify({"detections": items,
+                    "review_identity": _review_identity(job, doc),
                     "learning": doc.get("learning"),
                     "indexed_frames": any(d.get("frame_index", -1) >= 0 for d in doc["detections"]),
                     "frame_count": len(doc["render_state"]["cum"]),
@@ -2018,8 +2074,8 @@ def job_thumb(jid, i):
             abort(404)
         cv2.rectangle(crop, (pad, pad), (crop.shape[1] - pad,
                                          crop.shape[0] - pad), (0, 0, 255), 2)
-        cv2.imwrite(cache, crop, [cv2.IMWRITE_JPEG_QUALITY, 80])
-    return send_file(cache, mimetype="image/jpeg", max_age=3600)
+        _publish_preview_jpeg(cache, crop, 80)
+    return _snapshot_response(cache, "image/jpeg", max_age=3600)
 
 
 @app.route("/api/jobs/<jid>/frame_at")
@@ -2096,6 +2152,8 @@ def job_save_edits(jid):
     edits = request.get_json(force=True)
     path = os.path.join(job["dir"], "report.json")
     doc = _load_job_report(job)
+    if edits.get("review_identity") is not None and edits["review_identity"] != _review_identity(job, doc):
+        return jsonify({"error": "Review source or findings changed; reopen the review. Browser draft retained."}), 409
     stop_meta = doc.get("stop_review") or {}
     cutoff = (stop_meta["next_frame"] / stop_meta["fps"]
               if stop_meta.get("state") == "paused" else None)
@@ -2153,6 +2211,7 @@ def job_save_edits(jid):
     suggest = sorted(t for t, states in per.items()
                      if len(states) >= 2 and not any(states))
     return jsonify({"ok": True, "total": len(doc["detections"]),
+                    "review_identity": _review_identity(job, doc),
                     "suggest_allowlist": suggest})
 
 
@@ -2566,8 +2625,8 @@ def job_download(jid):
 @app.route("/api/jobs/<jid>/report")
 def job_report(jid):
     job = JOBS.get(jid) or abort(404)
-    return send_file(os.path.join(job["dir"], "report.json"),
-                     as_attachment=True,
+    return _snapshot_response(os.path.join(job["dir"], "report.json"),
+                     "application/json", as_attachment=True,
                      download_name=export_filenames(job)[1])
 
 
@@ -2964,6 +3023,7 @@ async function loadJobs(){
  }catch(error){
   JOBSFAILURES++;JOBSRETRYAT=Date.now()+Math.min(30000,2000*2**Math.min(4,JOBSFAILURES-1));
   const note=document.getElementById("jobsLoadStatus");
+  if(error.status===423)clearReviewDrafts();
   if(note)note.textContent=error.status===423?"Vault locked — unlock in Settings.":"Connection interrupted; retrying with backoff.";
  }finally{JOBSFLIGHT=null;}})();
  return JOBSFLIGHT;
@@ -2984,12 +3044,14 @@ async function delJob(id){
   try{const e=await r.json();m=e.error||e.description||m;}catch(_){}
   alert(m);return;
  }
+ clearReviewDrafts(id);
  if(CUR===id){CUR=null;if(POLL)clearTimeout(POLL);detail.innerHTML="";}
  JOBSJSON="";loadJobs();
 }
 async function openJob(id){
  if(!await flushPlateSaves())return;
  if(!closePlateQuad())return;
+ rememberReviewDraft();REVIEW_CONTEXT=null;REVIEW_RECOVER={};
  clearReviewPreviews();JOBVIEW++;REFRESHFAILURES=0;
  if(REFRESHCTRL)REFRESHCTRL.abort();
  CUR=id; EN={}; MAN=[]; PHIST=[]; PHPH=""; LOGN=0; SHELLPH=null;
@@ -3721,6 +3783,121 @@ function beHook(){
 
 // Only visible finding previews are requested. Editing reuses the same image
 // and geometry; it never starts a second video/image request.
+// Same-tab recovery only: coordinates/decisions, never source images or text.
+// Bind drafts to immutable source/timeline/row identity, not merely a job ID.
+const REVIEW_DRAFT_PREFIX="openscrub.review-draft.v1:";
+let REVIEW_CONTEXT=null,REVIEW_BASE_EN={},REVIEW_BASE_LABELS={},REVIEW_RECOVER={},REVIEW_SAVE_MESSAGE="";
+function reviewNotice(text){
+ REVIEW_SAVE_MESSAGE=text;
+ document.querySelectorAll("[data-review-save-status]").forEach(el=>el.textContent=text);
+}
+function reviewDecisionDraft(){
+ const decisions={};
+ if(!REVIEW_CONTEXT||REVIEW_CONTEXT.job!==CUR)return decisions;
+ for(const [i,on] of Object.entries(EN)){
+  const label=VLBL[i]==="clear"?"":(VLBL[i]||"");
+  if(on!==REVIEW_BASE_EN[i]||label!==(REVIEW_BASE_LABELS[i]||""))
+   decisions[i]={enabled:on,label};
+ }
+ return decisions;
+}
+function reviewDraftKey(){return REVIEW_DRAFT_PREFIX+CUR+":"+REVIEW_CONTEXT.identity;}
+function reviewHasDraft(){
+ return Object.keys(reviewDecisionDraft()).length>0||Object.keys(REVIEW_RECOVER).length>0;
+}
+function rememberReviewDraft(){
+ if(!REVIEW_CONTEXT||REVIEW_CONTEXT.job!==CUR||!REVIEW_CONTEXT.identity)return;
+ const corners={...REVIEW_RECOVER};
+ for(const s of PLATE_EDITS.values())if(s.job===CUR){
+  if(s.dirty||s.pending){
+   corners[s.i]={points:plateCopy(s.drag?s.drag.before:s.points),saved:plateCopy(s.saved),
+    version:s.version,pending:s.pending,frame:s.meta.frame,box:s.meta.box,
+    width:s.meta.width,height:s.meta.height};
+  }else delete corners[s.i];
+ }
+ const decisions=reviewDecisionDraft();
+ try{
+  if(Object.keys(decisions).length||Object.keys(corners).length)
+   sessionStorage.setItem(reviewDraftKey(),JSON.stringify({schema:1,job:CUR,
+    identity:REVIEW_CONTEXT.identity,decisions,corners}));
+  else sessionStorage.removeItem(reviewDraftKey());
+ }catch(error){
+  reviewNotice("Browser draft backup unavailable. Keep this tab open until the server confirms all edits saved.");
+  plateUnloadGuard();return false;
+ }
+ plateUnloadGuard();return true;
+}
+function recoverReviewDraft(data){
+ REVIEW_CONTEXT={job:CUR,identity:data.review_identity};REVIEW_RECOVER={};
+ REVIEW_BASE_EN={};REVIEW_BASE_LABELS={};EN={};VLBL={};VLBLJOB=CUR;
+ for(const row of data.detections){
+  REVIEW_BASE_EN[row.i]=EN[row.i]=row.enabled;
+  REVIEW_BASE_LABELS[row.i]=VLBL[row.i]=row.verified_label||"";
+ }
+ if(!data.review_identity){reviewNotice("Server review loaded, but source identity is unavailable. Browser draft recovery is disabled.");return;}
+ let recovered=null,older=false;
+ try{
+  recovered=JSON.parse(sessionStorage.getItem(reviewDraftKey())||"null");
+  older=Array.from({length:sessionStorage.length},(_,i)=>sessionStorage.key(i))
+   .some(k=>k.startsWith(REVIEW_DRAFT_PREFIX+CUR+":")&&k!==reviewDraftKey());
+ }catch(error){reviewNotice("Browser draft backup unavailable; server-saved review loaded.");return;}
+ if(recovered&&recovered.schema===1&&recovered.job===CUR&&recovered.identity===data.review_identity){
+  for(const [i,value] of Object.entries(recovered.decisions||{})){
+   if(!value||!Object.hasOwn(REVIEW_BASE_EN,i)||typeof value.enabled!=="boolean"||
+      !["","plate","not_plate"].includes(value.label))continue;
+   EN[i]=value.enabled;VLBL[i]=value.label||"clear";
+  }
+  for(const [i,value] of Object.entries(recovered.corners||{})){
+   if(value&&Object.hasOwn(REVIEW_BASE_EN,i)&&Array.isArray(value.points)&&
+      value.points.every(p=>Array.isArray(p))&&plateQuadValid(value.points))REVIEW_RECOVER[i]=value;
+  }
+  reviewNotice(reviewHasDraft()?"Recovered unsaved review draft from this tab. Decisions need Save; recovered corners need review and Retry save.":"Loaded server-saved review; the previous request was already applied.");
+ }else reviewNotice(older?"A browser draft belongs to a different scan/source; it was not applied. Use Download review draft to preserve it.":"Loaded server-saved review. New decisions are not saved until confirmed below.");
+}
+function acknowledgeReviewDecisions(payload,result){
+ if(!result||result.ok!==true)throw new Error("Server did not acknowledge the review save");
+ for(const [i,on] of Object.entries(payload.enabled||{}))REVIEW_BASE_EN[i]=on;
+ for(const [i,label] of Object.entries(payload.verified_labels||{}))REVIEW_BASE_LABELS[i]=label==="clear"?"":label;
+ const oldKey=REVIEW_CONTEXT?reviewDraftKey():null;
+ if(result.review_identity&&REVIEW_CONTEXT)REVIEW_CONTEXT.identity=result.review_identity;
+ const retained=rememberReviewDraft();
+ if(retained&&oldKey&&oldKey!==reviewDraftKey())try{sessionStorage.removeItem(oldKey);}catch(error){/* Keep valid new draft. */}
+}
+function restoreCornerDraft(s){
+ const old=REVIEW_RECOVER[s.i];if(!old)return;
+ if(old.frame!==s.meta.frame||JSON.stringify(old.box)!==JSON.stringify(s.meta.box)||
+    old.width!==s.meta.width||old.height!==s.meta.height){
+  plateStatus(s,"Recovered corners do not match this frame; draft retained.");return;
+ }
+ delete REVIEW_RECOVER[s.i];
+ // The server stores box-relative corners to six decimals. Recognize that
+ // exact committed shape after a lost reply, without resubmitting the draft.
+ const b=s.meta.box,epsilon=[Math.max(1e-5,(b[2]-b[0])*5.1e-7),Math.max(1e-5,(b[3]-b[1])*5.1e-7)];
+ if(old.points.every((p,k)=>p.every((v,axis)=>Math.abs(v-s.meta.points[k][axis])<=epsilon[axis]))){rememberReviewDraft();return;}
+ s.points=plateCopy(old.points);s.version=old.version||1;s.dirty=true;
+ // Keep a lost-response request's receipt ID. A source-bound user retry is
+ // required; recovery itself never silently overwrites server geometry.
+ s.pending=old.pending||null;s.refreshBeforeSave=!s.pending;
+ s.error=new Error("Recovered corner draft; check the outline and retry");s.conflict=false;
+ plateStatus(s,"Recovered corners — not saved. Check outline and Retry save.",true);
+ rememberReviewDraft();s.draw();
+}
+function downloadReviewDraft(){
+ rememberReviewDraft();const drafts=[];
+ try{for(let i=0;i<sessionStorage.length;i++){
+  const key=sessionStorage.key(i);if(key.startsWith(REVIEW_DRAFT_PREFIX+CUR+":"))drafts.push(JSON.parse(sessionStorage.getItem(key)));
+ }}catch(error){alert("Could not read browser drafts: "+error.message);return;}
+ const a=document.createElement("a"),url=URL.createObjectURL(new Blob([JSON.stringify({job:CUR,drafts},null,2)],{type:"application/json"}));
+ a.href=url;a.download="openscrub-review-draft-"+CUR+".json";a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+function clearReviewDrafts(job=null){
+ try{for(const key of Array.from({length:sessionStorage.length},(_,i)=>sessionStorage.key(i)))
+  if(key.startsWith(REVIEW_DRAFT_PREFIX+(job?job+":":"")))sessionStorage.removeItem(key);
+ }catch(error){/* Storage may be disabled. */}
+ if(!job||REVIEW_CONTEXT?.job===job){REVIEW_CONTEXT=null;REVIEW_RECOVER={};}
+}
+window.addEventListener("pagehide",rememberReviewDraft);
+
 let REVIEW_MEDIA=null;
 async function reviewRequest(url, options={}, type="json"){
  const ctl=new AbortController(),parent=options.signal;
@@ -3857,10 +4034,10 @@ function plateQuadValid(points){
  return area>=8&&(cross.every(v=>v>0)||cross.every(v=>v<0));
 }
 function plateEditsPending(){return [...PLATE_EDITS.values()].some(s=>s.dirty||s.pending||s.drag);}
-function plateUnloadWarning(e){if(plateEditsPending()){e.preventDefault();e.returnValue="";}}
+function plateUnloadWarning(e){if(plateEditsPending()||reviewHasDraft()||PLATE_REVIEW_BUSY){e.preventDefault();e.returnValue="";}}
 function plateUnloadGuard(){
  window.removeEventListener("beforeunload",plateUnloadWarning);
- if(plateEditsPending())window.addEventListener("beforeunload",plateUnloadWarning);
+ if(plateEditsPending()||(typeof reviewHasDraft==="function"&&reviewHasDraft())||PLATE_REVIEW_BUSY)window.addEventListener("beforeunload",plateUnloadWarning);
 }
 function plateStatus(s,text,retry=false){
  s.status.textContent=text;s.retry.hidden=!retry;
@@ -3868,6 +4045,7 @@ function plateStatus(s,text,retry=false){
 }
 function schedulePlateSaves(){
  clearTimeout(PLATE_TIMER);PLATE_TIMER=null;plateUnloadGuard();
+ if(typeof rememberReviewDraft==="function")rememberReviewDraft();
  if(PLATE_SAVE)return;
  const pending=[...PLATE_EDITS.values()].filter(s=>s.dirty&&!s.drag&&!s.error);
  if(pending.length)PLATE_TIMER=setTimeout(pumpPlateSaves,
@@ -3897,6 +4075,7 @@ function syncPlateTrack(s){
  }
 }
 function discardRejectedCorners(i){
+ if(typeof REVIEW_RECOVER!=="undefined")delete REVIEW_RECOVER[i];
  const s=PLATE_EDITS.get(i);if(!s)return;
  if(s.cancelDrag)s.cancelDrag();
  // The explicit rejection supersedes this track's uncommitted geometry.
@@ -3926,6 +4105,7 @@ function pumpPlateSaves(){
      apply_track:true,autosave:true,edit_id:Date.now().toString(36)+"-"+(++PLATE_SERIAL)+"-"+Math.random().toString(36).slice(2),
      version:s.version,label:VLBL[s.i]};
    }
+   if(typeof rememberReviewDraft==="function")rememberReviewDraft();
    const {data}=await reviewRequest("api/jobs/"+s.job+"/plate_quad/"+s.i,{method:"POST",
     headers:{"Content-Type":"application/json"},body:JSON.stringify(pending)});
    Object.assign(s.meta,data.preview);s.img._plateMeta=s.meta;
@@ -3936,7 +4116,9 @@ function pumpPlateSaves(){
    if(s.version===pending.version&&!s.drag)s.points=plateCopy(s.saved);
    s.dirty=s.version!==pending.version;
    if(VLBL[s.i]===pending.label&&VLBL[s.i]!=="not_plate"){
-    VLBL[s.i]="plate";const label=document.getElementById("vlabel"+s.i);
+    VLBL[s.i]="plate";
+    if(typeof REVIEW_CONTEXT!=="undefined"&&REVIEW_CONTEXT?.job===s.job)REVIEW_BASE_LABELS[s.i]="plate";
+    const label=document.getElementById("vlabel"+s.i);
     if(label)label.textContent="Confirmed plate";
    }
    s.draw();plateStatus(s,s.dirty?"Saving…":s.meta.track>=0?"Saved to track":"Saved");
@@ -3955,6 +4137,7 @@ function pumpPlateSaves(){
  return PLATE_SAVE;
 }
 async function flushPlateSaves(){
+ if(typeof REVIEW_RECOVER!=="undefined"&&Object.keys(REVIEW_RECOVER).length)return false;
  if([...PLATE_EDITS.values()].some(s=>s.drag))return false;
  for(const s of PLATE_EDITS.values())if(s.dirty&&!s.error)s.readyAt=0;
  while([...PLATE_EDITS.values()].some(s=>s.dirty&&!s.error)||PLATE_SAVE){
@@ -4059,7 +4242,7 @@ function initPlateCorners(img){
  },options);
  s.observer=typeof ResizeObserver!=="undefined"?new ResizeObserver(s.draw):null;
  if(s.observer)s.observer.observe(img);
- plateStatus(s,"Drag corners · autosaves");s.draw();return s;
+ plateStatus(s,"Drag corners · autosaves");s.draw();restoreCornerDraft(s);return s;
 }
 document.addEventListener("visibilitychange",()=>{
  if(document.hidden){for(const s of PLATE_EDITS.values())if(s.dirty&&!s.error)s.readyAt=0;pumpPlateSaves();}
@@ -4194,18 +4377,21 @@ async function rollbackLearning(){
  }catch(error){alert(error.message);}
 }
 async function trainAndRescan(){
- if(!await saveAndRender(true))return;
+ const job=CUR,view=JOBVIEW;
+ if(!await saveAndRender(true)||CUR!==job||JOBVIEW!==view)return;
  if(!LEARNING_TERMS){
   if(!confirm("Train locally from your reviewed examples and rescan this video from the beginning? The training environment uses Ultralytics; review its AGPL/Enterprise terms in docs/PLATE_TRAINING.md. Previous review is retained if training or validation fails."))return;
   LEARNING_TERMS=true;
  }
  try{
-  await reviewRequest(`api/jobs/${CUR}/learning`,{method:"POST",headers:{"Content-Type":"application/json"},
+  reviewNotice("Review saved. Requesting training and a full rescan…");
+  await reviewRequest(`api/jobs/${job}/learning`,{method:"POST",headers:{"Content-Type":"application/json"},
     body:JSON.stringify({license_accepted:true})});
+  if(CUR!==job||JOBVIEW!==view)return;
   LEARNING_SELECTION=null;clearReviewPreviews();
   const panel=document.getElementById("review");if(panel)panel.remove();
   await refresh();
- }catch(error){alert(error.message);}
+ }catch(error){if(CUR===job&&JOBVIEW===view){reviewNotice("Training not started: "+error.message+". Your review remains saved.");alert(error.message);}}
 }
 let VLBL={},VLBLJOB=null;  // explicit human labels; never infer from default blur state
 async function loadReview(){
@@ -4222,14 +4408,16 @@ async function loadReview(){
  }
  if(CUR!==job||view!==JOBVIEW)return;
  DUR=d.duration;
+ recoverReviewDraft(d);
  if(LEARNING_SELECTION_JOB!==CUR)LEARNING_SELECTION=null;
  const groups={}; const zdrop=[]; TRKMEM={};
  d.detections.forEach(x=>{
-  EN[x.i]=x.enabled;
-  if(!(x.i in VLBL)&&x.verified_label)VLBL[x.i]=x.verified_label;
+  // EN/VLBL were loaded and any matching unsent draft recovered above.
   if(x.zone_dropped){zdrop.push(x);return;}
   (groups[x.category]=groups[x.category]||[]).push(x);});
  let html=`<div class="card" id="review"><h2>Review findings</h2>
+ <p id="reviewSaveStatus" data-review-save-status role="status" aria-live="polite"></p>
+ <button type="button" class="sec" onclick="downloadReviewDraft()">Download review draft</button>
  <p class="review-copy">Choose what happens in the output. Thumbnails show the original video;
  boxes mark detections.<br>Drag plate corners to autosave their shape to the track. Output choices apply after <b>Save edits &amp; render</b>.
  Drag across cards to select several.</p>
@@ -4298,6 +4486,9 @@ async function loadReview(){
    TRKMEM[rep.i]=members.map(m=>m.i);
    items.push(rep);
   }
+  for(const x of rawItems)if(REVIEW_RECOVER[x.i]&&!items.some(m=>m.i===x.i)){
+   TRKMEM[x.i]=x.track>=0?rawItems.filter(m=>m.track===x.track).map(m=>m.i):[x.i];items.push(x);
+  }
   // person cards first, then everything else chronologically
   items.sort((a,b)=>((b.personcard?1:0)-(a.personcard?1:0))||a.t_start-b.t_start);
   if(!items.length)continue;
@@ -4332,10 +4523,13 @@ async function loadReview(){
  <button onclick="saveAndRender()">${SHELLPH==="paused"?"Save review edits":"Save edits &amp; render"}</button>
  <span style="font-size:12px;color:#94a3b8">missed something? use
   ▶ Preview video &amp; edit boxes above — its ＋ Add box replaces the old
-  add-region tool</span></div></div>`;
+  add-region tool</span></div><p data-review-save-status role="status" aria-live="polite"></p></div>`;
  const old=document.getElementById("review"); if(old)old.remove();
  detail.insertAdjacentHTML("beforeend",html);
- initMarquee();initReviewPreviews();
+ initMarquee();initReviewPreviews();reviewNotice(REVIEW_SAVE_MESSAGE);rememberReviewDraft();
+ for(const i of Object.keys(REVIEW_RECOVER)){
+  const img=document.getElementById("thumb"+i);if(img)queueReviewPreview(img,true);
+ }
 }
 
 function detChoices(i){
@@ -4373,6 +4567,7 @@ function applyDet(i,blur,preserveLabel=false){
   }
   if(t)t.classList.toggle("off",!blur);
  }
+ rememberReviewDraft();reviewNotice("Unsaved decisions — press Save review edits. A same-tab recovery draft is kept when browser storage is available.");
  if(document.getElementById("beCv")){beRefresh();}
 }
 function setAll(cat,on){document.querySelectorAll(`.det[data-cat=${cat}]`)
@@ -4459,33 +4654,51 @@ document.addEventListener("keydown",e=>{
   const lb=document.getElementById("lb");if(lb)lb.remove();}});
 
 async function saveAndRender(saveOnly=false){
- if(PLATE_REVIEW_BUSY)return false;
- PLATE_REVIEW_BUSY=true;
+ if(PLATE_REVIEW_BUSY){reviewNotice("A review save is already running; completion will be shown here.");return false;}
+ PLATE_REVIEW_BUSY=true;rememberReviewDraft();plateUnloadGuard();
  const job=CUR,view=JOBVIEW;
+ reviewNotice("Saving review edits to the server…");
  try{
-  if(!await flushPlateSaves()||CUR!==job||JOBVIEW!==view)return false;
+  if(plateEditsPending()||Object.keys(REVIEW_RECOVER).length){
+   // Persist decisions first, without falsely claiming failed corners saved.
+   // No manual-box append here: a second post must not duplicate annotations.
+   const payload={enabled:{...EN},verified_labels:{...VLBL},review_identity:REVIEW_CONTEXT?.identity};
+   const {data}=await reviewRequest(`api/jobs/${job}/detections`,{method:"POST",
+    headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
+   if(CUR!==job||JOBVIEW!==view)return false;
+   acknowledgeReviewDecisions(payload,data);
+   if(!await flushPlateSaves()){
+    reviewNotice("Review decisions saved to the server. Corner changes are NOT saved — use Retry save on the affected finding. Training/rendering not started; draft retained in this tab.");
+    return false;
+   }
+  }
+  if(CUR!==job||JOBVIEW!==view)return false;
   return await persistReview(saveOnly,job,view);
  }catch(error){
-  alert("Review save failed for job "+job+": "+
-   (error.name==="AbortError"?"request timed out":error.message)+
-   ". The save was not confirmed. Keep the review open and retry before leaving.");
+  if(CUR===job&&JOBVIEW===view){
+   rememberReviewDraft();reviewNotice("Review save NOT confirmed: "+
+    (error.name==="AbortError"?"request timed out":error.message)+". Training/rendering not started. Retry; do not discard this tab.");
+   alert(REVIEW_SAVE_MESSAGE);
+  }
   return false;
- }finally{PLATE_REVIEW_BUSY=false;}
+ }finally{PLATE_REVIEW_BUSY=false;plateUnloadGuard();}
 }
 async function persistReview(saveOnly=false,job=CUR,view=JOBVIEW){
  // Do not render until the server has confirmed the latest pending preview.
  if(document.getElementById("beCv")){
   if(BE.drag||BE.pending){
+   reviewNotice("Review is NOT fully saved: finish the current mask gesture/preview first. Training/rendering not started.");
    alert("Wait for the mask preview to finish updating before saving.");return false;
   }
   if(!await beRefresh()){
+   reviewNotice("Review is NOT fully saved: mask preview failed. Retry before leaving. Training/rendering not started.");
    alert("Could not update the mask preview. Finish editing and try again.");return false;
   }
  }
  const manual=[...MAN,...BE.adds.map(a=>({t_start:a.t0,t_end:a.t1,
   t_ref:a.tref,screen_box:a.box}))];
- const payload={enabled:EN,manual,box_overrides:BE.ov,
-   time_overrides:BE.times,verified_labels:VLBL};
+ const payload={enabled:{...EN},manual,box_overrides:BE.ov,
+   time_overrides:BE.times,verified_labels:{...VLBL},review_identity:REVIEW_CONTEXT?.identity};
  // only send audio spans when the box editor actually loaded them —
  // otherwise a save from plain review would wipe stored spans with []
  if(Array.isArray(BE.audio)&&BE.tlspans!==undefined)payload.audio=BE.audio;
@@ -4495,7 +4708,9 @@ async function persistReview(saveOnly=false,job=CUR,view=JOBVIEW){
   body:JSON.stringify(payload)});
  // A delayed response belongs to its original review, never a newly opened job.
  if(CUR!==job||JOBVIEW!==view)return false;
+ acknowledgeReviewDecisions(payload,r);
  BE.adds=[];BE.ov={};BE.times={};
+ reviewNotice(reviewHasDraft()?"Submitted decisions saved; newer decisions still need Save.":"Review edits saved to the server.");
  if(r.suggest_allowlist&&r.suggest_allowlist.length){
   if(confirm("You disabled every instance of: "+r.suggest_allowlist.join(", ")+". Add these to the permanent allow-list so future scans skip them?"))
    {await fetch("api/allowlist",{method:"POST",
@@ -4504,6 +4719,9 @@ async function persistReview(saveOnly=false,job=CUR,view=JOBVIEW){
     loadPersist();}}
  if(CUR!==job||JOBVIEW!==view)return false;
  MAN=[];
+ if(reviewHasDraft()){
+  reviewNotice("Submitted decisions saved; newer changes still need Save. Training/rendering not started.");return false;
+ }
  if(saveOnly||SHELLPH==="paused"){
   const note=document.getElementById("savedCheckpointNote");
   if(note)note.textContent="Review edits saved locally.";
@@ -4609,7 +4827,7 @@ async function vaultStatus(){
   document.getElementById("vunlock").style.display=(d.enabled&&d.locked)?"flex":"none";
   document.getElementById("vlock").style.display=(d.enabled&&!d.locked)?"flex":"none";
   if(!d.enabled){st.textContent="Disabled — job files (PII) are stored in plaintext. Set a password to enable at-rest encryption.";st.style.color="#fbbf24";}
-  else if(d.locked){st.textContent="LOCKED — "+d.encrypted_files+" file(s) encrypted on disk. Unlock to work with jobs.";st.style.color="#f87171";}
+  else if(d.locked){clearReviewDrafts();st.textContent="LOCKED — "+d.encrypted_files+" file(s) encrypted on disk. Unlock to work with jobs.";st.style.color="#f87171";}
   else{st.textContent="Unlocked — files decrypt while you work; they re-encrypt when you lock or shut down. Losing the password makes encrypted files unrecoverable.";st.style.color="#4ade80";}
   if(d.enabled&&!d.locked){
    document.getElementById("valk").checked=d.autolock_min>0;
