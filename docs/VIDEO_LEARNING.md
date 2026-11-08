@@ -131,3 +131,24 @@ mechanical test and uses a deterministic original proposal detector on generated
 video. Training, ONNX export/inference, the scan loop and renderer are real. It
 does not measure the user's GPU, footage, original plate-model recall or privacy
 accuracy. Production CUDA remains required and is not bypassed by that test.
+
+## Retrying a corrected-polygon crop error
+
+Older learning builds can stop during example collection with **Verified polygon
+does not fit its training crop** even after the review UI successfully saved
+valid corners. The old collector crops around the original detector rectangle;
+a human correction can extend beyond that rectangle and its padding.
+
+The collector now includes the original proposal **and all verified corners**
+in its training crop, then normalizes the label to those exact pixels. It does
+not shrink the annotation, drop the example or relax the dataset quality gates.
+Only the tiny source-boundary rounding error from six-decimal saved coordinates
+is tolerated; genuinely off-frame or non-convex polygons still stop collection
+with the finding index and frame in the error.
+
+Update/rebuild with all three Compose files above, keep the existing persistent
+data mount, and retry **Train & rescan this video** on the same saved job. No
+rescan, reannotation, cache deletion or checkpoint download is needed just to
+retry collection. An unsuccessful collection has not replaced the review report
+or activated a new model. This fix does not bypass the later minimum-example
+or validation checks.

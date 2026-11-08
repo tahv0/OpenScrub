@@ -136,17 +136,41 @@ def collect_feedback(job,doc,read_frame):
                               if s['group']!=group or s['label']!='positive'}
         image=read_frame(frame)
         if image is None:raise ValueError('Cannot decode reviewed frame %d for training'%frame)
-        x1,y1,x2,y2=vl.crop_bounds(box,image.shape)
-        crop=image[y1:y2,x1:x2]
-        if not crop.size:raise ValueError('Empty training crop')
-        points=None
+        bounds=list(box);screen_points=None
         if label=='positive':
-            points=[[(box[0]+float(x)*(box[2]-box[0])-x1)/(x2-x1),
-                     (box[1]+float(y)*(box[3]-box[1])-y1)/(y2-y1)] for x,y in r['plate_quad']]
-            a=np.asarray(points,np.float32)
-            if (a.shape!=(4,2) or not np.isfinite(a).all() or np.any(a<0) or np.any(a>1)
-                or not cv2.isContourConvex(a.reshape(-1,1,2))):
-                raise ValueError('Verified polygon does not fit its training crop')
+            # Review coordinates are relative to the ORIGINAL detector box,
+            # not its training crop. Values outside [0, 1] are valid when the
+            # reviewer corrects an undersized or misplaced detector proposal.
+            context='Reviewed finding %d, frame %d: '%(i,frame)
+            recovery='. Check this finding in review and retry; saved annotations were kept.'
+            q=np.asarray(r['plate_quad'],dtype=np.float64)
+            if q.shape!=(4,2) or not np.isfinite(q).all():
+                raise ValueError(context+'expected four finite corner points'+recovery)
+            scale=np.asarray([box[2]-box[0],box[3]-box[1]],dtype=np.float64)
+            screen_points=q*scale+box[:2]
+            # The autosave API rounds box-relative coordinates to 6 decimals.
+            # Permit only that subpixel error at the source frame boundary;
+            # never clamp a genuine off-frame polygon or truncate it to a box.
+            limit=np.asarray([image.shape[1],image.shape[0]],dtype=np.float64)
+            tolerance=np.abs(scale)*0.5e-6+1e-9
+            if (not np.isfinite(screen_points).all() or np.any(screen_points < -tolerance)
+                    or np.any(screen_points > limit+tolerance)):
+                raise ValueError(context+'verified corners are outside the source frame'+recovery)
+            screen_points=np.clip(screen_points,0,limit)
+            if not cv2.isContourConvex(screen_points.astype(np.float32).reshape(-1,1,2)):
+                raise ValueError(context+'corners must form a convex quadrilateral'+recovery)
+            # Include all corrected vertices before adding context and clipping
+            # the crop to the source image. Keep `box` unchanged for identity
+            # matching and comparison with the original detector's coverage.
+            bounds=[min(box[0],screen_points[:,0].min()),
+                    min(box[1],screen_points[:,1].min()),
+                    max(box[2],screen_points[:,0].max()),
+                    max(box[3],screen_points[:,1].max())]
+        x1,y1,x2,y2=vl.crop_bounds(bounds,image.shape)
+        crop=image[y1:y2,x1:x2]
+        if not crop.size:raise ValueError('Empty training crop for finding %d, frame %d'%(i,frame))
+        points=None if screen_points is None else (
+            (screen_points-[x1,y1])/[x2-x1,y2-y1]).tolist()
         filename='samples/'+uuid.uuid4().hex+'.png'
         if not cv2.imwrite(str(root/filename),crop):raise OSError('Could not persist training crop')
         if os.name!='nt':(root/filename).chmod(0o600)
