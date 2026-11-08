@@ -23,39 +23,38 @@ jobs:
           sudo apt-get update -qq && sudo apt-get install -y ffmpeg tesseract-ocr
           python -m pip install 'numpy<2' 'opencv-python-headless<5' onnx onnxruntime pytest pytest-timeout flask cheroot rapidfuzz pytesseract pillow pyyaml cryptography playwright build hatchling
           python -m playwright install --with-deps chromium
-      - name: Trace in original suite order; preserve real OCR outputs
+      - name: Original invocation and fixture, no monkeypatch or OCR instrumentation
         run: |
           set -o pipefail
-          python - <<'PY' 2>&1 | tee /tmp/ocr-diagnostic.txt
-          import json, cv2, numpy as np, openscrub, pytest, pytesseract
-          print('VERSIONS',cv2.__version__,np.__version__,pytesseract.get_tesseract_version())
-          class Trace(openscrub.Callbacks):
-              def log(self,message): print('PIPELINE',message)
-          class Diagnose:
-              def pytest_collection_modifyitems(self,items):
-                  n=next(i for i,t in enumerate(items) if t.name=='test_deep_backtrack_finds_true_onset')
-                  del items[n+1:]
-              def pytest_runtest_setup(self,item):
-                  if item.name!='test_deep_backtrack_finds_true_onset':return
-                  raw=pytesseract.image_to_data
-                  def observed(*args,**kwargs):
-                      result=raw(*args,**kwargs)
-                      if isinstance(result,dict):print('RAW',json.dumps([(t,c) for t,c in zip(result['text'],result['conf']) if t.strip()]))
-                      return result
-                  pytesseract.image_to_data=observed
-                  read=openscrub.TesseractBackend.read
-                  def words(self,frame):
-                      result=read(self,frame);print('WORDS',repr(result));return result
-                  openscrub.TesseractBackend.read=words
-                  pipeline=openscrub.run_pipeline
-                  openscrub.run_pipeline=lambda args,callbacks: pipeline(args,Trace())
-          raise SystemExit(pytest.main(['-q','-s','--timeout=60','--basetemp=/tmp/onset-fixture'],plugins=[Diagnose()]))
+          python -m compileall -q openscrub.py openscrub_web.py learning_session.py video_learning.py test_review_soak.py
+          python -c 'import openscrub_web;open("/tmp/diagnostic-app.js","w").write(openscrub_web.APP_JS)'
+          timeout 150s python -m pytest -q --maxfail=1 --timeout=60 --junitxml=/tmp/ocr-normal.xml 2>&1 | tee /tmp/ocr-normal.txt
+      - name: Inspect raw OCR on persisted fixture after original test finishes
+        if: always()
+        run: |
+          python - <<'PY' 2>&1 | tee /tmp/ocr-actual-frames.txt
+          import glob,cv2,pytesseract,openscrub,json,hashlib
+          for path in glob.glob('/tmp/pytest-of-*/pytest-*/test_deep_backtrack_finds_true0/late.mp4'):
+              print('VIDEO',path,'CV',cv2.__version__,'TESS',pytesseract.get_tesseract_version())
+              cap=cv2.VideoCapture(path)
+              for index in (90,120,150):
+                  cap.set(cv2.CAP_PROP_POS_FRAMES,index);ok,image=cap.read()
+                  print('FRAME',index,ok)
+                  if not ok:continue
+                  print('HASH',hashlib.sha256(image.tobytes()).hexdigest())
+                  raw=pytesseract.image_to_data(cv2.cvtColor(image,cv2.COLOR_BGR2GRAY),output_type=pytesseract.Output.DICT)
+                  print('RAW',json.dumps([(t,c) for t,c in zip(raw['text'],raw['conf']) if t.strip()]))
+                  words=openscrub.TesseractBackend().read(image)
+                  print('WORDS',words)
+                  print('FOUND',[(d.category,d.text) for d in openscrub.detect_phi(words,openscrub.group_lines(words),4,(0,0),None,None)])
+              cap.release()
           PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: ocr-onset-diagnostic
+          name: ocr-onset-original
           path: |
-            /tmp/ocr-diagnostic.txt
-            /tmp/onset-fixture/**/late*.json
+            /tmp/ocr-normal.*
+            /tmp/ocr-actual-frames.txt
+            /tmp/pytest-of-runner/pytest-0/test_deep_backtrack_finds_true0/
           retention-days: 3
