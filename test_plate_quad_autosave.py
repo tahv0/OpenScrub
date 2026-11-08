@@ -111,7 +111,7 @@ function reviewRequest(url,options){
 }
 ''' + helpers + r'''
 function state(i){const points=[[20,20],[80,20],[80,60],[20,60]];
- return {i,job:'test',meta:{points:plateCopy(points),crop:[0,0,100,100],preview_token:'old-'+i,track:i},
+ return {i,job:'test',meta:{box:[20,20,80,60],points:plateCopy(points),crop:[0,0,100,100],preview_token:'old-'+i,track:i},
   img:{},points:plateCopy(points),saved:plateCopy(points),version:0,dirty:false,pending:null,
   status:{textContent:'',scrollIntoView(){}},retry:{hidden:true},draw(){},readyAt:0,failures:0};
 }
@@ -141,10 +141,15 @@ function ack(s,request,token){return {data:{preview:{...s.meta,preview_token:tok
  resolve(ack(a,requests[4],'last'));await inflight;
  assert.equal(a.points[0][0],29);assert.equal(await flushPlateSaves(),false);
  a.drag=null;
+ // An explicit rejection also wins when the cancelled request later succeeds.
+ move(a,30);const obsolete=pumpPlateSaves();const oldRequest=requests[requests.length-1];
+ VLBL[0]='not_plate';discardRejectedCorners(0);
+ resolve(ack(a,oldRequest,'after-rejection'));await obsolete;
+ assert.equal(VLBL[0],'not_plate');assert.ok(!a.dirty&&!a.pending&&!a.error);
  // Busy decoder has bounded retries/backoff, not a request storm.
  move(b,26);
  for(let n=0;n<4;n++){b.readyAt=0;const busy=pumpPlateSaves();reject(Object.assign(new Error('busy'),{status:503}));await busy;}
- assert.ok(b.error&&b.dirty);assert.ok(requests.length<12);
+ assert.ok(b.error&&b.dirty);assert.ok(requests.length<13);
  console.log('autosave queue, latest-wins, labels, retries, navigation and backoff OK');
 })().catch(e=>{console.error(e);process.exitCode=1;});
 '''
@@ -164,3 +169,38 @@ def test_autosave_retry_refuses_replaced_source(plate_job):
     stat = os.stat(source)
     os.utime(source, ns=(stat.st_atime_ns,stat.st_mtime_ns+1000000000))
     assert client.post(endpoint, json=body).status_code == 409
+
+
+def test_track_metadata_refresh_does_not_save_an_unfinished_gesture():
+    import subprocess
+    js=web.APP_JS
+    helpers=js[js.index('let QEDIT=null;'):js.index('function initPlateCorners(')]
+    harness=r'''
+const assert=require('node:assert/strict');
+const window={removeEventListener(){},addEventListener(){}};
+const document={getElementById(){return null}};
+let VLBL={},CUR='test',calls=[],resolve;
+function setTimeout(){return 1} function clearTimeout(){}
+function reviewRequest(url,options){calls.push(options);return new Promise(ok=>resolve=ok);}
+''' + helpers + r'''
+(async()=>{
+ const points=[[20,20],[80,20],[80,60],[20,60]];
+ const meta={box:[20,20,80,60],points,crop:[0,0,100,100],preview_token:'old',source_token:'source',track:1};
+ const s={i:1,job:'test',img:{},meta,points:plateCopy(points),saved:plateCopy(points),
+  dirty:true,version:1,pending:null,readyAt:0,refreshBeforeSave:true,failures:0,
+  status:{textContent:''},retry:{hidden:true},draw(){}};
+ PLATE_EDITS.set(1,s);
+ const flight=pumpPlateSaves();assert.equal(calls.length,1);
+ s.drag={id:2,before:plateCopy(points)};s.points[0][0]=25;
+ resolve({data:{...meta,preview_token:'new'}});
+ await new Promise(r=>setImmediate(r));
+ assert.equal(calls.length,1,'a metadata refresh submitted an unfinished pointer drag');
+ assert.ok(s.dirty);await flight;
+ s.drag=null;const next=pumpPlateSaves();assert.equal(calls.length,2);
+ assert.equal(JSON.parse(calls[1].body).preview_token,'new');
+ resolve({data:{preview:{...meta,preview_token:'newer',points:s.points}}});await next;
+ assert.ok(!s.dirty);
+})().catch(e=>{console.error(e);process.exitCode=1});
+'''
+    result=subprocess.run(['node','-e',harness],capture_output=True,text=True,timeout=10)
+    assert result.returncode==0,result.stdout+result.stderr

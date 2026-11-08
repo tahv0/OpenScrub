@@ -377,3 +377,79 @@ def test_vault_encryption_excludes_cache_readers(monkeypatch):
     monkeypatch.setattr(web.vault, 'encrypt_tree', encrypt)
     assert web._vault_lock_now() == 0
     assert calls and web.VAULT['key'] is None
+
+
+def test_cached_corner_save_does_not_wait_for_video_decoder(plate_job, monkeypatch):
+    import threading
+    client, jid, report, _ = plate_job
+    url = '/api/jobs/%s/plate_quad/0' % jid
+    meta = client.get(url).get_json()
+    points = [p[:] for p in meta['points']]
+    points[0][0] += 2
+    entered, release = threading.Event(), threading.Event()
+    def occupy():
+        with web._REVIEW_WORK_LOCK:
+            entered.set(); release.wait(10)
+    worker = threading.Thread(target=occupy)
+    worker.start(); assert entered.wait(2)
+    monkeypatch.setattr(web, '_frame_at', lambda *a, **k: pytest.fail('warm save decoded video'))
+    try:
+        response = client.post(url, json=dict(points=points, preview_token=meta['preview_token'],
+                               autosave=True, edit_id='warm-save'))
+        assert response.status_code == 200, response.get_data(as_text=True)
+        assert json.loads(report.read_text())['detections'][0]['plate_quad']
+    finally:
+        release.set(); worker.join(2)
+
+
+def test_track_geometry_refresh_reuses_original_crop(plate_job, monkeypatch):
+    from copy import deepcopy
+    client, jid, report, _ = plate_job
+    doc = json.loads(report.read_text())
+    doc['detections'].append(deepcopy(doc['detections'][0]))
+    doc['detections'][1]['last_seen'] = .4
+    report.write_text(json.dumps(doc))
+    urls = ['/api/jobs/%s/plate_quad/%d' % (jid, i) for i in range(2)]
+    first, second = [client.get(url).get_json() for url in urls]
+    points = [p[:] for p in first['points']]; points[0][0] += 2
+    saved = client.post(urls[0], json=dict(points=points, preview_token=first['preview_token'],
+                                        autosave=True, edit_id='track-save'))
+    assert saved.status_code == 200
+    monkeypatch.setattr(web, '_frame_at', lambda *a, **k: pytest.fail('shape-only change decoded video'))
+    refreshed = client.get(urls[1])
+    assert refreshed.status_code == 200
+    data = refreshed.get_json()
+    assert data['points'][0][0] == pytest.approx(points[0][0], abs=.001)
+    assert data['crop'] == second['crop']
+    assert data['preview_token'] != second['preview_token']
+    assert data['source_token'] == second['source_token']
+
+
+def test_review_decisions_cannot_race_corner_report_write(plate_job, monkeypatch):
+    import threading
+    client, jid, report, _ = plate_job
+    endpoint = '/api/jobs/%s/plate_quad/0' % jid
+    meta = client.get(endpoint).get_json()
+    points = [p[:] for p in meta['points']]; points[0][0] += 2
+    entered, release = threading.Event(), threading.Event()
+    original = web._save_verified_plate_sample
+    def pause(*args, **kwargs):
+        entered.set(); assert release.wait(10)
+        return original(*args, **kwargs)
+    monkeypatch.setattr(web, '_save_verified_plate_sample', pause)
+    result = []
+    def save():
+        with web.app.test_client() as other:
+            result.append(other.post(endpoint, json=dict(points=points, autosave=True,
+                preview_token=meta['preview_token'], edit_id='serial-report-write')).status_code)
+    worker = threading.Thread(target=save); worker.start(); assert entered.wait(3)
+    payload = dict(enabled={'0':False}, verified_labels={'0':'not_plate'})
+    try:
+        busy = client.post('/api/jobs/%s/detections'%jid,json=payload)
+        assert busy.status_code == 503, 'concurrent report read/modify/write can erase the other edit'
+    finally:
+        release.set(); worker.join(3)
+    assert result == [200]
+    assert client.post('/api/jobs/%s/detections'%jid,json=payload).status_code == 200
+    row=json.loads(report.read_text())['detections'][0]
+    assert row['plate_quad'] and row['verified_label']=='not_plate' and row['enabled'] is False

@@ -290,3 +290,118 @@ def test_touch_corner_drag_autosaves(review_server):
         assert plate_points(card)[0] != before[0]
         assert json.loads(report.read_text())['detections'][0].get('plate_quad')
         browser.close()
+
+
+def sampled_track_page(page, url, report):
+    """Two displayed frames of one track, as in the 10% uncertainty view."""
+    doc = json.loads(report.read_text())
+    doc['detections'][1]['track'] = 0
+    doc['detections'][1]['frame_index'] = 301
+    doc['detections'][1]['t_start'] = doc['detections'][1]['t_end'] = doc['detections'][1]['last_seen'] = 301/30
+    report.write_text(json.dumps(doc))
+    load_browser_page(page, url, [], [])
+    page.get_by_role('link', name='Synthetic review fixture', exact=True).click()
+    page.locator('#review').wait_for()
+    page.evaluate('''async()=>{ LEARNING_SELECTION=new Set([0,1]);
+        LEARNING_SELECTION_JOB=CUR;await loadReview();}''')
+    page.locator('#det0').scroll_into_view_if_needed()
+    page.wait_for_function('!!document.querySelector("#det0 img")._quadEdit && !!document.querySelector("#det1 img")._quadEdit')
+
+
+def test_not_plate_updates_every_visible_frame_of_same_track(review_server):
+    sync_api = pytest.importorskip('playwright.sync_api')
+    url, report = review_server
+    with sync_api.sync_playwright() as pw:
+        browser = browser_instance(pw)
+        page = browser.new_page(viewport={'width':1440,'height':1000})
+        sampled_track_page(page, url, report)
+        page.locator('#det0').get_by_role('button',name='✕ Not a plate',exact=True).click()
+        for i in (0,1):
+            card = page.locator('#det%d'%i)
+            assert card.locator('.det-status').inner_text() == 'Will stay visible'
+            assert card.get_by_role('button',name='Keep visible',exact=True).get_attribute('aria-pressed') == 'true'
+        assert page.evaluate('saveAndRender(true)') is True
+        assert all(not r['enabled'] for r in json.loads(report.read_text())['detections'][:2])
+        browser.close()
+
+
+def test_not_plate_cancels_failed_corner_draft_without_blocking_decision_save(review_server, monkeypatch):
+    from flask import jsonify, request
+    url, report = review_server
+    original = web.app.view_functions['job_plate_quad']
+    def conflict(*args, **kwargs):
+        if request.method == 'POST':return jsonify(error='This finding changed. Reload its preview before saving.'),409
+        return original(*args, **kwargs)
+    monkeypatch.setitem(web.app.view_functions, 'job_plate_quad', conflict)
+    sync_api = pytest.importorskip('playwright.sync_api')
+    with sync_api.sync_playwright() as pw:
+        browser=browser_instance(pw)
+        page=browser.new_page(viewport={'width':1440,'height':1000})
+        load_browser_page(page,url,[],[])
+        page.get_by_role('link',name='Synthetic review fixture',exact=True).click()
+        card=page.locator('#det0');card.scroll_into_view_if_needed()
+        page.wait_for_function('!!document.querySelector("#det0 img")._quadEdit')
+        drag_corner(page,card)
+        page.wait_for_function('!!document.querySelector("#det0 img")._quadEdit.error')
+        card.get_by_role('button',name='✕ Not a plate',exact=True).click()
+        assert card.locator('.det-status').inner_text() == 'Will stay visible'
+        assert page.evaluate('saveAndRender(true)') is True, 'obsolete corners blocked the explicit rejection'
+        saved=json.loads(report.read_text())['detections'][0]
+        assert saved['verified_label']=='not_plate' and saved['enabled'] is False
+        browser.close()
+
+
+def test_editing_second_sample_after_track_save_does_not_conflict(review_server):
+    sync_api=pytest.importorskip('playwright.sync_api')
+    url,report=review_server
+    with sync_api.sync_playwright() as pw:
+        browser=browser_instance(pw);page=browser.new_page(viewport={'width':1440,'height':1000})
+        sampled_track_page(page,url,report)
+        for i in (0,1):
+            card=page.locator('#det%d'%i);card.scroll_into_view_if_needed()
+            drag_corner(page,card)
+            page.wait_for_function('(i)=>{const s=document.querySelector("#det"+i+" img")._quadEdit;return !s.dirty||s.error}',arg=i)
+            assert card.locator('img').evaluate('(img)=>img._quadEdit.error && img._quadEdit.error.message') is None
+            assert card.locator('.quad-status').inner_text().startswith('Saved')
+        browser.close()
+
+
+@pytest.mark.parametrize('viewport',[(1440,1000),(390,844)])
+def test_sixty_rejections_keep_working_after_failed_save(review_server, monkeypatch, tmp_path, viewport):
+    from flask import jsonify, request
+    url,report=review_server
+    original=web.app.view_functions['job_plate_quad']
+    posted=[]
+    def busy_save(*args,**kwargs):
+        if request.method=='POST':
+            posted.append(request.get_json())
+            return jsonify(error='Another preview is decoding. Retry this finding.'),503
+        return original(*args,**kwargs)
+    monkeypatch.setitem(web.app.view_functions,'job_plate_quad',busy_save)
+    sync_api=pytest.importorskip('playwright.sync_api')
+    with sync_api.sync_playwright() as pw:
+        browser=browser_instance(pw)
+        page=browser.new_page(viewport={'width':viewport[0],'height':viewport[1]})
+        errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
+        load_browser_page(page,url,[],[])
+        page.get_by_role('link',name='Synthetic review fixture',exact=True).click()
+        card=page.locator('#det0');card.scroll_into_view_if_needed()
+        page.wait_for_function('!!document.querySelector("#det0 img")._quadEdit')
+        drag_corner(page,card)
+        page.wait_for_function('document.querySelector("#det0 .quad-status").textContent.includes("Waiting")')
+        for i in range(60):
+            card=page.locator('#det%d'%i)
+            card.get_by_role('button',name='✕ Not a plate',exact=True).click()
+            assert card.locator('.det-status').inner_text()=='Will stay visible',i
+            assert card.get_by_role('button',name='Keep visible',exact=True).get_attribute('aria-pressed')=='true'
+        assert len(posted)==1,'rejected corner drafts must not retry in the background'
+        assert page.evaluate('saveAndRender(true)') is True
+        stored=json.loads(report.read_text())['detections']
+        assert all(r['enabled'] is False and r['verified_label']=='not_plate' for r in stored[:60])
+        assert all(r['enabled'] is True for r in stored[60:])
+        assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
+        assert not errors,errors
+        evidence=Path(os.environ.get('REVIEW_EVIDENCE_DIR',str(tmp_path)))
+        evidence.mkdir(parents=True,exist_ok=True)
+        page.screenshot(path=str(evidence/('sixty-rejections-%d.png'%viewport[0])))
+        browser.close()
