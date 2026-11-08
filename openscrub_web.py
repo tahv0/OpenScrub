@@ -370,6 +370,24 @@ def job_public(job):
     }
 
 
+def _publish_preview_jpeg(path, image, quality):
+    """Publish a complete preview without changing an open reader's bytes."""
+    ok, encoded = cv2.imencode(".jpg", image, [cv2.IMWRITE_JPEG_QUALITY, quality])
+    if not ok:
+        return False
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(dir=os.path.dirname(path),
+                                         suffix=".jpg", delete=False) as out:
+            temporary = out.name
+            out.write(encoded.tobytes())
+        os.replace(temporary, path)
+        return True
+    finally:
+        if temporary and os.path.exists(temporary):
+            os.unlink(temporary)
+
+
 class WebCallbacks(openscrub.Callbacks):
     wants_frames = True
 
@@ -428,8 +446,7 @@ class WebCallbacks(openscrub.Callbacks):
         h, w = frame.shape[:2]
         scale = 720 / w
         small = cv2.resize(frame, (720, int(h * scale)))
-        cv2.imwrite(os.path.join(self.job["dir"], "preview.jpg"), small,
-                    [cv2.IMWRITE_JPEG_QUALITY, 70])
+        _publish_preview_jpeg(os.path.join(self.job["dir"], "preview.jpg"), small, 70)
 
     def cancelled(self):
         return self.job["cancel"].is_set()
@@ -1017,9 +1034,16 @@ def job_log(jid):
 def job_preview(jid):
     job = JOBS.get(jid) or abort(404)
     p = os.path.join(job["dir"], "preview.jpg")
-    if not os.path.exists(p):
+    # send_file stats the path separately from streaming its contents. A live
+    # scanner can publish another JPEG between those steps. Freeze this small
+    # response so Cheroot's Content-Length always describes the bytes sent.
+    try:
+        with open(p, "rb") as source:
+            data = source.read()
+    except FileNotFoundError:
         abort(404)
-    return send_file(p, mimetype="image/jpeg", max_age=0)
+    return Response(data, mimetype="image/jpeg",
+                    headers={"Cache-Control": "no-store"})
 
 
 @app.route("/api/jobs/<jid>/stop", methods=["POST"])
@@ -2988,11 +3012,15 @@ async function delJob(id){
  JOBSJSON="";loadJobs();
 }
 async function openJob(id){
+ if(CUR&&document.getElementById("review")&&reviewChoicesPending()){
+  if(!await saveAndRender(true))return;
+ }
  if(!await flushPlateSaves())return;
  if(!closePlateQuad())return;
  clearReviewPreviews();JOBVIEW++;REFRESHFAILURES=0;
  if(REFRESHCTRL)REFRESHCTRL.abort();
  CUR=id; EN={}; MAN=[]; PHIST=[]; PHPH=""; LOGN=0; SHELLPH=null;
+ REVIEW_VERSION=0;REVIEW_SAVED=0;plateUnloadGuard();
  detail.innerHTML="";
  if(POLL)clearTimeout(POLL);
  refresh();
@@ -3857,10 +3885,23 @@ function plateQuadValid(points){
  return area>=8&&(cross.every(v=>v>0)||cross.every(v=>v<0));
 }
 function plateEditsPending(){return [...PLATE_EDITS.values()].some(s=>s.dirty||s.pending||s.drag);}
-function plateUnloadWarning(e){if(plateEditsPending()){e.preventDefault();e.returnValue="";}}
+let REVIEW_VERSION=0,REVIEW_SAVED=0;
+function reviewChoicesPending(){return REVIEW_VERSION!==REVIEW_SAVED;}
+function reviewSaveStatus(text,failed=false){
+ document.querySelectorAll(".review-save-status").forEach(el=>{
+  el.textContent=text;el.setAttribute("role",failed?"alert":"status");
+  el.style.color=failed?"#fbbf24":"#94a3b8";
+ });
+}
+function markReviewChanged(){
+ REVIEW_VERSION++;reviewSaveStatus("Review choices not saved.");plateUnloadGuard();
+}
+function plateUnloadWarning(e){
+ if(plateEditsPending()||reviewChoicesPending()){e.preventDefault();e.returnValue="";}
+}
 function plateUnloadGuard(){
  window.removeEventListener("beforeunload",plateUnloadWarning);
- if(plateEditsPending())window.addEventListener("beforeunload",plateUnloadWarning);
+ if(plateEditsPending()||reviewChoicesPending())window.addEventListener("beforeunload",plateUnloadWarning);
 }
 function plateStatus(s,text,retry=false){
  s.status.textContent=text;s.retry.hidden=!retry;
@@ -4238,6 +4279,7 @@ async function loadReview(){
   <button type="button" class="sec" onclick="reviewUncertain()">Review uncertain examples (10%)</button>
   ${LEARNING_SELECTION?'<button type="button" class="sec" onclick="reviewAllFindings()">Show all findings</button>':""}
  </div>
+ <p id="reviewSaveStatus" class="review-copy review-save-status" role="status" aria-live="polite">Review choices loaded from disk.</p>
  <p class="review-copy">Training uses saved corrections and the original detectors. It does not guarantee that undetected plates have been found. Review the output.</p>
  <p class="review-copy">Thumbnail rectangles are selection guides. Open shaped masks to inspect their coverage and exclusions.</p>
  <div class="row" style="margin:0 0 8px">
@@ -4330,6 +4372,7 @@ async function loadReview(){
  html+=`</div>
  <div class="row" style="margin-top:12px">
  <button onclick="saveAndRender()">${SHELLPH==="paused"?"Save review edits":"Save edits &amp; render"}</button>
+ <span class="review-save-status" role="status" aria-live="polite"></span>
  <span style="font-size:12px;color:#94a3b8">missed something? use
   ▶ Preview video &amp; edit boxes above — its ＋ Add box replaces the old
   add-region tool</span></div></div>`;
@@ -4373,6 +4416,7 @@ function applyDet(i,blur,preserveLabel=false){
   }
   if(t)t.classList.toggle("off",!blur);
  }
+ markReviewChanged();
  if(document.getElementById("beCv")){beRefresh();}
 }
 function setAll(cat,on){document.querySelectorAll(`.det[data-cat=${cat}]`)
@@ -4459,22 +4503,39 @@ document.addEventListener("keydown",e=>{
   const lb=document.getElementById("lb");if(lb)lb.remove();}});
 
 async function saveAndRender(saveOnly=false){
- if(PLATE_REVIEW_BUSY)return false;
+ if(PLATE_REVIEW_BUSY){
+  reviewSaveStatus("Save is still in progress; no new training/rendering action has started.");return false;
+ }
  PLATE_REVIEW_BUSY=true;
  const job=CUR,view=JOBVIEW;
  try{
-  if(!await flushPlateSaves()||CUR!==job||JOBVIEW!==view)return false;
+  reviewSaveStatus("Saving review…");
+  if([...PLATE_EDITS.values()].some(s=>s.drag)){
+   reviewSaveStatus("Finish dragging the corner first. Review has not been saved.",true);return false;
+  }
+  const cornersSaved=await flushPlateSaves();
+  if(CUR!==job||JOBVIEW!==view)return false;
+  if(!cornersSaved){
+   // An unrelated corner failure must not prevent saving rejection/visibility
+   // decisions. Do not submit failed geometry or pretend the review is complete.
+   if(!await persistReview(true,job,view,true))return false;
+   const n=[...PLATE_EDITS.values()].filter(s=>s.dirty||s.pending||s.drag).length;
+   reviewSaveStatus("Review choices saved to disk, but "+n+" corner adjustment(s) not saved. "+
+    "Training/rendering is blocked. Keep this page open and retry the corner save.",true);
+   return false;
+  }
   return await persistReview(saveOnly,job,view);
  }catch(error){
+  reviewSaveStatus("Review save not confirmed. Keep this page open and retry. "+error.message,true);
   alert("Review save failed for job "+job+": "+
    (error.name==="AbortError"?"request timed out":error.message)+
    ". The save was not confirmed. Keep the review open and retry before leaving.");
   return false;
  }finally{PLATE_REVIEW_BUSY=false;}
 }
-async function persistReview(saveOnly=false,job=CUR,view=JOBVIEW){
+async function persistReview(saveOnly=false,job=CUR,view=JOBVIEW,choicesOnly=false){
  // Do not render until the server has confirmed the latest pending preview.
- if(document.getElementById("beCv")){
+ if(!choicesOnly&&document.getElementById("beCv")){
   if(BE.drag||BE.pending){
    alert("Wait for the mask preview to finish updating before saving.");return false;
   }
@@ -4484,18 +4545,21 @@ async function persistReview(saveOnly=false,job=CUR,view=JOBVIEW){
  }
  const manual=[...MAN,...BE.adds.map(a=>({t_start:a.t0,t_end:a.t1,
   t_ref:a.tref,screen_box:a.box}))];
- const payload={enabled:EN,manual,box_overrides:BE.ov,
-   time_overrides:BE.times,verified_labels:VLBL};
+ const revision=REVIEW_VERSION;
+ const payload=choicesOnly?{enabled:EN,verified_labels:VLBL}:
+  {enabled:EN,manual,box_overrides:BE.ov,time_overrides:BE.times,verified_labels:VLBL};
  // only send audio spans when the box editor actually loaded them —
  // otherwise a save from plain review would wipe stored spans with []
- if(Array.isArray(BE.audio)&&BE.tlspans!==undefined)payload.audio=BE.audio;
+ if(!choicesOnly&&Array.isArray(BE.audio)&&BE.tlspans!==undefined)payload.audio=BE.audio;
  if(CUR!==job||JOBVIEW!==view)return false;
  const {data:r}=await reviewRequest(`api/jobs/${job}/detections`,{method:"POST",
   headers:{"Content-Type":"application/json"},
   body:JSON.stringify(payload)});
  // A delayed response belongs to its original review, never a newly opened job.
  if(CUR!==job||JOBVIEW!==view)return false;
- BE.adds=[];BE.ov={};BE.times={};
+ if(!r||r.ok!==true)throw new Error("The server did not confirm saving the review");
+ REVIEW_SAVED=revision;plateUnloadGuard();
+ if(!choicesOnly){BE.adds=[];BE.ov={};BE.times={};}
  if(r.suggest_allowlist&&r.suggest_allowlist.length){
   if(confirm("You disabled every instance of: "+r.suggest_allowlist.join(", ")+". Add these to the permanent allow-list so future scans skip them?"))
    {await fetch("api/allowlist",{method:"POST",
@@ -4503,10 +4567,12 @@ async function persistReview(saveOnly=false,job=CUR,view=JOBVIEW){
     body:JSON.stringify({words:r.suggest_allowlist})});
     loadPersist();}}
  if(CUR!==job||JOBVIEW!==view)return false;
- MAN=[];
+ if(!choicesOnly)MAN=[];
+ if(reviewChoicesPending()){
+  reviewSaveStatus("Earlier choices saved. Newer changes are not saved; save again before leaving.",true);return false;
+ }
  if(saveOnly||SHELLPH==="paused"){
-  const note=document.getElementById("savedCheckpointNote");
-  if(note)note.textContent="Review edits saved locally.";
+  reviewSaveStatus(choicesOnly?"Review choices saved to disk.":"Review edits saved to disk.");
   return true;
  }
  if(CUR!==job||JOBVIEW!==view)return false;

@@ -4226,11 +4226,17 @@ def test_review_choices_apply_the_named_action():
         pytest.skip("Node is needed to execute the review JavaScript")
     review_js = w.APP_JS[w.APP_JS.index("const plateFallbackLabels"):
                          w.APP_JS.index("function thumbRetry")]
+    # applyDet invokes the production dirty-state helpers outside this slice.
+    # Include those helpers too; only their browser surface is substituted.
+    review_js = (w.APP_JS[w.APP_JS.index("let REVIEW_VERSION="):
+                          w.APP_JS.index("function plateStatus")]+review_js)
     harness = r'''
 const assert = require('node:assert/strict');
 const vm = require('node:vm');
 const source = require('node:fs').readFileSync(0, 'utf8');
 const elements = {};
+const listeners = new Set();
+const status = {textContent:'',style:{},setAttribute(){}};
 const rows = [
   {i:0,enabled:true,track:7,person:-1,category:'plate',text:'plate',t_start:0,t_end:1,shaped:true,fallback_reason:'ambiguous_text'},
   {i:1,enabled:true,track:7,person:-1,category:'plate',text:'plate',t_start:1,t_end:2},
@@ -4240,8 +4246,12 @@ const context = vm.createContext({assert, EN:{}, CUR:'test', DUR:0, CATDN:{}, QE
   closePlateQuad(){return true;}, flushPlateSaves:async()=>true, clearReviewPreviews(){}, initReviewPreviews(){},
   reviewRequest:async()=>({data:{duration:2,detections:rows}}),
   fetch:async()=>({json:async()=>({duration:2,detections:rows})}),
-  showPanel(){return true;}, initMarquee(){},
-  document:{getElementById(id){
+  showPanel(){return true;}, initMarquee(){}, plateEditsPending(){return false;},
+  listeners, status,
+  window:{addEventListener(type,fn){if(type==='beforeunload')listeners.add(fn);},
+    removeEventListener(type,fn){if(type==='beforeunload')listeners.delete(fn);}},
+  document:{querySelectorAll(selector){assert.equal(selector,'.review-save-status');return [status];},
+   getElementById(id){
     if(!/^bb\d+$|^det\d+$/.test(id)) return null;
     return elements[id] ||= {classList:{toggle(){}},querySelector(){return {};},
       querySelectorAll(){return [{setAttribute(){}},{setAttribute(){}}];}};
@@ -4275,6 +4285,16 @@ vm.runInContext(`(async()=>{
   assert.strictEqual(EN[2],false,'An initially kept finding must stay visible');
   click('Blur',2);
   assert.strictEqual(EN[2],true,'An initially kept finding must be blur-able');
+  assert.equal(REVIEW_VERSION,6,'Every decision must invalidate save confirmation');
+  assert.equal(reviewChoicesPending(),true);
+  assert.equal(status.textContent,'Review choices not saved.');
+  assert.equal(listeners.size,1,'Decision-only edits must install an unload guard');
+  const event={prevented:false,preventDefault(){this.prevented=true;}};
+  for(const handler of listeners)handler(event);
+  assert.equal(event.prevented,true);
+  REVIEW_SAVED=REVIEW_VERSION;plateUnloadGuard();
+  assert.equal(reviewChoicesPending(),false);
+  assert.equal(listeners.size,0,'Acknowledged decisions release the unload guard');
 })()`,context).catch(error=>{console.error(error);process.exitCode=1;});
 '''
     result = subprocess.run([node, "-e", harness], input=review_js,
