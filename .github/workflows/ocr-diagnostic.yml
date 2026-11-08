@@ -8,7 +8,7 @@ permissions:
 jobs:
   reproduce:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 6
     env:
       OPENSCRUB_NO_AUTOFETCH: '1'
       OMP_NUM_THREADS: '2'
@@ -18,29 +18,38 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.10'
-      - name: Install diagnostic dependencies
+      - name: Install original full-suite environment
         run: |
           sudo apt-get update -qq && sudo apt-get install -y ffmpeg tesseract-ocr
-          python -m pip install 'numpy<2' 'opencv-python-headless<5' pytest pytest-timeout flask rapidfuzz pytesseract pillow pyyaml cryptography
-      - name: Run instrumented regression without changing detector decisions
+          python -m pip install 'numpy<2' 'opencv-python-headless<5' onnx onnxruntime pytest pytest-timeout flask cheroot rapidfuzz pytesseract pillow pyyaml cryptography playwright build hatchling
+          python -m playwright install --with-deps chromium
+      - name: Trace in original suite order; preserve real OCR outputs
         run: |
           set -o pipefail
           python - <<'PY' 2>&1 | tee /tmp/ocr-diagnostic.txt
           import json, cv2, numpy as np, openscrub, pytest, pytesseract
           print('VERSIONS',cv2.__version__,np.__version__,pytesseract.get_tesseract_version())
-          read=openscrub.TesseractBackend.read
-          def observed(self,frame):
-              raw=self.pt.image_to_data(cv2.cvtColor(frame,cv2.COLOR_BGR2GRAY),output_type=self.pt.Output.DICT)
-              print('RAW',json.dumps([(t,c) for t,c in zip(raw['text'],raw['conf']) if t.strip()]))
-              result=read(self,frame)
-              print('WORDS',repr(result))
-              return result
-          openscrub.TesseractBackend.read=observed
           class Trace(openscrub.Callbacks):
               def log(self,message): print('PIPELINE',message)
-          pipeline=openscrub.run_pipeline
-          openscrub.run_pipeline=lambda args,callbacks: pipeline(args,Trace())
-          raise SystemExit(pytest.main(['-q','-s','test_openscrub.py::test_deep_backtrack_finds_true_onset','--basetemp=/tmp/onset-fixture']))
+          class Diagnose:
+              def pytest_collection_modifyitems(self,items):
+                  n=next(i for i,t in enumerate(items) if t.name=='test_deep_backtrack_finds_true_onset')
+                  del items[n+1:]
+              def pytest_runtest_setup(self,item):
+                  if item.name!='test_deep_backtrack_finds_true_onset':return
+                  raw=pytesseract.image_to_data
+                  def observed(*args,**kwargs):
+                      result=raw(*args,**kwargs)
+                      if isinstance(result,dict):print('RAW',json.dumps([(t,c) for t,c in zip(result['text'],result['conf']) if t.strip()]))
+                      return result
+                  pytesseract.image_to_data=observed
+                  read=openscrub.TesseractBackend.read
+                  def words(self,frame):
+                      result=read(self,frame);print('WORDS',repr(result));return result
+                  openscrub.TesseractBackend.read=words
+                  pipeline=openscrub.run_pipeline
+                  openscrub.run_pipeline=lambda args,callbacks: pipeline(args,Trace())
+          raise SystemExit(pytest.main(['-q','-s','--timeout=60','--basetemp=/tmp/onset-fixture'],plugins=[Diagnose()]))
           PY
       - uses: actions/upload-artifact@v4
         if: always()
@@ -48,5 +57,5 @@ jobs:
           name: ocr-onset-diagnostic
           path: |
             /tmp/ocr-diagnostic.txt
-            /tmp/onset-fixture/**/*.json
+            /tmp/onset-fixture/**/late*.json
           retention-days: 3
