@@ -1,0 +1,62 @@
+name: Full suite and review reliability
+on:
+  pull_request:
+    paths:
+      - '**.py'
+      - 'pyproject.toml'
+      - 'requirements*.txt'
+      - 'Dockerfile*'
+      - 'compose*.yml'
+      - '.github/workflows/reliability.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: reliability-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  full-suite:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.10', '3.12']
+    env:
+      OPENSCRUB_NO_AUTOFETCH: '1'
+      REVIEW_EVIDENCE_DIR: /tmp/reliability-evidence
+      OMP_NUM_THREADS: '2'
+      OPENBLAS_NUM_THREADS: '2'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install CPU, production-server and browser validation dependencies
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y ffmpeg tesseract-ocr
+          python -m pip install 'numpy<2' 'opencv-python-headless<5' onnx onnxruntime pytest pytest-timeout flask cheroot rapidfuzz pytesseract pillow pyyaml cryptography playwright build hatchling
+          python -m playwright install --with-deps chromium
+      - name: Validate source syntax
+        run: |
+          python -m compileall -q openscrub.py openscrub_web.py learning_session.py video_learning.py test_review_soak.py
+          python -c 'import openscrub_web;open("/tmp/reliability-app.js","w").write(openscrub_web.APP_JS)'
+          node --check /tmp/reliability-app.js
+      - name: Run entire suite without deselection
+        run: |
+          set -o pipefail
+          python -m pytest -q --timeout=60 --durations=25 --junitxml=/tmp/reliability-full.xml 2>&1 | tee /tmp/reliability-full.txt
+      - name: Repeat high-volume sessions and failure recovery
+        run: |
+          set -o pipefail
+          python -m pytest -q test_review_soak.py --timeout=60 --durations=15 --junitxml=/tmp/reliability-repeat.xml 2>&1 | tee /tmp/reliability-repeat.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: reliability-python-${{ matrix.python-version }}
+          path: |
+            /tmp/reliability-full.*
+            /tmp/reliability-repeat.*
+            /tmp/reliability-evidence/
+          if-no-files-found: warn
+          retention-days: 14
