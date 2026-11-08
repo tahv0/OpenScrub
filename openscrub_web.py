@@ -1091,7 +1091,7 @@ def perform_learning(job):
             with open(destination, encoding="utf-8") as source:
                 return json.load(source)
         def publish(doc):
-            with _REVIEW_WORK_LOCK:
+            with _REVIEW_EDIT_LOCK, _REVIEW_WORK_LOCK:
                 stop_review.atomic_report(os.path.join(job["dir"], "report.json"), doc)
                 # Current thumbnails are indexed by row; a full rescan changes IDs.
                 for name in os.listdir(job["dir"]):
@@ -1159,7 +1159,7 @@ def job_learning_rollback(jid):
     with JOBS_LOCK:
         if job["phase"] not in ("paused", "review", "done"):
             return jsonify({"error": "Finish or cancel the active pass before restoring."}), 409
-        with _REVIEW_WORK_LOCK:
+        with _REVIEW_EDIT_LOCK, _REVIEW_WORK_LOCK:
             current = _load_job_report(job)
             root = (Path(job["dir"]) / "learning" / "passes").resolve()
             previous = (current.get("learning") or {}).get("previous_report")
@@ -1224,6 +1224,9 @@ import subprocess
 import tempfile
 import zipfile
 
+# Lock order for operations needing more than one gate: edit -> work -> cache.
+# Cached annotation saves must not compete with unrelated video decoding.
+_REVIEW_EDIT_LOCK = threading.RLock()
 _REVIEW_WORK_LOCK = threading.RLock()
 _REVIEW_CACHE_LOCK = threading.Lock()
 _REVIEW_FRAMES = OrderedDict()
@@ -1698,7 +1701,7 @@ def _store_plate_preview(job, index, meta, pixels):
             os.unlink(temp)
 
 
-def _cached_plate_preview(job, index, key):
+def _cached_plate_preview(job, index, key, source_key=None, points=None):
     """Read a valid published crop without occupying the video decoder.
 
     The cache gate also protects reads from vault encryption. Never acquire
@@ -1713,7 +1716,20 @@ def _cached_plate_preview(job, index, key):
         try:
             with np.load(cache, allow_pickle=False) as stored:
                 meta = json.loads(str(stored["metadata"]))
-                if meta.get("preview_token") == key:
+                exact = meta.get("preview_token") == key
+                same_source = source_key is not None and meta.get("source_token") == source_key
+                if exact or same_source:
+                    # Retain the original crop only when the current shape fits.
+                    # Old caches without source_token remain exact-hit-only.
+                    x1, y1, x2, y2 = meta["crop"]
+                    if not exact and (not points or not all(
+                            x1 <= x < x2 and y1 <= y < y2 for x, y in points)):
+                        return None
+                    meta = dict(meta, preview_token=key)
+                    if source_key is not None:
+                        meta["source_token"] = source_key
+                    if points is not None:
+                        meta["points"] = points
                     return meta, stored["pixels"].copy()
         except (OSError, ValueError, KeyError, EOFError, zipfile.BadZipFile):
             pass
@@ -1730,7 +1746,16 @@ def _plate_preview(job, index, doc=None, cache_only=False):
     if not rs.get("cum") or float(rs["fps"]) <= 0:
         abort(400, description="Review timeline not available")
     key, fidx, tref = _plate_preview_key(job, index, d, rs)
-    cached = _cached_plate_preview(job, index, key)
+    source_key = _plate_preview_key(job, index, dict(d, plate_quad=[]), rs)[0]
+    ox, oy = rs["cum"][fidx]
+    box = [float(d["cbox"][0])+ox, float(d["cbox"][1])+oy,
+           float(d["cbox"][2])+ox, float(d["cbox"][3])+oy]
+    bw, bh = box[2]-box[0], box[3]-box[1]
+    if bw <= 0 or bh <= 0:
+        abort(400, description="Invalid plate detection box")
+    q = d.get("plate_quad") or ((0., 0.), (1., 0.), (1., 1.), (0., 1.))
+    points = [[box[0]+float(x)*bw, box[1]+float(y)*bh] for x, y in q]
+    cached = _cached_plate_preview(job, index, key, source_key, points)
     if cached is not None:
         return doc, d, *cached
     if cache_only:
@@ -1740,26 +1765,19 @@ def _plate_preview(job, index, doc=None, cache_only=False):
         abort(503, description="Another preview is decoding. Retry this finding.")
     try:
         # Another request may have published the crop before we got the gate.
-        cached = _cached_plate_preview(job, index, key)
+        cached = _cached_plate_preview(job, index, key, source_key, points)
         if cached is not None:
             return doc, d, *cached
-        ox, oy = rs["cum"][fidx]
-        box = [float(d["cbox"][0])+ox, float(d["cbox"][1])+oy,
-               float(d["cbox"][2])+ox, float(d["cbox"][3])+oy]
-        bw, bh = box[2]-box[0], box[3]-box[1]
-        if bw <= 0 or bh <= 0:
-            abort(400, description="Invalid plate detection box")
         frame = _frame_at(job, tref, rs, fidx if d.get("frame_index", -1) >= 0 else None)
         if frame is None:
             abort(404, description="Could not decode plate frame")
-        q = d.get("plate_quad") or ((0., 0.), (1., 0.), (1., 1.), (0., 1.))
-        points = [[box[0]+float(x)*bw, box[1]+float(y)*bh] for x, y in q]
         h, w = frame.shape[:2]
         crop = _plate_editor_crop(box, points, w, h)
         x1, y1, x2, y2 = crop
         meta = {"i": index, "t": tref, "frame": fidx, "width": w, "height": h,
                 "box": box, "crop": crop, "points": points,
-                "track": d.get("track", -1), "preview_token": key}
+                "track": d.get("track", -1), "preview_token": key,
+                "source_token": source_key}
         pixels = frame[y1:y2, x1:x2].copy()
         _store_plate_preview(job, index, meta, pixels)
         return doc, d, meta, pixels
@@ -1792,10 +1810,12 @@ def job_plate_quad(jid, i):
     if request.method == "GET":
         _, _, meta, _ = _plate_preview(job, i)
         return jsonify(meta)
-    # Serialize save/cache writes, but do not park a queue of HTTP workers.
-    if not _REVIEW_WORK_LOCK.acquire(blocking=False):
-        abort(503, description="Another preview is decoding. Retry this finding.")
+    # Serialize report writers independently of the bounded video decoder.
+    if not _REVIEW_EDIT_LOCK.acquire(blocking=False):
+        abort(503, description="Another review edit is saving. Retry shortly.")
     try:
+        if vault_locked():
+            abort(423)
         doc, d, meta, pixels = _plate_preview(job, i)
         payload = request.get_json(silent=True) or {}
         autosave = payload.get("autosave") is True
@@ -1876,7 +1896,7 @@ def job_plate_quad(jid, i):
         return jsonify({"ok": True, "applied": changed,
                         "verified_samples_added": 1, "preview": meta})
     finally:
-        _REVIEW_WORK_LOCK.release()
+        _REVIEW_EDIT_LOCK.release()
 
 
 def _requested_review_frame(rstate):
@@ -2051,7 +2071,23 @@ def job_video_stream(jid):
     return send_file(job["video"], conditional=True)
 
 
+def _serialize_review_edit(fn):
+    from functools import wraps
+    @wraps(fn)
+    def write(*args, **kwargs):
+        if not _REVIEW_EDIT_LOCK.acquire(blocking=False):
+            abort(503, description="Another review edit is saving. Retry shortly.")
+        try:
+            if vault_locked():
+                abort(423)
+            return fn(*args, **kwargs)
+        finally:
+            _REVIEW_EDIT_LOCK.release()
+    return write
+
+
 @app.route("/api/jobs/<jid>/detections", methods=["POST"])
+@_serialize_review_edit
 def job_save_edits(jid):
     job = JOBS.get(jid) or abort(404)
     if job["phase"] not in ("paused", "review", "done"):
@@ -3846,38 +3882,73 @@ function commitPlateGesture(s,before){
  s.readyAt=Date.now()+450;
  plateStatus(s,"Saving…");schedulePlateSaves();
 }
+function syncPlateTrack(s){
+ if(s.meta.track<0)return;
+ const b=s.meta.box,q=s.meta.points.map(([x,y])=>[(x-b[0])/(b[2]-b[0]),(y-b[1])/(b[3]-b[1])]);
+ for(const other of PLATE_EDITS.values()){
+  if(other===s||other.job!==s.job||other.meta.track!==s.meta.track)continue;
+  other.refreshBeforeSave=true;
+  // Keep an unsubmitted human adjustment; only refresh untouched siblings.
+  if(!other.dirty&&!other.drag&&!other.pending){
+   const box=other.meta.box;
+   other.saved=q.map(([x,y])=>[box[0]+x*(box[2]-box[0]),box[1]+y*(box[3]-box[1])]);
+   other.points=plateCopy(other.saved);other.draw();
+  }
+ }
+}
+function discardRejectedCorners(i){
+ const s=PLATE_EDITS.get(i);if(!s)return;
+ if(s.cancelDrag)s.cancelDrag();
+ // The explicit rejection supersedes this track's uncommitted geometry.
+ // A running request may complete, but its old response must not restore it.
+ s.pending=null;s.version++;s.dirty=false;s.error=null;s.conflict=false;
+ s.points=plateCopy(s.saved);s.draw();plateStatus(s,"Not a plate");
+ schedulePlateSaves();
+}
 function pumpPlateSaves(){
  if(PLATE_SAVE)return PLATE_SAVE;
  const s=[...PLATE_EDITS.values()].find(s=>s.dirty&&!s.drag&&!s.error&&s.readyAt<=Date.now());
  if(!s){schedulePlateSaves();return Promise.resolve();}
- // Keep the same request/ID after a lost response. First recover its receipt,
- // then send the latest gesture; an older response never replaces newer points.
- if(!s.pending)s.pending={points:plateCopy(s.points),preview_token:s.meta.preview_token,
-  apply_track:true,autosave:true,edit_id:Date.now().toString(36)+"-"+(++PLATE_SERIAL)+"-"+Math.random().toString(36).slice(2),
-  version:s.version,label:VLBL[s.i]};
- const pending=s.pending;
+ let pending=s.pending;
  plateStatus(s,"Saving…");
  PLATE_SAVE=(async()=>{
   try{
+   if(!pending&&s.refreshBeforeSave){
+    const {data}=await reviewRequest("api/jobs/"+s.job+"/plate_quad/"+s.i);
+    if(!s.meta.source_token||data.source_token!==s.meta.source_token)
+     throw Object.assign(new Error("Source frame or detection changed. Reload this preview."),{status:409});
+    s.meta.preview_token=data.preview_token;s.refreshBeforeSave=false;
+   }
+   if(!s.dirty||s.drag)return; // Rejected, or a new gesture began during metadata loading.
+   if(!pending){
+    // Keep a request/ID only after an uncertain result, not a definite 503.
+    pending=s.pending={points:plateCopy(s.points),preview_token:s.meta.preview_token,
+     apply_track:true,autosave:true,edit_id:Date.now().toString(36)+"-"+(++PLATE_SERIAL)+"-"+Math.random().toString(36).slice(2),
+     version:s.version,label:VLBL[s.i]};
+   }
    const {data}=await reviewRequest("api/jobs/"+s.job+"/plate_quad/"+s.i,{method:"POST",
     headers:{"Content-Type":"application/json"},body:JSON.stringify(pending)});
    Object.assign(s.meta,data.preview);s.img._plateMeta=s.meta;
-   s.saved=plateCopy(s.meta.points);s.pending=null;s.failures=0;
+   s.saved=plateCopy(s.meta.points);s.failures=0;
+   syncPlateTrack(s);
+   if(s.pending!==pending)return; // A newer Not-a-plate decision wins.
+   s.pending=null;
    if(s.version===pending.version&&!s.drag)s.points=plateCopy(s.saved);
    s.dirty=s.version!==pending.version;
-   // Do not undo a newer Blur/Keep/Not-a-plate decision made during this save.
-   if(VLBL[s.i]===pending.label){
+   if(VLBL[s.i]===pending.label&&VLBL[s.i]!=="not_plate"){
     VLBL[s.i]="plate";const label=document.getElementById("vlabel"+s.i);
     if(label)label.textContent="Confirmed plate";
    }
    s.draw();plateStatus(s,s.dirty?"Saving…":s.meta.track>=0?"Saved to track":"Saved");
    if(!s.dirty&&CUR===s.job&&document.getElementById("beCv"))beRefresh();
   }catch(error){
+   if(!s.dirty||(pending&&s.pending!==pending))return;
    if(error.status===503&&++s.failures<=3){
+    s.pending=null; // Server explicitly refused this write before applying it.
     s.readyAt=Date.now()+1000*2**s.failures;plateStatus(s,"Waiting to save…");
    }else{
     s.error=error;s.conflict=error.status===409;
-    plateStatus(s,s.conflict?"Finding changed — not saved.":"Not saved — retry.",true);
+    plateStatus(s,"Not saved — "+error.message,true);
    }
   }finally{PLATE_SAVE=null;schedulePlateSaves();}
  })();
@@ -3919,7 +3990,7 @@ function initPlateCorners(img){
  if(!meta||!stage)return null;
  if(img._quadEdit)return img._quadEdit;
  const cv=stage.querySelector("canvas"),status=card.querySelector(".quad-status"),retry=card.querySelector(".quad-retry");
- const s={i:meta.i,job:CUR,img,cv,meta,card,status,retry,points:plateCopy(meta.points),
+ const s={i:meta.i,job:CUR,img,cv,meta,displayCrop:meta.crop.slice(),card,status,retry,points:plateCopy(meta.points),
   saved:plateCopy(meta.points),version:0,dirty:false,pending:null,drag:null,error:null,
   failures:0,readyAt:0,selected:0,events:new AbortController()};
  img._quadEdit=s;PLATE_EDITS.set(s.i,s);const options={signal:s.events.signal};
@@ -3927,7 +3998,7 @@ function initPlateCorners(img){
  cv.setAttribute("aria-label","Plate corners: drag a numbered handle. Keyboard: 1–4 selects a corner, arrows adjust, Ctrl+Z undoes. Autosaves to this track.");
  retry.onclick=()=>retryPlateSave(s);
  s.draw=()=>{
-  const r=img.getBoundingClientRect(),c=s.meta.crop;
+  const r=img.getBoundingClientRect(),c=s.displayCrop;
   if(r.width<1||r.height<1)return;
   cv.width=Math.max(1,Math.round(r.width));cv.height=Math.max(1,Math.round(r.height));
   const x=cv.getContext("2d"),sx=cv.width/(c[2]-c[0]),sy=cv.height/(c[3]-c[1]);
@@ -3940,10 +4011,10 @@ function initPlateCorners(img){
    x.fillStyle="#fff";x.font="bold 10px sans-serif";x.textAlign="center";x.fillText(String(k+1),px,py+3);
   });
  };
- function point(e){const r=cv.getBoundingClientRect(),c=s.meta.crop;
+ function point(e){const r=cv.getBoundingClientRect(),c=s.displayCrop;
   return [Math.max(c[0],Math.min(c[2]-1,c[0]+(e.clientX-r.left)/r.width*(c[2]-c[0]))),
           Math.max(c[1],Math.min(c[3]-1,c[1]+(e.clientY-r.top)/r.height*(c[3]-c[1])))];}
- function nearest(e){const r=cv.getBoundingClientRect(),c=s.meta.crop,p=point(e);
+ function nearest(e){const r=cv.getBoundingClientRect(),c=s.displayCrop,p=point(e);
   let index=-1,best=e.pointerType==="touch"?26:18;
   s.points.forEach((v,k)=>{const distance=Math.hypot((v[0]-p[0])*r.width/(c[2]-c[0]),(v[1]-p[1])*r.height/(c[3]-c[1]));
    if(distance<best){index=k;best=distance;}});return index;}
@@ -3975,7 +4046,7 @@ function initPlateCorners(img){
   if(e.key==="Escape"){s.cancelDrag();return;}
   if(s.drag||PLATE_REVIEW_BUSY)return;
   if(/^[1-4]$/.test(e.key)){s.selected=Number(e.key)-1;e.preventDefault();return;}
-  const before=plateCopy(s.points),c=s.meta.crop;
+  const before=plateCopy(s.points),c=s.displayCrop;
   if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="z"&&s.undo){s.points=plateCopy(s.undo);}
   else{
    const delta={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]}[e.key];
@@ -4280,27 +4351,29 @@ function detChoices(i){
 let TRKMEM={};
 function labelPlate(i,label){
  if(label!=="plate"&&label!=="not_plate")return;
- VLBL[i]=label;
+ for(const m of (TRKMEM[i]||[i])){
+  VLBL[m]=label;
+  if(label==="not_plate")discardRejectedCorners(m);
+ }
  applyDet(i,label==="plate",true);
- const el=document.getElementById("vlabel"+i);
- if(el)el.textContent=label==="plate"?"Confirmed plate":"Hard negative";
 }
 function applyDet(i,blur,preserveLabel=false){
- if(!preserveLabel){
-  VLBL[i]="clear";
-  const el=document.getElementById("vlabel"+i);if(el)el.textContent="";
+ for(const m of (TRKMEM[i]||[i])){
+  EN[m]=blur;
+  if(!preserveLabel)VLBL[m]="clear";
+  const label=document.getElementById("vlabel"+m);
+  if(label)label.textContent=VLBL[m]==="plate"?"Confirmed plate":VLBL[m]==="not_plate"?"Hard negative":"";
+  const b=document.getElementById("bb"+m),t=document.getElementById("det"+m);
+  if(b){
+   const status=b.querySelector(".det-status"),choices=b.querySelectorAll("button");
+   if(status){status.className="det-status "+(blur?"blur":"keep");
+    status.textContent=blur?"Will be blurred":"Will stay visible";}
+   if(choices[0])choices[0].setAttribute("aria-pressed",blur);
+   if(choices[1])choices[1].setAttribute("aria-pressed",!blur);
+  }
+  if(t)t.classList.toggle("off",!blur);
  }
- for(const m of (TRKMEM[i]||[i]))EN[m]=blur;
- const b=document.getElementById("bb"+i),t=document.getElementById("det"+i);
- if(b){
-  const status=b.querySelector(".det-status"),choices=b.querySelectorAll("button");
-  status.className="det-status "+(blur?"blur":"keep");
-  status.textContent=blur?"Will be blurred":"Will stay visible";
-  choices[0].setAttribute("aria-pressed",blur);
-  choices[1].setAttribute("aria-pressed",!blur);
- }
- if(t)t.classList.toggle("off",!blur);
- if(document.getElementById("beCv")){beRefresh();}   // live sync
+ if(document.getElementById("beCv")){beRefresh();}
 }
 function setAll(cat,on){document.querySelectorAll(`.det[data-cat=${cat}]`)
  .forEach(el=>applyDet(+el.id.slice(3),on));}
@@ -4767,7 +4840,7 @@ def _vault_lock_now():
         key = VAULT["key"]
         if key is None:
             return 0
-        with _REVIEW_WORK_LOCK:
+        with _REVIEW_EDIT_LOCK, _REVIEW_WORK_LOCK:
             with _REVIEW_CACHE_LOCK:
                 _REVIEW_FRAMES.clear()
                 _REVIEW_PROBES.clear()
