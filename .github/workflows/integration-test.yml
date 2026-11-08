@@ -3,6 +3,9 @@ name: Combined PR Docker and browser smoke test
 on:
   push:
     branches: ['integration/all-prs']
+  pull_request:
+    branches: ['integration/all-prs']
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -24,7 +27,7 @@ jobs:
           python-version: '3.12'
       - name: Install synthetic fixture and browser tooling
         run: |
-          python -m pip install -e . playwright
+          python -m pip install -e . playwright pytest
           python -m playwright install --with-deps chromium
           sudo apt-get install -y ffmpeg
       - name: Prepare isolated bind mounts and synthetic fixture
@@ -34,6 +37,7 @@ jobs:
           docker compose version
           docker compose -f compose.windows-test.yml config --quiet
           docker compose -f compose.windows-test.yml -f compose.windows-cuda.yml config --quiet
+          docker compose -f compose.windows-test.yml -f compose.windows-cuda.yml -f compose.windows-training.yml config --quiet
       - name: Fail early on Python syntax, module packaging and Docker COPY
         run: |
           python -m py_compile openscrub.py openscrub_web.py stop_review.py
