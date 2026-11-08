@@ -109,10 +109,10 @@ def test_failed_learning_run_keeps_report_and_phase(plate_job,monkeypatch):
     assert path.read_bytes()==before
 
 
-def _seed(plate_job):
+def _seed(plate_job, points=None):
     client,jid,path,folder=plate_job
     response=client.post('/api/jobs/%s/plate_quad/0'%jid,json={
-        'points':[[54,77],[126,74],[129,91],[52,94]],'autosave':True,'edit_id':'seed'})
+        'points':points or [[54,77],[126,74],[129,91],[52,94]],'autosave':True,'edit_id':'seed'})
     assert response.status_code==200
     job=web.JOBS[jid];job.update(log=[],learning_request={'license_accepted':True})
     doc=json.loads(path.read_text())
@@ -121,8 +121,12 @@ def _seed(plate_job):
     return job,doc,path,folder
 
 
-def test_successful_session_calls_full_scan_and_model_then_commits_constraints(plate_job,tmp_path):
-    ls=session();job,old,path,folder=_seed(plate_job)
+@pytest.mark.parametrize('points', [
+    [[54,77],[126,74],[129,91],[52,94]],
+    [[54,18],[126,21],[129,91],[52,94]],
+])
+def test_successful_session_calls_full_scan_and_model_then_commits_constraints(plate_job,tmp_path,points):
+    ls=session();job,old,path,folder=_seed(plate_job,points)
     old['provenance'].update(original_input='/local/original.mov',vfr_normalized=True,hdr_tonemapped=False)
     path.write_text(json.dumps(old));before=path.read_bytes();events=[]
     class Model:
@@ -151,8 +155,8 @@ def test_successful_session_calls_full_scan_and_model_then_commits_constraints(p
     assert result['learning']['needs_render'] is True
     assert result['provenance']['original_input']=='/local/original.mov'
     row=result['detections'][0];b=row['cbox']
-    points=np.array(row['plate_quad'])*[b[2]-b[0],b[3]-b[1]]+b[:2]
-    assert np.allclose(points,[[54,77],[126,74],[129,91],[52,94]],atol=.001)
+    restored=np.array(row['plate_quad'])*[b[2]-b[0],b[3]-b[1]]+b[:2]
+    assert np.allclose(restored,points,atol=.001)
     assert row['verified_label']=='plate'
     assert Path(result['learning']['previous_report']).read_bytes()==before or json.loads(Path(result['learning']['previous_report']).read_text())==old
     # Unchanged feedback must be refused before running training again.
@@ -248,3 +252,102 @@ def test_render_round_trip_refuses_changed_source(plate_job):
     rendered=deepcopy(before);rendered['provenance']['input_sha256']='c'*64
     with pytest.raises(ValueError,match='source'):
         ls.preserve_render_review(before,rendered)
+
+
+@pytest.mark.parametrize('box,points', [
+    ([45,67,137,103], [[54,18],[126,21],[129,91],[52,94]]),
+    ([45,67,137,103], [[54,77],[126,74],[129,153],[52,156]]),
+    ([82,76,98,86], [[55,65],[125,66],[122,97],[56,96]]),
+    ([45,67,137,103], [[70,16],[143,88],[102,129],[30,54]]),
+])
+@pytest.mark.parametrize('offset', [(0,0),(13,-9)])
+def test_training_crop_follows_saved_corners_beyond_detector_box(plate_job, box, points, offset):
+    """Use the real autosave path: these valid review edits used to fail collection."""
+    import cv2
+    import video_learning as vl
+    from scripts.train_plate_seg import _quad_valid
+    ls=session();client,jid,path,folder=plate_job;job=web.JOBS[jid]
+    doc=json.loads(path.read_text());ox,oy=offset
+    doc['detections'][0]['cbox']=[box[0]-ox,box[1]-oy,box[2]-ox,box[3]-oy]
+    doc['render_state']['cum']=[list(offset)]*10
+    doc['provenance']['input_sha256']=openscrub.sha256_file(job['video'])
+    path.write_text(json.dumps(doc))
+    endpoint='/api/jobs/%s/plate_quad/0'%jid
+    meta=client.get(endpoint).get_json()
+    response=client.post(endpoint,json={'points':points,'preview_token':meta['preview_token'],
+                                       'autosave':True,'edit_id':'expanded-correction'})
+    assert response.status_code==200, response.get_data(as_text=True)
+    doc=json.loads(path.read_text());source=web._read_exact_frame(job['video'],2)
+    old=vl.crop_bounds(box,source.shape)
+    p=np.asarray(points)
+    assert (p[:,0].min()<old[0] or p[:,1].min()<old[1]
+            or p[:,0].max()>old[2] or p[:,1].max()>old[3])
+    report_before=path.read_bytes()
+    annotation_before={p.name:p.read_bytes() for p in (folder/'plate_annotations').iterdir()}
+    calls=[]
+    def read_frame(index):
+        calls.append(index)
+        return source.copy()
+    feedback=ls.collect_feedback(job,doc,read_frame)
+    assert calls==[2]
+    assert len(feedback['samples'])==1
+    sample=next(iter(feedback['samples'].values()))
+    crop=cv2.imread(str(folder/'learning'/sample['image']))
+    h,w=crop.shape[:2]
+    origin=np.array(box[:2])-np.array(sample['baseline_box'][:2])*[w,h]
+    restored=np.array(sample['points'])*[w,h]+origin
+    assert np.allclose(restored,points,atol=.0001,rtol=0), 'Correction was clipped or shifted'
+    assert np.all(np.array(sample['points'])>=0) and np.all(np.array(sample['points'])<=1)
+    assert sample['box']==box, 'Original proposal identity changed'
+    x,y=np.rint(origin).astype(int)
+    assert np.array_equal(crop,source[y:y+h,x:x+w]), 'Pixels and labels refer to different crops'
+    records=ls.export_dataset(folder/'learning',feedback,folder/'dataset')
+    label_path=folder/'dataset'/'labels'/records[0]['split']/(Path(records[0]['image']).stem+'.txt')
+    values=label_path.read_text().split()
+    assert values[0]=='0' and _quad_valid(values[1:])
+    assert path.read_bytes()==report_before
+    assert annotation_before=={p.name:p.read_bytes() for p in (folder/'plate_annotations').iterdir()}
+    again=ls.collect_feedback(job,doc,lambda i:pytest.fail('Imported sample decoded again'))
+    assert again['fingerprint']==feedback['fingerprint'] and len(again['samples'])==1
+
+
+def test_training_crop_tolerates_only_saved_coordinate_roundoff_at_frame_edge(plate_job):
+    import cv2
+    ls=session();client,jid,path,folder=plate_job;job=web.JOBS[jid]
+    doc=json.loads(path.read_text());doc['detections'][0]['cbox']=[46,67,139,103]
+    doc['provenance']['input_sha256']=openscrub.sha256_file(job['video'])
+    path.write_text(json.dumps(doc))
+    points=[[0,50],[134,51],[134,95],[0,94]]
+    response=client.post('/api/jobs/%s/plate_quad/0'%jid,json={
+        'points':points,'autosave':True,'edit_id':'frame-edge'})
+    assert response.status_code==200
+    doc=json.loads(path.read_text())
+    q=np.array(doc['detections'][0]['plate_quad'])
+    assert -0.0001 < (q[:,0]*93+46).min() < 0, 'Fixture must exercise serialization roundoff'
+    data=ls.collect_feedback(job,doc,lambda i:web._read_exact_frame(job['video'],i))
+    sample=next(iter(data['samples'].values()))
+    crop=cv2.imread(str(folder/'learning'/sample['image']));h,w=crop.shape[:2]
+    origin=np.array([46,67])-np.array(sample['baseline_box'][:2])*[w,h]
+    assert np.allclose(np.array(sample['points'])*[w,h]+origin,points,atol=.0001,rtol=0)
+    assert np.all(np.array(sample['points'])>=0)
+
+
+@pytest.mark.parametrize('quad,reason', [
+    ([[-4,0],[1,0],[1,1],[-4,1]], 'outside the source frame'),
+    ([[0,0],[1,1],[0,1],[1,0]], 'convex'),
+    ([[0,0],[1,0],[1,1]], 'four finite'),
+    ([[float('nan'),0],[1,0],[1,1],[0,1]], 'four finite'),
+])
+def test_invalid_training_polygon_is_diagnosable_and_preserves_saved_feedback(plate_job, quad, reason):
+    ls=session();job,doc,path,folder=_seed(plate_job);client,jid,_,_=plate_job
+    ls.collect_feedback(job,doc,lambda i:web._read_exact_frame(job['video'],i))
+    saved_feedback=(folder/'learning/feedback.json').read_bytes()
+    assert client.post('/api/jobs/%s/plate_quad/0'%jid,json={
+        'points':[[55,76],[125,75],[128,92],[53,93]],'autosave':True,'edit_id':'second'}).status_code==200
+    doc=json.loads(path.read_text());doc['detections'][0]['plate_quad']=quad
+    before=path.read_bytes();manifest=(folder/'plate_annotations/annotations.jsonl').read_bytes()
+    with pytest.raises(ValueError,match='finding 0, frame 2.*'+reason):
+        ls.collect_feedback(job,doc,lambda i:web._read_exact_frame(job['video'],i))
+    assert path.read_bytes()==before
+    assert (folder/'plate_annotations/annotations.jsonl').read_bytes()==manifest
+    assert (folder/'learning/feedback.json').read_bytes()==saved_feedback
