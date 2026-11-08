@@ -1,0 +1,39 @@
+name: Full suite and review stress
+on:
+  pull_request:
+    branches: ['integration/all-prs']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  full-suite:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    env:
+      OPENSCRUB_NO_AUTOFETCH: '1'
+      OPENSCRUB_CPU_DNN: '1'
+      REVIEW_EVIDENCE_DIR: /tmp/release-evidence
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Install CPU and browser audit environment
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg tesseract-ocr
+          python -m pip install 'numpy<2' opencv-python-headless==4.11.0.86 onnxruntime==1.20.1 onnx pytest pytest-timeout flask rapidfuzz pyyaml cryptography playwright build hatchling cheroot pytesseract pillow
+          python -m playwright install --with-deps chromium
+      - name: Run all tests including large mixed sessions and recovery
+        run: |
+          set -o pipefail
+          python -m pytest -q -ra --timeout=60 --junitxml=/tmp/release-full.xml | tee /tmp/release-full.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: full-suite-and-review-stress
+          path: |
+            /tmp/release-full.*
+            /tmp/release-evidence/*.png
+          if-no-files-found: ignore
+          retention-days: 7

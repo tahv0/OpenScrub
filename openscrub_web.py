@@ -4461,12 +4461,18 @@ document.addEventListener("keydown",e=>{
 async function saveAndRender(saveOnly=false){
  if(PLATE_REVIEW_BUSY)return false;
  PLATE_REVIEW_BUSY=true;
+ const job=CUR,view=JOBVIEW;
  try{
-  if(!await flushPlateSaves())return false;
-  return await persistReview(saveOnly);
+  if(!await flushPlateSaves()||CUR!==job||JOBVIEW!==view)return false;
+  return await persistReview(saveOnly,job,view);
+ }catch(error){
+  alert("Review save failed for job "+job+": "+
+   (error.name==="AbortError"?"request timed out":error.message)+
+   ". The save was not confirmed. Keep the review open and retry before leaving.");
+  return false;
  }finally{PLATE_REVIEW_BUSY=false;}
 }
-async function persistReview(saveOnly=false){
+async function persistReview(saveOnly=false,job=CUR,view=JOBVIEW){
  // Do not render until the server has confirmed the latest pending preview.
  if(document.getElementById("beCv")){
   if(BE.drag||BE.pending){
@@ -4483,11 +4489,12 @@ async function persistReview(saveOnly=false){
  // only send audio spans when the box editor actually loaded them —
  // otherwise a save from plain review would wipe stored spans with []
  if(Array.isArray(BE.audio)&&BE.tlspans!==undefined)payload.audio=BE.audio;
- const response=await fetch(`api/jobs/${CUR}/detections`,{method:"POST",
+ if(CUR!==job||JOBVIEW!==view)return false;
+ const {data:r}=await reviewRequest(`api/jobs/${job}/detections`,{method:"POST",
   headers:{"Content-Type":"application/json"},
   body:JSON.stringify(payload)});
- if(!response.ok){alert("Review edits were not saved");return false;}
- const r=await response.json();
+ // A delayed response belongs to its original review, never a newly opened job.
+ if(CUR!==job||JOBVIEW!==view)return false;
  BE.adds=[];BE.ov={};BE.times={};
  if(r.suggest_allowlist&&r.suggest_allowlist.length){
   if(confirm("You disabled every instance of: "+r.suggest_allowlist.join(", ")+". Add these to the permanent allow-list so future scans skip them?"))
@@ -4495,14 +4502,16 @@ async function persistReview(saveOnly=false){
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({words:r.suggest_allowlist})});
     loadPersist();}}
+ if(CUR!==job||JOBVIEW!==view)return false;
  MAN=[];
  if(saveOnly||SHELLPH==="paused"){
   const note=document.getElementById("savedCheckpointNote");
   if(note)note.textContent="Review edits saved locally.";
   return true;
  }
- const render=await fetch(`api/jobs/${CUR}/render`,{method:"POST"});
- if(!render.ok){alert("Could not start render");return false;}
+ if(CUR!==job||JOBVIEW!==view)return false;
+ await reviewRequest(`api/jobs/${job}/render`,{method:"POST"});
+ if(CUR!==job||JOBVIEW!==view)return false;
  closePlateQuad();clearReviewPreviews();
  const rv=document.getElementById("review"); if(rv)rv.remove();
  return true;
