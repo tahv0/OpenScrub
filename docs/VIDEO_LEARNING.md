@@ -165,3 +165,22 @@ rescan, reannotation, cache deletion or checkpoint download is needed just to
 retry collection. An unsuccessful collection has not replaced the review report
 or activated a new model. This fix does not bypass the later minimum-example
 or validation checks.
+
+## Unsaved corner adjustments
+
+A rejected corner save keeps the draft and shows **Show finding #…** in the
+review's error summary. This reveals and focuses the same card even when it
+was hidden by the 10% filter. The card is outlined and an out-of-frame error
+names the numbered corners and their source coordinates; rejected handles
+are red. Correct the shape and let autosave finish, or use Retry save.
+
+Image-edge polygon vertices are valid at x=0/width and y=0/height. Only tiny
+rounding error from stored relative coordinates is snapped to an edge; genuinely
+out-of-frame shapes are rejected, not silently shrunk. A definite validation
+rejection is not reused as a stale request after a new adjustment. For an
+uncertain network result, retries retain the request ID to avoid double saves.
+
+Filtering or finding an unsaved card does not save it. Wait for **Saved** /
+**Saved to track**, then confirm **Review edits saved to disk** before leaving.
+Do not use **Reload preview** to preserve a draft: that conflict-recovery action
+explicitly asks permission to discard the unsaved shape.
