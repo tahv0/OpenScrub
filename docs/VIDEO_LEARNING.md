@@ -204,3 +204,33 @@ that arbitrarily large reports or overloaded machines always finish in 120 secon
 When updating an already-open tab, keep it open and preserve its drafts. The old
 page can retry against the faster backend, but still has its old timeout until
 refreshed. Do not refresh after another unconfirmed save just to get the new UI.
+
+## Learning collection and decoder progress
+
+Training collection no longer calls the interactive thumbnail decoder or its
+10-second request deadline. It selects only explicitly reviewed training
+examples, reads required source frames in sorted order through one FFmpeg
+process, and uses one decoded image for multiple examples from the same frame.
+The pass traverses from frame zero to the last needed source frame; long footage
+can still take time. No seekable replacement video, full-frame dump, model
+download, or change to existing annotations is required.
+
+The job status/log now distinguishes indexing decisions, `Collecting reviewed
+examples: 12/80`, and decoding a source frame toward the next required frame.
+These counts are new image examples, not epochs or the number of detector rows.
+Training has not started until collection and dataset preparation succeed.
+During decoding, updates are throttled to two seconds. Existing committed
+feedback is reused. The timestamp/constant-frame-rate checks remain strict;
+nearby frames are never silently substituted.
+
+Cancellation is checked during extraction. A decoder that makes no progress
+for 120 seconds is terminated and reaped, with a training-specific error and
+source frame number; useful ongoing decoding can exceed 120 seconds overall.
+A 12-hour overall decoder safety limit remains. An aborted collection removes
+only newly written, unpublished crops, not the saved review or prior feedback.
+This does not retroactively delete orphan files from earlier versions.
+
+After installing this fix, retry **Train & rescan this video** on the existing
+saved job, not Resume scan. No reannotation is needed. This fixes the collection
+failure path; it does not diagnose unrelated Windows disk activity or guarantee
+that a later model-quality gate passes.

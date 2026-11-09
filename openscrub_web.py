@@ -1125,7 +1125,7 @@ def perform_learning(job):
                         except OSError:
                             pass
         result = learning_session.run_session(
-            job, lambda index: _read_exact_frame(job["video"], index),
+            job, None,  # Collection owns a cancellable batch decoder, not a preview request.
             scan, publish, cb.log)
         job["phase"] = "review"
         job["error"] = None

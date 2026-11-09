@@ -1,5 +1,12 @@
 """Transactional, local video-learning sessions; no training on the web thread."""
 from copy import deepcopy
+from collections import deque
+from contextlib import closing
+from fractions import Fraction
+import queue
+import re
+import tempfile
+import threading
 import hashlib
 import importlib.util
 import json
@@ -58,13 +65,183 @@ def _load(path,default=None):
     return json.loads(path.read_text(encoding='utf-8'))
 
 
-def collect_feedback(job,doc,read_frame):
+# Training collection owns its decoder. Never borrow the interactive preview
+# lock, Flask abort(), or its ten-second request deadline for batch work.
+def _collection_cancel(cancel):
+    if cancel():
+        raise InterruptedError('Learning collection cancelled; saved review retained')
+
+
+def _stop_collection_process(process):
+    if process.poll() is None:
+        process.terminate()
+        try:
+            process.wait(timeout=2)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait()
+
+
+def _collection_probe(path, fps, cancel, progress, timeout):
+    command=['ffprobe','-v','error','-select_streams','v:0',
+             '-show_entries','stream=avg_frame_rate,r_frame_rate',
+             '-of','json',str(path)]
+    started=time.monotonic()
+    process=subprocess.Popen(command,stdin=subprocess.DEVNULL,
+                             stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+    try:
+        while True:
+            _collection_cancel(cancel)
+            if time.monotonic()-started>timeout:
+                raise TimeoutError('Training source probing stalled; saved review retained')
+            if progress:progress(-1,None)
+            try:
+                stdout,stderr=process.communicate(timeout=.2)
+                break
+            except subprocess.TimeoutExpired:
+                pass
+        if process.returncode:
+            raise ValueError('Cannot probe training source: '+stderr.decode(errors='replace')[-500:])
+        stream=json.loads(stdout)['streams'][0]
+        avg=float(Fraction(stream['avg_frame_rate']))
+        nominal=float(Fraction(stream['r_frame_rate']))
+        if (not math.isfinite(avg) or avg<=0 or
+                abs(avg-nominal)>max(.001,avg*.0001) or
+                not math.isclose(avg,fps,rel_tol=1e-6,abs_tol=1e-6)):
+            raise ValueError('Training source frame rate does not match the reviewed CFR timeline')
+    finally:
+        _stop_collection_process(process)
+        process.stdout.close();process.stderr.close()
+
+
+def _frame_selection(indices):
+    """Balanced selection avoids a linear expression scan per video frame."""
+    if len(indices)==1:return 'eq(n,%d)'%indices[0]
+    mid=len(indices)//2
+    return 'if(lt(n,%d),%s,%s)'%(indices[mid],
+        _frame_selection(indices[:mid]),_frame_selection(indices[mid:]))
+
+
+def iter_training_frames(path, indices, fps, cancel, progress=None, stall_timeout=120):
+    """Decode selected exact CFR frames once, in order, with bounded memory.
+
+    No transcode or frame dump is written. FFmpeg traverses from frame zero to
+    the last required frame, emitting only selected PPMs. Integer PTS is checked
+    against the reviewed timeline. The stall guard measures *lack of decoder
+    progress*, not total traversal time; cancellation kills and reaps the child.
+    """
+    wanted=sorted(set(indices))
+    if not wanted:return
+    if any(not isinstance(i,int) or isinstance(i,bool) or i<0 for i in wanted):
+        raise ValueError('Training source frames must be nonnegative integers')
+    if not math.isfinite(fps) or fps<=0 or stall_timeout<=0:
+        raise ValueError('Invalid training frame rate or decoder timeout')
+    _collection_cancel(cancel)
+    _collection_probe(path,fps,cancel,progress,stall_timeout)
+    # Only a filter expression is staged, never video/pixels. A script avoids
+    # operating-system argv limits for large reviewed sets.
+    with tempfile.TemporaryDirectory(prefix='openscrub-collect-') as temporary:
+        script=Path(temporary)/'select.txt'
+        script.write_text("showinfo=checksum=0,select='"+_frame_selection(wanted)+"'",encoding='utf-8')
+        command=['ffmpeg','-hide_banner','-loglevel','info','-nostats','-nostdin',
+                 '-threads','2','-filter_threads','1','-copyts','-i',str(path),
+                 '-map','0:v:0','-an','-sn','-filter_script:v',str(script),
+                 '-frames:v',str(len(wanted)),'-vsync','0','-threads','1',
+                 '-f','image2pipe','-vcodec','ppm','pipe:1']
+        process=subprocess.Popen(command,stdin=subprocess.DEVNULL,
+                                 stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+        stopped=threading.Event();frames=queue.Queue(maxsize=1)
+        metadata={};targets=set(wanted);tail=deque(maxlen=8)
+        state={'frame':-1,'updated':time.monotonic(),'origin':None,'timebase':None}
+        def put(value):
+            while not stopped.is_set():
+                try:frames.put(value,timeout=.1);return
+                except queue.Full:pass
+        def pixels():
+            try:
+                while not stopped.is_set():
+                    magic=process.stdout.readline(64)
+                    if not magic:break
+                    if magic.strip()!=b'P6':raise ValueError('Invalid training decoder image header')
+                    size=process.stdout.readline(128);maximum=process.stdout.readline(64)
+                    width,height=map(int,size.split())
+                    if (maximum.strip()!=b'255' or width<=0 or height<=0 or width*height>64000000):
+                        raise ValueError('Invalid training decoder image dimensions')
+                    remaining=width*height*3;data=bytearray()
+                    while remaining:
+                        chunk=process.stdout.read(min(1048576,remaining))
+                        if not chunk:raise ValueError('Incomplete training source frame')
+                        data.extend(chunk);remaining-=len(chunk);state['updated']=time.monotonic()
+                    rgb=np.frombuffer(data,np.uint8).reshape(height,width,3)
+                    put(cv2.cvtColor(rgb,cv2.COLOR_RGB2BGR))
+            except Exception as error:put(error)
+            finally:put(None)
+        def messages():
+            try:
+                for raw in iter(process.stderr.readline,b''):
+                    text=raw.decode('utf-8',errors='replace');tail.append(text[-600:])
+                    tb=re.search(r'config in time_base:\s*(\d+/\d+)',text)
+                    if tb:state['timebase']=Fraction(tb.group(1))
+                    match=re.search(r'\bn:\s*(\d+)\s+pts:\s*(-?\d+)\s+pts_time:',text)
+                    if match:
+                        n,pts=map(int,match.groups())
+                        if n==0:state['origin']=pts
+                        if n in targets:metadata[n]=pts
+                        state['frame']=n;state['updated']=time.monotonic()
+            except (OSError,ValueError):
+                pass # The main thread checks missing timeline information.
+        readers=[threading.Thread(target=pixels,daemon=True),threading.Thread(target=messages,daemon=True)]
+        for reader in readers:reader.start()
+        started=time.monotonic()
+        def check(index):
+            _collection_cancel(cancel)
+            if progress:progress(state['frame'],index)
+            if time.monotonic()-state['updated']>stall_timeout:
+                raise TimeoutError('Training decoder made no progress for %g seconds while preparing source frame %d; saved review retained'%(stall_timeout,index))
+            if time.monotonic()-started>43200:
+                raise TimeoutError('Learning collection exceeded its 12-hour safety limit; saved review retained')
+        try:
+            for index in wanted:
+                # Consumer work (crop persistence) is not a decoder stall.
+                state['updated']=time.monotonic()
+                while True:
+                    check(index)
+                    try:image=frames.get(timeout=.1);break
+                    except queue.Empty:pass
+                if isinstance(image,Exception):raise image
+                if image is None:
+                    raise ValueError('Cannot decode training source frame %d; source ended or decoder failed. %s'%(index,''.join(tail)[-600:]))
+                while index not in metadata or state['origin'] is None or state['timebase'] is None:
+                    check(index)
+                    if not readers[1].is_alive():
+                        raise ValueError('Cannot verify training source frame %d timeline'%index)
+                    time.sleep(.01)
+                got=float((metadata.pop(index)-state['origin'])*state['timebase'])*fps
+                if abs(got-index)>.15:
+                    raise ValueError('Training source frame %d does not match the reviewed timeline'%index)
+                yield index,image
+            # Errors after the last delivered image must not be hidden.
+            while process.poll() is None:
+                check(wanted[-1]);time.sleep(.05)
+            if process.returncode:
+                raise ValueError('Training decoder failed: '+''.join(tail)[-600:])
+        finally:
+            stopped.set();_stop_collection_process(process)
+            for reader in readers:reader.join(timeout=2)
+            process.stdout.close();process.stderr.close()
+
+
+def collect_feedback(job,doc,read_frame=None,log=None):
     """Migrate existing successful annotations, then accumulate source-bound data.
 
     Imported images are remembered by immutable filename, so old manifests are
     never reinterpreted against a later pass's changed detection indices.
     Current report labels can revoke previously imported examples.
     """
+    cancel=job.get('cancel')
+    cancelled=cancel.is_set if cancel is not None else lambda:False
+    _collection_cancel(cancelled)
+    log=log or (lambda message:None)
     root=private_dir(Path(job['dir'])/'learning')
     private_dir(root/'samples')
     source=doc['provenance'].get('input_sha256')
@@ -72,16 +249,25 @@ def collect_feedback(job,doc,read_frame):
     store=_load(root/'feedback.json',{'schema':1,'source_sha256':source,'samples':{},'imported_images':[],
                                     'constraints':None})
     if store['source_sha256']!=source:raise ValueError('Feedback source changed')
+    job['learning']={'stage':'collecting','message':'Indexing saved human decisions before collecting training images'}
+    log(job['learning']['message'])
     current=vl.capture_constraints(doc)
     prior=(store.get('constraints') or {}).get('anchors',[])
     merged={a['id']:a for a in prior}
+    by_frame={}
+    for k,a in merged.items():by_frame.setdefault(a['frame'],{})[k]=a
     for a in current['anchors']:
+        _collection_cancel(cancelled)
         # A new generation can have new IDs. Match same source frame/region,
         # using spatial agreement rather than pretending track numbers persist.
-        related=[k for k,v in merged.items() if v['frame']==a['frame'] and vl._iou(v['box'],a['box'])>=.5]
+        related=[k for k,v in by_frame.get(a['frame'],{}).items() if vl._iou(v['box'],a['box'])>=.5]
         if len(related)==1:
             a['id']=related[0];a['group']=merged[related[0]].get('group',a.get('group'))
+        old=merged.get(a['id'])
+        if old and old['frame']!=a['frame']:
+            by_frame.get(old['frame'],{}).pop(a['id'],None)
         merged[a['id']]=a
+        by_frame.setdefault(a['frame'],{})[a['id']]=a
     paths={p['group']:p for p in (store.get('constraints') or {}).get('negative_paths',[])}
     paths.update({p['group']:p for p in current.get('negative_paths',[])})
     current['negative_paths']=list(paths.values())
@@ -117,73 +303,124 @@ def collect_feedback(job,doc,read_frame):
         if r.get('category')=='plate' and r.get('verified_label')=='not_plate':
             negatives.setdefault(group_for(i,r),(i,r))
     requested.extend((i,r,'negative',None) for i,r in negatives.values())
-    for i,r,label,imported in requested:
-        frame=vl._frame(r,rs);box=vl._screen_box(r,rs,frame);group=group_for(i,r)
-        related=[(k,s) for k,s in store['samples'].items()
-                 if s['frame']==frame and vl._iou(s['box'],box)>=.5]
-        if len(related)==1:
-            sid,previous=related[0];group=previous['group']
-            if label=='negative' and previous['label']=='negative':continue
-        else:sid=uuid.uuid4().hex
-        if label=='positive':
-            # A newly drawn positive reverses an older rejection of that object.
-            store['samples']={k:s for k,s in store['samples'].items()
-                              if s['group']!=group or s['label']!='negative'}
-            current['negative_paths']=[p for p in current['negative_paths'] if p['group']!=group]
-            current['anchors']=[a for a in current['anchors'] if a.get('group')!=group or a.get('label')!='not_plate']
-        if label=='negative':
-            store['samples']={k:s for k,s in store['samples'].items()
-                              if s['group']!=group or s['label']!='positive'}
-        image=read_frame(frame)
-        if image is None:raise ValueError('Cannot decode reviewed frame %d for training'%frame)
-        bounds=list(box);screen_points=None
-        if label=='positive':
-            # Review coordinates are relative to the ORIGINAL detector box,
-            # not its training crop. Values outside [0, 1] are valid when the
-            # reviewer corrects an undersized or misplaced detector proposal.
-            context='Reviewed finding %d, frame %d: '%(i,frame)
-            recovery='. Check this finding in review and retry; saved annotations were kept.'
-            q=np.asarray(r['plate_quad'],dtype=np.float64)
-            if q.shape!=(4,2) or not np.isfinite(q).all():
-                raise ValueError(context+'expected four finite corner points'+recovery)
-            scale=np.asarray([box[2]-box[0],box[3]-box[1]],dtype=np.float64)
-            screen_points=q*scale+box[:2]
-            # The autosave API rounds box-relative coordinates to 6 decimals.
-            # Permit only that subpixel error at the source frame boundary;
-            # never clamp a genuine off-frame polygon or truncate it to a box.
-            limit=np.asarray([image.shape[1],image.shape[0]],dtype=np.float64)
-            tolerance=np.abs(scale)*0.5e-6+1e-9
-            if (not np.isfinite(screen_points).all() or np.any(screen_points < -tolerance)
-                    or np.any(screen_points > limit+tolerance)):
-                raise ValueError(context+'verified corners are outside the source frame'+recovery)
-            screen_points=np.clip(screen_points,0,limit)
-            if not cv2.isContourConvex(screen_points.astype(np.float32).reshape(-1,1,2)):
-                raise ValueError(context+'corners must form a convex quadrilateral'+recovery)
-            # Include all corrected vertices before adding context and clipping
-            # the crop to the source image. Keep `box` unchanged for identity
-            # matching and comparison with the original detector's coverage.
-            bounds=[min(box[0],screen_points[:,0].min()),
-                    min(box[1],screen_points[:,1].min()),
-                    max(box[2],screen_points[:,0].max()),
-                    max(box[3],screen_points[:,1].max())]
-        x1,y1,x2,y2=vl.crop_bounds(bounds,image.shape)
-        crop=image[y1:y2,x1:x2]
-        if not crop.size:raise ValueError('Empty training crop for finding %d, frame %d'%(i,frame))
-        points=None if screen_points is None else (
-            (screen_points-[x1,y1])/[x2-x1,y2-y1]).tolist()
-        filename='samples/'+uuid.uuid4().hex+'.png'
-        if not cv2.imwrite(str(root/filename),crop):raise OSError('Could not persist training crop')
-        if os.name!='nt':(root/filename).chmod(0o600)
-        store['samples'][sid]={'image':filename,'image_sha256':sha256(root/filename),
-            'label':label,'quality':'human_quad' if label=='positive' else 'human_hard_negative',
-            'points':points,'frame':frame,'box':box,'group':group,
-            'baseline_box':[(box[0]-x1)/(x2-x1),(box[1]-y1)/(y2-y1),
-                            (box[2]-x1)/(x2-x1),(box[3]-y1)/(y2-y1)]}
-        if imported:seen.add(imported)
-    store['imported_images']=sorted(seen)
-    store['fingerprint']=feedback_fingerprint(store['samples'])
-    atomic_json(root/'feedback.json',store)
-    return store
+    # Explicit rejection wins over contradictory positive rows from the same
+    # group, as in the previous positive-then-negative collector.
+    requested=[item for item in requested if item[2]=='negative' or group_for(item[0],item[1]) not in negatives]
+    requested.sort(key=lambda item:vl._frame(item[1],rs))
+    # Do not decode already committed negatives when retrying a collection.
+    committed={}
+    for sample in store['samples'].values():committed.setdefault(sample['frame'],[]).append(sample)
+    def already_saved(item):
+        i,r,label,_=item
+        if label!='negative':return False
+        frame=vl._frame(r,rs);box=vl._screen_box(r,rs,frame)
+        matches=[v for v in committed.get(frame,[]) if vl._iou(v['box'],box)>=.5]
+        return len(matches)==1 and matches[0]['label']=='negative'
+    requested=[item for item in requested if not already_saved(item)]
+    completed=0;total=len(requested);last_notice=[0.]
+    positive=sum(item[2]=='positive' for item in requested)
+    def progress(decoded=-1,target=None,force=False):
+        now=time.monotonic()
+        if not force and now-last_notice[0]<2:return
+        last_notice[0]=now
+        message='Collecting reviewed examples: %d/%d (%d positive, %d negative)'%(completed,total,positive,total-positive)
+        if target is not None:message+='; decoding source frame %d toward %d'%(max(0,decoded),target)
+        message+='; training has not started'
+        job['learning']={'stage':'collecting','message':message,'completed_examples':completed,
+                         'total_examples':total,'source_frame':decoded,'target_frame':target}
+        log(message)
+    progress(force=True)
+    wanted=sorted({vl._frame(r,rs) for _,r,_,_ in requested})
+    iterator=(iter_training_frames(job['video'],wanted,float(rs['fps']),cancelled,progress)
+              if read_frame is None else ((f,read_frame(f)) for f in wanted))
+    created=[];committed_ok=False;last_frame=None;image=None
+    try:
+        with closing(iterator):
+            for i,r,label,imported in requested:
+                _collection_cancel(cancelled)
+                frame=vl._frame(r,rs);box=vl._screen_box(r,rs,frame);group=group_for(i,r)
+                related=[(k,s) for k,s in store['samples'].items()
+                         if s['frame']==frame and vl._iou(s['box'],box)>=.5]
+                if len(related)==1:
+                    sid,previous=related[0];group=previous['group']
+                    if label=='negative' and previous['label']=='negative':
+                        completed+=1;progress(force=completed==total);continue
+                else:sid=uuid.uuid4().hex
+                if label=='positive':
+                    # A newly drawn positive reverses an older rejection of that object.
+                    store['samples']={k:s for k,s in store['samples'].items()
+                                      if s['group']!=group or s['label']!='negative'}
+                    current['negative_paths']=[p for p in current['negative_paths'] if p['group']!=group]
+                    current['anchors']=[a for a in current['anchors'] if a.get('group')!=group or a.get('label')!='not_plate']
+                if label=='negative':
+                    store['samples']={k:s for k,s in store['samples'].items()
+                                      if s['group']!=group or s['label']!='positive'}
+                if frame!=last_frame:
+                    decoded,image=next(iterator)
+                    if decoded!=frame:raise ValueError('Training source frame order mismatch')
+                    last_frame=frame
+                if image is None:raise ValueError('Cannot decode reviewed frame %d for training'%frame)
+                bounds=list(box);screen_points=None
+                if label=='positive':
+                    # Review coordinates are relative to the ORIGINAL detector box,
+                    # not its training crop. Values outside [0, 1] are valid when the
+                    # reviewer corrects an undersized or misplaced detector proposal.
+                    context='Reviewed finding %d, frame %d: '%(i,frame)
+                    recovery='. Check this finding in review and retry; saved annotations were kept.'
+                    q=np.asarray(r['plate_quad'],dtype=np.float64)
+                    if q.shape!=(4,2) or not np.isfinite(q).all():
+                        raise ValueError(context+'expected four finite corner points'+recovery)
+                    scale=np.asarray([box[2]-box[0],box[3]-box[1]],dtype=np.float64)
+                    screen_points=q*scale+box[:2]
+                    # The autosave API rounds box-relative coordinates to 6 decimals.
+                    # Permit only that subpixel error at the source frame boundary;
+                    # never clamp a genuine off-frame polygon or truncate it to a box.
+                    limit=np.asarray([image.shape[1],image.shape[0]],dtype=np.float64)
+                    tolerance=np.abs(scale)*0.5e-6+1e-9
+                    if (not np.isfinite(screen_points).all() or np.any(screen_points < -tolerance)
+                            or np.any(screen_points > limit+tolerance)):
+                        raise ValueError(context+'verified corners are outside the source frame'+recovery)
+                    screen_points=np.clip(screen_points,0,limit)
+                    if not cv2.isContourConvex(screen_points.astype(np.float32).reshape(-1,1,2)):
+                        raise ValueError(context+'corners must form a convex quadrilateral'+recovery)
+                    # Include all corrected vertices before adding context and clipping
+                    # the crop to the source image. Keep `box` unchanged for identity
+                    # matching and comparison with the original detector's coverage.
+                    bounds=[min(box[0],screen_points[:,0].min()),
+                            min(box[1],screen_points[:,1].min()),
+                            max(box[2],screen_points[:,0].max()),
+                            max(box[3],screen_points[:,1].max())]
+                x1,y1,x2,y2=vl.crop_bounds(bounds,image.shape)
+                crop=image[y1:y2,x1:x2]
+                if not crop.size:raise ValueError('Empty training crop for finding %d, frame %d'%(i,frame))
+                points=None if screen_points is None else (
+                    (screen_points-[x1,y1])/[x2-x1,y2-y1]).tolist()
+                filename='samples/'+uuid.uuid4().hex+'.png'
+                created.append(root/filename)
+                if not cv2.imwrite(str(root/filename),crop):raise OSError('Could not persist training crop')
+                if os.name!='nt':(root/filename).chmod(0o600)
+                store['samples'][sid]={'image':filename,'image_sha256':sha256(root/filename),
+                    'label':label,'quality':'human_quad' if label=='positive' else 'human_hard_negative',
+                    'points':points,'frame':frame,'box':box,'group':group,
+                    'baseline_box':[(box[0]-x1)/(x2-x1),(box[1]-y1)/(y2-y1),
+                                    (box[2]-x1)/(x2-x1),(box[3]-y1)/(y2-y1)]}
+                if imported:seen.add(imported)
+                completed+=1;progress(force=completed==total)
+            # Drive the reader to normal EOF so late decoding errors are checked.
+            try:next(iterator)
+            except StopIteration:pass
+            else:raise ValueError('Unexpected extra training source frame')
+        _collection_cancel(cancelled)
+        store['imported_images']=sorted(seen)
+        store['fingerprint']=feedback_fingerprint(store['samples'])
+        atomic_json(root/'feedback.json',store)
+        committed_ok=True
+        return store
+    finally:
+        if not committed_ok:
+            for path in created:
+                try:path.unlink()
+                except FileNotFoundError:pass
 
 
 def export_dataset(root,feedback,destination):
@@ -334,7 +571,7 @@ def run_session(job,read_frame,full_scan,publish,log=None,train=None,refiner=Non
         job['learning']={'stage':name,'message':message}
         atomic_json(root/'status.json',job['learning']);log(message)
     phase('collecting','Collecting your saved positive and negative examples')
-    feedback=collect_feedback(job,doc,read_frame)
+    feedback=collect_feedback(job,doc,read_frame,log=log)
     prior=(doc.get('learning') or {}).get('active', _load(root/'active.json',{}))
     if prior.get('feedback_fingerprint')==feedback['fingerprint']:
         raise ValueError('No new or changed training examples since the last accepted pass. Repeating that training is disabled; review unresolved cases first.')
