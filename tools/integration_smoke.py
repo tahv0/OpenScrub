@@ -360,6 +360,32 @@ def verify(args):
             check_contours(evidence, wait_for_frame(page, 0), 0)
             page.locator("#review").screenshot(path=str(evidence.path / "review.png"))
 
+            # Returning to the loaded Blur value is a no-op, not evidence of
+            # losing track choices. Sparse saves must omit that unchanged map.
+            with page.expect_response(lambda response: response.url.endswith(
+                    f"/api/jobs/{JOB_ID}/detections") and response.request.method == "POST") as unchanged:
+                unchanged_ok = page.evaluate("saveAndRender(true)")
+            evidence.check("unchanged visibility is omitted and acknowledged",
+                           unchanged_ok and unchanged.value.ok and
+                           unchanged.value.request.post_data_json["enabled"] == {})
+            # Commit an actual changed track before restoring Blur for render.
+            # This preserves the full-member save assertion below and verifies
+            # server persistence independently of the browser's displayed state.
+            keep.click()
+            page.wait_for_function("() => !BE.pending && BE.boxes.length===0")
+            with page.expect_response(lambda response: response.url.endswith(
+                    f"/api/jobs/{JOB_ID}/detections") and response.request.method == "POST") as kept:
+                kept_ok = page.evaluate("saveAndRender(true)")
+            kept_payload = kept.value.request.post_data_json["enabled"]
+            kept_report = api.get(url + f"/api/jobs/{JOB_ID}/report").json()
+            evidence.check("changed track choices reach the stored report",
+                           kept_ok and kept.value.ok and len(kept_payload) == FRAMES and
+                           all(v is False for v in kept_payload.values()) and
+                           len(kept_report["detections"]) == FRAMES and
+                           all(d["enabled"] is False for d in kept_report["detections"]),
+                           kept_payload)
+            blur.click()
+            page.wait_for_function("() => !BE.pending && BE.boxes.length===1")
             with page.expect_response(lambda response: response.url.endswith(
                     f"/api/jobs/{JOB_ID}/detections") and response.request.method == "POST") as saved:
                 page.locator("#review").get_by_role("button", name="Save edits & render",
@@ -397,7 +423,7 @@ def verify(args):
             evidence.check("rendered report retains indexed compound masks and narrow settings",
                            len(report["detections"]) == FRAMES and
                            all(d["poly"] and d["poly_holes"] and d["mask_pad"] == 0 and
-                               d["frame_index"] == i and d["track"] == 7
+                               d["frame_index"] == i and d["track"] == 7 and d["enabled"] is True
                                for i, d in enumerate(report["detections"])) and
                            report["provenance"]["settings"]["plate_coverage"] == "narrow" and
                            report["provenance"]["settings"]["plate_narrow_margin"] == 0)

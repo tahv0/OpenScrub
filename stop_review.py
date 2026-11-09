@@ -15,13 +15,51 @@ class CheckpointError(ValueError):
     pass
 
 
+def _write_compact_json(out, document):
+    """Batch large arrays through the C encoder without a whole-report string.
+
+    Reports have string-keyed objects and large detection/timeline arrays.
+    Keep standard JSON conversions for unusual keys and values. Batches bound
+    the number of rows encoded at once, not the size of an individual row.
+    """
+    encoder = json.JSONEncoder(separators=(",", ":"))
+    active = set()
+
+    def write(value):
+        if isinstance(value, dict) and all(isinstance(k, str) for k in value):
+            if id(value) in active:
+                raise ValueError("Circular reference detected")
+            active.add(id(value))
+            try:
+                out.write("{")
+                for i, (key, item) in enumerate(value.items()):
+                    if i:
+                        out.write(",")
+                    out.write(encoder.encode(key) + ":")
+                    write(item)
+                out.write("}")
+            finally:
+                active.remove(id(value))
+        elif isinstance(value, (list, tuple)):
+            out.write("[")
+            for start in range(0, len(value), 256):
+                if start:
+                    out.write(",")
+                out.write(encoder.encode(value[start:start + 256])[1:-1])
+            out.write("]")
+        else:
+            out.write(encoder.encode(value))
+
+    write(document)
+
+
 def atomic_report(path, document):
     """Publish a whole report or leave the preceding verified one unchanged."""
     directory = os.path.dirname(os.path.abspath(path))
     fd, tmp = tempfile.mkstemp(prefix=".report-", suffix=".json", dir=directory)
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as out:
-            json.dump(document, out, indent=1)
+            _write_compact_json(out, document)
             out.flush()
             os.fsync(out.fileno())
         try:

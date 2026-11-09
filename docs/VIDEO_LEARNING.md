@@ -184,3 +184,23 @@ Filtering or finding an unsaved card does not save it. Wait for **Saved** /
 **Saved to track**, then confirm **Review edits saved to disk** before leaving.
 Do not use **Reload preview** to preserve a draft: that conflict-recovery action
 explicitly asks permission to discard the unsaved shape.
+
+### Large review saves
+
+Review saving sends only changed visibility/verification entries from the loaded
+view. A new choice made while the save is in flight remains unsaved and can be
+submitted next; default Blur does not become a training label. The backend still
+accepts older full-state payloads and skips rewriting already-matching choices.
+Reports are compact JSON encoded in batches, with the same temporary-file,
+flush/fsync and atomic-replace safeguards. File formatting is not annotation data.
+
+An explicit review save has a bounded 120-second allowance (other requests retain
+15 seconds). A slow-save message is not success: only the disk-confirmation message
+allows you to close/refresh or proceed to training/rendering. Success responses
+include `timings_ms` and `Server-Timing` for parse/load/apply/write, which can help
+separate slow storage/report processing from transfer time. This is not a promise
+that arbitrarily large reports or overloaded machines always finish in 120 seconds.
+
+When updating an already-open tab, keep it open and preserve its drafts. The old
+page can retry against the faster backend, but still has its old timeout until
+refreshed. Do not refresh after another unconfirmed save just to get the new UI.
