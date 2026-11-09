@@ -150,36 +150,53 @@ def apply_constraints(doc, constraints):
     return result
 
 
-def review_sample(doc, fraction=.1):
-    """Round-robin uncertainty sampling across tracks, with temporal separation."""
+def review_sample_details(doc, fraction=.1):
+    """Budget human review by object groups, not their per-frame sightings.
+
+    Use the same identity-before-track grouping as the review cards. Spread
+    the budget over chronological groups, taking the most uncertain group in
+    each batch and just one representative from it. Long tracks must not
+    consume more of the review budget.
+    Unknown tracks remain separate: matching appearance/boxes is not identity.
+    This only selects row indices; no rendering detections are removed/merged.
+    """
     if not math.isfinite(fraction) or not 0 < fraction <= 1:
         raise ValueError('Review fraction must be in (0, 1]')
-    rows=doc['detections']; groups={}
-    eligible=[(i,r) for i,r in enumerate(rows) if r.get('category')=='plate'
-              and not r.get('verified_label') and not r.get('zone_dropped')]
-    budget=max(1,math.ceil(len(eligible)*fraction)) if eligible else 0
-    for i,r in eligible:
-        track=r.get('track',-1)
-        group=('track',track) if track>=0 else ('row',i)
-        confidence=float(r.get('confidence',0))
-        priority=2*bool(r.get('learning_conflict') or r.get('fallback_reason')) + (1-abs(confidence-.5)*2)
-        groups.setdefault(group,[]).append((priority,i))
-    for values in groups.values(): values.sort(reverse=True)
-    ordered=sorted(groups.values(),key=lambda v:v[0][0],reverse=True)
-    picked=[];last={};fps=float(doc['render_state']['fps'])
-    while ordered and len(picked)<budget:
-        remaining=[]
-        for group in ordered:
-            while group:
-                _,i=group.pop(0);r=rows[i];key=r.get('track',-1)
-                t=float(r['t_start'])
-                if key>=0 and any(abs(t-old)<max(.5,1/fps) for old in last.get(key,[])):
-                    continue
-                picked.append(i);last.setdefault(key,[]).append(t);break
-            if group: remaining.append(group)
-            if len(picked)>=budget: break
-        ordered=remaining
-    return picked
+    groups, starts = {}, {}
+    for i, row in enumerate(doc['detections']):
+        if (row.get('category') != 'plate' or row.get('verified_label')
+                or row.get('zone_dropped')):
+            continue
+        person, track = row.get('person', -1), row.get('track', -1)
+        key = (('person', person) if person >= 0 else
+               ('track', track) if track >= 0 else ('row', i))
+        start = (float(row.get('t_start', 0)), i)
+        starts[key] = min(starts.get(key, start), start)
+        confidence = float(row.get('confidence', 0))
+        priority = (2 * bool(row.get('learning_conflict') or row.get('fallback_reason'))
+                    + (1 - abs(confidence - .5) * 2))
+        # Stable tie-break: repeated identical frames don't change which group
+        # wins or cause a different picture on every click of the sample button.
+        candidate = (priority, -i)
+        if key not in groups or candidate > groups[key]:
+            groups[key] = candidate
+    budget = math.ceil(len(groups) * fraction)
+    ordered = sorted(groups, key=starts.__getitem__)
+    indices = []
+    for slot in range(budget):
+        # At 10%, 100 groups become ten consecutive batches of ten groups.
+        # Balanced integer boundaries also handle short lists and other ratios.
+        batch = ordered[slot * len(ordered) // budget:
+                        (slot + 1) * len(ordered) // budget]
+        _, index = max(groups[key] for key in batch)
+        indices.append(-index)
+    return {'indices': indices, 'fraction': fraction, 'unit': 'finding_group',
+            'eligible_groups': len(groups), 'selected_groups': len(indices)}
+
+
+def review_sample(doc, fraction=.1):
+    """Compatibility API: one representative per selected finding group."""
+    return review_sample_details(doc, fraction)['indices']
 
 
 def decode_segment(outputs, shape, size, gain, left, top, threshold=.25):

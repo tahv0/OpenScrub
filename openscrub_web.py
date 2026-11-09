@@ -1227,10 +1227,10 @@ def job_learning_review(jid):
     job = JOBS.get(jid) or abort(404)
     try:
         fraction = float(request.args.get("fraction", ".1"))
-        indices = video_learning.review_sample(_load_job_report(job), fraction)
+        sample = video_learning.review_sample_details(_load_job_report(job), fraction)
     except (ValueError, TypeError) as error:
         return jsonify({"error": str(error)}), 400
-    return jsonify({"indices": indices, "fraction": fraction})
+    return jsonify(sample)
 
 
 def _load_job_report(job):
@@ -4287,6 +4287,7 @@ async function reviewUncertain(){
  try{
   const {data}=await reviewRequest(`api/jobs/${CUR}/learning/review?fraction=0.1`);
   LEARNING_SELECTION=new Set(data.indices);LEARNING_SELECTION_JOB=CUR;
+  LEARNING_SAMPLE_INFO=data;
   await loadReview();
  }catch(error){alert(error.message);}
 }
@@ -4316,6 +4317,7 @@ async function trainAndRescan(){
   await refresh();
  }catch(error){alert(error.message);}
 }
+let LEARNING_SAMPLE_INFO=null;
 let VLBL={},VLBLJOB=null;  // explicit human labels; never infer from default blur state
 async function loadReview(){
  if(!await flushPlateSaves())return;
@@ -4344,9 +4346,10 @@ async function loadReview(){
  Drag across cards to select several.</p>
  <div class="row" style="margin-bottom:10px">
   <button type="button" onclick="trainAndRescan()">Train &amp; rescan this video</button>
-  <button type="button" class="sec" onclick="reviewUncertain()">Review uncertain examples (10%)</button>
+  <button type="button" class="sec" onclick="reviewUncertain()">Review 10% of plate groups</button>
   ${LEARNING_SELECTION?'<button type="button" class="sec" onclick="reviewAllFindings()">Show all findings</button>':""}
  </div>
+ ${LEARNING_SELECTION?`<p id="reviewSampleSummary" class="review-copy" role="status">Showing ${LEARNING_SELECTION.size} of ${Number(LEARNING_SAMPLE_INFO?.eligible_groups)||LEARNING_SELECTION.size} unreviewed plate groups (10%). One representative image per group, not one per frame. Groups are spread across the video; the most uncertain in each batch is selected.</p>`:""}
  <p id="reviewSaveStatus" class="review-copy review-save-status" role="status" aria-live="polite">Review choices loaded from disk.</p>
  <p class="review-copy">Training uses saved corrections and the original detectors. It does not guarantee that undetected plates have been found. Review the output.</p>
  <p class="review-copy">Thumbnail rectangles are selection guides. Open shaped masks to inspect their coverage and exclusions.</p>
@@ -4379,24 +4382,21 @@ async function loadReview(){
  for(const[cat,rawItems] of Object.entries(groups)){
   // collapse dense tracks: one card per physical object, not per frame
   const byGroup={},items=[];
-  if(LEARNING_SELECTION){
-   for(const x of rawItems){
-    if(!LEARNING_SELECTION.has(x.i))continue;
-    TRKMEM[x.i]=x.track>=0?rawItems.filter(m=>m.track===x.track).map(m=>m.i):[x.i];
-    items.push(x);
-   }
-  }
-  for(const x of (LEARNING_SELECTION?[]:rawItems)){
+  // Group BEFORE filtering: a sampled card retains the entire track's span
+  // and decision membership instead of becoming an isolated per-frame card.
+  for(const x of rawItems){
    // identity first: one card per PERSON (all their tracks); then per
    // track; ungrouped detections stand alone
    const key=x.person>=0?("p"+x.person):(x.track>=0?("t"+x.track):null);
    if(key){(byGroup[key]=byGroup[key]||[]).push(x);}
-   else{TRKMEM[x.i]=[x.i];items.push(x);}
+   else if(!LEARNING_SELECTION||LEARNING_SELECTION.has(x.i)){TRKMEM[x.i]=[x.i];items.push(x);}
   }
   for(const [key,members] of Object.entries(byGroup)){
    members.sort((a,b)=>a.t_start-b.t_start);
-   let best=members[0];             // clearest thumbnail = highest-confidence
-   for(const m of members)if((m.confidence||0)>(best.confidence||0))best=m;
+   const sampled=LEARNING_SELECTION?members.find(m=>LEARNING_SELECTION.has(m.i)):null;
+   if(LEARNING_SELECTION&&!sampled)continue;
+   let best=sampled||members[0];     // use the sampler's representative frame
+   if(!sampled)for(const m of members)if((m.confidence||0)>(best.confidence||0))best=m;
    const rep={...best};
    rep.learning_conflict=members.some(m=>m.learning_conflict)?"Model disagreement — review this track":"";
    rep.t_start=members[0].t_start;

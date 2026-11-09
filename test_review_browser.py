@@ -293,7 +293,7 @@ def test_touch_corner_drag_autosaves(review_server):
 
 
 def sampled_track_page(page, url, report):
-    """Two displayed frames of one track, as in the 10% uncertainty view."""
+    """Even duplicate sampled indices must collapse into one track card."""
     doc = json.loads(report.read_text())
     doc['detections'][1]['track'] = 0
     doc['detections'][1]['frame_index'] = 301
@@ -305,10 +305,11 @@ def sampled_track_page(page, url, report):
     page.evaluate('''async()=>{ LEARNING_SELECTION=new Set([0,1]);
         LEARNING_SELECTION_JOB=CUR;await loadReview();}''')
     page.locator('#det0').scroll_into_view_if_needed()
-    page.wait_for_function('!!document.querySelector("#det0 img")._quadEdit && !!document.querySelector("#det1 img")._quadEdit')
+    page.wait_for_function('!!document.querySelector("#det0 img")._quadEdit')
+    assert page.locator("#review .det").count() == 1
 
 
-def test_not_plate_updates_every_visible_frame_of_same_track(review_server):
+def test_not_plate_updates_every_member_of_sampled_group(review_server):
     sync_api = pytest.importorskip('playwright.sync_api')
     url, report = review_server
     with sync_api.sync_playwright() as pw:
@@ -316,10 +317,11 @@ def test_not_plate_updates_every_visible_frame_of_same_track(review_server):
         page = browser.new_page(viewport={'width':1440,'height':1000})
         sampled_track_page(page, url, report)
         page.locator('#det0').get_by_role('button',name='✕ Not a plate',exact=True).click()
-        for i in (0,1):
-            card = page.locator('#det%d'%i)
-            assert card.locator('.det-status').inner_text() == 'Will stay visible'
-            assert card.get_by_role('button',name='Keep visible',exact=True).get_attribute('aria-pressed') == 'true'
+        card = page.locator('#det0')
+        assert card.locator('.det-status').inner_text() == 'Will stay visible'
+        assert card.get_by_role('button',name='Keep visible',exact=True).get_attribute('aria-pressed') == 'true'
+        assert page.evaluate('TRKMEM[0]') == [0, 1]
+        assert page.evaluate('[EN[0], EN[1]]') == [False, False]
         assert page.evaluate('saveAndRender(true)') is True
         assert all(not r['enabled'] for r in json.loads(report.read_text())['detections'][:2])
         browser.close()
@@ -351,13 +353,18 @@ def test_not_plate_cancels_failed_corner_draft_without_blocking_decision_save(re
         browser.close()
 
 
-def test_editing_second_sample_after_track_save_does_not_conflict(review_server):
+def test_editing_another_representative_after_track_save_does_not_conflict(review_server):
     sync_api=pytest.importorskip('playwright.sync_api')
     url,report=review_server
     with sync_api.sync_playwright() as pw:
         browser=browser_instance(pw);page=browser.new_page(viewport={'width':1440,'height':1000})
         sampled_track_page(page,url,report)
         for i in (0,1):
+            if i == 1:
+                # A later selection uses another frame, not two duplicate cards.
+                page.evaluate('async()=>{LEARNING_SELECTION=new Set([1]);await loadReview();}')
+                page.locator('#det1').scroll_into_view_if_needed()
+                page.wait_for_function('!!document.querySelector("#det1 img")._quadEdit')
             card=page.locator('#det%d'%i);card.scroll_into_view_if_needed()
             drag_corner(page,card)
             page.wait_for_function('(i)=>{const s=document.querySelector("#det"+i+" img")._quadEdit;return !s.dirty||s.error}',arg=i)
