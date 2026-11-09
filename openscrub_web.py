@@ -1257,6 +1257,45 @@ _REVIEW_FRAMES = OrderedDict()
 _REVIEW_PROBES = OrderedDict()
 _REVIEW_FRAME_BYTES = 64 * 1024 * 1024
 _REVIEW_TIMEOUT = 10
+# Only thumbnail readers share this snapshot. Writers always load independent
+# documents. Retain at most ONE report, with a 32 MiB serialized-size ceiling;
+# this is an input-size bound, not a claim about Python object memory usage.
+_REVIEW_REPORT_LOCK = threading.Lock()
+_REVIEW_REPORTS = OrderedDict()
+_REVIEW_REPORT_MAX_FILE_BYTES = 32 * 1024 * 1024
+
+
+def _preview_report_identity(path):
+    stat = os.stat(path)
+    return (path, stat.st_dev, stat.st_ino, stat.st_size,
+            stat.st_mtime_ns, stat.st_ctime_ns)
+
+
+def _load_preview_report(job):
+    """Read-only thumbnail snapshot, invalidated by every published report.
+
+    Serializing first readers avoids reparsing a large report three times in
+    parallel. Do not use this helper in any operation that mutates a report.
+    Cache publication is checked again after reading, including vault state.
+    """
+    path = os.path.realpath(os.path.join(job["dir"], "report.json"))
+    with _REVIEW_REPORT_LOCK:
+        identity = _preview_report_identity(path)
+        with _REVIEW_CACHE_LOCK:
+            if vault_locked():
+                abort(423)
+            cached = _REVIEW_REPORTS.get(identity)
+            if cached is not None:
+                return cached
+        doc = _load_job_report(job)
+        current = _preview_report_identity(path)
+        with _REVIEW_CACHE_LOCK:
+            if vault_locked():
+                abort(423)
+            if current == identity and identity[3] <= _REVIEW_REPORT_MAX_FILE_BYTES:
+                _REVIEW_REPORTS.clear()
+                _REVIEW_REPORTS[identity] = doc
+        return doc
 
 
 def _video_identity(path):
@@ -1351,12 +1390,14 @@ def _read_review_frame(path, index, exact=True):
             abort(422, description="Exact review needs a constant-frame-rate scan copy.")
         # Seek slightly before the target to avoid rounding it to the next frame.
         target = max(0.0, (index-.1) / info["fps"]) if exact else index
+        # PPM transports lossless pixels without compressing a full 4K PNG
+        # just to decode it again before extracting a small plate crop.
         result = _review_process([
             "ffmpeg", "-hide_banner", "-loglevel", "info", "-nostdin",
             "-threads", "1", "-filter_threads", "1", "-copyts", "-ss", "%.9f" % target,
             "-i", path, "-map", "0:v:0", "-an", "-sn",
             "-vf", "showinfo", "-frames:v", "1", "-vsync", "0",
-            "-threads", "1", "-f", "image2pipe", "-vcodec", "png", "pipe:1"])
+            "-threads", "1", "-f", "image2pipe", "-vcodec", "ppm", "pipe:1"])
         log = result.stderr.decode("utf-8", errors="replace")
         match = re.search(r"\bn:\s*0\s+pts:\s*(-?\d+)\s+pts_time:", log)
         timebase = re.search(r"config in time_base:\s*(\d+/\d+)", log)
@@ -1987,7 +2028,7 @@ def job_boxes_at(jid):
 @app.route("/api/jobs/<jid>/thumb/<int:i>")
 def job_thumb(jid, i):
     job = JOBS.get(jid) or abort(404)
-    doc = _load_job_report(job)
+    doc = _load_preview_report(job)
     if not (0 <= i < len(doc["detections"])):
         abort(404)
     cache_only = request.args.get("cache_only") == "1"
@@ -3769,6 +3810,7 @@ function clearReviewPreviews(){
  if(!REVIEW_MEDIA)return;
  const old=REVIEW_MEDIA;REVIEW_MEDIA=null;
  if(old.observer)old.observer.disconnect();
+ if(old.retryTimer)clearTimeout(old.retryTimer);
  old.controllers.forEach(c=>c.abort());
  [...old.queue.splice(0),...old.cacheQueue.splice(0)].forEach(task=>task.resolve(false));
  old.urls.forEach(url=>URL.revokeObjectURL(url));
@@ -3780,7 +3822,7 @@ function drawPlateThumbnail(img){
 function queueReviewPreview(img, priority=false){
  const state=REVIEW_MEDIA;
  if(!state||!img||!img.isConnected)return Promise.resolve(false);
- if(img._plateMeta&&img.naturalWidth)return Promise.resolve(true);
+ if((img._plateMeta||(!priority&&img._previewLoaded))&&img.naturalWidth)return Promise.resolve(true);
  if(img._previewTask){
   if(priority){
    img._previewTask.priority=true;
@@ -3804,7 +3846,7 @@ async function loadReviewPreview(state,task,cacheOnly){
  const card=img.closest(".det"),status=card.querySelector(".preview-status"),retry=card.querySelector(".preview-retry");
  if(status)status.textContent="Loading preview…";
  if(retry)retry.hidden=true;
- let missing=false,ok=false,url=null;
+ let missing=false,retryBusy=false,ok=false,url=null;
  try{
   const base=img.dataset.previewUrl;
   const target=cacheOnly?base+(base.includes("?")?"&":"?")+"cache_only=1":base;
@@ -3824,9 +3866,15 @@ async function loadReviewPreview(state,task,cacheOnly){
   if(REVIEW_MEDIA!==state||!img.isConnected)return;
   drawPlateThumbnail(img);
   if(status)status.textContent="";
-  ok=true;
+  ok=true;img._previewLoaded=true;
  }catch(error){
   if(REVIEW_MEDIA===state&&img.isConnected){
+   if(error.status===503&&(task.busyRetries||0)<2){
+    task.busyRetries=(task.busyRetries||0)+1;
+    task.readyAt=Date.now()+250*2**task.busyRetries;retryBusy=true;
+    if(status)status.textContent="Decoder busy — retrying preview…";
+    return;
+   }
    if(status)status.textContent=error.name==="AbortError"
     ?"Preview timed out. Retry when ready.":"Preview unavailable: "+error.message;
    if(retry)retry.hidden=false;
@@ -3834,37 +3882,57 @@ async function loadReviewPreview(state,task,cacheOnly){
  }finally{
   if(url){state.urls.delete(url);URL.revokeObjectURL(url);}
   state[counter]--;state.controllers.delete(ctl);
-  if(missing&&REVIEW_MEDIA===state&&img.isConnected){
-   if(status)status.textContent="Waiting to generate preview…";
-   if(task.priority)state.queue.unshift(task);else state.queue.push(task);
+  if((missing||retryBusy)&&REVIEW_MEDIA===state&&img.isConnected){
+   if(missing&&status)status.textContent="Waiting to generate preview…";
+   const queue=retryBusy&&cacheOnly?state.cacheQueue:state.queue;
+   if(task.priority)queue.unshift(task);else queue.push(task);
   }else{img._previewTask=null;task.resolve(ok);}
   pumpReviewPreviews(state);
  }
 }
+function reviewPreviewRank(task){
+ if(!task.img.isConnected)return Infinity;
+ if(task.priority)return -1;  // an explicit Retry must not be silently dropped
+ // Old non-layout harnesses / browsers without geometry retain FIFO behavior.
+ if(!task.img.getBoundingClientRect)return 0;
+ const r=task.img.getBoundingClientRect(),h=window.innerHeight||document.documentElement.clientHeight;
+ const distance=r.bottom<0?-r.bottom:r.top>h?r.top-h:0;
+ return distance>240?Infinity:distance;
+}
 function pumpReviewPreviews(state){
  if(REVIEW_MEDIA!==state)return;
- // Cheap cache reads overtake cold decoding without increasing the decoder
- // budget. No interval retries or unbounded worker/request queues.
+ if(state.retryTimer){clearTimeout(state.retryTimer);state.retryTimer=null;}
+ let wake=Infinity;
+ // Cache hits overtake cold decoding. Re-rank at dispatch, not when the card
+ // first entered view: scrolling must not leave minutes of obsolete work.
  for(const [queue,counter,limit,cached] of [
   [state.cacheQueue,"cacheActive",3,true],[state.queue,"active",1,false]]){
-  while(state[counter]<limit&&queue.length){
-   const task=queue.shift();
-   if(!task.img.isConnected){task.img._previewTask=null;task.resolve(false);continue;}
-   loadReviewPreview(state,task,cached);
+  const ranked=queue.splice(0).map(task=>({task,rank:reviewPreviewRank(task)}));
+  ranked.sort((a,b)=>a.rank-b.rank);
+  for(const {task,rank} of ranked){
+   if(rank===Infinity){task.img._previewTask=null;task.resolve(false);}
+   else queue.push(task);
   }
+  while(state[counter]<limit&&queue.length){
+   const n=queue.findIndex(task=>!task.readyAt||task.readyAt<=Date.now());
+   if(n<0)break;
+   loadReviewPreview(state,queue.splice(n,1)[0],cached);
+  }
+  for(const task of queue)if(task.readyAt>Date.now())wake=Math.min(wake,task.readyAt);
  }
+ if(Number.isFinite(wake))state.retryTimer=setTimeout(()=>pumpReviewPreviews(state),Math.max(1,wake-Date.now()));
 }
 function initReviewPreviews(){
  clearReviewPreviews();
- const state=REVIEW_MEDIA={queue:[],cacheQueue:[],active:0,cacheActive:0,
+ const state=REVIEW_MEDIA={queue:[],cacheQueue:[],active:0,cacheActive:0,retryTimer:null,
   controllers:new Set(),urls:new Set(),observer:null};
  const images=document.querySelectorAll("#review img[data-preview-url]");
  if(typeof IntersectionObserver!=="undefined"){
   state.observer=new IntersectionObserver(entries=>{
-   for(const e of entries)if(e.isIntersecting){
-    state.observer.unobserve(e.target);queueReviewPreview(e.target);
-   }
-  },{rootMargin:"120px"});images.forEach(img=>state.observer.observe(img));
+   for(const e of entries)if(e.isIntersecting)queueReviewPreview(e.target);
+   // Keep observing: skipped queued work is requested again on re-entry.
+   pumpReviewPreviews(state);
+  },{rootMargin:"240px"});images.forEach(img=>state.observer.observe(img));
  }else images.forEach(img=>queueReviewPreview(img));
 }
 function retryReviewPreview(button){
@@ -4919,6 +4987,7 @@ def _vault_lock_now():
             with _REVIEW_CACHE_LOCK:
                 _REVIEW_FRAMES.clear()
                 _REVIEW_PROBES.clear()
+                _REVIEW_REPORTS.clear()
                 # Cached crop readers do not take the decoder gate. Keep their
                 # cache gate held until encryption and the locked state agree.
                 n = vault.encrypt_tree(key, JOBS_DIR)
