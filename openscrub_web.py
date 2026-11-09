@@ -1766,6 +1766,22 @@ def _store_plate_preview(job, index, meta, pixels):
             os.unlink(temp)
 
 
+def _plate_frame_bounds(points, box, width, height):
+    """Polygon vertices may lie on the outer image edge, not just pixel centers.
+
+    Snap only the error from six-decimal box-relative storage. Real overflow
+    remains invalid; do not silently shrink a user's mask to fit the frame.
+    """
+    p = np.asarray(points, dtype=np.float64).copy()
+    limit = np.asarray([width, height], dtype=np.float64)
+    scale = np.abs(np.asarray([box[2]-box[0], box[3]-box[1]], dtype=np.float64))
+    tolerance = scale * 0.5e-6 + 1e-9
+    invalid = np.any((p < -tolerance) | (p > limit+tolerance), axis=1)
+    p = np.where((p < 0) & (p >= -tolerance), 0, p)
+    p = np.where((p > limit) & (p <= limit+tolerance), limit, p)
+    return p, (np.flatnonzero(invalid)+1).tolist()
+
+
 def _cached_plate_preview(job, index, key, source_key=None, points=None):
     """Read a valid published crop without occupying the video decoder.
 
@@ -1787,8 +1803,11 @@ def _cached_plate_preview(job, index, key, source_key=None, points=None):
                     # Retain the original crop only when the current shape fits.
                     # Old caches without source_token remain exact-hit-only.
                     x1, y1, x2, y2 = meta["crop"]
+                    if points is not None:
+                        points = _plate_frame_bounds(points, meta["box"],
+                            meta["width"], meta["height"])[0].tolist()
                     if not exact and (not points or not all(
-                            x1 <= x < x2 and y1 <= y < y2 for x, y in points)):
+                            x1 <= x <= x2 and y1 <= y <= y2 for x, y in points)):
                         return None
                     meta = dict(meta, preview_token=key)
                     if source_key is not None:
@@ -1837,6 +1856,7 @@ def _plate_preview(job, index, doc=None, cache_only=False):
         if frame is None:
             abort(404, description="Could not decode plate frame")
         h, w = frame.shape[:2]
+        points = _plate_frame_bounds(points, box, w, h)[0].tolist()
         crop = _plate_editor_crop(box, points, w, h)
         x1, y1, x2, y2 = crop
         meta = {"i": index, "t": tref, "frame": fidx, "width": w, "height": h,
@@ -1895,9 +1915,13 @@ def job_plate_quad(jid, i):
         if p.shape != (4, 2) or not np.isfinite(p).all():
             return jsonify({"error": "Invalid corner coordinates"}), 400
         h, w = meta["height"], meta["width"]
-        if (np.any(p[:, 0] < 0) or np.any(p[:, 0] >= w) or
-                np.any(p[:, 1] < 0) or np.any(p[:, 1] >= h)):
-            return jsonify({"error": "Corners must be inside the video frame"}), 400
+        p, invalid = _plate_frame_bounds(p, meta["box"], w, h)
+        if invalid:
+            details = "; ".join("corner %d (x=%.6f, y=%.6f)" %
+                                (k, p[k-1, 0], p[k-1, 1]) for k in invalid)
+            return jsonify({"error": "Corners must be inside the video frame: " + details +
+                            ". Allowed edges: x=0..%d, y=0..%d." % (w, h),
+                            "invalid_corners": invalid, "frame_size": [w, h]}), 400
         contour = p.astype(np.float32).reshape((-1, 1, 2))
         if not cv2.isContourConvex(contour) or cv2.contourArea(contour) < 8.0:
             return jsonify({"error": "Corners must form a convex quadrilateral"}), 400
@@ -1927,8 +1951,8 @@ def job_plate_quad(jid, i):
         x1, y1, x2, y2 = meta["crop"]
         # The inline editor constrains edits to its visible source crop. Older
         # clients may submit a wider polygon; decode once only for that case.
-        if (np.all(p[:, 0] >= x1) and np.all(p[:, 0] < x2) and
-                np.all(p[:, 1] >= y1) and np.all(p[:, 1] < y2)):
+        if (np.all(p[:, 0] >= x1) and np.all(p[:, 0] <= x2) and
+                np.all(p[:, 1] >= y1) and np.all(p[:, 1] <= y2)):
             _save_verified_plate_sample(job, pixels, p, i, meta["t"],
                                         origin=(x1, y1), sample_key=sample_key)
         else:
@@ -1955,7 +1979,8 @@ def job_plate_quad(jid, i):
         stop_review.atomic_report(os.path.join(job["dir"], "report.json"), doc)
         # Reuse the exact source pixels after saving; round-trip the stored
         # geometry/token so reopening doesn't fetch/decode the video again.
-        meta["points"] = [[box[0]+x*bw, box[1]+y*bh] for x, y in q]
+        meta["points"] = _plate_frame_bounds(
+            [[box[0]+x*bw, box[1]+y*bh] for x, y in q], box, w, h)[0].tolist()
         meta["preview_token"] = _plate_preview_key(job, i, d, doc["render_state"])[0]
         _store_plate_preview(job, i, meta, pixels)
         return jsonify({"ok": True, "applied": changed,
@@ -2690,7 +2715,10 @@ progress{width:100%;height:12px;accent-color:var(--acc)}
 .plate-outline{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;touch-action:none}
 .preview-status{display:block;font-size:11px;color:#94a3b8;margin:5px 0}
 .preview-retry[hidden],.quad-retry[hidden],#review [hidden]{display:none!important}
-.quad-status{display:block;min-height:2.5em;margin:4px 0;font-size:11px;color:#94a3b8}
+.quad-status{display:block;min-height:2.5em;margin:4px 0;font-size:11px;color:#94a3b8;overflow-wrap:anywhere}
+.det.corner-save-error{outline:2px solid #fbbf24;outline-offset:3px}
+#plateSaveIssues{border:1px solid #fbbf24;border-radius:6px;padding:8px;overflow-wrap:anywhere}
+#plateSaveIssues .row{margin-top:5px}
 .plate-outline:focus-visible{outline:2px solid #60a5fa;outline-offset:2px}
 
 .det.selected{outline:2px dashed #60a5fa;outline-offset:2px}
@@ -3799,9 +3827,9 @@ async function reviewRequest(url, options={}, type="json"){
  try{
   const response=await fetch(url,{...options,signal:ctl.signal});
   if(!response.ok){
-   let message="Server returned HTTP "+response.status;
-   try{const d=await response.json();message=d.error||message;}catch(_){}
-   const error=new Error(message);error.status=response.status;throw error;
+   let message="Server returned HTTP "+response.status,details=null;
+   try{details=await response.json();message=details.error||message;}catch(_){}
+   const error=new Error(message);error.status=response.status;error.details=details;throw error;
   }
   return {response,data:await response[type]()};
  }finally{clearTimeout(timer);if(parent)parent.removeEventListener("abort",abort);}
@@ -3971,9 +3999,39 @@ function plateUnloadGuard(){
  window.removeEventListener("beforeunload",plateUnloadWarning);
  if(plateEditsPending()||reviewChoicesPending())window.addEventListener("beforeunload",plateUnloadWarning);
 }
+function showUnsavedPlate(i){
+ const s=PLATE_EDITS.get(i);if(!s||s.job!==CUR)return;
+ // Reveal through the normal local filter; never reload/discard an editor.
+ if(typeof reviewAllFindings==="function")reviewAllFindings();
+ const card=s.card||document.getElementById("det"+i);if(!card)return;
+ for(let el=card;el&&el.id!=="review";el=el.parentElement){
+  el.hidden=false;if(el.tagName==="DETAILS")el.open=true;
+ }
+ card.scrollIntoView({block:"center"});s.draw();
+ if(s.cv)s.cv.focus({preventScroll:true});
+}
+function updatePlateSaveIssues(){
+ const panel=document.getElementById("plateSaveIssues");if(!panel)return;
+ const issues=[...PLATE_EDITS.values()].filter(s=>s.job===CUR&&s.dirty&&s.error);
+ panel.replaceChildren();panel.hidden=!issues.length;
+ if(!issues.length)return;
+ const title=document.createElement("strong");
+ title.textContent=issues.length+" unsaved corner adjustment"+(issues.length===1?"":"s")+". Your drafts are kept.";
+ panel.appendChild(title);
+ for(const s of issues){
+  const row=document.createElement("div");row.className="row";
+  const button=document.createElement("button");button.type="button";button.className="sec";
+  button.textContent="Show finding #"+s.i;button.onclick=()=>showUnsavedPlate(s.i);
+  const note=document.createElement("span");
+  note.textContent="Source frame "+s.meta.frame+" — "+s.error.message;
+  row.append(button,note);panel.appendChild(row);
+ }
+}
 function plateStatus(s,text,retry=false){
  s.status.textContent=text;s.retry.hidden=!retry;
  s.retry.textContent=s.conflict?"Reload preview":"Retry save";
+ if(s.card)s.card.classList.toggle("corner-save-error",!!(s.dirty&&s.error));
+ updatePlateSaveIssues();
 }
 function schedulePlateSaves(){
  clearTimeout(PLATE_TIMER);PLATE_TIMER=null;plateUnloadGuard();
@@ -4052,12 +4110,22 @@ function pumpPlateSaves(){
    if(!s.dirty&&CUR===s.job&&document.getElementById("beCv"))beRefresh();
   }catch(error){
    if(!s.dirty||(pending&&s.pending!==pending))return;
+   // 400 is validation BEFORE any write in this endpoint. Never keep its
+   // rejected coordinates as an idempotent retry. Timeouts/5xx are ambiguous
+   // and MUST retain the original ID/payload until acknowledged.
+   if(error.status===400){
+    s.pending=null;
+    if(pending&&s.version!==pending.version){
+     s.error=null;s.conflict=false;s.readyAt=0;
+     plateStatus(s,"Saving corrected corners…");return;
+    }
+   }
    if(error.status===503&&++s.failures<=3){
     s.pending=null; // Server explicitly refused this write before applying it.
     s.readyAt=Date.now()+1000*2**s.failures;plateStatus(s,"Waiting to save…");
    }else{
     s.error=error;s.conflict=error.status===409;
-    plateStatus(s,"Not saved — "+error.message,true);
+    s.draw();plateStatus(s,"Not saved — "+error.message,true);
    }
   }finally{PLATE_SAVE=null;schedulePlateSaves();}
  })();
@@ -4072,7 +4140,7 @@ async function flushPlateSaves(){
    await new Promise(resolve=>setTimeout(resolve,100));
  }
  const failed=[...PLATE_EDITS.values()].find(s=>s.dirty||s.pending||s.drag);
- if(failed){failed.status.scrollIntoView({block:"nearest"});return false;}
+ if(failed){showUnsavedPlate(failed.i);return false;}
  return true;
 }
 async function retryPlateSave(s){
@@ -4083,6 +4151,7 @@ async function retryPlateSave(s){
   if(QEDIT===s)QEDIT=null;schedulePlateSaves();
   await queueReviewPreview(s.img,true);return;
  }
+ if(s.error?.status===400)s.pending=null;
  s.error=null;s.failures=0;s.readyAt=0;
  plateStatus(s,"Saving…");schedulePlateSaves();
 }
@@ -4092,7 +4161,7 @@ function closePlateQuad(){
  for(const s of PLATE_EDITS.values()){
   s.events.abort();if(s.observer)s.observer.disconnect();delete s.img._quadEdit;
  }
- PLATE_EDITS.clear();QEDIT=null;plateUnloadGuard();return true;
+ PLATE_EDITS.clear();QEDIT=null;updatePlateSaveIssues();plateUnloadGuard();return true;
 }
 function initPlateCorners(img){
  const meta=img._plateMeta,card=img.closest(".det"),stage=img.closest(".plate-preview");
@@ -4116,16 +4185,24 @@ function initPlateCorners(img){
    if(k)x.lineTo(px,py);else x.moveTo(px,py);});
   x.closePath();x.strokeStyle=plateQuadValid(s.points)?"#4ade80":"#f87171";x.lineWidth=2;x.stroke();
   s.points.forEach((p,k)=>{const px=(p[0]-c[0])*sx,py=(p[1]-c[1])*sy;
-   x.beginPath();x.arc(px,py,8,0,Math.PI*2);x.fillStyle="#0f172a";x.fill();x.stroke();
-   x.fillStyle="#fff";x.font="bold 10px sans-serif";x.textAlign="center";x.fillText(String(k+1),px,py+3);
+   const hx=Math.max(9,Math.min(cv.width-9,px)),hy=Math.max(9,Math.min(cv.height-9,py));
+   const outside=p[0]<0||p[0]>s.meta.width||p[1]<0||p[1]>s.meta.height;
+   const rejected=(s.error?.details?.invalid_corners||[]).includes(k+1);
+   x.strokeStyle=outside||rejected?"#f87171":"#4ade80";
+   if(hx!==px||hy!==py){x.beginPath();x.moveTo(px,py);x.lineTo(hx,hy);x.stroke();}
+   x.beginPath();x.arc(hx,hy,8,0,Math.PI*2);x.fillStyle="#0f172a";x.fill();x.stroke();
+   x.fillStyle="#fff";x.font="bold 10px sans-serif";x.textAlign="center";x.fillText(String(k+1),hx,hy+3);
   });
  };
- function point(e){const r=cv.getBoundingClientRect(),c=s.displayCrop;
-  return [Math.max(c[0],Math.min(c[2]-1,c[0]+(e.clientX-r.left)/r.width*(c[2]-c[0]))),
-          Math.max(c[1],Math.min(c[3]-1,c[1]+(e.clientY-r.top)/r.height*(c[3]-c[1])))];}
- function nearest(e){const r=cv.getBoundingClientRect(),c=s.displayCrop,p=point(e);
+ function point(e){const r=cv.getBoundingClientRect(),c=s.displayCrop,o=s.drag?.offset||[0,0];
+  return [Math.max(c[0],Math.min(c[2],c[0]+(e.clientX-r.left)/r.width*(c[2]-c[0])-o[0])),
+          Math.max(c[1],Math.min(c[3],c[1]+(e.clientY-r.top)/r.height*(c[3]-c[1])-o[1]))];}
+ function nearest(e){const r=cv.getBoundingClientRect(),c=s.displayCrop;
   let index=-1,best=e.pointerType==="touch"?26:18;
-  s.points.forEach((v,k)=>{const distance=Math.hypot((v[0]-p[0])*r.width/(c[2]-c[0]),(v[1]-p[1])*r.height/(c[3]-c[1]));
+  s.points.forEach((v,k)=>{
+   const x=Math.max(9,Math.min(r.width-9,(v[0]-c[0])*r.width/(c[2]-c[0])));
+   const y=Math.max(9,Math.min(r.height-9,(v[1]-c[1])*r.height/(c[3]-c[1])));
+   const distance=Math.hypot(x-(e.clientX-r.left),y-(e.clientY-r.top));
    if(distance<best){index=k;best=distance;}});return index;}
  function finish(e,cancel=false){
   if(!s.drag||(e&&e.pointerId!==s.drag.id))return;
@@ -4138,7 +4215,12 @@ function initPlateCorners(img){
  cv.addEventListener("pointerdown",e=>{
   e.stopPropagation();if(e.button!==0||s.drag||PLATE_REVIEW_BUSY)return;
   const k=nearest(e);if(k<0)return;
-  e.preventDefault();QEDIT=s;s.selected=k;s.drag={id:e.pointerId,before:plateCopy(s.points)};
+  e.preventDefault();QEDIT=s;s.selected=k;
+  const at=point(e),p=s.points[k],c=s.displayCrop;
+  // The visible handle is inset at a crop edge. Preserve the true vertex
+  // offset so grabbing it does not jump/shrink a valid boundary mask.
+  const inside=p[0]>=c[0]&&p[0]<=c[2]&&p[1]>=c[1]&&p[1]<=c[3];
+  s.drag={id:e.pointerId,before:plateCopy(s.points),offset:inside?[at[0]-p[0],at[1]-p[1]]:[0,0]};
   cv.focus({preventScroll:true});cv.setPointerCapture(e.pointerId);plateUnloadGuard();
  },options);
  cv.addEventListener("pointermove",e=>{
@@ -4161,8 +4243,8 @@ function initPlateCorners(img){
    const delta={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]}[e.key];
    if(!delta)return;
    const p=s.points[s.selected],step=e.shiftKey?10:1;
-   s.points[s.selected]=[Math.max(c[0],Math.min(c[2]-1,p[0]+delta[0]*step)),
-                         Math.max(c[1],Math.min(c[3]-1,p[1]+delta[1]*step))];
+   s.points[s.selected]=[Math.max(c[0],Math.min(c[2],p[0]+delta[0]*step)),
+                         Math.max(c[1],Math.min(c[3],p[1]+delta[1]*step))];
   }
   e.preventDefault();commitPlateGesture(s,before);s.draw();
  },options);
@@ -4419,6 +4501,7 @@ async function loadReview(){
  </div>
  <p id="reviewSampleSummary" class="review-copy" role="status" hidden></p>
  <p id="reviewSaveStatus" class="review-copy review-save-status" role="status" aria-live="polite">Review choices loaded from disk.</p>
+ <div id="plateSaveIssues" class="review-copy" role="status" aria-live="polite" hidden></div>
  <p class="review-copy">Training uses saved corrections and the original detectors. It does not guarantee that undetected plates have been found. Review the output.</p>
  <p class="review-copy">Thumbnail rectangles are selection guides. Open shaped masks to inspect their coverage and exclusions.</p>
  <div class="row" style="margin:0 0 8px">
