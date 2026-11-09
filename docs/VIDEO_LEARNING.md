@@ -49,9 +49,15 @@ local segmentation checkpoint. Do not set either from untrusted HTTP input.
 
 1. Scan normally. Optionally use **Stop & Review** at a checkpoint, or let the
    scan finish. Both paused and completed reviews support learning.
-2. Use **Review uncertain examples (10%)** for a proposed subset, or review all.
-   The budget is 10% of eligible plate findings, prioritizing disagreement and
-   uncertain scores across tracks and excluding near-adjacent duplicate views.
+2. Use **Review 10% of plate groups** for a proposed subset, or review all.
+   Repeated frame sightings are grouped by detected object/track first. The
+   budget is 10% of those unreviewed groups (rounded up), with one representative
+   image per chosen group. For example, 10,000 frame sightings of 100 tracks
+   produce 10 review cards, not 1,000. Groups are spread along the timeline;
+   disagreements and uncertain scores determine which group/frame to show
+   within each batch. The card keeps the full track's time span and decisions
+   apply to its members. Sampling never deletes per-frame rendering data.
+   Untracked detections remain separate rather than guessing object identity.
    It can be smaller when too few distinct examples remain. This is not a claim
    that reviewing 10% proves the rest of the video is safe.
 3. Correct corners; they autosave. Explicitly label **Not a plate** examples.

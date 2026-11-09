@@ -73,8 +73,8 @@ def test_uncertainty_budget_not_adjacent_frame_duplicates():
     for i,r in enumerate(rows): r.update(track=i//10,confidence=.5,frame_index=i)
     doc=report(rows)
     picks=vl.review_sample(doc,.1)
-    assert len(picks)==10
-    assert len({rows[i]['track'] for i in picks})==10
+    assert len(picks)==1  # 10% of ten tracks, not 10% of 100 frame rows
+    assert len({rows[i]['track'] for i in picks})==1
     doc['detections'][picks[0]]['verified_label']='plate'
     assert picks[0] not in vl.review_sample(doc,.1)
 
