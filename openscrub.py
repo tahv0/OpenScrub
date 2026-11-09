@@ -82,7 +82,12 @@ class TesseractBackend(OcrBackend):
                     or RE_DATE.search(t)
                     or sum(ch.isdigit() for ch in s) >= 6)
         for i in range(len(data["text"])):
-            txt = data["text"][i].strip()
+            # Tesseract can render a printed ASCII hyphen as a Unicode dash.
+            # Canonicalize those separators before regex matching/verification;
+            # retain the word's original pixel box and confidence.
+            txt = data["text"][i].strip().translate(str.maketrans(
+                "\u2010\u2011\u2012\u2013\u2014\u2212", "------"))
+            txt = re.sub(r"(?<=\d)-{2,}(?=\d)", "-", txt)
             conf = float(data["conf"][i]) if data["conf"][i] not in ("-1", -1) else 0.0
             if not txt:
                 continue

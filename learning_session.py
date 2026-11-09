@@ -58,6 +58,85 @@ def _load(path,default=None):
     return json.loads(path.read_text(encoding='utf-8'))
 
 
+def _reconcile_reviewed_samples(store, rows, rs):
+    """Latest explicit labels revoke old evidence, without destroying its pixels.
+
+    Match by source frame and an unambiguous region, never by transient row ID.
+    Unmatched historical samples survive a rescan. Retired samples are excluded
+    from export, but a restored verified label can reuse its exact old polygon.
+    """
+    indexed = {}
+    for row in rows:
+        if row.get('category') == 'plate' and 'verified_label' in row:
+            frame = vl._frame(row, rs)
+            indexed.setdefault(frame, []).append((row, vl._screen_box(row, rs, frame)))
+
+    def match(frame, box):
+        candidates = [row for row, bounds in indexed.get(frame, [])
+                      if vl._iou(box, bounds) >= .5]
+        # Identical rows from duplicate proposals agree on the same source
+        # region. Only distinct judgments/geometry need human disambiguation.
+        signatures = {json.dumps([row.get('verified_label'),
+                       vl._screen_box(row, rs, frame), row.get('plate_quad')],
+                       sort_keys=True) for row in candidates}
+        if len(signatures) > 1:
+            raise ValueError('Ambiguous changed review labels at frame %d; '
+                             'resolve overlapping findings before training' % frame)
+        return candidates[0] if candidates else None
+
+    retired = store.setdefault('retired_samples', {})
+    samples = store['samples']
+    revoked_groups = set()
+    for sid, sample in list(samples.items()):
+        row = match(sample['frame'], sample['box'])
+        if row is None:
+            continue
+        label = row.get('verified_label')
+        expected = 'plate' if sample['label'] == 'positive' else 'not_plate'
+        if label != expected:
+            retired[sid] = samples.pop(sid)
+            if label != 'not_plate':
+                revoked_groups.add(sample['group'])
+
+    # Revoking an old rejection must also revoke its propagated suppression.
+    constraints = store.get('constraints') or {}
+    kept = []
+    for anchor in constraints.get('anchors', []):
+        row = match(anchor['frame'], anchor['box'])
+        if row is not None and row.get('verified_label') != anchor.get('label'):
+            if row.get('verified_label') != 'not_plate':
+                revoked_groups.add(anchor.get('group'))
+            continue
+        kept.append(anchor)
+    constraints['anchors'] = kept
+    constraints['negative_paths'] = [p for p in constraints.get('negative_paths', [])
+                                     if p['group'] not in revoked_groups]
+    store['constraints'] = constraints
+
+    for sid, sample in list(retired.items()):
+        row = match(sample['frame'], sample['box'])
+        expected = 'plate' if sample['label'] == 'positive' else 'not_plate'
+        if row is None or row.get('verified_label') != expected:
+            continue
+        if any(s['frame'] == sample['frame'] and vl._iou(s['box'], sample['box']) >= .5
+               for s in samples.values()):
+            continue  # Never resurrect an obsolete geometry over a new sample.
+        if sample['label'] == 'positive':
+            if not row.get('plate_quad'):
+                continue  # Confirmation alone cannot invent a polygon label.
+            # Recover the verified source coordinates from its crop transform.
+            b = np.asarray(sample['box'], dtype=np.float64)
+            base = np.asarray(sample['baseline_box'], dtype=np.float64)
+            size = (b[2:]-b[:2]) / (base[2:]-base[:2])
+            origin = b[:2]-base[:2]*size
+            verified = np.asarray(sample['points'], dtype=np.float64)*size+origin
+            current = np.asarray(vl._screen_box(row, rs, sample['frame']), dtype=np.float64)
+            points = np.asarray(row['plate_quad'], dtype=np.float64)*(current[2:]-current[:2])+current[:2]
+            if points.shape != (4,2) or not np.allclose(points, verified, rtol=0, atol=.01):
+                continue
+        samples[sid] = retired.pop(sid)
+
+
 def collect_feedback(job,doc,read_frame):
     """Migrate existing successful annotations, then accumulate source-bound data.
 
@@ -72,6 +151,7 @@ def collect_feedback(job,doc,read_frame):
     store=_load(root/'feedback.json',{'schema':1,'source_sha256':source,'samples':{},'imported_images':[],
                                     'constraints':None})
     if store['source_sha256']!=source:raise ValueError('Feedback source changed')
+    _reconcile_reviewed_samples(store, doc['detections'], doc['render_state'])
     current=vl.capture_constraints(doc)
     prior=(store.get('constraints') or {}).get('anchors',[])
     merged={a['id']:a for a in prior}
@@ -127,13 +207,15 @@ def collect_feedback(job,doc,read_frame):
         else:sid=uuid.uuid4().hex
         if label=='positive':
             # A newly drawn positive reverses an older rejection of that object.
-            store['samples']={k:s for k,s in store['samples'].items()
-                              if s['group']!=group or s['label']!='negative'}
+            for key,sample in list(store['samples'].items()):
+                if sample['group']==group and sample['label']=='negative':
+                    store['retired_samples'][key]=store['samples'].pop(key)
             current['negative_paths']=[p for p in current['negative_paths'] if p['group']!=group]
             current['anchors']=[a for a in current['anchors'] if a.get('group')!=group or a.get('label')!='not_plate']
         if label=='negative':
-            store['samples']={k:s for k,s in store['samples'].items()
-                              if s['group']!=group or s['label']!='positive'}
+            for key,sample in list(store['samples'].items()):
+                if sample['group']==group and sample['label']=='positive':
+                    store['retired_samples'][key]=store['samples'].pop(key)
         image=read_frame(frame)
         if image is None:raise ValueError('Cannot decode reviewed frame %d for training'%frame)
         bounds=list(box);screen_points=None
