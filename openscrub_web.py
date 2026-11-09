@@ -2183,9 +2183,24 @@ def job_save_edits(jid):
     if job["phase"] not in ("paused", "review", "done"):
         return jsonify({"error": "Review edits require a paused or "
                                  "finished scan"}), 409
+    started = time.perf_counter()
     edits = request.get_json(force=True)
+    parsed = time.perf_counter()
     path = os.path.join(job["dir"], "report.json")
     doc = _load_job_report(job)
+    loaded = time.perf_counter()
+    # Legacy tabs send all rows. A retry of already-published choices needs
+    # confirmation, not another expensive rewrite. Non-choice edits still use
+    # the full existing transaction (manual additions must never be skipped).
+    changed = bool(edits.get("manual") or edits.get("box_overrides") or
+                   edits.get("time_overrides") or "audio" in edits)
+    for key, enabled in (edits.get("enabled") or {}).items():
+        try:
+            i = int(key)
+        except (ValueError, TypeError):
+            continue
+        if 0 <= i < len(doc["detections"]):
+            changed |= doc["detections"][i].get("enabled", True) != bool(enabled)
     stop_meta = doc.get("stop_review") or {}
     cutoff = (stop_meta["next_frame"] / stop_meta["fps"]
               if stop_meta.get("state") == "paused" else None)
@@ -2207,7 +2222,9 @@ def job_save_edits(jid):
         if 0 <= i < len(doc["detections"]):
             d = doc["detections"][i]
             if d.get("category") == "plate" and label in ("plate", "not_plate", "clear"):
-                d["verified_label"] = "" if label == "clear" else label
+                normalized = "" if label == "clear" else label
+                changed |= d.get("verified_label", "") != normalized
+                d["verified_label"] = normalized
     _apply_detection_edits(doc, edits, cutoff=cutoff)
     rs = doc["render_state"]
     for m in edits.get("manual", []):
@@ -2233,7 +2250,10 @@ def job_save_edits(jid):
                       else "mute")}
             for s in (edits.get("audio") or [])
             if float(s.get("t1", 0)) > float(s.get("t0", 0)) >= 0]
-    stop_review.atomic_report(path, doc)
+    applied = time.perf_counter()
+    if changed:
+        stop_review.atomic_report(path, doc)
+    published = time.perf_counter()
     # suggest allowlisting any string whose EVERY instance was disabled —
     # the review just taught us it's a recurring false positive
     per = {}
@@ -2242,8 +2262,16 @@ def job_save_edits(jid):
             per.setdefault(d["text"], []).append(d.get("enabled", True))
     suggest = sorted(t for t, states in per.items()
                      if len(states) >= 2 and not any(states))
-    return jsonify({"ok": True, "total": len(doc["detections"]),
-                    "suggest_allowlist": suggest})
+    timings = dict(zip(("parse", "load", "apply", "write"),
+                       [round((b-a)*1000, 2) for a, b in
+                        ((started, parsed), (parsed, loaded),
+                         (loaded, applied), (applied, published))]))
+    response = jsonify({"ok": True, "total": len(doc["detections"]),
+                        "suggest_allowlist": suggest, "changed": bool(changed),
+                        "timings_ms": timings})
+    response.headers["Server-Timing"] = ", ".join(
+        "%s;dur=%.2f" % (stage, elapsed) for stage, elapsed in timings.items())
+    return response
 
 
 @app.route("/api/jobs/<jid>/track_object", methods=["POST"])
@@ -3820,12 +3848,13 @@ function beHook(){
 // and geometry; it never starts a second video/image request.
 let REVIEW_MEDIA=null;
 async function reviewRequest(url, options={}, type="json"){
- const ctl=new AbortController(),parent=options.signal;
+ const {timeoutMs=15000,...fetchOptions}=options;
+ const ctl=new AbortController(),parent=fetchOptions.signal;
  const abort=()=>ctl.abort();
  if(parent){if(parent.aborted)ctl.abort();else parent.addEventListener("abort",abort,{once:true});}
- const timer=setTimeout(abort,15000);
+ const timer=setTimeout(abort,timeoutMs);
  try{
-  const response=await fetch(url,{...options,signal:ctl.signal});
+  const response=await fetch(url,{...fetchOptions,signal:ctl.signal});
   if(!response.ok){
    let message="Server returned HTTP "+response.status,details=null;
    try{details=await response.json();message=details.error||message;}catch(_){}
@@ -4096,6 +4125,11 @@ function pumpPlateSaves(){
    const {data}=await reviewRequest("api/jobs/"+s.job+"/plate_quad/"+s.i,{method:"POST",
     headers:{"Content-Type":"application/json"},body:JSON.stringify(pending)});
    Object.assign(s.meta,data.preview);s.img._plateMeta=s.meta;
+   // The corner endpoint commits its own explicit label. Reflect that disk
+   // state even if a newer Blur/Keep/Not-a-plate choice superseded the gesture,
+   // so the next sparse choice save can clear or replace it correctly.
+   if(typeof REVIEW_BASE!=="undefined"&&REVIEW_BASE&&REVIEW_BASE.job===s.job&&data.applied>0)
+    REVIEW_BASE.labels[s.i]="plate";
    s.saved=plateCopy(s.meta.points);s.failures=0;
    syncPlateTrack(s);
    if(s.pending!==pending)return; // A newer Not-a-plate decision wins.
@@ -4469,6 +4503,19 @@ async function trainAndRescan(){
 }
 let LEARNING_SAMPLE_INFO=null;
 let VLBL={},VLBLJOB=null;  // explicit human labels; never infer from default blur state
+let REVIEW_BASE=null; // Only decision scalars, not a second detection report.
+function reviewChoiceDelta(){
+ const base=REVIEW_BASE&&REVIEW_BASE.job===CUR?REVIEW_BASE:null;
+ const enabled={},verified_labels={};
+ for(const [i,value] of Object.entries(EN)){
+  if(!base||base.enabled[i]!==value)enabled[i]=value;
+ }
+ for(const [i,value] of Object.entries(VLBL)){
+  const normalized=value==="clear"?"":value;
+  if(!base||(base.labels[i]||"")!==normalized)verified_labels[i]=value;
+ }
+ return {enabled,verified_labels};
+}
 async function loadReview(){
  if(!await flushPlateSaves())return;
  if(!closePlateQuad())return;
@@ -4485,7 +4532,10 @@ async function loadReview(){
  DUR=d.duration;
  if(LEARNING_SELECTION_JOB!==CUR)LEARNING_SELECTION=null;
  const groups={}; const zdrop=[]; TRKMEM={};
+ REVIEW_BASE={job,enabled:{},labels:{}};
  d.detections.forEach(x=>{
+  REVIEW_BASE.enabled[x.i]=x.enabled;
+  if(x.verified_label)REVIEW_BASE.labels[x.i]=x.verified_label;
   EN[x.i]=x.enabled;
   if(!(x.i in VLBL)&&x.verified_label)VLBL[x.i]=x.verified_label;
   if(x.zone_dropped){zdrop.push(x);return;}
@@ -4773,19 +4823,34 @@ async function persistReview(saveOnly=false,job=CUR,view=JOBVIEW,choicesOnly=fal
  }
  const manual=[...MAN,...BE.adds.map(a=>({t_start:a.t0,t_end:a.t1,
   t_ref:a.tref,screen_box:a.box}))];
- const revision=REVIEW_VERSION;
- const payload=choicesOnly?{enabled:EN,verified_labels:VLBL}:
-  {enabled:EN,manual,box_overrides:BE.ov,time_overrides:BE.times,verified_labels:VLBL};
+ const revision=REVIEW_VERSION,baseline=REVIEW_BASE;
+ const choices=reviewChoiceDelta();
+ const payload=choicesOnly?choices:
+  {...choices,manual,box_overrides:BE.ov,time_overrides:BE.times};
  // only send audio spans when the box editor actually loaded them —
  // otherwise a save from plain review would wipe stored spans with []
  if(!choicesOnly&&Array.isArray(BE.audio)&&BE.tlspans!==undefined)payload.audio=BE.audio;
  if(CUR!==job||JOBVIEW!==view)return false;
- const {data:r}=await reviewRequest(`api/jobs/${job}/detections`,{method:"POST",
-  headers:{"Content-Type":"application/json"},
-  body:JSON.stringify(payload)});
+ const slow=setTimeout(()=>{
+  if(CUR===job&&JOBVIEW===view&&REVIEW_BASE===baseline)
+   reviewSaveStatus("Still saving review to disk… Keep this tab open. Training/rendering will wait for confirmation.");
+ },5000);
+ let r;
+ try{
+  // A disk transaction may legitimately outlast a preview request. Bounded,
+  // save-only allowance; do not lengthen thumbnail/poll/network timeouts.
+  ({data:r}=await reviewRequest(`api/jobs/${job}/detections`,{method:"POST",
+   headers:{"Content-Type":"application/json"},timeoutMs:120000,
+   body:JSON.stringify(payload)}));
+ }finally{clearTimeout(slow);}
  // A delayed response belongs to its original review, never a newly opened job.
- if(CUR!==job||JOBVIEW!==view)return false;
+ if(CUR!==job||JOBVIEW!==view||REVIEW_BASE!==baseline)return false;
  if(!r||r.ok!==true)throw new Error("The server did not confirm saving the review");
+ if(baseline){
+  Object.assign(baseline.enabled,payload.enabled);
+  for(const [i,label] of Object.entries(payload.verified_labels))
+   baseline.labels[i]=label==="clear"?"":label;
+ }
  REVIEW_SAVED=revision;plateUnloadGuard();
  if(!choicesOnly){BE.adds=[];BE.ov={};BE.times={};}
  if(r.suggest_allowlist&&r.suggest_allowlist.length){

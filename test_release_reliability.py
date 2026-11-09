@@ -187,7 +187,11 @@ def test_switching_jobs_cannot_render_wrong_job_during_save(review_server, monke
 
 
 def test_decision_save_timeout_keeps_draft_and_allows_retry(review_server):
-    """Headers arrive, body stalls: the production 15-second deadline must apply."""
+    """Headers arrive, body stalls: the save-only deadline still bounds the body.
+
+    Accelerate only the 120s save timer; do not make the suite sleep two minutes.
+    The separate slow-save case crosses 15s with actual wall-clock waiting.
+    """
     url, report = review_server
     api = pytest.importorskip('playwright.sync_api')
     with api.sync_playwright() as pw:
@@ -201,10 +205,16 @@ def test_decision_save_timeout_keeps_draft_and_allows_retry(review_server):
               })};
             return window.__workingFetch(url,opts);
           };}''')
+        page.evaluate('''()=>{window.__realTimeout=window.setTimeout;window.__saveTimers=[];
+         window.setTimeout=(fn,ms,...args)=>{
+          if(ms===120000){__saveTimers.push(ms);return __realTimeout(fn,150,...args);}
+          return __realTimeout(fn,ms,...args);};}''')
         result = page.evaluate('''async()=>{const start=Date.now();
           return {ok:await saveAndRender(true),elapsed:Date.now()-start};}''')
         assert result['ok'] is False
-        assert 14000 <= result['elapsed'] < 22000, result
+        assert page.evaluate('__saveTimers')==[120000]
+        assert 120 <= result['elapsed'] < 5000, result
+        page.evaluate('window.setTimeout=window.__realTimeout')
         assert page.evaluate('PLATE_REVIEW_BUSY') is False
         assert page.locator('#det0 .det-status').inner_text() == 'Will stay visible'
         assert json.loads(report.read_text())['detections'][0]['enabled'] is True
