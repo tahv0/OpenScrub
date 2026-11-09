@@ -302,7 +302,7 @@ const assert=require('node:assert/strict');
 let QEDIT=null,requests=[],badImage=false,activeCache=0,maxCache=0,activeCold=0,maxCold=0;
 const images=Array.from({length:8},(_,i)=>({
  isConnected:true,naturalWidth:0,dataset:{previewUrl:'/thumb/'+i},src:'',
- closest(){return {querySelector(){return {textContent:'',hidden:false}}}},
+ closest(selector){if(selector==='[hidden]')return null;assert.equal(selector,'.det');return {querySelector(){return {textContent:'',hidden:false}}}},
  async decode(){this.naturalWidth=100;}
 }));
 const document={querySelectorAll(){return images}};
