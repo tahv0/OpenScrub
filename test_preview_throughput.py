@@ -225,7 +225,8 @@ def test_busy_retry_budget_and_teardown_are_bounded(cancel):
     script=r'''
 const assert=require('node:assert/strict');
 const img={isConnected:true,naturalWidth:0,dataset:{previewUrl:'/thumb/0'},src:'',
- closest(){return {querySelector(){return {textContent:'',hidden:false}}}}};
+ closest(selector){if(selector==='[hidden]')return null;assert.equal(selector,'.det');
+  return {querySelector(){return {textContent:'',hidden:false}}}}};
 const document={querySelectorAll(){return [img]}};let calls=0;
 ''' + helpers + r'''
 reviewRequest=async(url)=>{

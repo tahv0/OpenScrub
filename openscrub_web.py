@@ -2689,7 +2689,7 @@ progress{width:100%;height:12px;accent-color:var(--acc)}
 .plate-preview img{display:block;width:100%;min-height:90px;object-fit:contain}
 .plate-outline{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;touch-action:none}
 .preview-status{display:block;font-size:11px;color:#94a3b8;margin:5px 0}
-.preview-retry[hidden],.quad-retry[hidden]{display:none!important}
+.preview-retry[hidden],.quad-retry[hidden],#review [hidden]{display:none!important}
 .quad-status{display:block;min-height:2.5em;margin:4px 0;font-size:11px;color:#94a3b8}
 .plate-outline:focus-visible{outline:2px solid #60a5fa;outline-offset:2px}
 
@@ -3891,7 +3891,7 @@ async function loadReviewPreview(state,task,cacheOnly){
  }
 }
 function reviewPreviewRank(task){
- if(!task.img.isConnected)return Infinity;
+ if(!task.img.isConnected||task.img.closest?.("[hidden]"))return Infinity;
  if(task.priority)return -1;  // an explicit Retry must not be silently dropped
  // Old non-layout harnesses / browsers without geometry retain FIFO behavior.
  if(!task.img.getBoundingClientRect)return 0;
@@ -4282,18 +4282,86 @@ function plateFallbackText(x){
  return prefix+": "+labels.join(", ");
 }
 let LEARNING_SELECTION=null,LEARNING_SELECTION_JOB=null,LEARNING_TERMS=false;
-async function reviewUncertain(){
- if(!await saveAndRender(true))return;
- try{
-  const {data}=await reviewRequest(`api/jobs/${CUR}/learning/review?fraction=0.1`);
-  LEARNING_SELECTION=new Set(data.indices);LEARNING_SELECTION_JOB=CUR;
-  LEARNING_SAMPLE_INFO=data;
-  await loadReview();
- }catch(error){alert(error.message);}
+function sampleReviewGroups(rows,fraction=.1,labels={}){
+ // Same grouping/quota as video_learning.review_sample_details. Work from
+ // already loaded metadata and current draft labels, never save to filter.
+ if(!Number.isFinite(fraction)||fraction<=0||fraction>1)throw new Error("Review fraction must be in (0, 1]");
+ const groups=new Map();
+ for(const row of rows){
+  const label=Object.prototype.hasOwnProperty.call(labels,row.i)?labels[row.i]:row.verified_label;
+  if(row.category!=="plate"||row.zone_dropped||(label&&label!=="clear"))continue;
+  const person=row.person??-1,track=row.track??-1;
+  const key=person>=0?"p"+person:track>=0?"t"+track:"r"+row.i;
+  const t=Number(row.t_start||0),confidence=Number(row.confidence||0);
+  const score=2*!!(row.learning_conflict||row.fallback_reason)+(1-Math.abs(confidence-.5)*2);
+  const g=groups.get(key);
+  if(!g)groups.set(key,{start:t,first:row.i,score,index:row.i});
+  else{
+   if(t<g.start||(t===g.start&&row.i<g.first)){g.start=t;g.first=row.i;}
+   if(score>g.score||(score===g.score&&row.i<g.index)){g.score=score;g.index=row.i;}
+  }
+ }
+ const ordered=[...groups.values()].sort((a,b)=>a.start-b.start||a.first-b.first);
+ const budget=Math.ceil(ordered.length*fraction),indices=[];
+ for(let slot=0;slot<budget;slot++){
+  const start=Math.floor(slot*ordered.length/budget),end=Math.floor((slot+1)*ordered.length/budget);
+  let best=ordered[start];
+  for(let k=start+1;k<end;k++){
+   const g=ordered[k];if(g.score>best.score||(g.score===best.score&&g.index<best.index))best=g;
+  }
+  indices.push(best.index);
+ }
+ return {indices,fraction,unit:"finding_group",eligible_groups:groups.size,selected_groups:indices.length};
 }
-async function reviewAllFindings(){
- if(!await saveAndRender(true))return;
- LEARNING_SELECTION=null;await loadReview();
+function applyReviewGroupFilter(){
+ const panel=document.getElementById("review");
+ if(!panel||panel._sampleJob!==CUR||panel._sampleView!==JOBVIEW)return false;
+ clearSel();
+ const selected=LEARNING_SELECTION;
+ let shown=0;
+ panel.querySelectorAll(".det").forEach(card=>{
+  const i=Number(card.id.slice(3));
+  card.hidden=!!selected&&(card.dataset.cat!=="plate"||!(TRKMEM[i]||[i]).some(m=>selected.has(m)));
+  if(!card.hidden)shown++;
+ });
+ panel.querySelectorAll("[data-review-category]").forEach(grid=>{
+  const count=grid.querySelectorAll(".det:not([hidden])").length;
+  grid.hidden=count===0;
+  const heading=grid.previousElementSibling;heading.hidden=count===0;
+  heading.querySelector(".badge").textContent=count;
+ });
+ const zones=panel.querySelector("#reviewZones");if(zones)zones.hidden=!!selected;
+ const all=panel.querySelector("#reviewShowAll");if(all)all.hidden=!selected;
+ const summary=panel.querySelector("#reviewSampleSummary");
+ if(summary){
+  summary.hidden=!selected;
+  if(selected){
+   const total=LEARNING_SAMPLE_INFO?.eligible_groups??selected.size;
+   summary.textContent="Showing "+shown+" of "+total+" unreviewed plate groups (10%). "+
+    "One representative image per group, not one per frame. Groups are spread across the video; "+
+    "the most uncertain in each batch is selected. This only filters the view; unsaved edits are kept.";
+  }
+ }
+ // Keep existing images/editors and autosaves alive. Drop hidden queued images
+ // without aborting unrelated requests or decoding every preview again.
+ if(REVIEW_MEDIA)pumpReviewPreviews(REVIEW_MEDIA);
+ return true;
+}
+function reviewUncertain(){
+ const panel=document.getElementById("review");
+ if(!panel||panel._sampleJob!==CUR||panel._sampleView!==JOBVIEW||!panel._sampleRows){
+  reviewSaveStatus("Open the review before selecting a sample.",true);return false;
+ }
+ if([...PLATE_EDITS.values()].some(s=>s.drag)){
+  reviewSaveStatus("Finish dragging the corner before changing the view.",true);return false;
+ }
+ const data=sampleReviewGroups(panel._sampleRows,.1,VLBL);
+ LEARNING_SELECTION=new Set(data.indices);LEARNING_SELECTION_JOB=CUR;LEARNING_SAMPLE_INFO=data;
+ return applyReviewGroupFilter();
+}
+function reviewAllFindings(){
+ LEARNING_SELECTION=null;
+ return applyReviewGroupFilter();
 }
 async function rollbackLearning(){
  if(!await saveAndRender(true))return;
@@ -4347,9 +4415,9 @@ async function loadReview(){
  <div class="row" style="margin-bottom:10px">
   <button type="button" onclick="trainAndRescan()">Train &amp; rescan this video</button>
   <button type="button" class="sec" onclick="reviewUncertain()">Review 10% of plate groups</button>
-  ${LEARNING_SELECTION?'<button type="button" class="sec" onclick="reviewAllFindings()">Show all findings</button>':""}
+  <button type="button" id="reviewShowAll" class="sec" hidden onclick="reviewAllFindings()">Show all findings</button>
  </div>
- ${LEARNING_SELECTION?`<p id="reviewSampleSummary" class="review-copy" role="status">Showing ${LEARNING_SELECTION.size} of ${Number(LEARNING_SAMPLE_INFO?.eligible_groups)||LEARNING_SELECTION.size} unreviewed plate groups (10%). One representative image per group, not one per frame. Groups are spread across the video; the most uncertain in each batch is selected.</p>`:""}
+ <p id="reviewSampleSummary" class="review-copy" role="status" hidden></p>
  <p id="reviewSaveStatus" class="review-copy review-save-status" role="status" aria-live="polite">Review choices loaded from disk.</p>
  <p class="review-copy">Training uses saved corrections and the original detectors. It does not guarantee that undetected plates have been found. Review the output.</p>
  <p class="review-copy">Thumbnail rectangles are selection guides. Open shaped masks to inspect their coverage and exclusions.</p>
@@ -4359,7 +4427,7 @@ async function loadReview(){
  <div id="beslot"></div>
  <div id="detwrap" style="position:relative;user-select:none">`;
  if(zdrop.length){
-  html+=`<details style="margin:4px 0 10px;border:1px dashed #f59e0b;border-radius:9px;padding:8px 10px;background:#26200a">
+  html+=`<details id="reviewZones" style="margin:4px 0 10px;border:1px dashed #f59e0b;border-radius:9px;padding:8px 10px;background:#26200a">
    <summary style="cursor:pointer;color:#fbbf24;font-weight:600">
     ⚠ ${zdrop.length} detection(s) outside your zones — NOT blurred
     (mostly logos/labels by design; open only if something real was zoned out)
@@ -4389,12 +4457,11 @@ async function loadReview(){
    // track; ungrouped detections stand alone
    const key=x.person>=0?("p"+x.person):(x.track>=0?("t"+x.track):null);
    if(key){(byGroup[key]=byGroup[key]||[]).push(x);}
-   else if(!LEARNING_SELECTION||LEARNING_SELECTION.has(x.i)){TRKMEM[x.i]=[x.i];items.push(x);}
+   else{TRKMEM[x.i]=[x.i];items.push(x);}
   }
   for(const [key,members] of Object.entries(byGroup)){
    members.sort((a,b)=>a.t_start-b.t_start);
    const sampled=LEARNING_SELECTION?members.find(m=>LEARNING_SELECTION.has(m.i)):null;
-   if(LEARNING_SELECTION&&!sampled)continue;
    let best=sampled||members[0];     // use the sampler's representative frame
    if(!sampled)for(const m of members)if((m.confidence||0)>(best.confidence||0))best=m;
    const rep={...best};
@@ -4415,7 +4482,7 @@ async function loadReview(){
    <button class="sec" style="padding:3px 8px;font-size:12px"
     onclick="setAll('${cat}',true)">Blur all</button>
    <button class="sec" style="padding:3px 8px;font-size:12px"
-    onclick="setAll('${cat}',false)">Keep all visible</button></h3><div class="grid3">`;
+    onclick="setAll('${cat}',false)">Keep all visible</button></h3><div class="grid3" data-review-category="${cat}">`;
   for(const x of items){
    html+=`<div class="det ${EN[x.i]?'':'off'}" id="det${x.i}" data-cat="${cat}">
     <div class="${x.category==="plate"?"plate-preview":"finding-preview"}">
@@ -4446,6 +4513,16 @@ async function loadReview(){
   add-region tool</span></div></div>`;
  const old=document.getElementById("review"); if(old)old.remove();
  detail.insertAdjacentHTML("beforeend",html);
+ // Bind the snapshot to this panel/view; removing it releases the metadata.
+ const panel=document.getElementById("review");
+ if(panel){
+  panel._sampleRows=d.detections.filter(x=>x.category==="plate"&&!x.zone_dropped).map(x=>({
+   i:x.i,category:"plate",person:x.person,track:x.track,t_start:x.t_start,
+   confidence:x.confidence,verified_label:x.verified_label,
+   learning_conflict:!!x.learning_conflict,fallback_reason:!!x.fallback_reason}));
+  panel._sampleJob=job;panel._sampleView=view;
+ }
+ if(LEARNING_SELECTION)applyReviewGroupFilter();
  initMarquee();initReviewPreviews();
 }
 
@@ -4487,7 +4564,7 @@ function applyDet(i,blur,preserveLabel=false){
  markReviewChanged();
  if(document.getElementById("beCv")){beRefresh();}
 }
-function setAll(cat,on){document.querySelectorAll(`.det[data-cat=${cat}]`)
+function setAll(cat,on){document.querySelectorAll(`.det[data-cat=${cat}]:not([hidden])`)
  .forEach(el=>applyDet(+el.id.slice(3),on));}
 function thumbRetry(img){
  const n=+(img.dataset.r||0);
@@ -4496,7 +4573,7 @@ function thumbRetry(img){
  setTimeout(()=>{img.src=img.src.split("?r=")[0]+"?r="+Date.now();},
             600*(n+1));
 }
-function setAllZd(on){document.querySelectorAll(`.det[data-cat=zdrop]`)
+function setAllZd(on){document.querySelectorAll(`.det[data-cat=zdrop]:not([hidden])`)
  .forEach(el=>applyDet(+el.id.slice(3),on));}
 
 let selSet=new Set(),marqEl=null,menuEl=null,mStart=null;
@@ -4530,7 +4607,7 @@ function initMarquee(){
    const r=marqEl.getBoundingClientRect();
    marqEl.remove();marqEl=null;
    if(r.width<8&&r.height<8)return;          // just a click — not a drag
-   document.querySelectorAll("#detwrap .det").forEach(t=>{
+   document.querySelectorAll("#detwrap .det:not([hidden])").forEach(t=>{
     const b=t.getBoundingClientRect();
     if(b.left<r.right&&b.right>r.left&&b.top<r.bottom&&b.bottom>r.top){
      selSet.add(+t.id.slice(3));t.classList.add("selected");}});

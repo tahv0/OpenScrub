@@ -54,9 +54,16 @@ local segmentation checkpoint. Do not set either from untrusted HTTP input.
    budget is 10% of those unreviewed groups (rounded up), with one representative
    image per chosen group. For example, 10,000 frame sightings of 100 tracks
    produce 10 review cards, not 1,000. Groups are spread along the timeline;
-   disagreements and uncertain scores determine which group/frame to show
+   disagreements and uncertain scores determine which group to include
    within each batch. The card keeps the full track's time span and decisions
    apply to its members. Sampling never deletes per-frame rendering data.
+   Switching between the sample and **Show all findings** is a local view filter:
+   it does not save the review, fetch the report again, or wait for corner saves.
+   Group ranking considers all loaded unreviewed members and current draft labels;
+   each chosen group keeps its displayed representative image and corner editor.
+   Unsaved decisions, pending/failed corner adjustments and existing images survive
+   either switch. Use the explicit save confirmation before refreshing, or
+   **Train & rescan** to save and begin learning. Changing the view is not a save.
    Untracked detections remain separate rather than guessing object identity.
    It can be smaller when too few distinct examples remain. This is not a claim
    that reviewing 10% proves the rest of the video is safe.

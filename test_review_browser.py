@@ -306,7 +306,7 @@ def sampled_track_page(page, url, report):
         LEARNING_SELECTION_JOB=CUR;await loadReview();}''')
     page.locator('#det0').scroll_into_view_if_needed()
     page.wait_for_function('!!document.querySelector("#det0 img")._quadEdit')
-    assert page.locator("#review .det").count() == 1
+    assert page.locator("#review .det:visible").count() == 1
 
 
 def test_not_plate_updates_every_member_of_sampled_group(review_server):

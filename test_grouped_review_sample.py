@@ -134,14 +134,14 @@ def test_human_sample_shows_ten_groups_not_hundreds_of_frames(review_server, wid
         assert page.title() == 'OpenScrub'
         page.get_by_role('link', name='Synthetic review fixture', exact=True).click()
         page.locator('#review').wait_for()
-        assert page.locator('#review .det').count() == 100
+        assert page.locator('#review .det:visible').count() == 100
         page.get_by_role('button', name='Review 10% of plate groups', exact=True).click()
         page.get_by_role('button', name='Show all findings', exact=True).wait_for()
-        assert page.locator('#review .det').count() == 10
+        assert page.locator('#review .det:visible').count() == 10
         assert '10 of 100' in page.locator('#reviewSampleSummary').inner_text()
         assert 'group' in page.locator('#reviewSampleSummary').inner_text()
         assert len(page.evaluate('Object.keys(EN)')) == 10000
-        cards = page.locator('#review .det')
+        cards = page.locator('#review .det:visible')
         card = cards.first
         index = int(card.get_attribute('id')[3:])
         members = page.evaluate('(i)=>TRKMEM[i]', index)
