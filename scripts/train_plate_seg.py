@@ -194,8 +194,12 @@ def validate_dataset(dataset, min_train_positive=12, min_val_positive=4,
 def _cuda_info(device):
     try:
         import torch
-    except ImportError as exc:
-        raise RuntimeError("Install a CUDA-enabled PyTorch build first") from exc
+    except (ImportError, OSError) as exc:
+        raise RuntimeError(
+            "Cannot import PyTorch using %s: %s: %s. "
+            "Check the training environment and conflicting CUDA libraries; "
+            "this does not necessarily mean PyTorch is missing."
+            % (sys.executable, type(exc).__name__, exc)) from exc
     if not torch.cuda.is_available() or not torch.version.cuda:
         raise RuntimeError("CUDA unavailable: a CUDA-capable PyTorch build "
                            "and NVIDIA driver are required; CPU fallback is forbidden")
@@ -203,6 +207,19 @@ def _cuda_info(device):
         raise RuntimeError("CUDA device %d is not available" % device)
     return {"torch": torch.__version__, "cuda": torch.version.cuda,
             "gpu": torch.cuda.get_device_name(device)}
+
+
+def training_environment(device=0):
+    """Same script/import order as train, without reading a dataset or weights."""
+    cuda = _cuda_info(device)
+    try:
+        import ultralytics
+        import onnx
+        import onnxruntime
+    except (ImportError, OSError) as exc:
+        raise RuntimeError("Training dependency import failed using %s: %s: %s"
+                           % (sys.executable, type(exc).__name__, exc)) from exc
+    return {"python": sys.executable, "isolated": bool(sys.flags.isolated), **cuda}
 
 
 def _metrics(model, dataset_yaml, device, project):
@@ -409,6 +426,8 @@ def train(args, report):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
+    environment = commands.add_parser("preflight", help="check this trainer's CUDA environment without training")
+    environment.add_argument("--device", type=int, default=0)
     check = commands.add_parser("check", help="validate PR #5 segment dataset")
     train_cmd = commands.add_parser("train", help="CUDA train, validate, export")
     for sub in (check, train_cmd):
@@ -433,7 +452,9 @@ def main(argv=None):
     commands.choices["verify"].add_argument("--version", required=True)
     args = parser.parse_args(argv)
     try:
-        if args.command in ("check", "train"):
+        if args.command == "preflight":
+            print(json.dumps(training_environment(args.device), indent=2))
+        elif args.command in ("check", "train"):
             if (args.min_train_positive < 1 or args.min_val_positive < 1 or
                     args.min_negative_per_split < 0):
                 raise DataError("Sample requirements must be nonnegative; "
