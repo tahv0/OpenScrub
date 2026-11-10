@@ -222,8 +222,12 @@ def training_environment(device=0):
     return {"python": sys.executable, "isolated": bool(sys.flags.isolated), **cuda}
 
 
-def _metrics(model, dataset_yaml, device, project):
+def _metrics(model, dataset_yaml, device, project, *, workers=0, batch=8, imgsz=640):
+    # Reloading best.pt does not retain all training loader settings. Explicitly
+    # preserve the caller's budget: GPU validation defaults otherwise spawn
+    # workers and exchange tensors via /dev/shm, even after workers=0 training.
     results = model.val(data=str(dataset_yaml), split="val", device=device,
+                        workers=workers, batch=batch, imgsz=imgsz, cache=False,
                         project=str(project), name="validation", exist_ok=True,
                         plots=False, verbose=False)
     seg = getattr(results, "seg", None)
@@ -359,7 +363,8 @@ def train(args, report):
             if not best.is_file():
                 raise RuntimeError("Training did not produce best.pt")
             trained = YOLO(str(best))
-            results = _metrics(trained, data_config, args.device, stage)
+            results = _metrics(trained, data_config, args.device, stage,
+                               workers=args.workers, batch=args.batch, imgsz=args.imgsz)
             if results["mask_map50"] < args.min_mask_map50:
                 raise RuntimeError("Validation mask mAP50 %.3f below "
                                    "required %.3f: candidate rejected" %

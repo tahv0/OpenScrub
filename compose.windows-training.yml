@@ -2,6 +2,9 @@
 # Reuse the same data/media mounts. No GPU or Docker socket exposed to HTTP.
 services:
   openscrub:
+    # Bounded private IPC headroom; not GPU VRAM or a disk reservation.
+    # Web training and standalone validation still use workers=0.
+    shm_size: "1gb"
     build:
       args:
         OPENSCRUB_ENABLE_TRAINING: "1"
