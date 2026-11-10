@@ -457,6 +457,14 @@ def trainer_script():
     raise ValueError('Training script was not packaged in this installation')
 
 
+def _training_command(script, *arguments):
+    # A wheel-installed trainer lives beside the WEB SERVER's dependencies.
+    # Do not put that directory (or PYTHONPATH/user site) on the training path.
+    # -I ignores PYTHONUNBUFFERED too, so -u is explicit for live epoch logs.
+    return [os.environ.get('OPENSCRUB_TRAIN_PYTHON', sys.executable),
+            '-I', '-u', str(script), *arguments]
+
+
 def preflight():
     python=os.environ.get('OPENSCRUB_TRAIN_PYTHON',sys.executable)
     weights=os.environ.get('OPENSCRUB_TRAIN_WEIGHTS','')
@@ -465,8 +473,7 @@ def preflight():
         problems.append('Set OPENSCRUB_TRAIN_WEIGHTS to a trusted local single-class-compatible segmentation .pt checkpoint.')
     script=trainer_script()
     try:
-        check=subprocess.run([python,'-c',
-            'import torch,ultralytics,onnx,onnxruntime; assert torch.cuda.is_available(), "CUDA unavailable"; print(torch.cuda.get_device_name(0))'],
+        check=subprocess.run(_training_command(script, 'preflight'),
             capture_output=True,text=True,timeout=30)
         if check.returncode:problems.append('Training environment is not ready: '+(check.stderr.strip().splitlines() or ['unknown import failure'])[-1])
     except (OSError,subprocess.TimeoutExpired) as e:problems.append('Training Python cannot run: '+str(e))
@@ -474,10 +481,10 @@ def preflight():
 
 
 def run_training(dataset,versions,weights,job,settings):
-    command=[os.environ.get('OPENSCRUB_TRAIN_PYTHON',sys.executable),str(trainer_script()),
+    command=_training_command(trainer_script(),
         'train','--dataset',str(dataset),'--weights',str(weights),'--versions-dir',str(versions),
         '--device','0','--epochs',str(settings.get('epochs',40)),'--batch',str(settings.get('batch',8)),
-        '--workers','0','--accept-ultralytics-license']
+        '--workers','0','--accept-ultralytics-license')
     private_dir(versions)
     logfile=Path(versions).parent/'training.log'
     with open(logfile,'w',encoding='utf-8') as log:
