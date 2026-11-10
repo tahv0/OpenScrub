@@ -262,3 +262,29 @@ This change does not add resume-from-failed-validation support. A new web
 learning attempt can reuse saved feedback but trains a new candidate; it does
 not automatically resume an unpublished `best.pt`. Previous reviewed output
 is retained until the entire learning pass succeeds.
+
+### Near-duplicate training/validation crops
+
+The connected exporter groups visually near-identical crops before assigning a
+split, using the same 64-bit difference-hash distance (at most two bits) as the
+trainer's independent leakage check. A whole track remains together, including
+transitive image-similarity links and links through exact duplicates omitted
+from the snapshot. The saved human labels and source crops are not deleted or
+changed. Similarity links apply across plate and explicit-negative labels too.
+
+A component touching a training group goes to training; a validation-only
+component stays held out. Accepted passes record cumulative training groups so
+removing a bridging example cannot later turn a previously trained group into a
+validation example when fine-tuning the accepted weights. Older accepted passes
+seed this history from their saved dataset manifest; retain those pass folders.
+Missing or invalid history refuses further learning rather than guessing.
+
+The log reports the resulting plate/negative counts in each split. There may be
+fewer independent validation examples after grouping: the existing minimum-count
+and near-duplicate checks still run, and no redaction acceptance gate is loosened.
+A similarity-hash match is conservative, not proof that two scenes are identical.
+
+After installing this exporter fix, retry Train & rescan on the same saved job.
+Do not delete the PNG named by the error, change labels to game the split, or
+reinstall CUDA. The saved feedback is reused, but a new dataset snapshot is built;
+this is not resume-from-an-epoch or automatic activation of a rejected candidate.

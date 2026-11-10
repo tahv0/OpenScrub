@@ -423,9 +423,85 @@ def collect_feedback(job,doc,read_frame=None,log=None):
                 except FileNotFoundError:pass
 
 
-def export_dataset(root,feedback,destination):
+def _feedback_dhash(image):
+    """Same 64-bit crop comparison as the trainer's independent leakage guard."""
+    gray=cv2.cvtColor(image,cv2.COLOR_BGR2GRAY)
+    small=cv2.resize(gray,(9,8),interpolation=cv2.INTER_AREA)
+    value=0
+    for bit in (small[:,1:]>small[:,:-1]).flat:value=(value<<1)|int(bit)
+    return value
+
+
+def _feedback_split_groups(root,samples,training_groups=()):
+    """Keep complete track/visual-duplicate components on one side of the split.
+
+    Build links BEFORE byte deduplication: even an omitted duplicate can connect
+    two tracks. Use the trainer's unchanged <=2-bit rule, across both labels.
+    Never move an original/prior training group into held-out validation.
+    """
+    parent={s['group']:s['group'] for s in samples.values()}
+    def find(group):
+        while parent[group]!=group:
+            parent[group]=parent[parent[group]];group=parent[group]
+        return group
+    def union(a,b):
+        a,b=find(a),find(b)
+        if a!=b:parent[max(a,b)]=min(a,b)
+    hashes={};digests={};buckets={}
+    # At <=2 differing bits, at least one of these THREE disjoint blocks
+    # matches. Index candidates without a full scan of every earlier crop.
+    blocks=((0,22),(22,21),(43,21))
+    for sid,sample in sorted(samples.items()):
+        source=Path(root)/sample['image'];digest=sha256(source)
+        if digest!=sample['image_sha256']:raise ValueError('Saved training image changed')
+        group=sample['group']
+        if digest in digests:
+            union(group,digests[digest]);continue
+        digests[digest]=group
+        image=cv2.imread(str(source))
+        if image is None or min(image.shape[:2])<8:
+            raise ValueError('Unreadable/too-small saved training crop: '+str(sid))
+        signature=_feedback_dhash(image)
+        if signature in hashes:
+            union(group,hashes[signature]);continue
+        keys=[(shift,(signature>>shift)&((1<<width)-1)) for shift,width in blocks]
+        candidates=set()
+        for key in keys:candidates.update(buckets.get(key,()))
+        for previous in candidates:
+            if (signature^previous).bit_count()<=2:union(group,hashes[previous])
+        hashes[signature]=group
+        for key in keys:buckets.setdefault(key,[]).append(signature)
+    trained=set(training_groups)
+    train_components={find(group) for group in parent if group in trained or
+        int(hashlib.sha256(group.encode()).hexdigest()[:8],16)/0xffffffff>=.2}
+    return {group:('train' if find(group) in train_components else 'val') for group in parent}
+
+
+def _prior_training_groups(root,prior):
+    """Remember accepted-model training exposure, including now-absent tracks."""
+    if not prior:return set()
+    groups=prior.get('training_groups',[])
+    if not isinstance(groups,list) or any(not isinstance(g,str) for g in groups):
+        raise ValueError('Invalid previous training split history; saved review retained')
+    pass_id=prior.get('pass_id','')
+    if not isinstance(pass_id,str) or not re.fullmatch(r'pass-[0-9a-f]{12}',pass_id):
+        raise ValueError('Cannot verify previous training dataset identity; saved review retained')
+    manifest=Path(root)/'passes'/pass_id/'dataset'/'manifest.jsonl'
+    try:
+        records=[json.loads(line) for line in manifest.read_text(encoding='utf-8').splitlines() if line.strip()]
+        if (not records or not any(r.get('split')=='train' for r in records) or
+                any(r.get('split') not in ('train','val') or not isinstance(r.get('job'),str) for r in records)):
+            raise ValueError('Invalid split metadata')
+    except (OSError,ValueError,TypeError,AttributeError) as error:
+        raise ValueError('Cannot verify previous training split; keep the accepted pass dataset and saved review') from error
+    return set(groups)|{r['job'] for r in records if r['split']=='train'}
+
+
+def export_dataset(root,feedback,destination,*,training_groups=()):
     """Export snapshots only; never revisit detection IDs or approximate seeks."""
-    destination=private_dir(destination);root=Path(root)
+    root=Path(root)
+    splits=_feedback_split_groups(root,feedback['samples'],training_groups)
+    destination=private_dir(destination)
     records=[];hashes=set()
     for sid,s in sorted(feedback['samples'].items()):
         source=root/s['image']
@@ -433,8 +509,8 @@ def export_dataset(root,feedback,destination):
         key=(s['image_sha256'],s['label'])
         if key in hashes:continue
         hashes.add(key)
-        # Group stable object examples together; do not split adjacent frames.
-        split='val' if int(hashlib.sha256(s['group'].encode()).hexdigest()[:8],16)/0xffffffff<.2 else 'train'
+        # Whole related components were assigned before exact-file deduplication.
+        split=splits[s['group']]
         image_dir=private_dir(destination/'images'/split)
         label_dir=private_dir(destination/'labels'/split)
         shutil.copyfile(source,image_dir/(sid+'.png'))
@@ -444,6 +520,8 @@ def export_dataset(root,feedback,destination):
                 'split':split,'job':s['group'],'track':0,'detection_index':s['frame'],
                 'baseline_box':s['baseline_box']}
         records.append(record)
+    # Include groups represented only by a byte-identical crop omitted above.
+    atomic_json(destination/'split-groups.json',{'schema':1,'groups':splits})
     (destination/'manifest.jsonl').write_text(''.join(json.dumps(r)+'\n' for r in records),encoding='utf-8')
     (destination/'data.yaml').write_text('path: '+json.dumps(str(destination.resolve()))+
         '\ntrain: images/train\nval: images/val\nnames:\n  0: plate\n',encoding='utf-8')
@@ -582,10 +660,17 @@ def run_session(job,read_frame,full_scan,publish,log=None,train=None,refiner=Non
     prior=(doc.get('learning') or {}).get('active', _load(root/'active.json',{}))
     if prior.get('feedback_fingerprint')==feedback['fingerprint']:
         raise ValueError('No new or changed training examples since the last accepted pass. Repeating that training is disabled; review unresolved cases first.')
+    training_groups=_prior_training_groups(root,prior)
     pass_id='pass-'+uuid.uuid4().hex[:12];stage=private_dir(root/'passes'/pass_id)
     atomic_json(stage/'before-report.json',doc)
-    records=export_dataset(root,feedback,stage/'dataset')
+    records=export_dataset(root,feedback,stage/'dataset',training_groups=training_groups)
+    split_groups=_load(stage/'dataset'/'split-groups.json')['groups']
+    training_groups.update(group for group,split in split_groups.items() if split=='train')
     if not records:raise ValueError('There are no explicit reviewed training examples yet')
+    counts=[sum(r['split']==split and r['label']==label for r in records)
+            for split in ('train','val') for label in ('positive','negative')]
+    log('Dataset split after grouping similar crops: train %d plates / %d negatives; '
+        'validation %d plates / %d negatives. Duplicate and minimum-sample checks remain enabled.'%tuple(counts))
     phase('training','Training on reviewed examples; original models and previous result are unchanged')
     weights=prior.get('weights') or os.environ.get('OPENSCRUB_TRAIN_WEIGHTS','')
     folder,meta=(train or run_training)(stage/'dataset',stage/'versions',weights,job,settings)
@@ -615,7 +700,8 @@ def run_session(job,read_frame,full_scan,publish,log=None,train=None,refiner=Non
         raise ValueError('The rescan produced no proposals for the learned model; previous result retained')
     if sha256(job['video'])!=source:raise ValueError('Source changed during training; previous result retained')
     active={'pass_id':pass_id,'weights':str(Path(folder)/'weights.pt'),
-            'model':str(Path(folder)/'model.onnx'),'feedback_fingerprint':feedback['fingerprint']}
+            'model':str(Path(folder)/'model.onnx'),'feedback_fingerprint':feedback['fingerprint'],
+            'training_groups':sorted(training_groups)}
     refined['learning']['active']=active
     # The report is the transaction's commit record. Side indexes are recoverable.
     publish(refined)
