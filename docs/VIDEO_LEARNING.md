@@ -234,3 +234,31 @@ After installing this fix, retry **Train & rescan this video** on the existing
 saved job, not Resume scan. No reannotation is needed. This fixes the collection
 failure path; it does not diagnose unrelated Windows disk activity or guarantee
 that a later model-quality gate passes.
+
+### Validation data-loader resources
+
+The standalone validation of `best.pt` explicitly uses the training request's
+`workers`, `batch`, and `imgsz`, with image caching disabled. In particular,
+web-launched training uses **workers=0** for both training and validation;
+reloading a checkpoint must not silently restore Ultralytics' multi-worker
+default. CLI users who explicitly choose nonzero workers keep that choice.
+This changes loading resources, not validation examples or acceptance gates.
+
+The optional `compose.windows-training.yml` also sets a private **1 GiB**
+`/dev/shm` limit as bounded headroom. It does not use host IPC, change persistent
+mounts, or allocate GPU VRAM. Actual host memory use remains subject to Docker's
+memory limit. Apply the updated overlay with `docker compose ... up -d --build`
+after saving new review edits and stopping active work; a plain restart does
+not apply changed container configuration.
+
+`unable to allocate shared memory(shm)` is a host-side interprocess allocation
+failure, not a CUDA out-of-memory error. The exact available capacity can be
+checked with `docker compose ... exec -T openscrub df -h /dev/shm`. A separate
+`Slow image access detected` warning concerns dataset I/O and is not proof of
+corrupt training examples. Do not delete reviewed data or reinstall CUDA to
+address either message.
+
+This change does not add resume-from-failed-validation support. A new web
+learning attempt can reuse saved feedback but trains a new candidate; it does
+not automatically resume an unpublished `best.pt`. Previous reviewed output
+is retained until the entire learning pass succeeds.
