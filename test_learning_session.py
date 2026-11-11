@@ -237,14 +237,24 @@ def test_render_round_trip_retains_review_rows_and_annotation_identities(plate_j
     denied=deepcopy(before['detections'][0]);denied.update(enabled=False,verified_label='not_plate',track=33)
     before['detections'].insert(0,denied)
     before['learning']={'needs_render':True,'active':{'pass_id':'accepted'}}
+    before['verification']={'schema':1,'model_sha256':'c'*64,'mode':'filter',
+                            'stats':{'checked':2,'suppressed':1}}
+    before['verification_history']=[dict(deepcopy(before['verification']),frame_range=[0,2])]
     rendered=deepcopy(before)
     rendered['detections']=[{'category':'plate','enabled':True}]
     rendered.pop('learning')
+    rendered.pop('verification')
+    rendered.pop('verification_history')
     rendered['provenance']['output_sha256']='b'*64
     result=ls.preserve_render_review(before,rendered)
     assert result['detections']==before['detections']
     assert result['learning']['needs_render'] is False
     assert result['learning']['active']==before['learning']['active']
+    assert result['verification']==before['verification']
+    assert result['verification'] is not before['verification']
+    assert result['verification_history']==before['verification_history']
+    result['verification_history'][0]['stats']['checked']=99
+    assert before['verification_history'][0]['stats']['checked']==2
     assert result['provenance']['output_sha256']=='b'*64
     assert before['learning']['needs_render'] is True
 

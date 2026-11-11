@@ -351,11 +351,11 @@ def test_web_worker_end_to_end_pause_edit_resume(tmp_path, monkeypatch):
 
 
 
-def test_review_detection_response_has_all_merged_fields(monkeypatch):
+def test_review_detection_response_has_all_merged_fields(monkeypatch, tmp_path):
     """Regression: conflict resolution must leave exactly one valid item dict."""
     import openscrub_web as web
     jid = "response-dict-check"
-    job = {"id": jid, "phase": "review"}
+    job = {"id": jid, "phase": "review", "dir": str(tmp_path)}
     doc = {
         "render_state": {"fps": 30, "cum": [[0, 0], [0, 0]]},
         "detections": [{

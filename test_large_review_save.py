@@ -116,11 +116,20 @@ def test_sparse_payload_and_newer_decisions_survive_save(review_server,width,tmp
         page.locator('#det0').get_by_role('button',name='Blur',exact=True).click()
         assert page.evaluate('saveAndRender(true)') is True
         third=page.evaluate('__payloads[2]')
-        assert third['enabled']=={}
+        assert third['enabled']=={str(i):True for i in range(20)}, 'Explicit same-value Blur preserves the human override'
         assert third['verified_labels']=={str(i):'clear' for i in range(20)}
         saved=json.loads(report.read_text())['detections']
+        assert all(r['enabled'] is True and r.get('plate_verification_override') is True for r in saved[:20])
         assert all(r['enabled'] is False and r['verified_label']=='not_plate' for r in saved[20:60])
         assert all(r.get('verified_label','')=='' for r in saved[:20]+saved[60:])
+        assert not any(r.get('plate_verification_override') for r in saved[60:]), 'Untouched findings must remain untouched'
+        # The explicit clear is acknowledged once, rather than replayed on
+        # every save of the otherwise unchanged report.
+        acknowledged=report.read_bytes()
+        assert page.evaluate('saveAndRender(true)') is True
+        fourth=page.evaluate('__payloads[3]')
+        assert fourth['enabled']=={} and fourth['verified_labels']=={}
+        assert report.read_bytes()==acknowledged
         page.evaluate('loadReview()');page.locator('#det20').wait_for()
         assert page.locator('#det20 .det-status').inner_text()=='Will stay visible'
         assert not errors and not dialogs,(errors,dialogs)

@@ -61,6 +61,13 @@ def library():
     return models()
 
 
+def evaluated_candidate(tmp_path, *, separable=True):
+    from test_learning_candidates import candidate_job, candidates, CANDIDATE_ID
+    job, folder = candidate_job(tmp_path, separable=separable)
+    assessment = candidates().evaluate(job, CANDIDATE_ID)
+    return job, folder, CANDIDATE_ID, assessment
+
+
 def accepted_job(tmp_path):
     job = tmp_path / 'original-video-job'
     version = job / 'learning' / 'passes' / 'accepted' / 'versions' / 'v1'
@@ -230,7 +237,8 @@ def test_export_import_is_independent_of_video_and_machine_paths(tmp_path, accep
     snap, copied = lm.load_snapshot(unrelated)
     assert copied == payload and snap['name'] == 'Garage'
     assert (unrelated / 'report.json').read_bytes() == before
-    assert sorted(p.name for p in unrelated.iterdir()) == ['plate_model', 'report.json']
+    assert sorted(p.name for p in unrelated.iterdir()) == [
+        'plate_model', 'plate_model_selection.json', 'report.json']
 
 
 def test_import_path_and_default_name_are_supported(tmp_path, accepted):
@@ -592,3 +600,143 @@ def test_successful_onnx_validation_reuses_metadata_and_revalidates_changed_byte
         with pytest.raises(lm.ModelError):
             lm.import_model(root, io.BytesIO(archive(manifest, invalid)))
         assert len(calls) == expected_calls
+
+
+@pytest.mark.parametrize('separable,status', [(True, 'validated'), (False, 'review_only')])
+def test_save_evaluated_candidate_has_honest_verifier_metadata_and_portable_bytes(
+        tmp_path, separable, status):
+    lm = models()
+    job, folder, candidate_id, assessment = evaluated_candidate(tmp_path / 'training', separable=separable)
+    before = (job / 'report.json').read_bytes()
+    root = tmp_path / 'machine-a-models'
+    saved = lm.save_candidate(root, job, candidate_id, 'Garage verifier', 'Background examples')
+    assert set(saved) == FIELDS
+    assert saved['schema'] == 2 and saved['kind'] == 'openscrub-plate-verifier'
+    assert saved['contract'] == 1
+    assert saved['validation'] == assessment
+    assert saved['validation']['status'] == status
+    assert saved['threshold'] == assessment['threshold']
+    exported = lm.export_model(root, saved['id'])
+    manifest, payload = unpack(exported)
+    assert manifest == saved
+    assert payload == (folder / 'model.onnx').read_bytes()
+    assert str(job) not in json.dumps(manifest)
+    assert not {'active', 'weights', 'training_groups', 'candidate_id'} & set(manifest)
+    assert (job / 'report.json').read_bytes() == before
+    shutil.rmtree(job)
+    imported = lm.import_model(tmp_path / 'machine-b' / 'other-layout', io.BytesIO(exported))
+    assert imported['id'] != saved['id']
+    assert imported['validation'] == assessment
+    assert imported['model_sha256'] == saved['model_sha256']
+
+
+def test_saving_unevaluated_candidate_never_invents_a_passing_assessment(tmp_path):
+    from test_learning_candidates import candidate_job, CANDIDATE_ID
+    lm = models()
+    job, _ = candidate_job(tmp_path / 'training')
+    root = tmp_path / 'models'
+    with pytest.raises(ValueError, match='assessment|evaluat'):
+        lm.save_candidate(root, job, CANDIDATE_ID, 'Not checked yet')
+    assert_unpublished(root)
+
+
+@pytest.mark.parametrize('mode', [None, 'review', 'filter'])
+def test_verifier_snapshot_persists_explicit_mode_before_report_and_survives_source_deletion(tmp_path, mode):
+    lm = models()
+    job, _, candidate_id, assessment = evaluated_candidate(tmp_path / 'training')
+    root = tmp_path / 'models'
+    saved = lm.save_candidate(root, job, candidate_id, 'Verifier')
+    target = tmp_path / 'new-job'
+    lm.snapshot_model(root, saved['id'], target, mode=mode)
+    selected = target / 'plate_model_selection.json'
+    assert selected.is_file()
+    assert not (target / 'report.json').exists()
+    assert {p.name for p in (target / 'plate_model').iterdir()} == {'model.onnx', 'manifest.json'}
+    lm.delete_model(root, saved['id'])
+    shutil.rmtree(job)
+    manifest, _ = lm.load_snapshot(target)
+    assert lm.load_selection(target, manifest) == (mode or 'review')
+    assert lm.load_selection(target) == (mode or 'review')
+
+
+def test_review_only_candidate_cannot_be_selected_for_filtering(tmp_path):
+    lm = models()
+    job, _, candidate_id, _ = evaluated_candidate(tmp_path / 'training', separable=False)
+    root = tmp_path / 'models'
+    saved = lm.save_candidate(root, job, candidate_id, 'Review only')
+    target = tmp_path / 'target'
+    with pytest.raises(ValueError, match='validat|filter'):
+        lm.snapshot_model(root, saved['id'], target, mode='filter')
+    assert not (target / 'plate_model').exists()
+    assert not (target / 'plate_model_selection.json').exists()
+
+
+@pytest.mark.parametrize('damage', ['missing', 'invalid_json', 'wrong_model', 'wrong_hash', 'wrong_mode', 'null_mode', 'link'])
+def test_verifier_selection_fails_clearly_if_missing_corrupt_or_rebound(tmp_path, damage):
+    lm = models()
+    job, _, candidate_id, _ = evaluated_candidate(tmp_path / 'training')
+    root = tmp_path / 'models'
+    saved = lm.save_candidate(root, job, candidate_id, 'Verifier')
+    target = tmp_path / 'target'
+    lm.snapshot_model(root, saved['id'], target, mode='filter')
+    path = target / 'plate_model_selection.json'
+    content = json.loads(path.read_text())
+    if damage == 'missing':
+        path.unlink()
+    elif damage == 'invalid_json':
+        path.write_text('{')
+    elif damage == 'link':
+        outside = tmp_path / 'outside-selection.json'
+        outside.write_text(json.dumps(content))
+        path.unlink()
+        path.symlink_to(outside)
+    else:
+        content[{'wrong_model': 'model_id', 'wrong_hash': 'model_sha256',
+                 'wrong_mode': 'mode', 'null_mode': 'mode'}[damage]] = {
+            'wrong_model': 'f' * 32, 'wrong_hash': 'f' * 64,
+            'wrong_mode': 'primary', 'null_mode': None}[damage]
+        path.write_text(json.dumps(content))
+    with pytest.raises(ValueError):
+        lm.load_selection(target)
+
+
+def test_legacy_refiner_mode_remains_refine_without_selection_file(tmp_path, accepted):
+    lm = models()
+    root = tmp_path / 'models'
+    saved = lm.save_model(root, accepted[0], 'Legacy mask model')
+    target = tmp_path / 'legacy-job'
+    lm.snapshot_model(root, saved['id'], target)
+    assert lm.load_selection(target) == 'refine'
+    (target / 'plate_model_selection.json').unlink()
+    assert lm.load_selection(target) == 'refine'
+    with pytest.raises(ValueError):
+        lm.snapshot_model(root, saved['id'], tmp_path / 'not-a-verifier', mode='filter')
+
+
+def test_verifier_manifest_cannot_claim_mask_validation_or_fake_filter_eligibility(tmp_path):
+    lm = models()
+    job, _, candidate_id, _ = evaluated_candidate(tmp_path / 'training', separable=False)
+    saved = lm.save_candidate(tmp_path / 'models', job, candidate_id, 'Review only')
+    manifest, payload = unpack(lm.export_model(tmp_path / 'models', saved['id']))
+    for altered in (
+            dict(manifest, schema=1),
+            dict(manifest, kind='openscrub-plate-mask-refiner'),
+            dict(manifest, validation=VALIDATION),
+            dict(manifest, validation=dict(manifest['validation'], status='validated'))):
+        with pytest.raises(ValueError):
+            lm.import_model(tmp_path / 'invalid-import', io.BytesIO(archive(altered, payload)))
+    assert_unpublished(tmp_path / 'invalid-import')
+
+
+def test_snapshot_rolls_back_when_its_mode_cannot_be_persisted(tmp_path, accepted, monkeypatch):
+    lm = models()
+    root = tmp_path / 'models'
+    saved = lm.save_model(root, accepted[0], 'Mask model')
+    target = tmp_path / 'new-job'
+    def no_space(*args, **kwargs):
+        raise OSError('synthetic full disk')
+    monkeypatch.setattr(lm, '_atomic_json', no_space)
+    with pytest.raises(lm.ModelError):
+        lm.snapshot_model(root, saved['id'], target)
+    assert not (target / 'plate_model').exists()
+    assert not (target / 'plate_model_selection.json').exists()

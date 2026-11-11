@@ -325,6 +325,30 @@ def test_range_provenance_records_the_actual_learned_model_and_learning_pass():
     assert "refinement" not in result and "learning" not in result
 
 
+def test_range_provenance_keeps_checker_modes_and_machine_decisions_in_owned_ranges():
+    previous = report([row(1), row(5), row(9)])
+    previous['verification'] = {'name': 'First checker', 'mode': 'review',
+                                'model_sha256': '1' * 64}
+    machine = {'decision': 'suppress', 'mode': 'filter', 'applied': True,
+               'previous_enabled': True, 'threshold': .5, 'score': .1}
+    candidate = report([row(5, enabled=False, plate_verification=machine)])
+    candidate['verification'] = {'name': 'Second checker', 'mode': 'filter',
+                                 'model_sha256': '2' * 64}
+    before, incoming = deepcopy(previous), deepcopy(candidate)
+    result = sections().replace_range(previous, candidate, 4, 8)
+    assert 'verification' not in result
+    assert [(item['start_frame'], item['end_frame'], item['verification']['mode'])
+            for item in result['range_provenance']] == [
+                (0, 4, 'review'), (4, 8, 'filter'), (8, 12, 'review')]
+    chosen = next(item for item in result['detections'] if item['frame_index'] == 5)
+    assert chosen['enabled'] is False and chosen['plate_verification'] == machine
+    assert not chosen.get('verified_label')
+    sliced = sections().slice_report(result, 4, 8)
+    assert len(sliced['range_provenance']) == 1
+    assert sliced['range_provenance'][0]['verification'] == candidate['verification']
+    assert previous == before and candidate == incoming
+
+
 def test_carried_manual_track_cannot_share_candidate_detector_identity():
     previous = report([span(track=7, person=3)])
     candidate = report([row(5)])

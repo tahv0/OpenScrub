@@ -28,6 +28,15 @@ import stop_review
 import openscrub_logging as diagnostics
 
 
+class CoverageRejected(ValueError):
+    """A completed candidate did not qualify for automatic mask activation."""
+
+    def __init__(self, message):
+        super().__init__(message.rstrip().rstrip('.') +
+            '. Training completed; the candidate is retained for the secondary plate checker. '
+            'Previous review kept.')
+
+
 def sha256(path):
     h=hashlib.sha256()
     with open(path,'rb') as f:
@@ -720,15 +729,33 @@ def calibrate(model,dataset):
         image=cv2.imread(str(dataset/r['image']))
         if image is None:raise ValueError('Unreadable validation crop')
         h,w=image.shape[:2];label=dataset/'labels'/'val'/(Path(r['image']).stem+'.txt')
-        values=[float(v) for v in label.read_text().split()[1:]]
-        pts=np.asarray(values,np.float32).reshape(-1,2)*[w,h]
+        fields=label.read_text().split()
+        if not fields or fields[0]!='0':raise ValueError('Invalid positive validation label')
+        values=np.asarray([float(v) for v in fields[1:]],np.float64)
+        if (len(values)<6 or len(values)%2 or not np.isfinite(values).all()
+                or (values<0).any() or (values>1).any()):
+            raise ValueError('Invalid positive validation polygon')
+        pts=values.astype(np.float32).reshape(-1,2)*[w,h]
+        if cv2.contourArea(pts.astype(np.float32))<=0:
+            raise ValueError('Empty positive validation polygon')
         gt=np.zeros((h,w),np.uint8);cv2.fillPoly(gt,[np.rint(pts).astype(np.int32)],1)
         mask,score=model.predict(image)
-        if mask is not None:_,mask=vl.conservative_quad(mask)
-        b=r['baseline_box'];base=np.zeros((h,w),np.uint8)
+        score=float(score)
+        if not math.isfinite(score) or not 0<=score<=1:
+            raise ValueError('Invalid validation prediction score')
+        if mask is not None:
+            mask=np.asarray(mask)
+            if mask.shape!=(h,w) or not np.isfinite(mask).all():
+                raise ValueError('Invalid validation prediction mask')
+            _,mask=vl.conservative_quad(mask)
+        b=np.asarray(r['baseline_box'],np.float64)
+        if b.shape!=(4,) or not np.isfinite(b).all() or b[2]<=b[0] or b[3]<=b[1]:
+            raise ValueError('Invalid validation baseline box')
+        base=np.zeros((h,w),np.uint8)
         cv2.rectangle(base,(int(b[0]*w),int(b[1]*h)),(int(b[2]*w),int(b[3]*h)),1,-1)
         examples.append((gt,base,mask,score))
-    if len(examples)<4:raise ValueError('At least four held-out positive examples are required for activation')
+    if len(examples)<4:
+        raise CoverageRejected('At least four held-out positive examples are required for mask activation')
     for threshold in sorted({.25,.5,.75,.9,.95}|{min(.999,s+.001) for _,_,_,s in examples}):
         gain=0.;accepted=0;valid=True
         for gt,base,mask,score in examples:
@@ -741,7 +768,7 @@ def calibrate(model,dataset):
             return {'threshold':threshold,'held_out_positive':len(examples),'accepted':accepted,
                     'excess_pixels_removed':int(gain),'minimum_known_coverage':.995,
                     'warning':'Held-out checks on this video do not prove complete redaction.'}
-    raise ValueError('The trained model did not demonstrate tighter coverage without known plate-pixel loss. Previous review kept; add different corrected examples instead of repeating an unchanged scan.')
+    raise CoverageRejected('The trained model did not demonstrate tighter coverage without known plate-pixel loss')
 
 
 def run_session(job,read_frame,full_scan,publish,log=None,train=None,refiner=None,calibration=None):
@@ -781,9 +808,21 @@ def run_session(job,read_frame,full_scan,publish,log=None,train=None,refiner=Non
     phase('training','Training on reviewed examples; original models and previous result are unchanged')
     weights=prior.get('weights') or os.environ.get('OPENSCRUB_TRAIN_WEIGHTS','')
     folder,meta=(train or run_training)(stage/'dataset',stage/'versions',weights,job,settings)
+    def record_mask(status,message):
+        # Explicit integration hooks may return an unpublished synthetic model.
+        # Default training and every published candidate always undergo the full
+        # path, manifest and artifact-hash checks before an outcome is recorded.
+        if train is None or meta.get('status')=='candidate' or (Path(folder)/'manifest.json').exists():
+            import learning_candidates
+            learning_candidates.record_mask_assessment(job['dir'],folder,status,message)
     model=(refiner or vl.CropRefiner)(Path(folder)/'model.onnx')
     phase('validating','Checking learned mask coverage on held-out examples')
-    gate=(calibration or calibrate)(model,stage/'dataset')
+    try:
+        gate=(calibration or calibrate)(model,stage/'dataset')
+    except CoverageRejected as error:
+        record_mask('failed',str(error))
+        raise
+    record_mask('passed','Held-out mask coverage passed; secondary checking requires its own assessment.')
     phase('rescanning','Rescanning from the beginning with the original detectors')
     fresh=full_scan(stage/'raw-report.json')
     if job['cancel'].is_set():raise InterruptedError('Learning cancelled; prior result retained')
@@ -819,11 +858,13 @@ def run_session(job,read_frame,full_scan,publish,log=None,train=None,refiner=Non
     refined['learning']={'pass_id':pass_id,'needs_render':True,'model_sha256':meta['artifacts']['model.onnx'],
         'version':meta['version'],'feedback_fingerprint':feedback['fingerprint'],
         'inference':stats,'validation':gate,'previous_report':str(stage/'before-report.json')}
-    if not stats['refined']:
-        raise ValueError('The learned model made no usable refinements on the rescan. Previous review retained; add different corrected examples rather than repeat this pass.')
-    if not stats['model_calls']:
-        raise ValueError('The rescan produced no proposals for the learned model; previous result retained')
+    if job['cancel'].is_set():raise InterruptedError('Learning cancelled; prior result retained')
     if sha256(job['video'])!=source:raise ValueError('Source changed during training; previous result retained')
+    if not stats['model_calls'] or not stats['refined']:
+        error=CoverageRejected('The rescan produced no proposals for the learned model'
+            if not stats['model_calls'] else 'The learned model made no usable refinements on the rescan')
+        record_mask('failed',str(error))
+        raise error
     active={'pass_id':pass_id,'weights':str(Path(folder)/'weights.pt'),
             'model':str(Path(folder)/'model.onnx'),'feedback_fingerprint':feedback['fingerprint'],
             'training_groups':sorted(training_groups)}
@@ -856,6 +897,10 @@ def preserve_render_review(before, rendered):
     result['detections'] = deepcopy(before['detections'])
     if before.get('refinement'):
         result['refinement'] = deepcopy(before['refinement'])
+    if before.get('verification'):
+        result['verification'] = deepcopy(before['verification'])
+    if before.get('verification_history'):
+        result['verification_history'] = deepcopy(before['verification_history'])
     if before.get('learning'):
         result['learning'] = deepcopy(before['learning'])
         result['learning']['needs_render'] = False

@@ -320,7 +320,7 @@ def _provenance_records(doc, start, end):
         records = [{"start_frame": 0, "end_frame": total,
                     "source_identity": identity(doc),
                     "provenance": deepcopy(doc.get("provenance", {}))}]
-        for key in ("refinement", "learning"):
+        for key in ("refinement", "learning", "verification", "verification_history"):
             if key in doc:
                 records[0][key] = deepcopy(doc[key])
     result = []
@@ -430,10 +430,12 @@ def replace_range(previous, candidate, start_frame, end_frame):
         key=lambda record: record["start_frame"])
     result["provenance"]["range_specific"] = True
     result["provenance"]["settings_scope"] = "initial_scan"
-    # Refiner checksums and learning-pass settings describe the corresponding
+    # Model checksums, verification modes and learning settings describe the
     # owned range, not every frame after a partial replacement.
     result.pop("refinement", None)
     result.pop("learning", None)
+    result.pop("verification", None)
+    result.pop("verification_history", None)
     return result
 
 

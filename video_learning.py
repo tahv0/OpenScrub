@@ -32,6 +32,14 @@ def _iou(a, b):
     return area / max(1e-9, (a[2]-a[0])*(a[3]-a[1])+(b[2]-b[0])*(b[3]-b[1])-area)
 
 
+def machine_suppressed(row):
+    """A machine-only Keep is reversible and is never a human training label."""
+    check = row.get('plate_verification') or {}
+    return (not row.get('verified_label') and not row.get('plate_verification_override')
+            and row.get('enabled') is False and isinstance(check, dict)
+            and check.get('applied') is True and check.get('decision') == 'suppress')
+
+
 def capture_constraints(doc):
     """Capture explicit decisions. Propagated shapes are not human ground truth."""
     source = doc.get('provenance', {}).get('input_sha256')
@@ -47,8 +55,8 @@ def capture_constraints(doc):
             continue
         label = row.get('verified_label')
         negative = (label == 'not_plate' and row.get('enabled') is False) or row.get('track', -1) in denied
-        keep = row.get('enabled') is False
-        if not (negative or keep or label == 'plate'):
+        keep = row.get('enabled') is False and not machine_suppressed(row)
+        if not (negative or keep or label == 'plate' or row.get('plate_verification_override')):
             continue
         frame = _frame(row, rs)
         box = _screen_box(row, rs, frame)
@@ -107,7 +115,9 @@ def apply_constraints(doc, constraints):
                 for r in matches:r['learning_conflict']='ambiguous reviewed-negative interval'
                 continue
             match=matches[0]
+            match.pop('plate_verification', None)
             match.update(enabled=False,verified_label='not_plate',learning_group=path['group'],
+                plate_verification_override=True,
                 learning_anchor=hashlib.sha256(json.dumps([constraints['source_sha256'],frame,box]).encode()).hexdigest()[:24])
     next_track = max((r.get('track',-1) for r in rows),default=-1)+1
     for anchor in constraints['anchors']:
@@ -134,6 +144,8 @@ def apply_constraints(doc, constraints):
                          t_end=(frame+.3)/rs['fps'],track=next_track)
             next_track+=1
             rows.append(match);indexed.setdefault(frame,[]).append(match)
+        match.pop('plate_verification', None)
+        match['plate_verification_override']=True
         match['enabled']=anchor['enabled']
         match['verified_label']=anchor['label']
         match['learning_anchor']=anchor['id']
@@ -199,7 +211,7 @@ def review_sample(doc, fraction=.1):
     return review_sample_details(doc, fraction)['indices']
 
 
-def decode_segment(outputs, shape, size, gain, left, top, threshold=.25):
+def decode_segment(outputs, shape, size, gain, left, top, threshold=.25, proposal=None):
     """Decode one-class raw YOLO-seg or end-to-end mask-coefficient heads.
 
     Returns an original-crop binary mask and score. Does not classify an empty
@@ -221,6 +233,31 @@ def decode_segment(outputs, shape, size, gain, left, top, threshold=.25):
         end2end=True
     else:
         raise ValueError('Unsupported single-class segmentation layout')
+    if proposal is not None:
+        box = np.asarray(proposal, dtype=np.float64)
+        if box.shape != (4,) or not np.isfinite(box).all() or box[2] <= box[0] or box[3] <= box[1]:
+            raise ValueError('Invalid verifier proposal box')
+        box = box * gain + [left, top, left, top]
+        boxes = p[:, :4].copy()
+        if end2end:
+            if len(p) and not np.all(p[:, 5] == 0):
+                raise ValueError('Expected a single plate class')
+        else:
+            centers = boxes[:, :2].copy()
+            boxes[:, :2] = centers - boxes[:, 2:] / 2
+            boxes[:, 2:] = centers + boxes[:, 2:] / 2
+        centers = (boxes[:, :2] + boxes[:, 2:]) / 2
+        intersection = np.maximum(0., np.minimum(boxes[:, 2:], box[2:]) - np.maximum(boxes[:, :2], box[:2]))
+        area = np.maximum(0., boxes[:, 2] - boxes[:, 0]) * np.maximum(0., boxes[:, 3] - boxes[:, 1])
+        # The candidate center must be inside this proposal, and at least half
+        # its predicted box must belong to it. Nearby plates/huge boxes cannot
+        # lend their confidence to an unrelated detector proposal.
+        associated = ((centers[:, 0] >= box[0]) & (centers[:, 0] <= box[2])
+                      & (centers[:, 1] >= box[1]) & (centers[:, 1] <= box[3])
+                      & (area > 0) & (intersection.prod(axis=1) >= .5 * area))
+        p = p[associated]
+        if len(p) and (np.any(p[:, 4] < 0) or np.any(p[:, 4] > 1)):
+            raise ValueError('Invalid verifier plate score')
     if not len(p): return None,0.
     scores=p[:,4];indices=np.flatnonzero(scores>=threshold)
     if not len(indices): return None,float(scores.max(initial=0))
@@ -267,6 +304,13 @@ class CropRefiner:
         self.size=dims[2];self.input=inputs[0].name;self.calls=0
 
     def predict(self, image):
+        return self._predict(image)
+
+    def predict_proposal(self, image, box):
+        """Score only predictions associated with a proposal in crop pixels."""
+        return self._predict(image, box)
+
+    def _predict(self, image, proposal=None):
         h,w=image.shape[:2];gain=self.size/max(h,w)
         rh,rw=int(round(h*gain)),int(round(w*gain))
         left,top=(self.size-rw)//2,(self.size-rh)//2
@@ -274,7 +318,8 @@ class CropRefiner:
         canvas[top:top+rh,left:left+rw]=cv2.resize(image,(rw,rh))
         blob=np.ascontiguousarray(canvas[:,:,::-1].transpose(2,0,1)[None],dtype=np.float32)/255
         outputs=self.session.run(None,{self.input:blob});self.calls+=1
-        return decode_segment(outputs,image.shape,self.size,gain,left,top)
+        return decode_segment(outputs,image.shape,self.size,gain,left,top,
+                              threshold=0. if proposal is not None else .25, proposal=proposal)
 
 
 def conservative_quad(mask):

@@ -195,6 +195,14 @@ boundary review and the training/rescan progress display.
 
 ## Four-corner plate review (experimental)
 
+Completed local training can also supply a **secondary plate checker** to help
+reject hands and other false detections. In Review, select a retained candidate
+and check the current detections without retraining. Review suggestions are the
+default; automatic filtering requires a separate held-out positive/negative
+assessment and an explicit choice. Save assessed checkers for another video or
+export/import them through the model library. See the [learning guide](docs/VIDEO_LEARNING.md#use-a-retained-candidate-to-reject-false-detections)
+and [reusable model guide](docs/REUSABLE_MODELS.md).
+
 For plates seen at an angle, an axis-aligned rectangle can hide much more
 of the car than necessary. OpenScrub can instead render a four-point,
 perspective-skewed plate mask. This first step also collects **local,

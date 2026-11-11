@@ -4,14 +4,28 @@ A learned model can be saved for an environment, selected for another video, and
 
 ## Save and use a model
 
-1. Complete **Train & rescan this video** and an accepted learning pass.
+1. Complete an accepted mask-refinement learning pass, or evaluate a retained
+   training candidate using the secondary checker in Review findings.
 2. In Review findings, open **Save trained model for other videos**.
-3. Enter a model name and optional environment description, then choose **Save model**.
-4. In Scan Setup, select it under **Learned plate model** and start a scan with plate detection enabled.
+3. Choose the accepted mask or evaluated secondary candidate as the source.
+   Enter a name and optional environment description, then choose **Save model**.
+4. In Scan Setup, select it under **Learned plate model**, choose its mode, and
+   start a scan with plate detection enabled.
 
 The default is **None — use original plate masks**. Saving or importing does not select a model automatically. The selected model is copied into each new job. Choosing a different model or removing its library entry does not change an existing job, including a paused job.
 
-Existing full-frame detectors still find plate proposals. The learned model refines masks around those proposals using every-frame plate detection. Empty, uncertain or spatially inconsistent predictions retain original coverage and are flagged for review. Reuse runs inference; it does not retrain the model. Review output on each recording: calibration on one recording does not establish accuracy on another.
+Existing full-frame detectors still find plate proposals using every-frame
+plate detection. Accepted mask models refine their geometry; empty, uncertain
+or spatially inconsistent predictions retain original coverage. Secondary
+checker models instead offer **Review suggestions** (the default) or explicit
+**Filter false positives** after an independent held-out positive/negative
+assessment passes. Review-only candidates remain review-only after transfer.
+Human decisions take precedence in both modes. The selected mode is pinned
+alongside the model and survives a restart, including a paused scan.
+
+Reuse runs inference; it does not retrain the model. Review output on each
+recording: calibration on one recording does not establish accuracy on another.
+See [Secondary checker assessment and limits](VIDEO_LEARNING.md#use-a-retained-candidate-to-reject-false-detections).
 
 ## Transfer through the UI
 
@@ -24,7 +38,12 @@ Open **Settings → Learned plate models**.
 
 Packages contain only `model.onnx` and a versioned `manifest.json`: display metadata, model type, decoder contract, checksum, input size, threshold, and the original calibration summary. There are no absolute source paths or source-video matching requirements. Original videos, training crops, exact human corner edits, rejected detections, training history and `weights.pt` are not included.
 
-These are OpenScrub plate **crop-mask** models. Saving from a job requires its accepted learned artifact; generic ONNX detectors are incompatible. Import checks bounded archive contents, the SHA-256 digest, metadata compatibility, and real ONNX inference before publication. The model limit is 256 MiB.
+These are OpenScrub plate crop models, not generic full-frame ONNX detectors.
+Schema 1 packages contain accepted mask refiners. Schema 2 packages, kind
+`openscrub-plate-verifier`, contain independently assessed secondary checkers;
+they do not claim to have passed mask tightening. Import checks bounded archive
+contents, the SHA-256 digest, metadata compatibility, and real ONNX inference
+before publication. The model limit is 256 MiB.
 
 Import packages from sources you trust. These checks establish integrity and decoder compatibility; they do not authenticate the exporter or sandbox arbitrary ONNX computations. The original calibration summary describes the training recording and does not prove accuracy on another recording.
 

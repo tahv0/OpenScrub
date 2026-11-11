@@ -152,8 +152,15 @@ class Sections:
         stop_review.atomic_report(Path(job['dir'])/'section-job.json',
             {k: job[k] for k in ('video', 'name', 'options', 'section')})
 
-    def options(self, parent, doc, section, model_id):
+    def options(self, parent, doc, section, model_id, model_mode=None):
+        if model_mode is not None and model_mode not in ('refine', 'review', 'filter'):
+            raise video_sections.SectionError('Choose a valid learned plate model mode.')
         result = deepcopy(parent['options'])
+        # A newly selected checker defaults to suggestions, even if the parent
+        # used filtering. new_job validates and durably stores the model's mode.
+        result.pop('learned_plate_model_mode', None)
+        if model_id and model_mode is not None:
+            result['learned_plate_model_mode'] = model_mode
         ident = video_sections.identity(doc)
         a, b = section['start_frame'], section['end_frame']
         # Context is read-only. Only the owned interval is published/approved.
@@ -236,10 +243,12 @@ class Sections:
                 current = web.JOBS.get(section.get('candidate_id'))
                 if current and current['phase'] in ('queued','scanning','learning','rendering'):
                     abort(409, description='This section already has work in progress.')
-                model_id = self.payload().get('model_id', '')
+                payload = self.payload()
+                model_id = payload.get('model_id', '')
                 if not isinstance(model_id, str):
                     raise video_sections.SectionError('Choose a valid model.')
-                options = self.options(job, doc, section, model_id)
+                options = self.options(job, doc, section, model_id,
+                                       payload.get('learned_plate_model_mode'))
                 child = web.new_job(job['video'], options, job['name']+' — '+section['name'])
                 child['section'] = dict(parent_id=jid, section_id=sid, role='candidate',
                     start_frame=section['start_frame'], end_frame=section['end_frame'],
@@ -297,7 +306,8 @@ class Sections:
                 if section.get('approved'):
                     section.setdefault('history',[]).append(section['approved'])
                 section['approved'] = dict(revision=revision, report=relative.as_posix(),
-                    approved_at=time.time(), model=(fresh.get('refinement') or {}).get('name') or
+                    approved_at=time.time(), model=(fresh.get('verification') or {}).get('name') or
+                    (fresh.get('refinement') or {}).get('name') or
                     (fresh.get('learning') or {}).get('version') or 'Original masks')
                 section['candidate_id'] = None
                 if candidate:
@@ -309,6 +319,7 @@ class Sections:
                     web._invalidate_review_previews(job)
                     job.pop('refinement',None)
                     job.pop('learning',None)
+                    job.pop('verification',None)
                     if job['phase']=='done': job['phase']='review'
                 return jsonify(section=section)
 
@@ -327,6 +338,7 @@ class Sections:
                 approved=json.loads(path.read_text(encoding='utf-8'))
                 options=deepcopy(approved.pop('section_export_options',job['options']))
                 # Rendering saved geometry never reloads a newer learned model.
+                options.pop('learned_plate_model_mode', None)
                 options.update(learned_plate_model='',section_range=[section['start_frame'],section['end_frame']],
                                clip_frac='',preview_mode=False,skip_review=False)
                 child=web.new_job(job['video'],options,job['name']+' — '+section['name'])
