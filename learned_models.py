@@ -410,9 +410,9 @@ def save_model(root, job_dir, name, description=''):
 
 
 @_boundary
-def save_candidate(root, job_dir, candidate_id, name, description=''):
+def save_candidate(root, job_dir, candidate_id, name, description='', *, publication_hook=None):
     """Save an evaluated candidate as a verifier, never as an accepted mask."""
-    from learning_candidates import load_candidate
+    from learning_candidates import load_candidate, _bound_record, _dataset_fingerprint, _ASSESSMENT
     from plate_verifier import validate_assessment
 
     name = _text(name, 'Model name', 80, required=True)
@@ -420,6 +420,9 @@ def save_candidate(root, job_dir, candidate_id, name, description=''):
     candidate = load_candidate(job_dir, candidate_id)
     if candidate['assessment'] is None:
         raise ModelError('Evaluate this candidate before saving its secondary assessment')
+    binding = _bound_record(candidate, _ASSESSMENT)
+    if binding is None or _dataset_fingerprint(candidate['dataset']) != binding['dataset_sha256']:
+        raise ModelError('Candidate dataset changed after its independent assessment; evaluate it again')
     validation = validate_assessment(candidate['assessment'])
     payload = _read_file(candidate['model_path'], _MODEL_LIMIT)
     digest = hashlib.sha256(payload).hexdigest()
@@ -433,6 +436,8 @@ def save_candidate(root, job_dir, candidate_id, name, description=''):
         'model_sha256': digest, 'model_size': len(payload), 'input_size': size,
         'threshold': validation['threshold'], 'validation': validation,
     })
+    if publication_hook is not None:
+        publication_hook(manifest, candidate)
     _publish(root, manifest['id'], manifest, payload)
     return manifest
 

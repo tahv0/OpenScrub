@@ -326,6 +326,8 @@ def collect_feedback(job,doc,read_frame=None,log=None):
     def group_for(i,r):
         track=r.get('track',-1)
         return groups.get(track) or '%s:%s:%s'%(source,generation,('track-'+str(track) if track>=0 else 'row-'+str(i)))
+    import findings_training
+    archive_managed,archive_plans=findings_training.session_feedback(job,doc,store,group_for)
     manifest=Path(job['dir'])/'plate_annotations'/'annotations.jsonl'
     seen=set(store['imported_images']);entries=[]
     if manifest.exists():
@@ -337,6 +339,7 @@ def collect_feedback(job,doc,read_frame=None,log=None):
     for item in entries:
         i=int(item.get('detection_index',-1))
         if not 0<=i<len(rows):continue
+        if i in archive_managed:continue
         r=rows[i]
         if r.get('category')!='plate' or r.get('verified_label')!='plate' or not r.get('plate_quad'):continue
         frame=vl._frame(r,rs)
@@ -345,6 +348,7 @@ def collect_feedback(job,doc,read_frame=None,log=None):
     # Explicit negative seed(s), not normal Keep/Blur output choices.
     negatives={}
     for i,r in enumerate(rows):
+        if i in archive_managed:continue
         if r.get('category')=='plate' and r.get('verified_label')=='not_plate':
             negatives.setdefault(group_for(i,r),(i,r))
     requested.extend((i,r,'negative',None) for i,r in negatives.values())
@@ -378,10 +382,21 @@ def collect_feedback(job,doc,read_frame=None,log=None):
         log(message)
     progress(force=True)
     wanted=sorted({vl._frame(r,rs) for _,r,_,_ in requested})
-    iterator=(iter_training_frames(job['video'],wanted,float(rs['fps']),cancelled,progress)
+    iterator=(((f,None) for f in ()) if not wanted else
+              iter_training_frames(job['video'],wanted,float(rs['fps']),cancelled,progress)
               if read_frame is None else ((f,read_frame(f)) for f in wanted))
     created=[];committed_ok=False;last_frame=None;image=None
     try:
+        for sid,sample,source_image in archive_plans:
+            _collection_cancel(cancelled)
+            destination=root/sample['image']
+            if not destination.exists():
+                created.append(destination)
+                shutil.copyfile(source_image,destination)
+                if os.name!='nt':destination.chmod(0o600)
+            if sha256(destination)!=sample['image_sha256']:
+                raise ValueError('Confirmed training crop changed while copying')
+            store['samples'][sid]=sample
         with closing(iterator):
             for i,r,label,imported in requested:
                 _collection_cancel(cancelled)
@@ -590,9 +605,9 @@ def _training_command(script, *arguments):
             '-I', '-u', '-X', 'faulthandler', str(script), *arguments]
 
 
-def preflight():
+def preflight(weights=None):
     python=os.environ.get('OPENSCRUB_TRAIN_PYTHON',sys.executable)
-    weights=os.environ.get('OPENSCRUB_TRAIN_WEIGHTS','')
+    weights=os.environ.get('OPENSCRUB_TRAIN_WEIGHTS','') if weights is None else str(weights)
     problems=[]
     if not weights or not Path(weights).is_file():
         problems.append('Set OPENSCRUB_TRAIN_WEIGHTS to a trusted local single-class-compatible segmentation .pt checkpoint.')
@@ -647,6 +662,8 @@ def run_training(dataset,versions,weights,job,settings):
         'train','--dataset',str(dataset),'--weights',str(weights),'--versions-dir',str(versions),
         '--device','0','--epochs',str(settings.get('epochs',40)),'--batch',str(settings.get('batch',8)),
         '--workers','0','--accept-ultralytics-license','--progress')
+    if settings.get('verifier_training'):
+        command.extend(['--allow-confirmed-regions', '--min-mask-map50', '0'])
     private_dir(versions)
     logfile=Path(versions).parent/'training.log'
     diagnostics.attach_job(job)
@@ -778,12 +795,17 @@ def run_session(job,read_frame,full_scan,publish,log=None,train=None,refiner=Non
     uses run_training, actual ONNX inference, and the original scan engine.
     """
     log=log or (lambda message:None)
+    import findings_training
+    import learned_models
+    settings=job.get('learning_request',{})
+    name=learned_models._text(settings.get('name') or findings_training.default_name(
+        [Path(job.get('video') or 'Confirmed findings').name]), 'Model name',80,required=True)
+    update_learning(job,name=name)
     root=private_dir(Path(job['dir'])/'learning')
     doc=_load(Path(job['dir'])/'report.json')
     update_learning(job,'verifying','Verifying the source fingerprint before using saved annotations')
     atomic_json(root/'status.json',job['learning'])
     source=verify_source(job,doc);doc.setdefault('provenance',{})['input_sha256']=source
-    settings=job.get('learning_request',{})
     if settings.get('license_accepted') is not True:
         raise ValueError('Local training license acknowledgment is required')
     def phase(name,message,**fields):
@@ -795,7 +817,14 @@ def run_session(job,read_frame,full_scan,publish,log=None,train=None,refiner=Non
     if prior.get('feedback_fingerprint')==feedback['fingerprint']:
         raise ValueError('No new or changed training examples since the last accepted pass. Repeating that training is disabled; review unresolved cases first.')
     training_groups=_prior_training_groups(root,prior)
+    training_parent=findings_training.session_parent(job,doc,prior)
+    if training_parent:
+        training_groups.update(training_parent['lineage'].get('training_groups',[]))
+        training_groups.update(findings_training._exposed_groups(
+            findings_training._signatures(root,feedback['samples']),
+            training_parent['lineage'].get('training_exposure',[])))
     pass_id='pass-'+uuid.uuid4().hex[:12];stage=private_dir(root/'passes'/pass_id)
+    atomic_json(stage/'run.json',{'schema':1,'name':name})
     atomic_json(stage/'before-report.json',doc)
     records=export_dataset(root,feedback,stage/'dataset',training_groups=training_groups)
     split_groups=_load(stage/'dataset'/'split-groups.json')['groups']
@@ -806,7 +835,7 @@ def run_session(job,read_frame,full_scan,publish,log=None,train=None,refiner=Non
     log('Dataset split after grouping similar crops: train %d plates / %d negatives; '
         'validation %d plates / %d negatives. Duplicate and minimum-sample checks remain enabled.'%tuple(counts))
     phase('training','Training on reviewed examples; original models and previous result are unchanged')
-    weights=prior.get('weights') or os.environ.get('OPENSCRUB_TRAIN_WEIGHTS','')
+    weights=training_parent['weights'] if training_parent else prior.get('weights') or os.environ.get('OPENSCRUB_TRAIN_WEIGHTS','')
     folder,meta=(train or run_training)(stage/'dataset',stage/'versions',weights,job,settings)
     def record_mask(status,message):
         # Explicit integration hooks may return an unpublished synthetic model.
@@ -821,8 +850,10 @@ def run_session(job,read_frame,full_scan,publish,log=None,train=None,refiner=Non
         gate=(calibration or calibrate)(model,stage/'dataset')
     except CoverageRejected as error:
         record_mask('failed',str(error))
+        findings_training.publish_session_candidate(job,stage,folder,feedback,training_groups,name,parent=training_parent)
         raise
     record_mask('passed','Held-out mask coverage passed; secondary checking requires its own assessment.')
+    saved_model=findings_training.publish_session_candidate(job,stage,folder,feedback,training_groups,name,parent=training_parent)
     phase('rescanning','Rescanning from the beginning with the original detectors')
     fresh=full_scan(stage/'raw-report.json')
     if job['cancel'].is_set():raise InterruptedError('Learning cancelled; prior result retained')
@@ -856,8 +887,9 @@ def run_session(job,read_frame,full_scan,publish,log=None,train=None,refiner=Non
         relation=job['section']
         refined=video_sections.carry_manual(doc,refined,relation['start_frame'],relation['end_frame'])
     refined['learning']={'pass_id':pass_id,'needs_render':True,'model_sha256':meta['artifacts']['model.onnx'],
-        'version':meta['version'],'feedback_fingerprint':feedback['fingerprint'],
+        'version':meta['version'],'name':name,'feedback_fingerprint':feedback['fingerprint'],
         'inference':stats,'validation':gate,'previous_report':str(stage/'before-report.json')}
+    if saved_model:refined['learning']['library_model_id']=saved_model['id']
     if job['cancel'].is_set():raise InterruptedError('Learning cancelled; prior result retained')
     if sha256(job['video'])!=source:raise ValueError('Source changed during training; previous result retained')
     if not stats['model_calls'] or not stats['refined']:
@@ -868,6 +900,7 @@ def run_session(job,read_frame,full_scan,publish,log=None,train=None,refiner=Non
     active={'pass_id':pass_id,'weights':str(Path(folder)/'weights.pt'),
             'model':str(Path(folder)/'model.onnx'),'feedback_fingerprint':feedback['fingerprint'],
             'training_groups':sorted(training_groups)}
+    if saved_model:active['model_id']=saved_model['id']
     refined['learning']['active']=active
     # The report is the transaction's commit record. Side indexes are recoverable.
     publish(refined)

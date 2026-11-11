@@ -102,8 +102,15 @@ def _metadata(job_dir, candidate_id):
         path = models._no_links(folder / name)
         if not stat.S_ISREG(path.stat().st_mode):
             raise models.ModelError('Candidate artifacts must be regular files')
+    run = stage / 'run.json'
+    if run.exists():
+        display_name = models._json(models._read_file(run, models._MANIFEST_LIMIT)).get('name')
+        display_name = models._text(display_name, 'Candidate name', 80, required=True)
+    else:
+        from findings_training import default_name
+        display_name = default_name([], datetime.fromisoformat(meta['created_utc'].replace('Z', '+00:00')))
     return {
-        'id': candidate_id, 'version': version, 'created_at': _timestamp(meta.get('created_utc')),
+        'id': candidate_id, 'name': display_name, 'version': version, 'created_at': _timestamp(meta.get('created_utc')),
         'model_sha256': artifacts['model.onnx'], 'artifacts': dict(artifacts),
         'folder': folder, 'model_path': folder / 'model.onnx',
         'dataset': models._no_links(stage / 'dataset'),
@@ -159,7 +166,7 @@ def _assessments(candidate):
 
 
 def _descriptor(candidate):
-    return {key: candidate[key] for key in ('id', 'version', 'created_at', 'model_sha256',
+    return {key: candidate[key] for key in ('id', 'name', 'version', 'created_at', 'model_sha256',
                                            'assessment', 'mask_assessment')}
 
 

@@ -159,7 +159,7 @@ def _dhash(image):
 
 
 def validate_dataset(dataset, min_train_positive=12, min_val_positive=4,
-                     min_negative_per_split=1):
+                     min_negative_per_split=1, *, allow_confirmed_regions=False):
     """Validate provenance, four-corner labels, split and near-duplicate leakage.
 
     'detect' exports with weak bbox pseudo-polygons are explicitly rejected:
@@ -194,7 +194,8 @@ def validate_dataset(dataset, min_train_positive=12, min_val_positive=4,
                     line_no, error)) from error
             if split not in ("train", "val") or label not in ("positive", "negative"):
                 raise DataError("Invalid split/label at manifest row %d" % line_no)
-            if (label == "positive" and quality != "human_quad") or (
+            positive_qualities = ('human_quad', 'human_region') if allow_confirmed_regions else ('human_quad',)
+            if (label == "positive" and quality not in positive_qualities) or (
                     label == "negative" and quality != "human_hard_negative"):
                 raise DataError("Unverified/weak label in row %d (%s); "
                                 "segmentation requires manually reviewed quads"
@@ -256,7 +257,9 @@ def validate_dataset(dataset, min_train_positive=12, min_val_positive=4,
             raise DataError("%s needs at least %d explicit false positives; "
                             "found %d" % (split, min_negative_per_split,
                                          counts[(split, "negative")]))
-    return {"counts": {split: {kind: counts[(split, kind)]
+    return {"supervision": "confirmed_regions" if any(r['quality'] == 'human_region' for r in records) else "human_quads",
+            "mask_eligible": not any(r['quality'] == 'human_region' for r in records),
+            "counts": {split: {kind: counts[(split, kind)]
                                for kind in ("positive", "negative")}
                        for split in ("train", "val")},
             "unique_track_groups": len(groups),
@@ -475,7 +478,8 @@ def train(args, report, progress=None):
                               done=1, total=2, unit="checks")
             latest = validate_dataset(
                 args.dataset, args.min_train_positive, args.min_val_positive,
-                args.min_negative_per_split)
+                args.min_negative_per_split,
+                allow_confirmed_regions=getattr(args, 'allow_confirmed_regions', False))
             if latest["dataset_sha256"] != report["dataset_sha256"]:
                 raise RuntimeError("Training dataset changed during the run; "
                                    "candidate not published")
@@ -533,6 +537,8 @@ def main(argv=None):
     check = commands.add_parser("check", help="validate PR #5 segment dataset")
     train_cmd = commands.add_parser("train", help="CUDA train, validate, export")
     for sub in (check, train_cmd):
+        sub.add_argument('--allow-confirmed-regions', action='store_true',
+                         help='Verifier-only training with explicitly confirmed bounding regions; never mask acceptance')
         sub.add_argument("--dataset", type=Path, required=True)
         sub.add_argument("--min-train-positive", type=int, default=12)
         sub.add_argument("--min-val-positive", type=int, default=4)
@@ -568,7 +574,8 @@ def main(argv=None):
                 progress.emit("checking", "Validating reviewed examples and dataset splits")
             report = validate_dataset(
                 args.dataset, args.min_train_positive,
-                args.min_val_positive, args.min_negative_per_split)
+                args.min_val_positive, args.min_negative_per_split,
+                allow_confirmed_regions=args.allow_confirmed_regions)
             print(json.dumps(report, indent=2))
             if args.command == "check":
                 return 0

@@ -161,7 +161,7 @@ const window={addEventListener(){}};
 function loadPersist(){};function loadCertInfo(){};function refreshLearnedModels(){};
 function stopJobPolling(){};function refresh(){};function setInterval(){};
 function reviewRequest(){return new Promise(resolve=>pending.push(resolve))};
-""" + load + lifecycle + r"""
+""" + script_between('function sectionEscape(', 'function sectionSeconds(') + load + lifecycle + r"""
 (async()=>{
  const stale=loadJobs();
  resumeJobPolling();
@@ -190,6 +190,9 @@ const job={id:'alpha',name:'Synthetic job',phase:'rendering',progress:.4,eta:nul
   error:null,stats:{},has_output:false,download_name:'fixture.mp4',report_name:'fixture.json'};
 const signal=new AbortController().signal;
 function renderWorkProgress(){};async function loadSectionsPanel(){};
+// A pending thumbnail queue, like the jobs list, must not stall job polling.
+function refreshPendingFindings(){return new Promise(()=>{})};
+function showTrainingResult(j){assert.notEqual(j.kind,'model_training')};
 """ + script_between('async function refreshJob(', '\nfunction sectionTime(')
 
 
@@ -245,6 +248,7 @@ def test_cancelled_review_response_cannot_rebuild_the_same_job_view():
 const assert=require('node:assert/strict');
 let CUR='alpha',JOBVIEW=1,SHELLPH='review',DUR=0,EN={},TRKMEM={},REVIEW_BASE=null;
 let VLBL={},VLBLJOB='alpha',LEARNING_SELECTION_JOB='alpha',LEARNING_SELECTION=null;
+let CONFIRM_CHAIN=Promise.resolve();const CONFIRM_FAILED=new Map();
 let release,inserted=[];
 const panel={};
 const document={getElementById(id){return id==='review'&&inserted.length?panel:null}};

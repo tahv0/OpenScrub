@@ -193,66 +193,70 @@ revision intact. Keep the shared source video and job data for future changes.
 The [section guide](docs/VIDEO_SECTIONS.md) explains frame rounding, locks,
 boundary review and the training/rescan progress display.
 
-## Four-corner plate review (experimental)
+## Confirmed findings and reusable plate learning (experimental)
 
-Completed local training can also supply a **secondary plate checker** to help
-reject hands and other false detections. In Review, select a retained candidate
-and check the current detections without retraining. Review suggestions are the
-default; automatic filtering requires a separate held-out positive/negative
-assessment and an explicit choice. Save assessed checkers for another video or
-export/import them through the model library. See the [learning guide](docs/VIDEO_LEARNING.md#use-a-retained-candidate-to-reject-false-detections)
-and [reusable model guide](docs/REUSABLE_MODELS.md).
+**Is a plate** and **Not a plate** save explicit human examples in a separate
+**Findings** library. Each example retains a small JPEG, its label and region,
+and the source video's content fingerprint. Browse and correct these pictures
+without reopening the video or running a detector. The same video can be moved
+to another folder; identity does not depend on its path. Saved findings survive
+ordinary job deletion.
 
-For plates seen at an angle, an axis-aligned rectangle can hide much more
-of the car than necessary. OpenScrub can instead render a four-point,
-perspective-skewed plate mask. This first step also collects **local,
-human-verified** examples for future model training.
+Review cards start at **Not reviewed**. Automatic protection can already be
+active, but a default blur is not presented as a human decision. **Blur / Keep
+visible** controls output without changing the training label. Adjusting an
+unconfirmed plate's corners saves its area; choose **Is a plate** or **Not a
+plate** to confirm the example. For tracked objects, only the explicitly
+confirmed picture becomes a training example, not every propagated frame.
 
-1. Scan a clip with the plate category enabled. In **Review**, click
-   **Edit 4 corners** on a detected plate and drag the numbered points to
-   the plate's physical corners. Save the shape, then render the video.
-   Optionally apply the same *relative shape* to other positions of that
-   detection track; review the result, especially if the perspective changes.
-2. If the detector **missed a plate entirely**, open **Preview video & edit
-   boxes**, select the relevant time window on the timeline, click
-   **Draw plate (4 corners)** and click its corners in order: upper left,
-   upper right, lower right, lower left. OpenScrub follows the seed region
-   with the existing local tracker and creates a plate review card.
-3. An edited/drawn plate saves **one manually confirmed sample** as a JPEG
-   crop plus a four-corner polygon in
-   `openscrub_jobs/<job-id>/plate_annotations/annotations.jsonl`. Other
-   automatically tracked frames are **not** verified training labels.
-4. Review cards provide explicit **Confirm plate** and **Not a plate**
-   judgements. Both are saved in the job's report. The normal
-   **Keep visible** decision is *not* assumed to mean a false positive
-   because real plates may intentionally be kept.
+Open **Findings**, filter by video or label, and select the plate examples you
+want to train with. **Train a named plate model** accepts a custom name or uses
+the video name and timestamp. Start from the configured checkpoint or continue
+a locally trainable model with accumulated examples. Training creates a new
+version and shows progress; it does not run automatically after each click.
+Previous models stay available, and optional CUDA training setup is still
+required.
 
-To export a deduplicated dataset from the **existing reviewed detections**,
-without sampling the video at fixed time intervals:
+Choose a saved model under **Learned plate model** in Scan Setup. The original
+full-frame detector finds proposals and the learned model checks them:
 
-```sh
-python scripts/prepare_plate_dataset.py --jobs-dir openscrub_jobs --out ./plate-detection-data --task detect
-python scripts/prepare_plate_dataset.py --jobs-dir openscrub_jobs --out ./plate-segmentation-data --task segment
-```
+- **Review suggestions — preserve output choices** highlights possible false
+  positives, such as hands, for human review. This is the default.
+- **Filter validated false positives** can disable low-scoring proposals after
+  a separate held-out positive/negative assessment passes. Human decisions
+  take precedence.
 
-The exporter uses human-corrected quadrilaterals as strong polygon
-labels, explicit Confirm plate findings without a polygon as **weak bounding
-box labels** (detection export only), and explicit Not a plate findings
-as hard-negative images with empty YOLO labels. Duplicate-looking samples
-are filtered using image hashes, and a track is assigned wholly to one
-train/validation partition. False positives are capped relative to positive
-examples (default: 2:1), avoiding a dataset overwhelmed by negatives.
-Training on a single video can easily overfit to its cars, cameras and
-lighting. Validate on a different recording before deploying a model.
+A trained model can be useful as a secondary checker even when it did not pass
+the stricter mask-tightening test. Accepted mask refiners can also narrow plate
+geometry while retaining original coverage for uncertain predictions.
+**Train & rescan this video** remains available for that workflow and accepts an
+optional training-run name. These crop models do not replace the full-frame
+proposal detector.
 
-The saved polygons are suitable for a future local **segmentation**
-fine-tuning workflow. This experimental feature does **not** yet fine-tune
-or reload an ONNX model automatically. It already improves the rendered
-mask geometry, but it cannot guarantee full coverage of missed plates.
-Scrutinize the final exported video before publication. If you delete the
-job, its training samples are deleted with it; keep backups if you intend
-to train across multiple jobs. Full-resolution crops contain original,
-unredacted pixels and need the same care as the source recordings.
+### Known plate numbers and complete number coverage
+
+The privacy target is the **whole registration number**. **Full plate** covers
+its background and edges too; **Lettering only** targets the letters and digits
+more narrowly and falls back to the full plate when uncertain. Lettering-only
+processing runs every frame and needs SDR output for HDR inputs. Review every
+character, including characters OCR could not read.
+
+If you know the number, open **Find examples using known plate numbers** in
+Review, enter up to ten targets, and choose **Find plate examples**. Local OCR
+tries rotated, mirrored, and perspective-corrected views and collects full or
+meaningful partial matches for review. The optional search samples up to 120
+frames by default; it is not an every-frame guarantee. It reads the source once
+on CPU, so a long video can still take time. A partial match never means only
+those recognized characters need protection. Confirm candidates before using
+them for training.
+
+See [Confirmed findings and named models](docs/CONFIRMED_FINDINGS.md) for the
+complete workflow, compact-picture limits, source matching, and retention.
+[Video-specific learning](docs/VIDEO_LEARNING.md) explains training setup,
+validation, rescans, and retained secondary candidates.
+[Reusable learned models](docs/REUSABLE_MODELS.md) covers UI export/import:
+model packages transfer inference models, not the findings library or local
+training checkpoints. No matching folder structure is required on another PC.
 
 ## Choosing a redaction mode
 

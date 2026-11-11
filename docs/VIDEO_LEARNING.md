@@ -6,6 +6,14 @@ refinement -> reapply human decisions -> review -> render**. It is not Resume.
 Existing successfully saved four-corner annotations are imported; no manual
 export command is needed for this workflow.
 
+For a library of small saved pictures that survives job deletion, use
+[Confirmed findings and named models](CONFIRMED_FINDINGS.md). Explicit
+**Is a plate / Not a plate** confirmations accumulate there; normal Blur/Keep
+choices and unconfirmed area edits do not. The Findings view can train a named
+secondary checker from selected examples across videos, including confirmed
+rectangles. The mask-refinement workflow on this page still requires manually
+confirmed corners for its positive examples.
+
 A completed training candidate can also serve as a **secondary plate checker**.
 That has its own assessment and does not require acceptance as a tighter mask.
 See [Use a retained candidate to reject false detections](#use-a-retained-candidate-to-reject-false-detections)
@@ -72,14 +80,19 @@ local segmentation checkpoint. Do not set either from untrusted HTTP input.
    Untracked detections remain separate rather than guessing object identity.
    It can be smaller when too few distinct examples remain. This is not a claim
    that reviewing 10% proves the rest of the video is safe.
-3. Correct corners; they autosave. Explicitly label **Not a plate** examples.
-   Merely choosing Keep visible is not a negative training label. Confirm plate
-   alone, without manually verified corners, is not a segmentation polygon.
-4. Click **Train & rescan this video**. The first use asks for acknowledgment of
-   the optional training framework terms. Status/logs distinguish source-hash
+3. Correct corners; the area autosaves. Choose **Is a plate** or **Not a plate**
+   explicitly and wait for its save acknowledgment. A new area edit alone is
+   not a positive example, and Keep visible is not a negative training label.
+   **Is a plate** without manually verified corners can train a named checker
+   through Findings, but is not a segmentation polygon for this workflow.
+4. Optionally enter a **Training run name**, then click **Train & rescan this
+   video**. A blank name uses the video name and UTC timestamp. The first use
+   asks for acknowledgment of the optional training framework terms. Status/logs distinguish source-hash
    verification, example collection, training, validation, rescanning and mask
    refinement. Training uses CUDA, 40 epochs and batch 8; absence of a working
    training environment is an explicit error, never a silent unchanged rescan.
+   Successfully published candidates are also saved as named models, including
+   retained checker candidates that did not pass mask-tightening validation.
 5. Review disagreements and new findings. A subsequent accepted pass starts
    from the last accepted learned weights. Unchanged feedback after an accepted
    pass is refused rather than launching the same training again.
@@ -133,8 +146,8 @@ There are two modes:
 
 | Mode | Result |
 | --- | --- |
-| **Review suggestions** | Adds a visible suggestion when the learned plate score is below the assessed cutoff. Keeps output choices for review. This is the default. |
-| **Filter false positives** | Disables low-scoring proposals after a separate assessment passes. The review shows which detections were filtered. |
+| **Review suggestions — preserve output choices** | Adds a visible suggestion when the learned plate score is below the assessed cutoff. Keeps output choices for review. This is the default. |
+| **Filter validated false positives** | Disables low-scoring proposals after a separate assessment passes. The review shows which detections were filtered. |
 
 Filtering requires at least **four held-out positive examples and two held-out
 negative examples**, a cutoff retaining **every** held-out positive, and at
@@ -147,7 +160,7 @@ plate score, not a calibrated probability that the object is a non-plate.
 
 The checker associates predictions with the particular original proposal; a
 nearby real plate must not confirm an unrelated hand. It preserves existing
-geometry. Explicit **Confirm plate**, **Not a plate**, Blur/Keep choices and
+geometry. Explicit **Is a plate**, **Not a plate**, Blur/Keep choices and
 manual shape corrections take precedence. Automatic filtering is stored as a
 machine decision and never becomes a human training label. Switching back to
 review suggestions restores choices changed only by the earlier filter; it
@@ -169,6 +182,12 @@ that every proposal detector missed. A sole full-frame primary detector would
 need a separate training dataset and detection integration; these crop-trained
 artifacts are not a drop-in primary detector.
 
+The optional [known-number search](CONFIRMED_FINDINGS.md#find-extra-examples-using-a-known-plate-number)
+can add sampled OCR candidates outside the detector's current proposals. Those
+are additional findings for human confirmation, not automatic training labels
+or a complete scan. Whether you use **Full plate** or **Lettering only**, protect
+the entire registration number, including unread characters.
+
 ## Gates and limitations
 
 The existing dataset validator requires at least **12 training positives,
@@ -188,10 +207,13 @@ proposal detector misses. It does not guarantee correctness through every
 occlusion, tracking identity error or perspective change. It is video-specific
 adaptation, not a model validated for unrelated recordings.
 
-All snapshots, models, logs and pass reports stay under the job's private
-`learning/` directory and inherit its vault lifecycle. Deleting the job deletes
-them. Back up the persistent data directory appropriately; it contains original
-unredacted pixels. Training does not upload recordings.
+Job-specific logs and pass reports stay under the job's private `learning/`
+directory and are deleted with that job. Explicit confirmed findings, published
+named models, and their retained local training state live separately and
+survive ordinary job deletion. Older unsaved candidates still depend on their
+original pass folders. All of these follow the app's vault lifecycle. Back up
+the persistent data directory appropriately; it contains original unredacted
+pixels. Training does not upload recordings.
 
 ## Verification commands
 
@@ -242,8 +264,11 @@ out-of-frame shapes are rejected, not silently shrunk. A definite validation
 rejection is not reused as a stale request after a new adjustment. For an
 uncertain network result, retries retain the request ID to avoid double saves.
 
-Filtering or finding an unsaved card does not save it. Wait for **Saved** /
-**Saved to track**, then confirm **Review edits saved to disk** before leaving.
+Filtering or finding an unsaved card does not save it. **Saved area · choose
+Is / Not to confirm** means the geometry was saved but has no explicit
+classification yet. Choose the label you intend, wait for its confirmation,
+then confirm **Review edits saved to disk** for remaining output edits before
+leaving.
 Do not use **Reload preview** to preserve a draft: that conflict-recovery action
 explicitly asks permission to discard the unsaved shape.
 
@@ -251,13 +276,13 @@ explicitly asks permission to discard the unsaved shape.
 
 Review saving sends only changed visibility/verification entries from the loaded
 view. A new choice made while the save is in flight remains unsaved and can be
-submitted next; default Blur does not become a training label. The backend still
-accepts older full-state payloads and skips rewriting already-matching choices.
+submitted next; automatic protection does not become a training label. The
+backend still accepts older full-state payloads and skips rewriting already-matching choices.
 Reports are compact JSON encoded in batches, with the same temporary-file,
 flush/fsync and atomic-replace safeguards. File formatting is not annotation data.
 
-An explicit review save has a bounded 120-second allowance (other requests retain
-15 seconds). A slow-save message is not success: only the disk-confirmation message
+An explicit review save has a bounded 120-second allowance. A slow-save message
+is not success: only the disk-confirmation message
 allows you to close/refresh or proceed to training/rendering. Success responses
 include `timings_ms` and `Server-Timing` for parse/load/apply/write, which can help
 separate slow storage/report processing from transfer time. This is not a promise
@@ -269,13 +294,15 @@ refreshed. Do not refresh after another unconfirmed save just to get the new UI.
 
 ## Learning collection and decoder progress
 
-Training collection no longer calls the interactive thumbnail decoder or its
-10-second request deadline. It selects only explicitly reviewed training
-examples, reads required source frames in sorted order through one FFmpeg
-process, and uses one decoded image for multiple examples from the same frame.
-The pass traverses from frame zero to the last needed source frame; long footage
-can still take time. No seekable replacement video, full-frame dump, model
-download, or change to existing annotations is required.
+Training collection first reuses confirmed crops and geometry from the Findings
+library; those examples need no new source decode. It imports only explicitly
+clicked seeds, not automatically propagated track members. Corrected or forgotten
+library examples are reconciled before collection. For older reviewed examples
+that still need a crop, collection reads required source frames in sorted order
+through one FFmpeg process and uses one decoded image for multiple examples from
+the same frame. That legacy pass traverses from frame zero to the last needed
+source frame, so long footage can still take time. Collection does not use the
+interactive thumbnail decoder or its request deadline.
 
 The job status/log now distinguishes indexing decisions, `Collecting reviewed
 examples: 12/80`, and decoding a source frame toward the next required frame.

@@ -66,6 +66,132 @@ def test_new_explicit_negative_replaces_old_positive_sample(plate_job):
     assert all(s['label']=='negative' for s in data['samples'].values())
 
 
+def _compact_archive_job(tmp_path, shape=True):
+    import threading
+    import confirmed_findings as cf
+    from test_confirmed_findings import jpeg, video, finding
+    jobdir=tmp_path/'job';jobdir.mkdir()
+    job={'dir':jobdir,'video':str(tmp_path/'missing-source.mp4'),'cancel':threading.Event(),
+         'log':[],'learning':{},'model_root':tmp_path/'models'}
+    archive=tmp_path/'confirmed_findings'
+    points=[[100,100],[280,100],[280,190],[100,190]]
+    positive=cf.record(archive,video(),finding(frame=4,points=points if shape else None,
+        shape_confirmed=shape),jpeg())
+    negative=cf.record(archive,video(),finding(frame=2,label='negative'),jpeg())
+    def row(frame,track,label,entry=None,propagated=False):
+        result=dict(category='plate',frame_index=frame,t_start=frame/25.,t_end=(frame+1)/25.,
+            cbox=[100,100,280,190],track=track,enabled=label=='positive',
+            plate_quad=[[0,0],[1,0],[1,1],[0,1]] if label=='positive' else [],
+            verified_label='plate' if label=='positive' else 'not_plate',
+            human_confirmation=dict(label=label,source='explicit',propagated=propagated))
+        if entry:
+            result.update(confirmed_finding_id=entry['id'],confirmed_finding_revision=1)
+        return result
+    doc=dict(provenance=dict(input_sha256='b'*64),render_state=dict(fps=25.,cum=[[0.,0.]]*10),
+        detections=[row(0,2,'negative',propagated=True),row(2,2,'negative',negative),
+                    row(4,4,'positive',positive)])
+    return job,doc,archive,positive,negative
+
+
+def test_compact_confirmed_seed_crops_train_without_legacy_annotations_or_decoder(tmp_path):
+    ls=session();job,doc,archive,positive,negative=_compact_archive_job(tmp_path)
+    def forbidden(*args):pytest.fail('Stored confirmed crop reopened source video')
+    data=ls.collect_feedback(job,doc,forbidden)
+    assert len(data['samples'])==2
+    by_label={s['label']:s for s in data['samples'].values()}
+    assert by_label['positive']['quality']=='human_quad'
+    assert by_label['positive']['frame']==4
+    assert by_label['negative']['frame']==2
+    assert by_label['positive']['archive_id']==positive['id']
+    assert by_label['negative']['archive_id']==negative['id']
+    assert np.allclose(by_label['positive']['points'],[[20/220,20/130],[200/220,20/130],
+                                                    [200/220,110/130],[20/220,110/130]])
+
+
+def test_current_archive_correction_and_revocation_override_stale_job_training_refs(tmp_path):
+    import confirmed_findings as cf
+    ls=session();job,doc,archive,positive,negative=_compact_archive_job(tmp_path)
+    def forbidden(*args):pytest.fail('Archive correction reopened source video')
+    ls.collect_feedback(job,doc,forbidden)
+    corrected=cf.update_finding(archive,positive['id'],points=[[110,110],[270,110],[270,180],[110,180]],expected_revision=1)
+    data=ls.collect_feedback(job,doc,forbidden)
+    sample=next(s for s in data['samples'].values() if s['archive_id']==positive['id'])
+    assert sample['archive_revision']==2
+    assert sample['points'][0]==pytest.approx([30/220,30/130])
+    cf.update_finding(archive,positive['id'],label='negative',expected_revision=corrected['revision'])
+    data=ls.collect_feedback(job,doc,forbidden)
+    assert all(s['label']=='negative' for s in data['samples'].values())
+    cf.forget(archive,positive['id'],expected_revision=3)
+    data=ls.collect_feedback(job,doc,forbidden)
+    assert len(data['samples'])==1
+    assert next(iter(data['samples'].values()))['archive_id']==negative['id']
+
+
+def test_compact_unshaped_positive_explains_named_checker_instead_of_mask_training(tmp_path):
+    ls=session();job,doc,*_=_compact_archive_job(tmp_path,shape=False)
+    def forbidden(*args):pytest.fail('Unshaped positive reopened source video')
+    with pytest.raises(ValueError,match='corners|named checker'):
+        ls.collect_feedback(job,doc,forbidden)
+
+
+def test_region_draft_and_propagated_classifications_do_not_create_training_seeds(tmp_path):
+    ls=session();job,doc,*_=_compact_archive_job(tmp_path)
+    for row in doc['detections']:
+        row.pop('confirmed_finding_id',None);row.pop('confirmed_finding_revision',None)
+        row['human_confirmation']['propagated']=True
+    draft=doc['detections'][-1]
+    draft.pop('human_confirmation');draft['human_region_confirmed']=True
+    def forbidden(*args):pytest.fail('A draft or propagated decision became a training seed')
+    assert ls.collect_feedback(job,doc,forbidden)['samples']=={}
+
+
+def test_rescan_propagated_rows_cannot_reharvest_or_resurrect_archived_seed(tmp_path):
+    import confirmed_findings as cf
+    ls=session();job,doc,archive,positive,negative=_compact_archive_job(tmp_path)
+    def forbidden(*args):pytest.fail('Propagated rescan row became a new training image')
+    first=ls.collect_feedback(job,doc,forbidden)
+    groups={s['archive_id']:s['group'] for s in first['samples'].values()}
+    for row in doc['detections']:
+        row.pop('human_confirmation',None);row.pop('confirmed_finding_id',None)
+        row.pop('confirmed_finding_revision',None)
+        row['learning_group']=groups[negative['id'] if row['track']==2 else positive['id']]
+    second=ls.collect_feedback(job,doc,forbidden)
+    assert len(second['samples'])==2
+    cf.forget(archive,negative['id'],expected_revision=1)
+    third=ls.collect_feedback(job,doc,forbidden)
+    fourth=ls.collect_feedback(job,doc,forbidden)
+    assert len(third['samples'])==len(fourth['samples'])==1
+    assert next(iter(fourth['samples'].values()))['archive_id']==positive['id']
+
+
+def test_legacy_archive_parent_then_named_correction_replaces_same_example(tmp_path):
+    import confirmed_findings as cf
+    import findings_training as ft
+    from test_findings_training import trainer, make_job
+    from test_learning_candidates import candidate_job, PASS_ID, VERSION
+    import shutil
+    ls=session();job,doc,archive,positive,negative=_compact_archive_job(tmp_path)
+    def forbidden(*args):pytest.fail('Stored seed reopened source video')
+    feedback=ls.collect_feedback(job,doc,forbidden)
+    fixture_job,fixture_folder=candidate_job(tmp_path/'fixture')
+    stage=job['dir']/'learning'/'passes'/PASS_ID
+    folder=stage/'versions'/VERSION
+    shutil.copytree(fixture_folder,folder)
+    ls.export_dataset(job['dir']/'learning',feedback,stage/'dataset')
+    splits=ls._load(stage/'dataset'/'split-groups.json')['groups']
+    parent=ft.publish_session_candidate(job,stage,folder,feedback,
+        {g for g,s in splits.items() if s=='train'},'Legacy parent')
+    cf.update_finding(archive,positive['id'],label='negative',expected_revision=1)
+    result=ft.run(make_job(tmp_path/'named'),archive,job['model_root'],
+        {'name':'Named correction','parent_model_id':parent['id'],
+         'example_ids':[positive['id']],'license_accepted':True},train=trainer)
+    lineage=ft.resolve_parent(job['model_root'],result['model_id'])['lineage']
+    same=[s for s in lineage['samples'].values() if s['source']['id']==positive['id']]
+    assert len(same)==1
+    assert same[0]['label']=='negative' and same[0]['source']['revision']==2
+    assert len(lineage['samples'])==2
+
+
 def test_training_action_rejects_missing_setup_without_starting_a_scan(plate_job,monkeypatch):
     client,jid,path,_=plate_job
     monkeypatch.delenv('OPENSCRUB_TRAIN_WEIGHTS',raising=False)
@@ -177,6 +303,67 @@ def test_validation_failure_does_not_start_full_scan_or_replace_report(plate_job
             lambda *a:pytest.fail('rejected model must not publish'),
             train=lambda *a:(tmp_path,{'version':'rejected'}),refiner=lambda *a:object(),calibration=gate)
     assert path.read_bytes()==before
+
+
+def test_named_failed_mask_candidate_is_saved_with_independent_checker_assessment(plate_job,tmp_path):
+    from test_findings_training import trainer
+    import learned_models as models
+    import learning_candidates
+    import findings_training
+    ls=session();job,old,path,folder=_seed(plate_job);before=path.read_bytes()
+    job['learning_request']['name']='Evening plates'
+    job['model_root']=tmp_path/'models'
+    weights=tmp_path/'base.pt';weights.write_bytes(b'trusted weights')
+    def local_train(dataset,versions,weight_path,job,settings):
+        return trainer(dataset,versions,weights,job,dict(settings,verifier_training=True))
+    def rejected(*args):raise ls.CoverageRejected('Mask too small')
+    with pytest.raises(ls.CoverageRejected):
+        ls.run_session(job,lambda i:web._read_exact_frame(job['video'],i),
+            lambda *a:pytest.fail('Rejected mask cannot rescan'),
+            lambda *a:pytest.fail('Rejected mask cannot publish a report'),
+            train=local_train,refiner=lambda *a:object(),calibration=rejected)
+    assert path.read_bytes()==before
+    saved=models.list_models(job['model_root'])
+    assert len(saved)==1 and saved[0]['name']=='Evening plates' and saved[0]['schema']==2
+    assert findings_training.training_info(job['model_root'],saved[0]['id'])['trainable']
+    candidate=learning_candidates.list_candidates(job['dir'])[0]
+    assert candidate['name']=='Evening plates'
+    assert candidate['mask_assessment']['status']=='failed'
+    assert candidate['assessment'] is not None
+
+
+def test_accepted_legacy_continuation_uses_detached_parent_checkpoint_and_retains_lineage(plate_job,tmp_path,monkeypatch):
+    from test_findings_training import trainer
+    import findings_training as ft
+    ls=session();job,old,path,folder=_seed(plate_job)
+    job['model_root']=tmp_path/'models'
+    job['learning_request']['name']='First pass'
+    base=tmp_path/'base.pt';base.write_bytes(b'base')
+    monkeypatch.setenv('OPENSCRUB_TRAIN_WEIGHTS',str(base))
+    seen=[]
+    def local_train(dataset,versions,weights,job,settings):
+        seen.append(Path(weights))
+        return trainer(dataset,versions,weights,job,dict(settings,verifier_training=True))
+    monkeypatch.setattr(ls.vl,'refine_report',lambda video,fresh,*a,**kw:
+        (deepcopy(fresh),{'model_calls':1,'refined':1}))
+    def execute():
+        return ls.run_session(job,lambda i:web._read_exact_frame(job['video'],i),
+            lambda destination:json.loads(path.read_text()),lambda result:ls.atomic_json(path,result),
+            train=local_train,refiner=lambda *a:object(),calibration=lambda *a:{'threshold':.5})
+    first=execute();parent_id=first['learning']['library_model_id']
+    assert first['learning']['active']['model_id']==parent_id
+    parent=ft.resolve_parent(job['model_root'],parent_id)
+    # The previous transient checkpoint and configured base can disappear;
+    # continuing the accepted model uses its verified independent local copy.
+    Path(first['learning']['active']['weights']).unlink();base.unlink()
+    changed=json.loads(path.read_text());changed['detections'][0].update(verified_label='not_plate',enabled=False)
+    path.write_text(json.dumps(changed));job['learning_request']['name']='Second pass'
+    second=execute();child_id=second['learning']['library_model_id']
+    child=ft.resolve_parent(job['model_root'],child_id)
+    assert seen[-1]==Path(parent['weights'])
+    assert child['lineage']['parent_model_id']==parent_id
+    assert all(item in child['lineage']['training_exposure'] for item in parent['lineage']['training_exposure'])
+    assert second['learning']['active']['model_id']==child_id
 
 
 def test_annotation_group_remains_identical_after_rescan_ids_change(plate_job):

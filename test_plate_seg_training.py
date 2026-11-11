@@ -94,6 +94,17 @@ def test_weak_and_automatic_labels_rejected(dataset, bad_quality):
         training.validate_dataset(root)
 
 
+def test_confirmed_regions_require_explicit_verifier_only_opt_in(dataset):
+    root, rows = dataset
+    rows[0]['quality'] = 'human_region'
+    _write_rows(root, rows)
+    with pytest.raises(training.DataError, match='Unverified/weak'):
+        training.validate_dataset(root)
+    report = training.validate_dataset(root, allow_confirmed_regions=True)
+    assert report['supervision'] == 'confirmed_regions'
+    assert report['mask_eligible'] is False
+
+
 def test_rejects_invalid_four_point_geometry(dataset):
     root, rows = dataset
     label_path = root / "labels" / "train" / (

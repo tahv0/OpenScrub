@@ -159,7 +159,7 @@ def test_scroll_jump_loads_current_cards_before_old_queue(review_server, width, 
         page.evaluate('''() => {
           window.__fetchBeforeHold=window.fetch;window.__coldStarts=[];
           window.fetch=async(url,opts)=>{
-            const m=String(url).match(/\\/thumb\\/(\\d+)/);
+            const m=String(url).match(/\\/finding-preview\\/(\\d+)/);
             if(m&&!String(url).includes('cache_only=1')){
               __coldStarts.push(Number(m[1]));
               if(!window.__held){window.__held=true;await new Promise(r=>window.__releaseCold=r);}
@@ -182,6 +182,7 @@ def test_scroll_jump_loads_current_cards_before_old_queue(review_server, width, 
         assert len(started)<14, started
         assert page.locator('#det85 canvas').count()==1
         page.locator('#det85').get_by_role('button',name='✕ Not a plate',exact=True).click()
+        page.evaluate('CONFIRM_CHAIN')
         assert page.locator('#det85 .det-status').inner_text()=='Will stay visible'
         evidence=Path(os.environ.get('REVIEW_EVIDENCE_DIR',str(tmp_path)));evidence.mkdir(parents=True,exist_ok=True)
         page.screenshot(path=str(evidence/('viewport-priority-%s.png'%width)))
@@ -198,13 +199,13 @@ def test_scroll_jump_loads_current_cards_before_old_queue(review_server, width, 
 def test_busy_preview_retries_automatically_without_another_click(review_server,monkeypatch):
     from flask import request,jsonify
     url,_=review_server
-    old=web.app.view_functions['job_thumb'];cold=[]
-    def busy_once(jid,i):
-        if i==0 and request.args.get('cache_only')!='1':
-            cold.append(i)
+    old=web.app.view_functions['finding_preview'];cold=[]
+    def busy_once(jid,index):
+        if index==0 and request.args.get('cache_only')!='1':
+            cold.append(index)
             if len(cold)==1:return jsonify(error='Synthetic busy decoder'),503
-        return old(jid,i)
-    monkeypatch.setitem(web.app.view_functions,'job_thumb',busy_once)
+        return old(jid,index)
+    monkeypatch.setitem(web.app.view_functions,'finding_preview',busy_once)
     api=pytest.importorskip('playwright.sync_api')
     with api.sync_playwright() as pw:
         browser=browser_instance(pw);page=browser.new_page(viewport={'width':1440,'height':1000})

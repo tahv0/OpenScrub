@@ -61,6 +61,14 @@ def test_packaged_preflight_ignores_server_and_working_directory_packages(runtim
     assert result['script'] == str(script)
 
 
+def test_preflight_uses_resolved_parent_checkpoint_without_configured_base(runtime, monkeypatch):
+    _, _, _, weights = runtime
+    monkeypatch.delenv('OPENSCRUB_TRAIN_WEIGHTS')
+    result = ls.preflight(weights=weights)
+    assert result['ready'], result['problems']
+    assert result['weights'] == str(weights)
+
+
 def test_preflight_loads_actual_trainer_before_optional_imports(runtime):
     _, site, _, _ = runtime
     # Loose import torch... used to pass even if the trainer's first import failed.

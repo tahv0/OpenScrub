@@ -2,6 +2,14 @@ name: Video learning loop
 on:
   pull_request:
     paths:
+      - 'confirmed_findings.py'
+      - 'finding_previews.py'
+      - 'findings*.py'
+      - 'plate_text*.py'
+      - 'test_confirmed_findings.py'
+      - 'test_finding_previews.py'
+      - 'test_findings*.py'
+      - 'test_plate_text*.py'
       - 'video_learning.py'
       - 'learning_session.py'
       - 'openscrub.py'
@@ -13,6 +21,7 @@ on:
       - 'requirements.training.txt'
       - 'Dockerfile*'
       - 'compose.windows-training.yml'
+      - 'windows/openscrub.spec'
       - 'pyproject.toml'
       - '.github/workflows/video-learning.yml'
   workflow_dispatch:
@@ -43,10 +52,10 @@ jobs:
       - name: Syntax and learning/regression tests
         run: |
           set -o pipefail
-          python -m compileall -q openscrub.py openscrub_web.py video_learning.py learning_session.py scripts tools/smoke_learning_cpu.py
+          python -m compileall -q openscrub.py openscrub_web.py video_learning.py learning_session.py confirmed_findings.py finding_previews.py findings_training.py findings_web.py findings_ui.py plate_text_hints.py plate_text_web.py scripts tools/smoke_learning_cpu.py
           python -c 'import openscrub_web;open("/tmp/learning-app.js","w").write(openscrub_web.APP_JS)'
           node --check /tmp/learning-app.js
-          python -m pytest -q test_plate_quad.py test_plate_quad_editor.py test_plate_quad_autosave.py test_review_performance.py test_stop_review.py test_plate_seg_training.py test_learning_session.py test_video_learning.py test_learning_packaging.py | tee /tmp/learning-unit.txt
+          python -m pytest -q test_plate_quad.py test_plate_quad_editor.py test_plate_quad_autosave.py test_review_performance.py test_stop_review.py test_plate_seg_training.py test_learning_session.py test_video_learning.py test_learning_packaging.py test_confirmed_findings.py test_finding_previews.py test_findings*.py test_plate_text*.py | tee /tmp/learning-unit.txt
           python -m pytest -q test_openscrub.py -k 'review or indexed or plate_quad or rotation or four_corner or late_frame' | tee /tmp/learning-related.txt
       - name: Real HTTP desktop/mobile learning and editing
         run: |
@@ -64,7 +73,7 @@ jobs:
           python -m venv --system-site-packages /tmp/learning-package-test
           /tmp/learning-package-test/bin/python -m pip install --no-deps dist/*.whl
           cd /tmp
-          /tmp/learning-package-test/bin/python -c 'import openscrub_web, learning_session, video_learning, openscrub_train_plate_seg; print("Installed learning modules import successfully")'
+          /tmp/learning-package-test/bin/python -c 'import openscrub_web, learning_session, video_learning, openscrub_train_plate_seg, confirmed_findings, finding_previews, findings_training, findings_web, findings_ui, plate_text_hints, plate_text_web; print("Installed learning modules import successfully")'
       - uses: actions/upload-artifact@v4
         if: always()
         with:

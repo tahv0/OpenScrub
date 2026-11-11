@@ -98,33 +98,37 @@ def test_sparse_payload_and_newer_decisions_survive_save(review_server,width,tmp
             __payloads.push(JSON.parse(opts.body));
             if(__payloads.length===1)await new Promise(r=>window.__releaseSave=r);
            }return __savedFetch(url,opts);};}''')
-        page.locator('#det20').get_by_role('button',name='✕ Not a plate',exact=True).click()
+        page.locator('#det20').get_by_role('button',name='Keep visible',exact=True).click()
         page.evaluate('window.__saveResult=saveAndRender(true);void 0')
         page.wait_for_function('typeof __releaseSave==="function"')
         first=page.evaluate('__payloads[0]')
         assert len(first['enabled'])==20, 'Do not resend 2,000 unchanged visibility entries'
-        assert len(first['verified_labels'])==20, 'Do not resend old confirmed labels'
+        assert first['verified_labels']=={}, 'Output drafts must not invent or resend training labels'
+        assert len(first['output_choices'])==20
         assert set(first['enabled'])=={str(i) for i in range(20,40)}
-        page.locator('#det40').get_by_role('button',name='✕ Not a plate',exact=True).click()
+        page.locator('#det40').get_by_role('button',name='Keep visible',exact=True).click()
         page.evaluate('__releaseSave()')
         assert page.evaluate('__saveResult') is False, 'Newer changes must remain unsaved'
         assert page.evaluate('reviewChoicesPending()')
         assert page.evaluate('saveAndRender(true)') is True
         second=page.evaluate('__payloads[1]')
         assert set(second['enabled'])=={str(i) for i in range(40,60)}
-        # An explicit output-only click clears, rather than confirms, a saved label.
+        # Output-only controls preserve an existing explicit classification.
         page.locator('#det0').get_by_role('button',name='Blur',exact=True).click()
         assert page.evaluate('saveAndRender(true)') is True
         third=page.evaluate('__payloads[2]')
         assert third['enabled']=={str(i):True for i in range(20)}, 'Explicit same-value Blur preserves the human override'
-        assert third['verified_labels']=={str(i):'clear' for i in range(20)}
+        assert third['verified_labels']=={}
+        assert third['output_choices']=={str(i):True for i in range(20)}
         saved=json.loads(report.read_text())['detections']
         assert all(r['enabled'] is True and r.get('plate_verification_override') is True for r in saved[:20])
-        assert all(r['enabled'] is False and r['verified_label']=='not_plate' for r in saved[20:60])
-        assert all(r.get('verified_label','')=='' for r in saved[:20]+saved[60:])
+        assert all(r['enabled'] is False and not r.get('verified_label') for r in saved[20:60])
+        assert all(r.get('verified_label')=='plate' for r in saved[:20])
+        assert all(not r.get('verified_label') for r in saved[60:])
+        with web.app.test_client() as client:
+            assert client.get('/api/findings').get_json()['total']==0, 'Output choices alone never create archived examples'
         assert not any(r.get('plate_verification_override') for r in saved[60:]), 'Untouched findings must remain untouched'
-        # The explicit clear is acknowledged once, rather than replayed on
-        # every save of the otherwise unchanged report.
+        # Output choices are acknowledged once and do not repeat on unchanged saves.
         acknowledged=report.read_bytes()
         assert page.evaluate('saveAndRender(true)') is True
         fourth=page.evaluate('__payloads[3]')
@@ -153,7 +157,7 @@ def test_actual_save_over_fifteen_seconds_waits_for_disk_confirmation(review_ser
         browser=browser_instance(pw);page=browser.new_page(viewport={'width':1440,'height':1000})
         page.set_default_timeout(25000)
         dialogs,errors=open_review(page,url)
-        page.locator('#det0').get_by_role('button',name='✕ Not a plate',exact=True).click()
+        page.locator('#det0').get_by_role('button',name='Keep visible',exact=True).click()
         if os.environ.get('REVIEW_INPROCESS')=='1':
             # The local Flask bridge cannot interrupt a Python binding; inject
             # the same delay at fetch with real browser AbortSignal handling.
@@ -168,7 +172,8 @@ def test_actual_save_over_fifteen_seconds_waits_for_disk_confirmation(review_ser
         assert page.evaluate('saveAndRender(true)') is True
         assert time.monotonic()-started>=16
         assert 'saved to disk' in page.locator('#reviewSaveStatus').inner_text().lower()
-        assert json.loads(report.read_text())['detections'][0]['verified_label']=='not_plate'
+        saved=json.loads(report.read_text())['detections'][0]
+        assert saved['enabled'] is False and not saved.get('verified_label')
         assert not dialogs and not errors,(dialogs,errors)
         browser.close()
 
@@ -242,8 +247,8 @@ def test_large_legacy_payload_saves_over_real_http(production_server,monkeypatch
 from test_review_save_confirmation import production_server
 
 
-def test_output_choice_can_clear_a_label_written_by_corner_autosave(review_server):
-    """The sparse baseline must follow successful independent corner writes."""
+def test_region_draft_requires_explicit_label_and_output_preserves_confirmation(review_server):
+    """Geometry drafts never label; output controls preserve explicit evidence."""
     from test_review_browser import drag_corner
     url,path=review_server
     api=pytest.importorskip('playwright.sync_api')
@@ -255,9 +260,27 @@ def test_output_choice_can_clear_a_label_written_by_corner_autosave(review_serve
         page.wait_for_function('!!document.querySelector("#det0 img")._quadEdit')
         drag_corner(page,card)
         assert page.evaluate('flushPlateSaves()') is True
-        assert json.loads(path.read_text())['detections'][0]['verified_label']=='plate'
+        draft=json.loads(path.read_text())['detections'][0]
+        assert draft.get('plate_quad') and not draft.get('verified_label')
+        with web.app.test_client() as client:
+            assert client.get('/api/findings').get_json()['total']==0
+        card.get_by_role('button',name='✓ Is a plate',exact=True).click()
+        page.evaluate('CONFIRM_CHAIN')
+        saved=json.loads(path.read_text())['detections'][0]
+        assert saved['verified_label']=='plate' and saved.get('confirmed_finding_id')
+        with web.app.test_client() as client:
+            archived=client.get('/api/findings').get_json()
+            assert archived['total']==1 and archived['items'][0]['label']=='positive'
+            assert archived['items'][0]['shape_confirmed'] is True
+        card.get_by_role('button',name='Keep visible',exact=True).click()
+        assert page.evaluate('saveAndRender(true)') is True
+        kept=json.loads(path.read_text())['detections'][0]
+        assert kept['enabled'] is False and kept['verified_label']=='plate'
         card.get_by_role('button',name='Blur',exact=True).click()
         assert page.evaluate('saveAndRender(true)') is True
-        assert json.loads(path.read_text())['detections'][0]['verified_label']=='', 'Explicit clear must reach disk'
+        blurred=json.loads(path.read_text())['detections'][0]
+        assert blurred['enabled'] is True and blurred['verified_label']=='plate'
+        with web.app.test_client() as client:
+            assert client.get('/api/findings').get_json()==archived, 'Output changes must not rewrite archived classification'
         assert not dialogs and not errors,(dialogs,errors)
         browser.close()
