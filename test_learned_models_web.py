@@ -256,3 +256,65 @@ def test_worker_refines_fresh_chunks_before_merge_and_preserves_review(model_app
     assert final["detections"][1]["frame_index"] == 8
     assert final["refinement"]["inference"]["model_calls"] == 1
     assert calls[1].plate_learning_exact is True
+
+
+@pytest.mark.parametrize("damage", [False, True])
+def test_restart_before_first_report_retains_pinned_model(model_app, tmp_path, damage):
+    _, root = model_app
+    selected = _saved(root, tmp_path)
+    source = _video(tmp_path / "before-checkpoint.mp4")
+    job = web.new_job(str(source), {"categories": "plate",
+                                   "learned_plate_model": selected["id"]}, source.name)
+    uploaded = Path(job["dir"]) / "input.mp4"
+    uploaded.write_bytes(source.read_bytes())
+    job["video"] = str(uploaded)
+    assert not (Path(job["dir"]) / "report.json").exists()
+    library().delete_model(root / "learned_plate_models", selected["id"])
+    if damage:
+        (Path(job["dir"]) / "plate_model" / "model.onnx").write_bytes(b"damaged snapshot")
+    web.JOBS.clear()
+    web.rehydrate_jobs()
+    recovered = web.JOBS[job["id"]]
+    assert recovered["phase"] == "error"
+    assert recovered["options"].get("learned_plate_model"), "A selected model must never silently disappear"
+    if damage:
+        assert "model" in recovered["error"].lower()
+        with pytest.raises(library().ModelError):
+            web.build_args(recovered)
+    else:
+        assert recovered["options"]["learned_plate_model"] == selected["id"]
+        assert recovered["refinement"]["model_sha256"] == selected["model_sha256"]
+        assert web.build_args(recovered).plate_learning_exact is True
+
+
+def test_model_upload_limit_applies_before_parsing_and_is_request_scoped(model_app, monkeypatch):
+    import flask
+    limit = web.learned_models.MAX_MODEL_BYTES + 1024 * 1024
+    for global_limit in (None, limit * 4, limit // 2):
+        monkeypatch.setitem(web.app.config, "MAX_CONTENT_LENGTH", global_limit)
+        with web.app.test_request_context("/api/jobs/learned-models/import", method="POST"):
+            assert flask.request.max_content_length == min(global_limit or limit, limit)
+        with web.app.test_request_context("/api/jobs", method="POST"):
+            assert flask.request.max_content_length == global_limit
+    monkeypatch.setitem(web.app.config, "MAX_CONTENT_LENGTH", None)
+    client, _ = model_app
+    oversized = client.post("/api/jobs/learned-models/import",
+                            environ_overrides={"CONTENT_LENGTH": str(limit + 1)})
+    assert oversized.status_code == 413
+    assert "model" in oversized.get_json()["error"].lower()
+
+
+def test_model_import_works_with_read_only_flask_request_limit(model_app, monkeypatch, tmp_path):
+    import flask
+    # Flask through 3.0 exposes this read-only property. Preserve that actual
+    # boundary without replacing request parsing, the upload stream, or ZIP IO.
+    monkeypatch.setattr(flask.Request, "max_content_length",
+                        property(lambda self: flask.current_app.config["MAX_CONTENT_LENGTH"]))
+    client, root = model_app
+    saved = _saved(root, tmp_path)
+    payload = library().export_model(root / "learned_plate_models", saved["id"])
+    response = client.post("/api/jobs/learned-models/import",
+                           data={"model": (io.BytesIO(payload), "portable.openscrub-model")},
+                           content_type="multipart/form-data")
+    assert response.status_code == 200, response.get_data(as_text=True)
+    assert response.get_json()["model"]["model_sha256"] == saved["model_sha256"]

@@ -6,7 +6,7 @@ import shutil
 
 import pytest
 import openscrub_web as web
-from test_learned_models import accepted_job
+from test_learned_models import accepted_job, library
 from test_review_browser import review_server, browser_instance, load_browser_page
 
 
@@ -77,3 +77,158 @@ def test_reusable_models_save_select_and_transfer_ui(review_server, tmp_path, mo
         page.evaluate("location.hash=''")
         page.locator("#learnedPlateModelControls").screenshot(path=str(evidence / ("model-selection-%s.png" % width)))
         browser.close()
+
+
+
+def _defer_next_model_list_response(page):
+    """Delay delivery of a real API response without replacing its contents."""
+    page.evaluate("""() => {
+      const originalFetch=window.fetch.bind(window);
+      let delayNext=true;
+      window.__releaseModelList=null;
+      window.fetch=async(input, options={})=>{
+        const address=typeof input==="string" ? input : input.url;
+        const isList=new URL(address,document.baseURI).pathname==="/api/jobs/learned-models";
+        if(delayNext && isList && (options.method||"GET").toUpperCase()==="GET"){
+          delayNext=false;
+          const response=await originalFetch(input,options);
+          return new Promise(resolve=>{
+            window.__releaseModelList=()=>resolve(response);
+          });
+        }
+        return originalFetch(input,options);
+      };
+      window.__pendingModelRefresh=refreshLearnedModels();
+    }""")
+    page.wait_for_function("typeof window.__releaseModelList==='function'")
+
+
+def _release_model_list_response(page):
+    page.evaluate("""async() => {
+      window.__releaseModelList();
+      await window.__pendingModelRefresh;
+    }""")
+
+
+def test_model_library_refresh_keeps_selection_made_while_response_is_pending(
+        review_server, tmp_path, monkeypatch):
+    sync = pytest.importorskip("playwright.sync_api")
+    url, _ = review_server
+    root = tmp_path / "selection-jobs"
+    root.mkdir()
+    monkeypatch.setattr(web, "JOBS_DIR", str(root))
+    monkeypatch.setattr(web, "vault_locked", lambda: False)
+    saved = library().save_model(root / "learned_plate_models",
+                                 accepted_job(tmp_path / "trained-seed"),
+                                 "Garage daylight")
+    with sync.sync_playwright() as pw:
+        browser = browser_instance(pw)
+        try:
+            page = browser.new_page(viewport={"width": 1440, "height": 1000})
+            page.set_default_timeout(15000)
+            load_browser_page(page, url, [], [])
+            sync.expect(page.locator("#learnedPlateModel option")).to_have_count(2)
+            page.evaluate("location.hash='#settings'")
+            page.locator("#learnedModelLibrary .learned-model").wait_for()
+            assert page.locator("#learnedPlateModel").input_value() == ""
+            _defer_next_model_list_response(page)
+            page.get_by_role("button", name="Use for next scan", exact=True).click()
+            sync.expect(page.locator("#mainview")).to_be_visible()
+            assert page.locator("#learnedPlateModel").input_value() == saved["id"]
+            _release_model_list_response(page)
+            assert page.locator("#learnedPlateModel").input_value() == saved["id"], (
+                "An earlier list request discarded the model chosen for the next scan")
+        finally:
+            browser.close()
+
+
+def test_model_library_ignores_an_older_list_response(
+        review_server, tmp_path, monkeypatch):
+    sync = pytest.importorskip("playwright.sync_api")
+    url, _ = review_server
+    root = tmp_path / "response-order-jobs"
+    root.mkdir()
+    monkeypatch.setattr(web, "JOBS_DIR", str(root))
+    monkeypatch.setattr(web, "vault_locked", lambda: False)
+    seed = accepted_job(tmp_path / "trained-seed")
+    library().save_model(root / "learned_plate_models", seed, "First camera")
+    with sync.sync_playwright() as pw:
+        browser = browser_instance(pw)
+        try:
+            page = browser.new_page(viewport={"width": 1440, "height": 1000})
+            page.set_default_timeout(15000)
+            load_browser_page(page, url, [], [])
+            sync.expect(page.locator("#learnedPlateModel option")).to_have_count(2)
+            _defer_next_model_list_response(page)
+            # The delayed response already contains the one-model snapshot.
+            second = library().save_model(root / "learned_plate_models", seed, "Second camera")
+            assert page.evaluate("refreshLearnedModels()") is True
+            sync.expect(page.locator("#learnedModelLibrary .learned-model")).to_have_count(2)
+            sync.expect(page.locator("#learnedPlateModel option")).to_have_count(3)
+            _release_model_list_response(page)
+            sync.expect(page.locator("#learnedModelLibrary .learned-model")).to_have_count(2)
+            assert page.locator("#learnedPlateModel option").evaluate_all(
+                "(items)=>items.map(item=>item.value)").count(second["id"]) == 1, (
+                "An older response replaced the newer model library")
+        finally:
+            browser.close()
+
+
+def test_model_library_controls_follow_real_vault_unlock_and_lock(
+        review_server, tmp_path, monkeypatch):
+    sync = pytest.importorskip("playwright.sync_api")
+    url, _ = review_server
+    data_root = tmp_path / "encrypted-application"
+    root = data_root / "jobs"
+    root.mkdir(parents=True)
+    monkeypatch.setattr(web, "_data_root", lambda: str(data_root))
+    monkeypatch.setattr(web, "JOBS_DIR", str(root))
+    monkeypatch.setattr(web, "VAULT", {"key": None})
+    monkeypatch.setattr(web, "_web_settings", lambda: {})
+    saved = library().save_model(root / "learned_plate_models",
+                                 accepted_job(tmp_path / "trained-seed"),
+                                 "Private garage camera")
+    model_dir = root / "learned_plate_models" / saved["id"]
+    password = "synthetic-vault-password"
+    with web.app.test_client() as client:
+        assert client.post("/api/vault/setup", json={"password": password}).status_code == 200
+        assert client.post("/api/vault/lock").status_code == 200
+    assert (model_dir / "model.onnx.osvault").is_file()
+    assert not (model_dir / "model.onnx").exists()
+    errors = []
+    with sync.sync_playwright() as pw:
+        browser = browser_instance(pw)
+        try:
+            page = browser.new_page(viewport={"width": 1440, "height": 1000})
+            page.set_default_timeout(15000)
+            page.on("pageerror", lambda error: errors.append(str(error)))
+            page.on("dialog", lambda dialog: dialog.accept())
+            load_browser_page(page, url, [], [])
+            selector = page.locator("#learnedPlateModel")
+            sync.expect(selector).to_be_disabled()
+            page.evaluate("location.hash='#settings'")
+            sync.expect(page.locator("#vunlock")).to_be_visible()
+            sync.expect(page.locator("#learnedModelLibrary .learned-model")).to_have_count(0)
+            sync.expect(page.locator("#learnedPlateModel option")).to_have_count(1)
+            assert saved["name"] not in page.locator("#learnedModelsPanel").inner_text()
+            page.locator("#vpw").fill(password)
+            page.get_by_role("button", name="Unlock", exact=True).click()
+            # No manual model Refresh or view navigation should be necessary.
+            sync.expect(selector).to_be_enabled()
+            sync.expect(page.locator("#learnedModelLibrary .learned-model")).to_have_count(1)
+            sync.expect(page.locator("#learnedModelLibrary")).to_contain_text(saved["name"])
+            sync.expect(page.locator("#learnedPlateModel option")).to_have_count(2)
+            assert selector.input_value() == ""
+            assert (model_dir / "model.onnx").is_file()
+            page.get_by_role("button", name="Lock now (encrypt all job files)", exact=True).click()
+            sync.expect(page.locator("#vstat")).to_contain_text("LOCKED")
+            sync.expect(selector).to_be_disabled()
+            sync.expect(page.locator("#learnedModelLibrary .learned-model")).to_have_count(0)
+            sync.expect(page.locator("#learnedPlateModel option")).to_have_count(1)
+            assert selector.input_value() == ""
+            assert saved["name"] not in page.locator("#learnedModelsPanel").inner_text()
+            assert (model_dir / "model.onnx.osvault").is_file()
+            assert not (model_dir / "model.onnx").exists()
+            assert not errors, errors
+        finally:
+            browser.close()

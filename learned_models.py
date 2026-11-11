@@ -4,6 +4,7 @@ Only the accepted artifact named by a job's committed report may be saved.
 Portable archives contain an ONNX graph and a small, whitelisted manifest;
 calibration metadata describes the original training checks, not new videos.
 """
+from collections import OrderedDict
 from contextlib import contextmanager
 from datetime import datetime, timezone
 import functools
@@ -17,6 +18,7 @@ import re
 import shutil
 import stat
 import tempfile
+import threading
 import unicodedata
 import uuid
 import zipfile
@@ -43,6 +45,10 @@ _VALIDATION_FIELDS = {
 _KIND = 'openscrub-plate-mask-refiner'
 _ID = re.compile(r'[0-9a-f]{32}')
 _HASH = re.compile(r'[0-9a-f]{64}')
+# Only successful validation metadata lives here, never model bytes or sessions.
+_VALIDATED_ONNX = OrderedDict()
+_VALIDATION_CACHE_LIMIT = 16
+_VALIDATION_CACHE_LOCK = threading.Lock()
 
 
 def _boundary(function):
@@ -53,6 +59,8 @@ def _boundary(function):
             return function(*args, **kwargs)
         except ModelError:
             raise
+        except OSError as error:
+            raise ModelError('Model files are missing, unreadable, or could not be saved') from error
         except Exception as error:
             raise ModelError('Model operation failed: ' + str(error)) from error
     return guarded
@@ -156,7 +164,7 @@ def _no_links(path):
         except FileNotFoundError:
             continue
         if stat.S_ISLNK(mode):
-            raise ModelError('Symbolic links are not permitted for model files: ' + str(component))
+            raise ModelError('Symbolic links are not permitted for model files')
     return path
 
 
@@ -166,7 +174,7 @@ def _directory(path, create=False):
         path.mkdir(mode=0o700, parents=True, exist_ok=True)
         _no_links(path)
     if not path.is_dir():
-        raise ModelError('Model directory is missing: ' + str(path))
+        raise ModelError('A required model directory is missing or is not a directory')
     return path
 
 
@@ -211,6 +219,23 @@ def _json(payload):
 
 
 def _validate_onnx(payload):
+    """Reuse only successful digest metadata; changed bytes always get checked."""
+    digest = hashlib.sha256(payload).hexdigest()
+    with _VALIDATION_CACHE_LOCK:
+        cached = _VALIDATED_ONNX.get(digest)
+        if cached is not None:
+            _VALIDATED_ONNX.move_to_end(digest)
+            return cached
+    size = _validate_onnx_uncached(payload)
+    with _VALIDATION_CACHE_LOCK:
+        _VALIDATED_ONNX[digest] = size
+        _VALIDATED_ONNX.move_to_end(digest)
+        while len(_VALIDATED_ONNX) > _VALIDATION_CACHE_LIMIT:
+            _VALIDATED_ONNX.popitem(last=False)
+    return size
+
+
+def _validate_onnx_uncached(payload):
     """Validate real inference from bytes; external ONNX data cannot read a path."""
     import onnxruntime as ort
     from video_learning import decode_segment
@@ -243,7 +268,7 @@ def _validate_onnx(payload):
     except ModelError:
         raise
     except Exception as error:
-        raise ModelError('Invalid or unsupported ONNX segmentation model: ' + str(error)) from error
+        raise ModelError('Invalid or unsupported ONNX segmentation model') from error
 
 
 def _verify(manifest, payload):
@@ -357,6 +382,24 @@ def save_model(root, job_dir, name, description=''):
     return manifest
 
 
+class _SeekableArchiveReader:
+    """Supply ZipFile's seekable interface for Python 3.10 uploaded temp files."""
+    def __init__(self, source):
+        self._source = source
+
+    def read(self, size=-1):
+        return self._source.read(size)
+
+    def seek(self, offset, whence=os.SEEK_SET):
+        return self._source.seek(offset, whence)
+
+    def tell(self):
+        return self._source.tell()
+
+    def seekable(self):
+        return True
+
+
 def _check_archive_stream(stream):
     # Bound the archive itself before ZipFile reads its central directory.
     stream.seek(0, os.SEEK_END)
@@ -364,7 +407,7 @@ def _check_archive_stream(stream):
     if length > _ARCHIVE_LIMIT:
         raise ModelError('Model archive exceeds its size limit')
     stream.seek(0)
-    return stream
+    return _SeekableArchiveReader(stream)
 
 
 @contextmanager
@@ -378,7 +421,10 @@ def _archive_source(archive):
                 raise ModelError('Model archive must be a regular file')
             yield _check_archive_stream(stream)
     else:
-        if not hasattr(archive, 'read') or not hasattr(archive, 'seek') or not archive.seekable():
+        if not all(callable(getattr(archive, method, None)) for method in ('read', 'seek', 'tell')):
+            raise ModelError('Model archive must be a seekable binary stream')
+        seekable = getattr(archive, 'seekable', None)
+        if callable(seekable) and not seekable():
             raise ModelError('Model archive must be a seekable binary stream')
         yield _check_archive_stream(archive)
 
