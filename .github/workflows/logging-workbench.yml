@@ -1,0 +1,22 @@
+name: Logging workbench
+on:
+  push:
+    branches: [fix/persistent-job-logging]
+    paths: [.github/workflows/logging-workbench.yml]
+permissions:
+  contents: read
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          mkdir -p /tmp/logging-source/wheels
+          git archive --format=tar HEAD > /tmp/logging-source/source.tar
+          python -m pip download --only-binary=:all: --dest /tmp/logging-source/wheels flask cheroot pytest-timeout build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: logging-source
+          path: /tmp/logging-source
+          retention-days: 2
