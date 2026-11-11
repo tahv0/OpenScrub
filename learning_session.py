@@ -25,6 +25,7 @@ import numpy as np
 
 import video_learning as vl
 import stop_review
+import openscrub_logging as diagnostics
 
 
 def sha256(path):
@@ -89,7 +90,11 @@ def update_learning(job,stage=None,message=None,*,progressed=False,**fields):
     if message is not None:state['message']=message
     state.update(fields)
     state['updated_at']=now
-    if advanced:state['last_progress_at']=now
+    if advanced:
+        state['last_progress_at']=now
+        diagnostics.progress(job,state.get('stage'),
+                             (state.get('done'),state.get('epoch'),state.get('batch'),state.get('source_frame')),
+                             state.get('total'))
     else:state.setdefault('last_progress_at',state['started_at'])
     return state
 
@@ -350,6 +355,7 @@ def collect_feedback(job,doc,read_frame=None,log=None):
     completed=0;total=len(requested);last_notice=[0.]
     positive=sum(item[2]=='positive' for item in requested)
     def progress(decoded=-1,target=None,force=False):
+        diagnostics.progress(job,'collecting',decoded,target)
         now=time.monotonic()
         if not force and now-last_notice[0]<2:return
         last_notice[0]=now
@@ -571,7 +577,7 @@ def _training_command(script, *arguments):
     # Do not put that directory (or PYTHONPATH/user site) on the training path.
     # -I ignores PYTHONUNBUFFERED too, so -u is explicit for live epoch logs.
     return [os.environ.get('OPENSCRUB_TRAIN_PYTHON', sys.executable),
-            '-I', '-u', str(script), *arguments]
+            '-I', '-u', '-X', 'faulthandler', str(script), *arguments]
 
 
 def preflight():
@@ -584,8 +590,12 @@ def preflight():
     try:
         check=subprocess.run(_training_command(script, 'preflight'),
             capture_output=True,text=True,timeout=30)
-        if check.returncode:problems.append('Training environment is not ready: '+(check.stderr.strip().splitlines() or ['unknown import failure'])[-1])
-    except (OSError,subprocess.TimeoutExpired) as e:problems.append('Training Python cannot run: '+str(e))
+        if check.returncode:
+            diagnostics.event('training_preflight_failed',level=40,returncode=check.returncode,stderr=check.stderr)
+            problems.append('Training environment is not ready: '+(check.stderr.strip().splitlines() or ['unknown import failure'])[-1])
+    except (OSError,subprocess.TimeoutExpired) as e:
+        diagnostics.exception('training_preflight_process_failed')
+        problems.append('Training Python cannot run: '+str(e))
     return {'ready':not problems,'problems':problems,'python':python,'weights':weights,'script':str(script)}
 
 
@@ -629,10 +639,12 @@ def run_training(dataset,versions,weights,job,settings):
         '--workers','0','--accept-ultralytics-license','--progress')
     private_dir(versions)
     logfile=Path(versions).parent/'training.log'
+    diagnostics.attach_job(job)
     update_learning(job,'training','Starting the local training process',done=0,total=None,unit=None)
     with open(logfile,'w',encoding='utf-8') as log:
         process=subprocess.Popen(command,stdout=log,stderr=subprocess.STDOUT,
                                  start_new_session=os.name!='nt')
+        diagnostics.event('training_process_started',job,child_pid=process.pid,logfile=logfile)
         with open(logfile,encoding='utf-8',errors='replace') as output:
             pending=''
             def drain(final=False):
@@ -664,15 +676,19 @@ def run_training(dataset,versions,weights,job,settings):
                     if time.monotonic()-started>43200:raise TimeoutError('Training exceeded the 12-hour process limit')
                     if job['cancel'].wait(.5):raise InterruptedError('Training cancelled; prior review retained')
                 drain(final=True) # A fast child can finish between poll ticks.
+                diagnostics.event('training_process_exited',job,child_pid=process.pid,returncode=process.returncode,
+                                  level=40 if process.returncode else 20)
                 if process.returncode:
                     tail=logfile.read_text(encoding='utf-8',errors='replace').splitlines()[-12:]
                     raise ValueError('Training failed: '+'\n'.join(tail))
             finally:
                 if process.poll() is None:
+                    diagnostics.event('training_process_terminating',job,child_pid=process.pid,level=30)
                     if os.name!='nt':os.killpg(process.pid,signal.SIGTERM)
                     else:process.terminate()
                     try:process.wait(timeout=10)
                     except subprocess.TimeoutExpired:
+                        diagnostics.event('training_process_forced_kill',job,child_pid=process.pid,level=40)
                         if os.name!='nt':os.killpg(process.pid,signal.SIGKILL)
                         else:process.kill()
                         process.wait()
@@ -690,41 +706,166 @@ def run_training(dataset,versions,weights,job,settings):
     return folder,meta
 
 
-def calibrate(model,dataset):
-    """Require an actually tighter held-out mask without known undercoverage.
+def _validate_snapshot(dataset):
+    """Use the packaged validator without importing the optional CUDA trainer."""
+    spec=importlib.util.spec_from_file_location('_openscrub_snapshot_check',trainer_script())
+    module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+    return module.validate_dataset(dataset)
 
-    Empty predictions keep the original proposal. This is not a statistical
-    guarantee for unseen frames, nor permission to reject new detections.
+
+def _reuse_candidate(root, dataset_report, source):
+    """An explicit reuse request may NEVER fall back to training.
+
+    Match this job's immutable source and exact validated dataset, including
+    split, images, labels and frame identities. Old candidates are supported.
     """
-    dataset=Path(dataset);examples=[]
+    root=Path(root).resolve()
+    files=sorted((root/'passes').glob('pass-*/versions/v*/manifest.json'),
+                 key=lambda p:p.parent.name,reverse=True)
+    for path in files:
+        if not path.resolve().is_relative_to(root):continue
+        folder=path.parent;stage=folder.parent.parent
+        meta=_load(path,{})
+        if (meta.get('status')!='candidate' or meta.get('version')!=folder.name or
+                (meta.get('dataset') or {}).get('dataset_sha256')!=dataset_report['dataset_sha256']):continue
+        before=_load(stage/'before-report.json',{})
+        if before.get('provenance',{}).get('input_sha256')!=source:continue
+        for name in ('model.onnx','weights.pt'):
+            artifact=folder/name
+            if (not artifact.is_file() or not artifact.resolve().is_relative_to(root) or
+                    sha256(artifact)!=meta.get('artifacts',{}).get(name)):
+                raise ValueError('Saved candidate integrity/checksum check failed; no training started')
+        saved=_validate_snapshot(stage/'dataset')
+        if saved['dataset_sha256']!=dataset_report['dataset_sha256']:
+            raise ValueError('Saved candidate dataset changed; no training started')
+        return folder,meta
+    raise ValueError('No compatible saved candidate for this source and these exact reviewed examples/splits. '
+                     'No training was started. Keep the original pass files; changed examples require a new training pass.')
+
+
+def _coverage_preview(image, gt, raw, proposed, row, margin):
+    """Small inspectable overlays from saved crops, never a source-video seek."""
+    h,w=gt.shape;scale=min(360/w,240/h)
+    size=(max(1,round(w*scale)),max(1,round(h*scale)))
+    original=cv2.resize(image,size,interpolation=cv2.INTER_AREA)
+    def overlay(mask, missing=False):
+        out=original.copy()
+        g=cv2.resize(gt,size,interpolation=cv2.INTER_NEAREST)
+        m=cv2.resize(mask,size,interpolation=cv2.INTER_NEAREST)
+        if missing:
+            lost=(g>0)&(m==0)
+            out[lost]=(.3*out[lost]+.7*np.array([20,20,255])).astype(np.uint8)
+            contours,_=cv2.findContours(g,cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
+            cv2.drawContours(out,contours,-1,(255,220,0),1)
+        contours,_=cv2.findContours(m,cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
+        cv2.drawContours(out,contours,-1,(0,225,255),1)
+        return out
+    parts=[original,overlay(raw),overlay(proposed,True)]
+    canvas=np.full((332,1080,3),28,np.uint8)
+    for i,part in enumerate(parts):
+        x=i*360+(360-size[0])//2;y=62+(240-size[1])//2
+        canvas[y:y+size[1],x:x+size[0]]=part
+    title='Frame %d | score %.3f | coverage %s | extra margin %.0f%%'%(row['frame'],row['score'],
+        'none' if row['coverage'] is None else '%.3f%%'%(100*row['coverage']),100*margin)
+    cv2.putText(canvas,title,(6,20),cv2.FONT_HERSHEY_SIMPLEX,.45,(240,240,240),1,cv2.LINE_AA)
+    cv2.putText(canvas,'Original | Raw mask | Outline: yellow; reviewed: cyan; missing: red',
+                (6,44),cv2.FONT_HERSHEY_SIMPLEX,.42,(240,240,240),1,cv2.LINE_AA)
+    ok,encoded=cv2.imencode('.jpg',canvas,[cv2.IMWRITE_JPEG_QUALITY,88])
+    if not ok:raise OSError('Cannot encode coverage comparison')
+    return encoded.tobytes()
+
+
+def calibrate(model,dataset,*,report_path=None,cancelled=None):
+    """Compare a small fixed policy set, never weaken coverage to force a pass.
+
+    Stream crops, infer once each, retain scalar measurements and at most six
+    small previews per policy. The selected policy is also used for refinement.
+    These same-video calibration checks are NOT an independent safety estimate.
+    """
+    dataset=Path(dataset).resolve();policies=(0.,.01,.02,.03,.05)
+    examples={m:[] for m in policies};previews={m:[] for m in policies}
+    def check():
+        if cancelled and cancelled():raise InterruptedError('Coverage check cancelled; previous review kept')
+    check()
     for line in (dataset/'manifest.jsonl').read_text(encoding='utf-8').splitlines():
+        if not line.strip():continue
         r=json.loads(line)
         if r['split']!='val' or r['label']!='positive':continue
-        image=cv2.imread(str(dataset/r['image']))
+        check()
+        path=(dataset/r['image']).resolve()
+        if not path.is_relative_to(dataset):raise ValueError('Unsafe validation crop path')
+        image=cv2.imread(str(path))
         if image is None:raise ValueError('Unreadable validation crop')
-        h,w=image.shape[:2];label=dataset/'labels'/'val'/(Path(r['image']).stem+'.txt')
+        h,w=image.shape[:2];label=dataset/'labels'/'val'/(path.stem+'.txt')
+        if not label.resolve().is_relative_to(dataset):raise ValueError('Unsafe validation label path')
         values=[float(v) for v in label.read_text().split()[1:]]
         pts=np.asarray(values,np.float32).reshape(-1,2)*[w,h]
         gt=np.zeros((h,w),np.uint8);cv2.fillPoly(gt,[np.rint(pts).astype(np.int32)],1)
-        mask,score=model.predict(image)
-        if mask is not None:_,mask=vl.conservative_quad(mask)
+        total=int(gt.sum())
+        if not total:raise ValueError('Empty reviewed validation outline')
+        raw,score=model.predict(image);score=float(score)
+        if not math.isfinite(score):raise ValueError('Non-finite candidate confidence')
+        if raw is not None and (np.asarray(raw).shape!=gt.shape or not np.isfinite(raw).all()):
+            raise ValueError('Invalid candidate mask')
+        if raw is not None:raw=(np.asarray(raw)!=0).astype(np.uint8)
         b=r['baseline_box'];base=np.zeros((h,w),np.uint8)
         cv2.rectangle(base,(int(b[0]*w),int(b[1]*h)),(int(b[2]*w),int(b[3]*h)),1,-1)
-        examples.append((gt,base,mask,score))
-    if len(examples)<4:raise ValueError('At least four held-out positive examples are required for activation')
-    for threshold in sorted({.25,.5,.75,.9,.95}|{min(.999,s+.001) for _,_,_,s in examples}):
-        gain=0.;accepted=0;valid=True
-        for gt,base,mask,score in examples:
-            if mask is None or score<threshold:continue
-            coverage=float(np.logical_and(mask,gt).sum())/max(1,int(gt.sum()))
-            if coverage<.995:valid=False;break
-            accepted+=1
-            gain+=int(np.logical_and(base,~gt.astype(bool)).sum())-int(np.logical_and(mask,~gt.astype(bool)).sum())
-        if valid and accepted and gain>0:
-            return {'threshold':threshold,'held_out_positive':len(examples),'accepted':accepted,
-                    'excess_pixels_removed':int(gain),'minimum_known_coverage':.995,
-                    'warning':'Held-out checks on this video do not prove complete redaction.'}
-    raise ValueError('The trained model did not demonstrate tighter coverage without known plate-pixel loss. Previous review kept; add different corrected examples instead of repeating an unchanged scan.')
+        excess_before=int(np.logical_and(base,gt==0).sum())
+        for margin in policies:
+            mask=None if raw is None else vl.conservative_quad(raw,margin_fraction=margin)[1]
+            covered=0 if mask is None else int(np.logical_and(mask,gt).sum())
+            row={'frame':int(r['detection_index']),'example':path.stem,'score':score,
+                 'coverage':None if mask is None else covered/total,
+                 'uncovered_pixels':None if mask is None else total-covered,
+                 'excess_pixels_removed':0 if mask is None else excess_before-int(np.logical_and(mask,gt==0).sum())}
+            examples[margin].append(row)
+            # Only bounded thumbnails of the worst disagreements are retained.
+            rank=(row['coverage'] if row['coverage'] is not None else -1.,-score,path.stem)
+            bank=previews[margin]
+            if report_path and (len(bank)<6 or rank<bank[-1][0]):
+                bank.append((rank,row,_coverage_preview(image,gt,np.zeros_like(gt) if raw is None else raw,
+                                                        np.zeros_like(gt) if mask is None else mask,row,margin)))
+                bank.sort(key=lambda item:item[0]);del bank[6:]
+    count=len(examples[0.])
+    if count<4:raise ValueError('At least four held-out positive examples are required for activation')
+    thresholds=sorted({.25,.5,.75,.9,.95}|{min(.999,r['score']+.001) for r in examples[0.]})
+    attempts=[];chosen=None
+    for margin in policies:
+        for threshold in thresholds:
+            check()
+            selected=[r for r in examples[margin] if r['coverage'] is not None and r['score']>=threshold]
+            bad=sum(r['coverage']<.995 for r in selected)
+            gain=sum(r['excess_pixels_removed'] for r in selected)
+            reason=('no_accepted_predictions' if not selected else 'undercoverage' if bad else
+                    'no_tightening' if gain<=0 else 'passed')
+            attempt=dict(margin_fraction=margin,threshold=threshold,selected=len(selected),
+                         undercoverage=bad,excess_pixels_removed=gain,reason=reason)
+            attempts.append(attempt)
+            if reason=='passed' and chosen is None:chosen=attempt
+        if chosen:break  # Prefer the smallest sufficient fixed outward margin.
+    shown=chosen or min((a for a in attempts if a['selected']),
+        key=lambda a:(a['undercoverage']/a['selected'],-a['selected'],a['margin_fraction']),default=attempts[0])
+    report={'schema':1,'decision':'passed' if chosen else 'rejected','minimum_known_coverage':.995,
+            'held_out_positive':count,'chosen':chosen,'display_policy':shown,
+            'examples':examples[shown['margin_fraction']],'attempts':attempts,'previews':[],
+            'warning':'Calibration on reviewed examples from this video does not prove complete redaction on other frames.'}
+    if report_path:
+        report_path=Path(report_path);private_dir(report_path.parent)
+        for i,(_,row,data) in enumerate(previews[shown['margin_fraction']]):
+            check();name='coverage-%d.jpg'%i;target=report_path.parent/name
+            target.write_bytes(data)
+            if os.name!='nt':target.chmod(0o600)
+            report['previews'].append({'frame':row['frame'],'image':name,'index':i})
+        check();atomic_json(report_path,report)
+    if chosen:
+        return {'threshold':chosen['threshold'],'margin_fraction':chosen['margin_fraction'],
+                'held_out_positive':count,'accepted':chosen['selected'],
+                'excess_pixels_removed':chosen['excess_pixels_removed'],'minimum_known_coverage':.995,
+                'warning':report['warning']}
+    raise ValueError('Coverage check rejected the saved candidate (%s) after bounded outward margins: '
+        '%d of %d selected outlines below 99.5%%; %d examples without a mask. '
+        'Open Coverage results to inspect the failed frames. Previous review kept; no rescan started.'%(
+        shown['reason'],shown['undercoverage'],shown['selected'],sum(r['coverage'] is None for r in report['examples'])))
 
 
 def run_session(job,read_frame,full_scan,publish,log=None,train=None,refiner=None,calibration=None):
@@ -740,7 +881,8 @@ def run_session(job,read_frame,full_scan,publish,log=None,train=None,refiner=Non
     atomic_json(root/'status.json',job['learning'])
     source=verify_source(job,doc);doc.setdefault('provenance',{})['input_sha256']=source
     settings=job.get('learning_request',{})
-    if settings.get('license_accepted') is not True:
+    reuse=settings.get('reuse_candidate') is True
+    if not reuse and settings.get('license_accepted') is not True:
         raise ValueError('Local training license acknowledgment is required')
     def phase(name,message,**fields):
         update_learning(job,name,message,**fields)
@@ -761,12 +903,24 @@ def run_session(job,read_frame,full_scan,publish,log=None,train=None,refiner=Non
             for split in ('train','val') for label in ('positive','negative')]
     log('Dataset split after grouping similar crops: train %d plates / %d negatives; '
         'validation %d plates / %d negatives. Duplicate and minimum-sample checks remain enabled.'%tuple(counts))
-    phase('training','Training on reviewed examples; original models and previous result are unchanged')
-    weights=prior.get('weights') or os.environ.get('OPENSCRUB_TRAIN_WEIGHTS','')
-    folder,meta=(train or run_training)(stage/'dataset',stage/'versions',weights,job,settings)
+    if reuse:
+        phase('rechecking','Reusing a saved candidate with identical examples; no training epochs will run')
+        snapshot=_validate_snapshot(stage/'dataset')
+        folder,meta=_reuse_candidate(root,snapshot,source)
+    else:
+        phase('training','Training on reviewed examples; original models and previous result are unchanged')
+        weights=prior.get('weights') or os.environ.get('OPENSCRUB_TRAIN_WEIGHTS','')
+        folder,meta=(train or run_training)(stage/'dataset',stage/'versions',weights,job,settings)
     model=(refiner or vl.CropRefiner)(Path(folder)/'model.onnx')
     phase('validating','Checking learned mask coverage on held-out examples')
-    gate=(calibration or calibrate)(model,stage/'dataset')
+    try:
+        gate=(calibration(model,stage/'dataset') if calibration else
+              calibrate(model,stage/'dataset',report_path=stage/'coverage.json',cancelled=job['cancel'].is_set))
+    finally:
+        if (stage/'coverage.json').is_file():
+            atomic_json(root/'last-coverage.json',{'pass_id':pass_id,'version':meta['version']})
+    log('Coverage passed with %.0f%% extra outward margin; %d held-out predictions accepted. '
+        'This is not a guarantee for unseen frames.'%(100*gate.get('margin_fraction',0),gate.get('accepted',0)))
     phase('rescanning','Rescanning from the beginning with the original detectors')
     fresh=full_scan(stage/'raw-report.json')
     if job['cancel'].is_set():raise InterruptedError('Learning cancelled; prior result retained')
@@ -788,7 +942,7 @@ def run_session(job,read_frame,full_scan,publish,log=None,train=None,refiner=Non
         update_learning(job,'refining','Refining plate proposals: %d/%d frames'%(done,total),
                         done=done,total=total,unit='frames')
     refined,stats=vl.refine_report(job['video'],fresh,model,gate['threshold'],job['cancel'].is_set,
-                                  progress=refine_progress,
+                                  progress=refine_progress,margin_fraction=gate.get('margin_fraction',0.),
                                   **({'frame_range':tuple(job['options']['section_context'])}
                                      if job.get('options',{}).get('section_context') else {}))
     constraints=feedback['constraints']
