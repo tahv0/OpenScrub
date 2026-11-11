@@ -217,7 +217,7 @@ def test_candidate_check_save_and_explicit_library_mode_in_browser(secondary_ui_
         sync.expect(page.locator('#plateVerifierCandidate')).to_have_value(CANDIDATE_ID)
         assert page.locator('#plateVerifierMode').input_value() == 'review'
         page.get_by_role('button', name='Check detections', exact=True).click()
-        page.wait_for_function("document.querySelector('#actions').textContent.includes('Cancel learning pass')")
+        sync.expect(page.get_by_role('button', name='Cancel learning pass', exact=True)).to_be_visible(timeout=12000)
         assert queued == [(job['id'], 'verify')]
         assert job['verification_request']['mode'] == 'review'
         web.perform_verification(job)
