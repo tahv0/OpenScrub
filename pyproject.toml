@@ -92,6 +92,7 @@ pattern = "VERSION = \"(?P<version>[^\"]+)\""
 include = [
     "openscrub.py",
     "openscrub_web.py",
+    "openscrub_logging.py",
     "stop_review.py",
     "video_learning.py",
     "learning_session.py",
@@ -118,6 +119,7 @@ include = [
     "openscrub_update.py",
     "openscrub_vault.py",
     "openscrub_web.py",
+    "openscrub_logging.py",
     "stop_review.py",
     "video_learning.py",
     "learning_session.py",

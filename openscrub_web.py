@@ -33,6 +33,7 @@ import socket
 import threading
 import time
 import uuid
+from pathlib import Path
 
 import cv2
 import numpy as np
@@ -44,6 +45,7 @@ import stop_review
 import learning_session
 import video_learning
 import learned_models
+import openscrub_logging as diagnostics
 import zones_ui
 
 
@@ -104,7 +106,10 @@ def load_model_select():
         with open(MODEL_SELECT_PATH, encoding="utf-8") as f:
             d = json.load(f)
             return d if isinstance(d, dict) else {}
+    except FileNotFoundError:
+        return {}
     except Exception:
+        diagnostics.exception("settings_load_failed")
         return {}
 
 
@@ -370,6 +375,8 @@ def new_job(video_path, options, name):
         import shutil
         shutil.rmtree(jdir, ignore_errors=True)
         raise
+    diagnostics.attach_job(job)
+    diagnostics.event("job_created", job)
     with JOBS_LOCK:
         JOBS[jid] = job
     return job
@@ -434,6 +441,7 @@ class WebCallbacks(openscrub.Callbacks):
     wants_frames = True
 
     def __init__(self, job):
+        diagnostics.attach_job(job)
         self.job = job
         self._last_frame = 0.0
         self._stage = None          # ETA state: current stage,
@@ -448,6 +456,7 @@ class WebCallbacks(openscrub.Callbacks):
         context = self.job.get("options", {}).get("section_context")
         if context and stage == "scan":
             cur, total = max(0, min(cur, context[1])-context[0]), context[1]-context[0]
+        diagnostics.progress(self.job, stage, cur, total)
         now = time.time()
         old = self.job.get("activity") or {}
         changed = old.get("stage") != stage
@@ -632,7 +641,7 @@ def build_args(job, for_render=False):
                 if json.load(f):
                     argv += ["--zones", ZONES_PATH]
         except Exception:
-            pass
+            diagnostics.exception("detection_zone_load_failed", job)
     server_allow = os.path.join(JOBS_DIR, "allowlist.txt")
     for kind in ("allow_names", "extra_names"):
         text = (o.get(kind) or "").strip()
@@ -651,7 +660,7 @@ def build_args(job, for_render=False):
                 for r in (json.load(f).get("ignore") or []):
                     argv += ["--ignore-region", "%s,%s,%s,%s" % tuple(r)]
     except Exception:
-        pass
+        diagnostics.exception("ignore_zone_load_failed", job)
     if for_render:
         argv += ["--from-report", os.path.join(jdir, "report.json")]
     parser = openscrub.build_parser()
@@ -682,6 +691,8 @@ def apply_selected_plate_model(job, chunk):
         refined, stats = video_learning.refine_report(
             chunk["provenance"]["input"], chunk, model,
             threshold=meta["threshold"], cancelled=job["cancel"].is_set,
+            **({"margin_fraction": meta["validation"]["margin_fraction"]}
+               if "margin_fraction" in meta["validation"] else {}),
             progress=lambda cur, total: cb.progress("refine", cur, total),
             **({"frame_range": tuple(job["options"]["section_context"])}
                if job.get("options", {}).get("section_context") else {}))
@@ -690,6 +701,8 @@ def apply_selected_plate_model(job, chunk):
     record = {key: meta[key] for key in
               ("id", "name", "contract", "model_sha256", "input_size", "threshold")}
     record.update(schema=1, inference=stats)
+    if "margin_fraction" in meta["validation"]:
+        record["margin_fraction"] = meta["validation"]["margin_fraction"]
     refined["refinement"] = record
     job["refinement"] = record
     cb.log("Learned model applied: %d mask refinements, %d uncertain proposals kept "
@@ -703,8 +716,12 @@ def worker():
         with JOBS_LOCK:
             job = JOBS.get(jid)
         if job is None:
+            diagnostics.event("queued_job_missing", job_id=jid, action=action, level=30)
+            WORK_Q.task_done()
             continue
         cb = WebCallbacks(job)
+        log_context = diagnostics.bind_job(job)
+        diagnostics.start_job(job, action)
         try:
             if action == "learn":
                 perform_learning(job)
@@ -841,8 +858,8 @@ def worker():
                         jb["log"].append("thumbnails pre-generated "
                                          f"({len(todo)})")
                     except Exception:
-                        pass
-                threading.Thread(target=_pregen, daemon=True).start()
+                        diagnostics.exception("thumbnail_pregeneration_failed", JOBS.get(jid))
+                threading.Thread(target=_pregen, name="openscrub-thumbnails-" + jid, daemon=True).start()
                 try:
                     prov = _load_job_report(job).get("provenance", {})
                     if ((prov.get("vfr_normalized") or meta)
@@ -851,7 +868,7 @@ def worker():
                         job["log"].append(
                             "using CFR-normalized file for previews/thumbnails")
                 except Exception:
-                    pass
+                    diagnostics.exception("preview_source_selection_failed", job)
                 if meta:
                     job["phase"] = "paused"
                 elif (not resuming and job["options"].get("skip_review")):
@@ -888,10 +905,12 @@ def worker():
                 job["progress"] = 1.0
                 job["eta"] = None
         except openscrub.PipelineCancelled:
+            diagnostics.event("job_cancelled", job, action=action)
             job["stop"].clear()
             job["phase"] = "cancelled"
             job["error"] = "cancelled by user"
         except Exception as e:
+            diagnostics.exception("job_action_failed", job, action=action)
             job["stop"].clear()
             # The prior report is untouched if a resumed scan fails.
             job["phase"] = ("paused" if action == "resume"
@@ -901,12 +920,57 @@ def worker():
             job["log"].append(f"ERROR: {e}")
         finally:
             job["eta"] = None       # a dead/paused job must not show "~N left"
+            diagnostics.finish_job(job, action)
+            diagnostics.reset_job(log_context)
             WORK_Q.task_done()
 
 
 # ----------------------------------------------------------------------------
 # Auth
 # ----------------------------------------------------------------------------
+
+
+@app.before_request
+def diagnostic_request_start():
+    from flask import g
+    g.diagnostic_started = time.monotonic()
+    g.diagnostic_id = uuid.uuid4().hex[:12]
+    jid = (request.view_args or {}).get("jid")
+    g.diagnostic_context = diagnostics.bind_job(JOBS.get(jid))
+
+
+@app.after_request
+def diagnostic_request_finish(response):
+    from flask import g
+    elapsed = time.monotonic() - getattr(g, "diagnostic_started", time.monotonic())
+    request_id = getattr(g, "diagnostic_id", "unknown")
+    response.headers["X-OpenScrub-Request-ID"] = request_id
+    if response.status_code >= 400 or elapsed >= 5:
+        reason = ""
+        if response.status_code >= 400 and response.is_json and (response.content_length or 0) <= 16384:
+            data = response.get_json(silent=True)
+            if isinstance(data, dict) and isinstance(data.get("error"), str):
+                reason = data["error"]
+        diagnostics.event("http_request_failed" if response.status_code >= 400 else "http_request_slow",
+            level=40 if response.status_code >= 500 else 30,
+            request_id=request_id, method=request.method,
+            route=str(request.url_rule) if request.url_rule else "unmatched",
+            status=response.status_code, elapsed_ms=round(elapsed * 1000, 1), reason=reason)
+    return response
+
+
+@app.teardown_request
+def diagnostic_request_teardown(error):
+    from flask import g
+    if error is not None:
+        diagnostics.event("http_unhandled_exception", level=40,
+            request_id=getattr(g, "diagnostic_id", "unknown"),
+            route=str(request.url_rule) if request.url_rule else "unmatched",
+            exc_info=(type(error), error, error.__traceback__))
+    token = g.pop("diagnostic_context", None)
+    if token is not None:
+        diagnostics.reset_job(token)
+
 
 @app.before_request
 def check_token():
@@ -1247,10 +1311,11 @@ def perform_learning(job):
     job["preview"] = None
     job["activity"] = None
     try:
-        job["learning"] = {"stage": "preflight", "message": "Checking the local CUDA training environment"}
-        ready = learning_session.preflight()
-        if not ready["ready"]:
-            raise ValueError("; ".join(ready["problems"]))
+        if not job.get("learning_request", {}).get("reuse_candidate"):
+            job["learning"] = {"stage": "preflight", "message": "Checking the local CUDA training environment"}
+            ready = learning_session.preflight()
+            if not ready["ready"]:
+                raise ValueError("; ".join(ready["problems"]))
         def scan(destination):
             args = build_args(job)
             args.resume_start = 0.0
@@ -1286,6 +1351,7 @@ def perform_learning(job):
         job["learning"]["inference"] = result["learning"]["inference"]
         job.pop("refinement", None)
     except Exception as error:
+        diagnostics.exception("learning_failed", job)
         job["phase"] = previous
         job["error"] = str(error)
         job["learning"] = {"stage": "failed", "message": str(error)}
@@ -1308,10 +1374,13 @@ def job_learning(jid):
             "weights_configured": os.path.isfile(os.environ.get("OPENSCRUB_TRAIN_WEIGHTS", "")),
             "note": "Training is local and video-specific. Empty model predictions are not automatic permission to leave a plate visible."})
     payload = request.get_json(silent=True) or {}
-    if not isinstance(payload, dict) or payload.get("license_accepted") is not True:
+    if not isinstance(payload, dict) or not isinstance(payload.get("reuse_candidate", False), bool):
+        return jsonify({"error": "Invalid learning request."}), 400
+    reuse = payload.get("reuse_candidate") is True
+    if not reuse and payload.get("license_accepted") is not True:
         return jsonify({"error": "Acknowledge the locally installed training framework's terms before training."}), 400
     weights = os.environ.get("OPENSCRUB_TRAIN_WEIGHTS", "")
-    if not os.path.isfile(weights):
+    if not reuse and not os.path.isfile(weights):
         return jsonify({"error": "Training setup needed: set OPENSCRUB_TRAIN_WEIGHTS to a trusted local segmentation .pt checkpoint and install the training environment. Your saved annotations are unchanged."}), 503
     with JOBS_LOCK:
         if job["phase"] not in ("paused", "review", "done"):
@@ -1322,14 +1391,52 @@ def job_learning(jid):
         if prior.get("provenance", {}).get("hdr_output"):
             return jsonify({"error": "This learning path currently requires SDR output. HDR-match learning is not supported; the existing HDR report and edits are unchanged."}), 409
         job["learning_previous_phase"] = job["phase"]
-        job["learning_request"] = {"license_accepted": True, "epochs": 40, "batch": 8}
+        job["learning_request"] = {"license_accepted": not reuse, "reuse_candidate": reuse,
+                                   "epochs": 40, "batch": 8}
         job["phase"] = "learning"
-        job["learning"] = {"stage": "queued", "message": "Learning pass queued"}
+        job["learning"] = {"stage": "queued", "message":
+            "Saved-model recheck queued; no training epochs" if reuse else "Learning pass queued"}
         job["cancel"].clear()
         job["stop"].clear()
         job["error"] = None
     WORK_Q.put((jid, "learn"))
     return jsonify({"ok": True})
+
+
+def _coverage_file(job, pass_id, name):
+    if not isinstance(pass_id, str) or not re.fullmatch(r"pass-[0-9a-f]{12}", pass_id):
+        abort(404)
+    root = (Path(job["dir"]) / "learning" / "passes").resolve()
+    stage = root / pass_id
+    path = stage / name
+    if (not stage.resolve().is_relative_to(root) or not path.is_file()
+            or not path.resolve().is_relative_to(stage.resolve())):
+        abort(404)
+    return path
+
+
+@app.route("/api/jobs/<jid>/learning/coverage")
+def job_learning_coverage(jid):
+    job = JOBS.get(jid) or abort(404)
+    pointer = Path(job["dir"]) / "learning" / "last-coverage.json"
+    if not pointer.is_file():
+        return jsonify({"error": "No coverage report yet. Recheck the saved model to generate one without training."}), 404
+    try:
+        current = json.loads(pointer.read_text(encoding="utf-8"))
+        path = _coverage_file(job, current.get("pass_id"), "coverage.json")
+        report = json.loads(path.read_text(encoding="utf-8"))
+    except (ValueError, OSError, AttributeError):
+        abort(404)
+    report.update(pass_id=current["pass_id"], version=current.get("version", ""))
+    return jsonify(report)
+
+
+@app.route("/api/jobs/<jid>/learning/coverage/<pass_id>/<int:index>.jpg")
+def job_learning_coverage_image(jid, pass_id, index):
+    job = JOBS.get(jid) or abort(404)
+    if not 0 <= index < 6:abort(404)
+    return send_file(str(_coverage_file(job, pass_id, "coverage-%d.jpg" % index)),
+                     mimetype="image/jpeg", conditional=True, max_age=0)
 
 
 @app.route("/api/jobs/<jid>/learning/rollback", methods=["POST"])
@@ -1487,11 +1594,15 @@ def _review_process(command):
         result = subprocess.run(command, capture_output=True,
                                 timeout=_REVIEW_TIMEOUT)
     except subprocess.TimeoutExpired:
+        diagnostics.exception("preview_process_timeout", tool=os.path.basename(str(command[0])), timeout_seconds=_REVIEW_TIMEOUT)
         abort(504, description="Preview decoding timed out. Retry this finding; "
               "a video with very sparse keyframes may need a seekable scan copy.")
     except OSError:
+        diagnostics.exception("preview_process_start_failed", tool=os.path.basename(str(command[0])))
         abort(503, description="FFmpeg and ffprobe are required for review previews.")
     if result.returncode:
+        diagnostics.event("preview_process_failed", level=40, tool=os.path.basename(str(command[0])),
+                          returncode=result.returncode, stderr=result.stderr.decode("utf-8", errors="replace")[-8000:])
         abort(422, description="Could not decode this video preview.")
     return result
 
@@ -2659,6 +2770,7 @@ def job_track_object(jid):
                                          new[0]["t_start"], new[-1]["t_end"]))
             st.update(state="done", added=len(new))
         except Exception as e:
+            diagnostics.exception("background_tracking_failed", job)
             st.update(state="done", added=0, error=str(e))
 
     threading.Thread(target=_run, daemon=True).start()
@@ -2758,6 +2870,7 @@ def model_status():
         try:
             out[kind] = bool(cls.resolve_model(mp)[0])
         except Exception:
+            diagnostics.exception("model_availability_check_failed", model_kind=kind)
             out[kind] = True        # can't tell -> don't cry wolf
     try:
         rec = next((m for m in openscrub.load_model_registry("plate")
@@ -2767,6 +2880,7 @@ def model_status():
             and str(rec.get("license", "")).lower().startswith(
                 ("mit", "apache", "bsd")))
     except Exception:
+        diagnostics.exception("plate_registry_load_failed")
         out["plate_autofetch"] = False
     return jsonify(out)
 
@@ -2793,6 +2907,7 @@ def model_download(kind, mid):
                 progress=lambda f: _model_dl.update(pct=int(f * 100)))
             _model_dl.update(state="done", pct=100)
         except Exception as e:
+            diagnostics.exception("model_download_failed", model_id=mid, model_kind=kind)
             _model_dl.update(state="error", error=str(e))
     threading.Thread(target=work, daemon=True).start()
     return jsonify({"ok": True})
@@ -2867,6 +2982,7 @@ def quality_tier():
                 save_model_select(sel)
             _tier_apply.update(state="done", step="")
         except Exception as e:
+            diagnostics.exception("model_tier_setup_failed")
             _tier_apply.update(state="error", error=str(e), step="")
     threading.Thread(target=work, daemon=True).start()
     return jsonify({"ok": True})
@@ -4933,19 +5049,52 @@ async function rollbackLearning(){
   LEARNING_SELECTION=null;VLBL={};VLBLJOB=null;await loadReview();await refresh();
  }catch(error){alert(error.message);}
 }
-async function trainAndRescan(){
+async function trainAndRescan(reuseCandidate=false){
  if(!await saveAndRender(true))return;
- if(!LEARNING_TERMS){
+ if(!reuseCandidate&&!LEARNING_TERMS){
   if(!confirm("Train locally from your reviewed examples and rescan this video from the beginning? The training environment uses Ultralytics; review its AGPL/Enterprise terms in docs/PLATE_TRAINING.md. Previous review is retained if training or validation fails."))return;
   LEARNING_TERMS=true;
  }
  try{
   await reviewRequest(`api/jobs/${CUR}/learning`,{method:"POST",headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({license_accepted:true})});
+    body:JSON.stringify({license_accepted:!reuseCandidate,reuse_candidate:reuseCandidate})});
   LEARNING_SELECTION=null;clearReviewPreviews();
   const panel=document.getElementById("review");if(panel)panel.remove();
-  await refresh();
+  await refresh();document.getElementById("jobcard")?.scrollIntoView({block:"start"});
  }catch(error){alert(error.message);}
+}
+async function showCoverage(){
+ const job=CUR,view=JOBVIEW,host=document.getElementById("learningCoverage");
+ if(!host)return;
+ host.hidden=false;host.textContent="Loading the saved coverage report…";
+ try{
+  const {data:r}=await reviewRequest(`api/jobs/${job}/learning/coverage`);
+  if(CUR!==job||JOBVIEW!==view||!host.isConnected)return;
+  host.replaceChildren();
+  const text=(tag,value,parent=host)=>{const e=document.createElement(tag);e.textContent=value;parent.append(e);return e;};
+  text("h3",r.decision==="passed"?"Saved model passed the calibration check":"Saved model needs coverage review");
+  const policy=r.display_policy||{};
+  text("p",`Candidate ${r.version||"unknown"}. Displayed policy: ${Math.round(100*(policy.margin_fraction||0))}% extra outward margin; confidence threshold ${Number(policy.threshold||0).toFixed(3)}.`);
+  text("p","Cyan is your saved outline; yellow is the proposed outline; red is the part of your outline left uncovered. These comparisons do not prove safety on unreviewed frames.");
+  const wrap=text("div","");wrap.style.overflowX="auto";
+  const table=text("table","",wrap);table.style.width="100%";
+  const header=text("tr","",table);
+  for(const label of ["Source frame","Confidence","Coverage","Missing pixels","Excess pixels removed","Selected by displayed threshold"]){text("th",label,header);}
+  for(const e of r.examples||[]){
+   const row=text("tr","",table);
+   const used=e.coverage!==null&&e.score>=policy.threshold;
+   for(const value of [e.frame,Number(e.score).toFixed(3),e.coverage===null?"No mask":(100*e.coverage).toFixed(3)+"%",e.uncovered_pixels??"—",e.excess_pixels_removed,used?"Yes":"No — original coverage retained"]){text("td",String(value),row);}
+  }
+  for(const preview of r.previews||[]){
+   text("h4",`Source frame ${preview.frame}`);
+   const img=document.createElement("img");img.loading="lazy";
+   img.alt=`Saved crop and mask comparison for source frame ${preview.frame}`;
+   img.style.cssText="display:block;max-width:100%;height:auto";
+   img.src=`api/jobs/${encodeURIComponent(job)}/learning/coverage/${encodeURIComponent(r.pass_id)}/${Number(preview.index)}.jpg`;
+   host.append(img);
+  }
+  host.scrollIntoView({block:"start"});
+ }catch(error){if(CUR===job&&JOBVIEW===view&&host.isConnected)host.textContent=error.message;}
 }
 let LEARNING_SAMPLE_INFO=null;
 let VLBL={},VLBLJOB=null;  // explicit human labels; never infer from default blur state
@@ -4996,6 +5145,8 @@ async function loadReview(signal=null,phase=SHELLPH){
  Drag across cards to select several.</p>
  <div class="row" style="margin-bottom:10px">
   <button type="button" onclick="trainAndRescan()">Train &amp; rescan this video</button>
+  <button type="button" class="sec" onclick="trainAndRescan(true)">Recheck saved model &amp; rescan</button>
+  <button type="button" class="sec" onclick="showCoverage()">Coverage results</button>
   <button type="button" class="sec" onclick="reviewUncertain()">Review 10% of plate groups</button>
   <button type="button" id="reviewShowAll" class="sec" hidden onclick="reviewAllFindings()">Show all findings</button>
  </div>
@@ -5009,6 +5160,7 @@ async function loadReview(signal=null,phase=SHELLPH){
   <button id="saveLearnedModelButton" type="button" onclick="saveLearnedModel()" ${d.learning&&d.learning.active&&d.learning.active.model?"":"disabled"}>Save model</button>
   <p id="saveLearnedModelStatus" class="review-copy" role="status" aria-live="polite">${d.learning&&d.learning.active&&d.learning.active.model?"Uses the last accepted training pass.":"Complete an accepted training pass to save a reusable model."}</p>
  </details>
+ <div id="learningCoverage" class="review-copy" role="region" aria-label="Saved model coverage results" aria-live="polite" hidden></div>
  <p id="reviewSampleSummary" class="review-copy" role="status" hidden></p>
  <p id="reviewSaveStatus" class="review-copy review-save-status" role="status" aria-live="polite">Review choices loaded from disk.</p>
  <div id="plateSaveIssues" class="review-copy" role="status" aria-live="polite" hidden></div>
@@ -5720,6 +5872,7 @@ def update_run():
             openscrub_update.run_update(log=log)
             ok = True
         except Exception as e:
+            diagnostics.exception("self_update_failed")
             log("update failed: %s" % e)
             ok = False
         with UPD_LOCK:
@@ -5754,7 +5907,10 @@ def _web_settings():
     try:
         with open(WEB_SETTINGS_PATH, encoding="utf-8") as f:
             return json.load(f)
+    except FileNotFoundError:
+        return {}
     except Exception:
+        diagnostics.exception("settings_load_failed")
         return {}
 
 
@@ -5785,7 +5941,7 @@ def _autolock_watcher():
             print("vault: auto-locked after %d idle minute(s) — "
                   "%d file(s) encrypted" % (mins, n))
         except Exception:
-            pass
+            diagnostics.exception("vault_autolock_failed")
 
 
 def vault_enabled():
@@ -5820,12 +5976,14 @@ def _vault_lock_atexit():
             busy = any(j.get("phase") in ("queued", "scanning", "rendering",
                                           "queued_render", "learning") for j in JOBS.values())
             if busy:
+                diagnostics.event("vault_not_locked_active_jobs", level=40)
                 print("vault: NOT locking on exit — a job was still running; "
                       "job files remain in plaintext. Restart and lock.")
                 return
             n = _vault_lock_now()
             print("vault: locked on shutdown (%d file(s) encrypted)" % n)
     except Exception as e:
+        diagnostics.exception("vault_shutdown_lock_failed")
         # never die silently here: a swallowed error means plaintext on disk
         print("vault: LOCK ON SHUTDOWN FAILED (%s) — job files may remain "
               "in plaintext. Restart the server and use the Lock button." % e)
@@ -6019,6 +6177,7 @@ def extras_install(eid):
             _EXT["log"].append("done — takes effect on the next scan")
             _EXT["state"] = "done"
         except Exception as e:
+            diagnostics.exception("optional_dependency_install_failed")
             _EXT["log"].append(str(e))
             _EXT["state"] = "error"
     threading.Thread(target=work, daemon=True).start()
@@ -6166,6 +6325,7 @@ def waveform():
              "-ac", "1", "-ar", "1000", "-f", "s16le", "-"],
             capture_output=True, timeout=180).stdout
     except Exception:
+        diagnostics.exception("waveform_extraction_failed")
         raw = b""
     if len(raw) < 4:
         return jsonify({"peaks": []})
@@ -6391,8 +6551,10 @@ def rehydrate_jobs():
                 JOBS[jid] = job
             n += 1
         except Exception:
+            diagnostics.exception("job_recovery_failed", recovered_job_id=jid)
             continue
     if n:
+        diagnostics.event("jobs_recovered", count=n)
         print(f"  recovered {n} job(s) from {JOBS_DIR}")
 
 
@@ -6452,6 +6614,10 @@ def main():
                          "via the 'path on the server' box than uploaded.")
     args = ap.parse_args()
     TOKEN = args.token or None
+    diagnostics.set_secrets([TOKEN])
+    diagnostics.configure(_data_root())
+    diagnostics.event("server_starting", version=openscrub.VERSION, python=sys.version.split()[0],
+                      port=args.port, transport="http" if args.http else "https")
     app.config["MAX_CONTENT_LENGTH"] = _max_upload_bytes(args.max_upload_gb)
     os.makedirs(JOBS_DIR, exist_ok=True)
     import atexit
@@ -6474,12 +6640,14 @@ def main():
             os._exit(1)
         _terming.append(1)
         print("SIGTERM — locking vault before exit…")
+        diagnostics.event("server_sigterm", signal=sig)
         _vault_lock_atexit()
+        diagnostics.shutdown(clean=True)
         os._exit(0)
     signal.signal(signal.SIGTERM, _on_sigterm)
     threading.Thread(target=_autolock_watcher, daemon=True).start()
     rehydrate_jobs()
-    threading.Thread(target=worker, daemon=True).start()
+    threading.Thread(target=worker, name="openscrub-job-worker", daemon=True).start()
     if args.retain_days > 0:
         threading.Thread(target=retention_loop, args=(args.retain_days,),
                          daemon=True).start()
@@ -6490,6 +6658,7 @@ def main():
         try:
             import cryptography  # noqa: F401 — needed for cert generation
         except ImportError:
+            diagnostics.exception("https_dependency_missing")
             print("=" * 60)
             print("HTTPS needs the 'cryptography' package, which isn't")
             print("installed. Fix it with ONE of these:")
@@ -6546,7 +6715,16 @@ def main():
     sys.stdout.flush()      # the banner must reach redirected logs NOW, not
     # when an 8KB block buffer eventually fills (a container ran "silent"
     # for minutes and the user debugged a healthy server)
-    _serve(args.host, args.port, ssl_ctx)
+    try:
+        _serve(args.host, args.port, ssl_ctx)
+    except BaseException:
+        diagnostics.exception("server_serve_failed")
+        # Keep diagnostics alive for the existing atexit vault-lock handler.
+        # The unclean marker is retained by the logging atexit hook.
+        raise
+    else:
+        _vault_lock_atexit()
+        diagnostics.shutdown(clean=True)
 
 
 def _serve(host, port, ssl_ctx):
@@ -6556,6 +6734,7 @@ def _serve(host, port, ssl_ctx):
     try:
         from cheroot.wsgi import Server
     except ImportError:
+        diagnostics.event("production_server_missing_using_flask", level=30)
         print("    (running on Flask's built-in server — `pip install cheroot`")
         print("     to switch to a production server and silence its warning)")
         app.run(host=host, port=port, threaded=True, ssl_context=ssl_ctx)
@@ -6568,18 +6747,11 @@ def _serve(host, port, ssl_ctx):
     # cheroot worker threads are cheap.
     server = Server((host, port), app, server_name="openscrub",
                     numthreads=64)
-    # Browsers probing/rejecting the self-signed certificate abort mid-
-    # handshake on every new socket, and cheroot logs each one. Harmless
-    # noise (install a trusted cert to stop the aborts themselves) —
-    # filter just that class of message, pass everything else through.
-    _orig_log = server.error_log
-    _TLS_NOISE = ("during handshake", "certificate unknown", "unknown ca",
-                  "peer dropped the tls connection", "http request")
-
+    # Cheroot's default stderr-only logger bypasses the persistent app log.
     def _quiet_log(msg="", level=20, traceback=False):
-        if any(s in str(msg).lower() for s in _TLS_NOISE):
-            return
-        _orig_log(msg, level, traceback)
+        # Retain server errors even when the browser disconnects or TLS fails.
+        diagnostics.event("wsgi_server_error", level=max(30, level),
+                          message=msg, exc_info=sys.exc_info() if traceback and sys.exc_info()[0] else None)
 
     server.error_log = _quiet_log
     if ssl_ctx:

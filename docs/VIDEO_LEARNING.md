@@ -288,3 +288,45 @@ After installing this exporter fix, retry Train & rescan on the same saved job.
 Do not delete the PNG named by the error, change labels to game the split, or
 reinstall CUDA. The saved feedback is reused, but a new dataset snapshot is built;
 this is not resume-from-an-epoch or automatic activation of a rejected candidate.
+
+### Recheck a saved model instead of repeating training
+
+After a candidate finishes training but fails coverage, **Recheck saved model &
+rescan** validates the current examples and looks for a candidate belonging to
+this job, the same source SHA256 and the exact same validated dataset fingerprint.
+Both ONNX and weight checksums are verified. The candidate's saved dataset must
+still pass the unchanged validator and match that fingerprint. A missing,
+changed or incompatible candidate stops explicitly; this action never silently
+launches new training. It does not need the training Python or starter checkpoint,
+but does need the saved candidate, its dataset and a working runtime ONNX loader.
+Do not copy only an old model file or reuse another PC's hard-coded job IDs.
+
+Rechecking still verifies the source, saves a snapshot of the current review,
+and indexes saved feedback. Unchanged committed crops are reused. This is not
+an epoch resume, and changed examples/splits require a genuinely new training pass.
+Only a successful coverage check allows the existing full rescan/refinement and
+transactional publication to run. Human constraints still win, and a new output
+still needs review and rendering.
+
+Coverage calibration tests the original outline and a fixed small set of outward
+margins: 1%, 2%, 3% and 5% of the raw mask bounding box's shorter side, rounded up
+and capped at 32 additional crop pixels. The original one-pixel guard remains.
+The first sufficient margin is selected; exactly the same function and policy
+are applied during refinement. The 99.5% per-selected-example coverage requirement,
+positive net reduction in excess masking and minimum held-out count are unchanged.
+Nothing about a confidence score proves coverage on an unseen frame. These
+same-video calibration examples are used to choose the policy: they are NOT a
+fresh independent safety test after that selection.
+
+**Coverage results** opens an in-place report, not a modal: source-frame numbers,
+confidence, covered area, missing pixels, excess-mask change and up to six worst
+comparison previews. Cyan marks the saved human outline, yellow the predicted
+outline, and red annotation pixels outside the proposal. The images contain
+unredacted crops and stay local under the job's pass directory. The report states
+its candidate version and displayed margin/threshold; selection in that table
+is not activation. A rejected policy leaves the previous review intact.
+
+A small boundary shortfall may be recoverable with padding. Wrong or missing
+predictions can still fail all policies, and a model with no net tightening is
+still rejected. Do not reduce the coverage requirement or redraw correct human
+annotations just to make this test pass. Inspect the recorded disagreements.

@@ -592,3 +592,21 @@ def test_successful_onnx_validation_reuses_metadata_and_revalidates_changed_byte
         with pytest.raises(lm.ModelError):
             lm.import_model(root, io.BytesIO(archive(manifest, invalid)))
         assert len(calls) == expected_calls
+
+
+@pytest.mark.parametrize('margin', [0., .03, .05])
+def test_calibrated_margin_survives_save_export_import_and_job_snapshot(tmp_path, accepted, margin):
+    lm = models()
+    job, report, _, _ = accepted
+    report['learning']['validation']['margin_fraction'] = margin
+    write_report(job, report)
+    origin = tmp_path/'model-origin'
+    saved = lm.save_model(origin, job, 'Recovery geometry')
+    imported = lm.import_model(tmp_path/'model-target', io.BytesIO(lm.export_model(origin, saved['id'])))
+    snapshot = tmp_path/'unrelated-job'
+    snapshot.mkdir()
+    lm.snapshot_model(tmp_path/'model-target', imported['id'], snapshot)
+    pinned, _ = lm.load_snapshot(snapshot)
+    assert saved['validation']['margin_fraction'] == margin
+    assert imported['validation']['margin_fraction'] == margin
+    assert pinned['validation']['margin_fraction'] == margin

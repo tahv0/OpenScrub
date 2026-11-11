@@ -104,13 +104,19 @@ def _threshold(value):
 def _validation(value, allow_warning=False):
     if not isinstance(value, dict):
         raise ModelError('Accepted calibration validation is missing')
+    optional = {'margin_fraction'}
     if allow_warning:
-        # Reports may have explanatory text, but never copy it into portable metadata.
-        value = {key: value[key] for key in _VALIDATION_FIELDS if key in value}
-    if set(value) != _VALIDATION_FIELDS:
+        # Reports may have explanatory text, but calibrated geometry must travel
+        # with the model so inference does not silently drop its outward margin.
+        value = {key: value[key] for key in _VALIDATION_FIELDS | optional if key in value}
+    if not _VALIDATION_FIELDS <= set(value) or set(value) - (_VALIDATION_FIELDS | optional):
         raise ModelError('Unsupported calibration validation fields')
     result = dict(value)
     result['threshold'] = _threshold(result['threshold'])
+    if 'margin_fraction' in result:
+        margin = _number(result['margin_fraction'], 'Calibrated mask margin')
+        if not 0 <= margin <= .05:
+            raise ModelError('Calibrated mask margin must be between 0 and 0.05')
     held_out = _integer(result['held_out_positive'], 'Held-out positive count', 4, 2**53)
     _integer(result['accepted'], 'Accepted positive count', 1, held_out)
     _integer(result['excess_pixels_removed'], 'Removed excess pixels', 1, 2**53)

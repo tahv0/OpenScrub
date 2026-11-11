@@ -277,9 +277,18 @@ class CropRefiner:
         return decode_segment(outputs,image.shape,self.size,gain,left,top)
 
 
-def conservative_quad(mask):
+def conservative_quad(mask, *, margin_fraction=0.):
     """Use one inspectable four-corner outline, shared by validation and rendering."""
-    padded=cv2.dilate(mask.astype(np.uint8),np.ones((3,3),np.uint8))
+    if not math.isfinite(margin_fraction) or not 0 <= margin_fraction <= .05:
+        raise ValueError('Learned mask margin must be between 0 and 0.05')
+    raw=(np.asarray(mask)!=0).astype(np.uint8)
+    if raw.ndim!=2:raise ValueError('Expected a two-dimensional learned mask')
+    # A fixed, bounded policy in crop coordinates, shared by the gate and rescan.
+    # The original 1px guard remains; extra padding is never confidence-based.
+    _,_,width,height=cv2.boundingRect(raw)
+    extra=min(32,int(math.ceil(min(width,height)*margin_fraction)))
+    radius=1+extra
+    padded=cv2.dilate(raw,np.ones((2*radius+1,2*radius+1),np.uint8))
     contours,_=cv2.findContours(padded,cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
     if not contours:return None,None
     allpoints=np.concatenate(contours)
@@ -298,7 +307,7 @@ def conservative_quad(mask):
 
 
 def refine_report(video, doc, model, threshold=.8, cancelled=None, progress=None,
-                  frame_range=None):
+                  frame_range=None, margin_fraction=0.):
     """One sequential decode, running the learned model on original proposals.
 
     A separate pass is intentional: crop-trained weights are never substituted
@@ -348,7 +357,7 @@ def refine_report(video, doc, model, threshold=.8, cancelled=None, progress=None
                 if mask is None or score < threshold:
                     row['learning_conflict']='learned model uncertain; original coverage retained'
                     stats['disagreements']+=1;continue
-                points,covered=conservative_quad(mask)
+                points,covered=conservative_quad(mask,margin_fraction=margin_fraction)
                 w,h=b[2]-b[0],b[3]-b[1]
                 if points is None or w<=0 or h<=0:
                     row['learning_conflict']='invalid learned mask; original coverage retained'
