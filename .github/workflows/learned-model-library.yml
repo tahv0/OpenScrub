@@ -6,8 +6,7 @@ on:
       - 'learned_models.py'
       - 'learning_candidates.py'
       - 'plate_verifier.py'
-      - 'test_secondary_models*.py'
-      - 'test_secondary_model_boundaries.py'
+      - 'test_secondary*.py'
       - 'test_plate_verifier.py'
       - 'test_learning_candidates.py'
       - 'test_learning_candidate_session.py'
@@ -46,7 +45,7 @@ jobs:
       - name: Run reusable model and checkpoint regressions
         run: |
           set -o pipefail
-          python -m pytest -q -ra --timeout=60 test_learned_models*.py test_secondary_models*.py test_secondary_model_boundaries.py test_plate_verifier.py test_learning_candidates.py test_learning_candidate_session.py test_video_learning.py test_learning_session.py test_learning_packaging.py test_stop_review.py test_video_sections.py test_section_workflow.py test_section_workflow_edges.py test_sections_browser.py test_section_ui_node.py --junitxml=/tmp/learned-model-tests.xml | tee /tmp/learned-model-tests.txt
+          python -m pytest -q -ra --timeout=60 test_learned_models*.py test_secondary*.py test_plate_verifier.py test_learning_candidates.py test_learning_candidate_session.py test_video_learning.py test_learning_session.py test_learning_packaging.py test_stop_review.py test_video_sections.py test_section_workflow.py test_section_workflow_edges.py test_sections_browser.py test_section_ui_node.py --junitxml=/tmp/learned-model-tests.xml | tee /tmp/learned-model-tests.txt
       - name: Check Flask 3.0 upload compatibility
         run: |
           python -m pip install flask==3.0.3 werkzeug==3.0.6

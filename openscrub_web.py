@@ -24,6 +24,7 @@ over the GPU.
 """
 
 import argparse
+from copy import deepcopy
 import json
 import os
 import queue
@@ -719,6 +720,44 @@ def _verifier_audit(doc, model_record, assessment, mode, stats, frame_range=None
     return record
 
 
+def _model_frame_range(job, doc):
+    """Intersect section context with the prefix actually scanned so far."""
+    context = job.get("options", {}).get("section_context")
+    if not context:
+        return None
+    if (not isinstance(context, (tuple, list)) or len(context) != 2 or
+            any(type(value) is not int for value in context) or
+            not 0 <= context[0] < context[1]):
+        raise ValueError("Section bounds must be two ordered integer source frames")
+    end = len(doc["render_state"]["cum"])
+    checkpoint = doc.get("stop_review") or {}
+    if checkpoint.get("state") == "paused":
+        end = min(end, stop_review.validate_resume(doc)["next_frame"])
+    return min(context[0], end), min(context[1], end)
+
+
+def _run_plate_model(job, video, doc, model, mode, *, threshold=None,
+                     assessment=None, progress=None):
+    frame_range = _model_frame_range(job, doc)
+    if job["cancel"].is_set():
+        raise InterruptedError("Plate model check cancelled; previous review retained")
+    if frame_range is not None and frame_range[0] == frame_range[1]:
+        # A Stop request may precede the section context. Preserve that valid
+        # checkpoint without decoding or claiming checks on unscanned frames.
+        stats = dict(model_calls=0, decoded_frames=0)
+        stats.update(dict(refined=0, disagreements=0) if mode == "refine" else
+                     dict(checked=0, suggested=0, suppressed=0, kept=0, human_preserved=0))
+        return deepcopy(doc), stats, frame_range
+    options = dict(cancelled=job["cancel"].is_set, progress=progress)
+    if frame_range is not None:
+        options["frame_range"] = frame_range
+    if mode == "refine":
+        result, stats = video_learning.refine_report(video, doc, model, threshold=threshold, **options)
+    else:
+        result, stats = plate_verifier.review_report(video, doc, model, assessment, mode=mode, **options)
+    return result, stats, frame_range
+
+
 def apply_selected_plate_model(job, chunk):
     """Apply the selected mode to fresh proposals; reviewed rows merge afterward."""
     selected = job.get("options", {}).get("learned_plate_model")
@@ -729,18 +768,10 @@ def apply_selected_plate_model(job, chunk):
     cb.log("Applying learned plate model: " + meta["name"])
     model = video_learning.CropRefiner(data)
     try:
-        options = dict(cancelled=job["cancel"].is_set,
-                       progress=lambda cur, total: cb.progress("refine", cur, total))
-        if job.get("options", {}).get("section_context"):
-            options["frame_range"] = tuple(job["options"]["section_context"])
-        if mode == "refine":
-            refined, stats = video_learning.refine_report(
-                chunk["provenance"]["input"], chunk, model,
-                threshold=meta["threshold"], **options)
-        else:
-            refined, stats = plate_verifier.review_report(
-                chunk["provenance"]["input"], chunk, model,
-                meta["validation"], mode=mode, **options)
+        refined, stats, frame_range = _run_plate_model(
+            job, chunk["provenance"]["input"], chunk, model, mode,
+            threshold=meta["threshold"], assessment=meta["validation"],
+            progress=lambda cur, total: cb.progress("refine", cur, total))
     except InterruptedError as error:
         raise openscrub.PipelineCancelled() from error
     record = {key: meta[key] for key in
@@ -754,7 +785,7 @@ def apply_selected_plate_model(job, chunk):
     else:
         job["verification"] = _verifier_audit(
             refined, record, meta["validation"], mode, stats,
-            frame_range=job.get("options", {}).get("section_context"))
+            frame_range=frame_range)
         cb.log("Secondary plate model checked %d proposals: %d suggested false positives, "
                "%d filtered; %d human decisions preserved." %
                (stats["checked"], stats["suggested"], stats["suppressed"], stats["human_preserved"]))
@@ -1465,14 +1496,12 @@ def perform_verification(job):
             learning_session.update_learning(job, "checking", "Checking existing plate detections",
                                              done=done, total=total, unit="frames")
         learning_session.update_learning(job, "checking", "Checking existing plate detections")
-        result, stats = plate_verifier.review_report(
-            job["video"], doc, video_learning.CropRefiner(model_data), assessment,
-            mode=mode, cancelled=job["cancel"].is_set, progress=inference_progress,
-            **({"frame_range": tuple(job["options"]["section_context"])}
-               if job.get("options", {}).get("section_context") else {}))
+        result, stats, frame_range = _run_plate_model(
+            job, job["video"], doc, video_learning.CropRefiner(model_data), mode,
+            assessment=assessment, progress=inference_progress)
         audit = _verifier_audit(result, dict(schema=1, candidate_id=candidate_id,
             version=candidate["version"], model_sha256=candidate["model_sha256"]), assessment, mode, stats,
-            frame_range=job.get("options", {}).get("section_context"))
+            frame_range=frame_range)
         result["render_required"] = True
         if learning_session.verify_source(job, result) != fingerprint:
             raise ValueError("Source changed during checking; previous review retained")

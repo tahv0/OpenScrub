@@ -73,6 +73,6 @@ Owner: root. Files: learning_session.py, openscrub_web.py, zones_ui.py, section_
 ## Task 4: Verification and integration
 
 - [x] Run focused tests, evaluated combined JavaScript syntax and build/import checks.
-- [ ] Independent review; resolve material findings.
+- [x] Independent review; resolve material findings. Model replacement, resumed audit history, and partial-section checkpoints have regression coverage.
 - [ ] Push feature branch and PR against integration/all-prs; run existing full/Docker/training CI as applicable, distinguish baseline failures.
 - [ ] Merge completed work into integration/all-prs per standing user instruction; verify final refs/tree and report actual results.
