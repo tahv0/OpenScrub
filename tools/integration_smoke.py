@@ -360,14 +360,36 @@ def verify(args):
             check_contours(evidence, wait_for_frame(page, 0), 0)
             page.locator("#review").screenshot(path=str(evidence.path / "review.png"))
 
-            # Returning to the loaded Blur value is a no-op, not evidence of
-            # losing track choices. Sparse saves must omit that unchanged map.
+            # An explicit Blur choice remains a human override even when the
+            # final visibility equals the loaded value. It must not become a
+            # positive/negative training label, or be lost as an unchanged map.
+            with page.expect_response(lambda response: response.url.endswith(
+                    f"/api/jobs/{JOB_ID}/detections") and response.request.method == "POST") as explicit:
+                explicit_ok = page.evaluate("saveAndRender(true)")
+            explicit_payload = explicit.value.request.post_data_json
+            explicit_report = api.get(url + f"/api/jobs/{JOB_ID}/report").json()
+            evidence.check("explicit same-value Blur is saved as a human override without a training label",
+                           explicit_ok and explicit.value.ok and
+                           explicit_payload["enabled"] == {str(i): True for i in range(FRAMES)} and
+                           explicit_payload["verified_labels"] == {str(i): "clear" for i in range(FRAMES)} and
+                           len(explicit_report["detections"]) == FRAMES and
+                           all(d["enabled"] is True and d.get("plate_verification_override") is True
+                               and not d.get("verified_label") for d in explicit_report["detections"]),
+                           explicit_payload)
+            # Once acknowledged, saving again without another click must stay
+            # sparse and must not replay the explicit override command.
+            unchanged_before = api.get(url + f"/api/jobs/{JOB_ID}/report").body()
             with page.expect_response(lambda response: response.url.endswith(
                     f"/api/jobs/{JOB_ID}/detections") and response.request.method == "POST") as unchanged:
                 unchanged_ok = page.evaluate("saveAndRender(true)")
-            evidence.check("unchanged visibility is omitted and acknowledged",
+            unchanged_payload = unchanged.value.request.post_data_json
+            unchanged_after = api.get(url + f"/api/jobs/{JOB_ID}/report").body()
+            evidence.check("acknowledged unchanged choices produce a sparse no-op save",
                            unchanged_ok and unchanged.value.ok and
-                           unchanged.value.request.post_data_json["enabled"] == {})
+                           unchanged_payload["enabled"] == {} and
+                           unchanged_payload["verified_labels"] == {} and
+                           unchanged_after == unchanged_before,
+                           unchanged_payload)
             # Commit an actual changed track before restoring Blur for render.
             # This preserves the full-member save assertion below and verifies
             # server persistence independently of the browser's displayed state.
