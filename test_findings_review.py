@@ -232,6 +232,7 @@ def test_explicit_compact_review_saved_without_video(review_server,monkeypatch,w
         load_browser_page(page,url,[],[])
         page.get_by_role('link',name='Synthetic review fixture',exact=True).click()
         card=page.locator('#det0');card.wait_for()
+        card.scroll_into_view_if_needed()
         assert card.locator('.det-status').inner_text()=='Not reviewed'
         assert card.locator('.det-choice[aria-pressed=true]').count()==0
         page.wait_for_function('!!document.querySelector("#det0 img")._quadEdit')

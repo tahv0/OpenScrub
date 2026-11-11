@@ -27,7 +27,7 @@ def test_learning_controls_preserve_decisions_and_queue_a_full_pass(review_serve
         page.wait_for_function('document.querySelectorAll("#review .det:not([hidden])").length===9')
         assert len(page.evaluate('Object.keys(EN)'))==90
         page.get_by_role('button',name='Show all findings',exact=True).click()
-        page.wait_for_function('document.querySelectorAll("#review .det").length===90')
+        page.wait_for_function('document.querySelectorAll("#review .det:not([hidden])").length===90')
         page.get_by_role('button',name='Train & rescan this video',exact=True).click()
         page.wait_for_function('LEARNING_TERMS===true')
         for _ in range(40):

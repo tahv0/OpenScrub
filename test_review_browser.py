@@ -47,7 +47,6 @@ def review_server(tmp_path, monkeypatch):
                phase='review', progress=1., error=None, stats={}, log=[], output=None,
                created=0, options={}, cancel=threading.Event(), stop=threading.Event())
     monkeypatch.setattr(web, 'JOBS_DIR', str(tmp_path))
-    monkeypatch.setattr(web, 'vault_locked', lambda: False)
     monkeypatch.setattr(web, 'JOBS', {job['id']: job})
     monkeypatch.setattr(web, 'TOKEN', None)
     monkeypatch.setattr(web, 'openscrub_update', None)  # No external update check in offline QA.
@@ -186,9 +185,13 @@ def test_cached_card_loads_while_another_preview_is_decoding(review_server, monk
     """A cold card must not block a ready card behind it in browser or server."""
     sync_api = pytest.importorskip('playwright.sync_api')
     url, report = review_server
+    # Keep cold0 first, warm1 second, and filler cards later in timeline order.
     # Distinct exact source frames make one JPEG warm while another stays cold.
     doc=json.loads(report.read_text())
-    doc['detections'][1].update(frame_index=301,t_start=301/30,t_end=301/30,last_seen=301/30)
+    for row in doc['detections']:
+        row.update(frame_index=301,t_start=301/30,t_end=301/30,last_seen=301/30)
+    doc['detections'][0].update(frame_index=299,t_start=299/30,t_end=299/30,last_seen=299/30)
+    doc['detections'][1].update(frame_index=300,t_start=10.,t_end=10.,last_seen=10.)
     report.write_text(json.dumps(doc))
     with web.app.test_client() as client:
         assert client.get('/api/jobs/inline-fixture/finding-preview/1').status_code == 200
@@ -208,12 +211,25 @@ def test_cached_card_loads_while_another_preview_is_decoding(review_server, monk
             errors = []
             page.on('pageerror', lambda e: errors.append(str(e)))
             page.goto(url)
+            # Hold the warm card at fetch until the server's cold decoder is
+            # definitely blocked. A warm image loaded earlier would not prove
+            # that cached reads can complete concurrently with a cold decode.
+            page.evaluate(r'''()=>{
+              const original=window.fetch;
+              window.__warmAllowed=new Promise(resolve=>window.__releaseWarm=resolve);
+              window.fetch=async(url,options)=>{
+                if(/\/finding-preview\/1(?:[?]|$)/.test(String(url)))await window.__warmAllowed;
+                return original(url,options);
+              };
+            }''')
             page.get_by_role('link', name='Synthetic review fixture', exact=True).click()
             page.locator('#review').wait_for()
             page.locator('#det0').scroll_into_view_if_needed()
+            assert entered.wait(5), 'the cold decoder never started'
+            assert page.locator('#det1 img').evaluate('(img)=>img.naturalWidth') == 0
+            page.evaluate('window.__releaseWarm()')
             page.wait_for_function(
                 "document.querySelector('#det1 img').naturalWidth > 0", timeout=5000)
-            assert entered.wait(2)
             assert not release.is_set()
             assert page.locator('#det0 img').evaluate('(img)=>img.naturalWidth') == 0
             card = page.locator('#det1')
