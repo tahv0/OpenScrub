@@ -17,12 +17,12 @@ Existing full-frame detectors still find plate proposals. The learned model refi
 
 Open **Settings → Learned plate models**.
 
-- **Export** downloads one \`.openscrub-model\` package.
+- **Export** downloads one `.openscrub-model` package.
 - On the other PC, **Import model** validates and adds that package to its library.
 - **Use for next scan**, or the Scan Setup selector, activates it for a new scan.
 - **Remove** removes a library entry while existing job copies remain available.
 
-Packages contain only \`model.onnx\` and a versioned \`manifest.json\`: display metadata, model type, decoder contract, checksum, input size, threshold, and the original calibration summary. There are no absolute source paths or source-video matching requirements. Original videos, training crops, exact human corner edits, rejected detections, training history and \`weights.pt\` are not included.
+Packages contain only `model.onnx` and a versioned `manifest.json`: display metadata, model type, decoder contract, checksum, input size, threshold, and the original calibration summary. There are no absolute source paths or source-video matching requirements. Original videos, training crops, exact human corner edits, rejected detections, training history and `weights.pt` are not included.
 
 These are OpenScrub plate **crop-mask** models. A generic ONNX detector or a candidate that did not pass the connected learning acceptance gate cannot be substituted. Import checks bounded archive contents, the SHA-256 digest, metadata compatibility, and real ONNX inference before publication. The model limit is 256 MiB.
 
@@ -30,7 +30,7 @@ These are OpenScrub plate **crop-mask** models. A generic ONNX detector or a can
 
 Reusable ONNX models are for processing videos. **Train & rescan this video** still uses the current job's own verified examples, accepted training checkpoint and history. Importing an inference model does not import a PyTorch checkpoint or transfer another video's human decisions.
 
-The library is stored under the reserved \`openscrub_jobs/learned_plate_models/\` directory and follows the app's encryption vault. It survives job retention and deletion. Each selected job has an independent \`plate_model/\` snapshot. Locking the vault blocks model management along with other job operations.
+The library is stored under the reserved `openscrub_jobs/learned_plate_models/` directory and follows the app's encryption vault. It survives job retention and deletion. Each selected job has an independent `plate_model/` snapshot. Locking the vault blocks model management along with other job operations.
 
 Use matching OpenScrub builds on both PCs. The normal Windows test/CUDA/training Compose commands remain unchanged; rebuild the application to obtain the new UI and runtime module. Continuing to train requires the optional training environment, while using saved models uses the normal ONNX runtime.
 

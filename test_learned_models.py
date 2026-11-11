@@ -535,3 +535,60 @@ def test_missing_library_is_empty_but_missing_model_and_snapshot_fail(tmp_path):
         lm.export_model(root, 'a' * 32)
     with pytest.raises(lm.ModelError):
         lm.load_snapshot(tmp_path / 'unconfigured-job')
+
+
+def test_successful_onnx_validation_reuses_metadata_and_revalidates_changed_bytes(tmp_path, accepted, monkeypatch):
+    # Count only the expensive boundary while preserving actual CPU graph loading,
+    # inference, and output decoding. Hashing, ZIPs, and filesystem IO remain real.
+    import onnxruntime as ort
+    lm = models()
+    real_session = ort.InferenceSession
+    calls = []
+    def counted_session(*args, **kwargs):
+        calls.append(None)
+        return real_session(*args, **kwargs)
+    monkeypatch.setattr(ort, 'InferenceSession', counted_session)
+    # A unique valid graph makes this independent of earlier process-local entries.
+    import onnx
+    graph = onnx.load_model_from_string(accepted[3])
+    graph.producer_name = 'cache-regression-' + tmp_path.name
+    payload = graph.SerializeToString()
+    job, report, model, _ = accepted
+    model.write_bytes(payload)
+    report['learning']['model_sha256'] = hashlib.sha256(payload).hexdigest()
+    write_report(job, report)
+    root = tmp_path / 'models'
+    saved = lm.save_model(root, job, 'Cache original')
+    assert len(calls) == 1
+    lm.list_models(root)
+    lm.list_models(root)
+    exported = lm.export_model(root, saved['id'])
+    next_job = tmp_path / 'unrelated-job'
+    next_job.mkdir()
+    lm.snapshot_model(root, saved['id'], next_job)
+    lm.load_snapshot(next_job)
+    assert len(calls) == 1, 'Repeated reads of verified identical bytes must reuse validation metadata'
+
+    # A genuinely different input graph has a different digest and needs validation.
+    changed_graph = onnx.load_model_from_string(onnx_bytes(shape=(1, 3, 64, 64)))
+    changed_graph.producer_name = 'cache-changed-' + tmp_path.name
+    changed = changed_graph.SerializeToString()
+    manifest, _ = unpack(exported)
+    manifest['input_size'] = 64
+    manifest['model_size'] = len(changed)
+    manifest['model_sha256'] = hashlib.sha256(changed).hexdigest()
+    imported = lm.import_model(root, io.BytesIO(archive(manifest, changed)), name='Changed graph')
+    assert imported['input_size'] == 64
+    assert len(calls) == 2
+    lm.export_model(root, imported['id'])
+    assert len(calls) == 2
+
+    # Matching manifest hashes cannot make invalid bytes eligible for the cache,
+    # and unsuccessful graph validation is deliberately attempted again.
+    invalid = b'invalid-onnx-' + tmp_path.name.encode()
+    manifest['model_size'] = len(invalid)
+    manifest['model_sha256'] = hashlib.sha256(invalid).hexdigest()
+    for expected_calls in (3, 4):
+        with pytest.raises(lm.ModelError):
+            lm.import_model(root, io.BytesIO(archive(manifest, invalid)))
+        assert len(calls) == expected_calls
