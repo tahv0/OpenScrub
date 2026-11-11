@@ -217,6 +217,14 @@ details .inner .full{grid-column:1/-1}
   <div id="sspeedhint" class="mutd" style="font-size:11.5px;margin-top:3px"></div>
  </div>
 
+ <div id="learnedPlateModelControls" style="margin:10px 0">
+  <label for="learnedPlateModel">Learned plate model</label>
+  <select id="learnedPlateModel" style="width:100%" onchange="document.getElementById('learnedPlateModelHint').textContent=this.value?'Selected model will refine plate masks in this scan.':'Use the original plate masks.'">
+   <option value="">None — use original plate masks</option>
+  </select>
+  <div id="learnedPlateModelHint" class="mutd" style="font-size:11.5px;margin-top:4px">Choose a saved model for this environment. Applied when plate detection is enabled; uses every-frame plate proposals and may take longer. Review the results.</div>
+  <a href="#settings" style="font-size:12px">Manage, import or export models</a>
+ </div>
  <button class="start" onclick="startScan()">&#9654; Start scan</button>
  <div class="mutd" id="summary" style="text-align:center;margin-top:7px"></div>
 </div>
@@ -1168,6 +1176,7 @@ async function startScan(){
    +"models.\n\nStart anyway?"))return;
  const o={
   plate_coverage:$("plateCoverage").value,plate_narrow_margin:margin,
+  learned_plate_model:$("learnedPlateModel").value,
   engine:$("engine").value,device:$("device").value,encoder:$("encoder").value,
   mode:$("mode").value,coverage:$("coverage").value,sample_interval:+$("si").value,scan_trigger:+$("st").value,
   pad:+$("pad").value,bridge_gap:+$("bgap").value,

@@ -29,7 +29,7 @@ def test_all_runtime_images_include_learning_imports():
     root=Path(__file__).parent
     for name in ('Dockerfile','Dockerfile.cuda','Dockerfile.intel'):
         text=(root/name).read_text()
-        for module in ('stop_review.py','video_learning.py','learning_session.py'):
+        for module in ('stop_review.py','video_learning.py','learning_session.py','learned_models.py'):
             assert module in text,name+' omits '+module
         assert 'COPY scripts/ scripts/' in text
     cuda=(root/'Dockerfile.cuda').read_text()

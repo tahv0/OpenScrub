@@ -729,6 +729,8 @@ def preserve_render_review(before, rendered):
         raise ValueError('Rendered timeline differs from the review; review retained')
     result = deepcopy(rendered)
     result['detections'] = deepcopy(before['detections'])
+    if before.get('refinement'):
+        result['refinement'] = deepcopy(before['refinement'])
     if before.get('learning'):
         result['learning'] = deepcopy(before['learning'])
         result['learning']['needs_render'] = False

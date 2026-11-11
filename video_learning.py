@@ -256,7 +256,8 @@ class CropRefiner:
         options=ort.SessionOptions();options.intra_op_num_threads=2
         providers=providers or ([p for p in ('CUDAExecutionProvider','CPUExecutionProvider')
                                 if p in ort.get_available_providers()])
-        self.session=ort.InferenceSession(str(path),sess_options=options,providers=providers)
+        source=bytes(path) if isinstance(path,(bytes,bytearray)) else str(path)
+        self.session=ort.InferenceSession(source,sess_options=options,providers=providers)
         inputs=self.session.get_inputs()
         if len(inputs)!=1 or len(inputs[0].shape)!=4:
             raise ValueError('Expected one NCHW segmentation input')
@@ -316,7 +317,7 @@ def refine_report(video, doc, model, threshold=.8, cancelled=None, progress=None
         fps=cap.get(cv2.CAP_PROP_FPS)
         if not math.isclose(fps,float(rs['fps']),rel_tol=1e-4,abs_tol=.001):
             raise ValueError('Refinement video frame rate differs from the scan timeline')
-        while True:
+        while index < len(rs['cum']):
             if cancelled and cancelled(): raise InterruptedError('Learning pass cancelled; prior review retained')
             ok,image=cap.read()
             if not ok: break

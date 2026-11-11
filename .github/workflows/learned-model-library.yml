@@ -1,0 +1,60 @@
+name: Reusable learned models
+on:
+  pull_request:
+    branches: ['integration/all-prs']
+    paths:
+      - 'learned_models.py'
+      - 'test_learned_models*.py'
+      - 'openscrub_web.py'
+      - 'video_learning.py'
+      - 'learning_session.py'
+      - 'zones_ui.py'
+      - 'pyproject.toml'
+      - '.github/workflows/learned-model-library.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  model-library:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      OPENSCRUB_NO_AUTOFETCH: '1'
+      OPENSCRUB_CPU_DNN: '1'
+      REVIEW_EVIDENCE_DIR: /tmp/learned-model-evidence
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Install synthetic test environment
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg tesseract-ocr
+          python -m pip install 'numpy<2' opencv-python-headless==4.11.0.86 onnxruntime==1.20.1 onnx pytest pytest-timeout flask rapidfuzz pyyaml cryptography playwright build hatchling cheroot pytesseract pillow
+          python -m playwright install --with-deps chromium
+      - name: Run reusable model and checkpoint regressions
+        run: |
+          set -o pipefail
+          python -m pytest -q -ra --timeout=60 test_learned_models*.py test_video_learning.py test_learning_session.py test_stop_review.py --junitxml=/tmp/learned-model-tests.xml | tee /tmp/learned-model-tests.txt
+      - name: Check Flask 3.0 upload compatibility
+        run: |
+          python -m pip install flask==3.0.3 werkzeug==3.0.6
+          python -m pytest -q -ra --timeout=60 test_learned_models_web.py
+      - name: Check combined browser scripts and distributable
+        run: |
+          python -c "import openscrub_web as w,re;from pathlib import Path;Path('/tmp/openscrub-model-ui.js').write_text('\n'.join(re.findall(r'<script>(.*?)</script>',w.PAGE,re.S)),encoding='utf-8')"
+          node --check /tmp/openscrub-model-ui.js
+          python -m build
+          python -m pip install --no-deps --force-reinstall dist/*.whl
+          cd /tmp
+          python -c "import learned_models, openscrub_web; assert callable(learned_models.import_model); assert callable(openscrub_web.apply_selected_plate_model)"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: reusable-model-evidence
+          path: |
+            /tmp/learned-model-tests.*
+            /tmp/learned-model-evidence/*.png
+          if-no-files-found: ignore
+          retention-days: 7

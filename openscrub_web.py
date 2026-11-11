@@ -36,13 +36,14 @@ import uuid
 
 import cv2
 import numpy as np
-from flask import (Flask, Response, abort, jsonify, redirect, request,
+from flask import (Flask, Request, Response, abort, jsonify, redirect, request,
                    send_file)
 
 import openscrub
 import stop_review
 import learning_session
 import video_learning
+import learned_models
 import zones_ui
 
 
@@ -188,7 +189,20 @@ def active_cert_pair():
         return CUSTOM_CERT, CUSTOM_KEY, "custom"
     ensure_self_signed()
     return AUTO_CERT, AUTO_KEY, "self-signed"
+class _OpenScrubRequest(Request):
+    @property
+    def max_content_length(self):
+        # A property override also supports Flask versions where the base
+        # request limit is read-only. It applies before multipart parsing.
+        configured = super().max_content_length
+        if self.method == "POST" and self.path == "/api/jobs/learned-models/import":
+            limit = learned_models.MAX_MODEL_BYTES + 1024 * 1024
+            return min(configured, limit) if configured is not None else limit
+        return configured
+
+
 app = Flask(__name__)
+app.request_class = _OpenScrubRequest
 
 
 def _max_upload_bytes(cli_value=None):
@@ -215,6 +229,9 @@ app.config["MAX_CONTENT_LENGTH"] = _max_upload_bytes()   # default 8 GB
 
 @app.errorhandler(413)
 def _too_large(e):
+    if request.method == "POST" and request.path == "/api/jobs/learned-models/import":
+        return jsonify({"error": "Model package exceeds this server's model upload limit "
+                                 "(maximum 256 MiB of model data)."}), 413
     cap = app.config.get("MAX_CONTENT_LENGTH")
     gb = cap / 1024 ** 3 if cap else 0
     return jsonify({"error":
@@ -322,18 +339,37 @@ def server_path_error(p):
     return None
 
 
+def learned_models_root():
+    """Reserved job-store directory: included in the vault, never in retention."""
+    return os.path.join(JOBS_DIR, "learned_plate_models")
+
+
 def new_job(video_path, options, name):
     jid = uuid.uuid4().hex[:12]
     jdir = os.path.join(JOBS_DIR, jid)
     os.makedirs(jdir, exist_ok=True)
     job = {
         "id": jid, "dir": jdir, "video": video_path, "name": name,
-        "options": options, "phase": "queued", "progress": 0.0,
+        "options": dict(options), "phase": "queued", "progress": 0.0,
         "eta": None, "size": 0,
         "log": [], "error": None, "output": None, "created": time.time(),
         "cancel": threading.Event(), "stop": threading.Event(),
         "stats": {},
     }
+    try:
+        selected = job["options"].get("learned_plate_model", "")
+        if not isinstance(selected, str):
+            raise learned_models.ModelError("Choose a valid learned plate model.")
+        if selected:
+            with _REVIEW_EDIT_LOCK, _REVIEW_WORK_LOCK:
+                if vault_locked():
+                    abort(423, description="Unlock the vault before selecting a model.")
+                job["refinement"] = learned_models.snapshot_model(
+                    learned_models_root(), selected, jdir)
+    except Exception:
+        import shutil
+        shutil.rmtree(jdir, ignore_errors=True)
+        raise
     with JOBS_LOCK:
         JOBS[jid] = job
     return job
@@ -367,6 +403,7 @@ def job_public(job):
         "checkpoint_frame": job.get("checkpoint_frame"),
         "checkpoint_total": job.get("checkpoint_total"),
         "learning": job.get("learning"),
+        "refinement": job.get("refinement"),
     }
 
 
@@ -410,8 +447,11 @@ class WebCallbacks(openscrub.Callbacks):
         # Rounded to 5 decimals, not 3: on a long slow scan 3-decimal
         # quantization froze the bar for 30s+ stretches, and the old
         # client-side ETA (extrapolated from bar movement) blanked out.
-        base, span = {"scan": (0, 0.45),
-                      "post": (0.45, 0.05)}.get(stage, (0.5, 0.5))
+        stages = ({"scan": (0, 0.38), "post": (0.38, 0.04),
+                   "refine": (0.42, 0.08)}
+                  if self.job.get("options", {}).get("learned_plate_model")
+                  else {"scan": (0, 0.45), "post": (0.45, 0.05)})
+        base, span = stages.get(stage, (0.5, 0.5))
         self.job["progress"] = round(base + span * cur / max(total, 1), 5)
 
         # Server-side per-STAGE ETA from the stage's whole-run average
@@ -588,7 +628,41 @@ def build_args(job, for_render=False):
     if for_render:
         argv += ["--from-report", os.path.join(jdir, "report.json")]
     parser = openscrub.build_parser()
-    return openscrub._prep_args(parser.parse_args(argv), parser)
+    args = openscrub._prep_args(parser.parse_args(argv), parser)
+    if o.get("learned_plate_model") and not for_render:
+        meta, _ = learned_models.load_snapshot(jdir)
+        if meta["id"] != o["learned_plate_model"]:
+            raise learned_models.ModelError("The selected job model does not match its saved copy.")
+        args.plate_learning_exact = True
+    return args
+
+
+def apply_selected_plate_model(job, chunk):
+    """Refine only a fresh scan chunk; older reviewed rows merge afterward."""
+    selected = job.get("options", {}).get("learned_plate_model")
+    if not selected:
+        return chunk
+    meta, data = learned_models.load_snapshot(job["dir"])
+    if meta["id"] != selected:
+        raise learned_models.ModelError("The selected job model does not match its saved copy.")
+    cb = WebCallbacks(job)
+    cb.log("Applying learned plate model: " + meta["name"])
+    model = video_learning.CropRefiner(data)
+    try:
+        refined, stats = video_learning.refine_report(
+            chunk["provenance"]["input"], chunk, model,
+            threshold=meta["threshold"], cancelled=job["cancel"].is_set,
+            progress=lambda cur, total: cb.progress("refine", cur, total))
+    except InterruptedError as error:
+        raise openscrub.PipelineCancelled() from error
+    record = {key: meta[key] for key in
+              ("id", "name", "contract", "model_sha256", "input_size", "threshold")}
+    record.update(schema=1, inference=stats)
+    refined["refinement"] = record
+    job["refinement"] = record
+    cb.log("Learned model applied: %d mask refinements, %d uncertain proposals kept "
+           "with original coverage." % (stats["refined"], stats["disagreements"]))
+    return refined
 
 
 def worker():
@@ -628,6 +702,7 @@ def worker():
                     openscrub.write_report(staging_path, args, state)
                     with open(staging_path, encoding="utf-8") as f:
                         chunk = json.load(f)
+                    chunk = apply_selected_plate_model(job, chunk)
                     end_frame = state.get("stop_at_frame")
                     total_frames = int(state["total_frames"])
                     if resuming:
@@ -821,7 +896,12 @@ def refuse_upload_without_disk_room():
     by the time create_job touches request.files, werkzeug has already
     spooled the whole upload into the temp dir — too late to protect the
     disk. Checking the Content-Length header here reads nothing."""
-    if request.method == "POST" and request.path == "/api/jobs":
+    if request.method == "POST" and request.path == "/api/jobs/learned-models/import":
+        # The request class supplies the same cap to the multipart parser,
+        # including uploads without a Content-Length header.
+        if request.content_length is not None and request.content_length > request.max_content_length:
+            return _too_large(None)
+    if request.method == "POST" and request.path in ("/api/jobs", "/api/jobs/learned-models/import"):
         err = _upload_disk_error(request.content_length)
         if err:
             return jsonify({"error": err}), 507
@@ -854,7 +934,12 @@ def set_cookie(resp):
 
 @app.route("/api/jobs", methods=["POST"])
 def create_job():
-    options = json.loads(request.form.get("options", "{}"))
+    try:
+        options = json.loads(request.form.get("options", "{}"))
+        if not isinstance(options, dict):
+            raise ValueError()
+    except (ValueError, TypeError):
+        return jsonify({"error": "Scan options must be a JSON object."}), 400
     try:
         margin = float(options.get("plate_narrow_margin", 0))
         if not np.isfinite(margin) or margin < 0 or options.get("plate_coverage", "full") not in ("full", "narrow"):
@@ -1133,6 +1218,7 @@ def perform_learning(job):
         job["checkpoint_frame"] = job["checkpoint_total"] = None
         job["progress"] = 0.5
         job["learning"]["inference"] = result["learning"]["inference"]
+        job.pop("refinement", None)
     except Exception as error:
         job["phase"] = previous
         job["error"] = str(error)
@@ -1469,6 +1555,7 @@ def job_detections(jid):
                       "shaped": bool(d.get("poly"))})
     return jsonify({"detections": items,
                     "learning": doc.get("learning"),
+                    "refinement": doc.get("refinement"),
                     "indexed_frames": any(d.get("frame_index", -1) >= 0 for d in doc["detections"]),
                     "frame_count": len(doc["render_state"]["cum"]),
                     "fps": doc["render_state"]["fps"],
@@ -2176,6 +2263,65 @@ def _serialize_review_edit(fn):
     return write
 
 
+
+@app.errorhandler(learned_models.ModelError)
+def learned_model_error(error):
+    app.logger.warning("Learned model operation failed: %s", error)
+    return jsonify({"error": str(error)}), 400
+
+
+@app.route("/api/jobs/learned-models")
+@_serialize_review_edit
+def learned_model_list():
+    return jsonify({"models": learned_models.list_models(learned_models_root())})
+
+
+@app.route("/api/jobs/<jid>/learned-models", methods=["POST"])
+@_serialize_review_edit
+def learned_model_save(jid):
+    job = JOBS.get(jid) or abort(404)
+    if job["phase"] not in ("review", "done", "paused"):
+        return jsonify({"error": "Finish or pause the current work before saving a model."}), 409
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return jsonify({"error": "Supply a model name and optional environment description."}), 400
+    with _REVIEW_WORK_LOCK:
+        model = learned_models.save_model(
+            learned_models_root(), job["dir"], payload.get("name"),
+            payload.get("description", ""))
+    return jsonify({"model": model})
+
+
+@app.route("/api/jobs/learned-models/import", methods=["POST"])
+@_serialize_review_edit
+def learned_model_import():
+    uploaded = request.files.get("model")
+    if uploaded is None or not uploaded.filename:
+        return jsonify({"error": "Choose an OpenScrub model package."}), 400
+    with _REVIEW_WORK_LOCK:
+        model = learned_models.import_model(learned_models_root(), uploaded.stream)
+    return jsonify({"model": model})
+
+
+@app.route("/api/jobs/learned-models/<model_id>/export")
+@_serialize_review_edit
+def learned_model_export(model_id):
+    import io
+    with _REVIEW_WORK_LOCK:
+        data = learned_models.export_model(learned_models_root(), model_id)
+    return send_file(io.BytesIO(data), mimetype="application/zip",
+                     as_attachment=True, download_name=model_id + ".openscrub-model",
+                     max_age=0)
+
+
+@app.route("/api/jobs/learned-models/<model_id>", methods=["DELETE"])
+@_serialize_review_edit
+def learned_model_delete(model_id):
+    with _REVIEW_WORK_LOCK:
+        learned_models.delete_model(learned_models_root(), model_id)
+    return jsonify({"ok": True})
+
+
 @app.route("/api/jobs/<jid>/detections", methods=["POST"])
 @_serialize_review_edit
 def job_save_edits(jid):
@@ -2832,6 +2978,18 @@ to any per-job allow names set in the Scan Setup editor.</div>
  <div id="msec_plate"></div>
  <div id="msec_person"></div>
 </div>
+<div class="card" id="learnedModelsPanel">
+<h2>Learned plate models</h2>
+<p class="review-copy">Save a trained model from a video review, then choose it for similar footage in Scan Setup. Import and export models to use on another PC.</p>
+<div class="row" style="gap:8px;flex-wrap:wrap">
+ <label for="learnedModelImport">Import model</label>
+ <input type="file" id="learnedModelImport" accept=".openscrub-model,.zip" style="max-width:100%" onchange="importLearnedModel(this)">
+ <button type="button" class="sec" onclick="refreshLearnedModels()">Refresh</button>
+</div>
+<p id="learnedModelStatus" class="review-copy" role="status" aria-live="polite"></p>
+<div id="learnedModelLibrary">Loading models...</div>
+<p class="review-copy">Model packages contain the learned model and its settings. Video files, training images and review decisions stay with their original jobs.</p>
+</div>
 <div class="card"><h2>Optional detection engines</h2>
 <div id="extras" style="font-size:13px">loading…</div>
 </div>
@@ -3128,6 +3286,7 @@ function shellHtml(j){
   <span class="badge" id="ph"></span><small id="eta"></small></h2>
  <progress id="prog" value="0" max="1"></progress>
  <div class="row" id="actions" style="margin-top:8px"></div>
+ <p id="selectedLearnedModel" class="review-copy" role="status"></p>
  <div style="margin-top:8px;text-align:center"><img id="pimg"
    style="max-width:100%;border-radius:8px;display:none;margin:0 auto"></div>
  <div id="pcap" style="font-size:12px;color:#94a3b8"></div>
@@ -3191,6 +3350,9 @@ async function refresh(){
 
 async function refreshJob(id,view,signal){
  const {data:j}=await reviewRequest("api/jobs/"+id,{signal});
+ const modelNote=document.getElementById("selectedLearnedModel");
+ if(modelNote&&CUR===id&&JOBVIEW===view)modelNote.textContent=j.refinement
+  ?"Learned plate model: "+j.refinement.name:"";
  if(CUR!==id||JOBVIEW!==view)return;
 
  EXPORT_NAMES={video:j.download_name,report:j.report_name};
@@ -4549,6 +4711,16 @@ async function loadReview(){
   <button type="button" class="sec" onclick="reviewUncertain()">Review 10% of plate groups</button>
   <button type="button" id="reviewShowAll" class="sec" hidden onclick="reviewAllFindings()">Show all findings</button>
  </div>
+ <details id="saveLearnedModelPanel" style="margin-bottom:12px">
+  <summary>Save trained model for other videos</summary>
+  <p class="review-copy">Save the accepted model for an environment, then select it when processing another video.</p>
+  <label for="learnedModelName">Model name</label>
+  <input id="learnedModelName" type="text" maxlength="80" placeholder="e.g. Garage daylight" style="width:100%;box-sizing:border-box">
+  <label for="learnedModelDescription">Environment description</label>
+  <textarea id="learnedModelDescription" maxlength="500" rows="2" placeholder="Camera, lighting or other useful notes" style="width:100%;box-sizing:border-box"></textarea>
+  <button id="saveLearnedModelButton" type="button" onclick="saveLearnedModel()" ${d.learning&&d.learning.active&&d.learning.active.model?"":"disabled"}>Save model</button>
+  <p id="saveLearnedModelStatus" class="review-copy" role="status" aria-live="polite">${d.learning&&d.learning.active&&d.learning.active.model?"Uses the last accepted training pass.":"Complete an accepted training pass to save a reusable model."}</p>
+ </details>
  <p id="reviewSampleSummary" class="review-copy" role="status" hidden></p>
  <p id="reviewSaveStatus" class="review-copy review-save-status" role="status" aria-live="polite">Review choices loaded from disk.</p>
  <div id="plateSaveIssues" class="review-copy" role="status" aria-live="polite" hidden></div>
@@ -4968,7 +5140,10 @@ async function vaultStatus(){
   document.getElementById("vunlock").style.display=(d.enabled&&d.locked)?"flex":"none";
   document.getElementById("vlock").style.display=(d.enabled&&!d.locked)?"flex":"none";
   if(!d.enabled){st.textContent="Disabled — job files (PII) are stored in plaintext. Set a password to enable at-rest encryption.";st.style.color="#fbbf24";}
-  else if(d.locked){st.textContent="LOCKED — "+d.encrypted_files+" file(s) encrypted on disk. Unlock to work with jobs.";st.style.color="#f87171";}
+  else if(d.locked){
+   st.textContent="LOCKED — "+d.encrypted_files+" file(s) encrypted on disk. Unlock to work with jobs.";st.style.color="#f87171";
+   clearLearnedModels("Unlock the vault to access saved models.");
+  }
   else{st.textContent="Unlocked — files decrypt while you work; they re-encrypt when you lock or shut down. Losing the password makes encrypted files unrecoverable.";st.style.color="#4ade80";}
   if(d.enabled&&!d.locked){
    document.getElementById("valk").checked=d.autolock_min>0;
@@ -4989,7 +5164,7 @@ async function vaultUnlock(){
  const r=await fetch("/api/vault/unlock",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({password:document.getElementById("vpw").value})});
  if(!r.ok){alert(await r.text());return;}
  document.getElementById("vpw").value="";
- vaultStatus();loadJobs();
+ await vaultStatus();loadJobs();await refreshLearnedModels();
 }
 async function vaultAutolockSave(){
  const on=document.getElementById("valk").checked;
@@ -5001,6 +5176,7 @@ async function vaultDoLock(){
  if(!await flushPlateSaves())return;
  if(!confirm("Encrypt all job files now?\\n\\nYou will need the password to access them again."))return;
  const r=await fetch("/api/vault/lock",{method:"POST"});
+ if(r.ok)clearLearnedModels("Unlock the vault to access saved models.");
  alert(r.ok?("Locked — "+(await r.json()).encrypted+" file(s) encrypted."):await r.text());
  vaultStatus();loadJobs();
 }
@@ -5027,12 +5203,127 @@ async function extraInstall(id){
  if(!r.ok){alert(await r.text());return;}
  extrasStatus();
 }
-loadPersist();loadCertInfo();loadJobs();setInterval(loadJobs,5000);
+
+let LEARNED_MODEL_LIST=[],LEARNED_MODEL_REFRESH=0;
+function clearLearnedModels(message){
+ ++LEARNED_MODEL_REFRESH;
+ LEARNED_MODEL_LIST=[];
+ const select=document.getElementById("learnedPlateModel");
+ if(select){select.replaceChildren(new Option("None — use original plate masks",""));select.disabled=true;}
+ document.getElementById("learnedModelLibrary").replaceChildren();
+ document.getElementById("learnedModelStatus").textContent=message;
+ document.getElementById("learnedPlateModelHint").textContent=message;
+}
+async function refreshLearnedModels(){
+ const refresh=++LEARNED_MODEL_REFRESH;
+ const select=document.getElementById("learnedPlateModel");
+ const box=document.getElementById("learnedModelLibrary");
+ const note=document.getElementById("learnedModelStatus");
+ try{
+  const {data}=await reviewRequest("api/jobs/learned-models",{timeoutMs:120000});
+  if(refresh!==LEARNED_MODEL_REFRESH)return false;
+  // The person may choose a model while this request is outstanding.
+  const selected=select?select.value:"";
+  LEARNED_MODEL_LIST=data.models;
+  note.textContent="";
+  if(select){
+   select.replaceChildren(new Option("None — use original plate masks",""));
+   for(const model of data.models)select.add(new Option(model.name,model.id));
+   select.value=data.models.some(m=>m.id===selected)?selected:"";
+   select.disabled=false;
+   const chosen=data.models.find(m=>m.id===select.value);
+   document.getElementById("learnedPlateModelHint").textContent=chosen?
+    "Selected: "+chosen.name+". Used for plate detection in new scans.":
+    "Choose a saved model for this environment. Applied when plate detection is enabled; uses every-frame plate proposals and may take longer. Review the results.";
+  }
+  box.replaceChildren();
+  if(!data.models.length)box.textContent="No saved models yet. Save an accepted model after training a video, or import a model package.";
+  for(const model of data.models){
+   const row=document.createElement("div");row.className="learned-model";
+   row.style.cssText="padding:12px 0;border-top:1px solid #334155;overflow-wrap:anywhere";
+   const title=document.createElement("strong");title.textContent=model.name;row.appendChild(title);
+   if(model.description){
+    const description=document.createElement("p");description.className="review-copy";
+    description.textContent=model.description;row.appendChild(description);
+   }
+   const size=document.createElement("p");size.className="review-copy";
+   size.textContent=(model.model_size/1048576).toFixed(1)+" MiB · Plate mask model";
+   row.appendChild(size);
+   const actions=document.createElement("div");actions.className="row";
+   actions.style.cssText="gap:10px;flex-wrap:wrap";
+   const use=document.createElement("button");use.type="button";use.className="sec";
+   use.textContent="Use for next scan";use.onclick=()=>{
+    select.value=model.id;
+    document.getElementById("learnedPlateModelHint").textContent="Selected: "+model.name+". Used for plate detection in new scans.";
+    location.hash="";
+    requestAnimationFrame(()=>select.scrollIntoView({block:"center"}));
+   };
+   const download=document.createElement("a");
+   download.textContent="Export";download.href="api/jobs/learned-models/"+encodeURIComponent(model.id)+"/export";
+   download.setAttribute("download","");
+   const remove=document.createElement("button");remove.type="button";remove.className="sec";
+   remove.textContent="Remove";remove.onclick=()=>removeLearnedModel(model.id,model.name);
+   actions.append(use,download,remove);row.appendChild(actions);box.appendChild(row);
+  }
+  return true;
+ }catch(error){
+  if(refresh!==LEARNED_MODEL_REFRESH)return false;
+  if(error.status===423)clearLearnedModels("Unlock the vault to access saved models.");
+  else{note.textContent=error.message;if(select)select.disabled=true;}
+  return false;
+ }
+}
+async function importLearnedModel(input){
+ const file=input.files[0];if(!file)return;
+ const note=document.getElementById("learnedModelStatus");
+ if(file.size>257*1024*1024){note.textContent="Model package is too large (256 MiB model limit).";input.value="";return;}
+ const data=new FormData();data.append("model",file);
+ input.disabled=true;note.textContent="Importing and checking the model...";
+ try{
+  const {data:result}=await reviewRequest("api/jobs/learned-models/import",
+    {method:"POST",body:data,timeoutMs:120000});
+  await refreshLearnedModels();
+  note.textContent="Imported "+result.model.name+". Choose it in Scan Setup when you want to use it.";
+ }catch(error){note.textContent="Import failed: "+error.message;}
+ finally{input.disabled=false;input.value="";}
+}
+async function removeLearnedModel(id,name){
+ if(!confirm("Remove "+name+" from the model library? Existing jobs keep their selected copy."))return;
+ const note=document.getElementById("learnedModelStatus");
+ try{
+  await reviewRequest("api/jobs/learned-models/"+encodeURIComponent(id),{method:"DELETE",timeoutMs:120000});
+  await refreshLearnedModels();note.textContent="Removed from the model library.";
+ }catch(error){note.textContent="Could not remove model: "+error.message;}
+}
+async function saveLearnedModel(){
+ const job=CUR,view=JOBVIEW;
+ const name=document.getElementById("learnedModelName").value.trim();
+ const description=document.getElementById("learnedModelDescription").value.trim();
+ const note=document.getElementById("saveLearnedModelStatus");
+ const button=document.getElementById("saveLearnedModelButton");
+ if(!name){note.textContent="Enter a model name.";return;}
+ button.disabled=true;note.textContent="Saving accepted model...";
+ try{
+  if(!await saveAndRender(true)){
+   if(CUR===job&&JOBVIEW===view)note.textContent="Review changes could not be saved. Resolve the review error and try again.";
+   return;
+  }
+  if(CUR!==job||JOBVIEW!==view)return;
+  const {data}=await reviewRequest("api/jobs/"+encodeURIComponent(job)+"/learned-models",
+    {method:"POST",headers:{"Content-Type":"application/json"},
+     body:JSON.stringify({name,description}),timeoutMs:120000});
+  if(CUR===job&&JOBVIEW===view)note.textContent="Saved "+data.model.name+" to the model library. Select it in Scan Setup for other videos.";
+  await refreshLearnedModels();
+ }catch(error){if(CUR===job&&JOBVIEW===view)note.textContent="Could not save model: "+error.message;}
+ finally{if(button.isConnected)button.disabled=false;}
+}
+
+loadPersist();loadCertInfo();loadJobs();refreshLearnedModels();setInterval(loadJobs,5000);
 function showView(){
  const s=location.hash==="#settings";
  document.getElementById("mainview").style.display=s?"none":"block";
  document.getElementById("settingsview").style.display=s?"block":"none";
- if(s)window.scrollTo(0,0);
+ if(s){window.scrollTo(0,0);refreshLearnedModels();}
 }
 window.addEventListener("hashchange",showView);
 updCheck();vaultStatus();extrasStatus();showView();
@@ -5674,6 +5965,8 @@ def rehydrate_jobs():
     way the person's work survives the server going down."""
     n = 0
     for jid in sorted(os.listdir(JOBS_DIR)):
+        if jid == "learned_plate_models":
+            continue
         jdir = os.path.join(JOBS_DIR, jid)
         rep = os.path.join(jdir, "report.json")
         if not os.path.isdir(jdir):
@@ -5717,6 +6010,24 @@ def rehydrate_jobs():
                 "cancel": threading.Event(), "stop": threading.Event(),
                 "stats": {},
             }
+            if os.path.lexists(os.path.join(jdir, "plate_model")):
+                # A snapshot is published before queueing, even if a restart
+                # happened before the first report. Keep selection fail-closed
+                # if that copy is damaged; Retry must not silently omit it.
+                job["options"]["learned_plate_model"] = "unavailable"
+                try:
+                    selected, _ = learned_models.load_snapshot(jdir)
+                except learned_models.ModelError as error:
+                    job["error"] = ("Recovered upload, but its selected learned model "
+                                    "copy is unavailable: %s. Start a new scan with "
+                                    "a valid model; the uploaded file was kept." % error)
+                else:
+                    job["options"]["learned_plate_model"] = selected["id"]
+                    job["refinement"] = selected
+                    job["error"] = ("Recovered before the scan finished. Retry uses "
+                                    "the saved learned model and default settings for "
+                                    "other options; the uploaded file was kept.")
+                    job["log"].append("Pinned learned model recovered: " + selected["name"])
             with JOBS_LOCK:
                 JOBS[jid] = job
             n += 1
@@ -5747,6 +6058,9 @@ def rehydrate_jobs():
                 "checkpoint_total": checkpoint.get("total_frames"),
                 "stats": {},
             }
+            if report_doc.get("refinement"):
+                job["refinement"] = report_doc["refinement"]
+                job["options"]["learned_plate_model"] = report_doc["refinement"]["id"]
             if checkpoint.get("state") == "paused":
                 job["options"] = checkpoint.get("options") or {}
                 job["log"].append("Stop & Review checkpoint recovered; "
@@ -5774,6 +6088,8 @@ def retention_sweep(days):
     import shutil as _sh
     cutoff = time.time() - days * 86400
     for jid in os.listdir(JOBS_DIR):
+        if jid == "learned_plate_models":
+            continue
         p = os.path.join(JOBS_DIR, jid)
         if not os.path.isdir(p):
             continue
