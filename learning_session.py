@@ -25,6 +25,7 @@ import numpy as np
 
 import video_learning as vl
 import stop_review
+import openscrub_logging as diagnostics
 
 
 def sha256(path):
@@ -91,6 +92,11 @@ def update_learning(job,stage=None,message=None,*,progressed=False,**fields):
     state['updated_at']=now
     if advanced:state['last_progress_at']=now
     else:state.setdefault('last_progress_at',state['started_at'])
+    # Reuse the real counters; polling alone must not reset stall diagnostics.
+    if advanced or stage is not None or any(k in fields for k in ('done','source_frame')):
+        current=state.get('done')
+        if current is None:current=state.get('source_frame')
+        diagnostics.progress(job,state.get('stage','learning'),current,state.get('total'))
     return state
 
 
@@ -350,6 +356,7 @@ def collect_feedback(job,doc,read_frame=None,log=None):
     completed=0;total=len(requested);last_notice=[0.]
     positive=sum(item[2]=='positive' for item in requested)
     def progress(decoded=-1,target=None,force=False):
+        diagnostics.progress(job,'collecting',decoded,target)
         now=time.monotonic()
         if not force and now-last_notice[0]<2:return
         last_notice[0]=now
@@ -571,7 +578,7 @@ def _training_command(script, *arguments):
     # Do not put that directory (or PYTHONPATH/user site) on the training path.
     # -I ignores PYTHONUNBUFFERED too, so -u is explicit for live epoch logs.
     return [os.environ.get('OPENSCRUB_TRAIN_PYTHON', sys.executable),
-            '-I', '-u', str(script), *arguments]
+            '-I', '-u', '-X', 'faulthandler', str(script), *arguments]
 
 
 def preflight():
@@ -584,8 +591,12 @@ def preflight():
     try:
         check=subprocess.run(_training_command(script, 'preflight'),
             capture_output=True,text=True,timeout=30)
-        if check.returncode:problems.append('Training environment is not ready: '+(check.stderr.strip().splitlines() or ['unknown import failure'])[-1])
-    except (OSError,subprocess.TimeoutExpired) as e:problems.append('Training Python cannot run: '+str(e))
+        if check.returncode:
+            diagnostics.event('training_preflight_failed',level=40,returncode=check.returncode,stderr=check.stderr)
+            problems.append('Training environment is not ready: '+(check.stderr.strip().splitlines() or ['unknown import failure'])[-1])
+    except (OSError,subprocess.TimeoutExpired) as e:
+        diagnostics.exception('training_preflight_process_failed')
+        problems.append('Training Python cannot run: '+str(e))
     return {'ready':not problems,'problems':problems,'python':python,'weights':weights,'script':str(script)}
 
 
@@ -629,10 +640,12 @@ def run_training(dataset,versions,weights,job,settings):
         '--workers','0','--accept-ultralytics-license','--progress')
     private_dir(versions)
     logfile=Path(versions).parent/'training.log'
+    diagnostics.attach_job(job)
     update_learning(job,'training','Starting the local training process',done=0,total=None,unit=None)
     with open(logfile,'w',encoding='utf-8') as log:
         process=subprocess.Popen(command,stdout=log,stderr=subprocess.STDOUT,
                                  start_new_session=os.name!='nt')
+        diagnostics.event('training_process_started',job,child_pid=process.pid,logfile=logfile)
         with open(logfile,encoding='utf-8',errors='replace') as output:
             pending=''
             def drain(final=False):
@@ -664,15 +677,19 @@ def run_training(dataset,versions,weights,job,settings):
                     if time.monotonic()-started>43200:raise TimeoutError('Training exceeded the 12-hour process limit')
                     if job['cancel'].wait(.5):raise InterruptedError('Training cancelled; prior review retained')
                 drain(final=True) # A fast child can finish between poll ticks.
+                diagnostics.event('training_process_exited',job,child_pid=process.pid,returncode=process.returncode,
+                                  level=40 if process.returncode else 20)
                 if process.returncode:
                     tail=logfile.read_text(encoding='utf-8',errors='replace').splitlines()[-12:]
                     raise ValueError('Training failed: '+'\n'.join(tail))
             finally:
                 if process.poll() is None:
+                    diagnostics.event('training_process_terminating',job,child_pid=process.pid,level=30)
                     if os.name!='nt':os.killpg(process.pid,signal.SIGTERM)
                     else:process.terminate()
                     try:process.wait(timeout=10)
                     except subprocess.TimeoutExpired:
+                        diagnostics.event('training_process_forced_kill',job,child_pid=process.pid,level=40)
                         if os.name!='nt':os.killpg(process.pid,signal.SIGKILL)
                         else:process.kill()
                         process.wait()

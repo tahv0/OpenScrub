@@ -45,6 +45,7 @@ import learning_session
 import video_learning
 import learned_models
 import zones_ui
+import openscrub_logging as diagnostics
 
 
 # Anchor to the script's own folder, NOT the process working directory —
@@ -104,7 +105,10 @@ def load_model_select():
         with open(MODEL_SELECT_PATH, encoding="utf-8") as f:
             d = json.load(f)
             return d if isinstance(d, dict) else {}
+    except FileNotFoundError:
+        return {}
     except Exception:
+        diagnostics.exception("settings_load_failed")
         return {}
 
 
@@ -370,6 +374,8 @@ def new_job(video_path, options, name):
         import shutil
         shutil.rmtree(jdir, ignore_errors=True)
         raise
+    diagnostics.attach_job(job)
+    diagnostics.event("job_created", job)
     with JOBS_LOCK:
         JOBS[jid] = job
     return job
@@ -434,6 +440,7 @@ class WebCallbacks(openscrub.Callbacks):
     wants_frames = True
 
     def __init__(self, job):
+        diagnostics.attach_job(job)
         self.job = job
         self._last_frame = 0.0
         self._stage = None          # ETA state: current stage,
@@ -448,6 +455,7 @@ class WebCallbacks(openscrub.Callbacks):
         context = self.job.get("options", {}).get("section_context")
         if context and stage == "scan":
             cur, total = max(0, min(cur, context[1])-context[0]), context[1]-context[0]
+        diagnostics.progress(self.job, stage, cur, total)
         now = time.time()
         old = self.job.get("activity") or {}
         changed = old.get("stage") != stage
@@ -632,7 +640,7 @@ def build_args(job, for_render=False):
                 if json.load(f):
                     argv += ["--zones", ZONES_PATH]
         except Exception:
-            pass
+            diagnostics.exception("detection_zone_load_failed", job)
     server_allow = os.path.join(JOBS_DIR, "allowlist.txt")
     for kind in ("allow_names", "extra_names"):
         text = (o.get(kind) or "").strip()
@@ -651,7 +659,7 @@ def build_args(job, for_render=False):
                 for r in (json.load(f).get("ignore") or []):
                     argv += ["--ignore-region", "%s,%s,%s,%s" % tuple(r)]
     except Exception:
-        pass
+        diagnostics.exception("ignore_zone_load_failed", job)
     if for_render:
         argv += ["--from-report", os.path.join(jdir, "report.json")]
     parser = openscrub.build_parser()
@@ -703,8 +711,12 @@ def worker():
         with JOBS_LOCK:
             job = JOBS.get(jid)
         if job is None:
+            diagnostics.event("queued_job_missing", job_id=jid, action=action, level=30)
+            WORK_Q.task_done()
             continue
         cb = WebCallbacks(job)
+        log_context = diagnostics.bind_job(job)
+        diagnostics.start_job(job, action)
         try:
             if action == "learn":
                 perform_learning(job)
@@ -841,8 +853,8 @@ def worker():
                         jb["log"].append("thumbnails pre-generated "
                                          f"({len(todo)})")
                     except Exception:
-                        pass
-                threading.Thread(target=_pregen, daemon=True).start()
+                        diagnostics.exception("thumbnail_pregeneration_failed", JOBS.get(jid))
+                threading.Thread(target=_pregen, name="openscrub-thumbnails-" + jid, daemon=True).start()
                 try:
                     prov = _load_job_report(job).get("provenance", {})
                     if ((prov.get("vfr_normalized") or meta)
@@ -851,7 +863,7 @@ def worker():
                         job["log"].append(
                             "using CFR-normalized file for previews/thumbnails")
                 except Exception:
-                    pass
+                    diagnostics.exception("preview_source_selection_failed", job)
                 if meta:
                     job["phase"] = "paused"
                 elif (not resuming and job["options"].get("skip_review")):
@@ -888,10 +900,12 @@ def worker():
                 job["progress"] = 1.0
                 job["eta"] = None
         except openscrub.PipelineCancelled:
+            diagnostics.event("job_cancelled", job, action=action)
             job["stop"].clear()
             job["phase"] = "cancelled"
             job["error"] = "cancelled by user"
         except Exception as e:
+            diagnostics.exception("job_action_failed", job, action=action)
             job["stop"].clear()
             # The prior report is untouched if a resumed scan fails.
             job["phase"] = ("paused" if action == "resume"
@@ -901,12 +915,57 @@ def worker():
             job["log"].append(f"ERROR: {e}")
         finally:
             job["eta"] = None       # a dead/paused job must not show "~N left"
+            diagnostics.finish_job(job, action)
+            diagnostics.reset_job(log_context)
             WORK_Q.task_done()
 
 
 # ----------------------------------------------------------------------------
 # Auth
 # ----------------------------------------------------------------------------
+
+
+@app.before_request
+def diagnostic_request_start():
+    from flask import g
+    g.diagnostic_started = time.monotonic()
+    g.diagnostic_id = uuid.uuid4().hex[:12]
+    jid = (request.view_args or {}).get("jid")
+    g.diagnostic_context = diagnostics.bind_job(JOBS.get(jid))
+
+
+@app.after_request
+def diagnostic_request_finish(response):
+    from flask import g
+    elapsed = time.monotonic() - getattr(g, "diagnostic_started", time.monotonic())
+    request_id = getattr(g, "diagnostic_id", "unknown")
+    response.headers["X-OpenScrub-Request-ID"] = request_id
+    if response.status_code >= 400 or elapsed >= 5:
+        reason = ""
+        if response.status_code >= 400 and response.is_json and (response.content_length or 0) <= 16384:
+            data = response.get_json(silent=True)
+            if isinstance(data, dict) and isinstance(data.get("error"), str):
+                reason = data["error"]
+        diagnostics.event("http_request_failed" if response.status_code >= 400 else "http_request_slow",
+            level=40 if response.status_code >= 500 else 30,
+            request_id=request_id, method=request.method,
+            route=str(request.url_rule) if request.url_rule else "unmatched",
+            status=response.status_code, elapsed_ms=round(elapsed * 1000, 1), reason=reason)
+    return response
+
+
+@app.teardown_request
+def diagnostic_request_teardown(error):
+    from flask import g
+    if error is not None:
+        diagnostics.event("http_unhandled_exception", level=40,
+            request_id=getattr(g, "diagnostic_id", "unknown"),
+            route=str(request.url_rule) if request.url_rule else "unmatched",
+            exc_info=(type(error), error, error.__traceback__))
+    token = g.pop("diagnostic_context", None)
+    if token is not None:
+        diagnostics.reset_job(token)
+
 
 @app.before_request
 def check_token():
@@ -1286,6 +1345,7 @@ def perform_learning(job):
         job["learning"]["inference"] = result["learning"]["inference"]
         job.pop("refinement", None)
     except Exception as error:
+        diagnostics.exception("learning_failed", job)
         job["phase"] = previous
         job["error"] = str(error)
         job["learning"] = {"stage": "failed", "message": str(error)}
@@ -1487,11 +1547,15 @@ def _review_process(command):
         result = subprocess.run(command, capture_output=True,
                                 timeout=_REVIEW_TIMEOUT)
     except subprocess.TimeoutExpired:
+        diagnostics.exception("preview_process_timeout", tool=os.path.basename(str(command[0])), timeout_seconds=_REVIEW_TIMEOUT)
         abort(504, description="Preview decoding timed out. Retry this finding; "
               "a video with very sparse keyframes may need a seekable scan copy.")
     except OSError:
+        diagnostics.exception("preview_process_start_failed", tool=os.path.basename(str(command[0])))
         abort(503, description="FFmpeg and ffprobe are required for review previews.")
     if result.returncode:
+        diagnostics.event("preview_process_failed", level=40, tool=os.path.basename(str(command[0])),
+                          returncode=result.returncode, stderr=result.stderr.decode("utf-8", errors="replace")[-8000:])
         abort(422, description="Could not decode this video preview.")
     return result
 
@@ -2659,6 +2723,7 @@ def job_track_object(jid):
                                          new[0]["t_start"], new[-1]["t_end"]))
             st.update(state="done", added=len(new))
         except Exception as e:
+            diagnostics.exception("background_tracking_failed", job)
             st.update(state="done", added=0, error=str(e))
 
     threading.Thread(target=_run, daemon=True).start()
@@ -2758,6 +2823,7 @@ def model_status():
         try:
             out[kind] = bool(cls.resolve_model(mp)[0])
         except Exception:
+            diagnostics.exception("model_availability_check_failed", model_kind=kind)
             out[kind] = True        # can't tell -> don't cry wolf
     try:
         rec = next((m for m in openscrub.load_model_registry("plate")
@@ -2767,6 +2833,7 @@ def model_status():
             and str(rec.get("license", "")).lower().startswith(
                 ("mit", "apache", "bsd")))
     except Exception:
+        diagnostics.exception("plate_registry_load_failed")
         out["plate_autofetch"] = False
     return jsonify(out)
 
@@ -2793,6 +2860,7 @@ def model_download(kind, mid):
                 progress=lambda f: _model_dl.update(pct=int(f * 100)))
             _model_dl.update(state="done", pct=100)
         except Exception as e:
+            diagnostics.exception("model_download_failed", model_id=mid, model_kind=kind)
             _model_dl.update(state="error", error=str(e))
     threading.Thread(target=work, daemon=True).start()
     return jsonify({"ok": True})
@@ -2867,6 +2935,7 @@ def quality_tier():
                 save_model_select(sel)
             _tier_apply.update(state="done", step="")
         except Exception as e:
+            diagnostics.exception("model_tier_setup_failed")
             _tier_apply.update(state="error", error=str(e), step="")
     threading.Thread(target=work, daemon=True).start()
     return jsonify({"ok": True})
@@ -5720,6 +5789,7 @@ def update_run():
             openscrub_update.run_update(log=log)
             ok = True
         except Exception as e:
+            diagnostics.exception("self_update_failed")
             log("update failed: %s" % e)
             ok = False
         with UPD_LOCK:
@@ -5754,7 +5824,10 @@ def _web_settings():
     try:
         with open(WEB_SETTINGS_PATH, encoding="utf-8") as f:
             return json.load(f)
+    except FileNotFoundError:
+        return {}
     except Exception:
+        diagnostics.exception("settings_load_failed")
         return {}
 
 
@@ -5785,7 +5858,7 @@ def _autolock_watcher():
             print("vault: auto-locked after %d idle minute(s) — "
                   "%d file(s) encrypted" % (mins, n))
         except Exception:
-            pass
+            diagnostics.exception("vault_autolock_failed")
 
 
 def vault_enabled():
@@ -5820,12 +5893,14 @@ def _vault_lock_atexit():
             busy = any(j.get("phase") in ("queued", "scanning", "rendering",
                                           "queued_render", "learning") for j in JOBS.values())
             if busy:
+                diagnostics.event("vault_not_locked_active_jobs", level=40)
                 print("vault: NOT locking on exit — a job was still running; "
                       "job files remain in plaintext. Restart and lock.")
                 return
             n = _vault_lock_now()
             print("vault: locked on shutdown (%d file(s) encrypted)" % n)
     except Exception as e:
+        diagnostics.exception("vault_shutdown_lock_failed")
         # never die silently here: a swallowed error means plaintext on disk
         print("vault: LOCK ON SHUTDOWN FAILED (%s) — job files may remain "
               "in plaintext. Restart the server and use the Lock button." % e)
@@ -6019,6 +6094,7 @@ def extras_install(eid):
             _EXT["log"].append("done — takes effect on the next scan")
             _EXT["state"] = "done"
         except Exception as e:
+            diagnostics.exception("optional_dependency_install_failed")
             _EXT["log"].append(str(e))
             _EXT["state"] = "error"
     threading.Thread(target=work, daemon=True).start()
@@ -6166,6 +6242,7 @@ def waveform():
              "-ac", "1", "-ar", "1000", "-f", "s16le", "-"],
             capture_output=True, timeout=180).stdout
     except Exception:
+        diagnostics.exception("waveform_extraction_failed")
         raw = b""
     if len(raw) < 4:
         return jsonify({"peaks": []})
@@ -6391,8 +6468,10 @@ def rehydrate_jobs():
                 JOBS[jid] = job
             n += 1
         except Exception:
+            diagnostics.exception("job_recovery_failed", recovered_job_id=jid)
             continue
     if n:
+        diagnostics.event("jobs_recovered", count=n)
         print(f"  recovered {n} job(s) from {JOBS_DIR}")
 
 
@@ -6452,6 +6531,10 @@ def main():
                          "via the 'path on the server' box than uploaded.")
     args = ap.parse_args()
     TOKEN = args.token or None
+    diagnostics.set_secrets([TOKEN])
+    diagnostics.configure(_data_root())
+    diagnostics.event("server_starting", version=openscrub.VERSION, python=sys.version.split()[0],
+                      port=args.port, transport="http" if args.http else "https")
     app.config["MAX_CONTENT_LENGTH"] = _max_upload_bytes(args.max_upload_gb)
     os.makedirs(JOBS_DIR, exist_ok=True)
     import atexit
@@ -6474,12 +6557,14 @@ def main():
             os._exit(1)
         _terming.append(1)
         print("SIGTERM — locking vault before exit…")
+        diagnostics.event("server_sigterm", signal=sig)
         _vault_lock_atexit()
+        diagnostics.shutdown(clean=True)
         os._exit(0)
     signal.signal(signal.SIGTERM, _on_sigterm)
     threading.Thread(target=_autolock_watcher, daemon=True).start()
     rehydrate_jobs()
-    threading.Thread(target=worker, daemon=True).start()
+    threading.Thread(target=worker, name="openscrub-job-worker", daemon=True).start()
     if args.retain_days > 0:
         threading.Thread(target=retention_loop, args=(args.retain_days,),
                          daemon=True).start()
@@ -6490,6 +6575,7 @@ def main():
         try:
             import cryptography  # noqa: F401 — needed for cert generation
         except ImportError:
+            diagnostics.exception("https_dependency_missing")
             print("=" * 60)
             print("HTTPS needs the 'cryptography' package, which isn't")
             print("installed. Fix it with ONE of these:")
@@ -6546,7 +6632,16 @@ def main():
     sys.stdout.flush()      # the banner must reach redirected logs NOW, not
     # when an 8KB block buffer eventually fills (a container ran "silent"
     # for minutes and the user debugged a healthy server)
-    _serve(args.host, args.port, ssl_ctx)
+    try:
+        _serve(args.host, args.port, ssl_ctx)
+    except BaseException:
+        diagnostics.exception("server_serve_failed")
+        # Keep diagnostics alive for the existing atexit vault-lock handler.
+        # The unclean marker is retained by the logging atexit hook.
+        raise
+    else:
+        _vault_lock_atexit()
+        diagnostics.shutdown(clean=True)
 
 
 def _serve(host, port, ssl_ctx):
@@ -6556,6 +6651,7 @@ def _serve(host, port, ssl_ctx):
     try:
         from cheroot.wsgi import Server
     except ImportError:
+        diagnostics.event("production_server_missing_using_flask", level=30)
         print("    (running on Flask's built-in server — `pip install cheroot`")
         print("     to switch to a production server and silence its warning)")
         app.run(host=host, port=port, threaded=True, ssl_context=ssl_ctx)
@@ -6568,18 +6664,11 @@ def _serve(host, port, ssl_ctx):
     # cheroot worker threads are cheap.
     server = Server((host, port), app, server_name="openscrub",
                     numthreads=64)
-    # Browsers probing/rejecting the self-signed certificate abort mid-
-    # handshake on every new socket, and cheroot logs each one. Harmless
-    # noise (install a trusted cert to stop the aborts themselves) —
-    # filter just that class of message, pass everything else through.
-    _orig_log = server.error_log
-    _TLS_NOISE = ("during handshake", "certificate unknown", "unknown ca",
-                  "peer dropped the tls connection", "http request")
-
+    # Cheroot's default stderr-only logger bypasses the persistent app log.
     def _quiet_log(msg="", level=20, traceback=False):
-        if any(s in str(msg).lower() for s in _TLS_NOISE):
-            return
-        _orig_log(msg, level, traceback)
+        # Retain server errors even when the browser disconnects or TLS fails.
+        diagnostics.event("wsgi_server_error", level=max(30, level),
+                          message=msg, exc_info=sys.exc_info() if traceback and sys.exc_info()[0] else None)
 
     server.error_log = _quiet_log
     if ssl_ctx:
