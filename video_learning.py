@@ -297,7 +297,8 @@ def conservative_quad(mask):
     return proposal,filled
 
 
-def refine_report(video, doc, model, threshold=.8, cancelled=None, progress=None):
+def refine_report(video, doc, model, threshold=.8, cancelled=None, progress=None,
+                  frame_range=None):
     """One sequential decode, running the learned model on original proposals.
 
     A separate pass is intentional: crop-trained weights are never substituted
@@ -308,16 +309,32 @@ def refine_report(video, doc, model, threshold=.8, cancelled=None, progress=None
     if not cap.isOpened():
         raise ValueError('Cannot open video for the learning refinement pass')
     result=deepcopy(doc);rs=result['render_state'];targets={}
-    for row in result['detections']:
-        if row.get('category')=='plate' and not row.get('zone_dropped'):
-            targets.setdefault(_frame(row,rs),[]).append(row)
     stats={'model_calls':0,'refined':0,'disagreements':0,'decoded_frames':0}
-    index=0
+    start,index,end=0,0,len(rs['cum'])
     try:
         fps=cap.get(cv2.CAP_PROP_FPS)
         if not math.isclose(fps,float(rs['fps']),rel_tol=1e-4,abs_tol=.001):
             raise ValueError('Refinement video frame rate differs from the scan timeline')
-        while index < len(rs['cum']):
+        if frame_range is not None:
+            # The engine does not import this module. A local import shares its
+            # verified decoder positioning without introducing an import cycle.
+            from openscrub import _section_frame_bounds, _seek_cap, sha256_file
+            start,end=_section_frame_bounds(frame_range,cap,float(rs['fps']),rs['cum'])
+            identity=doc.get('source_identity') or {}
+            expected=identity.get('input_sha256') or doc.get('provenance',{}).get('input_sha256')
+            if expected and sha256_file(video)!=expected:
+                raise ValueError('Refinement source changed; previous result retained')
+            if identity.get('total_frames') not in (None,int(cap.get(cv2.CAP_PROP_FRAME_COUNT))):
+                raise ValueError('Refinement source timeline changed; previous result retained')
+            if start and not _seek_cap(cap,start,fps):
+                raise ValueError('Refinement decoder cannot reach the section start frame')
+            index=start
+        for row in result['detections']:
+            if row.get('category')=='plate' and not row.get('zone_dropped'):
+                frame=_frame(row,rs)
+                if frame_range is None or start<=frame<end:
+                    targets.setdefault(frame,[]).append(row)
+        while index < end:
             if cancelled and cancelled(): raise InterruptedError('Learning pass cancelled; prior review retained')
             ok,image=cap.read()
             if not ok: break
@@ -347,12 +364,12 @@ def refine_report(video, doc, model, threshold=.8, cancelled=None, progress=None
                            frame_index=index,learning_conflict='',fallback_reason='')
                 stats['refined']+=1
             index+=1
-            if progress and index%30==0:progress(index,len(rs['cum']))
+            if progress and (index-start)%30==0:progress(index-start,end-start)
         if targets and max(targets)>=index:
             raise ValueError('Refinement decoder ended before the last detected frame')
-        if index < len(rs['cum']):
+        if index < end:
             raise ValueError('Refinement decoder did not cover the scan timeline')
-        if progress:progress(index,index)
+        if progress:progress(index-start,end-start)
         return result,stats
     finally:
         cap.release()

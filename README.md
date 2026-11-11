@@ -92,6 +92,13 @@ consoles) — but the engine is general-purpose.
   all its appearances — with an interactive box editor to resize, move,
   add, time-bound, or **template-track a manually drawn box** through a
   chosen time range, and audio mute/bleep spans for spoken PII.
+- **Video sections (experimental)** — independently approve and export
+  reviewed intervals, or rescan a section with another learned plate model
+  while its approved revision stays available. See the
+  [section workflow](docs/VIDEO_SECTIONS.md).
+- **Learning progress** — stage messages, real epoch/batch or frame counts,
+  elapsed time and last-progress age help you follow training and rescans;
+  the job view catches up after an inactive tab or a transient connection failure.
 - **HDR in, HDR out** — iPhone (Dolby Vision/HLG) and HDR10 footage keeps
   its 10-bit HDR signal through redaction: output is 10-bit HEVC with the
   original color primaries and transfer preserved, and the blur is applied
@@ -169,9 +176,22 @@ the checkpoint with a short overlap; it does not run the initial minutes
 through the detector again. Jobs remain paused across server restarts.
 
 A paused video **cannot be rendered or downloaded as if fully redacted**.
-The whole recording must be scanned and the final output reviewed before
-publishing. See [Stop & Review](docs/STOP_REVIEW.md) for the complete
-workflow, limitations and tests.
+For a whole-video export, scan the whole recording and review the final output
+before publishing. Independently approved sections can be exported from the
+fully scanned portion; unscanned tails and skipped gaps are refused. See
+[Stop & Review](docs/STOP_REVIEW.md) and
+[Video sections](docs/VIDEO_SECTIONS.md) for the workflows and limitations.
+
+## Preserve and export reviewed sections (experimental)
+
+Open **Video sections** on a saved job, name an interval on the original video
+timeline, review it and choose **Approve current results**. **Export approved
+section** renders only that interval and matching audio. To improve it later,
+choose a model and **Rescan section**, review the separate candidate, then
+**Approve this section**. Failed or unapproved work leaves the previous approved
+revision intact. Keep the shared source video and job data for future changes.
+The [section guide](docs/VIDEO_SECTIONS.md) explains frame rounding, locks,
+boundary review and the training/rescan progress display.
 
 ## Four-corner plate review (experimental)
 

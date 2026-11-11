@@ -1,5 +1,7 @@
 name: Full suite and review stress
 on:
+  push:
+    branches: ['integration/all-prs']
   pull_request:
     branches: ['integration/all-prs']
   workflow_dispatch:

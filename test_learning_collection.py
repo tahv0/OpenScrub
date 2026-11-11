@@ -59,6 +59,9 @@ def test_collection_reports_completed_examples_not_epochs(tmp_path):
     assert job['learning']['total_examples']==4
     assert job['learning']['stage']=='collecting'
     assert '4/4' in job['learning']['message']
+    assert job['learning']['done']==job['learning']['total']==4
+    assert job['learning']['unit']=='examples'
+    assert job['learning']['updated_at']>=job['learning']['started_at']
 
 
 def test_cancelled_collection_does_not_read_or_publish(tmp_path):

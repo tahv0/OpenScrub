@@ -38,7 +38,7 @@ from dataclasses import dataclass, asdict
 import cv2
 import numpy as np
 
-VERSION = "1.0.88"
+VERSION = "1.0.89"
 
 # ----------------------------------------------------------------------------
 # OCR backends
@@ -730,6 +730,8 @@ class Detection:
     poly_holes: tuple = ()     # exclusion rings per outer component
     mask_pad: float = -1       # pixels; -1 inherits global padding
     frame_index: int = -1      # exact source frame; -1 retains legacy timing
+    owned_start_frame: int = -1  # half-open section ownership; -1 = unrestricted
+    owned_end_frame: int = -1
     fallback_reason: str = ""  # additive narrow-plate diagnostic
 
 
@@ -3214,7 +3216,7 @@ def probe_has_audio(src):
 
 
 def audio_ffmpeg_args(src, spans, ain=1, mute_tracks=(), container=".mp4",
-                      lane_count=None, log=None):
+                      lane_count=None, log=None, trim=None):
     """ffmpeg (map_args, codec_args) for the render output's audio.
 
     spans: [(t0, t1, mode)] with mode "mute" or "bleep" — spoken names,
@@ -3239,9 +3241,17 @@ def audio_ffmpeg_args(src, spans, ain=1, mute_tracks=(), container=".mp4",
     log = log or (lambda m: None)
     spans = [(float(a), float(b), (m or "mute"))
              for a, b, m in (spans or []) if float(b) > float(a) >= 0]
+    if trim is not None:
+        start, end = map(float, trim)
+        if not (math.isfinite(start) and math.isfinite(end) and 0 <= start < end):
+            raise ValueError("Invalid section audio bounds")
+        spans = [(max(a, start) - start, min(b, end) - start, m)
+                 for a, b, m in spans if b > start and a < end]
     tracks = probe_audio_tracks(src)
     n = len(tracks)
     if n == 0:
+        if trim is not None:
+            return ([], []) # Never copy unverified audio around section filters.
         return (["-map", f"{ain}:a?"], ["-c:a", "copy"])
     if mute_tracks == "all" or (mute_tracks and "all" in mute_tracks):
         return ([], [])                       # no audio in the output
@@ -3276,7 +3286,7 @@ def audio_ffmpeg_args(src, spans, ain=1, mute_tracks=(), container=".mp4",
             log("      audio: no decodable audio track — the output has "
                 "no audio")
         return ([], [])
-    if not spans:
+    if not spans and trim is None:
         allow = _AUDIO_COPY_OK.get(container.lower(),
                                    _AUDIO_COPY_OK[".mp4"])
         maps, codecs, copy_all = [], [], True
@@ -3303,15 +3313,25 @@ def audio_ffmpeg_args(src, spans, ain=1, mute_tracks=(), container=".mp4",
     elif bx:
         fc.append("sine=frequency=1000[t0]")
     for k, i in enumerate(kept):
+        source = f"[{ain}:a:{i}]"
+        if trim is not None:
+            # Decode and trim samples before shifting redaction times. Copying
+            # AAC packets at a seek boundary can retain neighboring audio.
+            # Subtract the section origin, not the first surviving packet:
+            # a track starting late must keep its gap relative to the video.
+            source += f"atrim=start={start:.9f}:end={end:.9f},asetpts=PTS-{start:.9f}/TB,"
         if bx:
-            fc.append(f"[{ain}:a:{i}]volume=enable='{allx}':volume=0[m{k}]")
+            fc.append(source + f"volume=enable='{allx}':volume=0[m{k}]")
             fc.append(f"[t{k}]volume=enable='not({bx})':volume=0,"
                       f"volume=0.3[b{k}]")
             fc.append(f"[m{k}][b{k}]amix=inputs=2:duration=first:"
                       f"normalize=0[o{k}]")
             maps += ["-map", f"[o{k}]"]
+        elif spans:
+            fc.append(source + f"volume=enable='{allx}':volume=0[o{k}]")
+            maps += ["-map", f"[o{k}]"]
         else:
-            fc.append(f"[{ain}:a:{i}]volume=enable='{allx}':volume=0[o{k}]")
+            fc.append(source + f"anull[o{k}]")
             maps += ["-map", f"[o{k}]"]
     return (["-filter_complex", ";".join(fc)] + maps,
             ["-c:a", "aac", "-b:a", "192k"])
@@ -3786,10 +3806,29 @@ def _rate_cap_args(codec, out_quality, w, h, fps):
     return ["-maxrate", str(cap), "-bufsize", str(2 * cap)]
 
 
+def _section_frame_bounds(frame_range, cap, fps, cum, bands=None):
+    """Validate half-open source-frame bounds without inventing scan coverage."""
+    if (not isinstance(frame_range, (tuple, list)) or len(frame_range) != 2
+            or any(type(value) is not int for value in frame_range)):
+        raise ValueError("Section bounds must be two integer source frames")
+    start, end = frame_range
+    total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    actual_fps = float(cap.get(cv2.CAP_PROP_FPS))
+    if not cap.isOpened() or not 0 <= start < end <= total:
+        raise ValueError("Section frame range is outside the source timeline")
+    if (not math.isfinite(fps) or fps <= 0 or not math.isfinite(actual_fps)
+            or not math.isclose(actual_fps, fps, rel_tol=1e-6, abs_tol=1e-6)):
+        raise ValueError("Section source frame rate differs from the reviewed timeline")
+    if end > len(cum) or bands is not None and end > len(bands):
+        raise ValueError("Section includes frames outside the scanned timeline")
+    return start, end
+
+
 def render_hdr(src, dst, detections, cum, bands, fps, pad, mode,
                encoder, tags, band_margin=25, progress_every=60, cb=None,
                mode_map=None, face_shape="ellipse", audio_spans=None,
-               mute_tracks=(), out_quality="archival", audio_lanes=None):
+               mute_tracks=(), out_quality="archival", audio_lanes=None,
+               frame_range=None):
     """render(), but 10-bit end to end: decode the HDR source to raw
     yuv420p10le, blur the planes in place, encode 10-bit HEVC with the
     source's color tags (PQ/HLG + BT.2020) carried over. `hvc1` tagging
@@ -3803,12 +3842,23 @@ def render_hdr(src, dst, detections, cum, bands, fps, pad, mode,
     w = int(meta.get(cv2.CAP_PROP_FRAME_WIDTH))
     h = int(meta.get(cv2.CAP_PROP_FRAME_HEIGHT))
     total = int(meta.get(cv2.CAP_PROP_FRAME_COUNT))
-    meta.release()
+    start, end = 0, total
+    try:
+        if frame_range is not None:
+            start, end = _section_frame_bounds(frame_range, meta, fps, cum, bands)
+            total = end - start
+    finally:
+        meta.release()
     cb.log(f"      encoder: {encoder} 10-bit"
            + (" (GPU)" if encoder.endswith(("_nvenc", "_qsv")) else " (CPU)"))
 
+    section_video = (["-vf", f"trim=start_frame={start}:end_frame={end},setpts=PTS-STARTPTS",
+                      "-vsync", "0", "-frames:v", str(total)]
+                     if frame_range is not None else [])
+    section_output = (["-t", f"{total / fps:.9f}", "-frames:v", str(total)]
+                      if frame_range is not None else [])
     dec = subprocess.Popen(
-        ["ffmpeg", "-loglevel", "error", "-i", src,
+        ["ffmpeg", "-loglevel", "error", "-i", src, *section_video,
          "-f", "rawvideo", "-pix_fmt", "yuv420p10le", "pipe:1"],
         stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
         bufsize=w * h * 6)
@@ -3846,7 +3896,8 @@ def render_hdr(src, dst, detections, cum, bands, fps, pad, mode,
     amap, acodec = audio_ffmpeg_args(
         src, audio_spans, mute_tracks=mute_tracks,
         container=os.path.splitext(dst)[1] or ".mp4",
-        lane_count=audio_lanes, log=cb.log)
+        lane_count=audio_lanes, log=cb.log,
+        trim=(start / fps, end / fps) if frame_range is not None else None)
     ff_err = tempfile.TemporaryFile()   # see render(): names the cause
     enc = subprocess.Popen(
         ["ffmpeg", "-y", "-loglevel", "error",
@@ -3858,7 +3909,7 @@ def render_hdr(src, dst, detections, cum, bands, fps, pad, mode,
          # stream metadata (the explicit color tags above are encoder
          # flags, not metadata, so HDR signalling survives)
          "-map_metadata", "-1", "-map_chapters", "-1",
-         *vargs, *targs, *acodec, dst],
+         *vargs, *targs, *acodec, *section_output, dst],
         stdin=subprocess.PIPE, stderr=ff_err)
 
     buckets = {}
@@ -3874,6 +3925,8 @@ def render_hdr(src, dst, detections, cum, bands, fps, pad, mode,
             try:
                 if pr is enc:
                     pr.stdin.close()
+                else:
+                    pr.stdout.close()
             except Exception:
                 pass
             pr.terminate()
@@ -3884,13 +3937,16 @@ def render_hdr(src, dst, detections, cum, bands, fps, pad, mode,
             except OSError:
                 pass
 
-    idx = 0
-    while True:
-        if idx % 30 == 0 and cb.cancelled():
+    idx = start
+    while frame_range is None or idx < end:
+        if (idx - start) % 30 == 0 and cb.cancelled():
             cleanup_partial()
             raise PipelineCancelled()
         raw = dec.stdout.read(fbytes)
         if len(raw) < fbytes:
+            if frame_range is not None:
+                cleanup_partial()
+                raise RuntimeError("Section HDR decoder ended before the requested frame range")
             break
         buf = np.frombuffer(raw, dtype=np.uint16).copy()
         y = buf[:ysz].reshape(h, w)
@@ -3953,21 +4009,27 @@ def render_hdr(src, dst, detections, cum, bands, fps, pad, mode,
             cleanup_partial()
             raise err
         idx += 1
-        if idx % progress_every == 0:
-            cb.progress("render", idx, total)
-        if idx % 300 == 0:
-            cb.log(f"  rendering… {idx}/{max(total, idx)}")
+        done = idx - start
+        if done % progress_every == 0:
+            cb.progress("render", done, total)
+        if done % 300 == 0:
+            cb.log(f"  rendering… {done}/{max(total, done)}")
 
     dec.stdout.close()
-    dec.wait()
-    cb.progress("render", max(total, idx), max(total, idx))
+    decode_rc = dec.wait()
+    if frame_range is not None and decode_rc:
+        cleanup_partial()
+        raise RuntimeError("Section HDR decoder failed; partial output removed")
+    cb.progress("render", max(total, idx - start), max(total, idx - start))
     try:
         enc.stdin.close()
     except (BrokenPipeError, OSError):
         pass                        # exit code + stderr say why below
     rc = enc.wait()
     if rc != 0:
-        raise _ffmpeg_failure(ff_err, "HDR encode", rc)
+        error = _ffmpeg_failure(ff_err, "HDR encode", rc)
+        if frame_range is not None:cleanup_partial()
+        raise error
     cb.log(f"      HDR preserved: 10-bit HEVC, color tags "
            + (", ".join(f"{k.lstrip('-')}={v}" for k, v in (tags or {}).items())
               or "(none in source)"))
@@ -3977,7 +4039,8 @@ def render(src, dst, detections, cum, bands, fps, pad, mode, preview,
            encoder="auto", band_margin=25, progress_every=60, cb=None,
            mode_map=None, draw_scores=False, vcodec="h264",
            face_shape="ellipse", audio_spans=None, clip=None,
-           mute_tracks=(), out_quality="archival", audio_lanes=None):
+           mute_tracks=(), out_quality="archival", audio_lanes=None,
+           frame_range=None):
     # mode_map: {category: "blur"|"box"} overrides the global `mode` per
     # category. Lets you black-box the reversible-blur-vulnerable categories
     # (SSN, MRN, account numbers) while blurring faces, in one render.
@@ -3989,6 +4052,17 @@ def render(src, dst, detections, cum, bands, fps, pad, mode, preview,
     w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    start, end = 0, total
+    if frame_range is not None:
+        try:
+            start, end = _section_frame_bounds(frame_range, cap, fps, cum, bands)
+            if start and not _seek_cap(cap, start, fps):
+                raise ValueError("Section decoder cannot reach the requested start frame")
+        except Exception:
+            cap.release()
+            raise
+        total = end - start
+        clip = None # Explicit source frames take precedence over legacy bookends.
 
     # --- output sink: single-pass ffmpeg pipe (NVENC if available) ---
     proc = None
@@ -4044,11 +4118,14 @@ def render(src, dst, detections, cum, bands, fps, pad, mode, preview,
         amap, acodec = audio_ffmpeg_args(
             src, aspans_eff, mute_tracks=mute_tracks,
             container=os.path.splitext(dst)[1] or ".mp4",
-            lane_count=audio_lanes, log=cb.log)
+            lane_count=audio_lanes, log=cb.log,
+            trim=(start / fps, end / fps) if frame_range is not None else None)
         if aspans_eff and amap:
             cb.log("      audio: %d span(s) redacted (%s)" % (
                 len(aspans_eff),
                 ", ".join(sorted({m for _, _, m in aspans_eff}))))
+        section_output = (["-t", f"{total / fps:.9f}", "-frames:v", str(total)]
+                          if frame_range is not None else [])
         cmd = ["ffmpeg", "-y", "-loglevel", "error",
                "-f", "rawvideo", "-pix_fmt", "bgr24",
                "-s", f"{w}x{h}", "-r", f"{fps:.6f}", "-i", "pipe:0",
@@ -4057,7 +4134,7 @@ def render(src, dst, detections, cum, bands, fps, pad, mode, preview,
                # position, capture time, or device identifiers — strip
                # ALL container and stream metadata
                "-map_metadata", "-1", "-map_chapters", "-1",
-               *vargs, "-pix_fmt", "yuv420p", *acodec, dst]
+               *vargs, "-pix_fmt", "yuv420p", *acodec, *section_output, dst]
         # ffmpeg's stderr goes to a temp FILE (a pipe could fill and
         # deadlock the frame writes): when the encoder dies, its own
         # error message is what the job log needs — a bare "[Errno 32]
@@ -4098,19 +4175,22 @@ def render(src, dst, detections, cum, bands, fps, pad, mode, preview,
                 except OSError:
                     pass
 
-    idx = 0
+    idx = start
     if clip and clip[0] > 0.5:
         tgt = int(clip[0] * fps)
         if _seek_cap(cap, tgt, fps):     # verified — a lying seek would
             idx = tgt                    # shift the whole trimmed render
         # unseekable: decode from 0; the undershoot guard below skips
         # frames before the clip start one by one
-    while True:
-        if idx % 30 == 0 and cb.cancelled():
+    while frame_range is None or idx < end:
+        if (idx - start) % 30 == 0 and cb.cancelled():
             cleanup_partial()
             raise PipelineCancelled()
         ok, frame = cap.read()
         if not ok:
+            if frame_range is not None:
+                cleanup_partial()
+                raise RuntimeError("Section decoder ended before the requested frame range")
             break
         t = idx / fps
         if clip:
@@ -4205,10 +4285,11 @@ def render(src, dst, detections, cum, bands, fps, pad, mode, preview,
         else:
             out.write(frame)
         idx += 1
-        if idx % progress_every == 0:
-            cb.progress("render", idx, total)
-        if idx % 300 == 0:
-            cb.log(f"  rendering… {idx}/{total} ({100 * idx // max(total, 1)}%)")
+        done = idx - start
+        if done % progress_every == 0:
+            cb.progress("render", done, total)
+        if done % 300 == 0:
+            cb.log(f"  rendering… {done}/{total} ({100 * done // max(total, 1)}%)")
 
     cap.release()
     cb.progress("render", total, total)
@@ -4219,8 +4300,9 @@ def render(src, dst, detections, cum, bands, fps, pad, mode, preview,
             pass                        # exit code + stderr say why below
         rc = proc.wait()
         if rc != 0:
-            raise _ffmpeg_failure(ff_err, "video encode", rc,
-                                  hint=gpu_hint)
+            error = _ffmpeg_failure(ff_err, "video encode", rc, hint=gpu_hint)
+            if frame_range is not None:cleanup_partial()
+            raise error
     else:
         out.release()
         os.replace(tmp_video, dst)
@@ -6304,13 +6386,18 @@ def transcribe_audio_pii(video, cats, cb, model_size="base", nlp=None,
 
 
 def write_report(path, args, state, output_path=None):
+    original = getattr(args, "original_video", None) or getattr(args, "_report_original_input", None)
+    original_sha = getattr(args, "original_input_sha256", None)
+    if original and not original_sha:
+        original_sha = sha256_file(original)
+        args.original_input_sha256 = original_sha
     prov = {
         "tool": "openscrub", "version": VERSION,
         "timestamp": datetime.datetime.now().astimezone().isoformat(),
         "input": os.path.abspath(args.video),
         "input_sha256": state.get("input_sha256"),
-        "original_input": (os.path.abspath(args.original_video)
-                           if getattr(args, "original_video", None) else None),
+        "original_input": os.path.abspath(original) if original else None,
+        "original_input_sha256": original_sha,
         "vfr_normalized": bool(getattr(args, "original_video", None)),
         "hdr_tonemapped": bool(getattr(args, "hdr_tonemapped", False)),
         "hdr_output": bool(getattr(args, "hdr_source", None)),
@@ -6324,6 +6411,11 @@ def write_report(path, args, state, output_path=None):
         prov["output_sha256"] = sha256_file(output_path)
     doc = {
         "provenance": prov,
+        "source_identity": {
+            "input_sha256": state.get("input_sha256"),
+            "fps": state["fps"],
+            "total_frames": state.get("total_frames", len(state["cum"])),
+        },
         "render_state": {
             "fps": state["fps"],
             "cum": [[round(x, 1), round(y, 1)] for x, y in state["cum"]],
@@ -6378,6 +6470,12 @@ def _detection_pad(d, global_pad, offset):
 
 def _sample_active(d, frame_index, t):
     """Select exact-frame samples without changing legacy report timing."""
+    if (getattr(d, "owned_start_frame", -1) >= 0 and
+            frame_index < d.owned_start_frame):
+        return False
+    if (getattr(d, "owned_end_frame", -1) >= 0 and
+            frame_index >= d.owned_end_frame):
+        return False
     return (d.frame_index == frame_index if d.frame_index >= 0 else
             d.t_start - 0.01 <= t <= d.t_end + 0.01)
 
@@ -6419,6 +6517,8 @@ def load_report(path):
             poly_holes=_tuples(r.get("poly_holes") or ()),
             mask_pad=r.get("mask_pad", -1),
             frame_index=int(r.get("frame_index", -1)),
+            owned_start_frame=int(r.get("owned_start_frame", -1)),
+            owned_end_frame=int(r.get("owned_end_frame", -1)),
             fallback_reason=r.get("fallback_reason", "")))
     return dets, state, prov
 
@@ -6747,6 +6847,50 @@ def normalize_vfr(args, cb):
             cb.log("      NOTE: the GPU here can't encode 10-bit HEVC — "
                    "HDR will be processed on the CPU (libx265), which is "
                    "MUCH slower. Choose SDR output for full speed.")
+
+
+def _restore_section_intake(args, prov, cb):
+    """Reuse a verified scan copy and its existing parent HDR timeline.
+
+    The export directory belongs to a new section job. Re-running intake
+    there would transcode the full original again and could produce bytes
+    that differ from the reviewed source. Only restore render context;
+    run_render checks the HDR frame count and rate against the scan copy.
+    """
+    original = prov.get("original_input")
+    if original and prov.get("vfr_normalized"):
+        args.original_video = original
+    args.hdr_tonemapped = bool(prov.get("hdr_tonemapped"))
+    cb.log("      reusing verified section source " + os.path.basename(args.video))
+    if (getattr(args, "hdr_output", "match") == "sdr"
+            or getattr(args, "no_vfr_fix", False)
+            or getattr(args, "vfr", "auto") == "ignore"):
+        return
+    hdr_source = original or args.video
+    is_hdr, hdesc = probe_hdr(hdr_source)
+    if not is_hdr:
+        if prov.get("hdr_tonemapped") or prov.get("hdr_output"):
+            raise ValueError("Original HDR section source could not be verified; export refused")
+        return
+    is_vfr, _ = probe_vfr(hdr_source)
+    if is_vfr:
+        # normalize_vfr stores this beside the reviewed SDR scan copy.
+        # Its location belongs to the parent, independent of args.output.
+        base = os.path.splitext(os.path.basename(hdr_source))[0]
+        hdr_source = os.path.join(os.path.dirname(os.path.abspath(args.video)),
+                                  base + ".cfr.hdr.mp4")
+        if not os.path.isfile(hdr_source):
+            raise ValueError("Prepared HDR section source is missing; restore the parent "
+                             "media or choose SDR output")
+    henc = hevc10_encoder(getattr(args, "encoder", "auto"), cb)
+    if henc is None:
+        cb.log("      NOTE: no 10-bit HEVC encoder available — section output "
+               "will use the reviewed tone-mapped SDR copy.")
+        return
+    args.hdr_source = hdr_source
+    args.hdr_encoder = henc
+    args.hdr_tags = color_tags(hdr_source)
+    cb.log(f"      HDR section output: reusing {hdesc} source — 10-bit HEVC via {henc}")
 
 
 # ----------------------------------------------------------------------------
@@ -8549,6 +8693,28 @@ def run_render(args, state, cb=None):
         ce = float(getattr(args, "clip_end", 0) or 0)
     clip = ((cs, ce if ce > 0 else None)
             if (cs > 0 or ce > 0) else None)
+    frame_range = getattr(args, "section_range", None)
+    if frame_range is not None:
+        expected = state.get("input_sha256")
+        if expected and expected != sha256_file(args.video):
+            raise ValueError("Section source changed (sha256 mismatch); export refused")
+        source_cap = cv2.VideoCapture(args.video)
+        try:
+            _section_frame_bounds(frame_range, source_cap, state["fps"], state["cum"], state["bands"])
+            actual_total = int(source_cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            if state.get("total_frames") not in (None, actual_total):
+                raise ValueError("Section source timeline changed; export refused")
+        finally:
+            source_cap.release()
+        if getattr(args, "hdr_source", None) and not args.preview:
+            hdr_cap = cv2.VideoCapture(args.hdr_source)
+            try:
+                if int(hdr_cap.get(cv2.CAP_PROP_FRAME_COUNT)) != actual_total:
+                    raise ValueError("HDR source timeline differs from the reviewed source; section export refused")
+                _section_frame_bounds(frame_range, hdr_cap, state["fps"], state["cum"], state["bands"])
+            finally:
+                hdr_cap.release()
+        clip = None
     if clip and getattr(args, "hdr_source", None) and not args.preview:
         cb.log("      NOTE: output trim is not yet supported on HDR output — "
                "rendering full length. Use --hdr-output sdr to trim.")
@@ -8568,7 +8734,8 @@ def run_render(args, state, cb=None):
                    mode_map=getattr(args, "mode_map", None),
                    audio_spans=aspans, mute_tracks=mute_tracks, cb=cb,
                    out_quality=out_q,
-                   audio_lanes=getattr(args, "audio_lane_count", None))
+                   audio_lanes=getattr(args, "audio_lane_count", None),
+                   frame_range=frame_range)
     else:
         render(args.video, dst, dets_r, state["cum"],
                state["bands"],
@@ -8579,7 +8746,8 @@ def run_render(args, state, cb=None):
                face_shape=getattr(args, "face_shape", "ellipse"),
                encoder=args.encoder, audio_spans=aspans, clip=clip,
                mute_tracks=mute_tracks, cb=cb, out_quality=out_q,
-               audio_lanes=getattr(args, "audio_lane_count", None))
+               audio_lanes=getattr(args, "audio_lane_count", None),
+               frame_range=frame_range)
     if args.report:
         write_report(args.report, args, state, output_path=dst)
         cb.log(f"      audit report: {args.report} (contains PII text — protect it)")
@@ -8598,9 +8766,14 @@ def run_pipeline(args, cb=None):
         cb.log(f"[1/2] Loading detections from {args.from_report}")
         dets, rstate, prov = load_report(args.from_report)
         _restore_plate_settings(args, prov)
+        source_identity = {}
+        source_total = None
         try:
             with open(args.from_report, encoding="utf-8") as _f:
                 _adoc = json.load(_f)
+                source_identity = _adoc.get("source_identity") or {}
+                source_total = source_identity.get("total_frames") or (
+                    _adoc.get("stop_review") or {}).get("total_frames")
                 rstate["audio_suggestions"] = (
                     _adoc.get("audio_suggestions") or [])
                 # keep the transcript through the render-end report
@@ -8621,20 +8794,48 @@ def run_pipeline(args, cb=None):
             except Exception:
                 pass
         orig = prov.get("original_input")
-        if orig and os.path.exists(orig) \
-                and os.path.abspath(orig) != os.path.abspath(args.video):
-            # re-renders must start from the TRUE original so intake can
-            # re-derive the HDR/CFR context (cached intermediates are
-            # reused). Rendering straight from the tone-mapped scan copy
-            # silently downgraded HDR jobs to SDR output.
-            args.video = orig
-        normalize_vfr(args, cb)
+        original_sha = prov.get("original_input_sha256")
+        is_section = getattr(args, "section_range", None) is not None
+        in_sha = None
+        if orig and os.path.isfile(orig):
+            args._report_original_input = orig
+        if original_sha:
+            args.original_input_sha256 = original_sha
+            if is_section and (
+                    not orig or not os.path.isfile(orig) or sha256_file(orig) != original_sha):
+                raise ValueError("Original section source changed; export refused before normalization")
+        if is_section:
+            in_sha = sha256_file(args.video)
+            expected = source_identity.get("input_sha256") or prov.get("input_sha256")
+            if (not expected or in_sha != expected
+                    or prov.get("input_sha256") not in (None, in_sha)):
+                raise ValueError("Section source changed (sha256 mismatch); export refused")
+            _restore_section_intake(args, prov, cb)
+        else:
+            if orig and os.path.exists(orig) \
+                    and os.path.abspath(orig) != os.path.abspath(args.video):
+                # Full re-renders re-derive their HDR/CFR context from the
+                # true original, reusing the existing intake cache.
+                args.video = orig
+            normalize_vfr(args, cb)
         _validate_narrow_frame_alignment(args, has_narrow_samples=any(d.category == "plate" and d.frame_index >= 0 for d in dets))
         if rstate is None:
             raise RuntimeError("report has no render_state — re-run a scan "
                                "with --report using openscrub v4+")
         cb.log(f"      {len(dets)} enabled detections")
-        in_sha = sha256_file(args.video)
+        in_sha = in_sha or sha256_file(args.video)
+        if is_section:
+            cap = cv2.VideoCapture(args.video)
+            try:
+                _section_frame_bounds(args.section_range, cap, rstate["fps"],
+                                      rstate["cum"], rstate["bands"])
+                actual_total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+                if (source_total is not None and source_total != actual_total
+                        or source_identity.get("fps") not in (None, rstate["fps"])):
+                    raise ValueError("Section source timeline changed; export refused")
+                source_total = actual_total
+            finally:
+                cap.release()
         if prov.get("input_sha256") and prov["input_sha256"] != in_sha:
             cb.log("      WARNING: input file differs from the one this report "
                    "was made from (sha256 mismatch) — blur positions may be wrong")
@@ -8642,6 +8843,7 @@ def run_pipeline(args, cb=None):
                  "cum": [tuple(v) for v in rstate["cum"]],
                  "bands": [tuple(v) for v in rstate["bands"]],
                  "detections": dets, "input_sha256": in_sha,
+                 "total_frames": source_total or len(rstate["cum"]),
                  "stats": {"scans": 0, "raw_hits": 0, "regions": len(dets),
                            "recalls": 0, "remembered": 0}}
         return run_render(args, state, cb)

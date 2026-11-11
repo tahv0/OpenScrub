@@ -147,6 +147,9 @@ def test_successful_session_calls_full_scan_and_model_then_commits_constraints(p
         fresh['detections'][0].update(track=99,cbox=[40,60,140,110],plate_quad=[],verified_label='')
         return fresh
     def publish(result):
+        assert job['learning']['stage']=='refining'
+        assert job['learning']['done']==job['learning']['total']==len(old['render_state']['cum'])
+        assert job['learning']['unit']=='frames'
         events.append('publish');ls.atomic_json(path,result)
     result=ls.run_session(job,lambda i:web._read_exact_frame(job['video'],i),scan,publish,
         train=train,refiner=Model,calibration=lambda m,d:{'threshold':.5})

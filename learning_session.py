@@ -65,6 +65,35 @@ def _load(path,default=None):
     return json.loads(path.read_text(encoding='utf-8'))
 
 
+def update_learning(job,stage=None,message=None,*,progressed=False,**fields):
+    """Update live learning state without resetting a running stage's clock.
+
+    All timestamps are Unix seconds. ``started_at`` belongs to the current
+    stage; ``updated_at`` may advance on a heartbeat, while ``last_progress_at``
+    advances only on a stage transition or evidence of completed work.
+    """
+    state=job.get('learning')
+    if not isinstance(state,dict):
+        state={};job['learning']=state
+    now=time.time()
+    changed=stage is not None and stage!=state.get('stage')
+    advanced=progressed or changed or any(
+        isinstance(fields.get(key),(int,float)) and not isinstance(fields.get(key),bool)
+        and (state.get(key) is None or fields[key]>state[key])
+        for key in ('done','epoch','batch','source_frame'))
+    if changed:
+        state.update(started_at=now,done=None,total=None,unit=None,
+                     epoch=None,epochs=None,batch=None,batches=None)
+    state.setdefault('started_at',now)
+    if stage is not None:state['stage']=stage
+    if message is not None:state['message']=message
+    state.update(fields)
+    state['updated_at']=now
+    if advanced:state['last_progress_at']=now
+    else:state.setdefault('last_progress_at',state['started_at'])
+    return state
+
+
 # Training collection owns its decoder. Never borrow the interactive preview
 # lock, Flask abort(), or its ten-second request deadline for batch work.
 def _collection_cancel(cancel):
@@ -249,7 +278,8 @@ def collect_feedback(job,doc,read_frame=None,log=None):
     store=_load(root/'feedback.json',{'schema':1,'source_sha256':source,'samples':{},'imported_images':[],
                                     'constraints':None})
     if store['source_sha256']!=source:raise ValueError('Feedback source changed')
-    job['learning']={'stage':'collecting','message':'Indexing saved human decisions before collecting training images'}
+    update_learning(job,'collecting','Indexing saved human decisions before collecting training images',
+                    done=0,total=None,unit='examples')
     log(job['learning']['message'])
     current=vl.capture_constraints(doc)
     prior=(store.get('constraints') or {}).get('anchors',[])
@@ -326,8 +356,9 @@ def collect_feedback(job,doc,read_frame=None,log=None):
         message='Collecting reviewed examples: %d/%d (%d positive, %d negative)'%(completed,total,positive,total-positive)
         if target is not None:message+='; decoding source frame %d toward %d'%(max(0,decoded),target)
         message+='; training has not started'
-        job['learning']={'stage':'collecting','message':message,'completed_examples':completed,
-                         'total_examples':total,'source_frame':decoded,'target_frame':target}
+        update_learning(job,'collecting',message,done=completed,total=total,unit='examples',
+                        completed_examples=completed,total_examples=total,
+                        source_frame=decoded,target_frame=target)
         log(message)
     progress(force=True)
     wanted=sorted({vl._frame(r,rs) for _,r,_,_ in requested})
@@ -558,45 +589,104 @@ def preflight():
     return {'ready':not problems,'problems':problems,'python':python,'weights':weights,'script':str(script)}
 
 
+_TRAINING_PROGRESS_PREFIX='OPENSCRUB_PROGRESS '
+
+
+def _training_progress_line(job,line):
+    """Accept bounded scalar telemetry, never interpret arbitrary trainer output."""
+    if not line.startswith(_TRAINING_PROGRESS_PREFIX):return False
+    if len(line)>16384:return True
+    try:
+        event=json.loads(line[len(_TRAINING_PROGRESS_PREFIX):])
+        if not isinstance(event,dict):return True
+        if event.get('stage') not in ('training','candidate_validation','exporting','checking'):
+            return True
+        if not isinstance(event.get('message'),str):return True
+        fields={key:event[key] for key in ('done','total','unit','epoch','epochs','batch','batches')
+                if key in event}
+        for key,value in fields.items():
+            if key=='unit':
+                if value is not None and value not in ('batches','epochs','checks'):return True
+            elif value is not None and (type(value) is not int or value<0):return True
+        for done,total in (('done','total'),('epoch','epochs'),('batch','batches')):
+            if fields.get(done) is not None and fields.get(total) is not None and fields[done]>fields[total]:
+                return True
+        metrics=event.get('metrics')
+        if isinstance(metrics,dict):
+            fields['metrics']={key:value for key,value in metrics.items()
+                               if key in ('mask_map50','mask_map','box_map50')
+                               and type(value) in (int,float) and math.isfinite(value) and 0<=value<=1}
+        update_learning(job,event['stage'],event['message'][:600],**fields)
+    except (ValueError,TypeError):
+        pass # A damaged telemetry record must never kill training or fake work.
+    return True
+
+
 def run_training(dataset,versions,weights,job,settings):
     command=_training_command(trainer_script(),
         'train','--dataset',str(dataset),'--weights',str(weights),'--versions-dir',str(versions),
         '--device','0','--epochs',str(settings.get('epochs',40)),'--batch',str(settings.get('batch',8)),
-        '--workers','0','--accept-ultralytics-license')
+        '--workers','0','--accept-ultralytics-license','--progress')
     private_dir(versions)
     logfile=Path(versions).parent/'training.log'
+    update_learning(job,'training','Starting the local training process',done=0,total=None,unit=None)
     with open(logfile,'w',encoding='utf-8') as log:
         process=subprocess.Popen(command,stdout=log,stderr=subprocess.STDOUT,
                                  start_new_session=os.name!='nt')
-        position=0
-        try:
-            started=time.monotonic()
-            while process.poll() is None:
-                with open(logfile,encoding='utf-8',errors='replace') as output:
-                    output.seek(position);text=output.read(32768);position=output.tell()
-                if text:job.setdefault('log',[]).extend(text.replace(chr(13),chr(10)).splitlines()[-12:])
-                if time.monotonic()-started>43200:raise TimeoutError('Training exceeded the 12-hour process limit')
-                if job['cancel'].wait(.5):raise InterruptedError('Training cancelled; prior review retained')
-            if process.returncode:
-                tail=logfile.read_text(encoding='utf-8',errors='replace').splitlines()[-12:]
-                raise ValueError('Training failed: '+'\n'.join(tail))
-        finally:
-            if process.poll() is None:
-                if os.name!='nt':os.killpg(process.pid,signal.SIGTERM)
-                else:process.terminate()
-                try:process.wait(timeout=10)
-                except subprocess.TimeoutExpired:
-                    if os.name!='nt':os.killpg(process.pid,signal.SIGKILL)
-                    else:process.kill()
-                    process.wait()
+        with open(logfile,encoding='utf-8',errors='replace') as output:
+            pending=''
+            def drain(final=False):
+                nonlocal pending
+                ordinary=[];chunks=0
+                while final or chunks<4:
+                    text=output.read(32768)
+                    if not text:break
+                    chunks+=1
+                    lines=(pending+text.replace('\r','\n')).split('\n')
+                    pending=lines.pop()
+                    for line in lines:
+                        if line and not _training_progress_line(job,line):ordinary.append(line)
+                    # A giant diagnostic line must not grow a second copy of the
+                    # log in memory. The complete original remains on disk.
+                    if len(pending)>65536:
+                        if not pending.startswith(_TRAINING_PROGRESS_PREFIX):ordinary.append(pending[-2000:])
+                        pending=''
+                    ordinary=ordinary[-12:]
+                if final and pending:
+                    if not _training_progress_line(job,pending):ordinary.append(pending)
+                    pending=''
+                if ordinary:job.setdefault('log',[]).extend(ordinary[-12:])
+            try:
+                started=time.monotonic()
+                while process.poll() is None:
+                    drain()
+                    update_learning(job) # Liveness is distinct from progress.
+                    if time.monotonic()-started>43200:raise TimeoutError('Training exceeded the 12-hour process limit')
+                    if job['cancel'].wait(.5):raise InterruptedError('Training cancelled; prior review retained')
+                drain(final=True) # A fast child can finish between poll ticks.
+                if process.returncode:
+                    tail=logfile.read_text(encoding='utf-8',errors='replace').splitlines()[-12:]
+                    raise ValueError('Training failed: '+'\n'.join(tail))
+            finally:
+                if process.poll() is None:
+                    if os.name!='nt':os.killpg(process.pid,signal.SIGTERM)
+                    else:process.terminate()
+                    try:process.wait(timeout=10)
+                    except subprocess.TimeoutExpired:
+                        if os.name!='nt':os.killpg(process.pid,signal.SIGKILL)
+                        else:process.kill()
+                        process.wait()
+                drain(final=True)
     index=_load(Path(versions)/'index.json',{'versions':[]})
     if not index['versions']:raise ValueError('Training produced no candidate')
     version=index['versions'][-1]['version']
     folder=Path(versions)/version
     meta=_load(folder/'manifest.json')
-    for name in ('model.onnx','weights.pt'):
+    update_learning(job,'checking','Verifying trained model artifacts',done=0,total=2,unit='artifacts')
+    for done,name in enumerate(('model.onnx','weights.pt'),1):
         if sha256(folder/name)!=(meta.get('artifacts') or {}).get(name):
             raise ValueError('Training artifact integrity check failed')
+        update_learning(job,done=done)
     return folder,meta
 
 
@@ -646,14 +736,14 @@ def run_session(job,read_frame,full_scan,publish,log=None,train=None,refiner=Non
     log=log or (lambda message:None)
     root=private_dir(Path(job['dir'])/'learning')
     doc=_load(Path(job['dir'])/'report.json')
-    job['learning']={'stage':'verifying','message':'Verifying the source fingerprint before using saved annotations'}
+    update_learning(job,'verifying','Verifying the source fingerprint before using saved annotations')
     atomic_json(root/'status.json',job['learning'])
     source=verify_source(job,doc);doc.setdefault('provenance',{})['input_sha256']=source
     settings=job.get('learning_request',{})
     if settings.get('license_accepted') is not True:
         raise ValueError('Local training license acknowledgment is required')
-    def phase(name,message):
-        job['learning']={'stage':name,'message':message}
+    def phase(name,message,**fields):
+        update_learning(job,name,message,**fields)
         atomic_json(root/'status.json',job['learning']);log(message)
     phase('collecting','Collecting your saved positive and negative examples')
     feedback=collect_feedback(job,doc,read_frame,log=log)
@@ -685,12 +775,30 @@ def run_session(job,read_frame,full_scan,publish,log=None,train=None,refiner=Non
     if fresh['provenance'].get('input_sha256')!=source:
         raise ValueError('Rescan source changed; previous result retained')
     # Keep intake provenance so re-rendering cannot silently change HDR/normalization.
-    for key in ('original_input','vfr_normalized','hdr_tonemapped','hdr_output'):
+    for key in ('original_input','original_input_sha256','vfr_normalized','hdr_tonemapped','hdr_output'):
         if key in doc['provenance']:
             fresh['provenance'][key]=doc['provenance'][key]
-    phase('refining','Applying the learned segmentation model to original-detector proposals')
-    refined,stats=vl.refine_report(job['video'],fresh,model,gate['threshold'],job['cancel'].is_set)
-    refined=vl.apply_constraints(refined,feedback['constraints'])
+    phase('refining','Applying the learned segmentation model to original-detector proposals',
+          done=0,total=len(fresh['render_state']['cum']),unit='frames')
+    last_refine_notice=[0.]
+    def refine_progress(done,total):
+        now=time.monotonic()
+        if done!=total and now-last_refine_notice[0]<1:return
+        last_refine_notice[0]=now
+        update_learning(job,'refining','Refining plate proposals: %d/%d frames'%(done,total),
+                        done=done,total=total,unit='frames')
+    refined,stats=vl.refine_report(job['video'],fresh,model,gate['threshold'],job['cancel'].is_set,
+                                  progress=refine_progress,
+                                  **({'frame_range':tuple(job['options']['section_context'])}
+                                     if job.get('options',{}).get('section_context') else {}))
+    constraints=feedback['constraints']
+    if job.get('section'):
+        constraints=dict(constraints,manual=[])
+    refined=vl.apply_constraints(refined,constraints)
+    if job.get('section'):
+        import video_sections
+        relation=job['section']
+        refined=video_sections.carry_manual(doc,refined,relation['start_frame'],relation['end_frame'])
     refined['learning']={'pass_id':pass_id,'needs_render':True,'model_sha256':meta['artifacts']['model.onnx'],
         'version':meta['version'],'feedback_fingerprint':feedback['fingerprint'],
         'inference':stats,'validation':gate,'previous_report':str(stage/'before-report.json')}
@@ -710,7 +818,7 @@ def run_session(job,read_frame,full_scan,publish,log=None,train=None,refiner=Non
     except OSError as error:
         log('Active-version index could not be updated; the committed report retains it: '+str(error))
     message='Learning pass complete. Inspect remaining disagreements and rendered coverage before sharing.'
-    job['learning']={'stage':'review','message':message}
+    update_learning(job,'review',message)
     try:atomic_json(root/'status.json',job['learning'])
     except OSError:log(message)
     return refined

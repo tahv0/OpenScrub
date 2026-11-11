@@ -404,6 +404,11 @@ def job_public(job):
         "checkpoint_total": job.get("checkpoint_total"),
         "learning": job.get("learning"),
         "refinement": job.get("refinement"),
+        "activity": job.get("activity"),
+        "preview": job.get("preview"),
+        "server_time": time.time(),
+        "sections_revision": job.get("sections_revision", 0),
+        "section": job.get("section"),
     }
 
 
@@ -440,6 +445,26 @@ class WebCallbacks(openscrub.Callbacks):
         self.job["log"].append(msg)
 
     def progress(self, stage, cur, total):
+        context = self.job.get("options", {}).get("section_context")
+        if context and stage == "scan":
+            cur, total = max(0, min(cur, context[1])-context[0]), context[1]-context[0]
+        now = time.time()
+        old = self.job.get("activity") or {}
+        changed = old.get("stage") != stage
+        advanced = changed or cur > old.get("done", -1)
+        unit = "tracks" if stage == "post" else "frames"
+        activity = dict(stage=stage, done=cur, total=total, unit=unit,
+                        started_at=now if changed else old.get("started_at", now),
+                        updated_at=now,
+                        last_progress_at=now if advanced else old.get("last_progress_at", now))
+        self.job["activity"] = activity
+        if self.job.get("phase") == "learning":
+            label = {"scan": "rescanning", "post": "postprocessing", "refine": "refining"}.get(stage)
+            if label:
+                learning_session.update_learning(self.job, stage=label,
+                    message={"scan":"Rescanning video", "post":"Finalizing tracked detections",
+                             "refine":"Applying learned plate masks"}[stage],
+                    done=cur, total=total, unit=unit)
         # scan frame loop -> first 45% of the bar; "post" (dense-track
         # smoothing after the loop — previously a silent stall) -> 45-50%;
         # render -> back half. Jobs without a post stage jump 45 -> 50,
@@ -486,7 +511,9 @@ class WebCallbacks(openscrub.Callbacks):
         h, w = frame.shape[:2]
         scale = 720 / w
         small = cv2.resize(frame, (720, int(h * scale)))
-        _publish_preview_jpeg(os.path.join(self.job["dir"], "preview.jpg"), small, 70)
+        if _publish_preview_jpeg(os.path.join(self.job["dir"], "preview.jpg"), small, 70):
+            self.job["preview"] = dict(revision=uuid.uuid4().hex[:12], updated_at=now,
+                                        source_time=t, found=found)
 
     def cancelled(self):
         return self.job["cancel"].is_set()
@@ -629,6 +656,9 @@ def build_args(job, for_render=False):
         argv += ["--from-report", os.path.join(jdir, "report.json")]
     parser = openscrub.build_parser()
     args = openscrub._prep_args(parser.parse_args(argv), parser)
+    if o.get("section_range"):
+        args.section_range = tuple(o["section_range"])
+        args.clip_frac = ""
     if o.get("learned_plate_model") and not for_render:
         meta, _ = learned_models.load_snapshot(jdir)
         if meta["id"] != o["learned_plate_model"]:
@@ -652,7 +682,9 @@ def apply_selected_plate_model(job, chunk):
         refined, stats = video_learning.refine_report(
             chunk["provenance"]["input"], chunk, model,
             threshold=meta["threshold"], cancelled=job["cancel"].is_set,
-            progress=lambda cur, total: cb.progress("refine", cur, total))
+            progress=lambda cur, total: cb.progress("refine", cur, total),
+            **({"frame_range": tuple(job["options"]["section_context"])}
+               if job.get("options", {}).get("section_context") else {}))
     except InterruptedError as error:
         raise openscrub.PipelineCancelled() from error
     record = {key: meta[key] for key in
@@ -679,6 +711,8 @@ def worker():
             elif action in ("scan", "resume"):
                 resuming = action == "resume"
                 job["phase"] = "scanning"
+                job["preview"] = None
+                job["activity"] = None
                 args = build_args(job)
                 previous = None
                 old_frame = 0
@@ -703,6 +737,8 @@ def worker():
                     with open(staging_path, encoding="utf-8") as f:
                         chunk = json.load(f)
                     chunk = apply_selected_plate_model(job, chunk)
+                    if job.get("section") and state.get("stop_at_frame") is None:
+                        chunk = _SECTIONS.finish_scan(job, chunk)
                     end_frame = state.get("stop_at_frame")
                     total_frames = int(state["total_frames"])
                     if resuming:
@@ -714,6 +750,9 @@ def worker():
                                 int(end_frame) if end_frame is not None
                                 else len(state["cum"]),
                                 total_frames, completed=end_frame is None)
+                            for key in ("video_sections", "source_identity", "range_provenance", "render_required", "preview_revision"):
+                                if key in previous:
+                                    combined[key] = previous[key]
                     elif end_frame is not None:
                         combined = stop_review.with_checkpoint(
                             chunk, end_frame, total_frames, job["options"])
@@ -831,6 +870,10 @@ def worker():
                     res = openscrub.run_pipeline(args, cb)
                     rendered_doc = learning_session.preserve_render_review(
                         review_doc, _load_job_report(job))
+                    for key in ("source_identity", "video_sections", "range_provenance", "section_range", "preview_revision"):
+                        if key in review_doc:
+                            rendered_doc[key] = review_doc[key]
+                    rendered_doc.pop("render_required", None)
                     stop_review.atomic_report(os.path.join(job["dir"], "report.json"), rendered_doc)
                 except Exception:
                     # Render may already have rewritten its audit. Annotation
@@ -1042,6 +1085,9 @@ def job_delete(jid):
         if job.get("phase") in ("queued", "scanning", "rendering",
                                 "queued_render", "learning"):
             abort(409, "job is queued or running — cancel it first")
+    dependency = _SECTIONS.deletion_error(job)
+    if dependency:
+        return jsonify({"error": dependency}), 409
     if _reap_job_dir(job["dir"], jid):
         with JOBS_LOCK:
             JOBS.pop(jid, None)
@@ -1085,6 +1131,9 @@ def job_retry(jid):
         if job["phase"] not in ("error", "cancelled"):
             return jsonify({"error": "only a failed or cancelled job can "
                                      "be retried"}), 409
+        protected = _SECTIONS.whole_job_error(job)
+        if protected:
+            return jsonify({"error": protected}), 409
         if not (job.get("video") and os.path.exists(job["video"])):
             return jsonify({"error": "the job's video file is no longer "
                                      "on the server — start a new "
@@ -1110,9 +1159,20 @@ def job_status(jid):
 @app.route("/api/jobs/<jid>/log")
 def job_log(jid):
     job = JOBS.get(jid) or abort(404)
-    frm = max(0, int(request.args.get("from", 0)))
-    return jsonify({"from": frm, "lines": job["log"][frm:],
-                    "len": len(job["log"])})
+    try:
+        frm = max(0, int(request.args.get("from", 0)))
+        limit = max(1, min(400, int(request.args.get("limit", 400))))
+    except (TypeError, ValueError):
+        abort(400, description="log cursor and limit must be integers")
+    # Capture one end position before slicing: a worker can append between
+    # calls, and the cursor must only acknowledge lines in this response.
+    lines = job["log"]
+    end = len(lines)
+    if frm > end:
+        frm = 0  # a restarted/rehydrated job may have a shorter log
+    frm = max(frm, end - limit)
+    tail = lines[frm:end]
+    return jsonify({"from": frm, "lines": tail, "len": frm + len(tail)})
 
 
 @app.route("/api/jobs/<jid>/preview.jpg")
@@ -1184,6 +1244,8 @@ def perform_learning(job):
     previous = job.get("learning_previous_phase", "review")
     cb = WebCallbacks(job)
     job["phase"] = "learning"
+    job["preview"] = None
+    job["activity"] = None
     try:
         job["learning"] = {"stage": "preflight", "message": "Checking the local CUDA training environment"}
         ready = learning_session.preflight()
@@ -1201,6 +1263,10 @@ def perform_learning(job):
                 return json.load(source)
         def publish(doc):
             with _REVIEW_EDIT_LOCK, _REVIEW_WORK_LOCK:
+                if job.get("section"):
+                    import video_sections
+                    relation = job["section"]
+                    doc = video_sections.slice_report(doc, relation["start_frame"], relation["end_frame"])
                 stop_review.atomic_report(os.path.join(job["dir"], "report.json"), doc)
                 # Current thumbnails are indexed by row; a full rescan changes IDs.
                 for name in os.listdir(job["dir"]):
@@ -1233,6 +1299,10 @@ def perform_learning(job):
 @app.route("/api/jobs/<jid>/learning", methods=["GET", "POST"])
 def job_learning(jid):
     job = JOBS.get(jid) or abort(404)
+    if request.method == "POST":
+        protected = _SECTIONS.whole_job_error(job)
+        if protected:
+            return jsonify({"error": protected}), 409
     if request.method == "GET":
         return jsonify({"status": job.get("learning"),
             "weights_configured": os.path.isfile(os.environ.get("OPENSCRUB_TRAIN_WEIGHTS", "")),
@@ -1266,6 +1336,9 @@ def job_learning(jid):
 def job_learning_rollback(jid):
     from pathlib import Path
     job = JOBS.get(jid) or abort(404)
+    protected = _SECTIONS.whole_job_error(job)
+    if protected:
+        return jsonify({"error": protected}), 409
     with JOBS_LOCK:
         if job["phase"] not in ("paused", "review", "done"):
             return jsonify({"error": "Finish or cancel the active pass before restoring."}), 409
@@ -1322,6 +1395,15 @@ def job_learning_review(jid):
 def _load_job_report(job):
     with open(os.path.join(job["dir"], "report.json"), encoding="utf-8") as f:
         return json.load(f)
+
+
+def _invalidate_review_previews(job):
+    for name in os.listdir(job['dir']):
+        if re.fullmatch(r'(?:thumb2_\d+(?:_[0-9a-f]{16})?\.jpg|plate_preview_\d+\.npz)', name):
+            try:
+                os.unlink(os.path.join(job['dir'], name))
+            except OSError:
+                pass
 
 
 # Review work is deliberately bounded. Never replay a long video's prefix for
@@ -1990,6 +2072,15 @@ def job_plate_quad(jid, i):
             abort(423)
         doc, d, meta, pixels = _plate_preview(job, i)
         payload = request.get_json(silent=True) or {}
+        if doc.get("video_sections") or (job.get("section") or {}).get("role") == "export":
+            fps = doc["render_state"]["fps"]
+            if ((job.get("section") or {}).get("role") == "export" or any(
+                _SECTIONS.locked_overlap(doc, int(row["t_start"]*fps),
+                                         int(row["t_end"]*fps)+1)
+                for index, row in enumerate(doc["detections"])
+                if index == i or (d.get("track", -1) >= 0 and
+                                  row.get("track") == d["track"]))):
+                return jsonify({"error": "Open a section candidate to revise an approved section."}), 409
         autosave = payload.get("autosave") is True
         edit_id = payload.get("edit_id") if autosave else None
         if autosave and (not isinstance(edit_id, str) or
@@ -2111,8 +2202,10 @@ def job_boxes_at(jid):
     want_all = request.args.get("all") == "1"
     rows = _review_detections(job, doc)
     active = [(i, d) for i, d in enumerate(rows)
-              if (d.get("frame_index", -1) == fidx if d.get("frame_index", -1) >= 0
-                  else d["t_start"] - 0.01 <= t <= d["t_end"] + 0.01)]
+              if (d.get("owned_start_frame", -1) < 0 or fidx >= d["owned_start_frame"])
+              and (d.get("owned_end_frame", -1) < 0 or fidx < d["owned_end_frame"])
+              and (d.get("frame_index", -1) == fidx if d.get("frame_index", -1) >= 0
+                   else d["t_start"] - 0.01 <= t <= d["t_end"] + 0.01)]
     # Use the renderer's identity-based selector and retain report indices.
     from types import SimpleNamespace
     candidates = [(i, d, SimpleNamespace(t_start=d["t_start"],
@@ -2156,7 +2249,9 @@ def job_thumb(jid, i):
     i = int(i)
     if i < 0:
         abort(404)
-    cache = os.path.join(job["dir"], "thumb2_%d.jpg" % i)
+    revision = doc.get('preview_revision')
+    suffix = ('_' + hashlib.sha256(str(revision).encode()).hexdigest()[:16]) if revision else ''
+    cache = os.path.join(job["dir"], "thumb2_%d%s.jpg" % (i, suffix))
     if not os.path.exists(cache):
         if cache_only:
             return Response(status=204, headers={"Cache-Control": "no-store"})
@@ -2196,7 +2291,10 @@ def job_thumb(jid, i):
         cv2.rectangle(crop, (pad, pad), (crop.shape[1] - pad,
                                          crop.shape[0] - pad), (0, 0, 255), 2)
         cv2.imwrite(cache, crop, [cv2.IMWRITE_JPEG_QUALITY, 80])
-    return send_file(cache, mimetype="image/jpeg", max_age=3600)
+    response = send_file(cache, mimetype="image/jpeg", max_age=0)
+    # The URL identifies a report row, which may change after a rescan.
+    response.headers['Cache-Control'] = 'no-store'
+    return response
 
 
 @app.route("/api/jobs/<jid>/frame_at")
@@ -2398,6 +2496,8 @@ def job_save_edits(jid):
             if float(s.get("t1", 0)) > float(s.get("t0", 0)) >= 0]
     applied = time.perf_counter()
     if changed:
+        if doc.get("video_sections") or (job.get("section") or {}).get("role") == "export":
+            _SECTIONS.guard_edits(job, _load_job_report(job), doc)
         stop_review.atomic_report(path, doc)
     published = time.perf_counter()
     # suggest allowlisting any string whose EVERY instance was disabled —
@@ -2438,6 +2538,11 @@ def job_track_object(jid):
         abort(400)
     if len(box) != 4 or not (t1 > t0 >= 0) or not (t0 <= t_ref <= t1):
         abort(400)
+    locked_doc = _load_job_report(job)
+    if ((job.get("section") or {}).get("role") == "export" or
+        _SECTIONS.locked_overlap(locked_doc, int(t0*locked_doc["render_state"]["fps"]),
+                                int(t1*locked_doc["render_state"]["fps"])+1)):
+        return jsonify({"error": "Open a section candidate to track inside an approved section."}), 409
     if job["phase"] == "paused":
         saved = stop_review.validate_resume(_load_job_report(job))
         until = saved["next_frame"] / saved["fps"]
@@ -2537,7 +2642,17 @@ def job_track_object(jid):
                     _save_verified_plate_sample(job, frame, points,
                                                 seed_index, t_ref)
             path = os.path.join(job["dir"], "report.json")
-            stop_review.atomic_report(path, doc)
+            with _REVIEW_EDIT_LOCK:
+                current = _load_job_report(job)
+                # Tracking runs in the background. Publish against the latest
+                # report so concurrent section approvals and edits survive.
+                if current != doc:
+                    current["detections"].extend(new)
+                    proposed = current
+                else:
+                    proposed = doc
+                _SECTIONS.guard_edits(job, _load_job_report(job), proposed)
+                stop_review.atomic_report(path, proposed)
             job["log"].append(
                 "      tracked object: %d position(s), %.1f-%.1fs "
                 "(review card added)" % (len(new),
@@ -2819,6 +2934,8 @@ def job_render(jid):
 @app.route("/api/jobs/<jid>/download")
 def job_download(jid):
     job = JOBS.get(jid) or abort(404)
+    if _load_job_report(job).get("render_required"):
+        return jsonify({"error": "Render the updated sections before downloading this video."}), 409
     if (_load_job_report(job).get("learning") or {}).get("needs_render"):
         return jsonify({"error": "Render this learning pass before downloading; the previous video does not contain these changes."}), 409
     if not job["output"] or not os.path.exists(job["output"]):
@@ -3225,10 +3342,12 @@ let EXPORT_NAMES={video:null,report:null};
 const CAN_SAVE_AS=!!(window.isSecureContext&&window.showSaveFilePicker);
 
 async function loadJobs(){
- if(JOBSFLIGHT)return JOBSFLIGHT;
+ if(JOBSFLIGHT)return JOBSFLIGHT.promise;
  if(Date.now()<JOBSRETRYAT||(document.hidden&&JOBSJSON))return;
- JOBSFLIGHT=(async()=>{try{
- const {data:js}=await reviewRequest("api/jobs");
+ const flight={controller:new AbortController(),promise:null};JOBSFLIGHT=flight;
+ flight.promise=(async()=>{try{
+ const {data:js}=await reviewRequest("api/jobs",{signal:flight.controller.signal});
+ if(JOBSFLIGHT!==flight)return;
  JOBSFAILURES=0;JOBSRETRYAT=0;
  const note=document.getElementById("jobsLoadStatus");if(note)note.textContent="";
  const s=JSON.stringify(js);
@@ -3238,21 +3357,25 @@ async function loadJobs(){
   `<div class="row" style="justify-content:space-between;padding:4px 0">
    <a href="#" onclick="openJob('${j.id}');return false">${j.name}</a>
    <span style="display:flex;gap:10px;align-items:center"><span class="badge">${j.phase}</span>
-   ${(j.phase=="error"||j.phase=="cancelled")?`<a href="#" title="Retry the scan — reuses the file already on the server, nothing is re-uploaded" style="text-decoration:none;font-size:15px" onclick="retryJob('${j.id}');return false">&#8635;</a>`:""}
+   ${(j.phase=="error"||j.phase=="cancelled")?`<a href="#" title="${j.section?.role==="export"?"Retry section export":"Retry the scan — reuses the file already on the server, nothing is re-uploaded"}" aria-label="${j.section?.role==="export"?"Retry section export":"Retry scan"}" style="text-decoration:none;font-size:15px" onclick="retryJob('${j.id}',${j.section?.role==="export"});return false">&#8635;</a>`:""}
    <a href="#" title="Delete this job and all of its files" style="text-decoration:none;font-size:15px" onclick="delJob('${j.id}');return false">&#128465;&#65039;</a></span></div>`).join(""):"none yet";
  }catch(error){
+  if(JOBSFLIGHT!==flight||flight.controller.signal.aborted)return;
   JOBSFAILURES++;JOBSRETRYAT=Date.now()+Math.min(30000,2000*2**Math.min(4,JOBSFAILURES-1));
   const note=document.getElementById("jobsLoadStatus");
   if(note)note.textContent=error.status===423?"Vault locked — unlock in Settings.":"Connection interrupted; retrying with backoff.";
- }finally{JOBSFLIGHT=null;}})();
- return JOBSFLIGHT;
+ }finally{if(JOBSFLIGHT===flight)JOBSFLIGHT=null;}})();
+ return flight.promise;
 }
 
-async function retryJob(id){
- const r=await fetch("api/jobs/"+id+"/retry",{method:"POST"});
- let j={};try{j=await r.json();}catch(e){}
- if(!r.ok){alert(j.error||"could not retry the job");return;}
- JOBSJSON="";loadJobs();if(typeof openJob==="function")openJob(id);
+async function retryJob(id,sectionExport=false){
+ const opened=CUR,view=JOBVIEW;
+ try{
+  await reviewRequest("api/jobs/"+encodeURIComponent(id)+(sectionExport?"/render":"/retry"),
+   {method:"POST",headers:{"Content-Type":"application/json"},body:"{}"});
+  JOBSJSON="";loadJobs();
+  if(CUR===opened&&JOBVIEW===view)await openJob(id);
+ }catch(error){alert(error.message||"could not retry the job");}
 }
 async function delJob(id){
  if(CUR===id&&!await flushPlateSaves())return;
@@ -3263,7 +3386,7 @@ async function delJob(id){
   try{const e=await r.json();m=e.error||e.description||m;}catch(_){}
   alert(m);return;
  }
- if(CUR===id){CUR=null;if(POLL)clearTimeout(POLL);detail.innerHTML="";}
+ if(CUR===id){CUR=null;stopJobPolling();detail.innerHTML="";}
  JOBSJSON="";loadJobs();
 }
 async function openJob(id){
@@ -3273,19 +3396,27 @@ async function openJob(id){
  if(!await flushPlateSaves())return;
  if(!closePlateQuad())return;
  clearReviewPreviews();JOBVIEW++;REFRESHFAILURES=0;
- if(REFRESHCTRL)REFRESHCTRL.abort();
+ stopJobPolling();
  CUR=id; EN={}; MAN=[]; PHIST=[]; PHPH=""; LOGN=0; SHELLPH=null;
  REVIEW_VERSION=0;REVIEW_SAVED=0;plateUnloadGuard();
  detail.innerHTML="";
- if(POLL)clearTimeout(POLL);
  refresh();
+}
+
+function stopJobPolling(){
+ if(POLL)clearTimeout(POLL);POLL=null;
+ const previous=REFRESHCTRL;REFRESHCTRL=null;REFRESHFLIGHT=null;
+ if(previous)previous.abort();
 }
 
 function shellHtml(j){
  return `<div class="card" id="jobcard"><h2>${j.name}
   <span class="badge" id="ph"></span><small id="eta"></small></h2>
  <progress id="prog" value="0" max="1"></progress>
+ <div id="jobWorkStatus" class="review-copy" role="status" style="margin:8px 0"></div>
+ <progress id="workStageBar" value="0" max="1" hidden aria-label="Current stage progress"></progress>
  <div class="row" id="actions" style="margin-top:8px"></div>
+ <div id="sectionsPanel" style="margin-top:14px" hidden></div>
  <p id="selectedLearnedModel" class="review-copy" role="status"></p>
  <div style="margin-top:8px;text-align:center"><img id="pimg"
    style="max-width:100%;border-radius:8px;display:none;margin:0 auto"></div>
@@ -3325,35 +3456,42 @@ async function saveExportAs(kind, btn){
 
 async function refresh(){
  if(REFRESHFLIGHT)return REFRESHFLIGHT;
- if(POLL)clearTimeout(POLL);
- const id=CUR,view=JOBVIEW;if(!id)return;
+ if(POLL)clearTimeout(POLL);POLL=null;
+ // Return before assigning the flight. An async body with no await finishes
+ // its finally synchronously, then the outer assignment stores its completed
+ // promise forever (the hidden-tab freeze).
+ const id=CUR,view=JOBVIEW;if(!id||document.hidden)return;
  const ctl=REFRESHCTRL=new AbortController();
  REFRESHFLIGHT=(async()=>{try{
-  if(!document.hidden)await refreshJob(id,view,ctl.signal);
-  REFRESHFAILURES=0;
+  await refreshJob(id,view,ctl.signal);
+  if(REFRESHCTRL===ctl)REFRESHFAILURES=0;
  }catch(error){
-  if(error.name!=="AbortError"||!ctl.signal.aborted){
+  if(REFRESHCTRL===ctl&&!ctl.signal.aborted){
    REFRESHFAILURES++;
    const note=document.getElementById("jobsLoadStatus");
    if(note)note.textContent="Connection interrupted; retrying with backoff.";
   }
  }finally{
-  REFRESHFLIGHT=null;if(REFRESHCTRL===ctl)REFRESHCTRL=null;
-  if(CUR){
-   const idle=document.hidden||["review","paused","done","error","cancelled"].includes(SHELLPH);
-   const delay=CUR!==id||JOBVIEW!==view?0:REFRESHFAILURES
-    ?Math.min(30000,2000*2**Math.min(4,REFRESHFAILURES-1)):(idle?5000:900);
-   POLL=setTimeout(refresh,delay);
+  // Navigation or wake-up may already own a newer request. Late completion
+  // must not clear its slot, change its backoff, or schedule a duplicate poll.
+  if(REFRESHCTRL===ctl){
+   REFRESHFLIGHT=null;REFRESHCTRL=null;
+   if(CUR&&!document.hidden){
+    const idle=["review","paused","done","error","cancelled"].includes(SHELLPH);
+    const delay=CUR!==id||JOBVIEW!==view?0:REFRESHFAILURES
+     ?Math.min(30000,2000*2**Math.min(4,REFRESHFAILURES-1)):(idle?5000:900);
+    POLL=setTimeout(refresh,delay);
+   }
   }
  }})();return REFRESHFLIGHT;
 }
 
 async function refreshJob(id,view,signal){
  const {data:j}=await reviewRequest("api/jobs/"+id,{signal});
+ if(signal.aborted||CUR!==id||JOBVIEW!==view)return;
  const modelNote=document.getElementById("selectedLearnedModel");
  if(modelNote&&CUR===id&&JOBVIEW===view)modelNote.textContent=j.refinement
   ?"Learned plate model: "+j.refinement.name:"";
- if(CUR!==id||JOBVIEW!==view)return;
 
  EXPORT_NAMES={video:j.download_name,report:j.report_name};
  if(SHELLPH===null){
@@ -3380,25 +3518,33 @@ async function refreshJob(id,view,signal){
  document.getElementById("ph").textContent=j.phase;
  document.getElementById("eta").textContent=eta;
  document.getElementById("prog").value=j.progress;
+ renderWorkProgress(j);
 
  // incremental log append with stick-to-bottom (respects manual scroll-up)
  const lg=document.getElementById("log");
  const stick=lg.scrollTop+lg.clientHeight>=lg.scrollHeight-40;
- const {data:nl}=await reviewRequest(`api/jobs/${id}/log?from=${LOGN}`,{signal});
- if(CUR!==id||JOBVIEW!==view)return;
- if(LOGN===0&&nl.len>400){LOGN=nl.len-400;nl.lines=nl.lines.slice(-400);}
- if(nl.lines.length){
-  const NL=String.fromCharCode(10);
-  lg.textContent+=(lg.textContent?NL:"")+nl.lines.join(NL);
-  LOGN=nl.len;
-  if(stick)lg.scrollTop=lg.scrollHeight;
- }
+ const from=LOGN;
+ const {data:nl}=await reviewRequest(`api/jobs/${id}/log?from=${from}&limit=400`,{signal});
+ if(signal.aborted||CUR!==id||JOBVIEW!==view)return;
+ const NL=String.fromCharCode(10),reset=nl.len<from;
+ const start=Number.isInteger(nl.from)?nl.from:from;
+ const existing=reset||start>from?[]:lg.textContent?lg.textContent.split(NL):[];
+ const added=nl.lines.slice(reset?0:Math.max(0,from-start));
+ const text=existing.concat(added).slice(-400).join(NL).slice(-200000);
+ if(lg.textContent!==text){lg.textContent=text;if(stick)lg.scrollTop=lg.scrollHeight;}
+ LOGN=reset?nl.len:Math.max(from,nl.len);
 
  // live preview: swap src in place (browser keeps old frame until new loads)
  const img=document.getElementById("pimg");
- if(j.phase=="scanning"){
-  img.src=`api/jobs/${CUR}/preview.jpg?x=${Date.now()}`;
- }
+ const previewActive=j.phase==="scanning"||(j.phase==="learning"&&["rescanning","postprocessing"].includes(j.learning?.stage));
+ if(previewActive&&j.preview){
+  if(img.dataset.revision!==j.preview.revision){
+   img.dataset.revision=j.preview.revision;
+   img.src=`api/jobs/${id}/preview.jpg?revision=${encodeURIComponent(j.preview.revision)}`;
+  }
+  const age=Math.max(0,Math.floor((j.server_time||Date.now()/1000)-j.preview.updated_at));
+  document.getElementById("pcap").textContent=`Scan detections at ${sectionTime(j.preview.source_time)} · updated ${age}s ago`;
+ }else{img.style.display="none";img.removeAttribute("src");delete img.dataset.revision;document.getElementById("pcap").textContent="";}
 
  const wb=document.getElementById("warnbox");
  if(j.error){wb.style.display="block";wb.textContent=j.error;}
@@ -3409,7 +3555,6 @@ async function refreshJob(id,view,signal){
 
  // action buttons rebuilt ONLY when the phase changes
  if(SHELLPH!==j.phase){
-  SHELLPH=j.phase;
   let a="";
   if(j.phase=="scanning")
    a=`<button class="sec" id="stopReviewBtn" onclick="stopReview()">&#9632; Stop &amp; Review</button>
@@ -3421,12 +3566,16 @@ async function refreshJob(id,view,signal){
     <div class="warn">The previous reviewed result is retained until this pass succeeds. New output still requires review and rendering.</div>`;
   if(j.phase=="rendering")
    a=`<button class="danger" onclick="cancelJob()">Cancel render</button>`;
-  if(j.phase=="error"||j.phase=="cancelled")
-   a=`<button onclick="retryJob(CUR)">Retry scan (no re-upload)</button>
+  if(j.phase=="error"||j.phase=="cancelled"){
+   a=j.section?.role==="export"
+    ?`<button onclick="retryJob('${id}',true)">Retry section export</button>
+      <div class="review-copy">Renders the saved approved section again.</div>`
+    :`<button onclick="retryJob('${id}')">Retry scan (no re-upload)</button>
     <div style="width:100%;font-size:12px;color:#9ca3af">The uploaded file
     is still on the server — Retry re-runs the scan without uploading it
     again. Delete the job (&#128465;&#65039; in the list) to free its disk
     space.</div>`;
+  }
   if(j.phase=="paused"){
    const f=j.checkpoint_frame||0,t=j.checkpoint_total||1;
    a=`<button onclick="resumeJob()">&#9654; Save edits &amp; resume</button>
@@ -3434,16 +3583,14 @@ async function refreshJob(id,view,signal){
     <div class="warn" style="width:100%">INCOMPLETE: ${(f/t*100).toFixed(1)}%
     scanned (${f}/${t} frames). Do not publish as redacted video.
     Existing review decisions and plate corners remain saved on resume.</div>`;
-   await loadReview();
-   if(CUR!==id||JOBVIEW!==view)return;
+   if(!await loadReview(signal,j.phase)||signal.aborted||CUR!==id||JOBVIEW!==view)return;
   }
   if(j.phase=="review"){
    // no interstitial button: review is the ONLY next step after a scan,
    // so open it directly — both on a live scan finishing and on
    // selecting a job that is already waiting in review
    a="";
-   await loadReview();
-   if(CUR!==id||JOBVIEW!==view)return;
+   if(!await loadReview(signal,j.phase)||signal.aborted||CUR!==id||JOBVIEW!==view)return;
   }
   if(j.phase=="done"&&j.has_output){
    const video=CAN_SAVE_AS
@@ -3462,17 +3609,145 @@ async function refreshJob(id,view,signal){
        in your browser's download settings.</div>`;
    a=`${video}${report}${downloadHint}
     <button class="sec" onclick="loadReview()">Re-open review</button>
-    <button class="sec" onclick="loadCompare()">Compare before/after</button>
+    ${j.section?.role==="export"?"":`<button class="sec" onclick="loadCompare()">Compare before/after</button>`}
     <button class="sec" onclick="loadBoxEdit()">Preview &amp; edit blur boxes</button>
     <div class="warn" style="width:100%">Reminder: scrub the result before
     sharing. This tool is best-effort, not a compliance guarantee.</div>
     <div id="compare" style="width:100%"></div>
     <div id="beslot_done" style="width:100%"></div>`;
   }
+  SHELLPH=j.phase;
   document.getElementById("actions").innerHTML=a;
-  if(j.phase!="scanning")img.style.display="none";
+  if(!previewActive)img.style.display="none";
  }
- await loadJobs();
+ loadSectionsPanel(j,id,view);
+ loadJobs(); // the list must not hold up the selected job's next progress poll
+}
+
+function sectionTime(seconds){
+ const n=Math.max(0,Number(seconds)||0),m=Math.floor(n/60),s=n-m*60;
+ return `${m}:${s.toFixed(1).padStart(4,"0")}`;
+}
+function renderWorkProgress(j){
+ const box=document.getElementById("jobWorkStatus"),bar=document.getElementById("workStageBar");
+ if(!box||!bar)return;
+ const active=["scanning","learning","rendering"].includes(j.phase);
+ const p=j.phase==="learning"?j.learning:j.activity;
+ document.getElementById("prog").hidden=j.phase==="learning";
+ if(!active||!p){box.textContent="";bar.hidden=true;return;}
+ const labels={scan:"Scanning video",post:"Finalizing tracks",refine:"Applying learned masks",render:"Rendering video"};
+ const text=[p.message||labels[p.stage]||p.stage||"Working"];
+ if(Number.isFinite(p.done)&&Number.isFinite(p.total)&&p.total>0){
+  text.push(`${p.done.toLocaleString()} / ${p.total.toLocaleString()} ${p.unit||"items"}`);
+  bar.max=p.total;bar.value=Math.min(p.done,p.total);bar.hidden=false;
+ }else bar.hidden=true;
+ const now=j.server_time||Date.now()/1000;
+ if(p.started_at)text.push(`elapsed ${sectionTime(now-p.started_at)}`);
+ if(p.last_progress_at)text.push(`last progress ${Math.max(0,Math.floor(now-p.last_progress_at))}s ago`);
+ box.textContent=text.join(" · ");
+ if(p.last_progress_at&&now-p.last_progress_at>30)document.getElementById("eta").textContent="";
+}
+
+function sectionEscape(value){return String(value).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+function sectionSeconds(value){
+ const parts=String(value).trim().split(":");
+ if(parts.length>3||parts.some(p=>!p.trim()||!Number.isFinite(Number(p))||Number(p)<0))throw new Error("Enter a time in seconds or mm:ss.");
+ return parts.reduce((n,p)=>n*60+Number(p),0);
+}
+function refreshSectionModels(){
+ const select=document.getElementById("sectionModel");if(!select)return;
+ const models=typeof LEARNED_MODEL_LIST!=="undefined"?LEARNED_MODEL_LIST:[];
+ const key=JSON.stringify(models.map(m=>[m.id,m.name]));
+ if(select.dataset.models===key)return;
+ const selected=select.value;
+ select.replaceChildren(new Option("Original plate masks",""));
+ for(const model of models)select.add(new Option(model.name,model.id));
+ select.value=models.some(m=>m.id===selected)?selected:"";
+ select.dataset.models=key;
+}
+async function loadSectionsPanel(j,id,view){
+ const panel=document.getElementById("sectionsPanel");if(!panel)return;
+ const available=["review","paused","done"].includes(j.phase);
+ panel.hidden=!available;if(!available)return;
+ refreshSectionModels();
+ const key=`${id}:${j.sections_revision||0}:${j.phase}`;
+ if(panel.dataset.key===key||panel.dataset.loading===key)return;
+ panel.dataset.loading=key;
+ try{
+  if(j.section){
+   const s=j.section;
+   panel.innerHTML=`<div class="warn"><b>${s.role==="export"?"Approved section export":"Section candidate"}</b>
+    <p class="review-copy">${s.role==="export"?"This video uses the saved approved revision.":"Review this candidate, then approve it to update only its section. The previous approved result stays available."}</p>
+    <button class="sec" onclick="openJob('${sectionEscape(s.parent_id)}')">Back to video sections</button>
+    ${s.role==="candidate"?`<button onclick="sectionAction('${sectionEscape(s.parent_id)}','${sectionEscape(s.section_id)}','approve','${id}',this)">Approve this section</button>`:""}</div>`;
+   panel.dataset.key=key;return;
+  }
+  const {data}=await reviewRequest(`api/jobs/${id}/sections`);
+  if(CUR!==id||JOBVIEW!==view||!panel.isConnected)return;
+  const fps=data.identity.fps,total=data.identity.total_frames;
+  const next=data.items.reduce((m,s)=>Math.max(m,s.end_frame),0);
+  const end=Math.min(total,next+Math.ceil(300*fps));
+  let html=`<details open><summary style="cursor:pointer;font-weight:600">Video sections</summary>
+   <p class="review-copy">Approve finished sections, export them, or review a new scan of one interval. Times refer to the original video.</p>
+   <div class="row" style="align-items:end;gap:10px;flex-wrap:wrap">
+    <label>Name<br><input id="sectionName" value="Section ${data.items.length+1}" style="width:160px"></label>
+    <label>Start (s or mm:ss)<br><input id="sectionStart" value="${String(next/fps)}" style="width:100px"></label>
+    <label>End (s or mm:ss)<br><input id="sectionEnd" value="${String(end/fps)}" style="width:100px"></label>
+    <button onclick="createSection(this)">Add section</button></div>
+   <label style="display:block;margin:12px 0">Model for section rescans
+    <select id="sectionModel" style="max-width:100%"><option value="">Original plate masks</option></select></label>`;
+  for(const s of data.items){
+   const sid=sectionEscape(s.id),approved=s.approved;
+   html+=`<div style="border-top:1px solid #334155;padding:10px 0;overflow-wrap:anywhere">
+    <b>${sectionEscape(s.name)}</b> <span class="badge">${sectionTime(s.start_frame/fps)}–${sectionTime(s.end_frame/fps)}</span>
+    <p class="review-copy">${approved?`Approved · revision ${approved.revision} · ${sectionEscape(approved.model)}`:"Needs review"}</p>
+    <div class="row" style="gap:8px;flex-wrap:wrap">
+    ${!approved?`<button onclick="sectionAction('${id}','${sid}','approve','',this)">Approve current results</button>`:""}
+    <button class="sec" onclick="sectionAction('${id}','${sid}','rescan','',this)">Rescan section</button>
+    ${s.candidate_id?`<button class="sec" onclick="openJob('${sectionEscape(s.candidate_id)}')">Open candidate</button>`:""}
+    ${approved?`<button onclick="sectionAction('${id}','${sid}','export','',this)">Export approved section</button>`:""}
+    ${s.export_id?`<button class="sec" onclick="openJob('${sectionEscape(s.export_id)}')">Open export</button>`:""}
+    </div></div>`;
+  }
+  panel.innerHTML=html+'</details>';panel.dataset.key=key;refreshSectionModels();
+ }catch(error){if(CUR===id&&JOBVIEW===view)panel.textContent="Sections unavailable: "+(error.message||error);}
+ finally{if(panel.dataset.loading===key)delete panel.dataset.loading;}
+}
+async function saveSectionReview(){
+ const id=CUR,view=JOBVIEW;
+ if(!await flushPlateSaves()||CUR!==id||JOBVIEW!==view)return false;
+ // Box and audio edits do not increment the card-decision revision.
+ if(document.getElementById("beCv")||(document.getElementById("review")&&reviewChoicesPending())){
+  const saved=await saveAndRender(true);
+  return saved&&CUR===id&&JOBVIEW===view;
+ }
+ return true;
+}
+async function createSection(button){
+ try{
+  const id=CUR,view=JOBVIEW;
+  const payload={name:document.getElementById("sectionName").value,
+   start:sectionSeconds(document.getElementById("sectionStart").value),end:sectionSeconds(document.getElementById("sectionEnd").value)};
+  button.disabled=true;
+  if(!await saveSectionReview()||CUR!==id||JOBVIEW!==view)return;
+  await reviewRequest(`api/jobs/${id}/sections`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload),timeoutMs:120000});
+  if(CUR===id&&JOBVIEW===view){delete document.getElementById("sectionsPanel").dataset.key;refresh();}
+ }catch(error){alert(error.message||error);}finally{button.disabled=false;}
+}
+async function sectionAction(id,sid,action,candidate,button){
+ const selected=document.getElementById("sectionModel")?.value||"";
+ const view=JOBVIEW,opened=CUR;
+ try{
+  if(!await saveSectionReview())return;
+  if(CUR!==opened||JOBVIEW!==view)return;
+  button.disabled=true;
+  const payload=candidate?{candidate_id:candidate}:{model_id:selected};
+  const {data}=await reviewRequest(`api/jobs/${id}/sections/${sid}/${action}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload),timeoutMs:120000});
+  if(CUR!==opened||JOBVIEW!==view)return;
+  JOBSJSON="";
+  if(data.job_id)await openJob(data.job_id);
+  else{await openJob(id);}
+ }catch(error){alert(error.message||error);}finally{button.disabled=false;}
 }
 
 let BE={t:0,ox:0,oy:0,boxes:[],sel:-1,ov:{},dis:{},times:{},adds:[],
@@ -4012,17 +4287,26 @@ let REVIEW_MEDIA=null;
 async function reviewRequest(url, options={}, type="json"){
  const {timeoutMs=15000,...fetchOptions}=options;
  const ctl=new AbortController(),parent=fetchOptions.signal;
- const abort=()=>ctl.abort();
+ // Abort fetch as well as settling our caller: a suspended transport or body
+ // reader must not keep a single-flight slot occupied after its deadline.
+ let rejectStopped;
+ const stopped=new Promise((_,reject)=>{rejectStopped=reject;});
+ const stop=error=>{rejectStopped(error);ctl.abort();};
+ const abort=()=>stop(new DOMException("Request cancelled","AbortError"));
  if(parent){if(parent.aborted)ctl.abort();else parent.addEventListener("abort",abort,{once:true});}
- const timer=setTimeout(abort,timeoutMs);
+ const timer=setTimeout(()=>stop(new DOMException("Request timed out","TimeoutError")),timeoutMs);
  try{
-  const response=await fetch(url,{...fetchOptions,signal:ctl.signal});
-  if(!response.ok){
-   let message="Server returned HTTP "+response.status,details=null;
-   try{details=await response.json();message=details.error||message;}catch(_){}
-   const error=new Error(message);error.status=response.status;error.details=details;throw error;
-  }
-  return {response,data:await response[type]()};
+  const request=(async()=>{
+   if(ctl.signal.aborted)throw new DOMException("Request cancelled","AbortError");
+   const response=await fetch(url,{...fetchOptions,signal:ctl.signal});
+   if(!response.ok){
+    let message="Server returned HTTP "+response.status,details=null;
+    try{details=await response.json();message=details.error||message;}catch(_){}
+    const error=new Error(message);error.status=response.status;error.details=details;throw error;
+   }
+   return {response,data:await response[type]()};
+  })();
+  return await Promise.race([request,stopped]);
  }finally{clearTimeout(timer);if(parent)parent.removeEventListener("abort",abort);}
 }
 function clearReviewPreviews(){
@@ -4678,19 +4962,23 @@ function reviewChoiceDelta(){
  }
  return {enabled,verified_labels};
 }
-async function loadReview(){
- if(!await flushPlateSaves())return;
- if(!closePlateQuad())return;
- clearReviewPreviews();
+async function loadReview(signal=null,phase=SHELLPH){
  const job=CUR,view=JOBVIEW;
- if(!await showPanel("review"))return;
+ const current=()=>!(signal&&signal.aborted)&&CUR===job&&JOBVIEW===view;
+ if(!current()||!await flushPlateSaves()||!current())return false;
+ if(!closePlateQuad())return false;
+ clearReviewPreviews();
+ if(!await showPanel("review")||!current())return false;
  if(VLBLJOB!==CUR){VLBL={};VLBLJOB=CUR;}
  let d;
- try{d=(await reviewRequest(`api/jobs/${job}/detections`)).data;}catch(error){
-  if(CUR===job&&view===JOBVIEW){const w=document.getElementById("warnbox");if(w){w.style.display="block";w.textContent="Review could not load: "+error.message;}}
-  return;
+ try{d=(await reviewRequest(`api/jobs/${job}/detections`,{signal})).data;}catch(error){
+  if(current()){
+   const w=document.getElementById("warnbox");if(w){w.style.display="block";w.textContent="Review could not load: "+error.message;}
+   if(signal)throw error; // keep polling backoff and retry an unfinished transition
+  }
+  return false;
  }
- if(CUR!==job||view!==JOBVIEW)return;
+ if(!current())return false;
  DUR=d.duration;
  if(LEARNING_SELECTION_JOB!==CUR)LEARNING_SELECTION=null;
  const groups={}; const zdrop=[]; TRKMEM={};
@@ -4811,7 +5099,7 @@ async function loadReview(){
   html+=`</div>`}
  html+=`</div>
  <div class="row" style="margin-top:12px">
- <button onclick="saveAndRender()">${SHELLPH==="paused"?"Save review edits":"Save edits &amp; render"}</button>
+ <button onclick="saveAndRender()">${phase==="paused"?"Save review edits":"Save edits &amp; render"}</button>
  <span class="review-save-status" role="status" aria-live="polite"></span>
  <span style="font-size:12px;color:#94a3b8">missed something? use
   ▶ Preview video &amp; edit boxes above — its ＋ Add box replaces the old
@@ -4829,6 +5117,7 @@ async function loadReview(){
  }
  if(LEARNING_SELECTION)applyReviewGroupFilter();
  initMarquee();initReviewPreviews();
+ return true;
 }
 
 function detChoices(i){
@@ -5208,6 +5497,7 @@ let LEARNED_MODEL_LIST=[],LEARNED_MODEL_REFRESH=0;
 function clearLearnedModels(message){
  ++LEARNED_MODEL_REFRESH;
  LEARNED_MODEL_LIST=[];
+ refreshSectionModels();
  const select=document.getElementById("learnedPlateModel");
  if(select){select.replaceChildren(new Option("None — use original plate masks",""));select.disabled=true;}
  document.getElementById("learnedModelLibrary").replaceChildren();
@@ -5225,6 +5515,7 @@ async function refreshLearnedModels(){
   // The person may choose a model while this request is outstanding.
   const selected=select?select.value:"";
   LEARNED_MODEL_LIST=data.models;
+  refreshSectionModels();
   note.textContent="";
   if(select){
    select.replaceChildren(new Option("None — use original plate masks",""));
@@ -5319,6 +5610,18 @@ async function saveLearnedModel(){
 }
 
 loadPersist();loadCertInfo();loadJobs();refreshLearnedModels();setInterval(loadJobs,5000);
+function resumeJobPolling(){
+ if(document.hidden)return;
+ stopJobPolling();REFRESHFAILURES=0;
+ const previous=JOBSFLIGHT;JOBSFLIGHT=null;
+ if(previous)previous.controller.abort();
+ JOBSFAILURES=0;JOBSRETRYAT=0;
+ loadJobs();refresh();
+}
+document.addEventListener("visibilitychange",()=>{
+ if(document.hidden)stopJobPolling();else resumeJobPolling();
+});
+for(const event of ["focus","pageshow","online"])window.addEventListener(event,resumeJobPolling);
 function showView(){
  const s=location.hash==="#settings";
  document.getElementById("mainview").style.display=s?"none":"block";
@@ -5980,6 +6283,13 @@ def rehydrate_jobs():
         if jid in JOBS:
             continue
         if not os.path.exists(rep):
+            from pathlib import Path
+            recovered_section = _SECTIONS.restore_interrupted(jid, Path(jdir))
+            if recovered_section:
+                with JOBS_LOCK:
+                    JOBS[jid] = recovered_section
+                n += 1
+                continue
             # NO report: the scan never completed (crashed or the server
             # went down mid-scan). If the dir still holds an uploaded
             # input, surface it as a FAILED job instead of skipping it —
@@ -6041,7 +6351,8 @@ def rehydrate_jobs():
             if not video or not os.path.exists(video):
                 continue
             out = os.path.join(jdir, "output.mp4")
-            has_out = os.path.exists(out) and not (report_doc.get("learning") or {}).get("needs_render")
+            has_out = (os.path.exists(out) and not report_doc.get("render_required")
+                       and not (report_doc.get("learning") or {}).get("needs_render"))
             job = {
                 "id": jid, "dir": jdir, "video": video,
                 "name": os.path.basename(prov.get("original_input")
@@ -6061,6 +6372,7 @@ def rehydrate_jobs():
             if report_doc.get("refinement"):
                 job["refinement"] = report_doc["refinement"]
                 job["options"]["learned_plate_model"] = report_doc["refinement"]["id"]
+            _SECTIONS.recover(job, report_doc)
             if checkpoint.get("state") == "paused":
                 job["options"] = checkpoint.get("options") or {}
                 job["log"].append("Stop & Review checkpoint recovered; "
@@ -6086,9 +6398,17 @@ def rehydrate_jobs():
 
 def retention_sweep(days):
     import shutil as _sh
+    if vault_locked():
+        # Persisted section/source links cannot be checked while encrypted.
+        return
     cutoff = time.time() - days * 86400
     for jid in os.listdir(JOBS_DIR):
         if jid == "learned_plate_models":
+            continue
+        retained = JOBS.get(jid)
+        if (_SECTIONS.deletion_error({'id': jid}) or
+                (retained and retained.get("section")) or
+                os.path.isfile(os.path.join(JOBS_DIR, jid, 'section-job.json'))):
             continue
         p = os.path.join(JOBS_DIR, jid)
         if not os.path.isdir(p):
@@ -6329,6 +6649,13 @@ def _serve(host, port, ssl_ctx):
         server.start()
     except KeyboardInterrupt:
         server.stop()
+
+
+import section_workflow
+_SECTIONS = section_workflow.Sections(sys.modules[__name__])
+_SECTIONS.register(app)
+for _endpoint in ("job_learning", "job_learning_rollback", "job_retry", "job_resume", "job_render", "job_delete", "job_track_object"):
+    app.view_functions[_endpoint] = _serialize_review_edit(app.view_functions[_endpoint])
 
 
 if __name__ == "__main__":

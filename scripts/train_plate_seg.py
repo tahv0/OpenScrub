@@ -24,6 +24,7 @@ import platform
 import shutil
 import sys
 import tempfile
+import time
 import uuid
 from collections import Counter
 from pathlib import Path
@@ -34,6 +35,83 @@ import numpy as np
 
 class DataError(ValueError):
     pass
+
+
+class TrainingProgress:
+    """Scalar-only callbacks; no tensor reads, extra predictions or GPU syncs.
+
+    Batch events are throttled to once a second. Stage changes and completed
+    epochs/validation flush immediately so short operations remain observable.
+    The leading newline keeps structured records separate from tqdm output.
+    """
+    def __init__(self, stream=None):
+        self.stream = stream if stream is not None else sys.stdout
+        self.last_emit = float("-inf")
+        self.stage = None
+        self.epoch = self.epochs = None
+        self.batch = self.batches = 0
+        self.validation_batch = self.validation_batches = 0
+        self.validation_label = "Validating the trained candidate"
+
+    def emit(self, stage, message, *, force=False, **fields):
+        now = time.monotonic()
+        if not force and stage == self.stage and now - self.last_emit < 1:
+            return
+        self.last_emit, self.stage = now, stage
+        record = {"stage": stage, "message": message, **fields}
+        self.stream.write("\nOPENSCRUB_PROGRESS " + json.dumps(record, allow_nan=False) + "\n")
+        self.stream.flush()
+
+    def attach_training(self, model):
+        for name in ("on_train_epoch_start", "on_train_batch_end", "on_train_epoch_end"):
+            model.add_callback(name, getattr(self, name))
+        self._attach_validation(model)
+
+    def attach_validation(self, model):
+        self.validation_label = "Validating the trained candidate"
+        self._attach_validation(model)
+
+    def _attach_validation(self, model):
+        for name in ("on_val_start", "on_val_batch_end", "on_val_end"):
+            model.add_callback(name, getattr(self, name))
+
+    def _training(self, force=False):
+        self.emit("training", "Training epoch %d/%d: batch %d/%d" %
+                  (self.epoch, self.epochs, self.batch, self.batches), force=force,
+                  done=(self.epoch - 1) * self.batches + self.batch,
+                  total=self.epochs * self.batches, unit="batches",
+                  epoch=self.epoch, epochs=self.epochs,
+                  batch=self.batch, batches=self.batches)
+
+    def on_train_epoch_start(self, trainer):
+        self.epoch, self.epochs = int(trainer.epoch) + 1, int(trainer.epochs)
+        self.batch, self.batches = 0, len(trainer.train_loader)
+        self.validation_label = "Validating epoch %d/%d" % (self.epoch, self.epochs)
+        self._training()
+
+    def on_train_batch_end(self, trainer):
+        self.batch = min(self.batch + 1, self.batches)
+        self._training()
+
+    def on_train_epoch_end(self, trainer):
+        self._training(force=True)
+
+    def _validation(self, force=False):
+        self.emit("candidate_validation", "%s: batch %d/%d" %
+                  (self.validation_label, self.validation_batch, self.validation_batches),
+                  force=force, done=self.validation_batch, total=self.validation_batches,
+                  unit="batches")
+
+    def on_val_start(self, validator):
+        self.validation_batch, self.validation_batches = 0, len(validator.dataloader)
+        self._validation(force=True)
+
+    def on_val_batch_end(self, validator):
+        self.validation_batch = min(self.validation_batch + 1, self.validation_batches)
+        self._validation()
+
+    def on_val_end(self, validator):
+        self._validation(force=True)
 
 
 def sha256_file(path):
@@ -319,7 +397,7 @@ def verify_version(versions_dir, version):
     return meta
 
 
-def train(args, report):
+def train(args, report, progress=None):
     if not args.accept_ultralytics_license:
         raise RuntimeError("Ultralytics (weights, code and trained models) "
                            "are AGPL-3.0 / Enterprise licensed. Pass "
@@ -331,6 +409,10 @@ def train(args, report):
             args.imgsz % 32 != 0 or args.workers < 0 or args.patience < 0):
         raise DataError("epochs/batch must be positive; imgsz >=128 and "
                         "divisible by 32; workers/patience nonnegative")
+    if progress is None and getattr(args, "progress", False):
+        progress = TrainingProgress()
+    if progress:
+        progress.emit("training", "Preparing the model and training loaders")
     cuda = _cuda_info(args.device)
     try:
         import ultralytics
@@ -354,6 +436,8 @@ def train(args, report):
             if net.task != "segment":
                 raise RuntimeError("Checkpoint is not a YOLO instance "
                                    "segmentation model")
+            if progress:
+                progress.attach_training(net)
             net.train(data=str(data_config), epochs=args.epochs, batch=args.batch,
                       imgsz=args.imgsz, device=args.device, workers=args.workers,
                       patience=args.patience, seed=args.seed, amp=True,
@@ -363,12 +447,17 @@ def train(args, report):
             if not best.is_file():
                 raise RuntimeError("Training did not produce best.pt")
             trained = YOLO(str(best))
+            if progress:
+                progress.emit("candidate_validation", "Validating the trained candidate", force=True)
+                progress.attach_validation(trained)
             results = _metrics(trained, data_config, args.device, stage,
                                workers=args.workers, batch=args.batch, imgsz=args.imgsz)
             if results["mask_map50"] < args.min_mask_map50:
                 raise RuntimeError("Validation mask mAP50 %.3f below "
                                    "required %.3f: candidate rejected" %
                                    (results["mask_map50"], args.min_mask_map50))
+            if progress:
+                progress.emit("exporting", "Exporting the validated candidate to ONNX", metrics=results)
             result = trained.export(format="onnx", imgsz=args.imgsz,
                                     dynamic=False, half=False,
                                     simplify=False, nms=False, opset=17,
@@ -376,15 +465,23 @@ def train(args, report):
             exported = Path(result).resolve()
             if not exported.is_file():
                 raise RuntimeError("ONNX export did not create a model file")
+            if progress:
+                progress.emit("checking", "Checking exported ONNX graph and inference", done=0, total=2, unit="checks")
             onnx_check = _smoke_onnx(exported, args.imgsz)
             # The dataset may have been edited while GPU training was
             # running. Never publish metadata for a different dataset.
+            if progress:
+                progress.emit("checking", "Checking that the training dataset is unchanged", force=True,
+                              done=1, total=2, unit="checks")
             latest = validate_dataset(
                 args.dataset, args.min_train_positive, args.min_val_positive,
                 args.min_negative_per_split)
             if latest["dataset_sha256"] != report["dataset_sha256"]:
                 raise RuntimeError("Training dataset changed during the run; "
                                    "candidate not published")
+            if progress:
+                progress.emit("checking", "Model and source checks passed; saving the candidate", force=True,
+                              done=2, total=2, unit="checks")
             shutil.copy2(best, stage / "weights.pt")
             shutil.copy2(exported, stage / "model.onnx")
             version = "v" + dt.datetime.now(dt.timezone.utc).strftime(
@@ -451,11 +548,14 @@ def main(argv=None):
     train_cmd.add_argument("--patience", type=int, default=12)
     train_cmd.add_argument("--seed", type=int, default=42)
     train_cmd.add_argument("--min-mask-map50", type=float, default=0.25)
+    train_cmd.add_argument("--progress", action="store_true",
+                           help="emit structured scalar progress for the local learning UI")
     for sub in (train_cmd, commands.add_parser("list"),
                 commands.add_parser("verify")):
         sub.add_argument("--versions-dir", type=Path, required=True)
     commands.choices["verify"].add_argument("--version", required=True)
     args = parser.parse_args(argv)
+    progress = TrainingProgress() if getattr(args, "progress", False) else None
     try:
         if args.command == "preflight":
             print(json.dumps(training_environment(args.device), indent=2))
@@ -464,6 +564,8 @@ def main(argv=None):
                     args.min_negative_per_split < 0):
                 raise DataError("Sample requirements must be nonnegative; "
                                 "train and val need positive polygon samples")
+            if progress:
+                progress.emit("checking", "Validating reviewed examples and dataset splits")
             report = validate_dataset(
                 args.dataset, args.min_train_positive,
                 args.min_val_positive, args.min_negative_per_split)
@@ -472,7 +574,7 @@ def main(argv=None):
                 return 0
             if not 0 <= args.min_mask_map50 <= 1:
                 raise DataError("--min-mask-map50 must be in [0, 1]")
-            meta = train(args, report)
+            meta = train(args, report, progress=progress)
             print("Candidate saved: " + meta["version"])
             print("NOT activated; OpenScrub still uses its existing plate model")
         elif args.command == "list":
