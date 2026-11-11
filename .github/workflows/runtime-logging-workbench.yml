@@ -1,0 +1,20 @@
+name: Runtime logging workbench
+on:
+  push:
+    branches: [fix/persistent-runtime-logging]
+    paths: [.github/workflows/runtime-logging-workbench.yml]
+permissions:
+  contents: read
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Export exact source
+        run: git archive --format=tar HEAD > /tmp/runtime-logging-source.tar
+      - uses: actions/upload-artifact@v4
+        with:
+          name: runtime-logging-source
+          path: /tmp/runtime-logging-source.tar
+          retention-days: 1
