@@ -36,7 +36,7 @@ import uuid
 
 import cv2
 import numpy as np
-from flask import (Flask, Response, abort, jsonify, redirect, request,
+from flask import (Flask, Request, Response, abort, jsonify, redirect, request,
                    send_file)
 
 import openscrub
@@ -189,7 +189,20 @@ def active_cert_pair():
         return CUSTOM_CERT, CUSTOM_KEY, "custom"
     ensure_self_signed()
     return AUTO_CERT, AUTO_KEY, "self-signed"
+class _OpenScrubRequest(Request):
+    @property
+    def max_content_length(self):
+        # A property override also supports Flask versions where the base
+        # request limit is read-only. It applies before multipart parsing.
+        configured = super().max_content_length
+        if self.method == "POST" and self.path == "/api/jobs/learned-models/import":
+            limit = learned_models.MAX_MODEL_BYTES + 1024 * 1024
+            return min(configured, limit) if configured is not None else limit
+        return configured
+
+
 app = Flask(__name__)
+app.request_class = _OpenScrubRequest
 
 
 def _max_upload_bytes(cli_value=None):
@@ -216,6 +229,9 @@ app.config["MAX_CONTENT_LENGTH"] = _max_upload_bytes()   # default 8 GB
 
 @app.errorhandler(413)
 def _too_large(e):
+    if request.method == "POST" and request.path == "/api/jobs/learned-models/import":
+        return jsonify({"error": "Model package exceeds this server's model upload limit "
+                                 "(maximum 256 MiB of model data)."}), 413
     cap = app.config.get("MAX_CONTENT_LENGTH")
     gb = cap / 1024 ** 3 if cap else 0
     return jsonify({"error":
@@ -881,12 +897,10 @@ def refuse_upload_without_disk_room():
     spooled the whole upload into the temp dir — too late to protect the
     disk. Checking the Content-Length header here reads nothing."""
     if request.method == "POST" and request.path == "/api/jobs/learned-models/import":
-        # Bound the whole archive before multipart spooling, including requests
-        # without Content-Length (Werkzeug enforces max_content_length).
-        limit = learned_models.MAX_MODEL_BYTES + 1024 * 1024
-        request.max_content_length = min(request.max_content_length or limit, limit)
-        if request.content_length is not None and request.content_length > limit:
-            return jsonify({"error": "Model package exceeds the 256 MiB model limit."}), 413
+        # The request class supplies the same cap to the multipart parser,
+        # including uploads without a Content-Length header.
+        if request.content_length is not None and request.content_length > request.max_content_length:
+            return _too_large(None)
     if request.method == "POST" and request.path in ("/api/jobs", "/api/jobs/learned-models/import"):
         err = _upload_disk_error(request.content_length)
         if err:
@@ -5126,7 +5140,10 @@ async function vaultStatus(){
   document.getElementById("vunlock").style.display=(d.enabled&&d.locked)?"flex":"none";
   document.getElementById("vlock").style.display=(d.enabled&&!d.locked)?"flex":"none";
   if(!d.enabled){st.textContent="Disabled — job files (PII) are stored in plaintext. Set a password to enable at-rest encryption.";st.style.color="#fbbf24";}
-  else if(d.locked){st.textContent="LOCKED — "+d.encrypted_files+" file(s) encrypted on disk. Unlock to work with jobs.";st.style.color="#f87171";}
+  else if(d.locked){
+   st.textContent="LOCKED — "+d.encrypted_files+" file(s) encrypted on disk. Unlock to work with jobs.";st.style.color="#f87171";
+   clearLearnedModels("Unlock the vault to access saved models.");
+  }
   else{st.textContent="Unlocked — files decrypt while you work; they re-encrypt when you lock or shut down. Losing the password makes encrypted files unrecoverable.";st.style.color="#4ade80";}
   if(d.enabled&&!d.locked){
    document.getElementById("valk").checked=d.autolock_min>0;
@@ -5147,7 +5164,7 @@ async function vaultUnlock(){
  const r=await fetch("/api/vault/unlock",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({password:document.getElementById("vpw").value})});
  if(!r.ok){alert(await r.text());return;}
  document.getElementById("vpw").value="";
- vaultStatus();loadJobs();
+ await vaultStatus();loadJobs();await refreshLearnedModels();
 }
 async function vaultAutolockSave(){
  const on=document.getElementById("valk").checked;
@@ -5159,6 +5176,7 @@ async function vaultDoLock(){
  if(!await flushPlateSaves())return;
  if(!confirm("Encrypt all job files now?\\n\\nYou will need the password to access them again."))return;
  const r=await fetch("/api/vault/lock",{method:"POST"});
+ if(r.ok)clearLearnedModels("Unlock the vault to access saved models.");
  alert(r.ok?("Locked — "+(await r.json()).encrypted+" file(s) encrypted."):await r.text());
  vaultStatus();loadJobs();
 }
@@ -5186,20 +5204,37 @@ async function extraInstall(id){
  extrasStatus();
 }
 
-let LEARNED_MODEL_LIST=[];
+let LEARNED_MODEL_LIST=[],LEARNED_MODEL_REFRESH=0;
+function clearLearnedModels(message){
+ ++LEARNED_MODEL_REFRESH;
+ LEARNED_MODEL_LIST=[];
+ const select=document.getElementById("learnedPlateModel");
+ if(select){select.replaceChildren(new Option("None — use original plate masks",""));select.disabled=true;}
+ document.getElementById("learnedModelLibrary").replaceChildren();
+ document.getElementById("learnedModelStatus").textContent=message;
+ document.getElementById("learnedPlateModelHint").textContent=message;
+}
 async function refreshLearnedModels(){
+ const refresh=++LEARNED_MODEL_REFRESH;
  const select=document.getElementById("learnedPlateModel");
  const box=document.getElementById("learnedModelLibrary");
  const note=document.getElementById("learnedModelStatus");
- const selected=select?select.value:"";
  try{
   const {data}=await reviewRequest("api/jobs/learned-models",{timeoutMs:120000});
+  if(refresh!==LEARNED_MODEL_REFRESH)return false;
+  // The person may choose a model while this request is outstanding.
+  const selected=select?select.value:"";
   LEARNED_MODEL_LIST=data.models;
+  note.textContent="";
   if(select){
    select.replaceChildren(new Option("None — use original plate masks",""));
    for(const model of data.models)select.add(new Option(model.name,model.id));
    select.value=data.models.some(m=>m.id===selected)?selected:"";
    select.disabled=false;
+   const chosen=data.models.find(m=>m.id===select.value);
+   document.getElementById("learnedPlateModelHint").textContent=chosen?
+    "Selected: "+chosen.name+". Used for plate detection in new scans.":
+    "Choose a saved model for this environment. Applied when plate detection is enabled; uses every-frame plate proposals and may take longer. Review the results.";
   }
   box.replaceChildren();
   if(!data.models.length)box.textContent="No saved models yet. Save an accepted model after training a video, or import a model package.";
@@ -5232,8 +5267,9 @@ async function refreshLearnedModels(){
   }
   return true;
  }catch(error){
-  note.textContent=error.status===423?"Unlock the vault to access saved models.":error.message;
-  if(select)select.disabled=true;
+  if(refresh!==LEARNED_MODEL_REFRESH)return false;
+  if(error.status===423)clearLearnedModels("Unlock the vault to access saved models.");
+  else{note.textContent=error.message;if(select)select.disabled=true;}
   return false;
  }
 }
@@ -5268,7 +5304,10 @@ async function saveLearnedModel(){
  if(!name){note.textContent="Enter a model name.";return;}
  button.disabled=true;note.textContent="Saving accepted model...";
  try{
-  if(!await saveAndRender(true))return;
+  if(!await saveAndRender(true)){
+   if(CUR===job&&JOBVIEW===view)note.textContent="Review changes could not be saved. Resolve the review error and try again.";
+   return;
+  }
   if(CUR!==job||JOBVIEW!==view)return;
   const {data}=await reviewRequest("api/jobs/"+encodeURIComponent(job)+"/learned-models",
     {method:"POST",headers:{"Content-Type":"application/json"},
@@ -5971,6 +6010,24 @@ def rehydrate_jobs():
                 "cancel": threading.Event(), "stop": threading.Event(),
                 "stats": {},
             }
+            if os.path.lexists(os.path.join(jdir, "plate_model")):
+                # A snapshot is published before queueing, even if a restart
+                # happened before the first report. Keep selection fail-closed
+                # if that copy is damaged; Retry must not silently omit it.
+                job["options"]["learned_plate_model"] = "unavailable"
+                try:
+                    selected, _ = learned_models.load_snapshot(jdir)
+                except learned_models.ModelError as error:
+                    job["error"] = ("Recovered upload, but its selected learned model "
+                                    "copy is unavailable: %s. Start a new scan with "
+                                    "a valid model; the uploaded file was kept." % error)
+                else:
+                    job["options"]["learned_plate_model"] = selected["id"]
+                    job["refinement"] = selected
+                    job["error"] = ("Recovered before the scan finished. Retry uses "
+                                    "the saved learned model and default settings for "
+                                    "other options; the uploaded file was kept.")
+                    job["log"].append("Pinned learned model recovered: " + selected["name"])
             with JOBS_LOCK:
                 JOBS[jid] = job
             n += 1

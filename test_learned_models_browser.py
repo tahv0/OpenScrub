@@ -62,7 +62,7 @@ def test_reusable_models_save_select_and_transfer_ui(review_server, tmp_path, mo
         page.locator("#learnedModelLibrary .learned-model").last.get_by_role(
             "button", name="Use for next scan", exact=True).click()
         assert page.locator("#learnedPlateModel").input_value()
-        assert page.locator("#mainview").is_visible()
+        sync.expect(page.locator("#mainview")).to_be_visible()
         selected = page.locator("#learnedPlateModel").input_value()
         page.evaluate("location.hash='#settings'")
         page.locator("#learnedModelLibrary .learned-model").first.get_by_role(

@@ -30,3 +30,7 @@ Real small ONNX graphs and synthetic videos exercise save/import/export at diffe
 ## Scope
 
 This delivers reusable inference models and UI management. It does not make generic third-party ONNX detectors compatible, move video review projects, or claim a model is validated for every future video.
+
+## Model trust boundary
+
+Import is for packages from trusted OpenScrub sources. Archive/schema/hash/decoder checks reject malformed or incompatible packages; they do not authenticate their author or isolate arbitrary ONNX graph computation. Execution uses the app's existing ONNX runtime. A general untrusted-model execution sandbox is outside this change.

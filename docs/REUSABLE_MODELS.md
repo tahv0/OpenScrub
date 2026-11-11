@@ -24,7 +24,9 @@ Open **Settings → Learned plate models**.
 
 Packages contain only `model.onnx` and a versioned `manifest.json`: display metadata, model type, decoder contract, checksum, input size, threshold, and the original calibration summary. There are no absolute source paths or source-video matching requirements. Original videos, training crops, exact human corner edits, rejected detections, training history and `weights.pt` are not included.
 
-These are OpenScrub plate **crop-mask** models. A generic ONNX detector or a candidate that did not pass the connected learning acceptance gate cannot be substituted. Import checks bounded archive contents, the SHA-256 digest, metadata compatibility, and real ONNX inference before publication. The model limit is 256 MiB.
+These are OpenScrub plate **crop-mask** models. Saving from a job requires its accepted learned artifact; generic ONNX detectors are incompatible. Import checks bounded archive contents, the SHA-256 digest, metadata compatibility, and real ONNX inference before publication. The model limit is 256 MiB.
+
+Import packages from sources you trust. These checks establish integrity and decoder compatibility; they do not authenticate the exporter or sandbox arbitrary ONNX computations. The original calibration summary describes the training recording and does not prove accuracy on another recording.
 
 ## Training and storage
 
