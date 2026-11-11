@@ -166,6 +166,19 @@ def join_reports(previous, continuation, next_frame, total_frames,
                 d[field] = mapping[old_id]
         newer.append(d)
     merged["detections"] = older + newer
+    # Rows keep the checker SHA/mode that produced their machine decisions.
+    # Retain every corresponding assessment across paused prefixes, without
+    # claiming the latest chunk's checker also assessed those earlier rows.
+    verification_history = []
+    for document in (previous, continuation):
+        audits = list(document.get("verification_history") or [])
+        if document.get("verification"):
+            audits.append(document["verification"])
+        for audit in audits:
+            if audit not in verification_history:
+                verification_history.append(copy.deepcopy(audit))
+    if verification_history:
+        merged["verification_history"] = verification_history
     # Audio review, if edited, belongs to the reviewer; never wipe it.
     if "audio_redactions" in previous:
         merged["audio_redactions"] = copy.deepcopy(previous["audio_redactions"])

@@ -44,6 +44,8 @@ import stop_review
 import learning_session
 import video_learning
 import learned_models
+import learning_candidates
+import plate_verifier
 import zones_ui
 import openscrub_logging as diagnostics
 
@@ -369,7 +371,10 @@ def new_job(video_path, options, name):
                 if vault_locked():
                     abort(423, description="Unlock the vault before selecting a model.")
                 job["refinement"] = learned_models.snapshot_model(
-                    learned_models_root(), selected, jdir)
+                    learned_models_root(), selected, jdir,
+                    mode=job["options"].get("learned_plate_model_mode"))
+                job["options"]["learned_plate_model_mode"] = learned_models.load_selection(
+                    jdir, job["refinement"])
     except Exception:
         import shutil
         shutil.rmtree(jdir, ignore_errors=True)
@@ -410,6 +415,8 @@ def job_public(job):
         "checkpoint_total": job.get("checkpoint_total"),
         "learning": job.get("learning"),
         "refinement": job.get("refinement"),
+        "verification": job.get("verification"),
+        "verification_history": job.get("verification_history"),
         "activity": job.get("activity"),
         "preview": job.get("preview"),
         "server_time": time.time(),
@@ -668,40 +675,89 @@ def build_args(job, for_render=False):
         args.section_range = tuple(o["section_range"])
         args.clip_frac = ""
     if o.get("learned_plate_model") and not for_render:
-        meta, _ = learned_models.load_snapshot(jdir)
-        if meta["id"] != o["learned_plate_model"]:
-            raise learned_models.ModelError("The selected job model does not match its saved copy.")
+        _selected_plate_model(job)
         args.plate_learning_exact = True
     return args
 
 
+def _selected_plate_model(job):
+    """The pinned artifact and durable mode, never a mode guessed on restart."""
+    meta, data = learned_models.load_snapshot(job["dir"])
+    selected = job.get("options", {}).get("learned_plate_model")
+    if selected and selected != meta["id"]:
+        raise learned_models.ModelError("The selected job model does not match its saved copy.")
+    mode = learned_models.load_selection(job["dir"], meta)
+    job.setdefault("options", {}).update(learned_plate_model=meta["id"],
+                                        learned_plate_model_mode=mode)
+    return meta, data, mode
+
+
+def _recover_plate_model(job):
+    """Keep damaged selections visible and fail closed when retrying/resuming."""
+    if (not job.get("options", {}).get("learned_plate_model") and
+            not os.path.lexists(os.path.join(job["dir"], "plate_model"))):
+        return
+    try:
+        meta, _, _ = _selected_plate_model(job)
+        job.setdefault("refinement", meta)
+    except learned_models.ModelError as error:
+        job["options"]["learned_plate_model"] = "unavailable"
+        job["phase"] = "error"
+        job["error"] = "The saved learned model selection cannot be recovered: " + str(error)
+
+
+def _verifier_audit(doc, model_record, assessment, mode, stats, frame_range=None):
+    record = dict(model_record, mode=mode, assessment=assessment, inference=stats)
+    start, end = frame_range or (0, len(doc["render_state"]["cum"]))
+    record["scope"] = {"start_frame": start, "end_frame": end,
+                       "fps": doc["render_state"]["fps"]}
+    doc["verification"] = record
+    for row in doc["detections"]:
+        marker = row.get("plate_verification")
+        if marker and "model_sha256" not in marker:
+            marker.update(model_sha256=model_record["model_sha256"])
+    return record
+
+
 def apply_selected_plate_model(job, chunk):
-    """Refine only a fresh scan chunk; older reviewed rows merge afterward."""
+    """Apply the selected mode to fresh proposals; reviewed rows merge afterward."""
     selected = job.get("options", {}).get("learned_plate_model")
     if not selected:
         return chunk
-    meta, data = learned_models.load_snapshot(job["dir"])
-    if meta["id"] != selected:
-        raise learned_models.ModelError("The selected job model does not match its saved copy.")
+    meta, data, mode = _selected_plate_model(job)
     cb = WebCallbacks(job)
     cb.log("Applying learned plate model: " + meta["name"])
     model = video_learning.CropRefiner(data)
     try:
-        refined, stats = video_learning.refine_report(
-            chunk["provenance"]["input"], chunk, model,
-            threshold=meta["threshold"], cancelled=job["cancel"].is_set,
-            progress=lambda cur, total: cb.progress("refine", cur, total),
-            **({"frame_range": tuple(job["options"]["section_context"])}
-               if job.get("options", {}).get("section_context") else {}))
+        options = dict(cancelled=job["cancel"].is_set,
+                       progress=lambda cur, total: cb.progress("refine", cur, total))
+        if job.get("options", {}).get("section_context"):
+            options["frame_range"] = tuple(job["options"]["section_context"])
+        if mode == "refine":
+            refined, stats = video_learning.refine_report(
+                chunk["provenance"]["input"], chunk, model,
+                threshold=meta["threshold"], **options)
+        else:
+            refined, stats = plate_verifier.review_report(
+                chunk["provenance"]["input"], chunk, model,
+                meta["validation"], mode=mode, **options)
     except InterruptedError as error:
         raise openscrub.PipelineCancelled() from error
     record = {key: meta[key] for key in
               ("id", "name", "contract", "model_sha256", "input_size", "threshold")}
-    record.update(schema=1, inference=stats)
+    record.update(schema=meta["schema"], kind=meta["kind"], mode=mode, inference=stats)
     refined["refinement"] = record
     job["refinement"] = record
-    cb.log("Learned model applied: %d mask refinements, %d uncertain proposals kept "
-           "with original coverage." % (stats["refined"], stats["disagreements"]))
+    if mode == "refine":
+        cb.log("Learned model applied: %d mask refinements, %d uncertain proposals kept "
+               "with original coverage." % (stats["refined"], stats["disagreements"]))
+    else:
+        job["verification"] = _verifier_audit(
+            refined, record, meta["validation"], mode, stats,
+            frame_range=job.get("options", {}).get("section_context"))
+        cb.log("Secondary plate model checked %d proposals: %d suggested false positives, "
+               "%d filtered; %d human decisions preserved." %
+               (stats["checked"], stats["suggested"], stats["suppressed"], stats["human_preserved"]))
     return refined
 
 
@@ -720,6 +776,8 @@ def worker():
         try:
             if action == "learn":
                 perform_learning(job)
+            elif action == "verify":
+                perform_verification(job)
             elif action in ("scan", "resume"):
                 resuming = action == "resume"
                 job["phase"] = "scanning"
@@ -773,6 +831,11 @@ def worker():
                     # Never replace the last good checkpoint until the
                     # continuation scan AND postprocessing have both passed.
                     stop_review.atomic_report(report_path, combined)
+                    for key in ("verification", "verification_history"):
+                        if key in combined:
+                            job[key] = combined[key]
+                        else:
+                            job.pop(key, None)
                 finally:
                     if os.path.exists(staging_path):
                         os.remove(staging_path)
@@ -1282,6 +1345,12 @@ def job_resume(jid):
         # Persist the initial settings as part of the checkpoint, so a
         # restart cannot silently resume with unrelated default settings.
         job["options"] = meta["options"]
+        if (job["options"].get("learned_plate_model") or
+                os.path.lexists(os.path.join(job["dir"], "plate_model"))):
+            try:
+                _selected_plate_model(job)
+            except learned_models.ModelError as error:
+                return jsonify({"error": str(error)}), 409
         job["stop"].clear()
         job["cancel"].clear()
         job["error"] = None
@@ -1344,12 +1413,94 @@ def perform_learning(job):
         job["progress"] = 0.5
         job["learning"]["inference"] = result["learning"]["inference"]
         job.pop("refinement", None)
+        job.pop("verification", None)
+    except learning_session.CoverageRejected as error:
+        job["phase"] = previous
+        job["error"] = None
+        job["learning"] = {"stage": "candidate_ready", "message": str(error)}
+        diagnostics.event("learning_candidate_retained", job, reason=str(error))
+        cb.log(str(error))
     except Exception as error:
         diagnostics.exception("learning_failed", job)
         job["phase"] = previous
         job["error"] = str(error)
         job["learning"] = {"stage": "failed", "message": str(error)}
         cb.log("Learning stopped: " + str(error))
+    finally:
+        job["cancel"].clear()
+        job["stop"].clear()
+        job["eta"] = None
+
+
+def perform_verification(job):
+    """Evaluate a retained candidate and check proposals without training again."""
+    previous = job.get("verification_previous_phase", "review")
+    cb = WebCallbacks(job)
+    job.update(phase="learning", preview=None, activity=None)
+    path = os.path.join(job["dir"], "report.json")
+    try:
+        settings = job["verification_request"]
+        candidate_id, mode = settings["candidate_id"], settings["mode"]
+        selected_candidate = learning_candidates.load_candidate(job["dir"], candidate_id)
+        with open(path, "rb") as source:
+            before = source.read()
+        doc = json.loads(before)
+        fingerprint = learning_session.verify_source(job, doc)
+        learning_session.update_learning(job, "assessing", "Checking held-out plates and non-plates")
+        def assessment_progress(done, total):
+            learning_session.update_learning(job, "assessing", "Checking held-out plates and non-plates",
+                                             done=done, total=total, unit="examples")
+        assessment = learning_candidates.evaluate(
+            job["dir"], candidate_id, cancelled=job["cancel"].is_set, progress=assessment_progress)
+        if mode == "filter" and assessment["status"] != "validated":
+            raise ValueError("This candidate supports review suggestions only. " + assessment["reason"])
+        candidate = learning_candidates.load_candidate(job["dir"], candidate_id)
+        if (candidate["model_sha256"] != selected_candidate["model_sha256"] or
+                candidate["assessment"] != assessment):
+            raise ValueError("Candidate changed after its assessment; previous review retained")
+        model_data = candidate["model_path"].read_bytes()
+        if hashlib.sha256(model_data).hexdigest() != candidate["model_sha256"]:
+            raise ValueError("Candidate changed before checking; previous review retained")
+        def inference_progress(done, total):
+            learning_session.update_learning(job, "checking", "Checking existing plate detections",
+                                             done=done, total=total, unit="frames")
+        learning_session.update_learning(job, "checking", "Checking existing plate detections")
+        result, stats = plate_verifier.review_report(
+            job["video"], doc, video_learning.CropRefiner(model_data), assessment,
+            mode=mode, cancelled=job["cancel"].is_set, progress=inference_progress,
+            **({"frame_range": tuple(job["options"]["section_context"])}
+               if job.get("options", {}).get("section_context") else {}))
+        audit = _verifier_audit(result, dict(schema=1, candidate_id=candidate_id,
+            version=candidate["version"], model_sha256=candidate["model_sha256"]), assessment, mode, stats,
+            frame_range=job.get("options", {}).get("section_context"))
+        result["render_required"] = True
+        if learning_session.verify_source(job, result) != fingerprint:
+            raise ValueError("Source changed during checking; previous review retained")
+        with _REVIEW_EDIT_LOCK, _REVIEW_WORK_LOCK:
+            if job["cancel"].is_set():
+                raise InterruptedError("Plate verification cancelled; previous review retained")
+            latest = learning_candidates.load_candidate(job["dir"], candidate_id)
+            if (latest["model_sha256"] != candidate["model_sha256"] or
+                    latest["assessment"] != assessment):
+                raise ValueError("Candidate changed during checking; previous review retained")
+            with open(path, "rb") as source:
+                if source.read() != before:
+                    raise ValueError("Review changed during checking; save your choices and try again")
+            stop_review.atomic_report(path, result)
+        job.update(phase="paused" if previous == "paused" else "review",
+                   error=None, output=None, verification=audit)
+        message = ("Secondary model checked %d detections: %d suggested false positives, "
+                   "%d filtered; %d human decisions preserved. Review the results before rendering." %
+                   (stats["checked"], stats["suggested"], stats["suppressed"], stats["human_preserved"]))
+        learning_session.update_learning(job, "checked", message)
+        cb.log(message)
+    except InterruptedError as error:
+        job.update(phase=previous, error=None, learning={"stage": "cancelled", "message": str(error)})
+        cb.log(str(error))
+    except Exception as error:
+        diagnostics.exception("plate_verification_failed", job)
+        job.update(phase=previous, error=str(error), learning={"stage": "failed", "message": str(error)})
+        cb.log("Plate verification stopped: " + str(error))
     finally:
         job["cancel"].clear()
         job["stop"].clear()
@@ -1437,6 +1588,11 @@ def job_learning_rollback(jid):
             job["phase"] = "paused" if checkpoint.get("state") == "paused" else "review"
             job["output"] = None
             job["learning"] = {"stage": "restored", "message": "Previous review restored; training examples retained."}
+            for key in ("refinement", "verification", "verification_history"):
+                if doc.get(key):
+                    job[key] = doc[key]
+                else:
+                    job.pop(key, None)
             job["error"] = None
     return jsonify({"ok": True})
 
@@ -1696,12 +1852,16 @@ def job_detections(jid):
                       "verified_label": d.get("verified_label", ""),
                       "learning_conflict": d.get("learning_conflict", ""),
                       "learning_score": d.get("learning_score"),
+                      "plate_verification": d.get("plate_verification"),
                       "fallback_reason": d.get("fallback_reason", ""),
                       "zone_dropped": bool(d.get("zone_dropped")),
                       "shaped": bool(d.get("poly"))})
     return jsonify({"detections": items,
                     "learning": doc.get("learning"),
                     "refinement": doc.get("refinement"),
+                    "verification": doc.get("verification"),
+                    "verification_history": doc.get("verification_history"),
+                    "learning_candidates": learning_candidates.list_candidates(job["dir"]),
                     "indexed_frames": any(d.get("frame_index", -1) >= 0 for d in doc["detections"]),
                     "frame_count": len(doc["render_state"]["cum"]),
                     "fps": doc["render_state"]["fps"],
@@ -1785,11 +1945,27 @@ def _review_mask(d, ox, oy, shape, job, doc):
              for pt in contour] for contour in contours]
 
 
+def _human_plate_override(row):
+    """Explicit choices supersede a machine decision without inventing a label."""
+    if row.get("category") != "plate":
+        return False
+    marker = row.pop("plate_verification", None)
+    if marker and marker.get("applied"):
+        previous = marker.get("previous_enabled", True)
+        row["enabled"] = previous if type(previous) is bool else True
+    changed = bool(marker) or row.get("plate_verification_override") is not True
+    row["plate_verification_override"] = True
+    return changed
+
+
 def _apply_detection_edits(doc, edits, cutoff=None):
     """Apply the same pending changes for preview and save, in memory."""
     enabled = edits.get("enabled", {})
+    changed = False
     for i, d in enumerate(doc["detections"]):
         if str(i) in enabled:
+            if d.get("enabled", True) != bool(enabled[str(i)]):
+                changed |= _human_plate_override(d)
             d["enabled"] = bool(enabled[str(i)])
     for i, box in (edits.get("box_overrides") or {}).items():
         i = int(i)
@@ -1797,6 +1973,7 @@ def _apply_detection_edits(doc, edits, cutoff=None):
             d = doc["detections"][i]
             new_box = [float(v) for v in box]
             if new_box != d["cbox"]:
+                changed |= _human_plate_override(d)
                 d["cbox"] = new_box
                 d["poly"] = []
                 d["poly_holes"] = []
@@ -1811,6 +1988,8 @@ def _apply_detection_edits(doc, edits, cutoff=None):
                 t1 = min(t1, cutoff)
             if t1 > t0 >= 0:
                 d = doc["detections"][i]
+                if t0 != d["t_start"] or t1 != d["t_end"]:
+                    changed |= _human_plate_override(d)
                 if (d.get("category") == "plate" and d.get("frame_index", -1) >= 0
                         and (t0 != d["t_start"] or t1 != d["t_end"])):
                     d["frame_index"] = -1
@@ -1823,6 +2002,7 @@ def _apply_detection_edits(doc, edits, cutoff=None):
                 doc["detections"][i]["t_end"] = t1
                 doc["detections"][i]["last_seen"] = min(
                     max(doc["detections"][i].get("last_seen", t0), t0), t1)
+    return changed
 
 
 @app.route("/api/jobs/<jid>/detframe/<int:i>")
@@ -2212,6 +2392,7 @@ def job_plate_quad(jid, i):
         for j, row in enumerate(doc["detections"]):
             if j == i or (apply_track and tid >= 0 and row.get("track", -1) == tid
                           and row.get("category") == "plate"):
+                _human_plate_override(row)
                 row["plate_quad"] = q
                 row.pop("plate_edit_receipt", None)
                 changed += 1
@@ -2438,6 +2619,32 @@ def learned_model_list():
     return jsonify({"models": learned_models.list_models(learned_models_root())})
 
 
+@app.route("/api/jobs/<jid>/plate-verifier", methods=["POST"])
+@_serialize_review_edit
+def job_plate_verifier(jid):
+    job = JOBS.get(jid) or abort(404)
+    protected = _SECTIONS.whole_job_error(job)
+    if protected:
+        return jsonify({"error": protected}), 409
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict) or payload.get("mode", "review") not in ("review", "filter"):
+        return jsonify({"error": "Choose a retained candidate and review or filter mode."}), 400
+    if job["phase"] not in ("review", "done", "paused"):
+        return jsonify({"error": "Finish or pause the current work before checking detections."}), 409
+    if job.get("trackbg", {}).get("state") == "running":
+        return jsonify({"error": "Finish tracking before checking detections."}), 409
+    with _REVIEW_WORK_LOCK:
+        candidate = learning_candidates.load_candidate(job["dir"], payload.get("candidate_id"))
+    job["verification_previous_phase"] = job["phase"]
+    job["verification_request"] = {"candidate_id": candidate["id"], "mode": payload.get("mode", "review")}
+    job["cancel"].clear()
+    job["stop"].clear()
+    job.update(phase="learning", error=None, eta=None,
+               learning={"stage": "queued", "message": "Queued secondary plate check; no retraining needed"})
+    WORK_Q.put((jid, "verify"))
+    return jsonify({"ok": True})
+
+
 @app.route("/api/jobs/<jid>/learned-models", methods=["POST"])
 @_serialize_review_edit
 def learned_model_save(jid):
@@ -2448,9 +2655,14 @@ def learned_model_save(jid):
     if not isinstance(payload, dict):
         return jsonify({"error": "Supply a model name and optional environment description."}), 400
     with _REVIEW_WORK_LOCK:
-        model = learned_models.save_model(
-            learned_models_root(), job["dir"], payload.get("name"),
-            payload.get("description", ""))
+        if "candidate_id" in payload:
+            model = learned_models.save_candidate(
+                learned_models_root(), job["dir"], payload["candidate_id"],
+                payload.get("name"), payload.get("description", ""))
+        else:
+            model = learned_models.save_model(
+                learned_models_root(), job["dir"], payload.get("name"),
+                payload.get("description", ""))
     return jsonify({"model": model})
 
 
@@ -2531,9 +2743,10 @@ def job_save_edits(jid):
             d = doc["detections"][i]
             if d.get("category") == "plate" and label in ("plate", "not_plate", "clear"):
                 normalized = "" if label == "clear" else label
+                changed |= _human_plate_override(d)
                 changed |= d.get("verified_label", "") != normalized
                 d["verified_label"] = normalized
-    _apply_detection_edits(doc, edits, cutoff=cutoff)
+    changed |= _apply_detection_edits(doc, edits, cutoff=cutoff)
     rs = doc["render_state"]
     for m in edits.get("manual", []):
         t0 = float(m["t_start"]); t1 = float(m["t_end"])
@@ -3726,13 +3939,17 @@ function sectionSeconds(value){
 function refreshSectionModels(){
  const select=document.getElementById("sectionModel");if(!select)return;
  const models=typeof LEARNED_MODEL_LIST!=="undefined"?LEARNED_MODEL_LIST:[];
- const key=JSON.stringify(models.map(m=>[m.id,m.name]));
- if(select.dataset.models===key)return;
+ const key=JSON.stringify(models.map(m=>[m.id,m.name,m.kind,m.validation?.status]));
+ if(select.dataset.models===key){
+  if(document.getElementById("sectionModelMode"))refreshLearnedModelMode("sectionModel","sectionModelMode");
+  return;
+ }
  const selected=select.value;
  select.replaceChildren(new Option("Original plate masks",""));
  for(const model of models)select.add(new Option(model.name,model.id));
  select.value=models.some(m=>m.id===selected)?selected:"";
  select.dataset.models=key;
+ if(document.getElementById("sectionModelMode"))refreshLearnedModelMode("sectionModel","sectionModelMode");
 }
 async function loadSectionsPanel(j,id,view){
  const panel=document.getElementById("sectionsPanel");if(!panel)return;
@@ -3764,7 +3981,9 @@ async function loadSectionsPanel(j,id,view){
     <label>End (s or mm:ss)<br><input id="sectionEnd" value="${String(end/fps)}" style="width:100px"></label>
     <button onclick="createSection(this)">Add section</button></div>
    <label style="display:block;margin:12px 0">Model for section rescans
-    <select id="sectionModel" style="max-width:100%"><option value="">Original plate masks</option></select></label>`;
+    <select id="sectionModel" style="max-width:100%" onchange="refreshLearnedModelMode('sectionModel','sectionModelMode')"><option value="">Original plate masks</option></select></label>
+   <label style="display:block;margin:12px 0">Selected model use
+    <select id="sectionModelMode" aria-label="Section model use" disabled style="max-width:100%"><option value="">Select a model first</option></select></label>`;
   for(const s of data.items){
    const sid=sectionEscape(s.id),approved=s.approved;
    html+=`<div style="border-top:1px solid #334155;padding:10px 0;overflow-wrap:anywhere">
@@ -3805,12 +4024,14 @@ async function createSection(button){
 }
 async function sectionAction(id,sid,action,candidate,button){
  const selected=document.getElementById("sectionModel")?.value||"";
+ const selectedMode=document.getElementById("sectionModelMode")?.value||"";
  const view=JOBVIEW,opened=CUR;
  try{
   if(!await saveSectionReview())return;
   if(CUR!==opened||JOBVIEW!==view)return;
   button.disabled=true;
   const payload=candidate?{candidate_id:candidate}:{model_id:selected};
+  if(action==="rescan"&&selected&&selectedMode)payload.learned_plate_model_mode=selectedMode;
   const {data}=await reviewRequest(`api/jobs/${id}/sections/${sid}/${action}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload),timeoutMs:120000});
   if(CUR!==opened||JOBVIEW!==view)return;
   JOBSJSON="";
@@ -5019,6 +5240,47 @@ async function trainAndRescan(){
 let LEARNING_SAMPLE_INFO=null;
 let VLBL={},VLBLJOB=null;  // explicit human labels; never infer from default blur state
 let REVIEW_BASE=null; // Only decision scalars, not a second detection report.
+function verifierAssessmentText(assessment){
+ if(!assessment)return "Not evaluated yet. Check detections in review mode to assess this candidate without retraining.";
+ return `${assessment.status==="validated"?"Filtering validated on held-out examples":"Review suggestions only"}: ${assessment.retained_positive}/${assessment.held_out_positive} plates retained, ${assessment.rejected_positive} rejected plates, ${assessment.rejected_negative}/${assessment.held_out_negative} negatives rejected. ${assessment.reason||""}`;
+}
+function updatePlateVerifierCandidate(){
+ const panel=document.getElementById("review"),select=document.getElementById("plateVerifierCandidate");
+ const mode=document.getElementById("plateVerifierMode"),note=document.getElementById("plateVerifierStatus");
+ if(!panel||!select||!mode||!note)return;
+ const candidate=(panel._learningCandidates||[]).find(c=>c.id===select.value);
+ const validated=candidate?.assessment?.status==="validated";
+ const filter=Array.from(mode.options).find(option=>option.value==="filter");
+ if(filter)filter.disabled=!validated;
+ if(!validated&&mode.value==="filter")mode.value="review";
+ note.textContent=verifierAssessmentText(candidate?.assessment);
+}
+function plateVerificationBadge(row){
+ const marker=row.plate_verification;if(!marker)return "";
+ const label=marker.applied?"Model filtered":marker.decision==="suggest_not_plate"?"Model suggests false positive":"Model retained";
+ const score=Number.isFinite(marker.score)?` · plate score ${Math.round(marker.score*100)}%`:"";
+ return `<span class="badge plate-verification-badge" title="Secondary model decision; this is not a human label">${sectionEscape(label+" · "+(marker.mode||"review")+score)}</span> `;
+}
+async function checkPlateDetections(){
+ const job=CUR,view=JOBVIEW;
+ const candidate_id=document.getElementById("plateVerifierCandidate")?.value;
+ const mode=document.getElementById("plateVerifierMode")?.value||"review";
+ const note=document.getElementById("plateVerifierStatus"),button=document.getElementById("plateVerifierButton");
+ if(!job||!candidate_id||!note||!button)return;
+ button.disabled=true;note.textContent="Saving review edits before checking detections...";
+ try{
+  if(!await saveAndRender(true)){
+   if(CUR===job&&JOBVIEW===view)note.textContent="Save the pending review edits before checking detections.";
+   return;
+  }
+  if(CUR!==job||JOBVIEW!==view)return;
+  await reviewRequest("api/jobs/"+encodeURIComponent(job)+"/plate-verifier",{
+   method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({candidate_id,mode}),timeoutMs:120000});
+  if(CUR!==job||JOBVIEW!==view)return;
+  await openJob(job);
+ }catch(error){if(CUR===job&&JOBVIEW===view)note.textContent="Could not check detections: "+error.message;}
+ finally{if(button.isConnected)button.disabled=false;}
+}
 function reviewChoiceDelta(){
  const base=REVIEW_BASE&&REVIEW_BASE.job===CUR?REVIEW_BASE:null;
  const enabled={},verified_labels={};
@@ -5027,7 +5289,10 @@ function reviewChoiceDelta(){
  }
  for(const [i,value] of Object.entries(VLBL)){
   const normalized=value==="clear"?"":value;
-  if(!base||(base.labels[i]||"")!==normalized)verified_labels[i]=value;
+  if(value==="clear"||!base||(base.labels[i]||"")!==normalized){
+   verified_labels[i]=value;
+   if(value==="clear"&&Object.prototype.hasOwnProperty.call(EN,i))enabled[i]=EN[i];
+  }
  }
  return {enabled,verified_labels};
 }
@@ -5049,6 +5314,10 @@ async function loadReview(signal=null,phase=SHELLPH){
  }
  if(!current())return false;
  DUR=d.duration;
+ const candidates=Array.isArray(d.learning_candidates)?d.learning_candidates:[];
+ const evaluated=candidates.filter(candidate=>candidate.assessment);
+ const acceptedMask=!!(d.learning&&d.learning.active&&d.learning.active.model);
+ const verification=d.verification||(d.verification_history||[]).at(-1);
  if(LEARNING_SELECTION_JOB!==CUR)LEARNING_SELECTION=null;
  const groups={}; const zdrop=[]; TRKMEM={};
  REVIEW_BASE={job,enabled:{},labels:{}};
@@ -5068,15 +5337,29 @@ async function loadReview(signal=null,phase=SHELLPH){
   <button type="button" class="sec" onclick="reviewUncertain()">Review 10% of plate groups</button>
   <button type="button" id="reviewShowAll" class="sec" hidden onclick="reviewAllFindings()">Show all findings</button>
  </div>
+ ${verification?`<p id="plateVerifierResults" class="review-copy" role="status">${sectionEscape(`${d.verification?"Last check":"Earlier checker pass"}: ${verification.mode} mode; ${verification.inference?.checked||0} checked, ${verification.inference?.suggested||0} suggested, ${verification.inference?.suppressed||0} filtered, ${verification.inference?.human_preserved||0} human decisions preserved. `+verifierAssessmentText(verification.assessment))}</p>`:""}
+ ${candidates.length?`<details id="plateVerifierPanel" open style="margin-bottom:12px">
+  <summary>Check plate detections with a trained candidate</summary>
+  <p class="review-copy">Use learned background examples such as hands to check existing detections. This runs the retained model without training again or rescanning with the original detector.</p>
+  <label for="plateVerifierCandidate">Trained candidate</label>
+  <select id="plateVerifierCandidate" style="width:100%" onchange="updatePlateVerifierCandidate()">${candidates.map(candidate=>`<option value="${sectionEscape(candidate.id)}">${sectionEscape(candidate.version)}${candidate.assessment?" · "+sectionEscape(candidate.assessment.status):" · not evaluated"}</option>`).join("")}</select>
+  <label for="plateVerifierMode">Check mode</label>
+  <select id="plateVerifierMode" style="max-width:100%"><option value="review">Review suggestions — preserve output choices</option><option value="filter" disabled>Filter validated false positives</option></select>
+  <button type="button" id="plateVerifierButton" onclick="checkPlateDetections()">Check detections</button>
+  <p id="plateVerifierStatus" class="review-copy" role="status" aria-live="polite"></p>
+  <p class="review-copy">Plate scores are model confidence, not a probability that an object is not a plate. Review the results before rendering.</p>
+ </details>`:""}
  <details id="saveLearnedModelPanel" style="margin-bottom:12px">
   <summary>Save trained model for other videos</summary>
-  <p class="review-copy">Save the accepted model for an environment, then select it when processing another video.</p>
+  <p class="review-copy">Save an accepted mask model or an evaluated secondary checker for another video.</p>
+  <label for="learnedModelSource">Model to save</label>
+  <select id="learnedModelSource" style="width:100%">${acceptedMask?'<option value="">Accepted plate mask model</option>':""}${evaluated.map(candidate=>`<option value="${sectionEscape(candidate.id)}">Secondary checker · ${sectionEscape(candidate.version)} · ${sectionEscape(candidate.assessment.status)}</option>`).join("")}${!acceptedMask&&!evaluated.length?'<option value="" disabled>No evaluated model available</option>':""}</select>
   <label for="learnedModelName">Model name</label>
   <input id="learnedModelName" type="text" maxlength="80" placeholder="e.g. Garage daylight" style="width:100%;box-sizing:border-box">
   <label for="learnedModelDescription">Environment description</label>
   <textarea id="learnedModelDescription" maxlength="500" rows="2" placeholder="Camera, lighting or other useful notes" style="width:100%;box-sizing:border-box"></textarea>
-  <button id="saveLearnedModelButton" type="button" onclick="saveLearnedModel()" ${d.learning&&d.learning.active&&d.learning.active.model?"":"disabled"}>Save model</button>
-  <p id="saveLearnedModelStatus" class="review-copy" role="status" aria-live="polite">${d.learning&&d.learning.active&&d.learning.active.model?"Uses the last accepted training pass.":"Complete an accepted training pass to save a reusable model."}</p>
+  <button id="saveLearnedModelButton" type="button" onclick="saveLearnedModel()" ${acceptedMask||evaluated.length?"":"disabled"}>Save model</button>
+  <p id="saveLearnedModelStatus" class="review-copy" role="status" aria-live="polite">${acceptedMask||evaluated.length?"Choose the model to save. Secondary checkers default to review suggestions on new videos.":"Check a retained candidate above, or complete an accepted mask training pass, to save a reusable model."}</p>
  </details>
  <p id="reviewSampleSummary" class="review-copy" role="status" hidden></p>
  <p id="reviewSaveStatus" class="review-copy review-save-status" role="status" aria-live="polite">Review choices loaded from disk.</p>
@@ -5128,6 +5411,7 @@ async function loadReview(signal=null,phase=SHELLPH){
    if(!sampled)for(const m of members)if((m.confidence||0)>(best.confidence||0))best=m;
    const rep={...best};
    rep.learning_conflict=members.some(m=>m.learning_conflict)?"Model disagreement — review this track":"";
+   rep.plate_verification=(members.find(m=>m.plate_verification?.applied)||members.find(m=>m.plate_verification?.decision==="suggest_not_plate")||best).plate_verification;
    rep.t_start=members[0].t_start;
    rep.t_end=members[members.length-1].t_end;
    rep.frames=members.length;
@@ -5159,7 +5443,7 @@ async function loadReview(signal=null,phase=SHELLPH){
     <small class="preview-status" role="status">Preview not loaded</small>
     <button class="sec preview-retry" hidden onclick="retryReviewPreview(this)">Retry preview</button>
     ${x.category==="plate"?'<small class="quad-status" role="status" title="Corners apply to this detected track. Review changing perspective. Keyboard: select corner 1–4, use arrows; Ctrl+Z undoes.">Corners autosave to track</small><button type="button" class="sec quad-retry" hidden>Retry save</button>':""}
-    <div>${x.learning_conflict?'<span class="badge" title="The original coverage was retained where the learned model could not make a reliable refinement">Model disagreement — review</span> ':""}${plateFallbackText(x)?`<span class="badge" style="white-space:normal">${plateFallbackText(x)}</span> `:""}${x.shaped?'<span class="badge" title="Thumbnail rectangle is a selection guide; open to inspect the mask and any exclusions">shaped mask</span> ':""}${x.personcard?`<b>Person ${x.person+1}</b> — one decision for ALL their appearances`:`"${x.text}"`}${x.frames?` <span class="badge">×${x.frames} frames</span>`:""}${x.confidence?` <span class="badge" title="detector confidence — low values on a non-face thumbnail usually mean a false detection">${Math.round(x.confidence*100)}%</span>`:""} <br>${x.t_start.toFixed(1)}–${x.t_end.toFixed(1)}s</div>
+    <div>${plateVerificationBadge(x)}${x.learning_conflict?'<span class="badge" title="The original coverage was retained where the learned model could not make a reliable refinement">Model disagreement — review</span> ':""}${plateFallbackText(x)?`<span class="badge" style="white-space:normal">${plateFallbackText(x)}</span> `:""}${x.shaped?'<span class="badge" title="Thumbnail rectangle is a selection guide; open to inspect the mask and any exclusions">shaped mask</span> ':""}${x.personcard?`<b>Person ${x.person+1}</b> — one decision for ALL their appearances`:`"${x.text}"`}${x.frames?` <span class="badge">×${x.frames} frames</span>`:""}${x.confidence?` <span class="badge" title="detector confidence — low values on a non-face thumbnail usually mean a false detection">${Math.round(x.confidence*100)}%</span>`:""} <br>${x.t_start.toFixed(1)}–${x.t_end.toFixed(1)}s</div>
     <div id="bb${x.i}">${detChoices(x.i)}</div>
     ${x.category==="plate"?`<button class="sec" onclick="labelPlate(${x.i},'plate')">✓ Confirm plate</button>
      <button class="sec" onclick="labelPlate(${x.i},'not_plate')">✕ Not a plate</button>
@@ -5178,12 +5462,14 @@ async function loadReview(signal=null,phase=SHELLPH){
  // Bind the snapshot to this panel/view; removing it releases the metadata.
  const panel=document.getElementById("review");
  if(panel){
+  panel._learningCandidates=candidates;
   panel._sampleRows=d.detections.filter(x=>x.category==="plate"&&!x.zone_dropped).map(x=>({
    i:x.i,category:"plate",person:x.person,track:x.track,t_start:x.t_start,
    confidence:x.confidence,verified_label:x.verified_label,
    learning_conflict:!!x.learning_conflict,fallback_reason:!!x.fallback_reason}));
   panel._sampleJob=job;panel._sampleView=view;
  }
+ updatePlateVerifierCandidate();
  if(LEARNING_SELECTION)applyReviewGroupFilter();
  initMarquee();initReviewPreviews();
  return true;
@@ -5381,6 +5667,9 @@ async function persistReview(saveOnly=false,job=CUR,view=JOBVIEW,choicesOnly=fal
   for(const [i,label] of Object.entries(payload.verified_labels))
    baseline.labels[i]=label==="clear"?"":label;
  }
+ for(const [i,label] of Object.entries(payload.verified_labels)){
+  if(label==="clear"&&VLBL[i]==="clear"&&EN[i]===payload.enabled[i])VLBL[i]="";
+ }
  REVIEW_SAVED=revision;plateUnloadGuard();
  if(!choicesOnly){BE.adds=[];BE.ov={};BE.times={};}
  if(r.suggest_allowlist&&r.suggest_allowlist.length){
@@ -5572,6 +5861,34 @@ function clearLearnedModels(message){
  document.getElementById("learnedModelLibrary").replaceChildren();
  document.getElementById("learnedModelStatus").textContent=message;
  document.getElementById("learnedPlateModelHint").textContent=message;
+ refreshLearnedModelMode();
+}
+function refreshLearnedModelMode(selectId="learnedPlateModel",modeId="learnedPlateModelMode"){
+ const select=document.getElementById(selectId),mode=document.getElementById(modeId);
+ if(!select||!mode)return;
+ const model=LEARNED_MODEL_LIST.find(item=>item.id===select.value);
+ const previous=mode.dataset.model===select.value?mode.value:"";
+ const secondary=model?.kind==="openscrub-plate-verifier";
+ const validated=secondary&&model.validation?.status==="validated";
+ mode.replaceChildren();
+ if(!model){
+  mode.add(new Option("Select a model first",""));mode.disabled=true;mode.dataset.model="";
+  const hint=selectId==="learnedPlateModel"?document.getElementById("learnedPlateModelHint"):null;
+  if(hint&&!select.disabled)hint.textContent="Use the original plate masks; no learned model is selected.";
+  return;
+ }
+ if(secondary){
+  mode.add(new Option("Review suggestions — preserve output choices","review"));
+  const filter=new Option("Filter validated false positives","filter");filter.disabled=!validated;mode.add(filter);
+  mode.value=previous==="filter"&&validated?"filter":"review";
+ }else{mode.add(new Option("Refine plate masks","refine"));mode.value="refine";}
+ mode.disabled=false;mode.dataset.model=model.id;
+ if(selectId==="learnedPlateModel"){
+  const hint=document.getElementById("learnedPlateModelHint");
+  if(hint)hint.textContent="Selected: "+model.name+". "+(secondary?
+   (validated?"Review suggests false positives; filtering applies the separately validated cutoff. Human choices are preserved.":"Review suggestions only; filtering has not passed held-out checks."):
+   "Refines masks around original detector proposals. Review the results.");
+ }
 }
 async function refreshLearnedModels(){
  const refresh=++LEARNED_MODEL_REFRESH;
@@ -5595,9 +5912,10 @@ async function refreshLearnedModels(){
    document.getElementById("learnedPlateModelHint").textContent=chosen?
     "Selected: "+chosen.name+". Used for plate detection in new scans.":
     "Choose a saved model for this environment. Applied when plate detection is enabled; uses every-frame plate proposals and may take longer. Review the results.";
+   refreshLearnedModelMode();
   }
   box.replaceChildren();
-  if(!data.models.length)box.textContent="No saved models yet. Save an accepted model after training a video, or import a model package.";
+  if(!data.models.length)box.textContent="No saved models yet. Save an accepted mask model or an evaluated secondary checker from review, or import a model package.";
   for(const model of data.models){
    const row=document.createElement("div");row.className="learned-model";
    row.style.cssText="padding:12px 0;border-top:1px solid #334155;overflow-wrap:anywhere";
@@ -5607,14 +5925,15 @@ async function refreshLearnedModels(){
     description.textContent=model.description;row.appendChild(description);
    }
    const size=document.createElement("p");size.className="review-copy";
-   size.textContent=(model.model_size/1048576).toFixed(1)+" MiB · Plate mask model";
+   size.textContent=(model.model_size/1048576).toFixed(1)+" MiB · "+(model.kind==="openscrub-plate-verifier"?
+    "Secondary verifier · "+(model.validation?.status==="validated"?"filtering validated":"review suggestions only"):"Plate mask model");
    row.appendChild(size);
    const actions=document.createElement("div");actions.className="row";
    actions.style.cssText="gap:10px;flex-wrap:wrap";
    const use=document.createElement("button");use.type="button";use.className="sec";
    use.textContent="Use for next scan";use.onclick=()=>{
     select.value=model.id;
-    document.getElementById("learnedPlateModelHint").textContent="Selected: "+model.name+". Used for plate detection in new scans.";
+    refreshLearnedModelMode();
     location.hash="";
     requestAnimationFrame(()=>select.scrollIntoView({block:"center"}));
    };
@@ -5659,10 +5978,11 @@ async function saveLearnedModel(){
  const job=CUR,view=JOBVIEW;
  const name=document.getElementById("learnedModelName").value.trim();
  const description=document.getElementById("learnedModelDescription").value.trim();
+ const candidate_id=document.getElementById("learnedModelSource")?.value||"";
  const note=document.getElementById("saveLearnedModelStatus");
  const button=document.getElementById("saveLearnedModelButton");
  if(!name){note.textContent="Enter a model name.";return;}
- button.disabled=true;note.textContent="Saving accepted model...";
+ button.disabled=true;note.textContent="Saving selected model...";
  try{
   if(!await saveAndRender(true)){
    if(CUR===job&&JOBVIEW===view)note.textContent="Review changes could not be saved. Resolve the review error and try again.";
@@ -5671,7 +5991,7 @@ async function saveLearnedModel(){
   if(CUR!==job||JOBVIEW!==view)return;
   const {data}=await reviewRequest("api/jobs/"+encodeURIComponent(job)+"/learned-models",
     {method:"POST",headers:{"Content-Type":"application/json"},
-     body:JSON.stringify({name,description}),timeoutMs:120000});
+     body:JSON.stringify(candidate_id?{name,description,candidate_id}:{name,description}),timeoutMs:120000});
   if(CUR===job&&JOBVIEW===view)note.textContent="Saved "+data.model.name+" to the model library. Select it in Scan Setup for other videos.";
   await refreshLearnedModels();
  }catch(error){if(CUR===job&&JOBVIEW===view)note.textContent="Could not save model: "+error.message;}
@@ -6363,6 +6683,7 @@ def rehydrate_jobs():
             from pathlib import Path
             recovered_section = _SECTIONS.restore_interrupted(jid, Path(jdir))
             if recovered_section:
+                _recover_plate_model(recovered_section)
                 with JOBS_LOCK:
                     JOBS[jid] = recovered_section
                 n += 1
@@ -6404,12 +6725,14 @@ def rehydrate_jobs():
                 job["options"]["learned_plate_model"] = "unavailable"
                 try:
                     selected, _ = learned_models.load_snapshot(jdir)
+                    mode = learned_models.load_selection(jdir, selected)
                 except learned_models.ModelError as error:
                     job["error"] = ("Recovered upload, but its selected learned model "
                                     "copy is unavailable: %s. Start a new scan with "
                                     "a valid model; the uploaded file was kept." % error)
                 else:
                     job["options"]["learned_plate_model"] = selected["id"]
+                    job["options"]["learned_plate_model_mode"] = mode
                     job["refinement"] = selected
                     job["error"] = ("Recovered before the scan finished. Retry uses "
                                     "the saved learned model and default settings for "
@@ -6449,11 +6772,16 @@ def rehydrate_jobs():
             if report_doc.get("refinement"):
                 job["refinement"] = report_doc["refinement"]
                 job["options"]["learned_plate_model"] = report_doc["refinement"]["id"]
+            if report_doc.get("verification"):
+                job["verification"] = report_doc["verification"]
+            if report_doc.get("verification_history"):
+                job["verification_history"] = report_doc["verification_history"]
             _SECTIONS.recover(job, report_doc)
             if checkpoint.get("state") == "paused":
                 job["options"] = checkpoint.get("options") or {}
                 job["log"].append("Stop & Review checkpoint recovered; "
                                   "resume starts from saved frame")
+            _recover_plate_model(job)
             try:
                 # original upload size, for the editor's duplicate-upload
                 # warning (prov input may be the normalized scan copy)

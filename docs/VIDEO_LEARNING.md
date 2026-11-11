@@ -6,6 +6,11 @@ refinement -> reapply human decisions -> review -> render**. It is not Resume.
 Existing successfully saved four-corner annotations are imported; no manual
 export command is needed for this workflow.
 
+A completed training candidate can also serve as a **secondary plate checker**.
+That has its own assessment and does not require acceptance as a tighter mask.
+See [Use a retained candidate to reject false detections](#use-a-retained-candidate-to-reject-false-detections)
+below, and [Reusable learned models](REUSABLE_MODELS.md) for saving and transfer.
+
 ## Windows Docker / NVIDIA setup
 
 Keep the existing checkout, media/data environment variables and persistent
@@ -98,14 +103,71 @@ possibly different real plate. Inherited rejections do not expand automatically
 into a new tracker identity. Only a directly edited seed is human-verified;
 automatically propagated masks are not training labels.
 
-Original detector models remain the proposal source. The crop-trained ONNX
-model refines those proposals; it does **not** replace the full-frame detector.
+Original detector models remain the proposal source. In mask-refinement mode,
+the crop-trained ONNX model refines those proposals; it does **not** replace the full-frame detector.
 Learning rescans force every-frame plate proposals even with a fast preset.
 One sequential source decode then applies the learned masks, with the same
 four-corner geometry used in calibration, review and rendering. Low-confidence,
 empty, malformed or spatially inconsistent predictions retain the original
 coverage and create a review disagreement. They do not automatically unblur a
 new object. Explicit human false-positive decisions do remain rejected.
+
+## Use a retained candidate to reject false detections
+
+The message **"The trained model did not demonstrate tighter coverage without
+known plate-pixel loss"** concerns mask geometry. Training may have completed
+and saved valid `model.onnx` / `weights.pt` artifacts even though the mask was
+not accepted. The old mask check did not measure whether the candidate could
+reject a hand or another confirmed non-plate. Its runtime fallback deliberately
+kept original proposals when the learned prediction was uncertain or absent.
+
+In **Review findings**, use the secondary model controls to select a retained
+training candidate and **Check detections**. This evaluates the saved model on
+its held-out examples, then checks the current plate proposals. It does not
+train again, require CUDA training setup, or rescan with the original detectors.
+Historical complete candidates from existing job data are discovered too; keep
+their pass folder and dataset. A failed training process that never published
+an ONNX candidate cannot be recovered through these controls.
+
+There are two modes:
+
+| Mode | Result |
+| --- | --- |
+| **Review suggestions** | Adds a visible suggestion when the learned plate score is below the assessed cutoff. Keeps output choices for review. This is the default. |
+| **Filter false positives** | Disables low-scoring proposals after a separate assessment passes. The review shows which detections were filtered. |
+
+Filtering requires at least **four held-out positive examples and two held-out
+negative examples**, a cutoff retaining **every** held-out positive, and at
+least one held-out negative rejected. Missing predictions count in this check;
+they are not skipped. The cutoff includes a margin below the weakest retained
+positive. A candidate that cannot meet these checks can still provide review
+suggestions. These counts are small engineering checks, not a guarantee about
+unseen hands, plates, lighting, cameras, or recordings. The score is the model's
+plate score, not a calibrated probability that the object is a non-plate.
+
+The checker associates predictions with the particular original proposal; a
+nearby real plate must not confirm an unrelated hand. It preserves existing
+geometry. Explicit **Confirm plate**, **Not a plate**, Blur/Keep choices and
+manual shape corrections take precedence. Automatic filtering is stored as a
+machine decision and never becomes a human training label. Switching back to
+review suggestions restores choices changed only by the earlier filter; it
+keeps later human overrides.
+
+A successful check requires rendering again. A cancelled or failed check keeps
+the previous report and output. A paused job checks only the scanned portion;
+approved video sections must be revised through a section candidate.
+
+After checking a candidate, choose it as the source in **Save trained model for
+other videos**. It can then be selected in Scan Setup or exported/imported on
+another PC. New selections default to review suggestions; filtering is an
+explicit choice. The chosen mode is pinned with the job before it is queued and
+restored after a restart.
+
+This is a secondary decision stage over original detector proposals. Filtering
+lets the trained model reject those proposals, but it cannot discover a plate
+that every proposal detector missed. A sole full-frame primary detector would
+need a separate training dataset and detection integration; these crop-trained
+artifacts are not a drop-in primary detector.
 
 ## Gates and limitations
 

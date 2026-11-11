@@ -1,4 +1,4 @@
-"""Portable, explicitly selected plate-mask refiners.
+"""Portable, explicitly selected plate-mask refiners and secondary verifiers.
 
 Only the accepted artifact named by a job's committed report may be saved.
 Portable archives contain an ONNX graph and a small, whitelisted manifest;
@@ -43,6 +43,7 @@ _VALIDATION_FIELDS = {
     'minimum_known_coverage',
 }
 _KIND = 'openscrub-plate-mask-refiner'
+_VERIFIER_KIND = 'openscrub-plate-verifier'
 _ID = re.compile(r'[0-9a-f]{32}')
 _HASH = re.compile(r'[0-9a-f]{64}')
 # Only successful validation metadata lives here, never model bytes or sessions.
@@ -123,10 +124,11 @@ def _validation(value, allow_warning=False):
 def _manifest(value):
     if not isinstance(value, dict) or set(value) != _FIELDS:
         raise ModelError('Unsupported model manifest fields')
-    if type(value['schema']) is not int or value['schema'] != 1:
+    if type(value['schema']) is not int or value['schema'] not in (1, 2):
         raise ModelError('Unsupported model manifest schema')
-    if type(value['contract']) is not int or value['contract'] != 1 or value['kind'] != _KIND:
-        raise ModelError('Unsupported plate-mask model contract or kind')
+    expected_kind = _KIND if value['schema'] == 1 else _VERIFIER_KIND
+    if type(value['contract']) is not int or value['contract'] != 1 or value['kind'] != expected_kind:
+        raise ModelError('Unsupported learned plate model contract or kind')
     _identifier(value['id'])
     _text(value['name'], 'Model name', 80, required=True)
     _text(value['description'], 'Model description', 500)
@@ -144,7 +146,11 @@ def _manifest(value):
     _integer(value['model_size'], 'Model size', 1, _MODEL_LIMIT)
     _integer(value['input_size'], 'Model input size', 1, 2048)
     _threshold(value['threshold'])
-    checked = _validation(value['validation'])
+    if value['schema'] == 1:
+        checked = _validation(value['validation'])
+    else:
+        from plate_verifier import validate_assessment
+        checked = validate_assessment(value['validation'])
     if value['threshold'] != checked['threshold']:
         raise ModelError('Model and calibration thresholds do not agree')
     # JSON round trip provides a detached nested object to every caller.
@@ -299,6 +305,27 @@ def _write_file(path, payload):
         os.fsync(stream.fileno())
 
 
+def _atomic_json(path, value):
+    """Write a bounded private metadata record without exposing a partial file."""
+    path = _no_links(path)
+    parent = _directory(path.parent, create=True)
+    encoded = json.dumps(value, ensure_ascii=False, allow_nan=False,
+                         separators=(',', ':')).encode('utf-8')
+    if len(encoded) > _MANIFEST_LIMIT:
+        raise ModelError('Model metadata exceeds its size limit')
+    descriptor, pending = tempfile.mkstemp(prefix='.model-metadata-', dir=parent)
+    try:
+        with os.fdopen(descriptor, 'wb') as stream:
+            stream.write(encoded)
+            stream.flush()
+            os.fsync(stream.fileno())
+        _no_links(path)
+        os.replace(pending, path)
+    finally:
+        if os.path.exists(pending):
+            os.unlink(pending)
+
+
 def _publish(parent, name, manifest, payload):
     """Publish both files together; unsuccessful publication leaves no partial copy."""
     parent = _directory(parent, create=True)
@@ -373,6 +400,34 @@ def save_model(root, job_dir, name, description=''):
     size = _validate_onnx(payload)
     manifest = _manifest({
         'schema': 1, 'kind': _KIND, 'contract': 1, 'id': uuid.uuid4().hex,
+        'name': name, 'description': description,
+        'created_at': datetime.now(timezone.utc).isoformat(),
+        'model_sha256': digest, 'model_size': len(payload), 'input_size': size,
+        'threshold': validation['threshold'], 'validation': validation,
+    })
+    _publish(root, manifest['id'], manifest, payload)
+    return manifest
+
+
+@_boundary
+def save_candidate(root, job_dir, candidate_id, name, description=''):
+    """Save an evaluated candidate as a verifier, never as an accepted mask."""
+    from learning_candidates import load_candidate
+    from plate_verifier import validate_assessment
+
+    name = _text(name, 'Model name', 80, required=True)
+    description = _text(description, 'Model description', 500)
+    candidate = load_candidate(job_dir, candidate_id)
+    if candidate['assessment'] is None:
+        raise ModelError('Evaluate this candidate before saving its secondary assessment')
+    validation = validate_assessment(candidate['assessment'])
+    payload = _read_file(candidate['model_path'], _MODEL_LIMIT)
+    digest = hashlib.sha256(payload).hexdigest()
+    if digest != candidate['model_sha256']:
+        raise ModelError('Candidate model changed after its assessment was verified')
+    size = _validate_onnx(payload)
+    manifest = _manifest({
+        'schema': 2, 'kind': _VERIFIER_KIND, 'contract': 1, 'id': uuid.uuid4().hex,
         'name': name, 'description': description,
         'created_at': datetime.now(timezone.utc).isoformat(),
         'model_sha256': digest, 'model_size': len(payload), 'input_size': size,
@@ -489,14 +544,39 @@ def delete_model(root, model_id):
     shutil.rmtree(folder)
 
 
+def _selection_mode(manifest, mode=None):
+    if manifest['schema'] == 1:
+        if mode not in (None, 'refine'):
+            raise ModelError('A mask-refinement model supports only refine mode')
+        return 'refine'
+    if mode is None:
+        mode = 'review'
+    if mode not in ('review', 'filter'):
+        raise ModelError('Choose review or filter for a secondary plate model')
+    if mode == 'filter' and manifest['validation']['status'] != 'validated':
+        raise ModelError('Filtering requires a validated secondary assessment')
+    return mode
+
+
 @_boundary
-def snapshot_model(root, model_id, job_dir):
+def snapshot_model(root, model_id, job_dir, mode=None):
     model_id = _identifier(model_id)
     root = _directory(root)
     manifest, payload = _load_directory(root / model_id)
     if manifest['id'] != model_id:
         raise ModelError('Model directory and manifest identifiers differ')
+    mode = _selection_mode(manifest, mode)
+    selection = _no_links(_absolute(job_dir) / 'plate_model_selection.json')
+    if selection.exists():
+        raise ModelError('A model selection already exists for this job')
     _publish(job_dir, 'plate_model', manifest, payload)
+    try:
+        _atomic_json(selection, {'schema': 1, 'model_id': manifest['id'],
+                                'model_sha256': manifest['model_sha256'], 'mode': mode})
+    except Exception:
+        # No caller may queue a job whose mode was not durably recorded.
+        shutil.rmtree(_absolute(job_dir) / 'plate_model')
+        raise
     return manifest
 
 
@@ -504,3 +584,23 @@ def snapshot_model(root, model_id, job_dir):
 def load_snapshot(job_dir):
     job = _directory(job_dir)
     return _load_directory(job / 'plate_model')
+
+
+@_boundary
+def load_selection(job_dir, manifest=None):
+    job = _directory(job_dir)
+    manifest = _manifest(manifest) if manifest is not None else load_snapshot(job)[0]
+    path = _no_links(job / 'plate_model_selection.json')
+    if not path.exists():
+        if manifest['schema'] == 1:
+            return 'refine'  # Existing snapshots predate explicit mode storage.
+        raise ModelError('The secondary model selection is missing; start a new scan')
+    selection = _json(_read_file(path, _MANIFEST_LIMIT))
+    if (not isinstance(selection, dict)
+            or set(selection) != {'schema', 'model_id', 'model_sha256', 'mode'}
+            or type(selection['schema']) is not int or selection['schema'] != 1
+            or selection['model_id'] != manifest['id']
+            or selection['model_sha256'] != manifest['model_sha256']
+            or not isinstance(selection['mode'], str)):
+        raise ModelError('The saved model selection does not match this job snapshot')
+    return _selection_mode(manifest, selection['mode'])

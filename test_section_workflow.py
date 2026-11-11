@@ -10,6 +10,7 @@ import pytest
 
 import openscrub
 import openscrub_web as web
+import learned_models
 
 
 @pytest.fixture
@@ -132,3 +133,105 @@ def test_section_render_owns_half_open_frames(tmp_path):
     assert openscrub._sample_active(d,10,1.)
     assert openscrub._sample_active(d,19,1.9)
     assert not openscrub._sample_active(d,20,2.)
+
+
+@pytest.fixture
+def section_verifier(section_job, tmp_path):
+    from test_learned_models import evaluated_candidate
+
+    source, _, candidate_id, _ = evaluated_candidate(tmp_path / 'verifier-source')
+    return learned_models.save_candidate(web.learned_models_root(), source,
+                                         candidate_id, 'Garage checker')
+
+
+def test_section_rescan_does_not_inherit_parent_filter_mode(section_job, section_verifier):
+    client, parent, _, queued = section_job
+    parent['options'].update(learned_plate_model='previous-model',
+                             learned_plate_model_mode='filter')
+    section = create_section(client)
+    response = client.post('/api/jobs/parent/sections/' + section['id'] + '/rescan',
+                           json={'model_id': section_verifier['id']})
+    assert response.status_code == 202, response.get_data(as_text=True)
+    child = web.JOBS[response.get_json()['job_id']]
+    assert child['options'].get('learned_plate_model_mode', 'review') == 'review'
+    assert learned_models.load_selection(child['dir']) == 'review'
+    saved = json.loads((Path(child['dir']) / 'section-job.json').read_text())
+    assert saved['options'].get('learned_plate_model_mode', 'review') == 'review'
+    assert parent['options']['learned_plate_model_mode'] == 'filter'
+    assert queued == [(child['id'], 'scan')]
+
+
+def test_section_rescan_persists_explicit_verifier_filter_mode(section_job, section_verifier):
+    client, parent, _, queued = section_job
+    parent['options']['learned_plate_model_mode'] = 'review'
+    section = create_section(client)
+    response = client.post('/api/jobs/parent/sections/' + section['id'] + '/rescan',
+                           json={'model_id': section_verifier['id'],
+                                 'learned_plate_model_mode': 'filter'})
+    assert response.status_code == 202, response.get_data(as_text=True)
+    child = web.JOBS[response.get_json()['job_id']]
+    assert child['options'].get('learned_plate_model_mode') == 'filter'
+    assert learned_models.load_selection(child['dir']) == 'filter'
+    saved = json.loads((Path(child['dir']) / 'section-job.json').read_text())
+    assert saved['options']['learned_plate_model_mode'] == 'filter'
+    assert queued == [(child['id'], 'scan')]
+
+
+@pytest.mark.parametrize('mode', ['automatic', False, {}])
+def test_section_rescan_rejects_invalid_mode_before_creating_job(section_job, section_verifier, mode):
+    client, parent, _, queued = section_job
+    section = create_section(client)
+    before = (Path(parent['dir']) / 'report.json').read_bytes()
+    response = client.post('/api/jobs/parent/sections/' + section['id'] + '/rescan',
+                           json={'model_id': section_verifier['id'],
+                                 'learned_plate_model_mode': mode})
+    assert response.status_code == 400, response.get_data(as_text=True)
+    assert list(web.JOBS) == ['parent'] and queued == []
+    assert (Path(parent['dir']) / 'report.json').read_bytes() == before
+
+
+def test_section_export_clears_model_mode_but_keeps_checker_audit(section_job):
+    client, parent, source, queued = section_job
+    parent['options']['learned_plate_model_mode'] = 'filter'
+    source['verification'] = {'name': 'Garage checker', 'mode': 'filter',
+                              'model_sha256': 'b' * 64}
+    (Path(parent['dir']) / 'report.json').write_text(json.dumps(source))
+    section = create_section(client)
+    endpoint = '/api/jobs/parent/sections/' + section['id']
+    assert client.post(endpoint + '/approve', json={}).status_code == 200
+    response = client.post(endpoint + '/export', json={})
+    assert response.status_code == 202, response.get_data(as_text=True)
+    child = web.JOBS[response.get_json()['job_id']]
+    assert not child['options'].get('learned_plate_model')
+    assert not child['options'].get('learned_plate_model_mode')
+    assert not (Path(child['dir']) / 'plate_model_selection.json').exists()
+    saved = json.loads((Path(child['dir']) / 'section-job.json').read_text())
+    assert not saved['options'].get('learned_plate_model_mode')
+    exported = json.loads((Path(child['dir']) / 'report.json').read_text())
+    assert exported['verification'] == source['verification']
+    assert queued == [(child['id'], 'render')]
+
+
+def test_approved_checker_candidate_names_model_and_clears_whole_video_audit(section_job):
+    client, parent, source, _ = section_job
+    old_audit = {'name': 'Old checker', 'mode': 'review', 'model_sha256': 'a' * 64}
+    source['verification'] = old_audit
+    parent['verification'] = old_audit
+    (Path(parent['dir']) / 'report.json').write_text(json.dumps(source))
+    section = create_section(client)
+    endpoint = '/api/jobs/parent/sections/' + section['id']
+    response = client.post(endpoint + '/rescan', json={})
+    assert response.status_code == 202, response.get_data(as_text=True)
+    child = web.JOBS[response.get_json()['job_id']]
+    candidate = deepcopy(source)
+    candidate['verification'] = {'name': 'New checker', 'mode': 'filter',
+                                 'model_sha256': 'b' * 64}
+    (Path(child['dir']) / 'report.json').write_text(json.dumps(candidate))
+    child['phase'] = 'review'
+    response = client.post(endpoint + '/approve', json={'candidate_id': child['id']})
+    assert response.status_code == 200, response.get_data(as_text=True)
+    assert response.get_json()['section']['approved']['model'] == 'New checker'
+    merged = json.loads((Path(parent['dir']) / 'report.json').read_text())
+    assert 'verification' not in merged and 'verification' not in parent
+    assert [record['verification']['name'] for record in merged['range_provenance']] == [
+        'Old checker', 'New checker', 'Old checker']
