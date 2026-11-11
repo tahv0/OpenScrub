@@ -104,6 +104,8 @@ Desktop.ini
 *~
 
 # ---- Logs & scratch --------------------------------------------------------
+# Persistent diagnostics, rotations and restart markers may contain private paths.
+/logs/
 *.log
 web*.log
 *.tmp

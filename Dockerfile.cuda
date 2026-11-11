@@ -151,7 +151,7 @@ RUN python prefetch_models.py yunet sface vittrack ppdet plate_t640
 
 # ---- app layers: tiny, change every release
 COPY pyproject.toml README.md LICENSE NOTICE THIRD_PARTY_NOTICES.md plate_models.json face_models.json person_models.json ./
-COPY openscrub.py openscrub_web.py stop_review.py learning_session.py video_learning.py learned_models.py video_sections.py section_workflow.py openscrub_setup.py openscrub_update.py \
+COPY openscrub.py openscrub_web.py stop_review.py openscrub_logging.py learning_session.py video_learning.py learned_models.py video_sections.py section_workflow.py openscrub_setup.py openscrub_update.py \
      openscrub_vault.py zones_ui.py install.py test_openscrub.py ./
 COPY assets/openscrub.ico assets/
 COPY scripts/ scripts/
@@ -180,6 +180,7 @@ ENV OPENSCRUB_IN_DOCKER=1
 # debugged a perfectly healthy server because the startup banner (and any
 # crash traceback stuck behind it) never appeared.
 ENV PYTHONUNBUFFERED=1
+ENV PYTHONFAULTHANDLER=1
 
 EXPOSE 8384
 # Lets `docker ps`/Docker Desktop show whether the server actually answers
