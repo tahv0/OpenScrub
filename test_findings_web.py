@@ -438,3 +438,43 @@ def test_unlinked_archive_after_report_failure_requires_explicit_different_retry
     assert retry.get_json()['finding']['revision'] == 2
     row = json.loads(path.read_text())['detections'][0]
     assert row['confirmed_finding_id'] == original['id'] and row['verified_label'] == 'not_plate'
+
+
+def test_final_track_uses_cached_scan_representative_without_video_decode(findings_job, monkeypatch):
+    client, job, video, path = findings_job
+    doc = json.loads(path.read_text())
+    base = dict(doc['detections'][0])
+    # The scan cached the real detector hit at frame 2 before final tracking.
+    cap = cv2.VideoCapture(str(video))
+    cap.set(cv2.CAP_PROP_POS_FRAMES, 2)
+    ok, pixels = cap.read()
+    cap.release()
+    assert ok
+    raw = dict(base, frame_index=2, t_start=.2, t_end=.2, last_seen=.2, track=-1)
+    assert web.finding_previews.capture(job['dir'], pixels, 2, 10., [raw])['added'] == 1
+
+    # Post-processing inserted an earlier synthetic continuity row and assigned
+    # both rows to the same final track. Review chooses the earlier row.
+    synthetic = dict(base, frame_index=1, t_start=.1, t_end=.1, last_seen=.1,
+                     track=9, fallback_reason='interpolated_sample')
+    real = dict(base, frame_index=2, t_start=.2, t_end=.2, last_seen=.2, track=9)
+    doc['detections'] = [synthetic, real]
+    path.write_text(json.dumps(doc))
+
+    monkeypatch.setattr(web, '_frame_at',
+        lambda *a, **k: pytest.fail('reconciled cached preview reopened source video'))
+    # The detections call performs lazy reconciliation for jobs created before
+    # the post-scan reconciliation hook existed.
+    assert client.get(f'/api/jobs/{job["id"]}/detections').status_code == 200
+    preview = client.get(f'/api/jobs/{job["id"]}/finding-preview/0?cache_only=1')
+    assert preview.status_code == 200, preview.get_data(as_text=True)
+    meta = json.loads(preview.headers['X-Finding-Geometry'])
+    assert meta['match'] == 'representative'
+    assert meta['requested_frame'] == 1 and meta['frame'] == 2
+
+    saved = client.post(f'/api/jobs/{job["id"]}/confirm/0', json={'label':'positive'})
+    assert saved.status_code == 200, saved.get_data(as_text=True)
+    entry = saved.get_json()['finding']
+    assert entry['frame'] == 2
+    stored = json.loads(path.read_text())['detections']
+    assert all(r['verified_label'] == 'plate' for r in stored)
