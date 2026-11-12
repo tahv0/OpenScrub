@@ -4769,7 +4769,7 @@ async function loadReviewPreview(state,task,cacheOnly){
    }
    if(status)status.textContent=error.name==="AbortError"
     ?"Preview timed out. Retry when ready.":"Preview unavailable: "+error.message;
-   if(retry)retry.hidden=false;
+   if(retry){retry.hidden=false;retry.textContent="Retry preview";}
   }
  }finally{
   if(url){state.urls.delete(url);URL.revokeObjectURL(url);}
