@@ -23,7 +23,9 @@ import threading
 import cv2
 import numpy as np
 
-# Item count is only a safety ceiling; the 64 MiB byte budget is the real disk bound.\nMAX_ITEMS = 10000\nMAX_BYTES = 64 * 1024 * 1024
+# Item count is only a safety ceiling; the 64 MiB byte budget is the real disk bound.
+MAX_ITEMS = 10000
+MAX_BYTES = 64 * 1024 * 1024
 MAX_PER_CAPTURE = 12
 _LOCK = threading.RLock()
 _KEY = re.compile(r'[a-f0-9]{64}\Z')
