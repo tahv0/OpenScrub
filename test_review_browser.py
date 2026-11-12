@@ -43,6 +43,13 @@ def review_server(tmp_path, monkeypatch):
            'provenance': {'input':str(video), 'input_sha256':hashlib.sha256(video.read_bytes()).hexdigest()}}
     report = job_dir / 'report.json'
     report.write_text(json.dumps(doc))
+    # A modern scan already has compact review pictures. Browser tests should
+    # exercise that fast path by default; individual tests deliberately create
+    # misses when they need to exercise explicit source decoding.
+    for start in range(0, len(rows), web.finding_previews.MAX_PER_CAPTURE):
+        web.finding_previews.capture(
+            str(job_dir), frame, 300, 30.,
+            rows[start:start + web.finding_previews.MAX_PER_CAPTURE])
     job = dict(id='inline-fixture', dir=str(job_dir), video=str(video), name='Synthetic review fixture',
                phase='review', progress=1., error=None, stats={}, log=[], output=None,
                created=0, options={}, cancel=threading.Event(), stop=threading.Event())
@@ -225,7 +232,10 @@ def test_cached_card_loads_while_another_preview_is_decoding(review_server, monk
             page.get_by_role('link', name='Synthetic review fixture', exact=True).click()
             page.locator('#review').wait_for()
             page.locator('#det0').scroll_into_view_if_needed()
-            assert entered.wait(5), 'the cold decoder never started'
+            page.locator('#det0').get_by_role('button', name='Load preview', exact=True).wait_for()
+            assert not entered.is_set(), 'opening Review must not start a cold video decode'
+            page.locator('#det0').get_by_role('button', name='Load preview', exact=True).click()
+            assert entered.wait(5), 'explicit Load preview did not start the decoder'
             assert page.locator('#det1 img').evaluate('(img)=>img.naturalWidth') == 0
             page.evaluate('window.__releaseWarm()')
             page.wait_for_function(
@@ -393,6 +403,8 @@ def test_editing_another_representative_after_track_save_does_not_conflict(revie
                 # A later selection uses another frame, not two duplicate cards.
                 page.evaluate('async()=>{LEARNING_SELECTION=new Set([1]);await loadReview();}')
                 page.locator('#det1').scroll_into_view_if_needed()
+                page.locator('#det1').get_by_role('button', name='Load preview', exact=True).wait_for()
+                page.locator('#det1').get_by_role('button', name='Load preview', exact=True).click()
                 page.wait_for_function('!!document.querySelector("#det1 img")._quadEdit')
             card=page.locator('#det%d'%i);card.scroll_into_view_if_needed()
             drag_corner(page,card)
