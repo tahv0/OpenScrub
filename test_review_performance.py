@@ -327,7 +327,7 @@ reviewRequest=async (url,options)=>{
  for(let i=0;i<20;i++)await new Promise(resolve=>setImmediate(resolve));
  assert.equal(images[1].naturalWidth,100,'warm preview is blocked behind cold decoder');
  assert.equal(images[0].naturalWidth,0);
- assert.equal(maxCold,1);assert.ok(maxCache<=3);
+ assert.equal(maxCold,0,'opening Review silently started source decoding');assert.ok(maxCache<=3);
  const old=images[1].src;badImage=true;
  const failed=queueReviewPreview(images[1],true);
  assert.equal(await failed,false);
@@ -336,7 +336,7 @@ reviewRequest=async (url,options)=>{
  clearReviewPreviews();
  await Promise.all(pending);
  assert.equal(REVIEW_MEDIA,null);assert.equal(activeCold,0);
- console.log('cached preview overtakes cold work; limits, fallback and cancellation OK');
+ console.log('cached previews load without implicit cold work; limits and cancellation OK');
 })().catch(e=>{console.error(e);process.exitCode=1;});
 '''
     result = subprocess.run(['node','-e',harness],capture_output=True,text=True,timeout=10)
