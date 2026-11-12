@@ -4774,8 +4774,15 @@ async function loadReviewPreview(state,task,cacheOnly){
  }finally{
   if(url){state.urls.delete(url);URL.revokeObjectURL(url);}
   state[counter]--;state.controllers.delete(ctl);
-  if((missing||retryBusy)&&REVIEW_MEDIA===state&&img.isConnected){
-   if(missing&&status)status.textContent="Waiting to generate preview…";
+  if(missing&&cacheOnly&&!task.priority&&REVIEW_MEDIA===state&&img.isConnected){
+   // Opening Review must never start source-video decoding just because a
+   // compact scan-time picture is missing. Keep the card interactive and let
+   // the person opt into the expensive path for the few findings they need.
+   if(status)status.textContent="Preview not cached — load only if needed.";
+   if(retry){retry.hidden=false;retry.textContent="Load preview";}
+   img._previewTask=null;task.resolve(false);
+  }else if((missing||retryBusy)&&REVIEW_MEDIA===state&&img.isConnected){
+   if(missing&&status)status.textContent="Loading source preview…";
    const queue=retryBusy&&cacheOnly?state.cacheQueue:state.queue;
    if(task.priority)queue.unshift(task);else queue.push(task);
   }else{img._previewTask=null;task.resolve(ok);}
@@ -4829,7 +4836,11 @@ function initReviewPreviews(){
 }
 function retryReviewPreview(button){
  const img=button.closest(".det").querySelector("img[data-preview-url]");
- if(img){img._plateMeta=null;queueReviewPreview(img,true);}
+ if(img){
+  button.disabled=true;button.textContent="Loading preview…";
+  img._plateMeta=null;
+  queueReviewPreview(img,true).finally(()=>{if(button.isConnected)button.disabled=false;});
+ }
 }
 
 let QEDIT=null;
