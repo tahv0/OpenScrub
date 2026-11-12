@@ -23,7 +23,8 @@ import threading
 import cv2
 import numpy as np
 
-MAX_ITEMS = 2000
+# Item count is only a safety ceiling; the 64 MiB byte budget is the real disk bound.
+MAX_ITEMS = 10000
 MAX_BYTES = 64 * 1024 * 1024
 MAX_PER_CAPTURE = 12
 _LOCK = threading.RLock()
@@ -86,6 +87,8 @@ def _db(job_dir, create=False):
                            'metadata TEXT NOT NULL, jpeg BLOB NOT NULL)')
         connection.execute('CREATE INDEX IF NOT EXISTS frame_category '
                            'ON previews(frame,category)')
+        connection.execute('CREATE INDEX IF NOT EXISTS track_category '
+                           'ON previews(track,category)')
         connection.execute('CREATE TABLE IF NOT EXISTS settings '
                            '(key TEXT PRIMARY KEY, value INTEGER)')
         connection.commit()
@@ -364,27 +367,136 @@ def lookup(job_dir, row, render_state, *, allow_representative=False):
                             match='exact', requested_frame=index), bytes(jpeg)
             if not allow_representative:
                 return None
-            records = db.execute('SELECT metadata,jpeg FROM previews WHERE category=? '
-                                 'ORDER BY rowid', (category,)).fetchall()
+            if track >= 0:
+                records = db.execute(
+                    'SELECT metadata,jpeg FROM previews WHERE category=? AND track=? '
+                    'ORDER BY abs(frame-?), rowid', (category, track, index)).fetchall()
+            else:
+                records = db.execute('SELECT metadata,jpeg FROM previews WHERE category=? '
+                                     'ORDER BY rowid', (category,)).fetchall()
             for serialized, jpeg in records:
                 meta = json.loads(serialized)
                 if meta['fps'] != fps or meta['frame'] == index:
                     continue
-                same_track = track >= 0 and meta['track'] == track
-                same_region = (content == meta['content_box'] and
+                same_track = track >= 0 and meta.get('track', -1) == track
+                same_region = (track < 0 and
                                str(row.get('text', ''))[:1024] == meta['text'] and
-                               float(row['t_start']) <= meta['t'] <= float(row['t_end']))
+                               float(row['t_start']) <= meta['t'] <= float(row['t_end'])
+                               and _iou(content, meta['content_box']) >= .5)
                 if not (same_track or same_region):
                     continue
                 f = meta['frame']
                 if f >= len(render_state['cum']) or _offset(render_state['cum'][f]) != meta['offset']:
                     continue
-                return dict(meta, match='representative', requested_frame=index), bytes(jpeg)
+                points = _points(row, meta['box'])
+                if not _fits(points, meta['crop']):
+                    continue
+                return dict(meta, points=points,
+                            preview_token=_hash([meta['key'], points]),
+                            match='representative', requested_frame=index), bytes(jpeg)
         except (ValueError, TypeError, KeyError):
             return None
         finally:
             db.close()
     return None
+
+
+
+def _iou(a, b):
+    ix = max(0., min(a[2], b[2]) - max(a[0], b[0]))
+    iy = max(0., min(a[3], b[3]) - max(a[1], b[1]))
+    inter = ix * iy
+    union = ((a[2]-a[0])*(a[3]-a[1]) +
+             (b[2]-b[0])*(b[3]-b[1]) - inter)
+    return inter / union if union > 0 else 0.
+
+
+def reconcile(job_dir, detections, render_state):
+    """Link scan-time compact pictures to the final post-processed tracks.
+
+    Compact pictures are captured while frames are already decoded, before
+    dense tracking, continuity interpolation, reverse-pass recovery and other
+    post-processing finish. Final Review can therefore point at a synthetic
+    row whose exact frame was never stored even though the same physical
+    object has a nearby cached detector frame.
+
+    Reconciliation never decodes video. It only matches existing compact
+    pictures to final rows from the same category/frame by source-space IoU
+    and writes the final track id into the compact index. That lets Review use
+    a real cached representative of the final track automatically.
+    """
+    try:
+        fps = float(render_state['fps'])
+        cum = render_state['cum']
+        if not math.isfinite(fps) or fps <= 0 or not cum:
+            return dict(total=0, linked=0, already=0)
+    except (KeyError, TypeError, ValueError):
+        return dict(total=0, linked=0, already=0)
+
+    by_frame = {}
+    for row in detections or []:
+        try:
+            row = _row(row)
+            track = int(row.get('track', -1))
+            if track < 0:
+                continue
+            category = str(row.get('category', ''))
+            exact = int(row.get('frame_index', -1))
+            if exact >= 0:
+                frame = exact
+            else:
+                t = min(max(float(row.get('last_seen', row['t_start'])),
+                            float(row['t_start'])), float(row['t_end']))
+                frame = int(round(t * fps))
+            if not 0 <= frame < len(cum):
+                continue
+            content = _box(row['cbox'])
+            offset = _offset(cum[frame])
+            box = [content[0]+offset[0], content[1]+offset[1],
+                   content[2]+offset[0], content[3]+offset[1]]
+            by_frame.setdefault((frame, category), []).append(
+                (track, int(row.get('person', -1)), box))
+        except (ValueError, TypeError, KeyError, OverflowError):
+            continue
+
+    with _LOCK:
+        db = _db(job_dir)
+        if db is None:
+            return dict(total=0, linked=0, already=0)
+        try:
+            records = db.execute(
+                'SELECT key, metadata, track FROM previews ORDER BY rowid').fetchall()
+            linked = already = 0
+            updates = []
+            for key, serialized, old_track in records:
+                try:
+                    meta = json.loads(serialized)
+                    candidates = by_frame.get((int(meta['frame']),
+                                               str(meta['category'])), ())
+                    if not candidates:
+                        continue
+                    best = max(candidates, key=lambda item: _iou(meta['box'], item[2]))
+                    score = _iou(meta['box'], best[2])
+                    if score < .5:
+                        continue
+                    track, person, _ = best
+                    if int(old_track) == track and int(meta.get('track', -1)) == track:
+                        already += 1
+                        continue
+                    meta['track'] = track
+                    if person >= 0:
+                        meta['person'] = person
+                    updates.append((track, _json(meta), key))
+                    linked += 1
+                except (ValueError, TypeError, KeyError, OverflowError):
+                    continue
+            if updates:
+                db.executemany('UPDATE previews SET track=?, metadata=? WHERE key=?',
+                               updates)
+                db.commit()
+            return dict(total=len(records), linked=linked, already=already)
+        finally:
+            db.close()
 
 
 def pending(job_dir, offset=0, limit=60):
