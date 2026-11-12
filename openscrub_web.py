@@ -5518,7 +5518,8 @@ async function loadReview(signal=null,phase=SHELLPH){
   (groups[x.category]=groups[x.category]||[]).push(x);});
  let html=`<div class="card" id="review"><h2>Review findings</h2>
  <p class="review-copy">Review small saved pictures. Choose <b>Is a …</b> or <b>Not a …</b> to save a human example with its source video.
- Missing scan-time pictures stay unloaded until you click <b>Load preview</b>, so opening Review does not reopen the source video.
+ Scan-time pictures are matched to final tracked findings automatically; Review may show a nearby real cached frame from the same track.
+ A genuinely missing picture stays unloaded until you click <b>Load preview</b>, so opening Review does not reopen the source video.
  Drag plate corners to adjust the area; an area edit alone does not confirm a plate.<br>Automatic protection stays active while a finding is <b>Not reviewed</b>. Output choices apply after <b>Save edits &amp; render</b>.
  Drag across cards to select several.</p>
  <div class="row" style="margin-bottom:10px">
