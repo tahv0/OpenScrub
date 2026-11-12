@@ -80,11 +80,25 @@ def test_sample_and_show_all_work_without_report_network(review_server,width,tmp
         page=browser.new_page(viewport={'width':width,'height':1000 if width>400 else 844})
         page.set_default_timeout(12000)
         dialogs,errors=open_review(page,url)
+        # Explicit classification has its own durable transaction. Finish it
+        # before filtering so group0 is one reviewed group out of 100.
         page.locator('#det0').get_by_role('button',name='✕ Not a plate',exact=True).click()
+        page.evaluate('CONFIRM_CHAIN')
+        page.wait_for_function('document.getElementById("vlabel0").textContent.includes("Saved")')
+        assert page.evaluate('CONFIRM_FAILED.size')==0
+        confirmed=json.loads(report.read_text())['detections']
+        assert all(not row['enabled'] and row['verified_label']=='not_plate' for row in confirmed[:100])
+        assert page.evaluate('reviewChoicesPending()') is False
+        # Keep a separate output-only draft. It remains an unreviewed group:
+        # changing output must neither create a training label nor save here.
+        page.locator('#det100').get_by_role('button',name='Keep visible',exact=True).click()
+        assert page.evaluate('reviewChoicesPending()') is True
+        assert page.evaluate('reviewFindingLabel(100)')==''
         before=report.read_bytes()
         page.evaluate('''()=>{
          window.__originalReview=document.getElementById('review');
          window.__originalCard=document.getElementById('det0');
+         window.__draftCard=document.getElementById('det100');
          window.__originalFetch=window.fetch;window.__filterRequests=[];
          window.fetch=(url,opts={})=>{
           if(/\\/(detections|learning\\/review)(?:\\?|$)/.test(String(url))){
@@ -104,20 +118,30 @@ def test_sample_and_show_all_work_without_report_network(review_server,width,tmp
         assert page.evaluate('document.getElementById("det0")===__originalCard')
         assert page.evaluate('reviewChoicesPending()') is True
         assert page.evaluate('EN[0]') is False
+        assert page.evaluate('EN[100]') is False
         assert report.read_bytes()==before,'A filter must not silently save a draft'
         page.get_by_role('button',name='Show all findings',exact=True).click()
         assert page.locator('#review .det:visible').count()==100
         assert page.locator('#det0 .det-status').inner_text()=='Will stay visible'
         assert page.evaluate('__filterRequests')==[]
         assert page.evaluate('document.getElementById("det0")===__originalCard')
+        assert page.evaluate('document.getElementById("det100")===__draftCard')
+        assert page.locator('#det100 .det-status').inner_text()=='Will stay visible'
+        assert page.evaluate('reviewFindingLabel(100)')==''
         assert 'not saved' in page.locator('#reviewSaveStatus').inner_text().lower()
         assert not dialogs and not errors
-        # Explicit saving still persists every group member; sampling didn't.
+        # Explicit saving persists the output draft for every group1 member;
+        # filtering must preserve group0's independently saved classification.
         page.evaluate('window.fetch=window.__originalFetch')
         assert page.evaluate('saveAndRender(true)') is True
         saved=json.loads(report.read_text())['detections']
         assert all(not r['enabled'] and r['verified_label']=='not_plate' for r in saved[:100])
+        assert all(not r['enabled'] and not r.get('verified_label') for r in saved[100:200])
+        assert all(r['enabled'] and not r.get('verified_label') for r in saved[200:])
         assert len(saved)==10000
+        with web.app.test_client() as client:
+            archived=client.get('/api/findings').get_json()
+        assert archived['total']==1 and archived['items'][0]['label']=='negative', 'Only the explicit classification creates evidence'
         page.get_by_role('button',name='Review 10% of plate groups',exact=True).click()
         path=Path(os.environ.get('REVIEW_EVIDENCE_DIR',str(tmp_path)));path.mkdir(parents=True,exist_ok=True)
         page.locator('#reviewSampleSummary').scroll_into_view_if_needed()
@@ -156,6 +180,9 @@ def test_filter_keeps_failed_corner_draft_and_loaded_image(review_server):
         assert not dialogs and not errors
         # Existing explicit rejection recovers the independent draft and saves.
         card.get_by_role('button',name='✕ Not a plate',exact=True).click()
+        page.evaluate('CONFIRM_CHAIN')
+        page.wait_for_function('document.getElementById("vlabel1").textContent.includes("Saved")')
+        assert page.evaluate('CONFIRM_FAILED.size')==0
         page.evaluate('window.fetch=__originalFetch')
         assert page.evaluate('saveAndRender(true)') is True
         assert json.loads(report.read_text())['detections'][1]['verified_label']=='not_plate'
