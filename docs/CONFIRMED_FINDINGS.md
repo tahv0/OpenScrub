@@ -58,13 +58,18 @@ output. A saved example is not evidence that an older rendered file has changed.
 
 During scanning, available candidate pictures can accumulate in the review
 queue while processing continues. They stay unconfirmed until you classify
-them. The temporary scan-preview cache has a size limit. Opening or scrolling
-Review only loads pictures already in that compact cache; it does not
-automatically reopen the source video for a missing picture. A missing card
-shows **Load preview**. Click it only when you need that image; that explicit
-request may perform one CPU decode from the source. Permanently saved findings
-use their stored JPEGs for browsing and editing, including when the original
-video is unavailable.
+them. Tracking and continuity processing can later make a different frame the
+first row of a final Review group, so OpenScrub reconciles the scan-time
+pictures to the final track and automatically shows a nearby real cached frame
+from that same track. This reconciliation is metadata-only and does not reopen
+the video.
+
+The temporary scan-preview cache still has a size limit. Opening or scrolling
+Review does not automatically reopen the source video for a genuinely missing
+picture. Only those exceptional cards show **Load preview**. Clicking it may
+perform one CPU decode from the source. Permanently saved findings use their
+stored JPEGs for browsing and editing, including when the original video is
+unavailable.
 
 Older variable-frame-rate jobs may have timestamp-based findings without exact
 frame indices. You can still view their cached pictures and adjust output or
