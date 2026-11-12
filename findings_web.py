@@ -336,7 +336,7 @@ def region(job, index, payload):
         row['compact_edit_receipt'] = dict(id=edit_id,source=meta['source_token'],token=payload.get('preview_token'))
     doc['render_required'] = True
     stop_review.atomic_report(str(Path(job['dir'])/'report.json'),doc)
-    meta['preview_token'] = _token(doc,row,meta['frame'])
+    meta['preview_token'] = _token(doc,row,meta['frame'],meta.get('key'))
     return dict(ok=True, applied=len(members), verified_samples_added=0,
                 finding=entry, preview=meta, verified_label=row.get('verified_label',''),
                 classification_required=not bool(confirmed.get('label')))
