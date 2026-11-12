@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import subprocess
 import threading
+import shutil
 from unittest.mock import patch
 
 import cv2
@@ -144,61 +145,48 @@ from test_review_browser import review_server, browser_instance, load_browser_pa
 
 
 @pytest.mark.parametrize('width', [1440, 390])
-def test_scroll_jump_loads_current_cards_before_old_queue(review_server, width, tmp_path):
-    """Hold one cold request, enqueue 70 old cards, jump, then revisit a skipped card."""
+def test_scroll_jump_never_decodes_source_without_explicit_load(review_server, width, tmp_path):
+    """Scrolling through cache misses must not reopen the source video."""
     url, report = review_server
+    shutil.rmtree(report.parent / 'compact_previews')
     api = pytest.importorskip('playwright.sync_api')
     with api.sync_playwright() as pw:
         browser = browser_instance(pw)
         page = browser.new_page(viewport={'width':width,'height':1000 if width>400 else 844})
         page.set_default_timeout(12000)
         errors=[]; page.on('pageerror', lambda e:errors.append(str(e)))
-        page.on('dialog',lambda d:d.accept())
         load_browser_page(page,url,[],[])
         assert page.title() == 'OpenScrub'
         page.evaluate('''() => {
-          window.__fetchBeforeHold=window.fetch;window.__coldStarts=[];
+          window.__fetchBeforeObserve=window.fetch;window.__coldStarts=[];
           window.fetch=async(url,opts)=>{
             const m=String(url).match(/\\/finding-preview\\/(\\d+)/);
-            if(m&&!String(url).includes('cache_only=1')){
-              __coldStarts.push(Number(m[1]));
-              if(!window.__held){window.__held=true;await new Promise(r=>window.__releaseCold=r);}
-            }
-            return __fetchBeforeHold(url,opts);
+            if(m&&!String(url).includes('cache_only=1'))__coldStarts.push(Number(m[1]));
+            return __fetchBeforeObserve(url,opts);
           };
         }''')
         page.get_by_role('link',name='Synthetic review fixture',exact=True).click()
         page.locator('#det0').scroll_into_view_if_needed()
-        page.wait_for_function("typeof window.__releaseCold==='function'")
+        page.locator('#det0').get_by_role('button',name='Load preview',exact=True).wait_for()
         page.evaluate('''() => {for(let i=1;i<75;i++)queueReviewPreview(document.querySelector('#det'+i+' img'));}''')
         page.wait_for_function('REVIEW_MEDIA.cacheActive===0&&REVIEW_MEDIA.cacheQueue.length===0')
         page.locator('#det85').scroll_into_view_if_needed()
-        page.wait_for_function("!!document.querySelector('#det85 img')._previewTask")
-        page.wait_for_function('REVIEW_MEDIA.cacheActive===0&&REVIEW_MEDIA.cacheQueue.length===0')
-        page.evaluate('__releaseCold()')
+        page.locator('#det85').get_by_role('button',name='Load preview',exact=True).wait_for()
+        assert page.evaluate('__coldStarts') == [], 'cache misses silently started source decoding'
+        page.locator('#det85').get_by_role('button',name='Load preview',exact=True).click()
         page.wait_for_function("document.querySelector('#det85 img').naturalWidth>0")
-        started=page.evaluate('__coldStarts')
-        assert all(i>=75 for i in started[1:]), started
-        assert len(started)<14, started
+        assert page.evaluate('__coldStarts') == [85]
         assert page.locator('#det85 canvas').count()==1
-        page.locator('#det85').get_by_role('button',name='✕ Not a plate',exact=True).click()
-        page.evaluate('CONFIRM_CHAIN')
-        assert page.locator('#det85 .det-status').inner_text()=='Will stay visible'
         evidence=Path(os.environ.get('REVIEW_EVIDENCE_DIR',str(tmp_path)));evidence.mkdir(parents=True,exist_ok=True)
-        page.screenshot(path=str(evidence/('viewport-priority-%s.png'%width)))
-        # Intersection observation must re-enqueue work discarded on the way down.
-        page.locator('#det10').scroll_into_view_if_needed()
-        page.wait_for_function("!!document.querySelector('#det10 img')._quadEdit")
-        assert page.evaluate('saveAndRender(true)') is True
-        assert json.loads(report.read_text())['detections'][85]['verified_label']=='not_plate'
+        page.screenshot(path=str(evidence/('manual-cold-preview-%s.png'%width)))
         assert not errors,errors
         assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
         browser.close()
 
-
-def test_busy_preview_retries_automatically_without_another_click(review_server,monkeypatch):
+def test_busy_preview_retries_only_after_explicit_load(review_server,monkeypatch):
     from flask import request,jsonify
-    url,_=review_server
+    url,report=review_server
+    shutil.rmtree(report.parent / 'compact_previews')
     old=web.app.view_functions['finding_preview'];cold=[]
     def busy_once(jid,index):
         if index==0 and request.args.get('cache_only')!='1':
@@ -213,7 +201,10 @@ def test_busy_preview_retries_automatically_without_another_click(review_server,
         errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
         load_browser_page(page,url,[],[])
         page.get_by_role('link',name='Synthetic review fixture',exact=True).click()
-        page.locator('#det0').scroll_into_view_if_needed()
+        card=page.locator('#det0');card.scroll_into_view_if_needed()
+        card.get_by_role('button',name='Load preview',exact=True).wait_for()
+        assert cold==[]
+        card.get_by_role('button',name='Load preview',exact=True).click()
         page.wait_for_function("!!document.querySelector('#det0 img')._quadEdit")
         assert cold==[0,0]
         assert not errors,errors
@@ -235,7 +226,11 @@ reviewRequest=async(url)=>{
  calls++;const e=new Error('busy');e.status=503;throw e;
 };
 (async()=>{
- initReviewPreviews();const pending=img._previewTask.promise;
+ initReviewPreviews();
+ const automatic=img._previewTask.promise;
+ assert.equal(await automatic,false);
+ assert.equal(calls,0,'opening Review must not start a cold decode');
+ const pending=queueReviewPreview(img,true);
  await new Promise(r=>setTimeout(r,30));
  if(CANCEL){clearReviewPreviews();assert.equal(await pending,false);
    await new Promise(r=>setTimeout(r,1800));assert.equal(calls,1);}

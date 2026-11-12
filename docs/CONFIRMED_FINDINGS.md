@@ -58,10 +58,13 @@ output. A saved example is not evidence that an older rendered file has changed.
 
 During scanning, available candidate pictures can accumulate in the review
 queue while processing continues. They stay unconfirmed until you classify
-them. The temporary scan-preview cache has a size limit; an older job or a
-picture missing from that cache can require one CPU decode from the source when
-requested. Permanently saved findings use their stored JPEGs for browsing and
-editing, including when the original video is unavailable.
+them. The temporary scan-preview cache has a size limit. Opening or scrolling
+Review only loads pictures already in that compact cache; it does not
+automatically reopen the source video for a missing picture. A missing card
+shows **Load preview**. Click it only when you need that image; that explicit
+request may perform one CPU decode from the source. Permanently saved findings
+use their stored JPEGs for browsing and editing, including when the original
+video is unavailable.
 
 Older variable-frame-rate jobs may have timestamp-based findings without exact
 frame indices. You can still view their cached pictures and adjust output or
