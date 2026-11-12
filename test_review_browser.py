@@ -403,8 +403,6 @@ def test_editing_another_representative_after_track_save_does_not_conflict(revie
                 # A later selection uses another frame, not two duplicate cards.
                 page.evaluate('async()=>{LEARNING_SELECTION=new Set([1]);await loadReview();}')
                 page.locator('#det1').scroll_into_view_if_needed()
-                page.locator('#det1').get_by_role('button', name='Load preview', exact=True).wait_for()
-                page.locator('#det1').get_by_role('button', name='Load preview', exact=True).click()
                 page.wait_for_function('!!document.querySelector("#det1 img")._quadEdit')
             card=page.locator('#det%d'%i);card.scroll_into_view_if_needed()
             drag_corner(page,card)
