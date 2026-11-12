@@ -56,7 +56,20 @@ jobs:
         run: |
           docker compose -f compose.windows-test.yml down
           docker compose -f compose.windows-test.yml up -d --wait --wait-timeout 180
-          python -c "import json,urllib.request; j=json.load(urllib.request.urlopen('http://localhost:8384/api/jobs/integration-fixture')); assert j['phase']=='done' and j['has_output']; print('Rendered job recovered from bind-mounted data')"
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from urllib.request import urlopen
+          url = 'http://localhost:8384/api/jobs/integration-fixture'
+          job = json.load(urlopen(url))
+          assert job['phase'] == 'done' and job['has_output'], job
+          report = json.load(urlopen(url + '/report'))
+          expected = json.loads(Path('integration-evidence/updated_corners_audit.json').read_text())
+          assert report == expected, 'Restart changed the saved review report'
+          video = urlopen(url + '/download').read()
+          assert video == Path('integration-evidence/updated_corners.mp4').read_bytes(), 'Restart changed the rendered video'
+          print('Current rendered video and corrected review recovered unchanged from bind-mounted data')
+          PY
       - name: Capture container diagnostics
         if: always()
         run: |

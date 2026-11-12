@@ -48,6 +48,8 @@ HIDDEN = [
     "cheroot", "cheroot.wsgi", "cheroot.ssl", "cheroot.ssl.builtin",
     "openscrub_update", "openscrub_setup", "openscrub_vault", "zones_ui",
     "learning_candidates", "plate_verifier",
+    "confirmed_findings", "finding_previews", "findings_training",
+    "findings_web", "findings_ui", "plate_text_hints", "plate_text_web",
 ] + _ort_hidden
 EXCLUDES = [
     "spacy", "paddleocr", "paddle", "torch", "torchvision",

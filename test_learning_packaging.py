@@ -1,4 +1,5 @@
 """Training is optional, isolated from runtime cv2, and uses a pinned checkpoint."""
+import ast
 import hashlib
 import io
 from pathlib import Path
@@ -10,6 +11,30 @@ import tarfile
 import zipfile
 import pytest
 from scripts import download_training_checkpoint as checkpoint
+
+
+FINDINGS_MODULES = (
+    "confirmed_findings", "finding_previews", "findings_training",
+    "findings_web", "findings_ui", "plate_text_hints", "plate_text_web",
+)
+
+
+@pytest.mark.parametrize("target", ["wheel", "sdist"])
+def test_distributions_include_confirmed_findings_modules(target):
+    text = (Path(__file__).parent / "pyproject.toml").read_text(encoding="utf-8")
+    section = text.split(f"[tool.hatch.build.targets.{target}]", 1)[1].split("\n[", 1)[0]
+    for module in FINDINGS_MODULES:
+        assert f'"{module}.py"' in section, f"{target} omits {module}"
+
+
+def test_windows_web_build_includes_confirmed_findings_modules():
+    spec = Path(__file__).parent / "windows" / "openscrub.spec"
+    tree = ast.parse(spec.read_text(encoding="utf-8"))
+    hidden = next(node.value for node in tree.body if isinstance(node, ast.Assign)
+                  and any(isinstance(target, ast.Name) and target.id == "HIDDEN"
+                          for target in node.targets))
+    names = ast.literal_eval(hidden.left)
+    assert set(FINDINGS_MODULES) <= set(names)
 
 
 def test_download_verifies_before_installing(tmp_path,monkeypatch):
@@ -35,7 +60,8 @@ def test_all_runtime_images_include_learning_imports():
     root=Path(__file__).parent
     for name in ('Dockerfile','Dockerfile.cuda','Dockerfile.intel'):
         text=(root/name).read_text()
-        for module in ('stop_review.py','video_learning.py','learning_session.py','learned_models.py'):
+        for module in ('stop_review.py','video_learning.py','learning_session.py','learned_models.py',
+                       *(module + '.py' for module in FINDINGS_MODULES)):
             assert module in text,name+' omits '+module
         assert 'COPY scripts/ scripts/' in text
     cuda=(root/'Dockerfile.cuda').read_text()
@@ -59,16 +85,19 @@ def learning_distributions(tmp_path_factory):
 
 def _import_secondary_modules(folder):
     # A fresh interpreter cannot accidentally reuse modules from the source tree.
-    script = '''import pathlib,sys
+    script = '''import importlib,pathlib,sys
 root=pathlib.Path(sys.argv[1]).resolve()
 sys.path.insert(0,str(root))
+for name in sys.argv[2:]:
+    module = importlib.import_module(name)
+    assert pathlib.Path(module.__file__).parent == root, name
 import plate_verifier,learning_candidates
 assert pathlib.Path(plate_verifier.__file__).parent == root
 assert pathlib.Path(learning_candidates.__file__).parent == root
 assert callable(plate_verifier.review_report)
 assert callable(learning_candidates.evaluate)
 '''
-    result = subprocess.run([sys.executable, '-I', '-c', script, str(folder)],
+    result = subprocess.run([sys.executable, '-I', '-c', script, str(folder), *FINDINGS_MODULES],
                             cwd=folder, text=True, capture_output=True, timeout=30)
     assert result.returncode == 0, result.stdout + result.stderr
 

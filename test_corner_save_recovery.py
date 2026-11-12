@@ -6,6 +6,7 @@ import subprocess
 
 import numpy as np
 import pytest
+import confirmed_findings
 import openscrub_web as web
 from test_plate_quad_editor import plate_job
 from test_review_browser import review_server, browser_instance, load_browser_page, drag_corner, plate_points
@@ -214,7 +215,18 @@ def test_boundary_preview_drag_preserves_edge_without_handle_jump(review_server,
         after=plate_points(card)
         assert after[2][1]==360, 'An inset handle must not pull a valid edge inward on a horizontal drag'
         assert after[2][0]==pytest.approx(before[2][0]-2*handle['scale'],abs=.001)
-        assert len((path.parent/'plate_annotations/annotations.jsonl').read_text().splitlines())==1
+        archive=path.parent.parent/'confirmed_findings'
+        assert confirmed_findings.list_findings(archive)['total']==0, 'Area-only edits are drafts'
+        assert not (path.parent/'plate_annotations').exists()
+        card.get_by_role('button',name='✓ Is a plate',exact=True).click()
+        page.evaluate('CONFIRM_CHAIN')
+        assert page.evaluate('CONFIRM_PENDING.size===0&&CONFIRM_FAILED.size===0')
+        saved=confirmed_findings.list_findings(archive)
+        assert saved['total']==1
+        entry=saved['items'][0]
+        assert entry['label']=='positive' and entry['shape_confirmed']
+        assert np.allclose(entry['points'],after,atol=.001)
+        assert confirmed_findings.image_path(archive,entry['id']).is_file()
         assert not errors,errors
         browser.close()
 

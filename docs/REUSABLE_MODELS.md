@@ -4,6 +4,14 @@ A learned model can be saved for an environment, selected for another video, and
 
 ## Save and use a model
 
+The [Findings workflow](CONFIRMED_FINDINGS.md#train-a-named-model-from-accumulated-examples)
+trains a named checker from selected human confirmations and saves it directly
+to the model library. Completed **Train & rescan this video** candidates also
+receive the optional run name, or an automatic video/timestamp name. Select a
+saved model in Scan Setup when you want to use it; saving does not activate it.
+
+To save an older accepted mask or evaluated candidate manually:
+
 1. Complete an accepted mask-refinement learning pass, or evaluate a retained
    training candidate using the secondary checker in Review findings.
 2. In Review findings, open **Save trained model for other videos**.
@@ -17,9 +25,10 @@ The default is **None — use original plate masks**. Saving or importing does n
 Existing full-frame detectors still find plate proposals using every-frame
 plate detection. Accepted mask models refine their geometry; empty, uncertain
 or spatially inconsistent predictions retain original coverage. Secondary
-checker models instead offer **Review suggestions** (the default) or explicit
-**Filter false positives** after an independent held-out positive/negative
-assessment passes. Review-only candidates remain review-only after transfer.
+checker models instead offer **Review suggestions — preserve output choices**
+(the default) or explicit **Filter validated false positives** after an
+independent held-out positive/negative assessment passes. Review-only
+candidates remain review-only after transfer.
 Human decisions take precedence in both modes. The selected mode is pinned
 alongside the model and survives a restart, including a paused scan.
 
@@ -49,9 +58,27 @@ Import packages from sources you trust. These checks establish integrity and dec
 
 ## Training and storage
 
-Reusable ONNX models are for processing videos. **Train & rescan this video** still uses the current job's own verified examples, accepted training checkpoint and history. Importing an inference model does not import a PyTorch checkpoint or transfer another video's human decisions.
+Reusable ONNX packages are for processing videos. Local named training also
+retains a separate checkpoint, example snapshot, and training history. These
+locally trainable models appear under **Start from** in the Findings view, so
+you can continue with new confirmed examples while keeping previous versions.
+Current corrections and forgotten examples are reconciled before a new training
+snapshot; older weights are not retrospectively untrained.
+
+**Train & rescan this video** uses the current job's verified polygon examples
+and can continue its accepted local checkpoint/history. Its mask acceptance
+rules remain separate from the named checker's filtering assessment.
+Importing an inference package does not import a PyTorch checkpoint, example
+corpus, or another video's human decisions. Such a model cannot serve as a
+trainable parent just because it can perform inference.
 
 The library is stored under the reserved `openscrub_jobs/learned_plate_models/` directory and follows the app's encryption vault. It survives job retention and deletion. Each selected job has an independent `plate_model/` snapshot. Locking the vault blocks model management along with other job operations.
+
+The confirmed-picture library and retained local training state are also
+reserved data, independent of individual job retention. The
+[Findings guide](CONFIRMED_FINDINGS.md#source-identity-retention-and-another-pc)
+explains content-based video identity and what is retained. Export/import of a
+model is not an export/import operation for those records.
 
 Use matching OpenScrub builds on both PCs. The normal Windows test/CUDA/training Compose commands remain unchanged; rebuild the application to obtain the new UI and runtime module. Continuing to train requires the optional training environment, while using saved models uses the normal ONNX runtime.
 

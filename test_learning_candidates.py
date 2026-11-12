@@ -104,7 +104,7 @@ def test_historical_candidates_list_without_model_execution_or_activation(tmp_pa
     listed = lc.list_candidates(job)
     assert len(listed) == 1
     descriptor = listed[0]
-    assert set(descriptor) == {'id', 'version', 'created_at', 'model_sha256',
+    assert set(descriptor) == {'id', 'name', 'version', 'created_at', 'model_sha256',
                                 'assessment', 'mask_assessment'}
     assert descriptor['id'] == CANDIDATE_ID
     assert descriptor['version'] == VERSION

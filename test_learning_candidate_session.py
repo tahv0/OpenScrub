@@ -34,11 +34,14 @@ def rejection_type():
 
 
 class EmptyModel:
-    def __init__(self, *args):
+    def __init__(self, *args, **kwargs):
         pass
 
     def predict(self, image):
         return None, 0.
+
+    def predict_proposal(self, image, box):
+        return self.predict(image)
 
 
 class TightModel:
@@ -215,6 +218,9 @@ def test_worker_exposes_retained_candidate_without_marking_training_as_an_error(
     job, _, path, _ = _seed(plate_job)
     before = path.read_bytes()
     job.update(phase='learning', learning_previous_phase='review', error='previous error')
+    # The worker now saves a named secondary model, so keep that durable
+    # library isolated alongside this test's source job.
+    monkeypatch.setattr(web, 'JOBS_DIR', str(Path(job['dir']).parent))
     monkeypatch.setattr(ls, 'preflight', lambda: {'ready': True, 'problems': []})
     monkeypatch.setattr(ls, 'run_training', lambda dataset, versions, *args: complete_candidate(versions))
     monkeypatch.setattr(ls.vl, 'CropRefiner', EmptyModel)
@@ -227,3 +233,8 @@ def test_worker_exposes_retained_candidate_without_marking_training_as_an_error(
     assert 'candidate' in status['message'] and 'secondary' in status['message']
     records = learning_candidates.list_candidates(job['dir'])
     assert len(records) == 1 and records[0]['mask_assessment']['status'] == 'failed'
+    assert records[0]['assessment']['status'] == 'review_only'
+    model_id = job['learning']['model_id']
+    saved = web.learned_models.list_models(web.learned_models_root())
+    assert len(saved) == 1 and saved[0]['id'] == model_id
+    assert saved[0]['kind'] == 'openscrub-plate-verifier'

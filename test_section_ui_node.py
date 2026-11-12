@@ -69,6 +69,7 @@ def test_section_action_saves_manual_boxes_and_audio_without_card_changes(with_r
 const assert=require('node:assert/strict');
 let CUR='parent',JOBVIEW=1,JOBSJSON='',SHELLPH='done',PLATE_REVIEW_BUSY=false;
 let REVIEW_VERSION=0,REVIEW_SAVED=0,REVIEW_BASE=null,MAN=[];
+let CONFIRM_CHAIN=Promise.resolve();const CONFIRM_FAILED=new Map();
 const PLATE_EDITS=new Map(),posts=[];
 let BE={adds:[{t0:1,t1:2,tref:1,box:[10,10,20,20]}],ov:{},times:{},
  audio:[{t0:1,t1:2,mode:'mute'}],tlspans:[],pending:false,drag:null};
@@ -122,6 +123,8 @@ const document={hidden:false,getElementById(id){
 }};
 const signal=new AbortController().signal;
 function renderWorkProgress(){};async function loadSectionsPanel(){};
+function refreshPendingFindings(){return new Promise(()=>{})};
+function showTrainingResult(j){assert.notEqual(j.kind,'model_training')};
 function alert(error){throw new Error(error)};async function openJob(id){opened.push(id)};
 async function answer(url,options={}){
  if(options.method==='POST'){posts.push({url,body:options.body?JSON.parse(options.body):null});return {ok:true}};
@@ -130,6 +133,7 @@ async function answer(url,options={}){
 async function reviewRequest(url,options){return {data:await answer(url,options)}};
 async function fetch(url,options){return {ok:true,json:async()=>answer(url,options)}};
 """ + 'const job=' + json.dumps(job) + ';\n' + page_between(
+        'function sectionEscape(', 'function sectionSeconds(') + page_between(
         'async function loadJobs(){', 'async function delJob(') + page_between(
         'async function refreshJob(', '\nfunction sectionTime(')
 

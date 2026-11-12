@@ -4228,7 +4228,11 @@ def test_review_choices_apply_the_named_action():
                          w.APP_JS.index("function thumbRetry")]
     # applyDet invokes the production dirty-state helpers outside this slice.
     # Include those helpers too; only their browser surface is substituted.
-    review_js = (w.APP_JS[w.APP_JS.index("let REVIEW_VERSION="):
+    review_js = (w.APP_JS[w.APP_JS.index("function sectionEscape("):
+                          w.APP_JS.index("function sectionSeconds(")]+
+                 w.APP_JS[w.APP_JS.index("let CONFIRM_CHAIN="):
+                          w.APP_JS.index("const PLATE_EDITS=")]+
+                 w.APP_JS[w.APP_JS.index("let REVIEW_VERSION="):
                           w.APP_JS.index("function plateStatus")]+review_js)
     harness = r'''
 const assert = require('node:assert/strict');
@@ -4263,6 +4267,9 @@ vm.runInContext(`(async()=>{
   await loadReview();
   assert.ok(html.includes('shaped mask'),'Keep shaped-mask guidance beside the explicit actions');
   assert.ok(html.includes('possible occlusion'),'Keep narrow-mode fallback explanations beside the explicit actions');
+  assert.ok(detChoices(0).includes('Not reviewed'),'Automatic protection is not a human classification');
+  assert.equal((detChoices(0).match(/aria-pressed="false"/g)||[]).length,2,
+    'Neither output button starts as a human selection');
   const actions = [...html.matchAll(/<button\\b([^>]*)>([\\s\\S]*?)<\\/button>/g)];
   function click(label, i){
     const match=actions.find(([,attrs,text])=>text.replace(/<[^>]*>/g,'').trim()===label
@@ -4285,6 +4292,8 @@ vm.runInContext(`(async()=>{
   assert.strictEqual(EN[2],false,'An initially kept finding must stay visible');
   click('Blur',2);
   assert.strictEqual(EN[2],true,'An initially kept finding must be blur-able');
+  assert.equal(Object.keys(VLBL).length,0,'Output choices alone must not create training labels');
+  assert.equal(FINDING_META[0].human_confirmation,undefined);
   assert.equal(REVIEW_VERSION,6,'Every decision must invalidate save confirmation');
   assert.equal(reviewChoicesPending(),true);
   assert.equal(status.textContent,'Review choices not saved.');

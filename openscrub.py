@@ -3377,6 +3377,7 @@ class Callbacks:
     """Hooks for embedding the pipeline (GUI, batch runner, tests).
     The default implementation reproduces the CLI's print behavior."""
     wants_frames = False   # set True to receive scan_frame() calls
+    wants_finding_previews = False  # opt-in, already decoded source pixels
 
     def log(self, msg):
         print(msg, flush=True)
@@ -3386,6 +3387,9 @@ class Callbacks:
 
     def scan_frame(self, frame_bgr, t, found):
         pass  # annotated copy of the frame just OCR'd (only if wants_frames)
+
+    def scan_findings(self, frame_bgr, frame_index, fps, detections):
+        pass  # unpainted borrowed pixels; consume synchronously, never mutate
 
     def cancelled(self):
         return False
@@ -7846,6 +7850,7 @@ def run_scan(args, cb=None):
             continue
         small = (cv2.resize(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY), None,
                             fx=BT_SCALE, fy=BT_SCALE) if bt_on else None)
+        preview_raw_start = len(raw)
         if idx % max(1, dense_stride) == 0:
             dense_now = []      # latest dense boxes, drawn on the preview
         face_now = []           # this frame's face boxes (head dedupe)
@@ -8233,6 +8238,10 @@ def run_scan(args, cb=None):
                                 "last_ok": t, "last_emit": t,
                                 "conf": d.confidence})
             raw.extend(found)
+            if (getattr(cb, "wants_finding_previews", False)
+                    and len(raw) > preview_raw_start):
+                cb.scan_findings(frame, idx, fps, raw[preview_raw_start:])
+                preview_raw_start = len(raw)
             if ocr is not None:
                 scans.append((t, (cx, cy),
                               [(w, (b[0] - cx, b[1] - cy,
@@ -8271,6 +8280,12 @@ def run_scan(args, cb=None):
                                   (int(dx2), int(dy2)), (0, 0, 255), 2)
                 cb.scan_frame(shown, t, len(found) + len(dense_now))
             cb.progress("scan", idx, total)
+        if (getattr(cb, "wants_finding_previews", False)
+                and len(raw) > preview_raw_start):
+            # Dense detector rows are emitted outside the OCR cadence. Supply
+            # only this frame's real detections before template propagation.
+            # OCR frames already called this hook before drawing their boxes.
+            cb.scan_findings(frame, idx, fps, raw[preview_raw_start:])
         bands.append((cx - scan_cx, cy - scan_cy) if track_on
                      else (0.0, 0.0))
         if bt_on and face_tracks and not dense_faces:

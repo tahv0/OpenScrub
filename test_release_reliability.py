@@ -11,6 +11,7 @@ import random
 import threading
 
 import pytest
+import confirmed_findings
 import openscrub_web as web
 from test_review_browser import (review_server, browser_instance,
                                  load_browser_page, drag_corner, plate_points)
@@ -34,6 +35,22 @@ def _save(page):
     assert page.evaluate('saveAndRender(true)') is True
 
 
+def _confirmations_saved(page):
+    page.evaluate('CONFIRM_CHAIN')
+    assert page.evaluate('CONFIRM_PENDING.size===0&&CONFIRM_FAILED.size===0')
+
+
+def _archive(report):
+    return report.parent.parent/'confirmed_findings'
+
+
+def _distinct_box(row,index):
+    # Tracks in the shared fixture overlap exactly. Give independent findings
+    # distinct source geometry so opposite labels do not target one archive ID.
+    box=row['cbox'];shift=index/10.
+    return [box[0]+shift,box[1],box[2]+shift,box[3]]
+
+
 @pytest.mark.parametrize('width', [1440, 390])
 @pytest.mark.timeout(150)
 def test_large_mixed_review_survives_sampling_and_reopen(review_server, width, tmp_path):
@@ -41,11 +58,11 @@ def test_large_mixed_review_survives_sampling_and_reopen(review_server, width, t
     url, report = review_server
     doc = json.loads(report.read_text())
     row = doc['detections'][0]
-    doc['detections'] = [dict(deepcopy(row), track=i // 20) for i in range(7000)]
+    doc['detections'] = [dict(deepcopy(row), track=i // 20,cbox=_distinct_box(row,i//20)) for i in range(7000)]
     report.write_text(json.dumps(doc))
     rng = random.Random(2319)
     chosen = rng.sample(range(350), 210)
-    actions = [('✕ Not a plate', False, 'not_plate'), ('✓ Confirm plate', True, 'plate'),
+    actions = [('✕ Not a plate', False, 'not_plate'), ('✓ Is a plate', True, 'plate'),
                ('Keep visible', False, ''), ('Blur', True, '')]
     expected = {}
     api = pytest.importorskip('playwright.sync_api')
@@ -56,7 +73,12 @@ def test_large_mixed_review_survives_sampling_and_reopen(review_server, width, t
         for step, track in enumerate(chosen):
             name, enabled, label = actions[step % len(actions)]
             card = page.locator('#det%d' % (track * 20))
+            if label:
+                card.scroll_into_view_if_needed()
+                page.wait_for_function('(i)=>!!document.getElementById("thumb"+i)?._plateMeta',arg=track*20)
             card.get_by_role('button', name=name, exact=True).click()
+            if label:
+                _confirmations_saved(page)
             expected[track] = enabled, label
             assert card.locator('.det-status').inner_text() == ('Will be blurred' if enabled else 'Will stay visible')
             if (step + 1) % 35 == 0:
@@ -79,6 +101,8 @@ def test_large_mixed_review_survives_sampling_and_reopen(review_server, width, t
         for t, (on, verified) in expected.items():
             assert all(r['enabled'] is on for r in final[t*20:(t+1)*20]), t
             assert final[t*20].get('verified_label', '') == verified, t
+        saved_examples=confirmed_findings.list_findings(_archive(report),limit=200)
+        assert saved_examples['total']==sum(bool(label) for _,label in expected.values())
         assert not errors, errors
         assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
         evidence = Path(os.environ.get('REVIEW_EVIDENCE_DIR', str(tmp_path)))
@@ -116,11 +140,20 @@ def test_lost_corner_response_retry_and_newer_gesture_preserve_latest(review_ser
         assert received[0]['edit_id'] == received[1]['edit_id']
         assert received[2]['edit_id'] != received[1]['edit_id']
         assert received[2]['points'] == latest
-        annotations = report.parent / 'plate_annotations' / 'annotations.jsonl'
-        assert len(annotations.read_text().splitlines()) == 1
-        assert len(list(annotations.parent.glob('*.jpg'))) == 1
+        assert confirmed_findings.list_findings(_archive(report))['total']==0
+        assert not (report.parent/'plate_annotations').exists()
+        card.get_by_role('button',name='✓ Is a plate',exact=True).click()
+        _confirmations_saved(page)
+        saved=confirmed_findings.list_findings(_archive(report))
+        assert saved['total']==1
+        entry=saved['items'][0]
+        assert entry['label']=='positive' and entry['revision']==1 and entry['shape_confirmed']
+        assert [v for pt in entry['points'] for v in pt]==pytest.approx(
+            [v for pt in latest for v in pt],abs=.001)
+        assert confirmed_findings.image_path(_archive(report),entry['id']).is_file()
         _save(page)
         page.evaluate('loadReview()')
+        page.locator('#det0').scroll_into_view_if_needed()
         page.wait_for_function('!!document.querySelector("#det0 img")._quadEdit')
         assert [v for pt in plate_points(page.locator('#det0')) for v in pt] == pytest.approx(
             [v for pt in latest for v in pt], abs=.001)
@@ -135,7 +168,9 @@ def test_failed_decision_save_is_reported_and_retry_preserves_decisions(review_s
     with api.sync_playwright() as pw:
         browser, page, errors = _start(pw, url)
         card = page.locator('#det0')
-        card.get_by_role('button', name='✕ Not a plate', exact=True).click()
+        # Output-only choices remain drafts until Save; explicit Is / Not is a
+        # separate asynchronous archive transaction that commits immediately.
+        card.get_by_role('button', name='Keep visible', exact=True).click()
         # Inject a network failure at the actual browser fetch boundary.
         page.evaluate('''() => {window.__workingFetch=window.fetch;
           window.fetch=(url,opts={})=>String(url).endsWith('/detections')&&opts.method==='POST'
@@ -146,10 +181,11 @@ def test_failed_decision_save_is_reported_and_retry_preserves_decisions(review_s
         assert page.evaluate('PLATE_REVIEW_BUSY') is False
         assert card.locator('.det-status').inner_text() == 'Will stay visible'
         assert json.loads(report.read_text())['detections'][0]['enabled'] is True
-        page.evaluate('window.fetch=window.__workingFetch')
+        page.evaluate('()=>{window.fetch=window.__workingFetch;}')
         _save(page)
         saved = json.loads(report.read_text())['detections'][0]
-        assert saved['enabled'] is False and saved['verified_label'] == 'not_plate'
+        assert saved['enabled'] is False and not saved.get('verified_label')
+        assert confirmed_findings.list_findings(_archive(report))['total']==0
         assert not errors, errors
         browser.close()
 
@@ -167,7 +203,10 @@ def test_switching_jobs_cannot_render_wrong_job_during_save(review_server, monke
     api = pytest.importorskip('playwright.sync_api')
     with api.sync_playwright() as pw:
         browser, page, errors = _start(pw, url)
-        page.locator('#det0').get_by_role('button', name='✕ Not a plate', exact=True).click()
+        card=page.locator('#det0');card.scroll_into_view_if_needed()
+        page.wait_for_function('!!document.querySelector("#det0 img")._plateMeta')
+        card.get_by_role('button', name='✕ Not a plate', exact=True).click()
+        _confirmations_saved(page)
         page.evaluate('''() => {window.__workingFetch=window.fetch;
           window.fetch=async(url,opts={})=>{
             const r=await window.__workingFetch(url,opts);
@@ -196,7 +235,7 @@ def test_decision_save_timeout_keeps_draft_and_allows_retry(review_server):
     api = pytest.importorskip('playwright.sync_api')
     with api.sync_playwright() as pw:
         browser, page, errors = _start(pw, url)
-        page.locator('#det0').get_by_role('button', name='✕ Not a plate', exact=True).click()
+        page.locator('#det0').get_by_role('button', name='Keep visible', exact=True).click()
         page.evaluate('''() => {window.__workingFetch=window.fetch;
           window.fetch=async(url,opts={})=>{
             if(String(url).endsWith('/detections')&&opts.method==='POST')
@@ -205,22 +244,28 @@ def test_decision_save_timeout_keeps_draft_and_allows_retry(review_server):
               })};
             return window.__workingFetch(url,opts);
           };}''')
-        page.evaluate('''()=>{window.__realTimeout=window.setTimeout;window.__saveTimers=[];
-         window.setTimeout=(fn,ms,...args)=>{
-          if(ms===120000){__saveTimers.push(ms);return __realTimeout(fn,150,...args);}
-          return __realTimeout(fn,ms,...args);};}''')
+        page.evaluate('''()=>{window.__workingReviewRequest=reviewRequest;window.__saveTimers=[];
+         reviewRequest=(url,options={},type='json')=>{
+          if(String(url).endsWith('/detections')&&options.method==='POST'){
+           __saveTimers.push(options.timeoutMs);
+           return __workingReviewRequest(url,{...options,timeoutMs:150},type);
+          }
+          return __workingReviewRequest(url,options,type);
+         };}''')
         result = page.evaluate('''async()=>{const start=Date.now();
           return {ok:await saveAndRender(true),elapsed:Date.now()-start};}''')
         assert result['ok'] is False
         assert page.evaluate('__saveTimers')==[120000]
         assert 120 <= result['elapsed'] < 5000, result
-        page.evaluate('window.setTimeout=window.__realTimeout')
+        page.evaluate('()=>{reviewRequest=window.__workingReviewRequest;}')
         assert page.evaluate('PLATE_REVIEW_BUSY') is False
         assert page.locator('#det0 .det-status').inner_text() == 'Will stay visible'
         assert json.loads(report.read_text())['detections'][0]['enabled'] is True
-        page.evaluate('window.fetch=window.__workingFetch')
+        page.evaluate('()=>{window.fetch=window.__workingFetch;}')
         _save(page)
-        assert json.loads(report.read_text())['detections'][0]['verified_label'] == 'not_plate'
+        saved=json.loads(report.read_text())['detections'][0]
+        assert saved['enabled'] is False and not saved.get('verified_label')
+        assert confirmed_findings.list_findings(_archive(report))['total']==0
         assert not errors, errors
         browser.close()
 
@@ -228,6 +273,9 @@ def test_decision_save_timeout_keeps_draft_and_allows_retry(review_server):
 def test_saved_geometry_and_decisions_survive_server_rehydration(review_server, monkeypatch):
     """Throw away in-memory jobs, recover from disk, then open a fresh browser view."""
     url, report = review_server
+    doc=json.loads(report.read_text())
+    for i,row in enumerate(doc['detections']):row['cbox']=_distinct_box(row,i)
+    report.write_text(json.dumps(doc))
     api = pytest.importorskip('playwright.sync_api')
     with api.sync_playwright() as pw:
         browser, page, errors = _start(pw, url)
@@ -236,19 +284,30 @@ def test_saved_geometry_and_decisions_survive_server_rehydration(review_server, 
         drag_corner(page, card)
         assert page.evaluate('flushPlateSaves()') is True
         geometry = json.loads(report.read_text())['detections'][0]['plate_quad']
+        card.get_by_role('button',name='✓ Is a plate',exact=True).click()
+        _confirmations_saved(page)
         for i in range(1, 31):
-            page.locator('#det%d' % i).get_by_role('button', name='✕ Not a plate', exact=True).click()
+            card=page.locator('#det%d' % i);card.scroll_into_view_if_needed()
+            page.wait_for_function('(i)=>!!document.getElementById("thumb"+i)?._plateMeta',arg=i)
+            card.get_by_role('button', name='✕ Not a plate', exact=True).click()
+            _confirmations_saved(page)
         _save(page)
         before = report.read_bytes()
-        annotations = report.parent / 'plate_annotations' / 'annotations.jsonl'
-        labels_before = annotations.read_bytes()
+        archived_before=confirmed_findings.list_findings(_archive(report),limit=200)
+        assert archived_before['total']==31
+        images_before={entry['id']:confirmed_findings.image_path(_archive(report),entry['id']).read_bytes()
+                       for entry in archived_before['items']}
+        assert not (report.parent/'plate_annotations').exists()
         # Same disk rehydration entry point used at real process startup.
         monkeypatch.setattr(web, 'JOBS', {})
         monkeypatch.setattr(web, 'JOBS_DIR', str(report.parent.parent))
         web.rehydrate_jobs()
         recovered = web.JOBS['inline-fixture']
         assert recovered['phase'] == 'review'
-        assert report.read_bytes() == before and annotations.read_bytes() == labels_before
+        assert report.read_bytes() == before
+        assert confirmed_findings.list_findings(_archive(report),limit=200)==archived_before
+        assert all(confirmed_findings.image_path(_archive(report),identity).read_bytes()==jpeg
+                   for identity,jpeg in images_before.items())
         if os.environ.get('REVIEW_INPROCESS') != '1':
             page.reload()
         # The in-process bridge cannot register its binding twice; rebuild the

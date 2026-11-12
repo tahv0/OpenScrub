@@ -111,6 +111,8 @@ details .inner .full{grid-column:1/-1}
  <img src="%%WORDMARK%%" alt="" style="height:19px">
  <span class="meta hdrtag">local video redaction &mdash; review before you trust</span>
  <span class="meta" id="vmeta" style="margin-left:auto"></span>
+ <a href="#" title="Scan videos" style="font-size:12px;margin-left:10px">Videos</a>
+ <a href="#findings" title="Saved human examples" style="font-size:12px;margin-left:10px">Findings</a>
  <a href="#settings" title="Server settings" aria-label="Server settings"
   style="margin-left:14px;font-size:17px">&#9881;&#65039;</a>
 </header>
@@ -204,7 +206,7 @@ details .inner .full{grid-column:1/-1}
   <select id="plateCoverage" onchange="plateCoverageChanged()"><option value="full">Full plate</option><option value="narrow">Lettering only</option></select>
   <div id="plateMarginRow" hidden><label for="plateMargin">Extra margin (source pixels)</label>
    <input id="plateMargin" type="number" value="0" min="0" step="any"></div>
-  <div class="mutd" style="font-size:11.5px">Lettering-only detection runs every frame and may be slower. Uncertain regions fall back to the full plate. Review all results; a missed plate cannot be protected. HDR input requires SDR output in lettering-only mode.</div>
+  <div class="mutd" style="font-size:11.5px">Both choices aim to hide the entire plate number. Full plate includes its background and edges; Lettering only protects letters and numbers more narrowly. Lettering-only detection runs every frame and may be slower. Uncertain regions fall back to the full plate. Review all results; a missed plate cannot be protected. HDR input requires SDR output in lettering-only mode.</div>
  </div>
  <div style="margin:8px 0 6px">
   <label for="sspeed" style="font-size:12.5px;font-weight:600">Scan speed</label>

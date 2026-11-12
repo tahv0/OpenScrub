@@ -371,9 +371,11 @@ def verify(args):
             evidence.check("explicit same-value Blur is saved as a human override without a training label",
                            explicit_ok and explicit.value.ok and
                            explicit_payload["enabled"] == {str(i): True for i in range(FRAMES)} and
-                           explicit_payload["verified_labels"] == {str(i): "clear" for i in range(FRAMES)} and
+                           explicit_payload["verified_labels"] == {} and
+                           explicit_payload["output_choices"] == {str(i): True for i in range(FRAMES)} and
                            len(explicit_report["detections"]) == FRAMES and
                            all(d["enabled"] is True and d.get("plate_verification_override") is True
+                               and d.get("output_choice_explicit") is True
                                and not d.get("verified_label") for d in explicit_report["detections"]),
                            explicit_payload)
             # Once acknowledged, saving again without another click must stay
@@ -388,6 +390,7 @@ def verify(args):
                            unchanged_ok and unchanged.value.ok and
                            unchanged_payload["enabled"] == {} and
                            unchanged_payload["verified_labels"] == {} and
+                           unchanged_payload.get("output_choices", {}) == {} and
                            unchanged_after == unchanged_before,
                            unchanged_payload)
             # Commit an actual changed track before restoring Blur for render.
@@ -536,7 +539,40 @@ def verify(args):
             evidence.check("corner autosave applies to every detection on the track",
                            all(d.get("plate_quad") == updated[0].get("plate_quad")
                                for d in updated) and len(updated[0].get("plate_quad", [])) == 4)
+            evidence.check("unconfirmed corner adjustments do not create training labels or examples",
+                           all(not d.get("verified_label") and not d.get("confirmed_finding_id")
+                               for d in updated) and api.get(url + "/api/findings").json()["total"] == 0)
             card.screenshot(path=str(evidence.path / "direct-corners.png"))
+            evidence.check("changed corners block downloading the older render",
+                           api.get(url + f"/api/jobs/{JOB_ID}/report").json().get("render_required") is True and
+                           api.get(url + f"/api/jobs/{JOB_ID}/download").status == 409)
+            # Finish with an up-to-date render for the subsequent container
+            # recreation check. The corner gesture above invalidated the first
+            # export; recovering that stale export as done would be incorrect.
+            with page.expect_response(lambda response: response.url.endswith(
+                    f"/api/jobs/{JOB_ID}/render") and response.request.method == "POST") as rerender:
+                page.locator("#review").get_by_role("button", name="Save edits & render",
+                                                    exact=True).click()
+            evidence.check("updated corner render is queued", rerender.value.ok)
+            deadline = time.monotonic() + args.render_timeout
+            while True:
+                status = api.get(url + f"/api/jobs/{JOB_ID}").json()
+                if status["phase"] == "done":
+                    break
+                if status["phase"] in ("error", "cancelled") or time.monotonic() >= deadline:
+                    raise AssertionError(f"Updated-corner render did not finish: {status}")
+                page.wait_for_timeout(250)
+            final_report = api.get(url + f"/api/jobs/{JOB_ID}/report").json()
+            final_video = api.get(url + f"/api/jobs/{JOB_ID}/download")
+            evidence.check("updated corner render is ready for container recovery",
+                           status["has_output"] and final_video.ok and
+                           not final_report.get("render_required") and
+                           [d.get("plate_quad") for d in final_report["detections"]] ==
+                           [d.get("plate_quad") for d in updated] and
+                           api.get(url + "/api/findings").json()["total"] == 0,
+                           status)
+            (evidence.path / "updated_corners.mp4").write_bytes(final_video.body())
+            (evidence.path / "updated_corners_audit.json").write_text(json.dumps(final_report, indent=2))
             evidence.check("production pages raise no JavaScript errors",
                            not evidence.result["page_errors"], evidence.result["page_errors"])
             evidence.result["ok"] = True

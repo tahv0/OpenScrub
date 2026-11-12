@@ -29,6 +29,7 @@ import json
 import os
 import queue
 import secrets
+import shutil
 import sys
 import socket
 import threading
@@ -49,6 +50,10 @@ import learning_candidates
 import plate_verifier
 import zones_ui
 import openscrub_logging as diagnostics
+import finding_previews
+import findings_web
+import findings_ui
+import plate_text_web
 
 
 # Anchor to the script's own folder, NOT the process working directory —
@@ -423,6 +428,10 @@ def job_public(job):
         "server_time": time.time(),
         "sections_revision": job.get("sections_revision", 0),
         "section": job.get("section"),
+        "kind": job.get("kind", "video"),
+        "training_result": job.get("training_result"),
+        "review_queue": job.get("review_queue"),
+        "plate_text_search": job.get("plate_text_search"),
     }
 
 
@@ -446,6 +455,7 @@ def _publish_preview_jpeg(path, image, quality):
 
 class WebCallbacks(openscrub.Callbacks):
     wants_frames = True
+    wants_finding_previews = True
 
     def __init__(self, job):
         diagnostics.attach_job(job)
@@ -530,6 +540,17 @@ class WebCallbacks(openscrub.Callbacks):
         if _publish_preview_jpeg(os.path.join(self.job["dir"], "preview.jpg"), small, 70):
             self.job["preview"] = dict(revision=uuid.uuid4().hex[:12], updated_at=now,
                                         source_time=t, found=found)
+
+    def scan_findings(self, frame, frame_index, fps, detections):
+        try:
+            self.job['review_queue'] = finding_previews.capture(
+                self.job['dir'], frame, frame_index, fps, detections)
+        except Exception:
+            # Review caching must not turn an otherwise valid scan into failure.
+            if not self.job.get('review_cache_error'):
+                diagnostics.exception('compact_finding_preview_failed', self.job)
+                self.job['review_cache_error'] = True
+                self.log('Compact review preview unavailable; source previews remain available after scanning.')
 
     def cancelled(self):
         return self.job["cancel"].is_set()
@@ -805,12 +826,22 @@ def worker():
         log_context = diagnostics.bind_job(job)
         diagnostics.start_job(job, action)
         try:
-            if action == "learn":
+            if action == "learn_examples":
+                findings_web.perform_training(job)
+            elif action == "learn":
                 perform_learning(job)
             elif action == "verify":
                 perform_verification(job)
+            elif action == "plate_text":
+                plate_text_web.perform(job)
             elif action in ("scan", "resume"):
                 resuming = action == "resume"
+                if not resuming:
+                    cache = os.path.join(job['dir'], 'compact_previews')
+                    if os.path.isdir(cache) and not os.path.islink(cache):
+                        shutil.rmtree(cache)
+                    job.pop('review_queue', None)
+                    job.pop('review_cache_error', None)
                 job["phase"] = "scanning"
                 job["preview"] = None
                 job["activity"] = None
@@ -838,6 +869,9 @@ def worker():
                     with open(staging_path, encoding="utf-8") as f:
                         chunk = json.load(f)
                     chunk = apply_selected_plate_model(job, chunk)
+                    chunk, restored = findings_web.library.apply_to_report(findings_web.root(), chunk)
+                    if restored.get('applied', 0):
+                        cb.log('Restored saved confirmed findings for this video: %d' % restored['applied'])
                     if job.get("section") and state.get("stop_at_frame") is None:
                         chunk = _SECTIONS.finish_scan(job, chunk)
                     end_frame = state.get("stop_at_frame")
@@ -883,72 +917,9 @@ def worker():
                 else:
                     job["log"].append(
                         "      full scan complete; prior review edits retained")
-                def _pregen(jid=jid):
-                    """One pass through the video with a single decoder:
-                    thumbnails come out in seconds instead of minutes.
-                    Sorting by reference time keeps seeks short and forward-
-                    only, which is what codecs are fast at."""
-                    try:
-                        jb = JOBS.get(jid)
-                        doc = _load_job_report(jb)
-                        rs = doc["render_state"]
-                        todo = []
-                        for k, d in enumerate(doc["detections"]):
-                            cch = os.path.join(jb["dir"], f"thumb2_{k}.jpg")
-                            if os.path.exists(cch):
-                                continue
-                            tref = min(max(d.get("last_seen", d["t_start"]),
-                                           d["t_start"]), d["t_end"])
-                            todo.append((tref, k, d, cch))
-                        todo.sort()
-                        cap = cv2.VideoCapture(jb["video"])
-                        cur = -1
-                        frame = None
-                        for tref, k, d, cch in todo:
-                            fidx = min(int(tref * rs["fps"]),
-                                       len(rs["cum"]) - 1)
-                            if fidx != cur:
-                                if 0 <= fidx - cur <= 12:
-                                    while cur < fidx:   # cheap forward decode
-                                        ok, frame = cap.read()
-                                        if not ok:
-                                            frame = None
-                                            break
-                                        cur += 1
-                                else:
-                                    cap.set(cv2.CAP_PROP_POS_FRAMES, fidx)
-                                    ok, frame = cap.read()
-                                    cur = fidx if ok else cur
-                                    if not ok:
-                                        frame = None
-                            if frame is None:
-                                continue
-                            ox, oy = rs["cum"][fidx]
-                            h, wd = frame.shape[:2]
-                            pad = 24
-                            x1 = max(0, int(d["cbox"][0] + ox) - pad)
-                            y1 = max(0, int(d["cbox"][1] + oy) - pad)
-                            x2 = min(wd, int(d["cbox"][2] + ox) + pad)
-                            y2 = min(h, int(d["cbox"][3] + oy) + pad)
-                            crop = frame[y1:y2, x1:x2].copy()
-                            if crop.size == 0:
-                                continue
-                            inner = crop[pad:-pad or None, pad:-pad or None]
-                            if not inner.size or float(inner.std()) <= 8:
-                                continue   # blank: leave for the on-demand
-                                           # path, which tries other moments
-                            cv2.rectangle(crop, (pad, pad),
-                                          (crop.shape[1] - pad,
-                                           crop.shape[0] - pad),
-                                          (0, 0, 255), 2)
-                            cv2.imwrite(cch, crop,
-                                        [cv2.IMWRITE_JPEG_QUALITY, 80])
-                        cap.release()
-                        jb["log"].append("thumbnails pre-generated "
-                                         f"({len(todo)})")
-                    except Exception:
-                        diagnostics.exception("thumbnail_pregeneration_failed", JOBS.get(jid))
-                threading.Thread(target=_pregen, name="openscrub-thumbnails-" + jid, daemon=True).start()
+                # Representative compact previews were captured from decoded scan
+                # frames. Cold legacy images decode lazily once; do not reopen
+                # the entire video in a second thumbnail-generation pass.
                 try:
                     prov = _load_job_report(job).get("provenance", {})
                     if ((prov.get("vfr_normalized") or meta)
@@ -976,7 +947,7 @@ def worker():
                     res = openscrub.run_pipeline(args, cb)
                     rendered_doc = learning_session.preserve_render_review(
                         review_doc, _load_job_report(job))
-                    for key in ("source_identity", "video_sections", "range_provenance", "section_range", "preview_revision"):
+                    for key in ("source_identity", "video_sections", "range_provenance", "section_range", "preview_revision", "plate_text_search", "compact_preview_source"):
                         if key in review_doc:
                             rendered_doc[key] = review_doc[key]
                     rendered_doc.pop("render_required", None)
@@ -1079,11 +1050,13 @@ def _touch_activity():
 
 @app.before_request
 def enforce_vault_lock():
-    """While the vault is locked, every job operation is refused — the
+    """While the vault is locked, every job/archive operation is refused — the
     files are ciphertext, so this fails closed rather than half-working."""
-    if request.path.startswith("/api/jobs") and vault_locked():
+    protected = (request.path.startswith("/api/jobs") or
+                 request.path == "/api/findings" or request.path.startswith("/api/findings/"))
+    if protected and vault_locked():
         abort(423, "vault is locked — unlock it (Encryption panel) to "
-                   "access jobs")
+                   "access jobs and saved findings")
 
 
 @app.before_request
@@ -1405,9 +1378,14 @@ def perform_learning(job):
     job["phase"] = "learning"
     job["preview"] = None
     job["activity"] = None
+    job["model_root"] = learned_models_root()
     try:
         job["learning"] = {"stage": "preflight", "message": "Checking the local CUDA training environment"}
-        ready = learning_session.preflight()
+        document = _load_job_report(job)
+        active = (document.get('learning') or {}).get('active') or learning_session._load(
+            os.path.join(job['dir'],'learning','active.json'),{})
+        parent = findings_web.training.session_parent(job,document,active)
+        ready = learning_session.preflight(weights=parent['weights']) if parent else learning_session.preflight()
         if not ready["ready"]:
             raise ValueError("; ".join(ready["problems"]))
         def scan(destination):
@@ -1448,7 +1426,7 @@ def perform_learning(job):
     except learning_session.CoverageRejected as error:
         job["phase"] = previous
         job["error"] = None
-        job["learning"] = {"stage": "candidate_ready", "message": str(error)}
+        job["learning"] = dict(job.get("learning") or {}, stage="candidate_ready", message=str(error))
         diagnostics.event("learning_candidate_retained", job, reason=str(error))
         cb.log(str(error))
     except Exception as error:
@@ -1550,19 +1528,24 @@ def job_learning(jid):
     payload = request.get_json(silent=True) or {}
     if not isinstance(payload, dict) or payload.get("license_accepted") is not True:
         return jsonify({"error": "Acknowledge the locally installed training framework's terms before training."}), 400
-    weights = os.environ.get("OPENSCRUB_TRAIN_WEIGHTS", "")
-    if not os.path.isfile(weights):
-        return jsonify({"error": "Training setup needed: set OPENSCRUB_TRAIN_WEIGHTS to a trusted local segmentation .pt checkpoint and install the training environment. Your saved annotations are unchanged."}), 503
+    name = payload.get('name')
+    if name:
+        name = learned_models._text(name, 'Model name', 80, required=True)
     with JOBS_LOCK:
         if job["phase"] not in ("paused", "review", "done"):
             return jsonify({"error": "Pause or complete the scan before training."}), 409
         if job.get("trackbg", {}).get("state") == "running":
             return jsonify({"error": "Finish the current tracking operation before training."}), 409
         prior = _load_job_report(job)
+        parent_id = ((prior.get('learning') or {}).get('active') or {}).get('model_id') or (prior.get('learning') or {}).get('library_model_id')
+        parent_ready = parent_id and findings_web.training.training_info(learned_models_root(),parent_id).get('trainable')
+        if not os.path.isfile(os.environ.get('OPENSCRUB_TRAIN_WEIGHTS','')) and not parent_ready:
+            return jsonify(error='Training setup needed: configure a trusted local segmentation checkpoint or retain the accepted model’s local training checkpoint. Your saved annotations are unchanged.'),503
         if prior.get("provenance", {}).get("hdr_output"):
             return jsonify({"error": "This learning path currently requires SDR output. HDR-match learning is not supported; the existing HDR report and edits are unchanged."}), 409
         job["learning_previous_phase"] = job["phase"]
-        job["learning_request"] = {"license_accepted": True, "epochs": 40, "batch": 8}
+        job['model_root'] = learned_models_root()
+        job["learning_request"] = {"license_accepted": True, "epochs": 40, "batch": 8, "name": name}
         job["phase"] = "learning"
         job["learning"] = {"stage": "queued", "message": "Learning pass queued"}
         job["cancel"].clear()
@@ -1879,6 +1862,11 @@ def job_detections(jid):
                       "person": d.get("person", -1),
                       "confidence": d.get("confidence", 0),
                       "verified_label": d.get("verified_label", ""),
+                      "human_confirmation": d.get("human_confirmation"),
+                      "confirmed_finding_id": d.get("confirmed_finding_id"),
+                      "confirmed_finding_revision": d.get("confirmed_finding_revision"),
+                      "output_choice_explicit": bool(d.get("output_choice_explicit")),
+                      "plate_text_evidence": d.get("plate_text_evidence"),
                       "learning_conflict": d.get("learning_conflict", ""),
                       "learning_score": d.get("learning_score"),
                       "plate_verification": d.get("plate_verification"),
@@ -1887,6 +1875,8 @@ def job_detections(jid):
                       "shaped": bool(d.get("poly"))})
     return jsonify({"detections": items,
                     "learning": doc.get("learning"),
+                    "video_id": (doc.get('provenance') or {}).get('original_input_sha256') or (doc.get('provenance') or {}).get('input_sha256'),
+                    "plate_text_search": doc.get("plate_text_search"),
                     "refinement": doc.get("refinement"),
                     "verification": doc.get("verification"),
                     "verification_history": doc.get("verification_history"),
@@ -1976,13 +1966,18 @@ def _review_mask(d, ox, oy, shape, job, doc):
 
 def _human_plate_override(row):
     """Explicit choices supersede a machine decision without inventing a label."""
+    changed = False
+    confirmation = row.get('human_confirmation')
+    if isinstance(confirmation, dict) and confirmation.get('source') == 'confirmed_findings':
+        confirmation['source'] = 'explicit'
+        changed = True
     if row.get("category") != "plate":
-        return False
+        return changed
     marker = row.pop("plate_verification", None)
     if marker and marker.get("applied"):
         previous = marker.get("previous_enabled", True)
         row["enabled"] = previous if type(previous) is bool else True
-    changed = bool(marker) or row.get("plate_verification_override") is not True
+    changed |= bool(marker) or row.get("plate_verification_override") is not True
     row["plate_verification_override"] = True
     return changed
 
@@ -1992,6 +1987,11 @@ def _apply_detection_edits(doc, edits, cutoff=None):
     enabled = edits.get("enabled", {})
     changed = False
     for i, d in enumerate(doc["detections"]):
+        explicit_output = (edits.get('output_choices') or {}).get(str(i)) is True
+        if explicit_output:
+            changed |= _human_plate_override(d)
+            changed |= not bool(d.get('output_choice_explicit'))
+            d['output_choice_explicit'] = True
         if str(i) in enabled:
             if d.get("enabled", True) != bool(enabled[str(i)]):
                 changed |= _human_plate_override(d)
@@ -2332,6 +2332,23 @@ def job_plate_quad_frame(jid, i):
 @app.route("/api/jobs/<jid>/plate_quad/<int:i>", methods=["GET", "POST"])
 def job_plate_quad(jid, i):
     job = JOBS.get(jid) or abort(404)
+    compact = request.args.get('compact') == '1'
+    payload = request.get_json(silent=True) or {} if request.method == 'POST' else {}
+    if compact or payload.get('compact') is True:
+        if request.method == 'GET':
+            return jsonify(findings_web.preview(job, i)[2])
+        if job['phase'] not in ('paused','review','done'):
+            return jsonify(error='Pause or finish scanning before editing.'),409
+        with _REVIEW_EDIT_LOCK:
+            try:
+                return jsonify(findings_web.region(job,i,payload))
+            except findings_web.library.ConflictError as error:
+                details = {'error': str(error)}
+                if getattr(error, 'current_archive', None):
+                    details['current_archive'] = error.current_archive
+                return jsonify(details),409
+            except ValueError as error:
+                return jsonify(error=str(error)),400
     if request.method == "POST" and job["phase"] not in ("paused", "review", "done"):
         return jsonify({"error": "Cannot edit plates while scanning"}), 409
     if request.method == "GET":
@@ -2635,6 +2652,27 @@ def _serialize_review_edit(fn):
     return write
 
 
+def _serialize_review_read(fn):
+    """Protect small stored-picture I/O from vault encryption, without decoding.
+
+    Callers must not acquire the edit/decoder gates inside this cache gate.
+    Allow ordinary concurrent thumbnails a brief wait for another small read.
+    Bound the wait during encryption, then recheck the vault after acquisition.
+    """
+    from functools import wraps
+    @wraps(fn)
+    def read(*args, **kwargs):
+        if not _REVIEW_CACHE_LOCK.acquire(timeout=1.):
+            abort(503, description="Saved pictures are temporarily busy. Retry shortly.")
+        try:
+            if vault_locked():
+                abort(423)
+            return fn(*args, **kwargs)
+        finally:
+            _REVIEW_CACHE_LOCK.release()
+    return read
+
+
 
 @app.errorhandler(learned_models.ModelError)
 def learned_model_error(error):
@@ -2645,7 +2683,11 @@ def learned_model_error(error):
 @app.route("/api/jobs/learned-models")
 @_serialize_review_edit
 def learned_model_list():
-    return jsonify({"models": learned_models.list_models(learned_models_root())})
+    models = learned_models.list_models(learned_models_root())
+    for model in models:
+        if model.get('id'):
+            model['training'] = findings_web.training.training_info(learned_models_root(), model['id'])
+    return jsonify({"models": models})
 
 
 @app.route("/api/jobs/<jid>/plate-verifier", methods=["POST"])
@@ -2870,6 +2912,7 @@ def job_track_object(jid):
                 cv2.contourArea(q.astype(np.float32)) < 0.002):
             abort(400)
         quad_req = [[round(float(v), 6) for v in pt] for pt in q]
+    require_confirmation = p.get("require_confirmation") is True
     st = {"state": "running", "added": 0, "error": None}
     job["trackbg"] = st
 
@@ -2879,17 +2922,18 @@ def job_track_object(jid):
                 def log(self, m):
                     job["log"].append(m)
             det = None
-            try:
-                # same person-model resolution the scan uses: the panel
-                # selection first, then the engine's default ladder
-                mid = load_model_select().get("person")
-                p = find_model_file("%s.onnx" % mid) if mid else None
-                det = openscrub.PersonDetector(L(), model_path=p,
-                                               thresh=0.2)
-                if det.net is None and det.ort is None:
+            if quad_req is None:
+                try:
+                    # same person-model resolution the scan uses: the panel
+                    # selection first, then the engine's default ladder
+                    mid = load_model_select().get("person")
+                    p = find_model_file("%s.onnx" % mid) if mid else None
+                    det = openscrub.PersonDetector(L(), model_path=p,
+                                                   thresh=0.2)
+                    if det.net is None and det.ort is None:
+                        det = None
+                except Exception:
                     det = None
-            except Exception:
-                det = None
             samples = openscrub.track_manual_region(
                 job["video"], box, t_ref, t0, t1, cb=L(),
                 person_det=(det if quad_req is None else None))
@@ -2934,12 +2978,19 @@ def job_track_object(jid):
             new[-1]["t_end"] += 0.25
             seed_index = len(doc["detections"])
             doc["detections"].extend(new)
-            if quad_req is not None:
+            if quad_req is not None and require_confirmation:
+                # Drawing records an area, not an Is a plate decision. Only
+                # the actual drawn source instant has human-provided corners;
+                # other tracked positions remain geometric predictions.
+                seed = min(new, key=lambda row: abs(row["last_seen"]-t_ref))
+                if abs(seed["last_seen"]-t_ref) < 1e-6:
+                    seed["human_region_confirmed"] = True
+            elif quad_req is not None:
                 # The drawn reference is reviewed; propagated frames aren't.
                 nearest = min(range(len(new)),
                               key=lambda k: abs(new[k]["t_start"]-t_ref))
                 new[nearest]["verified_label"] = "plate"
-            if quad_req is not None:
+            if quad_req is not None and not require_confirmation:
                 frame = _frame_at(job, t_ref, rs)
                 if frame is not None:
                     points = [[box[0] + qx*(box[2]-box[0]),
@@ -3266,6 +3317,9 @@ def job_report(jid):
 # ----------------------------------------------------------------------------
 # UI
 # ----------------------------------------------------------------------------
+
+findings_web.install(app, sys.modules[__name__])
+plate_text_web.install(app, sys.modules[__name__])
 
 # ----------------------------------------------------------------------------
 # The app page. PAGE is COMPOSED at import time: zones_ui.ZONES_PAGE is the
@@ -3666,9 +3720,9 @@ async function loadJobs(){
  JOBSJSON=s;
  jobs.innerHTML=js.length?js.map(j=>
   `<div class="row" style="justify-content:space-between;padding:4px 0">
-   <a href="#" onclick="openJob('${j.id}');return false">${j.name}</a>
+   <a href="#" onclick="openJob('${j.id}');return false">${sectionEscape(j.name)}</a>
    <span style="display:flex;gap:10px;align-items:center"><span class="badge">${j.phase}</span>
-   ${(j.phase=="error"||j.phase=="cancelled")?`<a href="#" title="${j.section?.role==="export"?"Retry section export":"Retry the scan — reuses the file already on the server, nothing is re-uploaded"}" aria-label="${j.section?.role==="export"?"Retry section export":"Retry scan"}" style="text-decoration:none;font-size:15px" onclick="retryJob('${j.id}',${j.section?.role==="export"});return false">&#8635;</a>`:""}
+   ${((j.phase=="error"||j.phase=="cancelled")&&j.kind!=="model_training")?`<a href="#" title="${j.section?.role==="export"?"Retry section export":"Retry the scan — reuses the file already on the server, nothing is re-uploaded"}" aria-label="${j.section?.role==="export"?"Retry section export":"Retry scan"}" style="text-decoration:none;font-size:15px" onclick="retryJob('${j.id}',${j.section?.role==="export"});return false">&#8635;</a>`:""}
    <a href="#" title="Delete this job and all of its files" style="text-decoration:none;font-size:15px" onclick="delJob('${j.id}');return false">&#128465;&#65039;</a></span></div>`).join(""):"none yet";
  }catch(error){
   if(JOBSFLIGHT!==flight||flight.controller.signal.aborted)return;
@@ -3721,7 +3775,7 @@ function stopJobPolling(){
 }
 
 function shellHtml(j){
- return `<div class="card" id="jobcard"><h2>${j.name}
+ return `<div class="card" id="jobcard"><h2>${sectionEscape(j.name)}
   <span class="badge" id="ph"></span><small id="eta"></small></h2>
  <progress id="prog" value="0" max="1"></progress>
  <div id="jobWorkStatus" class="review-copy" role="status" style="margin:8px 0"></div>
@@ -3875,9 +3929,15 @@ async function refreshJob(id,view,signal){
    a=`<button class="danger" onclick="cancelJob()">Cancel learning pass</button>
     <div id="learningProgress" role="status">Training and full rescan queued</div>
     <div class="warn">The previous reviewed result is retained until this pass succeeds. New output still requires review and rendering.</div>`;
+  if(j.kind==="model_training"){
+   if(j.phase==="learning")a=`<button class="danger" onclick="cancelJob()">Cancel model training</button><div id="learningProgress" role="status">Training selected confirmed examples</div>`;
+   else a=`<a href="#findings">Confirmed findings &amp; training</a> · <a href="#settings">Manage saved models</a>`;
+  }
+  if(j.phase==="learning"&&j.learning?.stage?.startsWith("plate_text"))
+   a=`<button class="danger" onclick="cancelJob()">Cancel plate text search</button><div id="learningProgress" role="status">Searching sampled frames for known plate text</div><p class="review-copy">Possible matches accumulate for review. The search does not stop for individual decisions.</p>`;
   if(j.phase=="rendering")
    a=`<button class="danger" onclick="cancelJob()">Cancel render</button>`;
-  if(j.phase=="error"||j.phase=="cancelled"){
+  if((j.phase=="error"||j.phase=="cancelled")&&j.kind!=="model_training"){
    a=j.section?.role==="export"
     ?`<button onclick="retryJob('${id}',true)">Retry section export</button>
       <div class="review-copy">Renders the saved approved section again.</div>`
@@ -3931,7 +3991,9 @@ async function refreshJob(id,view,signal){
   document.getElementById("actions").innerHTML=a;
   if(!previewActive)img.style.display="none";
  }
- loadSectionsPanel(j,id,view);
+ if(j.kind!=="model_training")loadSectionsPanel(j,id,view);
+ refreshPendingFindings(j,id,view);
+ showTrainingResult(j);
  loadJobs(); // the list must not hold up the selected job's next progress poll
 }
 
@@ -4345,7 +4407,7 @@ async function beTrackGo(box,quad=null){
  const r=await fetch(`api/jobs/${CUR}/track_object`,{method:"POST",
   headers:{"Content-Type":"application/json"},
   body:JSON.stringify({box,t_ref:BE.t,t0:BE.win[0],t1:BE.win[1],
-   ...(quad?{plate_quad:quad}:{})})});
+   ...(quad?{plate_quad:quad,require_confirmation:true}:{})})});
  if(!r.ok){st.textContent="tracking failed to start";return;}
  const poll=setInterval(async()=>{
   const d=await (await fetch(`api/jobs/${CUR}/track_status`)).json();
@@ -4672,7 +4734,7 @@ async function loadReviewPreview(state,task,cacheOnly){
  try{
   const base=img.dataset.previewUrl;
   const target=cacheOnly?base+(base.includes("?")?"&":"?")+"cache_only=1":base;
-  const {response,data}=await reviewRequest(target,{signal:ctl.signal},"blob");
+  const {response,data}=await reviewRequest(target,{signal:ctl.signal,timeoutMs:cacheOnly?15000:120000},"blob");
   if(REVIEW_MEDIA!==state||!img.isConnected)return;
   if(cacheOnly&&response.status===204){missing=true;return;}
   const raw=response.headers.get("X-Plate-Geometry"),meta=raw?JSON.parse(raw):null;
@@ -4687,6 +4749,14 @@ async function loadReviewPreview(state,task,cacheOnly){
   url=null;
   if(REVIEW_MEDIA!==state||!img.isConnected)return;
   drawPlateThumbnail(img);
+  if(meta?.classification_allowed===false){
+   if(typeof FINDING_META!=="undefined"&&FINDING_META[meta.i]){
+    FINDING_META[meta.i].classification_allowed=false;
+    FINDING_META[meta.i].classification_note=meta.classification_note;
+   }
+   card.querySelectorAll('.finding-confirm button').forEach(button=>button.disabled=true);
+   const note=card.querySelector('[id^="vlabel"]');if(note)note.textContent=meta.classification_note;
+  }
   if(status)status.textContent="";
   ok=true;img._previewLoaded=true;
  }catch(error){
@@ -4763,6 +4833,8 @@ function retryReviewPreview(button){
 }
 
 let QEDIT=null;
+let CONFIRM_CHAIN=Promise.resolve();
+const CONFIRM_PENDING=new Set(),CONFIRM_FAILED=new Map();
 const PLATE_EDITS=new Map();
 let PLATE_SAVE=null,PLATE_TIMER=null,PLATE_SERIAL=0,PLATE_REVIEW_BUSY=false;
 const plateCopy=points=>points.map(p=>p.slice());
@@ -4776,7 +4848,7 @@ function plateQuadValid(points){
 }
 function plateEditsPending(){return [...PLATE_EDITS.values()].some(s=>s.dirty||s.pending||s.drag);}
 let REVIEW_VERSION=0,REVIEW_SAVED=0;
-function reviewChoicesPending(){return REVIEW_VERSION!==REVIEW_SAVED;}
+function reviewChoicesPending(){return REVIEW_VERSION!==REVIEW_SAVED||CONFIRM_PENDING.size>0||CONFIRM_FAILED.size>0;}
 function reviewSaveStatus(text,failed=false){
  document.querySelectorAll(".review-save-status").forEach(el=>{
   el.textContent=text;el.setAttribute("role",failed?"alert":"status");
@@ -4823,7 +4895,7 @@ function updatePlateSaveIssues(){
 }
 function plateStatus(s,text,retry=false){
  s.status.textContent=text;s.retry.hidden=!retry;
- s.retry.textContent=s.conflict?"Reload preview":"Retry save";
+ s.retry.textContent=s.archiveConflict?"Discard this unsaved adjustment":s.conflict?"Reload preview":"Retry save";
  if(s.card)s.card.classList.toggle("corner-save-error",!!(s.dirty&&s.error));
  updatePlateSaveIssues();
 }
@@ -4839,7 +4911,11 @@ function commitPlateGesture(s,before){
  if(!plateQuadValid(s.points)){
   s.points=before;s.draw();plateStatus(s,"Corners cannot cross; adjustment reverted.");return;
  }
- s.undo=before;s.version++;s.dirty=true;s.error=null;s.conflict=false;s.failures=0;
+ s.undo=before;s.version++;s.dirty=true;s.failures=0;
+ if(s.archiveConflict){
+  plateStatus(s,"Saved example changed · choose Is / Not to confirm this adjustment.",true);return;
+ }
+ s.error=null;s.conflict=false;
  s.readyAt=Date.now()+450;
  plateStatus(s,"Saving…");schedulePlateSaves();
 }
@@ -4862,7 +4938,7 @@ function discardRejectedCorners(i){
  if(s.cancelDrag)s.cancelDrag();
  // The explicit rejection supersedes this track's uncommitted geometry.
  // A running request may complete, but its old response must not restore it.
- s.pending=null;s.version++;s.dirty=false;s.error=null;s.conflict=false;
+ s.pending=null;s.version++;s.dirty=false;s.error=null;s.conflict=false;s.archiveConflict=false;
  s.points=plateCopy(s.saved);s.draw();plateStatus(s,"Not a plate");
  schedulePlateSaves();
 }
@@ -4875,7 +4951,7 @@ function pumpPlateSaves(){
  PLATE_SAVE=(async()=>{
   try{
    if(!pending&&s.refreshBeforeSave){
-    const {data}=await reviewRequest("api/jobs/"+s.job+"/plate_quad/"+s.i);
+    const {data}=await reviewRequest("api/jobs/"+s.job+"/plate_quad/"+s.i+(s.meta.compact?"?compact=1":""));
     if(!s.meta.source_token||data.source_token!==s.meta.source_token)
      throw Object.assign(new Error("Source frame or detection changed. Reload this preview."),{status:409});
     s.meta.preview_token=data.preview_token;s.refreshBeforeSave=false;
@@ -4883,7 +4959,7 @@ function pumpPlateSaves(){
    if(!s.dirty||s.drag)return; // Rejected, or a new gesture began during metadata loading.
    if(!pending){
     // Keep a request/ID only after an uncertain result, not a definite 503.
-    pending=s.pending={points:plateCopy(s.points),preview_token:s.meta.preview_token,
+    pending=s.pending={points:plateCopy(s.points),preview_token:s.meta.preview_token,compact:!!s.meta.compact,
      apply_track:true,autosave:true,edit_id:Date.now().toString(36)+"-"+(++PLATE_SERIAL)+"-"+Math.random().toString(36).slice(2),
      version:s.version,label:VLBL[s.i]};
    }
@@ -4894,21 +4970,29 @@ function pumpPlateSaves(){
    // state even if a newer Blur/Keep/Not-a-plate choice superseded the gesture,
    // so the next sparse choice save can clear or replace it correctly.
    if(typeof REVIEW_BASE!=="undefined"&&REVIEW_BASE&&REVIEW_BASE.job===s.job&&data.applied>0)
-    REVIEW_BASE.labels[s.i]="plate";
+    REVIEW_BASE.labels[s.i]=s.meta.compact?(data.verified_label||""):"plate";
+   if(data.finding&&typeof FINDING_META!=="undefined"&&FINDING_META[s.i])
+    FINDING_META[s.i].confirmed_finding_revision=data.finding.revision;
    s.saved=plateCopy(s.meta.points);s.failures=0;
    syncPlateTrack(s);
    if(s.pending!==pending)return; // A newer Not-a-plate decision wins.
    s.pending=null;
    if(s.version===pending.version&&!s.drag)s.points=plateCopy(s.saved);
    s.dirty=s.version!==pending.version;
-   if(VLBL[s.i]===pending.label&&VLBL[s.i]!=="not_plate"){
-    VLBL[s.i]="plate";const label=document.getElementById("vlabel"+s.i);
-    if(label)label.textContent="Confirmed plate";
+   if(VLBL[s.i]===pending.label&&VLBL[s.i]!=="not_plate"&&(!s.meta.compact||data.verified_label)){
+    VLBL[s.i]=s.meta.compact?data.verified_label:"plate";const label=document.getElementById("vlabel"+s.i);
+    if(label)label.textContent=VLBL[s.i]==="plate"?"Confirmed plate":"Not a plate";
    }
-   s.draw();plateStatus(s,s.dirty?"Saving…":s.meta.track>=0?"Saved to track":"Saved");
+   s.draw();plateStatus(s,s.dirty?"Saving…":data.classification_required?"Saved area · choose Is / Not to confirm":s.meta.track>=0?"Saved to track":"Saved");
    if(!s.dirty&&CUR===s.job&&document.getElementById("beCv"))beRefresh();
   }catch(error){
    if(!s.dirty||(pending&&s.pending!==pending))return;
+   if(error.status===409&&error.details?.current_archive){
+    rememberFindingConflict(s.i,error.details.current_archive);
+    s.pending=null;s.error=error;s.conflict=false;s.archiveConflict=true;
+    showFindingFailure(s.i,error);
+    s.draw();plateStatus(s,"Saved example changed · choose Is / Not to confirm this adjustment.",true);return;
+   }
    // 400 is validation BEFORE any write in this endpoint. Never keep its
    // rejected coordinates as an idempotent retry. Timeouts/5xx are ambiguous
    // and MUST retain the original ID/payload until acknowledged.
@@ -4943,6 +5027,7 @@ async function flushPlateSaves(){
  return true;
 }
 async function retryPlateSave(s){
+ if(s.archiveConflict){dismissFindingConfirmation(s.i);return;}
  if(s.conflict){
   if(!confirm("Reload this finding and discard its unsaved corner adjustment?"))return;
   s.events.abort();if(s.observer)s.observer.disconnect();
@@ -5012,7 +5097,7 @@ function initPlateCorners(img){
  }
  s.cancelDrag=()=>finish(null,true);
  cv.addEventListener("pointerdown",e=>{
-  e.stopPropagation();if(e.button!==0||s.drag||PLATE_REVIEW_BUSY)return;
+  e.stopPropagation();if(e.button!==0||s.drag||PLATE_REVIEW_BUSY||CONFIRM_PENDING.has(s.i))return;
   const k=nearest(e);if(k<0)return;
   e.preventDefault();QEDIT=s;s.selected=k;
   const at=point(e),p=s.points[k],c=s.displayCrop;
@@ -5034,7 +5119,7 @@ function initPlateCorners(img){
  cv.addEventListener("keydown",e=>{
   QEDIT=s;
   if(e.key==="Escape"){s.cancelDrag();return;}
-  if(s.drag||PLATE_REVIEW_BUSY)return;
+  if(s.drag||PLATE_REVIEW_BUSY||CONFIRM_PENDING.has(s.i))return;
   if(/^[1-4]$/.test(e.key)){s.selected=Number(e.key)-1;e.preventDefault();return;}
   const before=plateCopy(s.points),c=s.displayCrop;
   if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="z"&&s.undo){s.points=plateCopy(s.undo);}
@@ -5060,7 +5145,9 @@ async function zoomDet(i){
  if(!ov){ov=document.createElement("div");ov.id="lb";document.body.appendChild(ov);}
  ov.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:100;display:flex;align-items:center;justify-content:center;cursor:zoom-out;padding:18px";
  ov.onclick=()=>ov.remove();
- ov.innerHTML='<img src="api/jobs/'+CUR+'/detframe/'+i+'" style="max-width:96%;max-height:96%;border-radius:8px">';
+ const original=document.getElementById("thumb"+i);
+ const picture=document.createElement("img");picture.src=original?.src||('api/jobs/'+CUR+'/finding-preview/'+i);
+ picture.style.cssText="max-width:96%;max-height:96%;border-radius:8px";ov.replaceChildren(picture);
 }
 function beRemove(){
  if(BE.sel<0)return;
@@ -5153,7 +5240,7 @@ const plateFallbackLabels={
  invalid_crop:"plate crop unclear", no_text_detected:"lettering not found",
  invalid_geometry:"uncertain lettering shape", ambiguous_text:"possible occlusion",
  residual_text_evidence:"possible missed lettering", unverifiable_contrast:"uncertain contrast",
- interpolated_sample:"missing sample"
+ interpolated_sample:"missing sample",known_text_candidate:"number match awaiting review"
 };
 function plateFallbackText(x){
  const reasons=(x.fallbacks||[x.fallback_reason]).filter(Boolean);
@@ -5260,14 +5347,33 @@ async function trainAndRescan(){
  }
  try{
   await reviewRequest(`api/jobs/${CUR}/learning`,{method:"POST",headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({license_accepted:true})});
+    body:JSON.stringify({license_accepted:true,name:document.getElementById("trainingRunName")?.value.trim()||""})});
   LEARNING_SELECTION=null;clearReviewPreviews();
   const panel=document.getElementById("review");if(panel)panel.remove();
   await refresh();
  }catch(error){alert(error.message);}
 }
+async function searchKnownPlateText(){
+ const job=CUR,view=JOBVIEW,plate_texts=document.getElementById('knownPlateTexts')?.value||'';
+ const max_frames=Number(document.getElementById('plateTextSamples')?.value||120);
+ const note=document.getElementById('plateTextStatus'),button=document.getElementById('plateTextSearchButton');
+ if(button)button.disabled=true;
+ try{
+  if(!await saveAndRender(true)||CUR!==job||JOBVIEW!==view)return;
+  await reviewRequest('api/jobs/'+job+'/plate-text-search',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({plate_texts,max_frames})});
+  if(CUR!==job||JOBVIEW!==view)return;
+  clearReviewPreviews();document.getElementById('review')?.remove();await refresh();
+ }catch(error){if(note)note.textContent='Search could not start: '+error.message;}
+ finally{if(button)button.disabled=false;}
+}
+function plateTextBadge(row){
+ const evidence=row.plate_text_evidence;if(!evidence)return '';
+ const kind=evidence.match_kind==='exact'?'Full number match':'Partial number match';
+ return `<p class="review-copy"><b>${kind}</b> · OCR “${sectionEscape(evidence.observed_text||'')}” · target “${sectionEscape(evidence.matched_target||'')}”. Additional evidence; confirm the whole number region.</p>`;
+}
 let LEARNING_SAMPLE_INFO=null;
 let VLBL={},VLBLJOB=null;  // explicit human labels; never infer from default blur state
+let FINDING_META={},OUTPUT_CHOICES={},OUTPUT_VERSION={};
 let REVIEW_BASE=null; // Only decision scalars, not a second detection report.
 function verifierAssessmentText(assessment){
  if(!assessment)return "Not evaluated yet. Check detections in review mode to assess this candidate without retraining.";
@@ -5312,7 +5418,7 @@ async function checkPlateDetections(){
 }
 function reviewChoiceDelta(){
  const base=REVIEW_BASE&&REVIEW_BASE.job===CUR?REVIEW_BASE:null;
- const enabled={},verified_labels={};
+ const enabled={},verified_labels={},output_choices={};
  for(const [i,value] of Object.entries(EN)){
   if(!base||base.enabled[i]!==value)enabled[i]=value;
  }
@@ -5323,12 +5429,16 @@ function reviewChoiceDelta(){
    if(value==="clear"&&Object.prototype.hasOwnProperty.call(EN,i))enabled[i]=EN[i];
   }
  }
- return {enabled,verified_labels};
+ for(const [i,value] of Object.entries(OUTPUT_CHOICES)){
+  if(value&&(!base||!base.output_choices?.[i])){output_choices[i]=true;enabled[i]=EN[i];}
+ }
+ return {enabled,verified_labels,...(Object.keys(output_choices).length?{output_choices}:{})};
 }
 async function loadReview(signal=null,phase=SHELLPH){
  const job=CUR,view=JOBVIEW;
  const current=()=>!(signal&&signal.aborted)&&CUR===job&&JOBVIEW===view;
- if(!current()||!await flushPlateSaves()||!current())return false;
+ await CONFIRM_CHAIN;
+ if(!current()||CONFIRM_FAILED.size||!await flushPlateSaves()||!current())return false;
  if(!closePlateQuad())return false;
  clearReviewPreviews();
  if(!await showPanel("review")||!current())return false;
@@ -5349,8 +5459,11 @@ async function loadReview(signal=null,phase=SHELLPH){
  const verification=d.verification||(d.verification_history||[]).at(-1);
  if(LEARNING_SELECTION_JOB!==CUR)LEARNING_SELECTION=null;
  const groups={}; const zdrop=[]; TRKMEM={};
- REVIEW_BASE={job,enabled:{},labels:{}};
+ REVIEW_BASE={job,enabled:{},labels:{},output_choices:{}};
+ FINDING_META={};OUTPUT_CHOICES={};OUTPUT_VERSION={};
  d.detections.forEach(x=>{
+  FINDING_META[x.i]=x;
+  if(x.output_choice_explicit)OUTPUT_CHOICES[x.i]=REVIEW_BASE.output_choices[x.i]=true;
   REVIEW_BASE.enabled[x.i]=x.enabled;
   if(x.verified_label)REVIEW_BASE.labels[x.i]=x.verified_label;
   EN[x.i]=x.enabled;
@@ -5358,20 +5471,32 @@ async function loadReview(signal=null,phase=SHELLPH){
   if(x.zone_dropped){zdrop.push(x);return;}
   (groups[x.category]=groups[x.category]||[]).push(x);});
  let html=`<div class="card" id="review"><h2>Review findings</h2>
- <p class="review-copy">Choose what happens in the output. Thumbnails show the original video;
- boxes mark detections.<br>Drag plate corners to autosave their shape to the track. Output choices apply after <b>Save edits &amp; render</b>.
+ <p class="review-copy">Review small saved pictures. Choose <b>Is a …</b> or <b>Not a …</b> to save a human example with its source video.
+ Drag plate corners to adjust the area; an area edit alone does not confirm a plate.<br>Automatic protection stays active while a finding is <b>Not reviewed</b>. Output choices apply after <b>Save edits &amp; render</b>.
  Drag across cards to select several.</p>
+ <div class="row" style="margin-bottom:10px">
+  <a href="#findings" onclick="openFindingsForVideo('${sectionEscape(d.video_id||"")}')">Browse saved findings &amp; train a named model</a>
+ </div><label for="trainingRunName">Training run name (optional)</label>
+ <input id="trainingRunName" maxlength="80" placeholder="Automatic: video name and timestamp" style="width:100%;box-sizing:border-box;margin-bottom:8px">
  <div class="row" style="margin-bottom:10px">
   <button type="button" onclick="trainAndRescan()">Train &amp; rescan this video</button>
   <button type="button" class="sec" onclick="reviewUncertain()">Review 10% of plate groups</button>
   <button type="button" id="reviewShowAll" class="sec" hidden onclick="reviewAllFindings()">Show all findings</button>
  </div>
+ <details id="knownPlateSearch" style="margin-bottom:12px"><summary>Find examples using known plate numbers</summary>
+  <p class="review-copy">Optional local OCR search. Enter the number(s) you expect, one per line. Full matches count more strongly than fragments. It tries rotated, upside-down, mirrored and perspective-corrected views, then adds possible matches to review. Confirm examples before training.</p>
+  <label for="knownPlateTexts">Known plate numbers</label><textarea id="knownPlateTexts" rows="2" maxlength="400" placeholder="ABC-123" autocomplete="off" spellcheck="false" style="width:100%;box-sizing:border-box"></textarea>
+  <label for="plateTextSamples">Maximum sampled frames</label><input id="plateTextSamples" type="number" min="1" max="600" step="1" value="120" style="max-width:130px">
+  <button type="button" id="plateTextSearchButton" onclick="searchKnownPlateText()">Find plate examples</button>
+  <p id="plateTextStatus" class="review-copy" role="status">${d.plate_text_search?sectionEscape(`${d.plate_text_search.done||0} frames searched; ${d.plate_text_search.added||0} new candidates, ${d.plate_text_search.matched_existing||0} matches to existing findings.`):'Search reads sampled source frames once on CPU. It does not run when opening a saved picture.'}</p>
+  <p class="review-copy">A sample search can miss plates between checked frames. Partial matches never mean that only the recognized characters need hiding: protect the whole number. Full plate / Lettering only remains your scan coverage choice.</p>
+ </details>
  ${verification?`<p id="plateVerifierResults" class="review-copy" role="status">${sectionEscape(`${d.verification?"Last check":"Earlier checker pass"}: ${verification.mode} mode; ${verification.inference?.checked||0} checked, ${verification.inference?.suggested||0} suggested, ${verification.inference?.suppressed||0} filtered, ${verification.inference?.human_preserved||0} human decisions preserved. `+verifierAssessmentText(verification.assessment))}</p>`:""}
  ${candidates.length?`<details id="plateVerifierPanel" open style="margin-bottom:12px">
   <summary>Check plate detections with a trained candidate</summary>
   <p class="review-copy">Use learned background examples such as hands to check existing detections. This runs the retained model without training again or rescanning with the original detector.</p>
   <label for="plateVerifierCandidate">Trained candidate</label>
-  <select id="plateVerifierCandidate" style="width:100%" onchange="updatePlateVerifierCandidate()">${candidates.map(candidate=>`<option value="${sectionEscape(candidate.id)}">${sectionEscape(candidate.version)}${candidate.assessment?" · "+sectionEscape(candidate.assessment.status):" · not evaluated"}</option>`).join("")}</select>
+  <select id="plateVerifierCandidate" style="width:100%" onchange="updatePlateVerifierCandidate()">${candidates.map(candidate=>`<option value="${sectionEscape(candidate.id)}">${sectionEscape(candidate.name||candidate.version)}${candidate.assessment?" · "+sectionEscape(candidate.assessment.status):" · not evaluated"}</option>`).join("")}</select>
   <label for="plateVerifierMode">Check mode</label>
   <select id="plateVerifierMode" style="max-width:100%"><option value="review">Review suggestions — preserve output choices</option><option value="filter" disabled>Filter validated false positives</option></select>
   <button type="button" id="plateVerifierButton" onclick="checkPlateDetections()">Check detections</button>
@@ -5412,10 +5537,10 @@ async function loadReview(signal=null,phase=SHELLPH){
    <div class="grid3">`;
   for(const x of zdrop){
    html+=`<div class="det ${EN[x.i]?'':'off'}" id="det${x.i}" data-cat="zdrop">
-    <img data-preview-url="api/jobs/${job}/thumb/${x.i}" alt="Original detection preview"
+    <img id="thumb${x.i}" data-preview-url="api/jobs/${job}/finding-preview/${x.i}" alt="Original detection preview"
      style="cursor:zoom-in" onclick="zoomDet(${x.i})">
     <small class="preview-status" role="status">Preview not loaded</small><button class="sec preview-retry" hidden onclick="retryReviewPreview(this)">Retry preview</button>
-    <div>"${x.text}" <br>${x.t_start.toFixed(1)}–${x.t_end.toFixed(1)}s</div>
+    <div>"${sectionEscape(x.text)}" <br>${x.t_start.toFixed(1)}–${x.t_end.toFixed(1)}s</div>
     <div id="bb${x.i}">${detChoices(x.i)}</div>
    </div>`;
   }
@@ -5437,7 +5562,7 @@ async function loadReview(signal=null,phase=SHELLPH){
    members.sort((a,b)=>a.t_start-b.t_start);
    const sampled=LEARNING_SELECTION?members.find(m=>LEARNING_SELECTION.has(m.i)):null;
    let best=sampled||members[0];     // use the sampler's representative frame
-   if(!sampled)for(const m of members)if((m.confidence||0)>(best.confidence||0))best=m;
+   // The first exact sighting normally has its compact scan-time crop.
    const rep={...best};
    rep.learning_conflict=members.some(m=>m.learning_conflict)?"Model disagreement — review this track":"";
    rep.plate_verification=(members.find(m=>m.plate_verification?.applied)||members.find(m=>m.plate_verification?.decision==="suggest_not_plate")||best).plate_verification;
@@ -5461,7 +5586,7 @@ async function loadReview(signal=null,phase=SHELLPH){
   for(const x of items){
    html+=`<div class="det ${EN[x.i]?'':'off'}" id="det${x.i}" data-cat="${cat}">
     <div class="${x.category==="plate"?"plate-preview":"finding-preview"}">
-    <img id="thumb${x.i}" data-preview-url="api/jobs/${job}/thumb/${x.i}" alt="Original detection preview"
+    <img id="thumb${x.i}" data-preview-url="api/jobs/${job}/finding-preview/${x.i}" alt="Original detection preview"
      class="${x.category==="plate"?"plate-edit-thumb":""}"
      title="${x.category==="plate"?"Drag numbered corners; autosaved to this track":"Enlarge detection"}"
      style="cursor:${x.category==="plate"?"pointer":"zoom-in"}"
@@ -5472,11 +5597,14 @@ async function loadReview(signal=null,phase=SHELLPH){
     <small class="preview-status" role="status">Preview not loaded</small>
     <button class="sec preview-retry" hidden onclick="retryReviewPreview(this)">Retry preview</button>
     ${x.category==="plate"?'<small class="quad-status" role="status" title="Corners apply to this detected track. Review changing perspective. Keyboard: select corner 1–4, use arrows; Ctrl+Z undoes.">Corners autosave to track</small><button type="button" class="sec quad-retry" hidden>Retry save</button>':""}
-    <div>${plateVerificationBadge(x)}${x.learning_conflict?'<span class="badge" title="The original coverage was retained where the learned model could not make a reliable refinement">Model disagreement — review</span> ':""}${plateFallbackText(x)?`<span class="badge" style="white-space:normal">${plateFallbackText(x)}</span> `:""}${x.shaped?'<span class="badge" title="Thumbnail rectangle is a selection guide; open to inspect the mask and any exclusions">shaped mask</span> ':""}${x.personcard?`<b>Person ${x.person+1}</b> — one decision for ALL their appearances`:`"${x.text}"`}${x.frames?` <span class="badge">×${x.frames} frames</span>`:""}${x.confidence?` <span class="badge" title="detector confidence — low values on a non-face thumbnail usually mean a false detection">${Math.round(x.confidence*100)}%</span>`:""} <br>${x.t_start.toFixed(1)}–${x.t_end.toFixed(1)}s</div>
+    <div>${plateVerificationBadge(x)}${x.learning_conflict?'<span class="badge" title="The original coverage was retained where the learned model could not make a reliable refinement">Model disagreement — review</span> ':""}${plateFallbackText(x)?`<span class="badge" style="white-space:normal">${plateFallbackText(x)}</span> `:""}${x.shaped?'<span class="badge" title="Thumbnail rectangle is a selection guide; open to inspect the mask and any exclusions">shaped mask</span> ':""}${x.personcard?`<b>Person ${x.person+1}</b> — one decision for ALL their appearances`:`"${sectionEscape(x.text)}"`}${x.frames?` <span class="badge">×${x.frames} frames</span>`:""}${x.confidence?` <span class="badge" title="detector confidence — not a human decision">${Math.round(x.confidence*100)}%</span>`:""} <br>${x.t_start.toFixed(1)}–${x.t_end.toFixed(1)}s</div>
+    ${plateTextBadge(x)}
+    <div class="finding-confirm" role="group" aria-label="Human classification">
+     <button class="sec" onclick="confirmFinding(${x.i},'positive')" aria-pressed="${reviewFindingLabel(x.i)==='positive'}">✓ Is ${findingNoun(x.i)}</button>
+     <button class="sec" onclick="confirmFinding(${x.i},'negative')" aria-pressed="${reviewFindingLabel(x.i)==='negative'}">✕ Not ${findingNoun(x.i)}</button></div>
+    <small id="vlabel${x.i}" style="color:#93c5fd" role="status">${findingStatus(x.i)}</small>
+    <button class="sec" id="findingDismiss${x.i}" hidden onclick="dismissFindingConfirmation(${x.i})">Keep current review choice</button>
     <div id="bb${x.i}">${detChoices(x.i)}</div>
-    ${x.category==="plate"?`<button class="sec" onclick="labelPlate(${x.i},'plate')">✓ Confirm plate</button>
-     <button class="sec" onclick="labelPlate(${x.i},'not_plate')">✕ Not a plate</button>
-     <small id="vlabel${x.i}" style="color:#93c5fd">${VLBL[x.i]==="plate"?"Confirmed plate":VLBL[x.i]==="not_plate"?"Hard negative":""}</small>`:""}
    </div>`}
   html+=`</div>`}
  html+=`</div>
@@ -5505,38 +5633,141 @@ async function loadReview(signal=null,phase=SHELLPH){
 }
 
 function detChoices(i){
- const blur=!!EN[i];
- return `<div class="det-status ${blur?"blur":"keep"}">${blur?"Will be blurred":"Will stay visible"}</div>
+ const blur=!!EN[i],chosen=!!OUTPUT_CHOICES[i];
+ return `<div class="det-status ${chosen?(blur?"blur":"keep"):"unreviewed"}">${chosen?(blur?"Will be blurred":"Will stay visible"):"Not reviewed"}</div>
+  <small class="review-copy">${chosen?"Output choice":"Automatic output: "+(blur?"protected":"visible")}</small>
   <div class="det-choices" role="group" aria-label="Output for this finding">
-   <button class="det-choice blur" aria-label="Blur" aria-pressed="${blur}"
+   <button class="det-choice blur" aria-label="Blur" aria-pressed="${chosen&&blur}"
     onclick="applyDet(${i},true)">Blur</button>
-   <button class="det-choice keep" aria-label="Keep visible" aria-pressed="${!blur}"
+   <button class="det-choice keep" aria-label="Keep visible" aria-pressed="${chosen&&!blur}"
     onclick="applyDet(${i},false)">Keep visible</button>
   </div>`;
 }
 let TRKMEM={};
+function findingNoun(i){
+ const cat=FINDING_META[i]?.category||"finding";
+ return sectionEscape(({plate:"a plate",face:"a face",person:"a person",name:"a name",email:"an email address",manual:"a sensitive region"})[cat]||("a "+cat.replaceAll("_"," ")));
+}
+function reviewFindingLabel(i){return FINDING_META[i]?.human_confirmation?.label||(VLBL[i]==="plate"?"positive":VLBL[i]==="not_plate"?"negative":"");}
+function findingStatus(i){
+ const label=reviewFindingLabel(i);if(!label)return "Choose Is / Not to save a training example";
+ return (FINDING_META[i]?.confirmed_finding_id?"Saved · ":"Reviewed · ")+(label==="positive"?"Is ":"Not ")+findingNoun(i);
+}
 function labelPlate(i,label){
  if(label!=="plate"&&label!=="not_plate")return;
- for(const m of (TRKMEM[i]||[i])){
-  VLBL[m]=label;
-  if(label==="not_plate")discardRejectedCorners(m);
+ return confirmFinding(i,label==="plate"?"positive":"negative");
+}
+function rememberFindingConflict(i,current){
+ const row=FINDING_META[i];
+ if(row&&typeof current?.id==='string'&&(!row.confirmed_finding_id||current.id===row.confirmed_finding_id)&&Number.isInteger(current.revision)){
+  row.confirmed_finding_id=current.id;
+  row.confirmed_finding_revision=current.revision;
  }
- applyDet(i,label==="plate",true);
+}
+function showFindingFailure(i,error){
+ CONFIRM_FAILED.set(i,error);
+ const current=error.details?.current_archive,note=document.getElementById('vlabel'+i);
+ if(current)rememberFindingConflict(i,current);
+ const reason=current?(current.revoked?'This saved example was forgotten.':
+  'The saved example now says '+(current.label==='positive'?'Is ':'Not ')+findingNoun(i)+'.'):error.message;
+ if(note)note.textContent='Not saved · '+reason+' Click Is / Not to confirm your current decision.';
+ const dismiss=document.getElementById('findingDismiss'+i);
+ if(dismiss){
+  // A definite rejection can be dismissed. An uncertain network result must
+  // be retried with its saved receipt so the browser learns what was written.
+  dismiss.hidden=![400,409].includes(error.status)&&!error.beforeWrite;
+  dismiss.textContent=PLATE_EDITS.get(i)?.archiveConflict?'Discard this unsaved adjustment':'Keep current review choice';
+ }
+}
+function dismissFindingConfirmation(i){
+ if(CONFIRM_PENDING.has(i))return;
+ const error=CONFIRM_FAILED.get(i);
+ if(error&&![400,409].includes(error.status)&&!error.beforeWrite)return;
+ const edit=PLATE_EDITS.get(i);
+ if(edit?.archiveConflict){
+  edit.pending=null;edit.version++;edit.dirty=false;edit.error=null;
+  edit.archiveConflict=false;edit.conflict=false;edit.points=plateCopy(edit.saved);
+  edit.draw();plateStatus(edit,'Saved area · current review choice kept');schedulePlateSaves();
+ }
+ CONFIRM_FAILED.delete(i);
+ const note=document.getElementById('vlabel'+i);if(note)note.innerHTML=findingStatus(i);
+ const dismiss=document.getElementById('findingDismiss'+i);if(dismiss)dismiss.hidden=true;
+ plateUnloadGuard();
+}
+function confirmFinding(i,label){
+ if(!['positive','negative'].includes(label)||CONFIRM_PENDING.has(i))return CONFIRM_CHAIN;
+ if(PLATE_REVIEW_BUSY){
+  const note=document.getElementById('vlabel'+i);
+  if(note)note.textContent='Review is being saved; choose Is / Not after it finishes.';
+  return CONFIRM_CHAIN;
+ }
+ if(FINDING_META[i]?.classification_allowed===false){
+  const note=document.getElementById('vlabel'+i);if(note)note.textContent=FINDING_META[i].classification_note;
+  return CONFIRM_CHAIN;
+ }
+ const members=TRKMEM[i]||[i],versions=Object.fromEntries(members.map(m=>[m,OUTPUT_VERSION[m]||0]));
+ const job=CUR,view=JOBVIEW;CONFIRM_PENDING.add(i);CONFIRM_FAILED.delete(i);plateUnloadGuard();
+ const card=document.getElementById('det'+i),note=document.getElementById('vlabel'+i);
+ const dismiss=document.getElementById('findingDismiss'+i);if(dismiss)dismiss.hidden=true;
+ if(note)note.textContent='Saving confirmation…';
+ card?.querySelectorAll('button').forEach(button=>button.disabled=true);
+ CONFIRM_CHAIN=CONFIRM_CHAIN.then(async()=>{
+  try{
+   const edit=PLATE_EDITS.get(i);
+   if(edit?.drag)throw Object.assign(new Error('Finish moving the corners before confirming.'),{beforeWrite:true});
+   if(label==='negative')for(const m of members)discardRejectedCorners(m);
+   if(edit?.dirty&&!edit.archiveConflict){
+    edit.readyAt=0;
+    while((edit.dirty&&!edit.error)||PLATE_SAVE){
+     await (PLATE_SAVE||pumpPlateSaves());
+     if(edit.dirty&&!edit.error)await new Promise(resolve=>setTimeout(resolve,100));
+    }
+    if(edit.dirty||edit.error)
+     throw edit.archiveConflict?edit.error:Object.assign(new Error('Save or reload this area adjustment before confirming.'),{beforeWrite:true});
+   }else if(PLATE_SAVE)await PLATE_SAVE;
+   if(CUR!==job||JOBVIEW!==view)return;
+   const body={label,expected_revision:FINDING_META[i]?.confirmed_finding_revision};
+   if(edit?.meta.preview_token)body.preview_token=edit.meta.preview_token;
+   if(label==='positive'&&edit?.archiveConflict)body.points=plateCopy(edit.points);
+   const editVersion=edit?.version;
+   const {data}=await reviewRequest('api/jobs/'+job+'/confirm/'+i,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),timeoutMs:120000});
+   if(CUR!==job||JOBVIEW!==view)return;
+   for(const m of members){
+    const row=FINDING_META[m];if(!row)continue;
+    row.human_confirmation={label,propagated:m!==i};OUTPUT_CHOICES[m]=true;
+    const confirmedOutput=label==='positive';
+    if((OUTPUT_VERSION[m]||0)===versions[m])EN[m]=confirmedOutput;
+    if(row.category==='plate')VLBL[m]=label==='positive'?'plate':'not_plate';
+    if(REVIEW_BASE?.job===job){REVIEW_BASE.enabled[m]=confirmedOutput;REVIEW_BASE.labels[m]=VLBL[m]||'';REVIEW_BASE.output_choices[m]=true;}
+    const output=document.getElementById('bb'+m);if(output)output.innerHTML=detChoices(m);
+    document.getElementById('det'+m)?.classList.toggle('off',!EN[m]);
+   }
+   Object.assign(FINDING_META[i],{confirmed_finding_id:data.finding.id,confirmed_finding_revision:data.finding.revision});
+   if(edit&&data.preview){
+    Object.assign(edit.meta,data.preview);edit.img._plateMeta=edit.meta;
+    edit.saved=plateCopy(edit.meta.points);syncPlateTrack(edit);
+    if(edit.version===editVersion&&!edit.drag){
+     edit.points=plateCopy(edit.saved);edit.pending=null;edit.dirty=false;
+     edit.error=null;edit.conflict=false;edit.archiveConflict=false;
+    }
+    edit.draw();plateStatus(edit,edit.dirty?'Saving…':'Saved area · confirmation stored');
+   }
+   CONFIRM_FAILED.delete(i);
+   if(note)note.innerHTML=findingStatus(i);
+   card?.querySelectorAll('.finding-confirm button').forEach((button,index)=>button.setAttribute('aria-pressed',index===(label==='positive'?0:1)));
+   if(document.getElementById('beCv'))beRefresh();
+  }catch(error){showFindingFailure(i,error);}
+  finally{CONFIRM_PENDING.delete(i);card?.querySelectorAll('button').forEach(button=>button.disabled=FINDING_META[i]?.classification_allowed===false&&!!button.closest('.finding-confirm'));plateUnloadGuard();}
+ });
+ return CONFIRM_CHAIN;
 }
 function applyDet(i,blur,preserveLabel=false){
  for(const m of (TRKMEM[i]||[i])){
   EN[m]=blur;
-  if(!preserveLabel)VLBL[m]="clear";
-  const label=document.getElementById("vlabel"+m);
-  if(label)label.textContent=VLBL[m]==="plate"?"Confirmed plate":VLBL[m]==="not_plate"?"Hard negative":"";
+  OUTPUT_CHOICES[m]=true;
+  OUTPUT_VERSION[m]=(OUTPUT_VERSION[m]||0)+1;
   const b=document.getElementById("bb"+m),t=document.getElementById("det"+m);
-  if(b){
-   const status=b.querySelector(".det-status"),choices=b.querySelectorAll("button");
-   if(status){status.className="det-status "+(blur?"blur":"keep");
-    status.textContent=blur?"Will be blurred":"Will stay visible";}
-   if(choices[0])choices[0].setAttribute("aria-pressed",blur);
-   if(choices[1])choices[1].setAttribute("aria-pressed",!blur);
-  }
+  if(b)b.innerHTML=detChoices(m);
   if(t)t.classList.toggle("off",!blur);
  }
  markReviewChanged();
@@ -5633,6 +5864,8 @@ async function saveAndRender(saveOnly=false){
  const job=CUR,view=JOBVIEW;
  try{
   reviewSaveStatus("Saving review…");
+  await CONFIRM_CHAIN;
+  if(CONFIRM_FAILED.size){reviewSaveStatus('A confirmation was not saved. Retry its Is / Not choice, or dismiss its rejected change, before training or rendering.',true);return false;}
   if([...PLATE_EDITS.values()].some(s=>s.drag)){
    reviewSaveStatus("Finish dragging the corner first. Review has not been saved.",true);return false;
   }
@@ -5693,6 +5926,7 @@ async function persistReview(saveOnly=false,job=CUR,view=JOBVIEW,choicesOnly=fal
  if(!r||r.ok!==true)throw new Error("The server did not confirm saving the review");
  if(baseline){
   Object.assign(baseline.enabled,payload.enabled);
+  baseline.output_choices=Object.assign(baseline.output_choices||{},payload.output_choices||{});
   for(const [i,label] of Object.entries(payload.verified_labels))
    baseline.labels[i]=label==="clear"?"":label;
  }
@@ -6042,9 +6276,12 @@ document.addEventListener("visibilitychange",()=>{
 for(const event of ["focus","pageshow","online"])window.addEventListener(event,resumeJobPolling);
 function showView(){
  const s=location.hash==="#settings";
- document.getElementById("mainview").style.display=s?"none":"block";
+ const f=location.hash==="#findings";
+ document.getElementById("mainview").style.display=s||f?"none":"block";
  document.getElementById("settingsview").style.display=s?"block":"none";
+ document.getElementById("findingsview").style.display=f?"block":"none";
  if(s){window.scrollTo(0,0);refreshLearnedModels();}
+ if(f){window.scrollTo(0,0);loadConfirmedFindings();}
 }
 window.addEventListener("hashchange",showView);
 updCheck();vaultStatus();extrasStatus();showView();
@@ -6054,11 +6291,11 @@ PAGE = (zones_ui.ZONES_PAGE
         .replace("%%FAVICON%%", FAVICON_URI)
         .replace("%%LOGO%%", LOGO_URI)
         .replace("%%WORDMARK%%", WORDMARK_URI)
-        .replace("%%APP_CSS%%", APP_CSS)
+        .replace("%%APP_CSS%%", APP_CSS + findings_ui.CSS)
         .replace("%%JOBS_HTML%%", JOBS_HTML)
-        .replace("%%SETTINGS_HTML%%", SETTINGS_HTML)
+        .replace("%%SETTINGS_HTML%%", SETTINGS_HTML + findings_ui.HTML)
         .replace("%%FOOT_HTML%%", FOOT_HTML)
-        .replace("%%APP_JS%%", APP_JS))
+        .replace("%%APP_JS%%", findings_ui.SCRIPT + APP_JS))
 
 
 ASSET_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
@@ -6694,7 +6931,7 @@ def rehydrate_jobs():
     way the person's work survives the server going down."""
     n = 0
     for jid in sorted(os.listdir(JOBS_DIR)):
-        if jid == "learned_plate_models":
+        if jid in findings_web.RESERVED:
             continue
         jdir = os.path.join(JOBS_DIR, jid)
         rep = os.path.join(jdir, "report.json")
@@ -6709,6 +6946,12 @@ def rehydrate_jobs():
         if jid in JOBS:
             continue
         if not os.path.exists(rep):
+            recovered_training = findings_web.recover_training(jid, jdir)
+            if recovered_training:
+                with JOBS_LOCK:
+                    JOBS[jid] = recovered_training
+                n += 1
+                continue
             from pathlib import Path
             recovered_section = _SECTIONS.restore_interrupted(jid, Path(jdir))
             if recovered_section:
@@ -6839,7 +7082,7 @@ def retention_sweep(days):
         return
     cutoff = time.time() - days * 86400
     for jid in os.listdir(JOBS_DIR):
-        if jid == "learned_plate_models":
+        if jid in findings_web.RESERVED:
             continue
         retained = JOBS.get(jid)
         if (_SECTIONS.deletion_error({'id': jid}) or

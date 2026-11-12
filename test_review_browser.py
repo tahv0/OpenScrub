@@ -3,6 +3,7 @@
 Run: pytest -q test_review_browser.py (requires Playwright and Chromium).
 """
 import json
+import hashlib
 import base64
 from urllib.parse import urlsplit
 import os
@@ -37,12 +38,15 @@ def review_server(tmp_path, monkeypatch):
                  text='DEMO (synthetic)', confidence=.95, enabled=True,
                  dense=True, track=i, person=-1) for i in range(90)]
     doc = {'render_state': {'fps': 30, 'cum': [[0, 0]]*310, 'bands': [[0, 0]]*310},
-           'detections': rows, 'provenance': {'input': str(video)}}
+           'detections': rows,
+           'source_identity': {'width':640, 'height':360, 'fps':30, 'total_frames':310},
+           'provenance': {'input':str(video), 'input_sha256':hashlib.sha256(video.read_bytes()).hexdigest()}}
     report = job_dir / 'report.json'
     report.write_text(json.dumps(doc))
     job = dict(id='inline-fixture', dir=str(job_dir), video=str(video), name='Synthetic review fixture',
                phase='review', progress=1., error=None, stats={}, log=[], output=None,
                created=0, options={}, cancel=threading.Event(), stop=threading.Event())
+    monkeypatch.setattr(web, 'JOBS_DIR', str(tmp_path))
     monkeypatch.setattr(web, 'JOBS', {job['id']: job})
     monkeypatch.setattr(web, 'TOKEN', None)
     monkeypatch.setattr(web, 'openscrub_update', None)  # No external update check in offline QA.
@@ -124,18 +128,20 @@ def test_real_direct_corner_autosave_and_lazy_loading(review_server, viewport, t
         assert page.locator('#qSave,#qClose,#qTrack,#qRotateRight,#plateQuadEditor').count() == 0
         page.wait_for_function("!!document.querySelector('#det0 img')._quadEdit")
         initial, size = plate_points(card), card.bounding_box()
-        before_requests = sum('/thumb/0' in r for r in requests)
-        assert sum('/thumb/' in r for r in requests) < 35
+        before_requests = sum('/finding-preview/0' in r for r in requests)
+        assert sum('/finding-preview/' in r for r in requests) < 35
         drag_corner(page, card, release=False)
         assert not posts  # no requests during mousemove
         page.mouse.up()
-        page.wait_for_function("document.querySelector('#det0 .quad-status').textContent.startsWith('Saved')")
+        page.wait_for_function("document.querySelector('#det0 .quad-status').textContent.startsWith('Saved area')")
         moved = plate_points(card)
         assert moved[0] != initial[0] and moved[1:] == initial[1:]
         assert len(posts) == 1 and posts[0]['apply_track'] is True and posts[0]['autosave'] is True
         stored = json.loads(report.read_text())['detections'][0]
-        assert len(stored['plate_quad']) == 4 and stored['verified_label'] == 'plate'
-        assert sum('/thumb/0' in r for r in requests) == before_requests
+        assert len(stored['plate_quad']) == 4 and not stored.get('verified_label')
+        with web.app.test_client() as client:
+            assert client.get('/api/findings').get_json()['total'] == 0, 'An area adjustment alone is not explicit evidence'
+        assert sum('/finding-preview/0' in r for r in requests) == before_requests
         assert not any('/plate_quad/' in r and r.endswith('/frame') for r in requests)
         assert abs(card.bounding_box()['width']-size['width']) < 1
         assert not card.evaluate('(el)=>el.classList.contains("editing") || el.classList.contains("selected")')
@@ -147,7 +153,7 @@ def test_real_direct_corner_autosave_and_lazy_loading(review_server, viewport, t
         assert len(posts) == 1
         # Keyboard access needs no edit-mode click either.
         card.locator('canvas').focus();page.keyboard.press('3');page.keyboard.press('ArrowLeft')
-        page.wait_for_function("document.querySelector('#det0 .quad-status').textContent.startsWith('Saved')")
+        page.wait_for_function("document.querySelector('#det0 .quad-status').textContent.startsWith('Saved area')")
         latest = plate_points(card)
         assert latest[2][0] < moved[2][0]
         card.get_by_role('button', name='Keep visible', exact=True).click()
@@ -178,9 +184,17 @@ def test_real_direct_corner_autosave_and_lazy_loading(review_server, viewport, t
 def test_cached_card_loads_while_another_preview_is_decoding(review_server, monkeypatch, tmp_path):
     """A cold card must not block a ready card behind it in browser or server."""
     sync_api = pytest.importorskip('playwright.sync_api')
-    url, _ = review_server
+    url, report = review_server
+    # Keep cold0 first, warm1 second, and filler cards later in timeline order.
+    # Distinct exact source frames make one JPEG warm while another stays cold.
+    doc=json.loads(report.read_text())
+    for row in doc['detections']:
+        row.update(frame_index=301,t_start=301/30,t_end=301/30,last_seen=301/30)
+    doc['detections'][0].update(frame_index=299,t_start=299/30,t_end=299/30,last_seen=299/30)
+    doc['detections'][1].update(frame_index=300,t_start=10.,t_end=10.,last_seen=10.)
+    report.write_text(json.dumps(doc))
     with web.app.test_client() as client:
-        assert client.get('/api/jobs/inline-fixture/thumb/1').status_code == 200
+        assert client.get('/api/jobs/inline-fixture/finding-preview/1').status_code == 200
     entered, release = threading.Event(), threading.Event()
     original = web._frame_at
     calls = []
@@ -197,12 +211,25 @@ def test_cached_card_loads_while_another_preview_is_decoding(review_server, monk
             errors = []
             page.on('pageerror', lambda e: errors.append(str(e)))
             page.goto(url)
+            # Hold the warm card at fetch until the server's cold decoder is
+            # definitely blocked. A warm image loaded earlier would not prove
+            # that cached reads can complete concurrently with a cold decode.
+            page.evaluate(r'''()=>{
+              const original=window.fetch;
+              window.__warmAllowed=new Promise(resolve=>window.__releaseWarm=resolve);
+              window.fetch=async(url,options)=>{
+                if(/\/finding-preview\/1(?:[?]|$)/.test(String(url)))await window.__warmAllowed;
+                return original(url,options);
+              };
+            }''')
             page.get_by_role('link', name='Synthetic review fixture', exact=True).click()
             page.locator('#review').wait_for()
             page.locator('#det0').scroll_into_view_if_needed()
+            assert entered.wait(5), 'the cold decoder never started'
+            assert page.locator('#det1 img').evaluate('(img)=>img.naturalWidth') == 0
+            page.evaluate('window.__releaseWarm()')
             page.wait_for_function(
                 "document.querySelector('#det1 img').naturalWidth > 0", timeout=5000)
-            assert entered.wait(2)
             assert not release.is_set()
             assert page.locator('#det0 img').evaluate('(img)=>img.naturalWidth') == 0
             card = page.locator('#det1')
@@ -250,7 +277,7 @@ def test_autosave_failure_keeps_draft_and_blocks_render_until_retry(review_serve
         assert not json.loads(report.read_text())['detections'][0].get('plate_quad')
         assert page.evaluate("() => {const e=new Event('beforeunload',{cancelable:true});window.dispatchEvent(e);return e.defaultPrevented;}")
         card.get_by_role('button',name='Retry save',exact=True).click()
-        page.wait_for_function("document.querySelector('#det0 .quad-status').textContent.startsWith('Saved')")
+        page.wait_for_function("document.querySelector('#det0 .quad-status').textContent.startsWith('Saved area')")
         assert attempts[0]['edit_id'] == attempts[1]['edit_id']
         assert json.loads(report.read_text())['detections'][0].get('plate_quad')
         # Crossing corners and cancelled touch/pointer gestures never get saved.
@@ -286,7 +313,7 @@ def test_touch_corner_drag_autosaves(review_server):
         cdp.send('Input.dispatchTouchEvent',{'type':'touchStart','touchPoints':[point]})
         cdp.send('Input.dispatchTouchEvent',{'type':'touchMove','touchPoints':[{'x':point['x']+12,'y':point['y']+7}]})
         cdp.send('Input.dispatchTouchEvent',{'type':'touchEnd','touchPoints':[]})
-        page.wait_for_function("document.querySelector('#det0 .quad-status').textContent.startsWith('Saved')")
+        page.wait_for_function("document.querySelector('#det0 .quad-status').textContent.startsWith('Saved area')")
         assert plate_points(card)[0] != before[0]
         assert json.loads(report.read_text())['detections'][0].get('plate_quad')
         browser.close()
@@ -317,6 +344,7 @@ def test_not_plate_updates_every_member_of_sampled_group(review_server):
         page = browser.new_page(viewport={'width':1440,'height':1000})
         sampled_track_page(page, url, report)
         page.locator('#det0').get_by_role('button',name='✕ Not a plate',exact=True).click()
+        page.evaluate('CONFIRM_CHAIN')
         card = page.locator('#det0')
         assert card.locator('.det-status').inner_text() == 'Will stay visible'
         assert card.get_by_role('button',name='Keep visible',exact=True).get_attribute('aria-pressed') == 'true'
@@ -346,6 +374,7 @@ def test_not_plate_cancels_failed_corner_draft_without_blocking_decision_save(re
         drag_corner(page,card)
         page.wait_for_function('!!document.querySelector("#det0 img")._quadEdit.error')
         card.get_by_role('button',name='✕ Not a plate',exact=True).click()
+        page.evaluate('CONFIRM_CHAIN')
         assert card.locator('.det-status').inner_text() == 'Will stay visible'
         assert page.evaluate('saveAndRender(true)') is True, 'obsolete corners blocked the explicit rejection'
         saved=json.loads(report.read_text())['detections'][0]
@@ -369,7 +398,7 @@ def test_editing_another_representative_after_track_save_does_not_conflict(revie
             drag_corner(page,card)
             page.wait_for_function('(i)=>{const s=document.querySelector("#det"+i+" img")._quadEdit;return !s.dirty||s.error}',arg=i)
             assert card.locator('img').evaluate('(img)=>img._quadEdit.error && img._quadEdit.error.message') is None
-            assert card.locator('.quad-status').inner_text().startswith('Saved')
+            assert card.locator('.quad-status').inner_text().startswith('Saved area')
         browser.close()
 
 
@@ -399,6 +428,7 @@ def test_sixty_rejections_keep_working_after_failed_save(review_server, monkeypa
         for i in range(60):
             card=page.locator('#det%d'%i)
             card.get_by_role('button',name='✕ Not a plate',exact=True).click()
+            page.evaluate('CONFIRM_CHAIN')
             assert card.locator('.det-status').inner_text()=='Will stay visible',i
             assert card.get_by_role('button',name='Keep visible',exact=True).get_attribute('aria-pressed')=='true'
         assert len(posted)==1,'rejected corner drafts must not retry in the background'

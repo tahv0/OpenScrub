@@ -112,6 +112,7 @@ def test_save_choices_despite_failed_corner_then_refresh(production_server, monk
         page.wait_for_function('!!document.querySelector("#det0 img")._quadEdit.error')
         for i in range(1, 6):
             page.locator('#det%d' % i).get_by_role('button', name='✕ Not a plate', exact=True).click()
+            page.evaluate('CONFIRM_CHAIN')
         page.get_by_role('button', name='Save review edits', exact=True).click()
         page.wait_for_function('PLATE_REVIEW_BUSY===false')
         saved = json.loads(report.read_text())['detections']
@@ -150,9 +151,10 @@ def test_decision_only_draft_has_unload_warning(production_server):
         load_browser_page(page,url,[],[])
         page.get_by_role('link',name='Synthetic review fixture',exact=True).click()
         page.locator('#review').wait_for()
-        page.locator('#det1').get_by_role('button',name='✕ Not a plate',exact=True).click()
+        page.locator('#det1').get_by_role('button',name='Keep visible',exact=True).click()
         pending=page.evaluate('''()=>{const e=new Event("beforeunload",{cancelable:true});window.dispatchEvent(e);return e.defaultPrevented;}''')
         assert pending is True
+        assert page.evaluate('reviewFindingLabel(1)') == '', 'An output draft is not a human classification'
         assert page.evaluate('saveAndRender(true)') is True
         assert 'saved' in page.locator('#reviewSaveStatus').inner_text().lower()
         pending=page.evaluate('''()=>{const e=new Event("beforeunload",{cancelable:true});window.dispatchEvent(e);return e.defaultPrevented;}''')
@@ -187,7 +189,7 @@ def test_new_decision_during_save_remains_unsaved(production_server):
             await new Promise(resolve=>window.releaseSaveResponse=resolve);return r;};
          window.saveOutcome=saveAndRender(true);}''')
         page.wait_for_function('typeof window.releaseSaveResponse==="function"')
-        page.locator('#det1').get_by_role('button',name='✕ Not a plate',exact=True).click()
+        page.locator('#det1').get_by_role('button',name='Keep visible',exact=True).click()
         page.evaluate('window.releaseSaveResponse()')
         assert page.evaluate('window.saveOutcome') is False
         assert 'not saved' in page.locator('#reviewSaveStatus').inner_text().lower()
@@ -196,5 +198,6 @@ def test_new_decision_during_save_remains_unsaved(production_server):
         page.evaluate('window.fetch=window.savedFetch')
         assert page.evaluate('saveAndRender(true)') is True
         assert json.loads(report.read_text())['detections'][1]['enabled'] is False
+        assert not json.loads(report.read_text())['detections'][1].get('verified_label')
         page.evaluate('clearReviewPreviews();if(POLL)clearTimeout(POLL);')
         browser.close()

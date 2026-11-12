@@ -31,7 +31,7 @@ def run_node(source):
 def choice_harness():
     return r'''
 const assert=require('node:assert/strict');
-let CUR='one',JOBVIEW=1,EN={0:false},VLBL={0:'clear'};
+let CUR='one',JOBVIEW=1,EN={0:false},VLBL={0:'clear'},OUTPUT_CHOICES={};
 let REVIEW_BASE={job:'one',enabled:{0:false},labels:{}},REVIEW_VERSION=1,REVIEW_SAVED=0;
 let BE={adds:[],ov:{},times:{}},MAN=[],SHELLPH='review',release,posts=[];
 const document={getElementById(){return null}};
