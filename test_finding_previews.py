@@ -359,3 +359,24 @@ def test_explicit_store_rejects_database_symlinks_before_eviction(previews, tmp_
     with pytest.raises(ValueError, match='symlink|confined'):
         previews.store(tmp_path, row(frame=4), state(), meta, np.zeros((180, 320, 3), np.uint8))
     assert outside.read_bytes() == b'outside data must not change'
+
+
+def test_reconcile_links_scan_picture_to_final_track_representative(previews, tmp_path):
+    raw = row(frame=3)
+    raw['track'] = -1
+    assert previews.capture(tmp_path, frame(), 3, 10., [raw])['added'] == 1
+
+    synthetic = row(frame=2)
+    synthetic['track'] = 7
+    real = row(frame=3)
+    real['track'] = 7
+    stats = previews.reconcile(tmp_path, [synthetic, real], state())
+    assert stats['linked'] == 1
+
+    assert previews.lookup(tmp_path, synthetic, state()) is None
+    meta, jpeg = previews.lookup(tmp_path, synthetic, state(), allow_representative=True)
+    assert jpeg.startswith(b'\xff\xd8')
+    assert meta['match'] == 'representative'
+    assert meta['frame'] == 3
+    assert meta['requested_frame'] == 2
+    assert meta['track'] == 7
