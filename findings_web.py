@@ -60,9 +60,9 @@ def _job(jid, edit=False):
     return job
 
 
-def _token(doc, row, frame):
+def _token(doc, row, frame, sample_key=None):
     value = [doc.get('compact_preview_source',doc.get('provenance', {}).get('input_sha256')), frame,
-             row['category'], row['cbox'], row.get('plate_quad') or [],
+             sample_key, row['category'], row['cbox'], row.get('plate_quad') or [],
              doc['render_state']['cum'][frame], doc.get('preview_revision')]
     return hashlib.sha256(json.dumps(value, sort_keys=True).encode()).hexdigest()
 
@@ -129,6 +129,9 @@ def preview(job, index, doc=None, cache_only=False):
     # would be rounded differently by the generic cache's time-based lookup.
     cache_row = dict(row,frame_index=frame)
     cached = _web._serialize_review_read(previews.lookup)(job['dir'], cache_row, rs)
+    if cached is None and int(row.get('track', -1)) >= 0:
+        cached = _web._serialize_review_read(previews.lookup)(
+            job['dir'], cache_row, rs, allow_representative=True)
     if cached is None and cache_only:
         return None
     box = list(map(float, video_learning._screen_box(row, rs, frame)))
@@ -152,16 +155,24 @@ def preview(job, index, doc=None, cache_only=False):
     meta, jpeg = cached
     source = meta.get('source') or {}
     exact = source.get('timing') != 'timestamp'
-    meta = dict(meta, i=index, frame=frame, frame_index=frame if exact else -1,
-                t=frame/float(rs['fps']) if exact else source['requested_time'], box=box,
-                points=points, track=row.get('track', -1), compact=True,
+    representative = meta.get('match') == 'representative'
+    shown_frame = int(meta['frame']) if representative else frame
+    shown_box = list(map(float, meta['box'])) if representative else box
+    shown_points = meta.get('points') if representative else points
+    shown_t = float(meta.get('t', shown_frame/float(rs['fps'])))
+    sample_key = meta.get('key')
+    meta = dict(meta, i=index, frame=shown_frame,
+                frame_index=shown_frame if exact else -1,
+                t=shown_t if exact else source['requested_time'], box=shown_box,
+                points=shown_points, track=row.get('track', -1), compact=True,
                 exact_frame=exact, classification_allowed=exact,
                 classification_note=None if exact else _LEGACY_TIMING_NOTE,
-                preview_token=_token(doc, row, frame))
+                requested_frame=frame,
+                preview_token=_token(doc, row, shown_frame, sample_key))
     if not exact:
         meta['match'] = 'timestamp'
     source_row = dict(row, plate_quad=[])
-    meta['source_token'] = _token(doc, source_row, frame)
+    meta['source_token'] = _token(doc, source_row, shown_frame, sample_key)
     return doc, row, meta, jpeg
 
 
@@ -280,7 +291,7 @@ def confirm(job, index, payload):
     row['human_confirmation'].update(id=entry['id'], revision=entry['revision'])
     doc['render_required'] = True
     stop_review.atomic_report(str(Path(job['dir'])/'report.json'), doc)
-    meta['preview_token'] = _token(doc,row,meta['frame'])
+    meta['preview_token'] = _token(doc,row,meta['frame'],meta.get('key'))
     return dict(ok=True, finding=entry, applied=len(_members(doc,index)),
                 label=row.get('verified_label',''), preview=meta)
 
