@@ -64,7 +64,7 @@ pictures to the final track and automatically shows a nearby real cached frame
 from that same track. This reconciliation is metadata-only and does not reopen
 the video.
 
-The temporary scan-preview cache still has a size limit. Opening or scrolling
+The temporary scan-preview cache still has a 64 MiB per-job disk ceiling; the\nitem-count safety ceiling is high enough that small crops normally reach the byte\nbudget first. Opening or scrolling
 Review does not automatically reopen the source video for a genuinely missing
 picture. Only those exceptional cards show **Load preview**. Clicking it may
 perform one CPU decode from the source. Permanently saved findings use their
