@@ -181,7 +181,7 @@ def test_failed_decision_save_is_reported_and_retry_preserves_decisions(review_s
         assert page.evaluate('PLATE_REVIEW_BUSY') is False
         assert card.locator('.det-status').inner_text() == 'Will stay visible'
         assert json.loads(report.read_text())['detections'][0]['enabled'] is True
-        page.evaluate('window.fetch=window.__workingFetch')
+        page.evaluate('()=>{window.fetch=window.__workingFetch;}')
         _save(page)
         saved = json.loads(report.read_text())['detections'][0]
         assert saved['enabled'] is False and not saved.get('verified_label')
@@ -257,11 +257,11 @@ def test_decision_save_timeout_keeps_draft_and_allows_retry(review_server):
         assert result['ok'] is False
         assert page.evaluate('__saveTimers')==[120000]
         assert 120 <= result['elapsed'] < 5000, result
-        page.evaluate('reviewRequest=window.__workingReviewRequest')
+        page.evaluate('()=>{reviewRequest=window.__workingReviewRequest;}')
         assert page.evaluate('PLATE_REVIEW_BUSY') is False
         assert page.locator('#det0 .det-status').inner_text() == 'Will stay visible'
         assert json.loads(report.read_text())['detections'][0]['enabled'] is True
-        page.evaluate('window.fetch=window.__workingFetch')
+        page.evaluate('()=>{window.fetch=window.__workingFetch;}')
         _save(page)
         saved=json.loads(report.read_text())['detections'][0]
         assert saved['enabled'] is False and not saved.get('verified_label')
