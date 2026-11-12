@@ -896,6 +896,13 @@ def worker():
                     # Never replace the last good checkpoint until the
                     # continuation scan AND postprocessing have both passed.
                     stop_review.atomic_report(report_path, combined)
+                    try:
+                        cache_stats = _reconcile_compact_previews(job, combined)
+                        if cache_stats.get("linked"):
+                            cb.log("      review cache: linked %d scan-time picture(s) "
+                                   "to final tracked findings" % cache_stats["linked"])
+                    except Exception:
+                        diagnostics.exception("compact_preview_reconcile_failed", job)
                     for key in ("verification", "verification_history"):
                         if key in combined:
                             job[key] = combined[key]
@@ -1849,10 +1856,38 @@ def job_mediainfo(jid):
                     "width": w_, "height": h_})
 
 
+def _reconcile_compact_previews(job, doc):
+    """Bind scan-time cached pictures to final post-processed track ids.
+
+    This is metadata-only: it never opens the source video. The report file
+    identity makes repeated Review opens effectively free, while older jobs
+    created before reconciliation gain the mapping on first open.
+    """
+    try:
+        signature = _preview_report_identity(
+            os.path.realpath(os.path.join(job["dir"], "report.json")))
+    except OSError:
+        return dict(total=0, linked=0, already=0)
+    if job.get("_compact_preview_reconcile") == signature:
+        return dict(total=0, linked=0, already=0)
+    if not _REVIEW_CACHE_LOCK.acquire(timeout=1.):
+        return dict(total=0, linked=0, already=0)
+    try:
+        if vault_locked():
+            return dict(total=0, linked=0, already=0)
+        stats = finding_previews.reconcile(
+            job["dir"], doc.get("detections", []), doc.get("render_state") or {})
+        job["_compact_preview_reconcile"] = signature
+        return stats
+    finally:
+        _REVIEW_CACHE_LOCK.release()
+
+
 @app.route("/api/jobs/<jid>/detections")
 def job_detections(jid):
     job = JOBS.get(jid) or abort(404)
     doc = _load_job_report(job)
+    _reconcile_compact_previews(job, doc)
     items = []
     for i, d in enumerate(doc["detections"]):
         items.append({"i": i, "category": d["category"], "text": d["text"],
