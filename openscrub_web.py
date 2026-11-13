@@ -5595,7 +5595,7 @@ function updateReviewOverlayLabel(i,row=null){
  el.innerHTML=`<strong>OUTPUT · ${state.enabled?"HIDDEN":"VISIBLE"}</strong><span>${sectionEscape(state.source)}</span>`;
 }
 function redrawReviewOverlay(i){
- const edit=PLATE_EDITS.get(i);
+ const edit=typeof PLATE_EDITS!=="undefined"?PLATE_EDITS.get(i):null;
  if(edit)edit.draw();else updateReviewOverlayLabel(i);
 }
 function verifierAssessmentText(assessment){
