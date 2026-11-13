@@ -518,6 +518,17 @@ def verify(args):
             page.get_by_role("button", name="Re-open review", exact=True).click()
             card = page.locator("#review .det[data-cat='plate']").first
             card.scroll_into_view_if_needed()
+            # This hand-built fixture intentionally has no scan-time compact
+            # preview. Modern scans should load from cache automatically; an
+            # old/cacheless job must require the explicit source-decode action.
+            page.wait_for_function("""() => {
+              const img=document.querySelector('#review .plate-edit-thumb');
+              const retry=document.querySelector('#review .preview-retry');
+              return !!img?._quadEdit || (retry && !retry.hidden);
+            }""")
+            load_preview = card.get_by_role("button", name="Load preview", exact=True)
+            if load_preview.is_visible():
+                load_preview.click()
             page.wait_for_function("!!document.querySelector('#review .plate-edit-thumb')._quadEdit")
             before_point = card.locator("img").evaluate("img=>img._quadEdit.points[0].slice()")
             size = card.bounding_box()
