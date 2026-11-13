@@ -51,6 +51,7 @@ import plate_verifier
 import zones_ui
 import openscrub_logging as diagnostics
 import finding_previews
+import review_preview_index
 import findings_web
 import findings_ui
 import plate_text_web
@@ -933,6 +934,10 @@ def worker():
                     # continuation scan AND postprocessing have both passed.
                     stop_review.atomic_report(report_path, combined)
                     try:
+                        review_preview_index.prepare(report_path, combined)
+                    except Exception:
+                        diagnostics.exception("review_index_build_failed", job)
+                    try:
                         cache_stats = _reconcile_compact_previews(job, combined)
                         if cache_stats.get("linked"):
                             cb.log("      review cache: linked %d scan-time picture(s) "
@@ -1711,11 +1716,11 @@ def _preview_report_identity(path):
 
 
 def _load_preview_report(job):
-    """Read-only thumbnail snapshot, invalidated by every published report.
+    """Read-only, revision-fenced metadata for individual thumbnail requests.
 
-    Serializing first readers avoids reparsing a large report three times in
-    parallel. Do not use this helper in any operation that mutates a report.
-    Cache publication is checked again after reading, including vault state.
+    A large report is deserialized at most once per revision. Repeated warm
+    thumbnails use one SQLite row and a small cached shared timeline, rather
+    than parsing hundreds of thousands of detections per HTTP request.
     """
     path = os.path.realpath(os.path.join(job["dir"], "report.json"))
     with _REVIEW_REPORT_LOCK:
@@ -1726,14 +1731,28 @@ def _load_preview_report(job):
             cached = _REVIEW_REPORTS.get(identity)
             if cached is not None:
                 return cached
-        doc = _load_job_report(job)
+        doc = review_preview_index.load(path)
+        if doc is None:
+            # Legacy jobs are indexed once on demand. Scan completion builds
+            # the index up front, so normal new jobs avoid this path entirely.
+            source = _load_job_report(job)
+            try:
+                review_preview_index.prepare(path, source)
+                doc = review_preview_index.load(path)
+            except (OSError, ValueError, sqlite3.DatabaseError):
+                diagnostics.exception("review_index_build_failed", job)
+            if doc is None:
+                doc = source  # safe fallback; never sacrifice review accuracy
         current = _preview_report_identity(path)
         with _REVIEW_CACHE_LOCK:
             if vault_locked():
                 abort(423)
-            if current == identity and identity[3] <= _REVIEW_REPORT_MAX_FILE_BYTES:
-                _REVIEW_REPORTS.clear()
-                _REVIEW_REPORTS[identity] = doc
+            if current == identity:
+                # Indexed metadata is small even when report.json exceeds 32 MB.
+                if (isinstance(doc.get("detections"), review_preview_index.IndexedRows)
+                        or identity[3] <= _REVIEW_REPORT_MAX_FILE_BYTES):
+                    _REVIEW_REPORTS.clear()
+                    _REVIEW_REPORTS[identity] = doc
         return doc
 
 
@@ -2432,7 +2451,10 @@ def job_plate_quad(jid, i):
     try:
         if vault_locked():
             abort(423)
-        doc, d, meta, pixels = _plate_preview(job, i)
+        # Writes need an independently mutable authoritative report, never the
+        # lightweight read-only thumbnail index.
+        doc = _load_job_report(job)
+        doc, d, meta, pixels = _plate_preview(job, i, doc=doc)
         payload = request.get_json(silent=True) or {}
         if doc.get("video_sections") or (job.get("section") or {}).get("role") == "export":
             fps = doc["render_state"]["fps"]
