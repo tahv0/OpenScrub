@@ -6082,8 +6082,29 @@ function applyDet(i,blur,preserveLabel=false){
  markReviewChanged();
  if(document.getElementById("beCv")){beRefresh();}
 }
-function setAll(cat,on){document.querySelectorAll(`.det[data-cat=${cat}]:not([hidden])`)
- .forEach(el=>applyDet(+el.id.slice(3),on));}
+function setAll(cat,on){
+ // In a paged category, bulk choices must include every group, not merely
+ // the 48 currently mounted cards. Never silently omit unseen detections.
+ if(REVIEW_PENDING_PAGES[cat]&&!LEARNING_SELECTION){
+  for(const i of REVIEW_CATEGORY_GROUPS[cat]||[])
+   for(const m of TRKMEM[i]||[i]){
+    EN[m]=on;OUTPUT_CHOICES[m]=true;
+    OUTPUT_VERSION[m]=(OUTPUT_VERSION[m]||0)+1;
+   }
+  document.querySelectorAll("#review .det").forEach(card=>{
+   if(card.dataset.cat!==cat)return;
+   const i=Number(card.id.slice(3));
+   card.classList.toggle("off",!EN[i]);
+   const bb=document.getElementById("bb"+i);if(bb)bb.innerHTML=detChoices(i);
+   redrawReviewOverlay(i);
+  });
+  markReviewChanged();
+  if(document.getElementById("beCv"))beRefresh();
+  return;
+ }
+ document.querySelectorAll(`.det[data-cat=${cat}]:not([hidden])`)
+  .forEach(el=>applyDet(+el.id.slice(3),on));
+}
 function thumbRetry(img){
  const n=+(img.dataset.r||0);
  if(n>=3)return;
