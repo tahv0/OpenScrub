@@ -205,6 +205,44 @@ def test_busy_preview_retries_automatically_with_bounded_budget(review_server,mo
         browser.close()
 
 
+@pytest.mark.timeout(70)
+def test_large_review_pages_keep_all_group_choices_and_sample_members(review_server):
+    """Only mount the first 48 cards; bulk choices and sampled groups still cover all."""
+    from copy import deepcopy
+    url, report = review_server
+    doc = json.loads(report.read_text())
+    template = doc['detections'][0]
+    doc['detections'] = [dict(deepcopy(template), track=i, text='Synthetic plate %s' % i)
+                         for i in range(530)]
+    report.write_text(json.dumps(doc))
+    api = pytest.importorskip('playwright.sync_api')
+    with api.sync_playwright() as pw:
+        browser = browser_instance(pw)
+        page = browser.new_page(viewport={'width':1440,'height':1000})
+        page.set_default_timeout(12000)
+        errors=[];page.on('pageerror',lambda error:errors.append(str(error)))
+        load_browser_page(page,url,[],[])
+        page.get_by_role('link',name='Synthetic review fixture',exact=True).click()
+        page.locator('#review').wait_for()
+        assert page.locator('#review .det').count()==48
+        assert page.evaluate('Object.keys(FINDING_META).length')==530
+        assert page.evaluate('Object.keys(TRKMEM).length')==530
+        page.get_by_role('button',name='Keep all visible',exact=True).first.click()
+        assert page.evaluate('Object.values(EN).every(v=>v===false)')
+        delta=page.evaluate('reviewChoiceDelta()')
+        assert len(delta['enabled'])==530, 'Bulk actions must include unmounted groups'
+        page.get_by_role('button',name='Review 10% of plate groups',exact=True).click()
+        assert page.locator('#review .det:visible').count()==53
+        assert '53 of 530' in page.locator('#reviewSampleSummary').inner_text()
+        page.get_by_role('button',name='Show all findings',exact=True).click()
+        before=page.locator('#review .det').count()
+        page.evaluate("appendReviewPage('plate')")
+        assert page.locator('#review .det').count()>before
+        assert page.evaluate('Object.values(EN).every(v=>v===false)')
+        assert not errors,errors
+        browser.close()
+
+
 @pytest.mark.parametrize('cancel', [False, True])
 def test_busy_retry_budget_and_teardown_are_bounded(cancel):
     helpers=web.APP_JS[web.APP_JS.index('let REVIEW_MEDIA=null;'):web.APP_JS.index('let QEDIT=null;')]
