@@ -527,7 +527,7 @@ class WebCallbacks(openscrub.Callbacks):
                 or cur >= total):
             self._rate_points.append((now, cur))
             cutoff = now - 120.0
-            while len(self._rate_points) > 2 and self._rate_points[1][0] < cutoff:
+            while len(self._rate_points) > 2 and self._rate_points[0][0] < cutoff:
                 self._rate_points.pop(0)
 
         done, elapsed = cur - self._cur0, now - self._t0
