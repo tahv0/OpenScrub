@@ -5444,10 +5444,17 @@ async function searchKnownPlateText(){
  const max_frames=Number(document.getElementById('plateTextSamples')?.value||120);
  const note=document.getElementById('plateTextStatus'),button=document.getElementById('plateTextSearchButton');
  if(button)button.disabled=true;
+ if(note)note.textContent='Saving review edits before starting local OCR search…';
  try{
-  if(!await saveAndRender(true)||CUR!==job||JOBVIEW!==view)return;
+  if(!await saveAndRender(true)){
+   if(CUR===job&&JOBVIEW===view&&note)note.textContent='Search not started because review edits were not saved.';
+   return;
+  }
+  if(CUR!==job||JOBVIEW!==view)return;
+  if(note)note.textContent='Starting local OCR search…';
   await reviewRequest('api/jobs/'+job+'/plate-text-search',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({plate_texts,max_frames})});
   if(CUR!==job||JOBVIEW!==view)return;
+  if(note)note.textContent='Local OCR search queued…';
   clearReviewPreviews();document.getElementById('review')?.remove();await refresh();
  }catch(error){if(note)note.textContent='Search could not start: '+error.message;}
  finally{if(button)button.disabled=false;}
