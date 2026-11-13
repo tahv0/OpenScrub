@@ -548,7 +548,7 @@ class WebCallbacks(openscrub.Callbacks):
         if cur < total and rate > 0:
             rem = (total - cur) / rate
             self._eta = (rem if self._eta is None
-                         else 0.55 * self._eta + 0.45 * rem)
+                         else 0.35 * self._eta + 0.65 * rem)
             self.job["eta"] = round(self._eta)
         else:
             self._eta = None
