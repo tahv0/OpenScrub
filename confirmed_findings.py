@@ -331,10 +331,16 @@ def record(root, video, finding, jpeg_bytes):
     return _public(entry)
 
 
-def get_finding(root, id):
+def get_finding(root, id, *, include_revoked=False):
+    """Return live evidence; internal identity checks may inspect a tombstone.
+
+    Revoked entries stay inaccessible through the public HTTP detail route.
+    Review rebinding must still recognize their original frame and video
+    identity so a stale explicit revision retains its 409 conflict receipt.
+    """
     with _db(root) as conn:
         entry = _load(conn, id)
-    if entry.get('revoked'):
+    if entry.get('revoked') and not include_revoked:
         raise KeyError(id)
     return _public(entry)
 
