@@ -1742,7 +1742,7 @@ class _SavedPictureGate:
         self._writers_waiting = 0
         self._local = threading.local()
 
-    def reader(self, timeout=5.0):
+    def reader(self, timeout=1.0):
         from contextlib import contextmanager
         @contextmanager
         def lease():
