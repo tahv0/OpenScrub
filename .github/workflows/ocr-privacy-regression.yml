@@ -1,0 +1,31 @@
+name: OCR privacy and deep-backtrack regression
+on:
+  pull_request:
+    branches: ['integration/all-prs']
+    paths:
+      - 'openscrub.py'
+      - 'test_openscrub.py'
+      - '.github/workflows/ocr-privacy-regression.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  ocr-privacy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      OPENSCRUB_NO_AUTOFETCH: '1'
+      OPENSCRUB_CPU_DNN: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Install same CPU/Tesseract dependencies as release QA
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg tesseract-ocr
+          python -m pip install 'numpy<2' opencv-python-headless==4.11.0.86 onnxruntime==1.20.1 onnx pytest pytest-timeout flask rapidfuzz pyyaml cryptography pytesseract pillow
+      - name: Test optical OCR fidelity and 2-second backtracking
+        run: |
+          python -m pytest -q -ra --timeout=90 test_openscrub.py -k 'tesseract_repairs_ocr_dash_variants or deep_backtrack_finds_true_onset or custom_regex_category or gap_verification_refuses_real_absence'
