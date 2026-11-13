@@ -187,7 +187,7 @@ def read_listing(report_path):
         return None
 
 
-def publish_listing(report_path, doc):
+def publish_listing(report_path, doc, expected_identity=None):
     """Refresh the full Review GET response without rebuilding per-row indexes.
 
     Saving a report changes its inode, invalidating a formerly fast SQLite
@@ -201,6 +201,11 @@ def publish_listing(report_path, doc):
     """
     index = _index_path(report_path)
     expected = report_identity(report_path)
+    # Callers in background workers must pass the exact revision from which
+    # their in-memory document was read. Otherwise a newer report could be
+    # accidentally labeled with stale rows after a concurrent Save.
+    if expected_identity is not None and expected != list(expected_identity):
+        return False
     payload = public_listing(doc)
     values = (
         ('version', str(VERSION)),
@@ -248,7 +253,7 @@ def publish_listing(report_path, doc):
                 pass
 
 
-def prepare(report_path, doc):
+def prepare(report_path, doc, expected_identity=None):
     """Atomically publish an index from an already parsed authoritative report.
 
     On any failure the previous revision's index and the authoritative report
@@ -256,6 +261,8 @@ def prepare(report_path, doc):
     """
     index = _index_path(report_path)
     expected = report_identity(report_path)
+    if expected_identity is not None and expected != list(expected_identity):
+        return False
     if load(report_path) is not None:
         return False
     if not isinstance(doc.get('detections'), list):
