@@ -12,6 +12,7 @@ callers must explicitly opt into a representative from a different frame
 and use the returned actual frame and geometry, never the requested row's.
 """
 import hashlib
+import heapq
 import json
 import math
 import os
@@ -488,18 +489,18 @@ def _iou(a, b):
 
 
 def reconcile(job_dir, detections, render_state):
-    """Link scan-time compact pictures to the final post-processed tracks.
+    """Attach scan-time pictures to final tracks using safe time/box agreement.
 
-    Compact pictures are captured while frames are already decoded, before
-    dense tracking, continuity interpolation, reverse-pass recovery and other
-    post-processing finish. Final Review can therefore point at a synthetic
-    row whose exact frame was never stored even though the same physical
-    object has a nearby cached detector frame.
+    Dense continuity and onset interpolation can move a final detection's
+    last_seen away from the frame where the scanner saved a picture. Matching
+    only the final last_seen therefore throws away useful real pictures.
 
-    Reconciliation never decodes video. It only matches existing compact
-    pictures to final rows from the same category/frame by source-space IoU
-    and writes the final track id into the compact index. That lets Review use
-    a real cached representative of the final track automatically.
+    Sweep final detection intervals over the stored picture frames. A match
+    needs the actual stored frame to belong to the final detection's scanned
+    time interval, exactly the same timeline offset and category, and at
+    least 0.5 source-space IoU. Conflicting close-scoring tracks are rejected.
+    No video is opened or decoded, no class label is inferred, and the
+    picture's actual frame/box/points remain authoritative in the preview.
     """
     try:
         fps = float(render_state['fps'])
@@ -509,7 +510,8 @@ def reconcile(job_dir, detections, render_state):
     except (KeyError, TypeError, ValueError):
         return dict(total=0, linked=0, already=0)
 
-    by_frame = {}
+    last = len(cum) - 1
+    by_category = {}
     for row in detections or []:
         try:
             row = _row(row)
@@ -517,67 +519,119 @@ def reconcile(job_dir, detections, render_state):
             if track < 0:
                 continue
             category = str(row.get('category', ''))
+            content = _box(row['cbox'])
+            person = int(row.get('person', -1))
             exact = int(row.get('frame_index', -1))
             if exact >= 0:
-                frame = exact
+                start = end = exact
             else:
-                t = min(max(float(row.get('last_seen', row['t_start'])),
-                            float(row['t_start'])), float(row['t_end']))
-                frame = int(round(t * fps))
-            if not 0 <= frame < len(cum):
+                t0, t1 = float(row['t_start']), float(row['t_end'])
+                if not math.isfinite(t0) or not math.isfinite(t1) or t1 < t0:
+                    continue
+                # Allow only tiny frame-index rounding at interval boundaries,
+                # never an arbitrary time-nearest picture from another event.
+                start = int(math.floor(t0 * fps - 0.25))
+                end = int(math.ceil(t1 * fps + 0.25))
+                if int(row.get('owned_start_frame', -1)) >= 0:
+                    start = max(start, int(row['owned_start_frame']))
+                if int(row.get('owned_end_frame', -1)) >= 0:
+                    end = min(end, int(row['owned_end_frame']) - 1)
+            start, end = max(0, start), min(last, end)
+            if start > end:
                 continue
-            content = _box(row['cbox'])
-            offset = _offset(cum[frame])
-            box = [content[0]+offset[0], content[1]+offset[1],
-                   content[2]+offset[0], content[3]+offset[1]]
-            by_frame.setdefault((frame, category), []).append(
-                (track, int(row.get('person', -1)), box))
+            by_category.setdefault(category, []).append(
+                (start, end, track, person, content))
         except (ValueError, TypeError, KeyError, OverflowError):
             continue
+    for rows in by_category.values():
+        rows.sort(key=lambda item: item[0])
 
     with _LOCK:
         db = _db(job_dir)
         if db is None:
             return dict(total=0, linked=0, already=0)
         try:
-            records = db.execute(
+            stored = db.execute(
                 'SELECT key, metadata, track FROM previews ORDER BY rowid').fetchall()
-            linked = already = 0
-            byte_delta = 0
-            updates = []
-            for key, serialized, old_track in records:
+            samples = {}
+            for key, serialized, old_track in stored:
                 try:
                     meta = json.loads(serialized)
-                    candidates = by_frame.get((int(meta['frame']),
-                                               str(meta['category'])), ())
-                    if not candidates:
+                    frame = int(meta['frame'])
+                    category = str(meta['category'])
+                    if (not 0 <= frame <= last
+                            or float(meta['fps']) != fps
+                            or _offset(cum[frame]) != _offset(meta['offset'])):
                         continue
-                    best = max(candidates, key=lambda item: _iou(meta['box'], item[2]))
-                    score = _iou(meta['box'], best[2])
-                    if score < .5:
+                    box = _box(meta['box'])
+                    samples.setdefault(category, []).append(
+                        (frame, key, serialized, old_track, meta, box))
+                except (ValueError, TypeError, KeyError, OverflowError):
+                    continue
+
+            linked = already = ambiguous = 0
+            byte_delta = 0
+            updates = []
+            for category, cached_rows in samples.items():
+                choices = by_category.get(category, [])
+                if not choices:
+                    continue
+                cached_rows.sort(key=lambda item: item[0])
+                cursor, active, expirations = 0, {}, []
+                for frame, key, serialized, old_track, meta, box in cached_rows:
+                    while cursor < len(choices) and choices[cursor][0] <= frame:
+                        candidate = choices[cursor]
+                        active[cursor] = candidate
+                        heapq.heappush(expirations, (candidate[1], cursor))
+                        cursor += 1
+                    while expirations and expirations[0][0] < frame:
+                        _, index = heapq.heappop(expirations)
+                        active.pop(index, None)
+                    dx, dy = _offset(cum[frame])
+                    best_score, best, rival_score = 0., None, 0.
+                    for start, end, track, person, content in active.values():
+                        source_box = [content[0]+dx, content[1]+dy,
+                                      content[2]+dx, content[3]+dy]
+                        score = _iou(box, source_box)
+                        if score < .5:
+                            continue
+                        if best is None or score > best_score:
+                            if best is not None and best[0] != track:
+                                rival_score = max(rival_score, best_score)
+                            best_score, best = score, (track, person)
+                        elif best[0] != track:
+                            rival_score = max(rival_score, score)
+                    if best is None:
                         continue
-                    track, person, _ = best
+                    # Two similarly positioned physical objects at the same
+                    # moment cannot safely share a representative picture.
+                    if rival_score >= best_score - .075:
+                        ambiguous += 1
+                        continue
+                    track, person = best
                     if int(old_track) == track and int(meta.get('track', -1)) == track:
                         already += 1
                         continue
                     meta['track'] = track
                     if person >= 0:
                         meta['person'] = person
+                    else:
+                        meta.pop('person', None)
                     updated = _json(meta)
                     byte_delta += len(updated.encode()) - len(serialized.encode())
                     updates.append((track, updated, key))
                     linked += 1
-                except (ValueError, TypeError, KeyError, OverflowError):
-                    continue
             if updates:
                 db.executemany('UPDATE previews SET track=?, metadata=? WHERE key=?',
                                updates)
                 count, size, _ = _totals(db)
                 _set_total(db, 'bytes', size + byte_delta)
                 db.commit()
-            return dict(total=len(records), linked=linked, already=already)
+            return dict(total=len(stored), linked=linked,
+                        already=already, ambiguous=ambiguous)
         finally:
             db.close()
+
 
 
 def pending(job_dir, offset=0, limit=60):
