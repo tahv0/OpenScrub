@@ -118,6 +118,7 @@ def public_item(index, d):
                 learning_score=d.get('learning_score'),
                 plate_verification=d.get('plate_verification'),
                 fallback_reason=d.get('fallback_reason', ''),
+                human_region_confirmed=bool(d.get('human_region_confirmed')),
                 zone_dropped=bool(d.get('zone_dropped')),
                 shaped=bool(d.get('poly')))
 
