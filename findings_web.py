@@ -311,6 +311,20 @@ def _journal_members(doc, index):
             else len(_members(doc, index)))
 
 
+def _journal_matches_archived_source(job, doc, index):
+    """Never carry a confirmed label over to a different source box/frame.
+
+    The fast path may edit an existing archive only while its immutable
+    identity still matches the displayed exact-frame representative.
+    Relocalization must take the full legacy protection/rebind path.
+    """
+    row = doc['detections'][index]
+    if not row.get('confirmed_finding_id'):
+        return True
+    _, _, meta, _ = preview(job, index, doc=doc)
+    return not _archived_identity_changed(job, doc, row, meta)
+
+
 def _journal_confirm(job, index, payload, doc):
     label = payload.get('label')
     if label not in ('positive', 'negative') or type(label) is not str:
@@ -403,13 +417,16 @@ def _journal_region(job, index, payload, doc):
     return dict(ok=True, applied=_journal_members(doc,index),
                 verified_samples_added=0, finding=archive, preview=meta,
                 verified_label=row.get('verified_label',''),
-                classification_required=not bool(confirmed.get('label')))
+                classification_required=not bool(confirmed.get('label')),
+                reconfirmation_required=False, cleared_indices=[])
 
 
 def confirm(job, index, payload):
     journal_doc = _journal_doc(job)
-    if journal_doc is not None:
+    if journal_doc is not None and _journal_matches_archived_source(job, journal_doc, index):
         return _journal_confirm(job, index, payload, journal_doc)
+    # Relocalized confirmed rows and section-locked reports use the existing
+    # source-bound rebind rules. Materialize pending journal edits first.
     # Fallback section/legacy writes operate on one fully materialized report.
     _web._review_journal_snapshot(job)
     label = payload.get('label')
@@ -466,8 +483,9 @@ def confirm(job, index, payload):
 
 def region(job, index, payload):
     journal_doc = _journal_doc(job)
-    if journal_doc is not None:
+    if journal_doc is not None and _journal_matches_archived_source(job, journal_doc, index):
         return _journal_region(job, index, payload, journal_doc)
+    # An old confirmed example cannot authorize changed source geometry.
     _web._review_journal_snapshot(job)
     started = time.monotonic()
     # Explicit edits must operate on the complete authoritative report; the
