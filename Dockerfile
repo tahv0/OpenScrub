@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1
+
 # OpenScrub server image (CPU). Built and pushed to GitHub Container
 # Registry and Docker Hub automatically on every release
 # (.github/workflows/docker-image.yml):
@@ -24,25 +26,28 @@
 
 FROM python:3.12-slim
 
-# dist-upgrade pulls the latest Debian security patches even when the base
-# image tag lags behind. This layer is cached across builds; the weekly
-# security refresh re-runs a SEPARATE small layer at the top of the image
-# (see the end of this file) so published tags keep absorbing fixes
-# without invalidating the heavy layers below.
-RUN apt-get update \
+# Debian OS packages are installed and updated here (cached across normal
+# code changes). A later security refresh is deliberately placed after
+# expensive dependencies/models but BEFORE application source COPY.
+RUN --mount=type=cache,id=openscrub-pip-cpu,target=/root/.cache/pip,sharing=locked \
+ apt-get update \
  && apt-get dist-upgrade -y \
  && apt-get install -y --no-install-recommends tesseract-ocr ffmpeg \
  && rm -rf /var/lib/apt/lists/* \
- && pip install --no-cache-dir --upgrade pip setuptools wheel
+ && pip install --upgrade pip setuptools wheel
 
 WORKDIR /src
 
+# Persistent pip cache mount keeps downloaded wheels across rebuilds without
+# putting pip's cache inside the image. It is safe if a requirements file
+# changes or BuildKit has to re-execute the install step.
 # ---- heavy dependency layer: rebuilds ONLY when requirements.txt changes
 COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt \
+RUN --mount=type=cache,id=openscrub-pip-cpu,target=/root/.cache/pip,sharing=locked \
+ pip install -r requirements.txt \
  # faster-whisper: local speech transcription for spoken-PII
  # suggestions (fully offline)
- && pip install --no-cache-dir faster-whisper \
+ && pip install faster-whisper \
  # spaCy NER for name detection, baked in with its model
  && python -m spacy download en_core_web_sm
 
@@ -56,6 +61,19 @@ RUN pip install --no-cache-dir -r requirements.txt \
 COPY docker/prefetch_models.py ./
 RUN python prefetch_models.py yunet sface vittrack ppdet pprec pprec_yml plate_t640
 
+# ---- weekly security refresh: after large deps/models, BEFORE app code
+# CI varies SECURITY_REFRESH to install OS updates. Only this step and the
+# small source/app layers below rebuild; CUDA, Python wheels and downloaded
+# models remain cached. Ordinary code edits keep the default value (0) and
+# never need to re-run apt-get update or dist-upgrade.
+ARG SECURITY_REFRESH=0
+RUN --mount=type=cache,id=openscrub-pip-cpu,target=/root/.cache/pip,sharing=locked \
+ echo "security refresh ${SECURITY_REFRESH}" \
+ && apt-get update \
+ && apt-get dist-upgrade -y \
+ && rm -rf /var/lib/apt/lists/* \
+ && pip install --upgrade pip setuptools wheel
+
 # ---- app layers: tiny, change every release
 COPY pyproject.toml README.md LICENSE NOTICE THIRD_PARTY_NOTICES.md plate_models.json face_models.json person_models.json ./
 COPY openscrub.py openscrub_web.py stop_review.py openscrub_logging.py learning_session.py video_learning.py learned_models.py learning_candidates.py plate_verifier.py confirmed_findings.py finding_previews.py review_preview_index.py review_journal.py findings_training.py findings_web.py findings_ui.py plate_text_hints.py plate_text_web.py video_sections.py section_workflow.py openscrub_setup.py openscrub_update.py \
@@ -63,21 +81,8 @@ COPY openscrub.py openscrub_web.py stop_review.py openscrub_logging.py learning_
 COPY plate_text_subprocess.py ./
 COPY assets/openscrub.ico assets/
 COPY scripts/ scripts/
-RUN pip install --no-cache-dir --no-deps .
-
-# ---- security refresh layer: the ONLY layer the weekly scheduled rebuild
-# (docker-image.yml) invalidates. SECURITY_REFRESH is a cache-buster (the
-# workflow passes the run id); everything below it stays cached, so a
-# refresh republishes tags whose multi-GB dependency layers keep their
-# exact digests — users re-download only this small patch layer. The
-# earlier --no-cache refresh rebuilt every layer with new digests and
-# forced a near-full image re-pull on every user, every week.
-ARG SECURITY_REFRESH=0
-RUN echo "security refresh ${SECURITY_REFRESH}" \
- && apt-get update \
- && apt-get dist-upgrade -y \
- && rm -rf /var/lib/apt/lists/* \
- && pip install --no-cache-dir --upgrade pip setuptools wheel
+RUN --mount=type=cache,id=openscrub-pip-cpu,target=/root/.cache/pip,sharing=locked \
+ pip install --no-deps .
 
 # tells the web UI it runs in a container: the update notice becomes
 # inform-only ("pull the new image") instead of offering the in-place

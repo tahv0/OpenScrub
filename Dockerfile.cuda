@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1
+
 # OpenScrub server image — NVIDIA GPU build (CUDA OCR via PaddleOCR-GPU,
 # CUDA face detection via a source-built OpenCV, NVENC hardware encoding
 # via ffmpeg). Published on every release as
@@ -42,27 +44,30 @@ ENV DEBIAN_FRONTEND=noninteractive \
 # Keep both installs on the same version when restoring the GPU wheel.
 ARG ONNXRUNTIME_GPU_VERSION=1.20.2
 
-# dist-upgrade pulls the latest Ubuntu security patches even when the base
-# image lags. This layer is cached across builds; the weekly security
-# refresh re-runs a SEPARATE small layer at the top of the image (see the
-# end of this file) so published tags keep absorbing fixes without
-# invalidating the multi-GB CUDA/Paddle layers below.
-RUN apt-get update \
+# Ubuntu OS packages are installed and updated here (cached across normal
+# code changes). A later security refresh is deliberately placed after
+# expensive dependencies/models but BEFORE application source COPY.
+RUN --mount=type=cache,id=openscrub-pip-cuda,target=/root/.cache/pip,sharing=locked \
+ apt-get update \
  && apt-get dist-upgrade -y \
  && apt-get install -y --no-install-recommends tesseract-ocr ffmpeg \
  && rm -rf /var/lib/apt/lists/* \
- && pip install --no-cache-dir --upgrade pip setuptools wheel
+ && pip install --upgrade pip setuptools wheel
 
 WORKDIR /src
 
+# Persistent pip cache mount keeps downloaded wheels across rebuilds without
+# putting pip's cache inside the image. It is safe if a requirements file
+# changes or BuildKit has to re-execute the install step.
 # ---- heavy dependency layer: rebuilds ONLY when requirements.txt changes.
 # OpenCV is ALREADY provided (CUDA build) by the base image — install every
 # requirement EXCEPT opencv (the CPU wheel would shadow the CUDA one) and
 # numpy (the base image's numpy is the ABI OpenCV was compiled against; a
 # pip numpy of a different ABI would break `import cv2`).
 COPY requirements.txt ./
-RUN grep -viE '^(opencv|numpy|onnxruntime)' requirements.txt > /tmp/req.nocv \
- && pip install --no-cache-dir -r /tmp/req.nocv \
+RUN --mount=type=cache,id=openscrub-pip-cuda,target=/root/.cache/pip,sharing=locked \
+ grep -viE '^(opencv|numpy|onnxruntime)' requirements.txt > /tmp/req.nocv \
+ && pip install -r /tmp/req.nocv \
  # onnxruntime-GPU (not the CPU wheel in requirements.txt) so license-plate
  # detection runs on the GPU via the CUDAExecutionProvider on cu126. The
  # engine registers CPUExecutionProvider as a fallback, so if the CUDA/cuDNN
@@ -74,9 +79,9 @@ RUN grep -viE '^(opencv|numpy|onnxruntime)' requirements.txt > /tmp/req.nocv \
  # site-packages, which would shadow the base image's cuDNN and re-trigger the
  # Paddle CUDNN 5003 failure documented below. onnxruntime then loads CUDA/
  # cuDNN from the cudnn-runtime base image, the same copy Paddle uses.
- && pip install --no-cache-dir --no-deps "onnxruntime-gpu==${ONNXRUNTIME_GPU_VERSION}" \
- && pip install --no-cache-dir coloredlogs flatbuffers sympy humanfriendly \
- && pip install --no-cache-dir paddleocr \
+ && pip install --no-deps "onnxruntime-gpu==${ONNXRUNTIME_GPU_VERSION}" \
+ && pip install coloredlogs flatbuffers sympy humanfriendly \
+ && pip install paddleocr \
       paddlepaddle-gpu==3.2.2 \
       -i https://www.paddlepaddle.org.cn/packages/stable/cu126/ \
       --extra-index-url https://pypi.org/simple \
@@ -85,9 +90,9 @@ RUN grep -viE '^(opencv|numpy|onnxruntime)' requirements.txt > /tmp/req.nocv \
  # provider files (same-package overwrite — it killed the :intel image
  # when stock 1.27 released), so evict stock and re-lay the GPU wheel
  # LAST; the CUDA-provider assert below is the backstop.
- && pip install --no-cache-dir faster-whisper \
+ && pip install faster-whisper \
  && (pip uninstall -y onnxruntime || true) \
- && pip install --no-cache-dir --force-reinstall --no-deps \
+ && pip install --force-reinstall --no-deps \
       "onnxruntime-gpu==${ONNXRUNTIME_GPU_VERSION}" \
  # NOTE: no pip cuDNN here — the cudnn-runtime base image ships the
  # matched version; a second, newer pip copy caused CUDNN error 5003
@@ -96,7 +101,7 @@ RUN grep -viE '^(opencv|numpy|onnxruntime)' requirements.txt > /tmp/req.nocv \
  # Pin numpy to the EXACT version the CUDA OpenCV was built against
  # (PaddleOCR pulls numpy 2.x, whose C ABI breaks cv2). Paddle 3.x and
  # spaCy both support 1.26.4.
- && pip install --no-cache-dir "numpy==1.26.4" \
+ && pip install "numpy==1.26.4" \
  # PaddleOCR installs opencv-contrib-python from pip, which SHADOWS the
  # CUDA OpenCV (silently forcing face detection back onto the CPU) and
  # mixes its Python glue with our native module (the gapi/GStreamer
@@ -127,13 +132,14 @@ print('onnxruntime', ort.__version__, '| providers', provs)"
 # replace the base image's CUDA cv2, numpy, ORT or Paddle libraries.
 ARG OPENSCRUB_ENABLE_TRAINING=0
 COPY requirements.training.txt /tmp/requirements.training.txt
-RUN if [ "$OPENSCRUB_ENABLE_TRAINING" = "1" ]; then \
+RUN --mount=type=cache,id=openscrub-pip-cuda,target=/root/.cache/pip,sharing=locked \
+ if [ "$OPENSCRUB_ENABLE_TRAINING" = "1" ]; then \
       apt-get update && apt-get install -y --no-install-recommends python3-venv && \
       python3 -m venv /opt/openscrub-training && \
-      /opt/openscrub-training/bin/python -m pip install --no-cache-dir --upgrade pip && \
-      /opt/openscrub-training/bin/python -m pip install --no-cache-dir \
+      /opt/openscrub-training/bin/python -m pip install --upgrade pip && \
+      /opt/openscrub-training/bin/python -m pip install \
         torch==2.10.0 torchvision==0.25.0 --index-url https://download.pytorch.org/whl/cu126 && \
-      /opt/openscrub-training/bin/python -m pip install --no-cache-dir -r /tmp/requirements.training.txt && \
+      /opt/openscrub-training/bin/python -m pip install -r /tmp/requirements.training.txt && \
       /opt/openscrub-training/bin/python -c "import torch,ultralytics,onnx,onnxruntime; assert torch.version.cuda is not None" && \
       rm -rf /var/lib/apt/lists/*; \
     fi
@@ -149,6 +155,19 @@ RUN if [ "$OPENSCRUB_ENABLE_TRAINING" = "1" ]; then \
 COPY docker/prefetch_models.py ./
 RUN python prefetch_models.py yunet sface vittrack ppdet plate_t640
 
+# ---- weekly security refresh: after large deps/models, BEFORE app code
+# CI varies SECURITY_REFRESH to install OS updates. Only this step and the
+# small source/app layers below rebuild; CUDA, Python wheels and downloaded
+# models remain cached. Ordinary code edits keep the default value (0) and
+# never need to re-run apt-get update or dist-upgrade.
+ARG SECURITY_REFRESH=0
+RUN --mount=type=cache,id=openscrub-pip-cuda,target=/root/.cache/pip,sharing=locked \
+ echo "security refresh ${SECURITY_REFRESH}" \
+ && apt-get update \
+ && apt-get dist-upgrade -y \
+ && rm -rf /var/lib/apt/lists/* \
+ && pip install --upgrade pip setuptools wheel
+
 # ---- app layers: tiny, change every release
 COPY pyproject.toml README.md LICENSE NOTICE THIRD_PARTY_NOTICES.md plate_models.json face_models.json person_models.json ./
 COPY openscrub.py openscrub_web.py stop_review.py openscrub_logging.py learning_session.py video_learning.py learned_models.py learning_candidates.py plate_verifier.py confirmed_findings.py finding_previews.py review_preview_index.py review_journal.py findings_training.py findings_web.py findings_ui.py plate_text_hints.py plate_text_web.py video_sections.py section_workflow.py openscrub_setup.py openscrub_update.py \
@@ -156,21 +175,8 @@ COPY openscrub.py openscrub_web.py stop_review.py openscrub_logging.py learning_
 COPY plate_text_subprocess.py ./
 COPY assets/openscrub.ico assets/
 COPY scripts/ scripts/
-RUN pip install --no-cache-dir --no-deps .
-
-# ---- security refresh layer: the ONLY layer the weekly scheduled rebuild
-# (docker-image.yml) invalidates. SECURITY_REFRESH is a cache-buster (the
-# workflow passes the run id); everything below it stays cached, so a
-# refresh republishes tags whose multi-GB dependency layers keep their
-# exact digests — users re-download only this small patch layer. The
-# earlier --no-cache refresh rebuilt every layer with new digests and
-# forced a near-full image re-pull on every user, every week.
-ARG SECURITY_REFRESH=0
-RUN echo "security refresh ${SECURITY_REFRESH}" \
- && apt-get update \
- && apt-get dist-upgrade -y \
- && rm -rf /var/lib/apt/lists/* \
- && pip install --no-cache-dir --upgrade pip setuptools wheel
+RUN --mount=type=cache,id=openscrub-pip-cuda,target=/root/.cache/pip,sharing=locked \
+ pip install --no-deps .
 
 # tells the web UI it runs in a container: the update notice becomes
 # inform-only ("pull the new image") instead of offering the in-place

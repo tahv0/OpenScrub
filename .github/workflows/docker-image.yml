@@ -24,10 +24,10 @@ on:
   # rebuilt every layer with a new digest, so every user re-downloaded the
   # near-complete image (~10 GB for :cuda) every Monday, and Unraid's
   # auto-update recreated their container for a "new" image with the same
-  # code. Instead the Dockerfiles end with a small `apt-get dist-upgrade`
-  # layer keyed on the SECURITY_REFRESH build-arg (the run id): only that
-  # layer rebuilds, the heavy layers keep their digests and the pull is
-  # just the patch delta.
+  # code. Instead the Dockerfiles refresh AFTER the heavy dependency/model
+  # layers but BEFORE the app COPY. SECURITY_REFRESH (the run id) rebuilds
+  # the patch layer and small app layers only. CUDA/Paddle/torch/model layers
+  # keep their digests, and source-only builds never re-run apt upgrades.
   schedule:
     - cron: "17 8 * * 1"
   workflow_dispatch:
