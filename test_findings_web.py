@@ -83,7 +83,7 @@ def test_corner_draft_is_not_a_positive_training_label(findings_job):
     saved = client.post(f'/api/jobs/{job["id"]}/finding-region/0',
                         json={'points': points, 'preview_token': meta['preview_token']})
     assert saved.status_code == 200, saved.get_data(as_text=True)
-    row = json.loads(path.read_text())['detections'][0]
+    row = web._load_job_report(job)['detections'][0]
     assert row.get('plate_quad')
     assert not row.get('verified_label')
     assert client.get('/api/findings').get_json()['total'] == 0
@@ -176,26 +176,26 @@ def test_unsectioned_corner_autosave_does_not_deepcopy_huge_report(
         compact=True, points=points, preview_token=meta['preview_token'],
         autosave=True, edit_id='efficient-corner-save'))
     assert result.status_code == 200, result.get_data(as_text=True)
-    assert json.loads(path.read_text())['detections'][0]['human_region_confirmed']
+    assert web._load_job_report(job)['detections'][0]['human_region_confirmed']
 
 def test_confirm_retry_recovers_archive_after_report_failure(findings_job, monkeypatch):
     client, job, _, path = findings_job
     url = f'/api/jobs/{job["id"]}/confirm/0'
     assert client.post(url, json={'label':'positive'}).status_code == 200
-    original = web.stop_review.atomic_report
+    original = web.findings_web.review_journal.write
     def fail(*args, **kwargs):
         raise OSError('Injected report publication failure')
-    monkeypatch.setattr(web.stop_review, 'atomic_report', fail)
+    monkeypatch.setattr(web.findings_web.review_journal, 'write', fail)
     # Flask may propagate exceptions under the test environment.
     try:
         response = client.post(url, json={'label':'negative'})
         assert response.status_code == 500
     except OSError:
         pass
-    monkeypatch.setattr(web.stop_review, 'atomic_report', original)
+    monkeypatch.setattr(web.findings_web.review_journal, 'write', original)
     retry = client.post(url, json={'label':'negative'})
     assert retry.status_code == 200, retry.get_data(as_text=True)
-    assert json.loads(path.read_text())['detections'][0]['verified_label'] == 'not_plate'
+    assert web._load_job_report(job)['detections'][0]['verified_label'] == 'not_plate'
     assert client.get('/api/findings').get_json()['items'][0]['label'] == 'negative'
 
 
@@ -447,7 +447,7 @@ def test_legacy_vfr_cached_picture_supports_offline_drafts_but_not_training(lega
     drafted = client.post(f'/api/jobs/{job["id"]}/finding-region/0', json={
         'points': [[26, 25], [68, 25], [68, 39], [26, 39]], 'preview_token': meta['preview_token']})
     assert drafted.status_code == 200, drafted.get_data(as_text=True)
-    row = json.loads(path.read_text())['detections'][0]
+    row = web._load_job_report(job)['detections'][0]
     assert row['plate_quad'] and not row.get('verified_label') and not row.get('confirmed_finding_id')
     assert client.get('/api/findings').get_json()['total'] == 0
 
@@ -481,7 +481,7 @@ def test_unlinked_archive_after_report_failure_requires_explicit_different_retry
     def fail(*args, **kwargs):
         raise OSError('Injected initial report publication failure')
     with monkeypatch.context() as failure:
-        failure.setattr(web.stop_review, 'atomic_report', fail)
+        failure.setattr(web.findings_web.review_journal, 'write', fail)
         try:
             assert client.post(url, json={'label': 'positive'}).status_code == 500
         except OSError:
@@ -496,7 +496,7 @@ def test_unlinked_archive_after_report_failure_requires_explicit_different_retry
     retry = client.post(url, json={'label': 'negative', 'expected_revision': 1})
     assert retry.status_code == 200
     assert retry.get_json()['finding']['revision'] == 2
-    row = json.loads(path.read_text())['detections'][0]
+    row = web._load_job_report(job)['detections'][0]
     assert row['confirmed_finding_id'] == original['id'] and row['verified_label'] == 'not_plate'
 
 
@@ -536,5 +536,5 @@ def test_final_track_uses_cached_scan_representative_without_video_decode(findin
     assert saved.status_code == 200, saved.get_data(as_text=True)
     entry = saved.get_json()['finding']
     assert entry['frame'] == 2
-    stored = json.loads(path.read_text())['detections']
+    stored = web._load_job_report(job)['detections']
     assert all(r['verified_label'] == 'plate' for r in stored)
