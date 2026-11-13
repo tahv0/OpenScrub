@@ -80,8 +80,6 @@ def _assert_review_choice(page, track, enabled, step):
         ) from error
 
 
-
-
 def _distinct_box(row,index):
     # Tracks in the shared fixture overlap exactly. Give independent findings
     # distinct source geometry so opposite labels do not target one archive ID.
@@ -129,7 +127,7 @@ def test_large_mixed_review_survives_sampling_and_reopen(review_server, width, t
                 page.evaluate('loadReview()')
                 page.locator('#review .det').first.wait_for()
                 card = page.locator('#det%d' % (track * 20))
-                    _assert_review_choice(page, track, enabled, step)
+                _assert_review_choice(page, track, enabled, step)
         page.get_by_role('button', name='Review 10% of plate groups', exact=True).click()
         page.get_by_role('button', name='Show all findings', exact=True).wait_for()
         page.get_by_role('button', name='Show all findings', exact=True).click()
