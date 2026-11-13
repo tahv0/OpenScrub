@@ -1459,6 +1459,7 @@ def perform_learning(job):
     job["activity"] = None
     job["model_root"] = learned_models_root()
     try:
+        _review_journal_snapshot(job)
         job["learning"] = {"stage": "preflight", "message": "Checking the local CUDA training environment"}
         document = _load_job_report(job)
         active = (document.get('learning') or {}).get('active') or learning_session._load(
@@ -1527,6 +1528,7 @@ def perform_verification(job):
     job.update(phase="learning", preview=None, activity=None)
     path = os.path.join(job["dir"], "report.json")
     try:
+        _review_journal_snapshot(job)
         settings = job["verification_request"]
         candidate_id, mode = settings["candidate_id"], settings["mode"]
         selected_candidate = learning_candidates.load_candidate(job["dir"], candidate_id)
@@ -1615,6 +1617,7 @@ def job_learning(jid):
             return jsonify({"error": "Pause or complete the scan before training."}), 409
         if job.get("trackbg", {}).get("state") == "running":
             return jsonify({"error": "Finish the current tracking operation before training."}), 409
+        _review_journal_snapshot(job)
         prior = _load_job_report(job)
         parent_id = ((prior.get('learning') or {}).get('active') or {}).get('model_id') or (prior.get('learning') or {}).get('library_model_id')
         parent_ready = parent_id and findings_web.training.training_info(learned_models_root(),parent_id).get('trainable')
@@ -2092,6 +2095,11 @@ def job_detections(jid):
     static = review_preview_index.read_listing(
         os.path.join(job["dir"], "report.json"))
     if static is not None:
+        # Incremental human decisions live in SQLite until Save/render.
+        # Patch the already-cached public listing, not the huge scan report.
+        if review_journal.has_changes(job["dir"]):
+            listing = review_journal.overlay_listing(job["dir"], json.loads(static))
+            static = json.dumps(listing, separators=(",", ":"), ensure_ascii=False)
         candidates = learning_candidates.list_candidates(job["dir"])
         body = (static[:-1] + ',"learning_candidates":' +
                 json.dumps(candidates, separators=(",", ":"), ensure_ascii=False) + '}')
@@ -3035,6 +3043,9 @@ def job_save_edits(jid):
     started = time.perf_counter()
     edits = request.get_json(force=True)
     parsed = time.perf_counter()
+    # A deliberate Save is a report boundary; normal Is/Not and corner
+    # clicks never rewrite the long scan timeline.
+    _review_journal_snapshot(job)
     path = os.path.join(job["dir"], "report.json")
     doc = _load_job_report(job)
     loaded = time.perf_counter()
@@ -3567,6 +3578,7 @@ def job_download(jid):
 @app.route("/api/jobs/<jid>/report")
 def job_report(jid):
     job = JOBS.get(jid) or abort(404)
+    _review_journal_snapshot(job)
     return send_file(os.path.join(job["dir"], "report.json"),
                      as_attachment=True,
                      download_name=export_filenames(job)[1])
