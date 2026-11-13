@@ -5529,7 +5529,9 @@ const REVIEW_OVERLAY_COLORS={
  visible:"#22c55e",visibleFill:"rgba(34,197,94,.08)",edit:"#38bdf8",invalid:"#f87171"
 };
 function reviewOverlayState(i,row=null){
- const raw=FINDING_META[i]||row||{},display=REVIEW_DISPLAY_META[i]||{};
+ // A boxes_at row is authoritative for the standalone video editor; otherwise
+ // use the current Review snapshot/card representative.
+ const raw=row||FINDING_META[i]||{},display=row?{}:(REVIEW_DISPLAY_META[i]||{});
  const marker=raw.plate_verification||display.plate_verification||{};
  const draft=(Object.prototype.hasOwnProperty.call(VLBL,i)&&VLBL[i]!=="clear")?VLBL[i]:"";
  const verified=draft||raw.verified_label||display.verified_label||"";
@@ -5837,6 +5839,9 @@ async function loadReview(signal=null,phase=SHELLPH){
  }
  updatePlateVerifierCandidate();
  if(LEARNING_SELECTION)applyReviewGroupFilter();
+ document.querySelectorAll("#review .plate-output-badge").forEach(el=>{
+  const i=Number(el.id.slice("plateOverlay".length));if(Number.isInteger(i))updateReviewOverlayLabel(i);
+ });
  initMarquee();initReviewPreviews();
  return true;
 }
