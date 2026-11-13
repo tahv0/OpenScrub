@@ -16,7 +16,7 @@ import tempfile
 from flask import abort
 
 NAME = 'review-preview-index.sqlite3'
-VERSION = 2
+VERSION = 3
 META_KEYS = ('render_state', 'provenance', 'source_identity',
              'compact_preview_source', 'preview_revision', 'video_sections')
 
@@ -71,6 +71,23 @@ class IndexedRows:
     def __iter__(self):
         for i in range(self.count):
             yield self[i]
+
+    def member_count(self, index):
+        """Find exact person/track membership without reading every 4K row."""
+        row = self[index]
+        category = str(row.get('category', ''))
+        person, track = int(row.get('person', -1)), int(row.get('track', -1))
+        if person < 0 and track < 0:
+            return 1
+        column, value = ('person', person) if person >= 0 else ('track', track)
+        try:
+            if report_identity(self.report_path) != self.identity:
+                abort(409, description='Review changed. Reload its previews.')
+            with closing(_open_read(Path(self.index_path))) as db:
+                return int(db.execute('SELECT count(*) FROM rows WHERE '
+                    'category=? AND '+column+'=?', (category, value)).fetchone()[0])
+        except (OSError, sqlite3.DatabaseError):
+            abort(503, description='Review preview index unavailable. Retry shortly.')
 
 
 def load(report_path):
@@ -194,7 +211,11 @@ def prepare(report_path, doc):
             db.execute('PRAGMA journal_mode=DELETE')
             db.execute('PRAGMA cache_size=-4096')
             db.execute('CREATE TABLE metadata (name TEXT PRIMARY KEY, value TEXT NOT NULL)')
-            db.execute('CREATE TABLE rows (row_index INTEGER PRIMARY KEY, record TEXT NOT NULL)')
+            db.execute('CREATE TABLE rows (row_index INTEGER PRIMARY KEY, '
+                       'record TEXT NOT NULL, category TEXT NOT NULL, '
+                       'track INTEGER NOT NULL, person INTEGER NOT NULL)')
+            db.execute('CREATE INDEX rows_track ON rows(category,track)')
+            db.execute('CREATE INDEX rows_person ON rows(category,person)')
             db.executemany('INSERT INTO metadata VALUES (?,?)', [
                 ('version', str(VERSION)),
                 ('identity', json.dumps(expected)),
@@ -204,12 +225,14 @@ def prepare(report_path, doc):
             ])
             batch = []
             for i, row in enumerate(doc['detections']):
-                batch.append((i, json.dumps(row, separators=(',', ':'), ensure_ascii=False)))
+                batch.append((i, json.dumps(row, separators=(',', ':'), ensure_ascii=False),
+                              str(row.get('category', '')), int(row.get('track', -1)),
+                              int(row.get('person', -1))))
                 if len(batch) >= 512:
-                    db.executemany('INSERT INTO rows VALUES (?,?)', batch)
+                    db.executemany('INSERT INTO rows VALUES (?,?,?,?,?)', batch)
                     batch.clear()
             if batch:
-                db.executemany('INSERT INTO rows VALUES (?,?)', batch)
+                db.executemany('INSERT INTO rows VALUES (?,?,?,?,?)', batch)
             db.commit()
         if report_identity(report_path) != expected:
             return False
