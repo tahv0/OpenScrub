@@ -954,7 +954,7 @@ def worker():
                         # in-memory snapshot threshold.
                         if os.path.getsize(report_path) > _REVIEW_REPORT_MAX_FILE_BYTES:
                             started = time.monotonic()
-                            with _REVIEW_CACHE_LOCK:
+                            with _REVIEW_PICTURE_GATE.reader():
                                 built = (not vault_locked() and
                                          review_preview_index.prepare(report_path, combined))
                             if built:
@@ -1840,8 +1840,10 @@ def _load_preview_report(job):
                 # the index up front, outside HTTP request latency.
                 source = _load_job_report(job)
                 try:
-                    # Serialize publication with vault encryption.
-                    with _REVIEW_CACHE_LOCK:
+                    # The index may take seconds to build for older jobs.
+                    # Hold a SHARED vault lease rather than the global memory
+                    # cache mutex, so unrelated saved pictures stay usable.
+                    with _REVIEW_PICTURE_GATE.reader():
                         if vault_locked():
                             abort(423)
                         review_preview_index.prepare(path, source)
