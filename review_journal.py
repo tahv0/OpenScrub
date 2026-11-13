@@ -80,6 +80,15 @@ def _recover(db, report, meta, current):
     expected = meta.get('baseline')
     if expected is None or expected == current:
         return
+    # A previously completed snapshot leaves an empty journal. A new scan,
+    # rescan or section publish may legitimately replace that snapshot.
+    if (not db.execute('SELECT 1 FROM groups LIMIT 1').fetchone()
+            and not db.execute('SELECT 1 FROM anchors LIMIT 1').fetchone()):
+        db.execute('BEGIN IMMEDIATE')
+        _set(db, 'baseline', current)
+        db.execute('DELETE FROM meta WHERE name=?', ('publishing',))
+        db.commit()
+        return
     pending = meta.get('publishing')
     if pending:
         try:
@@ -149,8 +158,8 @@ def patch_row(row, index, groups, anchors):
     if anchor:
         result.update({field: value for field, value in anchor.items()
                        if not field.startswith('_')})
-        if group is not None and index == group[0] and 'human_confirmation' in result:
-            receipt_id = anchor.get('confirmed_finding_id')
+        if (group is None or index == group[0]) and 'human_confirmation' in result:
+            receipt_id = anchor.get('confirmed_finding_id', result.get('confirmed_finding_id'))
             receipt_revision = anchor.get('confirmed_finding_revision')
             if receipt_id and receipt_revision:
                 result['human_confirmation'] = dict(
