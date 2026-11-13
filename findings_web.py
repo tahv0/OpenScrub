@@ -213,12 +213,46 @@ def _shape(points, meta):
     return value.tolist()
 
 
+def _archived_identity_changed(job, doc, row, meta):
+    """Detect a stale training-archive link without changing its immutable ID.
+
+    An archive ID includes source bytes/variant, timeline, frame and source
+    detection box (not the editable four-corner polygon). A tracked review
+    representative can change frame/box after reconciling cached scan pixels.
+    That MUST NOT overwrite the original confirmed example or silently carry
+    a negative classification to the new source frame.
+    """
+    current = row.get('confirmed_finding_id')
+    if not current:
+        return False
+    original = library.get_finding(root(), current)
+    # _video may fill legacy provenance. Inspect a tiny shallow copy instead
+    # of mutating the authoritative report before its approved-section guard.
+    identity_doc = dict(doc, provenance=dict(doc.get('provenance') or {}),
+                        source_identity=dict(doc.get('source_identity') or {}))
+    video = _video(job, identity_doc, meta)
+    required = ('sha256', 'variant_sha256', 'fps', 'width', 'height', 'total_frames')
+    if (original['category'] != row['category'] or
+            any(original['video'].get(key) != video[key] for key in required)):
+        raise library.ConflictError(
+            'Confirmed finding belongs to a different source or timeline. '
+            'Restore the original video and rescan before editing this example.')
+    return (original['frame'] != int(meta['frame']) or
+            original['box'] != [float(x) for x in meta['box']])
+
+
 def _archived(job, doc, row, meta, jpeg, label, expected_revision=None):
     value = dict(category=row['category'], label=label, frame=meta['frame'],
                  box=meta['box'], crop=meta['crop'], job_id=job['id'], explicit=True,
                  shape_confirmed=bool(row.get('human_region_confirmed')),
                  points=meta['points'] if row.get('human_region_confirmed') else None)
     current = row.get('confirmed_finding_id')
+    if current and _archived_identity_changed(job, doc, row, meta):
+        # The user explicitly pressed Is / Not on a different verified image.
+        # Create a NEW deterministic archive identity. Never mutate the
+        # previous example or apply its revision to another source geometry.
+        current = None
+        expected_revision = None
     if current:
         value['id'] = current
         value['expected_revision'] = (expected_revision if expected_revision is not None
@@ -331,6 +365,10 @@ def region(job, index, payload):
     box = meta['box']
     quad = [[round((x-box[0])/(box[2]-box[0]),6),round((y-box[1])/(box[3]-box[1]),6)] for x,y in points]
     members = _members(doc,index)
+    # A previously confirmed archive is keyed to its original source frame
+    # and detection box. If the displayed representative has genuinely moved,
+    # this is a draft AREA save, not permission to relabel a different image.
+    moved_identity = _archived_identity_changed(job, doc, row, meta)
     edit_id = payload.get('edit_id') if payload.get('autosave') is True else None
     if payload.get('autosave') is True and (not isinstance(edit_id,str) or not re.fullmatch(r'[A-Za-z0-9_.:-]{1,120}',edit_id)):
         raise ValueError('Autosave requires a valid edit identifier.')
@@ -342,7 +380,9 @@ def region(job, index, payload):
             raise library.ConflictError('Edit identifier belongs to different corners.')
         return dict(ok=True,applied=len(members),verified_samples_added=0,preview=meta,
                     verified_label=row.get('verified_label',''),
-                    classification_required=not bool(confirmed.get('label')))
+                    classification_required=not bool(confirmed.get('label')),
+                    reconfirmation_required=bool(receipt.get('reconfirmation_required')),
+                    cleared_indices=receipt.get('cleared_indices') or [])
     if payload.get('preview_token') not in (None, meta['preview_token']):
         raise library.ConflictError('This finding changed. Reload its picture before saving.')
     for _, member in members:
@@ -351,14 +391,42 @@ def region(job, index, payload):
         member.pop('compact_edit_receipt',None)
     row['human_region_confirmed'] = True
     meta['points'] = points
+    cleared_indices = []
+    if moved_identity:
+        # The old training example stays untouched and available for its
+        # ORIGINAL frame/box. A new source view must be explicitly confirmed.
+        # Remove stale propagated labels from this group, restore protective
+        # output and retain the newly drawn four-corner geometry as a draft.
+        previous_id = row.get('confirmed_finding_id')
+        previous_label = confirmed.get('label')
+        for member_index, member in members:
+            if member_index != index:
+                propagated = member.get('human_confirmation') or {}
+                if (propagated.get('propagated') is not True or
+                        propagated.get('label') != previous_label or
+                        member.get('confirmed_finding_id') not in (None, previous_id)):
+                    continue
+            for key in ('confirmed_finding_id', 'confirmed_finding_revision',
+                        'human_confirmation', 'plate_verification_override'):
+                member.pop(key, None)
+            member['verified_label'] = ''
+            member['enabled'] = True
+            member['output_choice_explicit'] = False
+            cleared_indices.append(member_index)
     _guard_section(job,before,doc)
     entry = None
-    if row.get('confirmed_finding_id') and confirmed.get('label') in ('positive','negative') and not confirmed.get('propagated'):
+    if (not moved_identity and row.get('confirmed_finding_id') and
+            confirmed.get('label') in ('positive','negative') and
+            not confirmed.get('propagated')):
         entry = _archived(job,doc,row,meta,jpeg,confirmed['label'])
         row['confirmed_finding_revision'] = entry['revision']
         row['human_confirmation']['revision'] = entry['revision']
     if edit_id:
-        row['compact_edit_receipt'] = dict(id=edit_id,source=meta['source_token'],token=payload.get('preview_token'))
+        row['compact_edit_receipt'] = dict(
+            id=edit_id, source=meta['source_token'],
+            token=payload.get('preview_token'),
+            reconfirmation_required=moved_identity,
+            cleared_indices=cleared_indices)
     doc['render_required'] = True
     report_path = Path(job['dir'])/'report.json'
     writing = time.monotonic()
@@ -378,7 +446,9 @@ def region(job, index, payload):
     meta['preview_token'] = _token(doc,row,meta['frame'],meta.get('key'))
     return dict(ok=True, applied=len(members), verified_samples_added=0,
                 finding=entry, preview=meta, verified_label=row.get('verified_label',''),
-                classification_required=not bool(confirmed.get('label')))
+                classification_required=moved_identity or not bool(confirmed.get('label')),
+                reconfirmation_required=moved_identity,
+                cleared_indices=cleared_indices)
 
 
 def _state(job):
