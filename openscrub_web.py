@@ -4583,9 +4583,12 @@ async function beRefresh(t=BE.t){
  }
 }
 function beFilter(){
- // Keep visible/model-filtered findings in the editor so green really means
- // "this stays visible" rather than making a false positive disappear.
- BE.boxes=(BE.raw||[]);
+ // Keep visible/model-filtered plate findings in the editor so green really
+ // means "this stays visible", without reintroducing every kept face/text hit.
+ BE.boxes=(BE.raw||[]).filter(b=>{
+  const on=(b.i in EN)?EN[b.i]:b.enabled;
+  return on||b.category==="plate";
+ });
 }
 function beDraw(){
  const cv=document.getElementById("beCv");if(!cv)return;
@@ -4646,9 +4649,11 @@ function beDraw(){
     x.beginPath();x.arc(px,py,3,0,Math.PI*2);x.fill();
    }
   }
-  x.strokeStyle=REVIEW_OVERLAY_COLORS.proposal;x.lineWidth=1.5;x.setLineDash([6,4]);
-  x.strokeRect(a1,b1,a2-a1,b2-b1);x.setLineDash([]);
-  if(state.machineSuggestion&&state.enabled){
+  if(b.category==="plate"){
+   x.strokeStyle=REVIEW_OVERLAY_COLORS.proposal;x.lineWidth=1.5;x.setLineDash([6,4]);
+   x.strokeRect(a1,b1,a2-a1,b2-b1);x.setLineDash([]);
+  }
+  if(b.category==="plate"&&state.machineSuggestion&&state.enabled){
    x.strokeStyle=REVIEW_OVERLAY_COLORS.visible;x.lineWidth=1.5;x.setLineDash([5,4]);
    const inset=3;x.strokeRect(a1+inset,b1+inset,Math.max(0,a2-a1-2*inset),Math.max(0,b2-b1-2*inset));
    x.setLineDash([]);
@@ -5565,7 +5570,7 @@ function reviewOverlayState(i,row=null){
          machineSuggestion,conflict,fallback,shaped,source};
 }
 function reviewOverlayLegendHTML(){
- return `<div class="review-overlay-legend" role="note" aria-label="Review overlay legend">
+ return `<div class="review-overlay-legend" role="note" aria-label="Plate review overlay legend">
   <span class="review-overlay-key"><span class="review-overlay-swatch proposal"></span>Detector proposal</span>
   <span class="review-overlay-key"><span class="review-overlay-swatch hidden"></span>Will be hidden</span>
   <span class="review-overlay-key"><span class="review-overlay-swatch visible"></span>Visible / false positive</span>
