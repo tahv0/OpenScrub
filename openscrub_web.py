@@ -53,6 +53,7 @@ import zones_ui
 import openscrub_logging as diagnostics
 import finding_previews
 import review_preview_index
+import review_journal
 import findings_web
 import findings_ui
 import plate_text_web
@@ -1017,6 +1018,7 @@ def worker():
                 job["eta"] = None
             elif action == "render":
                 job["phase"] = "rendering"
+                _review_journal_snapshot(job)
                 args = build_args(job, for_render=True)
                 review_doc = _load_job_report(job)
                 try:
@@ -1416,6 +1418,7 @@ def job_resume(jid):
         if job.get("trackbg", {}).get("state") == "running":
             return jsonify({"error": "Finish tracking the selected object "
                                      "before resuming the scan"}), 409
+        _review_journal_snapshot(job)
         report = _load_job_report(job)
         try:
             meta = stop_review.validate_resume(report)
@@ -1698,7 +1701,16 @@ def job_learning_review(jid):
 
 def _load_job_report(job):
     with open(os.path.join(job["dir"], "report.json"), encoding="utf-8") as f:
-        return json.load(f)
+        return review_journal.apply(job["dir"], json.load(f))
+
+
+def _review_journal_snapshot(job):
+    """Publish human Review corrections only at a report-consuming boundary."""
+    with _REVIEW_EDIT_LOCK:
+        with _REVIEW_PICTURE_GATE.reader():
+            if vault_locked():
+                abort(423)
+            return review_journal.publish(job["dir"])
 
 
 def _invalidate_review_previews(job):
@@ -1817,7 +1829,7 @@ def _preview_report_identity(path):
             stat.st_mtime_ns, stat.st_ctime_ns)
 
 
-def _load_preview_report(job):
+def _load_preview_report_base(job):
     """Read-only, revision-fenced metadata for individual thumbnail requests.
 
     A large report is deserialized at most once per revision. Repeated warm
@@ -1870,6 +1882,12 @@ def _load_preview_report(job):
                 _REVIEW_REPORTS.clear()
                 _REVIEW_REPORTS[identity] = doc
         return doc
+
+
+def _load_preview_report(job):
+    # SQLite overlays stay small and independent of the large JSON/listing
+    # snapshot. Do not hold the global preview report-cache mutex for SQLite I/O.
+    return review_journal.view(job["dir"], _load_preview_report_base(job))
 
 
 def _video_identity(path):
