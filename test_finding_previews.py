@@ -477,3 +477,56 @@ def test_preview_totals_are_incremental_not_full_table_aggregates(previews, tmp_
     sql = '\n'.join(statements).lower()
     assert 'count(*)' not in sql and 'sum(' not in sql, (
         'hot-path totals must come from O(1) counters, not rescan every JPEG row')
+
+
+def test_large_same_frame_lookup_fetches_only_selected_jpeg(previews, tmp_path, monkeypatch):
+    # Real long videos can have dozens of distinct proposals on one frame.
+    # Do not read every image blob merely to find the matching geometry.
+    boxes = [(100 + i * 80, 90, 220 + i * 80, 140) for i in range(10)]
+    candidates = [row(frame=3, box=box) for box in boxes]
+    saved = previews.capture(tmp_path, frame(), 3, 10., candidates)
+    assert saved['added'] == len(candidates)
+    original_db = previews._db
+    queries = []
+    class CheckedConnection:
+        def __init__(self, connection):
+            self.connection = connection
+        def execute(self, sql, params=()):
+            queries.append(sql)
+            assert 'metadata,jpeg' not in sql.lower(), 'Fetched all image blobs before matching'
+            return self.connection.execute(sql, params)
+        def close(self):
+            self.connection.close()
+    def checked_db(*args, **kwargs):
+        connection = original_db(*args, **kwargs)
+        return CheckedConnection(connection) if connection is not None else None
+    monkeypatch.setattr(previews, '_db', checked_db)
+    result = previews.lookup(tmp_path, candidates[8], state())
+    assert result is not None and result[0]['match'] == 'exact'
+    assert result[1][:2] == bytes([0xff,0xd8])
+    assert sum('select jpeg' in q.lower() for q in queries) == 1
+
+
+def test_untracked_representative_lookup_limits_sql_to_real_time_window(previews, tmp_path, monkeypatch):
+    first = row(frame=3)
+    first['track'] = -1
+    previews.capture(tmp_path, frame(), 3, 10., [first])
+    unrelated = dict(row(frame=60), track=-1)
+    previews.capture(tmp_path, frame(), 60, 10., [unrelated])
+    target = dict(row(frame=4), track=-1, frame_index=-1,
+                  t_start=.25, t_end=.65, last_seen=.4)
+    original_db = previews._db
+    queries = []
+    class CheckedConnection:
+        def __init__(self, connection):
+            self.connection = connection
+        def execute(self, sql, params=()):
+            queries.append((sql,params))
+            return self.connection.execute(sql,params)
+        def close(self):
+            self.connection.close()
+    monkeypatch.setattr(previews, '_db', lambda *args, **kwargs:
+                        CheckedConnection(original_db(*args,**kwargs)))
+    result = previews.lookup(tmp_path, target, state(), allow_representative=True)
+    assert result is not None and result[0]['frame'] == 3
+    assert any('frame BETWEEN ? AND ?' in sql for sql,_ in queries)
