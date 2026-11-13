@@ -4909,14 +4909,7 @@ async function loadReviewPreview(state,task,cacheOnly){
  }finally{
   if(url){state.urls.delete(url);URL.revokeObjectURL(url);}
   state[counter]--;state.controllers.delete(ctl);
-  if(missing&&cacheOnly&&!task.priority&&REVIEW_MEDIA===state&&img.isConnected){
-   // Opening Review must never start source-video decoding just because a
-   // compact scan-time picture is missing. Keep the card interactive and let
-   // the person opt into the expensive path for the few findings they need.
-   if(status)status.textContent="Preview not cached — load only if needed.";
-   if(retry){retry.hidden=false;retry.textContent="Load preview";}
-   img._previewTask=null;task.resolve(false);
-  }else if((missing||retryBusy)&&REVIEW_MEDIA===state&&img.isConnected){
+  if((missing||retryBusy)&&REVIEW_MEDIA===state&&img.isConnected){
    if(missing&&status)status.textContent="Loading source preview…";
    const queue=retryBusy&&cacheOnly?state.cacheQueue:state.queue;
    if(task.priority)queue.unshift(task);else queue.push(task);
@@ -5703,7 +5696,7 @@ async function loadReview(signal=null,phase=SHELLPH){
  let html=`<div class="card" id="review"><h2>Review findings</h2>
  <p class="review-copy">Review small saved pictures. Choose <b>Is a …</b> or <b>Not a …</b> to save a human example with its source video.
  Scan-time pictures are matched to final tracked findings automatically; Review may show a nearby real cached frame from the same track.
- A genuinely missing picture stays unloaded until you click <b>Load preview</b>, so opening Review does not reopen the source video.
+ Missing thumbnails load automatically for visible cards with one bounded source decoder. Saved pictures stay available while other previews are prepared.
  Drag plate corners to adjust the area; an area edit alone does not confirm a plate.<br>Automatic protection stays active while a finding is <b>Not reviewed</b>. Output choices apply after <b>Save edits &amp; render</b>.
  Drag across cards to select several.</p>
  <div class="row" style="margin-bottom:10px">
