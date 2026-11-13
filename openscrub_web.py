@@ -5105,8 +5105,10 @@ function pumpPlateSaves(){
    if(data.finding&&typeof FINDING_META!=="undefined"&&FINDING_META[s.i])
     FINDING_META[s.i].confirmed_finding_revision=data.finding.revision;
    s.saved=plateCopy(s.meta.points);s.failures=0;
-   if(FINDING_META[s.i])FINDING_META[s.i].human_region_confirmed=true;
-   if(REVIEW_DISPLAY_META[s.i])REVIEW_DISPLAY_META[s.i].human_region_confirmed=true;
+   if(typeof FINDING_META!=="undefined"&&FINDING_META[s.i])
+    FINDING_META[s.i].human_region_confirmed=true;
+   if(typeof REVIEW_DISPLAY_META!=="undefined"&&REVIEW_DISPLAY_META[s.i])
+    REVIEW_DISPLAY_META[s.i].human_region_confirmed=true;
    syncPlateTrack(s);
    if(s.pending!==pending)return; // A newer Not-a-plate decision wins.
    s.pending=null;
