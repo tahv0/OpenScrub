@@ -382,6 +382,56 @@ def test_reconcile_links_scan_picture_to_final_track_representative(previews, tm
     assert meta['track'] == 7
 
 
+def test_reconcile_matches_scan_picture_inside_final_track_interval(previews, tmp_path):
+    # The saved detector sighting is at frame 3. Dense tracking extends the
+    # final row to frame 6; last_seen is now 6, not the cached frame.
+    raw = row(frame=3)
+    raw['track'] = -1
+    assert previews.capture(tmp_path, frame(), 3, 10., [raw])['added'] == 1
+    final = row(frame=6)
+    final.update(track=71, frame_index=-1, t_start=.2,
+                 t_end=.6, last_seen=.6)
+    stats = previews.reconcile(tmp_path, [final], state())
+    assert stats['linked'] == 1
+    result = previews.lookup(tmp_path, final, state(), allow_representative=True)
+    assert result is not None
+    meta, jpeg = result
+    assert jpeg.startswith(b'\\xff\\xd8')
+    assert meta['frame'] == 3 and meta['requested_frame'] == 6
+    assert meta['track'] == 71 and meta['match'] == 'representative'
+
+
+def test_reconcile_rejects_two_indistinguishable_tracks(previews, tmp_path):
+    raw = row(frame=3)
+    raw['track'] = -1
+    previews.capture(tmp_path, frame(), 3, 10., [raw])
+    a = dict(row(frame=3), track=17)
+    b = dict(row(frame=3), track=18)
+    stats = previews.reconcile(tmp_path, [a, b], state())
+    assert stats['linked'] == 0 and stats['ambiguous'] == 1
+    assert previews.lookup(tmp_path, a, state(), allow_representative=True) is None
+
+
+def test_reconcile_does_not_use_nearby_but_out_of_interval_preview(previews, tmp_path):
+    raw = row(frame=3)
+    raw['track'] = -1
+    previews.capture(tmp_path, frame(), 3, 10., [raw])
+    later = dict(row(frame=8), track=33, frame_index=-1,
+                 t_start=.7, t_end=.9, last_seen=.8)
+    assert previews.reconcile(tmp_path, [later], state())['linked'] == 0
+    assert previews.lookup(tmp_path, later, state(), allow_representative=True) is None
+
+
+def test_reconcile_refuses_source_timeline_offset_changes(previews, tmp_path):
+    raw = row(frame=3)
+    raw['track'] = -1
+    previews.capture(tmp_path, frame(), 3, 10., [raw])
+    timeline = state()
+    timeline['cum'][3] = [999, 888]
+    final = dict(row(frame=3), track=42)
+    assert previews.reconcile(tmp_path, [final], timeline)['linked'] == 0
+
+
 def test_repeated_scan_group_does_no_sqlite_work_after_first_capture(previews, tmp_path, monkeypatch):
     seen = set()
     first = previews.capture(tmp_path, frame(), 3, 10., [row()],
