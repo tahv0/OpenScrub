@@ -4990,7 +4990,7 @@ function beHook(){
  cv.addEventListener("pointerup",()=>{if(BE.drag){BE.drag=null;beRefresh();}});
 }
 
-// Only visible finding previews are requested. Editing reuses the same image
+// Nearby finding previews are prefetched before they scroll into view. Editing reuses the same image
 // and geometry; it never starts a second video/image request.
 // Large Review panels keep all finding/group decisions but materialize only
 // nearby card elements. Existing small reviews retain their exact behavior.
@@ -5123,7 +5123,7 @@ function reviewPreviewRank(task){
  if(!task.img.getBoundingClientRect)return 0;
  const r=task.img.getBoundingClientRect(),h=window.innerHeight||document.documentElement.clientHeight;
  const distance=r.bottom<0?-r.bottom:r.top>h?r.top-h:0;
- return distance>240?Infinity:distance;
+ return distance>2800?Infinity:distance;
 }
 function pumpReviewPreviews(state){
  if(REVIEW_MEDIA!==state)return;
@@ -5158,7 +5158,7 @@ function initReviewPreviews(){
    for(const e of entries)if(e.isIntersecting)queueReviewPreview(e.target);
    // Keep observing: skipped queued work is requested again on re-entry.
    pumpReviewPreviews(state);
-  },{rootMargin:"240px"});images.forEach(img=>state.observer.observe(img));
+  },{rootMargin:"2800px"});images.forEach(img=>state.observer.observe(img));
  }else images.forEach(img=>queueReviewPreview(img));
 }
 // Retain all decisions/group memberships, but mount card elements progressively.
@@ -5210,7 +5210,7 @@ function initReviewPages(){
    for(const entry of entries)
     if(entry.isIntersecting&&!entry.target.hidden)
      appendReviewPage(entry.target.dataset.reviewMore);
-  },{rootMargin:"720px"});
+  },{rootMargin:"1800px"});
   buttons.forEach(button=>panel._moreObserver.observe(button));
  }
 }
