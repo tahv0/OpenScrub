@@ -9,3 +9,33 @@ openscrub_jobs
 *.onnx
 *.mp4
 __pycache__
+
+# Never transfer local environments, caches or secrets as build context.
+**/.venv
+**/venv
+**/__pycache__
+**/.pytest_cache
+**/.ruff_cache
+**/.mypy_cache
+**/.tox
+**/.cache
+**/node_modules
+**/*.pyc
+**/*.pyo
+**/.env
+**/.env.*
+
+# User media, local model weights and job files live on mounted volumes.
+# The build downloads only the pinned models required by the Dockerfile.
+**/*.mkv
+**/*.mov
+**/*.avi
+**/*.webm
+**/*.pt
+**/*.pth
+**/*.ckpt
+**/*.safetensors
+**/*.engine
+**/*.log
+**/*.sqlite
+**/*.sqlite3
