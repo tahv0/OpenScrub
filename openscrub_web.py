@@ -1648,6 +1648,7 @@ def job_learning_rollback(jid):
         if job["phase"] not in ("paused", "review", "done"):
             return jsonify({"error": "Finish or cancel the active pass before restoring."}), 409
         with _REVIEW_EDIT_LOCK, _REVIEW_WORK_LOCK:
+            _review_journal_snapshot(job)
             current = _load_job_report(job)
             root = (Path(job["dir"]) / "learning" / "passes").resolve()
             previous = (current.get("learning") or {}).get("previous_report")
@@ -2617,6 +2618,8 @@ def job_plate_quad(jid, i):
     try:
         if vault_locked():
             abort(423)
+        # Legacy editor writes are an explicit snapshot boundary.
+        _review_journal_snapshot(job)
         # Writes need an independently mutable authoritative report, never the
         # lightweight read-only thumbnail index.
         doc = _load_job_report(job)
@@ -3269,6 +3272,7 @@ def job_track_object(jid):
                                                 seed_index, t_ref)
             path = os.path.join(job["dir"], "report.json")
             with _REVIEW_EDIT_LOCK:
+                _review_journal_snapshot(job)
                 current = _load_job_report(job)
                 # Tracking runs in the background. Publish against the latest
                 # report so concurrent section approvals and edits survive.
