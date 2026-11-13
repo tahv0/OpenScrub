@@ -29,6 +29,7 @@ import json
 import os
 import queue
 import secrets
+import sqlite3
 import shutil
 import sys
 import socket
