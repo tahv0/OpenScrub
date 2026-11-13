@@ -4593,6 +4593,16 @@ function beFilter(){
 function beDraw(){
  const cv=document.getElementById("beCv");if(!cv)return;
  const x=cv.getContext("2d"),s=BE.scale;
+ // Keep this primitive independently executable: focused regressions extract
+ // the video editor without loading the rest of Review.
+ const oc=typeof REVIEW_OVERLAY_COLORS!=="undefined"?REVIEW_OVERLAY_COLORS:{
+  proposal:"#f5c400",hidden:"#dc2626",hiddenFill:"rgba(220,38,38,.24)",
+  visible:"#22c55e",visibleFill:"rgba(34,197,94,.08)",edit:"#38bdf8"
+ };
+ const overlayState=b=>typeof reviewOverlayState==="function"
+  ?reviewOverlayState(b.i,b)
+  :{enabled:(b.i in EN)?!!EN[b.i]:b.enabled!==false,
+    machineFiltered:false,machineSuggestion:false};
  x.clearRect(0,0,cv.width,cv.height);
  if(BE.indexed&&(BE.playing||BE.pending))return;
  for(const a of BE.adds){
@@ -4611,16 +4621,16 @@ function beDraw(){
   x.beginPath();BE.platePoints.forEach((p,k)=>{
    if(k)x.lineTo(p[0]*s,p[1]*s);else x.moveTo(p[0]*s,p[1]*s);
   });
-  x.strokeStyle=REVIEW_OVERLAY_COLORS.edit;x.lineWidth=2;x.stroke();
+  x.strokeStyle=oc.edit;x.lineWidth=2;x.stroke();
   for(const p of BE.platePoints){
    x.beginPath();x.arc(p[0]*s,p[1]*s,5,0,Math.PI*2);
-   x.fillStyle=REVIEW_OVERLAY_COLORS.edit;x.fill();
+   x.fillStyle=oc.edit;x.fill();
   }
  }
  for(const b of BE.boxes){
-  const[a1,b1,a2,b2]=b.box.map(v=>v*s),state=reviewOverlayState(b.i,b);
-  const line=state.enabled?REVIEW_OVERLAY_COLORS.hidden:REVIEW_OVERLAY_COLORS.visible;
-  const fill=state.enabled?REVIEW_OVERLAY_COLORS.hiddenFill:REVIEW_OVERLAY_COLORS.visibleFill;
+  const[a1,b1,a2,b2]=b.box.map(v=>v*s),state=overlayState(b);
+  const line=state.enabled?oc.hidden:oc.visible;
+  const fill=state.enabled?oc.hiddenFill:oc.visibleFill;
   const machineVisible=!state.enabled&&state.machineFiltered;
   x.fillStyle=fill;x.strokeStyle=line;x.lineWidth=2;
   x.setLineDash(machineVisible?[7,4]:[]);
@@ -4650,17 +4660,17 @@ function beDraw(){
    }
   }
   if(b.category==="plate"){
-   x.strokeStyle=REVIEW_OVERLAY_COLORS.proposal;x.lineWidth=1.5;x.setLineDash([6,4]);
+   x.strokeStyle=oc.proposal;x.lineWidth=1.5;x.setLineDash([6,4]);
    x.strokeRect(a1,b1,a2-a1,b2-b1);x.setLineDash([]);
   }
   if(b.category==="plate"&&state.machineSuggestion&&state.enabled){
-   x.strokeStyle=REVIEW_OVERLAY_COLORS.visible;x.lineWidth=1.5;x.setLineDash([5,4]);
+   x.strokeStyle=oc.visible;x.lineWidth=1.5;x.setLineDash([5,4]);
    const inset=3;x.strokeRect(a1+inset,b1+inset,Math.max(0,a2-a1-2*inset),Math.max(0,b2-b1-2*inset));
    x.setLineDash([]);
   }
   if(b.i===BE.sel)for(const[hx,hy] of [[a1,b1],[a2,b1],[a1,b2],[a2,b2]]){
    x.fillStyle="#0f172a";x.fillRect(hx-5,hy-5,10,10);
-   x.strokeStyle=REVIEW_OVERLAY_COLORS.edit;x.lineWidth=2;x.strokeRect(hx-5,hy-5,10,10);}
+   x.strokeStyle=oc.edit;x.lineWidth=2;x.strokeRect(hx-5,hy-5,10,10);}
  }
 }
 function beAddMode(){
@@ -5847,9 +5857,9 @@ async function loadReview(signal=null,phase=SHELLPH){
  }
  updatePlateVerifierCandidate();
  if(LEARNING_SELECTION)applyReviewGroupFilter();
- document.querySelectorAll("#review .plate-output-badge").forEach(el=>{
-  const i=Number(el.id.slice("plateOverlay".length));if(Number.isInteger(i))updateReviewOverlayLabel(i);
- });
+ if(typeof updateReviewOverlayLabel==="function"&&typeof REVIEW_DISPLAY_META!=="undefined"){
+  for(const key of Object.keys(REVIEW_DISPLAY_META))updateReviewOverlayLabel(Number(key));
+ }
  initMarquee();initReviewPreviews();
  return true;
 }
