@@ -347,6 +347,34 @@ def test_vault_tamper_fails_closed(tmp_path):
     assert not f.exists(), "tampered file must NOT decrypt to plaintext"
 
 
+def test_tesseract_repairs_ocr_dash_variants_before_pii_rescue():
+    """Misread dash glyphs must not cause an SSN or claim ID to leak.
+
+    Captured OCR text from synthetic encoded video on Linux/Tesseract 5.5:
+    '123-—45—-6789' at confidence 9 and 'CLM—123456' at confidence 85.
+    The first must pass the structurally shaped low-confidence rescue.
+    """
+    class FakeTesseract:
+        class Output:
+            DICT = 'dict'
+
+        @staticmethod
+        def image_to_data(_frame, output_type):
+            assert output_type == 'dict'
+            return dict(text=['SSN', '123-—45—-6789', 'CLM—123456'],
+                        conf=[90, 9, 85], left=[0, 8, 20], top=[0, 0, 0],
+                        width=[6, 10, 10], height=[10, 10, 10])
+
+    ocr = object.__new__(openscrub.TesseractBackend)
+    ocr.pt = FakeTesseract()
+    result = ocr.read(np.zeros((32, 64, 3), dtype=np.uint8))
+    tokens = [item[0] for item in result]
+    assert '123-45-6789' in tokens, 'SSN must survive 9% OCR confidence'
+    assert 'CLM-123456' in tokens, 'Custom regex must see a regular hyphen'
+    assert openscrub.RE_SSN.fullmatch(tokens[1])
+    assert openscrub._normalize_ocr_hyphens('123—45—6789') == '123-45-6789'
+
+
 def test_custom_regex_category(tmp_path):
     """A user-defined regex category detects, reports, and survives the
     full pipeline like a built-in."""
@@ -357,7 +385,23 @@ def test_custom_regex_category(tmp_path):
     assert hits, "custom category should appear in the report"
 
 
-def test_deep_backtrack_finds_true_onset(tmp_path):
+def test_adaptive_scan_notices_small_local_identifier_appearance():
+    """Brief new PII must not be hidden by the whole-frame motion average.
+
+    On a 720p recording, a high-contrast SSN occupies well under 1% of
+    the pixels. Doubling the next OCR interval on this frame can miss
+    the only few seconds during which the number is visible.
+    """
+    before = np.full((360, 640), 245, np.uint8)
+    changed = before.copy()
+    cv2.putText(changed, "SSN 123-45-6789", (30, 150), FONT, .55, 20, 1)
+    assert float(cv2.absdiff(before, changed).mean()) < 1.0
+    assert openscrub._adaptive_text_scan_stride(before, before, 60) == 120
+    assert openscrub._adaptive_text_scan_stride(changed, before, 60) <= 30
+    assert openscrub._adaptive_text_scan_stride(changed, changed, 60) == 120
+
+
+def test_deep_backtrack_finds_true_onset(tmp_path, monkeypatch):
     """A region whose first frame lies beyond the RAM backtrack buffer must
     still get its true onset via the post-scan deep file search — and must
     not be extended earlier than it actually appeared."""
@@ -373,11 +417,26 @@ def test_deep_backtrack_finds_true_onset(tmp_path):
         out.write(with_text if i / fps >= appear_at else blank)
     out.release()
 
+    # Keep actionable diagnostics on a negative privacy-coverage test.
+    # OCR may differ across Tesseract/FFmpeg versions; reporting the actual
+    # sampled tokens and chosen cadence shows whether the miss was a read,
+    # regex or scan-scheduling error instead of tempting us to weaken tests.
+    probes = []
+    original_detect = openscrub.detect_phi
+
+    def detect_with_probe(words, lines, t, offset, namer, mrn_re, custom_res=()):
+        result = original_detect(words, lines, t, offset, namer, mrn_re, custom_res)
+        probes.append(dict(t=round(t, 3),
+                           tokens=[(txt, round(float(conf), 3)) for txt, _, conf in words],
+                           found=[(d.category, d.text) for d in result]))
+        return result
+
+    monkeypatch.setattr(openscrub, "detect_phi", detect_with_probe)
     _, dets = run(path, "--categories", "ssn",
                   "--sample-interval", "2.0",
                   "--backtrack-window", "0.5")
     ssn = [d for d in dets if d["category"] == "ssn"]
-    assert ssn, "SSN should be detected"
+    assert ssn, "SSN should be detected; OCR scan probes: %r" % probes
     start = min(d["t_start"] for d in ssn)
     assert start <= appear_at + 0.30, \
         f"deep backtrack should reach the true onset, got {start}"

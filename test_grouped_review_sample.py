@@ -113,6 +113,83 @@ def test_sample_api_reports_group_units_and_counts(plate_job):
 from test_review_browser import review_server, browser_instance, load_browser_page
 
 
+def test_pinned_representative_survives_new_exact_cache_sample(review_server):
+    """An in-flight thumbnail fill must not invalidate a human save token.
+
+    The browser showed frame 300, then another request cached exact frame 100
+    for the same track. Only a source-bound opaque key plus the original
+    preview token may authorize writing the image the reviewer actually saw.
+    """
+    import numpy as np
+
+    _, path = review_server
+    doc = json.loads(path.read_text())
+    row = dict(doc['detections'][0], frame_index=100, t_start=100/30,
+               t_end=101/30, last_seen=100/30)
+    doc['detections'] = [row]
+    path.write_text(json.dumps(doc))
+    job = web.JOBS['inline-fixture']
+    with web.app.test_client() as client:
+        old = client.get('/api/jobs/inline-fixture/finding-preview/0?cache_only=1')
+        assert old.status_code == 200
+        shown = json.loads(old.headers['X-Finding-Geometry'])
+        assert shown['frame'] == 300 and shown['match'] == 'representative'
+        # An unrelated viewer now saves a verified exact-frame preview.
+        box = [180, 120, 420, 220]
+        crop = [100, 60, 500, 280]
+        web.finding_previews.store(
+            job['dir'], row, doc['render_state'],
+            dict(frame=100, width=640, height=360, crop=crop, box=box,
+                 source={'timing':'frame', 'sha256':doc['provenance']['input_sha256']}),
+            np.full((220, 400, 3), 128, np.uint8))
+        newer = client.get('/api/jobs/inline-fixture/finding-preview/0?cache_only=1')
+        assert newer.status_code == 200
+        latest = json.loads(newer.headers['X-Finding-Geometry'])
+        assert latest['frame'] == 100 and latest['preview_token'] != shown['preview_token']
+        # Without its pinned key the old token no longer matches: fail closed.
+        rejected = client.post('/api/jobs/inline-fixture/confirm/0', json={
+            'label':'negative','preview_token':shown['preview_token']})
+        assert rejected.status_code == 409
+        # With its original key, source and crop validation bind the JPEG.
+        accepted = client.post('/api/jobs/inline-fixture/confirm/0', json={
+            'label':'negative','preview_token':shown['preview_token'],
+            'preview_key':shown['key']})
+        assert accepted.status_code == 200, accepted.get_data(as_text=True)[:500]
+        assert accepted.get_json()['finding']['frame'] == 300
+        saved = web._load_job_report(job)['detections'][0]
+        assert saved['verified_label'] == 'not_plate' and not saved['enabled']
+
+
+
+def test_large_group_single_http_confirmation_has_stable_preview_token(review_server):
+    """Regression for 409 when a 10k-row review uses a scan-time representative.
+
+    Distinct tracks intentionally share geometry: the confirmed archive is
+    source/frame/box-bound, while the output choice fans out by track.
+    """
+    _, path = review_server
+    doc = json.loads(path.read_text())
+    first = doc['detections'][0]
+    doc['detections'] = [
+        dict(deepcopy(first), track=t, frame_index=f, t_start=f / 30,
+             t_end=(f + 1) / 30, last_seen=f / 30)
+        for t in range(100) for f in range(100, 200)
+    ]
+    path.write_text(json.dumps(doc))
+    with web.app.test_client() as client:
+        listing = client.get('/api/jobs/inline-fixture/detections')
+        assert listing.status_code == 200, listing.get_data(as_text=True)[:500]
+        image = client.get('/api/jobs/inline-fixture/finding-preview/0')
+        assert image.status_code == 200, image.get_data(as_text=True)[:500]
+        meta = json.loads(image.headers['X-Finding-Geometry'])
+        saved = client.post('/api/jobs/inline-fixture/confirm/0', json={
+            'label': 'negative', 'preview_token': meta['preview_token']})
+        assert saved.status_code == 200, saved.get_data(as_text=True)[:500]
+        assert web._load_job_report(web.JOBS['inline-fixture'])['detections'][99]['verified_label'] == 'not_plate'
+        assert not web._load_job_report(web.JOBS['inline-fixture'])['detections'][100].get('verified_label')
+
+
+
 @pytest.mark.parametrize('width', [1440, 390])
 def test_human_sample_shows_ten_groups_not_hundreds_of_frames(review_server, width, tmp_path):
     url, path = review_server
@@ -150,9 +227,15 @@ def test_human_sample_shows_ten_groups_not_hundreds_of_frames(review_server, wid
         assert '100 frames' in card.inner_text(), 'Keep the full grouped span in the sampled card'
         card.scroll_into_view_if_needed()
         page.wait_for_function('(i)=>!!document.querySelector("#det"+i+" img")._quadEdit', arg=index)
+        # A cached scan-time representative can be a different exact source
+        # frame from this synthetic interpolated detection row. Its real
+        # picture/frame, not the guessed report-row frame, becomes evidence.
+        displayed = card.locator('img').evaluate(
+            '(img)=>({frame:img._plateMeta.frame,key:img._plateMeta.key})')
         card.get_by_role('button', name='✕ Not a plate', exact=True).click()
         page.evaluate('CONFIRM_CHAIN')
-        page.wait_for_function('(i)=>document.getElementById("vlabel"+i).textContent.includes("Saved")',arg=index)
+        page.wait_for_function('(i)=>document.getElementById("vlabel"+i).textContent.includes("Saved") || document.getElementById("vlabel"+i).textContent.includes("Not saved")',arg=index)
+        assert 'Saved' in page.locator('#vlabel%d' % index).inner_text(), page.locator('#vlabel%d' % index).inner_text()
         assert page.evaluate('CONFIRM_FAILED.size') == 0
         assert card.locator('.det-status').inner_text() == 'Will stay visible'
         assert page.evaluate('saveAndRender(true)') is True
@@ -165,11 +248,16 @@ def test_human_sample_shows_ten_groups_not_hundreds_of_frames(review_server, wid
             archived=client.get('/api/findings').get_json()
         assert archived['total']==1, 'One confirmed group stores one representative, not 100 frame examples'
         assert archived['items'][0]['label']=='negative'
-        assert archived['items'][0]['frame']==saved[index]['frame_index']
+        assert archived['items'][0]['frame']==displayed['frame']
         evidence = Path(os.environ.get('REVIEW_EVIDENCE_DIR', str(tmp_path)))
         evidence.mkdir(parents=True, exist_ok=True)
         page.locator('#reviewSampleSummary').scroll_into_view_if_needed()
-        page.screenshot(path=str(evidence / ('grouped-sample-%s.png' % width)))
+        # Browser evidence should not wait for a queued 4K source decode of
+        # an unrelated, offscreen card. Cancel optional preview prefetch after
+        # verifying the committed sample; decisions and visible cards persist.
+        page.evaluate('clearReviewPreviews()')
+        page.locator('#reviewSampleSummary').screenshot(
+            path=str(evidence / ('grouped-sample-%s.png' % width)), timeout=10000)
         page.get_by_role('button', name='Show all findings', exact=True).click()
         page.wait_for_function('document.querySelectorAll("#review .det:not([hidden])").length===100')
         assert page.locator('#det%d .det-status' % (index//100*100)).inner_text() == 'Will stay visible'

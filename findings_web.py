@@ -112,7 +112,7 @@ def _cold_frame(job,doc,row,frame):
         _web._REVIEW_WORK_LOCK.release()
 
 
-def preview(job, index, doc=None, cache_only=False):
+def preview(job, index, doc=None, cache_only=False, preferred_key=None):
     """Return source geometry and compact pixels; a warm read never opens video."""
     doc = doc if doc is not None else _web._load_preview_report(job)
     if not 0 <= index < len(doc.get('detections', [])):
@@ -131,10 +131,20 @@ def preview(job, index, doc=None, cache_only=False):
     # Match the canonical report frame even when a legacy fractional timestamp
     # would be rounded differently by the generic cache's time-based lookup.
     cache_row = dict(row,frame_index=frame)
-    cached = _web._serialize_review_read(previews.lookup)(job['dir'], cache_row, rs)
-    if cached is None and int(row.get('track', -1)) >= 0:
+    if preferred_key is not None:
+        # An in-flight cache fill may add a newer exact sample, but must not
+        # change the source JPEG of a human decision already being saved.
+        # Verify both the pinned sample's binding and the full preview_token.
         cached = _web._serialize_review_read(previews.lookup)(
-            job['dir'], cache_row, rs, allow_representative=True)
+            job['dir'], cache_row, rs, allow_representative=True,
+            preferred_key=preferred_key)
+        if cached is None:
+            abort(409, description='This displayed picture is no longer a valid cached sample. Reload its preview.')
+    else:
+        cached = _web._serialize_review_read(previews.lookup)(job['dir'], cache_row, rs)
+        if cached is None and int(row.get('track', -1)) >= 0:
+            cached = _web._serialize_review_read(previews.lookup)(
+                job['dir'], cache_row, rs, allow_representative=True)
     if cached is None and cache_only:
         return None
     box = list(map(float, video_learning._screen_box(row, rs, frame)))
@@ -311,7 +321,7 @@ def _journal_members(doc, index):
             else review_journal.member_count(rows, index))
 
 
-def _journal_matches_archived_source(job, doc, index):
+def _journal_matches_archived_source(job, doc, index, preferred_key=None):
     """Never carry a confirmed label over to a different source box/frame.
 
     The fast path may edit an existing archive only while its immutable
@@ -321,7 +331,7 @@ def _journal_matches_archived_source(job, doc, index):
     row = doc['detections'][index]
     if not row.get('confirmed_finding_id'):
         return True
-    _, _, meta, _ = preview(job, index, doc=doc)
+    _, _, meta, _ = preview(job, index, doc=doc, preferred_key=preferred_key)
     return not _archived_identity_changed(job, doc, row, meta)
 
 
@@ -329,7 +339,8 @@ def _journal_confirm(job, index, payload, doc):
     label = payload.get('label')
     if label not in ('positive', 'negative') or type(label) is not str:
         raise ValueError('Choose Is a … or Not a … to store a confirmed example.')
-    _, _, meta, jpeg = preview(job, index, doc=doc)
+    _, _, meta, jpeg = preview(
+        job, index, doc=doc, preferred_key=payload.get('preview_key'))
     if meta.get('classification_allowed') is False:
         raise library.ConflictError(_LEGACY_TIMING_NOTE)
     row = dict(doc['detections'][index])
@@ -367,7 +378,8 @@ def _journal_confirm(job, index, payload, doc):
 
 def _journal_region(job, index, payload, doc):
     started = time.monotonic()
-    _, _, meta, jpeg = preview(job,index,doc=doc)
+    _, _, meta, jpeg = preview(
+        job, index, doc=doc, preferred_key=payload.get('preview_key'))
     row = dict(doc['detections'][index])
     if row['category'] != 'plate':
         raise ValueError('Four-corner area editing currently applies to plate findings.')
@@ -425,7 +437,8 @@ def _journal_region(job, index, payload, doc):
 
 def confirm(job, index, payload):
     journal_doc = _journal_doc(job)
-    if journal_doc is not None and _journal_matches_archived_source(job, journal_doc, index):
+    if journal_doc is not None and _journal_matches_archived_source(
+            job, journal_doc, index, payload.get('preview_key')):
         return _journal_confirm(job, index, payload, journal_doc)
     # Relocalized confirmed rows and section-locked reports use the existing
     # source-bound rebind rules. Materialize pending journal edits first.
@@ -437,7 +450,8 @@ def confirm(job, index, payload):
     # Explicit edits must operate on the complete authoritative report; the
     # read-only per-finding index is for thumbnail GETs only.
     before = _web._load_job_report(job)
-    _, _, meta, jpeg = preview(job, index, doc=before)
+    _, _, meta, jpeg = preview(
+        job, index, doc=before, preferred_key=payload.get('preview_key'))
     if meta.get('classification_allowed') is False:
         raise library.ConflictError(_LEGACY_TIMING_NOTE)
     # The authoritative JSON load already gives this request an independent
@@ -485,7 +499,8 @@ def confirm(job, index, payload):
 
 def region(job, index, payload):
     journal_doc = _journal_doc(job)
-    if journal_doc is not None and _journal_matches_archived_source(job, journal_doc, index):
+    if journal_doc is not None and _journal_matches_archived_source(
+            job, journal_doc, index, payload.get('preview_key')):
         return _journal_region(job, index, payload, journal_doc)
     # An old confirmed example cannot authorize changed source geometry.
     _web._review_journal_snapshot(job)
@@ -493,7 +508,8 @@ def region(job, index, payload):
     # Explicit edits must operate on the complete authoritative report; the
     # read-only per-finding index is for thumbnail GETs only.
     before = _web._load_job_report(job)
-    _, _, meta, jpeg = preview(job, index, doc=before)
+    _, _, meta, jpeg = preview(
+        job, index, doc=before, preferred_key=payload.get('preview_key'))
     # The authoritative JSON load already gives this request an independent
     # mutable document. Duplicating its complete 4K timeline and hundreds of
     # thousands of findings for every corner autosave costs gigabytes of RAM.

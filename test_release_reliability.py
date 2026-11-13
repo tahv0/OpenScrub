@@ -132,7 +132,7 @@ def test_lost_corner_response_retry_and_newer_gesture_preserve_latest(review_ser
         page.wait_for_function('!!document.querySelector("#det0 img")._quadEdit')
         drag_corner(page, card)
         page.wait_for_function('!!document.querySelector("#det0 img")._quadEdit.error')
-        assert json.loads(report.read_text())['detections'][0].get('plate_quad')
+        assert web._load_job_report(web.JOBS['inline-fixture'])['detections'][0].get('plate_quad')
         drag_corner(page, card, index=2, dx=-7, dy=-4)
         latest = plate_points(card)
         assert page.evaluate('flushPlateSaves()') is True
@@ -283,7 +283,7 @@ def test_saved_geometry_and_decisions_survive_server_rehydration(review_server, 
         page.wait_for_function('!!document.querySelector("#det0 img")._quadEdit')
         drag_corner(page, card)
         assert page.evaluate('flushPlateSaves()') is True
-        geometry = json.loads(report.read_text())['detections'][0]['plate_quad']
+        geometry = web._load_job_report(web.JOBS['inline-fixture'])['detections'][0]['plate_quad']
         card.get_by_role('button',name='✓ Is a plate',exact=True).click()
         _confirmations_saved(page)
         for i in range(1, 31):

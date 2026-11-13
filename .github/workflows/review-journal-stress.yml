@@ -1,0 +1,50 @@
+name: Review journal and large-review regressions
+on:
+  pull_request:
+    branches: ['integration/all-prs']
+    paths:
+      - 'review_journal.py'
+      - 'review_preview_index.py'
+      - 'findings_web.py'
+      - 'openscrub_web.py'
+      - 'test_review_journal.py'
+      - 'test_grouped_review_sample.py'
+      - 'test_sample_filter_timeout.py'
+      - 'test_release_reliability.py'
+      - 'test_review_browser.py'
+      - '.github/workflows/review-journal-stress.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  review-journal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    env:
+      OPENSCRUB_NO_AUTOFETCH: '1'
+      OPENSCRUB_CPU_DNN: '1'
+      REVIEW_EVIDENCE_DIR: /tmp/review-journal-evidence
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Install fast real-HTTP test environment
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg tesseract-ocr
+          python -m pip install 'numpy<2' opencv-python-headless==4.11.0.86 onnxruntime==1.20.1 pytest pytest-timeout flask rapidfuzz pyyaml cryptography playwright cheroot pytesseract pillow
+          python -m playwright install --with-deps chromium
+      - name: Check journal and explicit 10k-group HTTP save
+        run: |
+          python -m pytest -q -ra --timeout=60 test_review_journal.py test_grouped_review_sample.py -k 'not human_sample_shows_ten_groups' 
+      - name: Check browser sample, reload, corners and stress paths
+        run: |
+          python -m pytest -q -ra --timeout=80 test_grouped_review_sample.py test_sample_filter_timeout.py test_release_reliability.py test_review_browser.py -k 'human_sample_shows_ten_groups or sample_and_show_all_work_without_report_network or filter_keeps_inflight_corner_save_alive or lost_corner_response_retry or saved_geometry_and_decisions_survive_server_rehydration or real_direct_corner_autosave_and_lazy_loading'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: review-journal-browser-evidence
+          path: /tmp/review-journal-evidence/*.png
+          if-no-files-found: ignore
+          retention-days: 7

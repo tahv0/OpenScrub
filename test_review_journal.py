@@ -8,6 +8,7 @@ import pytest
 import review_journal as journal
 import review_preview_index as review_index
 import stop_review
+from test_plate_quad_editor import plate_job
 
 
 def fixture(tmp_path):

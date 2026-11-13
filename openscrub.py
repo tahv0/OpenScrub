@@ -59,6 +59,19 @@ class OcrBackend:
         raise NotImplementedError
 
 
+# Tesseract can return typographic dashes for actual ASCII hyphens in
+# camera/screen video. An SSN like 123-45-6789 has been observed as
+# 123-—45—-6789; a claim ID as CLM—123456. Normalize within each OCR token
+# BEFORE the low-confidence PII rescue and exact regex matching. Collapsing
+# runs is important: simply replacing — with - leaves invalid -- separators.
+# This does not guess missing digits or join unrelated OCR words.
+_OCR_HYPHENS = re.compile(r"[-\u2010-\u2015\u2212\uFE58\uFE63\uFF0D]+")
+
+
+def _normalize_ocr_hyphens(text):
+    return _OCR_HYPHENS.sub("-", text)
+
+
 class TesseractBackend(OcrBackend):
     def __init__(self):
         import pytesseract
@@ -83,7 +96,7 @@ class TesseractBackend(OcrBackend):
                     or RE_DATE.search(t)
                     or sum(ch.isdigit() for ch in s) >= 6)
         for i in range(len(data["text"])):
-            txt = data["text"][i].strip()
+            txt = _normalize_ocr_hyphens(data["text"][i].strip())
             conf = float(data["conf"][i]) if data["conf"][i] not in ("-1", -1) else 0.0
             if not txt:
                 continue
@@ -7364,6 +7377,33 @@ def reverse_pass(scans, memory, cats, namer, lenient=76):
     return extra
 
 
+def _adaptive_text_scan_stride(current, previous, stride):
+    """Notice small, local text changes even when global motion is negligible.
+
+    Averaging change over a 4K scene can make a freshly appearing plate
+    number or short identifier look like no motion (<1 gray level), doubling
+    the OCR interval exactly when it is most important to read again.
+    Compare lightweight 16-pixel cells only in the 'almost unchanged'
+    case; two affected cells rule out a lone compression speck.
+    """
+    if previous is None or current.shape != previous.shape:
+        return stride
+    diff = cv2.absdiff(current, previous)
+    activity = float(diff.mean())
+    if activity > 8.0:
+        return max(2, stride // 2)
+    if activity >= 1.0:
+        return stride
+    cells = cv2.resize(
+        diff, (max(1, current.shape[1] // 16),
+               max(1, current.shape[0] // 16)),
+        interpolation=cv2.INTER_AREA)
+    if np.count_nonzero(cells >= 12) >= 2:
+        # A few characters can be far too small to affect global average.
+        return max(2, stride // 2)
+    return stride * 2
+
+
 def run_scan(args, cb=None):
     """Scan pass only: OCR + face detection + tracking. Returns a state dict
     consumed by run_render (and serialized into --report files)."""
@@ -8073,17 +8113,11 @@ def run_scan(args, cb=None):
         moved = abs(cx - scan_cx) + abs(cy - scan_cy)
         step_eff, trig_eff = step, args.scan_trigger
         if adapt:
-            # Self-tuning pace: when the screen has barely changed since the
-            # last scan, stretch the interval (2x) — nothing new to read, and
-            # memory/safety bands still backstop. Under heavy change, tighten
-            # it (0.5x) so new content is read sooner. Fast scrolling lowers
-            # the scroll trigger so scans fire earlier in the movement.
-            if scan_small is not None and scan_small.shape == small.shape:
-                act = float(cv2.absdiff(small, scan_small).mean())
-                if act < 1.0:
-                    step_eff = step * 2
-                elif act > 8.0:
-                    step_eff = max(2, step // 2)
+            # Small text can change only 0.5/255 of a whole frame's mean
+            # even though the new letters are perfectly visible locally.
+            # Never stretch the OCR cadence across such an appearance.
+            if scan_small is not None and small is not None:
+                step_eff = _adaptive_text_scan_stride(small, scan_small, step)
             speed = (abs(cx - prev_fcx) + abs(cy - prev_fcy)) * fps
             if speed > 300:
                 trig_eff = max(20.0, args.scan_trigger * 0.5)
