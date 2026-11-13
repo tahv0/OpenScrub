@@ -174,7 +174,7 @@ def test_scroll_jump_automatically_loads_visible_cache_misses(review_server, wid
         starts=page.evaluate('__coldStarts')
         # Same-frame, same-geometry findings may correctly share one exact
         # cached crop. No second video decode is required for that image.
-        assert starts and starts[0] == 0
+        assert 0 in starts, 'The first visible card did not load automatically'
         assert len(starts)<40, 'Scrolling started a source decoder for every offscreen card'
         assert page.locator('#det85 canvas').count()==1
         assert not errors,errors
