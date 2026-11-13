@@ -6,6 +6,7 @@ on:
       - 'openscrub_web.py'
       - 'test_plate_quad_editor.py'
       - 'test_plate_quad_autosave.py'
+      - 'test_corner_409_recovery.py'
       - 'test_review_performance.py'
       - 'test_review_browser.py'
       - 'tools/integration_smoke.py'
@@ -33,11 +34,11 @@ jobs:
           python -m pip install "numpy<3" "opencv-python-headless<5" pytest flask rapidfuzz pyyaml cryptography
       - name: Check syntax, embedded UI and browser test harness
         run: |
-          python -m py_compile openscrub_web.py test_plate_quad_editor.py test_plate_quad_autosave.py test_review_performance.py test_review_browser.py tools/integration_smoke.py
+          python -m py_compile openscrub_web.py test_plate_quad_editor.py test_plate_quad_autosave.py test_corner_409_recovery.py test_review_performance.py test_review_browser.py tools/integration_smoke.py
           python -c 'import openscrub_web; open("_plate_editor.js","w",encoding="utf-8").write(openscrub_web.APP_JS)'
           node --check _plate_editor.js
       - name: Test editor crop, persisted four-corner samples and validation
-        run: python -m pytest -q test_plate_quad_editor.py test_plate_quad_autosave.py test_review_performance.py
+        run: python -m pytest -q test_plate_quad_editor.py test_plate_quad_autosave.py test_corner_409_recovery.py test_review_performance.py
       - name: Install browser test dependencies
         if: matrix.python-version == '3.12'
         run: |
