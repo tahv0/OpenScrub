@@ -359,13 +359,16 @@ def region(job, index, payload):
     stop_review.atomic_report(str(report_path),doc)
     elapsed = time.monotonic()-started
     if elapsed >= 3:
-        # A slow Windows bind-mount fsync is not a failed save. Record safe
-        # sizes/stages so any remaining stalls can be diagnosed without PII.
+        # Diagnostic/stat failures must never turn an already committed
+        # human adjustment into an HTTP 500 (and a needless retry).
+        try:
+            report_mb=round(report_path.stat().st_size/1048576,1)
+        except OSError:
+            report_mb=None
         _web.diagnostics.event('review_corner_save_slow', job,
             total_ms=round(elapsed*1000),
             report_write_ms=round((time.monotonic()-writing)*1000),
-            rows=len(doc['detections']),
-            report_mb=round(report_path.stat().st_size/1048576,1))
+            rows=len(doc['detections']), report_mb=report_mb)
     meta['preview_token'] = _token(doc,row,meta['frame'],meta.get('key'))
     return dict(ok=True, applied=len(members), verified_samples_added=0,
                 finding=entry, preview=meta, verified_label=row.get('verified_label',''),
