@@ -6075,7 +6075,7 @@ async function loadReview(signal=null,phase=SHELLPH){
  if(!await showPanel("review")||!current())return false;
  if(VLBLJOB!==CUR){VLBL={};VLBLJOB=CUR;}
  let d;
- try{d=(await reviewRequest(`api/jobs/${job}/detections`,{signal})).data;}catch(error){
+ try{d=(await reviewRequest(`api/jobs/${job}/detections`,{signal,timeoutMs:90000})).data;}catch(error){
   if(current()){
    const w=document.getElementById("warnbox");if(w){w.style.display="block";w.textContent="Review could not load: "+error.message;}
    if(signal)throw error; // keep polling backoff and retry an unfinished transition
