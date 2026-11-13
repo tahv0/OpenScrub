@@ -8,6 +8,7 @@ import shutil
 import pytest
 
 import openscrub_web as web
+import review_journal
 from test_findings_web import findings_job
 
 
@@ -18,6 +19,10 @@ def _confirm(client, job, label):
 
 
 def _move_box(report):
+    # Other report publishers must first make committed SQLite corrections
+    # part of the authoritative snapshot. Moving a source box while the
+    # journal still targets the previous version must fail closed.
+    review_journal.publish(report.parent)
     data = json.loads(report.read_text())
     data['detections'][0]['cbox'] = [26, 24, 72, 40]
     report.write_text(json.dumps(data))
@@ -90,7 +95,7 @@ def test_moved_negative_group_restores_default_protection_for_all_members(
     original_doc['detections'][1]['track'] = original_doc['detections'][0]['track']
     report.write_text(json.dumps(original_doc))
     previous = _confirm(client, job, 'negative')
-    verified = json.loads(report.read_text())['detections']
+    verified = web._load_job_report(job)['detections']
     assert all(not verified[i]['enabled'] and
                verified[i]['verified_label'] == 'not_plate'
                for i in (0, 1))
@@ -135,6 +140,7 @@ def test_changed_original_video_identity_must_not_migrate_confirmation(
         findings_job):
     client, job, _, report = findings_job
     previous = _confirm(client, job, 'negative')
+    review_journal.publish(report.parent)
     data = json.loads(report.read_text())
     data['provenance']['original_input_sha256'] = 'f' * 64
     report.write_text(json.dumps(data))
