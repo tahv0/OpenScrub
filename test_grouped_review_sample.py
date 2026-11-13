@@ -113,6 +113,35 @@ def test_sample_api_reports_group_units_and_counts(plate_job):
 from test_review_browser import review_server, browser_instance, load_browser_page
 
 
+def test_large_group_single_http_confirmation_has_stable_preview_token(review_server):
+    """Regression for 409 when a 10k-row review uses a scan-time representative.
+
+    Distinct tracks intentionally share geometry: the confirmed archive is
+    source/frame/box-bound, while the output choice fans out by track.
+    """
+    _, path = review_server
+    doc = json.loads(path.read_text())
+    first = doc['detections'][0]
+    doc['detections'] = [
+        dict(deepcopy(first), track=t, frame_index=f, t_start=f / 30,
+             t_end=(f + 1) / 30, last_seen=f / 30)
+        for t in range(100) for f in range(100, 200)
+    ]
+    path.write_text(json.dumps(doc))
+    with web.app.test_client() as client:
+        listing = client.get('/api/jobs/inline-fixture/detections')
+        assert listing.status_code == 200, listing.get_data(as_text=True)[:500]
+        image = client.get('/api/jobs/inline-fixture/finding-preview/0')
+        assert image.status_code == 200, image.get_data(as_text=True)[:500]
+        meta = json.loads(image.headers['X-Finding-Geometry'])
+        saved = client.post('/api/jobs/inline-fixture/confirm/0', json={
+            'label': 'negative', 'preview_token': meta['preview_token']})
+        assert saved.status_code == 200, saved.get_data(as_text=True)[:500]
+        assert web._load_job_report(web.JOBS['inline-fixture'])['detections'][99]['verified_label'] == 'not_plate'
+        assert not web._load_job_report(web.JOBS['inline-fixture'])['detections'][100]['verified_label']
+
+
+
 @pytest.mark.parametrize('width', [1440, 390])
 def test_human_sample_shows_ten_groups_not_hundreds_of_frames(review_server, width, tmp_path):
     url, path = review_server
@@ -152,7 +181,8 @@ def test_human_sample_shows_ten_groups_not_hundreds_of_frames(review_server, wid
         page.wait_for_function('(i)=>!!document.querySelector("#det"+i+" img")._quadEdit', arg=index)
         card.get_by_role('button', name='✕ Not a plate', exact=True).click()
         page.evaluate('CONFIRM_CHAIN')
-        page.wait_for_function('(i)=>document.getElementById("vlabel"+i).textContent.includes("Saved")',arg=index)
+        page.wait_for_function('(i)=>document.getElementById("vlabel"+i).textContent.includes("Saved") || document.getElementById("vlabel"+i).textContent.includes("Not saved")',arg=index)
+        assert 'Saved' in page.locator('#vlabel%d' % index).inner_text(), page.locator('#vlabel%d' % index).inner_text()
         assert page.evaluate('CONFIRM_FAILED.size') == 0
         assert card.locator('.det-status').inner_text() == 'Will stay visible'
         assert page.evaluate('saveAndRender(true)') is True
