@@ -463,8 +463,12 @@ class WebCallbacks(openscrub.Callbacks):
         self._last_frame = 0.0
         self._stage = None          # ETA state: current stage,
         self._t0 = 0.0              # when it started,
-        self._cur0 = 0             # its first cur value,
+        self._cur0 = 0              # its first cur value,
         self._eta = None            # and the smoothed estimate
+        self._rate_points = []      # bounded recent stage progress samples
+        self._last_rate_log = 0.0
+        self._preview_groups = set()
+        self._preview_stats = None
 
     def log(self, msg):
         self.job["log"].append(msg)
@@ -505,29 +509,58 @@ class WebCallbacks(openscrub.Callbacks):
         base, span = stages.get(stage, (0.5, 0.5))
         self.job["progress"] = round(base + span * cur / max(total, 1), 5)
 
-        # Server-side per-STAGE ETA from the stage's whole-run average
-        # rate (units/sec since the stage began). Each stage runs at its
-        # own real speed — extrapolating one ETA across the stitched bar
-        # (what the client used to do) made the estimate lurch at every
-        # phase boundary. The whole-stage average is stable by
-        # construction, and a light EMA on the published value keeps
-        # re-estimates gliding instead of stepping when the scan hits a
-        # fast-skip jump or a dense stretch.
+        # ETA uses a rolling recent rate once enough recent history exists.
+        # The previous whole-stage average hid progressive slowdowns for hours:
+        # an early fast prefix kept the ETA optimistic long after current
+        # throughput had fallen. Keep the whole-stage rate as a fallback for
+        # startup, but prefer roughly the last two minutes during long scans.
         now = time.time()
         if stage != self._stage:
             self._stage, self._t0, self._cur0 = stage, now, cur
             self._eta = None
+            self._rate_points = [(now, cur)]
+            self._last_rate_log = now
             self.job["eta"] = None
             return
+
+        if (not self._rate_points or now - self._rate_points[-1][0] >= 5.0
+                or cur >= total):
+            self._rate_points.append((now, cur))
+            cutoff = now - 120.0
+            while len(self._rate_points) > 2 and self._rate_points[1][0] < cutoff:
+                self._rate_points.pop(0)
+
         done, elapsed = cur - self._cur0, now - self._t0
-        if cur < total and done > 0 and elapsed >= 3.0:
-            rem = (total - cur) * elapsed / done
+        average_rate = done / elapsed if done > 0 and elapsed >= 3.0 else 0.0
+        recent_rate = 0.0
+        recent_seconds = 0.0
+        if len(self._rate_points) >= 2:
+            recent_seconds = self._rate_points[-1][0] - self._rate_points[0][0]
+            recent_done = self._rate_points[-1][1] - self._rate_points[0][1]
+            if recent_done > 0 and recent_seconds > 0:
+                recent_rate = recent_done / recent_seconds
+        rate = recent_rate if recent_seconds >= 20.0 and recent_rate > 0 else average_rate
+
+        if rate > 0:
+            activity["rate_per_second"] = round(rate, 4)
+            activity["rate_window_seconds"] = round(
+                recent_seconds if recent_seconds >= 20.0 else elapsed, 1)
+        if cur < total and rate > 0:
+            rem = (total - cur) / rate
             self._eta = (rem if self._eta is None
-                         else 0.75 * self._eta + 0.25 * rem)
+                         else 0.55 * self._eta + 0.45 * rem)
             self.job["eta"] = round(self._eta)
         else:
             self._eta = None
             self.job["eta"] = None
+
+        if (stage == "scan" and rate > 0
+                and now - self._last_rate_log >= 300.0):
+            self._last_rate_log = now
+            diagnostics.event("scan_throughput", self.job,
+                frame=cur, total=total, recent_fps=round(rate, 4),
+                average_fps=round(average_rate, 4),
+                eta_minutes=round((total-cur)/rate/60, 1) if cur < total else 0)
 
     def scan_frame(self, frame, t, found):
         now = time.time()
@@ -543,8 +576,11 @@ class WebCallbacks(openscrub.Callbacks):
 
     def scan_findings(self, frame, frame_index, fps, detections):
         try:
-            self.job['review_queue'] = finding_previews.capture(
-                self.job['dir'], frame, frame_index, fps, detections)
+            self._preview_stats = finding_previews.capture(
+                self.job['dir'], frame, frame_index, fps, detections,
+                seen_groups=self._preview_groups,
+                previous_stats=self._preview_stats)
+            self.job['review_queue'] = self._preview_stats
         except Exception:
             # Review caching must not turn an otherwise valid scan into failure.
             if not self.job.get('review_cache_error'):
