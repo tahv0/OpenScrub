@@ -154,7 +154,7 @@ def test_real_direct_corner_autosave_and_lazy_loading(review_server, viewport, t
         moved = plate_points(card)
         assert moved[0] != initial[0] and moved[1:] == initial[1:]
         assert len(posts) == 1 and posts[0]['apply_track'] is True and posts[0]['autosave'] is True
-        stored = json.loads(report.read_text())['detections'][0]
+        stored = web._load_job_report(web.JOBS['inline-fixture'])['detections'][0]
         assert len(stored['plate_quad']) == 4 and not stored.get('verified_label')
         assert stored.get('human_region_confirmed') is True
         assert 'Human corrected corners' in card.locator('#plateOverlay0').inner_text()
@@ -197,7 +197,7 @@ def test_real_direct_corner_autosave_and_lazy_loading(review_server, viewport, t
         page.locator('#det0').scroll_into_view_if_needed()
         page.wait_for_function("!!document.querySelector('#det0 img')._quadEdit")
         assert max(abs(a-b) for p,q in zip(plate_points(page.locator('#det0')),latest) for a,b in zip(p,q)) < .001
-        assert json.loads(report.read_text())['detections'][1].get('plate_quad')
+        assert web._load_job_report(web.JOBS['inline-fixture'])['detections'][1].get('plate_quad')
         assert not errors, errors
         browser.close()
 
@@ -300,7 +300,7 @@ def test_autosave_failure_keeps_draft_and_blocks_render_until_retry(review_serve
         card.get_by_role('button',name='Retry save',exact=True).click()
         page.wait_for_function("document.querySelector('#det0 .quad-status').textContent.startsWith('Saved area')")
         assert attempts[0]['edit_id'] == attempts[1]['edit_id']
-        assert json.loads(report.read_text())['detections'][0].get('plate_quad')
+        assert web._load_job_report(web.JOBS['inline-fixture'])['detections'][0].get('plate_quad')
         # Crossing corners and cancelled touch/pointer gestures never get saved.
         before = plate_points(card)
         drag_corner(page,card,index=0,dx=140,dy=25)
@@ -336,7 +336,7 @@ def test_touch_corner_drag_autosaves(review_server):
         cdp.send('Input.dispatchTouchEvent',{'type':'touchEnd','touchPoints':[]})
         page.wait_for_function("document.querySelector('#det0 .quad-status').textContent.startsWith('Saved area')")
         assert plate_points(card)[0] != before[0]
-        assert json.loads(report.read_text())['detections'][0].get('plate_quad')
+        assert web._load_job_report(web.JOBS['inline-fixture'])['detections'][0].get('plate_quad')
         browser.close()
 
 
