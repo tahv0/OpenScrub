@@ -113,6 +113,54 @@ def test_sample_api_reports_group_units_and_counts(plate_job):
 from test_review_browser import review_server, browser_instance, load_browser_page
 
 
+def test_pinned_representative_survives_new_exact_cache_sample(review_server):
+    """An in-flight thumbnail fill must not invalidate a human save token.
+
+    The browser showed frame 300, then another request cached exact frame 100
+    for the same track. Only a source-bound opaque key plus the original
+    preview token may authorize writing the image the reviewer actually saw.
+    """
+    import numpy as np
+
+    _, path = review_server
+    doc = json.loads(path.read_text())
+    row = dict(doc['detections'][0], frame_index=100, t_start=100/30,
+               t_end=101/30, last_seen=100/30)
+    doc['detections'] = [row]
+    path.write_text(json.dumps(doc))
+    job = web.JOBS['inline-fixture']
+    with web.app.test_client() as client:
+        old = client.get('/api/jobs/inline-fixture/finding-preview/0?cache_only=1')
+        assert old.status_code == 200
+        shown = json.loads(old.headers['X-Finding-Geometry'])
+        assert shown['frame'] == 300 and shown['match'] == 'representative'
+        # An unrelated viewer now saves a verified exact-frame preview.
+        box = [180, 120, 420, 220]
+        crop = [100, 60, 500, 280]
+        web.finding_previews.store(
+            job['dir'], row, doc['render_state'],
+            dict(frame=100, width=640, height=360, crop=crop, box=box,
+                 source={'timing':'frame', 'sha256':doc['provenance']['input_sha256']}),
+            np.full((220, 400, 3), 128, np.uint8))
+        newer = client.get('/api/jobs/inline-fixture/finding-preview/0?cache_only=1')
+        assert newer.status_code == 200
+        latest = json.loads(newer.headers['X-Finding-Geometry'])
+        assert latest['frame'] == 100 and latest['preview_token'] != shown['preview_token']
+        # Without its pinned key the old token no longer matches: fail closed.
+        rejected = client.post('/api/jobs/inline-fixture/confirm/0', json={
+            'label':'negative','preview_token':shown['preview_token']})
+        assert rejected.status_code == 409
+        # With its original key, source and crop validation bind the JPEG.
+        accepted = client.post('/api/jobs/inline-fixture/confirm/0', json={
+            'label':'negative','preview_token':shown['preview_token'],
+            'preview_key':shown['key']})
+        assert accepted.status_code == 200, accepted.get_data(as_text=True)[:500]
+        assert accepted.get_json()['finding']['frame'] == 300
+        saved = web._load_job_report(job)['detections'][0]
+        assert saved['verified_label'] == 'not_plate' and not saved['enabled']
+
+
+
 def test_large_group_single_http_confirmation_has_stable_preview_token(review_server):
     """Regression for 409 when a 10k-row review uses a scan-time representative.
 
