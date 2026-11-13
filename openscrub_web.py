@@ -1743,24 +1743,27 @@ def _load_preview_report(job):
             cached = _REVIEW_REPORTS.get(identity)
             if cached is not None:
                 return cached
-        doc = review_preview_index.load(path)
-        if doc is None:
-            # Legacy jobs are indexed once on demand. Scan completion builds
-            # the index up front, so normal new jobs avoid this path entirely.
-            source = _load_job_report(job)
-            try:
-                # A legacy job may need indexing after scan. Serialize this
-                # disk publication with vault encryption, then recheck lock
-                # state before serving any resulting preview pixels.
-                with _REVIEW_CACHE_LOCK:
-                    if vault_locked():
-                        abort(423)
-                    review_preview_index.prepare(path, source)
-                    doc = review_preview_index.load(path)
-            except (OSError, ValueError, sqlite3.DatabaseError):
-                diagnostics.exception("review_index_build_failed", job)
+        if identity[3] <= _REVIEW_REPORT_MAX_FILE_BYTES:
+            # Small jobs retain the original plain-dict behavior. Avoid
+            # introducing a disk-index dependency to the common quick path.
+            doc = _load_job_report(job)
+        else:
+            doc = review_preview_index.load(path)
             if doc is None:
-                doc = source  # safe fallback; never sacrifice review accuracy
+                # Legacy large jobs are indexed once on demand. New scans build
+                # the index up front, outside HTTP request latency.
+                source = _load_job_report(job)
+                try:
+                    # Serialize publication with vault encryption.
+                    with _REVIEW_CACHE_LOCK:
+                        if vault_locked():
+                            abort(423)
+                        review_preview_index.prepare(path, source)
+                        doc = review_preview_index.load(path)
+                except (OSError, ValueError, sqlite3.DatabaseError):
+                    diagnostics.exception("review_index_build_failed", job)
+                if doc is None:
+                    doc = source  # safe fallback; never sacrifice review accuracy
         current = _preview_report_identity(path)
         with _REVIEW_CACHE_LOCK:
             if vault_locked():
