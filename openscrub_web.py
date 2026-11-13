@@ -950,9 +950,8 @@ def worker():
                     # continuation scan AND postprocessing have both passed.
                     stop_review.atomic_report(report_path, combined)
                     try:
-                        # Small reports already stay cheaply cached. Build a
-                        # per-row index only when a report exceeds the safe
-                        # in-memory snapshot threshold.
+                        # A scan has the complete report in memory. Prepare
+                        # a revision-fenced listing here, never on Review GET.
                         if os.path.getsize(report_path) > _REVIEW_REPORT_MAX_FILE_BYTES:
                             started = time.monotonic()
                             with _REVIEW_PICTURE_GATE.reader():
@@ -964,6 +963,8 @@ def worker():
                                     elapsed_ms=round((time.monotonic()-started)*1000),
                                     index_mb=round(os.path.getsize(os.path.join(
                                         job["dir"], review_preview_index.NAME))/1024**2, 1))
+                        elif os.path.getsize(report_path) >= _REVIEW_LISTING_INDEX_MIN_BYTES:
+                            review_preview_index.publish_listing(report_path, combined)
                     except Exception:
                         diagnostics.exception("review_index_build_failed", job)
                     try:
@@ -1815,6 +1816,8 @@ class _SavedPictureGate:
 
 _REVIEW_PICTURE_GATE = _SavedPictureGate()
 _REVIEW_RECONCILE_LOCK = threading.Lock()
+_REVIEW_RECONCILE_BACKGROUND_LOCK = threading.Lock()
+_REVIEW_RECONCILE_BACKGROUND_RUNNING = set()
 _REVIEW_FRAMES = OrderedDict()
 _REVIEW_PROBES = OrderedDict()
 _REVIEW_FRAME_BYTES = 64 * 1024 * 1024
@@ -1825,6 +1828,74 @@ _REVIEW_TIMEOUT = 10
 _REVIEW_REPORT_LOCK = threading.Lock()
 _REVIEW_REPORTS = OrderedDict()
 _REVIEW_REPORT_MAX_FILE_BYTES = 32 * 1024 * 1024
+# Even sub-32MB JSON can require 15 seconds to load over Windows bind mounts.
+_REVIEW_LISTING_INDEX_MIN_BYTES = 2 * 1024 * 1024
+_REVIEW_INDEX_BACKGROUND_LOCK = threading.Lock()
+_REVIEW_INDEX_BACKGROUND_PENDING = {}
+_REVIEW_INDEX_BACKGROUND_RUNNING = {}  # report path -> current worker identity
+_REVIEW_INDEX_BACKGROUND_ACTIVE = {}  # source-bound report while rows rebuild
+
+
+def _warm_review_listing_index(job, document, full_rows=False, expected_identity=None):
+    """Refresh fallback listings or stale indexed rows off the request path.
+
+    A single worker per job takes the newest pending report revision. Save
+    retains its own complete document only until the row index is ready.
+    A competing scan/save cannot publish obsolete metadata because prepare
+    and publish_listing both verify report identity before committing.
+    """
+    report_path = os.path.realpath(os.path.join(job['dir'], 'report.json'))
+    expected_identity = (list(expected_identity) if expected_identity is not None
+                         else review_preview_index.report_identity(report_path))
+    worker_token = object()
+    with _REVIEW_INDEX_BACKGROUND_LOCK:
+        if full_rows:
+            # Previews use this already-validated in-memory document until
+            # the new row index is published. No second full JSON parse is
+            # started by the thumbnail HTTP workers in the meantime.
+            _REVIEW_INDEX_BACKGROUND_ACTIVE[report_path] = (
+                expected_identity, document)
+        _REVIEW_INDEX_BACKGROUND_PENDING[report_path] = (
+            job, document, full_rows, expected_identity)
+        if report_path in _REVIEW_INDEX_BACKGROUND_RUNNING:
+            return
+        _REVIEW_INDEX_BACKGROUND_RUNNING[report_path] = worker_token
+
+    def build():
+        try:
+            while True:
+                with _REVIEW_INDEX_BACKGROUND_LOCK:
+                    item = _REVIEW_INDEX_BACKGROUND_PENDING.pop(report_path, None)
+                    if item is None:
+                        if _REVIEW_INDEX_BACKGROUND_RUNNING.get(report_path) is worker_token:
+                            _REVIEW_INDEX_BACKGROUND_RUNNING.pop(report_path, None)
+                            _REVIEW_INDEX_BACKGROUND_ACTIVE.pop(report_path, None)
+                        return
+                source_job, doc, full, expected = item
+                try:
+                    with _REVIEW_PICTURE_GATE.reader():
+                        if vault_locked():
+                            return
+                        if full:
+                            review_preview_index.prepare(
+                                report_path, doc, expected_identity=expected)
+                        else:
+                            review_preview_index.publish_listing(
+                                report_path, doc, expected_identity=expected)
+                except Exception:
+                    diagnostics.exception('review_index_warmup_failed', source_job)
+        finally:
+            with _REVIEW_INDEX_BACKGROUND_LOCK:
+                # A newer worker may already own this path after the final
+                # queue pop. Never evict its document or running marker.
+                if _REVIEW_INDEX_BACKGROUND_RUNNING.get(report_path) is worker_token:
+                    _REVIEW_INDEX_BACKGROUND_RUNNING.pop(report_path, None)
+                    _REVIEW_INDEX_BACKGROUND_ACTIVE.pop(report_path, None)
+
+    threading.Thread(target=build, name='openscrub-review-index',
+                     daemon=True).start()
+
+
 
 
 def _preview_report_identity(path):
@@ -1855,6 +1926,11 @@ def _load_preview_report_base(job):
             doc = _load_job_report(job)
         else:
             doc = review_preview_index.load(path)
+            if doc is None:
+                with _REVIEW_INDEX_BACKGROUND_LOCK:
+                    active = _REVIEW_INDEX_BACKGROUND_ACTIVE.get(path)
+                if active is not None and active[0] == list(identity[1:]):
+                    doc = active[1]
             if doc is None:
                 # Legacy large jobs are indexed once on demand. New scans build
                 # the index up front, outside HTTP request latency.
@@ -2054,7 +2130,7 @@ def job_mediainfo(jid):
                     "width": w_, "height": h_})
 
 
-def _reconcile_compact_previews(job, doc):
+def _reconcile_compact_previews(job, doc, expected_identity=None):
     """Bind scan-time cached pictures to final post-processed track ids.
 
     This is metadata-only: it never opens the source video. The report file
@@ -2068,6 +2144,8 @@ def _reconcile_compact_previews(job, doc):
         return dict(total=0, linked=0, already=0)
     if job.get("_compact_preview_reconcile"):
         return dict(total=0, linked=0, already=0)
+    if expected_identity is not None and list(signature[1:]) != list(expected_identity):
+        return dict(total=0, linked=0, already=0, stale=True)
     # Reconciliation is metadata-only, but a long-video SQLite sweep can
     # take seconds on a Windows-mounted drive. Never hold the global memory
     # cache lock, which formerly starved saved picture reads and autosaves.
@@ -2080,10 +2158,13 @@ def _reconcile_compact_previews(job, doc):
             if vault_locked():
                 return dict(total=0, linked=0, already=0)
             stats = finding_previews.reconcile(
-                job["dir"], doc.get("detections", []), doc.get("render_state") or {})
-            # One reconciliation per completed scan, not per report save.
-            # Human corner changes retain exact-frame/geometry cache checks.
-            job["_compact_preview_reconcile"] = signature
+                job["dir"], doc.get("detections", []), doc.get("render_state") or {},
+                expected_report_identity=list(signature[1:]))
+            # A concurrent Save may have replaced the report. Only acknowledge
+            # completed relinking for the exact revision that was inspected.
+            if not stats.get('stale') and _preview_report_identity(
+                    os.path.realpath(os.path.join(job["dir"], "report.json"))) == signature:
+                job["_compact_preview_reconcile"] = signature
             return stats
     except _SavedPictureBusyTimeout:
         abort(503, description="The vault is locking saved pictures. Retry shortly.")
@@ -2091,9 +2172,44 @@ def _reconcile_compact_previews(job, doc):
         _REVIEW_RECONCILE_LOCK.release()
 
 
+def _warm_legacy_preview_reconciliation(job, doc, expected_identity):
+    """Relink legacy scan-time pictures without blocking detection listing.
+
+    Normal scans already reconcile before exposing Review. Older jobs may
+    have a compact cache but not a final track binding. A single, revision-
+    fenced background sweep recovers it; cache-only image requests can retry
+    until it completes without causing another whole-report GET.
+    """
+    if job.get('_compact_preview_reconcile'):
+        return
+    path = os.path.join(job['dir'], 'compact_previews', 'index.sqlite3')
+    if not os.path.isfile(path):
+        return
+    key = os.path.realpath(job['dir'])
+    with _REVIEW_RECONCILE_BACKGROUND_LOCK:
+        if key in _REVIEW_RECONCILE_BACKGROUND_RUNNING:
+            return
+        _REVIEW_RECONCILE_BACKGROUND_RUNNING.add(key)
+
+    def relink():
+        try:
+            _reconcile_compact_previews(job, doc, expected_identity=expected_identity)
+        except Exception:
+            diagnostics.exception('review_legacy_preview_reconcile_failed', job)
+        finally:
+            with _REVIEW_RECONCILE_BACKGROUND_LOCK:
+                _REVIEW_RECONCILE_BACKGROUND_RUNNING.discard(key)
+
+    threading.Thread(target=relink, name='openscrub-preview-reconcile',
+                     daemon=True).start()
+
+
 @app.route("/api/jobs/<jid>/detections")
 def job_detections(jid):
     job = JOBS.get(jid) or abort(404)
+    started = time.monotonic()
+    if vault_locked():
+        abort(423, description='Unlock the vault before viewing saved detections.')
     # For oversized reports, the scan already published a revision-fenced
     # Review listing. Serve its JSON directly, never reparse hundreds of
     # thousands of report rows on each reopen. Model-library choices are
@@ -2112,9 +2228,39 @@ def job_detections(jid):
         response = Response(body, mimetype="application/json")
         response.headers["Cache-Control"] = "no-store"
         response.headers["X-Review-Listing"] = "indexed"
+        elapsed = round((time.monotonic() - started) * 1000)
+        response.headers['Server-Timing'] = 'detections;dur=%d' % elapsed
+        if elapsed > 3000:
+            diagnostics.event('review_detections_slow', job,
+                              mode='cached_listing', elapsed_ms=elapsed)
         return response
+    # Legacy or just-replaced reports may have no cached listing. Never
+    # reconcile every cached picture in a user-facing GET: even metadata-only
+    # SQLite sweeps can exceed the 15-second browser deadline on long videos.
+    # New scans reconcile once before Review opens; old exact cached pictures
+    # remain usable while a missing index is prepared in the background.
+    path = os.path.join(job['dir'], 'report.json')
+    try:
+        source_revision = review_preview_index.report_identity(path)
+    except FileNotFoundError:
+        # Test adapters and in-memory report providers have always been able
+        # to supply a loaded document without a report.json on disk. Preserve
+        # that existing GET contract; only disk-backed jobs need indexing.
+        source_revision = None
     doc = _load_job_report(job)
-    _reconcile_compact_previews(job, doc)
+    if source_revision is not None:
+        if review_preview_index.report_identity(path) != source_revision:
+            abort(409, description='Review report changed while listing. Reload.')
+        _warm_legacy_preview_reconciliation(job, doc, source_revision)
+        try:
+            size = os.path.getsize(path)
+            if (size >= _REVIEW_LISTING_INDEX_MIN_BYTES
+                    or os.path.exists(os.path.join(job['dir'], review_preview_index.NAME))):
+                _warm_review_listing_index(job, doc,
+                    full_rows=size > _REVIEW_REPORT_MAX_FILE_BYTES,
+                    expected_identity=source_revision)
+        except OSError:
+            diagnostics.exception('review_index_warmup_stat_failed', job)
     items = []
     for i, d in enumerate(doc["detections"]):
         items.append({"i": i, "category": d["category"], "text": d["text"],
@@ -2136,7 +2282,7 @@ def job_detections(jid):
                       "human_region_confirmed": bool(d.get("human_region_confirmed")),
                       "zone_dropped": bool(d.get("zone_dropped")),
                       "shaped": bool(d.get("poly"))})
-    return jsonify({"detections": items,
+    response = jsonify({"detections": items,
                     "learning": doc.get("learning"),
                     "video_id": (doc.get('provenance') or {}).get('original_input_sha256') or (doc.get('provenance') or {}).get('input_sha256'),
                     "plate_text_search": doc.get("plate_text_search"),
@@ -2149,6 +2295,14 @@ def job_detections(jid):
                     "fps": doc["render_state"]["fps"],
                     "duration": len(doc["render_state"]["cum"]) /
                                 doc["render_state"]["fps"]})
+    elapsed = round((time.monotonic() - started) * 1000)
+    response.headers['Server-Timing'] = 'detections;dur=%d' % elapsed
+    response.headers['X-Review-Listing'] = 'legacy_fallback'
+    if elapsed > 3000:
+        diagnostics.event('review_detections_slow', job,
+                          mode='report_fallback', elapsed_ms=elapsed,
+                          detections=len(items))
+    return response
 
 
 def _review_detections(job, doc):
@@ -3053,7 +3207,7 @@ def job_save_edits(jid):
     parsed = time.perf_counter()
     # A deliberate Save is a report boundary; normal Is/Not and corner
     # clicks never rewrite the long scan timeline.
-    _review_journal_snapshot(job)
+    journal_published = _review_journal_snapshot(job)
     path = os.path.join(job["dir"], "report.json")
     doc = _load_job_report(job)
     loaded = time.perf_counter()
@@ -3125,6 +3279,20 @@ def job_save_edits(jid):
             _SECTIONS.guard_edits(job, _load_job_report(job), doc)
         stop_review.atomic_report(path, doc)
     published = time.perf_counter()
+    # Refresh the small public listing without rewriting every indexed
+    # preview row on Save. Keep the row-index rebuild off the save request.
+    if changed or journal_published:
+        try:
+            size = os.path.getsize(path)
+            if (size >= _REVIEW_LISTING_INDEX_MIN_BYTES or
+                    os.path.isfile(os.path.join(job['dir'], review_preview_index.NAME))):
+                review_preview_index.publish_listing(path, doc)
+                if size > _REVIEW_REPORT_MAX_FILE_BYTES:
+                    _warm_review_listing_index(job, doc, full_rows=True)
+        except Exception:
+            # The authoritative report is already committed. A cache failure
+            # must never make successfully saved edits appear unsaved.
+            diagnostics.exception('review_listing_refresh_failed', job)
     # suggest allowlisting any string whose EVERY instance was disabled —
     # the review just taught us it's a recurring false positive
     per = {}
@@ -5982,7 +6150,7 @@ async function loadReview(signal=null,phase=SHELLPH){
  if(!await showPanel("review")||!current())return false;
  if(VLBLJOB!==CUR){VLBL={};VLBLJOB=CUR;}
  let d;
- try{d=(await reviewRequest(`api/jobs/${job}/detections`,{signal})).data;}catch(error){
+ try{d=(await reviewRequest(`api/jobs/${job}/detections`,{signal,timeoutMs:90000})).data;}catch(error){
   if(current()){
    const w=document.getElementById("warnbox");if(w){w.style.display="block";w.textContent="Review could not load: "+error.message;}
    if(signal)throw error; // keep polling backoff and retry an unfinished transition

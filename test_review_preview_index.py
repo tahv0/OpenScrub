@@ -167,3 +167,118 @@ def test_listing_revision_fence_excludes_later_unsafe_data(tmp_path):
     replacement.write_text(json.dumps(doc))
     replacement.replace(report)
     assert index.read_listing(report) is None
+
+
+def test_listing_only_cache_does_not_claim_stale_preview_rows(tmp_path):
+    report, doc = sample(tmp_path, 250)
+    assert index.publish_listing(report, doc)
+    public = json.loads(index.read_listing(report))
+    assert len(public['detections']) == 250
+    assert index.load(report) is None, 'A listing is not a source-frame row index'
+    assert index.prepare(report, doc)
+    assert index.load(report)['detections'][23] == doc['detections'][23]
+
+
+def test_saved_report_refreshes_listing_without_rebuilding_row_index(tmp_path):
+    report, doc = sample(tmp_path, 350)
+    assert index.prepare(report, doc)
+    old_rows = index.load(report)
+    modified = json.loads(report.read_text())
+    modified['detections'][17]['enabled'] = False
+    modified['detections'][17]['cbox'] = [40, 12, 80, 29]
+    replacement = report.with_name('report-new.json')
+    replacement.write_text(json.dumps(modified))
+    replacement.replace(report)
+    assert index.read_listing(report) is None
+    assert index.publish_listing(report, modified)
+    listed = json.loads(index.read_listing(report))['detections'][17]
+    assert listed['enabled'] is False
+    assert index.load(report) is None, 'Stale source geometry must not be exposed'
+    with pytest.raises(Exception) as error:
+        _ = old_rows['detections'][17]
+    assert getattr(error.value, 'code', None) == 409
+    assert index.prepare(report, modified)
+    assert index.load(report)['detections'][17]['cbox'] == [40, 12, 80, 29]
+
+
+def test_detections_get_never_waits_for_preview_reconciliation(plate_job, monkeypatch):
+    import openscrub_web as web
+    client, jid, report, _ = plate_job
+
+    def forbidden(*args, **kwargs):
+        pytest.fail('Review listing must not wait for full preview reconciliation')
+    monkeypatch.setattr(web, '_reconcile_compact_previews', forbidden)
+    response = client.get(f'/api/jobs/{jid}/detections')
+    assert response.status_code == 200
+    assert response.headers['X-Review-Listing'] == 'legacy_fallback'
+    assert 'detections;dur=' in response.headers['Server-Timing']
+    assert response.get_json()['detections']
+
+
+def test_save_refreshes_fast_listing_even_when_row_index_is_stale(plate_job, monkeypatch):
+    import openscrub_web as web
+    client, jid, report, _ = plate_job
+    doc = json.loads(report.read_text())
+    assert index.prepare(report, doc)
+    original_identity = index.report_identity(report)
+
+    response = client.post(f'/api/jobs/{jid}/detections',
+                           json={'enabled': {'0': False}})
+    assert response.status_code == 200, response.get_data(as_text=True)[:300]
+    assert index.report_identity(report) != original_identity
+    assert json.loads(index.read_listing(report))['detections'][0]['enabled'] is False
+    assert index.load(report) is None, 'Full per-row metadata must remain revision-fenced'
+
+    def no_full_report(*args, **kwargs):
+        pytest.fail('Review GET reparsed report after Save instead of using listing')
+    monkeypatch.setattr(web, '_load_job_report', no_full_report)
+    response = client.get(f'/api/jobs/{jid}/detections')
+    assert response.status_code == 200
+    assert response.headers['X-Review-Listing'] == 'indexed'
+    assert response.get_json()['detections'][0]['enabled'] is False
+
+
+def test_stale_listing_warms_asynchronously_without_inline_reconcile(plate_job, monkeypatch):
+    import openscrub_web as web
+    client, jid, report, _ = plate_job
+    queued = []
+    monkeypatch.setattr(web, '_REVIEW_LISTING_INDEX_MIN_BYTES', 1)
+    monkeypatch.setattr(web, '_warm_review_listing_index',
+                        lambda job, doc, **kwargs: queued.append(kwargs))
+    monkeypatch.setattr(web, '_reconcile_compact_previews',
+                        lambda *_: pytest.fail('GET started a long preview sweep'))
+    response = client.get(f'/api/jobs/{jid}/detections')
+    assert response.status_code == 200
+    assert queued and queued[0]['expected_identity'] == index.report_identity(report)
+    assert 'detections' in response.get_json()
+
+
+def test_async_row_rebuild_uses_source_bound_snapshot_during_preview_get(
+        plate_job, monkeypatch):
+    import threading
+    import openscrub_web as web
+
+    _, jid, report, _ = plate_job
+    job = web.JOBS[jid]
+    doc = json.loads(report.read_text())
+    started, release = threading.Event(), threading.Event()
+
+    def delayed_build(path, data, expected_identity=None):
+        assert data is doc
+        assert list(expected_identity) == index.report_identity(report)
+        started.set()
+        assert release.wait(5)
+        return False
+
+    monkeypatch.setattr(index, 'prepare', delayed_build)
+    monkeypatch.setattr(web, '_REVIEW_REPORT_MAX_FILE_BYTES', 1)
+    web._REVIEW_REPORTS.clear()
+    web._warm_review_listing_index(job, doc, full_rows=True)
+    assert started.wait(3), 'Background row builder did not start'
+    try:
+        def no_full_read(*args, **kwargs):
+            pytest.fail('An in-flight row index caused another huge report parse')
+        monkeypatch.setattr(web, '_load_job_report', no_full_read)
+        assert web._load_preview_report_base(job) is doc
+    finally:
+        release.set()

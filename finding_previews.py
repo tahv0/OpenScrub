@@ -552,7 +552,7 @@ def _iou(a, b):
     return inter / union if union > 0 else 0.
 
 
-def reconcile(job_dir, detections, render_state):
+def reconcile(job_dir, detections, render_state, expected_report_identity=None):
     """Attach scan-time pictures to final tracks using safe time/box agreement.
 
     Dense continuity and onset interpolation can move a final detection's
@@ -566,6 +566,17 @@ def reconcile(job_dir, detections, render_state):
     No video is opened or decoded, no class label is inferred, and the
     picture's actual frame/box/points remain authoritative in the preview.
     """
+    def same_revision():
+        if expected_report_identity is None:
+            return True
+        st = (Path(job_dir) / 'report.json').stat()
+        current = [st.st_dev, st.st_ino, st.st_size,
+                   st.st_mtime_ns, st.st_ctime_ns]
+        return current == list(expected_report_identity)
+
+    if not same_revision():
+        return dict(total=0, linked=0, already=0, stale=True)
+
     try:
         fps = float(render_state['fps'])
         cum = render_state['cum']
@@ -685,6 +696,12 @@ def reconcile(job_dir, detections, render_state):
                     byte_delta += len(updated.encode()) - len(serialized.encode())
                     updates.append((track, updated, key))
                     linked += 1
+            # A Save or rescan can replace report.json while the expensive
+            # legacy match is being computed. Never publish relinked tracks
+            # against another report's source geometry or timeline.
+            if not same_revision():
+                return dict(total=len(stored), linked=0, already=already,
+                            ambiguous=ambiguous, stale=True)
             if updates:
                 db.executemany('UPDATE previews SET track=?, metadata=? WHERE key=?',
                                updates)

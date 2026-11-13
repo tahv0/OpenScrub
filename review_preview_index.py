@@ -172,10 +172,10 @@ def read_listing(report_path):
         identity = report_identity(report_path)
         with closing(_open_read(index)) as db:
             values = dict(db.execute(
-                "SELECT name,value FROM metadata WHERE name IN ('version','identity','listing')"
+                "SELECT name,value FROM metadata WHERE name IN ('version','identity','listing_identity','listing')"
             ).fetchall())
             if (int(values.get('version', '-1')) != VERSION
-                    or json.loads(values['identity']) != identity):
+                    or json.loads(values.get('listing_identity') or values['identity']) != identity):
                 return None
             payload = values.get('listing')
             if not payload or not payload.endswith('}'):
@@ -187,7 +187,73 @@ def read_listing(report_path):
         return None
 
 
-def prepare(report_path, doc):
+def publish_listing(report_path, doc, expected_identity=None):
+    """Refresh the full Review GET response without rebuilding per-row indexes.
+
+    Saving a report changes its inode, invalidating a formerly fast SQLite
+    listing. Rebuilding tens of thousands of indexed rows on a Windows-mounted
+    volume would put that cost straight back on every Save. Instead, publish
+    the new listing and its *own* report identity in one small transaction.
+    Existing row-index identity stays unchanged so stale geometry can never
+    be returned to previews; a separate rebuild can refresh those rows.
+    Missing indexes use an atomic, restricted-permissions listing-only DB.
+    All source data remains in the vault-managed job directory.
+    """
+    index = _index_path(report_path)
+    expected = report_identity(report_path)
+    # Callers in background workers must pass the exact revision from which
+    # their in-memory document was read. Otherwise a newer report could be
+    # accidentally labeled with stale rows after a concurrent Save.
+    if expected_identity is not None and expected != list(expected_identity):
+        return False
+    payload = public_listing(doc)
+    values = (
+        ('version', str(VERSION)),
+        ('listing_identity', json.dumps(expected, separators=(',', ':'))),
+        ('listing', payload),
+    )
+
+    def write(db):
+        db.execute('CREATE TABLE IF NOT EXISTS metadata ('
+                   'name TEXT PRIMARY KEY, value TEXT NOT NULL)')
+        db.executemany(
+            'INSERT INTO metadata(name,value) VALUES (?,?) '
+            'ON CONFLICT(name) DO UPDATE SET value=excluded.value', values)
+        # Do not acknowledge a listing from a report replaced by another
+        # render/scan while this (potentially expensive) JSON was assembled.
+        if report_identity(report_path) != expected:
+            db.rollback()
+            return False
+        db.commit()
+        return True
+
+    if index.is_file():
+        with closing(sqlite3.connect(index, timeout=5)) as db:
+            return write(db)
+    fd, temporary = tempfile.mkstemp(prefix='.review-listing-', suffix='.sqlite3',
+                                      dir=str(index.parent))
+    try:
+        os.chmod(temporary, 0o600)
+        os.close(fd)
+        with closing(sqlite3.connect(temporary, timeout=5)) as db:
+            if not write(db):
+                return False
+        if report_identity(report_path) != expected:
+            return False
+        # Another cache builder may have published an index since our check;
+        # its listing is also revision-checked on every read.
+        os.replace(temporary, index)
+        temporary = None
+        return True
+    finally:
+        if temporary is not None:
+            try:
+                os.unlink(temporary)
+            except FileNotFoundError:
+                pass
+
+
+def prepare(report_path, doc, expected_identity=None):
     """Atomically publish an index from an already parsed authoritative report.
 
     On any failure the previous revision's index and the authoritative report
@@ -195,6 +261,8 @@ def prepare(report_path, doc):
     """
     index = _index_path(report_path)
     expected = report_identity(report_path)
+    if expected_identity is not None and expected != list(expected_identity):
+        return False
     if load(report_path) is not None:
         return False
     if not isinstance(doc.get('detections'), list):
@@ -219,6 +287,7 @@ def prepare(report_path, doc):
             db.executemany('INSERT INTO metadata VALUES (?,?)', [
                 ('version', str(VERSION)),
                 ('identity', json.dumps(expected)),
+                ('listing_identity', json.dumps(expected)),
                 ('count', str(len(doc['detections']))),
                 ('doc', json.dumps(header, separators=(',', ':'), ensure_ascii=False)),
                 ('listing', public_listing(doc)),

@@ -461,7 +461,8 @@ def test_ordinary_corner_edits_do_not_restart_full_preview_reconciliation(plate_
     job.pop('_compact_preview_reconcile', None)
     monkeypatch.setattr(web, 'vault_locked', lambda: False)
     calls = []
-    def reconcile(*args):
+    def reconcile(*args, **kwargs):
+        assert kwargs.get('expected_report_identity')
         calls.append(True)
         return dict(total=8, linked=3, already=0)
     monkeypatch.setattr(web.finding_previews, 'reconcile', reconcile)
