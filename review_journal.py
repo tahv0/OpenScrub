@@ -18,6 +18,7 @@ NAME = 'review-journal.sqlite3'
 MARKER = '_review_journal_snapshot'
 _LOCKS = {}
 _LOCKS_LOCK = threading.Lock()
+_READ_CACHE = {}
 
 
 class ConflictError(ValueError):
@@ -110,9 +111,18 @@ def _recover(db, report, meta, current):
 
 def _read(directory):
     database, report = _paths(directory)
-    db = _connection(database)
-    if db is None:
+    if not database.exists():
         return {}, {}
+    # Browser image GETs can arrive hundreds of times while scrolling. Most
+    # must not even open SQLite: stat the job-local DB and reuse an immutable
+    # group/anchor snapshot until a real write or report replacement.
+    st = database.stat()
+    signature = (st.st_dev, st.st_ino, st.st_size, st.st_mtime_ns,
+                 st.st_ctime_ns, _stamp(report))
+    cached = _READ_CACHE.get(str(database))
+    if cached is not None and cached[0] == signature:
+        return cached[1], cached[2]
+    db = _connection(database)
     try:
         meta = _meta(db)
         current = _stamp(report)
@@ -123,6 +133,13 @@ def _read(directory):
             groups[(kind, category, member)] = (anchor, json.loads(value))
         anchors = {i: json.loads(value) for i, value in db.execute(
             'SELECT row_index,patch FROM anchors')}
+        newstat = database.stat()
+        signature = (newstat.st_dev, newstat.st_ino, newstat.st_size,
+                     newstat.st_mtime_ns, newstat.st_ctime_ns, _stamp(report))
+        # No caller mutates either snapshot: patch_row always makes a copy.
+        _READ_CACHE[str(database)] = (signature, groups, anchors)
+        if len(_READ_CACHE) > 12:
+            _READ_CACHE.pop(next(iter(_READ_CACHE)))
         return groups, anchors
     finally:
         db.close()
@@ -285,6 +302,7 @@ def write(directory, row, index, group_fields, anchor_fields=None):
                     'ON CONFLICT(row_index) DO UPDATE SET patch=excluded.patch',
                     (index, json.dumps(updated, separators=(',', ':'))))
             db.commit()
+            _READ_CACHE.pop(str(database), None)
 
 
 def publish(directory, document=None):
@@ -330,4 +348,5 @@ def publish(directory, document=None):
             _set(db, 'baseline', _stamp(report))
             db.execute('DELETE FROM meta WHERE name=?', ('publishing',))
             db.commit()
+            _READ_CACHE.pop(str(database), None)
             return True
