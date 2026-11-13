@@ -39,6 +39,7 @@ import uuid
 
 import cv2
 import numpy as np
+from werkzeug.exceptions import HTTPException
 from flask import (Flask, Request, Response, abort, jsonify, redirect, request,
                    send_file)
 
@@ -2766,6 +2767,14 @@ def job_plate_quad(jid, i):
                 return jsonify(details),409
             except ValueError as error:
                 return jsonify(error=str(error)),400
+            except HTTPException as error:
+                # A pinned cached preview may disappear during review indexing.
+                # Return its real 409 reason as JSON, not Flask's generic HTML
+                # ("Server returned HTTP 409" in the corner editor).
+                if error.code == 409:
+                    return jsonify(error=error.description,
+                                   conflict="stale_preview"),409
+                raise
     if request.method == "POST" and job["phase"] not in ("paused", "review", "done"):
         return jsonify({"error": "Cannot edit plates while scanning"}), 409
     if request.method == "GET":
@@ -5407,6 +5416,15 @@ const PLATE_EDITS=new Map();
 let PLATE_SAVE=null,PLATE_TIMER=null,PLATE_SERIAL=0,PLATE_REVIEW_BUSY=false;
 const plateCopy=points=>points.map(p=>p.slice());
 const plateSame=(a,b)=>a.length===b.length&&a.every((p,k)=>p.every((v,j)=>Math.abs(v-b[k][j])<1e-5));
+// An auto-retry may update only an annotation revision, NEVER the underlying
+// image. The source token binds the video, frame, sample, box and timeline;
+// crop/size must also match so the old pixel coordinates remain editable.
+function plateSamePreviewSource(a,b){
+ return !!(a?.source_token&&b?.source_token&&a.source_token===b.source_token
+  &&a.frame===b.frame&&a.width===b.width&&a.height===b.height
+  &&a.key===b.key&&JSON.stringify(a.box)===JSON.stringify(b.box)
+  &&JSON.stringify(a.crop)===JSON.stringify(b.crop));
+}
 function plateQuadValid(points){
  if(points.length!==4||points.some(p=>p.length!==2||p.some(v=>!Number.isFinite(v))))return false;
  const cross=points.map((a,k)=>{const b=points[(k+1)%4],c=points[(k+2)%4];
@@ -5450,20 +5468,24 @@ function updatePlateSaveIssues(){
  panel.replaceChildren();panel.hidden=!issues.length;
  if(!issues.length)return;
  const title=document.createElement("strong");
- title.textContent=issues.length+" unsaved corner adjustment"+(issues.length===1?"":"s")+". Your drafts are kept.";
+ title.textContent=issues.length+" unsaved corner adjustment"+(issues.length===1?"":"s")+
+  ". Drafts are kept in this tab; download a backup before leaving.";
  panel.appendChild(title);
  for(const s of issues){
   const row=document.createElement("div");row.className="row";
   const button=document.createElement("button");button.type="button";button.className="sec";
   button.textContent="Show finding #"+s.i;button.onclick=()=>showUnsavedPlate(s.i);
+  const backup=document.createElement("button");backup.type="button";backup.className="sec";
+  backup.textContent="Download corner draft";backup.onclick=()=>downloadPlateDraft(s);
   const note=document.createElement("span");
   note.textContent="Source frame "+s.meta.frame+" — "+s.error.message;
-  row.append(button,note);panel.appendChild(row);
+  row.append(button,backup,note);panel.appendChild(row);
  }
 }
 function plateStatus(s,text,retry=false){
  s.status.textContent=text;s.retry.hidden=!retry;
- s.retry.textContent=s.archiveConflict?"Discard this unsaved adjustment":s.conflict?"Reload preview":"Retry save";
+ s.retry.textContent=s.archiveConflict?"Confirm Is / Not again":
+  s.needsSourceReview?"Save on refreshed picture":s.conflict?"Refresh picture (keep corners)":"Retry save";
  if(s.card)s.card.classList.toggle("corner-save-error",!!(s.dirty&&s.error));
  updatePlateSaveIssues();
 }
@@ -5479,7 +5501,10 @@ function commitPlateGesture(s,before){
  if(!plateQuadValid(s.points)){
   s.points=before;s.draw();plateStatus(s,"Corners cannot cross; adjustment reverted.");return;
  }
- s.undo=before;s.version++;s.dirty=true;s.failures=0;
+ s.undo=before;s.version++;s.dirty=true;s.failures=0;s.conflictAttempts=0;
+ if(s.needsSourceReview){
+  plateStatus(s,"Review the adjusted corners, then save on this refreshed picture.",true);return;
+ }
  if(s.archiveConflict){
   plateStatus(s,"Saved example changed · choose Is / Not to confirm this adjustment.",true);return;
  }
@@ -5541,6 +5566,70 @@ function applyReboundFindingState(s,data){
   if(typeof redrawReviewOverlay==="function")redrawReviewOverlay(i);
  }
 }
+function downloadPlateDraft(s){
+ // Local user-controlled backup; no server or training record is modified.
+ const data={format:"openscrub-corner-draft-v1",job:s.job,finding_index:s.i,
+  frame:s.meta.frame,box:s.meta.box,source_token:s.meta.source_token,
+  points:plateCopy(s.points)};
+ const blob=new Blob([JSON.stringify(data,null,2)+"\n"],{type:"application/json"});
+ const url=URL.createObjectURL(blob),link=document.createElement("a");
+ link.href=url;link.download="openscrub-corners-"+s.i+".json";
+ document.body.appendChild(link);link.click();link.remove();
+ setTimeout(()=>URL.revokeObjectURL(url),30000);
+}
+async function recoverPlate409(s,pending){
+ // Only a DEFINITE HTTP 409 may abandon the rejected edit_id. Timeout/5xx
+ // retains the byte-for-byte payload for safe idempotent retries.
+ if((s.conflictAttempts||0)>=2)return false;
+ let latest;
+ try{
+  ({data:latest}=await reviewRequest("api/jobs/"+s.job+"/plate_quad/"+s.i+
+   (s.meta.compact?"?compact=1":""),{timeoutMs:30000}));
+ }catch(_){return false;}
+ if(!s.dirty||s.pending!==pending||PLATE_EDITS.get(s.i)!==s)return true;
+ if(!plateSamePreviewSource(s.meta,latest)||!latest.preview_token||
+    latest.preview_token===pending?.preview_token)return false;
+ Object.assign(s.meta,latest);s.img._plateMeta=s.meta;
+ s.pending=null;s.error=null;s.conflict=false;s.refreshBeforeSave=false;
+ s.conflictAttempts=(s.conflictAttempts||0)+1;
+ s.readyAt=0;
+ plateStatus(s,"Preview revision updated · retrying your original corners…");
+ return true;
+}
+async function refreshPlateDraft(s){
+ if(s.refreshBusy||s.drag)return;
+ s.refreshBusy=true;
+ const originalMeta=s.meta,originalPoints=plateCopy(s.points);
+ plateStatus(s,"Refreshing picture without discarding your corners…",true);
+ // Refresh JPEG pixels as well as metadata: corners must be inspected on the
+ // actual current image before they can be deliberately rebound.
+ s.img._plateMeta=null;
+ try{
+  const loaded=await queueReviewPreview(s.img,true);
+  if(!loaded||!s.img._plateMeta)throw new Error("Current picture could not be loaded.");
+  if(PLATE_EDITS.get(s.i)!==s||CUR!==s.job)return;
+  const latest=s.img._plateMeta,same=plateSamePreviewSource(originalMeta,latest);
+  s.meta=latest;s.displayCrop=latest.crop.slice();
+  s.pending=null;s.conflict=false;s.refreshBeforeSave=false;
+  s.points=originalPoints;s.dirty=true;
+  if(same){
+   s.error=null;s.needsSourceReview=false;s.conflictAttempts=0;s.readyAt=0;
+   plateStatus(s,"Picture is unchanged · retrying saved corners…");
+   schedulePlateSaves();
+  }else{
+   s.needsSourceReview=true;
+   s.error=new Error("Source image changed. Verify corners on the refreshed picture before saving.");
+   plateStatus(s,"Picture changed · check all corners, then save on refreshed picture.",true);
+  }
+  s.draw();
+ }catch(error){
+  // An unsuccessful refresh must not silently reset a still-valid edit.
+  s.img._plateMeta=originalMeta;s.meta=originalMeta;
+  s.points=originalPoints;
+  s.error=error;s.conflict=true;
+  plateStatus(s,"Still not saved — "+error.message+". Draft preserved.",true);
+ }finally{s.refreshBusy=false;plateUnloadGuard();}
+}
 function pumpPlateSaves(){
  if(PLATE_SAVE)return PLATE_SAVE;
  const s=[...PLATE_EDITS.values()].find(s=>s.dirty&&!s.drag&&!s.error&&s.readyAt<=Date.now());
@@ -5582,7 +5671,7 @@ function pumpPlateSaves(){
     REVIEW_BASE.labels[s.i]=s.meta.compact?(data.verified_label||""):"plate";
    if(data.finding&&typeof FINDING_META!=="undefined"&&FINDING_META[s.i])
     FINDING_META[s.i].confirmed_finding_revision=data.finding.revision;
-   s.saved=plateCopy(s.meta.points);s.failures=0;
+   s.saved=plateCopy(s.meta.points);s.failures=0;s.conflictAttempts=0;s.needsSourceReview=false;
    if(typeof FINDING_META!=="undefined"&&FINDING_META[s.i])
     FINDING_META[s.i].human_region_confirmed=true;
    if(typeof REVIEW_DISPLAY_META!=="undefined"&&REVIEW_DISPLAY_META[s.i])
@@ -5610,6 +5699,12 @@ function pumpPlateSaves(){
     showFindingFailure(s.i,error);
     s.draw();plateStatus(s,"Saved example changed · choose Is / Not to confirm this adjustment.",true);return;
    }
+   if(error.status===409&&!error.details?.current_archive){
+    // A stale token is common when a journal/preview index refresh races the
+    // editor. Check current metadata and automatically recover ONLY if the
+    // underlying picture, box, sample and crop are identical.
+    if(await recoverPlate409(s,pending))return;
+   }
    // 400 is validation BEFORE any write in this endpoint. Never keep its
    // rejected coordinates as an idempotent retry. Timeouts/5xx are ambiguous
    // and MUST retain the original ID/payload until acknowledged.
@@ -5628,7 +5723,8 @@ function pumpPlateSaves(){
     plateStatus(s,"Waiting to save · retrying save automatically…");
    }else{
     s.error=error;s.conflict=error.status===409;
-    s.draw();plateStatus(s,"Not saved — "+error.message,true);
+    s.draw();plateStatus(s,"Not saved — "+error.message+
+     (s.conflict?". Refresh picture without losing corners, or download a draft backup.":""),true);
    }
   }finally{PLATE_SAVE=null;schedulePlateSaves();}
  })();
@@ -5648,13 +5744,14 @@ async function flushPlateSaves(){
 }
 async function retryPlateSave(s){
  if(s.archiveConflict){dismissFindingConfirmation(s.i);return;}
- if(s.conflict){
-  if(!confirm("Reload this finding and discard its unsaved corner adjustment?"))return;
-  s.events.abort();if(s.observer)s.observer.disconnect();
-  PLATE_EDITS.delete(s.i);delete s.img._quadEdit;s.img._plateMeta=null;
-  if(QEDIT===s)QEDIT=null;schedulePlateSaves();
-  await queueReviewPreview(s.img,true);return;
+ if(s.needsSourceReview){
+  if(!confirm("Save these four corners to the NEW picture now displayed? Review all corners first. The old confirmed training example will not be transferred."))return;
+  if(!plateQuadValid(s.points)){plateStatus(s,"Correct the four corners before saving.",true);return;}
+  s.needsSourceReview=false;s.pending=null;s.error=null;s.conflict=false;
+  s.conflictAttempts=0;s.readyAt=0;
+  plateStatus(s,"Saving reviewed corners to the current picture…");schedulePlateSaves();return;
  }
+ if(s.conflict){await refreshPlateDraft(s);return;}
  if(s.error?.status===400)s.pending=null;
  s.error=null;s.failures=0;s.readyAt=0;
  plateStatus(s,"Saving…");schedulePlateSaves();
@@ -5674,7 +5771,8 @@ function initPlateCorners(img){
  const cv=stage.querySelector("canvas"),status=card.querySelector(".quad-status"),retry=card.querySelector(".quad-retry");
  const s={i:meta.i,job:CUR,img,cv,meta,displayCrop:meta.crop.slice(),card,status,retry,points:plateCopy(meta.points),
   saved:plateCopy(meta.points),version:0,dirty:false,pending:null,drag:null,error:null,
-  failures:0,readyAt:0,selected:0,events:new AbortController()};
+  failures:0,readyAt:0,selected:0,events:new AbortController(),
+  conflictAttempts:0,needsSourceReview:false,refreshBusy:false};
  img._quadEdit=s;PLATE_EDITS.set(s.i,s);const options={signal:s.events.signal};
  cv.style.pointerEvents="auto";cv.tabIndex=0;
  cv.setAttribute("aria-label","Plate corners: drag a numbered handle. Keyboard: 1–4 selects a corner, arrows adjust, Ctrl+Z undoes. Autosaves to this track.");
