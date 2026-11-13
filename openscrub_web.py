@@ -4999,7 +4999,7 @@ function beHook(){
  cv.addEventListener("pointerup",()=>{if(BE.drag){BE.drag=null;beRefresh();}});
 }
 
-// Nearby finding previews are prefetched before they scroll into view. Editing reuses the same image
+// Only visible finding previews were fetched previously; now prefetch ahead of scrolling. Editing reuses the same image
 // and geometry; it never starts a second video/image request.
 // Large Review panels keep all finding/group decisions but materialize only
 // nearby card elements. Existing small reviews retain their exact behavior.
