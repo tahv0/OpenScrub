@@ -19,6 +19,9 @@ MARKER = '_review_journal_snapshot'
 _LOCKS = {}
 _LOCKS_LOCK = threading.Lock()
 _READ_CACHE = {}
+# Small in-memory reports still contain thousands of rows. Compute group
+# cardinalities once per actual underlying report list, not on every click.
+_COUNT_CACHE = {}
 
 
 class ConflictError(ValueError):
@@ -203,10 +206,30 @@ class PatchedRows:
     def member_count(self, index):
         if hasattr(self.rows, 'member_count'):
             return self.rows.member_count(index)
-        reference = self[index]
-        identity = key(reference, index)
-        return sum(key(row, i) == identity
-                   for i, row in enumerate(self.rows))
+        return member_count(self.rows, index)
+
+
+def member_count(rows, index):
+    """O(1) group counts after one bounded in-memory index build.
+
+    IndexedRows has its own SQL index. For small reports kept in RAM, reuse
+    one count map per source list rather than walking every detection after
+    each human classification. Keep the referenced list to avoid id reuse.
+    """
+    if not isinstance(rows, list):
+        row = rows[index]
+        return sum(key(other, i) == key(row, index) for i, other in enumerate(rows))
+    cached = _COUNT_CACHE.get(id(rows))
+    if cached is None or cached[0] is not rows:
+        counts = {}
+        for i, row in enumerate(rows):
+            group = key(row, i)
+            counts[group] = counts.get(group, 0) + 1
+        _COUNT_CACHE.clear()
+        _COUNT_CACHE[id(rows)] = (rows, counts)
+    else:
+        counts = cached[1]
+    return counts.get(key(rows[index], index), 1)
 
 
 def view(directory, doc):
