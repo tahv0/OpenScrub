@@ -5571,7 +5571,7 @@ function downloadPlateDraft(s){
  const data={format:"openscrub-corner-draft-v1",job:s.job,finding_index:s.i,
   frame:s.meta.frame,box:s.meta.box,source_token:s.meta.source_token,
   points:plateCopy(s.points)};
- const blob=new Blob([JSON.stringify(data,null,2)+"\n"],{type:"application/json"});
+ const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
  const url=URL.createObjectURL(blob),link=document.createElement("a");
  link.href=url;link.download="openscrub-corners-"+s.i+".json";
  document.body.appendChild(link);link.click();link.remove();
