@@ -935,18 +935,20 @@ def worker():
                     # continuation scan AND postprocessing have both passed.
                     stop_review.atomic_report(report_path, combined)
                     try:
-                        # Vault encryption and index publication must not touch
-                        # the same job files concurrently.
-                        started = time.monotonic()
-                        with _REVIEW_CACHE_LOCK:
-                            built = (not vault_locked() and
-                                     review_preview_index.prepare(report_path, combined))
-                        if built:
-                            diagnostics.event("review_index_ready", job,
-                                rows=len(combined.get("detections", [])),
-                                elapsed_ms=round((time.monotonic()-started)*1000),
-                                index_mb=round(os.path.getsize(os.path.join(
-                                    job["dir"], review_preview_index.NAME))/1024**2, 1))
+                        # Small reports already stay cheaply cached. Build a
+                        # per-row index only when a report exceeds the safe
+                        # in-memory snapshot threshold.
+                        if os.path.getsize(report_path) > _REVIEW_REPORT_MAX_FILE_BYTES:
+                            started = time.monotonic()
+                            with _REVIEW_CACHE_LOCK:
+                                built = (not vault_locked() and
+                                         review_preview_index.prepare(report_path, combined))
+                            if built:
+                                diagnostics.event("review_index_ready", job,
+                                    rows=len(combined.get("detections", [])),
+                                    elapsed_ms=round((time.monotonic()-started)*1000),
+                                    index_mb=round(os.path.getsize(os.path.join(
+                                        job["dir"], review_preview_index.NAME))/1024**2, 1))
                     except Exception:
                         diagnostics.exception("review_index_build_failed", job)
                     try:
