@@ -134,6 +134,9 @@ def test_real_direct_corner_autosave_and_lazy_loading(review_server, viewport, t
         assert card.get_by_role('button', name='Edit 4 corners', exact=True).count() == 0
         assert page.locator('#qSave,#qClose,#qTrack,#qRotateRight,#plateQuadEditor').count() == 0
         page.wait_for_function("!!document.querySelector('#det0 img')._quadEdit")
+        assert 'Detector proposal' in page.locator('#review .review-overlay-legend').inner_text()
+        assert 'OUTPUT · HIDDEN' in card.locator('#plateOverlay0').inner_text()
+        assert 'Detector coverage' in card.locator('#plateOverlay0').inner_text()
         initial, size = plate_points(card), card.bounding_box()
         before_requests = sum('/finding-preview/0' in r for r in requests)
         assert sum('/finding-preview/' in r for r in requests) < 35
@@ -146,6 +149,8 @@ def test_real_direct_corner_autosave_and_lazy_loading(review_server, viewport, t
         assert len(posts) == 1 and posts[0]['apply_track'] is True and posts[0]['autosave'] is True
         stored = json.loads(report.read_text())['detections'][0]
         assert len(stored['plate_quad']) == 4 and not stored.get('verified_label')
+        assert stored.get('human_region_confirmed') is True
+        assert 'Human corrected corners' in card.locator('#plateOverlay0').inner_text()
         with web.app.test_client() as client:
             assert client.get('/api/findings').get_json()['total'] == 0, 'An area adjustment alone is not explicit evidence'
         assert sum('/finding-preview/0' in r for r in requests) == before_requests
@@ -165,8 +170,10 @@ def test_real_direct_corner_autosave_and_lazy_loading(review_server, viewport, t
         assert latest[2][0] < moved[2][0]
         card.get_by_role('button', name='Keep visible', exact=True).click()
         assert page.evaluate('EN[0]') is False
+        assert 'OUTPUT · VISIBLE' in card.locator('#plateOverlay0').inner_text()
         card.get_by_role('button', name='Blur', exact=True).click()
         assert page.evaluate('EN[0]') is True
+        assert 'OUTPUT · HIDDEN' in card.locator('#plateOverlay0').inner_text()
         assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
         evidence = Path(os.environ.get('REVIEW_EVIDENCE_DIR', str(tmp_path)))
         evidence.mkdir(parents=True, exist_ok=True)
