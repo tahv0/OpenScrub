@@ -937,9 +937,16 @@ def worker():
                     try:
                         # Vault encryption and index publication must not touch
                         # the same job files concurrently.
+                        started = time.monotonic()
                         with _REVIEW_CACHE_LOCK:
-                            if not vault_locked():
-                                review_preview_index.prepare(report_path, combined)
+                            built = (not vault_locked() and
+                                     review_preview_index.prepare(report_path, combined))
+                        if built:
+                            diagnostics.event("review_index_ready", job,
+                                rows=len(combined.get("detections", [])),
+                                elapsed_ms=round((time.monotonic()-started)*1000),
+                                index_mb=round(os.path.getsize(os.path.join(
+                                    job["dir"], review_preview_index.NAME))/1024**2, 1))
                     except Exception:
                         diagnostics.exception("review_index_build_failed", job)
                     try:
@@ -1758,12 +1765,13 @@ def _load_preview_report(job):
         with _REVIEW_CACHE_LOCK:
             if vault_locked():
                 abort(423)
-            if current == identity:
-                # Indexed metadata is small even when report.json exceeds 32 MB.
-                if (isinstance(doc.get("detections"), review_preview_index.IndexedRows)
-                        or identity[3] <= _REVIEW_REPORT_MAX_FILE_BYTES):
-                    _REVIEW_REPORTS.clear()
-                    _REVIEW_REPORTS[identity] = doc
+            if current != identity:
+                abort(409, description="Review changed during preview indexing. Reload.")
+            # Indexed metadata is small even when report.json exceeds 32 MB.
+            if (isinstance(doc.get("detections"), review_preview_index.IndexedRows)
+                    or identity[3] <= _REVIEW_REPORT_MAX_FILE_BYTES):
+                _REVIEW_REPORTS.clear()
+                _REVIEW_REPORTS[identity] = doc
         return doc
 
 
