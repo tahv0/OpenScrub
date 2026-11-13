@@ -4799,6 +4799,10 @@ function beHook(){
 
 // Only visible finding previews are requested. Editing reuses the same image
 // and geometry; it never starts a second video/image request.
+// Large Review panels keep all finding/group decisions but materialize only
+// nearby card elements. Existing small reviews retain their exact behavior.
+const REVIEW_PAGE_THRESHOLD=400, REVIEW_PAGE_SIZE=48;
+let REVIEW_PENDING_PAGES={},REVIEW_CATEGORY_GROUPS={};
 let REVIEW_MEDIA=null;
 async function reviewRequest(url, options={}, type="json"){
  const {timeoutMs=15000,...fetchOptions}=options;
@@ -4829,6 +4833,8 @@ function clearReviewPreviews(){
  if(!REVIEW_MEDIA)return;
  const old=REVIEW_MEDIA;REVIEW_MEDIA=null;
  if(old.observer)old.observer.disconnect();
+ const panel=document.getElementById("review");
+ if(panel?._moreObserver){panel._moreObserver.disconnect();panel._moreObserver=null;}
  if(old.retryTimer)clearTimeout(old.retryTimer);
  old.controllers.forEach(c=>c.abort());
  [...old.queue.splice(0),...old.cacheQueue.splice(0)].forEach(task=>task.resolve(false));
@@ -5664,6 +5670,7 @@ async function loadReview(signal=null,phase=SHELLPH){
  if(!current()||CONFIRM_FAILED.size||!await flushPlateSaves()||!current())return false;
  if(!closePlateQuad())return false;
  clearReviewPreviews();
+ REVIEW_PENDING_PAGES={};REVIEW_CATEGORY_GROUPS={};
  if(!await showPanel("review")||!current())return false;
  if(VLBLJOB!==CUR){VLBL={};VLBLJOB=CUR;}
  let d;
@@ -5806,14 +5813,16 @@ async function loadReview(signal=null,phase=SHELLPH){
   // person cards first, then everything else chronologically
   items.sort((a,b)=>((b.personcard?1:0)-(a.personcard?1:0))||a.t_start-b.t_start);
   if(!items.length)continue;
+  REVIEW_CATEGORY_GROUPS[cat]=items.map(item=>item.i);
   html+=`<h3 style="margin:10px 0 6px">${CATDN[cat]||cat} <span class="badge">${items.length}</span>
    <button class="sec" style="padding:3px 8px;font-size:12px"
     onclick="setAll('${cat}',true)">Blur all</button>
    <button class="sec" style="padding:3px 8px;font-size:12px"
     onclick="setAll('${cat}',false)">Keep all visible</button></h3><div class="grid3" data-review-category="${cat}">`;
-  for(const x of items){
+  const lazy=items.length>REVIEW_PAGE_THRESHOLD,pending=[];
+  for(const [ordinal,x] of items.entries()){
    REVIEW_DISPLAY_META[x.i]=x;
-   html+=`<div class="det ${EN[x.i]?'':'off'}" id="det${x.i}" data-cat="${cat}">
+   const cardHTML=`<div class="det ${EN[x.i]?'':'off'}" id="det${x.i}" data-cat="${cat}">
     <div class="${x.category==="plate"?"plate-preview":"finding-preview"}">
     <img id="thumb${x.i}" data-preview-url="api/jobs/${job}/finding-preview/${x.i}" alt="Original detection preview"
      class="${x.category==="plate"?"plate-edit-thumb":""}"
@@ -5834,8 +5843,16 @@ async function loadReview(signal=null,phase=SHELLPH){
     <small id="vlabel${x.i}" style="color:#93c5fd" role="status">${findingStatus(x.i)}</small>
     <button class="sec" id="findingDismiss${x.i}" hidden onclick="dismissFindingConfirmation(${x.i})">Keep current review choice</button>
     <div id="bb${x.i}">${detChoices(x.i)}</div>
-   </div>`}
-  html+=`</div>`}
+   </div>`;
+   if(lazy&&ordinal>=REVIEW_PAGE_SIZE)pending.push({i:x.i,html:cardHTML});
+   else html+=cardHTML;
+  }
+  html+=`</div>`;
+  if(pending.length){
+   REVIEW_PENDING_PAGES[cat]=pending;
+   html+=`<button type="button" class="sec review-more" data-review-more="${sectionEscape(cat)}" style="margin:8px 0 12px">Load more ${sectionEscape(CATDN[cat]||cat)} (${pending.length} remaining)</button>`;
+  }
+ }
  html+=`</div>
  <div class="row" style="margin-top:12px">
  <button onclick="saveAndRender()">${phase==="paused"?"Save review edits":"Save edits &amp; render"}</button>
