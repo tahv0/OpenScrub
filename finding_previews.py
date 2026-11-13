@@ -24,9 +24,19 @@ import threading
 import cv2
 import numpy as np
 
-# Item count is only a safety ceiling; the 64 MiB byte budget is the real disk bound.
-MAX_ITEMS = 10000
-MAX_BYTES = 64 * 1024 * 1024
+# Cache scan-time thumbnails on the user's SSD instead of re-decoding 4K
+# source video when the reviewer scrolls. Configurable per deployment; still
+# bounded to prevent unbounded disk growth on long or dense captures.
+def _preview_budget():
+    try:
+        mb = int(os.environ.get('OPENSCRUB_PREVIEW_CACHE_MB', '1024'))
+    except ValueError:
+        mb = 1024
+    return max(64, min(mb, 8192)) * 1024 * 1024
+
+
+MAX_ITEMS = 120000
+MAX_BYTES = _preview_budget()
 MAX_PER_CAPTURE = 12
 _LOCK = threading.RLock()
 _SCHEMA_READY = set()
