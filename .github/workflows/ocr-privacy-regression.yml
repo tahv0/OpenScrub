@@ -28,4 +28,4 @@ jobs:
           python -m pip install 'numpy<2' opencv-python-headless==4.11.0.86 onnxruntime==1.20.1 onnx pytest pytest-timeout flask rapidfuzz pyyaml cryptography pytesseract pillow
       - name: Test optical OCR fidelity and 2-second backtracking
         run: |
-          python -m pytest -q -ra --timeout=90 test_openscrub.py -k 'tesseract_repairs_ocr_dash_variants or deep_backtrack_finds_true_onset or custom_regex_category or gap_verification_refuses_real_absence'
+          python -m pytest -q -ra --timeout=90 test_openscrub.py -k 'adaptive_scan_notices_small_local_identifier_appearance or tesseract_repairs_ocr_dash_variants or deep_backtrack_finds_true_onset or custom_regex_category or gap_verification_refuses_real_absence'
