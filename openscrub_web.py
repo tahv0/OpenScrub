@@ -5531,15 +5531,16 @@ const REVIEW_OVERLAY_COLORS={
  visible:"#22c55e",visibleFill:"rgba(34,197,94,.08)",edit:"#38bdf8",invalid:"#f87171"
 };
 function reviewOverlayState(i,row=null){
- // A boxes_at row is authoritative for the standalone video editor; otherwise
- // use the current Review snapshot/card representative.
+ // A boxes_at row is authoritative for the standalone video editor. Live
+ // Review maps override it only while they belong to this same current job.
+ const liveReview=!row||(REVIEW_BASE?.job===CUR);
  const raw=row||FINDING_META[i]||{},display=row?{}:(REVIEW_DISPLAY_META[i]||{});
  const marker=raw.plate_verification||display.plate_verification||{};
- const draft=(Object.prototype.hasOwnProperty.call(VLBL,i)&&VLBL[i]!=="clear")?VLBL[i]:"";
+ const draft=(liveReview&&Object.prototype.hasOwnProperty.call(VLBL,i)&&VLBL[i]!=="clear")?VLBL[i]:"";
  const verified=draft||raw.verified_label||display.verified_label||"";
  const confirmation=raw.human_confirmation?.label||display.human_confirmation?.label||"";
- const enabled=Object.prototype.hasOwnProperty.call(EN,i)?!!EN[i]:(row?row.enabled!==false:raw.enabled!==false);
- const explicit=!!OUTPUT_CHOICES[i]||!!raw.output_choice_explicit||!!display.output_choice_explicit;
+ const enabled=(liveReview&&Object.prototype.hasOwnProperty.call(EN,i))?!!EN[i]:(row?row.enabled!==false:raw.enabled!==false);
+ const explicit=(liveReview&&!!OUTPUT_CHOICES[i])||!!raw.output_choice_explicit||!!display.output_choice_explicit;
  const humanNegative=confirmation==="negative"||verified==="not_plate";
  const humanPositive=confirmation==="positive"||verified==="plate";
  const humanRegion=!!(raw.human_region_confirmed||display.human_region_confirmed);
