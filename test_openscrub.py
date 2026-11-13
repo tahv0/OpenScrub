@@ -4274,10 +4274,11 @@ const rows = [
   {i:2,enabled:false,track:-1,person:-1,category:'plate',text:'plate',t_start:0,t_end:2}
 ];
 const context = vm.createContext({assert, EN:{}, CUR:'test', DUR:0, CATDN:{}, QEDIT:null, JOBVIEW:0, SHELLPH:'review',
+  REVIEW_PAGE_THRESHOLD:400, REVIEW_PAGE_SIZE:48, REVIEW_PENDING_PAGES:{}, REVIEW_CATEGORY_GROUPS:{},
   closePlateQuad(){return true;}, flushPlateSaves:async()=>true, clearReviewPreviews(){}, initReviewPreviews(){},
   reviewRequest:async()=>({data:{duration:2,detections:rows}}),
   fetch:async()=>({json:async()=>({duration:2,detections:rows})}),
-  showPanel(){return true;}, initMarquee(){}, plateEditsPending(){return false;},
+  showPanel(){return true;}, initMarquee(){}, initReviewPages(){}, plateEditsPending(){return false;},
   listeners, status,
   window:{addEventListener(type,fn){if(type==='beforeunload')listeners.add(fn);},
     removeEventListener(type,fn){if(type==='beforeunload')listeners.delete(fn);}},
