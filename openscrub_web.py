@@ -1965,6 +1965,20 @@ def _reconcile_compact_previews(job, doc):
 @app.route("/api/jobs/<jid>/detections")
 def job_detections(jid):
     job = JOBS.get(jid) or abort(404)
+    # For oversized reports, the scan already published a revision-fenced
+    # Review listing. Serve its JSON directly, never reparse hundreds of
+    # thousands of report rows on each reopen. Model-library choices are
+    # independent of report.json, so append their current state each time.
+    static = review_preview_index.read_listing(
+        os.path.join(job["dir"], "report.json"))
+    if static is not None:
+        candidates = learning_candidates.list_candidates(job["dir"])
+        body = (static[:-1] + ',"learning_candidates":' +
+                json.dumps(candidates, separators=(",", ":"), ensure_ascii=False) + '}')
+        response = Response(body, mimetype="application/json")
+        response.headers["Cache-Control"] = "no-store"
+        response.headers["X-Review-Listing"] = "indexed"
+        return response
     doc = _load_job_report(job)
     _reconcile_compact_previews(job, doc)
     items = []
