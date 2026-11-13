@@ -18,6 +18,7 @@ import finding_previews as previews
 import findings_training as training
 import learning_session
 import stop_review
+import review_journal
 import video_learning
 
 
@@ -39,6 +40,8 @@ def _guard(function):
             return function(*args, **kwargs)
         except library.ConflictError as error:
             return jsonify(error=str(error),current_archive=getattr(error,'current_archive',None)), 409
+        except review_journal.ConflictError as error:
+            return jsonify(error=str(error)), 409
         except (KeyError, FileNotFoundError):
             return jsonify(error='This saved finding is no longer available.'), 404
         except ValueError as error:
@@ -289,7 +292,126 @@ def _guard_section(job, before, after):
         _web._SECTIONS.guard_edits(job, before, after)
 
 
+
+def _journal_doc(job):
+    """Only section-safe, source-bound reviews take the incremental path."""
+    doc = _web._load_preview_report(job)
+    sections = ((doc.get('video_sections') or {}).get('items') or [])
+    if ((job.get('section') or {}).get('role') == 'export'
+            or any(item.get('approved') for item in sections)
+            or not (doc.get('provenance') or {}).get('input_sha256')
+            or not doc.get('source_identity')):
+        return None
+    return doc
+
+
+def _journal_members(doc, index):
+    rows = doc['detections']
+    return (rows.member_count(index) if hasattr(rows, 'member_count')
+            else len(_members(doc, index)))
+
+
+def _journal_confirm(job, index, payload, doc):
+    label = payload.get('label')
+    if label not in ('positive', 'negative') or type(label) is not str:
+        raise ValueError('Choose Is a … or Not a … to store a confirmed example.')
+    _, _, meta, jpeg = preview(job, index, doc=doc)
+    if meta.get('classification_allowed') is False:
+        raise library.ConflictError(_LEGACY_TIMING_NOTE)
+    row = dict(doc['detections'][index])
+    if payload.get('preview_token') not in (None, meta['preview_token']):
+        abort(409, description='The finding changed. Reload its picture.')
+    fields = dict(enabled=(label == 'positive'), output_choice_explicit=True,
+                  human_confirmation=dict(label=label, category=row['category'],
+                                          source='explicit'))
+    if row['category'] == 'plate':
+        fields.update(verified_label='plate' if label == 'positive' else 'not_plate',
+                      plate_verification_override=True,
+                      _remove_plate_verification=True)
+    if payload.get('points') is not None:
+        meta['points'] = _shape(payload['points'], meta)
+        box = meta['box']
+        row['plate_quad'] = [[(x-box[0])/(box[2]-box[0]), (y-box[1])/(box[3]-box[1])]
+                             for x,y in meta['points']]
+        row['human_region_confirmed'] = True
+        fields['plate_quad'] = row['plate_quad']
+    # Archive evidence first. If the later small SQLite transaction fails,
+    # retrying the same evidence is idempotent and no false saved ACK is sent.
+    entry = _archived(job, doc, row, meta, jpeg, label, payload.get('expected_revision'))
+    anchor = dict(confirmed_finding_id=entry['id'],
+                  confirmed_finding_revision=entry['revision'])
+    if payload.get('points') is not None:
+        anchor['human_region_confirmed'] = True
+    review_journal.write(job['dir'], row, index, fields, anchor)
+    row.update(fields)
+    row['confirmed_finding_id'] = entry['id']
+    row['confirmed_finding_revision'] = entry['revision']
+    meta['preview_token'] = _token(doc, row, meta['frame'], meta.get('key'))
+    return dict(ok=True, finding=entry, applied=_journal_members(doc,index),
+                label=fields.get('verified_label',''), preview=meta)
+
+
+def _journal_region(job, index, payload, doc):
+    started = time.monotonic()
+    _, _, meta, jpeg = preview(job,index,doc=doc)
+    row = dict(doc['detections'][index])
+    if row['category'] != 'plate':
+        raise ValueError('Four-corner area editing currently applies to plate findings.')
+    points = _shape(payload.get('points'),meta)
+    box = meta['box']
+    quad = [[round((x-box[0])/(box[2]-box[0]),6),
+             round((y-box[1])/(box[3]-box[1]),6)] for x,y in points]
+    edit_id = payload.get('edit_id') if payload.get('autosave') is True else None
+    if payload.get('autosave') is True and (not isinstance(edit_id,str)
+            or not re.fullmatch(r'[A-Za-z0-9_.:-]{1,120}',edit_id)):
+        raise ValueError('Autosave requires a valid edit identifier.')
+    receipt = row.get('compact_edit_receipt') or {}
+    if edit_id and receipt.get('id') == edit_id:
+        if (receipt.get('source') != meta['source_token'] or row.get('plate_quad') != quad
+                or receipt.get('token') != payload.get('preview_token')):
+            raise library.ConflictError('Edit identifier belongs to different corners.')
+        return dict(ok=True,applied=_journal_members(doc,index),verified_samples_added=0,
+                    preview=meta,verified_label=row.get('verified_label',''),
+                    classification_required=not bool((row.get('human_confirmation') or {}).get('label')))
+    if payload.get('preview_token') not in (None, meta['preview_token']):
+        raise library.ConflictError('This finding changed. Reload its picture before saving.')
+    confirmed = row.get('human_confirmation') or {}
+    row['plate_quad'] = quad
+    row['human_region_confirmed'] = True
+    meta['points'] = points
+    archive = None
+    if (row.get('confirmed_finding_id')
+            and confirmed.get('label') in ('positive','negative')
+            and not confirmed.get('propagated')):
+        archive = _archived(job, doc, row, meta, jpeg, confirmed['label'])
+    anchor = dict(human_region_confirmed=True)
+    if edit_id:
+        anchor['compact_edit_receipt'] = dict(
+            id=edit_id,source=meta['source_token'],token=payload.get('preview_token'))
+    if archive:
+        anchor.update(confirmed_finding_id=archive['id'],
+                      confirmed_finding_revision=archive['revision'])
+    review_journal.write(job['dir'],row,index,dict(
+        plate_quad=quad, plate_verification_override=True,
+        _remove_plate_verification=True),anchor)
+    meta['preview_token'] = _token(doc,row,meta['frame'],meta.get('key'))
+    elapsed = time.monotonic()-started
+    if elapsed >= 3:
+        _web.diagnostics.event('review_corner_save_slow',job,
+            total_ms=round(elapsed*1000), report_write_ms=0,
+            rows=_journal_members(doc,index), mode='sqlite_journal')
+    return dict(ok=True, applied=_journal_members(doc,index),
+                verified_samples_added=0, finding=archive, preview=meta,
+                verified_label=row.get('verified_label',''),
+                classification_required=not bool(confirmed.get('label')))
+
+
 def confirm(job, index, payload):
+    journal_doc = _journal_doc(job)
+    if journal_doc is not None:
+        return _journal_confirm(job, index, payload, journal_doc)
+    # Fallback section/legacy writes operate on one fully materialized report.
+    _web._review_journal_snapshot(job)
     label = payload.get('label')
     if label not in ('positive', 'negative') or type(label) is not str:
         raise ValueError('Choose Is a … or Not a … to store a confirmed example.')
@@ -343,6 +465,10 @@ def confirm(job, index, payload):
 
 
 def region(job, index, payload):
+    journal_doc = _journal_doc(job)
+    if journal_doc is not None:
+        return _journal_region(job, index, payload, journal_doc)
+    _web._review_journal_snapshot(job)
     started = time.monotonic()
     # Explicit edits must operate on the complete authoritative report; the
     # read-only per-finding index is for thumbnail GETs only.
