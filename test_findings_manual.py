@@ -89,7 +89,7 @@ def test_drawn_plate_stays_a_draft_until_explicit_classification(drawn_job, monk
     assert not (Path(job['dir']) / 'plate_annotations').exists()
     job['model_root'] = web.learned_models_root()
     feedback = learning_session.collect_feedback(
-        job, json.loads(path.read_text()),
+        job, web._load_job_report(job),
         read_frame=lambda i: pytest.fail('Confirmed collection uses the stored JPEG'))
     assert len(feedback['samples']) == 1
     assert next(iter(feedback['samples'].values()))['label'] == 'positive'
