@@ -422,7 +422,7 @@ def _requested(row, render_state):
     return index, fps, _offset(render_state['cum'][index])
 
 
-def lookup(job_dir, row, render_state, *, allow_representative=False):
+def lookup(job_dir, row, render_state, *, allow_representative=False, preferred_key=None):
     """Read only a matching JPEG; never fetch all cached JPEGs to seek a crop.
 
     A large review can contain thousands of saved image BLOBs. Fetching
@@ -451,6 +451,46 @@ def lookup(job_dir, row, render_state, *, allow_representative=False):
                 return (dict(meta, points=points,
                              preview_token=_hash([meta['key'], points]),
                              match=kind, requested_frame=index), bytes(selected[0]))
+
+            # The browser may have shown a real representative while another
+            # request was generating an exact frame. A later exact cache hit
+            # must not silently change the JPEG behind an already-displayed
+            # token. Look up the pinned immutable sample by its opaque key,
+            # then enforce the same category/track/geometry/source-timeline
+            # constraints as ordinary cache selection. The HTTP caller still
+            # verifies the separately supplied preview_token against the
+            # current report row, so a key alone cannot authorize an edit.
+            if preferred_key is not None:
+                if not isinstance(preferred_key, str) or not _KEY.fullmatch(preferred_key):
+                    return None
+                record = db.execute(
+                    'SELECT rowid,metadata FROM previews WHERE key=?',
+                    (preferred_key,)).fetchone()
+                if record is None:
+                    return None
+                rowid, serialized = record
+                meta = json.loads(serialized)
+                if meta.get('category') != category or meta.get('fps') != fps:
+                    return None
+                stored_frame = int(meta['frame'])
+                if not 0 <= stored_frame < len(render_state['cum']):
+                    return None
+                exact_sample = (stored_frame == index and
+                    meta.get('content_box') == content and meta.get('offset') == offset)
+                same_track = (track >= 0 and int(meta.get('track', -1)) == track)
+                same_region = (track < 0 and
+                    str(row.get('text', ''))[:1024] == meta.get('text') and
+                    float(row['t_start']) <= float(meta['t']) <= float(row['t_end']) and
+                    _iou(content, meta['content_box']) >= .5)
+                representative = (allow_representative and stored_frame != index and
+                    (same_track or same_region) and
+                    _offset(render_state['cum'][stored_frame]) == _offset(meta['offset']))
+                if not (exact_sample or representative):
+                    return None
+                points = _points(row, meta['box'])
+                if not _fits(points, meta['crop']):
+                    return None
+                return image(rowid, meta, points, 'exact' if exact_sample else 'representative')
 
             exact = db.execute(
                 'SELECT rowid,metadata FROM previews WHERE frame=? AND category=? '
