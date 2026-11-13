@@ -935,7 +935,11 @@ def worker():
                     # continuation scan AND postprocessing have both passed.
                     stop_review.atomic_report(report_path, combined)
                     try:
-                        review_preview_index.prepare(report_path, combined)
+                        # Vault encryption and index publication must not touch
+                        # the same job files concurrently.
+                        with _REVIEW_CACHE_LOCK:
+                            if not vault_locked():
+                                review_preview_index.prepare(report_path, combined)
                     except Exception:
                         diagnostics.exception("review_index_build_failed", job)
                     try:
@@ -1738,8 +1742,14 @@ def _load_preview_report(job):
             # the index up front, so normal new jobs avoid this path entirely.
             source = _load_job_report(job)
             try:
-                review_preview_index.prepare(path, source)
-                doc = review_preview_index.load(path)
+                # A legacy job may need indexing after scan. Serialize this
+                # disk publication with vault encryption, then recheck lock
+                # state before serving any resulting preview pixels.
+                with _REVIEW_CACHE_LOCK:
+                    if vault_locked():
+                        abort(423)
+                    review_preview_index.prepare(path, source)
+                    doc = review_preview_index.load(path)
             except (OSError, ValueError, sqlite3.DatabaseError):
                 diagnostics.exception("review_index_build_failed", job)
             if doc is None:
