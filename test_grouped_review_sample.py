@@ -138,7 +138,7 @@ def test_large_group_single_http_confirmation_has_stable_preview_token(review_se
             'label': 'negative', 'preview_token': meta['preview_token']})
         assert saved.status_code == 200, saved.get_data(as_text=True)[:500]
         assert web._load_job_report(web.JOBS['inline-fixture'])['detections'][99]['verified_label'] == 'not_plate'
-        assert not web._load_job_report(web.JOBS['inline-fixture'])['detections'][100]['verified_label']
+        assert not web._load_job_report(web.JOBS['inline-fixture'])['detections'][100].get('verified_label')
 
 
 
