@@ -74,10 +74,12 @@ assert.equal(state.humanRegion,true);assert.equal(state.source,'Human corrected 
 def test_video_overlay_keeps_visible_findings_in_the_preview():
     source = r'''
 const assert=require('node:assert/strict');
-let BE={raw:[{i:0,enabled:true},{i:1,enabled:false}],boxes:[]};
+let EN={};
+let BE={raw:[{i:0,enabled:true,category:'plate'},{i:1,enabled:false,category:'plate'},
+            {i:2,enabled:false,category:'face'}],boxes:[]};
 ''' + page_between('function beFilter(', 'function beDraw(') + r'''
 beFilter();
-assert.deepEqual(BE.boxes,BE.raw);
+assert.deepEqual(BE.boxes,BE.raw.slice(0,2));
 assert.equal(BE.boxes.length,2);
 '''
     run_node(source)
