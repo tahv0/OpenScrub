@@ -1722,6 +1722,76 @@ import zipfile
 _REVIEW_EDIT_LOCK = threading.RLock()
 _REVIEW_WORK_LOCK = threading.RLock()
 _REVIEW_CACHE_LOCK = threading.Lock()
+
+class _SavedPictureGate:
+    """Concurrent image readers, exclusive vault encryption.
+
+    Unlike _REVIEW_CACHE_LOCK, this gate never serializes slow SQLite/JPEG
+    reads across independent cards. Writers have priority so a busy review
+    cannot starve an explicit vault lock. Reentrant reads support preview
+    helpers that already have an outer reader lease.
+    """
+    def __init__(self):
+        from contextlib import contextmanager
+        self._condition = threading.Condition()
+        self._readers = 0
+        self._writing = False
+        self._writers_waiting = 0
+        self._local = threading.local()
+
+    def reader(self, timeout=5.0):
+        from contextlib import contextmanager
+        @contextmanager
+        def lease():
+            depth = getattr(self._local, "depth", 0)
+            if depth:
+                self._local.depth = depth + 1
+                try:
+                    yield
+                finally:
+                    self._local.depth -= 1
+                return
+            deadline = time.monotonic() + timeout
+            with self._condition:
+                while self._writing or self._writers_waiting:
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        raise TimeoutError("Saved-picture gate is waiting for vault encryption")
+                    self._condition.wait(remaining)
+                self._readers += 1
+                self._local.depth = 1
+            try:
+                yield
+            finally:
+                with self._condition:
+                    self._local.depth = 0
+                    self._readers -= 1
+                    if not self._readers:
+                        self._condition.notify_all()
+        return lease()
+
+    def writer(self):
+        from contextlib import contextmanager
+        @contextmanager
+        def exclusive():
+            with self._condition:
+                self._writers_waiting += 1
+                try:
+                    while self._writing or self._readers:
+                        self._condition.wait()
+                    self._writing = True
+                finally:
+                    self._writers_waiting -= 1
+            try:
+                yield
+            finally:
+                with self._condition:
+                    self._writing = False
+                    self._condition.notify_all()
+        return exclusive()
+
+_REVIEW_PICTURE_GATE = _SavedPictureGate()
+_REVIEW_RECONCILE_LOCK = threading.Lock()
 _REVIEW_FRAMES = OrderedDict()
 _REVIEW_PROBES = OrderedDict()
 _REVIEW_FRAME_BYTES = 64 * 1024 * 1024
@@ -2803,23 +2873,22 @@ def _serialize_review_edit(fn):
 
 
 def _serialize_review_read(fn):
-    """Protect small stored-picture I/O from vault encryption, without decoding.
+    """Let independent saved-picture reads proceed without mutual contention.
 
-    Callers must not acquire the edit/decoder gates inside this cache gate.
-    Allow ordinary concurrent thumbnails a brief wait for another small read.
-    Bound the wait during encryption, then recheck the vault after acquisition.
+    The shared reader lease excludes vault encryption for the full read
+    lifetime; unlike the old one-second global cache mutex, a slow thumbnail
+    no longer makes unrelated reviews or corner saves return HTTP 503.
     """
     from functools import wraps
     @wraps(fn)
     def read(*args, **kwargs):
-        if not _REVIEW_CACHE_LOCK.acquire(timeout=1.):
-            abort(503, description="Saved pictures are temporarily busy. Retry shortly.")
         try:
-            if vault_locked():
-                abort(423)
-            return fn(*args, **kwargs)
-        finally:
-            _REVIEW_CACHE_LOCK.release()
+            with _REVIEW_PICTURE_GATE.reader():
+                if vault_locked():
+                    abort(423)
+                return fn(*args, **kwargs)
+        except TimeoutError:
+            abort(503, description="The vault is locking saved pictures. Retry shortly.")
     return read
 
 
@@ -6863,14 +6932,15 @@ def _vault_lock_now():
         if key is None:
             return 0
         with _REVIEW_EDIT_LOCK, _REVIEW_WORK_LOCK:
-            with _REVIEW_CACHE_LOCK:
-                _REVIEW_FRAMES.clear()
-                _REVIEW_PROBES.clear()
-                _REVIEW_REPORTS.clear()
-                # Cached crop readers do not take the decoder gate. Keep their
-                # cache gate held until encryption and the locked state agree.
-                n = vault.encrypt_tree(key, JOBS_DIR)
-                VAULT["key"] = None
+            # Wait for in-flight thumbnail/archive readers; block new ones
+            # before turning any plaintext file into vault ciphertext.
+            with _REVIEW_PICTURE_GATE.writer():
+                with _REVIEW_CACHE_LOCK:
+                    _REVIEW_FRAMES.clear()
+                    _REVIEW_PROBES.clear()
+                    _REVIEW_REPORTS.clear()
+                    n = vault.encrypt_tree(key, JOBS_DIR)
+                    VAULT["key"] = None
         return n
 
 
