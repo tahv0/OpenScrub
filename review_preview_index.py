@@ -6,6 +6,7 @@ reads exactly one row from SQLite. No video bytes or plaintext OCR hints live
 in the index beyond what was already in the report. Index files are job-local,
 vault-managed and disposable; rebuilding must never change review decisions.
 """
+from contextlib import closing
 import json
 import os
 from pathlib import Path
@@ -59,7 +60,7 @@ class IndexedRows:
         try:
             if report_identity(self.report_path) != self.identity:
                 abort(409, description='Review changed. Reload its previews.')
-            with _open_read(Path(self.index_path)) as db:
+            with closing(_open_read(Path(self.index_path))) as db:
                 record = db.execute('SELECT record FROM rows WHERE row_index=?', (key,)).fetchone()
                 if record is None:
                     abort(409, description='Review preview index changed. Reload.')
@@ -79,7 +80,7 @@ def load(report_path):
         return None
     try:
         expected = report_identity(report_path)
-        with _open_read(index) as db:
+        with closing(_open_read(index)) as db:
             fields = dict(db.execute('SELECT name, value FROM metadata').fetchall())
             if int(fields.get('version', '-1')) != VERSION:
                 return None
@@ -117,7 +118,7 @@ def prepare(report_path, doc):
         os.chmod(temporary, 0o600)
         with os.fdopen(fd, 'wb'):
             pass
-        with sqlite3.connect(temporary, timeout=5) as db:
+        with closing(sqlite3.connect(temporary, timeout=5)) as db:
             db.execute('PRAGMA journal_mode=DELETE')
             db.execute('PRAGMA cache_size=-4096')
             db.execute('CREATE TABLE metadata (name TEXT PRIMARY KEY, value TEXT NOT NULL)')
