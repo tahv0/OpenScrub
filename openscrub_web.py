@@ -1833,7 +1833,7 @@ _REVIEW_INDEX_BACKGROUND_PENDING = {}
 _REVIEW_INDEX_BACKGROUND_RUNNING = set()
 
 
-def _warm_review_listing_index(job, document, full_rows=False):
+def _warm_review_listing_index(job, document, full_rows=False, expected_identity=None):
     """Refresh fallback listings or stale indexed rows off the request path.
 
     A single worker per job takes the newest pending report revision. Save
@@ -1842,8 +1842,11 @@ def _warm_review_listing_index(job, document, full_rows=False):
     and publish_listing both verify report identity before committing.
     """
     report_path = os.path.join(job['dir'], 'report.json')
+    expected_identity = (list(expected_identity) if expected_identity is not None
+                         else review_preview_index.report_identity(report_path))
     with _REVIEW_INDEX_BACKGROUND_LOCK:
-        _REVIEW_INDEX_BACKGROUND_PENDING[report_path] = (job, document, full_rows)
+        _REVIEW_INDEX_BACKGROUND_PENDING[report_path] = (
+            job, document, full_rows, expected_identity)
         if report_path in _REVIEW_INDEX_BACKGROUND_RUNNING:
             return
         _REVIEW_INDEX_BACKGROUND_RUNNING.add(report_path)
@@ -1856,15 +1859,17 @@ def _warm_review_listing_index(job, document, full_rows=False):
                     if item is None:
                         _REVIEW_INDEX_BACKGROUND_RUNNING.discard(report_path)
                         return
-                source_job, doc, full = item
+                source_job, doc, full, expected = item
                 try:
                     with _REVIEW_PICTURE_GATE.reader():
                         if vault_locked():
                             return
                         if full:
-                            review_preview_index.prepare(report_path, doc)
+                            review_preview_index.prepare(
+                                report_path, doc, expected_identity=expected)
                         else:
-                            review_preview_index.publish_listing(report_path, doc)
+                            review_preview_index.publish_listing(
+                                report_path, doc, expected_identity=expected)
                 except Exception:
                     diagnostics.exception('review_index_warmup_failed', source_job)
         finally:
@@ -2176,14 +2181,18 @@ def job_detections(jid):
     # SQLite sweeps can exceed the 15-second browser deadline on long videos.
     # New scans reconcile once before Review opens; old exact cached pictures
     # remain usable while a missing index is prepared in the background.
-    doc = _load_job_report(job)
     path = os.path.join(job['dir'], 'report.json')
+    source_revision = review_preview_index.report_identity(path)
+    doc = _load_job_report(job)
+    if review_preview_index.report_identity(path) != source_revision:
+        abort(409, description='Review report changed while listing. Reload.')
     try:
         size = os.path.getsize(path)
         if (size >= _REVIEW_LISTING_INDEX_MIN_BYTES
                 or os.path.exists(os.path.join(job['dir'], review_preview_index.NAME))):
             _warm_review_listing_index(job, doc,
-                full_rows=size > _REVIEW_REPORT_MAX_FILE_BYTES)
+                full_rows=size > _REVIEW_REPORT_MAX_FILE_BYTES,
+                expected_identity=source_revision)
     except OSError:
         diagnostics.exception('review_index_warmup_stat_failed', job)
     items = []
