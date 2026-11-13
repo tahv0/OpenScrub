@@ -5390,7 +5390,7 @@ function pumpPlateSaves(){
    if(!s.dirty||s.drag)return; // Rejected, or a new gesture began during metadata loading.
    if(!pending){
     // Keep a request/ID only after an uncertain result, not a definite 503.
-    pending=s.pending={points:plateCopy(s.points),preview_token:s.meta.preview_token,compact:!!s.meta.compact,
+    pending=s.pending={points:plateCopy(s.points),preview_token:s.meta.preview_token,preview_key:s.meta.key,compact:!!s.meta.compact,
      apply_track:true,autosave:true,edit_id:Date.now().toString(36)+"-"+(++PLATE_SERIAL)+"-"+Math.random().toString(36).slice(2),
      version:s.version,label:VLBL[s.i]};
    }
@@ -6286,6 +6286,7 @@ function confirmFinding(i,label){
    if(CUR!==job||JOBVIEW!==view)return;
    const body={label,expected_revision:FINDING_META[i]?.confirmed_finding_revision};
    if(edit?.meta.preview_token)body.preview_token=edit.meta.preview_token;
+    if(edit?.meta.key)body.preview_key=edit.meta.key;
    if(label==='positive'&&edit?.archiveConflict)body.points=plateCopy(edit.points);
    const editVersion=edit?.version;
    const {data}=await reviewRequest('api/jobs/'+job+'/confirm/'+i,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),timeoutMs:120000});
