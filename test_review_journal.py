@@ -148,3 +148,39 @@ def test_partial_listing_overlay_preserves_public_shape(tmp_path):
     assert updated['detections'][1]['human_confirmation']['propagated']
     assert not updated['detections'][0]['human_confirmation']['propagated']
     assert '_remove_plate_verification' not in updated['detections'][0]
+
+
+def test_http_confirmation_commits_without_report_rewrite(plate_job,tmp_path,monkeypatch):
+    """A browser Is/Not click is a SQLite write, even on a fresh report."""
+    import findings_web
+    import learning_session
+
+    client,jid,report,job_dir=plate_job
+    job=__import__('openscrub_web').JOBS[jid]
+    source=learning_session.sha256(job['video'])
+    doc=json.loads(report.read_text())
+    doc['provenance']['input_sha256']=source
+    doc['source_identity']=dict(input_sha256=source,width=240,height=160,
+                                fps=10,total_frames=10)
+    doc['detections'][0].update(frame_index=2,aoff=[0,0])
+    stop_review.atomic_report(str(report),doc)
+    monkeypatch.setattr(findings_web,'root',lambda:tmp_path/'archives')
+    # Prime image metadata and the read-only report cache, then forbid any
+    # additional whole-document parser in the per-click save path.
+    preview=client.get(f'/api/jobs/{jid}/finding-preview/0')
+    assert preview.status_code==200,preview.get_data(as_text=True)[:300]
+    baseline=report.read_bytes()
+    import openscrub_web as web
+    monkeypatch.setattr(web,'_load_job_report',
+                        lambda *_: pytest.fail('Confirmation parsed the full report'))
+    saved=client.post(f'/api/jobs/{jid}/confirm/0',json={'label':'negative'})
+    assert saved.status_code==200,saved.get_json()
+    assert report.read_bytes()==baseline
+    visible=client.get(f'/api/jobs/{jid}/detections')
+    assert visible.status_code==200
+    row=visible.get_json()['detections'][0]
+    assert row['verified_label']=='not_plate' and row['enabled'] is False
+    assert row['human_confirmation']['label']=='negative'
+    assert journal.has_changes(job_dir)
+    assert journal.publish(job_dir)
+    assert json.loads(report.read_text())['detections'][0]['verified_label']=='not_plate'
