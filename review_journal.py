@@ -221,6 +221,27 @@ def has_changes(directory):
         return bool(groups or anchors)
 
 
+def overlay_listing(directory, listing):
+    """Update a cached public Review listing without opening report.json.
+
+    Callers provide the existing decoded listing, not the authoritative full
+    frame timeline. This only runs when SQLite contains actual corrections.
+    """
+    with _lock(directory):
+        groups, anchors = _read(directory)
+    if groups or anchors:
+        rows = listing['detections']
+        for index, item in enumerate(rows):
+            updated = patch_row(item, index, groups, anchors)
+            if updated is item:
+                continue
+            # Never expose internal receipt keys or duplicate archive data.
+            public = set(item)
+            rows[index] = {key: value for key, value in updated.items()
+                           if key in public}
+    return listing
+
+
 def write(directory, row, index, group_fields, anchor_fields=None):
     """One durable transaction for all members of a track/person group.
 
