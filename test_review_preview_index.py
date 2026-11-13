@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 import review_preview_index as index
+from test_plate_quad_editor import plate_job
 
 
 def sample(tmp_path, count=350):
