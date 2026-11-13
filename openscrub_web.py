@@ -4801,9 +4801,9 @@ function beHook(){
 // and geometry; it never starts a second video/image request.
 // Large Review panels keep all finding/group decisions but materialize only
 // nearby card elements. Existing small reviews retain their exact behavior.
+let REVIEW_MEDIA=null;
 const REVIEW_PAGE_THRESHOLD=400, REVIEW_PAGE_SIZE=48;
 let REVIEW_PENDING_PAGES={},REVIEW_CATEGORY_GROUPS={};
-let REVIEW_MEDIA=null;
 async function reviewRequest(url, options={}, type="json"){
  const {timeoutMs=15000,...fetchOptions}=options;
  const ctl=new AbortController(),parent=fetchOptions.signal;
