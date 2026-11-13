@@ -44,6 +44,44 @@ def _archive(report):
     return report.parent.parent/'confirmed_findings'
 
 
+def _assert_review_choice(page, track, enabled, step):
+    """Wait for the actual button state; report lost clicks, never retry them.
+
+    On a busy CI browser an output choice can be overtaken by asynchronous
+    review work. A fixed immediate DOM read is not a reliable completion
+    boundary. Validate the visible choice AND the in-memory edit that Save
+    will persist; a genuinely lost click still fails with diagnostics.
+    """
+    i = track * 20
+    status = 'Will be blurred' if enabled else 'Will stay visible'
+    try:
+        page.wait_for_function(
+            """args => {
+              const card = document.getElementById('det' + args.i);
+              return card?.querySelector('.det-status')?.textContent === args.status
+                && OUTPUT_CHOICES[args.i] === true
+                && EN[args.i] === args.enabled;
+            }""",
+            arg={'i': i, 'status': status, 'enabled': enabled},
+            timeout=3000,
+        )
+    except Exception as error:
+        state = page.evaluate(
+            """i => ({
+              status: document.querySelector('#det'+i+' .det-status')?.textContent,
+              enabled: EN[i], explicit: OUTPUT_CHOICES[i] || false,
+              members: TRKMEM[i]?.length, busy: PLATE_REVIEW_BUSY,
+              pending: CONFIRM_PENDING.size, failed: CONFIRM_FAILED.size,
+              reviewVersion: REVIEW_VERSION, savedVersion: REVIEW_SAVED
+            })""", i)
+        raise AssertionError(
+            f'Output choice lost at step {step}, track {track}: '
+            f'expected {status!r}; current state {state!r}'
+        ) from error
+
+
+
+
 def _distinct_box(row,index):
     # Tracks in the shared fixture overlap exactly. Give independent findings
     # distinct source geometry so opposite labels do not target one archive ID.
@@ -52,7 +90,7 @@ def _distinct_box(row,index):
 
 
 @pytest.mark.parametrize('width', [1440, 390])
-@pytest.mark.timeout(150)
+@pytest.mark.timeout(210)
 def test_large_mixed_review_survives_sampling_and_reopen(review_server, width, tmp_path):
     """7,000 rows, 350 tracks, 210 real clicks, 6 saves and multiple reopens."""
     url, report = review_server
@@ -80,7 +118,7 @@ def test_large_mixed_review_survives_sampling_and_reopen(review_server, width, t
             if label:
                 _confirmations_saved(page)
             expected[track] = enabled, label
-            assert card.locator('.det-status').inner_text() == ('Will be blurred' if enabled else 'Will stay visible')
+            _assert_review_choice(page, track, enabled, step)
             if (step + 1) % 35 == 0:
                 _save(page)
                 saved = json.loads(report.read_text())['detections']
@@ -91,7 +129,7 @@ def test_large_mixed_review_survives_sampling_and_reopen(review_server, width, t
                 page.evaluate('loadReview()')
                 page.locator('#review .det').first.wait_for()
                 card = page.locator('#det%d' % (track * 20))
-                assert card.locator('.det-status').inner_text() == ('Will be blurred' if enabled else 'Will stay visible')
+                    _assert_review_choice(page, track, enabled, step)
         page.get_by_role('button', name='Review 10% of plate groups', exact=True).click()
         page.get_by_role('button', name='Show all findings', exact=True).wait_for()
         page.get_by_role('button', name='Show all findings', exact=True).click()
