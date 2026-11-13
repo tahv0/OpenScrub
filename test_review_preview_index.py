@@ -110,3 +110,60 @@ def test_preview_http_uses_lightweight_document_and_edit_uses_full(plate_job, mo
                          json={'points': meta['points'], 'preview_token': meta['preview_token']})
     assert edited.status_code == 200, edited.get_data(as_text=True)
     assert len(reads) >= 2
+
+def test_indexed_review_listing_matches_original_api_without_reparsing(plate_job, monkeypatch):
+    import openscrub_web as web
+    client, jid, report, _ = plate_job
+    original = client.get(f'/api/jobs/{jid}/detections')
+    assert original.status_code == 200
+    reference = original.get_json()
+    doc = json.loads(report.read_text())
+    assert index.prepare(report, doc)
+    cached = client.get(f'/api/jobs/{jid}/detections')
+    assert cached.status_code == 200
+    assert cached.headers['X-Review-Listing'] == 'indexed'
+    assert cached.get_json() == reference
+
+    def no_full_report(*args, **kwargs):
+        pytest.fail('An indexed Review listing reopened report.json')
+    monkeypatch.setattr(web, '_load_job_report', no_full_report)
+    for _ in range(5):
+        res = client.get(f'/api/jobs/{jid}/detections')
+        assert res.status_code == 200
+        assert res.get_json() == reference
+
+
+def test_indexed_listing_tracks_dynamic_models_and_report_replacements(plate_job, monkeypatch):
+    import openscrub_web as web
+    client, jid, report, _ = plate_job
+    doc = json.loads(report.read_text())
+    assert index.prepare(report, doc)
+    monkeypatch.setattr(web.learning_candidates, 'list_candidates',
+                        lambda *_: [{'id':'newly-trained-model'}])
+    dynamic = client.get(f'/api/jobs/{jid}/detections')
+    assert dynamic.status_code == 200
+    assert dynamic.get_json()['learning_candidates'] == [{'id':'newly-trained-model'}]
+    edited = json.loads(report.read_text())
+    edited['detections'][0]['enabled'] = False
+    staged = report.with_suffix('.new')
+    staged.write_text(json.dumps(edited))
+    staged.replace(report)
+    assert index.read_listing(report) is None
+    newer = client.get(f'/api/jobs/{jid}/detections')
+    assert newer.status_code == 200
+    assert newer.get_json()['detections'][0]['enabled'] is False
+
+
+def test_listing_revision_fence_excludes_later_unsafe_data(tmp_path):
+    report, doc = sample(tmp_path)
+    assert index.prepare(report, doc)
+    listing = index.read_listing(report)
+    assert listing is not None
+    public = json.loads(listing)
+    assert public['detections'][0]['i'] == 0
+    assert public['frame_count'] == 600
+    replacement = report.with_suffix('.replacement')
+    doc['detections'][0]['text'] = 'changed'
+    replacement.write_text(json.dumps(doc))
+    replacement.replace(report)
+    assert index.read_listing(report) is None
