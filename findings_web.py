@@ -386,7 +386,9 @@ def _journal_region(job, index, payload, doc):
             raise library.ConflictError('Edit identifier belongs to different corners.')
         return dict(ok=True,applied=_journal_members(doc,index),verified_samples_added=0,
                     preview=meta,verified_label=row.get('verified_label',''),
-                    classification_required=not bool((row.get('human_confirmation') or {}).get('label')))
+                    classification_required=not bool((row.get('human_confirmation') or {}).get('label')),
+                    reconfirmation_required=bool(receipt.get('reconfirmation_required')),
+                    cleared_indices=receipt.get('cleared_indices') or [])
     if payload.get('preview_token') not in (None, meta['preview_token']):
         raise library.ConflictError('This finding changed. Reload its picture before saving.')
     confirmed = row.get('human_confirmation') or {}
