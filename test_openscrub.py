@@ -347,6 +347,34 @@ def test_vault_tamper_fails_closed(tmp_path):
     assert not f.exists(), "tampered file must NOT decrypt to plaintext"
 
 
+def test_tesseract_repairs_ocr_dash_variants_before_pii_rescue():
+    """Misread dash glyphs must not cause an SSN or claim ID to leak.
+
+    Captured OCR text from synthetic encoded video on Linux/Tesseract 5.5:
+    '123-—45—-6789' at confidence 9 and 'CLM—123456' at confidence 85.
+    The first must pass the structurally shaped low-confidence rescue.
+    """
+    class FakeTesseract:
+        class Output:
+            DICT = 'dict'
+
+        @staticmethod
+        def image_to_data(_frame, output_type):
+            assert output_type == 'dict'
+            return dict(text=['SSN', '123-—45—-6789', 'CLM—123456'],
+                        conf=[90, 9, 85], left=[0, 8, 20], top=[0, 0, 0],
+                        width=[6, 10, 10], height=[10, 10, 10])
+
+    ocr = object.__new__(openscrub.TesseractBackend)
+    ocr.pt = FakeTesseract()
+    result = ocr.read(np.zeros((32, 64, 3), dtype=np.uint8))
+    tokens = [item[0] for item in result]
+    assert '123-45-6789' in tokens, 'SSN must survive 9% OCR confidence'
+    assert 'CLM-123456' in tokens, 'Custom regex must see a regular hyphen'
+    assert openscrub.RE_SSN.fullmatch(tokens[1])
+    assert openscrub._normalize_ocr_hyphens('123—45—6789') == '123-45-6789'
+
+
 def test_custom_regex_category(tmp_path):
     """A user-defined regex category detects, reports, and survives the
     full pipeline like a built-in."""
