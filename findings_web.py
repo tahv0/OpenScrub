@@ -259,7 +259,10 @@ def confirm(job, index, payload):
     label = payload.get('label')
     if label not in ('positive', 'negative') or type(label) is not str:
         raise ValueError('Choose Is a … or Not a … to store a confirmed example.')
-    before, _, meta, jpeg = preview(job, index)
+    # Explicit edits must operate on the complete authoritative report; the
+    # read-only per-finding index is for thumbnail GETs only.
+    before = _web._load_job_report(job)
+    _, _, meta, jpeg = preview(job, index, doc=before)
     if meta.get('classification_allowed') is False:
         raise library.ConflictError(_LEGACY_TIMING_NOTE)
     doc = deepcopy(before)
@@ -297,7 +300,10 @@ def confirm(job, index, payload):
 
 
 def region(job, index, payload):
-    before, _, meta, jpeg = preview(job, index)
+    # Explicit edits must operate on the complete authoritative report; the
+    # read-only per-finding index is for thumbnail GETs only.
+    before = _web._load_job_report(job)
+    _, _, meta, jpeg = preview(job, index, doc=before)
     doc = deepcopy(before)
     row = doc['detections'][index]
     if row['category'] != 'plate':
