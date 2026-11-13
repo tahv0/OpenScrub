@@ -1890,8 +1890,13 @@ def _load_preview_report_base(job):
 
 def _load_preview_report(job):
     # SQLite overlays stay small and independent of the large JSON/listing
-    # snapshot. Do not hold the global preview report-cache mutex for SQLite I/O.
-    return review_journal.view(job["dir"], _load_preview_report_base(job))
+    # snapshot. The saved-picture reader lease must cover the journal's disk
+    # access while the vault may be encrypting saved review data.
+    doc = _load_preview_report_base(job)
+    with _REVIEW_PICTURE_GATE.reader():
+        if vault_locked():
+            abort(423)
+        return review_journal.view(job["dir"], doc)
 
 
 def _video_identity(path):
@@ -7045,6 +7050,8 @@ def _vault_lock_now():
                     _REVIEW_FRAMES.clear()
                     _REVIEW_PROBES.clear()
                     _REVIEW_REPORTS.clear()
+                    review_journal._READ_CACHE.clear()
+                    review_journal._COUNT_CACHE.clear()
                     n = vault.encrypt_tree(key, JOBS_DIR)
                     VAULT["key"] = None
         return n
