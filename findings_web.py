@@ -308,7 +308,7 @@ def _journal_doc(job):
 def _journal_members(doc, index):
     rows = doc['detections']
     return (rows.member_count(index) if hasattr(rows, 'member_count')
-            else len(_members(doc, index)))
+            else review_journal.member_count(rows, index))
 
 
 def _journal_matches_archived_source(job, doc, index):
