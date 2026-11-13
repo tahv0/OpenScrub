@@ -138,6 +138,24 @@ def _evidence(proposal):
     return value
 
 
+def _editor_crop(box, points, width, height):
+    # The isolated OCR process must not import the web server or its model
+    # state merely to compute the exact same source-coordinate preview crop.
+    if _web is not None:
+        return _web._plate_editor_crop(box, points, width, height)
+    xs = [float(box[0]), float(box[2])] + [float(pt[0]) for pt in points]
+    ys = [float(box[1]), float(box[3])] + [float(pt[1]) for pt in points]
+    xmin, xmax, ymin, ymax = min(xs), max(xs), min(ys), max(ys)
+    cx, cy = (xmin+xmax)/2., (ymin+ymax)/2.
+    radius = max(38., .5*math.hypot(xmax-xmin, ymax-ymin)
+                 + max(28., .15*(xmax-xmin)))
+    crop = [max(0, math.floor(cx-radius)), max(0, math.floor(cy-radius)),
+            min(width, math.ceil(cx+radius)), min(height, math.ceil(cy+radius))]
+    if crop[2] <= crop[0] or crop[3] <= crop[1]:
+        raise ValueError('Plate is outside the video frame')
+    return crop
+
+
 def _cache(job, doc, row, frame, pixels):
     rs = doc['render_state']
     height, width = pixels.shape[:2]
@@ -145,7 +163,7 @@ def _cache(job, doc, row, frame, pixels):
     quad = row.get('plate_quad') or [[0,0],[1,0],[1,1],[0,1]]
     points = [[box[0]+x*(box[2]-box[0]), box[1]+y*(box[3]-box[1])] for x,y in quad]
     # Reuse the review editor's source-coordinate rotation envelope.
-    crop = _web._plate_editor_crop(box, points, width, height)
+    crop = _editor_crop(box, points, width, height)
     x1,y1,x2,y2 = crop
     meta = dict(width=width, height=height, crop=crop, box=box, points=points,
                 frame=frame, fps=float(rs['fps']))
@@ -167,14 +185,21 @@ def _merge(job, doc, frame, pixels, proposals, stats):
         box = [min(box[0],source[0]),min(box[1],source[1]),
                max(box[2],source[2]),max(box[3],source[3])]
         evidence = _evidence(proposal)
-        matches = [row for row in doc['detections'] if _visible(row, frame, fps)
+        matches = [(i,row) for i,row in enumerate(doc['detections'])
+                   if _visible(row, frame, fps)
                    and video_learning._iou(video_learning._screen_box(row,rs,frame), box) >= .5]
         if matches:
-            row = max(matches, key=lambda r: video_learning._iou(
-                video_learning._screen_box(r,rs,frame),box))
+            row_index, row = max(matches, key=lambda item: video_learning._iou(
+                video_learning._screen_box(item[1],rs,frame),box))
             # OCR evidence is independent of every existing human/output
             # choice. Never replace a correction, classification or polygon.
             row['plate_text_evidence'] = evidence
+            # A subprocess publishes only sparse OCR changes. The main web
+            # process merges them into the authoritative report under its own
+            # edit lock; the child never writes report.json.
+            if ('_ocr_updates' in doc and
+                    row_index < doc.get('_ocr_original_count', 0)):
+                doc['_ocr_updates'][str(row_index)] = evidence
             stats['matched_existing'] += 1
             # Only exact-index rows can use this frame as their exact preview.
             if (video_learning._frame(row,rs) == frame and
@@ -251,6 +276,9 @@ def _progress(job, stats, done, total, frame):
     public = dict(state='running', note=NOTE, done=done,total=total,
                   added=stats['added'],matched_existing=stats['matched_existing'],source_frame=frame)
     job['plate_text_search'] = public
+    callback = job.get('_ocr_progress')
+    if callback is not None:
+        callback(public)
     learning_session.update_learning(job,'plate_text_search','Searching known plate text',
                                      done=done,total=total,unit='frames',source_frame=frame)
 
