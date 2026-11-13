@@ -380,3 +380,27 @@ def test_review_detection_response_has_all_merged_fields(monkeypatch, tmp_path):
     assert item["shaped"] is True
     assert item["zone_dropped"] is False
     assert payload["indexed_frames"] is True
+
+
+def test_scan_eta_prefers_recent_rate_after_progressive_slowdown(monkeypatch):
+    import openscrub_web as web
+
+    clock = [0.0]
+    monkeypatch.setattr(web.time, 'time', lambda: clock[0])
+    monkeypatch.setattr(web.diagnostics, 'progress', lambda *a, **k: None)
+    monkeypatch.setattr(web.diagnostics, 'event', lambda *a, **k: None)
+
+    job = {'id':'eta-fixture','options':{},'phase':'scanning','log':[],
+           'activity':None}
+    cb = web.WebCallbacks(job)
+    cb.progress('scan', 0, 1000)
+
+    # Fast first minute, then a sustained slowdown to 0.5 frame/s. The old
+    # whole-run average would still predict roughly two minutes remaining.
+    for when, frame_index in ((60, 600), (120, 630), (180, 660), (240, 690)):
+        clock[0] = float(when)
+        cb.progress('scan', frame_index, 1000)
+
+    assert job['activity']['rate_per_second'] == pytest.approx(.5, rel=.05)
+    assert job['activity']['rate_window_seconds'] >= 100
+    assert job['eta'] > 500, 'ETA stayed anchored to the fast prefix instead of recent throughput'
