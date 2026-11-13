@@ -1,8 +1,10 @@
 """Explicit, bounded local OCR discovery; proposals never confirm examples.
 
-The web request pins a report snapshot. The worker owns one sequential CPU
-decoder and publishes only after source/report revalidation. Neither thumbnail
-reads nor ordinary review decisions invoke this module's OCR search.
+The web request freezes report writers only long enough to record a cheap file
+identity and queue the work. The worker then reads and hashes that stable report
+snapshot, owns one sequential CPU decoder, and publishes only after
+source/report revalidation. Neither thumbnail reads nor ordinary review
+decisions invoke this module's OCR search.
 """
 from copy import deepcopy
 import hashlib
@@ -33,6 +35,13 @@ def _digest(data):
 
 def _path(job):
     return Path(job['dir']) / 'report.json'
+
+
+def _report_identity(job):
+    path = _path(job)
+    stat = path.stat()
+    return (str(path), stat.st_dev, stat.st_ino, stat.st_size,
+            stat.st_mtime_ns, stat.st_ctime_ns)
 
 
 def _cancel(job):
@@ -253,9 +262,13 @@ def perform(job):
     stats = dict(added=0,matched_existing=0,decoded_frames=0,sampled_frames=[])
     try:
         _cancel(job)
-        before = _path(job).read_bytes()
-        if _digest(before) != settings.get('report_sha256'):
+        expected_identity = tuple(settings.get('report_identity') or ())
+        if not expected_identity or _report_identity(job) != expected_identity:
             raise ValueError('Review changed before search')
+        before = _path(job).read_bytes()
+        if _report_identity(job) != expected_identity:
+            raise ValueError('Review changed while loading search snapshot')
+        report_sha256 = _digest(before)
         original = json.loads(before)
         fingerprint = learning_session.verify_source(job,original)
         for metadata in (original.get('source_identity'),original.get('stop_review')):
@@ -274,7 +287,7 @@ def perform(job):
             doc['render_required'] = True
         with _web._REVIEW_EDIT_LOCK, _web._REVIEW_WORK_LOCK:
             _cancel(job)
-            if _digest(_path(job).read_bytes()) != settings['report_sha256']:
+            if _digest(_path(job).read_bytes()) != report_sha256:
                 raise ValueError('Review changed during search')
             if learning_session.verify_source(job,doc) != fingerprint:
                 raise ValueError('Source changed before publication')
@@ -327,27 +340,29 @@ def install(app, web):
         except ValueError as error:
             # normalize_hints validation messages must contain no raw text.
             return jsonify(error=str(error)),400
-        with web._REVIEW_EDIT_LOCK, web.JOBS_LOCK:
-            if job['phase'] not in ('review','paused','done'):
-                return jsonify(error='Pause or finish scanning before searching known plate text.'),409
-            if job.get('trackbg',{}).get('state') == 'running':
-                return jsonify(error='Finish object tracking before searching known plate text.'),409
-            protected = web._SECTIONS.whole_job_error(job)
-            if protected:
-                return jsonify(error=protected),409
-            before = _path(job).read_bytes()
-            try:
-                doc = json.loads(before)
-                if not _intervals(job,doc):
-                    raise ValueError('No scanned frames to search.')
-            except (ValueError,KeyError,TypeError):
-                return jsonify(error='No valid scanned source timeline is available to search.'),409
-            job['plate_text_request'] = dict(plate_texts=targets,max_frames=maximum,
-                previous_phase=job['phase'],report_sha256=_digest(before))
-            job['cancel'].clear()
-            job['stop'].clear()
-            job.update(phase='learning',error=None,
-                plate_text_search=dict(state='queued',hint_count=len(targets),note=NOTE))
-            learning_session.update_learning(job,'plate_text_search','Searching known plate text')
+        if not web._REVIEW_EDIT_LOCK.acquire(blocking=False):
+            return jsonify(error='Another review edit is saving. Retry shortly.'),503
+        try:
+            with web.JOBS_LOCK:
+                if job['phase'] not in ('review','paused','done'):
+                    return jsonify(error='Pause or finish scanning before searching known plate text.'),409
+                if job.get('trackbg',{}).get('state') == 'running':
+                    return jsonify(error='Finish object tracking before searching known plate text.'),409
+                protected = web._SECTIONS.whole_job_error(job)
+                if protected:
+                    return jsonify(error=protected),409
+                try:
+                    report_identity = _report_identity(job)
+                except OSError:
+                    return jsonify(error='No valid scanned source timeline is available to search.'),409
+                job['plate_text_request'] = dict(plate_texts=targets,max_frames=maximum,
+                    previous_phase=job['phase'],report_identity=report_identity)
+                job['cancel'].clear()
+                job['stop'].clear()
+                job.update(phase='learning',error=None,
+                    plate_text_search=dict(state='queued',hint_count=len(targets),note=NOTE))
+                learning_session.update_learning(job,'plate_text_search','Searching known plate text')
+        finally:
+            web._REVIEW_EDIT_LOCK.release()
         web.WORK_Q.put((jid,'plate_text'))
         return jsonify(ok=True,status=job['plate_text_search'],note=NOTE)

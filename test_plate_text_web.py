@@ -220,6 +220,45 @@ def test_request_pins_report_snapshot_before_worker_starts(search_job,monkeypatc
     assert path.read_bytes()==before and job['plate_text_search']['state']=='failed'
 
 
+def test_queue_start_does_not_read_or_hash_full_report(search_job,monkeypatch):
+    client,job,_,path,queued = search_job
+    original_read_bytes = Path.read_bytes
+
+    def blocked_read_bytes(self):
+        if self == path:
+            pytest.fail('Queue startup must not read the full report')
+        return original_read_bytes(self)
+
+    monkeypatch.setattr(Path,'read_bytes',blocked_read_bytes)
+    monkeypatch.setattr(search,'_digest',
+        lambda *_: pytest.fail('Queue startup must not hash the full report'))
+    response = queue(client,job,max_frames=1)
+    assert response.status_code == 200,response.get_data(as_text=True)
+    assert job['phase'] == 'learning'
+    assert queued == [(job['id'],'plate_text')]
+    assert 'report_identity' in job['plate_text_request']
+    assert 'report_sha256' not in job['plate_text_request']
+
+
+def test_queue_start_fails_fast_when_review_writer_is_busy(search_job,monkeypatch):
+    client,job,_,path,queued = search_job
+    before = path.read_bytes()
+
+    class BusyLock:
+        def acquire(self,*args,**kwargs):
+            return False
+        def release(self):
+            pytest.fail('Busy lock was not acquired')
+
+    monkeypatch.setattr(web,'_REVIEW_EDIT_LOCK',BusyLock())
+    response = queue(client,job)
+    assert response.status_code == 503
+    assert 'Retry shortly' in response.get_json()['error']
+    assert job['phase'] == 'review'
+    assert not queued
+    assert path.read_bytes() == before
+
+
 def test_paused_section_intersects_actual_scanned_prefix(search_job,monkeypatch):
     _,job,_,path,_ = search_job
     doc = stop_review.with_checkpoint(json.loads(path.read_text()),8,12,{})
