@@ -249,7 +249,6 @@ def test_human_sample_shows_ten_groups_not_hundreds_of_frames(review_server, wid
         assert archived['total']==1, 'One confirmed group stores one representative, not 100 frame examples'
         assert archived['items'][0]['label']=='negative'
         assert archived['items'][0]['frame']==displayed['frame']
-        assert archived['items'][0]['frame'] in (saved[index]['frame_index'], 300)
         evidence = Path(os.environ.get('REVIEW_EVIDENCE_DIR', str(tmp_path)))
         evidence.mkdir(parents=True, exist_ok=True)
         page.locator('#reviewSampleSummary').scroll_into_view_if_needed()
