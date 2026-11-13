@@ -2240,20 +2240,27 @@ def job_detections(jid):
     # New scans reconcile once before Review opens; old exact cached pictures
     # remain usable while a missing index is prepared in the background.
     path = os.path.join(job['dir'], 'report.json')
-    source_revision = review_preview_index.report_identity(path)
-    doc = _load_job_report(job)
-    if review_preview_index.report_identity(path) != source_revision:
-        abort(409, description='Review report changed while listing. Reload.')
-    _warm_legacy_preview_reconciliation(job, doc, source_revision)
     try:
-        size = os.path.getsize(path)
-        if (size >= _REVIEW_LISTING_INDEX_MIN_BYTES
-                or os.path.exists(os.path.join(job['dir'], review_preview_index.NAME))):
-            _warm_review_listing_index(job, doc,
-                full_rows=size > _REVIEW_REPORT_MAX_FILE_BYTES,
-                expected_identity=source_revision)
-    except OSError:
-        diagnostics.exception('review_index_warmup_stat_failed', job)
+        source_revision = review_preview_index.report_identity(path)
+    except FileNotFoundError:
+        # Test adapters and in-memory report providers have always been able
+        # to supply a loaded document without a report.json on disk. Preserve
+        # that existing GET contract; only disk-backed jobs need indexing.
+        source_revision = None
+    doc = _load_job_report(job)
+    if source_revision is not None:
+        if review_preview_index.report_identity(path) != source_revision:
+            abort(409, description='Review report changed while listing. Reload.')
+        _warm_legacy_preview_reconciliation(job, doc, source_revision)
+        try:
+            size = os.path.getsize(path)
+            if (size >= _REVIEW_LISTING_INDEX_MIN_BYTES
+                    or os.path.exists(os.path.join(job['dir'], review_preview_index.NAME))):
+                _warm_review_listing_index(job, doc,
+                    full_rows=size > _REVIEW_REPORT_MAX_FILE_BYTES,
+                    expected_identity=source_revision)
+        except OSError:
+            diagnostics.exception('review_index_warmup_stat_failed', job)
     items = []
     for i, d in enumerate(doc["detections"]):
         items.append({"i": i, "category": d["category"], "text": d["text"],
