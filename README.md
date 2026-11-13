@@ -302,8 +302,12 @@ self-signed certificate — choose Advanced → Proceed.
 (or `ghcr.io/austinmabry/openscrub:latest` — use whichever registry
 pulls faster for you). Published tags are refreshed **weekly** with the
 latest OS security patches, not just at releases — the refresh only
-changes a small top layer, so a weekly re-pull downloads the patch delta,
+changes small top layers, so a weekly re-pull downloads the patch delta,
 not the whole image.
+
+Building a local source checkout with the Windows Compose files? See
+[Docker BuildKit caching and rebuild instructions](docs/DOCKER_BUILD_CACHE.md)
+to avoid repeating Ubuntu upgrades and large CUDA/Python downloads.
 
 Tesseract, FFmpeg, and the face model are baked in; jobs, certificates,
 zones, and downloaded plate models live in the mounted volume, so the
