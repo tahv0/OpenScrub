@@ -130,6 +130,53 @@ function gesture(s){const before=plateCopy(s.points);s.points=plateCopy(current)
     assert r.returncode == 0, r.stdout+r.stderr
 
 
+
+def test_busy_saved_picture_retries_without_manual_action(tmp_path):
+    js=web.APP_JS
+    helpers=js[js.index('let QEDIT=null;'):js.index('function initPlateCorners(')]
+    script=r'''
+const assert=require('node:assert/strict');
+const window={removeEventListener(){},addEventListener(){}};
+const document={getElementById(){return null}};
+let VLBL={},CUR='job',requests=[],resolve,reject;
+function setTimeout(){return 1} function clearTimeout(){}
+function reviewRequest(url,options){
+ requests.push(options);
+ return new Promise((ok,no)=>{resolve=ok;reject=no;});
+}
+''' + helpers + r'''
+const corners=[[20,20],[80,20],[80,50],[20,50]];
+const meta={box:[20,20,80,50],points:corners,crop:[0,0,100,100],
+ width:100,height:100,track:7,frame:42,preview_token:'first',compact:true};
+const s={i:1,job:'job',meta,img:{},points:plateCopy(corners),saved:plateCopy(corners),
+ version:1,dirty:true,pending:null,readyAt:0,failures:0,draw(){},
+ status:{textContent:''},retry:{hidden:true},card:null};
+(async()=>{
+ PLATE_EDITS.set(s.i,s);
+ const first=pumpPlateSaves();
+ assert.equal(requests[0].timeoutMs,120000,'Corner save was stopped by the 15-second thumbnail deadline');
+ const refusedId=JSON.parse(requests[0].body).edit_id;
+ reject(Object.assign(new Error('Saved pictures are temporarily busy. Retry shortly.'),{status:503}));
+ await first;
+ assert.equal(s.pending,null,'A definite 503 should not reuse a rejected edit ID');
+ assert.equal(s.error,undefined,'Busy preview must not require manual Retry save');
+ assert.equal(s.retry.hidden,true);
+ assert.ok(s.status.textContent.includes('retrying save'));
+ s.readyAt=0;
+ const next=pumpPlateSaves();
+ assert.notEqual(JSON.parse(requests[1].body).edit_id,refusedId);
+ resolve({data:{preview:{...meta,points:corners,preview_token:'second'},
+  applied:1,classification_required:true}});
+ await next;
+ assert.equal(s.dirty,false);
+ assert.equal(s.retry.hidden,true);
+ assert.equal(s.pending,null);
+ console.log('Automatic 503 retry, durable save deadline, and idempotency pass');
+})().catch(error=>{console.error(error);process.exitCode=1});
+'''
+    result=subprocess.run(['node','-e',script],capture_output=True,text=True,timeout=8)
+    assert result.returncode==0,result.stdout+result.stderr
+
 @pytest.mark.parametrize('width',[1440,390])
 def test_hidden_failed_card_can_be_found_corrected_and_saved(review_server, monkeypatch, width, tmp_path):
     from flask import jsonify, request
