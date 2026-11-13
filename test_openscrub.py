@@ -385,7 +385,7 @@ def test_custom_regex_category(tmp_path):
     assert hits, "custom category should appear in the report"
 
 
-def test_deep_backtrack_finds_true_onset(tmp_path):
+def test_deep_backtrack_finds_true_onset(tmp_path, monkeypatch):
     """A region whose first frame lies beyond the RAM backtrack buffer must
     still get its true onset via the post-scan deep file search — and must
     not be extended earlier than it actually appeared."""
@@ -401,11 +401,26 @@ def test_deep_backtrack_finds_true_onset(tmp_path):
         out.write(with_text if i / fps >= appear_at else blank)
     out.release()
 
+    # Keep actionable diagnostics on a negative privacy-coverage test.
+    # OCR may differ across Tesseract/FFmpeg versions; reporting the actual
+    # sampled tokens and chosen cadence shows whether the miss was a read,
+    # regex or scan-scheduling error instead of tempting us to weaken tests.
+    probes = []
+    original_detect = openscrub.detect_phi
+
+    def detect_with_probe(words, lines, t, offset, namer, mrn_re, custom_res=()):
+        result = original_detect(words, lines, t, offset, namer, mrn_re, custom_res)
+        probes.append(dict(t=round(t, 3),
+                           tokens=[(txt, round(float(conf), 3)) for txt, _, conf in words],
+                           found=[(d.category, d.text) for d in result]))
+        return result
+
+    monkeypatch.setattr(openscrub, "detect_phi", detect_with_probe)
     _, dets = run(path, "--categories", "ssn",
                   "--sample-interval", "2.0",
                   "--backtrack-window", "0.5")
     ssn = [d for d in dets if d["category"] == "ssn"]
-    assert ssn, "SSN should be detected"
+    assert ssn, "SSN should be detected; OCR scan probes: %r" % probes
     start = min(d["t_start"] for d in ssn)
     assert start <= appear_at + 0.30, \
         f"deep backtrack should reach the true onset, got {start}"
