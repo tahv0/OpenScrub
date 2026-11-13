@@ -58,6 +58,9 @@ class Sections:
         return next((s for s in self.items(doc) if s['id'] == sid), None) or abort(404)
 
     def publish(self, job, doc):
+        # A section approval is a full-report boundary. Incorporate any
+        # separately committed human corrections before replacing the report.
+        self.web._review_journal_snapshot(job)
         meta = doc.setdefault('video_sections', {'schema': 1, 'items': [], 'revision': 0})
         meta['revision'] = meta.get('revision', 0) + 1
         stop_review.atomic_report(Path(job['dir'])/'report.json', doc)
