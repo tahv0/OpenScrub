@@ -28,6 +28,7 @@ MAX_ITEMS = 10000
 MAX_BYTES = 64 * 1024 * 1024
 MAX_PER_CAPTURE = 12
 _LOCK = threading.RLock()
+_SCHEMA_READY = set()
 _KEY = re.compile(r'[a-f0-9]{64}\Z')
 
 
@@ -375,6 +376,11 @@ def capture(job_dir, frame_bgr, frame_index, fps, detections, source=None, seen_
                     else:
                         stats['skipped'] += 1
                         stats['truncated'] = True
+                        # SQLITE_FULL can roll back the active transaction,
+                        # including earlier inserts in this capture. This is
+                        # exceptional; resync the O(1) counters here rather
+                        # than carrying optimistic local totals forward.
+                        count, size, _ = _totals(db)
                 except (ValueError, TypeError, KeyError, OverflowError):
                     stats['invalid'] += 1
             db.commit()
