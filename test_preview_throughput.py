@@ -121,12 +121,16 @@ def test_parallel_cache_misses_parse_only_one_report(plate_job, monkeypatch):
     assert len(parses) == 1
 
 
-def test_oversize_report_is_not_retained(plate_job, monkeypatch):
+def test_oversize_report_retains_only_indexed_row_accessor(plate_job, monkeypatch):
+    import review_preview_index
     _, jid, report, _ = plate_job
     monkeypatch.setattr(web, '_REVIEW_REPORT_MAX_FILE_BYTES', 1)
+    web._REVIEW_REPORTS.clear()
     with web.app.test_request_context():
-        web._load_preview_report(web.JOBS[jid])
-    assert all(key[0] != str(report) for key in web._REVIEW_REPORTS)
+        doc = web._load_preview_report(web.JOBS[jid])
+    assert isinstance(doc['detections'], review_preview_index.IndexedRows)
+    assert any(key[0] == str(report) for key in web._REVIEW_REPORTS)
+    assert len(doc['detections']) == 1
 
 
 def test_vault_lock_forgets_preview_report_snapshot(plate_job, monkeypatch):

@@ -58,7 +58,7 @@ RUN python prefetch_models.py yunet sface vittrack ppdet pprec pprec_yml plate_t
 
 # ---- app layers: tiny, change every release
 COPY pyproject.toml README.md LICENSE NOTICE THIRD_PARTY_NOTICES.md plate_models.json face_models.json person_models.json ./
-COPY openscrub.py openscrub_web.py stop_review.py openscrub_logging.py learning_session.py video_learning.py learned_models.py learning_candidates.py plate_verifier.py confirmed_findings.py finding_previews.py findings_training.py findings_web.py findings_ui.py plate_text_hints.py plate_text_web.py video_sections.py section_workflow.py openscrub_setup.py openscrub_update.py \
+COPY openscrub.py openscrub_web.py stop_review.py openscrub_logging.py learning_session.py video_learning.py learned_models.py learning_candidates.py plate_verifier.py confirmed_findings.py finding_previews.py review_preview_index.py findings_training.py findings_web.py findings_ui.py plate_text_hints.py plate_text_web.py video_sections.py section_workflow.py openscrub_setup.py openscrub_update.py \
      openscrub_vault.py zones_ui.py install.py test_openscrub.py ./
 COPY assets/openscrub.ico assets/
 COPY scripts/ scripts/
