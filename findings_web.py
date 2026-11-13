@@ -269,8 +269,11 @@ def confirm(job, index, payload):
     # mutable document. Duplicating its complete 4K timeline and hundreds of
     # thousands of findings for every corner autosave costs gigabytes of RAM.
     # Approved sections alone require the old/new pair for the overlap guard.
-    sections = bool(before.get('video_sections') or
-                    (job.get('section') or {}).get('role') == 'export')
+    # Merely having section metadata does not require duplicating a huge
+    # report: only actually approved/locked intervals need old/new comparison.
+    section_rows = ((before.get('video_sections') or {}).get('items') or [])
+    sections = ((job.get('section') or {}).get('role') == 'export'
+                or any(item.get('approved') for item in section_rows))
     doc = deepcopy(before) if sections else before
     row = doc['detections'][index]
     if payload.get('preview_token') not in (None, meta['preview_token']):
@@ -315,8 +318,11 @@ def region(job, index, payload):
     # mutable document. Duplicating its complete 4K timeline and hundreds of
     # thousands of findings for every corner autosave costs gigabytes of RAM.
     # Approved sections alone require the old/new pair for the overlap guard.
-    sections = bool(before.get('video_sections') or
-                    (job.get('section') or {}).get('role') == 'export')
+    # Merely having section metadata does not require duplicating a huge
+    # report: only actually approved/locked intervals need old/new comparison.
+    section_rows = ((before.get('video_sections') or {}).get('items') or [])
+    sections = ((job.get('section') or {}).get('role') == 'export'
+                or any(item.get('approved') for item in section_rows))
     doc = deepcopy(before) if sections else before
     row = doc['detections'][index]
     if row['category'] != 'plate':
