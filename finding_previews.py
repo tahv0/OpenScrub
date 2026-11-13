@@ -82,8 +82,6 @@ def _db(job_dir, create=False):
     ready_key = str(path)
     if create and (not existed or ready_key not in _SCHEMA_READY):
         os.chmod(path, 0o600)
-        # SQLite pages and indexes count against the physical file ceiling too.
-        connection.execute('PRAGMA max_page_count=%d' % max(8, MAX_BYTES // 4096))
         connection.execute('CREATE TABLE IF NOT EXISTS previews ('
                            'key TEXT PRIMARY KEY, group_key TEXT UNIQUE, '
                            'frame INTEGER, category TEXT, track INTEGER, '
@@ -102,6 +100,15 @@ def _db(job_dir, create=False):
                            "SELECT 'bytes', coalesce(sum(length(jpeg) + "
                            "length(CAST(metadata AS BLOB))),0) FROM previews")
         connection.commit()
+        # Apply the physical ceiling AFTER schema/index creation. SQLite
+        # refuses to lower max_page_count below the current page_count; doing
+        # this before DDL let later schema pages silently raise the effective
+        # ceiling and explicit review crops could grow past MAX_BYTES.
+        page_size = int(connection.execute('PRAGMA page_size').fetchone()[0])
+        page_limit = max(8, MAX_BYTES // max(1, page_size))
+        page_count = int(connection.execute('PRAGMA page_count').fetchone()[0])
+        if page_count <= page_limit:
+            connection.execute('PRAGMA max_page_count=%d' % page_limit)
         _SCHEMA_READY.add(ready_key)
     return connection
 
