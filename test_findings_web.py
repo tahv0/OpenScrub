@@ -1,6 +1,7 @@
 """Confirmed examples are explicit, durable and reviewed from compact pixels."""
 import hashlib
 import json
+import time
 from pathlib import Path
 
 import cv2
@@ -523,10 +524,19 @@ def test_final_track_uses_cached_scan_representative_without_video_decode(findin
 
     monkeypatch.setattr(web, '_frame_at',
         lambda *a, **k: pytest.fail('reconciled cached preview reopened source video'))
-    # The detections call performs lazy reconciliation for jobs created before
-    # the post-scan reconciliation hook existed.
+    # Legacy track relinking must occur without blocking the detections GET.
+    # While it runs, cache-only previews may briefly return 204. They must
+    # eventually find the same verified real scan frame, without video decode.
+    started = time.monotonic()
     assert client.get(f'/api/jobs/{job["id"]}/detections').status_code == 200
-    preview = client.get(f'/api/jobs/{job["id"]}/finding-preview/0?cache_only=1')
+    assert time.monotonic() - started < 2.0
+    deadline = time.monotonic() + 5.0
+    while True:
+        preview = client.get(f'/api/jobs/{job["id"]}/finding-preview/0?cache_only=1')
+        if preview.status_code == 200 or time.monotonic() >= deadline:
+            break
+        assert preview.status_code in (204, 503), preview.get_data(as_text=True)
+        time.sleep(0.05)
     assert preview.status_code == 200, preview.get_data(as_text=True)
     meta = json.loads(preview.headers['X-Finding-Geometry'])
     assert meta['match'] == 'representative'
