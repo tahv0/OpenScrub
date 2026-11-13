@@ -272,7 +272,7 @@ def test_locked_findings_request_does_not_recreate_encrypted_database(findings_j
 
 
 @pytest.mark.parametrize('resource', ['list', 'image', 'queue', 'queue_image', 'preview'])
-def test_findings_reads_refuse_io_while_vault_cache_gate_is_held(findings_job, monkeypatch, resource):
+def test_findings_reads_refuse_io_while_vault_exclusive_gate_is_held(findings_job, monkeypatch, resource):
     client, job, _, path = findings_job
     entry = client.post(f'/api/jobs/{job["id"]}/confirm/0', json={'label': 'positive'}).get_json()['finding']
     key = client.get(f'/api/jobs/{job["id"]}/review-queue').get_json()['items'][0]['key']
@@ -283,11 +283,12 @@ def test_findings_reads_refuse_io_while_vault_cache_gate_is_held(findings_job, m
     # Pause after the report read so this checks the compact SQLite read itself.
     doc = json.loads(path.read_text())
     monkeypatch.setattr(web, '_load_preview_report', lambda job: doc)
-    with web._REVIEW_CACHE_LOCK:
+    # Only actual vault encryption should delay concurrent picture reads.
+    with web._REVIEW_PICTURE_GATE.writer():
         assert client.get(urls[resource]).status_code == 503
 
 
-def test_concurrent_saved_images_wait_for_short_cache_read_instead_of_failing(findings_job, monkeypatch):
+def test_concurrent_saved_images_do_not_wait_for_another_slow_reader(findings_job, monkeypatch):
     from concurrent.futures import ThreadPoolExecutor, TimeoutError
     import threading
     client, job, _, _ = findings_job
@@ -309,12 +310,49 @@ def test_concurrent_saved_images_wait_for_short_cache_read_instead_of_failing(fi
         assert entered.wait(3)
         second = pool.submit(request_image)
         try:
-            with pytest.raises(TimeoutError):
-                second.result(timeout=.1)
+            assert second.result(timeout=2) == 200, (
+                'A cached JPEG must not wait behind an unrelated slow reader')
         finally:
             release.set()
-        assert first.result(timeout=3) == second.result(timeout=3) == 200
+        assert first.result(timeout=3) == 200
 
+
+
+def test_saved_picture_reader_blocks_vault_encryption_until_complete(findings_job, monkeypatch):
+    from concurrent.futures import ThreadPoolExecutor, TimeoutError
+    import threading
+    client, job, _, _ = findings_job
+    entry = client.post(f'/api/jobs/{job["id"]}/confirm/0',
+                        json={'label': 'positive'}).get_json()['finding']
+    entered, release = threading.Event(), threading.Event()
+    original = web.findings_web.library.image_path
+    def blocked_image(*args):
+        entered.set()
+        assert release.wait(3)
+        return original(*args)
+    monkeypatch.setattr(web.findings_web.library, 'image_path', blocked_image)
+    monkeypatch.setitem(web.VAULT, 'key', b'fake-test-key')
+    encrypted = []
+    def encrypt(*args):
+        encrypted.append(True)
+        return 0
+    monkeypatch.setattr(web.vault, 'encrypt_tree', encrypt)
+    def read():
+        with web.app.test_client() as reader:
+            return reader.get(f'/api/findings/{entry["id"]}/image').status_code
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        reading = pool.submit(read)
+        assert entered.wait(2)
+        locking = pool.submit(web._vault_lock_now)
+        try:
+            with pytest.raises(TimeoutError):
+                locking.result(timeout=.1)
+            assert not encrypted, 'Vault encrypted plaintext while a reader was open'
+        finally:
+            release.set()
+        assert reading.result(timeout=3) == 200
+        assert locking.result(timeout=3) == 0
+        assert encrypted and web.VAULT['key'] is None
 
 def test_exact_warm_preview_can_confirm_after_source_removal(findings_job, monkeypatch):
     client, job, video, _ = findings_job
