@@ -5382,8 +5382,8 @@ function pumpPlateSaves(){
     // A busy vault/review writer refused before applying anything. Keep the
     // human's draft, release the refused request ID and retry automatically.
     s.pending=null;
-    s.readyAt=Date.now()+Math.min(8000,400*2**s.failures);
-    plateStatus(s,"Server busy · retrying save automatically…");
+    s.readyAt=Date.now()+Math.min(8000,1000*2**s.failures);
+    plateStatus(s,"Waiting to save · retrying save automatically…");
    }else{
     s.error=error;s.conflict=error.status===409;
     s.draw();plateStatus(s,"Not saved — "+error.message,true);
