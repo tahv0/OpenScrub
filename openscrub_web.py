@@ -950,9 +950,8 @@ def worker():
                     # continuation scan AND postprocessing have both passed.
                     stop_review.atomic_report(report_path, combined)
                     try:
-                        # Small reports already stay cheaply cached. Build a
-                        # per-row index only when a report exceeds the safe
-                        # in-memory snapshot threshold.
+                        # A scan has the complete report in memory. Prepare
+                        # a revision-fenced listing here, never on Review GET.
                         if os.path.getsize(report_path) > _REVIEW_REPORT_MAX_FILE_BYTES:
                             started = time.monotonic()
                             with _REVIEW_PICTURE_GATE.reader():
@@ -964,6 +963,8 @@ def worker():
                                     elapsed_ms=round((time.monotonic()-started)*1000),
                                     index_mb=round(os.path.getsize(os.path.join(
                                         job["dir"], review_preview_index.NAME))/1024**2, 1))
+                        elif os.path.getsize(report_path) >= _REVIEW_LISTING_INDEX_MIN_BYTES:
+                            review_preview_index.publish_listing(report_path, combined)
                     except Exception:
                         diagnostics.exception("review_index_build_failed", job)
                     try:
@@ -1825,6 +1826,55 @@ _REVIEW_TIMEOUT = 10
 _REVIEW_REPORT_LOCK = threading.Lock()
 _REVIEW_REPORTS = OrderedDict()
 _REVIEW_REPORT_MAX_FILE_BYTES = 32 * 1024 * 1024
+# Even sub-32MB JSON can require 15 seconds to load over Windows bind mounts.
+_REVIEW_LISTING_INDEX_MIN_BYTES = 2 * 1024 * 1024
+_REVIEW_INDEX_BACKGROUND_LOCK = threading.Lock()
+_REVIEW_INDEX_BACKGROUND_PENDING = {}
+_REVIEW_INDEX_BACKGROUND_RUNNING = set()
+
+
+def _warm_review_listing_index(job, document, full_rows=False):
+    """Refresh fallback listings or stale indexed rows off the request path.
+
+    A single worker per job takes the newest pending report revision. Save
+    retains its own complete document only until the row index is ready.
+    A competing scan/save cannot publish obsolete metadata because prepare
+    and publish_listing both verify report identity before committing.
+    """
+    report_path = os.path.join(job['dir'], 'report.json')
+    with _REVIEW_INDEX_BACKGROUND_LOCK:
+        _REVIEW_INDEX_BACKGROUND_PENDING[report_path] = (job, document, full_rows)
+        if report_path in _REVIEW_INDEX_BACKGROUND_RUNNING:
+            return
+        _REVIEW_INDEX_BACKGROUND_RUNNING.add(report_path)
+
+    def build():
+        try:
+            while True:
+                with _REVIEW_INDEX_BACKGROUND_LOCK:
+                    item = _REVIEW_INDEX_BACKGROUND_PENDING.pop(report_path, None)
+                    if item is None:
+                        _REVIEW_INDEX_BACKGROUND_RUNNING.discard(report_path)
+                        return
+                source_job, doc, full = item
+                try:
+                    with _REVIEW_PICTURE_GATE.reader():
+                        if vault_locked():
+                            return
+                        if full:
+                            review_preview_index.prepare(report_path, doc)
+                        else:
+                            review_preview_index.publish_listing(report_path, doc)
+                except Exception:
+                    diagnostics.exception('review_index_warmup_failed', source_job)
+        finally:
+            with _REVIEW_INDEX_BACKGROUND_LOCK:
+                _REVIEW_INDEX_BACKGROUND_RUNNING.discard(report_path)
+
+    threading.Thread(target=build, name='openscrub-review-index',
+                     daemon=True).start()
+
+
 
 
 def _preview_report_identity(path):
