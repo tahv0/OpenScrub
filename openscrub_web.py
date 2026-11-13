@@ -871,7 +871,18 @@ def worker():
             elif action == "verify":
                 perform_verification(job)
             elif action == "plate_text":
-                plate_text_web.perform(job)
+                # CPU OCR owns long-video decoders and can consume several GiB.
+                # On Linux (including Docker Desktop/WSL2), keep its allocations
+                # in a supervised subprocess so a failing OCR adapter does not
+                # bring down Flask/Cheroot and discard the open Review session.
+                # Windows-native/frozen entrypoints retain the existing path.
+                if (sys.platform.startswith("linux") and
+                        not getattr(sys, "frozen", False) and
+                        os.environ.get("OPENSCRUB_OCR_IN_PROCESS") != "1"):
+                    import plate_text_subprocess
+                    plate_text_subprocess.perform(job, sys.modules[__name__])
+                else:
+                    plate_text_web.perform(job)
             elif action in ("scan", "resume"):
                 resuming = action == "resume"
                 if not resuming:
