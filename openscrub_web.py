@@ -3939,7 +3939,7 @@ async function refreshJob(id,view,signal){
 
  // progress + ETA (updated in place — nothing is rebuilt).
  // The server sends a smoothed per-stage estimate (j.eta, seconds) built
- // from the stage's average processing rate — prefer it. The old
+ // from recent throughput on long stages — prefer it. The old
  // client-side extrapolation from bar movement stays only as a fallback
  // (rehydrated jobs mid-phase), with its history reset on phase change so
  // it never extrapolates a scan-speed rate across the render phase.
@@ -4087,6 +4087,10 @@ function renderWorkProgress(j){
  }else bar.hidden=true;
  const now=j.server_time||Date.now()/1000;
  if(p.started_at)text.push(`elapsed ${sectionTime(now-p.started_at)}`);
+ if(p.stage==="scan"&&Number.isFinite(p.rate_per_second)&&p.rate_per_second>0){
+  const rate=p.rate_per_second<.1?p.rate_per_second.toFixed(3):p.rate_per_second.toFixed(2);
+  text.push(`${rate} frames/s recent`);
+ }
  if(p.last_progress_at)text.push(`last progress ${Math.max(0,Math.floor(now-p.last_progress_at))}s ago`);
  box.textContent=text.join(" · ");
  if(p.last_progress_at&&now-p.last_progress_at>30)document.getElementById("eta").textContent="";
