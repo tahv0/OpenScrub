@@ -5958,7 +5958,7 @@ function confirmFinding(i,label){
     if(REVIEW_BASE?.job===job){REVIEW_BASE.enabled[m]=confirmedOutput;REVIEW_BASE.labels[m]=VLBL[m]||'';REVIEW_BASE.output_choices[m]=true;}
     const output=document.getElementById('bb'+m);if(output)output.innerHTML=detChoices(m);
     document.getElementById('det'+m)?.classList.toggle('off',!EN[m]);
-    redrawReviewOverlay(m);
+    if(typeof redrawReviewOverlay==="function")redrawReviewOverlay(m);
    }
    Object.assign(FINDING_META[i],{confirmed_finding_id:data.finding.id,confirmed_finding_revision:data.finding.revision});
    if(edit&&data.preview){
@@ -5987,7 +5987,7 @@ function applyDet(i,blur,preserveLabel=false){
   const b=document.getElementById("bb"+m),t=document.getElementById("det"+m);
   if(b)b.innerHTML=detChoices(m);
   if(t)t.classList.toggle("off",!blur);
-  redrawReviewOverlay(m);
+  if(typeof redrawReviewOverlay==="function")redrawReviewOverlay(m);
  }
  markReviewChanged();
  if(document.getElementById("beCv")){beRefresh();}
