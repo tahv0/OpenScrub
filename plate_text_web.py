@@ -380,6 +380,9 @@ def install(app, web):
                 if protected:
                     return jsonify(error=protected),409
                 try:
+                    # OCR reads report.json directly: publish SQLite review
+                    # decisions before freezing its report revision.
+                    web._review_journal_snapshot(job)
                     report_identity = _report_identity(job)
                 except OSError:
                     return jsonify(error='No valid scanned source timeline is available to search.'),409

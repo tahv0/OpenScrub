@@ -53,6 +53,7 @@ import zones_ui
 import openscrub_logging as diagnostics
 import finding_previews
 import review_preview_index
+import review_journal
 import findings_web
 import findings_ui
 import plate_text_web
@@ -1017,6 +1018,7 @@ def worker():
                 job["eta"] = None
             elif action == "render":
                 job["phase"] = "rendering"
+                _review_journal_snapshot(job)
                 args = build_args(job, for_render=True)
                 review_doc = _load_job_report(job)
                 try:
@@ -1416,6 +1418,7 @@ def job_resume(jid):
         if job.get("trackbg", {}).get("state") == "running":
             return jsonify({"error": "Finish tracking the selected object "
                                      "before resuming the scan"}), 409
+        _review_journal_snapshot(job)
         report = _load_job_report(job)
         try:
             meta = stop_review.validate_resume(report)
@@ -1456,6 +1459,7 @@ def perform_learning(job):
     job["activity"] = None
     job["model_root"] = learned_models_root()
     try:
+        _review_journal_snapshot(job)
         job["learning"] = {"stage": "preflight", "message": "Checking the local CUDA training environment"}
         document = _load_job_report(job)
         active = (document.get('learning') or {}).get('active') or learning_session._load(
@@ -1524,6 +1528,7 @@ def perform_verification(job):
     job.update(phase="learning", preview=None, activity=None)
     path = os.path.join(job["dir"], "report.json")
     try:
+        _review_journal_snapshot(job)
         settings = job["verification_request"]
         candidate_id, mode = settings["candidate_id"], settings["mode"]
         selected_candidate = learning_candidates.load_candidate(job["dir"], candidate_id)
@@ -1612,6 +1617,7 @@ def job_learning(jid):
             return jsonify({"error": "Pause or complete the scan before training."}), 409
         if job.get("trackbg", {}).get("state") == "running":
             return jsonify({"error": "Finish the current tracking operation before training."}), 409
+        _review_journal_snapshot(job)
         prior = _load_job_report(job)
         parent_id = ((prior.get('learning') or {}).get('active') or {}).get('model_id') or (prior.get('learning') or {}).get('library_model_id')
         parent_ready = parent_id and findings_web.training.training_info(learned_models_root(),parent_id).get('trainable')
@@ -1642,6 +1648,7 @@ def job_learning_rollback(jid):
         if job["phase"] not in ("paused", "review", "done"):
             return jsonify({"error": "Finish or cancel the active pass before restoring."}), 409
         with _REVIEW_EDIT_LOCK, _REVIEW_WORK_LOCK:
+            _review_journal_snapshot(job)
             current = _load_job_report(job)
             root = (Path(job["dir"]) / "learning" / "passes").resolve()
             previous = (current.get("learning") or {}).get("previous_report")
@@ -1698,7 +1705,16 @@ def job_learning_review(jid):
 
 def _load_job_report(job):
     with open(os.path.join(job["dir"], "report.json"), encoding="utf-8") as f:
-        return json.load(f)
+        return review_journal.apply(job["dir"], json.load(f))
+
+
+def _review_journal_snapshot(job):
+    """Publish human Review corrections only at a report-consuming boundary."""
+    with _REVIEW_EDIT_LOCK:
+        with _REVIEW_PICTURE_GATE.reader():
+            if vault_locked():
+                abort(423)
+            return review_journal.publish(job["dir"])
 
 
 def _invalidate_review_previews(job):
@@ -1817,7 +1833,7 @@ def _preview_report_identity(path):
             stat.st_mtime_ns, stat.st_ctime_ns)
 
 
-def _load_preview_report(job):
+def _load_preview_report_base(job):
     """Read-only, revision-fenced metadata for individual thumbnail requests.
 
     A large report is deserialized at most once per revision. Repeated warm
@@ -1870,6 +1886,17 @@ def _load_preview_report(job):
                 _REVIEW_REPORTS.clear()
                 _REVIEW_REPORTS[identity] = doc
         return doc
+
+
+def _load_preview_report(job):
+    # SQLite overlays stay small and independent of the large JSON/listing
+    # snapshot. The saved-picture reader lease must cover the journal's disk
+    # access while the vault may be encrypting saved review data.
+    doc = _load_preview_report_base(job)
+    with _REVIEW_PICTURE_GATE.reader():
+        if vault_locked():
+            abort(423)
+        return review_journal.view(job["dir"], doc)
 
 
 def _video_identity(path):
@@ -2074,6 +2101,11 @@ def job_detections(jid):
     static = review_preview_index.read_listing(
         os.path.join(job["dir"], "report.json"))
     if static is not None:
+        # Incremental human decisions live in SQLite until Save/render.
+        # Patch the already-cached public listing, not the huge scan report.
+        if review_journal.has_changes(job["dir"]):
+            listing = review_journal.overlay_listing(job["dir"], json.loads(static))
+            static = json.dumps(listing, separators=(",", ":"), ensure_ascii=False)
         candidates = learning_candidates.list_candidates(job["dir"])
         body = (static[:-1] + ',"learning_candidates":' +
                 json.dumps(candidates, separators=(",", ":"), ensure_ascii=False) + '}')
@@ -2591,6 +2623,8 @@ def job_plate_quad(jid, i):
     try:
         if vault_locked():
             abort(423)
+        # Legacy editor writes are an explicit snapshot boundary.
+        _review_journal_snapshot(job)
         # Writes need an independently mutable authoritative report, never the
         # lightweight read-only thumbnail index.
         doc = _load_job_report(job)
@@ -3017,6 +3051,9 @@ def job_save_edits(jid):
     started = time.perf_counter()
     edits = request.get_json(force=True)
     parsed = time.perf_counter()
+    # A deliberate Save is a report boundary; normal Is/Not and corner
+    # clicks never rewrite the long scan timeline.
+    _review_journal_snapshot(job)
     path = os.path.join(job["dir"], "report.json")
     doc = _load_job_report(job)
     loaded = time.perf_counter()
@@ -3240,6 +3277,7 @@ def job_track_object(jid):
                                                 seed_index, t_ref)
             path = os.path.join(job["dir"], "report.json")
             with _REVIEW_EDIT_LOCK:
+                _review_journal_snapshot(job)
                 current = _load_job_report(job)
                 # Tracking runs in the background. Publish against the latest
                 # report so concurrent section approvals and edits survive.
@@ -3549,6 +3587,7 @@ def job_download(jid):
 @app.route("/api/jobs/<jid>/report")
 def job_report(jid):
     job = JOBS.get(jid) or abort(404)
+    _review_journal_snapshot(job)
     return send_file(os.path.join(job["dir"], "report.json"),
                      as_attachment=True,
                      download_name=export_filenames(job)[1])
@@ -4960,7 +4999,7 @@ function beHook(){
  cv.addEventListener("pointerup",()=>{if(BE.drag){BE.drag=null;beRefresh();}});
 }
 
-// Only visible finding previews are requested. Editing reuses the same image
+// Only visible finding previews were fetched previously; now prefetch ahead of scrolling. Editing reuses the same image
 // and geometry; it never starts a second video/image request.
 // Large Review panels keep all finding/group decisions but materialize only
 // nearby card elements. Existing small reviews retain their exact behavior.
@@ -5093,7 +5132,7 @@ function reviewPreviewRank(task){
  if(!task.img.getBoundingClientRect)return 0;
  const r=task.img.getBoundingClientRect(),h=window.innerHeight||document.documentElement.clientHeight;
  const distance=r.bottom<0?-r.bottom:r.top>h?r.top-h:0;
- return distance>240?Infinity:distance;
+ return distance>2800?Infinity:distance;
 }
 function pumpReviewPreviews(state){
  if(REVIEW_MEDIA!==state)return;
@@ -5128,7 +5167,7 @@ function initReviewPreviews(){
    for(const e of entries)if(e.isIntersecting)queueReviewPreview(e.target);
    // Keep observing: skipped queued work is requested again on re-entry.
    pumpReviewPreviews(state);
-  },{rootMargin:"240px"});images.forEach(img=>state.observer.observe(img));
+  },{rootMargin:"1600px"});images.forEach(img=>state.observer.observe(img));
  }else images.forEach(img=>queueReviewPreview(img));
 }
 // Retain all decisions/group memberships, but mount card elements progressively.
@@ -5180,7 +5219,7 @@ function initReviewPages(){
    for(const entry of entries)
     if(entry.isIntersecting&&!entry.target.hidden)
      appendReviewPage(entry.target.dataset.reviewMore);
-  },{rootMargin:"720px"});
+  },{rootMargin:"1800px"});
   buttons.forEach(button=>panel._moreObserver.observe(button));
  }
 }
@@ -7011,6 +7050,8 @@ def _vault_lock_now():
                     _REVIEW_FRAMES.clear()
                     _REVIEW_PROBES.clear()
                     _REVIEW_REPORTS.clear()
+                    review_journal._READ_CACHE.clear()
+                    review_journal._COUNT_CACHE.clear()
                     n = vault.encrypt_tree(key, JOBS_DIR)
                     VAULT["key"] = None
         return n

@@ -335,7 +335,7 @@ def test_archive_revision_conflict_and_corner_reconfirmation_use_real_api(
             assert edit=={'dirty':False,'conflict':False,'error':False}
             assert page.evaluate('CONFIRM_FAILED.has(0)') is False
             assert 'confirmation stored' in card.locator('.quad-status').inner_text()
-            row=json.loads(report.read_text())['detections'][0]
+            row=web._load_job_report(web.JOBS['inline-fixture'])['detections'][0]
             assert row['confirmed_finding_revision']==5 and row['verified_label']=='plate'
             assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
             assert not errors,errors
