@@ -260,13 +260,13 @@ def test_region_draft_requires_explicit_label_and_output_preserves_confirmation(
         page.wait_for_function('!!document.querySelector("#det0 img")._quadEdit')
         drag_corner(page,card)
         assert page.evaluate('flushPlateSaves()') is True
-        draft=json.loads(path.read_text())['detections'][0]
+        draft=web._load_job_report(web.JOBS['inline-fixture'])['detections'][0]
         assert draft.get('plate_quad') and not draft.get('verified_label')
         with web.app.test_client() as client:
             assert client.get('/api/findings').get_json()['total']==0
         card.get_by_role('button',name='✓ Is a plate',exact=True).click()
         page.evaluate('CONFIRM_CHAIN')
-        saved=json.loads(path.read_text())['detections'][0]
+        saved=web._load_job_report(web.JOBS['inline-fixture'])['detections'][0]
         assert saved['verified_label']=='plate' and saved.get('confirmed_finding_id')
         with web.app.test_client() as client:
             archived=client.get('/api/findings').get_json()
