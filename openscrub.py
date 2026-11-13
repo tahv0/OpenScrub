@@ -59,6 +59,19 @@ class OcrBackend:
         raise NotImplementedError
 
 
+# Tesseract can return typographic dashes for actual ASCII hyphens in
+# camera/screen video. An SSN like 123-45-6789 has been observed as
+# 123-—45—-6789; a claim ID as CLM—123456. Normalize within each OCR token
+# BEFORE the low-confidence PII rescue and exact regex matching. Collapsing
+# runs is important: simply replacing — with - leaves invalid -- separators.
+# This does not guess missing digits or join unrelated OCR words.
+_OCR_HYPHENS = re.compile(r"[-\\u2010-\\u2015\\u2212\\uFE58\\uFE63\\uFF0D]+")
+
+
+def _normalize_ocr_hyphens(text):
+    return _OCR_HYPHENS.sub("-", text)
+
+
 class TesseractBackend(OcrBackend):
     def __init__(self):
         import pytesseract
@@ -83,7 +96,7 @@ class TesseractBackend(OcrBackend):
                     or RE_DATE.search(t)
                     or sum(ch.isdigit() for ch in s) >= 6)
         for i in range(len(data["text"])):
-            txt = data["text"][i].strip()
+            txt = _normalize_ocr_hyphens(data["text"][i].strip())
             conf = float(data["conf"][i]) if data["conf"][i] not in ("-1", -1) else 0.0
             if not txt:
                 continue
