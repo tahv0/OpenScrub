@@ -65,7 +65,7 @@ class OcrBackend:
 # BEFORE the low-confidence PII rescue and exact regex matching. Collapsing
 # runs is important: simply replacing — with - leaves invalid -- separators.
 # This does not guess missing digits or join unrelated OCR words.
-_OCR_HYPHENS = re.compile(r"[-\\u2010-\\u2015\\u2212\\uFE58\\uFE63\\uFF0D]+")
+_OCR_HYPHENS = re.compile(r"[-\u2010-\u2015\u2212\uFE58\uFE63\uFF0D]+")
 
 
 def _normalize_ocr_hyphens(text):
