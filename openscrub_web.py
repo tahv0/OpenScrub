@@ -5314,8 +5314,18 @@ function pumpPlateSaves(){
      apply_track:true,autosave:true,edit_id:Date.now().toString(36)+"-"+(++PLATE_SERIAL)+"-"+Math.random().toString(36).slice(2),
      version:s.version,label:VLBL[s.i]};
    }
-   const {data}=await reviewRequest("api/jobs/"+s.job+"/plate_quad/"+s.i,{method:"POST",
-    headers:{"Content-Type":"application/json"},body:JSON.stringify(pending)});
+   // Unlike a preview fetch, a durable report transaction may need tens of
+   // seconds on a large Windows-mounted job. Never abort at the 15-second
+   // thumbnail deadline and then force the person to press Retry save.
+   let data,slowNotice=setTimeout(()=>{
+    if(s.dirty&&s.pending===pending)
+     plateStatus(s,"Still saving corners to disk…");
+   },5000);
+   try{
+    ({data}=await reviewRequest("api/jobs/"+s.job+"/plate_quad/"+s.i,{method:"POST",
+     headers:{"Content-Type":"application/json"},body:JSON.stringify(pending),
+     timeoutMs:120000}));
+   }finally{clearTimeout(slowNotice);}
    Object.assign(s.meta,data.preview);s.img._plateMeta=s.meta;
    // The corner endpoint commits its own explicit label. Reflect that disk
    // state even if a newer Blur/Keep/Not-a-plate choice superseded the gesture,
@@ -5358,9 +5368,12 @@ function pumpPlateSaves(){
      plateStatus(s,"Saving corrected corners…");return;
     }
    }
-   if(error.status===503&&++s.failures<=3){
-    s.pending=null; // Server explicitly refused this write before applying it.
-    s.readyAt=Date.now()+1000*2**s.failures;plateStatus(s,"Waiting to save…");
+   if(error.status===503&&++s.failures<=6){
+    // A busy vault/review writer refused before applying anything. Keep the
+    // human's draft, release the refused request ID and retry automatically.
+    s.pending=null;
+    s.readyAt=Date.now()+Math.min(8000,400*2**s.failures);
+    plateStatus(s,"Server busy · retrying save automatically…");
    }else{
     s.error=error;s.conflict=error.status===409;
     s.draw();plateStatus(s,"Not saved — "+error.message,true);
