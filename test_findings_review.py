@@ -214,7 +214,11 @@ def test_embedded_modules_do_not_override_each_others_global_handlers():
     assert len(names)==len(set(names)), 'A later embedded module overrides an earlier UI handler'
 
 
+# A resource-constrained CI browser occasionally needs more than the global
+# 60-second pytest timeout just to create a Chromium page. Keep every save
+# and no-source-reopen assertion; allow the startup itself extra headroom.
 @pytest.mark.parametrize('width',[1440,390])
+@pytest.mark.timeout(120)
 def test_explicit_compact_review_saved_without_video(review_server,monkeypatch,width):
     url,report = review_server
     api = pytest.importorskip('playwright.sync_api')
