@@ -409,7 +409,13 @@ def test_reconcile_rejects_two_indistinguishable_tracks(previews, tmp_path):
     b = dict(row(frame=3), track=18)
     stats = previews.reconcile(tmp_path, [a, b], state())
     assert stats['linked'] == 0 and stats['ambiguous'] == 1
-    assert previews.lookup(tmp_path, a, state(), allow_representative=True) is None
+    # Exact-frame pixels remain valid without assigning either ambiguous track.
+    exact = previews.lookup(tmp_path, a, state(), allow_representative=True)
+    assert exact is not None
+    assert exact[0]['match'] == 'exact' and exact[0]['track'] == -1
+    next_frame = dict(a, frame_index=4, t_start=.4, t_end=.4, last_seen=.4)
+    assert previews.lookup(tmp_path, next_frame, state(),
+                           allow_representative=True) is None
 
 
 def test_reconcile_does_not_use_nearby_but_out_of_interval_preview(previews, tmp_path):
