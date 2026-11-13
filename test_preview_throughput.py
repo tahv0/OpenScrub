@@ -149,8 +149,8 @@ from test_review_browser import review_server, browser_instance, load_browser_pa
 
 
 @pytest.mark.parametrize('width', [1440, 390])
-def test_scroll_jump_never_decodes_source_without_explicit_load(review_server, width, tmp_path):
-    """Scrolling through cache misses must not reopen the source video."""
+def test_scroll_jump_automatically_loads_visible_cache_misses(review_server, width, tmp_path):
+    """A missing thumbnail is decoded automatically but only when near the viewport."""
     url, report = review_server
     shutil.rmtree(report.parent / 'compact_previews')
     api = pytest.importorskip('playwright.sync_api')
@@ -161,33 +161,32 @@ def test_scroll_jump_never_decodes_source_without_explicit_load(review_server, w
         errors=[]; page.on('pageerror', lambda e:errors.append(str(e)))
         load_browser_page(page,url,[],[])
         assert page.title() == 'OpenScrub'
-        page.evaluate('''() => {
+        page.evaluate(r'''() => {
           window.__fetchBeforeObserve=window.fetch;window.__coldStarts=[];
           window.fetch=async(url,opts)=>{
-            const m=String(url).match(/\\/finding-preview\\/(\\d+)/);
+            const m=String(url).match(/\/finding-preview\/(\d+)/);
             if(m&&!String(url).includes('cache_only=1'))__coldStarts.push(Number(m[1]));
             return __fetchBeforeObserve(url,opts);
           };
         }''')
         page.get_by_role('link',name='Synthetic review fixture',exact=True).click()
         page.locator('#det0').scroll_into_view_if_needed()
-        page.locator('#det0').get_by_role('button',name='Load preview',exact=True).wait_for()
-        page.evaluate('''() => {for(let i=1;i<75;i++)queueReviewPreview(document.querySelector('#det'+i+' img'));}''')
-        page.wait_for_function('REVIEW_MEDIA.cacheActive===0&&REVIEW_MEDIA.cacheQueue.length===0')
+        page.wait_for_function("document.querySelector('#det0 img').naturalWidth>0",timeout=60000)
+        assert 0 in page.evaluate('__coldStarts'), 'Visible cache miss did not decode automatically'
         page.locator('#det85').scroll_into_view_if_needed()
-        page.locator('#det85').get_by_role('button',name='Load preview',exact=True).wait_for()
-        assert page.evaluate('__coldStarts') == [], 'cache misses silently started source decoding'
-        page.locator('#det85').get_by_role('button',name='Load preview',exact=True).click()
-        page.wait_for_function("document.querySelector('#det85 img').naturalWidth>0")
-        assert page.evaluate('__coldStarts') == [85]
+        page.wait_for_function("document.querySelector('#det85 img').naturalWidth>0",timeout=60000)
+        starts=page.evaluate('__coldStarts')
+        # Same-frame, same-geometry findings may correctly share one exact
+        # cached crop. No second video decode is required for that image.
+        assert 0 in starts, 'The first visible card did not load automatically'
+        assert len(starts)<40, 'Scrolling started a source decoder for every offscreen card'
         assert page.locator('#det85 canvas').count()==1
-        evidence=Path(os.environ.get('REVIEW_EVIDENCE_DIR',str(tmp_path)));evidence.mkdir(parents=True,exist_ok=True)
-        page.screenshot(path=str(evidence/('manual-cold-preview-%s.png'%width)))
         assert not errors,errors
         assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
         browser.close()
 
-def test_busy_preview_retries_only_after_explicit_load(review_server,monkeypatch):
+
+def test_busy_preview_retries_automatically_with_bounded_budget(review_server,monkeypatch):
     from flask import request,jsonify
     url,report=review_server
     shutil.rmtree(report.parent / 'compact_previews')
@@ -206,11 +205,46 @@ def test_busy_preview_retries_only_after_explicit_load(review_server,monkeypatch
         load_browser_page(page,url,[],[])
         page.get_by_role('link',name='Synthetic review fixture',exact=True).click()
         card=page.locator('#det0');card.scroll_into_view_if_needed()
-        card.get_by_role('button',name='Load preview',exact=True).wait_for()
-        assert cold==[]
-        card.get_by_role('button',name='Load preview',exact=True).click()
-        page.wait_for_function("!!document.querySelector('#det0 img')._quadEdit")
-        assert cold==[0,0]
+        page.wait_for_function("!!document.querySelector('#det0 img')._quadEdit",timeout=60000)
+        assert cold==[0,0], 'A busy decoder should be retried only twice, not loop forever'
+        assert not errors,errors
+        browser.close()
+
+
+@pytest.mark.timeout(70)
+def test_large_review_pages_keep_all_group_choices_and_sample_members(review_server):
+    """Only mount the first 48 cards; bulk choices and sampled groups still cover all."""
+    from copy import deepcopy
+    url, report = review_server
+    doc = json.loads(report.read_text())
+    template = doc['detections'][0]
+    doc['detections'] = [dict(deepcopy(template), track=i, text='Synthetic plate %s' % i)
+                         for i in range(530)]
+    report.write_text(json.dumps(doc))
+    api = pytest.importorskip('playwright.sync_api')
+    with api.sync_playwright() as pw:
+        browser = browser_instance(pw)
+        page = browser.new_page(viewport={'width':1440,'height':1000})
+        page.set_default_timeout(12000)
+        errors=[];page.on('pageerror',lambda error:errors.append(str(error)))
+        load_browser_page(page,url,[],[])
+        page.get_by_role('link',name='Synthetic review fixture',exact=True).click()
+        page.locator('#review').wait_for()
+        assert page.locator('#review .det').count()==48
+        assert page.evaluate('Object.keys(FINDING_META).length')==530
+        assert page.evaluate('Object.keys(TRKMEM).length')==530
+        page.get_by_role('button',name='Keep all visible',exact=True).first.click()
+        assert page.evaluate('Object.values(EN).every(v=>v===false)')
+        delta=page.evaluate('reviewChoiceDelta()')
+        assert len(delta['enabled'])==530, 'Bulk actions must include unmounted groups'
+        page.get_by_role('button',name='Review 10% of plate groups',exact=True).click()
+        assert page.locator('#review .det:visible').count()==53
+        assert '53 of 530' in page.locator('#reviewSampleSummary').inner_text()
+        page.get_by_role('button',name='Show all findings',exact=True).click()
+        before=page.locator('#review .det').count()
+        page.evaluate("appendReviewPage('plate')")
+        assert page.locator('#review .det').count()>before
+        assert page.evaluate('Object.values(EN).every(v=>v===false)')
         assert not errors,errors
         browser.close()
 
@@ -232,14 +266,18 @@ reviewRequest=async(url)=>{
 (async()=>{
  initReviewPreviews();
  const automatic=img._previewTask.promise;
- assert.equal(await automatic,false);
- assert.equal(calls,0,'opening Review must not start a cold decode');
- const pending=queueReviewPreview(img,true);
  await new Promise(r=>setTimeout(r,30));
- if(CANCEL){clearReviewPreviews();assert.equal(await pending,false);
-   await new Promise(r=>setTimeout(r,1800));assert.equal(calls,1);}
- else{assert.equal(await pending,false);assert.equal(calls,3);
-   assert.equal(REVIEW_MEDIA.active,0);assert.equal(REVIEW_MEDIA.queue.length,0);clearReviewPreviews();}
+ assert.equal(calls,1,'automatic cold decoding should use one worker');
+ if(CANCEL){
+   clearReviewPreviews();assert.equal(await automatic,false);
+   await new Promise(r=>setTimeout(r,1800));assert.equal(calls,1);
+ }else{
+   assert.equal(await automatic,false);
+   assert.equal(calls,3,'busy retries must stop after two retries');
+   assert.equal(REVIEW_MEDIA.active,0);
+   assert.equal(REVIEW_MEDIA.queue.length,0);
+   clearReviewPreviews();
+ }
 })().catch(e=>{console.error(e);process.exitCode=1;});
 '''
     script=script.replace('if(CANCEL)','if('+str(cancel).lower()+')')

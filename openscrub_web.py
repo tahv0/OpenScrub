@@ -4856,7 +4856,11 @@ function beHook(){
 
 // Only visible finding previews are requested. Editing reuses the same image
 // and geometry; it never starts a second video/image request.
+// Large Review panels keep all finding/group decisions but materialize only
+// nearby card elements. Existing small reviews retain their exact behavior.
 let REVIEW_MEDIA=null;
+const REVIEW_PAGE_THRESHOLD=400, REVIEW_PAGE_SIZE=48;
+let REVIEW_PENDING_PAGES={},REVIEW_CATEGORY_GROUPS={};
 async function reviewRequest(url, options={}, type="json"){
  const {timeoutMs=15000,...fetchOptions}=options;
  const ctl=new AbortController(),parent=fetchOptions.signal;
@@ -4886,6 +4890,8 @@ function clearReviewPreviews(){
  if(!REVIEW_MEDIA)return;
  const old=REVIEW_MEDIA;REVIEW_MEDIA=null;
  if(old.observer)old.observer.disconnect();
+ const panel=document.getElementById?.("review");
+ if(panel?._moreObserver){panel._moreObserver.disconnect();panel._moreObserver=null;}
  if(old.retryTimer)clearTimeout(old.retryTimer);
  old.controllers.forEach(c=>c.abort());
  [...old.queue.splice(0),...old.cacheQueue.splice(0)].forEach(task=>task.resolve(false));
@@ -4966,14 +4972,7 @@ async function loadReviewPreview(state,task,cacheOnly){
  }finally{
   if(url){state.urls.delete(url);URL.revokeObjectURL(url);}
   state[counter]--;state.controllers.delete(ctl);
-  if(missing&&cacheOnly&&!task.priority&&REVIEW_MEDIA===state&&img.isConnected){
-   // Opening Review must never start source-video decoding just because a
-   // compact scan-time picture is missing. Keep the card interactive and let
-   // the person opt into the expensive path for the few findings they need.
-   if(status)status.textContent="Preview not cached — load only if needed.";
-   if(retry){retry.hidden=false;retry.textContent="Load preview";}
-   img._previewTask=null;task.resolve(false);
-  }else if((missing||retryBusy)&&REVIEW_MEDIA===state&&img.isConnected){
+  if((missing||retryBusy)&&REVIEW_MEDIA===state&&img.isConnected){
    if(missing&&status)status.textContent="Loading source preview…";
    const queue=retryBusy&&cacheOnly?state.cacheQueue:state.queue;
    if(task.priority)queue.unshift(task);else queue.push(task);
@@ -5025,6 +5024,59 @@ function initReviewPreviews(){
    pumpReviewPreviews(state);
   },{rootMargin:"240px"});images.forEach(img=>state.observer.observe(img));
  }else images.forEach(img=>queueReviewPreview(img));
+}
+// Retain all decisions/group memberships, but mount card elements progressively.
+function appendReviewPage(cat,selectedOnly=false){
+ const panel=document.getElementById("review"),pending=REVIEW_PENDING_PAGES[cat];
+ if(!panel||!pending||!pending.length)return 0;
+ const grid=[...panel.querySelectorAll("[data-review-category]")]
+  .find(node=>node.dataset.reviewCategory===cat);
+ if(!grid)return 0;
+ const added=[];
+ for(let k=0;k<pending.length&&added.length<(selectedOnly?Infinity:REVIEW_PAGE_SIZE);){
+  const entry=pending[k],members=TRKMEM[entry.i]||[entry.i];
+  if(selectedOnly&&(!LEARNING_SELECTION||!members.some(i=>LEARNING_SELECTION.has(i)))){k++;continue;}
+  added.push(entry);pending.splice(k,1);
+ }
+ if(added.length){
+  grid.insertAdjacentHTML("beforeend",added.map(item=>item.html).join(""));
+  for(const item of added){
+   const i=item.i,card=document.getElementById("det"+i);
+   if(!card)continue;
+   card.hidden=!!LEARNING_SELECTION&&!(TRKMEM[i]||[i]).some(m=>LEARNING_SELECTION.has(m));
+   card.classList.toggle("off",!EN[i]);
+   const bb=document.getElementById("bb"+i);if(bb)bb.innerHTML=detChoices(i);
+   const note=document.getElementById("vlabel"+i);if(note)note.innerHTML=findingStatus(i);
+   updateReviewOverlayLabel(i);
+   const img=card.querySelector("img[data-preview-url]");
+   if(img&&REVIEW_MEDIA){
+    if(REVIEW_MEDIA.observer)REVIEW_MEDIA.observer.observe(img);
+    else queueReviewPreview(img);
+   }
+  }
+ }
+ const more=[...panel.querySelectorAll(".review-more")]
+  .find(node=>node.dataset.reviewMore===cat);
+ if(more){
+  more.hidden=!!LEARNING_SELECTION||!pending.length;
+  more.textContent="Load more "+(CATDN[cat]||cat)+" ("+pending.length+" remaining)";
+ }
+ return added.length;
+}
+function initReviewPages(){
+ const panel=document.getElementById("review");
+ if(!panel)return;
+ const buttons=panel.querySelectorAll(".review-more");
+ if(!buttons.length)return;
+ buttons.forEach(button=>button.addEventListener("click",()=>appendReviewPage(button.dataset.reviewMore)));
+ if(typeof IntersectionObserver!=="undefined"){
+  panel._moreObserver=new IntersectionObserver(entries=>{
+   for(const entry of entries)
+    if(entry.isIntersecting&&!entry.target.hidden)
+     appendReviewPage(entry.target.dataset.reviewMore);
+  },{rootMargin:"720px"});
+  buttons.forEach(button=>panel._moreObserver.observe(button));
+ }
 }
 function retryReviewPreview(button){
  const img=button.closest(".det").querySelector("img[data-preview-url]");
@@ -5508,6 +5560,8 @@ function applyReviewGroupFilter(){
  if(!panel||panel._sampleJob!==CUR||panel._sampleView!==JOBVIEW)return false;
  clearSel();
  const selected=LEARNING_SELECTION;
+ // Group sampling must reveal representative cards beyond the first page.
+ if(selected)for(const cat of Object.keys(REVIEW_PENDING_PAGES))appendReviewPage(cat,true);
  let shown=0;
  panel.querySelectorAll(".det").forEach(card=>{
   const i=Number(card.id.slice(3));
@@ -5519,6 +5573,9 @@ function applyReviewGroupFilter(){
   grid.hidden=count===0;
   const heading=grid.previousElementSibling;heading.hidden=count===0;
   heading.querySelector(".badge").textContent=count;
+ });
+ panel.querySelectorAll(".review-more").forEach(button=>{
+  button.hidden=!!selected||!(REVIEW_PENDING_PAGES[button.dataset.reviewMore]||[]).length;
  });
  const zones=panel.querySelector("#reviewZones");if(zones)zones.hidden=!!selected;
  const all=panel.querySelector("#reviewShowAll");if(all)all.hidden=!selected;
@@ -5728,6 +5785,7 @@ async function loadReview(signal=null,phase=SHELLPH){
  if(!current()||CONFIRM_FAILED.size||!await flushPlateSaves()||!current())return false;
  if(!closePlateQuad())return false;
  clearReviewPreviews();
+ REVIEW_PENDING_PAGES={};REVIEW_CATEGORY_GROUPS={};
  if(!await showPanel("review")||!current())return false;
  if(VLBLJOB!==CUR){VLBL={};VLBLJOB=CUR;}
  let d;
@@ -5760,7 +5818,7 @@ async function loadReview(signal=null,phase=SHELLPH){
  let html=`<div class="card" id="review"><h2>Review findings</h2>
  <p class="review-copy">Review small saved pictures. Choose <b>Is a …</b> or <b>Not a …</b> to save a human example with its source video.
  Scan-time pictures are matched to final tracked findings automatically; Review may show a nearby real cached frame from the same track.
- A genuinely missing picture stays unloaded until you click <b>Load preview</b>, so opening Review does not reopen the source video.
+ Missing thumbnails load automatically for visible cards with one bounded source decoder. Saved pictures stay available while other previews are prepared.
  Drag plate corners to adjust the area; an area edit alone does not confirm a plate.<br>Automatic protection stays active while a finding is <b>Not reviewed</b>. Output choices apply after <b>Save edits &amp; render</b>.
  Drag across cards to select several.</p>
  <div class="row" style="margin-bottom:10px">
@@ -5870,14 +5928,16 @@ async function loadReview(signal=null,phase=SHELLPH){
   // person cards first, then everything else chronologically
   items.sort((a,b)=>((b.personcard?1:0)-(a.personcard?1:0))||a.t_start-b.t_start);
   if(!items.length)continue;
+  REVIEW_CATEGORY_GROUPS[cat]=items.map(item=>item.i);
   html+=`<h3 style="margin:10px 0 6px">${CATDN[cat]||cat} <span class="badge">${items.length}</span>
    <button class="sec" style="padding:3px 8px;font-size:12px"
     onclick="setAll('${cat}',true)">Blur all</button>
    <button class="sec" style="padding:3px 8px;font-size:12px"
     onclick="setAll('${cat}',false)">Keep all visible</button></h3><div class="grid3" data-review-category="${cat}">`;
-  for(const x of items){
+  const lazy=items.length>REVIEW_PAGE_THRESHOLD,pending=[];
+  for(const [ordinal,x] of items.entries()){
    REVIEW_DISPLAY_META[x.i]=x;
-   html+=`<div class="det ${EN[x.i]?'':'off'}" id="det${x.i}" data-cat="${cat}">
+   const cardHTML=`<div class="det ${EN[x.i]?'':'off'}" id="det${x.i}" data-cat="${cat}">
     <div class="${x.category==="plate"?"plate-preview":"finding-preview"}">
     <img id="thumb${x.i}" data-preview-url="api/jobs/${job}/finding-preview/${x.i}" alt="Original detection preview"
      class="${x.category==="plate"?"plate-edit-thumb":""}"
@@ -5898,8 +5958,16 @@ async function loadReview(signal=null,phase=SHELLPH){
     <small id="vlabel${x.i}" style="color:#93c5fd" role="status">${findingStatus(x.i)}</small>
     <button class="sec" id="findingDismiss${x.i}" hidden onclick="dismissFindingConfirmation(${x.i})">Keep current review choice</button>
     <div id="bb${x.i}">${detChoices(x.i)}</div>
-   </div>`}
-  html+=`</div>`}
+   </div>`;
+   if(lazy&&ordinal>=REVIEW_PAGE_SIZE)pending.push({i:x.i,html:cardHTML});
+   else html+=cardHTML;
+  }
+  html+=`</div>`;
+  if(pending.length){
+   REVIEW_PENDING_PAGES[cat]=pending;
+   html+=`<button type="button" class="sec review-more" data-review-more="${sectionEscape(cat)}" style="margin:8px 0 12px">Load more ${sectionEscape(CATDN[cat]||cat)} (${pending.length} remaining)</button>`;
+  }
+ }
  html+=`</div>
  <div class="row" style="margin-top:12px">
  <button onclick="saveAndRender()">${phase==="paused"?"Save review edits":"Save edits &amp; render"}</button>
@@ -5924,7 +5992,7 @@ async function loadReview(signal=null,phase=SHELLPH){
  if(typeof updateReviewOverlayLabel==="function"&&typeof REVIEW_DISPLAY_META!=="undefined"){
   for(const key of Object.keys(REVIEW_DISPLAY_META))updateReviewOverlayLabel(Number(key));
  }
- initMarquee();initReviewPreviews();
+ initMarquee();initReviewPreviews();initReviewPages();
  return true;
 }
 
@@ -6071,8 +6139,29 @@ function applyDet(i,blur,preserveLabel=false){
  markReviewChanged();
  if(document.getElementById("beCv")){beRefresh();}
 }
-function setAll(cat,on){document.querySelectorAll(`.det[data-cat=${cat}]:not([hidden])`)
- .forEach(el=>applyDet(+el.id.slice(3),on));}
+function setAll(cat,on){
+ // In a paged category, bulk choices must include every group, not merely
+ // the 48 currently mounted cards. Never silently omit unseen detections.
+ if(REVIEW_PENDING_PAGES[cat]&&!LEARNING_SELECTION){
+  for(const i of REVIEW_CATEGORY_GROUPS[cat]||[])
+   for(const m of TRKMEM[i]||[i]){
+    EN[m]=on;OUTPUT_CHOICES[m]=true;
+    OUTPUT_VERSION[m]=(OUTPUT_VERSION[m]||0)+1;
+   }
+  document.querySelectorAll("#review .det").forEach(card=>{
+   if(card.dataset.cat!==cat)return;
+   const i=Number(card.id.slice(3));
+   card.classList.toggle("off",!EN[i]);
+   const bb=document.getElementById("bb"+i);if(bb)bb.innerHTML=detChoices(i);
+   redrawReviewOverlay(i);
+  });
+  markReviewChanged();
+  if(document.getElementById("beCv"))beRefresh();
+  return;
+ }
+ document.querySelectorAll(`.det[data-cat=${cat}]:not([hidden])`)
+  .forEach(el=>applyDet(+el.id.slice(3),on));
+}
 function thumbRetry(img){
  const n=+(img.dataset.r||0);
  if(n>=3)return;
