@@ -885,6 +885,9 @@ def worker():
                     plate_text_web.perform(job)
             elif action in ("scan", "resume"):
                 resuming = action == "resume"
+                # New scan/resume can change final track membership; only that
+                # needs re-reconciliation. Ordinary corner saves do not.
+                job.pop("_compact_preview_reconcile", None)
                 if not resuming:
                     cache = os.path.join(job['dir'], 'compact_previews')
                     if os.path.isdir(cache) and not os.path.islink(cache):
@@ -951,7 +954,7 @@ def worker():
                         # in-memory snapshot threshold.
                         if os.path.getsize(report_path) > _REVIEW_REPORT_MAX_FILE_BYTES:
                             started = time.monotonic()
-                            with _REVIEW_CACHE_LOCK:
+                            with _REVIEW_PICTURE_GATE.reader():
                                 built = (not vault_locked() and
                                          review_preview_index.prepare(report_path, combined))
                             if built:
@@ -1722,6 +1725,80 @@ import zipfile
 _REVIEW_EDIT_LOCK = threading.RLock()
 _REVIEW_WORK_LOCK = threading.RLock()
 _REVIEW_CACHE_LOCK = threading.Lock()
+
+class _SavedPictureBusyTimeout(TimeoutError):
+    """Only a vault writer, never another thumbnail, can time out a reader."""
+
+
+class _SavedPictureGate:
+    """Concurrent image readers, exclusive vault encryption.
+
+    Unlike _REVIEW_CACHE_LOCK, this gate never serializes slow SQLite/JPEG
+    reads across independent cards. Writers have priority so a busy review
+    cannot starve an explicit vault lock. Reentrant reads support preview
+    helpers that already have an outer reader lease.
+    """
+    def __init__(self):
+        from contextlib import contextmanager
+        self._condition = threading.Condition()
+        self._readers = 0
+        self._writing = False
+        self._writers_waiting = 0
+        self._local = threading.local()
+
+    def reader(self, timeout=1.0):
+        from contextlib import contextmanager
+        @contextmanager
+        def lease():
+            depth = getattr(self._local, "depth", 0)
+            if depth:
+                self._local.depth = depth + 1
+                try:
+                    yield
+                finally:
+                    self._local.depth -= 1
+                return
+            deadline = time.monotonic() + timeout
+            with self._condition:
+                while self._writing or self._writers_waiting:
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        raise _SavedPictureBusyTimeout("Saved-picture gate is waiting for vault encryption")
+                    self._condition.wait(remaining)
+                self._readers += 1
+                self._local.depth = 1
+            try:
+                yield
+            finally:
+                with self._condition:
+                    self._local.depth = 0
+                    self._readers -= 1
+                    if not self._readers:
+                        self._condition.notify_all()
+        return lease()
+
+    def writer(self):
+        from contextlib import contextmanager
+        @contextmanager
+        def exclusive():
+            with self._condition:
+                self._writers_waiting += 1
+                try:
+                    while self._writing or self._readers:
+                        self._condition.wait()
+                    self._writing = True
+                finally:
+                    self._writers_waiting -= 1
+            try:
+                yield
+            finally:
+                with self._condition:
+                    self._writing = False
+                    self._condition.notify_all()
+        return exclusive()
+
+_REVIEW_PICTURE_GATE = _SavedPictureGate()
+_REVIEW_RECONCILE_LOCK = threading.Lock()
 _REVIEW_FRAMES = OrderedDict()
 _REVIEW_PROBES = OrderedDict()
 _REVIEW_FRAME_BYTES = 64 * 1024 * 1024
@@ -1767,12 +1844,16 @@ def _load_preview_report(job):
                 # the index up front, outside HTTP request latency.
                 source = _load_job_report(job)
                 try:
-                    # Serialize publication with vault encryption.
-                    with _REVIEW_CACHE_LOCK:
+                    # The index may take seconds to build for older jobs.
+                    # Hold a SHARED vault lease rather than the global memory
+                    # cache mutex, so unrelated saved pictures stay usable.
+                    with _REVIEW_PICTURE_GATE.reader():
                         if vault_locked():
                             abort(423)
                         review_preview_index.prepare(path, source)
                         doc = review_preview_index.load(path)
+                except _SavedPictureBusyTimeout:
+                    abort(503, description="The vault is locking saved pictures. Retry shortly.")
                 except (OSError, ValueError, sqlite3.DatabaseError):
                     diagnostics.exception("review_index_build_failed", job)
                 if doc is None:
@@ -1958,19 +2039,29 @@ def _reconcile_compact_previews(job, doc):
             os.path.realpath(os.path.join(job["dir"], "report.json")))
     except OSError:
         return dict(total=0, linked=0, already=0)
-    if job.get("_compact_preview_reconcile") == signature:
+    if job.get("_compact_preview_reconcile"):
         return dict(total=0, linked=0, already=0)
-    if not _REVIEW_CACHE_LOCK.acquire(timeout=1.):
+    # Reconciliation is metadata-only, but a long-video SQLite sweep can
+    # take seconds on a Windows-mounted drive. Never hold the global memory
+    # cache lock, which formerly starved saved picture reads and autosaves.
+    if not _REVIEW_RECONCILE_LOCK.acquire(blocking=False):
         return dict(total=0, linked=0, already=0)
     try:
-        if vault_locked():
+        if job.get("_compact_preview_reconcile"):
             return dict(total=0, linked=0, already=0)
-        stats = finding_previews.reconcile(
-            job["dir"], doc.get("detections", []), doc.get("render_state") or {})
-        job["_compact_preview_reconcile"] = signature
-        return stats
+        with _REVIEW_PICTURE_GATE.reader():
+            if vault_locked():
+                return dict(total=0, linked=0, already=0)
+            stats = finding_previews.reconcile(
+                job["dir"], doc.get("detections", []), doc.get("render_state") or {})
+            # One reconciliation per completed scan, not per report save.
+            # Human corner changes retain exact-frame/geometry cache checks.
+            job["_compact_preview_reconcile"] = signature
+            return stats
+    except _SavedPictureBusyTimeout:
+        abort(503, description="The vault is locking saved pictures. Retry shortly.")
     finally:
-        _REVIEW_CACHE_LOCK.release()
+        _REVIEW_RECONCILE_LOCK.release()
 
 
 @app.route("/api/jobs/<jid>/detections")
@@ -2803,23 +2894,22 @@ def _serialize_review_edit(fn):
 
 
 def _serialize_review_read(fn):
-    """Protect small stored-picture I/O from vault encryption, without decoding.
+    """Let independent saved-picture reads proceed without mutual contention.
 
-    Callers must not acquire the edit/decoder gates inside this cache gate.
-    Allow ordinary concurrent thumbnails a brief wait for another small read.
-    Bound the wait during encryption, then recheck the vault after acquisition.
+    The shared reader lease excludes vault encryption for the full read
+    lifetime; unlike the old one-second global cache mutex, a slow thumbnail
+    no longer makes unrelated reviews or corner saves return HTTP 503.
     """
     from functools import wraps
     @wraps(fn)
     def read(*args, **kwargs):
-        if not _REVIEW_CACHE_LOCK.acquire(timeout=1.):
-            abort(503, description="Saved pictures are temporarily busy. Retry shortly.")
         try:
-            if vault_locked():
-                abort(423)
-            return fn(*args, **kwargs)
-        finally:
-            _REVIEW_CACHE_LOCK.release()
+            with _REVIEW_PICTURE_GATE.reader():
+                if vault_locked():
+                    abort(423)
+                return fn(*args, **kwargs)
+        except _SavedPictureBusyTimeout:
+            abort(503, description="The vault is locking saved pictures. Retry shortly.")
     return read
 
 
@@ -3538,11 +3628,13 @@ progress{width:100%;height:12px;accent-color:var(--acc)}
 .review-overlay-swatch.edit{border:2px solid #38bdf8;background:transparent;position:relative}
 .review-overlay-swatch.edit::after{content:"";position:absolute;width:5px;height:5px;border-radius:50%;
  background:#38bdf8;left:8px;top:2px}
-.plate-output-badge{position:absolute;left:6px;bottom:6px;z-index:3;max-width:calc(100% - 12px);
- padding:4px 6px;border-radius:6px;background:rgba(2,6,23,.86);border:1px solid #475569;
- color:#e2e8f0;font-size:10.5px;line-height:1.25;text-align:left;pointer-events:none;
- box-sizing:border-box;overflow-wrap:anywhere}
-.plate-output-badge strong{display:block;font-size:10.5px;letter-spacing:.03em}
+.plate-output-badge{display:flex;align-items:center;justify-content:space-between;
+ gap:8px;width:100%;max-width:100%;margin:4px 0 0;padding:3px 6px;
+ border:1px solid #475569;border-radius:5px;background:#0f172a;
+ color:#cbd5e1;font-size:10px;line-height:1.3;text-align:left;box-sizing:border-box}
+.plate-output-badge strong{display:inline-block;flex:none;font-size:10px;letter-spacing:.025em}
+.plate-output-badge span{display:block;flex:1;min-width:0;text-align:right;
+ overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .plate-output-badge.hidden strong{color:#fca5a5}
 .plate-output-badge.visible strong{color:#86efac}
 
@@ -5232,8 +5324,18 @@ function pumpPlateSaves(){
      apply_track:true,autosave:true,edit_id:Date.now().toString(36)+"-"+(++PLATE_SERIAL)+"-"+Math.random().toString(36).slice(2),
      version:s.version,label:VLBL[s.i]};
    }
-   const {data}=await reviewRequest("api/jobs/"+s.job+"/plate_quad/"+s.i,{method:"POST",
-    headers:{"Content-Type":"application/json"},body:JSON.stringify(pending)});
+   // Unlike a preview fetch, a durable report transaction may need tens of
+   // seconds on a large Windows-mounted job. Never abort at the 15-second
+   // thumbnail deadline and then force the person to press Retry save.
+   let data,slowNotice=setTimeout(()=>{
+    if(s.dirty&&s.pending===pending)
+     plateStatus(s,"Still saving corners to disk…");
+   },5000);
+   try{
+    ({data}=await reviewRequest("api/jobs/"+s.job+"/plate_quad/"+s.i,{method:"POST",
+     headers:{"Content-Type":"application/json"},body:JSON.stringify(pending),
+     timeoutMs:120000}));
+   }finally{clearTimeout(slowNotice);}
    Object.assign(s.meta,data.preview);s.img._plateMeta=s.meta;
    // The corner endpoint commits its own explicit label. Reflect that disk
    // state even if a newer Blur/Keep/Not-a-plate choice superseded the gesture,
@@ -5276,9 +5378,12 @@ function pumpPlateSaves(){
      plateStatus(s,"Saving corrected corners…");return;
     }
    }
-   if(error.status===503&&++s.failures<=3){
-    s.pending=null; // Server explicitly refused this write before applying it.
-    s.readyAt=Date.now()+1000*2**s.failures;plateStatus(s,"Waiting to save…");
+   if(error.status===503&&++s.failures<=6){
+    // A busy vault/review writer refused before applying anything. Keep the
+    // human's draft, release the refused request ID and retry automatically.
+    s.pending=null;
+    s.readyAt=Date.now()+Math.min(8000,1000*2**s.failures);
+    plateStatus(s,"Waiting to save · retrying save automatically…");
    }else{
     s.error=error;s.conflict=error.status===409;
     s.draw();plateStatus(s,"Not saved — "+error.message,true);
@@ -5727,7 +5832,7 @@ function updateReviewOverlayLabel(i,row=null){
  const el=document.getElementById("plateOverlay"+i);if(!el)return;
  const state=reviewOverlayState(i,row);
  el.className="plate-output-badge "+(state.enabled?"hidden":"visible");
- el.innerHTML=`<strong>OUTPUT · ${state.enabled?"HIDDEN":"VISIBLE"}</strong><span>${sectionEscape(state.source)}</span>`;
+ el.innerHTML=`<strong>OUTPUT · ${state.enabled?"HIDDEN":"VISIBLE"}</strong><span title="${sectionEscape(state.source)}">${sectionEscape(state.source)}</span>`;
 }
 function redrawReviewOverlay(i){
  const edit=typeof PLATE_EDITS!=="undefined"?PLATE_EDITS.get(i):null;
@@ -5960,7 +6065,8 @@ async function loadReview(signal=null,phase=SHELLPH){
      onclick="${x.category==="plate"?"":"zoomDet("+x.i+")"}"
      onpointerdown="${x.category==="plate"?"event.stopPropagation()":""}"
      draggable="false" ondragstart="return false"
-     >${x.category==="plate"?'<canvas class="plate-outline"></canvas><span id="plateOverlay'+x.i+'" class="plate-output-badge"></span>':""}</div>
+     >${x.category==="plate"?'<canvas class="plate-outline"></canvas>':""}</div>
+    ${x.category==="plate"?'<div id="plateOverlay'+x.i+'" class="plate-output-badge"></div>':""}
     <small class="preview-status" role="status">Preview not loaded</small>
     <button class="sec preview-retry" hidden onclick="retryReviewPreview(this)">Retry preview</button>
     ${x.category==="plate"?'<small class="quad-status" role="status" title="Corners apply to this detected track. Review changing perspective. Keyboard: select corner 1–4, use arrows; Ctrl+Z undoes.">Corners autosave to track</small><button type="button" class="sec quad-retry" hidden>Retry save</button>':""}
@@ -6863,14 +6969,15 @@ def _vault_lock_now():
         if key is None:
             return 0
         with _REVIEW_EDIT_LOCK, _REVIEW_WORK_LOCK:
-            with _REVIEW_CACHE_LOCK:
-                _REVIEW_FRAMES.clear()
-                _REVIEW_PROBES.clear()
-                _REVIEW_REPORTS.clear()
-                # Cached crop readers do not take the decoder gate. Keep their
-                # cache gate held until encryption and the locked state agree.
-                n = vault.encrypt_tree(key, JOBS_DIR)
-                VAULT["key"] = None
+            # Wait for in-flight thumbnail/archive readers; block new ones
+            # before turning any plaintext file into vault ciphertext.
+            with _REVIEW_PICTURE_GATE.writer():
+                with _REVIEW_CACHE_LOCK:
+                    _REVIEW_FRAMES.clear()
+                    _REVIEW_PROBES.clear()
+                    _REVIEW_REPORTS.clear()
+                    n = vault.encrypt_tree(key, JOBS_DIR)
+                    VAULT["key"] = None
         return n
 
 

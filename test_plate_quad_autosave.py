@@ -149,7 +149,11 @@ function ack(s,request,token){return {data:{preview:{...s.meta,preview_token:tok
  // Busy decoder has bounded retries/backoff, not a request storm.
  move(b,26);
  for(let n=0;n<4;n++){b.readyAt=0;const busy=pumpPlateSaves();reject(Object.assign(new Error('busy'),{status:503}));await busy;}
- assert.ok(b.error&&b.dirty);assert.ok(requests.length<13);
+ assert.ok(b.dirty&&!b.error&&b.retry.hidden,'Short busy period must recover without manual Retry save');
+ // If the backend remains unavailable, stop after a bounded number of attempts,
+ // keep the human's unsaved draft, then offer the visible Retry control.
+ for(let n=0;n<3;n++){b.readyAt=0;const busy=pumpPlateSaves();reject(Object.assign(new Error('busy'),{status:503}));await busy;}
+ assert.ok(b.error&&b.dirty);assert.ok(requests.length<17);
  console.log('autosave queue, latest-wins, labels, retries, navigation and backoff OK');
 })().catch(e=>{console.error(e);process.exitCode=1;});
 '''

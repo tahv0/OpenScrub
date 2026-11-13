@@ -453,3 +453,28 @@ def test_review_decisions_cannot_race_corner_report_write(plate_job, monkeypatch
     assert client.post('/api/jobs/%s/detections'%jid,json=payload).status_code == 200
     row=json.loads(report.read_text())['detections'][0]
     assert row['plate_quad'] and row['verified_label']=='not_plate' and row['enabled'] is False
+
+
+def test_ordinary_corner_edits_do_not_restart_full_preview_reconciliation(plate_job, monkeypatch):
+    client, jid, report, _ = plate_job
+    job = web.JOBS[jid]
+    job.pop('_compact_preview_reconcile', None)
+    monkeypatch.setattr(web, 'vault_locked', lambda: False)
+    calls = []
+    def reconcile(*args):
+        calls.append(True)
+        return dict(total=8, linked=3, already=0)
+    monkeypatch.setattr(web.finding_previews, 'reconcile', reconcile)
+    doc = web._load_job_report(job)
+    assert web._reconcile_compact_previews(job, doc)['linked'] == 3
+    # An atomic report replacement occurs for every confirmed corner edit,
+    # but does not change the source-time identities of cached pictures.
+    changed = json.loads(report.read_text())
+    changed['detections'][0]['plate_quad'] = [[0,0],[1,0],[.95,1],[0,1]]
+    report.write_text(json.dumps(changed))
+    assert web._reconcile_compact_previews(job, changed)['linked'] == 0
+    assert len(calls) == 1, 'Every corner autosave triggered a full video cache sweep'
+    # A genuinely new scan/rescan clears the marker and must reconcile again.
+    job.pop('_compact_preview_reconcile', None)
+    assert web._reconcile_compact_previews(job, changed)['linked'] == 3
+    assert len(calls) == 2

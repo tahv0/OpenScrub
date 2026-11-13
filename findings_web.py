@@ -265,7 +265,16 @@ def confirm(job, index, payload):
     _, _, meta, jpeg = preview(job, index, doc=before)
     if meta.get('classification_allowed') is False:
         raise library.ConflictError(_LEGACY_TIMING_NOTE)
-    doc = deepcopy(before)
+    # The authoritative JSON load already gives this request an independent
+    # mutable document. Duplicating its complete 4K timeline and hundreds of
+    # thousands of findings for every corner autosave costs gigabytes of RAM.
+    # Approved sections alone require the old/new pair for the overlap guard.
+    # Merely having section metadata does not require duplicating a huge
+    # report: only actually approved/locked intervals need old/new comparison.
+    section_rows = ((before.get('video_sections') or {}).get('items') or [])
+    sections = ((job.get('section') or {}).get('role') == 'export'
+                or any(item.get('approved') for item in section_rows))
+    doc = deepcopy(before) if sections else before
     row = doc['detections'][index]
     if payload.get('preview_token') not in (None, meta['preview_token']):
         abort(409, description='The finding changed. Reload its picture.')
@@ -300,11 +309,21 @@ def confirm(job, index, payload):
 
 
 def region(job, index, payload):
+    started = time.monotonic()
     # Explicit edits must operate on the complete authoritative report; the
     # read-only per-finding index is for thumbnail GETs only.
     before = _web._load_job_report(job)
     _, _, meta, jpeg = preview(job, index, doc=before)
-    doc = deepcopy(before)
+    # The authoritative JSON load already gives this request an independent
+    # mutable document. Duplicating its complete 4K timeline and hundreds of
+    # thousands of findings for every corner autosave costs gigabytes of RAM.
+    # Approved sections alone require the old/new pair for the overlap guard.
+    # Merely having section metadata does not require duplicating a huge
+    # report: only actually approved/locked intervals need old/new comparison.
+    section_rows = ((before.get('video_sections') or {}).get('items') or [])
+    sections = ((job.get('section') or {}).get('role') == 'export'
+                or any(item.get('approved') for item in section_rows))
+    doc = deepcopy(before) if sections else before
     row = doc['detections'][index]
     if row['category'] != 'plate':
         raise ValueError('Four-corner area editing currently applies to plate findings.')
@@ -341,7 +360,21 @@ def region(job, index, payload):
     if edit_id:
         row['compact_edit_receipt'] = dict(id=edit_id,source=meta['source_token'],token=payload.get('preview_token'))
     doc['render_required'] = True
-    stop_review.atomic_report(str(Path(job['dir'])/'report.json'),doc)
+    report_path = Path(job['dir'])/'report.json'
+    writing = time.monotonic()
+    stop_review.atomic_report(str(report_path),doc)
+    elapsed = time.monotonic()-started
+    if elapsed >= 3:
+        # Diagnostic/stat failures must never turn an already committed
+        # human adjustment into an HTTP 500 (and a needless retry).
+        try:
+            report_mb=round(report_path.stat().st_size/1048576,1)
+        except OSError:
+            report_mb=None
+        _web.diagnostics.event('review_corner_save_slow', job,
+            total_ms=round(elapsed*1000),
+            report_write_ms=round((time.monotonic()-writing)*1000),
+            rows=len(doc['detections']), report_mb=report_mb)
     meta['preview_token'] = _token(doc,row,meta['frame'],meta.get('key'))
     return dict(ok=True, applied=len(members), verified_samples_added=0,
                 finding=entry, preview=meta, verified_label=row.get('verified_label',''),

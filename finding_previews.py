@@ -413,10 +413,13 @@ def _requested(row, render_state):
 
 
 def lookup(job_dir, row, render_state, *, allow_representative=False):
-    """Read exact pixels, or explicitly opt into an actual-frame representative.
+    """Read only a matching JPEG; never fetch all cached JPEGs to seek a crop.
 
-    Changed cbox/timeline/offset or geometry outside the stored crop misses.
-    A representative never receives the requested frame's polygon/box.
+    A large review can contain thousands of saved image BLOBs. Fetching
+    (metadata,jpeg) for every candidate previously held both the SQLite
+    mutex and the vault's shared cache gate while loading tens of megabytes
+    merely to find one thumbnail. Filter using small metadata rows first,
+    then fetch exactly the selected JPEG by its SQLite rowid.
     """
     try:
         row = _row(row)
@@ -430,28 +433,43 @@ def lookup(job_dir, row, render_state, *, allow_representative=False):
         if db is None:
             return None
         try:
-            records = db.execute('SELECT metadata,jpeg FROM previews WHERE frame=? '
-                                 'AND category=? ORDER BY rowid', (index, category)).fetchall()
-            for serialized, jpeg in records:
+            def image(rowid, meta, points, kind):
+                selected = db.execute(
+                    'SELECT jpeg FROM previews WHERE rowid=?', (rowid,)).fetchone()
+                if selected is None:
+                    return None
+                return (dict(meta, points=points,
+                             preview_token=_hash([meta['key'], points]),
+                             match=kind, requested_frame=index), bytes(selected[0]))
+
+            exact = db.execute(
+                'SELECT rowid,metadata FROM previews WHERE frame=? AND category=? '
+                'ORDER BY rowid', (index, category))
+            for rowid, serialized in exact:
                 meta = json.loads(serialized)
                 if (meta['content_box'] != content or meta['offset'] != offset
                         or meta['fps'] != fps):
                     continue
                 points = _points(row, meta['box'])
-                if not _fits(points, meta['crop']):
-                    continue
-                return dict(meta, points=points, preview_token=_hash([meta['key'], points]),
-                            match='exact', requested_frame=index), bytes(jpeg)
+                if _fits(points, meta['crop']):
+                    return image(rowid, meta, points, 'exact')
             if not allow_representative:
                 return None
             if track >= 0:
                 records = db.execute(
-                    'SELECT metadata,jpeg FROM previews WHERE category=? AND track=? '
-                    'ORDER BY abs(frame-?), rowid', (category, track, index)).fetchall()
+                    'SELECT rowid,metadata FROM previews WHERE category=? AND track=? '
+                    'ORDER BY abs(frame-?),rowid', (category, track, index))
             else:
-                records = db.execute('SELECT metadata,jpeg FROM previews WHERE category=? '
-                                     'ORDER BY rowid', (category,)).fetchall()
-            for serialized, jpeg in records:
+                # A matching untracked picture must already fall inside this
+                # object's time span. This indexed range prevents a 30-minute
+                # job from loading every JPEG of the same category.
+                start = max(0, int(math.floor(float(row['t_start'])*fps))-1)
+                end = int(math.ceil(float(row['t_end'])*fps))+1
+                records = db.execute(
+                    'SELECT rowid,metadata FROM previews WHERE category=? '
+                    'AND frame BETWEEN ? AND ? ORDER BY abs(frame-?),rowid',
+                    (category, start, end, index))
+            for rowid, serialized in records:
                 meta = json.loads(serialized)
                 if meta['fps'] != fps or meta['frame'] == index:
                     continue
@@ -466,17 +484,13 @@ def lookup(job_dir, row, render_state, *, allow_representative=False):
                 if f >= len(render_state['cum']) or _offset(render_state['cum'][f]) != meta['offset']:
                     continue
                 points = _points(row, meta['box'])
-                if not _fits(points, meta['crop']):
-                    continue
-                return dict(meta, points=points,
-                            preview_token=_hash([meta['key'], points]),
-                            match='representative', requested_frame=index), bytes(jpeg)
+                if _fits(points, meta['crop']):
+                    return image(rowid, meta, points, 'representative')
         except (ValueError, TypeError, KeyError):
             return None
         finally:
             db.close()
     return None
-
 
 
 def _iou(a, b):
