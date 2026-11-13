@@ -5162,7 +5162,7 @@ function initReviewPreviews(){
    for(const e of entries)if(e.isIntersecting)queueReviewPreview(e.target);
    // Keep observing: skipped queued work is requested again on re-entry.
    pumpReviewPreviews(state);
-  },{rootMargin:"2800px"});images.forEach(img=>state.observer.observe(img));
+  },{rootMargin:"1600px"});images.forEach(img=>state.observer.observe(img));
  }else images.forEach(img=>queueReviewPreview(img));
 }
 // Retain all decisions/group memberships, but mount card elements progressively.
