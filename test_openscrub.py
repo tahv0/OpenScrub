@@ -385,6 +385,22 @@ def test_custom_regex_category(tmp_path):
     assert hits, "custom category should appear in the report"
 
 
+def test_adaptive_scan_notices_small_local_identifier_appearance():
+    """Brief new PII must not be hidden by the whole-frame motion average.
+
+    On a 720p recording, a high-contrast SSN occupies well under 1% of
+    the pixels. Doubling the next OCR interval on this frame can miss
+    the only few seconds during which the number is visible.
+    """
+    before = np.full((360, 640), 245, np.uint8)
+    changed = before.copy()
+    cv2.putText(changed, "SSN 123-45-6789", (30, 150), FONT, .55, 20, 1)
+    assert float(cv2.absdiff(before, changed).mean()) < 1.0
+    assert openscrub._adaptive_text_scan_stride(before, before, 60) == 120
+    assert openscrub._adaptive_text_scan_stride(changed, before, 60) <= 30
+    assert openscrub._adaptive_text_scan_stride(changed, changed, 60) == 120
+
+
 def test_deep_backtrack_finds_true_onset(tmp_path, monkeypatch):
     """A region whose first frame lies beyond the RAM backtrack buffer must
     still get its true onset via the post-scan deep file search — and must
