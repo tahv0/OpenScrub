@@ -265,7 +265,13 @@ def confirm(job, index, payload):
     _, _, meta, jpeg = preview(job, index, doc=before)
     if meta.get('classification_allowed') is False:
         raise library.ConflictError(_LEGACY_TIMING_NOTE)
-    doc = deepcopy(before)
+    # The authoritative JSON load already gives this request an independent
+    # mutable document. Duplicating its complete 4K timeline and hundreds of
+    # thousands of findings for every corner autosave costs gigabytes of RAM.
+    # Approved sections alone require the old/new pair for the overlap guard.
+    sections = bool(before.get('video_sections') or
+                    (job.get('section') or {}).get('role') == 'export')
+    doc = deepcopy(before) if sections else before
     row = doc['detections'][index]
     if payload.get('preview_token') not in (None, meta['preview_token']):
         abort(409, description='The finding changed. Reload its picture.')
@@ -304,7 +310,13 @@ def region(job, index, payload):
     # read-only per-finding index is for thumbnail GETs only.
     before = _web._load_job_report(job)
     _, _, meta, jpeg = preview(job, index, doc=before)
-    doc = deepcopy(before)
+    # The authoritative JSON load already gives this request an independent
+    # mutable document. Duplicating its complete 4K timeline and hundreds of
+    # thousands of findings for every corner autosave costs gigabytes of RAM.
+    # Approved sections alone require the old/new pair for the overlap guard.
+    sections = bool(before.get('video_sections') or
+                    (job.get('section') or {}).get('role') == 'export')
+    doc = deepcopy(before) if sections else before
     row = doc['detections'][index]
     if row['category'] != 'plate':
         raise ValueError('Four-corner area editing currently applies to plate findings.')
