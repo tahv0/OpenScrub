@@ -2144,6 +2144,9 @@ def _reconcile_compact_previews(job, doc):
 @app.route("/api/jobs/<jid>/detections")
 def job_detections(jid):
     job = JOBS.get(jid) or abort(404)
+    started = time.monotonic()
+    if vault_locked():
+        abort(423, description='Unlock the vault before viewing saved detections.')
     # For oversized reports, the scan already published a revision-fenced
     # Review listing. Serve its JSON directly, never reparse hundreds of
     # thousands of report rows on each reopen. Model-library choices are
@@ -2162,9 +2165,27 @@ def job_detections(jid):
         response = Response(body, mimetype="application/json")
         response.headers["Cache-Control"] = "no-store"
         response.headers["X-Review-Listing"] = "indexed"
+        elapsed = round((time.monotonic() - started) * 1000)
+        response.headers['Server-Timing'] = 'detections;dur=%d' % elapsed
+        if elapsed > 3000:
+            diagnostics.event('review_detections_slow', job,
+                              mode='cached_listing', elapsed_ms=elapsed)
         return response
+    # Legacy or just-replaced reports may have no cached listing. Never
+    # reconcile every cached picture in a user-facing GET: even metadata-only
+    # SQLite sweeps can exceed the 15-second browser deadline on long videos.
+    # New scans reconcile once before Review opens; old exact cached pictures
+    # remain usable while a missing index is prepared in the background.
     doc = _load_job_report(job)
-    _reconcile_compact_previews(job, doc)
+    path = os.path.join(job['dir'], 'report.json')
+    try:
+        size = os.path.getsize(path)
+        if (size >= _REVIEW_LISTING_INDEX_MIN_BYTES
+                or os.path.exists(os.path.join(job['dir'], review_preview_index.NAME))):
+            _warm_review_listing_index(job, doc,
+                full_rows=size > _REVIEW_REPORT_MAX_FILE_BYTES)
+    except OSError:
+        diagnostics.exception('review_index_warmup_stat_failed', job)
     items = []
     for i, d in enumerate(doc["detections"]):
         items.append({"i": i, "category": d["category"], "text": d["text"],
@@ -2186,7 +2207,7 @@ def job_detections(jid):
                       "human_region_confirmed": bool(d.get("human_region_confirmed")),
                       "zone_dropped": bool(d.get("zone_dropped")),
                       "shaped": bool(d.get("poly"))})
-    return jsonify({"detections": items,
+    response = jsonify({"detections": items,
                     "learning": doc.get("learning"),
                     "video_id": (doc.get('provenance') or {}).get('original_input_sha256') or (doc.get('provenance') or {}).get('input_sha256'),
                     "plate_text_search": doc.get("plate_text_search"),
@@ -2199,6 +2220,14 @@ def job_detections(jid):
                     "fps": doc["render_state"]["fps"],
                     "duration": len(doc["render_state"]["cum"]) /
                                 doc["render_state"]["fps"]})
+    elapsed = round((time.monotonic() - started) * 1000)
+    response.headers['Server-Timing'] = 'detections;dur=%d' % elapsed
+    response.headers['X-Review-Listing'] = 'legacy_fallback'
+    if elapsed > 3000:
+        diagnostics.event('review_detections_slow', job,
+                          mode='report_fallback', elapsed_ms=elapsed,
+                          detections=len(items))
+    return response
 
 
 def _review_detections(job, doc):
@@ -3103,7 +3132,7 @@ def job_save_edits(jid):
     parsed = time.perf_counter()
     # A deliberate Save is a report boundary; normal Is/Not and corner
     # clicks never rewrite the long scan timeline.
-    _review_journal_snapshot(job)
+    journal_published = _review_journal_snapshot(job)
     path = os.path.join(job["dir"], "report.json")
     doc = _load_job_report(job)
     loaded = time.perf_counter()
@@ -3175,6 +3204,20 @@ def job_save_edits(jid):
             _SECTIONS.guard_edits(job, _load_job_report(job), doc)
         stop_review.atomic_report(path, doc)
     published = time.perf_counter()
+    # Refresh the small public listing without rewriting every indexed
+    # preview row on Save. Keep the row-index rebuild off the save request.
+    if changed or journal_published:
+        try:
+            size = os.path.getsize(path)
+            if (size >= _REVIEW_LISTING_INDEX_MIN_BYTES or
+                    os.path.isfile(os.path.join(job['dir'], review_preview_index.NAME))):
+                review_preview_index.publish_listing(path, doc)
+                if size > _REVIEW_REPORT_MAX_FILE_BYTES:
+                    _warm_review_listing_index(job, doc, full_rows=True)
+        except Exception:
+            # The authoritative report is already committed. A cache failure
+            # must never make successfully saved edits appear unsaved.
+            diagnostics.exception('review_listing_refresh_failed', job)
     # suggest allowlisting any string whose EVERY instance was disabled —
     # the review just taught us it's a recurring false positive
     per = {}
