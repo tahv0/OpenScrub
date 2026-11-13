@@ -239,10 +239,7 @@ def test_cached_card_loads_while_another_preview_is_decoding(review_server, monk
             page.get_by_role('link', name='Synthetic review fixture', exact=True).click()
             page.locator('#review').wait_for()
             page.locator('#det0').scroll_into_view_if_needed()
-            page.locator('#det0').get_by_role('button', name='Load preview', exact=True).wait_for()
-            assert not entered.is_set(), 'opening Review must not start a cold video decode'
-            page.locator('#det0').get_by_role('button', name='Load preview', exact=True).click()
-            assert entered.wait(5), 'explicit Load preview did not start the decoder'
+            assert entered.wait(10), 'automatic visible cache miss did not start one cold decoder'
             assert page.locator('#det1 img').evaluate('(img)=>img.naturalWidth') == 0
             page.evaluate('window.__releaseWarm()')
             page.wait_for_function(
