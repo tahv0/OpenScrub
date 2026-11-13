@@ -84,7 +84,8 @@ def test_sample_and_show_all_work_without_report_network(review_server,width,tmp
         # before filtering so group0 is one reviewed group out of 100.
         page.locator('#det0').get_by_role('button',name='✕ Not a plate',exact=True).click()
         page.evaluate('CONFIRM_CHAIN')
-        page.wait_for_function('document.getElementById("vlabel0").textContent.includes("Saved")')
+        page.wait_for_function('document.getElementById("vlabel0").textContent.includes("Saved") || document.getElementById("vlabel0").textContent.includes("Not saved")')
+        assert 'Saved' in page.locator('#vlabel0').inner_text(), page.locator('#vlabel0').inner_text()
         assert page.evaluate('CONFIRM_FAILED.size')==0
         confirmed=web._load_job_report(web.JOBS['inline-fixture'])['detections']
         assert all(not row['enabled'] and row['verified_label']=='not_plate' for row in confirmed[:100])
