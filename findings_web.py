@@ -225,7 +225,7 @@ def _archived_identity_changed(job, doc, row, meta):
     current = row.get('confirmed_finding_id')
     if not current:
         return False
-    original = library.get_finding(root(), current)
+    original = library.get_finding(root(), current, include_revoked=True)
     # _video may fill legacy provenance. Inspect a tiny shallow copy instead
     # of mutating the authoritative report before its approved-section guard.
     identity_doc = dict(doc, provenance=dict(doc.get('provenance') or {}),
