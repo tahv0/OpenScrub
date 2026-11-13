@@ -103,7 +103,7 @@ def load(report_path):
 
 def public_item(index, d):
     """Stable, lightweight detection fields already exposed by /detections."""
-    return dict(i=index, category=d['category'], text=d['text'],
+    return dict(i=index, category=d.get('category', ''), text=d.get('text', ''),
                 t_start=d['t_start'], t_end=round(d['t_end'], 2),
                 enabled=d.get('enabled', True),
                 track=d.get('track', -1), person=d.get('person', -1),
