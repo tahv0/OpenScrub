@@ -1830,7 +1830,7 @@ _REVIEW_REPORT_MAX_FILE_BYTES = 32 * 1024 * 1024
 _REVIEW_LISTING_INDEX_MIN_BYTES = 2 * 1024 * 1024
 _REVIEW_INDEX_BACKGROUND_LOCK = threading.Lock()
 _REVIEW_INDEX_BACKGROUND_PENDING = {}
-_REVIEW_INDEX_BACKGROUND_RUNNING = set()
+_REVIEW_INDEX_BACKGROUND_RUNNING = {}  # report path -> current worker identity
 _REVIEW_INDEX_BACKGROUND_ACTIVE = {}  # source-bound report while rows rebuild
 
 
@@ -1845,6 +1845,7 @@ def _warm_review_listing_index(job, document, full_rows=False, expected_identity
     report_path = os.path.realpath(os.path.join(job['dir'], 'report.json'))
     expected_identity = (list(expected_identity) if expected_identity is not None
                          else review_preview_index.report_identity(report_path))
+    worker_token = object()
     with _REVIEW_INDEX_BACKGROUND_LOCK:
         if full_rows:
             # Previews use this already-validated in-memory document until
@@ -1856,7 +1857,7 @@ def _warm_review_listing_index(job, document, full_rows=False, expected_identity
             job, document, full_rows, expected_identity)
         if report_path in _REVIEW_INDEX_BACKGROUND_RUNNING:
             return
-        _REVIEW_INDEX_BACKGROUND_RUNNING.add(report_path)
+        _REVIEW_INDEX_BACKGROUND_RUNNING[report_path] = worker_token
 
     def build():
         try:
@@ -1864,8 +1865,9 @@ def _warm_review_listing_index(job, document, full_rows=False, expected_identity
                 with _REVIEW_INDEX_BACKGROUND_LOCK:
                     item = _REVIEW_INDEX_BACKGROUND_PENDING.pop(report_path, None)
                     if item is None:
-                        _REVIEW_INDEX_BACKGROUND_RUNNING.discard(report_path)
-                        _REVIEW_INDEX_BACKGROUND_ACTIVE.pop(report_path, None)
+                        if _REVIEW_INDEX_BACKGROUND_RUNNING.get(report_path) is worker_token:
+                            _REVIEW_INDEX_BACKGROUND_RUNNING.pop(report_path, None)
+                            _REVIEW_INDEX_BACKGROUND_ACTIVE.pop(report_path, None)
                         return
                 source_job, doc, full, expected = item
                 try:
@@ -1884,8 +1886,8 @@ def _warm_review_listing_index(job, document, full_rows=False, expected_identity
             with _REVIEW_INDEX_BACKGROUND_LOCK:
                 # A newer worker may already own this path after the final
                 # queue pop. Never evict its document or running marker.
-                if report_path not in _REVIEW_INDEX_BACKGROUND_PENDING:
-                    _REVIEW_INDEX_BACKGROUND_RUNNING.discard(report_path)
+                if _REVIEW_INDEX_BACKGROUND_RUNNING.get(report_path) is worker_token:
+                    _REVIEW_INDEX_BACKGROUND_RUNNING.pop(report_path, None)
                     _REVIEW_INDEX_BACKGROUND_ACTIVE.pop(report_path, None)
 
     threading.Thread(target=build, name='openscrub-review-index',
