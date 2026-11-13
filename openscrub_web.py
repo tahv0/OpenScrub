@@ -1816,6 +1816,8 @@ class _SavedPictureGate:
 
 _REVIEW_PICTURE_GATE = _SavedPictureGate()
 _REVIEW_RECONCILE_LOCK = threading.Lock()
+_REVIEW_RECONCILE_BACKGROUND_LOCK = threading.Lock()
+_REVIEW_RECONCILE_BACKGROUND_RUNNING = set()
 _REVIEW_FRAMES = OrderedDict()
 _REVIEW_PROBES = OrderedDict()
 _REVIEW_FRAME_BYTES = 64 * 1024 * 1024
@@ -2128,7 +2130,7 @@ def job_mediainfo(jid):
                     "width": w_, "height": h_})
 
 
-def _reconcile_compact_previews(job, doc):
+def _reconcile_compact_previews(job, doc, expected_identity=None):
     """Bind scan-time cached pictures to final post-processed track ids.
 
     This is metadata-only: it never opens the source video. The report file
@@ -2142,6 +2144,8 @@ def _reconcile_compact_previews(job, doc):
         return dict(total=0, linked=0, already=0)
     if job.get("_compact_preview_reconcile"):
         return dict(total=0, linked=0, already=0)
+    if expected_identity is not None and list(signature[1:]) != list(expected_identity):
+        return dict(total=0, linked=0, already=0, stale=True)
     # Reconciliation is metadata-only, but a long-video SQLite sweep can
     # take seconds on a Windows-mounted drive. Never hold the global memory
     # cache lock, which formerly starved saved picture reads and autosaves.
@@ -2154,15 +2158,50 @@ def _reconcile_compact_previews(job, doc):
             if vault_locked():
                 return dict(total=0, linked=0, already=0)
             stats = finding_previews.reconcile(
-                job["dir"], doc.get("detections", []), doc.get("render_state") or {})
-            # One reconciliation per completed scan, not per report save.
-            # Human corner changes retain exact-frame/geometry cache checks.
-            job["_compact_preview_reconcile"] = signature
+                job["dir"], doc.get("detections", []), doc.get("render_state") or {},
+                expected_report_identity=list(signature[1:]))
+            # A concurrent Save may have replaced the report. Only acknowledge
+            # completed relinking for the exact revision that was inspected.
+            if not stats.get('stale') and _preview_report_identity(
+                    os.path.realpath(os.path.join(job["dir"], "report.json"))) == signature:
+                job["_compact_preview_reconcile"] = signature
             return stats
     except _SavedPictureBusyTimeout:
         abort(503, description="The vault is locking saved pictures. Retry shortly.")
     finally:
         _REVIEW_RECONCILE_LOCK.release()
+
+
+def _warm_legacy_preview_reconciliation(job, doc, expected_identity):
+    """Relink legacy scan-time pictures without blocking detection listing.
+
+    Normal scans already reconcile before exposing Review. Older jobs may
+    have a compact cache but not a final track binding. A single, revision-
+    fenced background sweep recovers it; cache-only image requests can retry
+    until it completes without causing another whole-report GET.
+    """
+    if job.get('_compact_preview_reconcile'):
+        return
+    path = os.path.join(job['dir'], 'compact_previews', 'index.sqlite3')
+    if not os.path.isfile(path):
+        return
+    key = os.path.realpath(job['dir'])
+    with _REVIEW_RECONCILE_BACKGROUND_LOCK:
+        if key in _REVIEW_RECONCILE_BACKGROUND_RUNNING:
+            return
+        _REVIEW_RECONCILE_BACKGROUND_RUNNING.add(key)
+
+    def relink():
+        try:
+            _reconcile_compact_previews(job, doc, expected_identity=expected_identity)
+        except Exception:
+            diagnostics.exception('review_legacy_preview_reconcile_failed', job)
+        finally:
+            with _REVIEW_RECONCILE_BACKGROUND_LOCK:
+                _REVIEW_RECONCILE_BACKGROUND_RUNNING.discard(key)
+
+    threading.Thread(target=relink, name='openscrub-preview-reconcile',
+                     daemon=True).start()
 
 
 @app.route("/api/jobs/<jid>/detections")
@@ -2205,6 +2244,7 @@ def job_detections(jid):
     doc = _load_job_report(job)
     if review_preview_index.report_identity(path) != source_revision:
         abort(409, description='Review report changed while listing. Reload.')
+    _warm_legacy_preview_reconciliation(job, doc, source_revision)
     try:
         size = os.path.getsize(path)
         if (size >= _REVIEW_LISTING_INDEX_MIN_BYTES
