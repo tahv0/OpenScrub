@@ -16,7 +16,7 @@ import tempfile
 from flask import abort
 
 NAME = 'review-preview-index.sqlite3'
-VERSION = 1
+VERSION = 2
 META_KEYS = ('render_state', 'provenance', 'source_identity',
              'compact_preview_source', 'preview_revision', 'video_sections')
 
@@ -81,7 +81,9 @@ def load(report_path):
     try:
         expected = report_identity(report_path)
         with closing(_open_read(index)) as db:
-            fields = dict(db.execute('SELECT name, value FROM metadata').fetchall())
+            fields = dict(db.execute(
+                "SELECT name,value FROM metadata WHERE name IN ('version','identity','count','doc')"
+            ).fetchall())
             if int(fields.get('version', '-1')) != VERSION:
                 return None
             if json.loads(fields['identity']) != expected:
@@ -94,6 +96,75 @@ def load(report_path):
                 return None
             meta['detections'] = IndexedRows(report_path, index, expected, count)
             return meta
+    except (OSError, ValueError, KeyError, TypeError, sqlite3.DatabaseError):
+        return None
+
+
+
+def public_item(index, d):
+    """Stable, lightweight detection fields already exposed by /detections."""
+    return dict(i=index, category=d['category'], text=d['text'],
+                t_start=d['t_start'], t_end=round(d['t_end'], 2),
+                enabled=d.get('enabled', True),
+                track=d.get('track', -1), person=d.get('person', -1),
+                confidence=d.get('confidence', 0),
+                verified_label=d.get('verified_label', ''),
+                human_confirmation=d.get('human_confirmation'),
+                confirmed_finding_id=d.get('confirmed_finding_id'),
+                confirmed_finding_revision=d.get('confirmed_finding_revision'),
+                output_choice_explicit=bool(d.get('output_choice_explicit')),
+                plate_text_evidence=d.get('plate_text_evidence'),
+                learning_conflict=d.get('learning_conflict', ''),
+                learning_score=d.get('learning_score'),
+                plate_verification=d.get('plate_verification'),
+                fallback_reason=d.get('fallback_reason', ''),
+                zone_dropped=bool(d.get('zone_dropped')),
+                shaped=bool(d.get('poly')))
+
+
+def public_listing(doc):
+    """Serialize the stable Review GET response once after report publication.
+
+    learned_candidates is an independent library and is inserted dynamically
+    by the HTTP route. The preview index stores only data tied to report.json.
+    """
+    rows = doc['detections']
+    state = doc['render_state']
+    provenance = doc.get('provenance') or {}
+    data = dict(
+        detections=[public_item(i, row) for i, row in enumerate(rows)],
+        learning=doc.get('learning'),
+        video_id=provenance.get('original_input_sha256') or provenance.get('input_sha256'),
+        plate_text_search=doc.get('plate_text_search'),
+        refinement=doc.get('refinement'),
+        verification=doc.get('verification'),
+        verification_history=doc.get('verification_history'),
+        indexed_frames=any(d.get('frame_index', -1) >= 0 for d in rows),
+        frame_count=len(state['cum']), fps=state['fps'],
+        duration=len(state['cum'])/state['fps'])
+    return json.dumps(data, separators=(',', ':'), ensure_ascii=False, allow_nan=False)
+
+
+def read_listing(report_path):
+    """Get an exact-revision cached JSON response without parsing report.json."""
+    index = _index_path(report_path)
+    if not index.is_file():
+        return None
+    try:
+        identity = report_identity(report_path)
+        with closing(_open_read(index)) as db:
+            values = dict(db.execute(
+                "SELECT name,value FROM metadata WHERE name IN ('version','identity','listing')"
+            ).fetchall())
+            if (int(values.get('version', '-1')) != VERSION
+                    or json.loads(values['identity']) != identity):
+                return None
+            payload = values.get('listing')
+            if not payload or not payload.endswith('}'):
+                return None
+        if report_identity(report_path) != identity:
+            return None
+        return payload
     except (OSError, ValueError, KeyError, TypeError, sqlite3.DatabaseError):
         return None
 
@@ -128,6 +199,7 @@ def prepare(report_path, doc):
                 ('identity', json.dumps(expected)),
                 ('count', str(len(doc['detections']))),
                 ('doc', json.dumps(header, separators=(',', ':'), ensure_ascii=False)),
+                ('listing', public_listing(doc)),
             ])
             batch = []
             for i, row in enumerate(doc['detections']):
