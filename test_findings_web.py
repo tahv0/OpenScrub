@@ -157,8 +157,14 @@ def test_compact_autosave_retry_returns_receipt_without_confirming_label(finding
 
 
 
-def test_unsectioned_corner_autosave_does_not_deepcopy_huge_report(findings_job, monkeypatch):
+@pytest.mark.parametrize('unapproved_sections', [False, True])
+def test_unsectioned_corner_autosave_does_not_deepcopy_huge_report(
+        findings_job, monkeypatch, unapproved_sections):
     client, job, _, path = findings_job
+    if unapproved_sections:
+        doc=json.loads(path.read_text())
+        doc['video_sections']={'schema':1,'items':[],'revision':1}
+        path.write_text(json.dumps(doc))
     image = client.get(f'/api/jobs/{job["id"]}/finding-preview/0')
     assert image.status_code == 200
     meta = json.loads(image.headers['X-Finding-Geometry'])
