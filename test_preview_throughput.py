@@ -222,14 +222,18 @@ reviewRequest=async(url)=>{
 (async()=>{
  initReviewPreviews();
  const automatic=img._previewTask.promise;
- assert.equal(await automatic,false);
- assert.equal(calls,0,'opening Review must not start a cold decode');
- const pending=queueReviewPreview(img,true);
  await new Promise(r=>setTimeout(r,30));
- if(CANCEL){clearReviewPreviews();assert.equal(await pending,false);
-   await new Promise(r=>setTimeout(r,1800));assert.equal(calls,1);}
- else{assert.equal(await pending,false);assert.equal(calls,3);
-   assert.equal(REVIEW_MEDIA.active,0);assert.equal(REVIEW_MEDIA.queue.length,0);clearReviewPreviews();}
+ assert.equal(calls,1,'automatic cold decoding should use one worker');
+ if(CANCEL){
+   clearReviewPreviews();assert.equal(await automatic,false);
+   await new Promise(r=>setTimeout(r,1800));assert.equal(calls,1);
+ }else{
+   assert.equal(await automatic,false);
+   assert.equal(calls,3,'busy retries must stop after two retries');
+   assert.equal(REVIEW_MEDIA.active,0);
+   assert.equal(REVIEW_MEDIA.queue.length,0);
+   clearReviewPreviews();
+ }
 })().catch(e=>{console.error(e);process.exitCode=1;});
 '''
     script=script.replace('if(CANCEL)','if('+str(cancel).lower()+')')
