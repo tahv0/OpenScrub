@@ -306,6 +306,7 @@ def confirm(job, index, payload):
 
 
 def region(job, index, payload):
+    started = time.monotonic()
     # Explicit edits must operate on the complete authoritative report; the
     # read-only per-finding index is for thumbnail GETs only.
     before = _web._load_job_report(job)
@@ -353,7 +354,18 @@ def region(job, index, payload):
     if edit_id:
         row['compact_edit_receipt'] = dict(id=edit_id,source=meta['source_token'],token=payload.get('preview_token'))
     doc['render_required'] = True
-    stop_review.atomic_report(str(Path(job['dir'])/'report.json'),doc)
+    report_path = Path(job['dir'])/'report.json'
+    writing = time.monotonic()
+    stop_review.atomic_report(str(report_path),doc)
+    elapsed = time.monotonic()-started
+    if elapsed >= 3:
+        # A slow Windows bind-mount fsync is not a failed save. Record safe
+        # sizes/stages so any remaining stalls can be diagnosed without PII.
+        _web.diagnostics.event('review_corner_save_slow', job,
+            total_ms=round(elapsed*1000),
+            report_write_ms=round((time.monotonic()-writing)*1000),
+            rows=len(doc['detections']),
+            report_mb=round(report_path.stat().st_size/1048576,1))
     meta['preview_token'] = _token(doc,row,meta['frame'],meta.get('key'))
     return dict(ok=True, applied=len(members), verified_samples_added=0,
                 finding=entry, preview=meta, verified_label=row.get('verified_label',''),
