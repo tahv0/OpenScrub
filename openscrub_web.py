@@ -3618,11 +3618,13 @@ progress{width:100%;height:12px;accent-color:var(--acc)}
 .review-overlay-swatch.edit{border:2px solid #38bdf8;background:transparent;position:relative}
 .review-overlay-swatch.edit::after{content:"";position:absolute;width:5px;height:5px;border-radius:50%;
  background:#38bdf8;left:8px;top:2px}
-.plate-output-badge{position:absolute;left:6px;bottom:6px;z-index:3;max-width:calc(100% - 12px);
- padding:4px 6px;border-radius:6px;background:rgba(2,6,23,.86);border:1px solid #475569;
- color:#e2e8f0;font-size:10.5px;line-height:1.25;text-align:left;pointer-events:none;
- box-sizing:border-box;overflow-wrap:anywhere}
-.plate-output-badge strong{display:block;font-size:10.5px;letter-spacing:.03em}
+.plate-output-badge{display:flex;align-items:center;justify-content:space-between;
+ gap:8px;width:100%;max-width:100%;margin:4px 0 0;padding:3px 6px;
+ border:1px solid #475569;border-radius:5px;background:#0f172a;
+ color:#cbd5e1;font-size:10px;line-height:1.3;text-align:left;box-sizing:border-box}
+.plate-output-badge strong{display:inline-block;flex:none;font-size:10px;letter-spacing:.025em}
+.plate-output-badge span{display:block;flex:1;min-width:0;text-align:right;
+ overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .plate-output-badge.hidden strong{color:#fca5a5}
 .plate-output-badge.visible strong{color:#86efac}
 
@@ -5807,7 +5809,7 @@ function updateReviewOverlayLabel(i,row=null){
  const el=document.getElementById("plateOverlay"+i);if(!el)return;
  const state=reviewOverlayState(i,row);
  el.className="plate-output-badge "+(state.enabled?"hidden":"visible");
- el.innerHTML=`<strong>OUTPUT · ${state.enabled?"HIDDEN":"VISIBLE"}</strong><span>${sectionEscape(state.source)}</span>`;
+ el.innerHTML=`<strong>OUTPUT · ${state.enabled?"HIDDEN":"VISIBLE"}</strong><span title="${sectionEscape(state.source)}">${sectionEscape(state.source)}</span>`;
 }
 function redrawReviewOverlay(i){
  const edit=typeof PLATE_EDITS!=="undefined"?PLATE_EDITS.get(i):null;
@@ -6040,7 +6042,8 @@ async function loadReview(signal=null,phase=SHELLPH){
      onclick="${x.category==="plate"?"":"zoomDet("+x.i+")"}"
      onpointerdown="${x.category==="plate"?"event.stopPropagation()":""}"
      draggable="false" ondragstart="return false"
-     >${x.category==="plate"?'<canvas class="plate-outline"></canvas><span id="plateOverlay'+x.i+'" class="plate-output-badge"></span>':""}</div>
+     >${x.category==="plate"?'<canvas class="plate-outline"></canvas>':""}</div>
+    ${x.category==="plate"?'<div id="plateOverlay'+x.i+'" class="plate-output-badge"></div>':""}
     <small class="preview-status" role="status">Preview not loaded</small>
     <button class="sec preview-retry" hidden onclick="retryReviewPreview(this)">Retry preview</button>
     ${x.category==="plate"?'<small class="quad-status" role="status" title="Corners apply to this detected track. Review changing perspective. Keyboard: select corner 1–4, use arrows; Ctrl+Z undoes.">Corners autosave to track</small><button type="button" class="sec quad-retry" hidden>Retry save</button>':""}
