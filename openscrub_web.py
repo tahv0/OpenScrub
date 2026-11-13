@@ -885,6 +885,9 @@ def worker():
                     plate_text_web.perform(job)
             elif action in ("scan", "resume"):
                 resuming = action == "resume"
+                # New scan/resume can change final track membership; only that
+                # needs re-reconciliation. Ordinary corner saves do not.
+                job.pop("_compact_preview_reconcile", None)
                 if not resuming:
                     cache = os.path.join(job['dir'], 'compact_previews')
                     if os.path.isdir(cache) and not os.path.islink(cache):
@@ -2028,19 +2031,27 @@ def _reconcile_compact_previews(job, doc):
             os.path.realpath(os.path.join(job["dir"], "report.json")))
     except OSError:
         return dict(total=0, linked=0, already=0)
-    if job.get("_compact_preview_reconcile") == signature:
+    if job.get("_compact_preview_reconcile"):
         return dict(total=0, linked=0, already=0)
-    if not _REVIEW_CACHE_LOCK.acquire(timeout=1.):
+    # Reconciliation is metadata-only, but a long-video SQLite sweep can
+    # take seconds on a Windows-mounted drive. Never hold the global memory
+    # cache lock, which formerly starved saved picture reads and autosaves.
+    if not _REVIEW_RECONCILE_LOCK.acquire(blocking=False):
         return dict(total=0, linked=0, already=0)
     try:
-        if vault_locked():
+        if job.get("_compact_preview_reconcile"):
             return dict(total=0, linked=0, already=0)
-        stats = finding_previews.reconcile(
-            job["dir"], doc.get("detections", []), doc.get("render_state") or {})
-        job["_compact_preview_reconcile"] = signature
-        return stats
+        with _REVIEW_PICTURE_GATE.reader():
+            if vault_locked():
+                return dict(total=0, linked=0, already=0)
+            stats = finding_previews.reconcile(
+                job["dir"], doc.get("detections", []), doc.get("render_state") or {})
+            # One reconciliation per completed scan, not per report save.
+            # Human corner changes retain exact-frame/geometry cache checks.
+            job["_compact_preview_reconcile"] = signature
+            return stats
     finally:
-        _REVIEW_CACHE_LOCK.release()
+        _REVIEW_RECONCILE_LOCK.release()
 
 
 @app.route("/api/jobs/<jid>/detections")
