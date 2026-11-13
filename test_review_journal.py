@@ -171,11 +171,13 @@ def test_http_confirmation_commits_without_report_rewrite(plate_job,tmp_path,mon
     assert preview.status_code==200,preview.get_data(as_text=True)[:300]
     baseline=report.read_bytes()
     import openscrub_web as web
+    original_loader=web._load_job_report
     monkeypatch.setattr(web,'_load_job_report',
                         lambda *_: pytest.fail('Confirmation parsed the full report'))
     saved=client.post(f'/api/jobs/{jid}/confirm/0',json={'label':'negative'})
     assert saved.status_code==200,saved.get_json()
     assert report.read_bytes()==baseline
+    monkeypatch.setattr(web,'_load_job_report',original_loader)
     visible=client.get(f'/api/jobs/{jid}/detections')
     assert visible.status_code==200
     row=visible.get_json()['detections'][0]
