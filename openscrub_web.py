@@ -4833,7 +4833,7 @@ function clearReviewPreviews(){
  if(!REVIEW_MEDIA)return;
  const old=REVIEW_MEDIA;REVIEW_MEDIA=null;
  if(old.observer)old.observer.disconnect();
- const panel=document.getElementById("review");
+ const panel=document.getElementById?.("review");
  if(panel?._moreObserver){panel._moreObserver.disconnect();panel._moreObserver=null;}
  if(old.retryTimer)clearTimeout(old.retryTimer);
  old.controllers.forEach(c=>c.abort());
