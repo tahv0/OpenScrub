@@ -5303,6 +5303,37 @@ function discardRejectedCorners(i){
  s.points=plateCopy(s.saved);s.draw();plateStatus(s,"Not a plate");
  schedulePlateSaves();
 }
+function applyReboundFindingState(s,data){
+ if(!data.reconfirmation_required)return;
+ // A relocalized source frame is a NEW training identity. The backend saved
+ // the edited corners as a draft and restored protective output. Reflect the
+ // exact persisted state across the entire old confirmation group.
+ for(const i of data.cleared_indices||[s.i]){
+  const row=typeof FINDING_META!=="undefined"?FINDING_META[i]:null;
+  if(row){
+   delete row.confirmed_finding_id;
+   delete row.confirmed_finding_revision;
+   delete row.human_confirmation;
+   delete row.plate_verification_override;
+   row.verified_label="";row.enabled=true;row.output_choice_explicit=false;
+  }
+  VLBL[i]="";
+  EN[i]=true;
+  if(typeof OUTPUT_CHOICES!=="undefined")delete OUTPUT_CHOICES[i];
+  if(typeof OUTPUT_VERSION!=="undefined")OUTPUT_VERSION[i]=(OUTPUT_VERSION[i]||0)+1;
+  if(typeof REVIEW_BASE!=="undefined"&&REVIEW_BASE?.job===s.job){
+   REVIEW_BASE.enabled[i]=true;
+   delete REVIEW_BASE.labels[i];
+   if(REVIEW_BASE.output_choices)delete REVIEW_BASE.output_choices[i];
+  }
+  const card=document.getElementById("det"+i),bb=document.getElementById("bb"+i);
+  if(card)card.classList.remove("off");
+  if(bb)bb.innerHTML=detChoices(i);
+  const note=document.getElementById("vlabel"+i);
+  if(note)note.textContent="Source picture changed · confirm Is / Not again";
+  if(typeof redrawReviewOverlay==="function")redrawReviewOverlay(i);
+ }
+}
 function pumpPlateSaves(){
  if(PLATE_SAVE)return PLATE_SAVE;
  const s=[...PLATE_EDITS.values()].find(s=>s.dirty&&!s.drag&&!s.error&&s.readyAt<=Date.now());
@@ -5351,6 +5382,7 @@ function pumpPlateSaves(){
     REVIEW_DISPLAY_META[s.i].human_region_confirmed=true;
    syncPlateTrack(s);
    if(s.pending!==pending)return; // A newer Not-a-plate decision wins.
+   applyReboundFindingState(s,data);
    s.pending=null;
    if(s.version===pending.version&&!s.drag)s.points=plateCopy(s.saved);
    s.dirty=s.version!==pending.version;
@@ -5358,7 +5390,10 @@ function pumpPlateSaves(){
     VLBL[s.i]=s.meta.compact?data.verified_label:"plate";const label=document.getElementById("vlabel"+s.i);
     if(label)label.textContent=VLBL[s.i]==="plate"?"Confirmed plate":"Not a plate";
    }
-   s.draw();plateStatus(s,s.dirty?"Saving…":data.classification_required?"Saved area · choose Is / Not to confirm":s.meta.track>=0?"Saved to track":"Saved");
+   s.draw();plateStatus(s,s.dirty?"Saving…":data.reconfirmation_required
+    ?"Saved new corners · image identity changed, confirm Is / Not again"
+    :data.classification_required?"Saved area · choose Is / Not to confirm"
+    :s.meta.track>=0?"Saved to track":"Saved");
    if(!s.dirty&&CUR===s.job&&document.getElementById("beCv"))beRefresh();
   }catch(error){
    if(!s.dirty||(pending&&s.pending!==pending))return;
