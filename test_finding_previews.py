@@ -396,7 +396,7 @@ def test_reconcile_matches_scan_picture_inside_final_track_interval(previews, tm
     result = previews.lookup(tmp_path, final, state(), allow_representative=True)
     assert result is not None
     meta, jpeg = result
-    assert jpeg.startswith(b'\\xff\\xd8')
+    assert jpeg[:2] == bytes([0xff, 0xd8])
     assert meta['frame'] == 3 and meta['requested_frame'] == 6
     assert meta['track'] == 71 and meta['match'] == 'representative'
 
