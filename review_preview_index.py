@@ -36,7 +36,7 @@ def _index_path(report_path):
 
 def _open_read(index):
     # A missing index must not be created merely because a preview was read.
-    return sqlite3.connect('file:%s?mode=ro' % index.as_posix(), uri=True, timeout=2)
+    return sqlite3.connect(index.resolve().as_uri() + '?mode=ro', uri=True, timeout=2)
 
 
 class IndexedRows:
