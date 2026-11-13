@@ -82,6 +82,38 @@ def test_relocalized_confirmed_corners_save_as_protected_draft(
     assert client.get('/api/findings').get_json()['total'] == 2
 
 
+
+def test_moved_negative_group_restores_default_protection_for_all_members(
+        findings_job):
+    client, job, _, report = findings_job
+    original_doc = json.loads(report.read_text())
+    original_doc['detections'][1]['track'] = original_doc['detections'][0]['track']
+    report.write_text(json.dumps(original_doc))
+    previous = _confirm(client, job, 'negative')
+    verified = json.loads(report.read_text())['detections']
+    assert all(not verified[i]['enabled'] and
+               verified[i]['verified_label'] == 'not_plate'
+               for i in (0, 1))
+    assert verified[1]['human_confirmation']['propagated'] is True
+    _move_box(report)
+    meta = _preview(client, job)
+    points = [list(p) for p in meta['points']]
+    points[0][0] += 1
+    result = client.post(f"/api/jobs/{job['id']}/plate_quad/0", json={
+        'compact': True, 'points': points,
+        'preview_token': meta['preview_token']})
+    assert result.status_code == 200, result.get_data(as_text=True)
+    assert result.get_json()['cleared_indices'] == [0, 1]
+    after = json.loads(report.read_text())['detections']
+    for i in (0, 1):
+        assert after[i]['enabled'] is True
+        assert after[i]['verified_label'] == ''
+        assert not after[i]['output_choice_explicit']
+        assert not after[i].get('human_confirmation')
+    assert client.get(f"/api/findings/{previous['id']}").status_code == 200
+
+
+
 def test_explicit_reconfirmation_rebinds_to_new_identity_without_reusing_old_revision(
         findings_job):
     client, job, _, report = findings_job
