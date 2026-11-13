@@ -236,3 +236,49 @@ def test_save_refreshes_fast_listing_even_when_row_index_is_stale(plate_job, mon
     assert response.status_code == 200
     assert response.headers['X-Review-Listing'] == 'indexed'
     assert response.get_json()['detections'][0]['enabled'] is False
+
+
+def test_stale_listing_warms_asynchronously_without_inline_reconcile(plate_job, monkeypatch):
+    import openscrub_web as web
+    client, jid, report, _ = plate_job
+    queued = []
+    monkeypatch.setattr(web, '_REVIEW_LISTING_INDEX_MIN_BYTES', 1)
+    monkeypatch.setattr(web, '_warm_review_listing_index',
+                        lambda job, doc, **kwargs: queued.append(kwargs))
+    monkeypatch.setattr(web, '_reconcile_compact_previews',
+                        lambda *_: pytest.fail('GET started a long preview sweep'))
+    response = client.get(f'/api/jobs/{jid}/detections')
+    assert response.status_code == 200
+    assert queued and queued[0]['expected_identity'] == index.report_identity(report)
+    assert 'detections' in response.get_json()
+
+
+def test_async_row_rebuild_uses_source_bound_snapshot_during_preview_get(
+        plate_job, monkeypatch):
+    import threading
+    import openscrub_web as web
+
+    _, jid, report, _ = plate_job
+    job = web.JOBS[jid]
+    doc = json.loads(report.read_text())
+    started, release = threading.Event(), threading.Event()
+
+    def delayed_build(path, data, expected_identity=None):
+        assert data is doc
+        assert list(expected_identity) == index.report_identity(report)
+        started.set()
+        assert release.wait(5)
+        return False
+
+    monkeypatch.setattr(index, 'prepare', delayed_build)
+    monkeypatch.setattr(web, '_REVIEW_REPORT_MAX_FILE_BYTES', 1)
+    web._REVIEW_REPORTS.clear()
+    web._warm_review_listing_index(job, doc, full_rows=True)
+    assert started.wait(3), 'Background row builder did not start'
+    try:
+        def no_full_read(*args, **kwargs):
+            pytest.fail('An in-flight row index caused another huge report parse')
+        monkeypatch.setattr(web, '_load_job_report', no_full_read)
+        assert web._load_preview_report_base(job) is doc
+    finally:
+        release.set()
