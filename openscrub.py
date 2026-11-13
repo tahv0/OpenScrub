@@ -24,6 +24,7 @@ import argparse
 import copy
 import datetime
 import hashlib
+import heapq
 import json
 import math
 import os
@@ -754,6 +755,12 @@ class PhiMemory:
         self.name_sightings = name_sightings
         self.items = {}    # normalized text -> category
         self.counts = {}   # normalized text -> primary-detector sightings
+        # Recall used to scan every remembered string for every OCR word.
+        # Long recordings therefore got progressively slower as memory grew.
+        # Length buckets preserve the exact matching rules while keeping each
+        # fuzzy search local to only plausible candidates.
+        self.by_length = {}  # normalized length -> [(insertion order, text)]
+        self._memory_serial = 0
 
     @staticmethod
     def norm(s):
@@ -764,7 +771,11 @@ class PhiMemory:
             return
         n = self.norm(text)
         if len(n) >= 3 and n not in STOPWORDS:
-            self.items.setdefault(n, category)
+            if n not in self.items:
+                self.items[n] = category
+                self.by_length.setdefault(len(n), []).append(
+                    (self._memory_serial, n))
+                self._memory_serial += 1
             if primary:
                 self.counts[n] = self.counts.get(n, 0) + 1
 
@@ -784,16 +795,21 @@ class PhiMemory:
         if n in self.items:
             return self._gated(n, self.items[n])
         if n.isdigit():
-            for k, cat in self.items.items():
-                if (k.isdigit() and len(k) == len(n)
+            for _, k in self.by_length.get(len(n), ()):
+                if (k.isdigit()
                         and sum(a != b for a, b in zip(k, n)) <= 1):
-                    return self._gated(k, cat)
+                    return self._gated(k, self.items[k])
             return None
         if len(n) >= 4:
-            for k, cat in self.items.items():
-                if (not k.isdigit() and abs(len(k) - len(n)) <= 2
+            buckets = [self.by_length.get(size, ())
+                       for size in range(max(3, len(n) - 2), len(n) + 3)]
+            # Each bucket is insertion-ordered; merging their serials retains
+            # the old dict-wide "first remembered match wins" tie-break without
+            # walking unrelated string lengths.
+            for _, k in heapq.merge(*buckets):
+                if (not k.isdigit()
                         and self.fuzz.ratio(k, n) >= self.threshold):
-                    return self._gated(k, cat)
+                    return self._gated(k, self.items[k])
         return None
 
 

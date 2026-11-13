@@ -28,6 +28,7 @@ MAX_ITEMS = 10000
 MAX_BYTES = 64 * 1024 * 1024
 MAX_PER_CAPTURE = 12
 _LOCK = threading.RLock()
+_SCHEMA_READY = set()
 _KEY = re.compile(r'[a-f0-9]{64}\Z')
 
 
@@ -74,13 +75,13 @@ def _db(job_dir, create=False):
     for suffix in ('', '-journal', '-wal', '-shm'):
         if Path(str(path) + suffix).is_symlink():
             raise ValueError('preview database must be confined, not a symlink')
-    if not create and not path.exists():
+    existed = path.exists()
+    if not create and not existed:
         return None
     connection = sqlite3.connect(str(path), timeout=2)
-    if create:
+    ready_key = str(path)
+    if create and (not existed or ready_key not in _SCHEMA_READY):
         os.chmod(path, 0o600)
-        # SQLite pages and indexes count against the physical file ceiling too.
-        connection.execute('PRAGMA max_page_count=%d' % max(8, MAX_BYTES // 4096))
         connection.execute('CREATE TABLE IF NOT EXISTS previews ('
                            'key TEXT PRIMARY KEY, group_key TEXT UNIQUE, '
                            'frame INTEGER, category TEXT, track INTEGER, '
@@ -91,15 +92,44 @@ def _db(job_dir, create=False):
                            'ON previews(track,category)')
         connection.execute('CREATE TABLE IF NOT EXISTS settings '
                            '(key TEXT PRIMARY KEY, value INTEGER)')
+        # Old caches predate the O(1) counters. Compute them exactly once on
+        # first open after upgrade, then maintain them transactionally.
+        connection.execute("INSERT OR IGNORE INTO settings "
+                           "SELECT 'count', count(*) FROM previews")
+        connection.execute("INSERT OR IGNORE INTO settings "
+                           "SELECT 'bytes', coalesce(sum(length(jpeg) + "
+                           "length(CAST(metadata AS BLOB))),0) FROM previews")
         connection.commit()
+        _SCHEMA_READY.add(ready_key)
+    if create:
+        # max_page_count must be applied to EACH write connection. Re-running
+        # this O(1) PRAGMA is cheap; re-running schema DDL or table aggregates
+        # is what the long-scan hot path must avoid. Apply it after first-time
+        # schema creation so schema pages themselves are accounted for.
+        page_size = int(connection.execute('PRAGMA page_size').fetchone()[0])
+        page_limit = max(8, MAX_BYTES // max(1, page_size))
+        connection.execute('PRAGMA max_page_count=%d' % page_limit)
     return connection
 
 
+def _set_total(db, key, value):
+    db.execute("INSERT INTO settings(key,value) VALUES (?,?) "
+               "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+               (key, int(value)))
+
+
 def _totals(db):
-    count, size = db.execute('SELECT count(*), coalesce(sum(length(jpeg) + '
-                            'length(CAST(metadata AS BLOB))),0) FROM previews').fetchone()
-    truncated = db.execute("SELECT value FROM settings WHERE key='truncated'").fetchone()
-    return int(count), int(size), bool(truncated and truncated[0])
+    values = dict(db.execute(
+        "SELECT key,value FROM settings WHERE key IN ('count','bytes','truncated')"))
+    if 'count' not in values or 'bytes' not in values:
+        count, size = db.execute(
+            'SELECT count(*), coalesce(sum(length(jpeg) + '
+            'length(CAST(metadata AS BLOB))),0) FROM previews').fetchone()
+        _set_total(db, 'count', count)
+        _set_total(db, 'bytes', size)
+        values.update(count=int(count), bytes=int(size))
+    return (int(values.get('count', 0)), int(values.get('bytes', 0)),
+            bool(values.get('truncated', 0)))
 
 
 def _truncate(db):
@@ -184,16 +214,19 @@ def _encode(meta, pixels):
     return meta, encoded.tobytes()
 
 
-def _insert(db, group, meta, jpeg):
-    count, size, _ = _totals(db)
+def _insert(db, group, meta, jpeg, totals=None):
+    count, size = (_totals(db)[:2] if totals is None else totals)
     serialized = _json(meta)
-    if count >= MAX_ITEMS or size+len(serialized.encode())+len(jpeg) > MAX_BYTES:
+    needed = len(serialized.encode()) + len(jpeg)
+    if count >= MAX_ITEMS or size + needed > MAX_BYTES:
         _truncate(db)
         return False
     try:
         db.execute('INSERT INTO previews VALUES (?,?,?,?,?,?,?)',
                    (meta['key'], group, meta['frame'], meta['category'], meta['track'],
                     serialized, jpeg))
+        _set_total(db, 'count', count + 1)
+        _set_total(db, 'bytes', size + needed)
     except sqlite3.IntegrityError:
         return False
     except sqlite3.OperationalError as exc:
@@ -245,6 +278,8 @@ def _insert_explicit(db, group, meta, jpeg):
             db.execute('INSERT INTO previews VALUES (?,?,?,?,?,?,?)',
                        (meta['key'], group, meta['frame'], meta['category'], meta['track'],
                         serialized, jpeg))
+            _set_total(db, 'count', count + 1)
+            _set_total(db, 'bytes', size + needed)
         except sqlite3.IntegrityError:
             db.rollback()
             return False
@@ -261,7 +296,7 @@ def _insert_explicit(db, group, meta, jpeg):
     return False
 
 
-def capture(job_dir, frame_bgr, frame_index, fps, detections, source=None):
+def capture(job_dir, frame_bgr, frame_index, fps, detections, source=None, seen_groups=None, previous_stats=None):
     """Capture <=12 new groups per call; report bounded sampling honestly.
 
     The caller retains ownership of frame_bgr; pixels are read synchronously
@@ -276,47 +311,88 @@ def capture(job_dir, frame_bgr, frame_index, fps, detections, source=None):
             or frame_bgr.shape[2] != 3 or frame_bgr.dtype != np.uint8):
         raise ValueError('source pixels must be uint8 BGR')
     height, width = frame_bgr.shape[:2]
-    stats = dict(added=0, duplicates=0, invalid=0, skipped=0, total=0, bytes=0, truncated=False)
+    prior = previous_stats or {}
+    stats = dict(added=0, duplicates=0, invalid=0, skipped=0,
+                 total=int(prior.get('total', 0)), bytes=int(prior.get('bytes', 0)),
+                 truncated=bool(prior.get('truncated', False)))
+    candidates = []
+    for detection in detections:
+        try:
+            row = _row(detection)
+            content = _box(row['cbox'])
+            offset = _offset(row.get('aoff', [0, 0]))
+            exact = int(row.get('frame_index', -1))
+            if exact >= 0 and exact != frame_index:
+                raise ValueError('detection belongs to a different frame')
+            group = _group(row, content, frame_index, fps)
+            if seen_groups is not None and group in seen_groups:
+                stats['duplicates'] += 1
+                continue
+            candidates.append((row, content, offset, group))
+        except (ValueError, TypeError, KeyError, OverflowError):
+            stats['invalid'] += 1
+
+    # Dense plate/face detectors can emit the same preview group on hundreds
+    # of consecutive frames. The per-scan seen set makes those frames do zero
+    # SQLite work instead of opening/querying the cache every time.
+    if not candidates:
+        return stats
+
     with _LOCK:
         db = _db(job_dir, create=True)
         try:
-            for detection in detections:
+            count, size, truncated = _totals(db)
+            stats.update(total=count, bytes=size,
+                         truncated=stats['truncated'] or truncated)
+            for row, content, offset, group in candidates:
+                if db.execute('SELECT 1 FROM previews WHERE group_key=?', (group,)).fetchone():
+                    stats['duplicates'] += 1
+                    if seen_groups is not None:
+                        seen_groups.add(group)
+                    continue
+                if seen_groups is not None:
+                    # Whether inserted or deliberately skipped because the
+                    # bounded cache is full, don't retry this group every frame.
+                    seen_groups.add(group)
+                if (stats['added'] >= MAX_PER_CAPTURE or count >= MAX_ITEMS
+                        or size >= MAX_BYTES):
+                    stats['skipped'] += 1
+                    _truncate(db)
+                    stats['truncated'] = True
+                    continue
+                box = [content[0]+offset[0], content[1]+offset[1],
+                       content[2]+offset[0], content[3]+offset[1]]
+                # Square rotation envelope + context, matching editor needs.
+                cx, cy = (box[0]+box[2])/2, (box[1]+box[3])/2
+                radius = max(38., math.hypot(box[2]-box[0], box[3]-box[1])/2
+                             + max(28., .15*(box[2]-box[0])))
+                crop = [max(0, math.floor(cx-radius)), max(0, math.floor(cy-radius)),
+                        min(width, math.ceil(cx+radius)), min(height, math.ceil(cy+radius))]
+                if crop[2] <= crop[0] or crop[3] <= crop[1]:
+                    stats['invalid'] += 1
+                    continue
                 try:
-                    row = _row(detection)
-                    content = _box(row['cbox'])
-                    offset = _offset(row.get('aoff', [0, 0]))
-                    exact = int(row.get('frame_index', -1))
-                    if exact >= 0 and exact != frame_index:
-                        raise ValueError('detection belongs to a different frame')
-                    group = _group(row, content, frame_index, fps)
-                    if db.execute('SELECT 1 FROM previews WHERE group_key=?', (group,)).fetchone():
-                        stats['duplicates'] += 1
-                        continue
-                    count, size, truncated = _totals(db)
-                    if stats['added'] >= MAX_PER_CAPTURE or count >= MAX_ITEMS or size >= MAX_BYTES:
-                        stats['skipped'] += 1
-                        _truncate(db)
-                        continue
-                    box = [content[0]+offset[0], content[1]+offset[1],
-                           content[2]+offset[0], content[3]+offset[1]]
-                    # Square rotation envelope + context, matching editor needs.
-                    cx, cy = (box[0]+box[2])/2, (box[1]+box[3])/2
-                    radius = max(38., math.hypot(box[2]-box[0], box[3]-box[1])/2
-                                 + max(28., .15*(box[2]-box[0])))
-                    crop = [max(0, math.floor(cx-radius)), max(0, math.floor(cy-radius)),
-                            min(width, math.ceil(cx+radius)), min(height, math.ceil(cy+radius))]
-                    if crop[2] <= crop[0] or crop[3] <= crop[1]:
-                        raise ValueError('box lies outside source frame')
                     meta = _metadata(row, frame_index, fps, width, height, offset, crop, source)
                     meta, jpeg = _encode(meta, frame_bgr[crop[1]:crop[3], crop[0]:crop[2]])
-                    if _insert(db, group, meta, jpeg):
+                    needed = len(_json(meta).encode()) + len(jpeg)
+                    if _insert(db, group, meta, jpeg, totals=(count, size)):
                         stats['added'] += 1
+                        count += 1
+                        size += needed
                     else:
                         stats['skipped'] += 1
+                        stats['truncated'] = True
+                        # SQLITE_FULL can roll back the active transaction,
+                        # including earlier inserts in this capture. This is
+                        # exceptional; resync the O(1) counters here rather
+                        # than carrying optimistic local totals forward.
+                        count, size, _ = _totals(db)
                 except (ValueError, TypeError, KeyError, OverflowError):
                     stats['invalid'] += 1
             db.commit()
-            stats['total'], stats['bytes'], stats['truncated'] = _totals(db)
+            _, _, truncated = _totals(db)
+            stats.update(total=count, bytes=size,
+                         truncated=stats['truncated'] or truncated)
             return stats
         finally:
             db.close()
@@ -467,6 +543,7 @@ def reconcile(job_dir, detections, render_state):
             records = db.execute(
                 'SELECT key, metadata, track FROM previews ORDER BY rowid').fetchall()
             linked = already = 0
+            byte_delta = 0
             updates = []
             for key, serialized, old_track in records:
                 try:
@@ -486,13 +563,17 @@ def reconcile(job_dir, detections, render_state):
                     meta['track'] = track
                     if person >= 0:
                         meta['person'] = person
-                    updates.append((track, _json(meta), key))
+                    updated = _json(meta)
+                    byte_delta += len(updated.encode()) - len(serialized.encode())
+                    updates.append((track, updated, key))
                     linked += 1
                 except (ValueError, TypeError, KeyError, OverflowError):
                     continue
             if updates:
                 db.executemany('UPDATE previews SET track=?, metadata=? WHERE key=?',
                                updates)
+                count, size, _ = _totals(db)
+                _set_total(db, 'bytes', size + byte_delta)
                 db.commit()
             return dict(total=len(records), linked=linked, already=already)
         finally:

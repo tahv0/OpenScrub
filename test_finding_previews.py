@@ -380,3 +380,44 @@ def test_reconcile_links_scan_picture_to_final_track_representative(previews, tm
     assert meta['frame'] == 3
     assert meta['requested_frame'] == 2
     assert meta['track'] == 7
+
+
+def test_repeated_scan_group_does_no_sqlite_work_after_first_capture(previews, tmp_path, monkeypatch):
+    seen = set()
+    first = previews.capture(tmp_path, frame(), 3, 10., [row()],
+                             seen_groups=seen)
+    assert first['added'] == 1 and seen
+
+    # Same physical untracked region in the same ten-second bucket should be
+    # rejected by the in-process scan set before SQLite is even opened.
+    again = row(frame=4, box=(100, 90, 220, 140))
+    monkeypatch.setattr(previews, '_db',
+        lambda *a, **k: pytest.fail('duplicate scan group reopened SQLite'))
+    stats = previews.capture(tmp_path, frame(), 4, 10., [again],
+                             seen_groups=seen, previous_stats=first)
+    assert stats['duplicates'] == 1
+    assert stats['total'] == first['total']
+    assert stats['bytes'] == first['bytes']
+
+
+def test_preview_totals_are_incremental_not_full_table_aggregates(previews, tmp_path):
+    seen = set()
+    stats = None
+    for i in range(20):
+        candidate = row(frame=i, box=(100 + i*40, 90, 220 + i*40, 140))
+        candidate['track'] = i
+        stats = previews.capture(tmp_path, frame(), i, 10., [candidate],
+                                 seen_groups=seen, previous_stats=stats)
+    assert stats['total'] == 20
+
+    db = previews._db(tmp_path)
+    statements = []
+    db.set_trace_callback(statements.append)
+    try:
+        count, size, _ = previews._totals(db)
+    finally:
+        db.close()
+    assert count == 20 and size > 0
+    sql = '\n'.join(statements).lower()
+    assert 'count(*)' not in sql and 'sum(' not in sql, (
+        'hot-path totals must come from O(1) counters, not rescan every JPEG row')
