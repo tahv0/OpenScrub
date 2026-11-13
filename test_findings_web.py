@@ -156,6 +156,22 @@ def test_compact_autosave_retry_returns_receipt_without_confirming_label(finding
     assert client.post(url, json=payload).status_code == 409
 
 
+
+def test_unsectioned_corner_autosave_does_not_deepcopy_huge_report(findings_job, monkeypatch):
+    client, job, _, path = findings_job
+    image = client.get(f'/api/jobs/{job["id"]}/finding-preview/0')
+    assert image.status_code == 200
+    meta = json.loads(image.headers['X-Finding-Geometry'])
+    points = [list(p) for p in meta['points']]
+    points[0][0] += 1
+    monkeypatch.setattr(web.findings_web, 'deepcopy',
+                        lambda *_: pytest.fail('Per-corner save deep-copied the entire report'))
+    result = client.post(f'/api/jobs/{job["id"]}/plate_quad/0', json=dict(
+        compact=True, points=points, preview_token=meta['preview_token'],
+        autosave=True, edit_id='efficient-corner-save'))
+    assert result.status_code == 200, result.get_data(as_text=True)
+    assert json.loads(path.read_text())['detections'][0]['human_region_confirmed']
+
 def test_confirm_retry_recovers_archive_after_report_failure(findings_job, monkeypatch):
     client, job, _, path = findings_job
     url = f'/api/jobs/{job["id"]}/confirm/0'
