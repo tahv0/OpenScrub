@@ -227,6 +227,11 @@ def test_human_sample_shows_ten_groups_not_hundreds_of_frames(review_server, wid
         assert '100 frames' in card.inner_text(), 'Keep the full grouped span in the sampled card'
         card.scroll_into_view_if_needed()
         page.wait_for_function('(i)=>!!document.querySelector("#det"+i+" img")._quadEdit', arg=index)
+        # A cached scan-time representative can be a different exact source
+        # frame from this synthetic interpolated detection row. Its real
+        # picture/frame, not the guessed report-row frame, becomes evidence.
+        displayed = card.locator('img').evaluate(
+            '(img)=>({frame:img._plateMeta.frame,key:img._plateMeta.key})')
         card.get_by_role('button', name='✕ Not a plate', exact=True).click()
         page.evaluate('CONFIRM_CHAIN')
         page.wait_for_function('(i)=>document.getElementById("vlabel"+i).textContent.includes("Saved") || document.getElementById("vlabel"+i).textContent.includes("Not saved")',arg=index)
@@ -243,7 +248,8 @@ def test_human_sample_shows_ten_groups_not_hundreds_of_frames(review_server, wid
             archived=client.get('/api/findings').get_json()
         assert archived['total']==1, 'One confirmed group stores one representative, not 100 frame examples'
         assert archived['items'][0]['label']=='negative'
-        assert archived['items'][0]['frame']==saved[index]['frame_index']
+        assert archived['items'][0]['frame']==displayed['frame']
+        assert archived['items'][0]['frame'] in (saved[index]['frame_index'], 300)
         evidence = Path(os.environ.get('REVIEW_EVIDENCE_DIR', str(tmp_path)))
         evidence.mkdir(parents=True, exist_ok=True)
         page.locator('#reviewSampleSummary').scroll_into_view_if_needed()
