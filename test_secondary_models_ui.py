@@ -45,6 +45,7 @@ async function reviewRequest(url,options){posts.push(JSON.parse(options.body));r
 def test_review_overlay_state_distinguishes_machine_and_human_decisions():
     source = r'''
 const assert=require('node:assert/strict');
+let CUR='job',REVIEW_BASE={job:'job'};
 let FINDING_META={},REVIEW_DISPLAY_META={},VLBL={},EN={},OUTPUT_CHOICES={};
 ''' + page_between('const REVIEW_OVERLAY_COLORS=', 'function verifierAssessmentText(') + r'''
 FINDING_META={0:{enabled:true,plate_verification:{decision:'suggest_not_plate',applied:false}}};EN={0:true};
