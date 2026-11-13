@@ -42,6 +42,49 @@ async function reviewRequest(url,options){posts.push(JSON.parse(options.body));r
         'async function persistReview(', 'async function loadPersist(')
 
 
+def test_review_overlay_state_distinguishes_machine_and_human_decisions():
+    source = r'''
+const assert=require('node:assert/strict');
+let CUR='job',REVIEW_BASE={job:'job'};
+let FINDING_META={},REVIEW_DISPLAY_META={},VLBL={},EN={},OUTPUT_CHOICES={};
+''' + page_between('const REVIEW_OVERLAY_COLORS=', 'function verifierAssessmentText(') + r'''
+FINDING_META={0:{enabled:true,plate_verification:{decision:'suggest_not_plate',applied:false}}};EN={0:true};
+let state=reviewOverlayState(0);
+assert.equal(state.enabled,true);assert.equal(state.machineSuggestion,true);
+assert.equal(state.source,'Learned model · suggests false positive');
+
+FINDING_META={0:{enabled:false,plate_verification:{decision:'suppress',applied:true}}};EN={0:false};
+state=reviewOverlayState(0);
+assert.equal(state.enabled,false);assert.equal(state.machineFiltered,true);
+assert.equal(state.source,'Learned model · filtered false positive');
+
+FINDING_META={0:{enabled:false,verified_label:'not_plate',
+ human_confirmation:{label:'negative'},plate_verification:{decision:'suppress',applied:true}}};EN={0:false};
+state=reviewOverlayState(0);
+assert.equal(state.humanNegative,true);assert.equal(state.machineFiltered,false);
+assert.equal(state.source,'Human confirmed · not a plate');
+
+FINDING_META={0:{enabled:true,human_region_confirmed:true,learning_score:.93,shaped:true}};EN={0:true};
+state=reviewOverlayState(0);
+assert.equal(state.humanRegion,true);assert.equal(state.source,'Human corrected corners');
+'''
+    run_node(source)
+
+
+def test_video_overlay_keeps_visible_findings_in_the_preview():
+    source = r'''
+const assert=require('node:assert/strict');
+let EN={};
+let BE={raw:[{i:0,enabled:true,category:'plate'},{i:1,enabled:false,category:'plate'},
+            {i:2,enabled:false,category:'face'}],boxes:[]};
+''' + page_between('function beFilter(', 'function beDraw(') + r'''
+beFilter();
+assert.deepEqual(BE.boxes,BE.raw.slice(0,2));
+assert.equal(BE.boxes.length,2);
+'''
+    run_node(source)
+
+
 def test_same_value_keep_sends_an_explicit_clear_and_enabled_choice():
     run_node(choice_harness() + r'''
 const delta=reviewChoiceDelta();
@@ -225,6 +268,9 @@ def test_candidate_check_save_and_explicit_library_mode_in_browser(secondary_ui_
         page.locator('#plateVerifierCandidate').wait_for()
         sync.expect(page.locator('#plateVerifierStatus')).to_contain_text('0 rejected plates')
         sync.expect(page.locator('#review .plate-verification-badge').first).to_contain_text('review')
+        sync.expect(page.locator('#plateOverlay0')).to_contain_text('OUTPUT · HIDDEN')
+        sync.expect(page.locator('#plateOverlay0')).to_contain_text('suggests false positive')
+        sync.expect(page.locator('#review .review-overlay-legend')).to_contain_text('Detector proposal')
         page.locator('#saveLearnedModelPanel summary').click()
         page.locator('#learnedModelName').fill('Garage <secondary>')
         page.get_by_role('button', name='Save model', exact=True).click()
