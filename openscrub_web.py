@@ -4968,6 +4968,59 @@ function initReviewPreviews(){
   },{rootMargin:"240px"});images.forEach(img=>state.observer.observe(img));
  }else images.forEach(img=>queueReviewPreview(img));
 }
+// Retain all decisions/group memberships, but mount card elements progressively.
+function appendReviewPage(cat,selectedOnly=false){
+ const panel=document.getElementById("review"),pending=REVIEW_PENDING_PAGES[cat];
+ if(!panel||!pending||!pending.length)return 0;
+ const grid=[...panel.querySelectorAll("[data-review-category]")]
+  .find(node=>node.dataset.reviewCategory===cat);
+ if(!grid)return 0;
+ const added=[];
+ for(let k=0;k<pending.length&&added.length<(selectedOnly?Infinity:REVIEW_PAGE_SIZE);){
+  const entry=pending[k],members=TRKMEM[entry.i]||[entry.i];
+  if(selectedOnly&&(!LEARNING_SELECTION||!members.some(i=>LEARNING_SELECTION.has(i)))){k++;continue;}
+  added.push(entry);pending.splice(k,1);
+ }
+ if(added.length){
+  grid.insertAdjacentHTML("beforeend",added.map(item=>item.html).join(""));
+  for(const item of added){
+   const i=item.i,card=document.getElementById("det"+i);
+   if(!card)continue;
+   card.hidden=!!LEARNING_SELECTION&&!(TRKMEM[i]||[i]).some(m=>LEARNING_SELECTION.has(m));
+   card.classList.toggle("off",!EN[i]);
+   const bb=document.getElementById("bb"+i);if(bb)bb.innerHTML=detChoices(i);
+   const note=document.getElementById("vlabel"+i);if(note)note.innerHTML=findingStatus(i);
+   updateReviewOverlayLabel(i);
+   const img=card.querySelector("img[data-preview-url]");
+   if(img&&REVIEW_MEDIA){
+    if(REVIEW_MEDIA.observer)REVIEW_MEDIA.observer.observe(img);
+    else queueReviewPreview(img);
+   }
+  }
+ }
+ const more=[...panel.querySelectorAll(".review-more")]
+  .find(node=>node.dataset.reviewMore===cat);
+ if(more){
+  more.hidden=!!LEARNING_SELECTION||!pending.length;
+  more.textContent="Load more "+(CATDN[cat]||cat)+" ("+pending.length+" remaining)";
+ }
+ return added.length;
+}
+function initReviewPages(){
+ const panel=document.getElementById("review");
+ if(!panel)return;
+ const buttons=panel.querySelectorAll(".review-more");
+ if(!buttons.length)return;
+ buttons.forEach(button=>button.addEventListener("click",()=>appendReviewPage(button.dataset.reviewMore)));
+ if(typeof IntersectionObserver!=="undefined"){
+  panel._moreObserver=new IntersectionObserver(entries=>{
+   for(const entry of entries)
+    if(entry.isIntersecting&&!entry.target.hidden)
+     appendReviewPage(entry.target.dataset.reviewMore);
+  },{rootMargin:"720px"});
+  buttons.forEach(button=>panel._moreObserver.observe(button));
+ }
+}
 function retryReviewPreview(button){
  const img=button.closest(".det").querySelector("img[data-preview-url]");
  if(img){
@@ -5450,6 +5503,8 @@ function applyReviewGroupFilter(){
  if(!panel||panel._sampleJob!==CUR||panel._sampleView!==JOBVIEW)return false;
  clearSel();
  const selected=LEARNING_SELECTION;
+ // Group sampling must reveal representative cards beyond the first page.
+ if(selected)for(const cat of Object.keys(REVIEW_PENDING_PAGES))appendReviewPage(cat,true);
  let shown=0;
  panel.querySelectorAll(".det").forEach(card=>{
   const i=Number(card.id.slice(3));
@@ -5461,6 +5516,9 @@ function applyReviewGroupFilter(){
   grid.hidden=count===0;
   const heading=grid.previousElementSibling;heading.hidden=count===0;
   heading.querySelector(".badge").textContent=count;
+ });
+ panel.querySelectorAll(".review-more").forEach(button=>{
+  button.hidden=!!selected||!(REVIEW_PENDING_PAGES[button.dataset.reviewMore]||[]).length;
  });
  const zones=panel.querySelector("#reviewZones");if(zones)zones.hidden=!!selected;
  const all=panel.querySelector("#reviewShowAll");if(all)all.hidden=!selected;
@@ -5877,7 +5935,7 @@ async function loadReview(signal=null,phase=SHELLPH){
  if(typeof updateReviewOverlayLabel==="function"&&typeof REVIEW_DISPLAY_META!=="undefined"){
   for(const key of Object.keys(REVIEW_DISPLAY_META))updateReviewOverlayLabel(Number(key));
  }
- initMarquee();initReviewPreviews();
+ initMarquee();initReviewPreviews();initReviewPages();
  return true;
 }
 
