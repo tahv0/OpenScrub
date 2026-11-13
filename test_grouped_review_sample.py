@@ -252,7 +252,12 @@ def test_human_sample_shows_ten_groups_not_hundreds_of_frames(review_server, wid
         evidence = Path(os.environ.get('REVIEW_EVIDENCE_DIR', str(tmp_path)))
         evidence.mkdir(parents=True, exist_ok=True)
         page.locator('#reviewSampleSummary').scroll_into_view_if_needed()
-        page.screenshot(path=str(evidence / ('grouped-sample-%s.png' % width)))
+        # Browser evidence should not wait for a queued 4K source decode of
+        # an unrelated, offscreen card. Cancel optional preview prefetch after
+        # verifying the committed sample; decisions and visible cards persist.
+        page.evaluate('clearReviewPreviews()')
+        page.locator('#reviewSampleSummary').screenshot(
+            path=str(evidence / ('grouped-sample-%s.png' % width)), timeout=10000)
         page.get_by_role('button', name='Show all findings', exact=True).click()
         page.wait_for_function('document.querySelectorAll("#review .det:not([hidden])").length===100')
         assert page.locator('#det%d .det-status' % (index//100*100)).inner_text() == 'Will stay visible'
