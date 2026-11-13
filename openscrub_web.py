@@ -1726,6 +1726,10 @@ _REVIEW_EDIT_LOCK = threading.RLock()
 _REVIEW_WORK_LOCK = threading.RLock()
 _REVIEW_CACHE_LOCK = threading.Lock()
 
+class _SavedPictureBusyTimeout(TimeoutError):
+    """Only a vault writer, never another thumbnail, can time out a reader."""
+
+
 class _SavedPictureGate:
     """Concurrent image readers, exclusive vault encryption.
 
@@ -1759,7 +1763,7 @@ class _SavedPictureGate:
                 while self._writing or self._writers_waiting:
                     remaining = deadline - time.monotonic()
                     if remaining <= 0:
-                        raise TimeoutError("Saved-picture gate is waiting for vault encryption")
+                        raise _SavedPictureBusyTimeout("Saved-picture gate is waiting for vault encryption")
                     self._condition.wait(remaining)
                 self._readers += 1
                 self._local.depth = 1
@@ -1848,6 +1852,8 @@ def _load_preview_report(job):
                             abort(423)
                         review_preview_index.prepare(path, source)
                         doc = review_preview_index.load(path)
+                except _SavedPictureBusyTimeout:
+                    abort(503, description="The vault is locking saved pictures. Retry shortly.")
                 except (OSError, ValueError, sqlite3.DatabaseError):
                     diagnostics.exception("review_index_build_failed", job)
                 if doc is None:
@@ -2052,6 +2058,8 @@ def _reconcile_compact_previews(job, doc):
             # Human corner changes retain exact-frame/geometry cache checks.
             job["_compact_preview_reconcile"] = signature
             return stats
+    except _SavedPictureBusyTimeout:
+        abort(503, description="The vault is locking saved pictures. Retry shortly.")
     finally:
         _REVIEW_RECONCILE_LOCK.release()
 
@@ -2900,7 +2908,7 @@ def _serialize_review_read(fn):
                 if vault_locked():
                     abort(423)
                 return fn(*args, **kwargs)
-        except TimeoutError:
+        except _SavedPictureBusyTimeout:
             abort(503, description="The vault is locking saved pictures. Retry shortly.")
     return read
 
