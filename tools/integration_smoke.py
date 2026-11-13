@@ -350,8 +350,9 @@ def verify(args):
             page.locator("#bePrev").click()
             check_contours(evidence, wait_for_frame(page, 0), 0)
             keep.click()
-            page.wait_for_function("() => !BE.pending && BE.boxes.length===0 && "
-                                   "BE.raw.length===1 && BE.raw[0].enabled===false")
+            page.wait_for_function("() => !BE.pending && BE.boxes.length===1 && "
+                                   "BE.raw.length===1 && BE.raw[0].enabled===false && "
+                                   "BE.boxes[0].enabled===false")
             check_track(page, evidence, "Keep visible updates every track member with preview mounted", False)
             blur.click()
             page.wait_for_function("() => !BE.pending && BE.boxes.length===1 && "
@@ -397,7 +398,8 @@ def verify(args):
             # This preserves the full-member save assertion below and verifies
             # server persistence independently of the browser's displayed state.
             keep.click()
-            page.wait_for_function("() => !BE.pending && BE.boxes.length===0")
+            page.wait_for_function("() => !BE.pending && BE.boxes.length===1 && "
+                                   "BE.boxes[0].enabled===false")
             with page.expect_response(lambda response: response.url.endswith(
                     f"/api/jobs/{JOB_ID}/detections") and response.request.method == "POST") as kept:
                 kept_ok = page.evaluate("saveAndRender(true)")

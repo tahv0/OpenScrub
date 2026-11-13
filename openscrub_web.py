@@ -1942,6 +1942,7 @@ def job_detections(jid):
                       "learning_score": d.get("learning_score"),
                       "plate_verification": d.get("plate_verification"),
                       "fallback_reason": d.get("fallback_reason", ""),
+                      "human_region_confirmed": bool(d.get("human_region_confirmed")),
                       "zone_dropped": bool(d.get("zone_dropped")),
                       "shaped": bool(d.get("poly"))})
     return jsonify({"detections": items,
@@ -2582,6 +2583,13 @@ def job_boxes_at(jid):
             boxes.append({"i": i, "category": d["category"],
                           "enabled": d.get("enabled", True),
                           "text": d.get("text", ""),
+                          "verified_label": d.get("verified_label", ""),
+                          "human_confirmation": d.get("human_confirmation"),
+                          "output_choice_explicit": bool(d.get("output_choice_explicit")),
+                          "human_region_confirmed": bool(d.get("human_region_confirmed")),
+                          "learning_conflict": d.get("learning_conflict", ""),
+                          "learning_score": d.get("learning_score"),
+                          "plate_verification": d.get("plate_verification"),
                           "plate_quad": d.get("plate_quad") or [],
                           "fallback_reason": d.get("fallback_reason", ""),
                           "shaped": bool(d.get("poly")),
@@ -3447,6 +3455,25 @@ progress{width:100%;height:12px;accent-color:var(--acc)}
 #plateSaveIssues{border:1px solid #fbbf24;border-radius:6px;padding:8px;overflow-wrap:anywhere}
 #plateSaveIssues .row{margin-top:5px}
 .plate-outline:focus-visible{outline:2px solid #60a5fa;outline-offset:2px}
+.review-overlay-legend{display:flex;gap:8px 14px;flex-wrap:wrap;align-items:center;
+ margin:8px 0 10px;padding:8px 10px;border:1px solid #334155;border-radius:8px;
+ background:#0f172a;color:#cbd5e1;font-size:11.5px}
+.review-overlay-key{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.review-overlay-swatch{display:inline-block;width:25px;height:14px;border-radius:3px;
+ box-sizing:border-box}
+.review-overlay-swatch.proposal{border:2px dashed #f5c400;background:transparent}
+.review-overlay-swatch.hidden{border:2px solid #dc2626;background:rgba(220,38,38,.28)}
+.review-overlay-swatch.visible{border:2px solid #22c55e;background:rgba(34,197,94,.08)}
+.review-overlay-swatch.edit{border:2px solid #38bdf8;background:transparent;position:relative}
+.review-overlay-swatch.edit::after{content:"";position:absolute;width:5px;height:5px;border-radius:50%;
+ background:#38bdf8;left:8px;top:2px}
+.plate-output-badge{position:absolute;left:6px;bottom:6px;z-index:3;max-width:calc(100% - 12px);
+ padding:4px 6px;border-radius:6px;background:rgba(2,6,23,.86);border:1px solid #475569;
+ color:#e2e8f0;font-size:10.5px;line-height:1.25;text-align:left;pointer-events:none;
+ box-sizing:border-box;overflow-wrap:anywhere}
+.plate-output-badge strong{display:block;font-size:10.5px;letter-spacing:.03em}
+.plate-output-badge.hidden strong{color:#fca5a5}
+.plate-output-badge.visible strong{color:#86efac}
 
 .det.selected{outline:2px dashed #60a5fa;outline-offset:2px}
 .review-copy{font-size:13px;color:#cbd5e1;line-height:1.5;margin:0 0 10px}
@@ -4224,7 +4251,7 @@ async function loadBoxEdit(fromReview){
      plateMode:false,platePoints:[],
      tlspans:[],audio:[],audioSel:-1,indexed:!!ri.indexed_frames,
      fps:ri.fps,frameCount:ri.frame_count,frame:0,imageFrame:-1,maskFrame:-1};
- c.innerHTML=`<div class="row" style="margin-top:8px">
+ c.innerHTML=`${reviewOverlayLegendHTML()}<div class="row" style="margin-top:8px">
   <button class="sec" id="bePlay" style="padding:3px 11px" title="${BE.indexed?'Play video; pause for precise masks':'Play the video with live boxes — pause to edit them'}" onclick="beTogglePlay()">&#9654;</button>t=
   ${BE.indexed?'<button class="sec" id="bePrev" onclick="beStepFrame(-1)" title="Previous frame">&#9664; frame</button>':''}
   <input type="range" id="beT" min="0" max="${BE.indexed?Math.max(0,BE.frameCount-1):Math.max(0.2,mi.duration-0.1).toFixed(1)}"
@@ -4248,7 +4275,7 @@ async function loadBoxEdit(fromReview){
    <button class="danger" id="beARm" style="display:none" onclick="beAudioRm()">Delete span</button></div>
   <div id="beASugg" style="display:none;margin-top:6px"></div>
   <div id="beATx" style="display:none;margin-top:6px"></div>
-  <div style="font-size:12px;color:#94a3b8">Moving or resizing a shaped mask removes its shape; faces follow the selected face shape, other detections use a box. Outlines without fill mean the preview is updating.</div>
+  <div style="font-size:12px;color:#94a3b8">Moving or resizing a shaped mask removes its shape; faces follow the selected face shape, other detections use a box. The effective red/green shape matches renderer coverage; the yellow dashed box is only the primary detector proposal.</div>
   <div class="row" style="margin-top:6px">
    <button class="tog" id="beAdd" onclick="beAddMode()">&#65291; Add box</button>
    <button class="tog" id="beTrk" onclick="beTrackMode()">&#8857; Track object</button>
@@ -4260,8 +4287,8 @@ async function loadBoxEdit(fromReview){
     <button class="sec" onclick="beApplyTimes()">Apply times</button></span>
    <span id="beTrkSt" style="display:none;font-size:13px;color:#fbbf24">tracking&#8230;</span>
    <button onclick="beSave()">Save changes &amp; re-render</button></div>
-  <p style="font-size:12px;color:#94a3b8;margin:4px 0 0">&#9654; ${BE.indexed?"plays the video without masks; pause to inspect a frame.":"plays the video with the boxes moving live (pause to edit)."} Click a red box to
-   select — drag inside to move, a corner to resize, edit its from/to times,
+  <p style="font-size:12px;color:#94a3b8;margin:4px 0 0">&#9654; ${BE.indexed?"plays the video without masks; pause to inspect a frame.":"plays the video with the overlays moving live (pause to edit)."} Click an effective outline to
+   select — red means hidden, green means visible, and yellow dashed is only the detector proposal. Drag inside to move, a corner to resize, edit its from/to times,
    or remove its blur. &#65291; Add box: drag a static region. &#8857; Track object:
    drag the timeline handles to the part of the video you care about, scrub
    to a frame where the object is clear, draw a box around it — it will be
@@ -4556,14 +4583,26 @@ async function beRefresh(t=BE.t){
  }
 }
 function beFilter(){
+ // Keep visible/model-filtered plate findings in the editor so green really
+ // means "this stays visible", without reintroducing every kept face/text hit.
  BE.boxes=(BE.raw||[]).filter(b=>{
-  const on=(b.i in EN)?EN[b.i]:b.enabled;   // live: review toggles apply here
-  return on;
+  const on=(b.i in EN)?EN[b.i]:b.enabled;
+  return on||b.category==="plate";
  });
 }
 function beDraw(){
  const cv=document.getElementById("beCv");if(!cv)return;
  const x=cv.getContext("2d"),s=BE.scale;
+ // Keep this primitive independently executable: focused regressions extract
+ // the video editor without loading the rest of Review.
+ const oc=typeof REVIEW_OVERLAY_COLORS!=="undefined"?REVIEW_OVERLAY_COLORS:{
+  proposal:"#f5c400",hidden:"#dc2626",hiddenFill:"rgba(220,38,38,.24)",
+  visible:"#22c55e",visibleFill:"rgba(34,197,94,.08)",edit:"#38bdf8"
+ };
+ const overlayState=b=>typeof reviewOverlayState==="function"
+  ?reviewOverlayState(b.i,b)
+  :{enabled:(b.i in EN)?!!EN[b.i]:b.enabled!==false,
+    machineFiltered:false,machineSuggestion:false};
  x.clearRect(0,0,cv.width,cv.height);
  if(BE.indexed&&(BE.playing||BE.pending))return;
  for(const a of BE.adds){
@@ -4582,35 +4621,56 @@ function beDraw(){
   x.beginPath();BE.platePoints.forEach((p,k)=>{
    if(k)x.lineTo(p[0]*s,p[1]*s);else x.moveTo(p[0]*s,p[1]*s);
   });
-  x.strokeStyle="#4ade80";x.lineWidth=2;x.stroke();
+  x.strokeStyle=oc.edit;x.lineWidth=2;x.stroke();
   for(const p of BE.platePoints){
    x.beginPath();x.arc(p[0]*s,p[1]*s,5,0,Math.PI*2);
-   x.fillStyle="#4ade80";x.fill();
+   x.fillStyle=oc.edit;x.fill();
   }
  }
  for(const b of BE.boxes){
-  const[a1,b1,a2,b2]=b.box.map(v=>v*s);
-  x.fillStyle=b.i===BE.sel?"rgba(37,99,235,.25)":"rgba(220,38,38,.22)";
-  x.strokeStyle=b.i===BE.sel?"#2563eb":"#dc2626";x.lineWidth=2;
-  if(b.category==="plate"&&b.plate_quad&&b.plate_quad.length===4){
-   x.beginPath();b.plate_quad.forEach((p,k)=>{
-    const px=(b.box[0]+p[0]*(b.box[2]-b.box[0]))*s;
-    const py=(b.box[1]+p[1]*(b.box[3]-b.box[1]))*s;
-    if(k)x.lineTo(px,py);else x.moveTo(px,py);
-   });x.closePath();x.fill();x.stroke();
-  }else{x.fillRect(a1,b1,a2-a1,b2-b1);x.strokeRect(a1,b1,a2-a1,b2-b1);}
-  if(!BE.pending&&!BE.drag&&b.mask_contours.length){
+  const[a1,b1,a2,b2]=b.box.map(v=>v*s),state=overlayState(b);
+  const line=state.enabled?oc.hidden:oc.visible;
+  const fill=state.enabled?oc.hiddenFill:oc.visibleFill;
+  const machineVisible=!state.enabled&&state.machineFiltered;
+  x.fillStyle=fill;x.strokeStyle=line;x.lineWidth=2;
+  x.setLineDash(machineVisible?[7,4]:[]);
+  let drew=false;
+  if(!BE.pending&&!BE.drag&&b.mask_contours?.length){
    x.beginPath();
    for(const ring of b.mask_contours){if(!ring.length)continue;
     x.moveTo(ring[0][0]*s,ring[0][1]*s);
     for(const p of ring.slice(1))x.lineTo(p[0]*s,p[1]*s);
     x.closePath();}
-   x.fill("evenodd");x.stroke();
-   x.setLineDash([4,4]);x.strokeRect(a1,b1,a2-a1,b2-b1);x.setLineDash([]);
-  }else{x.setLineDash([4,4]);x.strokeRect(a1,b1,a2-a1,b2-b1);x.setLineDash([]);}
+   x.fill("evenodd");x.stroke();drew=true;
+  }else if(b.category==="plate"&&b.plate_quad&&b.plate_quad.length===4){
+   x.beginPath();b.plate_quad.forEach((p,k)=>{
+    const px=(b.box[0]+p[0]*(b.box[2]-b.box[0]))*s;
+    const py=(b.box[1]+p[1]*(b.box[3]-b.box[1]))*s;
+    if(k)x.lineTo(px,py);else x.moveTo(px,py);
+   });x.closePath();x.fill();x.stroke();drew=true;
+  }
+  if(!drew){x.fillRect(a1,b1,a2-a1,b2-b1);x.strokeRect(a1,b1,a2-a1,b2-b1);}
+  x.setLineDash([]);
+  if(b.category==="plate"&&b.plate_quad&&b.plate_quad.length===4){
+   x.fillStyle=line;
+   for(const p of b.plate_quad){
+    const px=(b.box[0]+p[0]*(b.box[2]-b.box[0]))*s;
+    const py=(b.box[1]+p[1]*(b.box[3]-b.box[1]))*s;
+    x.beginPath();x.arc(px,py,3,0,Math.PI*2);x.fill();
+   }
+  }
+  if(b.category==="plate"){
+   x.strokeStyle=oc.proposal;x.lineWidth=1.5;x.setLineDash([6,4]);
+   x.strokeRect(a1,b1,a2-a1,b2-b1);x.setLineDash([]);
+  }
+  if(b.category==="plate"&&state.machineSuggestion&&state.enabled){
+   x.strokeStyle=oc.visible;x.lineWidth=1.5;x.setLineDash([5,4]);
+   const inset=3;x.strokeRect(a1+inset,b1+inset,Math.max(0,a2-a1-2*inset),Math.max(0,b2-b1-2*inset));
+   x.setLineDash([]);
+  }
   if(b.i===BE.sel)for(const[hx,hy] of [[a1,b1],[a2,b1],[a1,b2],[a2,b2]]){
-   x.fillStyle="#fff";x.fillRect(hx-5,hy-5,10,10);
-   x.strokeRect(hx-5,hy-5,10,10);}
+   x.fillStyle="#0f172a";x.fillRect(hx-5,hy-5,10,10);
+   x.strokeStyle=oc.edit;x.lineWidth=2;x.strokeRect(hx-5,hy-5,10,10);}
  }
 }
 function beAddMode(){
@@ -5060,6 +5120,10 @@ function pumpPlateSaves(){
    if(data.finding&&typeof FINDING_META!=="undefined"&&FINDING_META[s.i])
     FINDING_META[s.i].confirmed_finding_revision=data.finding.revision;
    s.saved=plateCopy(s.meta.points);s.failures=0;
+   if(typeof FINDING_META!=="undefined"&&FINDING_META[s.i])
+    FINDING_META[s.i].human_region_confirmed=true;
+   if(typeof REVIEW_DISPLAY_META!=="undefined"&&REVIEW_DISPLAY_META[s.i])
+    REVIEW_DISPLAY_META[s.i].human_region_confirmed=true;
    syncPlateTrack(s);
    if(s.pending!==pending)return; // A newer Not-a-plate decision wins.
    s.pending=null;
@@ -5150,19 +5214,34 @@ function initPlateCorners(img){
   if(r.width<1||r.height<1)return;
   cv.width=Math.max(1,Math.round(r.width));cv.height=Math.max(1,Math.round(r.height));
   const x=cv.getContext("2d"),sx=cv.width/(c[2]-c[0]),sy=cv.height/(c[3]-c[1]);
+  const state=reviewOverlayState(s.i),valid=plateQuadValid(s.points);
   x.clearRect(0,0,cv.width,cv.height);x.beginPath();
   s.points.forEach((p,k)=>{const px=(p[0]-c[0])*sx,py=(p[1]-c[1])*sy;
    if(k)x.lineTo(px,py);else x.moveTo(px,py);});
-  x.closePath();x.strokeStyle=plateQuadValid(s.points)?"#4ade80":"#f87171";x.lineWidth=2;x.stroke();
+  x.closePath();
+  x.fillStyle=state.enabled?REVIEW_OVERLAY_COLORS.hiddenFill:REVIEW_OVERLAY_COLORS.visibleFill;
+  x.strokeStyle=valid?(state.enabled?REVIEW_OVERLAY_COLORS.hidden:REVIEW_OVERLAY_COLORS.visible):REVIEW_OVERLAY_COLORS.invalid;
+  x.lineWidth=2;x.setLineDash(!state.enabled&&state.machineFiltered?[7,4]:[]);
+  x.fill();x.stroke();x.setLineDash([]);
+  const b=s.meta.box,bx1=(b[0]-c[0])*sx,by1=(b[1]-c[1])*sy,
+        bx2=(b[2]-c[0])*sx,by2=(b[3]-c[1])*sy;
+  x.strokeStyle=REVIEW_OVERLAY_COLORS.proposal;x.lineWidth=1.5;x.setLineDash([6,4]);
+  x.strokeRect(bx1,by1,bx2-bx1,by2-by1);x.setLineDash([]);
+  if(state.machineSuggestion&&state.enabled){
+   x.strokeStyle=REVIEW_OVERLAY_COLORS.visible;x.lineWidth=1.5;x.setLineDash([5,4]);
+   const inset=3;x.strokeRect(bx1+inset,by1+inset,Math.max(0,bx2-bx1-2*inset),Math.max(0,by2-by1-2*inset));
+   x.setLineDash([]);
+  }
   s.points.forEach((p,k)=>{const px=(p[0]-c[0])*sx,py=(p[1]-c[1])*sy;
    const hx=Math.max(9,Math.min(cv.width-9,px)),hy=Math.max(9,Math.min(cv.height-9,py));
    const outside=p[0]<0||p[0]>s.meta.width||p[1]<0||p[1]>s.meta.height;
    const rejected=(s.error?.details?.invalid_corners||[]).includes(k+1);
-   x.strokeStyle=outside||rejected?"#f87171":"#4ade80";
+   x.strokeStyle=outside||rejected?REVIEW_OVERLAY_COLORS.invalid:REVIEW_OVERLAY_COLORS.edit;
    if(hx!==px||hy!==py){x.beginPath();x.moveTo(px,py);x.lineTo(hx,hy);x.stroke();}
-   x.beginPath();x.arc(hx,hy,8,0,Math.PI*2);x.fillStyle="#0f172a";x.fill();x.stroke();
+   x.beginPath();x.arc(hx,hy,8,0,Math.PI*2);x.fillStyle="#0f172a";x.fill();x.lineWidth=2;x.stroke();
    x.fillStyle="#fff";x.font="bold 10px sans-serif";x.textAlign="center";x.fillText(String(k+1),hx,hy+3);
   });
+  updateReviewOverlayLabel(s.i);
  };
  function point(e){const r=cv.getBoundingClientRect(),c=s.displayCrop,o=s.drag?.offset||[0,0];
   return [Math.max(c[0],Math.min(c[2],c[0]+(e.clientX-r.left)/r.width*(c[2]-c[0])-o[0])),
@@ -5220,7 +5299,7 @@ function initPlateCorners(img){
  },options);
  s.observer=typeof ResizeObserver!=="undefined"?new ResizeObserver(s.draw):null;
  if(s.observer)s.observer.observe(img);
- plateStatus(s,"Drag corners · autosaves");s.draw();return s;
+ plateStatus(s,"Drag corners · autosaves");s.draw();updateReviewOverlayLabel(s.i);return s;
 }
 document.addEventListener("visibilitychange",()=>{
  if(document.hidden){for(const s of PLATE_EDITS.values())if(s.dirty&&!s.error)s.readyAt=0;pumpPlateSaves();}
@@ -5467,7 +5546,65 @@ function plateTextBadge(row){
 let LEARNING_SAMPLE_INFO=null;
 let VLBL={},VLBLJOB=null;  // explicit human labels; never infer from default blur state
 let FINDING_META={},OUTPUT_CHOICES={},OUTPUT_VERSION={};
+let REVIEW_DISPLAY_META={};
 let REVIEW_BASE=null; // Only decision scalars, not a second detection report.
+const REVIEW_OVERLAY_COLORS={
+ proposal:"#f5c400",hidden:"#dc2626",hiddenFill:"rgba(220,38,38,.24)",
+ visible:"#22c55e",visibleFill:"rgba(34,197,94,.08)",edit:"#38bdf8",invalid:"#f87171"
+};
+function reviewOverlayState(i,row=null){
+ // A boxes_at row is authoritative for the standalone video editor. Live
+ // Review maps override it only while they belong to this same current job.
+ const liveReview=!row||(REVIEW_BASE?.job===CUR);
+ const raw=row||FINDING_META[i]||{},display=row?{}:(REVIEW_DISPLAY_META[i]||{});
+ const marker=raw.plate_verification||display.plate_verification||{};
+ const draft=(liveReview&&Object.prototype.hasOwnProperty.call(VLBL,i)&&VLBL[i]!=="clear")?VLBL[i]:"";
+ const verified=draft||raw.verified_label||display.verified_label||"";
+ const confirmation=raw.human_confirmation?.label||display.human_confirmation?.label||"";
+ const enabled=(liveReview&&Object.prototype.hasOwnProperty.call(EN,i))?!!EN[i]:(row?row.enabled!==false:raw.enabled!==false);
+ const explicit=(liveReview&&!!OUTPUT_CHOICES[i])||!!raw.output_choice_explicit||!!display.output_choice_explicit;
+ const humanNegative=confirmation==="negative"||verified==="not_plate";
+ const humanPositive=confirmation==="positive"||verified==="plate";
+ const humanRegion=!!(raw.human_region_confirmed||display.human_region_confirmed);
+ const machineFiltered=marker.decision==="suppress"&&marker.applied===true&&!humanNegative&&!explicit;
+ const machineSuggestion=marker.decision==="suggest_not_plate"&&!humanNegative&&!explicit;
+ const conflict=raw.learning_conflict||display.learning_conflict||"";
+ const fallback=raw.fallback_reason||display.fallback_reason||"";
+ const shaped=!!(raw.shaped||display.shaped||row?.shaped);
+ const learnedScore=raw.learning_score??display.learning_score;
+ let source="Detector coverage";
+ if(humanNegative)source="Human confirmed · not a plate";
+ else if(humanRegion)source="Human corrected corners";
+ else if(humanPositive)source="Human confirmed · plate";
+ else if(explicit)source=enabled?"Human choice · hidden":"Human choice · visible";
+ else if(machineFiltered)source="Learned model · filtered false positive";
+ else if(machineSuggestion)source="Learned model · suggests false positive";
+ else if(conflict)source="Fallback · detector box";
+ else if(fallback)source="Fallback · full plate coverage";
+ else if(Number.isFinite(learnedScore)&&shaped)source="Learned mask";
+ else if(shaped)source="Shaped redaction";
+ return {enabled,explicit,humanNegative,humanPositive,humanRegion,machineFiltered,
+         machineSuggestion,conflict,fallback,shaped,source};
+}
+function reviewOverlayLegendHTML(){
+ return `<div class="review-overlay-legend" role="note" aria-label="Plate review overlay legend">
+  <span class="review-overlay-key"><span class="review-overlay-swatch proposal"></span>Detector proposal</span>
+  <span class="review-overlay-key"><span class="review-overlay-swatch hidden"></span>Will be hidden</span>
+  <span class="review-overlay-key"><span class="review-overlay-swatch visible"></span>Visible / false positive</span>
+  <span class="review-overlay-key"><span class="review-overlay-swatch edit"></span>Edit corners</span>
+  <span>Dashed green = learned-model judgement; solid green = human-visible decision.</span>
+ </div>`;
+}
+function updateReviewOverlayLabel(i,row=null){
+ const el=document.getElementById("plateOverlay"+i);if(!el)return;
+ const state=reviewOverlayState(i,row);
+ el.className="plate-output-badge "+(state.enabled?"hidden":"visible");
+ el.innerHTML=`<strong>OUTPUT · ${state.enabled?"HIDDEN":"VISIBLE"}</strong><span>${sectionEscape(state.source)}</span>`;
+}
+function redrawReviewOverlay(i){
+ const edit=typeof PLATE_EDITS!=="undefined"?PLATE_EDITS.get(i):null;
+ if(edit)edit.draw();else updateReviewOverlayLabel(i);
+}
 function verifierAssessmentText(assessment){
  if(!assessment)return "Not evaluated yet. Check detections in review mode to assess this candidate without retraining.";
  return `${assessment.status==="validated"?"Filtering validated on held-out examples":"Review suggestions only"}: ${assessment.retained_positive}/${assessment.held_out_positive} plates retained, ${assessment.rejected_positive} rejected plates, ${assessment.rejected_negative}/${assessment.held_out_negative} negatives rejected. ${assessment.reason||""}`;
@@ -5553,7 +5690,7 @@ async function loadReview(signal=null,phase=SHELLPH){
  if(LEARNING_SELECTION_JOB!==CUR)LEARNING_SELECTION=null;
  const groups={}; const zdrop=[]; TRKMEM={};
  REVIEW_BASE={job,enabled:{},labels:{},output_choices:{}};
- FINDING_META={};OUTPUT_CHOICES={};OUTPUT_VERSION={};
+ FINDING_META={};REVIEW_DISPLAY_META={};OUTPUT_CHOICES={};OUTPUT_VERSION={};
  d.detections.forEach(x=>{
   FINDING_META[x.i]=x;
   if(x.output_choice_explicit)OUTPUT_CHOICES[x.i]=REVIEW_BASE.output_choices[x.i]=true;
@@ -5614,7 +5751,8 @@ async function loadReview(signal=null,phase=SHELLPH){
  <p id="reviewSaveStatus" class="review-copy review-save-status" role="status" aria-live="polite">Review choices loaded from disk.</p>
  <div id="plateSaveIssues" class="review-copy" role="status" aria-live="polite" hidden></div>
  <p class="review-copy">Training uses saved corrections and the original detectors. It does not guarantee that undetected plates have been found. Review the output.</p>
- <p class="review-copy">Thumbnail rectangles are selection guides. Open shaped masks to inspect their coverage and exclusions.</p>
+ ${reviewOverlayLegendHTML()}
+ <p class="review-copy">Yellow is the primary detector proposal. Red is the effective area that will be concealed; it keeps four-corner rotation, skew and perspective. Green stays visible. Labels identify human corrections, learned masks and safe fallbacks.</p>
  <div class="row" style="margin:0 0 8px">
   <button class="sec" onclick="loadBoxEdit(1)">▶ Preview video &amp; edit boxes
   (before rendering)</button></div>
@@ -5666,6 +5804,8 @@ async function loadReview(signal=null,phase=SHELLPH){
    rep.frames=members.length;
    rep.fallbacks=[...new Set(members.map(m=>m.fallback_reason).filter(Boolean))];
    rep.fallbackCount=members.filter(m=>m.fallback_reason).length;
+   rep.human_region_confirmed=members.some(m=>m.human_region_confirmed);
+   rep.shaped=members.some(m=>m.shaped);
    rep.personcard=key[0]==="p";
    TRKMEM[rep.i]=members.map(m=>m.i);
    items.push(rep);
@@ -5679,6 +5819,7 @@ async function loadReview(signal=null,phase=SHELLPH){
    <button class="sec" style="padding:3px 8px;font-size:12px"
     onclick="setAll('${cat}',false)">Keep all visible</button></h3><div class="grid3" data-review-category="${cat}">`;
   for(const x of items){
+   REVIEW_DISPLAY_META[x.i]=x;
    html+=`<div class="det ${EN[x.i]?'':'off'}" id="det${x.i}" data-cat="${cat}">
     <div class="${x.category==="plate"?"plate-preview":"finding-preview"}">
     <img id="thumb${x.i}" data-preview-url="api/jobs/${job}/finding-preview/${x.i}" alt="Original detection preview"
@@ -5688,7 +5829,7 @@ async function loadReview(signal=null,phase=SHELLPH){
      onclick="${x.category==="plate"?"":"zoomDet("+x.i+")"}"
      onpointerdown="${x.category==="plate"?"event.stopPropagation()":""}"
      draggable="false" ondragstart="return false"
-     >${x.category==="plate"?'<canvas class="plate-outline"></canvas>':""}</div>
+     >${x.category==="plate"?'<canvas class="plate-outline"></canvas><span id="plateOverlay'+x.i+'" class="plate-output-badge"></span>':""}</div>
     <small class="preview-status" role="status">Preview not loaded</small>
     <button class="sec preview-retry" hidden onclick="retryReviewPreview(this)">Retry preview</button>
     ${x.category==="plate"?'<small class="quad-status" role="status" title="Corners apply to this detected track. Review changing perspective. Keyboard: select corner 1–4, use arrows; Ctrl+Z undoes.">Corners autosave to track</small><button type="button" class="sec quad-retry" hidden>Retry save</button>':""}
@@ -5723,6 +5864,9 @@ async function loadReview(signal=null,phase=SHELLPH){
  }
  updatePlateVerifierCandidate();
  if(LEARNING_SELECTION)applyReviewGroupFilter();
+ if(typeof updateReviewOverlayLabel==="function"&&typeof REVIEW_DISPLAY_META!=="undefined"){
+  for(const key of Object.keys(REVIEW_DISPLAY_META))updateReviewOverlayLabel(Number(key));
+ }
  initMarquee();initReviewPreviews();
  return true;
 }
@@ -5836,6 +5980,7 @@ function confirmFinding(i,label){
     if(REVIEW_BASE?.job===job){REVIEW_BASE.enabled[m]=confirmedOutput;REVIEW_BASE.labels[m]=VLBL[m]||'';REVIEW_BASE.output_choices[m]=true;}
     const output=document.getElementById('bb'+m);if(output)output.innerHTML=detChoices(m);
     document.getElementById('det'+m)?.classList.toggle('off',!EN[m]);
+    if(typeof redrawReviewOverlay==="function")redrawReviewOverlay(m);
    }
    Object.assign(FINDING_META[i],{confirmed_finding_id:data.finding.id,confirmed_finding_revision:data.finding.revision});
    if(edit&&data.preview){
@@ -5864,6 +6009,7 @@ function applyDet(i,blur,preserveLabel=false){
   const b=document.getElementById("bb"+m),t=document.getElementById("det"+m);
   if(b)b.innerHTML=detChoices(m);
   if(t)t.classList.toggle("off",!blur);
+  if(typeof redrawReviewOverlay==="function")redrawReviewOverlay(m);
  }
  markReviewChanged();
  if(document.getElementById("beCv")){beRefresh();}
