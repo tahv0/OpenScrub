@@ -27,3 +27,15 @@ jobs:
           docker buildx build --call=check -f Dockerfile.cuda .
       - name: Verify persistent dependency-image invariants
         run: python3 -m unittest discover -s tests -p test_cuda_dependency_image.py -v
+      - name: Parse Windows PowerShell wrapper
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            'scripts/build-windows-cuda.ps1', [ref]$tokens, [ref]$errors
+          ) | Out-Null
+          if ($errors.Count) {
+            $errors | Format-List
+            exit 1
+          }
