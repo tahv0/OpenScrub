@@ -473,6 +473,8 @@ def test_group_card_uses_strongest_plate_sighting(review_server):
     doc = json.loads(report.read_text())
     low, high = doc['detections'][:2]
     high['track'] = low['track']
+    high['frame_index'] = 301
+    high['t_start'] = high['t_end'] = high['last_seen'] = 301/30
     low['confidence'] = .95
     high['confidence'] = .42
     low['enabled'] = False
@@ -500,6 +502,16 @@ def test_group_card_uses_strongest_plate_sighting(review_server):
         badge = card.locator('.plate-verification-badge').inner_text()
         assert 'Model retained' in badge and 'plate score 84%' in badge
         assert 'Model filtered' not in badge
+        card.scroll_into_view_if_needed()
+        page.wait_for_function('''() => {
+            const btn=document.querySelector('#det1 .plate-group-exact');
+            return !!btn && !btn.hidden;
+        }''')
+        assert 'Cached picture is frame 300' in card.inner_text()
+        exact = card.get_by_role('button', name='Open exact selected frame', exact=True)
+        exact.click()
+        assert page.locator('#lb img').get_attribute('src').endswith('/detframe/1')
+        page.locator('#lb').click(position={'x': 4, 'y': 4})
         card.get_by_role('button', name='Keep visible', exact=True).click()
         assert page.evaluate('[EN[0], EN[1]]') == [False, False]
         assert '0/2 detections hidden, 2 visible' in card.inner_text()
