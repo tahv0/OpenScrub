@@ -6539,6 +6539,12 @@ def load_report(path):
     for r in rows:
         if not r.get("enabled", True):
             continue
+        quad_frame = plate_boundaries.quad_source_frame(
+            r, state.get("fps") if isinstance(state, dict) else None)
+        # A legacy time-spanning learned polygon cannot be applied at frames
+        # where it was never evaluated. Keep its detector box there instead.
+        poly = (() if r.get("category") == "plate" and quad_frame >= 0
+                and int(r.get("frame_index", -1)) < 0 else r.get("poly") or ())
         dets.append(Detection(
             t_start=float(r["t_start"]), t_end=float(r["t_end"]),
             cbox=tuple(r["cbox"]), category=r["category"], text=r["text"],
@@ -6552,11 +6558,11 @@ def load_report(path):
             track=int(r.get("track", -1)),
             person=int(r.get("person", -1)),
             plate_quad=tuple(tuple(pt) for pt in plate_boundaries.trusted_plate_quad(r)),
-            plate_quad_frame=int(r.get("plate_quad_frame", -1)),
+            plate_quad_frame=quad_frame,
             verified_label=(r.get("verified_label")
                             if r.get("verified_label") in ("plate", "not_plate")
                             else ""),
-            poly=_tuples(r.get("poly") or ()),
+            poly=_tuples(poly),
             poly_holes=_tuples(r.get("poly_holes") or ()),
             mask_pad=r.get("mask_pad", -1),
             frame_index=int(r.get("frame_index", -1)),
