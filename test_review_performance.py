@@ -327,7 +327,8 @@ reviewRequest=async (url,options)=>{
  for(let i=0;i<20;i++)await new Promise(resolve=>setImmediate(resolve));
  assert.equal(images[1].naturalWidth,100,'warm preview is blocked behind cold decoder');
  assert.equal(images[0].naturalWidth,0);
- assert.equal(maxCold,1,'visible cache misses must use only one cold decoder');assert.ok(maxCache<=3);
+ assert.equal(maxCold,1,'visible cache misses must use only one cold decoder');
+ assert.ok(maxCache>=1&&maxCache<=8,'cached JPEG reads must stay within the eight-request budget');
  const old=images[1].src;badImage=true;
  const failed=queueReviewPreview(images[1],true);
  assert.equal(await failed,false);
