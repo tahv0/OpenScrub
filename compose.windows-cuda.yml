@@ -2,6 +2,10 @@
 # Keep both -f arguments on subsequent build/up/run commands.
 services:
   openscrub:
+    # The fast Windows helper tags the final application image explicitly.
+    # Compose 'up --no-build' runs this exact local tag without invoking
+    # Compose's builder-selection path again. Manual Compose builds use it too.
+    image: openscrub-windows-test-openscrub:local
     build:
       dockerfile: Dockerfile.cuda
       # Keep the training variant consistent across 'build' and 'up --build'.
