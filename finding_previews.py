@@ -282,7 +282,7 @@ def _insert(db, group, meta, jpeg, totals=None):
     return True
 
 
-def _insert_explicit(db, group, meta, jpeg):
+def _insert_explicit(db, group, meta, jpeg, protected_keys=None):
     """Make room for an explicit request, retaining all rows if it cannot fit.
 
     Oldest insertion wins eviction order; reads need no LRU timestamp writes.
@@ -295,6 +295,10 @@ def _insert_explicit(db, group, meta, jpeg):
     if MAX_ITEMS < 1 or needed > MAX_BYTES:
         _truncate(db)
         return False
+    # A scan-finalization pass may be filling thousands of review cards.
+    # Do not sacrifice a card already marked ready just to fit a later one.
+    # Ordinary explicit edits retain their previous eviction semantics.
+    protected_keys = protected_keys or set()
     eviction_floor, attempts = 0, None
     while attempts is None or attempts > 0:
         db.execute('BEGIN IMMEDIATE')
@@ -308,13 +312,19 @@ def _insert_explicit(db, group, meta, jpeg):
             return False
         count, size = len(records), sum(size for _, size in records)
         victims = []
+        available_victims = sum(key not in protected_keys for key, _ in records)
         for key, record_size in records:
             if (len(victims) >= eviction_floor and count < MAX_ITEMS
                     and size + needed <= MAX_BYTES):
                 break
+            if key in protected_keys:
+                continue
             victims.append((key,))
             count -= 1
             size -= record_size
+        if count >= MAX_ITEMS or size + needed > MAX_BYTES:
+            db.rollback()
+            return False
         try:
             db.executemany('DELETE FROM previews WHERE key=?', victims)
             if victims:
@@ -331,7 +341,7 @@ def _insert_explicit(db, group, meta, jpeg):
             db.rollback()
             if 'full' not in str(exc).lower():
                 raise
-            if len(victims) == len(records):
+            if len(victims) >= available_victims:
                 break
             eviction_floor = len(victims) + 1
         else:
@@ -779,13 +789,15 @@ def image(job_dir, key):
             db.close()
 
 
-def store(job_dir, row, render_state, meta, pixels):
+def store(job_dir, row, render_state, meta, pixels, *, protected_keys=None):
     """Cache an externally decoded legacy crop with an explicit source mapping.
 
     ``pixels`` must cover exactly meta['crop'] at original source resolution;
     meta also supplies original width/height. Explicit requests may evict the
-    oldest job-local previews within the same bounds. An image that cannot fit
-    raises without evicting existing previews. Exact cached images are reused.
+    oldest job-local previews within the same bounds. Scan-finalization may
+    protect already prepared review-card images from eviction. An image that
+    cannot fit raises without evicting those protected previews. Exact cached
+    images are reused.
     """
     cached = lookup(job_dir, row, render_state)
     if cached is not None:
@@ -807,7 +819,8 @@ def store(job_dir, row, render_state, meta, pixels):
     with _LOCK:
         db = _db(job_dir, create=True)
         try:
-            if not _insert_explicit(db, 'legacy:'+result['key'], result, jpeg):
+            if not _insert_explicit(db, 'legacy:'+result['key'], result, jpeg,
+                                    protected_keys=protected_keys):
                 db.commit()
                 cached = image(job_dir, result['key'])
                 if cached is not None:
