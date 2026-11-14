@@ -42,9 +42,13 @@ class PersistentCudaDependencyImageTests(unittest.TestCase):
         compose = (ROOT / "compose.windows-cuda.yml").read_text(encoding="utf-8")
         self.assertIn('OPENSCRUB_ENABLE_TRAINING: "${OPENSCRUB_ENABLE_TRAINING:-1}"', compose)
         self.assertIn(
-            'OPENSCRUB_CUDA_DEPS_IMAGE: "${OPENSCRUB_CUDA_DEPS_IMAGE:-cuda_deps}"',
+            'OPENSCRUB_CUDA_DEPS_IMAGE: "${OPENSCRUB_CUDA_DEPS_IMAGE:-openscrub-cuda-deps:local}"',
             compose,
         )
+        # The default MUST NOT point back to the costly Dockerfile stage:
+        # a new PowerShell session drops exported vars and would reinstall
+        # torch + hundreds of MB of cuDNN when the BuildKit cache is evicted.
+        self.assertNotIn('OPENSCRUB_CUDA_DEPS_IMAGE: "${OPENSCRUB_CUDA_DEPS_IMAGE:-cuda_deps}"', compose)
         self.assertIn("capabilities: [gpu]", compose)
 
     def test_windows_script_retains_a_dependency_image_and_rebuilds_on_change(self):
