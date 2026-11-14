@@ -159,7 +159,9 @@ def public_listing(doc):
         verification_history=doc.get('verification_history'),
         indexed_frames=any(d.get('frame_index', -1) >= 0 for d in rows),
         frame_count=len(state['cum']), fps=state['fps'],
-        duration=len(state['cum'])/state['fps'])
+        duration=len(state['cum'])/state['fps'],
+        plate_free_intervals=doc.get('plate_free_intervals', []),
+        plate_free_range_can_undo=bool(doc.get('plate_free_range_undo')))
     return json.dumps(data, separators=(',', ':'), ensure_ascii=False, allow_nan=False)
 
 
