@@ -209,6 +209,21 @@ unconfirmed plate's corners saves its area; choose **Is a plate** or **Not a
 plate** to confirm the example. For tracked objects, only the explicitly
 confirmed picture becomes a training example, not every propagated frame.
 
+**Group similar pictures** in Review compares already-loaded, unpainted JPEG
+previews across tracking IDs. It works with **existing scans** (no YOLO run,
+video rescan or report migration) and only groups nearby, visually similar
+crops. The switch is remembered in that browser, and **Show individual
+pictures** restores the original cards. Expand any group to inspect or correct
+every saved human decision; reviewed examples are never deleted or hidden by
+review status. Similarity alone never classifies, changes a mask or creates a
+training example. **Group actions** require an explicit confirmation: human
+labels are applied only to unreviewed members, each through its original
+source-verified save; Blur/Keep choices can be applied to the group without
+changing labels. Failed batch saves stop with the number already saved, so
+any incomplete group stays editable and retryable. Group counts grow as
+existing thumbnails are loaded; missing thumbnails use the normal preview
+loader rather than rerunning detection.
+
 Open **Findings**, filter by video or label, and select the plate examples you
 want to train with. **Train a named plate model** accepts a custom name or uses
 the video name and timestamp. Start from the configured checkpoint or continue
