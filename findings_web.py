@@ -130,7 +130,8 @@ def _cold_frame(job,doc,row,frame):
         _web._REVIEW_WORK_LOCK.release()
 
 
-def preview(job, index, doc=None, cache_only=False, preferred_key=None):
+def preview(job, index, doc=None, cache_only=False, preferred_key=None,
+            protected_keys=None):
     """Return source geometry and compact pixels; a warm read never opens video."""
     doc = doc if doc is not None else _web._load_preview_report(job)
     if not 0 <= index < len(doc.get('detections', [])):
@@ -182,7 +183,8 @@ def preview(job, index, doc=None, cache_only=False, preferred_key=None):
                     source=source,
                     track=row.get('track', -1))
         cached = _web._serialize_review_read(previews.store)(
-            job['dir'], cache_row, rs, meta, pixels[y1:y2,x1:x2])
+            job['dir'], cache_row, rs, meta, pixels[y1:y2,x1:x2],
+            protected_keys=protected_keys)
     meta, jpeg = cached
     source = meta.get('source') or {}
     exact = source.get('timing') != 'timestamp'

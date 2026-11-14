@@ -487,7 +487,7 @@ class WebCallbacks(openscrub.Callbacks):
         old = self.job.get("activity") or {}
         changed = old.get("stage") != stage
         advanced = changed or cur > old.get("done", -1)
-        unit = "tracks" if stage == "post" else "frames"
+        unit = "pictures" if stage == "thumbnails" else ("tracks" if stage == "post" else "frames")
         activity = dict(stage=stage, done=cur, total=total, unit=unit,
                         started_at=now if changed else old.get("started_at", now),
                         updated_at=now,
@@ -511,7 +511,9 @@ class WebCallbacks(openscrub.Callbacks):
                    "refine": (0.42, 0.08)}
                   if self.job.get("options", {}).get("learned_plate_model")
                   else {"scan": (0, 0.45), "post": (0.45, 0.05)})
-        base, span = stages.get(stage, (0.5, 0.5))
+        # Thumbnail preparation starts after postprocessing; keep the bar at
+        # the Review hand-off point while showing a separate picture counter.
+        base, span = (0.5, 0.0) if stage == "thumbnails" else stages.get(stage, (0.5, 0.5))
         self.job["progress"] = round(base + span * cur / max(total, 1), 5)
 
         # ETA uses a rolling recent rate once enough recent history exists.
@@ -1009,6 +1011,16 @@ def worker():
                             "using CFR-normalized file for previews/thumbnails")
                 except Exception:
                     diagnostics.exception("preview_source_selection_failed", job)
+                # Cache the exact first representative for every card while the
+                # scan worker still owns the original source and completed
+                # report. Review should not have to decode missing 4K frames.
+                if not (not resuming and job["options"].get("skip_review")):
+                    try:
+                        _prepare_review_card_previews(job, combined, cb)
+                    except Exception:
+                        diagnostics.exception("review_thumbnail_preparation_failed", job)
+                        cb.log("Review thumbnail preparation was interrupted; "
+                               "existing cached images and legacy recovery remain available.")
                 if meta:
                     job["phase"] = "paused"
                 elif (not resuming and job["options"].get("skip_review")):
@@ -2172,6 +2184,120 @@ def _reconcile_compact_previews(job, doc, expected_identity=None):
         abort(503, description="The vault is locking saved pictures. Retry shortly.")
     finally:
         _REVIEW_RECONCILE_LOCK.release()
+
+
+def _prepare_review_card_previews(job, doc, cb):
+    """Fill missing first-card samples BEFORE exposing Review to the user.
+
+    Preflight *all* final person/track representatives and pin their saved
+    JPEG keys before cold generation. This prevents preparing a later card
+    from evicting an earlier or not-yet-visited card when the bounded cache
+    is nearly full. Cached pictures and source coordinates stay unmodified.
+    """
+    indices = finding_previews.review_representatives(doc.get("detections", []))
+    total = len(indices)
+    result = dict(total=total, cached=0, generated=0, failed=0,
+                  stopped=False, ready=(total == 0))
+    if not total:
+        job["review_preparation"] = result
+        return result
+    started = time.monotonic()
+    cb.log("Preparing %d review-card thumbnail(s) before opening Review…" % total)
+    cb.progress("thumbnails", 0, total)
+    first_errors = []
+    protected_keys = set()
+    missing = []
+
+    # First preserve every existing matching scan-time sample. Inspect the
+    # actual Review representative rather than assuming the scanner's raw
+    # group key matches the final, postprocessed track identity.
+    for done, index in enumerate(indices, 1):
+        if cb.cancelled() or cb.stop_requested():
+            result["stopped"] = True
+            break
+        try:
+            picture = findings_web.preview(job, index, doc=doc, cache_only=True)
+            if picture is not None:
+                result["cached"] += 1
+                key = picture[2].get("key")
+                if key:
+                    protected_keys.add(key)
+            else:
+                missing.append(index)
+        except Exception:
+            # A recoverable cache read error still gets a chance to produce
+            # the source image before Review opens.
+            missing.append(index)
+        if done % 128 == 0:
+            cb.progress("thumbnails", result["cached"], total)
+
+    if not result["stopped"] and missing:
+        cb.log("      %d already cached; extracting %d missing review thumbnail(s)" %
+               (result["cached"], len(missing)))
+        for done, index in enumerate(missing, 1):
+            if cb.cancelled() or cb.stop_requested():
+                result["stopped"] = True
+                result["failed"] += len(missing) - done + 1
+                break
+            try:
+                # The browser's normal legacy fallback remains single-flight,
+                # while this scan-finalization work runs before review.
+                for attempt in range(3):
+                    try:
+                        picture = findings_web.preview(
+                            job, index, doc=doc, protected_keys=protected_keys)
+                        key = picture[2].get("key")
+                        if key:
+                            protected_keys.add(key)
+                        result["generated"] += 1
+                        break
+                    except HTTPException as error:
+                        if error.code != 503 or attempt == 2:
+                            raise
+                        time.sleep(.15 * (attempt + 1))
+            except Exception as error:
+                result["failed"] += 1
+                if len(first_errors) < 4:
+                    first_errors.append("%d: %s" % (index, str(error)[:180]))
+                # A bad source frame cannot invalidate an otherwise complete
+                # scan or prevent unrelated review images being prepared.
+            if done % 32 == 0 or done == len(missing):
+                cb.progress("thumbnails",
+                            result["cached"] + result["generated"] + result["failed"],
+                            total)
+
+    if result["stopped"] and not result["failed"]:
+        result["failed"] = total - result["cached"] - result["generated"]
+    if not result["stopped"]:
+        cb.progress("thumbnails", total, total)
+    elapsed = time.monotonic() - started
+    result["ready"] = not result["stopped"] and result["failed"] == 0
+    result["elapsed_seconds"] = round(elapsed, 2)
+    database = os.path.join(job["dir"], "compact_previews", "index.sqlite3")
+    try:
+        result["disk_bytes"] = os.path.getsize(database)
+    except OSError:
+        result["disk_bytes"] = 0
+    try:
+        result["stored_samples"] = finding_previews.pending(job["dir"], limit=0)["total"]
+    except Exception:
+        result["stored_samples"] = None
+    result["used_sample_keys"] = len(protected_keys)
+    job["review_preparation"] = result
+    diagnostics.event("review_card_previews_prepared", job, **result)
+    if result["failed"]:
+        cb.log("Review thumbnails: %d cached, %d prepared, %d unavailable. "
+               "Unprepared legacy pictures retain automatic recovery." %
+               (result["cached"], result["generated"], result["failed"]))
+        if first_errors:
+            cb.log("      unavailable thumbnail examples: " + "; ".join(first_errors))
+    else:
+        cb.log("Review thumbnails ready: %d cached, %d generated, %.1fs, %.1f MiB on disk (%s samples, %d used by initial cards)" %
+               (result["cached"], result["generated"], elapsed,
+                result["disk_bytes"] / (1024 * 1024),
+                result["stored_samples"] if result["stored_samples"] is not None else "unknown",
+                result["used_sample_keys"]))
+    return result
 
 
 def _warm_legacy_preview_reconciliation(job, doc, expected_identity):
@@ -4486,7 +4612,7 @@ function renderWorkProgress(j){
  const p=j.phase==="learning"?j.learning:j.activity;
  document.getElementById("prog").hidden=j.phase==="learning";
  if(!active||!p){box.textContent="";bar.hidden=true;return;}
- const labels={scan:"Scanning video",post:"Finalizing tracks",refine:"Applying learned masks",render:"Rendering video"};
+ const labels={scan:"Scanning video",post:"Finalizing tracks",refine:"Applying learned masks",thumbnails:"Preparing review thumbnails",render:"Rendering video"};
  const text=[p.message||labels[p.stage]||p.stage||"Working"];
  if(Number.isFinite(p.done)&&Number.isFinite(p.total)&&p.total>0){
   text.push(`${p.done.toLocaleString()} / ${p.total.toLocaleString()} ${p.unit||"items"}`);
@@ -5342,7 +5468,7 @@ function pumpReviewPreviews(state){
  // Cache hits overtake cold decoding. Re-rank at dispatch, not when the card
  // first entered view: scrolling must not leave minutes of obsolete work.
  for(const [queue,counter,limit,cached] of [
-  [state.cacheQueue,"cacheActive",3,true],[state.queue,"active",1,false]]){
+  [state.cacheQueue,"cacheActive",8,true],[state.queue,"active",1,false]]){
   const ranked=queue.splice(0).map(task=>({task,rank:reviewPreviewRank(task)}));
   ranked.sort((a,b)=>a.rank-b.rank);
   for(const {task,rank} of ranked){
@@ -6360,7 +6486,7 @@ async function loadReview(signal=null,phase=SHELLPH){
  let html=`<div class="card" id="review"><h2>Review findings</h2>
  <p class="review-copy">Review small saved pictures. Choose <b>Is a …</b> or <b>Not a …</b> to save a human example with its source video.
  Scan-time pictures are matched to final tracked findings automatically; Review may show a nearby real cached frame from the same track.
- Missing thumbnails load automatically for visible cards with one bounded source decoder. Saved pictures stay available while other previews are prepared.
+ Initial card thumbnails are prepared during and immediately after scanning. Existing legacy scans or newly selected samples can recover a missing picture automatically. Saved pictures stay available while other previews are prepared.
  Drag plate corners to adjust the area; an area edit alone does not confirm a plate.<br>Automatic protection stays active while a finding is <b>Not reviewed</b>. Output choices apply after <b>Save edits &amp; render</b>.
  Drag across cards to select several.</p>
  <div class="row" style="margin-bottom:10px">
