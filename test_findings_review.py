@@ -345,3 +345,46 @@ def test_archive_revision_conflict_and_corner_reconfirmation_use_real_api(
             assert not errors,errors
         finally:
             browser.close()
+
+
+def test_positive_classification_survives_failed_corner_autosave_without_losing_draft():
+    """A human label can save while an independent area draft remains errored."""
+    choices_script(r'''
+const oldPoints=[[0,0],[10,0],[10,8],[0,8]];
+const draftPoints=[[1,1],[9,1],[9,7],[1,7]];
+const error=Object.assign(new Error('existing preview crop is incompatible with geometry'),{status:400});
+const meta={key:'displayed-jpeg',source_token:'same-source',frame:4,
+ width:64,height:48,box:[0,0,10,8],crop:[0,0,40,40],
+ preview_token:'shown-token',points:oldPoints};
+const edit={i:0,job:CUR,dirty:true,error,archiveConflict:false,
+ version:8,pending:null,points:plateCopy(draftPoints),saved:plateCopy(oldPoints),
+ meta:{...meta},img:{_plateMeta:{...meta}},draw(){this.drawn=true}};
+PLATE_EDITS.set(0,edit);
+let payload;
+function plateSamePreviewSource(a,b){
+ return a.source_token===b.source_token&&a.key===b.key&&
+        JSON.stringify(a.crop)===JSON.stringify(b.crop)&&
+        JSON.stringify(a.points)===JSON.stringify(b.points);
+}
+async function reviewRequest(url,options){
+ assert.ok(url.endsWith('/confirm/0'));
+ payload=JSON.parse(options.body);
+ return {data:{finding:{id:'example',revision:1},preview:{...meta,preview_token:'confirmed-token'}}};
+}
+(async()=>{
+ await confirmFinding(0,'positive');
+ assert.equal(payload.label,'positive');
+ assert.equal(payload.preview_key,'displayed-jpeg');
+ assert.equal(payload.preview_token,'shown-token');
+ assert.ok(!('points' in payload),'never archive a polygon whose save failed');
+ assert.equal(CONFIRM_FAILED.size,0);
+ assert.equal(VLBL[0],'plate');
+ assert.equal(EN[0],true);
+ assert.equal(edit.dirty,true,'human corners remain a draft');
+ assert.equal(edit.error,error,'the failing area save is still visible');
+ assert.deepEqual(edit.points,draftPoints);
+ assert.deepEqual(edit.saved,oldPoints);
+ assert.equal(edit.meta.preview_token,'confirmed-token');
+ assert.equal(edit.drawn,true);
+})().catch(error=>{console.error(error);process.exitCode=1});
+''')
