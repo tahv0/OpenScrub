@@ -13,6 +13,7 @@ on:
       - 'test_sample_filter_timeout.py'
       - 'test_release_reliability.py'
       - 'test_review_browser.py'
+      - 'test_corner_save_recovery.py'
       - '.github/workflows/review-journal-stress.yml'
   workflow_dispatch:
 permissions:
@@ -42,6 +43,9 @@ jobs:
       - name: Check browser sample, reload, corners and stress paths
         run: |
           python -m pytest -q -ra --timeout=80 test_grouped_review_sample.py test_sample_filter_timeout.py test_release_reliability.py test_review_browser.py -k 'human_sample_shows_ten_groups or sample_and_show_all_work_without_report_network or filter_keeps_inflight_corner_save_alive or lost_corner_response_retry or saved_geometry_and_decisions_survive_server_rehydration or real_direct_corner_autosave_and_lazy_loading'
+      - name: Recover evicted displayed pictures on browser and backend
+        run: |
+          python -m pytest -q -ra --timeout=70 test_corner_save_recovery.py test_grouped_review_sample.py -k 'stale_displayed_picture or stale_confirmed_picture or source_frame_recovery_never or evicted_displayed_image or source_frame_proof_distinguishes'
       - uses: actions/upload-artifact@v4
         if: always()
         with:
