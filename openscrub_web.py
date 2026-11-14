@@ -2278,6 +2278,11 @@ def _prepare_review_card_previews(job, doc, cb):
         result["disk_bytes"] = os.path.getsize(database)
     except OSError:
         result["disk_bytes"] = 0
+    try:
+        result["stored_samples"] = finding_previews.pending(job["dir"], limit=0)["total"]
+    except Exception:
+        result["stored_samples"] = None
+    result["used_sample_keys"] = len(protected_keys)
     job["review_preparation"] = result
     diagnostics.event("review_card_previews_prepared", job, **result)
     if result["failed"]:
@@ -2287,9 +2292,11 @@ def _prepare_review_card_previews(job, doc, cb):
         if first_errors:
             cb.log("      unavailable thumbnail examples: " + "; ".join(first_errors))
     else:
-        cb.log("Review thumbnails ready: %d cached, %d generated, %.1fs, %.1f MiB on disk" %
+        cb.log("Review thumbnails ready: %d cached, %d generated, %.1fs, %.1f MiB on disk (%s samples, %d used by initial cards)" %
                (result["cached"], result["generated"], elapsed,
-                result["disk_bytes"] / (1024 * 1024)))
+                result["disk_bytes"] / (1024 * 1024),
+                result["stored_samples"] if result["stored_samples"] is not None else "unknown",
+                result["used_sample_keys"]))
     return result
 
 
@@ -5461,7 +5468,7 @@ function pumpReviewPreviews(state){
  // Cache hits overtake cold decoding. Re-rank at dispatch, not when the card
  // first entered view: scrolling must not leave minutes of obsolete work.
  for(const [queue,counter,limit,cached] of [
-  [state.cacheQueue,"cacheActive",3,true],[state.queue,"active",1,false]]){
+  [state.cacheQueue,"cacheActive",8,true],[state.queue,"active",1,false]]){
   const ranked=queue.splice(0).map(task=>({task,rank:reviewPreviewRank(task)}));
   ranked.sort((a,b)=>a.rank-b.rank);
   for(const {task,rank} of ranked){
