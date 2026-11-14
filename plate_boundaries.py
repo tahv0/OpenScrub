@@ -34,6 +34,34 @@ def trusted_plate_quad(row):
         return quad
     return ()
 
+def quad_source_frame(row, fps=None):
+    """Restrict time-spanning plate quadrilaterals to their reviewed sample.
+
+    Old report rows lack plate_quad_frame: those source-frame annotations
+    cannot safely be assumed valid throughout a moving time interval.
+    Ordinary exact-frame detector rows need no additional restriction.
+    """
+    if not trusted_plate_quad(row):
+        return -1
+    marker = row.get('plate_quad_frame', -1)
+    if type(marker) is int and marker >= 0:
+        return marker
+    if int(row.get('frame_index', -1)) >= 0:
+        return -1
+    try:
+        rate = float(fps)
+        start = float(row.get('t_start', 0))
+        end = float(row.get('t_end', start))
+        if not math.isfinite(rate) or rate <= 0 or end - start <= 1.5 / rate:
+            return -1
+        seen = float(row.get('last_seen', start))
+        if not math.isfinite(seen):
+            return -1
+    except (ValueError, TypeError):
+        return -1
+    return max(0, int(round(max(start, min(end, seen)) * rate)))
+
+
 def _ordered_quad(points):
     points = np.asarray(points, dtype=np.float64).reshape(4, 2)
     center = points.mean(axis=0)
