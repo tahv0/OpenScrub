@@ -2187,16 +2187,12 @@ def _reconcile_compact_previews(job, doc, expected_identity=None):
 
 
 def _prepare_review_card_previews(job, doc, cb):
-    """Complete the Review's initial thumbnail set BEFORE exposing the cards.
+    """Fill missing first-card samples BEFORE exposing Review to the user.
 
-    Scan-time crops are free of extra source seeks but use transient detection
-    groups. After postprocessing/reconciliation, the actual first card for a
-    person/track may be different. Fill only those remaining cache misses now,
-    so normal Review scrolling performs cached JPEG reads, not 4K video seeks.
-
-    A failed preview never discards the saved scan/report. Legacy jobs and
-    optional later sample selections still retain the existing bounded retry
-    path when an exact cached picture genuinely does not exist.
+    Preflight *all* final person/track representatives and pin their saved
+    JPEG keys before cold generation. This prevents preparing a later card
+    from evicting an earlier or not-yet-visited card when the bounded cache
+    is nearly full. Cached pictures and source coordinates stay unmodified.
     """
     indices = finding_previews.review_representatives(doc.get("detections", []))
     total = len(indices)
@@ -2205,41 +2201,74 @@ def _prepare_review_card_previews(job, doc, cb):
     if not total:
         job["review_preparation"] = result
         return result
-    start = time.monotonic()
+    started = time.monotonic()
     cb.log("Preparing %d review-card thumbnail(s) before opening Review…" % total)
     cb.progress("thumbnails", 0, total)
     first_errors = []
+    protected_keys = set()
+    missing = []
+
+    # First preserve every existing matching scan-time sample. Inspect the
+    # actual Review representative rather than assuming the scanner's raw
+    # group key matches the final, postprocessed track identity.
     for done, index in enumerate(indices, 1):
         if cb.cancelled() or cb.stop_requested():
             result["stopped"] = True
-            result["failed"] += total - done + 1
             break
         try:
-            cached = findings_web.preview(job, index, doc=doc, cache_only=True)
-            if cached is not None:
+            picture = findings_web.preview(job, index, doc=doc, cache_only=True)
+            if picture is not None:
                 result["cached"] += 1
+                key = picture[2].get("key")
+                if key:
+                    protected_keys.add(key)
             else:
-                # A concurrent thumbnail request can momentarily own the
-                # decoder. Retry the same pinned report row a bounded number
-                # of times, without changing its source frame or geometry.
+                missing.append(index)
+        except Exception:
+            # A recoverable cache read error still gets a chance to produce
+            # the source image before Review opens.
+            missing.append(index)
+        if done % 128 == 0:
+            cb.progress("thumbnails", result["cached"], total)
+
+    if not result["stopped"] and missing:
+        cb.log("      %d already cached; extracting %d missing review thumbnail(s)" %
+               (result["cached"], len(missing)))
+        for done, index in enumerate(missing, 1):
+            if cb.cancelled() or cb.stop_requested():
+                result["stopped"] = True
+                result["failed"] += len(missing) - done + 1
+                break
+            try:
+                # The browser's normal legacy fallback remains single-flight,
+                # while this scan-finalization work runs before review.
                 for attempt in range(3):
                     try:
-                        findings_web.preview(job, index, doc=doc)
+                        picture = findings_web.preview(
+                            job, index, doc=doc, protected_keys=protected_keys)
+                        key = picture[2].get("key")
+                        if key:
+                            protected_keys.add(key)
                         result["generated"] += 1
                         break
                     except HTTPException as error:
                         if error.code != 503 or attempt == 2:
                             raise
                         time.sleep(.15 * (attempt + 1))
-        except Exception as error:
-            result["failed"] += 1
-            if len(first_errors) < 4:
-                first_errors.append("%d: %s" % (index, str(error)[:180]))
-            # Missing/corrupt frames must not prevent another valid picture
-            # from being prepared, nor invalidate the completed scan.
-        if done % 32 == 0 or done == total:
-            cb.progress("thumbnails", done, total)
-    elapsed = time.monotonic() - start
+            except Exception as error:
+                result["failed"] += 1
+                if len(first_errors) < 4:
+                    first_errors.append("%d: %s" % (index, str(error)[:180]))
+                # A bad source frame cannot invalidate an otherwise complete
+                # scan or prevent unrelated review images being prepared.
+            if done % 32 == 0 or done == len(missing):
+                cb.progress("thumbnails",
+                            result["cached"] + result["generated"] + result["failed"],
+                            total)
+
+    if result["stopped"] and not result["failed"]:
+        result["failed"] = total - result["cached"] - result["generated"]
+    elapsed = time.monotonic() - started
     result["ready"] = not result["stopped"] and result["failed"] == 0
     result["elapsed_seconds"] = round(elapsed, 2)
     database = os.path.join(job["dir"], "compact_previews", "index.sqlite3")
@@ -2251,7 +2280,7 @@ def _prepare_review_card_previews(job, doc, cb):
     diagnostics.event("review_card_previews_prepared", job, **result)
     if result["failed"]:
         cb.log("Review thumbnails: %d cached, %d prepared, %d unavailable. "
-               "The existing automatic legacy fallback remains available." %
+               "Unprepared legacy pictures retain automatic recovery." %
                (result["cached"], result["generated"], result["failed"]))
         if first_errors:
             cb.log("      unavailable thumbnail examples: " + "; ".join(first_errors))
