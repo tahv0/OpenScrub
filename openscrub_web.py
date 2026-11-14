@@ -5176,11 +5176,17 @@ function beHook(){
  cv.addEventListener("pointerup",()=>{if(BE.drag){BE.drag=null;beRefresh();}});
 }
 
-// Only visible finding previews were fetched previously; now prefetch ahead of scrolling. Editing reuses the same image
-// and geometry; it never starts a second video/image request.
+// Fetch saved review pictures as soon as Review opens, not when the user
+// reaches the corresponding card. Keep disk cache reads concurrent, while
+// source-video decoding remains single-flight and bounded to the lookahead.
+// Editing always reuses the displayed image and source-bound geometry.
 // Large Review panels keep all finding/group decisions but materialize only
 // nearby card elements. Existing small reviews retain their exact behavior.
 let REVIEW_MEDIA=null;
+// Background cached reads can reach all mounted cards. Cold source decodes
+// remain limited to a few screens AHEAD of the viewport; no 4K decoding for
+// thousands of unseen cards or for cards already scrolled far behind.
+const REVIEW_COLD_LOOKAHEAD_PX=11000, REVIEW_STALE_BEHIND_PX=4000;
 const REVIEW_PAGE_THRESHOLD=400, REVIEW_PAGE_SIZE=48;
 let REVIEW_PENDING_PAGES={},REVIEW_CATEGORY_GROUPS={};
 async function reviewRequest(url, options={}, type="json"){
@@ -5223,6 +5229,15 @@ function drawPlateThumbnail(img){
  if(!img._plateMeta||!img.naturalWidth)return;
  const state=initPlateCorners(img);if(state)state.draw();
 }
+function updateReviewPreloadStatus(state){
+ if(REVIEW_MEDIA!==state)return;
+ const el=document.getElementById?.("reviewPreloadStatus");
+ if(!el)return;
+ const ready=state.loadedImages.size;
+ el.textContent=ready
+  ?ready+" pictures ready · Preparing more before you scroll…"
+  :"Preparing review pictures before you scroll…";
+}
 function queueReviewPreview(img, priority=false){
  const state=REVIEW_MEDIA;
  if(!state||!img||!img.isConnected)return Promise.resolve(false);
@@ -5241,7 +5256,8 @@ function queueReviewPreview(img, priority=false){
  task.promise=new Promise(resolve=>task.resolve=resolve);
  img._previewTask=task;
  if(priority)state.cacheQueue.unshift(task);else state.cacheQueue.push(task);
- pumpReviewPreviews(state);return task.promise;
+ if(!state.batching)pumpReviewPreviews(state);
+ return task.promise;
 }
 async function loadReviewPreview(state,task,cacheOnly){
  const img=task.img, counter=cacheOnly?"cacheActive":"active";
@@ -5279,6 +5295,8 @@ async function loadReviewPreview(state,task,cacheOnly){
   }
   if(status)status.textContent="";
   ok=true;img._previewLoaded=true;
+  state.loadedImages.add(img);
+  updateReviewPreloadStatus(state);
  }catch(error){
   if(REVIEW_MEDIA===state&&img.isConnected){
    if(error.status===503&&(task.busyRetries||0)<2){
@@ -5308,8 +5326,12 @@ function reviewPreviewRank(task){
  // Old non-layout harnesses / browsers without geometry retain FIFO behavior.
  if(!task.img.getBoundingClientRect)return 0;
  const r=task.img.getBoundingClientRect(),h=window.innerHeight||document.documentElement.clientHeight;
- const distance=r.bottom<0?-r.bottom:r.top>h?r.top-h:0;
- return distance>2800?Infinity:distance;
+ // A card far BEHIND the viewport is obsolete until the user scrolls back.
+ // Cards AHEAD stay eligible for speculative JPEG cache reads even when they
+ // are far beyond IntersectionObserver's margin. Scroll changes re-rank work
+ // at dispatch: visible cards overtake the background queue.
+ if(r.bottom < -REVIEW_STALE_BEHIND_PX)return Infinity;
+ return r.bottom<0?-r.bottom:r.top>h?r.top-h:0;
 }
 function pumpReviewPreviews(state){
  if(REVIEW_MEDIA!==state)return;
@@ -5326,7 +5348,9 @@ function pumpReviewPreviews(state){
    else queue.push(task);
   }
   while(state[counter]<limit&&queue.length){
-   const n=queue.findIndex(task=>!task.readyAt||task.readyAt<=Date.now());
+   const n=queue.findIndex(task=>
+    (!task.readyAt||task.readyAt<=Date.now()) &&
+    (cached||reviewPreviewRank(task)<=REVIEW_COLD_LOOKAHEAD_PX));
    if(n<0)break;
    loadReviewPreview(state,queue.splice(n,1)[0],cached);
   }
@@ -5337,15 +5361,24 @@ function pumpReviewPreviews(state){
 function initReviewPreviews(){
  clearReviewPreviews();
  const state=REVIEW_MEDIA={queue:[],cacheQueue:[],active:0,cacheActive:0,retryTimer:null,
-  controllers:new Set(),urls:new Set(),observer:null};
+  controllers:new Set(),urls:new Set(),observer:null,batching:true,
+  loadedImages:new Set()};
  const images=document.querySelectorAll("#review img[data-preview-url]");
  if(typeof IntersectionObserver!=="undefined"){
   state.observer=new IntersectionObserver(entries=>{
    for(const e of entries)if(e.isIntersecting)queueReviewPreview(e.target);
-   // Keep observing: skipped queued work is requested again on re-entry.
+   // An actual scroll always gets re-ranked above offscreen prefetches.
    pumpReviewPreviews(state);
-  },{rootMargin:"1600px"});images.forEach(img=>state.observer.observe(img));
- }else images.forEach(img=>queueReviewPreview(img));
+  },{rootMargin:"1600px"});
+ }
+ // Begin cache-first, bounded background work for ALL mounted cards now.
+ // Waiting for IntersectionObserver here leaves blank cards until scrolling.
+ images.forEach(img=>{
+  if(state.observer)state.observer.observe(img);
+  queueReviewPreview(img);
+ });
+ state.batching=false;updateReviewPreloadStatus(state);
+ pumpReviewPreviews(state);
 }
 // Retain all decisions/group memberships, but mount card elements progressively.
 function appendReviewPage(cat,selectedOnly=false){
@@ -5373,7 +5406,8 @@ function appendReviewPage(cat,selectedOnly=false){
    const img=card.querySelector("img[data-preview-url]");
    if(img&&REVIEW_MEDIA){
     if(REVIEW_MEDIA.observer)REVIEW_MEDIA.observer.observe(img);
-    else queueReviewPreview(img);
+    // Even pages mounted *ahead* of the scroll position start warming now.
+    queueReviewPreview(img);
    }
   }
  }
@@ -5396,7 +5430,7 @@ function initReviewPages(){
    for(const entry of entries)
     if(entry.isIntersecting&&!entry.target.hidden)
      appendReviewPage(entry.target.dataset.reviewMore);
-  },{rootMargin:"1800px"});
+  },{rootMargin:"10000px 0px"});
   buttons.forEach(button=>panel._moreObserver.observe(button));
  }
 }
@@ -6322,6 +6356,7 @@ async function loadReview(signal=null,phase=SHELLPH){
   <p id="saveLearnedModelStatus" class="review-copy" role="status" aria-live="polite">${acceptedMask||evaluated.length?"Choose the model to save. Secondary checkers default to review suggestions on new videos.":"Check a retained candidate above, or complete an accepted mask training pass, to save a reusable model."}</p>
  </details>
  <p id="reviewSampleSummary" class="review-copy" role="status" hidden></p>
+ <small id="reviewPreloadStatus" class="review-copy" role="status" aria-live="off">Preparing review pictures before you scroll…</small>
  <p id="reviewSaveStatus" class="review-copy review-save-status" role="status" aria-live="polite">Review choices loaded from disk.</p>
  <div id="plateSaveIssues" class="review-copy" role="status" aria-live="polite" hidden></div>
  <p class="review-copy">Training uses saved corrections and the original detectors. It does not guarantee that undetected plates have been found. Review the output.</p>
