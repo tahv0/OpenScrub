@@ -25,13 +25,19 @@ run the checked-in script for this process only with:
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-windows-cuda.ps1
 ```
 
+The wrapper checks `docker context show` and selects its matching Docker-driver
+Buildx builder. On Windows Docker Desktop, this is normally `desktop-linux`.
+It does not force `--builder default`, which causes
+`use docker --context=default buildx to switch to context "default"`
+on `desktop-linux`. No Docker context switch is required.
+
 The wrapper:
 
 1. Builds `openscrub-cuda-deps:local` **once** with CUDA runtime packages,
    PaddleOCR, the complete PyTorch training virtualenv and prefetched models,
    then keeps that image under a normal local Docker tag.
 2. Rebuilds just the application from this tagged image using the same Docker
-   engine builder (`default`), avoiding even Docker Desktop's default 20GB
+   engine's active-context builder (usually `desktop-linux` on Windows), avoiding even Docker Desktop's default 20GB
    build-cache garbage collection affecting the expensive installation step.
 3. Rebuilds the dependency image **only** when its dependency-stage recipe
    or `requirements*.txt` / pinned model-prefetch code changes (or when
