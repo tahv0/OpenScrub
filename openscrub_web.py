@@ -5593,8 +5593,12 @@ function syncPlateTrack(s){
  const b=s.meta.box,q=s.meta.points.map(([x,y])=>[(x-b[0])/(b[2]-b[0]),(y-b[1])/(b[3]-b[1])]);
  for(const other of PLATE_EDITS.values()){
   if(other===s||other.job!==s.job||other.meta.track!==s.meta.track)continue;
+  // A TRACK is not a geometry identity. Its plate may rotate or become
+  // foreshortened from one source frame to the next. Reuse corners only
+  // when the immutable sampled JPEG and original detector box are identical.
+  if(other.meta.frame!==s.meta.frame||other.meta.key!==s.meta.key||
+     JSON.stringify(other.meta.box)!==JSON.stringify(b))continue;
   other.refreshBeforeSave=true;
-  // Keep an unsubmitted human adjustment; only refresh untouched siblings.
   if(!other.dirty&&!other.drag&&!other.pending){
    const box=other.meta.box;
    other.saved=q.map(([x,y])=>[box[0]+x*(box[2]-box[0]),box[1]+y*(box[3]-box[1])]);
