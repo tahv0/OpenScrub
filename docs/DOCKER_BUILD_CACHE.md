@@ -27,18 +27,21 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-windows-
 
 The wrapper checks `docker context show` and selects its matching Docker-driver
 Buildx builder. On Windows Docker Desktop, this is normally `desktop-linux`.
-It does not force `--builder default`, which causes
-`use docker --context=default buildx to switch to context "default"`
-on `desktop-linux`. No Docker context switch is required.
+It uses explicit `docker --context desktop-linux` on Docker Desktop. The
+dependency image is built by Buildx and loaded into that daemon; the
+application is built by **Compose without `--builder`**, which is the
+working configuration on Windows. Passing `--builder desktop-linux`
+to Compose produced `use docker --context=desktop-linux buildx` despite
+the identical option working for the direct dependency build.
 
 The wrapper:
 
 1. Builds `openscrub-cuda-deps:local` **once** with CUDA runtime packages,
    PaddleOCR, the complete PyTorch training virtualenv and prefetched models,
    then keeps that image under a normal local Docker tag.
-2. Rebuilds just the application from this tagged image using the same Docker
-   engine's active-context builder (usually `desktop-linux` on Windows), avoiding even Docker Desktop's default 20GB
-   build-cache garbage collection affecting the expensive installation step.
+2. Rebuilds just the application from this tagged image using Docker
+   Compose with the active context selected explicitly and **no** `--builder`
+   flag. The tagged image survives BuildKit cache garbage collection.
 3. Rebuilds the dependency image **only** when its dependency-stage recipe
    or `requirements*.txt` / pinned model-prefetch code changes (or when
    `-ForceDependencies` is explicitly provided). Application source edits
