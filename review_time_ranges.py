@@ -118,8 +118,10 @@ def _restore(row, snapshot):
 def preview(doc, start, end):
     first, last, fps = bounds(doc, start, end)
     selected, protected, boundary = _selection(doc, first, last, fps)
+    legacy=sum(doc['detections'][i].get('frame_index', -1) < 0 for i in selected)
     return dict(start_frame=first, end_frame=last, seconds=[first / fps, last / fps],
-                matched=len(selected), protected=protected, crossing_boundary=boundary)
+                matched=len(selected), protected=protected, crossing_boundary=boundary,
+                training_ineligible=legacy)
 
 
 def apply(doc, start, end, *, training=False):
@@ -141,15 +143,19 @@ def apply(doc, start, end, *, training=False):
     for i in selected:
         row = doc['detections'][i]
         previous = _snapshot(row)
+        # An approximate legacy timestamp is fine for an output decision,
+        # but not sufficient to bind a trusted crop to an exact source frame.
+        exact_frame=type(row.get('frame_index')) is int and row['frame_index'] >= 0
+        sample_train=training and exact_frame
         row['enabled'] = False
         row['output_choice_explicit'] = True
-        row['verified_label'] = 'not_plate' if training else ''
+        row['verified_label'] = 'not_plate' if sample_train else ''
         row['plate_verification_override'] = True
         row.pop('plate_verification', None)
         row['human_confirmation'] = dict(
             label='negative', category='plate', source='time_range',
-            training=training, range_id=identity)
-        row['interval_negative'] = dict(id=identity, training=training)
+            training=sample_train, range_id=identity)
+        row['interval_negative'] = dict(id=identity, training=sample_train)
         # Prevent the legacy denied-track propagation from leaking past bounds.
         row['learning_anchor'] = hashlib.sha256(
             json.dumps([source, identity, i, row.get('cbox')]).encode()
