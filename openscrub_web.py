@@ -6276,6 +6276,45 @@ function updatePlateVerifierCandidate(){
  if(!validated&&mode.value==="filter")mode.value="review";
  note.textContent=verifierAssessmentText(candidate?.assessment);
 }
+
+function selectReviewGroupRepresentative(members,sampled=null){
+ // Pick the strongest plate evidence for a group, rather than its first frame.
+ // Explicit uncertainty sampling retains the selected source-frame identity.
+ if(sampled)return {row:sampled,reason:"uncertainty review sample"};
+ if(!members.length)return null;
+ if(members[0].category!=="plate")return {row:members[0],reason:"first sighting"};
+ const valid=score=>typeof score==="number"&&Number.isFinite(score)&&score>=0&&score<=1;
+ const checked=members.filter(row=>valid(row.plate_verification?.score));
+ if(checked.length){
+  let best=checked[0];
+  for(const row of checked){
+   const a=row.plate_verification.score,b=best.plate_verification.score;
+   if(a>b||(a===b&&valid(row.confidence)&&(!valid(best.confidence)||row.confidence>best.confidence)))
+    best=row;
+  }
+  const partial=checked.length<members.length?" ("+checked.length+"/"+members.length+" evaluated)":"";
+  return {row:best,reason:"highest learned plate score "+Math.round(best.plate_verification.score*100)+"%"+partial};
+ }
+ let best=members[0];
+ for(const row of members){
+  if(valid(row.confidence)&&(!valid(best.confidence)||row.confidence>best.confidence))
+   best=row;
+ }
+ const reason=valid(best.confidence)?"highest YOLO confidence "+Math.round(best.confidence*100)+"%":"first sighting (no scores)";
+ return {row:best,reason};
+}
+function updatePlateGroupSummary(i){
+ const el=document.getElementById("plateGroupSummary"+i);if(!el)return;
+ const members=TRKMEM[i]||[i];
+ const hidden=members.filter(m=>EN[m]!==false).length;
+ const filtered=members.filter(m=>{
+  const marker=FINDING_META[m]?.plate_verification;
+  return EN[m]===false&&!OUTPUT_CHOICES[m]&&marker?.decision==="suppress"&&marker?.applied===true;
+ }).length;
+ el.textContent="Group output: "+hidden+"/"+members.length+" detections hidden, "+
+  (members.length-hidden)+" visible"+(filtered?" ("+filtered+" model-filtered)":"")+
+  ". Output and classification choices apply to the entire group.";
+}
 function plateVerificationBadge(row){
  const marker=row.plate_verification;if(!marker)return "";
  const label=marker.applied?"Model filtered":marker.decision==="suggest_not_plate"?"Model suggests false positive":"Model retained";
@@ -6455,11 +6494,11 @@ async function loadReview(signal=null,phase=SHELLPH){
   for(const [key,members] of Object.entries(byGroup)){
    members.sort((a,b)=>a.t_start-b.t_start);
    const sampled=LEARNING_SELECTION?members.find(m=>LEARNING_SELECTION.has(m.i)):null;
-   let best=sampled||members[0];     // use the sampler's representative frame
-   // The first exact sighting normally has its compact scan-time crop.
-   const rep={...best};
+   const selected=selectReviewGroupRepresentative(members,sampled);
+   const best=selected.row;
+   const rep={...best,representativeReason:selected.reason};
    rep.learning_conflict=members.some(m=>m.learning_conflict)?"Model disagreement — review this track":"";
-   rep.plate_verification=(members.find(m=>m.plate_verification?.applied)||members.find(m=>m.plate_verification?.decision==="suggest_not_plate")||best).plate_verification;
+   // The model badge must describe the displayed representative, not another frame.
    rep.t_start=members[0].t_start;
    rep.t_end=members[members.length-1].t_end;
    rep.frames=members.length;
@@ -6498,6 +6537,7 @@ async function loadReview(signal=null,phase=SHELLPH){
     <button class="sec preview-retry" hidden onclick="retryReviewPreview(this)">Retry preview</button>
     ${x.category==="plate"?'<small class="quad-status" role="status" title="Corners apply to this detected track. Review changing perspective. Keyboard: select corner 1–4, use arrows; Ctrl+Z undoes.">Corners autosave to track</small><button type="button" class="sec quad-retry" hidden>Retry save</button>':""}
     <div>${plateVerificationBadge(x)}${x.learning_conflict?'<span class="badge" title="The original coverage was retained where the learned model could not make a reliable refinement">Model disagreement — review</span> ':""}${plateFallbackText(x)?`<span class="badge" style="white-space:normal">${plateFallbackText(x)}</span> `:""}${x.shaped?'<span class="badge" title="Thumbnail rectangle is a selection guide; open to inspect the mask and any exclusions">shaped mask</span> ':""}${x.personcard?`<b>Person ${x.person+1}</b> — one decision for ALL their appearances`:`"${sectionEscape(x.text)}"`}${x.frames?` <span class="badge">×${x.frames} frames</span>`:""}${x.confidence?` <span class="badge" title="detector confidence — not a human decision">${Math.round(x.confidence*100)}%</span>`:""} <br>${x.t_start.toFixed(1)}–${x.t_end.toFixed(1)}s</div>
+    ${x.category==="plate"&&x.frames>1?`<div class="review-copy">Representative: ${sectionEscape(x.representativeReason)}</div><div class="review-copy" id="plateGroupSummary${x.i}"></div>`:""}
     ${plateTextBadge(x)}
     <div class="review-similar-slot" id="similar${x.i}"></div>
     <div class="finding-confirm" role="group" aria-label="Human classification">
@@ -6538,7 +6578,9 @@ async function loadReview(signal=null,phase=SHELLPH){
  updatePlateVerifierCandidate();
  if(LEARNING_SELECTION)applyReviewGroupFilter();
  if(typeof updateReviewOverlayLabel==="function"&&typeof REVIEW_DISPLAY_META!=="undefined"){
-  for(const key of Object.keys(REVIEW_DISPLAY_META))updateReviewOverlayLabel(Number(key));
+  for(const key of Object.keys(REVIEW_DISPLAY_META)){
+   updateReviewOverlayLabel(Number(key));updatePlateGroupSummary(Number(key));
+  }
  }
  initMarquee();initReviewPreviews();initReviewPages();
  if(typeof reviewSimilarRender==="function"&&typeof REVIEW_SIMILAR_ENABLED!=="undefined"&&REVIEW_SIMILAR_ENABLED)reviewSimilarRender();
@@ -6715,6 +6757,7 @@ function confirmFinding(i,label){
    }
    CONFIRM_FAILED.delete(i);
    if(note)note.innerHTML=findingStatus(i);
+   updatePlateGroupSummary(i);
    if(typeof reviewSimilarRender==="function"&&typeof REVIEW_SIMILAR_ENABLED!=="undefined"&&REVIEW_SIMILAR_ENABLED)reviewSimilarRender();
    card?.querySelectorAll('.finding-confirm button').forEach((button,index)=>button.setAttribute('aria-pressed',index===(label==='positive'?0:1)));
    if(document.getElementById('beCv'))beRefresh();
@@ -6733,6 +6776,7 @@ function applyDet(i,blur,preserveLabel=false){
   if(t)t.classList.toggle("off",!blur);
   if(typeof redrawReviewOverlay==="function")redrawReviewOverlay(m);
  }
+ updatePlateGroupSummary(i);
  markReviewChanged();
  if(document.getElementById("beCv")){beRefresh();}
 }
@@ -6750,7 +6794,7 @@ function setAll(cat,on){
    const i=Number(card.id.slice(3));
    card.classList.toggle("off",!EN[i]);
    const bb=document.getElementById("bb"+i);if(bb)bb.innerHTML=detChoices(i);
-   redrawReviewOverlay(i);
+   redrawReviewOverlay(i);updatePlateGroupSummary(i);
   });
   markReviewChanged();
   if(document.getElementById("beCv"))beRefresh();
