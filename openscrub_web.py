@@ -5796,9 +5796,10 @@ function pumpPlateSaves(){
     FINDING_META[s.i].confirmed_finding_revision=data.finding.revision;
    s.saved=plateCopy(s.meta.points);s.failures=0;s.conflictAttempts=0;
    s.samePictureRefreshAttempts=0;s.needsSourceReview=false;
-   if(typeof FINDING_META!=="undefined"&&FINDING_META[s.i])
+   if(typeof FINDING_META!=="undefined"&&FINDING_META[s.i]){
     FINDING_META[s.i].human_region_confirmed=true;
     FINDING_META[s.i].plate_boundary_source='human_corners';
+   }
    if(typeof REVIEW_DISPLAY_META!=="undefined"&&REVIEW_DISPLAY_META[s.i])
     REVIEW_DISPLAY_META[s.i].human_region_confirmed=true;
    const boundary=document.getElementById('boundary'+s.i);
