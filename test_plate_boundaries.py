@@ -98,3 +98,46 @@ def test_protected_human_corners_are_not_overwritten_by_learned_fallback():
     learning._fallback_plate_boundary(row, 'uncertain model')
     assert row['plate_quad'] == before
     assert row['plate_boundary_source'] == 'human_corners'
+
+
+def test_legacy_track_wide_quad_is_rejected_for_unconfirmed_sibling():
+    """Older reports copied the seed quad to siblings; those must render full boxes."""
+    quad = [[.2,.15],[.8,.1],[.85,.85],[.15,.8]]
+    seed = dict(category='plate', plate_quad=quad, verified_label='plate',
+                human_region_confirmed=True, track=8)
+    sibling = dict(category='plate', plate_quad=quad, verified_label='',
+                   track=8, human_region_confirmed=False)
+    confirmed_sibling = dict(sibling, verified_label='plate',
+                             human_confirmation={'label':'positive','propagated':True})
+    old_learned = dict(sibling, poly=[quad])
+    assert edges.trusted_plate_quad(seed) == quad
+    assert not edges.trusted_plate_quad(sibling)
+    assert not edges.trusted_plate_quad(confirmed_sibling)
+    assert edges.trusted_plate_quad(old_learned) == quad
+    new_learned = dict(sibling, plate_boundary_source='learned_perspective')
+    assert edges.trusted_plate_quad(new_learned) == quad
+    assert not edges.trusted_plate_quad(dict(sibling, plate_quad=[]))
+
+
+def test_legacy_untrusted_quad_never_narrows_rendered_output(tmp_path):
+    import json
+    import openscrub
+
+    quads = [[.1,.2],[.8,.1],[.9,.8],[.2,.9]]
+    doc = dict(render_state={'fps':30,'cum':[[0,0]]*3},
+               provenance={}, detections=[
+        dict(t_start=0.,t_end=.04,category='plate',text='plate',
+             confidence=.8,cbox=[20,20,100,50],enabled=True,
+             track=3,plate_quad=quads,verified_label='plate',
+             human_region_confirmed=True),
+        dict(t_start=.04,t_end=.08,category='plate',text='plate',
+             confidence=.8,cbox=[22,20,102,50],enabled=True,
+             track=3,plate_quad=quads,verified_label='',
+             human_region_confirmed=False),
+    ])
+    path=tmp_path/'legacy.json'
+    path.write_text(json.dumps(doc))
+    dets,_,_=openscrub.load_report(str(path))
+    assert len(dets)==2
+    assert list(map(list,dets[0].plate_quad))==quads
+    assert dets[1].plate_quad==(), 'the legacy propagated shape must not conceal a different frame'
