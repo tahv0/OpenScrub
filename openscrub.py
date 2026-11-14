@@ -38,6 +38,7 @@ from dataclasses import dataclass, asdict
 
 import cv2
 import numpy as np
+import plate_boundaries
 
 VERSION = "1.0.89"
 
@@ -6542,7 +6543,7 @@ def load_report(path):
             dense=bool(r.get("dense", False)),
             track=int(r.get("track", -1)),
             person=int(r.get("person", -1)),
-            plate_quad=tuple(tuple(pt) for pt in (r.get("plate_quad") or ())),
+            plate_quad=tuple(tuple(pt) for pt in plate_boundaries.trusted_plate_quad(r)),
             verified_label=(r.get("verified_label")
                             if r.get("verified_label") in ("plate", "not_plate")
                             else ""),
