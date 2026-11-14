@@ -60,7 +60,7 @@ function AssertCommands($context, $depsCount, $composeBuilds, $composeUps) {
         $_ -match ' compose.windows-cuda.yml up -d --no-build$'
     })
     if ($dep.Count -ne $depsCount -or $build.Count -ne $composeBuilds -or $up.Count -ne $composeUps) {
-        throw "Wrong command counts in $context: deps=$($dep.Count), compose-build=$($build.Count), up=$($up.Count). Calls: $($global:MockDockerCalls -join '; ')"
+        throw "Wrong command counts in ${context}: deps=$($dep.Count), compose-build=$($build.Count), up=$($up.Count). Calls: $($global:MockDockerCalls -join '; ')"
     }
     if ($global:MockDockerCalls -match '--builder default' -and $context -ne 'default') {
         throw 'Used default builder in another Docker context'
