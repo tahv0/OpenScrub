@@ -417,6 +417,11 @@ def test_editing_another_representative_after_track_save_does_not_conflict(revie
                 page.locator('#det1').scroll_into_view_if_needed()
                 page.wait_for_function('!!document.querySelector("#det1 img")._quadEdit')
             card=page.locator('#det%d'%i);card.scroll_into_view_if_needed()
+            # Cached nearby frames are fine for browsing, but their corners
+            # are NOT safe to edit until the actual new source frame loads.
+            if card.locator('.source-frame-exact').is_visible():
+                card.get_by_role('button',name='Load exact frame for corners',exact=True).click()
+                page.wait_for_function('(i)=>{const img=document.querySelector("#det"+i+" img");return img?._plateMeta&&!img._previewUnsafeGeometry}',arg=i,timeout=30000)
             drag_corner(page,card)
             page.wait_for_function('(i)=>{const s=document.querySelector("#det"+i+" img")._quadEdit;return !s.dirty||s.error}',arg=i)
             assert card.locator('img').evaluate('(img)=>img._quadEdit.error && img._quadEdit.error.message') is None
