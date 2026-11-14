@@ -83,6 +83,7 @@ def test_four_corner_drag_save_creates_verified_sample(plate_job):
     saved = json.loads(report.read_text(encoding="utf-8"))["detections"][0]
     assert saved["verified_label"] == "plate"
     assert len(saved["plate_quad"]) == 4
+    assert saved["plate_quad_frame"] == 2, 'wider time interval must remain box-protected'
     assert saved["plate_quad"][0][0] == pytest.approx((54-45)/92, abs=1e-6)
     labels = job_dir / "plate_annotations" / "annotations.jsonl"
     assert labels.is_file()
