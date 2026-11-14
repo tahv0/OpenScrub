@@ -7,6 +7,8 @@ on:
       - 'review_preview_index.py'
       - 'findings_web.py'
       - 'openscrub_web.py'
+      - 'review_similarity_ui.py'
+      - 'test_review_similarity_*.py'
       - 'test_review_journal.py'
       - 'test_review_preview_index.py'
       - 'test_grouped_review_sample.py'
@@ -39,6 +41,8 @@ jobs:
       - name: Check journal and explicit 10k-group HTTP save
         run: |
           python -m pytest -q -ra --timeout=60 test_review_journal.py test_review_preview_index.py test_grouped_review_sample.py -k 'not human_sample_shows_ten_groups' 
+      - name: Check cached visual groups, per-source explicit saves and JS syntax
+        run: python -m pytest -q -ra --timeout=90 test_review_similarity_logic.py test_review_similarity_browser.py
       - name: Check browser sample, reload, corners and stress paths
         run: |
           python -m pytest -q -ra --timeout=80 test_grouped_review_sample.py test_sample_filter_timeout.py test_release_reliability.py test_review_browser.py -k 'human_sample_shows_ten_groups or sample_and_show_all_work_without_report_network or filter_keeps_inflight_corner_save_alive or lost_corner_response_retry or saved_geometry_and_decisions_survive_server_rehydration or real_direct_corner_autosave_and_lazy_loading'
