@@ -464,3 +464,44 @@ def test_sixty_rejections_keep_working_after_failed_save(review_server, monkeypa
         evidence.mkdir(parents=True,exist_ok=True)
         page.screenshot(path=str(evidence/('sixty-rejections-%d.png'%viewport[0])))
         browser.close()
+
+
+def test_group_card_uses_strongest_plate_sighting(review_server):
+    """The card image, verifier badge and group totals refer to matching rows."""
+    sync_api = pytest.importorskip('playwright.sync_api')
+    url, report = review_server
+    doc = json.loads(report.read_text())
+    low, high = doc['detections'][:2]
+    high['track'] = low['track']
+    low['confidence'] = .95
+    high['confidence'] = .42
+    low['enabled'] = False
+    high['enabled'] = True
+    low['plate_verification'] = dict(score=.01, decision='suppress',
+                                     mode='filter', applied=True)
+    high['plate_verification'] = dict(score=.84, decision='retain',
+                                      mode='filter', applied=False)
+    report.write_text(json.dumps(doc))
+    with sync_api.sync_playwright() as pw:
+        browser = browser_instance(pw)
+        page = browser.new_page(viewport={'width': 1440, 'height': 1000})
+        page.set_default_timeout(12000)
+        errors = []
+        page.on('pageerror', lambda error: errors.append(str(error)))
+        load_browser_page(page, url, [], [])
+        page.get_by_role('link', name='Synthetic review fixture', exact=True).click()
+        card = page.locator('#det1')
+        card.wait_for()
+        assert page.locator('#det0').count() == 0, 'The first row must not be the group card'
+        assert card.locator('img').get_attribute('data-preview-url').endswith('/finding-preview/1')
+        assert page.evaluate('TRKMEM[1]') == [0, 1]
+        assert 'highest learned plate score 84%' in card.inner_text()
+        assert '1/2 detections hidden, 1 visible' in card.inner_text()
+        badge = card.locator('.plate-verification-badge').inner_text()
+        assert 'Model retained' in badge and 'plate score 84%' in badge
+        assert 'Model filtered' not in badge
+        card.get_by_role('button', name='Keep visible', exact=True).click()
+        assert page.evaluate('[EN[0], EN[1]]') == [False, False]
+        assert '0/2 detections hidden, 2 visible' in card.inner_text()
+        assert errors == [], errors
+        browser.close()
