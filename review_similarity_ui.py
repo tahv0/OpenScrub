@@ -215,6 +215,9 @@ async function reviewSimilarBatch(root,label){
  const name=label==="positive"?"Is a plate":"Not a plate";
  if(!confirm("Confirm "+targets.length+" unreviewed pictures as '"+name+
   "'? Every source-verified picture is saved separately. Existing human decisions will NOT be overwritten. Expand the group first if any image is uncertain."))return;
+ // Explicit batch decisions require the real previews, never a background
+ // decode of hidden cards. Expand the group first, then fetch visible cards.
+ REVIEW_SIMILAR_EXPANDED.add(root);
  REVIEW_SIMILAR_BUSY=true;reviewSimilarRender();
  const job=CUR,view=JOBVIEW;
  let saved=0,failure="";
