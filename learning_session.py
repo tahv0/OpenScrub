@@ -301,9 +301,26 @@ def collect_feedback(job,doc,read_frame=None,log=None):
     # harvested negatives; do not leave stale examples in a future pass.
     active_ranges={entry['id'] for entry in current.get('plate_free_intervals', [])
                    if entry.get('training') is True}
+    positive_regions={}
+    if any(sample.get('interval_negative_id') for sample in store['samples'].values()):
+        for candidate in doc['detections']:
+            confirmation=candidate.get('human_confirmation') or {}
+            if (candidate.get('category')=='plate'
+                    and (candidate.get('verified_label')=='plate'
+                         or confirmation.get('label')=='positive')):
+                frame=vl._frame(candidate,doc['render_state'])
+                positive_regions.setdefault(frame,[]).append(
+                    vl._screen_box(candidate,doc['render_state'],frame))
+    def keep_sample(sample):
+        interval=sample.get('interval_negative_id')
+        if not interval:return True
+        if interval not in active_ranges:return False
+        # An individual human reclassification supersedes its older negative
+        # training crop even if the enclosing plate-free interval is retained.
+        return not any(vl._iou(sample['box'],box)>=.5
+                       for box in positive_regions.get(sample['frame'],()))
     store['samples']={key:sample for key,sample in store['samples'].items()
-                      if not sample.get('interval_negative_id')
-                      or sample['interval_negative_id'] in active_ranges}
+                      if keep_sample(sample)}
     prior=(store.get('constraints') or {}).get('anchors',[])
     merged={a['id']:a for a in prior}
     by_frame={}
