@@ -271,8 +271,7 @@ def test_refiner_never_reclassifies_or_replaces_human_adjusted_frame(tmp_path):
     writer.release()
     original=[[.1,.2],[.8,.1],[.9,.8],[.2,.9]]
     doc=report([row(2,[20,20,90,54],plate_quad=original,
-                    human_region_confirmed=True,verified_label='plate',
-                    enabled=True)])
+                    human_region_confirmed=True,verified_label='plate')])
     class NeverPredict:
         def predict(self,crop):
             raise AssertionError('A human-corrected source frame must stay authoritative')
