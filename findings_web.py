@@ -73,8 +73,16 @@ def _job(jid, edit=False):
     return job
 
 
+def _source_hash(doc):
+    # Some legacy reports explicitly contain compact_preview_source=None.
+    # dict.get(..., fallback) does NOT use its fallback for that case.
+    return (doc.get('compact_preview_source')
+            or (doc.get('provenance') or {}).get('input_sha256')
+            or (doc.get('source_identity') or {}).get('input_sha256'))
+
+
 def _token(doc, row, frame, sample_key=None):
-    value = [doc.get('compact_preview_source',doc.get('provenance', {}).get('input_sha256')), frame,
+    value = [_source_hash(doc), frame,
              sample_key, row['category'], row['cbox'], row.get('plate_quad') or [],
              doc['render_state']['cum'][frame], doc.get('preview_revision')]
     return hashlib.sha256(json.dumps(value, sort_keys=True).encode()).hexdigest()
@@ -200,7 +208,8 @@ def preview(job, index, doc=None, cache_only=False, preferred_key=None):
     # JPEG cache key. A picture may be evicted while a person adjusts corners;
     # a newly fetched crop of the very SAME source frame may safely reuse
     # those frame coordinates, but a changed frame or detection may not.
-    meta['frame_source_token'] = _token(doc, source_row, shown_frame, None)
+    meta['frame_source_token'] = (
+        _token(doc, source_row, shown_frame, None) if _source_hash(doc) else None)
     return doc, row, meta, jpeg
 
 
