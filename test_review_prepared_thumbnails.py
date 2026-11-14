@@ -5,7 +5,7 @@ import pytest
 import finding_previews as previews
 import openscrub_web as web
 from test_finding_previews import frame, row, state
-from werkzeug.exceptions import ServiceUnavailable
+from werkzeug.exceptions import UnprocessableEntity
 
 
 class Callbacks:
@@ -87,7 +87,7 @@ def test_preparation_reports_bad_source_without_abandoning_other_cards(tmp_path,
             return None
         cold.append(index)
         if index == 1:
-            raise ServiceUnavailable("broken source frame")
+            raise UnprocessableEntity("broken source frame")
         return doc, rows[index], {"key": str(index)}, b"jpeg"
 
     monkeypatch.setattr(web.findings_web, "preview", preview)
