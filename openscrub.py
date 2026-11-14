@@ -738,6 +738,7 @@ class Detection:
                                # PERSON, applied to all their appearances
     verified_label: str = ""  # explicit 'plate' or 'not_plate' review, not a default
     plate_quad: tuple = ()    # four normalized plate corners, ordered clockwise
+    plate_quad_frame: int = -1 # optional source frame for narrow quad on a time-spanning track
     poly: tuple = ()           # silhouette contour(s) from a segmentation
                                # model, points NORMALIZED to cbox (0..1) —
                                # render blurs ONLY inside them (person
@@ -3993,7 +3994,7 @@ def render_hdr(src, dst, detections, cum, bands, fps, pad, mode,
                if _sample_active(d, idx, t)]
         for d in _dedupe_dense(act):
             px = _detection_pad(d, pad, (ox, oy))
-            if d.category == "plate" and len(d.plate_quad) == 4:
+            if _plate_quad_active(d, idx):
                 # Use four human-adjusted corners, not the oversized bbox.
                 base = (d.cbox[0] + ox, d.cbox[1] + oy,
                         d.cbox[2] + ox, d.cbox[3] + oy)
@@ -4249,7 +4250,7 @@ def render(src, dst, detections, cum, bands, fps, pad, mode, preview,
             pbox = (d.cbox[0] + ox, d.cbox[1] + oy,
                     d.cbox[2] + ox, d.cbox[3] + oy)
             if preview:
-                if d.category == "plate" and len(d.plate_quad) == 4:
+                if _plate_quad_active(d, idx):
                     vertices = np.asarray(
                         _plate_quad_pixels(pbox, d.plate_quad), dtype=np.int32)
                     cv2.polylines(frame, [vertices], True, (0, 0, 255), 2)
@@ -4268,7 +4269,7 @@ def render(src, dst, detections, cum, bands, fps, pad, mode, preview,
                     label = f"face {d.confidence:.2f}"
                 cv2.putText(frame, label, (int(max(0, x1)), int(max(12, y1 - 4))),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
-            elif d.category == "plate" and len(d.plate_quad) == 4:
+            elif _plate_quad_active(d, idx):
                 # Tight skewed mask: ignore the global box padding.
                 quad = _plate_quad_pixels(pbox, d.plate_quad)
                 blur_silhouette(frame, min(p[0] for p in quad)-2,
@@ -6502,6 +6503,13 @@ def _detection_pad(d, global_pad, offset):
     return effective_mask_pad(d.mask_pad, global_pad) + drift
 
 
+def _plate_quad_active(d, frame_index):
+    """Moving tracked boxes stay active, but a narrow human quad may be frame-local."""
+    source = getattr(d, "plate_quad_frame", -1)
+    return (d.category == "plate" and len(d.plate_quad) == 4
+            and (source < 0 or source == frame_index))
+
+
 def _sample_active(d, frame_index, t):
     """Select exact-frame samples without changing legacy report timing."""
     if (getattr(d, "owned_start_frame", -1) >= 0 and
@@ -6544,6 +6552,7 @@ def load_report(path):
             track=int(r.get("track", -1)),
             person=int(r.get("person", -1)),
             plate_quad=tuple(tuple(pt) for pt in plate_boundaries.trusted_plate_quad(r)),
+            plate_quad_frame=int(r.get("plate_quad_frame", -1)),
             verified_label=(r.get("verified_label")
                             if r.get("verified_label") in ("plate", "not_plate")
                             else ""),
