@@ -112,8 +112,9 @@ def test_explicit_group_decision_saves_each_source_frame_separately(review_serve
                 items = client.get("/api/findings").get_json()["items"]
             assert {item["frame"] for item in items} == {300, 301, 302}
 
-            # Show all and correct one saved decision; disagreement is visible.
-            page.locator("#similar0 button[id^=similarExpand]").click()
+            # Batch review opened the group to display every verified picture;
+            # it stays expanded so any saved decision can be corrected.
+            page.locator("#det1").wait_for(state="visible")
             page.locator("#det1").get_by_role("button", name="✓ Is a plate").click()
             page.wait_for_function(
                 "() => FINDING_META[1]?.human_confirmation?.label === 'positive' && !CONFIRM_PENDING.has(1)")
