@@ -46,6 +46,7 @@ class PersistentCudaDependencyImageTests(unittest.TestCase):
             compose,
         )
         self.assertIn("capabilities: [gpu]", compose)
+        self.assertIn("image: openscrub-windows-test-openscrub:local", compose)
 
     def test_windows_script_retains_a_dependency_image_and_rebuilds_on_change(self):
         script = (ROOT / "scripts/build-windows-cuda.ps1").read_text(encoding="utf-8")
@@ -56,9 +57,23 @@ class PersistentCudaDependencyImageTests(unittest.TestCase):
         self.assertNotIn('--builder default', script)
         self.assertIn('docker context show', script)
         self.assertIn('$builderName = $dockerContext', script)
-        self.assertIn('docker buildx inspect $builderName', script)
+        self.assertIn('docker --context $dockerContext buildx inspect $builderName', script)
         self.assertIn("'(?m)^Driver:\\s*docker\\s*$'", script)
-        self.assertIn('build --builder $builderName', script)
+        self.assertIn('buildx build --builder $builderName', script)
+        # The app is built by the same direct Buildx path as the dependencies.
+        # Passing --builder to Compose triggered the Docker Desktop context error.
+        self.assertEqual(
+            script.count('docker --context $dockerContext buildx build --builder $builderName'),
+            2,
+        )
+        self.assertIn("--target app", script)
+        self.assertIn("OPENSCRUB_CUDA_DEPS_IMAGE=$depsImage", script)
+        self.assertIn("--tag $appImage", script)
+        self.assertIn("'openscrub-windows-test-openscrub:local'", script)
+        self.assertNotIn("compose --progress plain", script)
+        self.assertNotIn("compose build --builder", script.replace("# Compose build --builder", ""))
+        self.assertIn("compose -f compose.windows-test.yml", script)
+        self.assertIn("up -d --no-build", script)
         self.assertIn('--builder $builderName --progress plain --load', script)
         self.assertIn('--load', script)
         self.assertIn('--build-arg OPENSCRUB_ENABLE_TRAINING=1', script)
