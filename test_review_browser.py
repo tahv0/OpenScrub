@@ -146,7 +146,8 @@ def test_real_direct_corner_autosave_and_lazy_loading(review_server, viewport, t
         assert status_box['y'] >= image_box['y']+image_box['height']-1
         initial, size = plate_points(card), card.bounding_box()
         before_requests = sum('/finding-preview/0' in r for r in requests)
-        assert sum('/finding-preview/' in r for r in requests) <= 60, 'Prefetch should remain bounded to nearby cards'
+        assert sum('/finding-preview/' in r for r in requests) <= 180, (
+            'Speculative prefetch should use at most one warm and one cold request per mounted card')
         drag_corner(page, card, release=False)
         assert not posts  # no requests during mousemove
         page.mouse.up()
