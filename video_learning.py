@@ -176,7 +176,9 @@ def apply_constraints(doc, constraints):
                     or review_time_ranges._protected(row)
                     or not review_time_ranges._inside(row,start,end,float(rs['fps']))):
                 continue
-            training=interval['training']
+            training=(interval['training']
+                      and type(row.get('frame_index')) is int
+                      and row['frame_index']>=0)
             row.update(enabled=False,output_choice_explicit=True,
                 verified_label='not_plate' if training else '',
                 plate_verification_override=True,
