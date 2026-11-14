@@ -5237,6 +5237,14 @@ function clearReviewPreviews(){
 }
 function drawPlateThumbnail(img){
  if(!img._plateMeta||!img.naturalWidth)return;
+ const existing=img._quadEdit;
+ if(existing&&!existing.dirty&&!existing.drag&&existing.meta!==img._plateMeta){
+  // An exact source-frame request can replace a borrowed cached thumbnail.
+  // Rebind a CLEAN editor to the actual new image and its own coordinates.
+  existing.meta=img._plateMeta;existing.displayCrop=img._plateMeta.crop.slice();
+  existing.points=plateCopy(img._plateMeta.points);
+  existing.saved=plateCopy(img._plateMeta.points);
+ }
  const state=initPlateCorners(img);if(state)state.draw();
 }
 function updateReviewPreloadStatus(state){
@@ -5278,7 +5286,9 @@ async function loadReviewPreview(state,task,cacheOnly){
  if(retry)retry.hidden=true;
  let missing=false,retryBusy=false,ok=false,url=null;
  try{
-  const base=img.dataset.previewUrl;
+  const original=img.dataset.previewUrl;
+  const base=img._forceExactPreview?
+   original+(original.includes("?")?"&":"?")+"exact=1":original;
   const target=cacheOnly?base+(base.includes("?")?"&":"?")+"cache_only=1":base;
   const {response,data}=await reviewRequest(target,{signal:ctl.signal,timeoutMs:cacheOnly?15000:120000},"blob");
   if(REVIEW_MEDIA!==state||!img.isConnected)return;
@@ -5294,6 +5304,16 @@ async function loadReviewPreview(state,task,cacheOnly){
   if(state.urls.delete(previous))URL.revokeObjectURL(previous);
   url=null;
   if(REVIEW_MEDIA!==state||!img.isConnected)return;
+  const borrowed=!!(meta?.match==="representative"&&
+      Number.isInteger(meta.frame)&&Number.isInteger(meta.requested_frame)&&
+      meta.frame!==meta.requested_frame);
+  img._previewUnsafeGeometry=borrowed;
+  const hint=card.querySelector(".source-frame-note");
+  const exactButton=card.querySelector(".source-frame-exact");
+  if(hint)hint.textContent=borrowed?
+   "The cached picture is source frame "+meta.frame+", but this detection is on frame "+
+   meta.requested_frame+". Load the exact frame before adjusting corners.":"";
+  if(exactButton)exactButton.hidden=!borrowed;
   drawPlateThumbnail(img);
   if(meta?.classification_allowed===false){
    if(typeof FINDING_META!=="undefined"&&FINDING_META[meta.i]){
@@ -5444,6 +5464,22 @@ function initReviewPages(){
   },{rootMargin:"10000px 0px"});
   buttons.forEach(button=>panel._moreObserver.observe(button));
  }
+}
+function loadExactPlateFrame(button){
+ const card=button.closest(".det"),img=card?.querySelector("img[data-preview-url]");
+ if(!img)return;
+ const edit=img._quadEdit;
+ if(edit&&(edit.dirty||edit.drag)){
+  const status=card.querySelector(".source-frame-note");
+  if(status)status.textContent="Preserve or resolve your unsaved corner draft before switching source frames.";
+  return;
+ }
+ img._forceExactPreview=true;
+ img._plateMeta=null;
+ button.disabled=true;button.textContent="Loading exact source frame…";
+ queueReviewPreview(img,true).finally(()=>{
+  if(button.isConnected){button.disabled=false;button.textContent="Load exact frame for corners";}
+ });
 }
 function retryReviewPreview(button){
  const img=button.closest(".det").querySelector("img[data-preview-url]");
@@ -5929,7 +5965,12 @@ function initPlateCorners(img){
  }
  s.cancelDrag=()=>finish(null,true);
  cv.addEventListener("pointerdown",e=>{
-  e.stopPropagation();if(e.button!==0||s.drag||PLATE_REVIEW_BUSY||CONFIRM_PENDING.has(s.i))return;
+  e.stopPropagation();
+  if(img._previewUnsafeGeometry){
+   plateStatus(s,"Load the exact source frame before changing its corners.");
+   return;
+  }
+  if(e.button!==0||s.drag||PLATE_REVIEW_BUSY||CONFIRM_PENDING.has(s.i))return;
   const k=nearest(e);if(k<0)return;
   e.preventDefault();QEDIT=s;s.selected=k;
   const at=point(e),p=s.points[k],c=s.displayCrop;
@@ -5951,7 +5992,7 @@ function initPlateCorners(img){
  cv.addEventListener("keydown",e=>{
   QEDIT=s;
   if(e.key==="Escape"){s.cancelDrag();return;}
-  if(s.drag||PLATE_REVIEW_BUSY||CONFIRM_PENDING.has(s.i))return;
+  if(s.drag||img._previewUnsafeGeometry||PLATE_REVIEW_BUSY||CONFIRM_PENDING.has(s.i))return;
   if(/^[1-4]$/.test(e.key)){s.selected=Number(e.key)-1;e.preventDefault();return;}
   const before=plateCopy(s.points),c=s.displayCrop;
   if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="z"&&s.undo){s.points=plateCopy(s.undo);}
@@ -6537,6 +6578,7 @@ async function loadReview(signal=null,phase=SHELLPH){
     ${x.category==="plate"?'<div id="plateOverlay'+x.i+'" class="plate-output-badge"></div>':""}
     <small class="preview-status" role="status">Preview not loaded</small>
     <button class="sec preview-retry" hidden onclick="retryReviewPreview(this)">Retry preview</button>
+    ${x.category==="plate"?'<small class="source-frame-note review-copy" role="status"></small><button class="sec source-frame-exact" type="button" hidden onclick="loadExactPlateFrame(this)">Load exact frame for corners</button>':""}
     ${x.category==="plate"?'<small class="quad-status" role="status" title="Corners apply only to this exact source frame. Group-wide Is/Not and Blur/Keep choices are separate. Keyboard: select 1–4, use arrows; Ctrl+Z undoes.">Corners autosave to track</small><button type="button" class="sec quad-retry" hidden>Retry save</button>':""}
     <div>${plateVerificationBadge(x)}${plateBoundaryBadge(x)}${x.learning_conflict?'<span class="badge" title="The original coverage was retained where the learned model could not make a reliable refinement">Model disagreement — review</span> ':""}${plateFallbackText(x)?`<span class="badge" style="white-space:normal">${plateFallbackText(x)}</span> `:""}${x.shaped?'<span class="badge" title="Thumbnail rectangle is a selection guide; open to inspect the mask and any exclusions">shaped mask</span> ':""}${x.personcard?`<b>Person ${x.person+1}</b> — one decision for ALL their appearances`:`"${sectionEscape(x.text)}"`}${x.frames?` <span class="badge">×${x.frames} frames</span>`:""}${x.confidence?` <span class="badge" title="detector confidence — not a human decision">${Math.round(x.confidence*100)}%</span>`:""} <br>${x.t_start.toFixed(1)}–${x.t_end.toFixed(1)}s</div>
     ${x.boundarySummary?`<p class="review-copy">${sectionEscape(x.boundarySummary)}</p>`:""}
