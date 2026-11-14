@@ -130,7 +130,8 @@ def _cold_frame(job,doc,row,frame):
         _web._REVIEW_WORK_LOCK.release()
 
 
-def preview(job, index, doc=None, cache_only=False, preferred_key=None):
+def preview(job, index, doc=None, cache_only=False, preferred_key=None,
+            exact_only=False):
     """Return source geometry and compact pixels; a warm read never opens video."""
     doc = doc if doc is not None else _web._load_preview_report(job)
     if not 0 <= index < len(doc.get('detections', [])):
@@ -160,7 +161,7 @@ def preview(job, index, doc=None, cache_only=False, preferred_key=None):
             abort(409, description='This displayed picture is no longer a valid cached sample. Reload its preview.')
     else:
         cached = _web._serialize_review_read(previews.lookup)(job['dir'], cache_row, rs)
-        if cached is None and int(row.get('track', -1)) >= 0:
+        if cached is None and not exact_only and int(row.get('track', -1)) >= 0:
             cached = _web._serialize_review_read(previews.lookup)(
                 job['dir'], cache_row, rs, allow_representative=True)
     if cached is None and cache_only:
@@ -231,6 +232,14 @@ def _video(job, doc, meta):
                 name=Path(job.get('name') or p.get('original_input') or p.get('input') or 'Video').name,
                 fps=float(doc['render_state']['fps']), width=meta['width'], height=meta['height'],
                 total_frames=int(identity.get('total_frames') or len(doc['render_state']['cum'])))
+
+
+def _require_exact_corners(row, rs, meta, payload):
+    """A borrowed cached neighbor cannot authorize a narrow quad in another frame."""
+    if (payload.get('points') is not None
+            and int(meta['frame']) != video_learning._frame(row, rs)):
+        raise library.ConflictError(
+            'This picture is from another frame. Load the exact source frame before editing corners.')
 
 
 def _shape(points, meta):
@@ -378,6 +387,7 @@ def _journal_confirm(job, index, payload, doc):
                       plate_verification_override=True,
                       _remove_plate_verification=True)
     if payload.get('points') is not None:
+        _require_exact_corners(row, doc['render_state'], meta, payload)
         meta['points'] = _shape(payload['points'], meta)
         box = meta['box']
         row['plate_quad'] = [[(x-box[0])/(box[2]-box[0]), (y-box[1])/(box[3]-box[1])]
@@ -412,6 +422,7 @@ def _journal_region(job, index, payload, doc):
     row = dict(doc['detections'][index])
     if row['category'] != 'plate':
         raise ValueError('Four-corner area editing currently applies to plate findings.')
+    _require_exact_corners(row, doc['render_state'], meta, payload)
     points = _shape(payload.get('points'),meta)
     box = meta['box']
     quad = [[round((x-box[0])/(box[2]-box[0]),6),
@@ -500,6 +511,7 @@ def confirm(job, index, payload):
     if payload.get('preview_token') not in (None, meta['preview_token']):
         abort(409, description='The finding changed. Reload its picture.')
     if payload.get('points') is not None:
+        _require_exact_corners(row, doc['render_state'], meta, payload)
         meta['points'] = _shape(payload['points'], meta)
         box = meta['box']
         row['plate_quad'] = [[(x-box[0])/(box[2]-box[0]),(y-box[1])/(box[3]-box[1])]
@@ -558,6 +570,7 @@ def region(job, index, payload):
     row = doc['detections'][index]
     if row['category'] != 'plate':
         raise ValueError('Four-corner area editing currently applies to plate findings.')
+    _require_exact_corners(row, doc['render_state'], meta, payload)
     points = _shape(payload.get('points'), meta)
     box = meta['box']
     quad = [[round((x-box[0])/(box[2]-box[0]),6),round((y-box[1])/(box[3]-box[1]),6)] for x,y in points]
@@ -722,7 +735,9 @@ def install(app, web):
     @app.get('/api/jobs/<jid>/finding-preview/<int:index>')
     @_guard
     def finding_preview(jid,index):
-        result = preview(_job(jid),index,cache_only=request.args.get('cache_only')=='1')
+        result = preview(_job(jid),index,
+                         cache_only=request.args.get('cache_only')=='1',
+                         exact_only=request.args.get('exact')=='1')
         if result is None:
             return Response(status=204,headers={'Cache-Control':'no-store'})
         _,_,meta,jpeg = result
