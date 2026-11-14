@@ -5295,7 +5295,7 @@ async function loadReviewPreview(state,task,cacheOnly){
    const note=card.querySelector('[id^="vlabel"]');if(note)note.textContent=meta.classification_note;
   }
   if(status)status.textContent="";
-  reviewSimilarFingerprint(img);
+  if(typeof reviewSimilarFingerprint==="function")reviewSimilarFingerprint(img);
   ok=true;img._previewLoaded=true;
   state.loadedImages.add(img);
   updateReviewPreloadStatus(state);
@@ -6134,7 +6134,7 @@ function applyReviewGroupFilter(){
  }
  // Keep existing images/editors and autosaves alive. Drop hidden queued images
  // without aborting unrelated requests or decoding every preview again.
- reviewSimilarRender();
+ if(typeof reviewSimilarRender==="function")reviewSimilarRender();
  return true;
 }
 function reviewUncertain(){
@@ -6327,7 +6327,7 @@ async function loadReview(signal=null,phase=SHELLPH){
  await CONFIRM_CHAIN;
  if(!current()||CONFIRM_FAILED.size||!await flushPlateSaves()||!current())return false;
  if(!closePlateQuad())return false;
- clearReviewPreviews();reviewSimilarReset();
+ clearReviewPreviews();if(typeof reviewSimilarReset==="function")reviewSimilarReset();
  REVIEW_PENDING_PAGES={};REVIEW_CATEGORY_GROUPS={};
  if(!await showPanel("review")||!current())return false;
  if(VLBLJOB!==CUR){VLBL={};VLBLJOB=CUR;}
@@ -6542,7 +6542,7 @@ async function loadReview(signal=null,phase=SHELLPH){
   for(const key of Object.keys(REVIEW_DISPLAY_META))updateReviewOverlayLabel(Number(key));
  }
  initMarquee();initReviewPreviews();initReviewPages();
- if(REVIEW_SIMILAR_ENABLED)reviewSimilarRender();
+ if(typeof reviewSimilarRender==="function"&&typeof REVIEW_SIMILAR_ENABLED!=="undefined"&&REVIEW_SIMILAR_ENABLED)reviewSimilarRender();
  return true;
 }
 
@@ -6716,7 +6716,7 @@ function confirmFinding(i,label){
    }
    CONFIRM_FAILED.delete(i);
    if(note)note.innerHTML=findingStatus(i);
-   if(REVIEW_SIMILAR_ENABLED)reviewSimilarRender();
+   if(typeof reviewSimilarRender==="function"&&typeof REVIEW_SIMILAR_ENABLED!=="undefined"&&REVIEW_SIMILAR_ENABLED)reviewSimilarRender();
    card?.querySelectorAll('.finding-confirm button').forEach((button,index)=>button.setAttribute('aria-pressed',index===(label==='positive'?0:1)));
    if(document.getElementById('beCv'))beRefresh();
   }catch(error){showFindingFailure(i,error);}
