@@ -50,6 +50,7 @@ import video_learning
 import learned_models
 import learning_candidates
 import plate_verifier
+import plate_boundaries
 import zones_ui
 import openscrub_logging as diagnostics
 import finding_previews
@@ -2317,7 +2318,7 @@ def _review_detections(job, doc):
         tuple(r.get("aoff", (0, 0))), dense=r.get("dense", False),
         track=r.get("track", -1), poly=r.get("poly") or (),
         poly_holes=r.get("poly_holes") or (), mask_pad=r.get("mask_pad", -1),
-        plate_quad=tuple(tuple(pt) for pt in (r.get("plate_quad") or ())))
+        plate_quad=tuple(tuple(pt) for pt in plate_boundaries.trusted_plate_quad(r)))
         for r in rows]
     coverage, pad, _ = _job_mask_options(job)
     if coverage not in ("tight", "box", "concealed"):
@@ -2338,7 +2339,7 @@ def _review_detections(job, doc):
     for row, det in zip(rows, effective):
         copy = dict(row)
         copy.update(cbox=det.cbox, poly=det.poly, poly_holes=det.poly_holes,
-                    mask_pad=det.mask_pad)
+                    mask_pad=det.mask_pad, plate_quad=det.plate_quad)
         copy["_coverage_box"] = (coverage in ("box", "concealed") and
                                   det.dense and det.category in ("person", "manual"))
         result.append(copy)
