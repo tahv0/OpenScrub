@@ -47,7 +47,7 @@ DATAS = [
 HIDDEN = [
     "cheroot", "cheroot.wsgi", "cheroot.ssl", "cheroot.ssl.builtin",
     "openscrub_update", "openscrub_setup", "openscrub_vault", "zones_ui",
-    "learning_candidates", "plate_verifier",
+    "learning_candidates", "plate_verifier", "plate_boundaries",
     "confirmed_findings", "finding_previews", "findings_training",
     "findings_web", "findings_ui", "review_similarity_ui", "plate_text_hints", "plate_text_web",
 ] + _ort_hidden
