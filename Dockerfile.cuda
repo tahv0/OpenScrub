@@ -32,7 +32,13 @@
 
 # CUDA-enabled OpenCV base (built by .github/workflows/opencv-cuda-base.yml).
 # Bump this tag only when that base image is rebuilt.
-FROM ghcr.io/austinmabry/opencv-cuda:4.10.0-cu126
+# Default: build the dependency stage as usual (e.g. public release CI).
+# Windows fast builds may instead FROM a tagged local image containing all
+# Python/CUDA dependencies and the optional training virtualenv. Unlike an
+# evictable BuildKit cache, that tagged image survives builder cache GC.
+ARG OPENSCRUB_CUDA_DEPS_IMAGE=cuda_deps
+
+FROM ghcr.io/austinmabry/opencv-cuda:4.10.0-cu126 AS cuda_deps
 
 ENV DEBIAN_FRONTEND=noninteractive \
     NVIDIA_VISIBLE_DEVICES=all \
@@ -154,6 +160,17 @@ RUN --mount=type=cache,id=openscrub-pip-cuda,target=/root/.cache/pip,sharing=loc
 # first use.)
 COPY docker/prefetch_models.py ./
 RUN python prefetch_models.py yunet sface vittrack ppdet plate_t640
+
+# This label is stored on the *tagged dependency image* by the optional
+# Windows build script. It is only metadata, so changing the fingerprint
+# doesn't force a PyTorch reinstall unless an actual dependency changed.
+ARG OPENSCRUB_DEPS_FINGERPRINT=unmanaged
+LABEL org.openscrub.cuda.deps-fingerprint="${OPENSCRUB_DEPS_FINGERPRINT}"
+
+# Release/normal builds inherit the stage above; local Windows builds can
+# select a stable tagged image via OPENSCRUB_CUDA_DEPS_IMAGE. Both paths use
+# the exact same app COPY/install and security-refresh instructions.
+FROM ${OPENSCRUB_CUDA_DEPS_IMAGE} AS app
 
 # ---- weekly security refresh: after large deps/models, BEFORE app code
 # CI varies SECURITY_REFRESH to install OS updates. Only this step and the
