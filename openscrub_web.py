@@ -2268,6 +2268,8 @@ def _prepare_review_card_previews(job, doc, cb):
 
     if result["stopped"] and not result["failed"]:
         result["failed"] = total - result["cached"] - result["generated"]
+    if not result["stopped"]:
+        cb.progress("thumbnails", total, total)
     elapsed = time.monotonic() - started
     result["ready"] = not result["stopped"] and result["failed"] == 0
     result["elapsed_seconds"] = round(elapsed, 2)
