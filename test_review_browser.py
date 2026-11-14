@@ -464,3 +464,47 @@ def test_sixty_rejections_keep_working_after_failed_save(review_server, monkeypa
         evidence.mkdir(parents=True,exist_ok=True)
         page.screenshot(path=str(evidence/('sixty-rejections-%d.png'%viewport[0])))
         browser.close()
+
+
+def test_plate_editor_requires_exact_source_frame_before_tracking_corners(review_server):
+    """Lazy cache preview stays fast; source-bound corner edit loads exact pixels on demand."""
+    sync_api=pytest.importorskip('playwright.sync_api')
+    url,report=review_server
+    doc=json.loads(report.read_text())
+    first=doc['detections'][0]
+    first['frame_index']=301
+    first['t_start']=first['t_end']=first['last_seen']=301/30
+    report.write_text(json.dumps(doc))
+    with sync_api.sync_playwright() as pw:
+        browser=browser_instance(pw)
+        page=browser.new_page(viewport={'width':1440,'height':1000})
+        page.set_default_timeout(15000)
+        errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
+        load_browser_page(page,url,[],[])
+        page.get_by_role('link',name='Synthetic review fixture',exact=True).click()
+        card=page.locator('#det0')
+        card.scroll_into_view_if_needed()
+        page.wait_for_function('''() => {
+          const img=document.querySelector('#det0 img');
+          return !!img?._plateMeta && img._plateMeta.match==='representative';
+        }''')
+        assert 'Load the exact frame' in card.locator('.source-frame-note').inner_text()
+        assert page.evaluate('document.querySelector("#det0 img")._previewUnsafeGeometry') is True
+        before=json.loads(report.read_text())['detections'][0].get('plate_quad')
+        assert not before
+        exact=card.get_by_role('button',name='Load exact frame for corners',exact=True)
+        exact.click()
+        page.wait_for_function('''() => {
+          const img=document.querySelector('#det0 img');
+          return img?._plateMeta?.frame===301 && !img._previewUnsafeGeometry;
+        }''',timeout=30000)
+        assert exact.is_hidden()
+        assert page.evaluate('PLATE_EDITS.get(0).meta.frame') == 301
+        assert page.evaluate('PLATE_EDITS.get(0).points') == page.evaluate('PLATE_EDITS.get(0).meta.points')
+        drag_corner(page,card)
+        page.wait_for_function('''() => {
+          const s=PLATE_EDITS.get(0);return !!s && !s.dirty && s.version>0;
+        }''',timeout=30000)
+        assert web._load_job_report(web.JOBS['inline-fixture'])['detections'][0]['plate_boundary_source']=='human_corners'
+        assert not errors,errors
+        browser.close()
