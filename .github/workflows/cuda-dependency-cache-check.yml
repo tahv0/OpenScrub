@@ -8,6 +8,7 @@ on:
       - scripts/build-windows-cuda.ps1
       - docs/DOCKER_BUILD_CACHE.md
       - tests/test_cuda_dependency_image.py
+      - tests/test_windows_cuda_builder.ps1
   workflow_dispatch:
 
 jobs:
@@ -39,3 +40,6 @@ jobs:
             $errors | Format-List
             exit 1
           }
+      - name: Mock Docker Desktop context selection (no CUDA downloads)
+        shell: pwsh
+        run: ./tests/test_windows_cuda_builder.ps1
