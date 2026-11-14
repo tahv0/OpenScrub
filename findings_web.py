@@ -16,6 +16,7 @@ from werkzeug.exceptions import HTTPException
 
 import confirmed_findings as library
 import finding_previews as previews
+import plate_boundaries
 import findings_training as training
 import learning_session
 import stop_review
@@ -150,6 +151,8 @@ def preview(job, index, doc=None, cache_only=False, preferred_key=None,
     # Match the canonical report frame even when a legacy fractional timestamp
     # would be rounded differently by the generic cache's time-based lookup.
     cache_row = dict(row,frame_index=frame)
+    if row.get('category') == 'plate' and not plate_boundaries.trusted_plate_quad(row):
+        cache_row['plate_quad'] = []
     if preferred_key is not None:
         # An in-flight cache fill may add a newer exact sample, but must not
         # change the source JPEG of a human decision already being saved.
@@ -167,7 +170,7 @@ def preview(job, index, doc=None, cache_only=False, preferred_key=None,
     if cached is None and cache_only:
         return None
     box = list(map(float, video_learning._screen_box(row, rs, frame)))
-    q = row.get('plate_quad') or ((0., 0.), (1., 0.), (1., 1.), (0., 1.))
+    q = cache_row.get('plate_quad') or ((0., 0.), (1., 0.), (1., 1.), (0., 1.))
     points = [[box[0]+x*(box[2]-box[0]), box[1]+y*(box[3]-box[1])] for x,y in q]
     if cached is None:
         # Legacy jobs may need one bounded CPU decode. All subsequent thumbnail,
