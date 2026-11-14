@@ -314,6 +314,12 @@ def test_large_review_pages_keep_all_group_choices_and_sample_members(review_ser
         page.locator('#review').wait_for()
         mounted = page.locator('#review .det').count()
         assert 48 <= mounted < 530, 'Mount pages ahead, not the entire 530-card report'
+        # Additional cards should be mounted and queued while still far below
+        # the viewport, without the reviewer having to scroll to "Load more".
+        page.wait_for_function(
+            'document.querySelectorAll("#review .det").length > 48',
+            timeout=10000)
+        assert page.locator('#review .det').count() < 530
         assert page.evaluate('Object.keys(FINDING_META).length')==530
         assert page.evaluate('Object.keys(TRKMEM).length')==530
         page.get_by_role('button',name='Keep all visible',exact=True).first.click()
