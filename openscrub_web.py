@@ -5323,9 +5323,8 @@ async function loadReviewPreview(state,task,cacheOnly){
  }
 }
 function reviewPreviewRank(task){
- if(!task.img.isConnected)return Infinity;
- if(task.priority)return -1; // Explicit group review can fetch a collapsed member.
- if(task.img.closest?.("[hidden]"))return Infinity;  // an explicit Retry must not be silently dropped
+ if(!task.img.isConnected||task.img.closest?.("[hidden]"))return Infinity;
+ if(task.priority)return -1; // An explicit retry of a visible image gets priority.
  // Old non-layout harnesses / browsers without geometry retain FIFO behavior.
  if(!task.img.getBoundingClientRect)return 0;
  const r=task.img.getBoundingClientRect(),h=window.innerHeight||document.documentElement.clientHeight;
