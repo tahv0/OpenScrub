@@ -6660,8 +6660,11 @@ function confirmFinding(i,label){
      await (PLATE_SAVE||pumpPlateSaves());
      if(edit.dirty&&!edit.error)await new Promise(resolve=>setTimeout(resolve,100));
     }
-    if(edit.dirty||edit.error)
-     throw edit.archiveConflict?edit.error:Object.assign(new Error('Save or reload this area adjustment before confirming.'),{beforeWrite:true});
+    // Human classification is separate from a four-corner adjustment.
+    // If that save failed, still allow an explicit Is-a-plate decision
+    // using the authenticated displayed source sample, but NEVER include
+    // or acknowledge the unsaved draft polygon as archived geometry.
+    // A stale or changed picture is independently rejected by the API.
    }else if(PLATE_SAVE)await PLATE_SAVE;
    if(CUR!==job||JOBVIEW!==view)return;
    const displayed=edit?.meta||card?.querySelector('img[data-preview-url]')?._plateMeta;
@@ -6672,6 +6675,7 @@ function confirmFinding(i,label){
    if(displayed?.key)body.preview_key=displayed.key;
    if(label==='positive'&&edit?.archiveConflict)body.points=plateCopy(edit.points);
    const editVersion=edit?.version;
+   const areaStillUnsaved=label==='positive'&&!!edit?.dirty&&!edit.archiveConflict;
    const submit=()=>reviewRequest('api/jobs/'+job+'/confirm/'+i,{method:'POST',
     headers:{'Content-Type':'application/json'},body:JSON.stringify(body),timeoutMs:120000});
    let data;
@@ -6705,13 +6709,22 @@ function confirmFinding(i,label){
    }
    Object.assign(FINDING_META[i],{confirmed_finding_id:data.finding.id,confirmed_finding_revision:data.finding.revision});
    if(edit&&data.preview){
-    Object.assign(edit.meta,data.preview);edit.img._plateMeta=edit.meta;
-    edit.saved=plateCopy(edit.meta.points);syncPlateTrack(edit);
-    if(edit.version===editVersion&&!edit.drag){
-     edit.points=plateCopy(edit.saved);edit.pending=null;edit.dirty=false;
-     edit.error=null;edit.conflict=false;edit.archiveConflict=false;
+    if(areaStillUnsaved&&edit.dirty){
+     // The label was saved without the failed corner adjustment. Keep the
+     // original displayed image, coordinates, local error and retry control;
+     // replacing them with server metadata would falsely claim that the
+     // user's unsaved polygon was accepted.
+     edit.draw();
+     plateStatus(edit,'Plate classification saved · corner adjustment still not saved.',true);
+    }else{
+     Object.assign(edit.meta,data.preview);edit.img._plateMeta=edit.meta;
+     edit.saved=plateCopy(edit.meta.points);syncPlateTrack(edit);
+     if(edit.version===editVersion&&!edit.drag){
+      edit.points=plateCopy(edit.saved);edit.pending=null;edit.dirty=false;
+      edit.error=null;edit.conflict=false;edit.archiveConflict=false;
+     }
+     edit.draw();plateStatus(edit,edit.dirty?'Saving…':'Saved area · confirmation stored');
     }
-    edit.draw();plateStatus(edit,edit.dirty?'Saving…':'Saved area · confirmation stored');
    }
    CONFIRM_FAILED.delete(i);
    if(note)note.innerHTML=findingStatus(i);
