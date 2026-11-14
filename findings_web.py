@@ -383,14 +383,19 @@ def _journal_confirm(job, index, payload, doc):
         row['plate_quad'] = [[(x-box[0])/(box[2]-box[0]), (y-box[1])/(box[3]-box[1])]
                              for x,y in meta['points']]
         row['human_region_confirmed'] = True
-        fields['plate_quad'] = row['plate_quad']
+        row['plate_boundary_source'] = 'human_corners'
     # Archive evidence first. If the later small SQLite transaction fails,
     # retrying the same evidence is idempotent and no false saved ACK is sent.
     entry = _archived(job, doc, row, meta, jpeg, label, payload.get('expected_revision'))
     anchor = dict(confirmed_finding_id=entry['id'],
                   confirmed_finding_revision=entry['revision'])
     if payload.get('points') is not None:
-        anchor['human_region_confirmed'] = True
+        # Classification is group-wide; geometry belongs to this frame only.
+        anchor.update(human_region_confirmed=True,
+                      plate_quad=row['plate_quad'],
+                      plate_boundary_source='human_corners',
+                      poly=[], poly_holes=[], mask_pad=0,
+                      _remove_plate_verification=True)
     review_journal.write(job['dir'], row, index, fields, anchor)
     row.update(fields)
     row['confirmed_finding_id'] = entry['id']
@@ -436,23 +441,26 @@ def _journal_region(job, index, payload, doc):
             and confirmed.get('label') in ('positive','negative')
             and not confirmed.get('propagated')):
         archive = _archived(job, doc, row, meta, jpeg, confirmed['label'])
-    anchor = dict(human_region_confirmed=True)
+    anchor = dict(human_region_confirmed=True, plate_quad=quad,
+                  plate_boundary_source='human_corners',
+                  poly=[], poly_holes=[], mask_pad=0,
+                  plate_verification_override=True,
+                  _remove_plate_verification=True)
     if edit_id:
         anchor['compact_edit_receipt'] = dict(
             id=edit_id,source=meta['source_token'],token=payload.get('preview_token'))
     if archive:
         anchor.update(confirmed_finding_id=archive['id'],
                       confirmed_finding_revision=archive['revision'])
-    review_journal.write(job['dir'],row,index,dict(
-        plate_quad=quad, plate_verification_override=True,
-        _remove_plate_verification=True),anchor)
+    # Review decisions may propagate; narrow human corners must not.
+    review_journal.write(job['dir'],row,index,{},anchor)
     meta['preview_token'] = _token(doc,row,meta['frame'],meta.get('key'))
     elapsed = time.monotonic()-started
     if elapsed >= 3:
         _web.diagnostics.event('review_corner_save_slow',job,
             total_ms=round(elapsed*1000), report_write_ms=0,
             rows=_journal_members(doc,index), mode='sqlite_journal')
-    return dict(ok=True, applied=_journal_members(doc,index),
+    return dict(ok=True, applied=1,
                 verified_samples_added=0, finding=archive, preview=meta,
                 verified_label=row.get('verified_label',''),
                 classification_required=not bool(confirmed.get('label')),
@@ -505,8 +513,11 @@ def confirm(job, index, payload):
                                             source='explicit', propagated=i != index)
         if row['category'] == 'plate':
             member['verified_label'] = 'plate' if label == 'positive' else 'not_plate'
-            if payload.get('points') is not None:
-                member['plate_quad'] = row['plate_quad']
+            if payload.get('points') is not None and i == index:
+                member.update(plate_quad=row['plate_quad'],
+                              plate_boundary_source='human_corners',
+                              human_region_confirmed=True,
+                              poly=[], poly_holes=[], mask_pad=0)
     _guard_section(job, before, doc)
     # Archive first. A failed report write is retryable/idempotent; never tell
     # the UI the example is saved if its JPEG/metadata transaction failed.
@@ -571,11 +582,11 @@ def region(job, index, payload):
                     cleared_indices=receipt.get('cleared_indices') or [])
     if payload.get('preview_token') not in (None, meta['preview_token']):
         raise library.ConflictError('This finding changed. Reload its picture before saving.')
-    for _, member in members:
-        _web._human_plate_override(member)
-        member['plate_quad'] = quad
-        member.pop('compact_edit_receipt',None)
-    row['human_region_confirmed'] = True
+    # Other track frames may have a different rotation or perspective.
+    _web._human_plate_override(row)
+    row.update(plate_quad=quad, plate_boundary_source='human_corners',
+               human_region_confirmed=True, poly=[], poly_holes=[], mask_pad=0)
+    row.pop('compact_edit_receipt',None)
     meta['points'] = points
     cleared_indices = []
     if moved_identity:
@@ -630,7 +641,7 @@ def region(job, index, payload):
             report_write_ms=round((time.monotonic()-writing)*1000),
             rows=len(doc['detections']), report_mb=report_mb)
     meta['preview_token'] = _token(doc,row,meta['frame'],meta.get('key'))
-    return dict(ok=True, applied=len(members), verified_samples_added=0,
+    return dict(ok=True, applied=1, verified_samples_added=0,
                 finding=entry, preview=meta, verified_label=row.get('verified_label',''),
                 classification_required=moved_identity or not bool(confirmed.get('label')),
                 reconfirmation_required=moved_identity,
