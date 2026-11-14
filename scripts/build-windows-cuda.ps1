@@ -10,8 +10,6 @@ param(
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $depsImage = 'openscrub-cuda-deps:local'
-# Explicit image tag shared by direct Buildx and the Windows CUDA Compose overlay.
-$appImage = 'openscrub-windows-test-openscrub:local'
 $dockerfilePath = Join-Path $repoRoot 'Dockerfile.cuda'
 $oldBase = [Environment]::GetEnvironmentVariable('OPENSCRUB_CUDA_DEPS_IMAGE', 'Process')
 $oldTraining = [Environment]::GetEnvironmentVariable('OPENSCRUB_ENABLE_TRAINING', 'Process')
@@ -85,20 +83,14 @@ try {
         Write-Host "Using retained CUDA/PyTorch dependency image ($depsImage); no Python installs required."
     }
 
-    # Build the app with the SAME Buildx command that successfully built the
-    # dependency image. Compose build --builder can misroute Docker Desktop's
-    # built-in context builder even when buildx build --builder succeeds.
-    # Keep Compose only for starting the already-built, explicitly tagged app.
-    # The Dockerfile's "FROM" resolves the retained image directly, so no
-    # CUDA/PyTorch dependency stage runs on ordinary source-only rebuilds.
+    # Compose handles the app build successfully when its Docker context is
+    # selected explicitly. Do NOT pass --builder: Docker Desktop rejects its
+    # built-in desktop-linux builder when selected through Compose --builder.
+    # The retained deps image is already loaded into this Docker daemon.
     $env:OPENSCRUB_CUDA_DEPS_IMAGE = $depsImage
     $env:OPENSCRUB_ENABLE_TRAINING = '1'
     Write-Host "Building OpenScrub app from retained image '$depsImage'."
-    & docker --context $dockerContext buildx build --builder $builderName --progress plain --load `
-        --file Dockerfile.cuda --target app `
-        --build-arg "OPENSCRUB_CUDA_DEPS_IMAGE=$depsImage" `
-        --build-arg OPENSCRUB_ENABLE_TRAINING=1 `
-        --tag $appImage .
+    & docker --context $dockerContext compose --progress plain -f compose.windows-test.yml -f compose.windows-cuda.yml build
     if ($LASTEXITCODE -ne 0) {
         throw 'OpenScrub application build failed; the running container was not replaced.'
     }
