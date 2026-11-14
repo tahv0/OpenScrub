@@ -6380,7 +6380,8 @@ async function previewPlateFreeRange(){
    body:JSON.stringify({...values,preview_only:true}),timeoutMs:90000});
   plateRangeNotice(data.matched+' plate finding(s) eligible; '+data.protected+
    ' individually confirmed finding(s) preserved; '+data.crossing_boundary+
-   ' boundary-crossing legacy finding(s) need individual review.');
+   ' boundary-crossing legacy finding(s) need individual review; '+data.training_ineligible+
+   ' approximate-frame finding(s) cannot become training samples until rescanned with exact frame indexes.');
  }catch(error){plateRangeNotice(error.message,true);}
  finally{PLATE_RANGE_BUSY=false;}
 }
@@ -6417,7 +6418,8 @@ async function applyPlateFreeRange(undo=false){
    data.matched+' plate finding(s) marked Not a plate and Keep visible. '+
    (data.training?'Training negatives approved. ':'Training examples not added. ')+
    data.protected+' individually confirmed finding(s) preserved; '+
-   data.crossing_boundary+' boundary-crossing finding(s) need individual review.');
+   data.crossing_boundary+' boundary-crossing finding(s) need individual review. '+
+   data.training_ineligible+' approximate-frame finding(s) were excluded from training.');
  }catch(error){if(CUR===job&&JOBVIEW===view)plateRangeNotice(error.message,true);}
  finally{PLATE_RANGE_BUSY=false;}
 }
