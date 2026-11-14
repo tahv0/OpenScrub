@@ -176,6 +176,8 @@ def patch_row(row, index, groups, anchors):
             confirmation['propagated'] = index != source_index
             result['human_confirmation'] = confirmation
     if anchor:
+        if anchor.get('_remove_plate_verification'):
+            result.pop('plate_verification', None)
         result.update({field: value for field, value in anchor.items()
                        if not field.startswith('_')})
         if (group is None or index == group[0]) and 'human_confirmation' in result:
@@ -299,6 +301,13 @@ def write(directory, row, index, group_fields, anchor_fields=None):
                 'SELECT patch FROM groups WHERE kind=? AND category=? AND member=?',
                 group).fetchone()
             patch = json.loads(existing[0]) if existing else {}
+            if anchor_fields and 'plate_quad' in anchor_fields:
+                # Old review sessions may have stored a quadrilateral in the
+                # GROUP patch. A new source-frame edit must stop propagating
+                # that old narrow polygon to every track member.
+                patch.pop('plate_quad', None)
+                patch.pop('human_region_confirmed', None)
+                patch.pop('plate_boundary_source', None)
             patch.update(group_fields)
             if 'human_confirmation' in group_fields:
                 # Only the most recent explicit confirmation is the group's anchor.
