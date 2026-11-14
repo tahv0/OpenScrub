@@ -607,3 +607,47 @@ def test_confirmation_supplied_corners_do_not_become_track_wide_segmentation(fin
     assert not current[1].get('plate_quad')
     assert not current[1].get('human_region_confirmed')
     assert current[1]['verified_label'] == 'plate'
+
+
+def test_cached_neighbor_cannot_save_narrow_corners_until_exact_frame_loaded(findings_job):
+    """A frame-2 thumbnail cannot place a narrow polygon on frame 8."""
+    client, job, _, report = findings_job
+    doc = json.loads(report.read_text())
+    doc['detections'][1]['track'] = doc['detections'][0]['track']
+    report.write_text(json.dumps(doc))
+    base = f'/api/jobs/{job["id"]}/finding-preview'
+    first = client.get(base+'/0')
+    assert first.status_code == 200
+    original = json.loads(first.headers['X-Finding-Geometry'])
+    near = client.get(base+'/1?cache_only=1')
+    assert near.status_code == 200
+    borrowed = json.loads(near.headers['X-Finding-Geometry'])
+    assert borrowed['match'] == 'representative'
+    assert borrowed['frame'] == original['frame']
+    assert borrowed['requested_frame'] == doc['detections'][1]['frame_index']
+    assert borrowed['frame'] != borrowed['requested_frame']
+    corners = [list(pt) for pt in borrowed['points']]
+    corners[0][0] += 1
+    refused = client.post(f'/api/jobs/{job["id"]}/finding-region/1',json={
+        'points':corners,'preview_key':borrowed['key'],
+        'preview_token':borrowed['preview_token']})
+    assert refused.status_code == 409, refused.get_data(as_text=True)
+    assert 'exact source frame' in refused.get_json()['error']
+    assert not web._load_job_report(job)['detections'][1].get('plate_quad')
+    exact = client.get(base+'/1?exact=1')
+    assert exact.status_code == 200, exact.get_data(as_text=True)
+    own = json.loads(exact.headers['X-Finding-Geometry'])
+    assert own['frame'] == doc['detections'][1]['frame_index']
+    assert own['match'] == 'exact'
+    assert own['key'] != borrowed['key']
+    points = [list(pt) for pt in own['points']]
+    points[0][0] += 1
+    saved = client.post(f'/api/jobs/{job["id"]}/finding-region/1',json={
+        'points':points,'preview_key':own['key'],
+        'preview_token':own['preview_token']})
+    assert saved.status_code == 200, saved.get_data(as_text=True)
+    rows = web._load_job_report(job)['detections']
+    assert not rows[0].get('plate_quad')
+    assert rows[1]['plate_quad'] and rows[1]['plate_boundary_source']=='human_corners'
+    assert not rows[0].get('human_region_confirmed')
+    assert rows[1]['human_region_confirmed']
