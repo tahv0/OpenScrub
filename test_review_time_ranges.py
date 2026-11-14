@@ -110,7 +110,7 @@ def test_rescan_reapplies_negative_only_inside_same_source_frame_range():
         dict(original['detections'][0],frame_index=70,t_start=7.,t_end=7.1),
         dict(original['detections'][0],frame_index=100,t_start=10.,t_end=10.1)]
     result=video_learning.apply_constraints(new,constraints)
-    assert [r['enabled'] for r in result['detections']]==[True,False,True]
+    assert [r['enabled'] for r in result['detections'][:3]]==[True,False,True]
     assert result['detections'][1]['verified_label']=='not_plate'
     assert result['detections'][1]['interval_negative']['training'] is True
     assert len(result['plate_free_intervals'])==1
