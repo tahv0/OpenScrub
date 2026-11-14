@@ -6421,6 +6421,23 @@ async function loadReview(signal=null,phase=SHELLPH){
   <button type="button" class="sec" id="reviewSimilarToggle" onclick="toggleReviewSimilarity()">Group similar pictures</button>
   <button type="button" id="reviewShowAll" class="sec" hidden onclick="reviewAllFindings()">Show all findings</button>
  </div>
+ <details id="plateFreeRangePanel" style="margin-bottom:12px">
+  <summary>Mark a video time range as containing no licence plates</summary>
+  <p class="review-copy">If you know this stretch contains no plates, mark only its plate findings as Not a plate and keep them visible in the output. Findings outside the interval and individually confirmed examples are preserved. A group can contain both marked and unmarked frames.</p>
+  <div class="row" style="gap:8px;align-items:end">
+   <label>From (MM:SS or HH:MM:SS)<input id="plateFreeFrom" type="text" placeholder="02:00" style="max-width:140px"></label>
+   <label>To (MM:SS or HH:MM:SS)<input id="plateFreeTo" type="text" placeholder="12:00" style="max-width:140px"></label>
+  </div>
+  <label style="display:block;margin:10px 0"><input id="plateFreeTrain" type="checkbox"> Use these negatives as trusted examples when training &amp; rescanning this video</label>
+  <p class="review-copy">Training selects representative examples from this section instead of saving a separate large image for every detected frame. Check this only if you are certain the interval has no real plates.</p>
+  <div class="row">
+   <button type="button" class="sec" onclick="previewPlateFreeRange()">Check affected findings</button>
+   <button type="button" onclick="applyPlateFreeRange()">Mark interval Not a plate</button>
+   <button type="button" class="sec" onclick="applyPlateFreeRange(true)">Undo last interval</button>
+  </div>
+  <p id="plateFreeRangeStatus" class="review-copy" role="status" aria-live="polite">${(d.plate_free_intervals||[]).length} previous plate-free interval(s). ${d.plate_free_range_can_undo?'Last interval can be undone.':'No interval action available to undo.'}</p>
+  <p class="review-copy">Only plate detections are changed. Unindexed detections crossing a boundary are left for manual review rather than being changed outside the chosen range.</p>
+ </details>
  <details id="knownPlateSearch" style="margin-bottom:12px"><summary>Find examples using known plate numbers</summary>
   <p class="review-copy">Optional local OCR search. Enter the number(s) you expect, one per line. Full matches count more strongly than fragments. It tries rotated, upside-down, mirrored and perspective-corrected views, then adds possible matches to review. Confirm examples before training.</p>
   <label for="knownPlateTexts">Known plate numbers</label><textarea id="knownPlateTexts" rows="2" maxlength="400" placeholder="ABC-123" autocomplete="off" spellcheck="false" style="width:100%;box-sizing:border-box"></textarea>
@@ -6511,6 +6528,7 @@ async function loadReview(signal=null,phase=SHELLPH){
    rep.t_start=members[0].t_start;
    rep.t_end=members[members.length-1].t_end;
    rep.frames=members.length;
+   rep.rangeNegativeCount=members.filter(m=>m.human_confirmation?.source==='time_range').length;
    rep.fallbacks=[...new Set(members.map(m=>m.fallback_reason).filter(Boolean))];
    rep.fallbackCount=members.filter(m=>m.fallback_reason).length;
    rep.human_region_confirmed=members.some(m=>m.human_region_confirmed);
@@ -6545,7 +6563,7 @@ async function loadReview(signal=null,phase=SHELLPH){
     <small class="preview-status" role="status">Preview not loaded</small>
     <button class="sec preview-retry" hidden onclick="retryReviewPreview(this)">Retry preview</button>
     ${x.category==="plate"?'<small class="quad-status" role="status" title="Corners apply to this detected track. Review changing perspective. Keyboard: select corner 1–4, use arrows; Ctrl+Z undoes.">Corners autosave to track</small><button type="button" class="sec quad-retry" hidden>Retry save</button>':""}
-    <div>${plateVerificationBadge(x)}${x.learning_conflict?'<span class="badge" title="The original coverage was retained where the learned model could not make a reliable refinement">Model disagreement — review</span> ':""}${plateFallbackText(x)?`<span class="badge" style="white-space:normal">${plateFallbackText(x)}</span> `:""}${x.shaped?'<span class="badge" title="Thumbnail rectangle is a selection guide; open to inspect the mask and any exclusions">shaped mask</span> ':""}${x.personcard?`<b>Person ${x.person+1}</b> — one decision for ALL their appearances`:`"${sectionEscape(x.text)}"`}${x.frames?` <span class="badge">×${x.frames} frames</span>`:""}${x.confidence?` <span class="badge" title="detector confidence — not a human decision">${Math.round(x.confidence*100)}%</span>`:""} <br>${x.t_start.toFixed(1)}–${x.t_end.toFixed(1)}s</div>
+    <div>${plateVerificationBadge(x)}${x.learning_conflict?'<span class="badge" title="The original coverage was retained where the learned model could not make a reliable refinement">Model disagreement — review</span> ':""}${plateFallbackText(x)?`<span class="badge" style="white-space:normal">${plateFallbackText(x)}</span> `:""}${x.shaped?'<span class="badge" title="Thumbnail rectangle is a selection guide; open to inspect the mask and any exclusions">shaped mask</span> ':""}${x.personcard?`<b>Person ${x.person+1}</b> — one decision for ALL their appearances`:`"${sectionEscape(x.text)}"`}${x.frames?` <span class="badge">×${x.frames} frames</span>`:""}${x.rangeNegativeCount?` <span class="badge" title="Applies only to these sightings, not necessarily the whole track">${x.rangeNegativeCount}/${x.frames} interval negatives</span>`:""}${x.confidence?` <span class="badge" title="detector confidence — not a human decision">${Math.round(x.confidence*100)}%</span>`:""} <br>${x.t_start.toFixed(1)}–${x.t_end.toFixed(1)}s</div>
     ${plateTextBadge(x)}
     <div class="review-similar-slot" id="similar${x.i}"></div>
     <div class="finding-confirm" role="group" aria-label="Human classification">
