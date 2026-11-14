@@ -356,8 +356,15 @@ def session_feedback(job, doc, store, group_for):
     """
     import confirmed_findings
     rows = doc['detections']
+    # A human-adjusted region by itself is NOT an archive confirmation,
+    # but the legacy plate editor has a separate verified-sample manifest and
+    # sets verified_label=plate. Only exclude an unclassified region draft here:
+    # confirmed/archive-backed rows are managed below via immutable revisions.
+    # Otherwise those legacy *saved* positives silently disappear from
+    # Train & rescan after an editor marks its source-bound corners as human.
     managed = {i for i,r in enumerate(rows) if r.get('confirmed_finding_id')
-               or r.get('human_confirmation') or r.get('human_region_confirmed')}
+               or r.get('human_confirmation')
+               or (r.get('human_region_confirmed') and not r.get('verified_label'))}
     seeds = {r['confirmed_finding_id']: (i,r) for i,r in enumerate(rows)
              if r.get('confirmed_finding_id')
              and not (r.get('human_confirmation') or {}).get('propagated')}
