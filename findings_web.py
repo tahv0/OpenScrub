@@ -397,6 +397,7 @@ def _journal_confirm(job, index, payload, doc):
                              for x,y in meta['points']]
         row['human_region_confirmed'] = True
         row['plate_boundary_source'] = 'human_corners'
+        row['plate_quad_frame'] = (int(meta['frame']) if int(row.get('frame_index', -1)) < 0 else -1)
     # Archive evidence first. If the later small SQLite transaction fails,
     # retrying the same evidence is idempotent and no false saved ACK is sent.
     entry = _archived(job, doc, row, meta, jpeg, label, payload.get('expected_revision'))
@@ -406,6 +407,7 @@ def _journal_confirm(job, index, payload, doc):
         # Classification is group-wide; geometry belongs to this frame only.
         anchor.update(human_region_confirmed=True,
                       plate_quad=row['plate_quad'],
+                      plate_quad_frame=row['plate_quad_frame'],
                       plate_boundary_source='human_corners',
                       poly=[], poly_holes=[], mask_pad=0,
                       _remove_plate_verification=True)
@@ -449,6 +451,7 @@ def _journal_region(job, index, payload, doc):
     confirmed = row.get('human_confirmation') or {}
     row['plate_quad'] = quad
     row['human_region_confirmed'] = True
+    row['plate_quad_frame'] = (int(meta['frame']) if int(row.get('frame_index', -1)) < 0 else -1)
     meta['points'] = points
     archive = None
     if (row.get('confirmed_finding_id')
@@ -456,6 +459,7 @@ def _journal_region(job, index, payload, doc):
             and not confirmed.get('propagated')):
         archive = _archived(job, doc, row, meta, jpeg, confirmed['label'])
     anchor = dict(human_region_confirmed=True, plate_quad=quad,
+                  plate_quad_frame=row['plate_quad_frame'],
                   plate_boundary_source='human_corners',
                   poly=[], poly_holes=[], mask_pad=0,
                   plate_verification_override=True,
@@ -520,6 +524,7 @@ def confirm(job, index, payload):
         row['plate_quad'] = [[(x-box[0])/(box[2]-box[0]),(y-box[1])/(box[3]-box[1])]
                              for x,y in meta['points']]
         row['human_region_confirmed'] = True
+        row['plate_quad_frame'] = (int(meta['frame']) if int(row.get('frame_index', -1)) < 0 else -1)
     for i, member in _members(doc, index):
         _web._human_plate_override(member)
         member['enabled'] = label == 'positive'
@@ -530,6 +535,7 @@ def confirm(job, index, payload):
             member['verified_label'] = 'plate' if label == 'positive' else 'not_plate'
             if payload.get('points') is not None and i == index:
                 member.update(plate_quad=row['plate_quad'],
+                              plate_quad_frame=row['plate_quad_frame'],
                               plate_boundary_source='human_corners',
                               human_region_confirmed=True,
                               poly=[], poly_holes=[], mask_pad=0)
@@ -601,6 +607,7 @@ def region(job, index, payload):
     # Other track frames may have a different rotation or perspective.
     _web._human_plate_override(row)
     row.update(plate_quad=quad, plate_boundary_source='human_corners',
+               plate_quad_frame=(int(meta['frame']) if int(row.get('frame_index', -1)) < 0 else -1),
                human_region_confirmed=True, poly=[], poly_holes=[], mask_pad=0)
     row.pop('compact_edit_receipt',None)
     meta['points'] = points
