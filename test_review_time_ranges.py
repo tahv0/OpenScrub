@@ -141,6 +141,26 @@ def test_training_collects_one_hardest_negative_per_time_bucket_and_undo_revokes
     assert not any(v.get('interval_negative_id') for v in after['samples'].values())
 
 
+def test_positive_correction_revokes_its_previous_range_negative_sample(tmp_path):
+    doc=document()
+    ranges.apply(doc,5,10,training=True)
+    folder=tmp_path/'job';folder.mkdir()
+    job={'dir':str(folder),'video':str(folder/'video.mp4'),
+         'cancel':threading.Event(),'learning':{'stage':'collecting'},'log':[]}
+    read=lambda frame:np.full((100,120,3),frame,dtype=np.uint8)
+    first=learning_session.collect_feedback(job,doc,read)
+    assert {sample['frame'] for sample in first['samples'].values()}=={90}
+    # The reviewer corrects the strongest interval false positive to a real
+    # plate. It cannot remain a trusted hard negative in the training corpus.
+    corrected=doc['detections'][2]
+    corrected.pop('interval_negative')
+    corrected['verified_label']='plate'
+    corrected['human_confirmation']={'label':'positive','source':'explicit'}
+    newer=learning_session.collect_feedback(job,doc,read)
+    assert all(sample['frame']!=90 for sample in newer['samples'].values())
+    assert {sample['frame'] for sample in newer['samples'].values()}=={50}
+
+
 def test_http_preview_classify_undo_persists_across_review_reopen(findings_job):
     client,job,_,report=findings_job
     endpoint='/api/jobs/'+job['id']+'/plate-free-range'
