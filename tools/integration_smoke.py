@@ -549,9 +549,11 @@ def verify(args):
                            page.locator("#qSave,#qClose,#qTrack,#qRotateRight,#plateQuadEditor").count() == 0 and
                            page.locator(".marq").count() == 0)
             updated = api.get(url + f"/api/jobs/{JOB_ID}/report").json()["detections"]
-            evidence.check("corner autosave applies to every detection on the track",
-                           all(d.get("plate_quad") == updated[0].get("plate_quad")
-                               for d in updated) and len(updated[0].get("plate_quad", [])) == 4)
+            evidence.check("corner autosave changes only the reviewed source-frame geometry",
+                           len(updated[0].get("plate_quad", [])) == 4 and
+                           updated[0].get("human_region_confirmed") is True and
+                           all(not d.get("plate_quad") for d in updated[1:]), (
+                           "A moving track must keep its own protective boxes"))
             evidence.check("unconfirmed corner adjustments do not create training labels or examples",
                            all(not d.get("verified_label") and not d.get("confirmed_finding_id")
                                for d in updated) and api.get(url + "/api/findings").json()["total"] == 0)
