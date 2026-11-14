@@ -57,6 +57,7 @@ import review_preview_index
 import review_journal
 import findings_web
 import findings_ui
+import review_similarity_ui
 import plate_text_web
 
 
@@ -5294,6 +5295,7 @@ async function loadReviewPreview(state,task,cacheOnly){
    const note=card.querySelector('[id^="vlabel"]');if(note)note.textContent=meta.classification_note;
   }
   if(status)status.textContent="";
+  reviewSimilarFingerprint(img);
   ok=true;img._previewLoaded=true;
   state.loadedImages.add(img);
   updateReviewPreloadStatus(state);
@@ -6084,7 +6086,7 @@ function applyReviewGroupFilter(){
  }
  // Keep existing images/editors and autosaves alive. Drop hidden queued images
  // without aborting unrelated requests or decoding every preview again.
- if(REVIEW_MEDIA)pumpReviewPreviews(REVIEW_MEDIA);
+ reviewSimilarRender();
  return true;
 }
 function reviewUncertain(){
@@ -6277,7 +6279,7 @@ async function loadReview(signal=null,phase=SHELLPH){
  await CONFIRM_CHAIN;
  if(!current()||CONFIRM_FAILED.size||!await flushPlateSaves()||!current())return false;
  if(!closePlateQuad())return false;
- clearReviewPreviews();
+ clearReviewPreviews();reviewSimilarReset();
  REVIEW_PENDING_PAGES={};REVIEW_CATEGORY_GROUPS={};
  if(!await showPanel("review")||!current())return false;
  if(VLBLJOB!==CUR){VLBL={};VLBLJOB=CUR;}
@@ -6321,6 +6323,7 @@ async function loadReview(signal=null,phase=SHELLPH){
  <div class="row" style="margin-bottom:10px">
   <button type="button" onclick="trainAndRescan()">Train &amp; rescan this video</button>
   <button type="button" class="sec" onclick="reviewUncertain()">Review 10% of plate groups</button>
+  <button type="button" class="sec" id="reviewSimilarToggle" onclick="toggleReviewSimilarity()">Group similar pictures</button>
   <button type="button" id="reviewShowAll" class="sec" hidden onclick="reviewAllFindings()">Show all findings</button>
  </div>
  <details id="knownPlateSearch" style="margin-bottom:12px"><summary>Find examples using known plate numbers</summary>
@@ -6356,6 +6359,8 @@ async function loadReview(signal=null,phase=SHELLPH){
   <p id="saveLearnedModelStatus" class="review-copy" role="status" aria-live="polite">${acceptedMask||evaluated.length?"Choose the model to save. Secondary checkers default to review suggestions on new videos.":"Check a retained candidate above, or complete an accepted mask training pass, to save a reusable model."}</p>
  </details>
  <p id="reviewSampleSummary" class="review-copy" role="status" hidden></p>
+ <p id="reviewSimilarInfo" class="review-copy">Uses already loaded pictures · no rescan or automatic classification.</p>
+ <p id="reviewSimilarityStatus" class="review-copy" role="status" aria-live="polite"></p>
  <small id="reviewPreloadStatus" class="review-copy" role="status" aria-live="off">Preparing review pictures before you scroll…</small>
  <p id="reviewSaveStatus" class="review-copy review-save-status" role="status" aria-live="polite">Review choices loaded from disk.</p>
  <div id="plateSaveIssues" class="review-copy" role="status" aria-live="polite" hidden></div>
@@ -6447,6 +6452,7 @@ async function loadReview(signal=null,phase=SHELLPH){
     ${x.category==="plate"?'<small class="quad-status" role="status" title="Corners apply to this detected track. Review changing perspective. Keyboard: select corner 1–4, use arrows; Ctrl+Z undoes.">Corners autosave to track</small><button type="button" class="sec quad-retry" hidden>Retry save</button>':""}
     <div>${plateVerificationBadge(x)}${x.learning_conflict?'<span class="badge" title="The original coverage was retained where the learned model could not make a reliable refinement">Model disagreement — review</span> ':""}${plateFallbackText(x)?`<span class="badge" style="white-space:normal">${plateFallbackText(x)}</span> `:""}${x.shaped?'<span class="badge" title="Thumbnail rectangle is a selection guide; open to inspect the mask and any exclusions">shaped mask</span> ':""}${x.personcard?`<b>Person ${x.person+1}</b> — one decision for ALL their appearances`:`"${sectionEscape(x.text)}"`}${x.frames?` <span class="badge">×${x.frames} frames</span>`:""}${x.confidence?` <span class="badge" title="detector confidence — not a human decision">${Math.round(x.confidence*100)}%</span>`:""} <br>${x.t_start.toFixed(1)}–${x.t_end.toFixed(1)}s</div>
     ${plateTextBadge(x)}
+    <div class="review-similar-slot" id="similar${x.i}"></div>
     <div class="finding-confirm" role="group" aria-label="Human classification">
      <button class="sec" onclick="confirmFinding(${x.i},'positive')" aria-pressed="${reviewFindingLabel(x.i)==='positive'}">✓ Is ${findingNoun(x.i)}</button>
      <button class="sec" onclick="confirmFinding(${x.i},'negative')" aria-pressed="${reviewFindingLabel(x.i)==='negative'}">✕ Not ${findingNoun(x.i)}</button></div>
@@ -6488,6 +6494,7 @@ async function loadReview(signal=null,phase=SHELLPH){
   for(const key of Object.keys(REVIEW_DISPLAY_META))updateReviewOverlayLabel(Number(key));
  }
  initMarquee();initReviewPreviews();initReviewPages();
+ if(REVIEW_SIMILAR_ENABLED)reviewSimilarRender();
  return true;
 }
 
@@ -6615,6 +6622,7 @@ function confirmFinding(i,label){
    }
    CONFIRM_FAILED.delete(i);
    if(note)note.innerHTML=findingStatus(i);
+   if(REVIEW_SIMILAR_ENABLED)reviewSimilarRender();
    card?.querySelectorAll('.finding-confirm button').forEach((button,index)=>button.setAttribute('aria-pressed',index===(label==='positive'?0:1)));
    if(document.getElementById('beCv'))beRefresh();
   }catch(error){showFindingFailure(i,error);}
@@ -7178,7 +7186,7 @@ PAGE = (zones_ui.ZONES_PAGE
         .replace("%%JOBS_HTML%%", JOBS_HTML)
         .replace("%%SETTINGS_HTML%%", SETTINGS_HTML + findings_ui.HTML)
         .replace("%%FOOT_HTML%%", FOOT_HTML)
-        .replace("%%APP_JS%%", findings_ui.SCRIPT + APP_JS))
+        .replace("%%APP_JS%%", findings_ui.SCRIPT + APP_JS + review_similarity_ui.SCRIPT))
 
 
 ASSET_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
