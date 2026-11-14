@@ -17,6 +17,7 @@ function reviewSimilarReset(){
  REVIEW_SIMILAR_EXPANDED.clear();REVIEW_SIMILAR_LAYOUT="";REVIEW_SIMILAR_BUSY=false;
 }
 function reviewSimilarFingerprint(img){
+ if(!REVIEW_SIMILAR_ENABLED)return;
  const card=img?.closest?.(".det"),meta=img?._plateMeta;
  if(!card||card.dataset.cat!=="plate"||!img.naturalWidth||
     !meta||!Array.isArray(meta.box)||meta.box.length!==4)return;
@@ -177,10 +178,17 @@ function reviewSimilarRender(){
  if(REVIEW_MEDIA)pumpReviewPreviews(REVIEW_MEDIA);
 }
 function reviewSimilarExpand(root){
- if(!REVIEW_SIMILAR_GROUPS.has(root))return;
+ const members=REVIEW_SIMILAR_GROUPS.get(root);
+ if(!members)return;
  if(REVIEW_SIMILAR_EXPANDED.has(root))REVIEW_SIMILAR_EXPANDED.delete(root);
  else REVIEW_SIMILAR_EXPANDED.add(root);
  reviewSimilarRender();
+ // Collapsed members may have been excluded from preview prefetch. Opening
+ // the group must load those pictures automatically rather than add clicks.
+ if(REVIEW_SIMILAR_EXPANDED.has(root))for(const i of members){
+  const img=document.getElementById("thumb"+i);
+  if(img&&!img._previewLoaded)queueReviewPreview(img);
+ }
 }
 function toggleReviewSimilarity(){
  if(REVIEW_SIMILAR_BUSY)return;
