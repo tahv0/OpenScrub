@@ -188,9 +188,10 @@ const old={source_token:'jpeg-a',frame_source_token:'same-frame',
  preview_token:'token-a',key:'cache-a',frame:300,width:640,height:360,
  box:[180,120,420,220],crop:[100,40,490,280],
  points:[[180,120],[420,120],[420,220],[180,220]]};
-const newer={...old,source_token:'jpeg-b',key:'cache-b',crop:[110,50,480,280]};
+const newer={...old,source_token:'jpeg-b',key:'cache-b'};
 assert.equal(plateSamePreviewSource(old,newer),false);
 assert.equal(plateSameSourceFrame(old,newer),true);
+assert.equal(plateSameSourceFrame(old,{...newer,crop:[110,50,480,280]}),false);
 assert.equal(plateCornersInsideCrop(old.points,newer.crop),true);
 assert.equal(plateSameSourceFrame(old,{...newer,frame_source_token:'other-video'}),false);
 assert.equal(plateSameSourceFrame(old,{...newer,frame:301}),false);
