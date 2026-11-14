@@ -161,7 +161,8 @@ def test_filter_keeps_failed_corner_draft_and_loaded_image(review_server):
         page.wait_for_function('!!document.querySelector("#det1 img")._quadEdit')
         page.evaluate('''()=>{
          window.__originalFetch=window.fetch;window.__corner=document.querySelector('#det1 img')._quadEdit;
-         window.__image=document.querySelector('#det1 img');window.__src=__image.src;
+         window.__image=document.querySelector('#det1 img');
+         window.__shownMeta=JSON.parse(JSON.stringify(__image._plateMeta));
          window.fetch=(url,opts={})=>opts.method==='POST'&&String(url).includes('/plate_quad/')
           ?Promise.resolve(new Response(JSON.stringify({error:'synthetic conflict'}),{status:409,headers:{'Content-Type':'application/json'}}))
           :__originalFetch(url,opts);
@@ -175,7 +176,17 @@ def test_filter_keeps_failed_corner_draft_and_loaded_image(review_server):
         assert page.evaluate('PLATE_EDITS.get(1)===__corner && __corner.dirty && !!__corner.error')
         page.get_by_role('button',name='Show all findings',exact=True).click()
         assert plate_points(card)==points
-        assert page.evaluate('document.querySelector("#det1 img")===__image && __image.src===__src')
+        # 409 recovery may safely replace a disposable blob: URL while a
+        # filtered card is hidden. Preserve the *element*, the human edit,
+        # and authenticated frame/crop identity rather than the temporary URL.
+        assert page.evaluate('''()=>{
+         const img=document.querySelector("#det1 img");
+         return img===__image && img._quadEdit===__corner
+          && img.complete && img.naturalWidth>0 && !!img._plateMeta
+          && (plateSamePreviewSource(__shownMeta,img._plateMeta)
+              ||plateSameSourceFrame(__shownMeta,img._plateMeta))
+          && plateCornersInsideCrop(__corner.points,img._plateMeta.crop);
+        }''')
         assert page.evaluate('plateEditsPending()') is True
         assert 'Not saved' in card.locator('.quad-status').inner_text()
         assert not dialogs and not errors
