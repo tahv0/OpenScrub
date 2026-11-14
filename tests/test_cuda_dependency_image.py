@@ -56,13 +56,26 @@ class PersistentCudaDependencyImageTests(unittest.TestCase):
         self.assertNotIn('--builder default', script)
         self.assertIn('docker context show', script)
         self.assertIn('$builderName = $dockerContext', script)
-        self.assertIn('docker buildx inspect $builderName', script)
+        self.assertIn('docker --context $dockerContext buildx inspect $builderName', script)
         self.assertIn("'(?m)^Driver:\\s*docker\\s*$'", script)
-        self.assertIn('build --builder $builderName', script)
+        self.assertIn('buildx build --builder $builderName', script)
+        # CUDA dependencies are built with direct Buildx; the app must use
+        # the proven context-only Compose build without any --builder flag.
+        self.assertEqual(
+            script.count('docker --context $dockerContext buildx build --builder $builderName'),
+            1,
+        )
+        self.assertNotIn("--target app", script)
+        self.assertNotIn("--tag $appImage", script)
+        self.assertIn("docker --context $dockerContext compose --progress plain", script)
+        self.assertIn("compose.windows-cuda.yml build", script)
+        self.assertNotIn("compose.windows-cuda.yml build --builder", script)
+        self.assertIn("docker --context $dockerContext compose -f", script)
+        self.assertIn("up -d --no-build", script)
         self.assertIn('--builder $builderName --progress plain --load', script)
         self.assertIn('--load', script)
         self.assertIn('--build-arg OPENSCRUB_ENABLE_TRAINING=1', script)
-        self.assertIn('docker image inspect', script)
+        self.assertIn('docker --context $dockerContext image inspect', script)
         self.assertIn('org.openscrub.cuda.deps-fingerprint', script)
         self.assertIn('$existingFingerprint -ne $fingerprint', script)
         self.assertIn("dockerfile.Substring(0, $index)", script)
