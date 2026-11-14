@@ -6353,7 +6353,7 @@ async function checkPlateDetections(){
 let PLATE_RANGE_BUSY=false;
 function parsePlateRangeTime(value){
  const parts=String(value||'').trim().split(':');
- if(parts.length<2||parts.length>3||parts.some(x=>!/^\d+$/.test(x)))return NaN;
+ if(parts.length<2||parts.length>3||parts.some(x=>!/^[0-9]+$/.test(x)))return NaN;
  const numbers=parts.map(Number);
  if(numbers.some(x=>!Number.isSafeInteger(x))||numbers.at(-1)>59||(parts.length===3&&numbers.at(-2)>59))return NaN;
  return numbers.reduce((total,part)=>total*60+part,0);
