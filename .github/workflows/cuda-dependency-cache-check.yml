@@ -1,0 +1,29 @@
+name: CUDA dependency-stage cache contract
+
+on:
+  pull_request:
+    paths:
+      - Dockerfile.cuda
+      - compose.windows-cuda.yml
+      - scripts/build-windows-cuda.ps1
+      - docs/DOCKER_BUILD_CACHE.md
+      - tests/test_cuda_dependency_image.py
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - name: Validate CUDA Dockerfile without downloading PyTorch
+        run: |
+          set -euo pipefail
+          docker buildx build --call=targets -f Dockerfile.cuda . | tee /tmp/openscrub-cuda-targets
+          grep -q cuda_deps /tmp/openscrub-cuda-targets
+          grep -q app /tmp/openscrub-cuda-targets
+          docker buildx build --call=check -f Dockerfile.cuda .
+      - name: Verify persistent dependency-image invariants
+        run: python3 -m unittest discover -s tests -p test_cuda_dependency_image.py -v
