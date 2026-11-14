@@ -6350,6 +6350,77 @@ async function checkPlateDetections(){
  }catch(error){if(CUR===job&&JOBVIEW===view)note.textContent="Could not check detections: "+error.message;}
  finally{if(button.isConnected)button.disabled=false;}
 }
+let PLATE_RANGE_BUSY=false;
+function parsePlateRangeTime(value){
+ const parts=String(value||'').trim().split(':');
+ if(parts.length<2||parts.length>3||parts.some(x=>!/^\d+$/.test(x)))return NaN;
+ const numbers=parts.map(Number);
+ if(numbers.some(x=>!Number.isSafeInteger(x))||numbers.at(-1)>59||(parts.length===3&&numbers.at(-2)>59))return NaN;
+ return numbers.reduce((total,part)=>total*60+part,0);
+}
+function plateRangeValues(){
+ const start=parsePlateRangeTime(document.getElementById('plateFreeFrom')?.value);
+ const end=parsePlateRangeTime(document.getElementById('plateFreeTo')?.value);
+ if(!Number.isFinite(start)||!Number.isFinite(end)||start<0||end<=start||end>DUR+1e-6)
+  throw new Error('Enter valid start and end times within this scanned video (MM:SS or HH:MM:SS).');
+ return {start,end,training:!!document.getElementById('plateFreeTrain')?.checked};
+}
+function plateRangeNotice(message,failed=false){
+ const status=document.getElementById('plateFreeRangeStatus');
+ if(status){status.textContent=message;status.style.color=failed?'#fbbf24':'#94a3b8';}
+}
+async function previewPlateFreeRange(){
+ if(PLATE_RANGE_BUSY)return;
+ PLATE_RANGE_BUSY=true;
+ try{
+  const values=plateRangeValues();
+  plateRangeNotice('Checking exact source-frame boundaries…');
+  const {data}=await reviewRequest('api/jobs/'+CUR+'/plate-free-range',{
+   method:'POST',headers:{'Content-Type':'application/json'},
+   body:JSON.stringify({...values,preview_only:true}),timeoutMs:90000});
+  plateRangeNotice(data.matched+' plate finding(s) eligible; '+data.protected+
+   ' individually confirmed finding(s) preserved; '+data.crossing_boundary+
+   ' boundary-crossing legacy finding(s) need individual review.');
+ }catch(error){plateRangeNotice(error.message,true);}
+ finally{PLATE_RANGE_BUSY=false;}
+}
+async function applyPlateFreeRange(undo=false){
+ if(PLATE_RANGE_BUSY)return;
+ let values;
+ try{if(!undo)values=plateRangeValues();}
+ catch(error){plateRangeNotice(error.message,true);return;}
+ const message=undo?'Undo the most recent plate-free interval? Newer edits to those findings will be protected.':
+  'Mark all eligible plate findings in this interval as Not a plate and Keep visible?'+
+  (values.training?' The interval will also supply explicitly approved negative training examples.':
+   ' These labels will NOT be used to create training examples.');
+ if(!confirm(message))return;
+ PLATE_RANGE_BUSY=true;
+ const job=CUR,view=JOBVIEW;
+ const from=document.getElementById('plateFreeFrom')?.value||'';
+ const to=document.getElementById('plateFreeTo')?.value||'';
+ try{
+  plateRangeNotice('Saving existing edits before updating the interval…');
+  if(!await saveAndRender(true))throw new Error('Save the pending review choices before marking this interval.');
+  if(CUR!==job||JOBVIEW!==view)return;
+  plateRangeNotice('Saving the interval decision…');
+  const {data}=await reviewRequest('api/jobs/'+job+'/plate-free-range',{
+   method:'POST',headers:{'Content-Type':'application/json'},
+   body:JSON.stringify(undo?{undo:true}:values),timeoutMs:120000});
+  if(CUR!==job||JOBVIEW!==view)return;
+  VLBL={};VLBLJOB=null;LEARNING_SELECTION=null;
+  const refreshed=await loadReview();
+  if(!refreshed)return;
+  document.getElementById('plateFreeFrom').value=from;
+  document.getElementById('plateFreeTo').value=to;
+  document.getElementById('plateFreeTrain').checked=!!values?.training;
+  plateRangeNotice(undo?data.undone+' finding(s) restored.':
+   data.matched+' plate finding(s) marked Not a plate and Keep visible. '+
+   (data.training?'Training negatives approved. ':'Training examples not added. ')+
+   data.protected+' individually confirmed finding(s) preserved; '+
+   data.crossing_boundary+' boundary-crossing finding(s) need individual review.');
+ }catch(error){if(CUR===job&&JOBVIEW===view)plateRangeNotice(error.message,true);}
+ finally{PLATE_RANGE_BUSY=false;}
+}
 function reviewChoiceDelta(){
  const base=REVIEW_BASE&&REVIEW_BASE.job===CUR?REVIEW_BASE:null;
  const enabled={},verified_labels={},output_choices={};
