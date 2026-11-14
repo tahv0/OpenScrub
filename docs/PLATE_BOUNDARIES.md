@@ -62,10 +62,19 @@ characters will leak from an unseen or poorly trained model. Automatic
 mask refinement must still pass human/held-out validation and be reviewed
 on real footage. When in doubt, retain the original full-plate box.
 
-Unlike per-frame segmentation, manually tracked regions carry only tracked
-bounding boxes away from the exact manually drawn source frame, because the
-existing template tracker predicts positions, *not* physical corner motion.
-These fallback rows remain enabled for redaction.
+Unlike per-frame segmentation, manually tracked regions retain their
+**continuous time-spanning** tracked bounding boxes, including between the
+sampled tracker positions. Only at the exact drawn source frame may they
+substitute the human quadrilateral; a distinct `plate_quad_frame` marker
+controls that use without restricting the tracked box's active time span.
+The existing tracker predicts box positions, *not* physical corner motion.
+All other covered frames remain enabled with the protective box.
+
+When reopening older jobs, a plate quadrilateral lacking trusted source
+provenance is treated as detector-box coverage, unless there is source-bound
+human confirmation or independently established learned geometry. This
+guards against old review code that duplicated the same narrow corners over
+multiple different frames in a track.
 
 ## Training feedback and model scores
 
