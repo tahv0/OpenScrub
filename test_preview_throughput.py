@@ -114,7 +114,7 @@ def test_review_prefetch_reads_offscreen_cache_before_any_observer_event():
     script = r'''
 const assert=require('node:assert/strict');
 const window={innerHeight:900};
-const cards=[100,1600,5000,14000,24000].map((top,id)=>({
+const cards=[100,1600,5000,14000,24000,26000,28000,30000,32000,34000,36000,38000].map((top,id)=>({
   id,top,isConnected:true,naturalWidth:0,
   dataset:{previewUrl:'/thumb/'+id},
   closest(selector){return null;},
@@ -135,10 +135,10 @@ loadReviewPreview=(state,task,cacheOnly)=>{
 initReviewPreviews();
 // No IntersectionObserver event was delivered, yet even the far cards
 // have been registered for automatic cache reads.
-assert.deepEqual(observed,[0,1,2,3,4]);
-assert.deepEqual(started.map(item=>item.id),[0,1,2]);
+assert.deepEqual(observed,Array.from({length:12},(_,i)=>i));
+assert.deepEqual(started.map(item=>item.id),[0,1,2,3,4,5,6,7]);
 REVIEW_MEDIA.cacheActive=0;pumpReviewPreviews(REVIEW_MEDIA);
-assert.deepEqual(started.map(item=>item.id),[0,1,2,3,4]);
+assert.deepEqual(started.map(item=>item.id),Array.from({length:12},(_,i)=>i));
 const near={img:cards[0],resolve(){}},far={img:cards[4],resolve(){}};
 REVIEW_MEDIA.cacheActive=3;REVIEW_MEDIA.active=0;
 REVIEW_MEDIA.queue=[far,near];
