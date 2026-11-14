@@ -26,6 +26,8 @@ let changed=0;function markReviewChanged(){changed++}function sectionEscape(s){r
 function discardRejectedCorners(){}function plateUnloadGuard(){};
 const plateCopy=points=>points.map(p=>p.slice());
 function syncPlateTrack(){}function plateStatus(){}function schedulePlateSaves(){};
+// Group summary is exercised separately; isolated choice tests omit the full Review UI.
+function updatePlateGroupSummary(){};
 ''' + between('function reviewChoiceDelta(){','async function loadReview(') + between('function detChoices(i){','function setAll(')
     result = subprocess.run([shutil.which('node') or 'node','-e',source+'\n'+body],capture_output=True,text=True,timeout=10)
     assert result.returncode == 0, result.stderr
