@@ -102,6 +102,88 @@ console.log('visible work overtakes offscreen backlog');
     assert result.returncode == 0,result.stdout+result.stderr
 
 
+
+def test_review_prefetch_reads_offscreen_cache_before_any_observer_event():
+    """Opening Review should warm even cards far beyond the scroll threshold.
+
+    Cache JPEG reads run ahead of the user, but cold source-video decoding
+    must remain bounded to the next few screens and hidden cards stay idle.
+    """
+    source = web.APP_JS
+    helpers = source[source.index('let REVIEW_MEDIA=null;'):source.index('let QEDIT=null;')]
+    script = r'''
+const assert=require('node:assert/strict');
+const window={innerHeight:900};
+const cards=[100,1600,5000,14000,24000].map((top,id)=>({
+  id,top,isConnected:true,naturalWidth:0,
+  dataset:{previewUrl:'/thumb/'+id},
+  closest(selector){return null;},
+  getBoundingClientRect(){return {top:this.top,bottom:this.top+180}}
+}));
+const document={documentElement:{clientHeight:900},querySelectorAll(){return cards}};
+let observed=[],started=[];
+global.IntersectionObserver=class{
+  constructor(callback){this.callback=callback;}
+  observe(img){observed.push(img.id);}
+  disconnect(){}
+};
+''' + helpers + r'''
+loadReviewPreview=(state,task,cacheOnly)=>{
+  state[cacheOnly?'cacheActive':'active']++;
+  started.push({id:task.img.id,cacheOnly});
+};
+initReviewPreviews();
+// No IntersectionObserver event was delivered, yet even the far cards
+// have been registered for automatic cache reads.
+assert.deepEqual(observed,[0,1,2,3,4]);
+assert.deepEqual(started.map(item=>item.id),[0,1,2]);
+REVIEW_MEDIA.cacheActive=0;pumpReviewPreviews(REVIEW_MEDIA);
+assert.deepEqual(started.map(item=>item.id),[0,1,2,3,4]);
+const near={img:cards[0],resolve(){}},far={img:cards[4],resolve(){}};
+REVIEW_MEDIA.cacheActive=3;REVIEW_MEDIA.active=0;
+REVIEW_MEDIA.queue=[far,near];
+pumpReviewPreviews(REVIEW_MEDIA);
+assert.equal(started.at(-1).id,0,'visible cold miss must outrank speculative work');
+assert.equal(started.at(-1).cacheOnly,false);
+assert.equal(REVIEW_MEDIA.queue.length,1,'far-ahead cold decode was not deferred');
+assert.equal(REVIEW_MEDIA.queue[0],far);
+clearReviewPreviews();
+'''
+    result = subprocess.run(['node', '-e', script], capture_output=True,
+                            text=True, timeout=10)
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+@pytest.mark.timeout(75)
+def test_offscreen_review_jpeg_is_ready_before_user_scrolls(review_server):
+    """Real browser: cached images several screens below are downloaded early."""
+    from test_review_browser import browser_instance, load_browser_page
+
+    url, _ = review_server
+    sync_api = pytest.importorskip('playwright.sync_api')
+    with sync_api.sync_playwright() as pw:
+        browser = browser_instance(pw)
+        page = browser.new_page(viewport={'width':1440, 'height':1000})
+        page.set_default_timeout(20000)
+        errors = []
+        page.on('pageerror', lambda e: errors.append(str(e)))
+        load_browser_page(page, url, [], [])
+        page.get_by_role('link', name='Synthetic review fixture', exact=True).click()
+        page.locator('#review').wait_for()
+        # Do not scroll this card into view. The old IntersectionObserver-only
+        # implementation would never fetch it until the user moved down.
+        offscreen = page.locator('#det30 img')
+        distance = offscreen.evaluate(
+            '(img)=>img.getBoundingClientRect().top - window.innerHeight')
+        assert distance > 1600, 'The test card must be outside the old preload margin'
+        page.wait_for_function(
+            'document.querySelector("#det30 img").naturalWidth > 0',
+            timeout=25000)
+        assert 'pictures ready' in page.locator('#reviewPreloadStatus').inner_text()
+        assert not errors, errors
+        browser.close()
+
+
 def test_parallel_cache_misses_parse_only_one_report(plate_job, monkeypatch):
     import time
     from concurrent.futures import ThreadPoolExecutor
@@ -230,7 +312,14 @@ def test_large_review_pages_keep_all_group_choices_and_sample_members(review_ser
         load_browser_page(page,url,[],[])
         page.get_by_role('link',name='Synthetic review fixture',exact=True).click()
         page.locator('#review').wait_for()
-        assert page.locator('#review .det').count()==48
+        mounted = page.locator('#review .det').count()
+        assert 48 <= mounted < 530, 'Mount pages ahead, not the entire 530-card report'
+        # Additional cards should be mounted and queued while still far below
+        # the viewport, without the reviewer having to scroll to "Load more".
+        page.wait_for_function(
+            'document.querySelectorAll("#review .det").length > 48',
+            timeout=10000)
+        assert page.locator('#review .det').count() < 530
         assert page.evaluate('Object.keys(FINDING_META).length')==530
         assert page.evaluate('Object.keys(TRKMEM).length')==530
         page.get_by_role('button',name='Keep all visible',exact=True).first.click()

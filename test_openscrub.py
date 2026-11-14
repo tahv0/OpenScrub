@@ -4147,7 +4147,7 @@ def test_indexed_review_pointer_edits_wait_for_matched_frame(tmp_path):
     if not shutil.which('node'):
         pytest.skip('node required for evaluated PAGE behavior')
     page=web.PAGE
-    script=page[page.index('async function beScrub(){'):page.index('// Only visible finding previews')]
+    script=page[page.index('async function beScrub(){'):page.index('let REVIEW_MEDIA=null;')]
     harness=r'''
 const assert=require('assert');let handlers={},captures=0,prompts=0,tracks=0,queue=[];
 const ctx={clearRect(){},fillRect(){},strokeRect(){},beginPath(){},moveTo(){},lineTo(){},closePath(){},fill(){},stroke(){},setLineDash(){}};
