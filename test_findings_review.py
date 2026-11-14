@@ -388,3 +388,48 @@ async function reviewRequest(url,options){
  assert.equal(edit.drawn,true);
 })().catch(error=>{console.error(error);process.exitCode=1});
 ''')
+
+
+def test_stale_confirmation_rebinds_dirty_editor_without_transferring_its_corners():
+    """Refreshing a changed source must end the old preview-key retry loop."""
+    if not shutil.which('node'):
+        pytest.skip('Node required for source-bound browser recovery')
+    js = web.APP_JS
+    start = js.index('async function reloadStaleFindingForConfirmation(')
+    end = js.index('function confirmFinding(', start)
+    source = r'''
+const assert=require('node:assert/strict');
+const plateCopy=p=>p.map(row=>row.slice());
+let next=null,loads=0;
+function plateSamePreviewSource(a,b){return a.key===b.key&&JSON.stringify(a.crop)===JSON.stringify(b.crop)}
+function plateSameSourceFrame(){return false}
+function plateCornersInsideCrop(){return true}
+async function queueReviewPreview(img){loads++;img._plateMeta=next;return true}
+function plateStatus(edit,msg){edit.status=msg}
+''' + js[start:end] + r'''
+const shown={frame:300,key:'old',preview_token:'old-token',crop:[0,0,70,50],
+ points:[[10,10],[60,10],[60,40],[10,40]]};
+const draft=[[3,3],[65,3],[65,43],[3,43]];
+const img={_plateMeta:{...shown}};
+const edit={img,dirty:true,drag:null,meta:{...shown},
+ displayCrop:shown.crop.slice(),saved:plateCopy(shown.points),points:plateCopy(draft),
+ pending:{edit_id:'old'},error:new Error('Old preview could not be saved'),
+ draw(){this.drawn=true}};
+const card={querySelector(){return img}};
+(async()=>{
+ next={...shown,frame:301,key:'new',preview_token:'new-token',
+  crop:[0,0,80,55],points:[[12,12],[62,12],[62,42],[12,42]]};
+ const r=await reloadStaleFindingForConfirmation(card,edit,shown);
+ assert.equal(r.same,false);assert.equal(loads,1);
+ assert.equal(edit.meta.key,'new');assert.equal(edit.meta.preview_token,'new-token');
+ assert.deepEqual(edit.points,draft,'keep the unsaved human geometry only as a draft');
+ assert.deepEqual(edit.saved,next.points,'backend geometry is the new reset point');
+ assert.equal(edit.needsSourceReview,true);assert.equal(edit.pending,null);
+ assert.match(edit.status,/inspect before trying Is \/ Not again/);
+ assert.equal(edit.dirty,true);assert.equal(edit.drawn,true);
+ assert.equal(img._plateMeta.key,edit.meta.key);
+})().catch(error=>{console.error(error);process.exitCode=1});
+'''
+    result = subprocess.run([shutil.which('node'), '-e', source],
+                            capture_output=True, text=True, timeout=10)
+    assert result.returncode == 0, result.stdout + result.stderr
