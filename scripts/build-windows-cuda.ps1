@@ -10,6 +10,8 @@ param(
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $depsImage = 'openscrub-cuda-deps:local'
+# Explicit image tag shared by direct Buildx and the Windows CUDA Compose overlay.
+$appImage = 'openscrub-windows-test-openscrub:local'
 $dockerfilePath = Join-Path $repoRoot 'Dockerfile.cuda'
 $oldBase = [Environment]::GetEnvironmentVariable('OPENSCRUB_CUDA_DEPS_IMAGE', 'Process')
 $oldTraining = [Environment]::GetEnvironmentVariable('OPENSCRUB_ENABLE_TRAINING', 'Process')
@@ -48,7 +50,7 @@ try {
     }
     $dockerContext = $dockerContext.Trim()
     $builderName = $dockerContext
-    $builderInfo = (& docker buildx inspect $builderName 2>&1) -join "`n"
+    $builderInfo = (& docker --context $dockerContext buildx inspect $builderName 2>&1) -join "`n"
     if ($LASTEXITCODE -ne 0) {
         throw "No Buildx builder for Docker context '$dockerContext'. Check docker buildx ls."
     }
@@ -59,7 +61,7 @@ try {
 
     $existingFingerprint = $null
     try {
-        $imageJson = & docker image inspect $depsImage 2>$null
+        $imageJson = & docker --context $dockerContext image inspect $depsImage 2>$null
         if ($LASTEXITCODE -eq 0) {
             $imageInfo = @((($imageJson -join "`n") | ConvertFrom-Json))[0]
             $existingFingerprint = $imageInfo.Config.Labels.'org.openscrub.cuda.deps-fingerprint'
@@ -71,7 +73,7 @@ try {
     if ($ForceDependencies -or $existingFingerprint -ne $fingerprint) {
         Write-Host "Building retained CUDA/PyTorch dependency image ($depsImage)."
         Write-Host 'This expensive installation should only run once per dependency version.'
-        & docker buildx build --builder $builderName --progress plain --load `
+        & docker --context $dockerContext buildx build --builder $builderName --progress plain --load `
             --file Dockerfile.cuda --target cuda_deps `
             --build-arg OPENSCRUB_ENABLE_TRAINING=1 `
             --build-arg "OPENSCRUB_DEPS_FINGERPRINT=$fingerprint" `
@@ -83,16 +85,25 @@ try {
         Write-Host "Using retained CUDA/PyTorch dependency image ($depsImage); no Python installs required."
     }
 
-    # The same active-context docker-driver builder sees the tagged dependency
-    # image loaded into this daemon. Keep it for both build operations.
+    # Build the app with the SAME Buildx command that successfully built the
+    # dependency image. Compose build --builder can misroute Docker Desktop's
+    # built-in context builder even when buildx build --builder succeeds.
+    # Keep Compose only for starting the already-built, explicitly tagged app.
+    # The Dockerfile's "FROM" resolves the retained image directly, so no
+    # CUDA/PyTorch dependency stage runs on ordinary source-only rebuilds.
     $env:OPENSCRUB_CUDA_DEPS_IMAGE = $depsImage
     $env:OPENSCRUB_ENABLE_TRAINING = '1'
-    & docker compose --progress plain -f compose.windows-test.yml -f compose.windows-cuda.yml build --builder $builderName
+    Write-Host "Building OpenScrub app from retained image '$depsImage'."
+    & docker --context $dockerContext buildx build --builder $builderName --progress plain --load `
+        --file Dockerfile.cuda --target app `
+        --build-arg "OPENSCRUB_CUDA_DEPS_IMAGE=$depsImage" `
+        --build-arg OPENSCRUB_ENABLE_TRAINING=1 `
+        --tag $appImage .
     if ($LASTEXITCODE -ne 0) {
         throw 'OpenScrub application build failed; the running container was not replaced.'
     }
     if (-not $BuildOnly) {
-        & docker compose -f compose.windows-test.yml -f compose.windows-cuda.yml up -d --no-build
+        & docker --context $dockerContext compose -f compose.windows-test.yml -f compose.windows-cuda.yml up -d --no-build
         if ($LASTEXITCODE -ne 0) {
             throw 'OpenScrub image built, but Compose could not start the service.'
         }
