@@ -230,7 +230,8 @@ def test_large_review_pages_keep_all_group_choices_and_sample_members(review_ser
         load_browser_page(page,url,[],[])
         page.get_by_role('link',name='Synthetic review fixture',exact=True).click()
         page.locator('#review').wait_for()
-        assert page.locator('#review .det').count()==48
+        mounted = page.locator('#review .det').count()
+        assert 48 <= mounted < 530, 'Mount pages ahead, not the entire 530-card report'
         assert page.evaluate('Object.keys(FINDING_META).length')==530
         assert page.evaluate('Object.keys(TRKMEM).length')==530
         page.get_by_role('button',name='Keep all visible',exact=True).first.click()
