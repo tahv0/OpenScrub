@@ -40,6 +40,18 @@ jobs:
             $errors | Format-List
             exit 1
           }
+      - name: Parse Docker Desktop PowerShell mock test
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            'tests/test_windows_cuda_builder.ps1', [ref]$tokens, [ref]$errors
+          ) | Out-Null
+          if ($errors.Count) {
+            $errors | Format-List
+            exit 1
+          }
       - name: Mock Docker Desktop context selection (no CUDA downloads)
         shell: pwsh
         run: ./tests/test_windows_cuda_builder.ps1
