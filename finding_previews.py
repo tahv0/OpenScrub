@@ -162,6 +162,39 @@ def _group(row, content, frame_index, fps):
                   quantized, int(frame_index / fps / 10)])
 
 
+def review_representatives(detections):
+    """One initial thumbnail per card the Review UI actually displays.
+
+    The browser groups by category, then person id or final track id, keeping
+    the earliest sighting. Untracked and zone-excluded detections are separate
+    cards. Preparing arbitrary raw scan groups leaves those first cards cold.
+    Only source row indices are returned; this never changes classifications.
+    """
+    groups = {}
+    dropped = []
+    for index, value in enumerate(detections or []):
+        row = _row(value)
+        if row.get('zone_dropped'):
+            dropped.append(index)
+            continue
+        category = str(row.get('category', ''))
+        try:
+            person = int(row.get('person', -1))
+            track = int(row.get('track', -1))
+            start = float(row.get('t_start', 0))
+            if not math.isfinite(start):
+                start = float('inf')
+        except (ValueError, TypeError, OverflowError):
+            person, track, start = -1, -1, float('inf')
+        key = ((category, 'person', person) if person >= 0
+               else (category, 'track', track) if track >= 0
+               else (category, 'row', index))
+        current = groups.get(key)
+        if current is None or start < current[0]:
+            groups[key] = (start, index)
+    return dropped + [index for _, index in groups.values()]
+
+
 def _points(row, box):
     quad = row.get('plate_quad') or [[0, 0], [1, 0], [1, 1], [0, 1]]
     if len(quad) != 4:
