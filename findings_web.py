@@ -12,6 +12,7 @@ import time
 import cv2
 import numpy as np
 from flask import Response, abort, jsonify, request
+from werkzeug.exceptions import HTTPException
 
 import confirmed_findings as library
 import finding_previews as previews
@@ -42,6 +43,15 @@ def _guard(function):
             return jsonify(error=str(error),current_archive=getattr(error,'current_archive',None)), 409
         except review_journal.ConflictError as error:
             return jsonify(error=str(error)), 409
+        except HTTPException as error:
+            # A displayed JPEG can be evicted by bounded background prefetch.
+            # Return a machine-readable recovery hint so the browser may
+            # reload the JPEG without sacrificing the user's unsaved draft.
+            if error.code == 409 and error.description.startswith(
+                    'This displayed picture is no longer a valid cached sample.'):
+                return jsonify(error=error.description,
+                               conflict='stale_preview'), 409
+            raise
         except (KeyError, FileNotFoundError):
             return jsonify(error='This saved finding is no longer available.'), 404
         except ValueError as error:
@@ -186,6 +196,11 @@ def preview(job, index, doc=None, cache_only=False, preferred_key=None):
         meta['match'] = 'timestamp'
     source_row = dict(row, plate_quad=[])
     meta['source_token'] = _token(doc, source_row, shown_frame, sample_key)
+    # Separate the immutable *frame/box/timeline* binding from the mutable
+    # JPEG cache key. A picture may be evicted while a person adjusts corners;
+    # a newly fetched crop of the very SAME source frame may safely reuse
+    # those frame coordinates, but a changed frame or detection may not.
+    meta['frame_source_token'] = _token(doc, source_row, shown_frame, None)
     return doc, row, meta, jpeg
 
 
