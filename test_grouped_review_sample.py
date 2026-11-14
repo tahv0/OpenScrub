@@ -161,6 +161,23 @@ def test_pinned_representative_survives_new_exact_cache_sample(review_server):
 
 
 
+def test_source_frame_proof_distinguishes_legacy_null_video_hashes():
+    """No cross-video frame rebinding when old reports store a null source."""
+    import findings_web as fw
+
+    row = dict(category='plate', cbox=[180, 120, 420, 220], plate_quad=[])
+    document = dict(
+        compact_preview_source=None,
+        provenance=dict(input_sha256='source-video-a'),
+        render_state=dict(fps=30, cum=[[0, 0]]))
+    before = fw._token(document, row, 0, None)
+    assert fw._source_hash(document) == 'source-video-a'
+    document['provenance']['input_sha256'] = 'different-source-video-b'
+    assert fw._token(document, row, 0, None) != before
+    document['provenance'].clear()
+    assert fw._source_hash(document) is None
+
+
 def test_evicted_displayed_image_can_be_reloaded_and_saved_with_same_frame_binding(review_server):
     """A preloaded JPEG can be evicted before the human saves four corners.
 
