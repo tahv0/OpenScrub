@@ -177,6 +177,50 @@ const s={i:1,job:'job',meta,img:{},points:plateCopy(corners),saved:plateCopy(cor
     result=subprocess.run(['node','-e',script],capture_output=True,text=True,timeout=8)
     assert result.returncode==0,result.stdout+result.stderr
 
+def test_stale_displayed_picture_autoreloads_and_saves_corners(review_server, monkeypatch):
+    """A definite stale-picture 409 should not strand a correctable draft."""
+    from flask import jsonify, request
+
+    url, _ = review_server
+    original = web.app.view_functions['job_plate_quad']
+    attempts = []
+
+    def one_stale_jpeg(*args, **kwargs):
+        if request.method == 'POST' and request.get_json(silent=True,).get('compact'):
+            attempts.append(request.get_json())
+            if len(attempts) == 1:
+                return jsonify(error='This displayed picture is no longer a valid cached sample. '
+                                     'Reload its preview.', conflict='stale_preview'), 409
+        return original(*args, **kwargs)
+
+    monkeypatch.setitem(web.app.view_functions, 'job_plate_quad', one_stale_jpeg)
+    api = pytest.importorskip('playwright.sync_api')
+    with api.sync_playwright() as pw:
+        browser = browser_instance(pw)
+        page = browser.new_page(viewport={'width': 1440, 'height': 1000})
+        page.set_default_timeout(20000)
+        errors = []
+        page.on('pageerror', lambda e: errors.append(str(e)))
+        load_browser_page(page, url, [], [])
+        page.get_by_role('link', name='Synthetic review fixture', exact=True).click()
+        card = page.locator('#det0')
+        card.scroll_into_view_if_needed()
+        page.wait_for_function('!!document.querySelector("#det0 img")._quadEdit')
+        before = plate_points(card)
+        drag_corner(page, card, index=0, dx=9, dy=5)
+        page.wait_for_function(
+            'document.querySelector("#det0 .quad-status").textContent.startsWith("Saved area")',
+            timeout=20000)
+        assert plate_points(card) != before
+        assert len(attempts) == 2, 'The rejected picture should be reloaded and retried automatically'
+        assert attempts[0]['edit_id'] != attempts[1]['edit_id'], (
+            'A definite rejected request cannot reuse its stale write receipt')
+        assert attempts[0]['preview_key'] == attempts[1]['preview_key']
+        assert not errors, errors
+        assert web._load_job_report(web.JOBS['inline-fixture'])['detections'][0]['human_region_confirmed']
+        browser.close()
+
+
 @pytest.mark.parametrize('width',[1440,390])
 def test_hidden_failed_card_can_be_found_corrected_and_saved(review_server, monkeypatch, width, tmp_path):
     from flask import jsonify, request
