@@ -18,6 +18,13 @@ git pull --ff-only
 .\scripts\build-windows-cuda.ps1
 ```
 
+If Windows PowerShell reports that scripts are disabled by execution policy,
+run the checked-in script for this process only with:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-windows-cuda.ps1
+```
+
 The wrapper:
 
 1. Builds `openscrub-cuda-deps:local` **once** with CUDA runtime packages,
