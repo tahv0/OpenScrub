@@ -46,7 +46,6 @@ class PersistentCudaDependencyImageTests(unittest.TestCase):
             compose,
         )
         self.assertIn("capabilities: [gpu]", compose)
-        self.assertIn("image: openscrub-windows-test-openscrub:local", compose)
 
     def test_windows_script_retains_a_dependency_image_and_rebuilds_on_change(self):
         script = (ROOT / "scripts/build-windows-cuda.ps1").read_text(encoding="utf-8")
@@ -60,24 +59,23 @@ class PersistentCudaDependencyImageTests(unittest.TestCase):
         self.assertIn('docker --context $dockerContext buildx inspect $builderName', script)
         self.assertIn("'(?m)^Driver:\\s*docker\\s*$'", script)
         self.assertIn('buildx build --builder $builderName', script)
-        # The app is built by the same direct Buildx path as the dependencies.
-        # Passing --builder to Compose triggered the Docker Desktop context error.
+        # CUDA dependencies are built with direct Buildx; the app must use
+        # the proven context-only Compose build without any --builder flag.
         self.assertEqual(
             script.count('docker --context $dockerContext buildx build --builder $builderName'),
-            2,
+            1,
         )
-        self.assertIn("--target app", script)
-        self.assertIn("OPENSCRUB_CUDA_DEPS_IMAGE=$depsImage", script)
-        self.assertIn("--tag $appImage", script)
-        self.assertIn("'openscrub-windows-test-openscrub:local'", script)
-        self.assertNotIn("compose --progress plain", script)
-        self.assertNotIn("compose build --builder", script.replace("# Compose build --builder", ""))
-        self.assertIn("compose -f compose.windows-test.yml", script)
+        self.assertNotIn("--target app", script)
+        self.assertNotIn("--tag $appImage", script)
+        self.assertIn("docker --context $dockerContext compose --progress plain", script)
+        self.assertIn("compose.windows-cuda.yml build", script)
+        self.assertNotIn("compose.windows-cuda.yml build --builder", script)
+        self.assertIn("docker --context $dockerContext compose -f", script)
         self.assertIn("up -d --no-build", script)
         self.assertIn('--builder $builderName --progress plain --load', script)
         self.assertIn('--load', script)
         self.assertIn('--build-arg OPENSCRUB_ENABLE_TRAINING=1', script)
-        self.assertIn('docker image inspect', script)
+        self.assertIn('docker --context $dockerContext image inspect', script)
         self.assertIn('org.openscrub.cuda.deps-fingerprint', script)
         self.assertIn('$existingFingerprint -ne $fingerprint', script)
         self.assertIn("dockerfile.Substring(0, $index)", script)
