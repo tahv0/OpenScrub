@@ -9,10 +9,15 @@ services:
       # evict the much larger training=1 build cache.
       args:
         OPENSCRUB_ENABLE_TRAINING: "${OPENSCRUB_ENABLE_TRAINING:-1}"
-        # Default builds the Dockerfile's dependency stage normally.
-        # scripts/build-windows-cuda.ps1 selects a tagged local dependency
-        # image, which survives Docker Desktop's build-cache garbage collector.
-        OPENSCRUB_CUDA_DEPS_IMAGE: "${OPENSCRUB_CUDA_DEPS_IMAGE:-cuda_deps}"
+        # Use the RETAINED local dependency image by default on Windows.
+        # Formerly this fell back to "cuda_deps" on every new terminal, so
+        # a plain Compose build could silently run apt/pip/torch all over
+        # again (including ~700 MB cuDNN). First run the checked-in wrapper
+        # to create openscrub-cuda-deps:local; missing images fail instead
+        # of unexpectedly downloading the whole training environment.
+        # Official release builds use Dockerfile.cuda directly and are
+        # unaffected by this Windows-only Compose default.
+        OPENSCRUB_CUDA_DEPS_IMAGE: "${OPENSCRUB_CUDA_DEPS_IMAGE:-openscrub-cuda-deps:local}"
     deploy:
       resources:
         reservations:
