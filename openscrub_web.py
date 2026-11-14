@@ -4612,7 +4612,7 @@ function renderWorkProgress(j){
  const p=j.phase==="learning"?j.learning:j.activity;
  document.getElementById("prog").hidden=j.phase==="learning";
  if(!active||!p){box.textContent="";bar.hidden=true;return;}
- const labels={scan:"Scanning video",post:"Finalizing tracks",refine:"Applying learned masks",render:"Rendering video"};
+ const labels={scan:"Scanning video",post:"Finalizing tracks",refine:"Applying learned masks",thumbnails:"Preparing review thumbnails",render:"Rendering video"};
  const text=[p.message||labels[p.stage]||p.stage||"Working"];
  if(Number.isFinite(p.done)&&Number.isFinite(p.total)&&p.total>0){
   text.push(`${p.done.toLocaleString()} / ${p.total.toLocaleString()} ${p.unit||"items"}`);
