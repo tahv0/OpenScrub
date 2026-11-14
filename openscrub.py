@@ -738,7 +738,6 @@ class Detection:
                                # PERSON, applied to all their appearances
     verified_label: str = ""  # explicit 'plate' or 'not_plate' review, not a default
     plate_quad: tuple = ()    # four normalized plate corners, ordered clockwise
-    plate_quad_frame: int = -1 # optional source frame for narrow quad on a time-spanning track
     poly: tuple = ()           # silhouette contour(s) from a segmentation
                                # model, points NORMALIZED to cbox (0..1) —
                                # render blurs ONLY inside them (person
@@ -749,6 +748,7 @@ class Detection:
     owned_start_frame: int = -1  # half-open section ownership; -1 = unrestricted
     owned_end_frame: int = -1
     fallback_reason: str = ""  # additive narrow-plate diagnostic
+    plate_quad_frame: int = -1 # human quad valid only at this frame; never truncate track lifetime
 
 
 class PhiMemory:
