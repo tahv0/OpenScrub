@@ -51,7 +51,15 @@ class PersistentCudaDependencyImageTests(unittest.TestCase):
         script = (ROOT / "scripts/build-windows-cuda.ps1").read_text(encoding="utf-8")
         self.assertIn("'openscrub-cuda-deps:local'", script)
         self.assertIn('--target cuda_deps', script)
-        self.assertIn('--builder default', script)
+        # The builder must match Docker Desktop's active context (usually
+        # desktop-linux), NOT the hard-coded default context.
+        self.assertNotIn('--builder default', script)
+        self.assertIn('docker context show', script)
+        self.assertIn('$builderName = $dockerContext', script)
+        self.assertIn('docker buildx inspect $builderName', script)
+        self.assertIn("'(?m)^Driver:\\s*docker\\s*$'", script)
+        self.assertIn('build --builder $builderName', script)
+        self.assertIn('--builder $builderName --progress plain --load', script)
         self.assertIn('--load', script)
         self.assertIn('--build-arg OPENSCRUB_ENABLE_TRAINING=1', script)
         self.assertIn('docker image inspect', script)
