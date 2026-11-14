@@ -4,6 +4,15 @@ services:
   openscrub:
     build:
       dockerfile: Dockerfile.cuda
+      # Keep the training variant consistent across 'build' and 'up --build'.
+      # An unset ARG previously reverted to 0 on 'up --build' and could
+      # evict the much larger training=1 build cache.
+      args:
+        OPENSCRUB_ENABLE_TRAINING: "${OPENSCRUB_ENABLE_TRAINING:-1}"
+        # Default builds the Dockerfile's dependency stage normally.
+        # scripts/build-windows-cuda.ps1 selects a tagged local dependency
+        # image, which survives Docker Desktop's build-cache garbage collector.
+        OPENSCRUB_CUDA_DEPS_IMAGE: "${OPENSCRUB_CUDA_DEPS_IMAGE:-cuda_deps}"
     deploy:
       resources:
         reservations:

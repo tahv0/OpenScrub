@@ -1,8 +1,59 @@
 # Faster Docker rebuilds on Windows (CUDA)
 
 The Windows Compose overlay builds the **local checkout** with `Dockerfile.cuda`.
-Buildx/BuildKit is already used by modern Docker Desktop/Compose; a separate
-builder is not normally necessary.
+Buildx/BuildKit is included with modern Docker Desktop.
+
+## Recommended: stable local CUDA/PyTorch image (PowerShell)
+
+The old BuildKit pip cache saved downloaded wheels, not installed packages.
+If Docker Desktop removes that cache or you switch build arguments/builders,
+`RUN ... python3 -m venv ... pip install torch` has to reinstall everything.
+
+From the repository root, use the checked-in wrapper instead of manually
+alternating `build --build-arg ...` and `up --build`:
+
+```powershell
+git switch integration/all-prs
+git pull --ff-only
+.\scripts\build-windows-cuda.ps1
+```
+
+If Windows PowerShell reports that scripts are disabled by execution policy,
+run the checked-in script for this process only with:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-windows-cuda.ps1
+```
+
+The wrapper:
+
+1. Builds `openscrub-cuda-deps:local` **once** with CUDA runtime packages,
+   PaddleOCR, the complete PyTorch training virtualenv and prefetched models,
+   then keeps that image under a normal local Docker tag.
+2. Rebuilds just the application from this tagged image using the same Docker
+   engine builder (`default`), avoiding even Docker Desktop's default 20GB
+   build-cache garbage collection affecting the expensive installation step.
+3. Rebuilds the dependency image **only** when its dependency-stage recipe
+   or `requirements*.txt` / pinned model-prefetch code changes (or when
+   `-ForceDependencies` is explicitly provided). Application source edits
+   and later Dockerfile instructions do not affect this fingerprint.
+4. Starts your existing Windows test Compose service. Its media/data volume
+   paths and NVIDIA GPU reservation are unchanged.
+
+For build-only, use `.\scripts\build-windows-cuda.ps1 -BuildOnly`; after
+changing the CUDA base or dependencies, use `-ForceDependencies` if you want
+to explicitly refresh the tagged dependency image. The first run is still
+expensive. Normal rebuilds should print "Using retained CUDA/PyTorch
+dependency image", and **must not execute** the PyTorch install step.
+
+A *tagged image* stays available even when BuildKit's temporary cache is
+garbage-collected. Do not remove it with `docker image rm
+openscrub-cuda-deps:local` or `docker image prune -a`. If removed, the
+wrapper rebuilds it. Large images still consume Docker Desktop disk space.
+
+The standard Compose build below remains supported without the wrapper,
+but it relies on BuildKit's normal layer cache; it cannot guarantee
+retention of the multi-GB training layer.
 
 ## Build or rebuild (PowerShell)
 
@@ -33,16 +84,21 @@ visible from the next warm rebuild.
 
 ## Optional CUDA training
 
-Training requires the explicit build argument and lives in its own virtual
-environment. Preserve this argument each time you rebuild a training image:
+Training lives in a separate virtual environment. The Windows CUDA Compose
+overlay now defaults to `OPENSCRUB_ENABLE_TRAINING=1`, so regular
+`up --build` does not unexpectedly toggle to the non-training variant.
+Use the retained-image wrapper above for the most reliable warm rebuilds.
+
+For manual builds, you can still pass the training build argument explicitly:
 
 ```powershell
 docker compose --progress plain -f compose.windows-test.yml -f compose.windows-cuda.yml build --build-arg OPENSCRUB_ENABLE_TRAINING=1
 docker compose -f compose.windows-test.yml -f compose.windows-cuda.yml up -d --no-build
 ```
 
-If you later run `up --build` without that build argument, Compose may
-rebuild the **non-training** image (the Dockerfile default is 0).
+To opt out in Windows PowerShell, set `$env:OPENSCRUB_ENABLE_TRAINING="0"`
+before a manual Compose build (the standalone Dockerfile still defaults to
+0). The wrapper always builds the training-enabled variant.
 
 ## Why this now stays cached
 
