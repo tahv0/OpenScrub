@@ -6585,6 +6585,31 @@ function dismissFindingConfirmation(i){
  const dismiss=document.getElementById('findingDismiss'+i);if(dismiss)dismiss.hidden=true;
  plateUnloadGuard();
 }
+async function reloadStaleFindingForConfirmation(card,edit,shown){
+ // Never reclassify a different JPEG simply because the person clicked the
+ // old card. Load the current pixels first; retry only if the backend proves
+ // the exact source frame/box and unchanged human polygon.
+ const img=edit?.img||card?.querySelector('img[data-preview-url]');
+ if(!img||!shown)return null;
+ img._plateMeta=null;
+ let loaded=false;
+ try{loaded=await queueReviewPreview(img,true);}catch(_){}
+ const latest=img._plateMeta;
+ if(!loaded||!latest){
+  img._plateMeta=shown;return null;
+ }
+ const same=(plateSamePreviewSource(shown,latest)||
+  plateSameSourceFrame(shown,latest))&&
+  plateCornersInsideCrop(shown.points,latest.crop);
+ if(edit&&!edit.dirty&&!edit.drag){
+  // This is the preview now actually shown; never keep the old key alive
+  // in a non-dirty editor after a refresh, regardless of rebindability.
+  edit.meta=latest;edit.displayCrop=latest.crop.slice();
+  edit.points=plateCopy(latest.points);edit.saved=plateCopy(latest.points);
+  edit.draw();
+ }
+ return {latest,same};
+}
 function confirmFinding(i,label){
  if(!['positive','negative'].includes(label)||CONFIRM_PENDING.has(i))return CONFIRM_CHAIN;
  if(PLATE_REVIEW_BUSY){
@@ -6617,12 +6642,33 @@ function confirmFinding(i,label){
      throw edit.archiveConflict?edit.error:Object.assign(new Error('Save or reload this area adjustment before confirming.'),{beforeWrite:true});
    }else if(PLATE_SAVE)await PLATE_SAVE;
    if(CUR!==job||JOBVIEW!==view)return;
+   const displayed=edit?.meta||card?.querySelector('img[data-preview-url]')?._plateMeta;
    const body={label,expected_revision:FINDING_META[i]?.confirmed_finding_revision};
-   if(edit?.meta.preview_token)body.preview_token=edit.meta.preview_token;
-    if(edit?.meta.key)body.preview_key=edit.meta.key;
+   // Non-plate confirmations have no four-corner editor, but must still be
+   // bound to the actual displayed image instead of a newly cached JPEG.
+   if(displayed?.preview_token)body.preview_token=displayed.preview_token;
+   if(displayed?.key)body.preview_key=displayed.key;
    if(label==='positive'&&edit?.archiveConflict)body.points=plateCopy(edit.points);
    const editVersion=edit?.version;
-   const {data}=await reviewRequest('api/jobs/'+job+'/confirm/'+i,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),timeoutMs:120000});
+   const submit=()=>reviewRequest('api/jobs/'+job+'/confirm/'+i,{method:'POST',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify(body),timeoutMs:120000});
+   let data;
+   try{
+    ({data}=await submit());
+   }catch(error){
+    if(error.status!==409||error.details?.conflict!=='stale_preview'||!displayed)
+     throw error;
+    const recovery=await reloadStaleFindingForConfirmation(card,edit,displayed);
+    if(!recovery?.same){
+     throw Object.assign(new Error(
+      recovery?'The picture changed. Inspect the updated image and choose Is / Not again.':
+       'Could not refresh the picture. Retry your confirmation after it loads.'),
+      {status:409,beforeWrite:true});
+    }
+    body.preview_token=recovery.latest.preview_token;
+    body.preview_key=recovery.latest.key;
+    ({data}=await submit()); // one source-bound retry, never loop on 409
+   }
    if(CUR!==job||JOBVIEW!==view)return;
    for(const m of members){
     const row=FINDING_META[m];if(!row)continue;
