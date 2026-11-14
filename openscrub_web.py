@@ -2312,14 +2312,20 @@ def job_detections(jid):
 def _review_detections(job, doc):
     """Compute rendered coverage while retaining all report row indices."""
     rows = doc["detections"]
+    fps = (doc.get("render_state") or {}).get("fps")
+    def safe_poly(row):
+        if (row.get("category") == "plate" and row.get("frame_index", -1) < 0
+                and plate_boundaries.quad_source_frame(row, fps) >= 0):
+            return ()
+        return row.get("poly") or ()
     dets = [openscrub.Detection(
         r["t_start"], r["t_end"], tuple(r["cbox"]), r["category"],
         r.get("text", ""), r.get("confidence", 1.0),
         tuple(r.get("aoff", (0, 0))), dense=r.get("dense", False),
-        track=r.get("track", -1), poly=r.get("poly") or (),
+        track=r.get("track", -1), poly=safe_poly(r),
         poly_holes=r.get("poly_holes") or (), mask_pad=r.get("mask_pad", -1),
         plate_quad=tuple(tuple(pt) for pt in plate_boundaries.trusted_plate_quad(r)),
-        plate_quad_frame=int(r.get("plate_quad_frame", -1)))
+        plate_quad_frame=plate_boundaries.quad_source_frame(r, fps))
         for r in rows]
     coverage, pad, _ = _job_mask_options(job)
     if coverage not in ("tight", "box", "concealed"):
@@ -2340,7 +2346,8 @@ def _review_detections(job, doc):
     for row, det in zip(rows, effective):
         copy = dict(row)
         copy.update(cbox=det.cbox, poly=det.poly, poly_holes=det.poly_holes,
-                    mask_pad=det.mask_pad, plate_quad=det.plate_quad)
+                    mask_pad=det.mask_pad, plate_quad=det.plate_quad,
+                    plate_quad_frame=det.plate_quad_frame)
         copy["_coverage_box"] = (coverage in ("box", "concealed") and
                                   det.dense and det.category in ("person", "manual"))
         result.append(copy)
