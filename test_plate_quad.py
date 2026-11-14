@@ -125,3 +125,23 @@ def test_ordinary_frame_bound_learned_quad_keeps_original_eligibility():
     assert openscrub._sample_active(d,2,.2)
     assert not openscrub._sample_active(d,3,.3)
     assert openscrub._plate_quad_active(d,2)
+
+
+def test_old_spanning_human_polygon_conceals_only_its_source_frame(tmp_path):
+    """Legacy interval-wide quad duplicates may not make intervening frames narrow."""
+    import json
+    quad = [[.1,.1],[.9,.1],[.9,.8],[.1,.8]]
+    doc = {'render_state': {'fps':10,'cum':[[0,0]]*10},
+           'detections':[dict(t_start=.2,t_end=.6,last_seen=.4,
+                              cbox=[20,20,100,50],category='plate',
+                              text='plate',confidence=.9,track=8,
+                              dense=True,plate_quad=quad,
+                              human_region_confirmed=True,
+                              verified_label='plate',enabled=True)]}
+    path=tmp_path/'old-human-quad.json';path.write_text(json.dumps(doc))
+    dets,_,_=openscrub.load_report(str(path))
+    d=dets[0]
+    assert d.plate_quad_frame==4
+    assert [i for i in range(2,7) if openscrub._sample_active(d,i,i/10)]==[2,3,4,5,6]
+    assert [i for i in range(2,7) if openscrub._plate_quad_active(d,i)]==[4]
+    assert not d.poly
