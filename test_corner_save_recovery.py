@@ -177,6 +177,75 @@ const s={i:1,job:'job',meta,img:{},points:plateCopy(corners),saved:plateCopy(cor
     result=subprocess.run(['node','-e',script],capture_output=True,text=True,timeout=8)
     assert result.returncode==0,result.stdout+result.stderr
 
+def test_source_frame_recovery_never_bypasses_new_human_corners_or_other_frames(tmp_path):
+    """Different image identities or a newer human quad require review."""
+    js = web.APP_JS
+    helpers = js[js.index('let QEDIT=null;'):js.index('function plateQuadValid(')]
+    script = r"""
+const assert=require('node:assert/strict');
+""" + helpers + r"""
+const old={source_token:'jpeg-a',frame_source_token:'same-frame',
+ preview_token:'token-a',key:'cache-a',frame:300,width:640,height:360,
+ box:[180,120,420,220],crop:[100,40,490,280],
+ points:[[180,120],[420,120],[420,220],[180,220]]};
+const newer={...old,source_token:'jpeg-b',key:'cache-b',crop:[110,50,480,280]};
+assert.equal(plateSamePreviewSource(old,newer),false);
+assert.equal(plateSameSourceFrame(old,newer),true);
+assert.equal(plateCornersInsideCrop(old.points,newer.crop),true);
+assert.equal(plateSameSourceFrame(old,{...newer,frame_source_token:'other-video'}),false);
+assert.equal(plateSameSourceFrame(old,{...newer,frame:301}),false);
+assert.equal(plateSameSourceFrame(old,{...newer,box:[181,120,421,220]}),false);
+assert.equal(plateSameSourceFrame(old,{...newer,
+ points:[[190,120],[420,120],[420,220],[180,220]]}),false);
+assert.equal(plateCornersInsideCrop(old.points,[200,100,480,280]),false);
+"""
+    file = tmp_path/'source-proof.js'
+    file.write_text(script)
+    result = subprocess.run(['node', str(file)], capture_output=True, text=True, timeout=8)
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_stale_confirmed_picture_is_reloaded_before_retry(review_server, monkeypatch):
+    """An Is/Not click retries a discarded JPEG without switching source."""
+    from flask import jsonify, request
+
+    url, _ = review_server
+    original = web.app.view_functions['finding_confirm']
+    attempts = []
+
+    def one_stale_confirmation(*args, **kwargs):
+        if request.method == 'POST':
+            attempts.append(request.get_json())
+            if len(attempts) == 1:
+                return jsonify(error='This displayed picture is no longer a valid cached sample. '
+                                     'Reload its preview.', conflict='stale_preview'), 409
+        return original(*args, **kwargs)
+
+    monkeypatch.setitem(web.app.view_functions, 'finding_confirm', one_stale_confirmation)
+    api = pytest.importorskip('playwright.sync_api')
+    with api.sync_playwright() as pw:
+        browser = browser_instance(pw)
+        page = browser.new_page(viewport={'width': 1440, 'height': 1000})
+        page.set_default_timeout(20000)
+        errors = []
+        page.on('pageerror', lambda e: errors.append(str(e)))
+        load_browser_page(page, url, [], [])
+        page.get_by_role('link', name='Synthetic review fixture', exact=True).click()
+        card = page.locator('#det0')
+        card.scroll_into_view_if_needed()
+        page.wait_for_function('!!document.querySelector("#det0 img")._quadEdit')
+        card.get_by_role('button', name='✓ Is a plate', exact=True).click()
+        page.wait_for_function(
+            'document.querySelector("#vlabel0").textContent.startsWith("Saved")',
+            timeout=20000)
+        assert len(attempts) == 2
+        assert attempts[0]['preview_key'] == attempts[1]['preview_key']
+        assert attempts[0]['preview_token'] == attempts[1]['preview_token']
+        assert not errors, errors
+        assert web._load_job_report(web.JOBS['inline-fixture'])['detections'][0]['verified_label'] == 'plate'
+        browser.close()
+
+
 def test_stale_displayed_picture_autoreloads_and_saves_corners(review_server, monkeypatch):
     """A definite stale-picture 409 should not strand a correctable draft."""
     from flask import jsonify, request
