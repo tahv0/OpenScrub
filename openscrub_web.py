@@ -6623,11 +6623,22 @@ async function reloadStaleFindingForConfirmation(card,edit,shown){
  const same=(plateSamePreviewSource(shown,latest)||
   plateSameSourceFrame(shown,latest))&&
   plateCornersInsideCrop(shown.points,latest.crop);
- if(edit&&!edit.dirty&&!edit.drag){
-  // This is the preview now actually shown; never keep the old key alive
-  // in a non-dirty editor after a refresh, regardless of rebindability.
+ if(edit&&!edit.drag){
+  // This is the preview now actually shown. A failed area draft may still
+  // contain the OLD key: leaving it there causes Is/Not to hit the same
+  // stale-preview 409 forever even after a new picture has loaded.
+  const oldDraft=edit.dirty?plateCopy(edit.points):null;
   edit.meta=latest;edit.displayCrop=latest.crop.slice();
-  edit.points=plateCopy(latest.points);edit.saved=plateCopy(latest.points);
+  edit.saved=plateCopy(latest.points);
+  edit.points=oldDraft||plateCopy(latest.points);
+  if(oldDraft&&!same){
+   // Keep the user's unsaved points but NEVER transfer them into the new
+   // source image as confirmed geometry. The next Is/Not click is explicit
+   // approval of the newly displayed image; area edits need separate review.
+   edit.pending=null;edit.needsSourceReview=true;edit.conflict=false;
+   edit.error=new Error('Picture changed. Inspect it before confirming; review the corners separately.');
+   plateStatus(edit,'New picture loaded · corner draft preserved; inspect before trying Is / Not again.',true);
+  }
   edit.draw();
  }
  return {latest,same};
