@@ -2280,6 +2280,7 @@ def job_detections(jid):
                       "learning_conflict": d.get("learning_conflict", ""),
                       "learning_score": d.get("learning_score"),
                       "plate_verification": d.get("plate_verification"),
+                      "plate_boundary_source": d.get("plate_boundary_source", ""),
                       "fallback_reason": d.get("fallback_reason", ""),
                       "human_region_confirmed": bool(d.get("human_region_confirmed")),
                       "zone_dropped": bool(d.get("zone_dropped")),
@@ -2828,10 +2829,11 @@ def job_plate_quad(jid, i):
         box = meta["box"]
         bw, bh = box[2]-box[0], box[3]-box[1]
         q = [[round((float(x)-box[0])/bw, 6), round((float(y)-box[1])/bh, 6)] for x, y in p]
-        apply_track, tid = autosave or payload.get("apply_track") is True, d.get("track", -1)
-        applied = sum(1 for j, row in enumerate(doc["detections"])
-                      if j == i or (apply_track and tid >= 0 and row.get("track", -1) == tid
-                                    and row.get("category") == "plate"))
+        # Four-corner geometry is source-frame-specific. Classification may
+        # apply to the track, but copying one narrow quad to later rotations
+        # could expose license characters. The old apply_track flag is now
+        # intentionally limited to the selected source row.
+        applied = 1
         sample_key = (hashlib.sha256(json.dumps([
             _video_identity(job["video"]), i, meta["frame"]]).encode()).hexdigest()
                       if autosave else None)
@@ -2867,13 +2869,11 @@ def job_plate_quad(jid, i):
             pixels = frame[y1:y2, x1:x2].copy()
         d["verified_label"] = "plate"
         changed = 0
-        for j, row in enumerate(doc["detections"]):
-            if j == i or (apply_track and tid >= 0 and row.get("track", -1) == tid
-                          and row.get("category") == "plate"):
-                _human_plate_override(row)
-                row["plate_quad"] = q
-                row.pop("plate_edit_receipt", None)
-                changed += 1
+        _human_plate_override(d)
+        d.update(plate_quad=q, plate_boundary_source="human_corners",
+                 human_region_confirmed=True, poly=[], poly_holes=[], mask_pad=0)
+        d.pop("plate_edit_receipt", None)
+        changed = 1
         if autosave:
             d["plate_edit_receipt"] = {"id": edit_id, "source": sample_key,
                                        "token": payload.get("preview_token")}
@@ -3425,26 +3425,35 @@ def job_track_object(jid):
                     "confidence": round(float(score), 3),
                     "aoff": [ox, oy], "last_seen": t,
                     "dense": True, "track": tid, "enabled": True,
-                    "plate_quad": (quad_req or []),
+                    "frame_index": (fidx if quad_req is not None else -1),
+                    "plate_quad": [],
+                    "plate_boundary_source": ("tracked_box_fallback" if quad_req is not None else ""),
                     "poly": ([[[float(x), float(y)] for x, y in c]
                               for c in poly] if quad_req is None else [])})
+            if quad_req is not None:
+                # The tracker returns boxes, not four physical plate corners.
+                # Keep every other time instant protected by its own box.
+                # Only the exact human-drawn source instant may use the
+                # manually provided quadrilateral.
+                source_frame = int(round(t_ref * fps))
+                seed = min(new, key=lambda row: abs(row["last_seen"]-t_ref))
+                if int(round(seed["last_seen"] * fps)) == source_frame:
+                    seed["plate_quad"] = quad_req
+                    seed["plate_boundary_source"] = "human_corners"
             # grace pads: cover the sub-sample sliver at both ends
             new[0]["t_start"] = max(0.0, new[0]["t_start"] - 0.25)
             new[-1]["t_end"] += 0.25
             seed_index = len(doc["detections"])
             doc["detections"].extend(new)
             if quad_req is not None and require_confirmation:
-                # Drawing records an area, not an Is a plate decision. Only
-                # the actual drawn source instant has human-provided corners;
-                # other tracked positions remain geometric predictions.
-                seed = min(new, key=lambda row: abs(row["last_seen"]-t_ref))
-                if abs(seed["last_seen"]-t_ref) < 1e-6:
+                # Drawing records an area, not an Is-a-plate decision.
+                if seed.get("plate_quad"):
                     seed["human_region_confirmed"] = True
             elif quad_req is not None:
-                # The drawn reference is reviewed; propagated frames aren't.
-                nearest = min(range(len(new)),
-                              key=lambda k: abs(new[k]["t_start"]-t_ref))
-                new[nearest]["verified_label"] = "plate"
+                # An actual drawn reference is reviewed. Never promote a
+                # nearby predicted tracked box to a human-labeled plate.
+                if seed.get("plate_quad"):
+                    seed["verified_label"] = "plate"
             if quad_req is not None and not require_confirmation:
                 frame = _frame_at(job, t_ref, rs)
                 if frame is not None:
