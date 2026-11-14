@@ -356,8 +356,10 @@ def session_feedback(job, doc, store, group_for):
     """
     import confirmed_findings
     rows = doc['detections']
-    managed = {i for i,r in enumerate(rows) if r.get('confirmed_finding_id')
-               or r.get('human_confirmation') or r.get('human_region_confirmed')}
+    managed = {i for i,r in enumerate(rows)
+               if (r.get('human_confirmation') or {}).get('source') != 'time_range'
+               and (r.get('confirmed_finding_id') or r.get('human_confirmation')
+                    or r.get('human_region_confirmed'))}
     seeds = {r['confirmed_finding_id']: (i,r) for i,r in enumerate(rows)
              if r.get('confirmed_finding_id')
              and not (r.get('human_confirmation') or {}).get('propagated')}
