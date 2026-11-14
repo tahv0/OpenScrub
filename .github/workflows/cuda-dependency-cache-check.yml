@@ -28,6 +28,15 @@ jobs:
           docker buildx build --call=check -f Dockerfile.cuda .
       - name: Verify persistent dependency-image invariants
         run: python3 -m unittest discover -s tests -p test_cuda_dependency_image.py -v
+      - name: Confirm Windows CUDA Compose defaults to the retained local image
+        shell: bash
+        run: |
+          set -euo pipefail
+          env -u OPENSCRUB_CUDA_DEPS_IMAGE \
+            OPENSCRUB_TEST_MEDIA_DIR=/tmp \
+            OPENSCRUB_TEST_DATA_DIR=/tmp \
+            docker compose -f compose.windows-test.yml -f compose.windows-cuda.yml config --format json \
+              | python3 -c 'import json,sys; d=json.load(sys.stdin); a=d["services"]["openscrub"]["build"]["args"]; assert a["OPENSCRUB_CUDA_DEPS_IMAGE"] == "openscrub-cuda-deps:local", a; assert str(a["OPENSCRUB_ENABLE_TRAINING"]) == "1", a'
       - name: Parse Windows PowerShell wrapper
         shell: pwsh
         run: |
@@ -35,6 +44,18 @@ jobs:
           $errors = $null
           [System.Management.Automation.Language.Parser]::ParseFile(
             'scripts/build-windows-cuda.ps1', [ref]$tokens, [ref]$errors
+          ) | Out-Null
+          if ($errors.Count) {
+            $errors | Format-List
+            exit 1
+          }
+      - name: Parse Docker Desktop PowerShell mock test
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            'tests/test_windows_cuda_builder.ps1', [ref]$tokens, [ref]$errors
           ) | Out-Null
           if ($errors.Count) {
             $errors | Format-List
