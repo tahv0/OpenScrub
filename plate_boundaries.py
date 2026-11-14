@@ -11,6 +11,29 @@ import cv2
 import numpy as np
 
 
+
+def trusted_plate_quad(row):
+    """Read old reports safely: only a source-bound plate quad may narrow output.
+
+    Older Review versions copied one row's plate_quad to every track member,
+    often across different viewpoints. An old propagated Is/Not label is not
+    polygon provenance. If a row has no independent mask/confirmation source,
+    its safe geometry is the original detector box.
+    """
+    quad = row.get('plate_quad') or ()
+    if row.get('category') != 'plate' or len(quad) != 4:
+        return ()
+    origin = row.get('plate_boundary_source') or ''
+    confirmation = row.get('human_confirmation') or {}
+    if (row.get('human_region_confirmed') is True
+            or origin in ('human_corners', 'learned_perspective',
+                          'learned_rotated_box')
+            or row.get('poly')
+            or (row.get('verified_label') == 'plate'
+                and confirmation.get('propagated') is not True)):
+        return quad
+    return ()
+
 def _ordered_quad(points):
     points = np.asarray(points, dtype=np.float64).reshape(4, 2)
     center = points.mean(axis=0)
