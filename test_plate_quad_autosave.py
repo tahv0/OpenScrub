@@ -19,7 +19,7 @@ def add_track(plate_job):
     return client, '/api/jobs/%s/plate_quad/0' % jid, path, folder
 
 
-def test_autosave_applies_track_and_verifies_only_seed(plate_job):
+def test_autosave_preserves_per_frame_corners_and_verifies_only_seed(plate_job):
     client, endpoint, path, folder = add_track(plate_job)
     meta = client.get(endpoint).get_json()
     points = [[54, 77], [126, 74], [129, 91], [52, 94]]
@@ -27,11 +27,13 @@ def test_autosave_applies_track_and_verifies_only_seed(plate_job):
                           autosave=True, edit_id='gesture-1'))
     assert response.status_code == 200, response.get_json()
     rows = json.loads(path.read_text())['detections']
-    assert rows[0]['plate_quad'] == rows[1].get('plate_quad')
+    assert rows[0]['plate_quad'] and len(rows[0]['plate_quad']) == 4
+    assert not rows[1].get('plate_quad'), 'do not copy narrow corners across rotations'
     assert not rows[2].get('plate_quad')
+    assert rows[0]['plate_boundary_source'] == 'human_corners'
     assert rows[0]['verified_label'] == 'plate'
     assert not rows[1].get('verified_label')
-    assert response.get_json()['applied'] == 2
+    assert response.get_json()['applied'] == 1
 
 
 def test_autosave_retry_is_idempotent_and_latest_sample_replaces_old(plate_job, monkeypatch):
