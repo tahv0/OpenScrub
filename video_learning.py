@@ -447,8 +447,15 @@ def refine_report(video, doc, model, threshold=.8, cancelled=None, progress=None
                     stats['boundary_fallbacks']+=1
                     continue
                 quad=[[(float(x)+x1-b[0])/w,(float(y)+y1-b[1])/h] for x,y in points]
+                # A legacy time-spanning row must stay enabled for its WHOLE
+                # interval. Narrowing it to frame_index=index would make the
+                # other frames unredacted. Instead, apply the narrow learned
+                # polygon only at this evaluated source frame; everywhere
+                # else the active detector box still protects the interval.
+                source_bound=(int(row.get('frame_index', -1)) < 0)
                 row.update(poly=[quad],poly_holes=[],plate_quad=quad,mask_pad=0,
-                           frame_index=index,learning_conflict='',fallback_reason='',
+                           plate_quad_frame=index if source_bound else -1,
+                           learning_conflict='',fallback_reason='',
                            plate_boundary_source=('learned_perspective' if method=='perspective'
                                                   else 'learned_rotated_box'))
                 stats['refined']+=1
