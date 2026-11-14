@@ -37,10 +37,25 @@ try {
 
 Push-Location $repoRoot
 try {
-    & docker buildx inspect default *> $null
-    if ($LASTEXITCODE -ne 0) {
-        throw 'Docker Desktop default Buildx builder unavailable. Check docker buildx ls.'
+    # Docker Desktop normally uses the "desktop-linux" context. Hard-coding
+    # "default" as the builder fails there with a context mismatch error.
+    # Contexts have their own built-in docker-driver Buildx builders. Select
+    # the builder belonging to this Docker daemon, NOT a docker-container
+    # builder that may be unable to resolve the tagged image we --load below.
+    $dockerContext = (& docker context show)
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($dockerContext)) {
+        throw 'Cannot determine the active Docker context. Check docker context ls.'
     }
+    $dockerContext = $dockerContext.Trim()
+    $builderName = $dockerContext
+    $builderInfo = (& docker buildx inspect $builderName 2>&1) -join "`n"
+    if ($LASTEXITCODE -ne 0) {
+        throw "No Buildx builder for Docker context '$dockerContext'. Check docker buildx ls."
+    }
+    if ($builderInfo -notmatch '(?m)^Driver:\s*docker\s*$') {
+        throw "The Buildx builder '$builderName' must use the docker driver to reuse local CUDA images. Check docker buildx ls."
+    }
+    Write-Host "Using Docker context '$dockerContext' and local builder '$builderName'."
 
     $existingFingerprint = $null
     try {
@@ -56,7 +71,7 @@ try {
     if ($ForceDependencies -or $existingFingerprint -ne $fingerprint) {
         Write-Host "Building retained CUDA/PyTorch dependency image ($depsImage)."
         Write-Host 'This expensive installation should only run once per dependency version.'
-        & docker buildx build --builder default --progress plain --load `
+        & docker buildx build --builder $builderName --progress plain --load `
             --file Dockerfile.cuda --target cuda_deps `
             --build-arg OPENSCRUB_ENABLE_TRAINING=1 `
             --build-arg "OPENSCRUB_DEPS_FINGERPRINT=$fingerprint" `
@@ -68,11 +83,11 @@ try {
         Write-Host "Using retained CUDA/PyTorch dependency image ($depsImage); no Python installs required."
     }
 
-    # Local tagged images are available to Docker Desktop's default builder.
-    # A docker-container Buildx builder may not see daemon-local image tags.
+    # The same active-context docker-driver builder sees the tagged dependency
+    # image loaded into this daemon. Keep it for both build operations.
     $env:OPENSCRUB_CUDA_DEPS_IMAGE = $depsImage
     $env:OPENSCRUB_ENABLE_TRAINING = '1'
-    & docker compose --progress plain -f compose.windows-test.yml -f compose.windows-cuda.yml build --builder default
+    & docker compose --progress plain -f compose.windows-test.yml -f compose.windows-cuda.yml build --builder $builderName
     if ($LASTEXITCODE -ne 0) {
         throw 'OpenScrub application build failed; the running container was not replaced.'
     }
