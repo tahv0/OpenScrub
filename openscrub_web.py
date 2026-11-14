@@ -55,6 +55,7 @@ import openscrub_logging as diagnostics
 import finding_previews
 import review_preview_index
 import review_journal
+import review_time_ranges
 import findings_web
 import findings_ui
 import review_similarity_ui
@@ -2296,7 +2297,9 @@ def job_detections(jid):
                     "frame_count": len(doc["render_state"]["cum"]),
                     "fps": doc["render_state"]["fps"],
                     "duration": len(doc["render_state"]["cum"]) /
-                                doc["render_state"]["fps"]})
+                                doc["render_state"]["fps"],
+                    "plate_free_intervals": doc.get("plate_free_intervals", []),
+                    "plate_free_range_can_undo": bool(doc.get("plate_free_range_undo"))})
     elapsed = round((time.monotonic() - started) * 1000)
     response.headers['Server-Timing'] = 'detections;dur=%d' % elapsed
     response.headers['X-Review-Listing'] = 'legacy_fallback'
@@ -3203,6 +3206,51 @@ def learned_model_delete(model_id):
     with _REVIEW_WORK_LOCK:
         learned_models.delete_model(learned_models_root(), model_id)
     return jsonify({"ok": True})
+
+
+@app.route("/api/jobs/<jid>/plate-free-range", methods=["POST"])
+@_serialize_review_edit
+def job_plate_free_range(jid):
+    """One source-bound time-range decision, not thousands of confirm POSTs."""
+    job = JOBS.get(jid) or abort(404)
+    if job['phase'] not in ('paused', 'review', 'done'):
+        return jsonify(error='Pause or finish scanning before reviewing a time range.'), 409
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return jsonify(error='Choose a video start and end time.'), 400
+    try:
+        if payload.get('preview_only') is True:
+            document = _load_job_report(job)
+            review_time_ranges.source_hash(document)
+            return jsonify(review_time_ranges.preview(
+                document, payload.get('start'), payload.get('end')))
+        # Range changes are rare explicit report boundaries. Never write one
+        # archive crop per sighting or propagate to an entire tracked group.
+        _review_journal_snapshot(job)
+        document = _load_job_report(job)
+        approved = (document.get('video_sections') or {}).get('items') or []
+        section_locked = ((job.get('section') or {}).get('role') == 'export'
+                          or any(item.get('approved') for item in approved))
+        original = deepcopy(document) if section_locked else None
+        if payload.get('undo') is True:
+            result = review_time_ranges.undo(document)
+        else:
+            result = review_time_ranges.apply(
+                document, payload.get('start'), payload.get('end'),
+                training=payload.get('training', False))
+        if section_locked:
+            _SECTIONS.guard_edits(job, original, document)
+        path = os.path.join(job['dir'], 'report.json')
+        stop_review.atomic_report(path, document)
+        try:
+            review_preview_index.publish_listing(path, document)
+        except Exception:
+            diagnostics.exception('plate_free_range_listing_refresh_failed', job)
+        return jsonify(result)
+    except review_time_ranges.RangeConflict as error:
+        return jsonify(error=str(error)), 409
+    except ValueError as error:
+        return jsonify(error=str(error)), 400
 
 
 @app.route("/api/jobs/<jid>/detections", methods=["POST"])
