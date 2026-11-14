@@ -2875,6 +2875,7 @@ def job_plate_quad(jid, i):
         changed = 0
         _human_plate_override(d)
         d.update(plate_quad=q, plate_boundary_source="human_corners",
+                 plate_quad_frame=(int(meta["frame"]) if int(d.get("frame_index", -1)) < 0 else -1),
                  human_region_confirmed=True, poly=[], poly_holes=[], mask_pad=0)
         d.pop("plate_edit_receipt", None)
         changed = 1
