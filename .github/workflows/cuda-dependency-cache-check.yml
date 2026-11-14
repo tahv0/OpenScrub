@@ -39,3 +39,6 @@ jobs:
             $errors | Format-List
             exit 1
           }
+      - name: Mock Docker Desktop context selection (no CUDA downloads)
+        shell: pwsh
+        run: ./tests/test_windows_cuda_builder.ps1
