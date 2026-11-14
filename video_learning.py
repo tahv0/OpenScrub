@@ -453,7 +453,8 @@ def refine_report(video, doc, model, threshold=.8, cancelled=None, progress=None
                 # polygon only at this evaluated source frame; everywhere
                 # else the active detector box still protects the interval.
                 source_bound=(int(row.get('frame_index', -1)) < 0)
-                row.update(poly=[quad],poly_holes=[],plate_quad=quad,mask_pad=0,
+                row.update(poly=[] if source_bound else [quad],poly_holes=[],
+                           plate_quad=quad,mask_pad=0,
                            plate_quad_frame=index if source_bound else -1,
                            learning_conflict='',fallback_reason='',
                            plate_boundary_source=('learned_perspective' if method=='perspective'
