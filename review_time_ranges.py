@@ -107,6 +107,16 @@ def _snapshot(row):
             for k in _FIELDS}
 
 
+def _after_digest(row):
+    """Detect newer classification OR geometry edits without duplicating rows."""
+    snapshot=_snapshot(row)
+    for name in ('confirmed_finding_id','confirmed_finding_revision',
+                 'cbox','plate_quad','t_start','t_end','frame_index'):
+        snapshot[name]=deepcopy(row[name]) if name in row else _MISSING
+    return hashlib.sha256(json.dumps(
+        snapshot,sort_keys=True,separators=(',',':')).encode()).hexdigest()
+
+
 def _restore(row, snapshot):
     for k, value in snapshot.items():
         if value == _MISSING:
@@ -161,7 +171,8 @@ def apply(doc, start, end, *, training=False):
             json.dumps([source, identity, i, row.get('cbox')]).encode()
         ).hexdigest()[:24]
         row.pop('learning_group', None)
-        changes.append(dict(index=i, before=previous, after=_snapshot(row)))
+        changes.append(dict(index=i, before=previous,
+                            after_digest=_after_digest(row)))
     doc.setdefault('plate_free_intervals', []).append(record)
     # The last bulk operation is reversible even after Save or reopening Review.
     doc['plate_free_range_undo'] = dict(record=record, row_count=len(doc['detections']),
@@ -179,7 +190,7 @@ def undo(doc):
             or action.get('row_count') != len(doc['detections'])):
         raise RangeConflict('The report or source changed. Review the affected findings instead of undoing stale labels.')
     for change in action['changes']:
-        if _snapshot(doc['detections'][change['index']]) != change['after']:
+        if _after_digest(doc['detections'][change['index']]) != change['after_digest']:
             raise RangeConflict('A finding was edited after the range action. Undo would overwrite newer work.')
     for change in action['changes']:
         _restore(doc['detections'][change['index']], change['before'])
