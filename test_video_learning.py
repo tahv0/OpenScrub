@@ -279,3 +279,33 @@ def test_refiner_never_reclassifies_or_replaces_human_adjusted_frame(tmp_path):
     assert out['detections'][0]['plate_quad']==original
     assert out['detections'][0]['plate_boundary_source']=='human_corners'
     assert stats['human_preserved']==1 and stats['model_calls']==0
+
+
+def test_time_spanning_refined_plate_keeps_full_box_on_unevaluated_frames(tmp_path):
+    """A single learned sample cannot turn a multi-frame protective box into a gap."""
+    vl=learning()
+    import openscrub
+    path=tmp_path/'time-spanning.avi'
+    writer=cv2.VideoWriter(str(path),cv2.VideoWriter_fourcc(*'MJPG'),10,(160,80))
+    for _ in range(10):writer.write(np.full((80,160,3),130,np.uint8))
+    writer.release()
+    detection=row(2,[20,20,90,54])
+    detection.update(frame_index=-1,t_start=.2,t_end=.6,last_seen=.2)
+    doc=report([detection])
+    class Segmentation:
+        def predict(self,crop):
+            m=np.zeros(crop.shape[:2],np.uint8)
+            cv2.fillConvexPoly(m,np.array([[29,22],[83,26],[80,50],[32,46]],np.int32),1)
+            return m,.97
+    out,stats=vl.refine_report(path,doc,Segmentation(),threshold=.8)
+    result=out['detections'][0]
+    assert stats['refined']==1
+    assert result['frame_index']==-1
+    assert result['plate_quad_frame']==2
+    assert not result['poly'], 'no polygon to cover other unevaluated frames'
+    assert len(result['plate_quad'])==4
+    d=openscrub.Detection(.2,.6,tuple(result['cbox']),'plate','plate',.9,
+                          dense=True,track=7,plate_quad=tuple(tuple(pt) for pt in result['plate_quad']),
+                          plate_quad_frame=result['plate_quad_frame'],frame_index=result['frame_index'])
+    assert all(openscrub._sample_active(d,i,i/10) for i in range(2,7))
+    assert [i for i in range(2,7) if openscrub._plate_quad_active(d,i)]==[2]
