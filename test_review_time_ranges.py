@@ -74,6 +74,23 @@ def test_training_opt_in_is_required_and_undo_restores_original_row_fields():
     assert 'plate_free_range_undo' not in doc
 
 
+def test_legacy_fully_contained_findings_get_output_change_but_no_approximate_training():
+    doc=document()
+    doc['detections'].append(dict(category='plate', track=44, person=-1,
+        frame_index=-1, t_start=7.1, t_end=7.2, last_seen=7.1,
+        cbox=[15,20,65,50], enabled=True))
+    summary=ranges.apply(doc,5,10,training=True)
+    legacy=doc['detections'][-1]
+    assert summary['training_ineligible']==1
+    assert legacy['enabled'] is False
+    assert legacy['verified_label']==''
+    assert legacy['human_confirmation']['source']=='time_range'
+    assert legacy['human_confirmation']['training'] is False
+    assert legacy['interval_negative']['training'] is False
+    assert not any(a['original'].get('interval_negative')
+                   for a in video_learning.capture_constraints(doc)['anchors'])
+
+
 def test_overlaps_and_newer_review_edits_are_protected():
     doc=document()
     ranges.apply(doc,5,10,training=True)
