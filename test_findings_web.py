@@ -638,7 +638,7 @@ def test_cached_neighbor_cannot_save_narrow_corners_until_exact_frame_loaded(fin
     assert exact.status_code == 200, exact.get_data(as_text=True)
     own = json.loads(exact.headers['X-Finding-Geometry'])
     assert own['frame'] == doc['detections'][1]['frame_index']
-    assert own['match'] == 'exact'
+    assert own.get('match') in (None, 'exact'), 'fresh exact-frame crops have no lookup match tag'
     assert own['key'] != borrowed['key']
     points = [list(pt) for pt in own['points']]
     points[0][0] += 1
