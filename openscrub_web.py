@@ -5762,8 +5762,11 @@ function pumpPlateSaves(){
    s.samePictureRefreshAttempts=0;s.needsSourceReview=false;
    if(typeof FINDING_META!=="undefined"&&FINDING_META[s.i])
     FINDING_META[s.i].human_region_confirmed=true;
+    FINDING_META[s.i].plate_boundary_source='human_corners';
    if(typeof REVIEW_DISPLAY_META!=="undefined"&&REVIEW_DISPLAY_META[s.i])
     REVIEW_DISPLAY_META[s.i].human_region_confirmed=true;
+   const boundary=document.getElementById('boundary'+s.i);
+   if(boundary)boundary.textContent='Boundary · Human corrected corners · this frame';
    syncPlateTrack(s);
    if(s.pending!==pending)return; // A newer Not-a-plate decision wins.
    applyReboundFindingState(s,data);
@@ -5777,7 +5780,7 @@ function pumpPlateSaves(){
    s.draw();plateStatus(s,s.dirty?"Saving…":data.reconfirmation_required
     ?"Saved new corners · image identity changed, confirm Is / Not again"
     :data.classification_required?"Saved area · choose Is / Not to confirm"
-    :s.meta.track>=0?"Saved to track":"Saved");
+    :s.meta.track>=0?"Saved corners for this source frame":"Saved");
    if(!s.dirty&&CUR===s.job&&document.getElementById("beCv"))beRefresh();
   }catch(error){
    if(!s.dirty||(pending&&s.pending!==pending))return;
@@ -6289,6 +6292,23 @@ function updatePlateVerifierCandidate(){
  if(!validated&&mode.value==="filter")mode.value="review";
  note.textContent=verifierAssessmentText(candidate?.assessment);
 }
+function plateBoundaryName(row){
+ if(row.plate_boundary_source==='human_corners')return 'Human corrected corners · this frame';
+ if(row.plate_boundary_source==='learned_perspective')return 'Learned perspective boundary · this frame';
+ if(row.plate_boundary_source==='learned_rotated_box')return 'Learned rotated rectangle · this frame';
+ if(row.plate_boundary_source==='tracked_box_fallback')return 'Tracked detector box · corners not tracked';
+ if(row.plate_boundary_source==='detector_fallback')return 'Detector box · learned outline rejected';
+ if(row.plate_boundary_source==='lettering_mask')return 'Existing lettering mask';
+ if(row.human_region_confirmed)return 'Human corrected corners · this frame';
+ if(row.shaped)return 'Existing shaped mask';
+ return 'YOLO detector rectangle · not physical plate edges';
+}
+function plateBoundaryBadge(row){
+ if(row.category!=='plate')return '';
+ return '<span class="badge plate-boundary-source" id="boundary'+row.i+'" '+
+  'title="This provenance describes only this source frame, not every frame of the group">'+
+  sectionEscape('Boundary · '+plateBoundaryName(row))+'</span> ';
+}
 function plateVerificationBadge(row){
  const marker=row.plate_verification;if(!marker)return "";
  const label=marker.applied?"Model filtered":marker.decision==="suggest_not_plate"?"Model suggests false positive":"Model retained";
@@ -6478,8 +6498,16 @@ async function loadReview(signal=null,phase=SHELLPH){
    rep.frames=members.length;
    rep.fallbacks=[...new Set(members.map(m=>m.fallback_reason).filter(Boolean))];
    rep.fallbackCount=members.filter(m=>m.fallback_reason).length;
-   rep.human_region_confirmed=members.some(m=>m.human_region_confirmed);
-   rep.shaped=members.some(m=>m.shaped);
+   // Image overlays describe the SELECTED frame, not a different member.
+   rep.human_region_confirmed=!!best.human_region_confirmed;
+   rep.shaped=!!best.shaped;
+   if(cat==='plate'&&members.length>1){
+    const learned=members.filter(m=>String(m.plate_boundary_source||'').startsWith('learned_')).length;
+    const manual=members.filter(m=>m.plate_boundary_source==='human_corners'||m.human_region_confirmed).length;
+    rep.boundarySummary='Group geometry: '+learned+' learned source frames, '+
+     manual+' human-corrected frames, '+(members.length-learned-manual)+
+     ' other frames (detector/lettering fallback). Each frame keeps its own redaction.';
+   }
    rep.personcard=key[0]==="p";
    TRKMEM[rep.i]=members.map(m=>m.i);
    items.push(rep);
@@ -6500,7 +6528,7 @@ async function loadReview(signal=null,phase=SHELLPH){
     <div class="${x.category==="plate"?"plate-preview":"finding-preview"}">
     <img id="thumb${x.i}" data-preview-url="api/jobs/${job}/finding-preview/${x.i}" alt="Original detection preview"
      class="${x.category==="plate"?"plate-edit-thumb":""}"
-     title="${x.category==="plate"?"Drag numbered corners; autosaved to this track":"Enlarge detection"}"
+     title="${x.category==="plate"?"Drag numbered corners; only this source frame receives the corrected geometry":"Enlarge detection"}"
      style="cursor:${x.category==="plate"?"pointer":"zoom-in"}"
      onclick="${x.category==="plate"?"":"zoomDet("+x.i+")"}"
      onpointerdown="${x.category==="plate"?"event.stopPropagation()":""}"
@@ -6509,8 +6537,9 @@ async function loadReview(signal=null,phase=SHELLPH){
     ${x.category==="plate"?'<div id="plateOverlay'+x.i+'" class="plate-output-badge"></div>':""}
     <small class="preview-status" role="status">Preview not loaded</small>
     <button class="sec preview-retry" hidden onclick="retryReviewPreview(this)">Retry preview</button>
-    ${x.category==="plate"?'<small class="quad-status" role="status" title="Corners apply to this detected track. Review changing perspective. Keyboard: select corner 1–4, use arrows; Ctrl+Z undoes.">Corners autosave to track</small><button type="button" class="sec quad-retry" hidden>Retry save</button>':""}
-    <div>${plateVerificationBadge(x)}${x.learning_conflict?'<span class="badge" title="The original coverage was retained where the learned model could not make a reliable refinement">Model disagreement — review</span> ':""}${plateFallbackText(x)?`<span class="badge" style="white-space:normal">${plateFallbackText(x)}</span> `:""}${x.shaped?'<span class="badge" title="Thumbnail rectangle is a selection guide; open to inspect the mask and any exclusions">shaped mask</span> ':""}${x.personcard?`<b>Person ${x.person+1}</b> — one decision for ALL their appearances`:`"${sectionEscape(x.text)}"`}${x.frames?` <span class="badge">×${x.frames} frames</span>`:""}${x.confidence?` <span class="badge" title="detector confidence — not a human decision">${Math.round(x.confidence*100)}%</span>`:""} <br>${x.t_start.toFixed(1)}–${x.t_end.toFixed(1)}s</div>
+    ${x.category==="plate"?'<small class="quad-status" role="status" title="Corners apply only to this exact source frame. Group-wide Is/Not and Blur/Keep choices are separate. Keyboard: select 1–4, use arrows; Ctrl+Z undoes.">Corners autosave to track</small><button type="button" class="sec quad-retry" hidden>Retry save</button>':""}
+    <div>${plateVerificationBadge(x)}${plateBoundaryBadge(x)}${x.learning_conflict?'<span class="badge" title="The original coverage was retained where the learned model could not make a reliable refinement">Model disagreement — review</span> ':""}${plateFallbackText(x)?`<span class="badge" style="white-space:normal">${plateFallbackText(x)}</span> `:""}${x.shaped?'<span class="badge" title="Thumbnail rectangle is a selection guide; open to inspect the mask and any exclusions">shaped mask</span> ':""}${x.personcard?`<b>Person ${x.person+1}</b> — one decision for ALL their appearances`:`"${sectionEscape(x.text)}"`}${x.frames?` <span class="badge">×${x.frames} frames</span>`:""}${x.confidence?` <span class="badge" title="detector confidence — not a human decision">${Math.round(x.confidence*100)}%</span>`:""} <br>${x.t_start.toFixed(1)}–${x.t_end.toFixed(1)}s</div>
+    ${x.boundarySummary?`<p class="review-copy">${sectionEscape(x.boundarySummary)}</p>`:""}
     ${plateTextBadge(x)}
     <div class="review-similar-slot" id="similar${x.i}"></div>
     <div class="finding-confirm" role="group" aria-label="Human classification">
