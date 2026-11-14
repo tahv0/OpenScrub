@@ -9,8 +9,16 @@ The old BuildKit pip cache saved downloaded wheels, not installed packages.
 If Docker Desktop removes that cache or you switch build arguments/builders,
 `RUN ... python3 -m venv ... pip install torch` has to reinstall everything.
 
-From the repository root, use the checked-in wrapper instead of manually
-alternating `build --build-arg ...` and `up --build`:
+The Windows CUDA Compose overlay **now defaults to the saved local
+`openscrub-cuda-deps:local` image**, even in a new PowerShell window.
+Previously it silently selected the Dockerfile's `cuda_deps` stage whenever
+`OPENSCRUB_CUDA_DEPS_IMAGE` was unset. If Docker Desktop had evicted the
+BuildKit cache, that rebuilt `python3-venv`, PyTorch and CUDA/cuDNN wheels
+again. The separate training venv is intentional; there is no reason to
+reinstall it for normal application edits.
+
+From the repository root, use the checked-in wrapper for initial setup and
+subsequent updates:
 
 ```powershell
 git switch integration/all-prs
@@ -60,9 +68,24 @@ garbage-collected. Do not remove it with `docker image rm
 openscrub-cuda-deps:local` or `docker image prune -a`. If removed, the
 wrapper rebuilds it. Large images still consume Docker Desktop disk space.
 
-The standard Compose build below remains supported without the wrapper,
-but it relies on BuildKit's normal layer cache; it cannot guarantee
-retention of the multi-GB training layer.
+**Manual Compose builds now also reuse the local dependency image** because
+the Windows overlay defaults to `openscrub-cuda-deps:local`. If that image
+does not exist (e.g., on a fresh PC, or after `docker image prune -a`),
+Compose will fail rather than silently redownload multi-GB dependencies.
+Run `.\scripts\build-windows-cuda.ps1` once to create it, and keep using
+the helper when dependency requirements change.
+
+To confirm which base Compose uses in the current shell:
+
+```powershell
+docker --context desktop-linux compose -f compose.windows-test.yml -f compose.windows-cuda.yml config | Select-String OPENSCRUB_CUDA_DEPS_IMAGE
+docker --context desktop-linux image inspect openscrub-cuda-deps:local --format '{{.Id}}'
+```
+
+The expected build argument is `openscrub-cuda-deps:local`, not `cuda_deps`.
+An explicit `$env:OPENSCRUB_CUDA_DEPS_IMAGE='cuda_deps'` overrides the
+default and intentionally selects the costly stage; remove that override
+or set it back to the local image.
 
 ## Build or rebuild (PowerShell)
 
@@ -77,9 +100,11 @@ docker compose --progress plain -f compose.windows-test.yml -f compose.windows-c
 docker compose -f compose.windows-test.yml -f compose.windows-cuda.yml up -d --no-build
 ```
 
-For subsequent source-only updates, use the same two Compose files and
-the **same Docker builder**. You can also use `up -d --build` directly.
-With plain progress, expensive steps should print `CACHED`:
+For source-only updates, prefer the helper, which checks the dependency
+fingerprint and preserves the tagged image. You can also use manual
+`up -d --build` with the same Compose files once the local image exists.
+With plain progress, expensive stages should be **skipped entirely** (they
+might not print `CACHED` because they are not part of the app's build graph):
 
 - Ubuntu system packages and original CUDA/OpenCV base
 - Runtime Python dependencies, PaddleOCR and ONNX Runtime GPU
@@ -98,7 +123,8 @@ overlay now defaults to `OPENSCRUB_ENABLE_TRAINING=1`, so regular
 `up --build` does not unexpectedly toggle to the non-training variant.
 Use the retained-image wrapper above for the most reliable warm rebuilds.
 
-For manual builds, you can still pass the training build argument explicitly:
+For manual builds, the saved dependency image must already exist. The
+training argument may still be specified explicitly:
 
 ```powershell
 docker compose --progress plain -f compose.windows-test.yml -f compose.windows-cuda.yml build --build-arg OPENSCRUB_ENABLE_TRAINING=1
@@ -134,10 +160,11 @@ before a manual Compose build (the standalone Dockerfile still defaults to
   Docker Desktop can also evict caches under disk pressure.
 - Check which builder is active with `docker buildx ls`. Switching or
   deleting builders loses access to their separate cache stores.
-- A changed `requirements.txt`, `requirements.training.txt`, CUDA base
-  image, or build argument can still invalidate the affected dependency
-  layers. Cache mounts can save downloads, not the time spent installing or
-  validating packages.
+- The helper **intentionally rebuilds** the saved dependency image when
+  `requirements.txt`, `requirements.training.txt`, the CUDA base recipe,
+  or pinned model-prefetch inputs change. A genuine dependency update may
+  reinstall large packages; ordinary Python code edits do not.
+  Cache mounts can save downloads but not installation time.
 - BuildKit cache mounts are **local to the builder** and can be garbage
   collected. GitHub Actions' registry cache reuses completed image layers,
   but does not automatically export the pip cache mount itself.
