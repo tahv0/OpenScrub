@@ -2318,7 +2318,8 @@ def _review_detections(job, doc):
         tuple(r.get("aoff", (0, 0))), dense=r.get("dense", False),
         track=r.get("track", -1), poly=r.get("poly") or (),
         poly_holes=r.get("poly_holes") or (), mask_pad=r.get("mask_pad", -1),
-        plate_quad=tuple(tuple(pt) for pt in plate_boundaries.trusted_plate_quad(r)))
+        plate_quad=tuple(tuple(pt) for pt in plate_boundaries.trusted_plate_quad(r)),
+        plate_quad_frame=int(r.get("plate_quad_frame", -1)))
         for r in rows]
     coverage, pad, _ = _job_mask_options(job)
     if coverage not in ("tight", "box", "concealed"):
@@ -2346,7 +2347,7 @@ def _review_detections(job, doc):
     return result
 
 
-def _review_mask_data(d, ox, oy, shape, job, doc):
+def _review_mask_data(d, ox, oy, shape, job, doc, frame_index=None):
     """Rasterize the effective mask at the review frame coordinates."""
     box = [d["cbox"][0] + ox, d["cbox"][1] + oy,
            d["cbox"][2] + ox, d["cbox"][3] + oy]
@@ -2361,7 +2362,9 @@ def _review_mask_data(d, ox, oy, shape, job, doc):
     drift = 0 if d.get("category") == "plate" and d.get("frame_index", -1) >= 0 and d.get("poly") else min(24.0, 0.05 * (abs(ox-anchor[0]) + abs(oy-anchor[1])))
     pad = base + drift
     region = (box[0]-pad, box[1]-pad, box[2]+pad, box[3]+pad)
-    if d.get("category") == "plate" and len(d.get("plate_quad") or ()) == 4:
+    if (d.get("category") == "plate" and len(d.get("plate_quad") or ()) == 4
+            and (int(d.get("plate_quad_frame", -1)) < 0
+                 or int(d.get("plate_quad_frame")) == frame_index)):
         quad = openscrub._plate_quad_pixels(box, d["plate_quad"])
         tight = (min(p[0] for p in quad)-2, min(p[1] for p in quad)-2,
                  max(p[0] for p in quad)+2, max(p[1] for p in quad)+2)
@@ -2375,8 +2378,8 @@ def _review_mask_data(d, ox, oy, shape, job, doc):
     return openscrub.rasterize_region_mask(shape, region, kind)
 
 
-def _review_mask(d, ox, oy, shape, job, doc):
-    data = _review_mask_data(d, ox, oy, shape, job, doc)
+def _review_mask(d, ox, oy, shape, job, doc, frame_index=None):
+    data = _review_mask_data(d, ox, oy, shape, job, doc, frame_index)
     if data is None:
         return []
     region, mask = data
@@ -2472,7 +2475,7 @@ def job_detframe(jid, i):
         abort(404)
     x1, y1 = int(d["cbox"][0] + ox), int(d["cbox"][1] + oy)
     x2, y2 = int(d["cbox"][2] + ox), int(d["cbox"][3] + oy)
-    data = _review_mask_data(d, ox, oy, frame.shape, job, doc)
+    data = _review_mask_data(d, ox, oy, frame.shape, job, doc, fidx)
     if data is not None:
         region, mask = data
         xlo, ylo, xhi, yhi = region
@@ -2954,7 +2957,7 @@ def job_boxes_at(jid):
                           "plate_quad": d.get("plate_quad") or [],
                           "fallback_reason": d.get("fallback_reason", ""),
                           "shaped": bool(d.get("poly")),
-                          "mask_contours": _review_mask(d, ox, oy, shape, job, doc),
+                          "mask_contours": _review_mask(d, ox, oy, shape, job, doc, fidx),
                           "t_start": d["t_start"], "t_end": d["t_end"],
                           "box": [d["cbox"][0] + ox, d["cbox"][1] + oy,
                                   d["cbox"][2] + ox, d["cbox"][3] + oy]})
@@ -3426,7 +3429,7 @@ def job_track_object(jid):
                     "confidence": round(float(score), 3),
                     "aoff": [ox, oy], "last_seen": t,
                     "dense": True, "track": tid, "enabled": True,
-                    "frame_index": (fidx if quad_req is not None else -1),
+                    "frame_index": -1,  # preserve time-spanning redaction between tracker samples
                     "plate_quad": [],
                     "plate_boundary_source": ("tracked_box_fallback" if quad_req is not None else ""),
                     "poly": ([[[float(x), float(y)] for x, y in c]
@@ -3440,6 +3443,7 @@ def job_track_object(jid):
                 seed = min(new, key=lambda row: abs(row["last_seen"]-t_ref))
                 if int(round(seed["last_seen"] * fps)) == source_frame:
                     seed["plate_quad"] = quad_req
+                    seed["plate_quad_frame"] = source_frame
                     seed["plate_boundary_source"] = "human_corners"
             # grace pads: cover the sub-sample sliver at both ends
             new[0]["t_start"] = max(0.0, new[0]["t_start"] - 0.25)
