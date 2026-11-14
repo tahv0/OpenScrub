@@ -161,6 +161,68 @@ def test_pinned_representative_survives_new_exact_cache_sample(review_server):
 
 
 
+def test_source_frame_proof_distinguishes_legacy_null_video_hashes():
+    """No cross-video frame rebinding when old reports store a null source."""
+    import findings_web as fw
+
+    row = dict(category='plate', cbox=[180, 120, 420, 220], plate_quad=[])
+    document = dict(
+        compact_preview_source=None,
+        provenance=dict(input_sha256='source-video-a'),
+        render_state=dict(fps=30, cum=[[0, 0]]))
+    before = fw._token(document, row, 0, None)
+    assert fw._source_hash(document) == 'source-video-a'
+    document['provenance']['input_sha256'] = 'different-source-video-b'
+    assert fw._token(document, row, 0, None) != before
+    document['provenance'].clear()
+    assert fw._source_hash(document) is None
+
+
+def test_evicted_displayed_image_can_be_reloaded_and_saved_with_same_frame_binding(review_server):
+    """A preloaded JPEG can be evicted before the human saves four corners.
+
+    The old opaque key must fail closed. A freshly decoded source frame can
+    safely authorize a new request only if the backend proves the same
+    immutable source frame and original detection geometry.
+    """
+    import sqlite3
+
+    _, path = review_server
+    job = web.JOBS['inline-fixture']
+    with web.app.test_client() as client:
+        initial = client.get('/api/jobs/inline-fixture/finding-preview/0?cache_only=1')
+        assert initial.status_code == 200
+        shown = json.loads(initial.headers['X-Finding-Geometry'])
+        assert shown['key'] and shown['frame_source_token']
+        stale_body = dict(compact=True, autosave=True, edit_id='evicted-draft',
+                          points=[[185, 125], [415, 125], [415, 215], [185, 215]],
+                          preview_key=shown['key'],
+                          preview_token=shown['preview_token'])
+        database = Path(job['dir']) / 'compact_previews' / 'index.sqlite3'
+        with sqlite3.connect(database) as db:
+            assert db.execute('DELETE FROM previews WHERE key=?',
+                              (shown['key'],)).rowcount == 1
+            db.commit()
+        refused = client.post('/api/jobs/inline-fixture/plate_quad/0', json=stale_body)
+        assert refused.status_code == 409
+        assert refused.get_json()['conflict'] == 'stale_preview'
+        assert not web._load_job_report(job)['detections'][0].get('plate_quad')
+
+        refreshed = client.get('/api/jobs/inline-fixture/finding-preview/0')
+        assert refreshed.status_code == 200, refreshed.get_data(as_text=True)[:150]
+        current = json.loads(refreshed.headers['X-Finding-Geometry'])
+        assert current['frame_source_token'] == shown['frame_source_token']
+        assert current['frame'] == shown['frame'] and current['box'] == shown['box']
+
+        stale_body.update(preview_key=current['key'],
+                          preview_token=current['preview_token'],
+                          edit_id='rebound-source-verified')
+        saved = client.post('/api/jobs/inline-fixture/plate_quad/0', json=stale_body)
+        assert saved.status_code == 200, saved.get_data(as_text=True)[:300]
+        assert saved.get_json()['ok']
+        assert web._load_job_report(job)['detections'][0]['human_region_confirmed']
+
+
 def test_large_group_single_http_confirmation_has_stable_preview_token(review_server):
     """Regression for 409 when a 10k-row review uses a scan-time representative.
 
