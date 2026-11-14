@@ -273,8 +273,8 @@ def test_expanded_crop_is_not_reused_for_a_different_source_frame(previews, tmp_
     fresh, _ = previews.store(tmp_path, moved, state(), expanded,
                               np.zeros((400,500,3), np.uint8))
     assert fresh['frame'] == 4
-    assert previews.lookup(tmp_path, moved, state())['frame'] == 4
-    assert previews.lookup(tmp_path, row(), state())['frame'] == 3
+    assert previews.lookup(tmp_path, moved, state())[0]['frame'] == 4
+    assert previews.lookup(tmp_path, row(), state())[0]['frame'] == 3
 
 
 
