@@ -94,10 +94,15 @@ function ack(s){responses.at(-1).resolve({data:{preview:{...s.meta,points:plateC
  assert.deepEqual(posts.at(-1).points,corners);
  assert.notEqual(posts.at(-1).edit_id,old,'A definite 409 releases rejected ID');
  ack(s);await second;assert.equal(s.dirty,false);
- // A second 409 with NO new revision must stop rather than spin forever.
+ // A second 409 with NO new revision may represent an evicted cache item:
+ // reload once, but a third rejection of the still-identical JPEG must stop
+ // rather than enter an endless retry loop.
  s.points=plateCopy(corners);s.points[0][0]+=2;s.version++;s.dirty=true;s.readyAt=0;
  fresh={...s.meta,preview_token:s.meta.preview_token};
  let blocked=pumpPlateSaves();reject409();await blocked;
+ assert.equal(s.conflict,false);assert.equal(s.dirty,true);
+ assert.equal(refreshes,1,'one automatic reload of potentially evicted JPEG');
+ let refusedAgain=pumpPlateSaves();reject409();await refusedAgain;
  assert.equal(s.conflict,true);assert.equal(s.dirty,true);
  assert.equal(s.retry.textContent,'Refresh picture (keep corners)');
  const kept=plateCopy(s.points);
@@ -106,16 +111,16 @@ function ack(s){responses.at(-1).resolve({data:{preview:{...s.meta,points:plateC
  fresh={...base,frame:11821,source_token:'other-frame',preview_token:'new-frame',
         key:'sample-02',points:plateCopy(base.points)};
  await retryPlateSave(s);
- assert.equal(refreshes,1);
+ assert.equal(refreshes,2);
  assert.deepEqual(s.points,kept,'Refreshing cannot discard a human gesture');
  assert.equal(s.meta.frame,11821);
  assert.equal(s.needsSourceReview,true);
  assert.equal(s.retry.textContent,'Save on refreshed picture');
  assert.equal(s.error.message.includes('Verify corners'),true);
- assert.equal(posts.length,3,'A new source must never be autosaved');
+ assert.equal(posts.length,4,'A new source must never be autosaved');
  // Additional gestures on the new image also require explicit review.
  const before=plateCopy(s.points);s.points[0][0]+=1;
- commitPlateGesture(s,before);assert.equal(posts.length,3);
+ commitPlateGesture(s,before);assert.equal(posts.length,4);
  assert.equal(s.needsSourceReview,true);
  await retryPlateSave(s);assert.equal(confirmations,1);
  const final=pumpPlateSaves();
@@ -137,12 +142,16 @@ def test_cropping_change_is_not_automatically_rebased():
     if not shutil.which("node"):
         pytest.skip("Node required")
     js = web.APP_JS
-    matcher = js[js.index("function plateSamePreviewSource("):js.index("function plateQuadValid(")]
+    matcher = js[js.index("function plateSameSourceCorners("):js.index("function plateQuadValid(")]
     code = ("const assert=require('node:assert/strict');\n" + matcher + r"""
-const same={source_token:'same',frame:4,width:100,height:80,key:'a',
- box:[10,10,40,30],crop:[0,0,50,40]};
+const same={source_token:'same',frame_source_token:'verified-frame',
+ frame:4,width:100,height:80,key:'a',
+ box:[10,10,40,30],crop:[0,0,50,40],
+ points:[[10,10],[40,10],[40,30],[10,30]]};
 assert.equal(plateSamePreviewSource(same,{...same}),true);
 assert.equal(plateSamePreviewSource(same,{...same,crop:[0,0,60,40]}),false);
+assert.equal(plateSameSourceFrame(same,{...same,key:'b',source_token:'new-jpeg'}),true);
+assert.equal(plateSameSourceFrame(same,{...same,crop:[0,0,60,40]}),false);
 assert.equal(plateSamePreviewSource(same,{...same,key:'b'}),false);
 assert.equal(plateSamePreviewSource(same,{...same,frame:5}),false);
 assert.equal(plateSamePreviewSource(same,{...same,source_token:'changed'}),false);
