@@ -121,6 +121,13 @@ section and are not counted as ordinary review groups.
 
 Open **Findings** and filter by video, category, or positive/negative label.
 Each card shows its source video name, frame/time, confirmation, and saved JPEG.
+In the gallery, **dashed yellow** outlines the original detector box;
+**solid green** outlines saved human-confirmed four-corner plate geometry when
+present. Both are drawn over the original **unredacted JPEG**, never painted
+into the training pixels. A card that only shows yellow has no saved
+human-confirmed quadrilateral; opening **Edit confirmation** lets you check
+and correct it.
+
 Choose **Edit confirmation** to change the label or, for plates, adjust the
 corners. **Save confirmation** writes a new revision. The editor only uses the
 saved picture; it does not load or play the source video.
@@ -206,11 +213,24 @@ before trying again.
 The Findings library can store several categories, but this training workflow
 currently trains **plate models**.
 
-1. In Findings, select **Use for plate training** on the examples you want.
-   **Select plate examples on this page** selects the visible page only.
-   Selection stays when changing filters or pages; check the positive,
-   negative, and video counts before starting. Examples from other videos are
-   included only when you select them or retain them through a chosen parent.
+1. In Findings, choose the **Video**, **Category** (Plate, or All
+   categories), and **Confirmation** (positive, negative, or both) filters.
+   **Select all matching plate examples** explicitly selects the entire matching
+   set across *every page*; the count preview shows positive/negative totals
+   and how many videos match before you confirm. Only already-confirmed plates
+   can be selected, not unreviewed detector findings. You can uncheck any
+   visible matching example to **exclude** it, or use **Clear selection** to
+   start over. The counts display these exclusions and any manually added
+   examples. A bulk scope stays pinned to its original video/label filters
+   even when you browse other pages or filters; manually added examples from
+   other videos are kept separately.
+   **Select plate examples on this page** still selects only the current page.
+   The backend validates the exact matching IDs and revisions when training is
+   queued; if someone adds, edits, reclassifies, or forgets a matching example,
+   the old bulk selection is rejected with HTTP 409 rather than silently using
+   a changed dataset. Review and reselect the scope, including any exclusions.
+   Examples from other videos are included only if explicitly selected or
+   inherited from a chosen locally trainable parent.
 2. Under **Train a named plate model**, enter a model name or leave it blank.
    The automatic name uses the video name and UTC timestamp for one video,
    or **Confirmed findings** and a timestamp for a selection across videos.

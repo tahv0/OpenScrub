@@ -179,6 +179,9 @@ def test_saved_jpeg_browse_edit_and_explicit_selection_without_video(
     monkeypatch.setattr(web, 'JOBS_DIR', str(root))
     monkeypatch.setattr(web, 'vault_locked', lambda: False)
     entries = seed_examples(root / 'confirmed_findings')
+    # Store real human corners to verify their overlays without changing JPEGs.
+    confirmed_findings.update_finding(root / 'confirmed_findings', entries[0]['id'],
+        points=[[210, 130], [312, 128], [310, 178], [207, 175]], expected_revision=1)
     monkeypatch.setattr(web, '_frame_at', lambda *a, **k: pytest.fail('Library editor reopened a video'))
     with sync.sync_playwright() as pw:
         browser = browser_instance(pw)
@@ -194,6 +197,9 @@ def test_saved_jpeg_browse_edit_and_explicit_selection_without_video(
             page.locator('#findingsList .finding-card').first.wait_for()
             assert page.locator('#findingsList .finding-card').count() == 3
             assert 'Garage <daylight>' in page.locator('#findingsList').inner_text()
+            assert page.locator('#findingsList .finding-human-quad').count() == 1
+            assert page.locator('#findingsList .finding-detector-box').count() == 2
+            assert page.locator('#findingsList .finding-card-picture img').count() == 3
             assert page.locator('#findingsList daylight').count() == 0
             assert page.locator('#findingsList input:checked').count() == 0
             assert page.locator('#findingsTrain').is_disabled()
@@ -224,3 +230,71 @@ def test_saved_jpeg_browse_edit_and_explicit_selection_without_video(
             assert not errors, errors
         finally:
             browser.close()
+
+
+def test_gallery_renders_source_aligned_human_quads_not_painted_jpegs():
+    run_ui(r"""
+const plate={id:'plate-a',video_id:'one',category:'plate',label:'positive',
+ video:{name:'Garage'},frame:9,time:.9,box:[100,100,280,190],
+ crop:{box:[80,80,300,210]},shape_confirmed:true,
+ points:[[94,101],[275,104],[270,186],[91,181]]};
+const html=findingCard(plate),svg=findingGalleryShape(plate);
+assert.ok(html.includes('class="finding-card-picture"'));
+assert.ok(html.includes('src="api/findings/plate-a/image"'));
+assert.ok(svg.includes('viewBox="80 80 220 130"'));
+assert.ok(svg.includes('points="94,101 275,104 270,186 91,181"'));
+assert.ok(svg.includes('class="finding-human-quad"'));
+assert.ok(svg.includes('class="finding-detector-box"'));
+assert.ok(svg.includes('preserveAspectRatio="xMidYMid meet"'));
+assert.ok(html.includes('Human-confirmed corners'));
+const detector=findingGalleryShape({...plate,shape_confirmed:false,points:null});
+assert.ok(detector.includes('finding-detector-box'));
+assert.ok(!detector.includes('finding-human-quad'));
+assert.ok(findingCard({...plate,shape_confirmed:false,points:null}).includes('Original detector box'));
+assert.equal(findingGalleryShape({...plate,category:'face'}),'');
+assert.ok(!findingGalleryShape({...plate,points:[['\\"><script>',0],[1,1],[2,2],[3,3]]}).includes('<script>'));
+""")
+
+
+def test_bulk_scope_selects_thousands_without_paging_and_sends_only_exclusions():
+    run_ui(r"""
+bindConfirmedFindings();
+node('findingsCategory').value='plate';
+node('findingsVideo').value='one';
+const response={snapshot:'s'.repeat(64),category:'plate',video_id:'one',label:null,
+ total:3000,positive:2500,negative:500,video_count:1};
+reviewRequest=async(url,options)=>{
+ calls.push({url,options});
+ if(url.startsWith('api/findings/selection?'))return {data:response};
+ if(url==='api/findings/train')return {data:{id:'trained-job',name:'Bulk'}};
+ throw Error(url);
+};
+await node('findingsSelectAll').onclick();
+assert.equal(calls.length,1);
+assert.ok(calls[0].url.includes('video_id=one'));
+assert.equal(FINDINGS.scope.total,3000);
+assert.equal(FINDINGS.selected.size,0,'never materialize 3000 browser cards');
+assert.ok(node('findingsSelection').textContent.includes('3000 plate examples'));
+const a={id:'a',category:'plate',video_id:'one',label:'positive',revision:2};
+const b={id:'b',category:'plate',video_id:'one',label:'negative',revision:1};
+FINDINGS.items=[a,b];FINDINGS.total=3000;renderConfirmedFindings();
+assert.ok(findingIsSelected(a)&&findingIsSelected(b));
+node('findingsList').onchange({target:{dataset:{selectFinding:'b'},checked:false}});
+assert.equal(FINDINGS.scope.excluded.get('b'),'negative');
+assert.equal(findingIsSelected(b),false);
+assert.ok(node('findingsSelection').textContent.includes('1 excluded'));
+const extra={id:'extra',category:'plate',video_id:'two',label:'negative',revision:3};
+FINDINGS.selected.set(extra.id,extra);
+node('findingsLicense').checked=true;
+node('findingsModelName').value='Bulk';
+await trainConfirmedFindings();
+const request=JSON.parse(calls[1].options.body);
+assert.deepEqual(request.example_ids,['extra']);
+assert.deepEqual(request.expected_revisions,{extra:3});
+assert.deepEqual(request.selection,{category:'plate',video_id:'one',label:null,
+ snapshot:'s'.repeat(64),excluded_ids:['b']});
+assert.deepEqual(opened,['trained-job']);
+node('findingsClear').onclick();
+assert.equal(FINDINGS.scope,null);
+assert.equal(FINDINGS.selected.size,0);
+""")
