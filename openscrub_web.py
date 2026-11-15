@@ -6101,7 +6101,7 @@ function sampleReviewGroups(rows,fraction=.1,labels={}){
 let REVIEW_STATUS_FILTER="all",REVIEW_STATUS_FILTER_JOB=null,REVIEW_FILTER_TIMER=null;
 function reviewGroupStatus(i){
  const members=TRKMEM[i]||[i];
- const handled=members.some(m=>!!OUTPUT_CHOICES[m]||!!reviewFindingLabel(m));
+ const handled=members.every(m=>!!OUTPUT_CHOICES[m]||!!reviewFindingLabel(m));
  const pending=members.some(m=>{
   const edit=PLATE_EDITS.get(m);
   return !!((edit&&(edit.dirty||edit.pending||edit.drag))||CONFIRM_PENDING.has(m)||CONFIRM_FAILED.has(m));
