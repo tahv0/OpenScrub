@@ -382,3 +382,62 @@ def test_windows_directory_durability_does_not_require_posix_descriptor(tmp_path
             pytest.fail('Windows CRT cannot open a directory for POSIX fsync')
     monkeypatch.setattr(cf,'os',WindowsOS())
     cf._sync_dir(tmp_path)
+
+
+def test_bulk_plate_scope_includes_all_matching_pages_without_reading_images(tmp_path, monkeypatch):
+    # More than the 24-card UI page and the 60-item default API page.
+    positives = [save(tmp_path, frame=i) for i in range(65)]
+    negatives = [save(tmp_path, frame=i, label='negative') for i in range(65, 69)]
+    other_video = cf.record(tmp_path, video(sha256='c' * 64),
+                            finding(label='positive'), jpeg())
+    save(tmp_path, category='face', frame=80)
+    monkeypatch.setattr(cf, '_verified_image',
+                        lambda *args: pytest.fail('Selection metadata must not read JPEGs'))
+    all_plates = cf.plate_selection(tmp_path)
+    assert all_plates['total'] == 70
+    assert all_plates['positive'] == 66
+    assert all_plates['negative'] == 4
+    assert all_plates['video_count'] == 2
+    assert len(all_plates['ids']) == 70
+    one_video = cf.plate_selection(tmp_path, video_id='a' * 64, label='positive')
+    assert one_video['total'] == 65
+    assert other_video['id'] not in one_video['ids']
+    negative = cf.plate_selection(tmp_path, label='negative')
+    assert negative['total'] == 4
+    excluded = cf.plate_selection(tmp_path, expected_snapshot=all_plates['snapshot'],
+                                  excluded_ids=[positives[0]['id'], negatives[0]['id']])
+    assert excluded['selected_total'] == 68
+    assert excluded['selected_positive'] == 65
+    assert excluded['selected_negative'] == 3
+    assert positives[0]['id'] not in excluded['ids']
+    assert excluded['revisions'][positives[1]['id']] == 1
+    with pytest.raises(ValueError, match='Excluded examples'):
+        cf.plate_selection(tmp_path, video_id='c' * 64,
+                           excluded_ids=[positives[0]['id']])
+
+
+def test_bulk_plate_scope_fails_closed_for_revisions_insertions_and_revocations(tmp_path):
+    first = save(tmp_path)
+    second = save(tmp_path, frame=11, label='negative')
+    scope = cf.plate_selection(tmp_path, excluded_ids=[second['id']])
+    assert scope['selected_total'] == 1
+    # Even a human correction to an *excluded* example must invalidate the
+    # reviewed selection, because it changed between counting and training.
+    cf.update_finding(tmp_path, second['id'],
+        points=[[100, 100], [280, 100], [280, 190], [100, 190]],
+        expected_revision=1)
+    with pytest.raises(cf.ConflictError, match='changed after selection'):
+        cf.plate_selection(tmp_path, expected_snapshot=scope['snapshot'],
+                           excluded_ids=[second['id']])
+    refreshed = cf.plate_selection(tmp_path)
+    cf.forget(tmp_path, first['id'], expected_revision=1)
+    with pytest.raises(cf.ConflictError):
+        cf.plate_selection(tmp_path, expected_snapshot=refreshed['snapshot'])
+    refreshed = cf.plate_selection(tmp_path)
+    save(tmp_path, frame=12)
+    with pytest.raises(cf.ConflictError):
+        cf.plate_selection(tmp_path, expected_snapshot=refreshed['snapshot'])
+    with pytest.raises(ValueError, match='selection snapshot'):
+        cf.plate_selection(tmp_path, expected_snapshot='invalid')
+    with pytest.raises(ValueError, match='excluded'):
+        cf.plate_selection(tmp_path, excluded_ids=['not-an-id'])
