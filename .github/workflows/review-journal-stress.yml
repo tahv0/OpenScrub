@@ -10,6 +10,7 @@ on:
       - 'review_similarity_ui.py'
       - 'test_review_similarity_*.py'
       - 'test_review_journal.py'
+      - 'test_rebound_confirmation_fast_path.py'
       - 'test_review_preview_index.py'
       - 'test_grouped_review_sample.py'
       - 'test_sample_filter_timeout.py'
@@ -42,6 +43,8 @@ jobs:
       - name: Check journal and explicit 10k-group HTTP save
         run: |
           python -m pytest -q -ra --timeout=60 test_review_journal.py test_review_preview_index.py test_grouped_review_sample.py -k 'not human_sample_shows_ten_groups' 
+      - name: Verify source-rebound confirmations remain crash-safe without full report rewrites
+        run: python -m pytest -q -ra --timeout=70 test_rebound_confirmation_fast_path.py test_review_confirmation_timing.py
       - name: Check cached visual groups, per-source explicit saves and JS syntax
         run: python -m pytest -q -ra --timeout=90 test_review_similarity_logic.py test_review_similarity_browser.py
       - name: Check browser sample, reload, corners and stress paths
