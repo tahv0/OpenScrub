@@ -6147,7 +6147,8 @@ function sampleReviewGroups(rows,fraction=.1,labels={}){
  }
  return {indices,fraction,unit:"finding_group",eligible_groups:groups.size,selected_groups:indices.length};
 }
-let REVIEW_STATUS_FILTER="all",REVIEW_STATUS_FILTER_JOB=null,REVIEW_FILTER_TIMER=null;
+let REVIEW_STATUS_FILTER="all",REVIEW_TYPE_FILTER="all",REVIEW_OUTPUT_FILTER="all";
+let REVIEW_STATUS_FILTER_JOB=null,REVIEW_FILTER_TIMER=null;
 function reviewGroupStatus(i){
  const members=TRKMEM[i]||[i];
  const handled=members.every(m=>!!OUTPUT_CHOICES[m]||!!reviewFindingLabel(m));
@@ -6157,49 +6158,115 @@ function reviewGroupStatus(i){
  });
  return {handled,pending};
 }
-function reviewMatchesFilter(i,cat){
- if(LEARNING_SELECTION&&(cat!=="plate"||!(TRKMEM[i]||[i]).some(m=>LEARNING_SELECTION.has(m))))return false;
- const status=reviewGroupStatus(i);
- if(REVIEW_STATUS_FILTER==="unreviewed")return !status.handled||status.pending;
- if(REVIEW_STATUS_FILTER==="reviewed")return status.handled&&!status.pending;
- if(REVIEW_STATUS_FILTER==="pending")return status.pending;
+function reviewSampleMatches(i,cat){
+ return !LEARNING_SELECTION||(cat==="plate"&&
+  (TRKMEM[i]||[i]).some(m=>LEARNING_SELECTION.has(m)));
+}
+function reviewTypeMatches(cat,type=REVIEW_TYPE_FILTER){
+ return type==="all"||(type==="plate"?cat==="plate":cat!=="plate");
+}
+function reviewOutputFlags(i){
+ const members=TRKMEM[i]||[i];
+ let blur=false,visible=false;
+ for(const m of members){
+  if(EN[m]===false)visible=true;else blur=true;
+  if(blur&&visible)break;
+ }
+ return {blur,visible};
+}
+function reviewOutputMatches(i,output=REVIEW_OUTPUT_FILTER){
+ if(output==="all")return true;
+ const flags=reviewOutputFlags(i);
+ return output==="blur"?flags.blur:flags.visible;
+}
+function reviewStatusMatches(status,mode=REVIEW_STATUS_FILTER){
+ if(mode==="unreviewed")return !status.handled||status.pending;
+ if(mode==="reviewed")return status.handled&&!status.pending;
+ if(mode==="pending")return status.pending;
  return true;
 }
-function setReviewStatusFilter(mode){
- if(!["all","unreviewed","reviewed","pending"].includes(mode))return false;
+function reviewMatchesFilter(i,cat){
+ if(!reviewSampleMatches(i,cat)||!reviewTypeMatches(cat)||
+    !reviewOutputMatches(i))return false;
+ return reviewStatusMatches(reviewGroupStatus(i));
+}
+function setReviewViewFilter(kind,mode){
+ const options={status:["all","unreviewed","reviewed","pending"],
+  type:["all","plate","other"],output:["all","blur","visible"]};
+ const controls={status:"reviewStatusFilter",type:"reviewTypeFilter",
+  output:"reviewOutputFilter"};
+ if(!options[kind]?.includes(mode))return false;
  if([...PLATE_EDITS.values()].some(s=>s.drag)){
   reviewSaveStatus("Finish dragging the corner before changing the view.",true);
-  const control=document.getElementById("reviewStatusFilter");
-  if(control)control.value=REVIEW_STATUS_FILTER;
+  const control=document.getElementById(controls[kind]);
+  if(control)control.value=kind==="status"?REVIEW_STATUS_FILTER:
+   kind==="type"?REVIEW_TYPE_FILTER:REVIEW_OUTPUT_FILTER;
   return false;
  }
- REVIEW_STATUS_FILTER=mode;clearSel();
+ if(kind==="status")REVIEW_STATUS_FILTER=mode;
+ else if(kind==="type")REVIEW_TYPE_FILTER=mode;
+ else REVIEW_OUTPUT_FILTER=mode;
+ clearSel();
  return applyReviewGroupFilter();
 }
+function setReviewStatusFilter(mode){return setReviewViewFilter("status",mode);}
+function setReviewTypeFilter(mode){return setReviewViewFilter("type",mode);}
+function setReviewOutputFilter(mode){return setReviewViewFilter("output",mode);}
+function reviewViewIsFiltered(){
+ return REVIEW_STATUS_FILTER!=="all"||REVIEW_TYPE_FILTER!=="all"||
+  REVIEW_OUTPUT_FILTER!=="all";
+}
 function scheduleReviewStatusFilter(){
- if(REVIEW_STATUS_FILTER==="all"||REVIEW_FILTER_TIMER!==null)return;
+ if(!reviewViewIsFiltered()||REVIEW_FILTER_TIMER!==null)return;
  REVIEW_FILTER_TIMER=setTimeout(()=>{REVIEW_FILTER_TIMER=null;applyReviewGroupFilter();},100);
 }
 function applyReviewGroupFilter(){
  const panel=document.getElementById("review");
  if(!panel||panel._sampleJob!==CUR||panel._sampleView!==JOBVIEW)return false;
  const selected=LEARNING_SELECTION;
- const totals={all:0,unreviewed:0,reviewed:0,pending:0};
- for(const indices of Object.values(REVIEW_CATEGORY_GROUPS)){
+ // Count review GROUPS from metadata, not mounted thumbnail cards.
+ // Each selector shows totals under the OTHER active selectors.
+ const statuses={all:0,unreviewed:0,reviewed:0,pending:0};
+ const types={all:0,plate:0,other:0};
+ const outputs={all:0,blur:0,visible:0};
+ const perCategory={},allGroups=Object.values(REVIEW_CATEGORY_GROUPS)
+  .reduce((n,indices)=>n+indices.length,0);
+ let matched=0;
+ for(const [cat,indices] of Object.entries(REVIEW_CATEGORY_GROUPS)){
   for(const i of indices){
-   const group=reviewGroupStatus(i);totals.all++;
-   if(group.pending)totals.pending++;
-   if(!group.handled||group.pending)totals.unreviewed++;
-   else totals.reviewed++;
+   if(!reviewSampleMatches(i,cat))continue;
+   const state=reviewGroupStatus(i);
+   const statusOK=reviewStatusMatches(state);
+   const typeOK=reviewTypeMatches(cat);
+   const flags=reviewOutputFlags(i);
+   const outputOK=REVIEW_OUTPUT_FILTER==="all"||
+    (REVIEW_OUTPUT_FILTER==="blur"?flags.blur:flags.visible);
+   if(typeOK&&outputOK){
+    statuses.all++;
+    if(!state.handled||state.pending)statuses.unreviewed++;
+    else statuses.reviewed++;
+    if(state.pending)statuses.pending++;
+   }
+   if(statusOK&&outputOK){
+    types.all++;types[cat==="plate"?"plate":"other"]++;
+   }
+   if(statusOK&&typeOK){
+    outputs.all++;if(flags.blur)outputs.blur++;
+    if(flags.visible)outputs.visible++;
+   }
+   if(typeOK&&outputOK&&statusOK){
+    matched++;perCategory[cat]=(perCategory[cat]||0)+1;
+   }
   }
  }
- // Preserve unmounted cards in the lazy queue. Load only matching cards,
- // not thousands of irrelevant previews while a reviewer is filtering.
+ // Keep lazy pagination: show matching results from deferred groups without
+ // loading the images of every excluded detection on a 271k-row review.
  for(const cat of Object.keys(REVIEW_PENDING_PAGES)){
+  if(!reviewTypeMatches(cat))continue;
   const mounted=[...panel.querySelectorAll("[data-review-category] .det")]
    .filter(card=>card.dataset.cat===cat&&reviewMatchesFilter(Number(card.id.slice(3)),cat)).length;
   if(selected)appendReviewPage(cat,true);
-  else if(REVIEW_STATUS_FILTER!=="all"&&mounted<REVIEW_PAGE_SIZE)appendReviewPage(cat);
+  else if(reviewViewIsFiltered()&&mounted<REVIEW_PAGE_SIZE)appendReviewPage(cat);
  }
  let shown=0;
  panel.querySelectorAll("[data-review-category] .det").forEach(card=>{
@@ -6209,10 +6276,10 @@ function applyReviewGroupFilter(){
  });
  panel.querySelectorAll("[data-review-category]").forEach(grid=>{
   const cat=grid.dataset.reviewCategory;
-  const matching=(REVIEW_CATEGORY_GROUPS[cat]||[]).filter(i=>reviewMatchesFilter(i,cat)).length;
-  grid.hidden=matching===0;
-  const heading=grid.previousElementSibling;heading.hidden=matching===0;
-  heading.querySelector(".badge").textContent=matching;
+  const n=perCategory[cat]||0;
+  grid.hidden=n===0;
+  const heading=grid.previousElementSibling;heading.hidden=n===0;
+  heading.querySelector(".badge").textContent=n;
  });
  panel.querySelectorAll(".review-more").forEach(button=>{
   const cat=button.dataset.reviewMore;
@@ -6221,22 +6288,29 @@ function applyReviewGroupFilter(){
   button.textContent="Load more "+(CATDN[cat]||cat)+" ("+pending+" remaining)";
  });
  const zones=panel.querySelector("#reviewZones");if(zones)zones.hidden=!!selected;
- const all=panel.querySelector("#reviewShowAll");if(all)all.hidden=!selected&&REVIEW_STATUS_FILTER==="all";
- const control=panel.querySelector("#reviewStatusFilter");
- if(control){
-  control.value=REVIEW_STATUS_FILTER;
-  for(const [value,label] of [["all","All"],["unreviewed","Needs review"],
-   ["reviewed","Handled"],["pending","Unsaved / failed"]]){
+ const all=panel.querySelector("#reviewShowAll");if(all)all.hidden=!selected&&!reviewViewIsFiltered();
+ for(const [id,chosen,options] of [
+  ["reviewStatusFilter",REVIEW_STATUS_FILTER,[
+   ["all","All"],["unreviewed","Needs review"],["reviewed","Handled"],["pending","Unsaved / failed"]
+  ]],["reviewTypeFilter",REVIEW_TYPE_FILTER,[
+   ["all","All detected types"],["plate","License plates"],["other","Other sensitive areas"]
+  ]],["reviewOutputFilter",REVIEW_OUTPUT_FILTER,[
+   ["all","All outputs"],["blur","Will be blurred"],["visible","Will remain visible"]
+  ]]
+ ]){
+  const control=panel.querySelector("#"+id);
+  if(!control)continue;
+  control.value=chosen;
+  const counts=id==="reviewStatusFilter"?statuses:
+   id==="reviewTypeFilter"?types:outputs;
+  for(const [value,label] of options){
    const option=control.querySelector('option[value="'+value+'"]');
-   if(option)option.textContent=label+" ("+totals[value]+")";
+   if(option)option.textContent=label+" ("+counts[value]+")";
   }
  }
  const filtered=panel.querySelector("#reviewFilterSummary");
- if(filtered){
-  const total=Object.values(REVIEW_CATEGORY_GROUPS).flat()
-   .filter(i=>reviewMatchesFilter(i,FINDING_META[i]?.category)).length;
-  filtered.textContent=total+" of "+totals.all+" review groups match. View only — no decisions are changed or discarded.";
- }
+ if(filtered)filtered.textContent=matched+" of "+allGroups+
+  " review groups match. Filters only change the view; saved choices and corner drafts stay intact.";
  const summary=panel.querySelector("#reviewSampleSummary");
  if(summary){
   summary.hidden=!selected;
@@ -6260,11 +6334,12 @@ function reviewUncertain(){
  }
  const data=sampleReviewGroups(panel._sampleRows,.1,VLBL);
  LEARNING_SELECTION=new Set(data.indices);LEARNING_SELECTION_JOB=CUR;LEARNING_SAMPLE_INFO=data;
- REVIEW_STATUS_FILTER="all";clearSel();
+ REVIEW_STATUS_FILTER="all";REVIEW_TYPE_FILTER="all";REVIEW_OUTPUT_FILTER="all";clearSel();
  return applyReviewGroupFilter();
 }
 function reviewAllFindings(){
- LEARNING_SELECTION=null;REVIEW_STATUS_FILTER="all";clearSel();
+ LEARNING_SELECTION=null;REVIEW_STATUS_FILTER="all";
+ REVIEW_TYPE_FILTER="all";REVIEW_OUTPUT_FILTER="all";clearSel();
  return applyReviewGroupFilter();
 }
 async function rollbackLearning(){
@@ -6460,7 +6535,8 @@ async function loadReview(signal=null,phase=SHELLPH){
  const acceptedMask=!!(d.learning&&d.learning.active&&d.learning.active.model);
  const verification=d.verification||(d.verification_history||[]).at(-1);
  if(LEARNING_SELECTION_JOB!==CUR)LEARNING_SELECTION=null;
- if(REVIEW_STATUS_FILTER_JOB!==CUR){REVIEW_STATUS_FILTER="all";REVIEW_STATUS_FILTER_JOB=CUR;}
+ if(REVIEW_STATUS_FILTER_JOB!==CUR){REVIEW_STATUS_FILTER="all";REVIEW_TYPE_FILTER="all";
+  REVIEW_OUTPUT_FILTER="all";REVIEW_STATUS_FILTER_JOB=CUR;}
  const groups={}; const zdrop=[]; TRKMEM={};
  REVIEW_BASE={job,enabled:{},labels:{},output_choices:{}};
  FINDING_META={};REVIEW_DISPLAY_META={};OUTPUT_CHOICES={};OUTPUT_VERSION={};
@@ -6489,16 +6565,28 @@ async function loadReview(signal=null,phase=SHELLPH){
   <button type="button" class="sec" id="reviewSimilarToggle" onclick="toggleReviewSimilarity()">Group similar pictures</button>
   <button type="button" id="reviewShowAll" class="sec" hidden onclick="reviewAllFindings()">Show all findings</button>
  </div>
- <div class="row" style="margin-bottom:10px;align-items:center">
-  <label for="reviewStatusFilter">Show findings</label>
-  <select id="reviewStatusFilter" style="max-width:240px" onchange="setReviewStatusFilter(this.value)">
+ <div class="row" style="margin-bottom:6px;align-items:center;flex-wrap:wrap;gap:8px 12px">
+  <label for="reviewStatusFilter">Review status</label>
+  <select id="reviewStatusFilter" style="max-width:205px" onchange="setReviewStatusFilter(this.value)">
    <option value="all">All</option>
    <option value="unreviewed">Needs review</option>
    <option value="reviewed">Handled</option>
    <option value="pending">Unsaved / failed</option>
   </select>
-  <small id="reviewFilterSummary" class="review-copy" role="status" aria-live="polite"></small>
+  <label for="reviewTypeFilter">Detection type</label>
+  <select id="reviewTypeFilter" style="max-width:220px" onchange="setReviewTypeFilter(this.value)">
+   <option value="all">All detected types</option>
+   <option value="plate">License plates</option>
+   <option value="other">Other sensitive areas</option>
+  </select>
+  <label for="reviewOutputFilter">Output</label>
+  <select id="reviewOutputFilter" style="max-width:220px" onchange="setReviewOutputFilter(this.value)">
+   <option value="all">All outputs</option>
+   <option value="blur">Will be blurred</option>
+   <option value="visible">Will remain visible</option>
+  </select>
  </div>
+ <small id="reviewFilterSummary" class="review-copy" role="status" aria-live="polite"></small>
  <details id="knownPlateSearch" style="margin-bottom:12px"><summary>Find examples using known plate numbers</summary>
   <p class="review-copy">Optional local OCR search. Enter the number(s) you expect, one per line. Full matches count more strongly than fragments. It tries rotated, upside-down, mirrored and perspective-corrected views, then adds possible matches to review. Confirm examples before training.</p>
   <label for="knownPlateTexts">Known plate numbers</label><textarea id="knownPlateTexts" rows="2" maxlength="400" placeholder="ABC-123" autocomplete="off" spellcheck="false" style="width:100%;box-sizing:border-box"></textarea>
