@@ -19,7 +19,8 @@ def _cold_review_row(report):
     # The scan saved group-0 JPEG at 300. Request an EXACT uncached source
     # frame 299: no cached neighbor may silently masquerade as frame 299.
     doc["detections"][0].update(
-        frame_index=299, t_start=299/30, t_end=299/30, last_seen=299/30)
+        frame_index=299, t_start=299/30, t_end=299/30,
+        last_seen=299/30, track=-1
     report.write_text(json.dumps(doc))
 
 
@@ -29,6 +30,8 @@ def test_source_crop_decodes_exact_same_pixels_and_pts_as_full_frame(review_serv
     crop = (181, 121, 417, 217)
     with web.app.test_request_context():
         full = web._read_exact_frame(path, 299)
+        with web._REVIEW_CACHE_LOCK:
+            web._REVIEW_FRAMES.clear()  # Exercise FFmpeg crop, not a warm full-frame slice.
         cropped = web._read_exact_frame(path, 299, crop=crop)
         assert full is not None
         assert cropped is not None
@@ -153,7 +156,7 @@ def test_browser_retry_recovers_504_without_changing_output_or_drafts(
         retry = card.locator(".preview-retry")
         retry.wait_for(state="visible")
         assert "Retry preview" in retry.inner_text()
-        assert "Preview unavailable" in card.locator(".preview-status").inner_text()
+        assert "too long" in card.locator(".preview-status").inner_text()
         before = page.evaluate("EN[0]")
         retry.click()
         page.wait_for_function("""() => {
