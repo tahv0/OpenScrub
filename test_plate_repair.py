@@ -230,6 +230,64 @@ def test_repaired_corners_remain_frame_only_on_later_drags(broken_plate):
     assert not rows[1].get('human_region_confirmed')
 
 
+
+def test_real_browser_can_drag_new_box_on_bad_plate_and_confirm(review_server):
+    """Real Flask + Chromium: offscreen source box -> full-frame drag -> save."""
+    sync_api = pytest.importorskip('playwright.sync_api')
+    from test_review_browser import browser_instance, load_browser_page
+    url, report = review_server
+    doc = json.loads(report.read_text())
+    doc['detections'][0]['cbox'] = [-50, 120, 420, 220]
+    stop_review.atomic_report(str(report), doc)
+    with sync_api.sync_playwright() as pw:
+        browser = browser_instance(pw)
+        page = browser.new_page(viewport={'width': 1360, 'height': 920})
+        page.set_default_timeout(30000)
+        errors = []
+        page.on('pageerror', lambda error: errors.append(str(error)))
+        requests, posts = [], []
+        load_browser_page(page, url, requests, posts)
+        page.get_by_role('link', name='Synthetic review fixture', exact=True).click()
+        card = page.locator('#det0')
+        card.scroll_into_view_if_needed()
+        redraw = card.get_by_role('button', name='Redraw plate area')
+        redraw.wait_for(state='visible', timeout=90000)
+        assert not card.get_by_role('button', name='Is plate').is_enabled()
+        redraw.click()
+        modal = page.get_by_role('dialog', name='Redraw plate area on exact original frame')
+        modal.wait_for(timeout=90000)
+        canvas = modal.locator('canvas')
+        bounds = canvas.bounding_box()
+        assert bounds and bounds['width'] > 100 and bounds['height'] > 100
+        page.mouse.move(bounds['x']+180/640*bounds['width'],
+                        bounds['y']+120/360*bounds['height'])
+        page.mouse.down()
+        page.mouse.move(bounds['x']+420/640*bounds['width'],
+                        bounds['y']+220/360*bounds['height'], steps=6)
+        page.mouse.up()
+        submit = modal.get_by_role('button', name='Save replacement · this frame only')
+        assert submit.is_enabled()
+        submit.click()
+        modal.wait_for(state='detached', timeout=90000)
+        page.wait_for_function(
+            "document.querySelector('#det0 img')._plateMeta?.source_repaired===true",
+            timeout=90000)
+        now = card.locator('img').evaluate('(img)=>img._plateMeta')
+        assert now['classification_allowed'] is True
+        assert now['exact_frame'] is True and now['frame'] == 300
+        assert now['box'][0] >= 0
+        assert now['box'][2] <= 640
+        assert now['box'][1] >= 0 and now['box'][3] <= 360
+        assert not redraw.is_visible()
+        assert card.get_by_role('button', name='Is plate').is_enabled()
+        # A polygon repair is durable but NOT automatically trusted training.
+        with web.app.test_client() as client:
+            assert client.get('/api/findings').get_json()['total'] == 0
+        assert review_journal.has_changes(web.JOBS['inline-fixture']['dir'])
+        assert not errors, errors
+        browser.close()
+
+
 def test_ui_has_full_frame_redraw_and_reenables_confirmation():
     if not shutil.which('node'):
         pytest.skip('Node not installed')
