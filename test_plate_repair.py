@@ -30,6 +30,7 @@ def broken_plate(plate_job, tmp_path, monkeypatch):
     doc['source_identity'] = dict(input_sha256=sha, width=240, height=160,
                                   fps=10, total_frames=10)
     doc['detections'][0].update(frame_index=2, aoff=[0, 0],
+                                t_start=.2, t_end=.2, last_seen=.2,
                                 cbox=[-30, 67, 137, 103])
     # Two independent sightings of the same track. The repair must never
     # transplant one frame's perspective geometry into its moving sibling.
@@ -207,7 +208,7 @@ def test_ui_has_full_frame_redraw_and_reenables_confirmation():
     assert 'openPlateRepair(this)' in js
     assert 'Save replacement · this frame only' in js
     assert 'photo.style.width=Math.round(baseWidth*zoom)' in js
-    assert 'row.classification_allowed=meta.classification_allowed!==false' not in js or True
+    assert 'FINDING_META[meta.i].classification_allowed=meta.classification_allowed!==false' in js
     helper = js[js.index('function validPlateRepair('):js.index('async function openPlateRepair(')]
     script = ("""
 const assert=require('node:assert/strict');
