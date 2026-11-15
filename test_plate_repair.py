@@ -162,6 +162,119 @@ def test_redraw_preserves_previous_track_decisions_on_other_frames(broken_plate)
     assert published[0]['cbox'] == after[0]['cbox']
 
 
+
+def test_full_frame_get_returns_while_source_sha256_runs(broken_plate, monkeypatch):
+    """A multi-GB video hash must not occupy the full-image HTTP request."""
+    client, jid, report, _, job, doc = broken_plate
+    job.pop('_finding_source_verified', None)
+    started, release = threading.Event(), threading.Event()
+    original_sha = learning_session.sha256
+
+    def delayed_sha(path):
+        started.set()
+        if not release.wait(15):
+            raise TimeoutError('test did not release background hash')
+        return original_sha(path)
+
+    monkeypatch.setattr(learning_session, 'sha256', delayed_sha)
+    try:
+        # An uncached redraw must not inspect/recreate a compact JPEG first.
+        with monkeypatch.context() as deny:
+            deny.setattr(findings_web, 'preview',
+                         lambda *a, **kw: pytest.fail('redraw read a compact JPEG'))
+            view = client.get(f'/api/jobs/{jid}/plate-repair/0/frame')
+        assert view.status_code == 200, view.get_data(as_text=True)[:300]
+        assert started.wait(3)
+        shown = json.loads(view.headers['X-Repair-Geometry'])
+        assert shown['source_verification'] == 'pending'
+        payload = dict(edit_id='slow-hash-but-fast-image',
+                       points=[[51., 75.], [126., 75.],
+                               [126., 94.], [51., 94.]],
+                       frame=shown['frame'],
+                       preview_token=shown['preview_token'],
+                       frame_source_token=shown['frame_source_token'])
+        not_yet = client.post(f'/api/jobs/{jid}/plate-repair/0', json=payload)
+        assert not_yet.status_code == 503
+        assert 'still running' in not_yet.get_json()['error']
+        assert not review_journal.has_changes(job['dir'])
+    finally:
+        release.set()
+    for _ in range(200):
+        if job.get('_plate_repair_source_check', {}).get('status') != 'pending':
+            break
+        time.sleep(.01)
+    assert job['_plate_repair_source_check']['status'] == 'verified'
+    ready = client.post(f'/api/jobs/{jid}/plate-repair/0', json=payload)
+    assert ready.status_code == 200, ready.get_data(as_text=True)[:500]
+    assert ready.get_json()['preview_ready'] is True
+
+
+def test_thumbnail_eviction_during_full_frame_redraw_does_not_conflict(
+        broken_plate, monkeypatch):
+    client, jid, report, job_dir, job, doc = broken_plate
+    # This used to make GET rehash and regenerate the original crop, changing
+    # the modal's disposable preview_token while its source frame stayed fixed.
+    with monkeypatch.context() as deny:
+        deny.setattr(findings_web, 'preview',
+                     lambda *a, **kw: pytest.fail('redraw depends on thumbnail key'))
+        first = client.get(f'/api/jobs/{jid}/plate-repair/0/frame')
+        second = client.get(f'/api/jobs/{jid}/plate-repair/0/frame')
+    assert first.status_code == second.status_code == 200
+    one = json.loads(first.headers['X-Repair-Geometry'])
+    two = json.loads(second.headers['X-Repair-Geometry'])
+    assert one['preview_token'] == two['preview_token']
+    assert one['frame_source_token'] == two['frame_source_token']
+    data = dict(edit_id='after-cache-eviction', frame=one['frame'],
+                preview_token=one['preview_token'],
+                frame_source_token=one['frame_source_token'],
+                points=[[51., 75.], [126., 75.],
+                        [126., 94.], [51., 94.]])
+    saved = client.post(f'/api/jobs/{jid}/plate-repair/0', json=data)
+    assert saved.status_code == 200, saved.get_data(as_text=True)[:500]
+    assert saved.get_json()['preview_ready'] is True
+    assert client.get(f'/api/jobs/{jid}/finding-preview/0?cache_only=1').status_code == 200
+
+
+def test_stale_confirmed_preview_can_be_rehydrated_without_losing_repair(
+        broken_plate):
+    client, jid, report, job_dir, job, doc = broken_plate
+    _, _, payload = view_and_payload(broken_plate)
+    fixed = client.post(f'/api/jobs/{jid}/plate-repair/0', json=payload)
+    assert fixed.status_code == 200
+    current = client.get(f'/api/jobs/{jid}/finding-preview/0?cache_only=1')
+    assert current.status_code == 200
+    first = json.loads(current.headers['X-Finding-Geometry'])
+    # Simulate bounded disk-cache eviction after the human has inspected the
+    # JPEG but before clicking Is a plate.
+    dbpath = job_dir / 'compact_previews' / 'index.sqlite3'
+    with sqlite3.connect(dbpath) as db:
+        row = db.execute('SELECT length(jpeg),length(CAST(metadata AS BLOB)) '
+                         'FROM previews WHERE key=?', (first['key'],)).fetchone()
+        assert row
+        db.execute('DELETE FROM previews WHERE key=?', (first['key'],))
+        db.execute("UPDATE settings SET value=value-1 WHERE key='count'")
+        db.execute("UPDATE settings SET value=value-? WHERE key='bytes'",
+                   (sum(row),))
+    stale = client.post(f'/api/jobs/{jid}/confirm/0', json=dict(
+        label='positive', preview_token=first['preview_token'],
+        preview_key=first['key']))
+    assert stale.status_code == 409
+    assert stale.get_json()['conflict'] == 'stale_preview'
+    assert client.get(f'/api/jobs/{jid}/finding-preview/0?cache_only=1').status_code == 204
+
+    refreshed = client.get(f'/api/jobs/{jid}/finding-preview/0?exact=1&retry_decode=1')
+    assert refreshed.status_code == 200, refreshed.get_data(as_text=True)[:500]
+    latest = json.loads(refreshed.headers['X-Finding-Geometry'])
+    assert latest['frame_source_token'] == first['frame_source_token']
+    assert latest['box'] == first['box']
+    assert latest['source_repaired'] is True
+    confirmed = client.post(f'/api/jobs/{jid}/confirm/0', json=dict(
+        label='positive', preview_token=latest['preview_token'],
+        preview_key=latest['key']))
+    assert confirmed.status_code == 200, confirmed.get_data(as_text=True)[:500]
+    assert confirmed.get_json()['finding']['label'] == 'positive'
+
+
 def test_repair_is_revision_safe_and_idempotent(broken_plate):
     client, jid, report, _, job, _ = broken_plate
     before = report.read_bytes()
