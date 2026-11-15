@@ -115,6 +115,36 @@ def test_repair_uses_verified_full_frame_and_keeps_siblings_untouched(broken_pla
     assert saved[1]['cbox'] == doc['detections'][1]['cbox']
 
 
+
+def test_redraw_preserves_previous_track_decisions_on_other_frames(broken_plate):
+    client, jid, report, job_dir, job, doc = broken_plate
+    review_journal.write(job_dir, doc['detections'][0], 0,
+                         dict(enabled=False, verified_label='not_plate',
+                              human_confirmation=dict(
+                                  label='negative', category='plate',
+                                  source='explicit')),
+                         dict(confirmed_finding_id='prior-source-only',
+                              confirmed_finding_revision=1))
+    before = review_journal.view(job_dir, json.loads(report.read_text()))['detections']
+    assert before[0]['enabled'] is False and before[1]['enabled'] is False
+    _, _, payload = view_and_payload(broken_plate)
+    repaired = client.post(f'/api/jobs/{jid}/plate-repair/0', json=payload)
+    assert repaired.status_code == 200, repaired.get_data(as_text=True)
+    after = review_journal.view(job_dir, json.loads(report.read_text()))['detections']
+    assert after[0]['enabled'] is True
+    assert after[0]['human_confirmation'] is None
+    assert after[0]['confirmed_finding_id'] is None
+    assert after[0]['verified_label'] == ''
+    assert after[1]['enabled'] is False
+    assert after[1]['verified_label'] == 'not_plate'
+    assert after[1]['human_confirmation']['label'] == 'negative'
+    assert after[1]['cbox'] == doc['detections'][1]['cbox']
+    assert review_journal.publish(job_dir)
+    published = json.loads(report.read_text())['detections']
+    assert published[1]['human_confirmation']['label'] == 'negative'
+    assert published[0]['cbox'] == after[0]['cbox']
+
+
 def test_repair_is_revision_safe_and_idempotent(broken_plate):
     client, jid, report, _, job, _ = broken_plate
     before = report.read_bytes()
