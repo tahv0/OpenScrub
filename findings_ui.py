@@ -106,7 +106,7 @@ function findingSelection(){
  const positives=(scope?scope.positive-excluded.filter(label=>label==='positive').length:0)+extras.filter(i=>i.label==='positive').length;
  const negatives=(scope?scope.negative-excluded.filter(label=>label==='negative').length:0)+extras.filter(i=>i.label==='negative').length;
  const videos=new Set(extras.map(i=>i.video_id));
- const source=scope?(scope.video_id?'this video's saved findings':'all videos' saved findings')+' matching '+(scope.label||'positive/negative'):'';
+ const source=scope?(scope.video_id?'this video':'all videos')+' matching '+(scope.label||'positive/negative')+' confirmations':'';
  let description=total?total+' plate example'+(total===1?'':'s')+' selected. '+positives+' positive · '+negatives+' negative. ':'No plate examples selected.';
  if(scope)description+='Bulk selection: '+source+' ('+scope.video_count+' matching video(s), '+excluded.length+' excluded). '+extras.length+' extra page selection(s). ';
  else if(total)description+='From '+videos.size+' video'+(videos.size===1?'':'s')+'. ';
