@@ -9,6 +9,7 @@ on:
       - 'scripts/build-windows-cuda-inference.ps1'
       - 'docs/CUDA_INFERENCE_IMAGE_PREVIEW.md'
       - 'tests/test_cuda_inference_preview.py'
+      - 'tests/test_windows_cuda_inference_preview.ps1'
       - '.github/workflows/cuda-inference-preview.yml'
   workflow_dispatch:
 
@@ -44,6 +45,19 @@ jobs:
             $errors | Format-List
             exit 1
           }
+      - name: Parse and run mocked Windows cold/warm inference builder
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            'tests/test_windows_cuda_inference_preview.ps1', [ref]$tokens, [ref]$errors
+          ) | Out-Null
+          if ($errors.Count) {
+            $errors | Format-List
+            exit 1
+          }
+          ./tests/test_windows_cuda_inference_preview.ps1
       - name: Assert production Windows Compose retains the full CUDA variant
         shell: bash
         run: |
