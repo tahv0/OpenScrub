@@ -19,6 +19,7 @@ import review_journal
 import stop_review
 import openscrub_web as web
 from test_plate_quad_editor import plate_job
+from test_review_browser import review_server, browser_instance, load_browser_page
 
 
 @pytest.fixture
@@ -235,7 +236,6 @@ def test_repaired_corners_remain_frame_only_on_later_drags(broken_plate):
 def test_real_browser_can_drag_new_box_on_bad_plate_and_confirm(review_server):
     """Real Flask + Chromium: offscreen source box -> full-frame drag -> save."""
     sync_api = pytest.importorskip('playwright.sync_api')
-    from test_review_browser import browser_instance, load_browser_page
     url, report = review_server
     doc = json.loads(report.read_text())
     doc['detections'][0]['cbox'] = [-50, 120, 420, 220]
