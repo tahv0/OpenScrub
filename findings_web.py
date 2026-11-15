@@ -455,6 +455,7 @@ def repair_plate_anchor(job, index, payload):
             evidence.get('frame_source_token') != meta['frame_source_token'])):
         raise library.ConflictError(
             'Open the verified full source frame again before saving a redrawn plate.')
+    _plate_repair_require_verified(job, evidence['identity'], evidence['source_sha256'])
     if ((job.get('section') or {}).get('role') == 'export'
             or any(item.get('approved') for item in
                    ((doc.get('video_sections') or {}).get('items') or []))):
@@ -490,8 +491,32 @@ def repair_plate_anchor(job, index, payload):
     # A fresh source anchor replaces the old detector identity, not any
     # previously archived human finding or its revision.
     review_journal.write_anchor(job['dir'], index, patch)
+    ready = False
+    frame_cache = job.pop('_plate_repair_frame_cache', None)
+    if (frame_cache and frame_cache['identity'] == evidence['identity']
+            and frame_cache['frame'] == meta['frame']):
+        try:
+            # A source SHA was fully verified before the journal write. Publish
+            # the NEW source-bound JPEG before the browser asks for it: no
+            # second FFmpeg seek or another full-video integrity hash.
+            crop = _web._plate_editor_crop(new_box, points, width, height)
+            pixels = frame_cache['pixels'][crop[1]:crop[3], crop[0]:crop[2]].copy()
+            new_row = dict(row, **patch, frame_index=meta['frame'])
+            source = dict(sha256=evidence['source_sha256'], timing='frame')
+            previews.store(job['dir'], new_row, doc['render_state'],
+                           dict(frame=meta['frame'], width=width, height=height,
+                                box=new_box, crop=crop, points=points,
+                                source=source), pixels)
+            ready = True
+        except (OSError, ValueError, TypeError, KeyError, RuntimeError):
+            # The durable source-frame repair is already committed. Missing
+            # cache is recoverable, never roll back or invent a saved label.
+            try:
+                _web.diagnostics.exception('plate_repair_preview_prewarm_failed', job)
+            except Exception:
+                pass
     return dict(ok=True, applied=1, source_repaired=True,
-                needs_confirmation=True, box=new_box, points=points,
+                preview_ready=ready, needs_confirmation=True, box=new_box, points=points,
                 frame=meta['frame'], verified_samples_added=0)
 
 
