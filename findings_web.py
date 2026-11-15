@@ -237,6 +237,11 @@ def _plate_repair_preview(job, index, doc=None):
     row = doc['detections'][index]
     if row.get('category') != 'plate':
         abort(404)
+    fps = float(doc['render_state']['fps'])
+    if (fps <= 0 or float(row['t_end']) - float(row['t_start']) > 1.5 / fps):
+        raise library.ConflictError(
+            'This detection spans several frames. Open the video editor to '
+            'correct a time interval instead of applying one frame shape.')
     if not _source_hash(doc):
         raise library.ConflictError(
             'This scan has no verified source identity. Rescan or restore its source metadata.')
@@ -339,11 +344,6 @@ def repair_plate_anchor(job, index, payload):
             or payload.get('frame_source_token') != meta['frame_source_token']
             or payload.get('frame') != meta['frame']):
         raise library.ConflictError('This source frame or detector changed. Reopen Redraw plate.')
-    row_fps = float(doc['render_state']['fps'])
-    if (float(row['t_end']) - float(row['t_start'])) > 1.5 / row_fps:
-        raise library.ConflictError(
-            'This detection spans several source frames. Open the video editor '
-            'to correct a whole interval instead of applying one frame shape.')
     evidence = (job.get('_plate_repair_views') or {}).get(index)
     if not evidence or any((
             evidence.get('identity') != _web._video_identity(job['video']),
