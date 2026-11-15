@@ -360,3 +360,70 @@ def test_review_loads_exact_source_frame_and_rebinds_clean_editor(
         assert any(item["frame"] == 299 for item in items)
         assert not errors, errors
         browser.close()
+
+
+def test_repeated_stale_representative_conflict_recovers_by_loading_exact_frame(
+    review_server, monkeypatch
+):
+    """A cached neighbor can remain unchanged through repeated stale-preview
+    409s; requiring the exact source frame resolves the real-world dead end."""
+    sync_api = pytest.importorskip("playwright.sync_api")
+    from flask import jsonify, request
+    url, report = review_server
+    doc = json.loads(report.read_text())
+    doc["detections"][0].update(
+        frame_index=299, t_start=299 / 30, t_end=299 / 30,
+        last_seen=299 / 30, track=1
+    )
+    report.write_text(json.dumps(doc))
+    original = web.app.view_functions["finding_confirm"]
+    requests = []
+
+    def twice_stale(*args, **kwargs):
+        if request.method == "POST":
+            requests.append(request.get_json())
+            if len(requests) <= 2:
+                return jsonify(
+                    error="This displayed picture is no longer a valid cached sample.",
+                    conflict="stale_preview"
+                ), 409
+        return original(*args, **kwargs)
+
+    monkeypatch.setitem(web.app.view_functions, "finding_confirm", twice_stale)
+    with sync_api.sync_playwright() as pw:
+        browser = browser_instance(pw)
+        page = browser.new_page(viewport={"width": 1440, "height": 1000})
+        page.set_default_timeout(20000)
+        errors = []
+        page.on("pageerror", lambda exc: errors.append(str(exc)))
+        load_browser_page(page, url, [], [])
+        page.get_by_role(
+            "link", name="Synthetic review fixture", exact=True
+        ).click()
+        card = page.locator("#det0")
+        card.scroll_into_view_if_needed()
+        page.wait_for_function("""() => {
+          const m=document.querySelector("#det0 img")?._plateMeta;
+          return m?.frame===300&&m.requested_frame===299;
+        }""")
+        card.get_by_role("button", name="✓ Is a plate", exact=True).click()
+        page.evaluate("CONFIRM_CHAIN")
+        assert page.evaluate("CONFIRM_FAILED.size") == 1
+        assert len(requests) == 2
+        assert page.locator("#confirmationSaveIssues").is_visible()
+        button = card.get_by_role("button", name="Load exact source frame")
+        button.wait_for(state="visible")
+        button.click()
+        page.wait_for_function(
+            'document.querySelector("#det0 img")?._plateMeta?.frame===299'
+        )
+        assert page.evaluate("PLATE_EDITS.get(0).dirty") is False
+        card.get_by_role("button", name="✓ Is a plate", exact=True).click()
+        page.evaluate("CONFIRM_CHAIN")
+        assert len(requests) == 3
+        assert page.evaluate("CONFIRM_FAILED.size") == 0
+        assert page.evaluate("saveAndRender(true)") is True
+        assert web._load_job_report(web.JOBS["inline-fixture"])[
+            "detections"][0]["human_confirmation"]["label"] == "positive"
+        assert not errors, errors
+        browser.close()
