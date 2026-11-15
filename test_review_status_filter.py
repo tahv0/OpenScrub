@@ -35,6 +35,10 @@ def test_needs_review_hides_handled_and_preserves_unsaved_corner_drafts(review_s
         assert page.evaluate("OUTPUT_CHOICES[0]") is True
         assert "Needs review (89)" == control.locator('option[value="unreviewed"]').inner_text()
         assert page.locator("#det1").is_visible()
+        # Similarity grouping must never unhide a handled item under this filter.
+        page.evaluate("() => {REVIEW_SIMILAR_ENABLED=true;reviewSimilarRender()}")
+        assert card.is_hidden()
+        page.evaluate("() => {REVIEW_SIMILAR_ENABLED=false;reviewSimilarRender()}")
 
         # A handled card remains reachable; filtering does not unmount it.
         control.select_option("reviewed")
