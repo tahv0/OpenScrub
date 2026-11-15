@@ -360,6 +360,9 @@ def _journal_matches_archived_source(job, doc, index, preferred_key=None):
     return not _archived_identity_changed(job, doc, row, meta)
 
 
+_CONFIRM_SLOW_TRACE_SECONDS = 3.0
+
+
 class _ConfirmTrace:
     """Stage timings for slow confirmations only; never include source PII.
 
@@ -385,7 +388,7 @@ class _ConfirmTrace:
     def finish(self):
         now = time.monotonic()
         total = now - self.start
-        if total < 3.0:
+        if total < _CONFIRM_SLOW_TRACE_SECONDS:
             return
         try:
             report_mb = round((Path(self.job['dir']) / 'report.json').stat().st_size / 1024 ** 2, 2)
