@@ -6,7 +6,10 @@ track-wide box transplant, or an automatic trusted training classification.
 import json
 import re
 import shutil
+import sqlite3
 import subprocess
+import threading
+import time
 
 import cv2
 import numpy as np
@@ -40,6 +43,10 @@ def broken_plate(plate_job, tmp_path, monkeypatch):
     sibling.update(frame_index=3, t_start=.3, t_end=.3, last_seen=.3)
     doc['detections'].append(sibling)
     stop_review.atomic_report(str(report), doc)
+    # Most existing fixtures verify a tiny synthetic source up front. Only
+    # the dedicated pending-SHA test must exercise asynchronous verification.
+    job['_finding_source_verified'] = dict(
+        signature=(web._video_identity(job['video']), sha), sha256=sha)
     monkeypatch.setattr(findings_web, 'root', lambda: tmp_path/'archives')
     return client, jid, report, job_dir, job, doc
 
@@ -58,8 +65,11 @@ def view_and_payload(fixture):
     shown = json.loads(view.headers['X-Repair-Geometry'])
     assert shown['frame'] == before['frame'] == 2
     assert shown['width'] == 240 and shown['height'] == 160
-    assert shown['preview_token'] == before['preview_token']
+    # The full-frame correction token is source-bound, not keyed to a
+    # disposable thumbnail JPEG. The frame source proof stays identical.
+    assert shown['preview_token']
     assert shown['frame_source_token'] == before['frame_source_token']
+    assert shown['source_verification'] == 'verified'
     return before, shown, dict(edit_id='source-repair-fixture-1',
                                frame=shown['frame'], points=[
                                    [51., 75.], [126., 75.],
@@ -79,6 +89,11 @@ def test_repair_uses_verified_full_frame_and_keeps_siblings_untouched(broken_pla
     assert data['ok'] is True and data['applied'] == 1
     assert data['needs_confirmation'] is True
     assert data['verified_samples_added'] == 0
+    assert data['preview_ready'] is True
+    # The corrected exact-frame JPEG is prepared by the Save request itself.
+    # No full video SHA or FFmpeg seek should be needed to reopen it.
+    immediate = client.get(f'/api/jobs/{jid}/finding-preview/0?cache_only=1')
+    assert immediate.status_code == 200
     assert report.read_bytes() == unchanged_report, 'repair must use durable SQLite journal'
     repaired = review_journal.view(job_dir, json.loads(report.read_text()))['detections']
     assert repaired[1]['cbox'] == doc['detections'][1]['cbox']
