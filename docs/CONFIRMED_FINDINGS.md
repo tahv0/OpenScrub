@@ -77,6 +77,26 @@ regions, but these approximate frame matches cannot be saved as exact training
 examples. The card explains when a new scan is needed to obtain frame-indexed
 findings for confirmation.
 
+## Filter the Review queue without changing decisions
+
+The **Show findings** selector in Review has **All**, **Needs review**,
+**Handled**, and **Unsaved / failed**, with counts of review groups (not
+individual frames). Needs review shows groups that lack an explicit human
+output choice or Is/Not confirmation for any member, plus any group with a
+pending or failed corner edit or human confirmation. A group partially reviewed
+across its frames stays in Needs review. Handled shows complete groups without
+outstanding draft/confirmation errors; Unsaved / failed focuses the exceptions.
+
+This is strictly a browser-side view filter: changing it never confirms a
+finding, disables protection, saves choices, or discards unsaved corner drafts.
+Status updates as you use Blur/Keep and Is/Not, so handled groups drop from
+the Needs review view. The existing 10% plate sampler is separate; **Show all
+findings** resets both filters. Bulk category choices while filtered apply only
+to matching review groups; other hidden findings retain their decisions.
+Very large Review pages mount matching cards on demand without decoding all
+the filtered-out images. Zone-excluded warnings remain in their separate
+section and are not counted as ordinary review groups.
+
 ## Browse, correct, and forget saved examples
 
 Open **Findings** and filter by video, category, or positive/negative label.
