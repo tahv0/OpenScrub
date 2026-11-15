@@ -140,6 +140,18 @@ review choice; an uncertain network error cannot be silently dismissed.
 The **corner draft** error list remains independent. A corner archive-revision
 conflict must not masquerade as a failed Is/Not confirmation. A rejected corner
 polygon stays in the browser until it is corrected or deliberately discarded.
+
+When a finding displays a **cached representative image from another frame**
+(for example, finding frame 2305 shows cached frame 2332), Review clearly
+identifies both frames and offers **Load exact source frame**. This explicit
+request bypasses track-neighbor fallback, decodes that specific frame only if
+no matching scan-time JPEG exists, and binds its preview token to the actual
+picture. A clean corner editor is reloaded with the exact frame's geometry;
+a pending manual polygon is never silently transferred. Inspect the exact
+picture and explicitly choose **Is / Not** again. No human label is
+automatically carried from the borrowed thumbnail to an uninspected frame.
+An absent source or decoder failure leaves the previous image and any
+unsaved draft intact and blocks unverified training evidence.
 Render and video-specific training must still wait for all polygon edits and
 human confirmation requests to be settled. **Save edits** can safely preserve
 other Blur/Keep choices during a confirmation failure, but this limited save
