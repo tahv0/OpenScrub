@@ -5555,6 +5555,13 @@ function plateStatus(s,text,retry=false){
  s.retry.textContent=s.archiveConflict?"Confirm Is / Not again":
   s.needsSourceReview?"Save on refreshed picture":s.conflict?"Refresh picture (keep corners)":"Retry save";
  if(s.card)s.card.classList.toggle("corner-save-error",!!(s.dirty&&s.error));
+ // A rejected AREA save needs an explicit discard control even though it
+ // must not create a phantom failed human classification.
+ const dismiss=document.getElementById("findingDismiss"+s.i);
+ if(dismiss&&!CONFIRM_FAILED.has(s.i)){
+  dismiss.hidden=!s.archiveConflict;
+  if(s.archiveConflict)dismiss.textContent="Discard this unsaved adjustment";
+ }
  updatePlateSaveIssues();
  if(typeof scheduleReviewStatusFilter==="function")scheduleReviewStatusFilter();
 }
@@ -6742,15 +6749,23 @@ function dismissFindingConfirmation(i){
  if(CONFIRM_PENDING.has(i))return;
  const error=CONFIRM_FAILED.get(i);
  if(error&&![400,409].includes(error.status)&&!error.beforeWrite)return;
- const edit=PLATE_EDITS.get(i);
- if(edit?.archiveConflict){
+ const edit=PLATE_EDITS.get(i),hadCornerConflict=!!edit?.archiveConflict;
+ if(hadCornerConflict){
+  // Discard only the rejected AREA polygon, never an independent human
+  // classification failure that may have happened on the same finding.
   edit.pending=null;edit.version++;edit.dirty=false;edit.error=null;
   edit.archiveConflict=false;edit.conflict=false;edit.points=plateCopy(edit.saved);
   edit.draw();plateStatus(edit,'Saved area · current review choice kept');schedulePlateSaves();
  }
- CONFIRM_FAILED.delete(i);
- const note=document.getElementById('vlabel'+i);if(note)note.innerHTML=findingStatus(i);
- const dismiss=document.getElementById('findingDismiss'+i);if(dismiss)dismiss.hidden=true;
+ const keepClassificationFailure=hadCornerConflict&&!!error?.reviewAttemptedLabel;
+ if(!keepClassificationFailure)CONFIRM_FAILED.delete(i);
+ const note=document.getElementById('vlabel'+i);
+ if(note)note.innerHTML=keepClassificationFailure?'Confirmation not saved · retry Is / Not or keep the current review choice.':findingStatus(i);
+ const dismiss=document.getElementById('findingDismiss'+i);
+ if(dismiss){
+  dismiss.hidden=!keepClassificationFailure;
+  if(keepClassificationFailure)dismiss.textContent='Keep current review choice';
+ }
  updateConfirmationIssues();
  plateUnloadGuard();if(typeof scheduleReviewStatusFilter==="function")scheduleReviewStatusFilter();
 }
