@@ -78,7 +78,13 @@ def render(source: str) -> str:
                       "pip install torch", "torch==2.10.0", "ultralytics=="):
         if forbidden in deps:
             raise ValueError("Training dependency leaked into inference image: " + forbidden)
-    return NOTICE + body
+    # Dockerfile parser directives MUST be the first line. Inserting our
+    # generated-file notice above "# syntax=..." would silently disable
+    # BuildKit syntax selection (and potentially break RUN --mount).
+    syntax = "# syntax=docker/dockerfile:1\\n\\n"
+    if not body.startswith(syntax):
+        raise ValueError("Full CUDA Dockerfile must begin with its BuildKit syntax directive")
+    return syntax + NOTICE + body[len(syntax):]
 
 
 def main(argv=None) -> int:
