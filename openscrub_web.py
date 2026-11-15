@@ -5406,11 +5406,15 @@ async function loadReviewPreview(state,task,cacheOnly){
   const exactButton=card.querySelector(".source-frame-exact");
   const outside=meta?.geometry_outside_frame===true;
   if(hint)hint.textContent=outside
-   ?"Detector box/corners extend outside the video frame. Original pixels only — correct the box in Preview video & edit boxes or rescan."
+   ?"Detector box/corners extend outside the video frame. "+
+    (borrowed?"Showing cached frame "+meta.frame+" instead of detection frame "+
+      meta.requested_frame+". Load exact frame to inspect the actual sighting. "
+      :"Original source pixels only. ")+
+    "Correct the box in Preview video & edit boxes or rescan before trusted training."
    :borrowed?
    "Showing cached frame "+meta.frame+" instead of detection frame "+
    meta.requested_frame+". Load the exact source frame before confirming this finding.":"";
-  if(exactButton)exactButton.hidden=!borrowed||outside;
+  if(exactButton)exactButton.hidden=!borrowed;
   drawPlateThumbnail(img);
   if(meta?.classification_allowed===false){
    if(typeof FINDING_META!=="undefined"&&FINDING_META[meta.i]){
