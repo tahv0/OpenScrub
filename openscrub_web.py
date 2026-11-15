@@ -5294,10 +5294,12 @@ function updateReviewPreloadStatus(state){
   :"Preparing review pictures before you scroll…";
 }
 function reviewTimedOutImages(){
+ if(typeof document.querySelectorAll!=="function")return [];
  return [...document.querySelectorAll("#review img[data-preview-url]")]
   .filter(img=>img._previewFailureType==="timeout"&&!img.closest("[hidden]"));
 }
 function updateReviewTimedOutButton(){
+ if(typeof document.getElementById!=="function")return;
  const button=document.getElementById("reviewRetryTimedOut");
  if(!button)return;
  const failed=reviewTimedOutImages();
