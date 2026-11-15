@@ -172,3 +172,56 @@ def test_browser_retry_recovers_504_without_changing_output_or_drafts(
         assert page.evaluate("CONFIRM_FAILED.size") == 0
         assert not errors, errors
         browser.close()
+
+
+def test_one_click_recovers_multiple_timed_out_cards_without_implicit_choices(
+    review_server, monkeypatch
+):
+    """Batch the user's failed cards in the existing single cold-decoder lane."""
+    api = pytest.importorskip("playwright.sync_api")
+    url, report = review_server
+    _cold_review_row(report)
+    doc = json.loads(report.read_text())
+    doc["detections"][1].update(
+        frame_index=298, t_start=298/30, t_end=298/30,
+        last_seen=298/30, track=-1)
+    report.write_text(json.dumps(doc))
+    original = web._frame_at
+    calls = []
+
+    def timeout_then_long(job, timestamp, rstate, frame_index=None, **kwargs):
+        calls.append((frame_index, kwargs.get("decode_timeout")))
+        if kwargs.get("decode_timeout") is None:
+            abort(504, description="Synthetic strict preview decoder timeout")
+        return original(job, timestamp, rstate, frame_index, **kwargs)
+
+    monkeypatch.setattr(web, "_frame_at", timeout_then_long)
+    with api.sync_playwright() as pw:
+        browser = browser_instance(pw)
+        page = browser.new_page(viewport={"width": 1440, "height": 1000})
+        page.set_default_timeout(20000)
+        errors = []
+        page.on("pageerror", lambda error: errors.append(str(error)))
+        load_browser_page(page, url, [], [])
+        page.get_by_role("link", name="Synthetic review fixture", exact=True).click()
+        all_retry = page.locator("#reviewRetryTimedOut")
+        page.wait_for_function("""() =>
+          document.querySelectorAll("#review .preview-retry:not([hidden])").length>=2
+        """)
+        assert all_retry.is_visible()
+        assert "2" in all_retry.inner_text()
+        assert page.evaluate("REVIEW_VERSION") == 0
+        all_retry.click()
+        page.wait_for_function("""() => {
+          const a=document.querySelector("#det0 img")?._plateMeta;
+          const b=document.querySelector("#det1 img")?._plateMeta;
+          return a?.frame===299&&b?.frame===298;
+        }""")
+        assert all_retry.is_hidden()
+        assert sorted(calls) == [(298, None), (298, 60), (299, None), (299, 60)]
+        assert page.evaluate("REVIEW_VERSION") == 0
+        assert page.evaluate("EN[0]") is True
+        assert page.evaluate("EN[1]") is True
+        assert page.evaluate("CONFIRM_FAILED.size") == 0
+        assert not errors, errors
+        browser.close()
