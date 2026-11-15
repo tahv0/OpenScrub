@@ -169,6 +169,8 @@ def patch_row(row, index, groups, anchors):
         source_index, fields = group
         if fields.get('_remove_plate_verification'):
             result.pop('plate_verification', None)
+        if fields.get('_remove_interval_negative'):
+            result.pop('interval_negative', None)
         result.update({field: value for field, value in fields.items()
                        if not field.startswith('_') and field != 'human_confirmation'})
         if 'human_confirmation' in fields:

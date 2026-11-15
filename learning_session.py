@@ -297,6 +297,30 @@ def collect_feedback(job,doc,read_frame=None,log=None):
                     done=0,total=None,unit='examples')
     log(job['learning']['message'])
     current=vl.capture_constraints(doc)
+    # Withdrawing a plate-free declaration must also withdraw its previous
+    # harvested negatives; do not leave stale examples in a future pass.
+    active_ranges={entry['id'] for entry in current.get('plate_free_intervals', [])
+                   if entry.get('training') is True}
+    positive_regions={}
+    if any(sample.get('interval_negative_id') for sample in store['samples'].values()):
+        for candidate in doc['detections']:
+            confirmation=candidate.get('human_confirmation') or {}
+            if (candidate.get('category')=='plate'
+                    and (candidate.get('verified_label')=='plate'
+                         or confirmation.get('label')=='positive')):
+                frame=vl._frame(candidate,doc['render_state'])
+                positive_regions.setdefault(frame,[]).append(
+                    vl._screen_box(candidate,doc['render_state'],frame))
+    def keep_sample(sample):
+        interval=sample.get('interval_negative_id')
+        if not interval:return True
+        if interval not in active_ranges:return False
+        # An individual human reclassification supersedes its older negative
+        # training crop even if the enclosing plate-free interval is retained.
+        return not any(vl._iou(sample['box'],box)>=.5
+                       for box in positive_regions.get(sample['frame'],()))
+    store['samples']={key:sample for key,sample in store['samples'].items()
+                      if keep_sample(sample)}
     prior=(store.get('constraints') or {}).get('anchors',[])
     merged={a['id']:a for a in prior}
     by_frame={}
@@ -321,9 +345,16 @@ def collect_feedback(job,doc,read_frame=None,log=None):
     generation=(doc.get('learning') or {}).get('pass_id','initial')
     groups={}
     for i,r in enumerate(rows):
-        if r.get('learning_group'):
+        if r.get('learning_group') and not r.get('interval_negative'):
             groups[r.get('track',-1)]=r['learning_group']
     def group_for(i,r):
+        interval=r.get('interval_negative') or {}
+        if interval.get('training') is True:
+            # Cap correlated frames: one hard negative per 10-second window,
+            # choosing the strongest detector false positive within that
+            # window below, rather than dumping every video frame to disk.
+            bucket=int(vl._frame(r,rs)//max(1,round(rs['fps']*10)))
+            return '%s:platefree:%s:%d'%(source,interval['id'],bucket)
         track=r.get('track',-1)
         return groups.get(track) or '%s:%s:%s'%(source,generation,('track-'+str(track) if track>=0 else 'row-'+str(i)))
     import findings_training
@@ -350,7 +381,10 @@ def collect_feedback(job,doc,read_frame=None,log=None):
     for i,r in enumerate(rows):
         if i in archive_managed:continue
         if r.get('category')=='plate' and r.get('verified_label')=='not_plate':
-            negatives.setdefault(group_for(i,r),(i,r))
+            key=group_for(i,r)
+            if key not in negatives or (r.get('interval_negative') and
+                    float(r.get('confidence',0))>float(negatives[key][1].get('confidence',0))):
+                negatives[key]=(i,r)
     requested.extend((i,r,'negative',None) for i,r in negatives.values())
     # Explicit rejection wins over contradictory positive rows from the same
     # group, as in the previous positive-then-negative collector.
@@ -463,6 +497,7 @@ def collect_feedback(job,doc,read_frame=None,log=None):
                 if os.name!='nt':(root/filename).chmod(0o600)
                 store['samples'][sid]={'image':filename,'image_sha256':sha256(root/filename),
                     'label':label,'quality':'human_quad' if label=='positive' else 'human_hard_negative',
+                    'interval_negative_id':(r.get('interval_negative') or {}).get('id'),
                     'points':points,'frame':frame,'box':box,'group':group,
                     'baseline_box':[(box[0]-x1)/(x2-x1),(box[1]-y1)/(y2-y1),
                                     (box[2]-x1)/(x2-x1),(box[3]-y1)/(y2-y1)]}

@@ -55,6 +55,7 @@ import openscrub_logging as diagnostics
 import finding_previews
 import review_preview_index
 import review_journal
+import review_time_ranges
 import findings_web
 import findings_ui
 import review_similarity_ui
@@ -2296,7 +2297,9 @@ def job_detections(jid):
                     "frame_count": len(doc["render_state"]["cum"]),
                     "fps": doc["render_state"]["fps"],
                     "duration": len(doc["render_state"]["cum"]) /
-                                doc["render_state"]["fps"]})
+                                doc["render_state"]["fps"],
+                    "plate_free_intervals": doc.get("plate_free_intervals", []),
+                    "plate_free_range_can_undo": bool(doc.get("plate_free_range_undo"))})
     elapsed = round((time.monotonic() - started) * 1000)
     response.headers['Server-Timing'] = 'detections;dur=%d' % elapsed
     response.headers['X-Review-Listing'] = 'legacy_fallback'
@@ -3203,6 +3206,51 @@ def learned_model_delete(model_id):
     with _REVIEW_WORK_LOCK:
         learned_models.delete_model(learned_models_root(), model_id)
     return jsonify({"ok": True})
+
+
+@app.route("/api/jobs/<jid>/plate-free-range", methods=["POST"])
+@_serialize_review_edit
+def job_plate_free_range(jid):
+    """One source-bound time-range decision, not thousands of confirm POSTs."""
+    job = JOBS.get(jid) or abort(404)
+    if job['phase'] not in ('paused', 'review', 'done'):
+        return jsonify(error='Pause or finish scanning before reviewing a time range.'), 409
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return jsonify(error='Choose a video start and end time.'), 400
+    try:
+        if payload.get('preview_only') is True:
+            document = _load_job_report(job)
+            review_time_ranges.source_hash(document)
+            return jsonify(review_time_ranges.preview(
+                document, payload.get('start'), payload.get('end')))
+        # Range changes are rare explicit report boundaries. Never write one
+        # archive crop per sighting or propagate to an entire tracked group.
+        _review_journal_snapshot(job)
+        document = _load_job_report(job)
+        approved = (document.get('video_sections') or {}).get('items') or []
+        section_locked = ((job.get('section') or {}).get('role') == 'export'
+                          or any(item.get('approved') for item in approved))
+        original = deepcopy(document) if section_locked else None
+        if payload.get('undo') is True:
+            result = review_time_ranges.undo(document)
+        else:
+            result = review_time_ranges.apply(
+                document, payload.get('start'), payload.get('end'),
+                training=payload.get('training', False))
+        if section_locked:
+            _SECTIONS.guard_edits(job, original, document)
+        path = os.path.join(job['dir'], 'report.json')
+        stop_review.atomic_report(path, document)
+        try:
+            review_preview_index.publish_listing(path, document)
+        except Exception:
+            diagnostics.exception('plate_free_range_listing_refresh_failed', job)
+        return jsonify(result)
+    except review_time_ranges.RangeConflict as error:
+        return jsonify(error=str(error)), 409
+    except ValueError as error:
+        return jsonify(error=str(error)), 400
 
 
 @app.route("/api/jobs/<jid>/detections", methods=["POST"])
@@ -6302,6 +6350,79 @@ async function checkPlateDetections(){
  }catch(error){if(CUR===job&&JOBVIEW===view)note.textContent="Could not check detections: "+error.message;}
  finally{if(button.isConnected)button.disabled=false;}
 }
+let PLATE_RANGE_BUSY=false;
+function parsePlateRangeTime(value){
+ const parts=String(value||'').trim().split(':');
+ if(parts.length<2||parts.length>3||parts.some(x=>!/^[0-9]+$/.test(x)))return NaN;
+ const numbers=parts.map(Number);
+ if(numbers.some(x=>!Number.isSafeInteger(x))||numbers.at(-1)>59||(parts.length===3&&numbers.at(-2)>59))return NaN;
+ return numbers.reduce((total,part)=>total*60+part,0);
+}
+function plateRangeValues(){
+ const start=parsePlateRangeTime(document.getElementById('plateFreeFrom')?.value);
+ const end=parsePlateRangeTime(document.getElementById('plateFreeTo')?.value);
+ if(!Number.isFinite(start)||!Number.isFinite(end)||start<0||end<=start||end>DUR+1e-6)
+  throw new Error('Enter valid start and end times within this scanned video (MM:SS or HH:MM:SS).');
+ return {start,end,training:!!document.getElementById('plateFreeTrain')?.checked};
+}
+function plateRangeNotice(message,failed=false){
+ const status=document.getElementById('plateFreeRangeStatus');
+ if(status){status.textContent=message;status.style.color=failed?'#fbbf24':'#94a3b8';}
+}
+async function previewPlateFreeRange(){
+ if(PLATE_RANGE_BUSY)return;
+ PLATE_RANGE_BUSY=true;
+ try{
+  const values=plateRangeValues();
+  plateRangeNotice('Checking exact source-frame boundaries…');
+  const {data}=await reviewRequest('api/jobs/'+CUR+'/plate-free-range',{
+   method:'POST',headers:{'Content-Type':'application/json'},
+   body:JSON.stringify({...values,preview_only:true}),timeoutMs:90000});
+  plateRangeNotice(data.matched+' plate finding(s) eligible; '+data.protected+
+   ' individually confirmed finding(s) preserved; '+data.crossing_boundary+
+   ' boundary-crossing legacy finding(s) need individual review; '+data.training_ineligible+
+   ' approximate-frame finding(s) cannot become training samples until rescanned with exact frame indexes.');
+ }catch(error){plateRangeNotice(error.message,true);}
+ finally{PLATE_RANGE_BUSY=false;}
+}
+async function applyPlateFreeRange(undo=false){
+ if(PLATE_RANGE_BUSY)return;
+ let values;
+ try{if(!undo)values=plateRangeValues();}
+ catch(error){plateRangeNotice(error.message,true);return;}
+ const message=undo?'Undo the most recent plate-free interval? Newer edits to those findings will be protected.':
+  'Mark all eligible plate findings in this interval as Not a plate and Keep visible?'+
+  (values.training?' The interval will also supply explicitly approved negative training examples.':
+   ' These labels will NOT be used to create training examples.');
+ if(!confirm(message))return;
+ PLATE_RANGE_BUSY=true;
+ const job=CUR,view=JOBVIEW;
+ const from=document.getElementById('plateFreeFrom')?.value||'';
+ const to=document.getElementById('plateFreeTo')?.value||'';
+ try{
+  plateRangeNotice('Saving existing edits before updating the interval…');
+  if(!await saveAndRender(true))throw new Error('Save the pending review choices before marking this interval.');
+  if(CUR!==job||JOBVIEW!==view)return;
+  plateRangeNotice('Saving the interval decision…');
+  const {data}=await reviewRequest('api/jobs/'+job+'/plate-free-range',{
+   method:'POST',headers:{'Content-Type':'application/json'},
+   body:JSON.stringify(undo?{undo:true}:values),timeoutMs:120000});
+  if(CUR!==job||JOBVIEW!==view)return;
+  VLBL={};VLBLJOB=null;LEARNING_SELECTION=null;
+  const refreshed=await loadReview();
+  if(!refreshed)return;
+  document.getElementById('plateFreeFrom').value=from;
+  document.getElementById('plateFreeTo').value=to;
+  document.getElementById('plateFreeTrain').checked=!!values?.training;
+  plateRangeNotice(undo?data.undone+' finding(s) restored.':
+   data.matched+' plate finding(s) marked Not a plate and Keep visible. '+
+   (data.training?'Training negatives approved. ':'Training examples not added. ')+
+   data.protected+' individually confirmed finding(s) preserved; '+
+   data.crossing_boundary+' boundary-crossing finding(s) need individual review. '+
+   data.training_ineligible+' approximate-frame finding(s) were excluded from training.');
+ }catch(error){if(CUR===job&&JOBVIEW===view)plateRangeNotice(error.message,true);}
+ finally{PLATE_RANGE_BUSY=false;}
+}
 function reviewChoiceDelta(){
  const base=REVIEW_BASE&&REVIEW_BASE.job===CUR?REVIEW_BASE:null;
  const enabled={},verified_labels={},output_choices={};
@@ -6373,6 +6494,23 @@ async function loadReview(signal=null,phase=SHELLPH){
   <button type="button" class="sec" id="reviewSimilarToggle" onclick="toggleReviewSimilarity()">Group similar pictures</button>
   <button type="button" id="reviewShowAll" class="sec" hidden onclick="reviewAllFindings()">Show all findings</button>
  </div>
+ <details id="plateFreeRangePanel" style="margin-bottom:12px">
+  <summary>Mark a video time range as containing no licence plates</summary>
+  <p class="review-copy">If you know this stretch contains no plates, mark only its plate findings as Not a plate and keep them visible in the output. Findings outside the interval and individually confirmed examples are preserved. A group can contain both marked and unmarked frames.</p>
+  <div class="row" style="gap:8px;align-items:end">
+   <label>From (MM:SS or HH:MM:SS)<input id="plateFreeFrom" type="text" placeholder="02:00" style="max-width:140px"></label>
+   <label>To (MM:SS or HH:MM:SS)<input id="plateFreeTo" type="text" placeholder="12:00" style="max-width:140px"></label>
+  </div>
+  <label style="display:block;margin:10px 0"><input id="plateFreeTrain" type="checkbox"> Use these negatives as trusted examples when training &amp; rescanning this video</label>
+  <p class="review-copy">Training selects representative examples from this section instead of saving a separate large image for every detected frame. Check this only if you are certain the interval has no real plates.</p>
+  <div class="row">
+   <button type="button" class="sec" onclick="previewPlateFreeRange()">Check affected findings</button>
+   <button type="button" onclick="applyPlateFreeRange()">Mark interval Not a plate</button>
+   <button type="button" class="sec" onclick="applyPlateFreeRange(true)">Undo last interval</button>
+  </div>
+  <p id="plateFreeRangeStatus" class="review-copy" role="status" aria-live="polite">${(d.plate_free_intervals||[]).length} previous plate-free interval(s). ${d.plate_free_range_can_undo?'Last interval can be undone.':'No interval action available to undo.'}</p>
+  <p class="review-copy">Only plate detections are changed. Unindexed detections crossing a boundary are left for manual review rather than being changed outside the chosen range.</p>
+ </details>
  <details id="knownPlateSearch" style="margin-bottom:12px"><summary>Find examples using known plate numbers</summary>
   <p class="review-copy">Optional local OCR search. Enter the number(s) you expect, one per line. Full matches count more strongly than fragments. It tries rotated, upside-down, mirrored and perspective-corrected views, then adds possible matches to review. Confirm examples before training.</p>
   <label for="knownPlateTexts">Known plate numbers</label><textarea id="knownPlateTexts" rows="2" maxlength="400" placeholder="ABC-123" autocomplete="off" spellcheck="false" style="width:100%;box-sizing:border-box"></textarea>
@@ -6463,6 +6601,7 @@ async function loadReview(signal=null,phase=SHELLPH){
    rep.t_start=members[0].t_start;
    rep.t_end=members[members.length-1].t_end;
    rep.frames=members.length;
+   rep.rangeNegativeCount=members.filter(m=>m.human_confirmation?.source==='time_range').length;
    rep.fallbacks=[...new Set(members.map(m=>m.fallback_reason).filter(Boolean))];
    rep.fallbackCount=members.filter(m=>m.fallback_reason).length;
    rep.human_region_confirmed=members.some(m=>m.human_region_confirmed);
@@ -6497,7 +6636,7 @@ async function loadReview(signal=null,phase=SHELLPH){
     <small class="preview-status" role="status">Preview not loaded</small>
     <button class="sec preview-retry" hidden onclick="retryReviewPreview(this)">Retry preview</button>
     ${x.category==="plate"?'<small class="quad-status" role="status" title="Corners apply to this detected track. Review changing perspective. Keyboard: select corner 1–4, use arrows; Ctrl+Z undoes.">Corners autosave to track</small><button type="button" class="sec quad-retry" hidden>Retry save</button>':""}
-    <div>${plateVerificationBadge(x)}${x.learning_conflict?'<span class="badge" title="The original coverage was retained where the learned model could not make a reliable refinement">Model disagreement — review</span> ':""}${plateFallbackText(x)?`<span class="badge" style="white-space:normal">${plateFallbackText(x)}</span> `:""}${x.shaped?'<span class="badge" title="Thumbnail rectangle is a selection guide; open to inspect the mask and any exclusions">shaped mask</span> ':""}${x.personcard?`<b>Person ${x.person+1}</b> — one decision for ALL their appearances`:`"${sectionEscape(x.text)}"`}${x.frames?` <span class="badge">×${x.frames} frames</span>`:""}${x.confidence?` <span class="badge" title="detector confidence — not a human decision">${Math.round(x.confidence*100)}%</span>`:""} <br>${x.t_start.toFixed(1)}–${x.t_end.toFixed(1)}s</div>
+    <div>${plateVerificationBadge(x)}${x.learning_conflict?'<span class="badge" title="The original coverage was retained where the learned model could not make a reliable refinement">Model disagreement — review</span> ':""}${plateFallbackText(x)?`<span class="badge" style="white-space:normal">${plateFallbackText(x)}</span> `:""}${x.shaped?'<span class="badge" title="Thumbnail rectangle is a selection guide; open to inspect the mask and any exclusions">shaped mask</span> ':""}${x.personcard?`<b>Person ${x.person+1}</b> — one decision for ALL their appearances`:`"${sectionEscape(x.text)}"`}${x.frames?` <span class="badge">×${x.frames} frames</span>`:""}${x.rangeNegativeCount?` <span class="badge" title="Applies only to these sightings, not necessarily the whole track">${x.rangeNegativeCount}/${x.frames} interval negatives</span>`:""}${x.confidence?` <span class="badge" title="detector confidence — not a human decision">${Math.round(x.confidence*100)}%</span>`:""} <br>${x.t_start.toFixed(1)}–${x.t_end.toFixed(1)}s</div>
     ${plateTextBadge(x)}
     <div class="review-similar-slot" id="similar${x.i}"></div>
     <div class="finding-confirm" role="group" aria-label="Human classification">

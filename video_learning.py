@@ -9,6 +9,7 @@ import hashlib
 import json
 import math
 from pathlib import Path
+import review_time_ranges
 
 import cv2
 import numpy as np
@@ -51,7 +52,9 @@ def capture_constraints(doc):
               and not r.get('learning_anchor') and r.get('track', -1) >= 0}
     anchors = []
     for row_index, row in enumerate(rows):
-        if row.get('category') != 'plate':
+        if row.get('category') != 'plate' or row.get('interval_negative'):
+            # Interval assertions have their own bounded source-level evidence.
+            # Never manufacture thousands of independent clicked-frame anchors.
             continue
         label = row.get('verified_label')
         negative = (label == 'not_plate' and row.get('enabled') is False) or row.get('track', -1) in denied
@@ -78,6 +81,7 @@ def capture_constraints(doc):
         group=next((a['group'] for a in anchors if a['original'].get('track')==track),str(track))
         paths.append({'group':group,'samples':sorted(samples.items())})
     return {'schema':1,'negative_paths':paths,'source_sha256':source,'fps':float(rs['fps']),
+            'plate_free_intervals':deepcopy(doc.get('plate_free_intervals', [])),
             'anchors':anchors,
             'manual':[deepcopy(r) for r in rows if r.get('category')=='manual'],
             'audio_redactions':deepcopy(doc.get('audio_redactions',[]))}
@@ -155,6 +159,40 @@ def apply_constraints(doc, constraints):
             if w<=0 or h<=0: raise ValueError('Invalid rescan box')
             match['plate_quad']=[[(x-b[0])/w,(y-b[1])/h] for x,y in anchor['points']]
             match.update(poly=[],poly_holes=[],mask_pad=0,fallback_reason='')
+    # A reviewer can certify an entire SOURCE interval as plate-free.
+    # Keep it frame-bounded on each rescan: a track may cross both edges.
+    # This also classifies new proposals appearing in the same known-empty
+    # source interval without inventing per-frame clicked archive entries.
+    intervals=deepcopy(constraints.get('plate_free_intervals', []))
+    for interval in intervals:
+        start,end=interval['start_frame'],interval['end_frame']
+        if (interval.get('source_sha256')!=constraints['source_sha256']
+                or type(start) is not int or type(end) is not int
+                or not 0<=start<end<=len(rs['cum'])
+                or type(interval.get('training')) is not bool):
+            raise ValueError('A plate-free interval belongs to a different video timeline')
+        for i,row in enumerate(rows):
+            if (row.get('category')!='plate'
+                    or review_time_ranges._protected(row)
+                    or not review_time_ranges._inside(row,start,end,float(rs['fps']))):
+                continue
+            training=(interval['training']
+                      and type(row.get('frame_index')) is int
+                      and row['frame_index']>=0)
+            row.update(enabled=False,output_choice_explicit=True,
+                verified_label='not_plate' if training else '',
+                plate_verification_override=True,
+                human_confirmation=dict(label='negative',category='plate',
+                    source='time_range',training=training,range_id=interval['id']),
+                interval_negative=dict(id=interval['id'],training=training),
+                learning_anchor=hashlib.sha256(json.dumps([
+                    constraints['source_sha256'],interval['id'],i,row.get('cbox')
+                ]).encode()).hexdigest()[:24])
+            row.pop('plate_verification',None)
+            row.pop('learning_group',None)
+    result['plate_free_intervals']=intervals
+    # A new scan changes row identities; an old row-index undo receipt is stale.
+    result.pop('plate_free_range_undo',None)
     existing={json.dumps(r,sort_keys=True) for r in rows if r.get('category')=='manual'}
     rows.extend(deepcopy(r) for r in constraints.get('manual',[])
                 if json.dumps(r,sort_keys=True) not in existing)

@@ -376,7 +376,8 @@ def _journal_confirm(job, index, payload, doc):
     if row['category'] == 'plate':
         fields.update(verified_label='plate' if label == 'positive' else 'not_plate',
                       plate_verification_override=True,
-                      _remove_plate_verification=True)
+                      _remove_plate_verification=True,
+                      _remove_interval_negative=True)
     if payload.get('points') is not None:
         meta['points'] = _shape(payload['points'], meta)
         box = meta['box']
@@ -503,6 +504,7 @@ def confirm(job, index, payload):
         member['output_choice_explicit'] = True
         member['human_confirmation'] = dict(label=label, category=row['category'],
                                             source='explicit', propagated=i != index)
+        member.pop('interval_negative', None)
         if row['category'] == 'plate':
             member['verified_label'] = 'plate' if label == 'positive' else 'not_plate'
             if payload.get('points') is not None:
