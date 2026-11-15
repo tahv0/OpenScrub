@@ -345,3 +345,43 @@ def test_archive_revision_conflict_and_corner_reconfirmation_use_real_api(
             assert not errors,errors
         finally:
             browser.close()
+
+
+def test_busy_review_writer_retries_confirmation_without_duplicate_human_labels():
+    """A proven pre-write lock refusal must not drop a human training label."""
+    choices_script(r"""
+let calls=0;
+async function reviewRequest(url,options){
+ const body=JSON.parse(options.body);
+ assert.equal(body.label,'positive');
+ assert.equal(url,'api/jobs/job/confirm/0');
+ calls++;
+ if(calls<3)throw Object.assign(new Error('Another review edit is saving. Retry shortly.'),{status:503});
+ return {data:{finding:{id:'example',revision:1}}};
+}
+(async()=>{
+ await confirmFinding(0,'positive');
+ assert.equal(calls,3);
+ assert.equal(CONFIRM_FAILED.size,0);
+ assert.equal(EN[0],true);
+ assert.equal(VLBL[0],'plate');
+ assert.equal(REVIEW_BASE.labels[0],'plate');
+})().catch(error=>{console.error(error);process.exitCode=1});
+""")
+
+
+def test_unrelated_503_does_not_repeat_human_confirmation():
+    """An ambiguous server failure is never safe to replay as a write."""
+    choices_script(r"""
+let calls=0;
+async function reviewRequest(){
+ calls++;
+ throw Object.assign(new Error('Saved picture writer failed after starting'),{status:503});
+}
+(async()=>{
+ await confirmFinding(0,'negative');
+ assert.equal(calls,1,'an uncertain failure must never be replayed');
+ assert.equal(CONFIRM_FAILED.size,1);
+ assert.equal(VLBL[0],undefined);
+})().catch(error=>{console.error(error);process.exitCode=1});
+""")
