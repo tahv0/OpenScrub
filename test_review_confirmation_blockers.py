@@ -191,12 +191,12 @@ def test_discarding_conflicted_corners_preserves_real_failed_confirmation():
 
     choices_script(r"""
 const before=[[0,0],[10,0],[10,8],[0,8]];
-const changed=[[1,1],[10,0],[10,8],[0,8]];
+const adjustedPoints=[[1,1],[10,0],[10,8],[0,8]];
 const error=Object.assign(new Error("Human confirmation not acknowledged"),{
   status:409,reviewAttemptedLabel:"positive"
 });
 const edit={i:0,job:CUR,dirty:true,archiveConflict:true,error,
-  version:1,pending:null,points:plateCopy(changed),saved:plateCopy(before),
+  version:1,pending:null,points:plateCopy(adjustedPoints),saved:plateCopy(before),
   draw(){}};
 PLATE_EDITS.set(0,edit);CONFIRM_FAILED.set(0,error);
 dismissFindingConfirmation(0);
@@ -273,7 +273,7 @@ def test_exact_frame_endpoint_replaces_borrowed_representative_for_confirmation(
     # now source frame 299 and shares a track with finding 1 (on frame 300).
     doc["detections"][0].update(
         frame_index=299, t_start=299 / 30, t_end=299 / 30,
-        last_seen=299 / 30, track=1
+        last_seen=299 / 30
     )
     report.write_text(json.dumps(doc))
     with web.app.test_client() as client:
@@ -316,7 +316,7 @@ def test_review_loads_exact_source_frame_and_rebinds_clean_editor(
     doc = json.loads(report.read_text())
     doc["detections"][0].update(
         frame_index=299, t_start=299 / 30, t_end=299 / 30,
-        last_seen=299 / 30, track=1
+        last_seen=299 / 30
     )
     report.write_text(json.dumps(doc))
     with sync_api.sync_playwright() as pw:
@@ -373,7 +373,7 @@ def test_repeated_stale_representative_conflict_recovers_by_loading_exact_frame(
     doc = json.loads(report.read_text())
     doc["detections"][0].update(
         frame_index=299, t_start=299 / 30, t_end=299 / 30,
-        last_seen=299 / 30, track=1
+        last_seen=299 / 30
     )
     report.write_text(json.dumps(doc))
     original = web.app.view_functions["finding_confirm"]
