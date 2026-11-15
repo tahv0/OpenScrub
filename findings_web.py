@@ -29,9 +29,9 @@ _LEGACY_TIMING_NOTE = ('This legacy variable-frame-rate picture uses an approxim
     'before saving confirmed training examples.')
 _OFF_FRAME_GEOMETRY_NOTE = (
     'Detector box or plate corners extend outside the source video frame. '
-    'This original-frame picture is for inspection only. Correct the detection '
-    'in Preview video & edit boxes or rescan before confirming a training '
-    'example or saving corners. Automatic redaction is unchanged.')
+    'This original-frame picture is for inspection only. Use Redraw plate area '
+    'on its exact source frame to replace the invalid detection before saving '
+    'corners or trusted training. Automatic redaction is unchanged.')
 _web = None
 
 
