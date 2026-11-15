@@ -2100,7 +2100,7 @@ def _read_review_frame(path, index, exact=True, crop=None, decode_timeout=None):
                     not (0 <= x1 < x2 <= info["width"] and
                          0 <= y1 < y2 <= info["height"])):
                 abort(422, description="Preview crop is outside source frame.")
-            video_filter = ("showinfo,crop=w=%d:h=%d:x=%d:y=%d:exact=1"
+            video_filter = ("showinfo,format=rgb24,crop=w=%d:h=%d:x=%d:y=%d:exact=1"
                             % (x2-x1, y2-y1, x1, y1))
         else:
             video_filter = "showinfo"
