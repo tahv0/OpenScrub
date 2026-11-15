@@ -406,7 +406,7 @@ class _ConfirmTrace:
             pass
 
 
-def _journal_confirm(job, index, payload, doc, trace=None):
+def _journal_confirm(job, index, payload, doc, trace=None, rebind=False):
     label = payload.get('label')
     if label not in ('positive', 'negative') or type(label) is not str:
         raise ValueError('Choose Is a … or Not a … to store a confirmed example.')
@@ -419,6 +419,17 @@ def _journal_confirm(job, index, payload, doc, trace=None):
     row = dict(doc['detections'][index])
     if payload.get('preview_token') not in (None, meta['preview_token']):
         abort(409, description='The finding changed. Reload its picture.')
+    unverified_rebound_shape = (rebind and row['category'] == 'plate'
+                                and payload.get('points') is None)
+    if unverified_rebound_shape:
+        # This Is/Not click proves only the displayed *new* source image.
+        # Never transplant corners, polygons or machine masks associated with
+        # the previously archived frame. Keep the original archived example
+        # intact; use conservative detector-box coverage on the new frame.
+        row.update(plate_quad=[], human_region_confirmed=False)
+        box = meta['box']
+        meta['points'] = [[box[0], box[1]], [box[2], box[1]],
+                          [box[2], box[3]], [box[0], box[3]]]
     fields = dict(enabled=(label == 'positive'), output_choice_explicit=True,
                   human_confirmation=dict(label=label, category=row['category'],
                                           source='explicit'))
@@ -440,6 +451,11 @@ def _journal_confirm(job, index, payload, doc, trace=None):
     if trace: trace.mark('archive')
     anchor = dict(confirmed_finding_id=entry['id'],
                   confirmed_finding_revision=entry['revision'])
+    if unverified_rebound_shape:
+        # Source-bound redaction geometry is an anchor override, never a
+        # group-wide replacement of other frames' independently saved shapes.
+        anchor.update(plate_quad=[], human_region_confirmed=False,
+                      poly=[], poly_holes=[], mask_pad=-1)
     if payload.get('points') is not None:
         anchor['human_region_confirmed'] = True
     if trace: trace.enter('journal_commit')
@@ -525,13 +541,24 @@ def confirm(job, index, payload):
         fast_path = (journal_doc is not None and _journal_matches_archived_source(
             job, journal_doc, index, payload.get('preview_key')))
         trace.mark('source_identity_check')
-        if fast_path:
-            trace.mode = 'journal'
-            return _journal_confirm(job, index, payload, journal_doc, trace)
+        if journal_doc is not None:
+            # An explicit Is/Not click may deliberately reconfirm a *different*
+            # source frame/box from the same track. _archived() already proves
+            # the original video/timeline identity and then derives a NEW
+            # immutable archive ID for a relocated sample. It never changes
+            # the old confirmed example. The small SQLite group/anchor journal
+            # can safely record that new receipt without rewriting all rows of
+            # a large report, which also invalidated the preview index.
+            #
+            # Do NOT apply this relaxation to region(): a corner drag alone
+            # cannot transfer a prior human classification to a new picture.
+            trace.mode = 'journal' if fast_path else 'journal_rebound'
+            return _journal_confirm(job, index, payload, journal_doc, trace,
+                                    rebind=not fast_path)
         trace.mode = 'full_report'
-        # Relocalized confirmed rows and section-locked reports use the existing
-        # source-bound rebind rules. Materialize pending journal edits first.
-        # Fallback section/legacy writes operate on one fully materialized report.
+        # Approved sections and legacy reports missing verified source
+        # metadata still require the original guarded full-report path.
+        # Those operations remain fail-closed until their source is verified.
         trace.enter('publish_journal')
         _web._review_journal_snapshot(job)
         trace.mark('publish_journal')
