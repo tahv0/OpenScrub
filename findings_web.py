@@ -29,9 +29,9 @@ _LEGACY_TIMING_NOTE = ('This legacy variable-frame-rate picture uses an approxim
     'before saving confirmed training examples.')
 _OFF_FRAME_GEOMETRY_NOTE = (
     'Detector box or plate corners extend outside the source video frame. '
-    'This original-frame picture is for inspection only. Correct the detection '
-    'in Preview video & edit boxes or rescan before confirming a training '
-    'example or saving corners. Automatic redaction is unchanged.')
+    'This original-frame picture is for inspection only. Use Redraw plate area '
+    'on its exact source frame to replace the invalid detection before saving '
+    'corners or trusted training. Automatic redaction is unchanged.')
 _web = None
 
 
@@ -173,7 +173,8 @@ def preview(job, index, doc=None, cache_only=False, preferred_key=None,
             abort(409, description='This displayed picture is no longer a valid cached sample. Reload its preview.')
     else:
         cached = _web._serialize_review_read(previews.lookup)(job['dir'], cache_row, rs)
-        if cached is None and not exact_only and int(row.get('track', -1)) >= 0:
+        if (cached is None and not exact_only and not row.get('source_repair_receipt')
+                and int(row.get('track', -1)) >= 0):
             cached = _web._serialize_review_read(previews.lookup)(
                 job['dir'], cache_row, rs, allow_representative=True)
     if cached is None and cache_only:
@@ -208,7 +209,8 @@ def preview(job, index, doc=None, cache_only=False, preferred_key=None,
                 frame_index=shown_frame if exact else -1,
                 t=shown_t if exact else source['requested_time'], box=shown_box,
                 points=shown_points, track=row.get('track', -1), compact=True,
-                exact_frame=exact, classification_allowed=exact and not unsafe_geometry,
+                exact_frame=exact, source_repaired=bool(row.get('source_repair_receipt')),
+                classification_allowed=exact and not unsafe_geometry,
                 classification_note=(_OFF_FRAME_GEOMETRY_NOTE if unsafe_geometry
                                      else None if exact else _LEGACY_TIMING_NOTE),
                 requested_frame=frame,
@@ -224,6 +226,172 @@ def preview(job, index, doc=None, cache_only=False, preferred_key=None,
     meta['frame_source_token'] = (
         _token(doc, source_row, shown_frame, None) if _source_hash(doc) else None)
     return doc, row, meta, jpeg
+
+
+
+def _plate_repair_preview(job, index, doc=None):
+    """Require an EXACT, original-video frame; a borrowed track JPEG is unsafe."""
+    doc = doc if doc is not None else _web._load_preview_report(job)
+    if not (0 <= index < len(doc.get('detections', []))):
+        abort(404)
+    row = doc['detections'][index]
+    if row.get('category') != 'plate':
+        abort(404)
+    fps = float(doc['render_state']['fps'])
+    if (fps <= 0 or float(row['t_end']) - float(row['t_start']) > 1.5 / fps):
+        raise library.ConflictError(
+            'This detection spans several frames. Open the video editor to '
+            'correct a time interval instead of applying one frame shape.')
+    if not _source_hash(doc):
+        raise library.ConflictError(
+            'This scan has no verified source identity. Rescan or restore its source metadata.')
+    _, _, meta, _ = preview(job, index, doc=doc, exact_only=True)
+    if not (row.get('frame_index', -1) >= 0
+            and meta.get('geometry_outside_frame') is True
+            and meta.get('exact_frame') is True
+            and meta.get('requested_frame') == meta.get('frame')
+            and meta.get('frame_source_token')):
+        raise library.ConflictError(
+            'The source geometry is no longer invalid or the exact frame is unavailable. '
+            'Reload Review before redrawing.')
+    return doc, row, meta
+
+
+def plate_repair_frame(job, index):
+    """Return a FULL, PTS-verified source frame for an explicit user redraw.
+
+    A thumbnail may be cropped around the wrong detector rectangle, hiding
+    the real plate. Never redraw on a neighboring track representative.
+    """
+    doc, _, meta = _plate_repair_preview(job, index)
+    identity = _web._video_identity(job['video'])
+    expected = ((doc.get('provenance') or {}).get('input_sha256')
+                or (doc.get('source_identity') or {}).get('input_sha256'))
+    if not expected:
+        raise library.ConflictError('An original video SHA-256 is required for a plate repair.')
+    signature = (identity, expected)
+    verified = job.get('_finding_source_verified')
+    if not verified or verified.get('signature') != signature:
+        actual = learning_session.sha256(job['video'])
+        if actual != expected or _web._video_identity(job['video']) != identity:
+            raise library.ConflictError(
+                'The source video changed. Restore the scanned original before redrawing.')
+        verified = dict(signature=signature, sha256=actual)
+        job['_finding_source_verified'] = verified
+    frame = _web._read_exact_frame(job['video'], meta['frame'], decode_timeout=60)
+    if frame is None or _web._video_identity(job['video']) != identity:
+        raise library.ConflictError('The original source frame changed or could not be decoded.')
+    height, width = frame.shape[:2]
+    if (width, height) != (int(meta['width']), int(meta['height'])):
+        raise library.ConflictError('Source dimensions changed. No correction was saved.')
+    scale = min(1., 1920.0 / max(width, height))
+    if scale < 1:
+        frame = cv2.resize(frame, (max(1, round(width * scale)),
+                                   max(1, round(height * scale))),
+                           interpolation=cv2.INTER_AREA)
+    ok, encoded = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 82])
+    if not ok:
+        abort(500, description='Could not encode the exact source frame.')
+    # A POST must prove that this SAME current process served the full exact
+    # frame, not merely that a cropped/borrowed JPEG existed.
+    evidence = dict(identity=identity, source_sha256=expected,
+                    frame=meta['frame'], preview_token=meta['preview_token'],
+                    frame_source_token=meta['frame_source_token'])
+    receipts = job.setdefault('_plate_repair_views', {})
+    receipts[index] = evidence
+    if len(receipts) > 12:
+        receipts.pop(next(iter(receipts)))
+    response = Response(encoded.tobytes(), mimetype='image/jpeg',
+                        headers={'Cache-Control': 'no-store'})
+    response.headers['X-Repair-Geometry'] = json.dumps(dict(
+        frame=meta['frame'], width=width, height=height,
+        preview_token=meta['preview_token'],
+        frame_source_token=meta['frame_source_token']), separators=(',', ':'))
+    return response
+
+
+def repair_plate_anchor(job, index, payload):
+    """Explicitly replace ONLY the bad source-frame box and perspective quad.
+
+    No automatic Is/Not label, no trusted training archive, no propagation of
+    one frame's polygon to the rest of a rotating/moving track.
+    """
+    edit_id = payload.get('edit_id')
+    if not isinstance(edit_id, str) or not re.fullmatch(r'[A-Za-z0-9_.:-]{1,120}', edit_id):
+        raise ValueError('Redrawing requires an idempotent edit identifier.')
+    doc = _web._load_preview_report(job)
+    if not (0 <= index < len(doc.get('detections', []))):
+        abort(404)
+    row = doc['detections'][index]
+    receipt = row.get('source_repair_receipt') or {}
+    if receipt.get('edit_id') == edit_id:
+        box, quad = receipt.get('box'), row.get('plate_quad')
+        current_points = ([[box[0] + float(p[0]) * (box[2]-box[0]),
+                            box[1] + float(p[1]) * (box[3]-box[1])]
+                           for p in quad] if box and quad and len(quad) == 4 else [])
+        if (payload.get('points') != receipt.get('points')
+                or receipt.get('source_sha256') != _source_hash(doc)
+                or any(abs(a-b) > .01 for p, q in zip(
+                    current_points, receipt['points']) for a, b in zip(p, q))
+                or len(current_points) != 4):
+            raise library.ConflictError('This repair has been changed or superseded.')
+        return dict(ok=True, applied=1, source_repaired=True,
+                    needs_confirmation=True, box=receipt['box'],
+                    points=receipt['points'], frame=receipt['frame'],
+                    verified_samples_added=0)
+    doc, row, meta = _plate_repair_preview(job, index, doc=doc)
+    if (payload.get('preview_token') != meta['preview_token']
+            or payload.get('frame_source_token') != meta['frame_source_token']
+            or payload.get('frame') != meta['frame']):
+        raise library.ConflictError('This source frame or detector changed. Reopen Redraw plate.')
+    evidence = (job.get('_plate_repair_views') or {}).get(index)
+    if not evidence or any((
+            evidence.get('identity') != _web._video_identity(job['video']),
+            evidence.get('source_sha256') != ((doc.get('provenance') or {}).get('input_sha256')
+                                                 or (doc.get('source_identity') or {}).get('input_sha256')),
+            evidence.get('frame') != meta['frame'],
+            evidence.get('preview_token') != meta['preview_token'],
+            evidence.get('frame_source_token') != meta['frame_source_token'])):
+        raise library.ConflictError(
+            'Open the verified full source frame again before saving a redrawn plate.')
+    if ((job.get('section') or {}).get('role') == 'export'
+            or any(item.get('approved') for item in
+                   ((doc.get('video_sections') or {}).get('items') or []))):
+        raise library.ConflictError(
+            'This section is protected. Open an editable section candidate to repair it.')
+    points = _shape(payload.get('points'),
+                    dict(crop=[0, 0, meta['width'], meta['height']]))
+    xs, ys = [p[0] for p in points], [p[1] for p in points]
+    span = max(max(xs)-min(xs), max(ys)-min(ys))
+    pad = max(2., min(32., .04 * span))
+    width, height = int(meta['width']), int(meta['height'])
+    new_box = [max(0., float(math.floor(min(xs)-pad))),
+               max(0., float(math.floor(min(ys)-pad))),
+               min(float(width), float(math.ceil(max(xs)+pad))),
+               min(float(height), float(math.ceil(max(ys)+pad)))]
+    if not (new_box[0] < new_box[2] and new_box[1] < new_box[3]):
+        raise ValueError('Select a plate area inside the original video.')
+    sx, sy = new_box[2]-new_box[0], new_box[3]-new_box[1]
+    normalized = [[round((x-new_box[0])/sx, 6),
+                   round((y-new_box[1])/sy, 6)] for x, y in points]
+    ox, oy = doc['render_state']['cum'][meta['frame']]
+    new_content_box = [new_box[0]-ox, new_box[1]-oy,
+                       new_box[2]-ox, new_box[3]-oy]
+    patch = dict(cbox=new_content_box, plate_quad=normalized,
+                 human_region_confirmed=True, plate_verification_override=True,
+                 plate_verification=None, poly=[], poly_holes=[], mask_pad=-1,
+                 fallback_reason='', enabled=True, output_choice_explicit=False,
+                 verified_label='', human_confirmation=None,
+                 confirmed_finding_id=None, confirmed_finding_revision=None,
+                 source_repair_receipt=dict(edit_id=edit_id, points=points,
+                                            box=new_box, frame=meta['frame'],
+                                            source_sha256=_source_hash(doc)))
+    # A fresh source anchor replaces the old detector identity, not any
+    # previously archived human finding or its revision.
+    review_journal.write_anchor(job['dir'], index, patch)
+    return dict(ok=True, applied=1, source_repaired=True,
+                needs_confirmation=True, box=new_box, points=points,
+                frame=meta['frame'], verified_samples_added=0)
 
 
 def _video(job, doc, meta):
@@ -463,6 +631,15 @@ def _journal_confirm(job, index, payload, doc, trace=None, rebind=False):
     if trace: trace.mark('archive')
     anchor = dict(confirmed_finding_id=entry['id'],
                   confirmed_finding_revision=entry['revision'])
+    if row.get('source_repair_receipt'):
+        # An earlier invalid-box repair explicitly reset this one frame's
+        # untrusted label and protective output. A NEW human Is/Not click
+        # updates that source-row exception without altering sibling shapes.
+        anchor.update(human_confirmation=dict(fields['human_confirmation']),
+                      enabled=(label == 'positive'),
+                      output_choice_explicit=True,
+                      verified_label=fields.get('verified_label', ''),
+                      plate_verification_override=True)
     if unverified_rebound_shape:
         # Source-bound redaction geometry is an anchor override, never a
         # group-wide replacement of other frames' independently saved shapes.
@@ -529,16 +706,22 @@ def _journal_region(job, index, payload, doc):
     if archive:
         anchor.update(confirmed_finding_id=archive['id'],
                       confirmed_finding_revision=archive['revision'])
-    review_journal.write(job['dir'],row,index,dict(
-        plate_quad=quad, plate_verification_override=True,
-        _remove_plate_verification=True),anchor)
+    if row.get('source_repair_receipt'):
+        anchor.update(plate_quad=quad, plate_verification_override=True,
+                      plate_verification=None)
+        review_journal.write_anchor(job['dir'], index, anchor)
+    else:
+        review_journal.write(job['dir'],row,index,dict(
+            plate_quad=quad, plate_verification_override=True,
+            _remove_plate_verification=True),anchor)
     meta['preview_token'] = _token(doc,row,meta['frame'],meta.get('key'))
     elapsed = time.monotonic()-started
     if elapsed >= 3:
         _web.diagnostics.event('review_corner_save_slow',job,
             total_ms=round(elapsed*1000), report_write_ms=0,
             rows=_journal_members(doc,index), mode='sqlite_journal')
-    return dict(ok=True, applied=_journal_members(doc,index),
+    return dict(ok=True, applied=(1 if row.get('source_repair_receipt')
+                                  else _journal_members(doc,index)),
                 verified_samples_added=0, finding=archive, preview=meta,
                 verified_label=row.get('verified_label',''),
                 classification_required=not bool(confirmed.get('label')),
@@ -861,6 +1044,17 @@ def install(app, web):
         response.headers['X-Finding-Geometry'] = json.dumps(meta,separators=(',',':'))
         response.headers['X-Plate-Geometry'] = response.headers['X-Finding-Geometry']
         return response
+
+    @app.get('/api/jobs/<jid>/plate-repair/<int:index>/frame')
+    @_guard
+    def plate_repair_image(jid, index):
+        return plate_repair_frame(_job(jid), index)
+
+    @app.post('/api/jobs/<jid>/plate-repair/<int:index>')
+    @_guard
+    @web._serialize_review_edit
+    def plate_repair_save(jid, index):
+        return jsonify(repair_plate_anchor(_job(jid, True), index, _body()))
 
     @app.post('/api/jobs/<jid>/confirm/<int:index>')
     @_guard

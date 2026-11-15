@@ -5283,6 +5283,8 @@ function drawPlateThumbnail(img){
  if(!img._plateMeta||!img.naturalWidth)return;
  const existing=img._quadEdit;
  if(img._plateMeta.geometry_outside_frame){
+  const status=img.closest(".det")?.querySelector(".quad-status");
+  if(status)status.textContent="Corners outside source frame · use Redraw plate area";
   // Displaying original pixels is safe, but editing off-frame polygon is not.
   // Preserve an outstanding human draft rather than silently deleting it.
   if(existing&&!existing.dirty&&!existing.pending&&!existing.drag){
@@ -5405,24 +5407,32 @@ async function loadReviewPreview(state,task,cacheOnly){
   const hint=card.querySelector(".source-frame-note");
   const exactButton=card.querySelector(".source-frame-exact");
   const outside=meta?.geometry_outside_frame===true;
+  const repair=card.querySelector(".plate-repair-button");
+  if(repair)repair.hidden=!(outside&&meta?.exact_frame===true&&!borrowed);
   if(hint)hint.textContent=outside
    ?"Detector box/corners extend outside the video frame. "+
     (borrowed?"Showing cached frame "+meta.frame+" instead of detection frame "+
       meta.requested_frame+". Load exact frame to inspect the actual sighting. "
       :"Original source pixels only. ")+
-    "Correct the box in Preview video & edit boxes or rescan before trusted training."
+    "Use Redraw plate area on this exact source frame before trusted training."
    :borrowed?
    "Showing cached frame "+meta.frame+" instead of detection frame "+
    meta.requested_frame+". Load the exact source frame before confirming this finding.":"";
   if(exactButton)exactButton.hidden=!borrowed;
   drawPlateThumbnail(img);
-  if(meta?.classification_allowed===false){
+  if(meta){
    if(typeof FINDING_META!=="undefined"&&FINDING_META[meta.i]){
-    FINDING_META[meta.i].classification_allowed=false;
-    FINDING_META[meta.i].classification_note=meta.classification_note;
+    FINDING_META[meta.i].classification_allowed=meta.classification_allowed!==false;
+    FINDING_META[meta.i].classification_note=meta.classification_note||"";
+    FINDING_META[meta.i].source_repaired=!!meta.source_repaired;
+    if(meta.source_repaired)FINDING_META[meta.i].fallback_reason="";
    }
-   card.querySelectorAll('.finding-confirm button').forEach(button=>button.disabled=true);
-   const note=card.querySelector('[id^="vlabel"]');if(note)note.textContent=meta.classification_note;
+   card.querySelectorAll('.finding-confirm button').forEach(button=>
+    button.disabled=meta.classification_allowed===false||
+     CONFIRM_PENDING.has(meta.i)||PLATE_REVIEW_BUSY);
+   const note=card.querySelector('[id^="vlabel"]');
+   if(note)note.textContent=meta.classification_allowed===false?
+    meta.classification_note:findingStatus(meta.i);
   }
   if(status)status.textContent="";
   if(typeof reviewSimilarFingerprint==="function")reviewSimilarFingerprint(img);
@@ -5595,6 +5605,216 @@ function loadExactReviewFrame(button){
   if(button.isConnected){button.disabled=false;button.textContent="Load exact source frame";}
  });
 }
+
+function validPlateRepair(points,geom){
+ return Array.isArray(points)&&points.length===4&&
+  points.every(p=>p.length===2&&p.every(Number.isFinite)&&
+   p[0]>=0&&p[0]<=geom.width&&p[1]>=0&&p[1]<=geom.height)&&plateQuadValid(points);
+}
+async function openPlateRepair(button){
+ const card=button.closest(".det"),img=card?.querySelector("img[data-preview-url]");
+ const selected=img?._plateMeta,job=CUR,view=JOBVIEW;
+ const status=card?.querySelector(".source-frame-note");
+ if(!selected?.geometry_outside_frame||!selected.frame_source_token)return;
+ if(selected.match==="representative"||selected.frame!==selected.requested_frame){
+  if(status)status.textContent="Load the exact source frame before redrawing.";return;
+ }
+ const old=PLATE_EDITS.get(selected.i);
+ if(old&&(old.dirty||old.pending||old.drag)){
+  if(status)status.textContent="Preserve the unsaved corner draft before redrawing.";return;
+ }
+ button.disabled=true;button.textContent="Loading exact source frame…";
+ let url=null,dialog=null,saving=false,closed=false;
+ try{
+  const {response,data}=await reviewRequest(
+   "api/jobs/"+encodeURIComponent(job)+"/plate-repair/"+selected.i+"/frame",
+   {timeoutMs:120000},"blob");
+  if(CUR!==job||JOBVIEW!==view||!button.isConnected)return;
+  const geom=JSON.parse(response.headers.get("X-Repair-Geometry")||"null");
+  if(!geom||geom.frame!==selected.frame||
+     geom.frame_source_token!==selected.frame_source_token||
+     geom.preview_token!==selected.preview_token)
+   throw new Error("Source frame changed; reload the original preview.");
+  url=URL.createObjectURL(data);
+  const photo=new Image();photo.src=url;await photo.decode();
+  if(CUR!==job||JOBVIEW!==view||!button.isConnected)return;
+  const add=(parent,tag,label,style)=>{
+   const el=document.createElement(tag);
+   if(label!==null)el.textContent=label;
+   if(style)el.style.cssText=style;
+   parent.appendChild(el);return el;
+  };
+  dialog=add(document.body,"div",null,
+   "position:fixed;inset:0;z-index:11000;background:rgba(2,6,23,.94);"+
+   "display:flex;align-items:center;justify-content:center;padding:8px");
+  dialog.setAttribute("role","dialog");dialog.setAttribute("aria-modal","true");
+  dialog.setAttribute("aria-label","Redraw plate area on exact original frame");
+  const panel=add(dialog,"section",null,
+   "background:#111827;color:#e5e7eb;border:1px solid #475569;border-radius:10px;"+
+   "width:min(1150px,100%);max-height:96vh;display:flex;flex-direction:column;gap:8px;padding:12px");
+  add(panel,"strong","Redraw plate · exact frame "+geom.frame);
+  add(panel,"p","The old detector box is outside the video. Drag a new box or click "+
+   "four perspective corners. Zoom and pan as needed. Only this source frame "+
+   "will be changed; choose Is / Not afterward.",
+   "font-size:13px;margin:0");
+  const tools=add(panel,"div",null,"display:flex;flex-wrap:wrap;gap:6px;align-items:center");
+  const box=add(tools,"button","Drag box");
+  const corners=add(tools,"button","Four corners");
+  const clear=add(tools,"button","Clear");
+  const less=add(tools,"button","− Zoom");
+  const more=add(tools,"button","+ Zoom");
+  const zoomNote=add(tools,"span","100%","font-size:12px;color:#cbd5e1");
+  const scroller=add(panel,"div",null,
+   "overflow:auto;min-height:120px;max-height:67vh;flex:1 1 auto;"+
+   "border:1px solid #64748b;background:#080f1d");
+  const stage=add(scroller,"div",null,"position:relative;display:inline-block;vertical-align:top");
+  photo.draggable=false;
+  photo.style.cssText="display:block;max-width:none;height:auto;user-select:none;pointer-events:none";
+  stage.appendChild(photo);
+  const canvas=add(stage,"canvas",null,
+   "position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor:crosshair");
+  canvas.tabIndex=0;canvas.setAttribute("aria-label","Draw replacement plate on exact frame");
+  const hint=add(panel,"small","Drag a box around the entire plate.",
+   "font-size:12px;color:#cbd5e1;min-height:1.4em");
+  const buttons=add(panel,"div",null,"display:flex;gap:8px;justify-content:flex-end");
+  const cancel=add(buttons,"button","Cancel");
+  const save=add(buttons,"button","Save replacement · this frame only");save.disabled=true;
+  let mode="box",points=[],drag=null,zoom=1,requestBody=null;
+  const baseWidth=Math.min(geom.width,Math.max(290,Math.min(1050,window.innerWidth-70)));
+  const fromEvent=e=>{
+   const b=canvas.getBoundingClientRect();
+   return [Math.max(0,Math.min(geom.width,(e.clientX-b.left)/b.width*geom.width)),
+           Math.max(0,Math.min(geom.height,(e.clientY-b.top)/b.height*geom.height))];
+  };
+  const quadFrom=(a,b)=>[
+   [Math.min(a[0],b[0]),Math.min(a[1],b[1])],
+   [Math.max(a[0],b[0]),Math.min(a[1],b[1])],
+   [Math.max(a[0],b[0]),Math.max(a[1],b[1])],
+   [Math.min(a[0],b[0]),Math.max(a[1],b[1])]];
+  function draw(){
+   canvas.width=Math.max(1,Math.round(photo.clientWidth));
+   canvas.height=Math.max(1,Math.round(photo.clientHeight));
+   const ctx=canvas.getContext("2d");if(!ctx)return;
+   ctx.clearRect(0,0,canvas.width,canvas.height);
+   const shown=drag?quadFrom(drag.start,drag.end):points;
+   if(shown.length){
+    ctx.beginPath();
+    shown.forEach((p,k)=>{
+     const x=p[0]/geom.width*canvas.width,y=p[1]/geom.height*canvas.height;
+     if(k)ctx.lineTo(x,y);else ctx.moveTo(x,y);
+    });
+    if(shown.length===4)ctx.closePath();
+    ctx.fillStyle="rgba(239,68,68,.16)";ctx.strokeStyle="#22d3ee";ctx.lineWidth=2;
+    ctx.fill();ctx.stroke();
+    shown.forEach((p,k)=>{
+     const x=p[0]/geom.width*canvas.width,y=p[1]/geom.height*canvas.height;
+     ctx.beginPath();ctx.arc(x,y,6,0,Math.PI*2);ctx.fillStyle="#f8fafc";ctx.fill();
+     ctx.fillStyle="#0f172a";ctx.font="bold 10px sans-serif";ctx.textAlign="center";
+     ctx.fillText(String(k+1),x,y+3);
+    });
+   }
+   const valid=validPlateRepair(points,geom);
+   save.disabled=saving||!valid;
+   hint.textContent=mode==="box"
+    ?(valid?"Box ready. Save to replace this one-frame detection.":"Drag a box around the plate.")
+    :(valid?"Four corners ready. Verify that the entire plate is covered."
+      :"Click all four corners clockwise ("+points.length+"/4).");
+  }
+  const reset=()=>{points=[];drag=null;requestBody=null;draw();};
+  const choose=value=>{
+   if(saving)return;
+   mode=value;box.disabled=mode==="box";corners.disabled=mode==="corners";reset();
+  };
+  box.onclick=()=>choose("box");corners.onclick=()=>choose("corners");clear.onclick=reset;
+  const setZoom=value=>{
+   zoom=Math.max(1,Math.min(6,value));
+   photo.style.width=Math.round(baseWidth*zoom)+"px";
+   zoomNote.textContent=Math.round(zoom*100)+"%";
+   requestAnimationFrame(draw);
+  };
+  less.onclick=()=>setZoom(zoom/1.5);
+  more.onclick=()=>setZoom(zoom*1.5);
+  canvas.addEventListener("pointerdown",e=>{
+   if(saving||e.button!==0||mode!=="box")return;
+   e.preventDefault();drag={start:fromEvent(e),end:fromEvent(e),id:e.pointerId};
+   canvas.setPointerCapture(e.pointerId);draw();
+  });
+  canvas.addEventListener("pointermove",e=>{
+   if(drag&&drag.id===e.pointerId&&!saving){drag.end=fromEvent(e);draw();}
+  });
+  canvas.addEventListener("pointerup",e=>{
+   if(!drag||drag.id!==e.pointerId||saving)return;
+   drag.end=fromEvent(e);points=quadFrom(drag.start,drag.end);drag=null;
+   requestBody=null;
+   if(canvas.hasPointerCapture(e.pointerId))canvas.releasePointerCapture(e.pointerId);
+   draw();
+  });
+  canvas.addEventListener("pointercancel",()=>{drag=null;draw();});
+  canvas.addEventListener("click",e=>{
+   if(mode!=="corners"||saving)return;
+   if(points.length===4)points=[];
+   points.push(fromEvent(e));requestBody=null;draw();
+  });
+  function close(){
+   if(closed||saving)return;
+   closed=true;document.removeEventListener("keydown",onKey);
+   dialog.remove();dialog=null;URL.revokeObjectURL(url);url=null;
+   if(button.isConnected){button.disabled=false;button.textContent="Redraw plate area";}
+  }
+  const onKey=e=>{if(e.key==="Escape"){e.preventDefault();close();}};
+  document.addEventListener("keydown",onKey);cancel.onclick=close;
+  save.onclick=async()=>{
+   if(saving||!validPlateRepair(points,geom))return;
+   saving=true;cancel.disabled=true;save.disabled=true;
+   hint.textContent="Saving corrected frame geometry…";
+   try{
+    // If the acknowledgment is lost, retry the SAME idempotent payload.
+    const body=requestBody||(requestBody={
+     edit_id:Date.now().toString(36)+"-"+Math.random().toString(36).slice(2),
+     points:points.map(p=>p.slice()),frame:geom.frame,
+     preview_token:geom.preview_token,frame_source_token:geom.frame_source_token});
+    const {data}=await reviewRequest("api/jobs/"+encodeURIComponent(job)+
+     "/plate-repair/"+selected.i,{method:"POST",
+     headers:{"Content-Type":"application/json"},body:JSON.stringify(body),timeoutMs:120000});
+    if(!data.ok)throw new Error("The corrected area was not acknowledged.");
+    saving=false;cancel.disabled=false;close();
+    if(CUR!==job||JOBVIEW!==view)return;
+    // A redrawn region is NOT a classification. Continue protection and
+    // require an explicit Is / Not on the newly verified source picture.
+    const row=FINDING_META[selected.i];
+    if(row){row.human_region_confirmed=true;row.verified_label="";
+     row.human_confirmation=null;row.confirmed_finding_id=null;
+     row.confirmed_finding_revision=null;row.classification_allowed=false;
+     row.classification_note="Loading the corrected source-frame preview…";}
+    if(REVIEW_DISPLAY_META[selected.i])
+     REVIEW_DISPLAY_META[selected.i].human_region_confirmed=true;
+    VLBL[selected.i]="";EN[selected.i]=true;delete OUTPUT_CHOICES[selected.i];
+    if(REVIEW_BASE?.job===job){
+     REVIEW_BASE.enabled[selected.i]=true;REVIEW_BASE.labels[selected.i]="";
+     if(REVIEW_BASE.output_choices)delete REVIEW_BASE.output_choices[selected.i];
+    }
+    const bb=document.getElementById("bb"+selected.i);
+    if(bb)bb.innerHTML=detChoices(selected.i);
+    updateReviewOverlayLabel(selected.i);
+    const label=document.getElementById("vlabel"+selected.i);
+    if(label)label.textContent="New area saved for this frame; loading verified picture…";
+    img._plateMeta=null;img._previewLoaded=false;img._forceExactPreview=true;
+    if(!await queueReviewPreview(img,true)&&status)
+     status.textContent="Correction saved. Retry the exact preview to confirm it.";
+    plateUnloadGuard();
+   }catch(error){
+    saving=false;cancel.disabled=false;
+    draw();hint.textContent="Save failed: "+error.message+". Corners preserved; retry Save.";
+   }
+  };
+  choose("box");setZoom(1);
+ }catch(error){
+  if(status)status.textContent="Could not open redraw: "+error.message;
+ }finally{
+  if(!dialog&&url)URL.revokeObjectURL(url);
+  if(button.isConnected&&!dialog){button.disabled=false;button.textContent="Redraw plate area";}
+ }
+}
 function retryReviewPreview(button){
  const img=button.closest(".det").querySelector("img[data-preview-url]");
  if(img){
@@ -5751,7 +5971,7 @@ function commitPlateGesture(s,before){
  plateStatus(s,"Saving…");schedulePlateSaves();
 }
 function syncPlateTrack(s){
- if(s.meta.track<0)return;
+ if(s.meta.source_repaired||s.meta.track<0)return;
  const b=s.meta.box,q=s.meta.points.map(([x,y])=>[(x-b[0])/(b[2]-b[0]),(y-b[1])/(b[3]-b[1])]);
  for(const other of PLATE_EDITS.values()){
   if(other===s||other.job!==s.job||other.meta.track!==s.meta.track)continue;
@@ -5893,7 +6113,7 @@ function pumpPlateSaves(){
    if(!pending){
     // Keep a request/ID only after an uncertain result, not a definite 503.
     pending=s.pending={points:plateCopy(s.points),preview_token:s.meta.preview_token,preview_key:s.meta.key,compact:!!s.meta.compact,
-     apply_track:true,autosave:true,edit_id:Date.now().toString(36)+"-"+(++PLATE_SERIAL)+"-"+Math.random().toString(36).slice(2),
+     apply_track:!s.meta.source_repaired,autosave:true,edit_id:Date.now().toString(36)+"-"+(++PLATE_SERIAL)+"-"+Math.random().toString(36).slice(2),
      version:s.version,label:VLBL[s.i]};
    }
    // Unlike a preview fetch, a durable report transaction may need tens of
@@ -5935,6 +6155,7 @@ function pumpPlateSaves(){
    s.draw();plateStatus(s,s.dirty?"Saving…":data.reconfirmation_required
     ?"Saved new corners · image identity changed, confirm Is / Not again"
     :data.classification_required?"Saved area · choose Is / Not to confirm"
+    :s.meta.source_repaired?"Saved this exact frame"
     :s.meta.track>=0?"Saved to track":"Saved");
    if(!s.dirty&&CUR===s.job&&document.getElementById("beCv"))beRefresh();
   }catch(error){
@@ -6048,8 +6269,12 @@ function initPlateCorners(img){
   x.fill();x.stroke();x.setLineDash([]);
   const b=s.meta.box,bx1=(b[0]-c[0])*sx,by1=(b[1]-c[1])*sy,
         bx2=(b[2]-c[0])*sx,by2=(b[3]-c[1])*sy;
-  x.strokeStyle=REVIEW_OVERLAY_COLORS.proposal;x.lineWidth=1.5;x.setLineDash([6,4]);
-  x.strokeRect(bx1,by1,bx2-bx1,by2-by1);x.setLineDash([]);
+  if(!s.meta.source_repaired){
+   // Once a person replaces the detector anchor, the new enclosing box is
+   // human geometry, NOT a primary YOLO proposal. Do not mislabel it yellow.
+   x.strokeStyle=REVIEW_OVERLAY_COLORS.proposal;x.lineWidth=1.5;x.setLineDash([6,4]);
+   x.strokeRect(bx1,by1,bx2-bx1,by2-by1);x.setLineDash([]);
+  }
   if(state.machineSuggestion&&state.enabled){
    x.strokeStyle=REVIEW_OVERLAY_COLORS.visible;x.lineWidth=1.5;x.setLineDash([5,4]);
    const inset=3;x.strokeRect(bx1+inset,by1+inset,Math.max(0,bx2-bx1-2*inset),Math.max(0,by2-by1-2*inset));
@@ -6122,7 +6347,9 @@ function initPlateCorners(img){
  },options);
  s.observer=typeof ResizeObserver!=="undefined"?new ResizeObserver(s.draw):null;
  if(s.observer)s.observer.observe(img);
- plateStatus(s,"Drag corners · autosaves");s.draw();updateReviewOverlayLabel(s.i);return s;
+ plateStatus(s,meta.source_repaired
+  ?"Corners apply to this exact source frame · autosaves"
+  :"Drag corners · autosaves");s.draw();updateReviewOverlayLabel(s.i);return s;
 }
 document.addEventListener("visibilitychange",()=>{
  if(document.hidden){for(const s of PLATE_EDITS.values())if(s.dirty&&!s.error)s.readyAt=0;pumpPlateSaves();}
@@ -6835,7 +7062,7 @@ async function loadReview(signal=null,phase=SHELLPH){
     ${x.category==="plate"?'<div id="plateOverlay'+x.i+'" class="plate-output-badge"></div>':""}
     <small class="preview-status" role="status">Preview not loaded</small>
     <button class="sec preview-retry" hidden onclick="retryReviewPreview(this)">Retry preview</button>
-    ${x.category==="plate"?'<small class="source-frame-note review-copy" role="status"></small><button type="button" class="sec source-frame-exact" hidden onclick="loadExactReviewFrame(this)">Load exact source frame</button>':""}
+    ${x.category==="plate"?'<small class="source-frame-note review-copy" role="status"></small><button type="button" class="sec source-frame-exact" hidden onclick="loadExactReviewFrame(this)">Load exact source frame</button><button type="button" class="sec plate-repair-button" hidden onclick="openPlateRepair(this)">Redraw plate area</button>':""}
     ${x.category==="plate"?'<small class="quad-status" role="status" title="Corners apply to this detected track. Review changing perspective. Keyboard: select corner 1–4, use arrows; Ctrl+Z undoes.">Corners autosave to track</small><button type="button" class="sec quad-retry" hidden>Retry save</button>':""}
     <div>${plateVerificationBadge(x)}${x.learning_conflict?'<span class="badge" title="The original coverage was retained where the learned model could not make a reliable refinement">Model disagreement — review</span> ':""}${plateFallbackText(x)?`<span class="badge" style="white-space:normal">${plateFallbackText(x)}</span> `:""}${x.shaped?'<span class="badge" title="Thumbnail rectangle is a selection guide; open to inspect the mask and any exclusions">shaped mask</span> ':""}${x.personcard?`<b>Person ${x.person+1}</b> — one decision for ALL their appearances`:`"${sectionEscape(x.text)}"`}${x.frames?` <span class="badge">×${x.frames} frames</span>`:""}${x.confidence?` <span class="badge" title="detector confidence — not a human decision">${Math.round(x.confidence*100)}%</span>`:""} <br>${x.t_start.toFixed(1)}–${x.t_end.toFixed(1)}s</div>
     ${plateTextBadge(x)}
