@@ -11,7 +11,7 @@ import time
 
 import cv2
 import numpy as np
-from flask import Response, abort, jsonify, request
+from flask import Response, abort, jsonify, request, g, has_request_context
 from werkzeug.exceptions import HTTPException
 
 import confirmed_findings as library
@@ -360,12 +360,60 @@ def _journal_matches_archived_source(job, doc, index, preferred_key=None):
     return not _archived_identity_changed(job, doc, row, meta)
 
 
-def _journal_confirm(job, index, payload, doc):
+_CONFIRM_SLOW_TRACE_SECONDS = 3.0
+
+
+class _ConfirmTrace:
+    """Stage timings for slow confirmations only; never include source PII.
+
+    A successful HTTP 200 that takes 115 seconds has already acquired the
+    nonblocking review-edit lock. Identify its active operation before
+    changing locking or journal durability.
+    """
+    def __init__(self, job):
+        self.job = job
+        self.start = self.last = time.monotonic()
+        self.mode = 'selecting'
+        self.current = 'start'
+        self.stages = {}
+
+    def enter(self, name):
+        self.current = name
+
+    def mark(self, name):
+        now = time.monotonic()
+        self.stages[name + '_ms'] = round((now - self.last) * 1000, 1)
+        self.last = now
+
+    def finish(self):
+        now = time.monotonic()
+        total = now - self.start
+        if total < _CONFIRM_SLOW_TRACE_SECONDS:
+            return
+        # Only stage timings/mode/request id are recorded. No disk usage,
+        # original filename, video pixels, plate labels or coordinates.
+        try:
+            _web.diagnostics.event(
+                'review_confirmation_stages_slow', self.job,
+                request_id=(getattr(g, 'diagnostic_id', None)
+                            if has_request_context() else None),
+                total_ms=round(total * 1000, 1), mode=self.mode,
+                current_stage=self.current,
+                unfinished_stage_ms=round((now - self.last) * 1000, 1),
+                **self.stages)
+        except Exception:
+            # A logging failure must never change the save receipt.
+            pass
+
+
+def _journal_confirm(job, index, payload, doc, trace=None):
     label = payload.get('label')
     if label not in ('positive', 'negative') or type(label) is not str:
         raise ValueError('Choose Is a … or Not a … to store a confirmed example.')
+    if trace: trace.enter('preview')
     _, _, meta, jpeg = preview(
         job, index, doc=doc, preferred_key=payload.get('preview_key'))
+    if trace: trace.mark('preview')
     if meta.get('classification_allowed') is False:
         raise library.ConflictError(_LEGACY_TIMING_NOTE)
     row = dict(doc['detections'][index])
@@ -387,17 +435,24 @@ def _journal_confirm(job, index, payload, doc):
         fields['plate_quad'] = row['plate_quad']
     # Archive evidence first. If the later small SQLite transaction fails,
     # retrying the same evidence is idempotent and no false saved ACK is sent.
+    if trace: trace.enter('archive')
     entry = _archived(job, doc, row, meta, jpeg, label, payload.get('expected_revision'))
+    if trace: trace.mark('archive')
     anchor = dict(confirmed_finding_id=entry['id'],
                   confirmed_finding_revision=entry['revision'])
     if payload.get('points') is not None:
         anchor['human_region_confirmed'] = True
+    if trace: trace.enter('journal_commit')
     review_journal.write(job['dir'], row, index, fields, anchor)
+    if trace: trace.mark('journal_commit')
     row.update(fields)
     row['confirmed_finding_id'] = entry['id']
     row['confirmed_finding_revision'] = entry['revision']
     meta['preview_token'] = _token(doc, row, meta['frame'], meta.get('key'))
-    return dict(ok=True, finding=entry, applied=_journal_members(doc,index),
+    if trace: trace.enter('member_count')
+    count = _journal_members(doc, index)
+    if trace: trace.mark('member_count')
+    return dict(ok=True, finding=entry, applied=count,
                 label=fields.get('verified_label',''), preview=meta)
 
 
@@ -461,66 +516,94 @@ def _journal_region(job, index, payload, doc):
 
 
 def confirm(job, index, payload):
-    journal_doc = _journal_doc(job)
-    if journal_doc is not None and _journal_matches_archived_source(
-            job, journal_doc, index, payload.get('preview_key')):
-        return _journal_confirm(job, index, payload, journal_doc)
-    # Relocalized confirmed rows and section-locked reports use the existing
-    # source-bound rebind rules. Materialize pending journal edits first.
-    # Fallback section/legacy writes operate on one fully materialized report.
-    _web._review_journal_snapshot(job)
-    label = payload.get('label')
-    if label not in ('positive', 'negative') or type(label) is not str:
-        raise ValueError('Choose Is a … or Not a … to store a confirmed example.')
-    # Explicit edits must operate on the complete authoritative report; the
-    # read-only per-finding index is for thumbnail GETs only.
-    before = _web._load_job_report(job)
-    _, _, meta, jpeg = preview(
-        job, index, doc=before, preferred_key=payload.get('preview_key'))
-    if meta.get('classification_allowed') is False:
-        raise library.ConflictError(_LEGACY_TIMING_NOTE)
-    # The authoritative JSON load already gives this request an independent
-    # mutable document. Duplicating its complete 4K timeline and hundreds of
-    # thousands of findings for every corner autosave costs gigabytes of RAM.
-    # Approved sections alone require the old/new pair for the overlap guard.
-    # Merely having section metadata does not require duplicating a huge
-    # report: only actually approved/locked intervals need old/new comparison.
-    section_rows = ((before.get('video_sections') or {}).get('items') or [])
-    sections = ((job.get('section') or {}).get('role') == 'export'
-                or any(item.get('approved') for item in section_rows))
-    doc = deepcopy(before) if sections else before
-    row = doc['detections'][index]
-    if payload.get('preview_token') not in (None, meta['preview_token']):
-        abort(409, description='The finding changed. Reload its picture.')
-    if payload.get('points') is not None:
-        meta['points'] = _shape(payload['points'], meta)
-        box = meta['box']
-        row['plate_quad'] = [[(x-box[0])/(box[2]-box[0]),(y-box[1])/(box[3]-box[1])]
-                             for x,y in meta['points']]
-        row['human_region_confirmed'] = True
-    for i, member in _members(doc, index):
-        _web._human_plate_override(member)
-        member['enabled'] = label == 'positive'
-        member['output_choice_explicit'] = True
-        member['human_confirmation'] = dict(label=label, category=row['category'],
-                                            source='explicit', propagated=i != index)
-        if row['category'] == 'plate':
-            member['verified_label'] = 'plate' if label == 'positive' else 'not_plate'
-            if payload.get('points') is not None:
-                member['plate_quad'] = row['plate_quad']
-    _guard_section(job, before, doc)
-    # Archive first. A failed report write is retryable/idempotent; never tell
-    # the UI the example is saved if its JPEG/metadata transaction failed.
-    entry = _archived(job, doc, row, meta, jpeg, label, payload.get('expected_revision'))
-    row['confirmed_finding_id'] = entry['id']
-    row['confirmed_finding_revision'] = entry['revision']
-    row['human_confirmation'].update(id=entry['id'], revision=entry['revision'])
-    doc['render_required'] = True
-    stop_review.atomic_report(str(Path(job['dir'])/'report.json'), doc)
-    meta['preview_token'] = _token(doc,row,meta['frame'],meta.get('key'))
-    return dict(ok=True, finding=entry, applied=len(_members(doc,index)),
-                label=row.get('verified_label',''), preview=meta)
+    trace = _ConfirmTrace(job)
+    try:
+        trace.enter('load_preview_report')
+        journal_doc = _journal_doc(job)
+        trace.mark('load_preview_report')
+        trace.enter('source_identity_check')
+        fast_path = (journal_doc is not None and _journal_matches_archived_source(
+            job, journal_doc, index, payload.get('preview_key')))
+        trace.mark('source_identity_check')
+        if fast_path:
+            trace.mode = 'journal'
+            return _journal_confirm(job, index, payload, journal_doc, trace)
+        trace.mode = 'full_report'
+        # Relocalized confirmed rows and section-locked reports use the existing
+        # source-bound rebind rules. Materialize pending journal edits first.
+        # Fallback section/legacy writes operate on one fully materialized report.
+        trace.enter('publish_journal')
+        _web._review_journal_snapshot(job)
+        trace.mark('publish_journal')
+        label = payload.get('label')
+        if label not in ('positive', 'negative') or type(label) is not str:
+            raise ValueError('Choose Is a … or Not a … to store a confirmed example.')
+        # Explicit edits must operate on the complete authoritative report; the
+        # read-only per-finding index is for thumbnail GETs only.
+        trace.enter('load_full_report')
+        before = _web._load_job_report(job)
+        trace.mark('load_full_report')
+        trace.enter('preview')
+        _, _, meta, jpeg = preview(
+            job, index, doc=before, preferred_key=payload.get('preview_key'))
+        trace.mark('preview')
+        if meta.get('classification_allowed') is False:
+            raise library.ConflictError(_LEGACY_TIMING_NOTE)
+        # The authoritative JSON load already gives this request an independent
+        # mutable document. Duplicating its complete 4K timeline and hundreds of
+        # thousands of findings for every corner autosave costs gigabytes of RAM.
+        # Approved sections alone require the old/new pair for the overlap guard.
+        # Merely having section metadata does not require duplicating a huge
+        # report: only actually approved/locked intervals need old/new comparison.
+        section_rows = ((before.get('video_sections') or {}).get('items') or [])
+        sections = ((job.get('section') or {}).get('role') == 'export'
+                    or any(item.get('approved') for item in section_rows))
+        doc = deepcopy(before) if sections else before
+        row = doc['detections'][index]
+        if payload.get('preview_token') not in (None, meta['preview_token']):
+            abort(409, description='The finding changed. Reload its picture.')
+        if payload.get('points') is not None:
+            meta['points'] = _shape(payload['points'], meta)
+            box = meta['box']
+            row['plate_quad'] = [[(x-box[0])/(box[2]-box[0]),(y-box[1])/(box[3]-box[1])]
+                                 for x,y in meta['points']]
+            row['human_region_confirmed'] = True
+        trace.enter('propagate_group')
+        for i, member in _members(doc, index):
+            _web._human_plate_override(member)
+            member['enabled'] = label == 'positive'
+            member['output_choice_explicit'] = True
+            member['human_confirmation'] = dict(label=label, category=row['category'],
+                                                source='explicit', propagated=i != index)
+            if row['category'] == 'plate':
+                member['verified_label'] = 'plate' if label == 'positive' else 'not_plate'
+                if payload.get('points') is not None:
+                    member['plate_quad'] = row['plate_quad']
+        trace.mark('propagate_group')
+        trace.enter('section_guard')
+        _guard_section(job, before, doc)
+        trace.mark('section_guard')
+        # Archive first. A failed report write is retryable/idempotent; never tell
+        # the UI the example is saved if its JPEG/metadata transaction failed.
+        trace.enter('archive')
+        entry = _archived(job, doc, row, meta, jpeg, label, payload.get('expected_revision'))
+        trace.mark('archive')
+        row['confirmed_finding_id'] = entry['id']
+        row['confirmed_finding_revision'] = entry['revision']
+        row['human_confirmation'].update(id=entry['id'], revision=entry['revision'])
+        doc['render_required'] = True
+        trace.enter('save_full_report')
+        stop_review.atomic_report(str(Path(job['dir'])/'report.json'), doc)
+        trace.mark('save_full_report')
+        meta['preview_token'] = _token(doc,row,meta['frame'],meta.get('key'))
+        trace.enter('member_count')
+        count = len(_members(doc, index))
+        trace.mark('member_count')
+        return dict(ok=True, finding=entry, applied=count,
+                    label=row.get('verified_label',''), preview=meta)
 
+    finally:
+        trace.finish()
 
 def region(job, index, payload):
     journal_doc = _journal_doc(job)
