@@ -81,7 +81,7 @@ def render(source: str) -> str:
     # Dockerfile parser directives MUST be the first line. Inserting our
     # generated-file notice above "# syntax=..." would silently disable
     # BuildKit syntax selection (and potentially break RUN --mount).
-    syntax = "# syntax=docker/dockerfile:1\\n\\n"
+    syntax = "# syntax=docker/dockerfile:1\n\n"
     if not body.startswith(syntax):
         raise ValueError("Full CUDA Dockerfile must begin with its BuildKit syntax directive")
     return syntax + NOTICE + body[len(syntax):]
