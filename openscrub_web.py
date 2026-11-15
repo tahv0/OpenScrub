@@ -5383,7 +5383,7 @@ function initReviewPreviews(){
  pumpReviewPreviews(state);
 }
 // Retain all decisions/group memberships, but mount card elements progressively.
-function appendReviewPage(cat,selectedOnly=false){
+function appendReviewPage(cat,selectedOnly=false,targetIndex=null){
  const panel=document.getElementById("review"),pending=REVIEW_PENDING_PAGES[cat];
  if(!panel||!pending||!pending.length)return 0;
  const grid=[...panel.querySelectorAll("[data-review-category]")]
@@ -5392,6 +5392,7 @@ function appendReviewPage(cat,selectedOnly=false){
  const added=[];
  for(let k=0;k<pending.length&&added.length<(selectedOnly?Infinity:REVIEW_PAGE_SIZE);){
   const entry=pending[k];
+  if(targetIndex!==null&&entry.i!==targetIndex){k++;continue;}
   if(!reviewMatchesFilter(entry.i,cat)){k++;continue;}
   added.push(entry);pending.splice(k,1);
  }
@@ -5773,7 +5774,8 @@ function pumpPlateSaves(){
    if(error.status===409&&error.details?.current_archive){
     rememberFindingConflict(s.i,error.details.current_archive);
     s.pending=null;s.error=error;s.conflict=false;s.archiveConflict=true;
-    showFindingFailure(s.i,error);
+    // The AREA save has a distinct draft/error: it did not attempt Is/Not.
+    // Never register a phantom failed confirmation in CONFIRM_FAILED.
     s.draw();plateStatus(s,"Saved example changed · choose Is / Not to confirm this adjustment.",true);return;
    }
    if(error.status===409&&!error.details?.current_archive){
@@ -6489,6 +6491,7 @@ async function loadReview(signal=null,phase=SHELLPH){
  <small id="reviewPreloadStatus" class="review-copy" role="status" aria-live="off">Preparing review pictures before you scroll…</small>
  <p id="reviewSaveStatus" class="review-copy review-save-status" role="status" aria-live="polite">Review choices loaded from disk.</p>
  <div id="plateSaveIssues" class="review-copy" role="status" aria-live="polite" hidden></div>
+ <div id="confirmationSaveIssues" class="review-copy" role="alert" aria-live="polite" hidden></div>
  <p class="review-copy">Training uses saved corrections and the original detectors. It does not guarantee that undetected plates have been found. Review the output.</p>
  ${reviewOverlayLegendHTML()}
  <p class="review-copy">Yellow is the primary detector proposal. Red is the effective area that will be concealed; it keeps four-corner rotation, skew and perspective. Green stays visible. Labels identify human corrections, learned masks and safe fallbacks.</p>
