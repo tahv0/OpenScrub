@@ -1,9 +1,9 @@
+# syntax=docker/dockerfile:1
+
 # GENERATED FROM Dockerfile.cuda BY docker/generate_cuda_inference.py.
 # DO NOT EDIT. Run: python docker/generate_cuda_inference.py --write
 # EXPERIMENTAL scan-only CUDA image: no PyTorch/Ultralytics training venv.
 # Does not change the existing full CUDA image or Compose configuration.
-
-# syntax=docker/dockerfile:1
 
 # OpenScrub server image — NVIDIA GPU build (CUDA OCR via PaddleOCR-GPU,
 # CUDA face detection via a source-built OpenCV, NVENC hardware encoding
