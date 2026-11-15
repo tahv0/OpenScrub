@@ -1,0 +1,114 @@
+{
+  "schema": 1,
+  "intent": "Target architecture contract only. Current Dockerfiles are unchanged in this audit PR.",
+  "current": {
+    "gpu_base": "ghcr.io/austinmabry/opencv-cuda:4.10.0-cu126",
+    "windows_retained_dependency_image": "openscrub-cuda-deps:local",
+    "windows_application_image": "openscrub-windows-test-openscrub:latest",
+    "cuda_runtime": "12.6",
+    "training_python": "/opt/openscrub-training",
+    "description": "Inference and training dependencies currently live in the same retained image."
+  },
+  "target": [
+    {
+      "id": "cuda-core",
+      "parent": null,
+      "from": "nvidia/cuda:12.6.3-cudnn-runtime-ubuntu22.04",
+      "role": "shared",
+      "contains": [
+        "CUDA runtime",
+        "matched cuDNN runtime",
+        "minimal Ubuntu/Python runtime"
+      ],
+      "excludes": [
+        "PyTorch",
+        "PaddleOCR",
+        "OpenCV compiler/toolchain",
+        "application source"
+      ]
+    },
+    {
+      "id": "opencv-cuda",
+      "parent": "cuda-core",
+      "role": "shared",
+      "contains": [
+        "OpenCV CUDA runtime libraries",
+        "OpenCV Python bindings",
+        "required codec runtimes"
+      ],
+      "excludes": [
+        "OpenCV source tree",
+        "CMake",
+        "nvcc/toolchain",
+        "debug symbols when safe"
+      ]
+    },
+    {
+      "id": "inference-deps",
+      "parent": "opencv-cuda",
+      "role": "inference",
+      "contains": [
+        "PaddlePaddle GPU",
+        "ONNX Runtime GPU",
+        "OCR and FFmpeg runtime dependencies",
+        "pinned detection models"
+      ],
+      "excludes": [
+        "PyTorch",
+        "Ultralytics",
+        "training checkpoints"
+      ]
+    },
+    {
+      "id": "scan-app",
+      "parent": "inference-deps",
+      "role": "application",
+      "contains": [
+        "OpenScrub application",
+        "review and export"
+      ],
+      "excludes": [
+        "pip wheel caches",
+        "training virtualenv"
+      ]
+    },
+    {
+      "id": "training-deps",
+      "parent": "cuda-core",
+      "role": "training",
+      "contains": [
+        "isolated training Python",
+        "PyTorch CUDA",
+        "torchvision",
+        "Ultralytics",
+        "training ONNX exporter"
+      ],
+      "excludes": [
+        "PaddlePaddle GPU",
+        "scan application's model cache"
+      ]
+    },
+    {
+      "id": "trainer-worker",
+      "parent": "training-deps",
+      "role": "training",
+      "contains": [
+        "training script",
+        "isolated progress/cancellation protocol"
+      ],
+      "excludes": [
+        "OpenScrub web server"
+      ]
+    }
+  ],
+  "shared_requirements": [
+    "Shared means identical base layer digests, not merely matching CUDA version strings.",
+    "PyTorch CUDA wheels cannot be removed or substituted until runtime ABI/CUDA/cuDNN validation proves compatibility.",
+    "Do not change the production dependency-stage commands before verifying image size and GPU functionality.",
+    "Do not put user datasets, training checkpoints or persistent jobs inside the image or an ephemeral build layer.",
+    "Make inference and trainer siblings, not trainer FROM inference; otherwise the training image carries PaddlePaddle unnecessarily.",
+    "Train using an isolated worker and share only specifically mounted user-data directories; keep review/training progress, cancellation and ONNX export validation.",
+    "Only purge build-only files inside the step that introduces them or copy selected artifacts into a new stage.",
+    "Preserve existing installed CUDA images and build cache until a tested replacement is available."
+  ]
+}
