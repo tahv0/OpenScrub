@@ -20,7 +20,7 @@ def _cold_review_row(report):
     # frame 299: no cached neighbor may silently masquerade as frame 299.
     doc["detections"][0].update(
         frame_index=299, t_start=299/30, t_end=299/30,
-        last_seen=299/30, track=-1
+        last_seen=299/30, track=-1)
     report.write_text(json.dumps(doc))
 
 
