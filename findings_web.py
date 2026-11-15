@@ -173,7 +173,8 @@ def preview(job, index, doc=None, cache_only=False, preferred_key=None,
             abort(409, description='This displayed picture is no longer a valid cached sample. Reload its preview.')
     else:
         cached = _web._serialize_review_read(previews.lookup)(job['dir'], cache_row, rs)
-        if cached is None and not exact_only and int(row.get('track', -1)) >= 0:
+        if (cached is None and not exact_only and not row.get('source_repair_receipt')
+                and int(row.get('track', -1)) >= 0):
             cached = _web._serialize_review_read(previews.lookup)(
                 job['dir'], cache_row, rs, allow_representative=True)
     if cached is None and cache_only:
