@@ -113,8 +113,10 @@ def test_rebound_explicit_confirmation_uses_journal_without_full_report_rewrite(
         assert new.get_json()["finding"]["frame"] == 299
     traces = [values for name, values in events
               if name == "review_confirmation_stages_slow"]
-    assert traces
-    assert all(v["mode"] == "journal_rebound" for v in traces)
+    assert len(traces) == 2
+    assert traces[0]["mode"] == "journal_rebound"
+    assert traces[1]["mode"] == "journal", (
+        "After the first rebound the new source is already the trusted archive")
     assert all("save_full_report_ms" not in v for v in traces)
 
 
