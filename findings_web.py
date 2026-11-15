@@ -350,35 +350,48 @@ def plate_repair_frame(job, index):
     A thumbnail may be cropped around the wrong detector rectangle, hiding
     the real plate. Never redraw on a neighboring track representative.
     """
+    began = time.monotonic()
     doc, _, meta = _plate_repair_preview(job, index)
+    prepared = time.monotonic()
     identity = _web._video_identity(job['video'])
     expected = ((doc.get('provenance') or {}).get('input_sha256')
                 or (doc.get('source_identity') or {}).get('input_sha256'))
     if not expected:
         raise library.ConflictError('An original video SHA-256 is required for a plate repair.')
-    signature = (identity, expected)
-    verified = job.get('_finding_source_verified')
-    if not verified or verified.get('signature') != signature:
-        actual = learning_session.sha256(job['video'])
-        if actual != expected or _web._video_identity(job['video']) != identity:
-            raise library.ConflictError(
-                'The source video changed. Restore the scanned original before redrawing.')
-        verified = dict(signature=signature, sha256=actual)
-        job['_finding_source_verified'] = verified
-    frame = _web._read_exact_frame(job['video'], meta['frame'], decode_timeout=60)
-    if frame is None or _web._video_identity(job['video']) != identity:
+    # First return exact PTS-checked pixels; the multi-GB SHA check runs in a
+    # single background worker and gates POST, not the browser's image GET.
+    original = _web._read_exact_frame(job['video'], meta['frame'], decode_timeout=60)
+    if original is None or _web._video_identity(job['video']) != identity:
         raise library.ConflictError('The original source frame changed or could not be decoded.')
-    height, width = frame.shape[:2]
+    height, width = original.shape[:2]
     if (width, height) != (int(meta['width']), int(meta['height'])):
         raise library.ConflictError('Source dimensions changed. No correction was saved.')
+    decoded = time.monotonic()
     scale = min(1., 1920.0 / max(width, height))
-    if scale < 1:
-        frame = cv2.resize(frame, (max(1, round(width * scale)),
-                                   max(1, round(height * scale))),
-                           interpolation=cv2.INTER_AREA)
-    ok, encoded = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 82])
+    displayed = (cv2.resize(original, (max(1, round(width * scale)),
+                                     max(1, round(height * scale))),
+                            interpolation=cv2.INTER_AREA)
+                 if scale < 1 else original)
+    ok, encoded = cv2.imencode('.jpg', displayed, [cv2.IMWRITE_JPEG_QUALITY, 82])
     if not ok:
         abort(500, description='Could not encode the exact source frame.')
+    encoded_at = time.monotonic()
+    status = _plate_repair_source_check(job, identity, expected)
+    # Keep a single bounded full-resolution frame in RAM until its explicit
+    # redraw is saved, so the corrected JPEG can be prepared without another
+    # costly 4K FFmpeg seek. Never write these private pixels to logs.
+    job['_plate_repair_frame_cache'] = (
+        dict(identity=identity, frame=meta['frame'], pixels=original)
+        if original.nbytes <= 48 * 1024 * 1024 else None)
+    if encoded_at-began >= 1:
+        try:
+            _web.diagnostics.event('plate_repair_frame_stages', job,
+                metadata_ms=round((prepared-began)*1000),
+                ffmpeg_decode_ms=round((decoded-prepared)*1000),
+                jpeg_encode_ms=round((encoded_at-decoded)*1000),
+                source_hash_status=status)
+        except Exception:
+            pass
     # A POST must prove that this SAME current process served the full exact
     # frame, not merely that a cropped/borrowed JPEG existed.
     evidence = dict(identity=identity, source_sha256=expected,
@@ -392,6 +405,7 @@ def plate_repair_frame(job, index):
                         headers={'Cache-Control': 'no-store'})
     response.headers['X-Repair-Geometry'] = json.dumps(dict(
         frame=meta['frame'], width=width, height=height,
+        source_verification=status,
         preview_token=meta['preview_token'],
         frame_source_token=meta['frame_source_token']), separators=(',', ':'))
     return response
