@@ -229,31 +229,118 @@ def preview(job, index, doc=None, cache_only=False, preferred_key=None,
 
 
 
+_REPAIR_VERIFY_LOCK = threading.Lock()
+
+
+def _plate_repair_source_check(job, identity, expected):
+    """Start one nonblocking SHA-256 verification for the selected source.
+
+    A preview GET can show exact PTS-checked pixels before this multi-GB
+    integrity check completes. POST must still wait for successful verification.
+    Never reuse a SHA from a different file stat or source hash.
+    """
+    signature = (identity, expected)
+    with _REPAIR_VERIFY_LOCK:
+        previous = job.get('_plate_repair_source_check')
+        if previous and previous['signature'] == signature:
+            return previous['status']
+        if previous and previous['status'] == 'pending':
+            raise library.ConflictError(
+                'The source video changed while an earlier integrity check is running. '
+                'Reopen Review after it completes.')
+        verified = job.get('_finding_source_verified')
+        if verified and verified.get('signature') == signature:
+            job['_plate_repair_source_check'] = dict(signature=signature,
+                                                     status='verified')
+            return 'verified'
+        record = dict(signature=signature, status='pending')
+        job['_plate_repair_source_check'] = record
+
+    def verify():
+        started = time.monotonic()
+        try:
+            digest = learning_session.sha256(job['video'])
+            unchanged = _web._video_identity(job['video']) == identity
+            valid = unchanged and digest == expected
+        except (OSError, ValueError):
+            valid = False
+        with _REPAIR_VERIFY_LOCK:
+            if job.get('_plate_repair_source_check') is record:
+                record['status'] = 'verified' if valid else 'failed'
+                if valid:
+                    job['_finding_source_verified'] = dict(
+                        signature=signature, sha256=expected)
+        try:
+            _web.diagnostics.event(
+                'plate_repair_source_hash_finished', job,
+                status='verified' if valid else 'failed',
+                elapsed_ms=round((time.monotonic()-started)*1000))
+        except Exception:
+            pass
+
+    threading.Thread(target=verify, name='openscrub-repair-source-hash',
+                     daemon=True).start()
+    return 'pending'
+
+
+def _plate_repair_require_verified(job, identity, expected):
+    signature = (identity, expected)
+    with _REPAIR_VERIFY_LOCK:
+        state = job.get('_plate_repair_source_check')
+        status = state.get('status') if state and state.get('signature') == signature else None
+    if status == 'pending':
+        abort(503, description='Original video verification is still running. '
+              'The replacement was not saved; retry the same request shortly.')
+    if status != 'verified' or _web._video_identity(job['video']) != identity:
+        raise library.ConflictError(
+            'Original video verification failed or the source changed. '
+            'No plate correction was saved.')
+
+
 def _plate_repair_preview(job, index, doc=None):
-    """Require an EXACT, original-video frame; a borrowed track JPEG is unsafe."""
+    """Metadata-only, exact-frame identity independent of disposable JPEG keys.
+
+    Do not call preview(): that can hash a huge source file and decode an
+    unrelated compact crop before the user can even open the full-frame tool.
+    The image returned by plate_repair_frame is separately PTS-checked.
+    """
     doc = doc if doc is not None else _web._load_preview_report(job)
     if not (0 <= index < len(doc.get('detections', []))):
         abort(404)
     row = doc['detections'][index]
     if row.get('category') != 'plate':
         abort(404)
-    fps = float(doc['render_state']['fps'])
-    if (fps <= 0 or float(row['t_end']) - float(row['t_start']) > 1.5 / fps):
+    rs = doc['render_state']
+    fps = float(rs['fps'])
+    if fps <= 0 or float(row['t_end']) - float(row['t_start']) > 1.5 / fps:
         raise library.ConflictError(
             'This detection spans several frames. Open the video editor to '
             'correct a time interval instead of applying one frame shape.')
+    frame = int(row.get('frame_index', -1))
+    if not (0 <= frame < len(rs.get('cum') or [])):
+        raise library.ConflictError('Redraw needs an exact indexed source frame.')
     if not _source_hash(doc):
         raise library.ConflictError(
             'This scan has no verified source identity. Rescan or restore its source metadata.')
-    _, _, meta, _ = preview(job, index, doc=doc, exact_only=True)
-    if not (row.get('frame_index', -1) >= 0
-            and meta.get('geometry_outside_frame') is True
-            and meta.get('exact_frame') is True
-            and meta.get('requested_frame') == meta.get('frame')
-            and meta.get('frame_source_token')):
+    dimensions = doc.get('source_identity') or {}
+    width, height = int(dimensions.get('width') or 0), int(dimensions.get('height') or 0)
+    if width <= 0 or height <= 0:
+        info = _web._review_probe(job['video'], _web._video_identity(job['video']))
+        width, height = info['width'], info['height']
+    box = video_learning._screen_box(row, rs, frame)
+    quad = row.get('plate_quad') or ((0., 0.), (1., 0.), (1., 1.), (0., 1.))
+    points = [[box[0]+float(x)*(box[2]-box[0]),
+               box[1]+float(y)*(box[3]-box[1])] for x, y in quad]
+    if not previews._outside_source_frame(box, points, width, height):
         raise library.ConflictError(
-            'The source geometry is no longer invalid or the exact frame is unavailable. '
-            'Reload Review before redrawing.')
+            'This detection no longer extends beyond the source video. '
+            'Reload Review to edit its corrected corners.')
+    source_row = dict(row, plate_quad=[])
+    meta = dict(i=index, width=width, height=height, frame=frame,
+                requested_frame=frame, box=box, points=points,
+                geometry_outside_frame=True, exact_frame=True,
+                preview_token=_token(doc, row, frame, None),
+                frame_source_token=_token(doc, source_row, frame, None))
     return doc, row, meta
 
 
