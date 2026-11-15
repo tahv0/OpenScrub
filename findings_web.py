@@ -27,6 +27,11 @@ RESERVED = {'learned_plate_models', 'confirmed_findings', 'learned_model_trainin
 _LEGACY_TIMING_NOTE = ('This legacy variable-frame-rate picture uses an approximate timestamp. '
     'Output and draft area edits remain available. Rescan with frame-rate normalization '
     'before saving confirmed training examples.')
+_OFF_FRAME_GEOMETRY_NOTE = (
+    'Detector box or plate corners extend outside the source video frame. '
+    'This original-frame picture is for inspection only. Correct the detection '
+    'in Preview video & edit boxes or rescan before confirming a training '
+    'example or saving corners. Automatic redaction is unchanged.')
 _web = None
 
 
@@ -192,6 +197,7 @@ def preview(job, index, doc=None, cache_only=False, preferred_key=None,
     meta, jpeg = cached
     source = meta.get('source') or {}
     exact = source.get('timing') != 'timestamp'
+    unsafe_geometry = meta.get('geometry_outside_frame') is True
     representative = meta.get('match') == 'representative'
     shown_frame = int(meta['frame']) if representative else frame
     shown_box = list(map(float, meta['box'])) if representative else box
@@ -202,8 +208,9 @@ def preview(job, index, doc=None, cache_only=False, preferred_key=None,
                 frame_index=shown_frame if exact else -1,
                 t=shown_t if exact else source['requested_time'], box=shown_box,
                 points=shown_points, track=row.get('track', -1), compact=True,
-                exact_frame=exact, classification_allowed=exact,
-                classification_note=None if exact else _LEGACY_TIMING_NOTE,
+                exact_frame=exact, classification_allowed=exact and not unsafe_geometry,
+                classification_note=(_OFF_FRAME_GEOMETRY_NOTE if unsafe_geometry
+                                     else None if exact else _LEGACY_TIMING_NOTE),
                 requested_frame=frame,
                 preview_token=_token(doc, row, shown_frame, sample_key))
     if not exact:
@@ -420,7 +427,7 @@ def _journal_confirm(job, index, payload, doc, trace=None, rebind=False):
         job, index, doc=doc, preferred_key=payload.get('preview_key'))
     if trace: trace.mark('preview')
     if meta.get('classification_allowed') is False:
-        raise library.ConflictError(_LEGACY_TIMING_NOTE)
+        raise library.ConflictError(meta.get('classification_note') or _LEGACY_TIMING_NOTE)
     row = dict(doc['detections'][index])
     if payload.get('preview_token') not in (None, meta['preview_token']):
         abort(409, description='The finding changed. Reload its picture.')
@@ -481,6 +488,8 @@ def _journal_region(job, index, payload, doc):
     started = time.monotonic()
     _, _, meta, jpeg = preview(
         job, index, doc=doc, preferred_key=payload.get('preview_key'))
+    if meta.get('geometry_outside_frame'):
+        raise library.ConflictError(_OFF_FRAME_GEOMETRY_NOTE)
     row = dict(doc['detections'][index])
     if row['category'] != 'plate':
         raise ValueError('Four-corner area editing currently applies to plate findings.')
@@ -580,7 +589,7 @@ def confirm(job, index, payload):
             job, index, doc=before, preferred_key=payload.get('preview_key'))
         trace.mark('preview')
         if meta.get('classification_allowed') is False:
-            raise library.ConflictError(_LEGACY_TIMING_NOTE)
+            raise library.ConflictError(meta.get('classification_note') or _LEGACY_TIMING_NOTE)
         # The authoritative JSON load already gives this request an independent
         # mutable document. Duplicating its complete 4K timeline and hundreds of
         # thousands of findings for every corner autosave costs gigabytes of RAM.
@@ -650,6 +659,8 @@ def region(job, index, payload):
     before = _web._load_job_report(job)
     _, _, meta, jpeg = preview(
         job, index, doc=before, preferred_key=payload.get('preview_key'))
+    if meta.get('geometry_outside_frame'):
+        raise library.ConflictError(_OFF_FRAME_GEOMETRY_NOTE)
     # The authoritative JSON load already gives this request an independent
     # mutable document. Duplicating its complete 4K timeline and hundreds of
     # thousands of findings for every corner autosave costs gigabytes of RAM.
