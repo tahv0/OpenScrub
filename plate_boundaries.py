@@ -76,6 +76,42 @@ def _fill(shape, corners):
     return coverage
 
 
+def _enclosing_quad(candidate, hull, margin=1.0):
+    """Shift each *edge* outward until it encloses the full convex mask hull.
+
+    Approximating a pixelated trapezoid with four hull vertices cuts across
+    shallow stair-step bulges. Radially enlarging just the vertices does not
+    cover those edge pixels (and over-expands unrelated edges). Offset the
+    four supporting lines by their maximum positive hull distance instead,
+    then intersect adjacent lines for a tight perspective-preserving quad.
+    """
+    edges = np.roll(candidate, -1, axis=0) - candidate
+    lengths = np.linalg.norm(edges, axis=1)
+    if not np.isfinite(lengths).all() or np.min(lengths) < 2:
+        return None
+    winding = cv2.contourArea(candidate.astype(np.float32), oriented=True)
+    if not np.isfinite(winding) or abs(winding) < 8:
+        return None
+    outward = np.column_stack((edges[:, 1], -edges[:, 0]))
+    outward *= (1 if winding > 0 else -1) / lengths[:, None]
+    hull_points = np.asarray(hull, dtype=np.float64).reshape(-1, 2)
+    # Max distance of any real mask pixel outside each simplified edge.
+    distances = np.einsum('ij,ikj->ik', outward,
+                          hull_points[None, :, :] - candidate[:, None, :])
+    shift = np.maximum(0, distances.max(axis=1)) + margin
+    lines = candidate + outward * shift[:, None]
+    result = []
+    for i in range(4):
+        previous = (i - 1) % 4
+        matrix = np.column_stack((edges[previous], -edges[i]))
+        if abs(np.linalg.det(matrix)) < .03 * lengths[previous] * lengths[i]:
+            return None
+        t = np.linalg.solve(matrix, lines[i] - lines[previous])[0]
+        result.append(lines[previous] + t * edges[previous])
+    result = np.asarray(result, dtype=np.float64)
+    return result if np.isfinite(result).all() else None
+
+
 def _fit(mask):
     """Return (crop-local four corners, filled polygon, method), or no fit."""
     if mask is None:
@@ -109,13 +145,14 @@ def _fit(mask):
                        'rotated_box')]
     total = cv2.countNonZero(padded)
     for candidate, method in candidates:
-        # Inward polygon simplification can clip the true predicted mask.
-        # Expand slightly and require >=99.5% pixel coverage; never silently
-        # trade away a dark corner or a single line of lettering.
-        center = candidate.mean(axis=0)
-        vectors = candidate - center
-        lengths = np.maximum(np.linalg.norm(vectors, axis=1), 1.)
-        expanded = candidate + vectors / lengths[:, None] * 2.0
+        # An approxPolyDP quad has vertices ON the convex hull, but its four
+        # straight edges can cut inward through shallow rasterized bulges.
+        # Compute a genuinely enclosing quadrilateral by offsetting its
+        # supporting lines; merely expanding corners from the center failed
+        # on real perspective slopes even with a generous radial margin.
+        expanded = _enclosing_quad(candidate, hull)
+        if expanded is None:
+            continue
         cover = _fill(binary.shape, expanded)
         missed = cv2.countNonZero(cv2.bitwise_and(padded, 1 - cover))
         if missed <= max(1, math.floor(total * .005)):
