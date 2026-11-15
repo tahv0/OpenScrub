@@ -7,6 +7,7 @@ on:
       - 'docker/cuda-shared-layers.json'
       - 'scripts/audit-windows-cuda.ps1'
       - 'tests/test_cuda_image_audit.py'
+      - 'tests/test_windows_cuda_audit_output.ps1'
       - 'docs/CUDA_SHARED_LAYER_ARCHITECTURE.md'
       - '.github/workflows/cuda-image-audit.yml'
   workflow_dispatch:
@@ -34,6 +35,9 @@ jobs:
             $errors | Format-List
             exit 1
           }
+      - name: Check Windows output-folder regression
+        shell: pwsh
+        run: ./tests/test_windows_cuda_audit_output.ps1
       - name: Verify no image installation is required for the audit
         shell: bash
         run: |
