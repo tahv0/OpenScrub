@@ -6621,7 +6621,7 @@ async function loadReview(signal=null,phase=SHELLPH){
  if(typeof updateReviewOverlayLabel==="function"&&typeof REVIEW_DISPLAY_META!=="undefined"){
   for(const key of Object.keys(REVIEW_DISPLAY_META))updateReviewOverlayLabel(Number(key));
  }
- initMarquee();initReviewPreviews();initReviewPages();
+ initMarquee();initReviewPreviews();initReviewPages();updateConfirmationIssues();
  if(typeof reviewSimilarRender==="function"&&typeof REVIEW_SIMILAR_ENABLED!=="undefined"&&REVIEW_SIMILAR_ENABLED)reviewSimilarRender();
  return true;
 }
@@ -6726,7 +6726,8 @@ function showFindingFailure(i,error){
  if(current)rememberFindingConflict(i,current);
  const reason=current?(current.revoked?'This saved example was forgotten.':
   'The saved example now says '+(current.label==='positive'?'Is ':'Not ')+findingNoun(i)+'.'):error.message;
- if(note)note.textContent='Not saved · '+reason+' Click Is / Not to confirm your current decision.';
+ if(note)note.textContent=([400,409].includes(error.status)||error.beforeWrite?'Not saved':'Save not confirmed')+
+  ' · '+reason+' Click Is / Not to confirm your current decision.';
  const dismiss=document.getElementById('findingDismiss'+i);
  if(dismiss){
   // A definite rejection can be dismissed. An uncertain network result must
@@ -7031,7 +7032,21 @@ async function saveAndRender(saveOnly=false){
  try{
   reviewSaveStatus("Saving review…");
   await CONFIRM_CHAIN;
-  if(CONFIRM_FAILED.size){reviewSaveStatus('A confirmation was not saved. Retry its Is / Not choice, or dismiss its rejected change, before training or rendering.',true);return false;}
+  if(CONFIRM_FAILED.size){
+  // Preserve independent Blur/Keep choices, but do not render or start learning
+  // while a human confirmation remains unresolved. No polygons or labels from
+  // failed confirmation requests are silently committed.
+  updateConfirmationIssues();
+  const failed=CONFIRM_FAILED.size;
+  const saved=await persistReview(true,job,view,true);
+  if(CUR!==job||JOBVIEW!==view)return false;
+  reviewSaveStatus(saved?
+   "Other review choices saved to disk, but "+failed+" human confirmation(s) need review. "+
+   "Use the list above to retry Is / Not or dismiss a definitely rejected change. Rendering/training is blocked.":
+   "Could not confirm saving other review choices. "+failed+
+   " human confirmation(s) need review before rendering/training.",true);
+  return false;
+ }
   if([...PLATE_EDITS.values()].some(s=>s.drag)){
    reviewSaveStatus("Finish dragging the corner first. Review has not been saved.",true);return false;
   }
@@ -7110,7 +7125,13 @@ async function persistReview(saveOnly=false,job=CUR,view=JOBVIEW,choicesOnly=fal
  if(CUR!==job||JOBVIEW!==view)return false;
  if(!choicesOnly)MAN=[];
  if(reviewChoicesPending()){
-  reviewSaveStatus("Earlier choices saved. Newer changes are not saved; save again before leaving.",true);return false;
+  // Only a choices-only backup may finish while failed Is/Not confirmations
+  // remain. This path never renders, trains or asserts those labels succeeded.
+  const unresolved=choicesOnly&&CONFIRM_FAILED.size>0&&
+   REVIEW_VERSION===REVIEW_SAVED&&CONFIRM_PENDING.size===0;
+  if(!unresolved){
+   reviewSaveStatus("Earlier choices saved. Newer changes are not saved; save again before leaving.",true);return false;
+  }
  }
  if(saveOnly||SHELLPH==="paused"){
   reviewSaveStatus(choicesOnly?"Review choices saved to disk.":"Review edits saved to disk.");
