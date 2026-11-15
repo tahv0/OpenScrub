@@ -525,13 +525,23 @@ def confirm(job, index, payload):
         fast_path = (journal_doc is not None and _journal_matches_archived_source(
             job, journal_doc, index, payload.get('preview_key')))
         trace.mark('source_identity_check')
-        if fast_path:
-            trace.mode = 'journal'
+        if journal_doc is not None:
+            # An explicit Is/Not click may deliberately reconfirm a *different*
+            # source frame/box from the same track. _archived() already proves
+            # the original video/timeline identity and then derives a NEW
+            # immutable archive ID for a relocated sample. It never changes
+            # the old confirmed example. The small SQLite group/anchor journal
+            # can safely record that new receipt without rewriting all rows of
+            # a large report, which also invalidated the preview index.
+            #
+            # Do NOT apply this relaxation to region(): a corner drag alone
+            # cannot transfer a prior human classification to a new picture.
+            trace.mode = 'journal' if fast_path else 'journal_rebound'
             return _journal_confirm(job, index, payload, journal_doc, trace)
         trace.mode = 'full_report'
-        # Relocalized confirmed rows and section-locked reports use the existing
-        # source-bound rebind rules. Materialize pending journal edits first.
-        # Fallback section/legacy writes operate on one fully materialized report.
+        # Approved sections and legacy reports missing verified source
+        # metadata still require the original guarded full-report path.
+        # Those operations remain fail-closed until their source is verified.
         trace.enter('publish_journal')
         _web._review_journal_snapshot(job)
         trace.mark('publish_journal')
