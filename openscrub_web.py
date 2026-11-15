@@ -5677,7 +5677,7 @@ async function openPlateRepair(button){
   const buttons=add(panel,"div",null,"display:flex;gap:8px;justify-content:flex-end");
   const cancel=add(buttons,"button","Cancel");
   const save=add(buttons,"button","Save replacement · this frame only");save.disabled=true;
-  let mode="box",points=[],drag=null,zoom=1;
+  let mode="box",points=[],drag=null,zoom=1,requestBody=null;
   const baseWidth=Math.min(geom.width,Math.max(290,Math.min(1050,window.innerWidth-70)));
   const fromEvent=e=>{
    const b=canvas.getBoundingClientRect();
@@ -5718,7 +5718,7 @@ async function openPlateRepair(button){
     :(valid?"Four corners ready. Verify that the entire plate is covered."
       :"Click all four corners clockwise ("+points.length+"/4).");
   }
-  const reset=()=>{points=[];drag=null;draw();};
+  const reset=()=>{points=[];drag=null;requestBody=null;draw();};
   const choose=value=>{
    if(saving)return;
    mode=value;box.disabled=mode==="box";corners.disabled=mode==="corners";reset();
@@ -5743,6 +5743,7 @@ async function openPlateRepair(button){
   canvas.addEventListener("pointerup",e=>{
    if(!drag||drag.id!==e.pointerId||saving)return;
    drag.end=fromEvent(e);points=quadFrom(drag.start,drag.end);drag=null;
+   requestBody=null;
    if(canvas.hasPointerCapture(e.pointerId))canvas.releasePointerCapture(e.pointerId);
    draw();
   });
@@ -5750,12 +5751,13 @@ async function openPlateRepair(button){
   canvas.addEventListener("click",e=>{
    if(mode!=="corners"||saving)return;
    if(points.length===4)points=[];
-   points.push(fromEvent(e));draw();
+   points.push(fromEvent(e));requestBody=null;draw();
   });
   function close(){
    if(closed||saving)return;
    closed=true;document.removeEventListener("keydown",onKey);
    dialog.remove();dialog=null;URL.revokeObjectURL(url);url=null;
+   if(button.isConnected){button.disabled=false;button.textContent="Redraw plate area";}
   }
   const onKey=e=>{if(e.key==="Escape"){e.preventDefault();close();}};
   document.addEventListener("keydown",onKey);cancel.onclick=close;
@@ -5764,9 +5766,11 @@ async function openPlateRepair(button){
    saving=true;cancel.disabled=true;save.disabled=true;
    hint.textContent="Saving corrected frame geometry…";
    try{
-    const body={edit_id:Date.now().toString(36)+"-"+Math.random().toString(36).slice(2),
+    // If the acknowledgment is lost, retry the SAME idempotent payload.
+    const body=requestBody||(requestBody={
+     edit_id:Date.now().toString(36)+"-"+Math.random().toString(36).slice(2),
      points:points.map(p=>p.slice()),frame:geom.frame,
-     preview_token:geom.preview_token,frame_source_token:geom.frame_source_token};
+     preview_token:geom.preview_token,frame_source_token:geom.frame_source_token});
     const {data}=await reviewRequest("api/jobs/"+encodeURIComponent(job)+
      "/plate-repair/"+selected.i,{method:"POST",
      headers:{"Content-Type":"application/json"},body:JSON.stringify(body),timeoutMs:120000});
@@ -5806,7 +5810,7 @@ async function openPlateRepair(button){
   if(status)status.textContent="Could not open redraw: "+error.message;
  }finally{
   if(!dialog&&url)URL.revokeObjectURL(url);
-  if(button.isConnected){button.disabled=false;button.textContent="Redraw plate area";}
+  if(button.isConnected&&!dialog){button.disabled=false;button.textContent="Redraw plate area";}
  }
 }
 function retryReviewPreview(button){
