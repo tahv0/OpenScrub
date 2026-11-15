@@ -1,0 +1,209 @@
+# GENERATED FROM Dockerfile.cuda BY docker/generate_cuda_inference.py.
+# DO NOT EDIT. Run: python docker/generate_cuda_inference.py --write
+# EXPERIMENTAL scan-only CUDA image: no PyTorch/Ultralytics training venv.
+# Does not change the existing full CUDA image or Compose configuration.
+
+# syntax=docker/dockerfile:1
+
+# OpenScrub server image — NVIDIA GPU build (CUDA OCR via PaddleOCR-GPU,
+# CUDA face detection via a source-built OpenCV, NVENC hardware encoding
+# via ffmpeg). Published on every release as
+# ghcr.io/austinmabry/openscrub:<version>-cuda and :cuda (also on Docker
+# Hub as pharmhero/openscrub with the same tags).
+#
+# Unraid (with the Nvidia Driver plugin installed):
+#   Repository:   pharmhero/openscrub:cuda
+#   Extra Params: --runtime=nvidia
+#   Variables:    NVIDIA_VISIBLE_DEVICES=all   (already set in the image)
+#   Port:         8384 -> 8384
+#   Path:         /root/.local/share/OpenScrub -> /mnt/user/appdata/openscrub
+#
+# Plain docker:
+#   docker run -d --gpus all -p 8384:8384 \
+#     -v openscrub_data:/root/.local/share/OpenScrub \
+#     ghcr.io/austinmabry/openscrub:cuda
+#
+# GPU features light up automatically: PaddleOCR uses the CUDA build,
+# OpenCV DNN runs face detection + identity grouping on the GPU (the base
+# image below is a CUDA-built OpenCV — see docker/Dockerfile.opencv-cuda),
+# and NVENC selects h264_nvenc/hevc_nvenc when the driver is exposed.
+# Set OPENSCRUB_CPU_DNN=1 to force face detection back onto the CPU.
+#
+# LAYER ORDER MATTERS: the multi-GB CUDA/OpenCV/Paddle stack lives BELOW
+# the app COPY layers, so a release that only changes code rebuilds (and
+# users only re-download) the small app layers. The CUDA-OpenCV layer is
+# inherited from the opencv-cuda base image, which is rebuilt rarely
+# (docker/Dockerfile.opencv-cuda) and keeps a stable digest across releases.
+
+# CUDA-enabled OpenCV base (built by .github/workflows/opencv-cuda-base.yml).
+# Bump this tag only when that base image is rebuilt.
+# Default: build the dependency stage as usual (e.g. public release CI).
+# Windows fast builds may instead FROM a tagged local image containing all
+# Python/CUDA dependencies and the optional training virtualenv. Unlike an
+# evictable BuildKit cache, that tagged image survives builder cache GC.
+ARG OPENSCRUB_CUDA_DEPS_IMAGE=cuda_inference_deps
+
+FROM ghcr.io/austinmabry/opencv-cuda:4.10.0-cu126 AS cuda_inference_deps
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    NVIDIA_VISIBLE_DEVICES=all \
+    NVIDIA_DRIVER_CAPABILITIES=compute,utility,video \
+    ORT_DISABLE_TELEMETRY=1
+
+# This base provides CUDA 12.6 and cuDNN 9. ORT 1.20.x supports that pair;
+# newer wheels require CUDA 12.8 or 13 and can silently initialize on CPU.
+# Keep both installs on the same version when restoring the GPU wheel.
+ARG ONNXRUNTIME_GPU_VERSION=1.20.2
+
+# Ubuntu OS packages are installed and updated here (cached across normal
+# code changes). A later security refresh is deliberately placed after
+# expensive dependencies/models but BEFORE application source COPY.
+RUN --mount=type=cache,id=openscrub-pip-cuda,target=/root/.cache/pip,sharing=locked \
+ apt-get update \
+ && apt-get dist-upgrade -y \
+ && apt-get install -y --no-install-recommends tesseract-ocr ffmpeg \
+ && rm -rf /var/lib/apt/lists/* \
+ && pip install --upgrade pip setuptools wheel
+
+WORKDIR /src
+
+# Persistent pip cache mount keeps downloaded wheels across rebuilds without
+# putting pip's cache inside the image. It is safe if a requirements file
+# changes or BuildKit has to re-execute the install step.
+# ---- heavy dependency layer: rebuilds ONLY when requirements.txt changes.
+# OpenCV is ALREADY provided (CUDA build) by the base image — install every
+# requirement EXCEPT opencv (the CPU wheel would shadow the CUDA one) and
+# numpy (the base image's numpy is the ABI OpenCV was compiled against; a
+# pip numpy of a different ABI would break `import cv2`).
+COPY requirements.txt ./
+RUN --mount=type=cache,id=openscrub-pip-cuda,target=/root/.cache/pip,sharing=locked \
+ grep -viE '^(opencv|numpy|onnxruntime)' requirements.txt > /tmp/req.nocv \
+ && pip install -r /tmp/req.nocv \
+ # onnxruntime-GPU (not the CPU wheel in requirements.txt) so license-plate
+ # detection runs on the GPU via the CUDAExecutionProvider on cu126. The
+ # engine registers CPUExecutionProvider as a fallback, so if the CUDA/cuDNN
+ # init ever fails at runtime plates degrade to CPU instead of killing the
+ # job — the GPU path is a speed-up, never a hard requirement.
+ #
+ # --no-deps + its light pure-Python deps by hand: this stops onnxruntime-gpu
+ # from pulling nvidia-cudnn-cu12 (a SECOND, possibly newer cuDNN) into
+ # site-packages, which would shadow the base image's cuDNN and re-trigger the
+ # Paddle CUDNN 5003 failure documented below. onnxruntime then loads CUDA/
+ # cuDNN from the cudnn-runtime base image, the same copy Paddle uses.
+ && pip install --no-deps "onnxruntime-gpu==${ONNXRUNTIME_GPU_VERSION}" \
+ && pip install coloredlogs flatbuffers sympy humanfriendly \
+ && pip install paddleocr \
+      paddlepaddle-gpu==3.2.2 \
+      -i https://www.paddlepaddle.org.cn/packages/stable/cu126/ \
+      --extra-index-url https://pypi.org/simple \
+ # faster-whisper: local speech transcription (CPU int8 — fine).
+ # Its STOCK onnxruntime dependency would clobber onnxruntime-gpu's
+ # provider files (same-package overwrite — it killed the :intel image
+ # when stock 1.27 released), so evict stock and re-lay the GPU wheel
+ # LAST; the CUDA-provider assert below is the backstop.
+ && pip install faster-whisper \
+ && (pip uninstall -y onnxruntime || true) \
+ && pip install --force-reinstall --no-deps \
+      "onnxruntime-gpu==${ONNXRUNTIME_GPU_VERSION}" \
+ # NOTE: no pip cuDNN here — the cudnn-runtime base image ships the
+ # matched version; a second, newer pip copy caused CUDNN error 5003
+ # (EXECUTION_FAILED) at the first Paddle-GPU inference.
+ && python -m spacy download en_core_web_sm \
+ # Pin numpy to the EXACT version the CUDA OpenCV was built against
+ # (PaddleOCR pulls numpy 2.x, whose C ABI breaks cv2). Paddle 3.x and
+ # spaCy both support 1.26.4.
+ && pip install "numpy==1.26.4" \
+ # PaddleOCR installs opencv-contrib-python from pip, which SHADOWS the
+ # CUDA OpenCV (silently forcing face detection back onto the CPU) and
+ # mixes its Python glue with our native module (the gapi/GStreamer
+ # import crash). Remove any pip OpenCV and restore the CUDA build, which
+ # still lives at /opt/opencv in the base image.
+ && pip uninstall -y opencv-python opencv-contrib-python \
+      opencv-python-headless opencv-contrib-python-headless || true \
+ && CVSRC="$(find /opt/opencv -type d -name cv2 | head -1)" \
+ && SITE="$(python3 -c 'import site;print(site.getsitepackages()[0])')" \
+ && rm -rf "$SITE/cv2" && cp -r "$CVSRC" "$SITE/" \
+ && ldconfig \
+ # fail the build LOUDLY if cv2 still won't load or lost its CUDA support,
+ # rather than shipping a broken or silently-CPU image
+ && python -c "import cv2, numpy; \
+assert hasattr(cv2, 'cuda') and hasattr(cv2, 'FaceDetectorYN_create'); \
+print('cv2', cv2.__version__, '| numpy', numpy.__version__, \
+'| CUDA-capable OpenCV OK')" \
+ # fail the build if onnxruntime-gpu didn't register its CUDA provider (the
+ # provider list is populated from the wheel, not from a GPU being present,
+ # so this is valid on a CPU CI runner). Without it, plate detection would
+ # silently run on CPU in a GPU image.
+ && python -c "import onnxruntime as ort; \
+provs = ort.get_available_providers(); \
+assert 'CUDAExecutionProvider' in provs, ('onnxruntime CUDA provider missing: %r' % provs); \
+print('onnxruntime', ort.__version__, '| providers', provs)"
+
+# ---- model layer: pre-fetched detection models so first run works
+# offline. In its OWN cached layer ABOVE the app code (standalone script,
+# no openscrub import): a release that only changes code no longer
+# re-downloads the unchanged models. Rebuilds only when
+# docker/prefetch_models.py itself changes; a sync test pins its table to
+# the engine's constants. (No pprec/pprec_yml here — this image ships
+# GPU PaddleOCR as its OCR engine; `--engine onnx` would fetch them at
+# first use.)
+COPY docker/prefetch_models.py ./
+RUN python prefetch_models.py yunet sface vittrack ppdet plate_t640
+
+# This label is stored on the *tagged dependency image* by the optional
+# Windows build script. It is only metadata, so changing the fingerprint
+# doesn't force a PyTorch reinstall unless an actual dependency changed.
+ARG OPENSCRUB_DEPS_FINGERPRINT=unmanaged
+LABEL org.openscrub.cuda.deps-fingerprint="${OPENSCRUB_DEPS_FINGERPRINT}"
+LABEL org.openscrub.cuda.flavor="inference-only"
+
+# Release/normal builds inherit the stage above; local Windows builds can
+# select a stable tagged image via OPENSCRUB_CUDA_DEPS_IMAGE. Both paths use
+# the exact same app COPY/install and security-refresh instructions.
+FROM ${OPENSCRUB_CUDA_DEPS_IMAGE} AS app
+
+# ---- weekly security refresh: after large deps/models, BEFORE app code
+# CI varies SECURITY_REFRESH to install OS updates. Only this step and the
+# small source/app layers below rebuild; CUDA, Python wheels and downloaded
+# models remain cached. Ordinary code edits keep the default value (0) and
+# never need to re-run apt-get update or dist-upgrade.
+ARG SECURITY_REFRESH=0
+RUN --mount=type=cache,id=openscrub-pip-cuda,target=/root/.cache/pip,sharing=locked \
+ echo "security refresh ${SECURITY_REFRESH}" \
+ && apt-get update \
+ && apt-get dist-upgrade -y \
+ && rm -rf /var/lib/apt/lists/* \
+ && pip install --upgrade pip setuptools wheel
+
+# ---- app layers: tiny, change every release
+COPY pyproject.toml README.md LICENSE NOTICE THIRD_PARTY_NOTICES.md plate_models.json face_models.json person_models.json ./
+COPY openscrub.py openscrub_web.py stop_review.py openscrub_logging.py learning_session.py video_learning.py learned_models.py learning_candidates.py plate_verifier.py confirmed_findings.py finding_previews.py review_preview_index.py review_journal.py findings_training.py findings_web.py findings_ui.py review_similarity_ui.py plate_text_hints.py plate_text_web.py video_sections.py section_workflow.py openscrub_setup.py openscrub_update.py \
+     openscrub_vault.py zones_ui.py install.py test_openscrub.py ./
+COPY plate_text_subprocess.py ./
+COPY assets/openscrub.ico assets/
+COPY scripts/ scripts/
+RUN --mount=type=cache,id=openscrub-pip-cuda,target=/root/.cache/pip,sharing=locked \
+ pip install --no-deps .
+
+# tells the web UI it runs in a container: the update notice becomes
+# inform-only ("pull the new image") instead of offering the in-place
+# updater, whose writes would vanish on the next container recreate
+ENV OPENSCRUB_IN_DOCKER=1
+# Unbuffered stdout: without this, Python block-buffers prints in a non-TTY
+# container and `docker logs` stays EMPTY for minutes — a real Mac user
+# debugged a perfectly healthy server because the startup banner (and any
+# crash traceback stuck behind it) never appeared.
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONFAULTHANDLER=1
+
+EXPOSE 8384
+# Lets `docker ps`/Docker Desktop show whether the server actually answers
+# (the reported failure looked identical whether the server was up or not).
+# Scheme-agnostic: tries the default self-signed HTTPS, then --http.
+HEALTHCHECK --interval=60s --timeout=10s --start-period=90s --retries=3 \
+  CMD python -c "import urllib.request,ssl;\
+ctx=ssl._create_unverified_context();\
+exec('try:\n urllib.request.urlopen(\"https://127.0.0.1:8384/\",context=ctx,timeout=8)\nexcept Exception:\n urllib.request.urlopen(\"http://127.0.0.1:8384/\",timeout=8)')"
+
+VOLUME ["/root/.local/share/OpenScrub"]
+CMD ["openscrub-web", "--host", "0.0.0.0"]
