@@ -6856,9 +6856,24 @@ function confirmFinding(i,label){
    const areaStillUnsaved=label==='positive'&&!!edit?.dirty&&!edit.archiveConflict;
    const submit=()=>reviewRequest('api/jobs/'+job+'/confirm/'+i,{method:'POST',
     headers:{'Content-Type':'application/json'},body:JSON.stringify(body),timeoutMs:120000});
+   // The review edit lock returns this exact 503 BEFORE entering the
+   // confirmation handler. A bounded replay of the same source-bound
+   // request is safe; never auto-retry a timeout, other 5xx, or 409.
+   const submitWithBusyRetry=async()=>{
+    for(let attempt=0;;attempt++){
+     try{return await submit();}
+     catch(error){
+      if(attempt>=3||error.status!==503||
+         !/^Another review edit is saving\. Retry shortly\./.test(error.message||"")||
+         CUR!==job||JOBVIEW!==view)throw error;
+      if(note)note.textContent="Another review edit is saving · retrying confirmation…";
+      await new Promise(resolve=>setTimeout(resolve,[150,400,900][attempt]));
+     }
+    }
+   };
    let data;
    try{
-    ({data}=await submit());
+    ({data}=await submitWithBusyRetry());
    }catch(error){
     if(error.status!==409||error.details?.conflict!=='stale_preview'||!displayed)
      throw error;
@@ -6871,7 +6886,7 @@ function confirmFinding(i,label){
     }
     body.preview_token=recovery.latest.preview_token;
     body.preview_key=recovery.latest.key;
-    ({data}=await submit()); // one source-bound retry, never loop on 409
+    ({data}=await submitWithBusyRetry()); // one source-bound retry, never loop on 409
    }
    if(CUR!==job||JOBVIEW!==view)return;
    for(const m of members){
@@ -7142,8 +7157,9 @@ async function persistReview(saveOnly=false,job=CUR,view=JOBVIEW,choicesOnly=fal
  if(reviewChoicesPending()){
   // Only a choices-only backup may finish while failed Is/Not confirmations
   // remain. This path never renders, trains or asserts those labels succeeded.
-  const unresolved=choicesOnly&&CONFIRM_FAILED.size>0&&
-   REVIEW_VERSION===REVIEW_SAVED&&CONFIRM_PENDING.size===0;
+  const unresolved=choicesOnly&&typeof CONFIRM_FAILED!=="undefined"&&
+   CONFIRM_FAILED.size>0&&REVIEW_VERSION===REVIEW_SAVED&&
+   typeof CONFIRM_PENDING!=="undefined"&&CONFIRM_PENDING.size===0;
   if(!unresolved){
    reviewSaveStatus("Earlier choices saved. Newer changes are not saved; save again before leaving.",true);return false;
   }
