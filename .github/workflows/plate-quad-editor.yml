@@ -9,6 +9,7 @@ on:
       - 'test_corner_409_recovery.py'
       - 'test_review_performance.py'
       - 'test_review_browser.py'
+      - 'test_review_confirmation_blockers.py'
       - 'tools/integration_smoke.py'
       - '.github/workflows/plate-quad-editor.yml'
   workflow_dispatch:
@@ -49,6 +50,9 @@ jobs:
         env:
           REVIEW_EVIDENCE_DIR: review-evidence
         run: python -m pytest -q test_review_browser.py
+      - name: Regression for repeated stale representative frames and review confirmation recovery
+        if: matrix.python-version == '3.12'
+        run: python -m pytest -q test_review_confirmation_blockers.py
       - uses: actions/upload-artifact@v4
         if: always() && matrix.python-version == '3.12'
         with:

@@ -5228,6 +5228,17 @@ function clearReviewPreviews(){
 }
 function drawPlateThumbnail(img){
  if(!img._plateMeta||!img.naturalWidth)return;
+ const existing=img._quadEdit;
+ if(existing&&!existing.dirty&&!existing.drag&&!existing.pending&&
+    existing.meta!==img._plateMeta){
+  // Switching from a borrowed group JPEG to the exact detection frame
+  // must rebind a CLEAN editor to the actual new image and its geometry.
+  // Never overwrite a pending/failed human polygon.
+  existing.meta=img._plateMeta;
+  existing.displayCrop=img._plateMeta.crop.slice();
+  existing.points=plateCopy(img._plateMeta.points);
+  existing.saved=plateCopy(img._plateMeta.points);
+ }
  const state=initPlateCorners(img);if(state)state.draw();
 }
 function updateReviewPreloadStatus(state){
@@ -5269,7 +5280,9 @@ async function loadReviewPreview(state,task,cacheOnly){
  if(retry)retry.hidden=true;
  let missing=false,retryBusy=false,ok=false,url=null;
  try{
-  const base=img.dataset.previewUrl;
+  const original=img.dataset.previewUrl;
+  const base=img._forceExactPreview?
+   original+(original.includes("?")?"&":"?")+"exact=1":original;
   const target=cacheOnly?base+(base.includes("?")?"&":"?")+"cache_only=1":base;
   const {response,data}=await reviewRequest(target,{signal:ctl.signal,timeoutMs:cacheOnly?15000:120000},"blob");
   if(REVIEW_MEDIA!==state||!img.isConnected)return;
@@ -5285,6 +5298,15 @@ async function loadReviewPreview(state,task,cacheOnly){
   if(state.urls.delete(previous))URL.revokeObjectURL(previous);
   url=null;
   if(REVIEW_MEDIA!==state||!img.isConnected)return;
+  const borrowed=!!(meta?.match==="representative"&&
+   Number.isInteger(meta.frame)&&Number.isInteger(meta.requested_frame)&&
+   meta.frame!==meta.requested_frame);
+  const hint=card.querySelector(".source-frame-note");
+  const exactButton=card.querySelector(".source-frame-exact");
+  if(hint)hint.textContent=borrowed?
+   "Showing cached frame "+meta.frame+" instead of detection frame "+
+   meta.requested_frame+". Load the exact source frame before confirming this finding.":"";
+  if(exactButton)exactButton.hidden=!borrowed;
   drawPlateThumbnail(img);
   if(meta?.classification_allowed===false){
    if(typeof FINDING_META!=="undefined"&&FINDING_META[meta.i]){
@@ -5383,7 +5405,7 @@ function initReviewPreviews(){
  pumpReviewPreviews(state);
 }
 // Retain all decisions/group memberships, but mount card elements progressively.
-function appendReviewPage(cat,selectedOnly=false){
+function appendReviewPage(cat,selectedOnly=false,targetIndex=null){
  const panel=document.getElementById("review"),pending=REVIEW_PENDING_PAGES[cat];
  if(!panel||!pending||!pending.length)return 0;
  const grid=[...panel.querySelectorAll("[data-review-category]")]
@@ -5392,6 +5414,7 @@ function appendReviewPage(cat,selectedOnly=false){
  const added=[];
  for(let k=0;k<pending.length&&added.length<(selectedOnly?Infinity:REVIEW_PAGE_SIZE);){
   const entry=pending[k];
+  if(targetIndex!==null&&entry.i!==targetIndex){k++;continue;}
   if(!reviewMatchesFilter(entry.i,cat)){k++;continue;}
   added.push(entry);pending.splice(k,1);
  }
@@ -5436,6 +5459,23 @@ function initReviewPages(){
   },{rootMargin:"10000px 0px"});
   buttons.forEach(button=>panel._moreObserver.observe(button));
  }
+}
+function loadExactReviewFrame(button){
+ const card=button.closest(".det"),img=card?.querySelector("img[data-preview-url]");
+ if(!img)return;
+ const edit=img._quadEdit,warning=card.querySelector(".source-frame-note");
+ if(edit&&(edit.dirty||edit.pending||edit.drag)){
+  if(warning)warning.textContent="Preserve or resolve your unsaved corner draft before changing source frames.";
+  return;
+ }
+ img._forceExactPreview=true;
+ img._plateMeta=null;
+ button.disabled=true;button.textContent="Loading exact frame…";
+ queueReviewPreview(img,true).then(ok=>{
+  if(!ok&&warning)warning.textContent="Exact source frame did not load. Retry without changing your corners.";
+ }).finally(()=>{
+  if(button.isConnected){button.disabled=false;button.textContent="Load exact source frame";}
+ });
 }
 function retryReviewPreview(button){
  const img=button.closest(".det").querySelector("img[data-preview-url]");
@@ -5554,6 +5594,13 @@ function plateStatus(s,text,retry=false){
  s.retry.textContent=s.archiveConflict?"Confirm Is / Not again":
   s.needsSourceReview?"Save on refreshed picture":s.conflict?"Refresh picture (keep corners)":"Retry save";
  if(s.card)s.card.classList.toggle("corner-save-error",!!(s.dirty&&s.error));
+ // A rejected AREA save needs an explicit discard control even though it
+ // must not create a phantom failed human classification.
+ const dismiss=document.getElementById("findingDismiss"+s.i);
+ if(dismiss&&!CONFIRM_FAILED.has(s.i)){
+  dismiss.hidden=!s.archiveConflict;
+  if(s.archiveConflict)dismiss.textContent="Discard this unsaved adjustment";
+ }
  updatePlateSaveIssues();
  if(typeof scheduleReviewStatusFilter==="function")scheduleReviewStatusFilter();
 }
@@ -5773,7 +5820,8 @@ function pumpPlateSaves(){
    if(error.status===409&&error.details?.current_archive){
     rememberFindingConflict(s.i,error.details.current_archive);
     s.pending=null;s.error=error;s.conflict=false;s.archiveConflict=true;
-    showFindingFailure(s.i,error);
+    // The AREA save has a distinct draft/error: it did not attempt Is/Not.
+    // Never register a phantom failed confirmation in CONFIRM_FAILED.
     s.draw();plateStatus(s,"Saved example changed · choose Is / Not to confirm this adjustment.",true);return;
    }
    if(error.status===409&&!error.details?.current_archive){
@@ -6489,6 +6537,7 @@ async function loadReview(signal=null,phase=SHELLPH){
  <small id="reviewPreloadStatus" class="review-copy" role="status" aria-live="off">Preparing review pictures before you scroll…</small>
  <p id="reviewSaveStatus" class="review-copy review-save-status" role="status" aria-live="polite">Review choices loaded from disk.</p>
  <div id="plateSaveIssues" class="review-copy" role="status" aria-live="polite" hidden></div>
+ <div id="confirmationSaveIssues" class="review-copy" role="alert" aria-live="polite" hidden></div>
  <p class="review-copy">Training uses saved corrections and the original detectors. It does not guarantee that undetected plates have been found. Review the output.</p>
  ${reviewOverlayLegendHTML()}
  <p class="review-copy">Yellow is the primary detector proposal. Red is the effective area that will be concealed; it keeps four-corner rotation, skew and perspective. Green stays visible. Labels identify human corrections, learned masks and safe fallbacks.</p>
@@ -6574,6 +6623,7 @@ async function loadReview(signal=null,phase=SHELLPH){
     ${x.category==="plate"?'<div id="plateOverlay'+x.i+'" class="plate-output-badge"></div>':""}
     <small class="preview-status" role="status">Preview not loaded</small>
     <button class="sec preview-retry" hidden onclick="retryReviewPreview(this)">Retry preview</button>
+    ${x.category==="plate"?'<small class="source-frame-note review-copy" role="status"></small><button type="button" class="sec source-frame-exact" hidden onclick="loadExactReviewFrame(this)">Load exact source frame</button>':""}
     ${x.category==="plate"?'<small class="quad-status" role="status" title="Corners apply to this detected track. Review changing perspective. Keyboard: select corner 1–4, use arrows; Ctrl+Z undoes.">Corners autosave to track</small><button type="button" class="sec quad-retry" hidden>Retry save</button>':""}
     <div>${plateVerificationBadge(x)}${x.learning_conflict?'<span class="badge" title="The original coverage was retained where the learned model could not make a reliable refinement">Model disagreement — review</span> ':""}${plateFallbackText(x)?`<span class="badge" style="white-space:normal">${plateFallbackText(x)}</span> `:""}${x.shaped?'<span class="badge" title="Thumbnail rectangle is a selection guide; open to inspect the mask and any exclusions">shaped mask</span> ':""}${x.personcard?`<b>Person ${x.person+1}</b> — one decision for ALL their appearances`:`"${sectionEscape(x.text)}"`}${x.frames?` <span class="badge">×${x.frames} frames</span>`:""}${x.confidence?` <span class="badge" title="detector confidence — not a human decision">${Math.round(x.confidence*100)}%</span>`:""} <br>${x.t_start.toFixed(1)}–${x.t_end.toFixed(1)}s</div>
     ${plateTextBadge(x)}
@@ -6618,7 +6668,7 @@ async function loadReview(signal=null,phase=SHELLPH){
  if(typeof updateReviewOverlayLabel==="function"&&typeof REVIEW_DISPLAY_META!=="undefined"){
   for(const key of Object.keys(REVIEW_DISPLAY_META))updateReviewOverlayLabel(Number(key));
  }
- initMarquee();initReviewPreviews();initReviewPages();
+ initMarquee();initReviewPreviews();initReviewPages();updateConfirmationIssues();
  if(typeof reviewSimilarRender==="function"&&typeof REVIEW_SIMILAR_ENABLED!=="undefined"&&REVIEW_SIMILAR_ENABLED)reviewSimilarRender();
  return true;
 }
@@ -6655,13 +6705,76 @@ function rememberFindingConflict(i,current){
   row.confirmed_finding_revision=current.revision;
  }
 }
+function revealFailedConfirmation(i){
+ // Reveal one failed card without reloading Review or discarding pending edits.
+ if(typeof reviewAllFindings==="function")reviewAllFindings();
+ let card=document.getElementById("det"+i);
+ if(!card&&typeof REVIEW_PENDING_PAGES!=="undefined"){
+  for(const [cat,pending] of Object.entries(REVIEW_PENDING_PAGES)){
+   if(pending.some(entry=>entry.i===i)){
+    appendReviewPage(cat,false,i);card=document.getElementById("det"+i);break;
+   }
+  }
+ }
+ if(!card)return false;
+ if(typeof REVIEW_SIMILAR_GROUPS!=="undefined"){
+  for(const [root,members] of REVIEW_SIMILAR_GROUPS){
+   if(members.includes(i)){
+    REVIEW_SIMILAR_EXPANDED.add(root);
+    if(typeof reviewSimilarRender==="function")reviewSimilarRender();
+    break;
+   }
+  }
+ }
+ for(let el=card;el&&el.id!=="review";el=el.parentElement){
+  el.hidden=false;if(el.tagName==="DETAILS")el.open=true;
+ }
+ card.scrollIntoView({block:"center"});
+ const control=card.querySelector(".finding-confirm button");
+ if(control)control.focus({preventScroll:true});
+ return true;
+}
+function updateConfirmationIssues(){
+ const panel=document.getElementById("confirmationSaveIssues");if(!panel)return;
+ panel.replaceChildren();panel.hidden=CONFIRM_FAILED.size===0;
+ if(!CONFIRM_FAILED.size)return;
+ const title=document.createElement("strong");
+ title.textContent=CONFIRM_FAILED.size+" unsuccessful human confirmation"+
+  (CONFIRM_FAILED.size===1?"":"s")+". Resolve these before rendering or training.";
+ panel.appendChild(title);
+ for(const [i,error] of CONFIRM_FAILED){
+  const row=document.createElement("div");row.className="row";
+  const show=document.createElement("button");show.type="button";show.className="sec";
+  show.textContent="Show finding #"+i;show.onclick=()=>revealFailedConfirmation(i);
+  row.appendChild(show);
+  if(error?.reviewAttemptedLabel==="positive"||error?.reviewAttemptedLabel==="negative"){
+   const label=error.reviewAttemptedLabel;
+   const retry=document.createElement("button");retry.type="button";retry.className="sec";
+   retry.textContent="Retry "+(label==="positive"?"Is":"Not")+" "+findingNoun(i);
+   retry.onclick=()=>{revealFailedConfirmation(i);confirmFinding(i,label);};
+   row.appendChild(retry);
+  }
+  if([400,409].includes(error?.status)||error?.beforeWrite){
+   const dismiss=document.createElement("button");dismiss.type="button";dismiss.className="sec";
+   dismiss.textContent=PLATE_EDITS.get(i)?.archiveConflict
+    ?"Discard rejected corner adjustment":"Keep current review choice";
+   dismiss.onclick=()=>dismissFindingConfirmation(i);
+   row.appendChild(dismiss);
+  }
+  const details=document.createElement("span");
+  const code=Number.isInteger(error?.status)?"HTTP "+error.status+" · ":"";
+  details.textContent=code+(error?.message||"Confirmation not acknowledged");
+  row.appendChild(details);panel.appendChild(row);
+ }
+}
 function showFindingFailure(i,error){
  CONFIRM_FAILED.set(i,error);
  const current=error.details?.current_archive,note=document.getElementById('vlabel'+i);
  if(current)rememberFindingConflict(i,current);
  const reason=current?(current.revoked?'This saved example was forgotten.':
   'The saved example now says '+(current.label==='positive'?'Is ':'Not ')+findingNoun(i)+'.'):error.message;
- if(note)note.textContent='Not saved · '+reason+' Click Is / Not to confirm your current decision.';
+ if(note)note.textContent=([400,409].includes(error.status)||error.beforeWrite?'Not saved':'Save not confirmed')+
+  ' · '+reason+' Click Is / Not to confirm your current decision.';
  const dismiss=document.getElementById('findingDismiss'+i);
  if(dismiss){
   // A definite rejection can be dismissed. An uncertain network result must
@@ -6669,20 +6782,31 @@ function showFindingFailure(i,error){
   dismiss.hidden=![400,409].includes(error.status)&&!error.beforeWrite;
   dismiss.textContent=PLATE_EDITS.get(i)?.archiveConflict?'Discard this unsaved adjustment':'Keep current review choice';
  }
+ updateConfirmationIssues();
+ if(typeof scheduleReviewStatusFilter==='function')scheduleReviewStatusFilter();
 }
 function dismissFindingConfirmation(i){
  if(CONFIRM_PENDING.has(i))return;
  const error=CONFIRM_FAILED.get(i);
  if(error&&![400,409].includes(error.status)&&!error.beforeWrite)return;
- const edit=PLATE_EDITS.get(i);
- if(edit?.archiveConflict){
+ const edit=PLATE_EDITS.get(i),hadCornerConflict=!!edit?.archiveConflict;
+ if(hadCornerConflict){
+  // Discard only the rejected AREA polygon, never an independent human
+  // classification failure that may have happened on the same finding.
   edit.pending=null;edit.version++;edit.dirty=false;edit.error=null;
   edit.archiveConflict=false;edit.conflict=false;edit.points=plateCopy(edit.saved);
   edit.draw();plateStatus(edit,'Saved area · current review choice kept');schedulePlateSaves();
  }
- CONFIRM_FAILED.delete(i);
- const note=document.getElementById('vlabel'+i);if(note)note.innerHTML=findingStatus(i);
- const dismiss=document.getElementById('findingDismiss'+i);if(dismiss)dismiss.hidden=true;
+ const keepClassificationFailure=hadCornerConflict&&!!error?.reviewAttemptedLabel;
+ if(!keepClassificationFailure)CONFIRM_FAILED.delete(i);
+ const note=document.getElementById('vlabel'+i);
+ if(note)note.innerHTML=keepClassificationFailure?'Confirmation not saved · retry Is / Not or keep the current review choice.':findingStatus(i);
+ const dismiss=document.getElementById('findingDismiss'+i);
+ if(dismiss){
+  dismiss.hidden=!keepClassificationFailure;
+  if(keepClassificationFailure)dismiss.textContent='Keep current review choice';
+ }
+ updateConfirmationIssues();
  plateUnloadGuard();if(typeof scheduleReviewStatusFilter==="function")scheduleReviewStatusFilter();
 }
 async function reloadStaleFindingForConfirmation(card,edit,shown){
@@ -6733,7 +6857,8 @@ function confirmFinding(i,label){
   return CONFIRM_CHAIN;
  }
  const members=TRKMEM[i]||[i],versions=Object.fromEntries(members.map(m=>[m,OUTPUT_VERSION[m]||0]));
- const job=CUR,view=JOBVIEW;CONFIRM_PENDING.add(i);CONFIRM_FAILED.delete(i);plateUnloadGuard();
+ const job=CUR,view=JOBVIEW;CONFIRM_PENDING.add(i);CONFIRM_FAILED.delete(i);
+ updateConfirmationIssues();plateUnloadGuard();
  const card=document.getElementById('det'+i),note=document.getElementById('vlabel'+i);
  const dismiss=document.getElementById('findingDismiss'+i);if(dismiss)dismiss.hidden=true;
  if(note)note.textContent='Saving confirmation…';
@@ -6771,9 +6896,24 @@ function confirmFinding(i,label){
    const areaStillUnsaved=label==='positive'&&!!edit?.dirty&&!edit.archiveConflict;
    const submit=()=>reviewRequest('api/jobs/'+job+'/confirm/'+i,{method:'POST',
     headers:{'Content-Type':'application/json'},body:JSON.stringify(body),timeoutMs:120000});
+   // The review edit lock returns this exact 503 BEFORE entering the
+   // confirmation handler. A bounded replay of the same source-bound
+   // request is safe; never auto-retry a timeout, other 5xx, or 409.
+   const submitWithBusyRetry=async()=>{
+    for(let attempt=0;;attempt++){
+     try{return await submit();}
+     catch(error){
+      if(attempt>=3||error.status!==503||
+         !/^Another review edit is saving\\. Retry shortly\\./.test(error.message||"")||
+         CUR!==job||JOBVIEW!==view)throw error;
+      if(note)note.textContent="Another review edit is saving · retrying confirmation…";
+      await new Promise(resolve=>setTimeout(resolve,[150,400,900][attempt]));
+     }
+    }
+   };
    let data;
    try{
-    ({data}=await submit());
+    ({data}=await submitWithBusyRetry());
    }catch(error){
     if(error.status!==409||error.details?.conflict!=='stale_preview'||!displayed)
      throw error;
@@ -6786,7 +6926,7 @@ function confirmFinding(i,label){
     }
     body.preview_token=recovery.latest.preview_token;
     body.preview_key=recovery.latest.key;
-    ({data}=await submit()); // one source-bound retry, never loop on 409
+    ({data}=await submitWithBusyRetry()); // one source-bound retry, never loop on 409
    }
    if(CUR!==job||JOBVIEW!==view)return;
    for(const m of members){
@@ -6829,8 +6969,8 @@ function confirmFinding(i,label){
    if(typeof reviewSimilarRender==="function"&&typeof REVIEW_SIMILAR_ENABLED!=="undefined"&&REVIEW_SIMILAR_ENABLED)reviewSimilarRender();
    card?.querySelectorAll('.finding-confirm button').forEach((button,index)=>button.setAttribute('aria-pressed',index===(label==='positive'?0:1)));
    if(document.getElementById('beCv'))beRefresh();
-  }catch(error){showFindingFailure(i,error);}
-  finally{CONFIRM_PENDING.delete(i);card?.querySelectorAll('button').forEach(button=>button.disabled=FINDING_META[i]?.classification_allowed===false&&!!button.closest('.finding-confirm'));plateUnloadGuard();if(typeof scheduleReviewStatusFilter==="function")scheduleReviewStatusFilter();}
+  }catch(error){error.reviewAttemptedLabel=label;showFindingFailure(i,error);}
+  finally{CONFIRM_PENDING.delete(i);card?.querySelectorAll('button').forEach(button=>button.disabled=FINDING_META[i]?.classification_allowed===false&&!!button.closest('.finding-confirm'));updateConfirmationIssues();plateUnloadGuard();if(typeof scheduleReviewStatusFilter==="function")scheduleReviewStatusFilter();}
  });
  return CONFIRM_CHAIN;
 }
@@ -6962,7 +7102,21 @@ async function saveAndRender(saveOnly=false){
  try{
   reviewSaveStatus("Saving review…");
   await CONFIRM_CHAIN;
-  if(CONFIRM_FAILED.size){reviewSaveStatus('A confirmation was not saved. Retry its Is / Not choice, or dismiss its rejected change, before training or rendering.',true);return false;}
+  if(CONFIRM_FAILED.size){
+  // Preserve independent Blur/Keep choices, but do not render or start learning
+  // while a human confirmation remains unresolved. No polygons or labels from
+  // failed confirmation requests are silently committed.
+  updateConfirmationIssues();
+  const failed=CONFIRM_FAILED.size;
+  const saved=await persistReview(true,job,view,true);
+  if(CUR!==job||JOBVIEW!==view)return false;
+  reviewSaveStatus(saved?
+   "Other review choices saved to disk, but "+failed+" human confirmation(s) need review. "+
+   "Use the list above to retry Is / Not or dismiss a definitely rejected change. Rendering/training is blocked.":
+   "Could not confirm saving other review choices. "+failed+
+   " human confirmation(s) need review before rendering/training.",true);
+  return false;
+ }
   if([...PLATE_EDITS.values()].some(s=>s.drag)){
    reviewSaveStatus("Finish dragging the corner first. Review has not been saved.",true);return false;
   }
@@ -7041,7 +7195,14 @@ async function persistReview(saveOnly=false,job=CUR,view=JOBVIEW,choicesOnly=fal
  if(CUR!==job||JOBVIEW!==view)return false;
  if(!choicesOnly)MAN=[];
  if(reviewChoicesPending()){
-  reviewSaveStatus("Earlier choices saved. Newer changes are not saved; save again before leaving.",true);return false;
+  // Only a choices-only backup may finish while failed Is/Not confirmations
+  // remain. This path never renders, trains or asserts those labels succeeded.
+  const unresolved=choicesOnly&&typeof CONFIRM_FAILED!=="undefined"&&
+   CONFIRM_FAILED.size>0&&REVIEW_VERSION===REVIEW_SAVED&&
+   typeof CONFIRM_PENDING!=="undefined"&&CONFIRM_PENDING.size===0;
+  if(!unresolved){
+   reviewSaveStatus("Earlier choices saved. Newer changes are not saved; save again before leaving.",true);return false;
+  }
  }
  if(saveOnly||SHELLPH==="paused"){
   reviewSaveStatus(choicesOnly?"Review choices saved to disk.":"Review edits saved to disk.");

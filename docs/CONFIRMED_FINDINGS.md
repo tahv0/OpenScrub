@@ -126,6 +126,40 @@ edit. This dismisses that rejected action while preserving your other work.
 Changes to the library do not globally rewrite existing independent job review
 decisions.
 
+## Resolve blocked review saves before rendering or learning
+
+An unsuccessful **Is a … / Not a …** confirmation is different from an
+unsaved four-corner adjustment. If a confirmation fails, Review displays an
+**Unsuccessful human confirmations** list near the top, with the affected
+finding number, the server error, **Show finding**, and an explicit retry of the
+label you originally chose. **Show finding** reveals the card even if a filter,
+similarity group, or deferred page had hidden it. A rejected HTTP 400/409
+confirmation can also be explicitly dismissed, preserving the current saved
+review choice; an uncertain network error cannot be silently dismissed.
+
+The **corner draft** error list remains independent. A corner archive-revision
+conflict must not masquerade as a failed Is/Not confirmation. A rejected corner
+polygon stays in the browser until it is corrected or deliberately discarded.
+
+When a finding displays a **cached representative image from another frame**
+(for example, finding frame 2305 shows cached frame 2332), Review clearly
+identifies both frames and offers **Load exact source frame**. This explicit
+request bypasses track-neighbor fallback, decodes that specific frame only if
+no matching scan-time JPEG exists, and binds its preview token to the actual
+picture. A clean corner editor is reloaded with the exact frame's geometry;
+a pending manual polygon is never silently transferred. Inspect the exact
+picture and explicitly choose **Is / Not** again. No human label is
+automatically carried from the borrowed thumbnail to an uninspected frame.
+An absent source or decoder failure leaves the previous image and any
+unsaved draft intact and blocks unverified training evidence.
+Render and video-specific training must still wait for all polygon edits and
+human confirmation requests to be settled. **Save edits** can safely preserve
+other Blur/Keep choices during a confirmation failure, but this limited save
+does not acknowledge the rejected example, start rendering, train a model or
+save an unsaved corner polygon. Retry the failed Is/Not choice from its
+source-bound image, or deliberately dismiss a definitely rejected change
+before trying again.
+
 ## Train a named model from accumulated examples
 
 The Findings library can store several categories, but this training workflow
