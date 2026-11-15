@@ -241,7 +241,8 @@ def _plate_repair_preview(job, index, doc=None):
         raise library.ConflictError(
             'This scan has no verified source identity. Rescan or restore its source metadata.')
     _, _, meta, _ = preview(job, index, doc=doc, exact_only=True)
-    if not (meta.get('geometry_outside_frame') is True
+    if not (row.get('frame_index', -1) >= 0
+            and meta.get('geometry_outside_frame') is True
             and meta.get('exact_frame') is True
             and meta.get('requested_frame') == meta.get('frame')
             and meta.get('frame_source_token')):
@@ -319,8 +320,16 @@ def repair_plate_anchor(job, index, payload):
     row = doc['detections'][index]
     receipt = row.get('source_repair_receipt') or {}
     if receipt.get('edit_id') == edit_id:
-        if payload.get('points') != receipt.get('points'):
-            raise library.ConflictError('This redraw identifier belongs to different corners.')
+        box, quad = receipt.get('box'), row.get('plate_quad')
+        current_points = ([[box[0] + float(p[0]) * (box[2]-box[0]),
+                            box[1] + float(p[1]) * (box[3]-box[1])]
+                           for p in quad] if box and quad and len(quad) == 4 else [])
+        if (payload.get('points') != receipt.get('points')
+                or receipt.get('source_sha256') != _source_hash(doc)
+                or any(abs(a-b) > .01 for p, q in zip(
+                    current_points, receipt['points']) for a, b in zip(p, q))
+                or len(current_points) != 4):
+            raise library.ConflictError('This repair has been changed or superseded.')
         return dict(ok=True, applied=1, source_repaired=True,
                     needs_confirmation=True, box=receipt['box'],
                     points=receipt['points'], frame=receipt['frame'],
@@ -330,6 +339,11 @@ def repair_plate_anchor(job, index, payload):
             or payload.get('frame_source_token') != meta['frame_source_token']
             or payload.get('frame') != meta['frame']):
         raise library.ConflictError('This source frame or detector changed. Reopen Redraw plate.')
+    row_fps = float(doc['render_state']['fps'])
+    if (float(row['t_end']) - float(row['t_start'])) > 1.5 / row_fps:
+        raise library.ConflictError(
+            'This detection spans several source frames. Open the video editor '
+            'to correct a whole interval instead of applying one frame shape.')
     evidence = (job.get('_plate_repair_views') or {}).get(index)
     if not evidence or any((
             evidence.get('identity') != _web._video_identity(job['video']),
@@ -370,7 +384,8 @@ def repair_plate_anchor(job, index, payload):
                  verified_label='', human_confirmation=None,
                  confirmed_finding_id=None, confirmed_finding_revision=None,
                  source_repair_receipt=dict(edit_id=edit_id, points=points,
-                                            box=new_box, frame=meta['frame']))
+                                            box=new_box, frame=meta['frame'],
+                                            source_sha256=_source_hash(doc)))
     # A fresh source anchor replaces the old detector identity, not any
     # previously archived human finding or its revision.
     review_journal.write_anchor(job['dir'], index, patch)
