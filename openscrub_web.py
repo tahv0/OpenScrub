@@ -7286,7 +7286,10 @@ async function reloadStaleFindingForConfirmation(card,edit,shown){
  const img=edit?.img||card?.querySelector('img[data-preview-url]');
  if(!img||!shown)return null;
  img._plateMeta=null;
- img._forceExactPreview=true;
+ // Preserve the original borrowed-frame recovery contract: first rehydrate
+ // the exact JPEG that the user really saw. A human-repaired source anchor,
+ // however, MUST reload its own frame, never borrow a sibling's pixels.
+ if(shown?.source_repaired)img._forceExactPreview=true;
  img._previewLongRetry=true;
  let loaded=false;
  try{loaded=await queueReviewPreview(img,true);}catch(_){}
