@@ -219,5 +219,6 @@ def test_rebound_does_not_transfer_old_human_corners_or_narrow_masks(
     assert current["human_region_confirmed"] is False
     assert current["plate_quad"] == []
     assert current["poly"] == [] and current["poly_holes"] == []
+    assert current["mask_pad"] == -1, "Detector fallback must keep configured privacy padding"
     assert current["confirmed_finding_id"] == new["id"]
     assert current["enabled"] is True
