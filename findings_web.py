@@ -802,6 +802,18 @@ def install(app, web):
             category=request.args.get('category') or None,label=request.args.get('label') or None,
             offset=int(request.args.get('offset',0)),limit=int(request.args.get('limit',60))))
 
+    @app.get('/api/findings/selection')
+    @_guard
+    @web._serialize_review_read
+    def findings_selection():
+        """Return counts and a revision fingerprint, never thousands of IDs."""
+        selection = library.plate_selection(
+            root(), video_id=request.args.get('video_id') or None,
+            label=request.args.get('label') or None)
+        return jsonify({key: selection[key] for key in
+                        ('snapshot', 'video_id', 'category', 'label', 'total',
+                         'positive', 'negative', 'video_count')})
+
     @app.route('/api/findings/<identity>',methods=['GET','POST','DELETE'])
     @_guard
     @web._serialize_review_edit
@@ -876,14 +888,47 @@ def install(app, web):
         value = _body()
         if value.get('license_accepted') is not True:
             raise ValueError('Acknowledge the existing training framework terms before training.')
-        if not (isinstance(value.get('example_ids'),list) and value['example_ids']):
-            raise ValueError('Select the confirmed plate examples to train.')
-        selected = library.training_snapshot(root(),ids=value.get('example_ids'),
-                                             video_ids=value.get('video_ids'),category='plate')
-        if not selected:
+        manual_ids = value.get('example_ids', [])
+        if not isinstance(manual_ids, list) or len(manual_ids) > 10000:
+            raise ValueError('Provide a list of at most 10000 manually selected example IDs')
+        if any(not isinstance(identity, str) for identity in manual_ids):
+            raise ValueError('Invalid manually selected example ID')
+        scope = value.get('selection')
+        scope_revisions = {}
+        if scope is not None:
+            if not isinstance(scope, dict) or scope.get('category') != 'plate':
+                raise ValueError('Bulk training selection must be scoped to plate examples')
+            if scope.get('label') not in (None, 'positive', 'negative'):
+                raise ValueError('Invalid bulk selection confirmation filter')
+            if not isinstance(scope.get('snapshot'), str):
+                raise ValueError('Bulk selection requires the original revision snapshot')
+            selection = library.plate_selection(
+                root(), video_id=scope.get('video_id'),
+                label=scope.get('label'), expected_snapshot=scope['snapshot'],
+                excluded_ids=scope.get('excluded_ids', []))
+            scope_revisions = selection['revisions']
+        if not manual_ids and not scope_revisions:
             raise ValueError('Select confirmed plate examples to train.')
-        if {item['id'] for item in selected} != set(value['example_ids']):
-            raise library.ConflictError('Some selected examples changed or were forgotten. Reload the library before training.')
+        ids = sorted(set(manual_ids) | set(scope_revisions))
+        if len(ids) > 50000:
+            raise ValueError('Too many training examples in one selection')
+        selected = library.training_snapshot(root(), ids=ids, category='plate')
+        current = {item['id']: item['revision'] for item in selected}
+        if set(current) != set(ids) or any(current.get(identity) != revision
+                                         for identity, revision in scope_revisions.items()):
+            raise library.ConflictError(
+                'Selected confirmed examples changed or were forgotten. '
+                'Refresh the selection before training.')
+        # Individual page selections can pin their displayed revisions too.
+        manual_revisions = value.get('expected_revisions')
+        if manual_revisions is not None:
+            if not isinstance(manual_revisions, dict) or set(manual_revisions) - set(manual_ids):
+                raise ValueError('Invalid manually selected revision map')
+            if any(type(revision) is not int or revision < 1 or
+                   current.get(identity) != revision
+                   for identity, revision in manual_revisions.items()):
+                raise library.ConflictError(
+                    'A manually selected example changed after it was displayed. Refresh it.')
         parent = training.resolve_parent(web.learned_models_root(),value.get('parent_model_id'))
         ready = learning_session.preflight(weights=parent['weights'])
         if not ready['ready']:
@@ -891,12 +936,11 @@ def install(app, web):
         name = value.get('name') or training.default_name([item['video']['name'] for item in selected])
         if not isinstance(name,str) or not name.strip() or len(name)>80 or any(ord(c)<32 or ord(c)==127 for c in name):
             raise ValueError('Use a model name between 1 and 80 characters.')
-        settings = {key:value[key] for key in ('example_ids','video_ids','parent_model_id') if key in value}
+        settings = {key:value[key] for key in ('parent_model_id',) if key in value}
         settings.update(name=name.strip(),license_accepted=True,epochs=40,batch=8)
-        # Resolve/filter now and persist the explicit selected identities. The
-        # worker freezes their revisions/pixels before invoking the trainer.
-        settings['example_ids'] = [item['id'] for item in selected]
-        settings['expected_revisions'] = {item['id']:item['revision'] for item in selected}
+        # The worker verifies these exact revisions again before freezing pixels.
+        settings['example_ids'] = ids
+        settings['expected_revisions'] = current
         job = web.new_job('',{},name.strip())
         job.update(kind='model_training',phase='learning',learning_request=settings,
                    learning={'stage':'queued','message':'Named model training queued'})
