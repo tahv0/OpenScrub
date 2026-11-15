@@ -5554,7 +5554,8 @@ function plateStatus(s,text,retry=false){
  s.retry.textContent=s.archiveConflict?"Confirm Is / Not again":
   s.needsSourceReview?"Save on refreshed picture":s.conflict?"Refresh picture (keep corners)":"Retry save";
  if(s.card)s.card.classList.toggle("corner-save-error",!!(s.dirty&&s.error));
- updatePlateSaveIssues();scheduleReviewStatusFilter();
+ updatePlateSaveIssues();
+ if(typeof scheduleReviewStatusFilter==="function")scheduleReviewStatusFilter();
 }
 function schedulePlateSaves(){
  clearTimeout(PLATE_TIMER);PLATE_TIMER=null;plateUnloadGuard();
