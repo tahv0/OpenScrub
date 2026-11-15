@@ -6683,7 +6683,7 @@ function dismissFindingConfirmation(i){
  CONFIRM_FAILED.delete(i);
  const note=document.getElementById('vlabel'+i);if(note)note.innerHTML=findingStatus(i);
  const dismiss=document.getElementById('findingDismiss'+i);if(dismiss)dismiss.hidden=true;
- plateUnloadGuard();scheduleReviewStatusFilter();
+ plateUnloadGuard();if(typeof scheduleReviewStatusFilter==="function")scheduleReviewStatusFilter();
 }
 async function reloadStaleFindingForConfirmation(card,edit,shown){
  // Never reclassify a different JPEG simply because the person clicked the
@@ -6830,7 +6830,7 @@ function confirmFinding(i,label){
    card?.querySelectorAll('.finding-confirm button').forEach((button,index)=>button.setAttribute('aria-pressed',index===(label==='positive'?0:1)));
    if(document.getElementById('beCv'))beRefresh();
   }catch(error){showFindingFailure(i,error);}
-  finally{CONFIRM_PENDING.delete(i);card?.querySelectorAll('button').forEach(button=>button.disabled=FINDING_META[i]?.classification_allowed===false&&!!button.closest('.finding-confirm'));plateUnloadGuard();scheduleReviewStatusFilter();}
+  finally{CONFIRM_PENDING.delete(i);card?.querySelectorAll('button').forEach(button=>button.disabled=FINDING_META[i]?.classification_allowed===false&&!!button.closest('.finding-confirm'));plateUnloadGuard();if(typeof scheduleReviewStatusFilter==="function")scheduleReviewStatusFilter();}
  });
  return CONFIRM_CHAIN;
 }
@@ -6844,7 +6844,7 @@ function applyDet(i,blur,preserveLabel=false){
   if(t)t.classList.toggle("off",!blur);
   if(typeof redrawReviewOverlay==="function")redrawReviewOverlay(m);
  }
- markReviewChanged();scheduleReviewStatusFilter();
+ markReviewChanged();if(typeof scheduleReviewStatusFilter==="function")scheduleReviewStatusFilter();
  if(document.getElementById("beCv")){beRefresh();}
 }
 function setAll(cat,on){
@@ -6865,7 +6865,7 @@ function setAll(cat,on){
    const bb=document.getElementById("bb"+i);if(bb)bb.innerHTML=detChoices(i);
    redrawReviewOverlay(i);
   });
-  markReviewChanged();scheduleReviewStatusFilter();
+  markReviewChanged();if(typeof scheduleReviewStatusFilter==="function")scheduleReviewStatusFilter();
   if(document.getElementById("beCv"))beRefresh();
   return;
  }
