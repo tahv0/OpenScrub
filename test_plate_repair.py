@@ -4,6 +4,7 @@ A redrawn plate is a new frame-specific shape, not a borrowed JPEG, a
 track-wide box transplant, or an automatic trusted training classification.
 """
 import json
+import re
 import shutil
 import subprocess
 
@@ -252,7 +253,7 @@ def test_real_browser_can_drag_new_box_on_bad_plate_and_confirm(review_server):
         card.scroll_into_view_if_needed()
         redraw = card.get_by_role('button', name='Redraw plate area')
         redraw.wait_for(state='visible', timeout=90000)
-        assert not card.get_by_role('button', name='Is plate').is_enabled()
+        assert not card.get_by_role('button', name=re.compile(r'Is .*plate')).is_enabled()
         redraw.click()
         modal = page.get_by_role('dialog', name='Redraw plate area on exact original frame')
         modal.wait_for(timeout=90000)
@@ -279,7 +280,7 @@ def test_real_browser_can_drag_new_box_on_bad_plate_and_confirm(review_server):
         assert now['box'][2] <= 640
         assert now['box'][1] >= 0 and now['box'][3] <= 360
         assert not redraw.is_visible()
-        assert card.get_by_role('button', name='Is plate').is_enabled()
+        assert card.get_by_role('button', name=re.compile(r'Is .*plate')).is_enabled()
         # A polygon repair is durable but NOT automatically trusted training.
         with web.app.test_client() as client:
             assert client.get('/api/findings').get_json()['total'] == 0
