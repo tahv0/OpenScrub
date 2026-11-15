@@ -5631,9 +5631,10 @@ async function openPlateRepair(button){
    {timeoutMs:120000},"blob");
   if(CUR!==job||JOBVIEW!==view||!button.isConnected)return;
   const geom=JSON.parse(response.headers.get("X-Repair-Geometry")||"null");
+  // The full-frame redraw token is independent of the disposable compact
+  // JPEG key. Verify the actual source frame instead of a cache entry.
   if(!geom||geom.frame!==selected.frame||
-     geom.frame_source_token!==selected.frame_source_token||
-     geom.preview_token!==selected.preview_token)
+     geom.frame_source_token!==selected.frame_source_token)
    throw new Error("Source frame changed; reload the original preview.");
   url=URL.createObjectURL(data);
   const photo=new Image();photo.src=url;await photo.decode();
@@ -5715,10 +5716,12 @@ async function openPlateRepair(button){
    }
    const valid=validPlateRepair(points,geom);
    save.disabled=saving||!valid;
-   hint.textContent=mode==="box"
+   const verifying=geom.source_verification==="pending"?
+    " Source integrity is being checked in the background.":"";
+   hint.textContent=(mode==="box"
     ?(valid?"Box ready. Save to replace this one-frame detection.":"Drag a box around the plate.")
     :(valid?"Four corners ready. Verify that the entire plate is covered."
-      :"Click all four corners clockwise ("+points.length+"/4).");
+      :"Click all four corners clockwise ("+points.length+"/4)."))+verifying;
   }
   const reset=()=>{points=[];drag=null;requestBody=null;draw();};
   const choose=value=>{
@@ -5773,10 +5776,26 @@ async function openPlateRepair(button){
      edit_id:Date.now().toString(36)+"-"+Math.random().toString(36).slice(2),
      points:points.map(p=>p.slice()),frame:geom.frame,
      preview_token:geom.preview_token,frame_source_token:geom.frame_source_token});
-    const {data}=await reviewRequest("api/jobs/"+encodeURIComponent(job)+
-     "/plate-repair/"+selected.i,{method:"POST",
-     headers:{"Content-Type":"application/json"},body:JSON.stringify(body),timeoutMs:120000});
-    if(!data.ok)throw new Error("The corrected area was not acknowledged.");
+    let data,completed=false;
+    // The huge original-source hash runs off the image GET. A pending 503 is
+    // a definite non-write: retry the SAME edit ID until verification finishes.
+    for(let check=0;check<180;check++){
+     if(CUR!==job||JOBVIEW!==view)throw new Error("The selected Review changed.");
+     try{
+      ({data}=await reviewRequest("api/jobs/"+encodeURIComponent(job)+
+       "/plate-repair/"+selected.i,{method:"POST",
+       headers:{"Content-Type":"application/json"},body:JSON.stringify(body),timeoutMs:120000}));
+      completed=true;break;
+     }catch(error){
+      if(error.status!==503||!String(error.message).includes(
+       "Original video verification is still running"))throw error;
+      hint.textContent="Verifying the original video in the background. Your "+
+       "corners are preserved; saving resumes when verification completes…";
+      await new Promise(resolve=>setTimeout(resolve,2000));
+     }
+    }
+    if(!completed||!data?.ok)
+     throw new Error("Source verification is still pending. Your corners are preserved; retry Save.");
     saving=false;cancel.disabled=false;close();
     if(CUR!==job||JOBVIEW!==view)return;
     // A redrawn region is NOT a classification. Continue protection and
@@ -5799,6 +5818,8 @@ async function openPlateRepair(button){
     const label=document.getElementById("vlabel"+selected.i);
     if(label)label.textContent="New area saved for this frame; loading verified picture…";
     img._plateMeta=null;img._previewLoaded=false;img._forceExactPreview=true;
+    // If the prepared crop was evicted, use the explicit extended exact seek.
+    img._previewLongRetry=true;
     if(!await queueReviewPreview(img,true)&&status)
      status.textContent="Correction saved. Retry the exact preview to confirm it.";
     plateUnloadGuard();
@@ -6058,6 +6079,12 @@ async function refreshPlateDraft(s){
  if(s.refreshBusy||s.drag)return;
  s.refreshBusy=true;
  const originalMeta=s.meta,originalPoints=plateCopy(s.points);
+ // An explicit retry can use one bounded longer source decode. Preserve the
+ // displayed pixels and draft until the new picture is verified.
+ if(originalMeta?.source_repaired||s.conflict){
+  s.img._forceExactPreview=true;
+  s.img._previewLongRetry=true;
+ }
  plateStatus(s,"Refreshing picture without discarding your corners…",true);
  // Refresh JPEG pixels as well as metadata: corners must be inspected on the
  // actual current image before they can be deliberately rebound.
@@ -6079,6 +6106,10 @@ async function refreshPlateDraft(s){
   s.points=originalPoints;s.dirty=true;
   if(same){
    s.error=null;s.needsSourceReview=false;s.readyAt=0;
+   const failed=CONFIRM_FAILED.get(s.i);
+   if(failed?.status===409&&failed?.details?.conflict==="stale_preview"){
+    CONFIRM_FAILED.delete(s.i);updateConfirmationIssues();
+   }
    plateStatus(s,"Picture is unchanged · retrying saved corners…");
    schedulePlateSaves();
   }else{
@@ -7255,6 +7286,8 @@ async function reloadStaleFindingForConfirmation(card,edit,shown){
  const img=edit?.img||card?.querySelector('img[data-preview-url]');
  if(!img||!shown)return null;
  img._plateMeta=null;
+ img._forceExactPreview=true;
+ img._previewLongRetry=true;
  let loaded=false;
  try{loaded=await queueReviewPreview(img,true);}catch(_){}
  const latest=img._plateMeta;
