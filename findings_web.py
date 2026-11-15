@@ -390,10 +390,8 @@ class _ConfirmTrace:
         total = now - self.start
         if total < _CONFIRM_SLOW_TRACE_SECONDS:
             return
-        try:
-            report_mb = round((Path(self.job['dir']) / 'report.json').stat().st_size / 1024 ** 2, 2)
-        except (OSError, KeyError, TypeError):
-            report_mb = None
+        # Only stage timings/mode/request id are recorded. No disk usage,
+        # original filename, video pixels, plate labels or coordinates.
         try:
             _web.diagnostics.event(
                 'review_confirmation_stages_slow', self.job,
@@ -402,7 +400,7 @@ class _ConfirmTrace:
                 total_ms=round(total * 1000, 1), mode=self.mode,
                 current_stage=self.current,
                 unfinished_stage_ms=round((now - self.last) * 1000, 1),
-                report_mb=report_mb, **self.stages)
+                **self.stages)
         except Exception:
             # A logging failure must never change the save receipt.
             pass
