@@ -5228,6 +5228,17 @@ function clearReviewPreviews(){
 }
 function drawPlateThumbnail(img){
  if(!img._plateMeta||!img.naturalWidth)return;
+ const existing=img._quadEdit;
+ if(existing&&!existing.dirty&&!existing.drag&&!existing.pending&&
+    existing.meta!==img._plateMeta){
+  // Switching from a borrowed group JPEG to the exact detection frame
+  // must rebind a CLEAN editor to the actual new image and its geometry.
+  // Never overwrite a pending/failed human polygon.
+  existing.meta=img._plateMeta;
+  existing.displayCrop=img._plateMeta.crop.slice();
+  existing.points=plateCopy(img._plateMeta.points);
+  existing.saved=plateCopy(img._plateMeta.points);
+ }
  const state=initPlateCorners(img);if(state)state.draw();
 }
 function updateReviewPreloadStatus(state){
@@ -5269,7 +5280,9 @@ async function loadReviewPreview(state,task,cacheOnly){
  if(retry)retry.hidden=true;
  let missing=false,retryBusy=false,ok=false,url=null;
  try{
-  const base=img.dataset.previewUrl;
+  const original=img.dataset.previewUrl;
+  const base=img._forceExactPreview?
+   original+(original.includes("?")?"&":"?")+"exact=1":original;
   const target=cacheOnly?base+(base.includes("?")?"&":"?")+"cache_only=1":base;
   const {response,data}=await reviewRequest(target,{signal:ctl.signal,timeoutMs:cacheOnly?15000:120000},"blob");
   if(REVIEW_MEDIA!==state||!img.isConnected)return;
@@ -5285,6 +5298,15 @@ async function loadReviewPreview(state,task,cacheOnly){
   if(state.urls.delete(previous))URL.revokeObjectURL(previous);
   url=null;
   if(REVIEW_MEDIA!==state||!img.isConnected)return;
+  const borrowed=!!(meta?.match==="representative"&&
+   Number.isInteger(meta.frame)&&Number.isInteger(meta.requested_frame)&&
+   meta.frame!==meta.requested_frame);
+  const hint=card.querySelector(".source-frame-note");
+  const exactButton=card.querySelector(".source-frame-exact");
+  if(hint)hint.textContent=borrowed?
+   "Showing cached frame "+meta.frame+" instead of detection frame "+
+   meta.requested_frame+". Load the exact source frame before confirming this finding.":"";
+  if(exactButton)exactButton.hidden=!borrowed;
   drawPlateThumbnail(img);
   if(meta?.classification_allowed===false){
    if(typeof FINDING_META!=="undefined"&&FINDING_META[meta.i]){
@@ -5437,6 +5459,23 @@ function initReviewPages(){
   },{rootMargin:"10000px 0px"});
   buttons.forEach(button=>panel._moreObserver.observe(button));
  }
+}
+function loadExactReviewFrame(button){
+ const card=button.closest(".det"),img=card?.querySelector("img[data-preview-url]");
+ if(!img)return;
+ const edit=img._quadEdit,warning=card.querySelector(".source-frame-note");
+ if(edit&&(edit.dirty||edit.pending||edit.drag)){
+  if(warning)warning.textContent="Preserve or resolve your unsaved corner draft before changing source frames.";
+  return;
+ }
+ img._forceExactPreview=true;
+ img._plateMeta=null;
+ button.disabled=true;button.textContent="Loading exact frame…";
+ queueReviewPreview(img,true).then(ok=>{
+  if(!ok&&warning)warning.textContent="Exact source frame did not load. Retry without changing your corners.";
+ }).finally(()=>{
+  if(button.isConnected){button.disabled=false;button.textContent="Load exact source frame";}
+ });
 }
 function retryReviewPreview(button){
  const img=button.closest(".det").querySelector("img[data-preview-url]");
@@ -6584,6 +6623,7 @@ async function loadReview(signal=null,phase=SHELLPH){
     ${x.category==="plate"?'<div id="plateOverlay'+x.i+'" class="plate-output-badge"></div>':""}
     <small class="preview-status" role="status">Preview not loaded</small>
     <button class="sec preview-retry" hidden onclick="retryReviewPreview(this)">Retry preview</button>
+    ${x.category==="plate"?'<small class="source-frame-note review-copy" role="status"></small><button type="button" class="sec source-frame-exact" hidden onclick="loadExactReviewFrame(this)">Load exact source frame</button>':""}
     ${x.category==="plate"?'<small class="quad-status" role="status" title="Corners apply to this detected track. Review changing perspective. Keyboard: select corner 1–4, use arrows; Ctrl+Z undoes.">Corners autosave to track</small><button type="button" class="sec quad-retry" hidden>Retry save</button>':""}
     <div>${plateVerificationBadge(x)}${x.learning_conflict?'<span class="badge" title="The original coverage was retained where the learned model could not make a reliable refinement">Model disagreement — review</span> ':""}${plateFallbackText(x)?`<span class="badge" style="white-space:normal">${plateFallbackText(x)}</span> `:""}${x.shaped?'<span class="badge" title="Thumbnail rectangle is a selection guide; open to inspect the mask and any exclusions">shaped mask</span> ':""}${x.personcard?`<b>Person ${x.person+1}</b> — one decision for ALL their appearances`:`"${sectionEscape(x.text)}"`}${x.frames?` <span class="badge">×${x.frames} frames</span>`:""}${x.confidence?` <span class="badge" title="detector confidence — not a human decision">${Math.round(x.confidence*100)}%</span>`:""} <br>${x.t_start.toFixed(1)}–${x.t_end.toFixed(1)}s</div>
     ${plateTextBadge(x)}
