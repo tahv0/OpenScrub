@@ -6658,6 +6658,68 @@ function rememberFindingConflict(i,current){
   row.confirmed_finding_revision=current.revision;
  }
 }
+function revealFailedConfirmation(i){
+ // Reveal one failed card without reloading Review or discarding pending edits.
+ if(typeof reviewAllFindings==="function")reviewAllFindings();
+ let card=document.getElementById("det"+i);
+ if(!card&&typeof REVIEW_PENDING_PAGES!=="undefined"){
+  for(const [cat,pending] of Object.entries(REVIEW_PENDING_PAGES)){
+   if(pending.some(entry=>entry.i===i)){
+    appendReviewPage(cat,false,i);card=document.getElementById("det"+i);break;
+   }
+  }
+ }
+ if(!card)return false;
+ if(typeof REVIEW_SIMILAR_GROUPS!=="undefined"){
+  for(const [root,members] of REVIEW_SIMILAR_GROUPS){
+   if(members.includes(i)){
+    REVIEW_SIMILAR_EXPANDED.add(root);
+    if(typeof reviewSimilarRender==="function")reviewSimilarRender();
+    break;
+   }
+  }
+ }
+ for(let el=card;el&&el.id!=="review";el=el.parentElement){
+  el.hidden=false;if(el.tagName==="DETAILS")el.open=true;
+ }
+ card.scrollIntoView({block:"center"});
+ const control=card.querySelector(".finding-confirm button");
+ if(control)control.focus({preventScroll:true});
+ return true;
+}
+function updateConfirmationIssues(){
+ const panel=document.getElementById("confirmationSaveIssues");if(!panel)return;
+ panel.replaceChildren();panel.hidden=CONFIRM_FAILED.size===0;
+ if(!CONFIRM_FAILED.size)return;
+ const title=document.createElement("strong");
+ title.textContent=CONFIRM_FAILED.size+" unsuccessful human confirmation"+
+  (CONFIRM_FAILED.size===1?"":"s")+". Resolve these before rendering or training.";
+ panel.appendChild(title);
+ for(const [i,error] of CONFIRM_FAILED){
+  const row=document.createElement("div");row.className="row";
+  const show=document.createElement("button");show.type="button";show.className="sec";
+  show.textContent="Show finding #"+i;show.onclick=()=>revealFailedConfirmation(i);
+  row.appendChild(show);
+  if(error?.reviewAttemptedLabel==="positive"||error?.reviewAttemptedLabel==="negative"){
+   const label=error.reviewAttemptedLabel;
+   const retry=document.createElement("button");retry.type="button";retry.className="sec";
+   retry.textContent="Retry "+(label==="positive"?"Is":"Not")+" "+findingNoun(i);
+   retry.onclick=()=>{revealFailedConfirmation(i);confirmFinding(i,label);};
+   row.appendChild(retry);
+  }
+  if([400,409].includes(error?.status)||error?.beforeWrite){
+   const dismiss=document.createElement("button");dismiss.type="button";dismiss.className="sec";
+   dismiss.textContent=PLATE_EDITS.get(i)?.archiveConflict
+    ?"Discard rejected corner adjustment":"Keep current review choice";
+   dismiss.onclick=()=>dismissFindingConfirmation(i);
+   row.appendChild(dismiss);
+  }
+  const details=document.createElement("span");
+  const code=Number.isInteger(error?.status)?"HTTP "+error.status+" · ":"";
+  details.textContent=code+(error?.message||"Confirmation not acknowledged");
+  row.appendChild(details);panel.appendChild(row);
+ }
+}
 function showFindingFailure(i,error){
  CONFIRM_FAILED.set(i,error);
  const current=error.details?.current_archive,note=document.getElementById('vlabel'+i);
@@ -6672,6 +6734,8 @@ function showFindingFailure(i,error){
   dismiss.hidden=![400,409].includes(error.status)&&!error.beforeWrite;
   dismiss.textContent=PLATE_EDITS.get(i)?.archiveConflict?'Discard this unsaved adjustment':'Keep current review choice';
  }
+ updateConfirmationIssues();
+ if(typeof scheduleReviewStatusFilter==='function')scheduleReviewStatusFilter();
 }
 function dismissFindingConfirmation(i){
  if(CONFIRM_PENDING.has(i))return;
@@ -6686,6 +6750,7 @@ function dismissFindingConfirmation(i){
  CONFIRM_FAILED.delete(i);
  const note=document.getElementById('vlabel'+i);if(note)note.innerHTML=findingStatus(i);
  const dismiss=document.getElementById('findingDismiss'+i);if(dismiss)dismiss.hidden=true;
+ updateConfirmationIssues();
  plateUnloadGuard();if(typeof scheduleReviewStatusFilter==="function")scheduleReviewStatusFilter();
 }
 async function reloadStaleFindingForConfirmation(card,edit,shown){
@@ -6736,7 +6801,8 @@ function confirmFinding(i,label){
   return CONFIRM_CHAIN;
  }
  const members=TRKMEM[i]||[i],versions=Object.fromEntries(members.map(m=>[m,OUTPUT_VERSION[m]||0]));
- const job=CUR,view=JOBVIEW;CONFIRM_PENDING.add(i);CONFIRM_FAILED.delete(i);plateUnloadGuard();
+ const job=CUR,view=JOBVIEW;CONFIRM_PENDING.add(i);CONFIRM_FAILED.delete(i);
+ updateConfirmationIssues();plateUnloadGuard();
  const card=document.getElementById('det'+i),note=document.getElementById('vlabel'+i);
  const dismiss=document.getElementById('findingDismiss'+i);if(dismiss)dismiss.hidden=true;
  if(note)note.textContent='Saving confirmation…';
@@ -6832,8 +6898,8 @@ function confirmFinding(i,label){
    if(typeof reviewSimilarRender==="function"&&typeof REVIEW_SIMILAR_ENABLED!=="undefined"&&REVIEW_SIMILAR_ENABLED)reviewSimilarRender();
    card?.querySelectorAll('.finding-confirm button').forEach((button,index)=>button.setAttribute('aria-pressed',index===(label==='positive'?0:1)));
    if(document.getElementById('beCv'))beRefresh();
-  }catch(error){showFindingFailure(i,error);}
-  finally{CONFIRM_PENDING.delete(i);card?.querySelectorAll('button').forEach(button=>button.disabled=FINDING_META[i]?.classification_allowed===false&&!!button.closest('.finding-confirm'));plateUnloadGuard();if(typeof scheduleReviewStatusFilter==="function")scheduleReviewStatusFilter();}
+  }catch(error){error.reviewAttemptedLabel=label;showFindingFailure(i,error);}
+  finally{CONFIRM_PENDING.delete(i);card?.querySelectorAll('button').forEach(button=>button.disabled=FINDING_META[i]?.classification_allowed===false&&!!button.closest('.finding-confirm'));updateConfirmationIssues();plateUnloadGuard();if(typeof scheduleReviewStatusFilter==="function")scheduleReviewStatusFilter();}
  });
  return CONFIRM_CHAIN;
 }
