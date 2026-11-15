@@ -2634,7 +2634,16 @@ def _plate_editor_crop(box, points, width, height):
     x2 = min(width, int(np.ceil(cx + radius)))
     y2 = min(height, int(np.ceil(cy + radius)))
     if x2 <= x1 or y2 <= y1:
-        abort(400, description="Plate is outside the video frame")
+        # Even a wholly off-screen legacy proposal should show the nearest
+        # ORIGINAL source pixels for inspection. No geometry is moved: the
+        # compact preview marks it view-only and forbids trusted labels/edits.
+        cx, cy = max(0., min(float(width), cx)), max(0., min(float(height), cy))
+        x1 = max(0, int(np.floor(cx - radius)))
+        y1 = max(0, int(np.floor(cy - radius)))
+        x2 = min(width, int(np.ceil(cx + radius)))
+        y2 = min(height, int(np.ceil(cy + radius)))
+        if x2 <= x1 or y2 <= y1:
+            abort(400, description="Source frame has no visible preview pixels")
     return [x1, y1, x2, y2]
 
 
@@ -5273,6 +5282,18 @@ function clearReviewPreviews(){
 function drawPlateThumbnail(img){
  if(!img._plateMeta||!img.naturalWidth)return;
  const existing=img._quadEdit;
+ if(img._plateMeta.geometry_outside_frame){
+  // Displaying original pixels is safe, but editing off-frame polygon is not.
+  // Preserve an outstanding human draft rather than silently deleting it.
+  if(existing&&!existing.dirty&&!existing.pending&&!existing.drag){
+   existing.events.abort();
+   if(existing.observer)existing.observer.disconnect();
+   PLATE_EDITS.delete(existing.i);delete img._quadEdit;
+   const cv=img.closest(".plate-preview")?.querySelector("canvas");
+   if(cv){cv.width=cv.width;cv.style.pointerEvents="none";}
+  }
+  return;
+ }
  if(existing&&!existing.dirty&&!existing.drag&&!existing.pending&&
     existing.meta!==img._plateMeta){
   // Switching from a borrowed group JPEG to the exact detection frame
@@ -5362,6 +5383,12 @@ async function loadReviewPreview(state,task,cacheOnly){
   if(REVIEW_MEDIA!==state||!img.isConnected)return;
   if(cacheOnly&&response.status===204){missing=true;return;}
   const raw=response.headers.get("X-Plate-Geometry"),meta=raw?JSON.parse(raw):null;
+  const currentDraft=img._quadEdit;
+  if(meta?.geometry_outside_frame && currentDraft &&
+     (currentDraft.dirty||currentDraft.pending||currentDraft.drag)){
+   if(status)status.textContent="Source geometry is outside the video. Keep or back up your unsaved corners before changing pictures.";
+   return;
+  }
   // Decode a replacement off-DOM first. A failed/aborted refresh must leave
   // the usable old image in place rather than turn the finding blank.
   url=URL.createObjectURL(data);state.urls.add(url);
@@ -5377,10 +5404,13 @@ async function loadReviewPreview(state,task,cacheOnly){
    meta.frame!==meta.requested_frame);
   const hint=card.querySelector(".source-frame-note");
   const exactButton=card.querySelector(".source-frame-exact");
-  if(hint)hint.textContent=borrowed?
+  const outside=meta?.geometry_outside_frame===true;
+  if(hint)hint.textContent=outside
+   ?"Detector box/corners extend outside the video frame. Original pixels only — correct the box in Preview video & edit boxes or rescan."
+   :borrowed?
    "Showing cached frame "+meta.frame+" instead of detection frame "+
    meta.requested_frame+". Load the exact source frame before confirming this finding.":"";
-  if(exactButton)exactButton.hidden=!borrowed;
+  if(exactButton)exactButton.hidden=!borrowed||outside;
   drawPlateThumbnail(img);
   if(meta?.classification_allowed===false){
    if(typeof FINDING_META!=="undefined"&&FINDING_META[meta.i]){
