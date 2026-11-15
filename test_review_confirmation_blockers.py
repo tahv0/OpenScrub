@@ -208,3 +208,55 @@ dismissFindingConfirmation(0);
 assert.equal(CONFIRM_FAILED.size,0,
   "A second explicit action can keep the current saved choice");
 """)
+
+
+def test_stale_picture_requires_new_human_click_then_clears_confirmation_failure():
+    """409 changed-source rejection is not a permanent rendering blocker."""
+    from test_findings_review import choices_script
+
+    choices_script(r"""
+const points=[[0,0],[10,0],[10,8],[0,8]];
+const old={frame:100,key:"old",source_token:"old-image",preview_token:"old-token",
+ box:[0,0,10,8],crop:[0,0,20,15],width:20,height:15,points};
+const fresh={...old,frame:101,key:"fresh",source_token:"fresh-image",
+ preview_token:"fresh-token",points};
+const img={_plateMeta:{...old}};
+const card={
+ querySelector(){return img;},
+ querySelectorAll(){return [];},
+ classList:{toggle(){}}
+};
+document.getElementById=id=>id==="det0"?card:null;
+const edit={i:0,job:CUR,img,meta:{...old},
+ displayCrop:old.crop.slice(),points:plateCopy(points),
+ saved:plateCopy(points),dirty:false,drag:null,version:0,
+ draw(){}};
+PLATE_EDITS.set(0,edit);
+let calls=0;
+async function queueReviewPreview(image) {image._plateMeta={...fresh};return true}
+function plateSamePreviewSource(){return false}
+function plateSameSourceFrame(){return false}
+function plateCornersInsideCrop(){return true}
+async function reviewRequest(url,options){
+ const body=JSON.parse(options.body);calls++;
+ if(calls===1)throw Object.assign(new Error("Stale preview"),{
+  status:409,details:{conflict:"stale_preview"}});
+ assert.equal(body.preview_token,fresh.preview_token);
+ assert.equal(body.preview_key,fresh.key);
+ return {data:{finding:{id:"saved",revision:1},preview:{...fresh}}};
+}
+(async()=>{
+ await confirmFinding(0,"positive");
+ assert.equal(calls,1,"Different source must never auto-reconfirm");
+ assert.equal(CONFIRM_FAILED.size,1);
+ assert.equal(CONFIRM_FAILED.get(0).status,409);
+ assert.equal(CONFIRM_FAILED.get(0).beforeWrite,true);
+ assert.match(CONFIRM_FAILED.get(0).message,/picture changed/i);
+ assert.equal(edit.meta.key,"fresh","The new source is shown for inspection");
+ await confirmFinding(0,"positive");
+ assert.equal(calls,2,"Only the second human click can save new source");
+ assert.equal(CONFIRM_FAILED.size,0);
+ assert.equal(VLBL[0],"plate");
+ assert.equal(FINDING_META[0].confirmed_finding_id,"saved");
+})().catch(error=>{console.error(error);process.exitCode=1});
+""")
