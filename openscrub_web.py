@@ -2011,7 +2011,7 @@ def _review_process(command, timeout=None):
             "60-second attempt. The original detection keeps its automatic "
             "protection; a seekable normalized source copy may be needed."
             if deadline > _REVIEW_TIMEOUT else
-            "Source frame decoding exceeded 10 seconds. Use Retry preview "
+            "Preview decoding timed out after 10 seconds. Use Retry preview "
             "to attempt one longer, bounded exact-frame decode."))
     except OSError:
         diagnostics.exception("preview_process_start_failed", tool=os.path.basename(str(command[0])))
@@ -2108,13 +2108,14 @@ def _read_review_frame(path, index, exact=True, crop=None, decode_timeout=None):
         target = max(0.0, (index-.1) / info["fps"]) if exact else index
         # PPM transports lossless pixels without compressing a full 4K PNG
         # just to decode it again before extracting a small plate crop.
-        result = _review_process([
+        command = [
             "ffmpeg", "-hide_banner", "-loglevel", "info", "-nostdin",
             "-threads", "1", "-filter_threads", "1", "-copyts", "-ss", "%.9f" % target,
             "-i", path, "-map", "0:v:0", "-an", "-sn",
             "-vf", video_filter, "-frames:v", "1", "-vsync", "0",
-            "-threads", "1", "-f", "image2pipe", "-vcodec", "ppm", "pipe:1"],
-            timeout=decode_timeout)
+            "-threads", "1", "-f", "image2pipe", "-vcodec", "ppm", "pipe:1"]
+        result = (_review_process(command) if decode_timeout is None
+                  else _review_process(command, timeout=decode_timeout))
         log = result.stderr.decode("utf-8", errors="replace")
         match = re.search(r"\bn:\s*0\s+pts:\s*(-?\d+)\s+pts_time:", log)
         timebase = re.search(r"config in time_base:\s*(\d+/\d+)", log)
