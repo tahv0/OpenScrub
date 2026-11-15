@@ -361,6 +361,77 @@ def test_repaired_corners_remain_frame_only_on_later_drags(broken_plate):
 
 
 
+
+def test_refresh_picture_keep_corners_recovers_409_in_production_js():
+    """Execute the actual Review retry helper with source-safe metadata."""
+    if not shutil.which('node'):
+        pytest.skip('Node not installed')
+    js = web.APP_JS
+    helper = js[js.index('async function refreshPlateDraft(s){'):
+                js.index('function pumpPlateSaves(){')]
+    script = r"""
+const assert=require('node:assert/strict');
+const CUR='job',PLATE_EDITS=new Map(),CONFIRM_FAILED=new Map();
+let refreshes=0,retryScheduled=0,statusTexts=[],cleared=0;
+const plateCopy=points=>points.map(p=>p.slice());
+const plateSamePreviewSource=(a,b)=>a.frame_source_token===b.frame_source_token;
+const plateSameSourceFrame=(a,b)=>a.frame_source_token===b.frame_source_token;
+const plateCornersInsideCrop=(p,c)=>p.every(v=>v[0]>=c[0]&&v[0]<=c[2]&&v[1]>=c[1]&&v[1]<=c[3]);
+function plateStatus(s,msg){statusTexts.push(msg);}
+function schedulePlateSaves(){retryScheduled++;}
+function updateConfirmationIssues(){cleared++;}
+function plateUnloadGuard(){}
+const original={frame:2,box:[40,60,140,120],width:240,height:160,
+ crop:[30,50,160,130],frame_source_token:'same-source',source_repaired:true,
+ points:[[50,75],[125,75],[125,94],[50,94]]};
+const latest={...original,preview_token:'new-key',key:'new-thumbnail'};
+let shouldLoad=true;
+async function queueReviewPreview(img,priority){
+ assert(priority);refreshes++;
+ if(!shouldLoad)return false;
+ img._plateMeta=latest;
+ return true;
+}
+""" + helper + r"""
+(async()=>{
+ const img={_plateMeta:original,_forceExactPreview:false,_previewLongRetry:false};
+ const s={i:4,job:'job',img,meta:original,
+  points:[[52,76],[125,75],[125,93],[52,94]],
+  pending:{edit_id:'rejected'},dirty:true,error:{status:409},conflict:true,
+  displayCrop:original.crop,refreshBusy:false,drag:null,draw(){}};
+ PLATE_EDITS.set(4,s);
+ CONFIRM_FAILED.set(4,{status:409,details:{conflict:'stale_preview'}});
+ const originalDraft=JSON.stringify(s.points);
+ await refreshPlateDraft(s);
+ assert.equal(refreshes,1);
+ assert.equal(JSON.stringify(s.points),originalDraft,'corners were lost');
+ assert.equal(s.meta,latest);
+ assert.equal(s.pending,null);
+ assert.equal(s.error,null);
+ assert.equal(s.conflict,false);
+ assert.equal(s.dirty,true);
+ assert.equal(s.refreshBusy,false);
+ assert(img._forceExactPreview && img._previewLongRetry);
+ assert(retryScheduled>=1);
+ assert(!CONFIRM_FAILED.has(4));
+ assert(cleared>=1);
+ shouldLoad=false;
+ s.error={status:409};s.conflict=true;s.pending={edit_id:'uncertain'};
+ const preserved=JSON.stringify(s.points);
+ await refreshPlateDraft(s);
+ assert.equal(JSON.stringify(s.points),preserved,'failed reload discarded corners');
+ assert.equal(s.meta,latest,'failed reload changed source metadata');
+ assert.equal(s.img._plateMeta,latest);
+ assert(s.error&&s.conflict);
+ assert(s.dirty);
+ assert(!s.refreshBusy);
+})().catch(error=>{console.error(error);process.exitCode=1});
+"""
+    result = subprocess.run(['node', '-e', script], capture_output=True,
+                            text=True, timeout=15)
+    assert result.returncode == 0, result.stderr
+
+
 def test_real_browser_can_drag_new_box_on_bad_plate_and_confirm(review_server):
     """Real Flask + Chromium: offscreen source box -> full-frame drag -> save."""
     sync_api = pytest.importorskip('playwright.sync_api')
