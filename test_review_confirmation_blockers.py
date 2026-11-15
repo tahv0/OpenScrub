@@ -141,3 +141,70 @@ def test_area_archive_conflict_is_not_misfiled_as_a_failed_human_confirmation(
         assert stored[0]["verified_label"] == "not_plate"
         assert not errors, errors
         browser.close()
+
+
+def test_pre_write_busy_confirmation_retries_without_creating_a_sticky_failure(
+    review_server, monkeypatch
+):
+    sync_api = pytest.importorskip("playwright.sync_api")
+    from flask import jsonify, request
+
+    url, _report = review_server
+    original = web.app.view_functions["finding_confirm"]
+    calls = []
+
+    def transient_busy(*args, **kwargs):
+        if request.method == "POST":
+            calls.append(request.get_json())
+            if len(calls) <= 2:
+                return jsonify(
+                    error="Another review edit is saving. Retry shortly."
+                ), 503
+        return original(*args, **kwargs)
+
+    monkeypatch.setitem(web.app.view_functions, "finding_confirm", transient_busy)
+    with sync_api.sync_playwright() as pw:
+        browser = browser_instance(pw)
+        page = browser.new_page(viewport={"width": 1440, "height": 1000})
+        page.set_default_timeout(20000)
+        errors = []
+        page.on("pageerror", lambda exc: errors.append(str(exc)))
+        load_browser_page(page, url, [], [])
+        page.get_by_role("link", name="Synthetic review fixture", exact=True).click()
+        card = page.locator("#det0")
+        card.scroll_into_view_if_needed()
+        page.wait_for_function('!!document.querySelector("#det0 img")._plateMeta')
+        card.get_by_role("button", name="✓ Is a plate", exact=True).click()
+        page.evaluate("CONFIRM_CHAIN")
+        assert len(calls) == 3
+        assert page.evaluate("CONFIRM_FAILED.size") == 0
+        assert page.locator("#confirmationSaveIssues").is_hidden()
+        assert page.evaluate("saveAndRender(true)") is True
+        stored = web._load_job_report(web.JOBS["inline-fixture"])["detections"]
+        assert stored[0]["human_confirmation"]["label"] == "positive"
+        assert not errors, errors
+        browser.close()
+
+
+def test_discarding_conflicted_corners_preserves_real_failed_confirmation():
+    from test_findings_review import choices_script
+
+    choices_script(r"""
+const before=[[0,0],[10,0],[10,8],[0,8]];
+const changed=[[1,1],[10,0],[10,8],[0,8]];
+const error=Object.assign(new Error("Human confirmation not acknowledged"),{
+  status:409,reviewAttemptedLabel:"positive"
+});
+const edit={i:0,job:CUR,dirty:true,archiveConflict:true,error,
+  version:1,pending:null,points:plateCopy(changed),saved:plateCopy(before),
+  draw(){}};
+PLATE_EDITS.set(0,edit);CONFIRM_FAILED.set(0,error);
+dismissFindingConfirmation(0);
+assert.equal(edit.dirty,false);
+assert.deepEqual(edit.points,before);
+assert.equal(CONFIRM_FAILED.get(0),error,
+  "The failed classification is independent of the discarded area");
+dismissFindingConfirmation(0);
+assert.equal(CONFIRM_FAILED.size,0,
+  "A second explicit action can keep the current saved choice");
+""")
