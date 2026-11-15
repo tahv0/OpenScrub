@@ -6904,7 +6904,7 @@ function confirmFinding(i,label){
      try{return await submit();}
      catch(error){
       if(attempt>=3||error.status!==503||
-         !/^Another review edit is saving\. Retry shortly\./.test(error.message||"")||
+         !/^Another review edit is saving\\. Retry shortly\\./.test(error.message||"")||
          CUR!==job||JOBVIEW!==view)throw error;
       if(note)note.textContent="Another review edit is saving · retrying confirmation…";
       await new Promise(resolve=>setTimeout(resolve,[150,400,900][attempt]));
