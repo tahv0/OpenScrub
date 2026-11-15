@@ -34,7 +34,7 @@ def test_journal_confirmation_emits_bounded_stage_times(review_server, monkeypat
     assert trace['mode'] == 'journal'
     assert trace['request_id']
     assert trace['total_ms'] >= 0
-    assert trace['report_mb'] >= 0
+    assert 'report_mb' not in trace  # No disk or private source telemetry
     for key in ('load_preview_report_ms', 'source_identity_check_ms',
                 'preview_ms', 'archive_ms', 'journal_commit_ms', 'member_count_ms'):
         assert key in trace and trace[key] >= 0
