@@ -77,6 +77,26 @@ regions, but these approximate frame matches cannot be saved as exact training
 examples. The card explains when a new scan is needed to obtain frame-indexed
 findings for confirmation.
 
+## Filter detected types and what will actually be blurred
+
+Review offers three independent **view-only** filters: **Review status**
+(All / Needs review / Handled / Unsaved or failed), **Detection type**
+(All / License plates / Other sensitive areas), and **Output**
+(All / Will be blurred / Will remain visible). Combine them to inspect,
+for example, only plate detections whose effective output will be blurred,
+or other detected areas currently set to stay visible.
+
+Output comes from the actual current enabled/disabled Review choices,
+including unsaved Blur/Keep edits, **not** confidence scores or only
+confirmed training labels. A group with different output choices across
+its frames can appear in both output views. The totals count groups, not
+individual frames; each selector's counts reflect the other active filters.
+Lazy pages mount matching cards on demand without loading unrelated images.
+The existing 10% plate sample, visual similarity grouping, and unsaved
+corner drafts remain intact. **Show all findings** resets every view filter.
+Filtering by output never changes a blur, confirms a training example,
+saves a choice, or exempts another detection from rendering protection.
+
 ## Filter the Review queue without changing decisions
 
 The **Show findings** selector in Review has **All**, **Needs review**,
