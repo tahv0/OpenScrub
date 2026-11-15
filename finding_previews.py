@@ -774,17 +774,25 @@ def store(job_dir, row, render_state, meta, pixels):
     with _LOCK:
         db = _db(job_dir, create=True)
         try:
+            if db.execute('SELECT 1 FROM previews WHERE key=?', (result['key'],)).fetchone():
+                # A scan-time sample has the same frame/box key but its old
+                # crop can exclude newly corrected corners. Never overwrite
+                # that JPEG under the SAME opaque key: a pending human
+                # confirmation may still refer to its exact displayed pixels.
+                # Publish this verified, larger crop under a distinct,
+                # deterministic sample key instead.
+                result['key'] = _hash(['explicit-crop-v1', result['key'], result['crop']])
+                result['source_token'] = result['key']
+                result['preview_token'] = _hash([result['key'], result['points']])
             if not _insert_explicit(db, 'legacy:'+result['key'], result, jpeg):
                 db.commit()
-                cached = image(job_dir, result['key'])
-                if cached is not None:
-                    # The same source/box key cannot acknowledge a different
-                    # crop or polygon that the persisted pixels do not cover.
-                    reusable = lookup(job_dir, row, render_state)
-                    if reusable is not None:
-                        return reusable
-                    raise ValueError('existing preview crop is incompatible with geometry')
-                raise PreviewLimitError('compact preview cache is full')
+                # A concurrent explicit request may have published the
+                # identical crop. Recheck compatibility rather than claiming
+                # that an unrelated existing JPEG satisfies these corners.
+                reusable = lookup(job_dir, row, render_state)
+                if reusable is not None:
+                    return reusable
+                raise PreviewLimitError('compact preview cache cannot retain this crop')
             db.commit()
         finally:
             db.close()

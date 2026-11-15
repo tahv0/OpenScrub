@@ -6623,11 +6623,22 @@ async function reloadStaleFindingForConfirmation(card,edit,shown){
  const same=(plateSamePreviewSource(shown,latest)||
   plateSameSourceFrame(shown,latest))&&
   plateCornersInsideCrop(shown.points,latest.crop);
- if(edit&&!edit.dirty&&!edit.drag){
-  // This is the preview now actually shown; never keep the old key alive
-  // in a non-dirty editor after a refresh, regardless of rebindability.
+ if(edit&&!edit.drag){
+  // This is the preview now actually shown. A failed area draft may still
+  // contain the OLD key: leaving it there causes Is/Not to hit the same
+  // stale-preview 409 forever even after a new picture has loaded.
+  const oldDraft=edit.dirty?plateCopy(edit.points):null;
   edit.meta=latest;edit.displayCrop=latest.crop.slice();
-  edit.points=plateCopy(latest.points);edit.saved=plateCopy(latest.points);
+  edit.saved=plateCopy(latest.points);
+  edit.points=oldDraft||plateCopy(latest.points);
+  if(oldDraft&&!same){
+   // Keep the user's unsaved points but NEVER transfer them into the new
+   // source image as confirmed geometry. The next Is/Not click is explicit
+   // approval of the newly displayed image; area edits need separate review.
+   edit.pending=null;edit.needsSourceReview=true;edit.conflict=false;
+   edit.error=new Error('Picture changed. Inspect it before confirming; review the corners separately.');
+   plateStatus(edit,'New picture loaded · corner draft preserved; inspect before trying Is / Not again.',true);
+  }
   edit.draw();
  }
  return {latest,same};
@@ -6660,8 +6671,15 @@ function confirmFinding(i,label){
      await (PLATE_SAVE||pumpPlateSaves());
      if(edit.dirty&&!edit.error)await new Promise(resolve=>setTimeout(resolve,100));
     }
-    if(edit.dirty||edit.error)
-     throw edit.archiveConflict?edit.error:Object.assign(new Error('Save or reload this area adjustment before confirming.'),{beforeWrite:true});
+    // A NEW archive-revision conflict discovered during the flush still
+    // requires another explicit click; never reconfirm a newer human label
+    // as a side effect of the previous click.
+    if(edit.archiveConflict)throw edit.error||new Error('Saved example changed. Choose Is / Not again.');
+    // Human classification is separate from a four-corner adjustment.
+    // If that save failed, still allow an explicit Is-a-plate decision
+    // using the authenticated displayed source sample, but NEVER include
+    // or acknowledge the unsaved draft polygon as archived geometry.
+    // A stale or changed picture is independently rejected by the API.
    }else if(PLATE_SAVE)await PLATE_SAVE;
    if(CUR!==job||JOBVIEW!==view)return;
    const displayed=edit?.meta||card?.querySelector('img[data-preview-url]')?._plateMeta;
@@ -6672,6 +6690,7 @@ function confirmFinding(i,label){
    if(displayed?.key)body.preview_key=displayed.key;
    if(label==='positive'&&edit?.archiveConflict)body.points=plateCopy(edit.points);
    const editVersion=edit?.version;
+   const areaStillUnsaved=label==='positive'&&!!edit?.dirty&&!edit.archiveConflict;
    const submit=()=>reviewRequest('api/jobs/'+job+'/confirm/'+i,{method:'POST',
     headers:{'Content-Type':'application/json'},body:JSON.stringify(body),timeoutMs:120000});
    let data;
@@ -6705,13 +6724,27 @@ function confirmFinding(i,label){
    }
    Object.assign(FINDING_META[i],{confirmed_finding_id:data.finding.id,confirmed_finding_revision:data.finding.revision});
    if(edit&&data.preview){
-    Object.assign(edit.meta,data.preview);edit.img._plateMeta=edit.meta;
-    edit.saved=plateCopy(edit.meta.points);syncPlateTrack(edit);
-    if(edit.version===editVersion&&!edit.drag){
-     edit.points=plateCopy(edit.saved);edit.pending=null;edit.dirty=false;
-     edit.error=null;edit.conflict=false;edit.archiveConflict=false;
+    if(areaStillUnsaved&&edit.dirty){
+     // The label was saved without the failed corner adjustment. Keep the
+     // original displayed image, coordinates, local error and retry control;
+     // replacing them with server metadata would falsely claim that the
+     // user's unsaved polygon was accepted. Only renew an identity token
+     // when it still describes the SAME displayed source JPEG and corners.
+     if(plateSamePreviewSource(edit.meta,data.preview)){
+      edit.meta.preview_token=data.preview.preview_token;
+      edit.img._plateMeta=edit.meta;
+     }
+     edit.draw();
+     plateStatus(edit,'Plate classification saved · corner adjustment still not saved.',true);
+    }else{
+     Object.assign(edit.meta,data.preview);edit.img._plateMeta=edit.meta;
+     edit.saved=plateCopy(edit.meta.points);syncPlateTrack(edit);
+     if(edit.version===editVersion&&!edit.drag){
+      edit.points=plateCopy(edit.saved);edit.pending=null;edit.dirty=false;
+      edit.error=null;edit.conflict=false;edit.archiveConflict=false;
+     }
+     edit.draw();plateStatus(edit,edit.dirty?'Saving…':'Saved area · confirmation stored');
     }
-    edit.draw();plateStatus(edit,edit.dirty?'Saving…':'Saved area · confirmation stored');
    }
    CONFIRM_FAILED.delete(i);
    if(note)note.innerHTML=findingStatus(i);

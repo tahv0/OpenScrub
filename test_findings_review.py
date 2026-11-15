@@ -345,3 +345,91 @@ def test_archive_revision_conflict_and_corner_reconfirmation_use_real_api(
             assert not errors,errors
         finally:
             browser.close()
+
+
+def test_positive_classification_survives_failed_corner_autosave_without_losing_draft():
+    """A human label can save while an independent area draft remains errored."""
+    choices_script(r'''
+const oldPoints=[[0,0],[10,0],[10,8],[0,8]];
+const draftPoints=[[1,1],[9,1],[9,7],[1,7]];
+const error=Object.assign(new Error('existing preview crop is incompatible with geometry'),{status:400});
+const meta={key:'displayed-jpeg',source_token:'same-source',frame:4,
+ width:64,height:48,box:[0,0,10,8],crop:[0,0,40,40],
+ preview_token:'shown-token',points:oldPoints};
+const edit={i:0,job:CUR,dirty:true,error,archiveConflict:false,
+ version:8,pending:null,points:plateCopy(draftPoints),saved:plateCopy(oldPoints),
+ meta:{...meta},img:{_plateMeta:{...meta}},draw(){this.drawn=true}};
+PLATE_EDITS.set(0,edit);
+let payload;
+function plateSamePreviewSource(a,b){
+ return a.source_token===b.source_token&&a.key===b.key&&
+        JSON.stringify(a.crop)===JSON.stringify(b.crop)&&
+        JSON.stringify(a.points)===JSON.stringify(b.points);
+}
+async function reviewRequest(url,options){
+ assert.ok(url.endsWith('/confirm/0'));
+ payload=JSON.parse(options.body);
+ return {data:{finding:{id:'example',revision:1},preview:{...meta,preview_token:'confirmed-token'}}};
+}
+(async()=>{
+ await confirmFinding(0,'positive');
+ assert.equal(payload.label,'positive');
+ assert.equal(payload.preview_key,'displayed-jpeg');
+ assert.equal(payload.preview_token,'shown-token');
+ assert.ok(!('points' in payload),'never archive a polygon whose save failed');
+ assert.equal(CONFIRM_FAILED.size,0);
+ assert.equal(VLBL[0],'plate');
+ assert.equal(EN[0],true);
+ assert.equal(edit.dirty,true,'human corners remain a draft');
+ assert.equal(edit.error,error,'the failing area save is still visible');
+ assert.deepEqual(edit.points,draftPoints);
+ assert.deepEqual(edit.saved,oldPoints);
+ assert.equal(edit.meta.preview_token,'confirmed-token');
+ assert.equal(edit.drawn,true);
+})().catch(error=>{console.error(error);process.exitCode=1});
+''')
+
+
+def test_stale_confirmation_rebinds_dirty_editor_without_transferring_its_corners():
+    """Refreshing a changed source must end the old preview-key retry loop."""
+    if not shutil.which('node'):
+        pytest.skip('Node required for source-bound browser recovery')
+    js = web.APP_JS
+    start = js.index('async function reloadStaleFindingForConfirmation(')
+    end = js.index('function confirmFinding(', start)
+    source = r'''
+const assert=require('node:assert/strict');
+const plateCopy=p=>p.map(row=>row.slice());
+let next=null,loads=0;
+function plateSamePreviewSource(a,b){return a.key===b.key&&JSON.stringify(a.crop)===JSON.stringify(b.crop)}
+function plateSameSourceFrame(){return false}
+function plateCornersInsideCrop(){return true}
+async function queueReviewPreview(img){loads++;img._plateMeta=next;return true}
+function plateStatus(edit,msg){edit.status=msg}
+''' + js[start:end] + r'''
+const shown={frame:300,key:'old',preview_token:'old-token',crop:[0,0,70,50],
+ points:[[10,10],[60,10],[60,40],[10,40]]};
+const draft=[[3,3],[65,3],[65,43],[3,43]];
+const img={_plateMeta:{...shown}};
+const edit={img,dirty:true,drag:null,meta:{...shown},
+ displayCrop:shown.crop.slice(),saved:plateCopy(shown.points),points:plateCopy(draft),
+ pending:{edit_id:'old'},error:new Error('Old preview could not be saved'),
+ draw(){this.drawn=true}};
+const card={querySelector(){return img}};
+(async()=>{
+ next={...shown,frame:301,key:'new',preview_token:'new-token',
+  crop:[0,0,80,55],points:[[12,12],[62,12],[62,42],[12,42]]};
+ const r=await reloadStaleFindingForConfirmation(card,edit,shown);
+ assert.equal(r.same,false);assert.equal(loads,1);
+ assert.equal(edit.meta.key,'new');assert.equal(edit.meta.preview_token,'new-token');
+ assert.deepEqual(edit.points,draft,'keep the unsaved human geometry only as a draft');
+ assert.deepEqual(edit.saved,next.points,'backend geometry is the new reset point');
+ assert.equal(edit.needsSourceReview,true);assert.equal(edit.pending,null);
+ assert.match(edit.status,/inspect before trying Is \/ Not again/);
+ assert.equal(edit.dirty,true);assert.equal(edit.drawn,true);
+ assert.equal(img._plateMeta.key,edit.meta.key);
+})().catch(error=>{console.error(error);process.exitCode=1});
+'''
+    result = subprocess.run([shutil.which('node'), '-e', source],
+                            capture_output=True, text=True, timeout=10)
+    assert result.returncode == 0, result.stdout + result.stderr

@@ -464,3 +464,84 @@ def test_sixty_rejections_keep_working_after_failed_save(review_server, monkeypa
         evidence.mkdir(parents=True,exist_ok=True)
         page.screenshot(path=str(evidence/('sixty-rejections-%d.png'%viewport[0])))
         browser.close()
+
+
+@pytest.mark.parametrize('label', ['positive', 'negative'])
+def test_changed_plate_corners_outgrow_cached_crop_and_still_confirm(review_server, label):
+    """Enlarging a plate quad must not trap Review behind an old JPEG cache key."""
+    _, report = review_server
+    path = '/api/jobs/inline-fixture/finding-preview/0'
+    with web.app.test_client() as client:
+        old_response = client.get(path)
+        assert old_response.status_code == 200, old_response.get_data(as_text=True)
+        old = json.loads(old_response.headers['X-Finding-Geometry'])
+        # A scan-time JPEG is a small crop around the detector box. A later
+        # corner correction grows beyond its border without moving the
+        # source frame, detector box or existing cached JPEG.
+        doc = json.loads(report.read_text())
+        doc['detections'][0]['plate_quad'] = [
+            [-.5, -.5], [1.5, -.5], [1.5, 1.5], [-.5, 1.5]]
+        report.write_text(json.dumps(doc))
+        again = client.get(path)
+        assert again.status_code == 200, again.get_data(as_text=True)
+        expanded = json.loads(again.headers['X-Finding-Geometry'])
+        assert expanded['key'] != old['key']
+        assert expanded['crop'][0] <= 60 and expanded['crop'][2] >= 540
+        assert expanded['crop'][1] <= 70 and expanded['crop'][3] >= 270
+        assert expanded['preview_token'] != old['preview_token']
+        assert web.finding_previews.image(report.parent, old['key'])[1] == old_response.data
+        assert client.get(path + '?cache_only=1').status_code == 200
+        assert client.get(path + '?cache_only=1').headers['X-Finding-Geometry'] != ''
+        # Both human labels must be saveable without repeating the old
+        # 'existing preview crop is incompatible with geometry' error.
+        confirmation = client.post('/api/jobs/inline-fixture/confirm/0',
+            json=dict(label=label, preview_key=expanded['key'],
+                      preview_token=expanded['preview_token']))
+        assert confirmation.status_code == 200, confirmation.get_data(as_text=True)
+        result = confirmation.get_json()
+        assert result['finding']['label'] == label
+        assert result['finding']['frame'] == expanded['frame']
+
+
+def test_failed_corner_save_still_allows_both_human_labels(review_server, monkeypatch):
+    """An errored area save cannot hijack Is/Not; a positive keeps its draft."""
+    from flask import jsonify, request
+    url, report = review_server
+    original = web.app.view_functions['job_plate_quad']
+
+    def reject_area(*args, **kwargs):
+        if request.method == 'POST':
+            return jsonify(error='Synthetic corner save failed'), 400
+        return original(*args, **kwargs)
+
+    monkeypatch.setitem(web.app.view_functions, 'job_plate_quad', reject_area)
+    sync_api = pytest.importorskip('playwright.sync_api')
+    with sync_api.sync_playwright() as pw:
+        browser = browser_instance(pw)
+        page = browser.new_page(viewport={'width': 1440, 'height': 1000})
+        page.set_default_timeout(12000)
+        errors = []
+        page.on('pageerror', lambda error: errors.append(str(error)))
+        load_browser_page(page, url, [], [])
+        page.get_by_role('link', name='Synthetic review fixture', exact=True).click()
+        card = page.locator('#det0')
+        card.scroll_into_view_if_needed()
+        page.wait_for_function('!!document.querySelector("#det0 img")._quadEdit')
+        drag_corner(page, card)
+        page.wait_for_function('PLATE_EDITS.get(0)?.error?.status===400')
+        original_draft = page.evaluate('PLATE_EDITS.get(0).points.map(p=>p.slice())')
+        card.get_by_role('button', name='✓ Is a plate', exact=True).click()
+        page.evaluate('CONFIRM_CHAIN')
+        assert page.evaluate('CONFIRM_FAILED.size') == 0
+        assert 'Saved' in card.locator('#vlabel0').inner_text()
+        assert 'corner adjustment still not saved' in card.locator('.quad-status').inner_text()
+        assert page.evaluate('PLATE_EDITS.get(0).dirty') is True
+        assert page.evaluate('PLATE_EDITS.get(0).points') == original_draft
+        card.get_by_role('button', name='✕ Not a plate', exact=True).click()
+        page.evaluate('CONFIRM_CHAIN')
+        assert page.evaluate('CONFIRM_FAILED.size') == 0
+        assert page.evaluate('PLATE_EDITS.get(0).dirty') is False
+        assert page.evaluate('EN[0]') is False
+        assert page.evaluate('VLBL[0]') == 'not_plate'
+        assert not errors, errors
+        browser.close()
