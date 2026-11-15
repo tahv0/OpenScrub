@@ -5324,8 +5324,10 @@ async function loadReviewPreview(state,task,cacheOnly){
  let missing=false,retryBusy=false,ok=false,url=null;
  try{
   const original=img.dataset.previewUrl;
-  const base=img._forceExactPreview?
+  const originalWithFrame=img._forceExactPreview?
    original+(original.includes("?")?"&":"?")+"exact=1":original;
+  const base=img._previewLongRetry?
+   originalWithFrame+(originalWithFrame.includes("?")?"&":"?")+"retry_decode=1":originalWithFrame;
   const target=cacheOnly?base+(base.includes("?")?"&":"?")+"cache_only=1":base;
   const {response,data}=await reviewRequest(target,{signal:ctl.signal,timeoutMs:cacheOnly?15000:120000},"blob");
   if(REVIEW_MEDIA!==state||!img.isConnected)return;
@@ -5361,7 +5363,7 @@ async function loadReviewPreview(state,task,cacheOnly){
   }
   if(status)status.textContent="";
   if(typeof reviewSimilarFingerprint==="function")reviewSimilarFingerprint(img);
-  ok=true;img._previewLoaded=true;
+  ok=true;img._previewLoaded=true;img._previewLongRetry=false;
   state.loadedImages.add(img);
   updateReviewPreloadStatus(state);
  }catch(error){
@@ -5372,15 +5374,22 @@ async function loadReviewPreview(state,task,cacheOnly){
     if(status)status.textContent="Decoder busy — retrying preview…";
     return;
    }
-   if(status)status.textContent=error.name==="AbortError"
-    ?"Preview timed out. Retry when ready.":"Preview unavailable: "+error.message;
-   if(retry){retry.hidden=false;retry.textContent="Retry preview";}
+   if(status)status.textContent=error.status===504
+    ?(img._previewLongRetry
+      ?"Exact source preview still timed out after the extended attempt. Automatic redaction remains enabled unless deliberately changed."
+      :"Source frame took too long to decode. Retry preview for a longer attempt.")
+    :error.name==="AbortError"?"Preview timed out. Retry when ready."
+    :"Preview unavailable: "+error.message;
+   if(retry){retry.hidden=false;retry.textContent=error.status===504
+    ?"Retry preview (up to 60s)":"Retry preview";}
   }
  }finally{
   if(url){state.urls.delete(url);URL.revokeObjectURL(url);}
   state[counter]--;state.controllers.delete(ctl);
   if((missing||retryBusy)&&REVIEW_MEDIA===state&&img.isConnected){
-   if(missing&&status)status.textContent="Loading source preview…";
+   if(missing&&status)status.textContent=img._previewLongRetry
+    ?"Loading source preview with a longer, bounded decode…"
+    :"Loading source preview…";
    const queue=retryBusy&&cacheOnly?state.cacheQueue:state.queue;
    if(task.priority)queue.unshift(task);else queue.push(task);
   }else{img._previewTask=null;task.resolve(ok);}
@@ -5523,7 +5532,11 @@ function loadExactReviewFrame(button){
 function retryReviewPreview(button){
  const img=button.closest(".det").querySelector("img[data-preview-url]");
  if(img){
-  button.disabled=true;button.textContent="Loading preview…";
+  // A normal cold decode has a strict 10s FFmpeg deadline. Do not repeat
+  // the exact same doomed attempt: on an explicit click, use one bounded 60s
+  // original-frame crop decode instead, with the SAME source-PTS checks.
+  img._previewLongRetry=true;
+  button.disabled=true;button.textContent="Loading source crop (longer attempt)…";
   img._plateMeta=null;
   queueReviewPreview(img,true).finally(()=>{if(button.isConnected)button.disabled=false;});
  }
