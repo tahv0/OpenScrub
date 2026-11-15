@@ -130,7 +130,8 @@ def _cold_frame(job,doc,row,frame):
         _web._REVIEW_WORK_LOCK.release()
 
 
-def preview(job, index, doc=None, cache_only=False, preferred_key=None):
+def preview(job, index, doc=None, cache_only=False, preferred_key=None,
+            exact_only=False):
     """Return source geometry and compact pixels; a warm read never opens video."""
     doc = doc if doc is not None else _web._load_preview_report(job)
     if not 0 <= index < len(doc.get('detections', [])):
@@ -160,7 +161,7 @@ def preview(job, index, doc=None, cache_only=False, preferred_key=None):
             abort(409, description='This displayed picture is no longer a valid cached sample. Reload its preview.')
     else:
         cached = _web._serialize_review_read(previews.lookup)(job['dir'], cache_row, rs)
-        if cached is None and int(row.get('track', -1)) >= 0:
+        if cached is None and not exact_only and int(row.get('track', -1)) >= 0:
             cached = _web._serialize_review_read(previews.lookup)(
                 job['dir'], cache_row, rs, allow_representative=True)
     if cached is None and cache_only:
@@ -711,7 +712,9 @@ def install(app, web):
     @app.get('/api/jobs/<jid>/finding-preview/<int:index>')
     @_guard
     def finding_preview(jid,index):
-        result = preview(_job(jid),index,cache_only=request.args.get('cache_only')=='1')
+        result = preview(_job(jid),index,
+                         cache_only=request.args.get('cache_only')=='1',
+                         exact_only=request.args.get('exact')=='1')
         if result is None:
             return Response(status=204,headers={'Cache-Control':'no-store'})
         _,_,meta,jpeg = result
