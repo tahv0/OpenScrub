@@ -5414,7 +5414,7 @@ async function loadReviewPreview(state,task,cacheOnly){
     (borrowed?"Showing cached frame "+meta.frame+" instead of detection frame "+
       meta.requested_frame+". Load exact frame to inspect the actual sighting. "
       :"Original source pixels only. ")+
-    "Correct the box in Preview video & edit boxes or rescan before trusted training."
+    "Use Redraw plate area on this exact source frame before trusted training."
    :borrowed?
    "Showing cached frame "+meta.frame+" instead of detection frame "+
    meta.requested_frame+". Load the exact source frame before confirming this finding.":"";
@@ -5424,6 +5424,8 @@ async function loadReviewPreview(state,task,cacheOnly){
    if(typeof FINDING_META!=="undefined"&&FINDING_META[meta.i]){
     FINDING_META[meta.i].classification_allowed=meta.classification_allowed!==false;
     FINDING_META[meta.i].classification_note=meta.classification_note||"";
+    FINDING_META[meta.i].source_repaired=!!meta.source_repaired;
+    if(meta.source_repaired)FINDING_META[meta.i].fallback_reason="";
    }
    card.querySelectorAll('.finding-confirm button').forEach(button=>
     button.disabled=meta.classification_allowed===false||
@@ -6153,6 +6155,7 @@ function pumpPlateSaves(){
    s.draw();plateStatus(s,s.dirty?"Saving…":data.reconfirmation_required
     ?"Saved new corners · image identity changed, confirm Is / Not again"
     :data.classification_required?"Saved area · choose Is / Not to confirm"
+    :s.meta.source_repaired?"Saved this exact frame"
     :s.meta.track>=0?"Saved to track":"Saved");
    if(!s.dirty&&CUR===s.job&&document.getElementById("beCv"))beRefresh();
   }catch(error){
@@ -6266,8 +6269,12 @@ function initPlateCorners(img){
   x.fill();x.stroke();x.setLineDash([]);
   const b=s.meta.box,bx1=(b[0]-c[0])*sx,by1=(b[1]-c[1])*sy,
         bx2=(b[2]-c[0])*sx,by2=(b[3]-c[1])*sy;
-  x.strokeStyle=REVIEW_OVERLAY_COLORS.proposal;x.lineWidth=1.5;x.setLineDash([6,4]);
-  x.strokeRect(bx1,by1,bx2-bx1,by2-by1);x.setLineDash([]);
+  if(!s.meta.source_repaired){
+   // Once a person replaces the detector anchor, the new enclosing box is
+   // human geometry, NOT a primary YOLO proposal. Do not mislabel it yellow.
+   x.strokeStyle=REVIEW_OVERLAY_COLORS.proposal;x.lineWidth=1.5;x.setLineDash([6,4]);
+   x.strokeRect(bx1,by1,bx2-bx1,by2-by1);x.setLineDash([]);
+  }
   if(state.machineSuggestion&&state.enabled){
    x.strokeStyle=REVIEW_OVERLAY_COLORS.visible;x.lineWidth=1.5;x.setLineDash([5,4]);
    const inset=3;x.strokeRect(bx1+inset,by1+inset,Math.max(0,bx2-bx1-2*inset),Math.max(0,by2-by1-2*inset));
