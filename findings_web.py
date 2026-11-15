@@ -455,7 +455,7 @@ def _journal_confirm(job, index, payload, doc, trace=None, rebind=False):
         # Source-bound redaction geometry is an anchor override, never a
         # group-wide replacement of other frames' independently saved shapes.
         anchor.update(plate_quad=[], human_region_confirmed=False,
-                      poly=[], poly_holes=[], mask_pad=0)
+                      poly=[], poly_holes=[], mask_pad=-1)
     if payload.get('points') is not None:
         anchor['human_region_confirmed'] = True
     if trace: trace.enter('journal_commit')
