@@ -16,7 +16,7 @@ import openscrub_web as web
 from test_review_browser import review_server
 
 
-def _rebound_fixture(review_server):
+def _rebound_fixture(review_server, human_corners=False):
     """Confirm the synthetic sample, publish it, then move only its scan row."""
     _, report = review_server
     job = web.JOBS["inline-fixture"]
@@ -26,11 +26,16 @@ def _rebound_fixture(review_server):
         assert first.status_code == 200
         first_meta = json.loads(first.headers["X-Finding-Geometry"])
         assert first_meta["frame"] == 300
-        saved = client.post("/api/jobs/inline-fixture/confirm/0", json={
+        value = {
             "label": "positive",
             "preview_key": first_meta["key"],
             "preview_token": first_meta["preview_token"],
-        })
+        }
+        if human_corners:
+            x1, y1, x2, y2 = first_meta["box"]
+            value["points"] = [[x1 + 8, y1 + 7], [x2 - 8, y1 + 7],
+                               [x2 - 8, y2 - 7], [x1 + 8, y2 - 7]]
+        saved = client.post("/api/jobs/inline-fixture/confirm/0", json=value)
         assert saved.status_code == 200, saved.get_data(as_text=True)
         original = saved.get_json()["finding"]
         assert original["label"] == "positive"
@@ -176,3 +181,43 @@ def test_rebound_cannot_change_existing_archived_evidence_with_mismatched_video(
         assert "different source or timeline" in response.get_json()["error"]
     assert report.read_bytes() == original_content
     assert not review_journal.has_changes(job["dir"])
+
+
+def test_rebound_does_not_transfer_old_human_corners_or_narrow_masks(
+    review_server
+):
+    """Only a fresh explicit polygon may narrow the NEW frame's redaction."""
+    report, job, original, metadata = _rebound_fixture(
+        review_server, human_corners=True
+    )
+    old = library.get_finding(findings_web.root(), original["id"])
+    assert old["frame"] == 300
+    assert old["shape_confirmed"] is True
+    assert len(old["points"]) == 4
+
+    with web.app.test_client() as client:
+        updated = client.post("/api/jobs/inline-fixture/confirm/0", json={
+            "label": "positive",
+            "preview_key": metadata["key"],
+            "preview_token": metadata["preview_token"],
+            "expected_revision": old["revision"],
+        })
+        assert updated.status_code == 200, updated.get_data(as_text=True)
+        new = updated.get_json()["finding"]
+        assert new["frame"] == 299
+        assert new["id"] != old["id"]
+        assert new["shape_confirmed"] is False
+        assert new["points"] is None
+    # The old example retains its independently verified four corners;
+    # the new frame is protected by its full detector box until adjusted.
+    persisted_old = library.get_finding(findings_web.root(), old["id"])
+    assert persisted_old["points"] == old["points"]
+    assert persisted_old["shape_confirmed"] is True
+    recovered = review_journal.apply(job["dir"], json.loads(report.read_text()))
+    current = recovered["detections"][0]
+    assert current["verified_label"] == "plate"
+    assert current["human_region_confirmed"] is False
+    assert current["plate_quad"] == []
+    assert current["poly"] == [] and current["poly_holes"] == []
+    assert current["confirmed_finding_id"] == new["id"]
+    assert current["enabled"] is True
