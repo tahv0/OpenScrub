@@ -6770,8 +6770,24 @@ function confirmFinding(i,label){
    if(displayed?.key)body.preview_key=displayed.key;
    if(label==='positive'&&edit?.archiveConflict)body.points=plateCopy(edit.points);
    const editVersion=edit?.version;
-   const submit=()=>reviewRequest('api/jobs/'+job+'/confirm/'+i,{method:'POST',
-    headers:{'Content-Type':'application/json'},body:JSON.stringify(body),timeoutMs:120000});
+   // The review writer refuses with 503 *before writing* if another save
+   // holds its lock. Only this specific safe refusal may be retried; never
+   // resubmit uncertain 5xx/network failures or stale human confirmations.
+   const submit=async()=>{
+    for(let busy=0;;busy++){
+     try{
+      return await reviewRequest('api/jobs/'+job+'/confirm/'+i,{method:'POST',
+       headers:{'Content-Type':'application/json'},body:JSON.stringify(body),timeoutMs:120000});
+     }catch(error){
+      if(error.status!==503||!String(error.message).includes('Another review edit is saving')||busy>=8)
+       throw error;
+      if(note)note.textContent='Another review edit is saving · waiting to confirm…';
+      await new Promise(resolve=>setTimeout(resolve,Math.min(1600,200*2**busy)));
+      if(CUR!==job||JOBVIEW!==view)
+       throw Object.assign(new Error('Review changed while waiting to confirm.'),{beforeWrite:true});
+     }
+    }
+   };
    let data;
    try{
     ({data}=await submit());
