@@ -6,7 +6,10 @@ track-wide box transplant, or an automatic trusted training classification.
 import json
 import re
 import shutil
+import sqlite3
 import subprocess
+import threading
+import time
 
 import cv2
 import numpy as np
@@ -40,6 +43,10 @@ def broken_plate(plate_job, tmp_path, monkeypatch):
     sibling.update(frame_index=3, t_start=.3, t_end=.3, last_seen=.3)
     doc['detections'].append(sibling)
     stop_review.atomic_report(str(report), doc)
+    # Most existing fixtures verify a tiny synthetic source up front. Only
+    # the dedicated pending-SHA test must exercise asynchronous verification.
+    job['_finding_source_verified'] = dict(
+        signature=(web._video_identity(job['video']), sha), sha256=sha)
     monkeypatch.setattr(findings_web, 'root', lambda: tmp_path/'archives')
     return client, jid, report, job_dir, job, doc
 
@@ -58,8 +65,11 @@ def view_and_payload(fixture):
     shown = json.loads(view.headers['X-Repair-Geometry'])
     assert shown['frame'] == before['frame'] == 2
     assert shown['width'] == 240 and shown['height'] == 160
-    assert shown['preview_token'] == before['preview_token']
+    # The full-frame correction token is source-bound, not keyed to a
+    # disposable thumbnail JPEG. The frame source proof stays identical.
+    assert shown['preview_token']
     assert shown['frame_source_token'] == before['frame_source_token']
+    assert shown['source_verification'] == 'verified'
     return before, shown, dict(edit_id='source-repair-fixture-1',
                                frame=shown['frame'], points=[
                                    [51., 75.], [126., 75.],
@@ -79,6 +89,11 @@ def test_repair_uses_verified_full_frame_and_keeps_siblings_untouched(broken_pla
     assert data['ok'] is True and data['applied'] == 1
     assert data['needs_confirmation'] is True
     assert data['verified_samples_added'] == 0
+    assert data['preview_ready'] is True
+    # The corrected exact-frame JPEG is prepared by the Save request itself.
+    # No full video SHA or FFmpeg seek should be needed to reopen it.
+    immediate = client.get(f'/api/jobs/{jid}/finding-preview/0?cache_only=1')
+    assert immediate.status_code == 200
     assert report.read_bytes() == unchanged_report, 'repair must use durable SQLite journal'
     repaired = review_journal.view(job_dir, json.loads(report.read_text()))['detections']
     assert repaired[1]['cbox'] == doc['detections'][1]['cbox']
@@ -145,6 +160,119 @@ def test_redraw_preserves_previous_track_decisions_on_other_frames(broken_plate)
     published = json.loads(report.read_text())['detections']
     assert published[1]['human_confirmation']['label'] == 'negative'
     assert published[0]['cbox'] == after[0]['cbox']
+
+
+
+def test_full_frame_get_returns_while_source_sha256_runs(broken_plate, monkeypatch):
+    """A multi-GB video hash must not occupy the full-image HTTP request."""
+    client, jid, report, _, job, doc = broken_plate
+    job.pop('_finding_source_verified', None)
+    started, release = threading.Event(), threading.Event()
+    original_sha = learning_session.sha256
+
+    def delayed_sha(path):
+        started.set()
+        if not release.wait(15):
+            raise TimeoutError('test did not release background hash')
+        return original_sha(path)
+
+    monkeypatch.setattr(learning_session, 'sha256', delayed_sha)
+    try:
+        # An uncached redraw must not inspect/recreate a compact JPEG first.
+        with monkeypatch.context() as deny:
+            deny.setattr(findings_web, 'preview',
+                         lambda *a, **kw: pytest.fail('redraw read a compact JPEG'))
+            view = client.get(f'/api/jobs/{jid}/plate-repair/0/frame')
+        assert view.status_code == 200, view.get_data(as_text=True)[:300]
+        assert started.wait(3)
+        shown = json.loads(view.headers['X-Repair-Geometry'])
+        assert shown['source_verification'] == 'pending'
+        payload = dict(edit_id='slow-hash-but-fast-image',
+                       points=[[51., 75.], [126., 75.],
+                               [126., 94.], [51., 94.]],
+                       frame=shown['frame'],
+                       preview_token=shown['preview_token'],
+                       frame_source_token=shown['frame_source_token'])
+        not_yet = client.post(f'/api/jobs/{jid}/plate-repair/0', json=payload)
+        assert not_yet.status_code == 503
+        assert 'still running' in not_yet.get_json()['error']
+        assert not review_journal.has_changes(job['dir'])
+    finally:
+        release.set()
+    for _ in range(200):
+        if job.get('_plate_repair_source_check', {}).get('status') != 'pending':
+            break
+        time.sleep(.01)
+    assert job['_plate_repair_source_check']['status'] == 'verified'
+    ready = client.post(f'/api/jobs/{jid}/plate-repair/0', json=payload)
+    assert ready.status_code == 200, ready.get_data(as_text=True)[:500]
+    assert ready.get_json()['preview_ready'] is True
+
+
+def test_thumbnail_eviction_during_full_frame_redraw_does_not_conflict(
+        broken_plate, monkeypatch):
+    client, jid, report, job_dir, job, doc = broken_plate
+    # This used to make GET rehash and regenerate the original crop, changing
+    # the modal's disposable preview_token while its source frame stayed fixed.
+    with monkeypatch.context() as deny:
+        deny.setattr(findings_web, 'preview',
+                     lambda *a, **kw: pytest.fail('redraw depends on thumbnail key'))
+        first = client.get(f'/api/jobs/{jid}/plate-repair/0/frame')
+        second = client.get(f'/api/jobs/{jid}/plate-repair/0/frame')
+    assert first.status_code == second.status_code == 200
+    one = json.loads(first.headers['X-Repair-Geometry'])
+    two = json.loads(second.headers['X-Repair-Geometry'])
+    assert one['preview_token'] == two['preview_token']
+    assert one['frame_source_token'] == two['frame_source_token']
+    data = dict(edit_id='after-cache-eviction', frame=one['frame'],
+                preview_token=one['preview_token'],
+                frame_source_token=one['frame_source_token'],
+                points=[[51., 75.], [126., 75.],
+                        [126., 94.], [51., 94.]])
+    saved = client.post(f'/api/jobs/{jid}/plate-repair/0', json=data)
+    assert saved.status_code == 200, saved.get_data(as_text=True)[:500]
+    assert saved.get_json()['preview_ready'] is True
+    assert client.get(f'/api/jobs/{jid}/finding-preview/0?cache_only=1').status_code == 200
+
+
+def test_stale_confirmed_preview_can_be_rehydrated_without_losing_repair(
+        broken_plate):
+    client, jid, report, job_dir, job, doc = broken_plate
+    _, _, payload = view_and_payload(broken_plate)
+    fixed = client.post(f'/api/jobs/{jid}/plate-repair/0', json=payload)
+    assert fixed.status_code == 200
+    current = client.get(f'/api/jobs/{jid}/finding-preview/0?cache_only=1')
+    assert current.status_code == 200
+    first = json.loads(current.headers['X-Finding-Geometry'])
+    # Simulate bounded disk-cache eviction after the human has inspected the
+    # JPEG but before clicking Is a plate.
+    dbpath = job_dir / 'compact_previews' / 'index.sqlite3'
+    with sqlite3.connect(dbpath) as db:
+        row = db.execute('SELECT length(jpeg),length(CAST(metadata AS BLOB)) '
+                         'FROM previews WHERE key=?', (first['key'],)).fetchone()
+        assert row
+        db.execute('DELETE FROM previews WHERE key=?', (first['key'],))
+        db.execute("UPDATE settings SET value=value-1 WHERE key='count'")
+        db.execute("UPDATE settings SET value=value-? WHERE key='bytes'",
+                   (sum(row),))
+    stale = client.post(f'/api/jobs/{jid}/confirm/0', json=dict(
+        label='positive', preview_token=first['preview_token'],
+        preview_key=first['key']))
+    assert stale.status_code == 409
+    assert stale.get_json()['conflict'] == 'stale_preview'
+    assert client.get(f'/api/jobs/{jid}/finding-preview/0?cache_only=1').status_code == 204
+
+    refreshed = client.get(f'/api/jobs/{jid}/finding-preview/0?exact=1&retry_decode=1')
+    assert refreshed.status_code == 200, refreshed.get_data(as_text=True)[:500]
+    latest = json.loads(refreshed.headers['X-Finding-Geometry'])
+    assert latest['frame_source_token'] == first['frame_source_token']
+    assert latest['box'] == first['box']
+    assert latest['source_repaired'] is True
+    confirmed = client.post(f'/api/jobs/{jid}/confirm/0', json=dict(
+        label='positive', preview_token=latest['preview_token'],
+        preview_key=latest['key']))
+    assert confirmed.status_code == 200, confirmed.get_data(as_text=True)[:500]
+    assert confirmed.get_json()['finding']['label'] == 'positive'
 
 
 def test_repair_is_revision_safe_and_idempotent(broken_plate):
@@ -231,6 +359,77 @@ def test_repaired_corners_remain_frame_only_on_later_drags(broken_plate):
     assert rows[1]['cbox'] == [-30, 67, 137, 103]
     assert not rows[1].get('human_region_confirmed')
 
+
+
+
+def test_refresh_picture_keep_corners_recovers_409_in_production_js():
+    """Execute the actual Review retry helper with source-safe metadata."""
+    if not shutil.which('node'):
+        pytest.skip('Node not installed')
+    js = web.APP_JS
+    helper = js[js.index('async function refreshPlateDraft(s){'):
+                js.index('function pumpPlateSaves(){')]
+    script = r"""
+const assert=require('node:assert/strict');
+const CUR='job',PLATE_EDITS=new Map(),CONFIRM_FAILED=new Map();
+let refreshes=0,retryScheduled=0,statusTexts=[],cleared=0;
+const plateCopy=points=>points.map(p=>p.slice());
+const plateSamePreviewSource=(a,b)=>a.frame_source_token===b.frame_source_token;
+const plateSameSourceFrame=(a,b)=>a.frame_source_token===b.frame_source_token;
+const plateCornersInsideCrop=(p,c)=>p.every(v=>v[0]>=c[0]&&v[0]<=c[2]&&v[1]>=c[1]&&v[1]<=c[3]);
+function plateStatus(s,msg){statusTexts.push(msg);}
+function schedulePlateSaves(){retryScheduled++;}
+function updateConfirmationIssues(){cleared++;}
+function plateUnloadGuard(){}
+const original={frame:2,box:[40,60,140,120],width:240,height:160,
+ crop:[30,50,160,130],frame_source_token:'same-source',source_repaired:true,
+ points:[[50,75],[125,75],[125,94],[50,94]]};
+const latest={...original,preview_token:'new-key',key:'new-thumbnail'};
+let shouldLoad=true;
+async function queueReviewPreview(img,priority){
+ assert(priority);refreshes++;
+ if(!shouldLoad)return false;
+ img._plateMeta=latest;
+ return true;
+}
+""" + helper + r"""
+(async()=>{
+ const img={_plateMeta:original,_forceExactPreview:false,_previewLongRetry:false};
+ const s={i:4,job:'job',img,meta:original,
+  points:[[52,76],[125,75],[125,93],[52,94]],
+  pending:{edit_id:'rejected'},dirty:true,error:{status:409},conflict:true,
+  displayCrop:original.crop,refreshBusy:false,drag:null,draw(){}};
+ PLATE_EDITS.set(4,s);
+ CONFIRM_FAILED.set(4,{status:409,details:{conflict:'stale_preview'}});
+ const originalDraft=JSON.stringify(s.points);
+ await refreshPlateDraft(s);
+ assert.equal(refreshes,1);
+ assert.equal(JSON.stringify(s.points),originalDraft,'corners were lost');
+ assert.equal(s.meta,latest);
+ assert.equal(s.pending,null);
+ assert.equal(s.error,null);
+ assert.equal(s.conflict,false);
+ assert.equal(s.dirty,true);
+ assert.equal(s.refreshBusy,false);
+ assert(img._forceExactPreview && img._previewLongRetry);
+ assert(retryScheduled>=1);
+ assert(!CONFIRM_FAILED.has(4));
+ assert(cleared>=1);
+ shouldLoad=false;
+ s.error={status:409};s.conflict=true;s.pending={edit_id:'uncertain'};
+ const preserved=JSON.stringify(s.points);
+ await refreshPlateDraft(s);
+ assert.equal(JSON.stringify(s.points),preserved,'failed reload discarded corners');
+ assert.equal(s.meta,latest,'failed reload changed source metadata');
+ assert.equal(s.img._plateMeta,latest);
+ assert(s.error&&s.conflict);
+ assert(s.dirty);
+ assert(!s.refreshBusy);
+})().catch(error=>{console.error(error);process.exitCode=1});
+"""
+    result = subprocess.run(['node', '-e', script], capture_output=True,
+                            text=True, timeout=15)
+    assert result.returncode == 0, result.stderr
 
 
 def test_real_browser_can_drag_new_box_on_bad_plate_and_confirm(review_server):
