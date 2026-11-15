@@ -406,7 +406,7 @@ class _ConfirmTrace:
             pass
 
 
-def _journal_confirm(job, index, payload, doc, trace=None):
+def _journal_confirm(job, index, payload, doc, trace=None, rebind=False):
     label = payload.get('label')
     if label not in ('positive', 'negative') or type(label) is not str:
         raise ValueError('Choose Is a … or Not a … to store a confirmed example.')
@@ -419,6 +419,17 @@ def _journal_confirm(job, index, payload, doc, trace=None):
     row = dict(doc['detections'][index])
     if payload.get('preview_token') not in (None, meta['preview_token']):
         abort(409, description='The finding changed. Reload its picture.')
+    unverified_rebound_shape = (rebind and row['category'] == 'plate'
+                                and payload.get('points') is None)
+    if unverified_rebound_shape:
+        # This Is/Not click proves only the displayed *new* source image.
+        # Never transplant corners, polygons or machine masks associated with
+        # the previously archived frame. Keep the original archived example
+        # intact; use conservative detector-box coverage on the new frame.
+        row.update(plate_quad=[], human_region_confirmed=False)
+        box = meta['box']
+        meta['points'] = [[box[0], box[1]], [box[2], box[1]],
+                          [box[2], box[3]], [box[0], box[3]]]
     fields = dict(enabled=(label == 'positive'), output_choice_explicit=True,
                   human_confirmation=dict(label=label, category=row['category'],
                                           source='explicit'))
@@ -440,6 +451,11 @@ def _journal_confirm(job, index, payload, doc, trace=None):
     if trace: trace.mark('archive')
     anchor = dict(confirmed_finding_id=entry['id'],
                   confirmed_finding_revision=entry['revision'])
+    if unverified_rebound_shape:
+        # Source-bound redaction geometry is an anchor override, never a
+        # group-wide replacement of other frames' independently saved shapes.
+        anchor.update(plate_quad=[], human_region_confirmed=False,
+                      poly=[], poly_holes=[], mask_pad=0)
     if payload.get('points') is not None:
         anchor['human_region_confirmed'] = True
     if trace: trace.enter('journal_commit')
@@ -537,7 +553,8 @@ def confirm(job, index, payload):
             # Do NOT apply this relaxation to region(): a corner drag alone
             # cannot transfer a prior human classification to a new picture.
             trace.mode = 'journal' if fast_path else 'journal_rebound'
-            return _journal_confirm(job, index, payload, journal_doc, trace)
+            return _journal_confirm(job, index, payload, journal_doc, trace,
+                                    rebind=not fast_path)
         trace.mode = 'full_report'
         # Approved sections and legacy reports missing verified source
         # metadata still require the original guarded full-report path.
