@@ -5293,6 +5293,32 @@ function updateReviewPreloadStatus(state){
   ?ready+" pictures ready · Preparing more before you scroll…"
   :"Preparing review pictures before you scroll…";
 }
+function reviewTimedOutImages(){
+ return [...document.querySelectorAll("#review img[data-preview-url]")]
+  .filter(img=>img._previewFailureType==="timeout"&&!img.closest("[hidden]"));
+}
+function updateReviewTimedOutButton(){
+ const button=document.getElementById("reviewRetryTimedOut");
+ if(!button)return;
+ const failed=reviewTimedOutImages();
+ button.hidden=failed.length===0;
+ const busy=failed.filter(img=>!!img._previewTask).length;
+ button.disabled=!!busy&&busy===failed.length;
+ button.textContent=busy
+  ?"Retrying timed-out pictures ("+failed.length+" remaining)…"
+  :"Retry timed-out pictures ("+failed.length+")";
+}
+function retryTimedOutReviewPreviews(){
+ for(const img of reviewTimedOutImages()){
+  if(img._previewTask)continue;
+  img._previewLongRetry=true;
+  img._plateMeta=null;
+  // Existing single cold-decoder lane keeps one extended attempt active
+  // at a time. Cached thumbnails continue loading separately.
+  queueReviewPreview(img,true);
+ }
+ updateReviewTimedOutButton();
+}
 function queueReviewPreview(img, priority=false){
  const state=REVIEW_MEDIA;
  if(!state||!img||!img.isConnected)return Promise.resolve(false);
@@ -5364,10 +5390,12 @@ async function loadReviewPreview(state,task,cacheOnly){
   if(status)status.textContent="";
   if(typeof reviewSimilarFingerprint==="function")reviewSimilarFingerprint(img);
   ok=true;img._previewLoaded=true;img._previewLongRetry=false;
+  img._previewFailureType=null;
   state.loadedImages.add(img);
   updateReviewPreloadStatus(state);
  }catch(error){
   if(REVIEW_MEDIA===state&&img.isConnected){
+   img._previewFailureType=error.status===504?"timeout":null;
    if(error.status===503&&(task.busyRetries||0)<2){
     task.busyRetries=(task.busyRetries||0)+1;
     task.readyAt=Date.now()+250*2**task.busyRetries;retryBusy=true;
@@ -5394,6 +5422,7 @@ async function loadReviewPreview(state,task,cacheOnly){
    if(task.priority)queue.unshift(task);else queue.push(task);
   }else{img._previewTask=null;task.resolve(ok);}
   pumpReviewPreviews(state);
+  updateReviewTimedOutButton();
  }
 }
 function reviewPreviewRank(task){
@@ -6544,6 +6573,8 @@ async function loadReview(signal=null,phase=SHELLPH){
   <button type="button" class="sec" onclick="reviewUncertain()">Review 10% of plate groups</button>
   <button type="button" class="sec" id="reviewSimilarToggle" onclick="toggleReviewSimilarity()">Group similar pictures</button>
   <button type="button" id="reviewShowAll" class="sec" hidden onclick="reviewAllFindings()">Show all findings</button>
+  <button type="button" id="reviewRetryTimedOut" class="sec" hidden
+   onclick="retryTimedOutReviewPreviews()">Retry timed-out pictures</button>
  </div>
  <div class="row" style="margin-bottom:10px;align-items:center">
   <label for="reviewStatusFilter">Show findings</label>
