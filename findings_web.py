@@ -88,8 +88,8 @@ def _token(doc, row, frame, sample_key=None):
     return hashlib.sha256(json.dumps(value, sort_keys=True).encode()).hexdigest()
 
 
-def _cold_frame(job,doc,row,frame):
-    """Bind a cold crop to verified bytes once per source file identity."""
+def _cold_frame(job,doc,row,frame,box,points,long_retry=False):
+    """Decode only a source-verified original-frame crop, not a full 4K PPM."""
     if not _web._REVIEW_WORK_LOCK.acquire(blocking=False):
         abort(503,description='Another preview is decoding. Retry shortly.')
     try:
@@ -112,6 +112,11 @@ def _cold_frame(job,doc,row,frame):
         source_identity = doc.get('source_identity') or {}
         if any(source_identity.get(key) not in (None,info[key]) for key in ('width','height')):
             raise library.ConflictError('The source dimensions differ from the saved review timeline. Rescan before creating new previews.')
+        # Compute and validate the crop using original source dimensions
+        # BEFORE requesting pixels. The JPEG and metadata retain original
+        # coordinates, so a manually drawn quad remains frame-bound.
+        crop = _web._plate_editor_crop(box, points, info['width'], info['height'])
+        budget = 60 if long_retry else None
         approximate = row.get('frame_index',-1) < 0 and not info['cfr']
         source = dict(sha256=verified['sha256'],timing='timestamp' if approximate else 'frame')
         if approximate:
@@ -119,19 +124,21 @@ def _cold_frame(job,doc,row,frame):
             # timestamp seeking established an exact source frame for training.
             tref = min(max(float(row.get('last_seen',row['t_start'])),float(row['t_start'])),float(row['t_end']))
             source['requested_time'] = tref
-            pixels = _web._frame_at(job,tref,rs,None)
+            pixels = _web._frame_at(job,tref,rs,None,
+                                    crop=crop,decode_timeout=budget)
         else:
-            pixels = _web._frame_at(job,frame/float(rs['fps']),rs,frame)
+            pixels = _web._frame_at(job,frame/float(rs['fps']),rs,frame,
+                                    crop=crop,decode_timeout=budget)
         if _web._video_identity(job['video']) != identity:
             job.pop('_finding_source_verified',None)
             raise library.ConflictError('The source changed while reading this preview. Retry with the original video.')
-        return pixels,source
+        return pixels,source,crop,info['width'],info['height']
     finally:
         _web._REVIEW_WORK_LOCK.release()
 
 
 def preview(job, index, doc=None, cache_only=False, preferred_key=None,
-            exact_only=False):
+            exact_only=False, retry_decode=False):
     """Return source geometry and compact pixels; a warm read never opens video."""
     doc = doc if doc is not None else _web._load_preview_report(job)
     if not 0 <= index < len(doc.get('detections', [])):
@@ -172,18 +179,16 @@ def preview(job, index, doc=None, cache_only=False, preferred_key=None,
     if cached is None:
         # Legacy jobs may need one bounded CPU decode. All subsequent thumbnail,
         # confirmation and area-editor requests share this compact cache.
-        pixels, source = _cold_frame(job,doc,row,frame)
+        pixels,source,crop,w,h = _cold_frame(
+            job,doc,row,frame,box,points,long_retry=retry_decode)
         if pixels is None:
             abort(404, description='Source frame is unavailable and has no saved preview.')
-        h,w = pixels.shape[:2]
-        crop = _web._plate_editor_crop(box, points, w, h)
-        x1,y1,x2,y2 = crop
         meta = dict(width=w, height=h, crop=crop, box=box, points=points,
                     frame=frame, t=frame/float(rs['fps']), fps=float(rs['fps']),
                     source=source,
                     track=row.get('track', -1))
         cached = _web._serialize_review_read(previews.store)(
-            job['dir'], cache_row, rs, meta, pixels[y1:y2,x1:x2])
+            job['dir'], cache_row, rs, meta, pixels)
     meta, jpeg = cached
     source = meta.get('source') or {}
     exact = source.get('timing') != 'timestamp'
@@ -824,7 +829,8 @@ def install(app, web):
     def finding_preview(jid,index):
         result = preview(_job(jid),index,
                          cache_only=request.args.get('cache_only')=='1',
-                         exact_only=request.args.get('exact')=='1')
+                         exact_only=request.args.get('exact')=='1',
+                         retry_decode=request.args.get('retry_decode')=='1')
         if result is None:
             return Response(status=204,headers={'Cache-Control':'no-store'})
         _,_,meta,jpeg = result

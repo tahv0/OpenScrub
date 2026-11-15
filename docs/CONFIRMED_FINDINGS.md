@@ -146,6 +146,27 @@ edit. This dismisses that rejected action while preserving your other work.
 Changes to the library do not globally rewrite existing independent job review
 decisions.
 
+## Recover a timed-out saved picture
+
+Review normally uses compact scan-time JPEGs without reopening the source
+video. If a requested frame has no cached JPEG, the bounded source reader
+decodes **only its source-coordinate crop** instead of transporting a full
+uncompressed 4K frame. Its original frame PTS is verified before the crop
+can become a Review image or confirmed training example. A picture from
+the wrong frame, crop, video or source timeline is never substituted.
+
+An uncached decoder has a normal 10-second limit. If it reports HTTP 504,
+the card shows **Retry preview (up to 60s)**; the reviewer may also select
+**Retry timed-out pictures** to queue the currently visible failures in one
+click, using only one cold source decoder at a time. These user-initiated
+retries have a bounded 60-second deadline and do not change automatic blur
+coverage, the detector group, draft corners or the human classification.
+Successful crops are persisted to the existing compact-preview cache, so
+subsequent Review visits can use the JPEG without reopening video.
+If the longer decode fails, the card reports that a seekable normalized
+source copy may be required. A failed image remains unconfirmed for training
+and does **not** imply a false positive.
+
 ## Resolve blocked review saves before rendering or learning
 
 An unsuccessful **Is a … / Not a …** confirmation is different from an

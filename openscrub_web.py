@@ -1993,14 +1993,26 @@ def review_error(error):
     return response
 
 
-def _review_process(command):
+def _review_process(command, timeout=None):
+    # Normal reads retain the 10-second bounded decoder. A *user-initiated*
+    # long retry gets one longer deadline, not an unbounded worker. ffprobe
+    # and other consumers keep their original short timeout.
+    deadline = _REVIEW_TIMEOUT if timeout is None else max(
+        _REVIEW_TIMEOUT, min(60.0, float(timeout)))
     try:
         result = subprocess.run(command, capture_output=True,
-                                timeout=_REVIEW_TIMEOUT)
+                                timeout=deadline)
     except subprocess.TimeoutExpired:
-        diagnostics.exception("preview_process_timeout", tool=os.path.basename(str(command[0])), timeout_seconds=_REVIEW_TIMEOUT)
-        abort(504, description="Preview decoding timed out. Retry this finding; "
-              "a video with very sparse keyframes may need a seekable scan copy.")
+        diagnostics.exception("preview_process_timeout",
+                              tool=os.path.basename(str(command[0])),
+                              timeout_seconds=deadline)
+        abort(504, description=(
+            "This source frame still cannot be decoded within the longer "
+            "60-second attempt. The original detection keeps its automatic "
+            "protection; a seekable normalized source copy may be needed."
+            if deadline > _REVIEW_TIMEOUT else
+            "Preview decoding timed out after 10 seconds. Use Retry preview "
+            "to attempt one longer, bounded exact-frame decode."))
     except OSError:
         diagnostics.exception("preview_process_start_failed", tool=os.path.basename(str(command[0])))
         abort(503, description="FFmpeg and ffprobe are required for review previews.")
@@ -2039,7 +2051,7 @@ def _review_probe(path, identity):
     return info
 
 
-def _read_review_frame(path, index, exact=True):
+def _read_review_frame(path, index, exact=True, crop=None, decode_timeout=None):
     """Accurate seek on the CFR scan video, verified by the decoded frame PTS.
 
     Indexed/narrow review requires normalized CFR input. Refuse unverifiable
@@ -2054,11 +2066,19 @@ def _read_review_frame(path, index, exact=True):
         abort(423)
     identity = _video_identity(path)
     key = identity + ("frame" if exact else "time", index)
+    def from_cached(frame):
+        if crop is None:
+            return frame.copy()
+        x1, y1, x2, y2 = crop
+        if not (0 <= x1 < x2 <= frame.shape[1] and
+                0 <= y1 < y2 <= frame.shape[0]):
+            abort(422, description="Preview crop is outside source frame.")
+        return frame[y1:y2, x1:x2].copy()
     with _REVIEW_CACHE_LOCK:
         cached = _REVIEW_FRAMES.get(key)
         if cached is not None:
             _REVIEW_FRAMES.move_to_end(key)
-            return cached.copy()  # callers may paint a mask on their image
+            return from_cached(cached)  # original full-frame cache is read-only
     if not _REVIEW_WORK_LOCK.acquire(blocking=False):
         abort(503, description="Another preview is decoding. Retry this finding.")
     try:
@@ -2067,20 +2087,35 @@ def _read_review_frame(path, index, exact=True):
         with _REVIEW_CACHE_LOCK:
             cached = _REVIEW_FRAMES.get(key)
             if cached is not None:
-                return cached.copy()
+                return from_cached(cached)
         info = _review_probe(path, identity)
         if exact and not info["cfr"]:
             abort(422, description="Exact review needs a constant-frame-rate scan copy.")
+        # Pixel-space crop is taken *after* showinfo measures the original
+        # frame PTS, never before source identity verification. Cropping before
+        # the PPM pipe avoids transporting full 4K RGB frames for tiny cards.
+        if crop is not None:
+            x1, y1, x2, y2 = crop
+            if (not all(isinstance(v, int) for v in crop) or
+                    not (0 <= x1 < x2 <= info["width"] and
+                         0 <= y1 < y2 <= info["height"])):
+                abort(422, description="Preview crop is outside source frame.")
+            video_filter = ("showinfo,format=rgb24,crop=w=%d:h=%d:x=%d:y=%d:exact=1"
+                            % (x2-x1, y2-y1, x1, y1))
+        else:
+            video_filter = "showinfo"
         # Seek slightly before the target to avoid rounding it to the next frame.
         target = max(0.0, (index-.1) / info["fps"]) if exact else index
         # PPM transports lossless pixels without compressing a full 4K PNG
         # just to decode it again before extracting a small plate crop.
-        result = _review_process([
+        command = [
             "ffmpeg", "-hide_banner", "-loglevel", "info", "-nostdin",
             "-threads", "1", "-filter_threads", "1", "-copyts", "-ss", "%.9f" % target,
             "-i", path, "-map", "0:v:0", "-an", "-sn",
-            "-vf", "showinfo", "-frames:v", "1", "-vsync", "0",
-            "-threads", "1", "-f", "image2pipe", "-vcodec", "ppm", "pipe:1"])
+            "-vf", video_filter, "-frames:v", "1", "-vsync", "0",
+            "-threads", "1", "-f", "image2pipe", "-vcodec", "ppm", "pipe:1"]
+        result = (_review_process(command) if decode_timeout is None
+                  else _review_process(command, timeout=decode_timeout))
         log = result.stderr.decode("utf-8", errors="replace")
         match = re.search(r"\bn:\s*0\s+pts:\s*(-?\d+)\s+pts_time:", log)
         timebase = re.search(r"config in time_base:\s*(\d+/\d+)", log)
@@ -2095,6 +2130,12 @@ def _read_review_frame(path, index, exact=True):
         frame = cv2.imdecode(np.frombuffer(result.stdout, np.uint8), cv2.IMREAD_COLOR)
         if frame is None:
             return None
+        if crop is not None:
+            # The filter must return precisely the requested source-space
+            # geometry. Never save or label a padded/shrunk/shifted crop.
+            if frame.shape[:2] != (y2-y1, x2-x1):
+                abort(422, description="Exact source crop dimensions differ.")
+            return frame
         with _REVIEW_CACHE_LOCK:
             if frame.nbytes <= _REVIEW_FRAME_BYTES:
                 _REVIEW_FRAMES[key] = frame
@@ -2105,16 +2146,19 @@ def _read_review_frame(path, index, exact=True):
         _REVIEW_WORK_LOCK.release()
 
 
-def _read_exact_frame(path, index):
-    return _read_review_frame(path, index, exact=True)
+def _read_exact_frame(path, index, *, crop=None, decode_timeout=None):
+    return _read_review_frame(path, index, exact=True,
+                              crop=crop, decode_timeout=decode_timeout)
 
 
-def _frame_at(job, t, rstate, frame_index=None):
+def _frame_at(job, t, rstate, frame_index=None, *, crop=None, decode_timeout=None):
     if frame_index is not None:
-        return _read_exact_frame(job["video"], frame_index)
-    # Legacy, time-based findings may come from deliberately unnormalized VFR.
-    # Keep that path timestamp-based; indexed review remains strictly verified.
-    return _read_review_frame(job["video"], max(0.0, float(t)), exact=False)
+        return _read_exact_frame(job["video"], frame_index,
+                                 crop=crop, decode_timeout=decode_timeout)
+    # Legacy VFR requests remain timestamp-based and are not classified as
+    # exact-frame training examples.
+    return _read_review_frame(job["video"], max(0.0, float(t)), exact=False,
+                              crop=crop, decode_timeout=decode_timeout)
 
 
 @app.route("/api/jobs/<jid>/mediainfo")
@@ -5250,6 +5294,34 @@ function updateReviewPreloadStatus(state){
   ?ready+" pictures ready · Preparing more before you scroll…"
   :"Preparing review pictures before you scroll…";
 }
+function reviewTimedOutImages(){
+ if(typeof document.querySelectorAll!=="function")return [];
+ return [...document.querySelectorAll("#review img[data-preview-url]")]
+  .filter(img=>img._previewFailureType==="timeout"&&!img.closest("[hidden]"));
+}
+function updateReviewTimedOutButton(){
+ if(typeof document.getElementById!=="function")return;
+ const button=document.getElementById("reviewRetryTimedOut");
+ if(!button)return;
+ const failed=reviewTimedOutImages();
+ button.hidden=failed.length===0;
+ const busy=failed.filter(img=>!!img._previewTask).length;
+ button.disabled=!!busy&&busy===failed.length;
+ button.textContent=busy
+  ?"Retrying timed-out pictures ("+failed.length+" remaining)…"
+  :"Retry timed-out pictures ("+failed.length+")";
+}
+function retryTimedOutReviewPreviews(){
+ for(const img of reviewTimedOutImages()){
+  if(img._previewTask)continue;
+  img._previewLongRetry=true;
+  img._plateMeta=null;
+  // Existing single cold-decoder lane keeps one extended attempt active
+  // at a time. Cached thumbnails continue loading separately.
+  queueReviewPreview(img,true);
+ }
+ updateReviewTimedOutButton();
+}
 function queueReviewPreview(img, priority=false){
  const state=REVIEW_MEDIA;
  if(!state||!img||!img.isConnected)return Promise.resolve(false);
@@ -5281,8 +5353,10 @@ async function loadReviewPreview(state,task,cacheOnly){
  let missing=false,retryBusy=false,ok=false,url=null;
  try{
   const original=img.dataset.previewUrl;
-  const base=img._forceExactPreview?
+  const originalWithFrame=img._forceExactPreview?
    original+(original.includes("?")?"&":"?")+"exact=1":original;
+  const base=img._previewLongRetry?
+   originalWithFrame+(originalWithFrame.includes("?")?"&":"?")+"retry_decode=1":originalWithFrame;
   const target=cacheOnly?base+(base.includes("?")?"&":"?")+"cache_only=1":base;
   const {response,data}=await reviewRequest(target,{signal:ctl.signal,timeoutMs:cacheOnly?15000:120000},"blob");
   if(REVIEW_MEDIA!==state||!img.isConnected)return;
@@ -5318,30 +5392,40 @@ async function loadReviewPreview(state,task,cacheOnly){
   }
   if(status)status.textContent="";
   if(typeof reviewSimilarFingerprint==="function")reviewSimilarFingerprint(img);
-  ok=true;img._previewLoaded=true;
+  ok=true;img._previewLoaded=true;img._previewLongRetry=false;
+  img._previewFailureType=null;
   state.loadedImages.add(img);
   updateReviewPreloadStatus(state);
  }catch(error){
   if(REVIEW_MEDIA===state&&img.isConnected){
+   img._previewFailureType=error.status===504?"timeout":null;
    if(error.status===503&&(task.busyRetries||0)<2){
     task.busyRetries=(task.busyRetries||0)+1;
     task.readyAt=Date.now()+250*2**task.busyRetries;retryBusy=true;
     if(status)status.textContent="Decoder busy — retrying preview…";
     return;
    }
-   if(status)status.textContent=error.name==="AbortError"
-    ?"Preview timed out. Retry when ready.":"Preview unavailable: "+error.message;
-   if(retry){retry.hidden=false;retry.textContent="Retry preview";}
+   if(status)status.textContent=error.status===504
+    ?(img._previewLongRetry
+      ?"Exact source preview still timed out after the extended attempt. Automatic redaction remains enabled unless deliberately changed."
+      :"Source frame took too long to decode. Retry preview for a longer attempt.")
+    :error.name==="AbortError"?"Preview timed out. Retry when ready."
+    :"Preview unavailable: "+error.message;
+   if(retry){retry.hidden=false;retry.textContent=error.status===504
+    ?"Retry preview (up to 60s)":"Retry preview";}
   }
  }finally{
   if(url){state.urls.delete(url);URL.revokeObjectURL(url);}
   state[counter]--;state.controllers.delete(ctl);
   if((missing||retryBusy)&&REVIEW_MEDIA===state&&img.isConnected){
-   if(missing&&status)status.textContent="Loading source preview…";
+   if(missing&&status)status.textContent=img._previewLongRetry
+    ?"Loading source preview with a longer, bounded decode…"
+    :"Loading source preview…";
    const queue=retryBusy&&cacheOnly?state.cacheQueue:state.queue;
    if(task.priority)queue.unshift(task);else queue.push(task);
   }else{img._previewTask=null;task.resolve(ok);}
   pumpReviewPreviews(state);
+  updateReviewTimedOutButton();
  }
 }
 function reviewPreviewRank(task){
@@ -5480,7 +5564,11 @@ function loadExactReviewFrame(button){
 function retryReviewPreview(button){
  const img=button.closest(".det").querySelector("img[data-preview-url]");
  if(img){
-  button.disabled=true;button.textContent="Loading preview…";
+  // A normal cold decode has a strict 10s FFmpeg deadline. Do not repeat
+  // the exact same doomed attempt: on an explicit click, use one bounded 60s
+  // original-frame crop decode instead, with the SAME source-PTS checks.
+  img._previewLongRetry=true;
+  button.disabled=true;button.textContent="Loading source crop (longer attempt)…";
   img._plateMeta=null;
   queueReviewPreview(img,true).finally(()=>{if(button.isConnected)button.disabled=false;});
  }
@@ -6564,6 +6652,8 @@ async function loadReview(signal=null,phase=SHELLPH){
   <button type="button" class="sec" onclick="reviewUncertain()">Review 10% of plate groups</button>
   <button type="button" class="sec" id="reviewSimilarToggle" onclick="toggleReviewSimilarity()">Group similar pictures</button>
   <button type="button" id="reviewShowAll" class="sec" hidden onclick="reviewAllFindings()">Show all findings</button>
+  <button type="button" id="reviewRetryTimedOut" class="sec" hidden
+   onclick="retryTimedOutReviewPreviews()">Retry timed-out pictures</button>
  </div>
  <div class="row" style="margin-bottom:6px;align-items:center;flex-wrap:wrap;gap:8px 12px">
   <label for="reviewStatusFilter">Review status</label>
