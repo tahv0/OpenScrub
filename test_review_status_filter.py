@@ -25,7 +25,7 @@ def test_needs_review_hides_handled_and_preserves_unsaved_corner_drafts(review_s
         control = page.locator("#reviewStatusFilter")
         control.wait_for()
         assert page.locator('#review .det').count() == 90
-        assert "Needs review (90)" == control.locator('option[value="unreviewed"]').inner_text()
+        assert "Needs review (90)" == control.locator('option[value="unreviewed"]').text_content()
 
         control.select_option("unreviewed")
         card = page.locator("#det0")
@@ -40,10 +40,10 @@ def test_needs_review_hides_handled_and_preserves_unsaved_corner_drafts(review_s
         control.select_option("reviewed")
         assert card.is_visible()
         assert page.locator("#det1").is_hidden()
-        original = card.evaluate("(el)=>el")
+        page.evaluate('window.__originalCard0=document.getElementById("det0")')
         control.select_option("pending")
         assert card.is_hidden()
-        assert control.locator('option[value="pending"]').inner_text() == "Unsaved / failed (0)"
+        assert control.locator('option[value="pending"]').text_content() == "Unsaved / failed (0)"
 
         # Failed corner autosaves MUST surface in Needs review even for a
         # previously handled group, and retain the same in-memory editor.
@@ -62,11 +62,11 @@ def test_needs_review_hides_handled_and_preserves_unsaved_corner_drafts(review_s
         control.select_option("unreviewed")
         page.wait_for_function('!document.querySelector("#det0").hidden')
         assert page.evaluate("PLATE_EDITS.get(0).dirty") is True
-        assert control.locator('option[value="pending"]').inner_text() == "Unsaved / failed (1)"
+        assert control.locator('option[value="pending"]').text_content() == "Unsaved / failed (1)"
 
         control.select_option("all")
         assert card.is_visible()
-        assert card.evaluate("(el)=>el") == original
+        assert page.evaluate('document.getElementById("det0")===window.__originalCard0')
         assert not errors, errors
         browser.close()
 
@@ -85,6 +85,9 @@ def test_lazy_filter_can_find_unmounted_handled_groups_without_loading_all(revie
         browser = browser_instance(pw)
         page = browser.new_page(viewport={"width": 1440, "height": 1000})
         page.set_default_timeout(20000)
+        # Keep the automatic load-more observer from pre-mounting every card.
+        page.add_init_script("window.IntersectionObserver=undefined")
+        page.evaluate("window.IntersectionObserver=undefined")
         errors = []
         page.on("pageerror", lambda e: errors.append(str(e)))
         load_browser_page(page, url, [], [])
@@ -100,7 +103,7 @@ def test_lazy_filter_can_find_unmounted_handled_groups_without_loading_all(revie
         page.wait_for_function('!!document.querySelector("#det450")')
         assert page.locator("#det450").is_visible()
         assert page.locator("#det0").is_hidden()
-        assert control.locator('option[value="reviewed"]').inner_text() == "Handled (1)"
+        assert control.locator('option[value="reviewed"]').text_content() == "Handled (1)"
         assert page.locator('[data-review-category="plate"] .det').count() < 60
 
         control.select_option("unreviewed")
