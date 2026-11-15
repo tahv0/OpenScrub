@@ -68,7 +68,7 @@ def test_uncached_exact_preview_is_cropped_and_retains_source_dimensions(
         assert meta["classification_allowed"] is True
         assert len(calls) == 1
         assert calls[0]["frame"] == 299
-        assert calls[0]["crop"] == tuple(meta["crop"])
+        assert list(calls[0]["crop"]) == meta["crop"]
         assert calls[0]["decode_timeout"] is None
         # Once the exact crop has been cached, even a subsequent old cached
         # neighbor or transient decoder failure cannot replace its identity.
@@ -218,7 +218,8 @@ def test_one_click_recovers_multiple_timed_out_cards_without_implicit_choices(
           return a?.frame===299&&b?.frame===298;
         }""")
         assert all_retry.is_hidden()
-        assert sorted(calls) == [(298, None), (298, 60), (299, None), (299, 60)]
+        assert len(calls) == 4
+        assert set(calls) == {(298, None), (298, 60), (299, None), (299, 60)}
         assert page.evaluate("REVIEW_VERSION") == 0
         assert page.evaluate("EN[0]") is True
         assert page.evaluate("EN[1]") is True
