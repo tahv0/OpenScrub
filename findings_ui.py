@@ -16,7 +16,12 @@ CSS = r"""
 #findingsview input[type=checkbox]{width:18px;height:18px;flex:0 0 auto;accent-color:#2563eb}
 .findings-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px;margin:14px 0}
 .finding-card{border:1px solid #334155;border-radius:9px;min-width:0;overflow:hidden;background:var(--bg)}
-.finding-card img{display:block;width:100%;height:118px;object-fit:contain;background:#0b1220}
+.finding-card-picture{position:relative;height:118px;background:#0b1220}
+.finding-card-picture img{display:block;width:100%;height:100%;object-fit:contain}
+.finding-card-picture svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.finding-detector-box{fill:none;stroke:#eab308;stroke-width:1.7;stroke-dasharray:5 3;vector-effect:non-scaling-stroke}
+.finding-human-quad{fill:#22c55e20;stroke:#22c55e;stroke-width:2.3;vector-effect:non-scaling-stroke}
+.finding-geometry-note{display:block;font-size:11px;color:var(--mut);margin-top:6px}
 .finding-body{padding:10px;font-size:13px;overflow-wrap:anywhere}
 .finding-body strong{display:block;margin-bottom:5px}.finding-label{display:block;color:#bfdbfe;margin:7px 0;font-weight:600}
 .finding-body label{display:flex;align-items:center;gap:8px;margin:9px 0}
@@ -29,7 +34,7 @@ CSS = r"""
 .finding-corners label{display:flex;align-items:center;gap:6px;font-size:12px;min-width:0}.finding-corners input{width:70px!important}
 .findings-license{display:flex;align-items:flex-start;gap:9px;font-size:13px;line-height:1.5;margin:14px 0}
 .pending-findings{margin:16px 0;padding:16px}.pending-findings .findings-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr));max-height:400px;overflow:auto}.pending-findings img{height:88px}
-@media(max-width:500px){#findingsview{padding:0 10px 20px}#findingsview .card{padding:13px}.findings-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.finding-card img{height:95px}.finding-body{padding:8px;font-size:12px}.finding-corners{grid-template-columns:1fr}.findings-row>*{max-width:100%}}
+@media(max-width:500px){#findingsview{padding:0 10px 20px}#findingsview .card{padding:13px}.findings-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.finding-card-picture{height:95px}.finding-body{padding:8px;font-size:12px}.finding-corners{grid-template-columns:1fr}.findings-row>*{max-width:100%}}
 """
 
 HTML = r"""
@@ -42,8 +47,8 @@ HTML = r"""
    <label>Category<select id="findingsCategory"><option value="">All categories</option><option value="plate">Plate</option><option value="face">Face</option><option value="person">Person</option><option value="text">Text</option></select></label>
    <label>Confirmation<select id="findingsLabel"><option value="">Positive and negative</option><option value="positive">Positive — Is a …</option><option value="negative">Negative — Not a …</option></select></label>
   </div>
-  <div class="findings-row"><button type="button" class="sec" id="findingsRefresh">Refresh findings</button><button type="button" class="sec" id="findingsSelectPage">Select plate examples on this page</button><button type="button" class="sec" id="findingsClear">Clear selection</button></div>
-  <p id="findingsStatus" class="findings-note" role="status" aria-live="polite"></p>
+  <div class="findings-row"><button type="button" class="sec" id="findingsRefresh">Refresh findings</button><button type="button" class="sec" id="findingsSelectPage">Select plate examples on this page</button><button type="button" class="sec" id="findingsSelectAll">Select all matching plate examples</button><button type="button" class="sec" id="findingsClear">Clear selection</button></div>
+  <p id="findingsStatus" class="findings-note" role="status" aria-live="polite"></p><p class="findings-copy">Gallery outlines: dashed yellow = original detector box; solid green = saved, human-confirmed four-corner geometry. Outlines sit over the unaltered JPEG and are not painted into training pixels.</p>
   <div id="findingsList" class="findings-grid"></div>
   <div class="findings-row"><button type="button" class="sec" id="findingsPrevious">Previous page</button><span id="findingsPage" class="findings-copy"></span><button type="button" class="sec" id="findingsNext">Next page</button></div>
  </div>
@@ -63,15 +68,35 @@ HTML = r"""
 
 SCRIPT = r"""
 // Confirmed library state is independent of the currently opened scan job.
-const FINDINGS={offset:0,limit:24,total:0,items:[],selected:new Map(),request:0,editorRequest:0,editor:null,bound:false,training:false,parentRequest:0};
+const FINDINGS={offset:0,limit:24,total:0,items:[],selected:new Map(),scope:null,selectionRequest:0,request:0,editorRequest:0,editor:null,bound:false,training:false,parentRequest:0};
 const FINDINGS_QUEUES=new Map();
 function findingEscape(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function findingTime(value){const n=Number(value);return Number.isFinite(n)?n.toFixed(2)+' s':'Unknown time';}
 function findingLabel(item){return (item.label==='positive'?'Confirmed ':'Not a ')+(item.category||'finding');}
 function findingImageURL(id){return 'api/findings/'+encodeURIComponent(id)+'/image';}
+function findingInScope(item, scope=FINDINGS.scope){
+ return !!(scope&&item.category==='plate'&&(!scope.video_id||item.video_id===scope.video_id)&&(!scope.label||item.label===scope.label));
+}
+function findingIsSelected(item){
+ return FINDINGS.selected.has(item.id)||(findingInScope(item)&&!FINDINGS.scope.excluded.has(item.id));
+}
+function findingGalleryShape(item){
+ if(item.category!=='plate')return '';
+ const crop=item.crop?.box,box=item.box;
+ if(!Array.isArray(crop)||crop.length!==4||!Array.isArray(box)||box.length!==4)return '';
+ const cc=crop.map(Number),bb=box.map(Number);
+ if([...cc,...bb].some(n=>!Number.isFinite(n))||cc[2]<=cc[0]||cc[3]<=cc[1])return '';
+ const rect='<rect class="finding-detector-box" x="'+bb[0]+'" y="'+bb[1]+'" width="'+(bb[2]-bb[0])+'" height="'+(bb[3]-bb[1])+'"></rect>';
+ const raw=item.shape_confirmed===true&&Array.isArray(item.points)&&item.points.length===4?item.points:null;
+ const points=raw&&raw.every(p=>Array.isArray(p)&&p.length===2&&p.every(n=>Number.isFinite(Number(n))))?raw.map(p=>p.map(Number)):null;
+ const quad=points?'<polygon class="finding-human-quad" points="'+points.map(p=>p.join(',')).join(' ')+'"></polygon>':'';
+ const name=points?'Human-confirmed corners and original detector box':'Original detector box';
+ return '<svg viewBox="'+cc[0]+' '+cc[1]+' '+(cc[2]-cc[0])+' '+(cc[3]-cc[1])+'" preserveAspectRatio="xMidYMid meet" role="img" aria-label="'+name+'">'+rect+quad+'</svg>';
+}
 function findingCard(item){
- const id=findingEscape(item.id),plate=item.category==='plate';
- return `<article class="finding-card" data-finding="${id}"><img loading="lazy" decoding="async" src="${findingEscape(findingImageURL(item.id))}" alt="Saved ${findingEscape(item.category)} finding"><div class="finding-body"><strong>${findingEscape(item.video?.name||'Video')}</strong><span>Frame ${findingEscape(item.frame)} · ${findingTime(item.time)}</span><span class="finding-label">${findingEscape(findingLabel(item))}</span>${plate?`<label><input type="checkbox" data-select-finding="${id}" ${FINDINGS.selected.has(item.id)?'checked':''}>Use for plate training</label>`:'<p class="findings-copy">Stored confirmation; plate training only.</p>'}<button type="button" class="sec" data-edit-finding="${id}">Edit confirmation</button></div></article>`;
+ const id=findingEscape(item.id),plate=item.category==='plate',human=plate&&item.shape_confirmed===true&&Array.isArray(item.points)&&item.points.length===4;
+ const geometry=plate?'<span class="finding-geometry-note">'+(human?'Human-confirmed corners (green) + detector box (yellow)':'Original detector box (yellow)')+'</span>':'';
+ return `<article class="finding-card" data-finding="${id}"><div class="finding-card-picture"><img loading="lazy" decoding="async" src="${findingEscape(findingImageURL(item.id))}" alt="Saved ${findingEscape(item.category)} finding">${findingGalleryShape(item)}</div><div class="finding-body"><strong>${findingEscape(item.video?.name||'Video')}</strong><span>Frame ${findingEscape(item.frame)} · ${findingTime(item.time)}</span><span class="finding-label">${findingEscape(findingLabel(item))}</span>${geometry}${plate?`<label><input type="checkbox" data-select-finding="${id}" ${findingIsSelected(item)?'checked':''}>Use for plate training</label>`:'<p class="findings-copy">Stored confirmation; plate training only.</p>'}<button type="button" class="sec" data-edit-finding="${id}">Edit confirmation</button></div></article>`;
 }
 function findingNotice(id,message,error=false){const node=document.getElementById(id);if(node){node.textContent=message;node.classList.toggle('findings-error',error);}}
 function findingSelection(){
