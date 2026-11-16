@@ -253,6 +253,32 @@ That workflow also accepts an optional **Training run name** and retains a
 successfully published candidate as a named model. See
 [Video-specific learning](VIDEO_LEARNING.md) for its acceptance rules.
 
+### Recover a completed model after a publication error
+
+Large named-model selections formerly wrote every selected finding/revision to
+the small candidate run receipt. With thousands of confirmations, **Model file
+exceeds its size limit** could occur *after* ONNX export succeeded. This is a
+run-metadata limit, not the 256 MiB ONNX model package limit. No model is
+automatically activated; the trained candidate remains in that failed job.
+
+The failed model-training job now offers **Finish existing trained candidate
+(no retraining)**. It reopens exactly one completed candidate, verifies the
+original frozen selected revisions, training/validation split, artifact
+hashes and held-out assessment, then saves the model with its locally
+trainable checkpoint in the model library. It does not run new training epochs
+or scan the source video. Missing, modified or incomplete candidate files are
+rejected without deleting the saved training pass.
+
+Keep the failed model-training job and its private learning directory until
+the model has been finalized. The original data mount and vault must remain
+available. Later changes to confirmed findings do not silently change the
+frozen training dataset.
+
+New training receipts store only a count and SHA-256 digest of the selected
+revisions; the full frozen revision map remains in the private job request
+and immutable corpus. Older large receipts remain readable within a separate
+bounded limit.
+
 Training starts only when you request it. Clicking Is/Not accumulates evidence;
 it does not retrain in the background after every click. Each request freezes
 the chosen revisions, so a correction or forgotten example made before the
