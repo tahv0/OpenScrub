@@ -94,6 +94,38 @@ Preserve upstream defaults, entry points, security refreshes, declared Python fl
 - [ ] **V:** Run `python -m pytest test_openscrub.py tests/test_review_render_alignment.py -q`, build, affected browser checks and real synthetic SDR/HDR render where applicable.
 - [ ] **D/R/L:** PR lead names the exact visible mismatch and affected setting/frame case. Include before/after synthetic evidence and preserve default output elsewhere. Declare any helper later used by P17 rather than bundling that feature now.
 
+### P16A — cover every affected HDR chroma cell
+
+**What / why:** Map the existing luma mask onto the global 4:2:0 grid by including every chroma cell touched by a covered luma pixel. Nearest-neighbor resizing misses cells at sparse/diagonal edges and odd origins. Research reproduced misses in 26 of 48 ordinary mask cases and in the exact bytes sent to an actual HDR encoder; luma coverage was unchanged.
+
+**When:** Independent W3 bugfix, eligible earlier now that the actual render reproduction exists. It needs no compound-mask schema, plate-quad feature or custom model.
+
+- [ ] **I:** Add an independent touched-cell oracle and sparse/edge regressions, including all origin parities, odd ROI sizes, clipping/frame edges and current padding. Retain the filled-square control, which alone also passes the old implementation.
+- [ ] **I/V:** Change only chroma mapping in the existing owner; preserve luma, unrelated chroma cells, selected fill mode and current face/padding defaults. Check every supported mode and actual synthetic SDR/HDR paths, then run the suite/build.
+- [ ] **D/R/L:** Explain the exact subsampling error and unchanged luma coverage. Use pre-encode planes for exact mask evidence and output probes for format/signalling; lossy decoded pixels do not prove exact coverage or a visible privacy leak. Keep geometry validation separate.
+
+### P16B — retain the known-box fallback for invalid polygons
+
+**What / why:** For a valid finite positive box, malformed/nonfinite or degenerate polygon data should use the existing full-box fallback. Current conversion errors stop rendering; collinear/repeated points can produce tiny nonempty masks that bypass fallback. Empty/two-point/empty-clipped masks already fall back and must keep working.
+
+**When:** Separate W3 reliability PR after actual SDR/HDR regressions. Extract only this ordinary geometry behavior from mixed donor `8697c28`.
+
+- [ ] **I:** Validate point shape, finite/int32-safe conversion and degenerate raster geometry, handling relevant conversion/OpenCV failures at the local boundary. Preserve the known valid padded/clipped region and selected mode. Do not import hole handling, arbitrary coordinate ceilings or changed dilation policy.
+- [ ] **V:** Exercise real report-to-SDR/HDR rendering, malformed/nonfinite/collinear/repeated polygons, existing empty controls, valid clipped polygons, unchanged outside pixels, and failure cleanup. Run suite/build. A narrow shared raster helper is justified only if it removes actual SDR/HDR divergence.
+- [ ] **D/R/L:** Lead with invalid polygon data inside a valid fallback box. State that an invalid box has no justified fallback; do not claim this patch resolves P16C or silently ignore invalid regions.
+
+### P16C — reject invalid regions before successful output
+
+**What / why:** Establish a clear failure and cleanup contract for nonfinite, reversed or zero-area source/translated boxes. Research reproduced NaN-box failure and a reversed-box HDR render that reported success with zero coverage; the donor polygon fix leaves both unchanged.
+
+**When:** A separate P16 investigation/validation PR after its pre-output and error-lifecycle contract is exercised. The observed runtime defect is confirmed, but implementation and full-path validation remain open.
+
+- [ ] **E/I:** Validate four finite numeric coordinates with positive extents before opening output encoders where possible, plus a defensive render boundary for direct callers. Keep valid boxes extending beyond the frame and ordinary no-intersection clipping legal. Provide a useful geometry error rather than inventing a full-frame mask or returning an unredacted successful result.
+- [ ] **V:** Prove unsuccessful publication preserves prior reports/output and cleans decoder/encoder processes and partial files. Cover actual SDR/HDR, direct calls and ordinary report/worker paths. Separate existing process-cleanup defects if needed to keep the delivery reviewable.
+- [ ] **D/R/L:** Describe the exact corrupt-input trigger, failure behavior and preserved valid-input defaults; report any remaining output-lifecycle limits.
+
+**Additional P16 reproduction gate:** P07a browser validation observed image/overlay scaling diverge after resizing an already-open editor from desktop to mobile without reloading or scrubbing. Its baseline regression status is unverified. Preserve the recorded steps/screenshots, reproduce against pinned Austin, and scope a separate fix only if confirmed; it is not included in P07a.
+
 ## P17 — manual whole-plate four-corner masks
 
 **What:** Let a user specify a plate quadrilateral and render it consistently in review/SDR/HDR.
