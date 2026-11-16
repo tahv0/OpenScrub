@@ -2078,6 +2078,35 @@ async function applyTier(id){
 refreshModelPanel();renderTiers();
 let CUR=null, EN={}, MAN=[], DUR=0, POLL=null, PHIST=[], PHPH="", LOGN=0, SHELLPH=null, JOBSJSON="";
 
+// VIEW_GEN advances on every openJob (including A -> B -> A) and removal.
+// Drafts live only in this page; late acknowledgements reconcile their owner,
+// but may never publish into, or start rendering from, a different view.
+let VIEW_GEN=0, EDITS=null;
+const REVIEW_DRAFTS=new Map();
+function emptyEditor(){return {t:0,ox:0,oy:0,boxes:[],sel:-1,ov:{},dis:{},times:{},adds:[],
+ add:false,addAnchor:null,drag:null,scale:1,dur:10,
+ audio:[],audioSaved:[],audioLoaded:false};}
+function sameEdit(a,b){return JSON.stringify(a)===JSON.stringify(b);}
+function copyEdit(a){return JSON.parse(JSON.stringify(a));}
+function ownsView(id,gen){return CUR===id&&VIEW_GEN===gen;}
+function saveStatus(d,message){
+ d.status=message;
+ if(d!==EDITS)return;
+ const el=document.getElementById("reviewSaveStatus");if(el)el.textContent=message;
+ document.querySelectorAll("button[data-save-edits]").forEach(b=>{b.disabled=!!d.busy;});
+}
+function trimReviewDraft(d){
+ if(!d.busy&&!hasReviewEdits(d)){
+  d.en={};d.editor=emptyEditor();
+ }
+}
+function hasReviewEdits(d){
+ const b=d.editor;
+ return Object.keys(d.enabled).length||d.manual.length||b.adds.length||
+  Object.keys(b.ov).length||Object.keys(b.times).length||
+  !sameEdit(b.audio,b.audioSaved);
+}
+
 async function loadJobs(){
  const r=await fetch("api/jobs");
  if(r.status===423){jobs.innerHTML='<span style="color:#f87171">&#128274; locked — unlock in the Encryption panel below</span>';JOBSJSON="";return;}
@@ -2107,12 +2136,29 @@ async function delJob(id){
   try{const e=await r.json();m=e.error||e.description||m;}catch(_){}
   alert(m);return;
  }
- if(CUR===id){CUR=null;if(POLL)clearInterval(POLL);detail.innerHTML="";}
+ REVIEW_DRAFTS.delete(id);
+ if(CUR===id){VIEW_GEN++;CUR=null;EDITS=null;if(POLL)clearInterval(POLL);detail.innerHTML="";}
  JOBSJSON="";loadJobs();
 }
 async function openJob(id){
- CUR=id; EN={}; MAN=[]; PHIST=[]; PHPH=""; LOGN=0; SHELLPH=null;
- detail.innerHTML="";
+ const video=document.getElementById("beVid");
+ if(video){try{video.pause();}catch(e){}}
+ if(EDITS){
+  // Retain edit bookkeeping, not fetched box/report/transcript display data.
+  EDITS.en={};
+  const b=EDITS.editor;delete b.raw;b.boxes=[];
+  delete b.tlspans;delete b.audioSugg;delete b.audioTx;b.playing=false;
+  trimReviewDraft(EDITS);
+ }
+ VIEW_GEN++;CUR=id;
+ EDITS=REVIEW_DRAFTS.get(id);
+ if(!EDITS){EDITS={en:{},enabled:{},manual:[],editor:emptyEditor(),busy:false,status:""};
+  REVIEW_DRAFTS.set(id,EDITS);}
+ EN=EDITS.en;MAN=EDITS.manual;BE=EDITS.editor;
+ PHIST=[];PHPH="";LOGN=0;SHELLPH=null;
+ detail.innerHTML='<div id="reviewSaveStatus" role="status" aria-live="polite" style="margin:8px 0;color:#fbbf24"></div>';
+ saveStatus(EDITS,EDITS.status);
+
  if(POLL)clearInterval(POLL);
  POLL=setInterval(refresh,900); refresh();
 }
@@ -2132,7 +2178,9 @@ function shellHtml(j){
 
 async function refresh(){
  if(!CUR)return;
- const j=await (await fetch("api/jobs/"+CUR)).json();
+ const id=CUR,gen=VIEW_GEN;
+ const j=await (await fetch("api/jobs/"+id)).json();
+ if(!ownsView(id,gen))return;
  if(SHELLPH===null){
   detail.insertAdjacentHTML("afterbegin",shellHtml(j));SHELLPH="";
   const im=document.getElementById("pimg");
@@ -2161,7 +2209,8 @@ async function refresh(){
  // incremental log append with stick-to-bottom (respects manual scroll-up)
  const lg=document.getElementById("log");
  const stick=lg.scrollTop+lg.clientHeight>=lg.scrollHeight-40;
- const nl=await (await fetch(`api/jobs/${CUR}/log?from=${LOGN}`)).json();
+ const nl=await (await fetch(`api/jobs/${id}/log?from=${LOGN}`)).json();
+ if(!ownsView(id,gen))return;
  if(LOGN===0&&nl.len>400){LOGN=nl.len-400;nl.lines=nl.lines.slice(-400);}
  if(nl.lines.length){
   const NL=String.fromCharCode(10);
@@ -2215,20 +2264,20 @@ async function refresh(){
  loadJobs();
 }
 
-let BE={t:0,ox:0,oy:0,boxes:[],sel:-1,ov:{},dis:{},times:{},adds:[],
-        add:false,addAnchor:null,drag:null,scale:1,dur:10};
+let BE=emptyEditor();
 async function loadBoxEdit(fromReview){
+ const id=CUR,gen=VIEW_GEN,editor=BE;
  showPanel(fromReview?"boxedit_rev":"boxedit");
- const mi=await (await fetch(`api/jobs/${CUR}/mediainfo`)).json();
+ const mi=await (await fetch(`api/jobs/${id}/mediainfo`)).json();
+ if(!ownsView(id,gen)||BE!==editor)return;
  // in review: the slot right under the Preview button; on done: the actions slot
  let c=document.getElementById("beslot")||document.getElementById("beslot_done");
  if(!c){c=document.createElement("div");c.id="beslot";c.style.width="100%";
   (document.getElementById("review")||document.getElementById("jobcard")||detail)
    .appendChild(c);}
- BE={t:0,ox:0,oy:0,boxes:[],sel:-1,ov:{},dis:{},times:{},adds:[],
-     add:false,addAnchor:null,drag:null,scale:1,dur:mi.duration,
-     win:[0,mi.duration],trk:false,muteArm:false,tlDrag:null,
-     tlspans:[],audio:[],audioSel:-1};
+ Object.assign(BE,{dur:mi.duration,win:[0,mi.duration],trk:false,muteArm:false,tlDrag:null,
+     audioSel:-1,tlspans:[]});
+
  c.innerHTML=`<div class="row" style="margin-top:8px">
   <button class="sec" id="bePlay" style="padding:3px 11px" title="Play the video with live boxes — pause to edit them" onclick="beTogglePlay()">&#9654;</button>t=
   <input type="range" id="beT" min="0" max="${Math.max(0.2,mi.duration-0.1).toFixed(1)}"
@@ -2259,7 +2308,7 @@ async function loadBoxEdit(fromReview){
     to <input type="number" id="beT1" step="0.1" style="width:74px"> s
     <button class="sec" onclick="beApplyTimes()">Apply times</button></span>
    <span id="beTrkSt" style="display:none;font-size:13px;color:#fbbf24">tracking&#8230;</span>
-   <button onclick="beSave()">Save changes &amp; re-render</button></div>
+   <button data-save-edits onclick="beSave()">Save changes &amp; re-render</button></div>
   <p style="font-size:12px;color:#94a3b8;margin:4px 0 0">&#9654; plays the
    video with the boxes moving live (pause to edit). Click a red box to
    select — drag inside to move, a corner to resize, edit its from/to times,
@@ -2269,19 +2318,23 @@ async function loadBoxEdit(fromReview){
    followed and blurred through the window. &#128263; Audio span: drag on the
    timeline's bottom lane to silence (or bleep) that stretch of sound.</p>`;
  const img=document.getElementById("beImg");
- img.onload=()=>{if(BE.playing)return;const cv=document.getElementById("beCv");
+ img.onload=()=>{if(!ownsView(id,gen)||BE!==editor||document.getElementById("beImg")!==img||BE.playing)return;const cv=document.getElementById("beCv");
   cv.width=img.clientWidth;cv.height=img.clientHeight;
   BE.scale=img.clientWidth/(img.naturalWidth||1);beDraw();};
  const bv=document.getElementById("beVid");
- bv.addEventListener("pause",()=>{if(BE.playing)bePlayStop();});
- bv.addEventListener("ended",()=>{if(BE.playing)bePlayStop();});
- beHook();tlHook();await tlInit();beScrub();
+ const stop=()=>{if(ownsView(id,gen)&&BE===editor&&document.getElementById("beVid")===bv&&BE.playing)bePlayStop();};
+ bv.addEventListener("pause",stop);bv.addEventListener("ended",stop);
+ saveStatus(EDITS,EDITS.status);
+ beHook();tlHook();await tlInit();
+ if(ownsView(id,gen)&&BE===editor)beScrub();
 }
 
 // ---- playback with live boxes (issue #17: review was scrub-only) ----
 async function beTogglePlay(){
+ const id=CUR,gen=VIEW_GEN,editor=BE;
  const v=document.getElementById("beVid"),img=document.getElementById("beImg");
  if(!v)return;
+ const current=()=>ownsView(id,gen)&&BE===editor&&document.getElementById("beVid")===v;
  if(BE.playing){v.pause();return;}          // the pause handler cleans up
  if(!v.src)v.src=`api/jobs/${CUR}/video`;
  BE.playing=true;
@@ -2294,9 +2347,12 @@ async function beTogglePlay(){
   if(v.readyState<1)await new Promise((res,rej)=>{
    v.onloadedmetadata=res;
    v.onerror=()=>rej(new Error("the browser cannot decode this file"));});
+  if(!current())return;
   v.currentTime=BE.t||0;
   await v.play();
+  if(!current()){v.pause();return;}
  }catch(e){
+  if(!current())return;
   bePlayStop();
   alert("Could not play the video in this browser ("+(e&&e.message||e)
    +") — the scrub slider still works frame by frame.");
@@ -2308,16 +2364,16 @@ async function beTogglePlay(){
  // while rAF keeps the playhead, label and box painting per-frame smooth
  let lastQ=0,inFlight=false;
  const step=()=>{
-  if(!BE.playing)return;
+  if(!current()||!BE.playing)return;
   BE.t=v.currentTime;
   document.getElementById("beT").value=BE.t;
   document.getElementById("beL").textContent=BE.t.toFixed(1)+"s";
   const now=performance.now();
   if(!inFlight&&now-lastQ>150){
    inFlight=true;lastQ=now;
-   fetch(`api/jobs/${CUR}/boxes_at?t=${BE.t.toFixed(2)}&all=1`)
+   fetch(`api/jobs/${id}/boxes_at?t=${BE.t.toFixed(2)}&all=1`)
     .then(r=>r.json())
-    .then(d=>{BE.ox=d.ox;BE.oy=d.oy;BE.raw=d.boxes;beFilter();})
+    .then(d=>{if(!current())return;BE.ox=d.ox;BE.oy=d.oy;BE.raw=d.boxes;beFilter();})
     .catch(()=>{}).finally(()=>{inFlight=false;});
   }
   beDraw();beTLDraw();
@@ -2340,10 +2396,14 @@ const TLC={name:"#3b82f6",dob:"#22c55e",phone:"#f59e0b",ssn:"#ef4444",
  apikey:"#0891b2",ipaddr:"#65a30d",plate:"#7c3aed",face:"#ec4899",
  person:"#0ea5e9",manual:"#eab308"};
 async function tlInit(){
+ const id=CUR,gen=VIEW_GEN,editor=BE;
  // one fetch of the full report: detection spans for the lanes (dense
  // tracks collapse to one span per track) + stored audio redactions
  try{
-  const doc=await (await fetch(`api/jobs/${CUR}/report`)).json();
+  const response=await fetch(`api/jobs/${id}/report`);
+  if(!response.ok)throw Error("could not load audio");
+  const doc=await response.json();
+  if(!ownsView(id,gen)||BE!==editor)return;
   const per={};
   for(const d of (doc.detections||[])){
    if(d.enabled===false)continue;
@@ -2352,11 +2412,15 @@ async function tlInit(){
    s.t0=Math.min(s.t0,d.t_start);s.t1=Math.max(s.t1,d.t_end);
   }
   BE.tlspans=Object.values(per);
-  BE.audio=(doc.audio_redactions||[]).map(s=>({t0:s.t0,t1:s.t1,mode:s.mode||"mute"}));
+  if(!BE.audioLoaded){
+   const stored=(doc.audio_redactions||[]).map(s=>({t0:s.t0,t1:s.t1,mode:s.mode||"mute"}));
+   // Audio controls can be used while this initial report request is pending.
+   BE.audio=[...stored,...BE.audio];BE.audioSaved=copyEdit(stored);BE.audioLoaded=true;
+  }
   BE.audioSugg=doc.audio_suggestions||[];
   BE.audioTx=doc.audio_transcript||[];BE.txAnchor=-1;
   renderAudioSugg();renderTranscript();
- }catch(e){BE.tlspans=[];}
+ }catch(e){if(!ownsView(id,gen)||BE!==editor)return;BE.tlspans=[];}
  beTLDraw();
 }
 function tlX(t,w){return Math.max(0,Math.min(w,t/Math.max(0.1,BE.dur)*w));}
@@ -2478,6 +2542,7 @@ async function beTrackGo(box){
  },1500);
 }
 async function beScrub(){
+ const id=CUR,gen=VIEW_GEN,editor=BE;
  const sl=document.getElementById("beT");if(!sl)return; // editor was closed
  if(BE.playing){               // dragging the slider while playing = seek
   const v=document.getElementById("beVid");
@@ -2489,7 +2554,8 @@ async function beScrub(){
  BE.t=+document.getElementById("beT").value;
  document.getElementById("beL").textContent=BE.t.toFixed(1)+"s";
  document.getElementById("beImg").src=`api/jobs/${CUR}/frame_at?t=${BE.t}`;
- const d=await (await fetch(`api/jobs/${CUR}/boxes_at?t=${BE.t}&all=1`)).json();
+ const d=await (await fetch(`api/jobs/${id}/boxes_at?t=${BE.t}&all=1`)).json();
+ if(!ownsView(id,gen)||BE!==editor)return;
  BE.ox=d.ox;BE.oy=d.oy;BE.raw=d.boxes;
  beFilter();beDraw();beTLDraw();
 }
@@ -2656,11 +2722,7 @@ function beRemove(){
  document.getElementById("beRm").style.display="none";
  document.getElementById("beTimes").style.display="none";
 }
-async function beSave(){
- await saveAndRender();
- const c=document.querySelector("#beslot");
- if(c)c.innerHTML="rendering with your edits…";
-}
+async function beSave(){return saveAndRender();}
 async function cancelJob(){await fetch("api/jobs/"+CUR+"/cancel",{method:"POST"})}
 
 // the three post-render views (compare, review, box editor) are mutually
@@ -2706,12 +2768,14 @@ function cmpShow(){
 }
 
 async function loadReview(){
+ const id=CUR,gen=VIEW_GEN;
  showPanel("review");
- const d=await (await fetch(`api/jobs/${CUR}/detections`)).json();
+ const d=await (await fetch(`api/jobs/${id}/detections`)).json();
+ if(!ownsView(id,gen))return;
  DUR=d.duration;
  const groups={}; const zdrop=[]; TRKMEM={};
  d.detections.forEach(x=>{
-  EN[x.i]=x.enabled;
+  EN[x.i]=(x.i in EDITS.enabled)?EDITS.enabled[x.i]:x.enabled;
   if(x.zone_dropped){zdrop.push(x);return;}
   (groups[x.category]=groups[x.category]||[]).push(x);});
  let html=`<div class="card" id="review"><h2>Review — red = will be blurred,
@@ -2783,18 +2847,20 @@ async function loadReview(){
   html+=`</div>`}
  html+=`</div>
  <div class="row" style="margin-top:12px">
- <button onclick="saveAndRender()">Save edits &amp; render</button>
+ <button data-save-edits onclick="saveAndRender()">Save edits &amp; render</button>
  <span style="font-size:12px;color:#94a3b8">missed something? use
   ▶ Preview video &amp; edit boxes above — its ＋ Add box replaces the old
   add-region tool</span></div></div>`;
  const old=document.getElementById("review"); if(old)old.remove();
  detail.insertAdjacentHTML("beforeend",html);
- initMarquee();
+ initMarquee();saveStatus(EDITS,EDITS.status);
 }
 
 let TRKMEM={};
 function applyDet(i,blur){
- for(const m of (TRKMEM[i]||[i]))EN[m]=blur;
+ for(const m of (TRKMEM[i]||[i])){EN[m]=blur;EDITS.enabled[m]=blur;}
+ // A toggle back while a save is pending is still a deliberate next choice.
+ if(!EDITS.busy)saveStatus(EDITS,"Unsaved edits — save to include them in the render.");
  const b=document.getElementById("bb"+i),t=document.getElementById("det"+i);
  if(b){b.className="blurbtn "+(blur?"blur":"keep");
        b.textContent=blur?"Blur":"Keep";}
@@ -2888,27 +2954,77 @@ document.addEventListener("keydown",e=>{
  if(e.key==="Escape"){clearSel();
   const lb=document.getElementById("lb");if(lb)lb.remove();}});
 
+async function reviewPost(url,payload){
+ const response=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},
+  ...(payload===undefined?{}:{body:JSON.stringify(payload)})});
+ let body;
+ try{body=await response.json();}catch(e){throw Error("Invalid server response (HTTP "+response.status+")");}
+ if(!response.ok||!body||body.error||body.ok!==true)
+  throw Error((body&&body.error)||("Request failed (HTTP "+response.status+")"));
+ return body;
+}
+function acknowledgeMap(current,submitted){
+ for(const [key,value] of Object.entries(submitted))
+  if(sameEdit(current[key],value))delete current[key];
+}
+function acknowledgeAdds(current,refs,submitted){
+ for(let i=current.length-1;i>=0;i--){
+  const index=refs.indexOf(current[i]);
+  if(index>=0&&sameEdit(current[i],submitted[index]))current.splice(i,1);
+ }
+}
 async function saveAndRender(){
- const manual=[...MAN,...BE.adds.map(a=>({t_start:a.t0,t_end:a.t1,
-  t_ref:a.tref,screen_box:a.box}))];
- const payload={enabled:EN,manual,box_overrides:BE.ov,
-   time_overrides:BE.times};
- // only send audio spans when the box editor actually loaded them —
- // otherwise a save from plain review would wipe stored spans with []
- if(Array.isArray(BE.audio)&&BE.tlspans!==undefined)payload.audio=BE.audio;
- const r=await (await fetch(`api/jobs/${CUR}/detections`,{method:"POST",
-  headers:{"Content-Type":"application/json"},
-  body:JSON.stringify(payload)})).json();
- BE.adds=[];BE.ov={};BE.times={};
- if(r.suggest_allowlist&&r.suggest_allowlist.length){
-  if(confirm("You disabled every instance of: "+r.suggest_allowlist.join(", ")+". Add these to the permanent allow-list so future scans skip them?"))
-   {await fetch("api/allowlist",{method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({words:r.suggest_allowlist})});
-    loadPersist();}}
- MAN=[];
- await fetch(`api/jobs/${CUR}/render`,{method:"POST"});
- const rv=document.getElementById("review"); if(rv)rv.remove();
+ const id=CUR,gen=VIEW_GEN,d=EDITS;
+ if(!id||!d||d.busy)return false;
+ const b=d.editor,manRefs=[...d.manual],addRefs=[...b.adds];
+ const man=copyEdit(d.manual),adds=copyEdit(b.adds);
+ const payload=copyEdit({enabled:d.enabled,manual:[...man,...adds.map(a=>({
+  t_start:a.t0,t_end:a.t1,t_ref:a.tref,screen_box:a.box}))],
+  box_overrides:b.ov,time_overrides:b.times});
+ // Plain review must never wipe audio that the editor has not loaded.
+ if(b.audioLoaded&&!sameEdit(b.audio,b.audioSaved)){payload.audio=copyEdit(b.audio);}
+ d.busy=true;saveStatus(d,"Saving edits… You can keep editing; newer edits stay pending.");
+ let saved=false;
+ try{
+  const result=await reviewPost(`api/jobs/${id}/detections`,payload);
+  saved=true;
+  acknowledgeMap(d.enabled,payload.enabled);
+  acknowledgeMap(b.ov,payload.box_overrides);acknowledgeMap(b.times,payload.time_overrides);
+  acknowledgeAdds(d.manual,manRefs,man);acknowledgeAdds(b.adds,addRefs,adds);
+  if(payload.audio!==undefined)b.audioSaved=copyEdit(payload.audio);
+  // A switched-away view never opens a confirmation or changes current UI.
+  if(!ownsView(id,gen)){
+   saveStatus(d,"Edits saved. Review pending edits, then save to render this job.");return false;
+  }
+  let allowError="";
+  if(result.suggest_allowlist&&result.suggest_allowlist.length&&
+     confirm("You disabled every instance of: "+result.suggest_allowlist.join(", ")+". Add these to the permanent allow-list so future scans skip them?")){
+   try{await reviewPost("api/allowlist",{words:result.suggest_allowlist});loadPersist();}
+   catch(e){allowError=" Allow-list update failed: "+e.message;}
+  }
+  if(!ownsView(id,gen)){
+   saveStatus(d,"Edits saved. Review pending edits, then save to render this job."+allowError);return false;
+  }
+  if(hasReviewEdits(d)){
+   saveStatus(d,"Submitted edits saved. Newer edits are still pending — save again to include them before rendering."+allowError);return false;
+  }
+  saveStatus(d,"Edits saved; requesting render…");
+  await reviewPost(`api/jobs/${id}/render`);
+  // Edits can also arrive while the render request is pending.
+  if(hasReviewEdits(d)){
+   saveStatus(d,"Render started with submitted edits. Newer edits are pending — save again to render them."+allowError);return true;
+  }
+  saveStatus(d,"Rendering with saved edits…"+allowError);
+  if(ownsView(id,gen)){
+   const rv=document.getElementById("review");if(rv)rv.remove();
+   const c=document.getElementById("beslot_done");if(c)c.innerHTML="rendering with your edits…";
+  }
+  return true;
+ }catch(e){
+  saveStatus(d,(saved?"Edits saved; render was not confirmed. Retry with Save to render. ":
+   "Save was not confirmed; drafts retained. Retry with Save. ")+e.message);
+  return false;
+ }finally{d.busy=false;saveStatus(d,d.status);if(d!==EDITS)trimReviewDraft(d);}
 }
 async function loadPersist(){
  const a=await (await fetch("api/allowlist")).json();

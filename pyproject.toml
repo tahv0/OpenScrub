@@ -120,3 +120,6 @@ include = [
     "test_openscrub.py",
     "tests",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["test_openscrub.py", "tests"]
