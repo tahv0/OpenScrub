@@ -1298,6 +1298,8 @@ def job_delete(jid):
     if dependency:
         return jsonify({"error": dependency}), 409
     if _reap_job_dir(job["dir"], jid):
+        # The job's in-process JPEG leases are not part of the removed files.
+        finding_previews.clear_retained(job["dir"])
         with JOBS_LOCK:
             JOBS.pop(jid, None)
         return jsonify({"ok": True})
@@ -1309,6 +1311,8 @@ def job_delete(jid):
             f.write(str(time.time()))
     except OSError:
         pass
+    # Also clear copies of dismissed jobs pending physical deletion.
+    finding_previews.clear_retained(job["dir"])
     with JOBS_LOCK:
         JOBS.pop(jid, None)
 
@@ -8425,6 +8429,9 @@ def _vault_lock_now():
                     _REVIEW_FRAMES.clear()
                     _REVIEW_PROBES.clear()
                     _REVIEW_REPORTS.clear()
+                    # Unencrypted source JPEGs from active Review sessions
+                    # must not outlive a vault lock.
+                    finding_previews.clear_retained()
                     review_journal._READ_CACHE.clear()
                     review_journal._COUNT_CACHE.clear()
                     n = vault.encrypt_tree(key, JOBS_DIR)
