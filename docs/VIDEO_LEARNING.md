@@ -158,6 +158,19 @@ suggestions. These counts are small engineering checks, not a guarantee about
 unseen hands, plates, lighting, cameras, or recordings. The score is the model's
 plate score, not a calibrated probability that the object is a non-plate.
 
+Review shows the **raw secondary checker score** (with scientific notation for
+very small nonzero values), the selected held-out **cutoff**, whether that
+single detector proposal lies below it, and the **source frame** that was
+actually scored. This avoids misleading displays such as a rounded "0%" next
+to "Model retained" when the score is tiny but still above an extremely low
+cutoff. Neither number is an 81%-style plate-detection probability. On a
+multi-frame Review group, the detailed score belongs only to the displayed
+representative detection, with other frame results summarized separately;
+none of the group's other scores is copied onto the representative. A cached
+picture borrowed from another frame is labelled explicitly; load the exact
+source frame before drawing conclusions from the image. Grouping detections
+is not the same as optically tracking all four plate corners through the video.
+
 The checker associates predictions with the particular original proposal; a
 nearby real plate must not confirm an unrelated hand. It preserves existing
 geometry. Explicit **Is a plate**, **Not a plate**, Blur/Keep choices and
