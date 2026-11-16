@@ -11,6 +11,15 @@ $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $depsImage = 'openscrub-cuda-deps:local'
 $dockerfilePath = Join-Path $repoRoot 'Dockerfile.cuda'
+# Keep the training overlay in BOTH the app build and the container startup.
+# The retained dependency image alone does not configure the trainer's
+# checkpoint/env variables: those live in compose.windows-training.yml.
+# Use one array so build-only and normal runs cannot silently diverge.
+$composeFiles = @(
+    '-f', 'compose.windows-test.yml',
+    '-f', 'compose.windows-cuda.yml',
+    '-f', 'compose.windows-training.yml'
+)
 $oldBase = [Environment]::GetEnvironmentVariable('OPENSCRUB_CUDA_DEPS_IMAGE', 'Process')
 $oldTraining = [Environment]::GetEnvironmentVariable('OPENSCRUB_ENABLE_TRAINING', 'Process')
 
@@ -90,12 +99,12 @@ try {
     $env:OPENSCRUB_CUDA_DEPS_IMAGE = $depsImage
     $env:OPENSCRUB_ENABLE_TRAINING = '1'
     Write-Host "Building OpenScrub app from retained image '$depsImage'."
-    & docker --context $dockerContext compose --progress plain -f compose.windows-test.yml -f compose.windows-cuda.yml build
+    & docker --context $dockerContext compose --progress plain @composeFiles build
     if ($LASTEXITCODE -ne 0) {
         throw 'OpenScrub application build failed; the running container was not replaced.'
     }
     if (-not $BuildOnly) {
-        & docker --context $dockerContext compose -f compose.windows-test.yml -f compose.windows-cuda.yml up -d --no-build
+        & docker --context $dockerContext compose @composeFiles up -d --no-build
         if ($LASTEXITCODE -ne 0) {
             throw 'OpenScrub image built, but Compose could not start the service.'
         }
