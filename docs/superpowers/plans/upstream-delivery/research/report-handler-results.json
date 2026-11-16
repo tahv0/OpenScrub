@@ -1,0 +1,65 @@
+{
+  "upstream_sha": "5d3a15ae683c08f368d6ba4bd0d2d77b4e7b8e2f",
+  "python": "3.14.4",
+  "platform": "Linux",
+  "scope": "source-isolated handler; no HTTP, browser or video decoding",
+  "minimal_report_baseline": [
+    {
+      "rows": 1000,
+      "report_bytes": 242770,
+      "save_seconds": [
+        0.01022545399973751,
+        0.009853893003310077,
+        0.0101644189999206
+      ],
+      "median_seconds": 0.0101644189999206
+    },
+    {
+      "rows": 10000,
+      "report_bytes": 2456771,
+      "save_seconds": [
+        0.1045546640016255,
+        0.1040612639990286,
+        0.10209475900046527
+      ],
+      "median_seconds": 0.1040612639990286
+    },
+    {
+      "rows": 100000,
+      "report_bytes": 24866772,
+      "save_seconds": [
+        1.0996436989989888,
+        1.0743546839985356,
+        1.0460158900023089
+      ],
+      "median_seconds": 1.0743546839985356
+    }
+  ],
+  "interrupted_write": {
+    "previous_bytes_preserved": false,
+    "report_is_valid_json_after_failure": false
+  },
+  "replayed_manual_save": {
+    "initial_rows": 2,
+    "rows_after_first": 3,
+    "rows_after_identical_retry": 4
+  },
+  "overlapping_sparse_saves": {
+    "expected_enabled": [
+      false,
+      false
+    ],
+    "actual_enabled": [
+      true,
+      false
+    ],
+    "schedule": "both read old report; save 0 completes; save 1 writes its snapshot"
+  },
+  "research_date": "2026-11-16",
+  "limitations": [
+    "Extracted upstream functions with request/jsonify stubs, not real Flask/WSGI requests.",
+    "Minimal synthetic reports omit realistic cumulative-motion history and other large fields.",
+    "Timings are baseline local measurements, not end-to-end video performance or a claimed optimization.",
+    "Failure injection and controlled concurrency demonstrate handler behavior; full integration regressions remain required."
+  ]
+}
