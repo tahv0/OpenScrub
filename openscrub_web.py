@@ -5470,15 +5470,15 @@ function queueReviewPreview(img, priority=false){
  return task.promise;
 }
 function plateSameBoundSourceGeometry(a,b){
- // The compact crop is disposable. The original source + exact frame +
- // detector anchor + baseline polygon prove identity even if a new crop is
- // wider or shifted. A changed crop still needs human inspection before
- // transferring an unsaved label or adjustment.
+ // The source-bound frame token intentionally excludes mutable plate_quad.
+ // We may DISPLAY a replacement crop for the same verified source/frame/box
+ // after a newer save changed the polygon. The old human draft is preserved;
+ // confirmation and corner writes still require explicit approval on that
+ // new image and never auto-transfer a changed polygon.
  return !!(a?.frame_source_token&&b?.frame_source_token&&
   a.frame_source_token===b.frame_source_token&&
   a.frame===b.frame&&a.width===b.width&&a.height===b.height&&
-  JSON.stringify(a.box)===JSON.stringify(b.box)&&
-  plateSameSourceCorners(a.points,b.points));
+  JSON.stringify(a.box)===JSON.stringify(b.box));
 }
 function reviewMayRebindOffframeDraft(img,meta,edit){
  // Only an explicit 409 recovery can replace a displayed JPEG while its
@@ -5488,6 +5488,7 @@ function reviewMayRebindOffframeDraft(img,meta,edit){
  // trusted classification; refreshPlateDraft/reloadStaleFinding distinguish
  // crop changes and request deliberate approval.
  return !!(img._reviewRebindingDraft&&!edit.drag&&meta&&
+  (!edit.pending||edit.error?.status===409)&&
   plateSameBoundSourceGeometry(edit.meta,meta)&&
   plateCornersInsideCrop(edit.points,meta.crop));
 }
