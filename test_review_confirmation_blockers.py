@@ -444,7 +444,7 @@ def test_offframe_stale_409_allows_only_safe_explicit_draft_reload():
     source = web.APP_JS
     comparisons = source[source.index('function plateSameSourceCorners('):
                          source.index('function plateQuadValid(')]
-    recovery = source[source.index('function reviewMayRebindOffframeDraft('):
+    recovery = source[source.index('function plateSameBoundSourceGeometry('):
                       source.index('async function loadReviewPreview(')]
     assert '!reviewMayRebindOffframeDraft(img,meta,currentDraft)' in source
     assert 's.img._reviewRebindingDraft=true' in source
