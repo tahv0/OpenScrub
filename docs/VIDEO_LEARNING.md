@@ -272,6 +272,30 @@ leaving.
 Do not use **Reload preview** to preserve a draft: that conflict-recovery action
 explicitly asks permission to discard the unsaved shape.
 
+### Durable Review saves on large jobs
+
+A Review Save containing **no new unsaved changes** now acknowledges the
+already-durable Is/Not confirmations and exact-frame corner edits directly,
+without rewriting the entire 4K report in the HTTP request. Those decisions
+remain in the journal until a report-consuming action, including Render,
+atomically publishes them into report.json.
+
+When a current, revision-bound Review listing is available, a batch of new,
+explicit Blur/Keep choices can also be saved in one small SQLite transaction.
+These per-row output choices are overlaid on the display and later published
+at the render/report boundary. A later Is/Not confirmation takes precedence
+without deleting saved exact-frame corners; a later deliberate Blur/Keep
+choice can still override output without altering the human label. New
+manually added areas, audio edits, time/box overrides, legacy full-state
+requests, or missing cached listings continue through the established full
+report save path.
+
+A success response means a durable save acknowledgment, not an uncommitted
+background write. Rendering remains blocked by outstanding confirmations or
+corner drafts in the browser, and the render worker publishes the journal
+before reading redaction instructions. If an older browser save timed out,
+keep its tab and drafts; retry Save after the server is responsive.
+
 ### Large review saves
 
 Review saving sends only changed visibility/verification entries from the loaded
