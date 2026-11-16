@@ -4836,11 +4836,14 @@ async function loadBoxEdit(fromReview){
    select — red means hidden, green means visible, and yellow dashed is only the detector proposal. Drag inside to move, a corner to resize, edit its from/to times,
    or remove its blur. &#65291; Add box: drag a static region. &#8857; Track object:
    drag the timeline handles to the part of the video you care about, scrub
-   to a frame where the object is clear, draw a box around it — it will be
-   followed and blurred through the window. &#9645; Draw plate: choose the
-   time window, then click its four corners clockwise (top-left, top-right,
-   bottom-right, bottom-left) to create a tracked, perspective-tight plate
-   mask and a local verified training sample. &#128263; Audio span: drag
+   to a frame where the object is clear, draw a box around it — the
+   tracking box is followed and blurred through the window. &#9645; Draw plate:
+   choose the time window, then click its corners clockwise (top-left,
+   top-right, bottom-right, bottom-left). The tracker follows the enclosing
+   box and reuses your seed corner shape relative to it; it does NOT
+   estimate new perspective corners for every frame. Inspect the resulting
+   motion and explicitly confirm the source-frame plate before trusting it
+   as a training example. &#128263; Audio span: drag
    on the timeline's bottom lane to silence (or bleep) that stretch of sound.</p>`;
  const img=document.getElementById("beImg");
  img.onload=()=>{if(BE.playing)return;const cv=document.getElementById("beCv");
