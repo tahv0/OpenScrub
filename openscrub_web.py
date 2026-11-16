@@ -3271,6 +3271,7 @@ def _fast_review_choices(job, edits, started, parsed):
     when a revision-fenced cached Review listing is available.
     """
     if (not isinstance(edits, dict) or
+            edits.get('defer_report_write') is not True or
             any(edits.get(field) for field in
                 ('manual', 'box_overrides', 'time_overrides', 'verified_labels')) or
             'audio' in edits):
@@ -7751,6 +7752,9 @@ async function persistReview(saveOnly=false,job=CUR,view=JOBVIEW,choicesOnly=fal
  const choices=reviewChoiceDelta();
  const payload=choicesOnly?choices:
   {...choices,manual,box_overrides:BE.ov,time_overrides:BE.times};
+ // Opt in to journal ACK only when a render worker will materialize the report.
+ // Save-only callers keep the original full-report publication contract.
+ if(!saveOnly&&SHELLPH!=="paused"&&!choicesOnly)payload.defer_report_write=true;
  // only send audio spans when the box editor actually loaded them —
  // otherwise a save from plain review would wipe stored spans with []
  if(!choicesOnly&&Array.isArray(BE.audio)&&BE.tlspans!==undefined)payload.audio=BE.audio;
