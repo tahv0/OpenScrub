@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 import hashlib
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import shutil
 import unicodedata
 import uuid
@@ -406,6 +406,20 @@ def session_feedback(job, doc, store, group_for):
     return managed, plans
 
 
+def _run_metadata(name, expected_revisions=None):
+    """Keep run metadata compact even with thousands of confirmed findings.
+
+    The full revision set is still pinned in training_job.json and in the
+    frozen corpus/examples.json, so no evidence is lost by hashing it here.
+    """
+    result = {'schema': 1, 'name': name}
+    if expected_revisions is not None:
+        encoded = json.dumps(sorted(expected_revisions.items()), separators=(',', ':')).encode('utf-8')
+        result['selected_revisions_count'] = len(expected_revisions)
+        result['selected_revisions_sha256'] = hashlib.sha256(encoded).hexdigest()
+    return result
+
+
 def run(job, findings_root, model_root, settings, log=None, train=None):
     import confirmed_findings
     log = log or (lambda message: None)
@@ -417,19 +431,16 @@ def run(job, findings_root, model_root, settings, log=None, train=None):
         [item['video']['name'] for item in selected]), 'Model name', 80, required=True)
     session.update_learning(job, 'collecting', 'Freezing confirmed examples', name=name)
     stage = session.private_dir(Path(job['dir']) / 'learning' / 'passes' / ('pass-' + uuid.uuid4().hex[:12]))
-    run_metadata = {'schema': 1, 'name': name}
-    if 'expected_revisions' in settings:
-        expected = settings['expected_revisions']
+    expected = settings.get('expected_revisions')
+    if expected is not None:
         if (not isinstance(expected, dict) or any(not isinstance(k, str) or type(v) is not int or v < 1
-                                                 for k,v in expected.items())):
+                                                  for k,v in expected.items())):
             raise models.ModelError('Expected example revisions must map selected IDs to positive revision numbers')
-        run_metadata['expected_revisions'] = dict(expected)
-        session.atomic_json(stage / 'run.json', run_metadata)
         current = {record['id']: record['revision'] for record in selected}
         if current != expected:
             raise models.ModelError('Selected confirmed examples changed revision or were revoked after queuing; refresh your selection before training')
-    else:
-        session.atomic_json(stage / 'run.json', run_metadata)
+    run_metadata = _run_metadata(name, expected)
+    session.atomic_json(stage / 'run.json', run_metadata)
     parent = resolve_parent(model_root, settings.get('parent_model_id'))
     selected, parent, reconciliation = _reconcile(findings_root, selected, parent)
     corpus, samples = _freeze(stage, selected, parent)
