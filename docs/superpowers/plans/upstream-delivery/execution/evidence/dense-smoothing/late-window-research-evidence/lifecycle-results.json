@@ -1,0 +1,1212 @@
+{
+  "gop30/base/before": {
+    "mode": "base",
+    "failure": false,
+    "cancel": "before",
+    "seconds": 0.004415425002662232,
+    "returned": null,
+    "exception": "PipelineCancelled",
+    "rows": [
+      {
+        "t_start": 600,
+        "t_end": 600,
+        "cbox": [
+          100,
+          70,
+          164,
+          118
+        ],
+        "category": "face",
+        "text": "synthetic",
+        "confidence": 0.95,
+        "aoff": [
+          0.0,
+          0.0
+        ],
+        "last_seen": 0.0,
+        "dense": true,
+        "track": 1,
+        "person": -1,
+        "poly": []
+      },
+      {
+        "t_start": 600.2,
+        "t_end": 600.2,
+        "cbox": [
+          101,
+          70,
+          165,
+          118
+        ],
+        "category": "face",
+        "text": "synthetic",
+        "confidence": 0.95,
+        "aoff": [
+          0.0,
+          0.0
+        ],
+        "last_seen": 0.0,
+        "dense": true,
+        "track": 1,
+        "person": -1,
+        "poly": []
+      },
+      {
+        "t_start": 600.3,
+        "t_end": 600.3,
+        "cbox": [
+          101,
+          70,
+          165,
+          118
+        ],
+        "category": "face",
+        "text": "synthetic",
+        "confidence": 0.95,
+        "aoff": [
+          0.0,
+          0.0
+        ],
+        "last_seen": 0.0,
+        "dense": true,
+        "track": 1,
+        "person": -1,
+        "poly": []
+      }
+    ],
+    "row_sha256": "d9a2f06b6075f692f5530fb6522e228af1ea4cb2b8885ba8ac49b3a6ee1e470a",
+    "useful_markers": [],
+    "seeks": [],
+    "reads": 0,
+    "seek_reads": 0,
+    "capture_count": 1,
+    "releases": 0,
+    "remaining_grab_state": 0,
+    "backend": [
+      "FFMPEG"
+    ],
+    "native_set_calls": []
+  },
+  "gop30/base/timed": {
+    "mode": "base",
+    "failure": false,
+    "cancel": "timed",
+    "seconds": 0.03777446399908513,
+    "returned": null,
+    "exception": "PipelineCancelled",
+    "rows": [
+      {
+        "t_start": 600,
+        "t_end": 600.0166666666667,
+        "cbox": [
+          100,
+          70,
+          164,
+          118
+        ],
+        "category": "face",
+        "text": "synthetic",
+        "confidence": 0.95,
+        "aoff": [
+          0.0,
+          0.0
+        ],
+        "last_seen": 0.0,
+        "dense": true,
+        "track": 1,
+        "person": -1,
+        "poly": []
+      },
+      {
+        "t_start": 600.2,
+        "t_end": 600.2166666666667,
+        "cbox": [
+          101,
+          70,
+          165,
+          118
+        ],
+        "category": "face",
+        "text": "synthetic",
+        "confidence": 0.95,
+        "aoff": [
+          0.0,
+          0.0
+        ],
+        "last_seen": 0.0,
+        "dense": true,
+        "track": 1,
+        "person": -1,
+        "poly": []
+      },
+      {
+        "t_start": 600.3,
+        "t_end": 600.3,
+        "cbox": [
+          101,
+          70,
+          165,
+          118
+        ],
+        "category": "face",
+        "text": "synthetic",
+        "confidence": 0.95,
+        "aoff": [
+          0.0,
+          0.0
+        ],
+        "last_seen": 0.0,
+        "dense": true,
+        "track": 1,
+        "person": -1,
+        "poly": []
+      }
+    ],
+    "row_sha256": "b877d3900060d2124709bcb4feea4252b2e506e158e3efd10dec1a7f2f980679",
+    "useful_markers": [],
+    "seeks": [],
+    "reads": 90,
+    "seek_reads": 0,
+    "capture_count": 1,
+    "releases": 0,
+    "remaining_grab_state": 0,
+    "backend": [
+      "FFMPEG"
+    ],
+    "native_set_calls": []
+  },
+  "gop30/safe/before": {
+    "mode": "safe",
+    "failure": false,
+    "cancel": "before",
+    "seconds": 0.012505007998697693,
+    "returned": null,
+    "exception": "PipelineCancelled",
+    "rows": [
+      {
+        "t_start": 600,
+        "t_end": 600,
+        "cbox": [
+          100,
+          70,
+          164,
+          118
+        ],
+        "category": "face",
+        "text": "synthetic",
+        "confidence": 0.95,
+        "aoff": [
+          0.0,
+          0.0
+        ],
+        "last_seen": 0.0,
+        "dense": true,
+        "track": 1,
+        "person": -1,
+        "poly": []
+      },
+      {
+        "t_start": 600.2,
+        "t_end": 600.2,
+        "cbox": [
+          101,
+          70,
+          165,
+          118
+        ],
+        "category": "face",
+        "text": "synthetic",
+        "confidence": 0.95,
+        "aoff": [
+          0.0,
+          0.0
+        ],
+        "last_seen": 0.0,
+        "dense": true,
+        "track": 1,
+        "person": -1,
+        "poly": []
+      },
+      {
+        "t_start": 600.3,
+        "t_end": 600.3,
+        "cbox": [
+          101,
+          70,
+          165,
+          118
+        ],
+        "category": "face",
+        "text": "synthetic",
+        "confidence": 0.95,
+        "aoff": [
+          0.0,
+          0.0
+        ],
+        "last_seen": 0.0,
+        "dense": true,
+        "track": 1,
+        "person": -1,
+        "poly": []
+      }
+    ],
+    "row_sha256": "d9a2f06b6075f692f5530fb6522e228af1ea4cb2b8885ba8ac49b3a6ee1e470a",
+    "useful_markers": [],
+    "seeks": [
+      {
+        "target": 17872,
+        "ok": true,
+        "seconds": 0.00857866499791271,
+        "next_frame": 17872.0
+      }
+    ],
+    "reads": 1,
+    "seek_reads": 1,
+    "capture_count": 1,
+    "releases": 0,
+    "remaining_grab_state": 1,
+    "backend": [
+      "FFMPEG"
+    ],
+    "native_set_calls": [
+      {
+        "property": 0,
+        "value": 595700.0,
+        "ok": true,
+        "seconds": 0.006534203999763122
+      }
+    ]
+  },
+  "gop30/safe/timed": {
+    "mode": "safe",
+    "failure": false,
+    "cancel": "timed",
+    "seconds": 0.030881942999258172,
+    "returned": null,
+    "exception": "PipelineCancelled",
+    "rows": [
+      {
+        "t_start": 600,
+        "t_end": 600.0166666666667,
+        "cbox": [
+          100,
+          70,
+          164,
+          118
+        ],
+        "category": "face",
+        "text": "synthetic",
+        "confidence": 0.95,
+        "aoff": [
+          0.0,
+          0.0
+        ],
+        "last_seen": 0.0,
+        "dense": true,
+        "track": 1,
+        "person": -1,
+        "poly": []
+      },
+      {
+        "t_start": 600.2,
+        "t_end": 600.2166666666667,
+        "cbox": [
+          101,
+          70,
+          165,
+          118
+        ],
+        "category": "face",
+        "text": "synthetic",
+        "confidence": 0.95,
+        "aoff": [
+          0.0,
+          0.0
+        ],
+        "last_seen": 0.0,
+        "dense": true,
+        "track": 1,
+        "person": -1,
+        "poly": []
+      },
+      {
+        "t_start": 600.3,
+        "t_end": 600.3,
+        "cbox": [
+          101,
+          70,
+          165,
+          118
+        ],
+        "category": "face",
+        "text": "synthetic",
+        "confidence": 0.95,
+        "aoff": [
+          0.0,
+          0.0
+        ],
+        "last_seen": 0.0,
+        "dense": true,
+        "track": 1,
+        "person": -1,
+        "poly": []
+      }
+    ],
+    "row_sha256": "b877d3900060d2124709bcb4feea4252b2e506e158e3efd10dec1a7f2f980679",
+    "useful_markers": [
+      17872,
+      17873,
+      17874,
+      17875,
+      17876,
+      17877,
+      17878,
+      17879,
+      17880,
+      17881,
+      17882,
+      17883,
+      17884,
+      17885,
+      17886,
+      17887,
+      17888,
+      17889,
+      17890,
+      17891,
+      17892,
+      17893,
+      17894,
+      17895,
+      17896,
+      17897,
+      17898,
+      17899,
+      17900,
+      17901,
+      17902,
+      17903,
+      17904,
+      17905,
+      17906,
+      17907,
+      17908,
+      17909
+    ],
+    "seeks": [
+      {
+        "target": 17872,
+        "ok": true,
+        "seconds": 0.008134263996907976,
+        "next_frame": 17872.0
+      }
+    ],
+    "reads": 39,
+    "seek_reads": 1,
+    "capture_count": 1,
+    "releases": 0,
+    "remaining_grab_state": 1,
+    "backend": [
+      "FFMPEG"
+    ],
+    "native_set_calls": [
+      {
+        "property": 0,
+        "value": 595700.0,
+        "ok": true,
+        "seconds": 0.006094674001360545
+      }
+    ]
+  },
+  "gop30/safe-cleanup/before": {
+    "mode": "safe-cleanup",
+    "failure": false,
+    "cancel": "before",
+    "seconds": 0.005232439998508198,
+    "returned": null,
+    "exception": "PipelineCancelled",
+    "rows": [
+      {
+        "t_start": 600,
+        "t_end": 600,
+        "cbox": [
+          100,
+          70,
+          164,
+          118
+        ],
+        "category": "face",
+        "text": "synthetic",
+        "confidence": 0.95,
+        "aoff": [
+          0.0,
+          0.0
+        ],
+        "last_seen": 0.0,
+        "dense": true,
+        "track": 1,
+        "person": -1,
+        "poly": []
+      },
+      {
+        "t_start": 600.2,
+        "t_end": 600.2,
+        "cbox": [
+          101,
+          70,
+          165,
+          118
+        ],
+        "category": "face",
+        "text": "synthetic",
+        "confidence": 0.95,
+        "aoff": [
+          0.0,
+          0.0
+        ],
+        "last_seen": 0.0,
+        "dense": true,
+        "track": 1,
+        "person": -1,
+        "poly": []
+      },
+      {
+        "t_start": 600.3,
+        "t_end": 600.3,
+        "cbox": [
+          101,
+          70,
+          165,
+          118
+        ],
+        "category": "face",
+        "text": "synthetic",
+        "confidence": 0.95,
+        "aoff": [
+          0.0,
+          0.0
+        ],
+        "last_seen": 0.0,
+        "dense": true,
+        "track": 1,
+        "person": -1,
+        "poly": []
+      }
+    ],
+    "row_sha256": "d9a2f06b6075f692f5530fb6522e228af1ea4cb2b8885ba8ac49b3a6ee1e470a",
+    "useful_markers": [],
+    "seeks": [],
+    "reads": 0,
+    "seek_reads": 0,
+    "capture_count": 1,
+    "releases": 1,
+    "remaining_grab_state": 0,
+    "backend": [],
+    "native_set_calls": []
+  },
+  "gop30/safe-cleanup/timed": {
+    "mode": "safe-cleanup",
+    "failure": false,
+    "cancel": "timed",
+    "seconds": 0.03034984699843335,
+    "returned": null,
+    "exception": "PipelineCancelled",
+    "rows": [
+      {
+        "t_start": 600,
+        "t_end": 600.0166666666667,
+        "cbox": [
+          100,
+          70,
+          164,
+          118
+        ],
+        "category": "face",
+        "text": "synthetic",
+        "confidence": 0.95,
+        "aoff": [
+          0.0,
+          0.0
+        ],
+        "last_seen": 0.0,
+        "dense": true,
+        "track": 1,
+        "person": -1,
+        "poly": []
+      },
+      {
+        "t_start": 600.2,
+        "t_end": 600.2166666666667,
+        "cbox": [
+          101,
+          70,
+          165,
+          118
+        ],
+        "category": "face",
+        "text": "synthetic",
+        "confidence": 0.95,
+        "aoff": [
+          0.0,
+          0.0
+        ],
+        "last_seen": 0.0,
+        "dense": true,
+        "track": 1,
+        "person": -1,
+        "poly": []
+      },
+      {
+        "t_start": 600.3,
+        "t_end": 600.3,
+        "cbox": [
+          101,
+          70,
+          165,
+          118
+        ],
+        "category": "face",
+        "text": "synthetic",
+        "confidence": 0.95,
+        "aoff": [
+          0.0,
+          0.0
+        ],
+        "last_seen": 0.0,
+        "dense": true,
+        "track": 1,
+        "person": -1,
+        "poly": []
+      }
+    ],
+    "row_sha256": "b877d3900060d2124709bcb4feea4252b2e506e158e3efd10dec1a7f2f980679",
+    "useful_markers": [
+      17872,
+      17873,
+      17874,
+      17875,
+      17876,
+      17877,
+      17878,
+      17879,
+      17880,
+      17881,
+      17882,
+      17883,
+      17884,
+      17885,
+      17886,
+      17887,
+      17888,
+      17889,
+      17890,
+      17891,
+      17892,
+      17893,
+      17894,
+      17895,
+      17896,
+      17897,
+      17898,
+      17899,
+      17900,
+      17901,
+      17902,
+      17903,
+      17904,
+      17905,
+      17906,
+      17907,
+      17908,
+      17909
+    ],
+    "seeks": [
+      {
+        "target": 17872,
+        "ok": true,
+        "seconds": 0.008256690998678096,
+        "next_frame": 17872.0
+      }
+    ],
+    "reads": 39,
+    "seek_reads": 1,
+    "capture_count": 1,
+    "releases": 1,
+    "remaining_grab_state": 0,
+    "backend": [],
+    "native_set_calls": [
+      {
+        "property": 0,
+        "value": 595700.0,
+        "ok": true,
+        "seconds": 0.006198346000019228
+      }
+    ]
+  },
+  "single-keyframe/base/before": {
+    "mode": "base",
+    "failure": false,
+    "cancel": "before",
+    "seconds": 0.003664430001663277,
+    "returned": null,
+    "exception": "PipelineCancelled",
+    "rows": [
+      {
+        "t_start": 600,
+        "t_end": 600,
+        "cbox": [
+          100,
+          70,
+          164,
+          118
+        ],
+        "category": "face",
+        "text": "synthetic",
+        "confidence": 0.95,
+        "aoff": [
+          0.0,
+          0.0
+        ],
+        "last_seen": 0.0,
+        "dense": true,
+        "track": 1,
+        "person": -1,
+        "poly": []
+      },
+      {
+        "t_start": 600.2,
+        "t_end": 600.2,
+        "cbox": [
+          101,
+          70,
+          165,
+          118
+        ],
+        "category": "face",
+        "text": "synthetic",
+        "confidence": 0.95,
+        "aoff": [
+          0.0,
+          0.0
+        ],
+        "last_seen": 0.0,
+        "dense": true,
+        "track": 1,
+        "person": -1,
+        "poly": []
+      },
+      {
+        "t_start": 600.3,
+        "t_end": 600.3,
+        "cbox": [
+          101,
+          70,
+          165,
+          118
+        ],
+        "category": "face",
+        "text": "synthetic",
+        "confidence": 0.95,
+        "aoff": [
+          0.0,
+          0.0
+        ],
+        "last_seen": 0.0,
+        "dense": true,
+        "track": 1,
+        "person": -1,
+        "poly": []
+      }
+    ],
+    "row_sha256": "d9a2f06b6075f692f5530fb6522e228af1ea4cb2b8885ba8ac49b3a6ee1e470a",
+    "useful_markers": [],
+    "seeks": [],
+    "reads": 0,
+    "seek_reads": 0,
+    "capture_count": 1,
+    "releases": 0,
+    "remaining_grab_state": 0,
+    "backend": [
+      "FFMPEG"
+    ],
+    "native_set_calls": []
+  },
+  "single-keyframe/base/timed": {
+    "mode": "base",
+    "failure": false,
+    "cancel": "timed",
+    "seconds": 0.034926729000289924,
+    "returned": null,
+    "exception": "PipelineCancelled",
+    "rows": [
+      {
+        "t_start": 600,
+        "t_end": 600.0166666666667,
+        "cbox": [
+          100,
+          70,
+          164,
+          118
+        ],
+        "category": "face",
+        "text": "synthetic",
+        "confidence": 0.95,
+        "aoff": [
+          0.0,
+          0.0
+        ],
+        "last_seen": 0.0,
+        "dense": true,
+        "track": 1,
+        "person": -1,
+        "poly": []
+      },
+      {
+        "t_start": 600.2,
+        "t_end": 600.2166666666667,
+        "cbox": [
+          101,
+          70,
+          165,
+          118
+        ],
+        "category": "face",
+        "text": "synthetic",
+        "confidence": 0.95,
+        "aoff": [
+          0.0,
+          0.0
+        ],
+        "last_seen": 0.0,
+        "dense": true,
+        "track": 1,
+        "person": -1,
+        "poly": []
+      },
+      {
+        "t_start": 600.3,
+        "t_end": 600.3,
+        "cbox": [
+          101,
+          70,
+          165,
+          118
+        ],
+        "category": "face",
+        "text": "synthetic",
+        "confidence": 0.95,
+        "aoff": [
+          0.0,
+          0.0
+        ],
+        "last_seen": 0.0,
+        "dense": true,
+        "track": 1,
+        "person": -1,
+        "poly": []
+      }
+    ],
+    "row_sha256": "b877d3900060d2124709bcb4feea4252b2e506e158e3efd10dec1a7f2f980679",
+    "useful_markers": [],
+    "seeks": [],
+    "reads": 90,
+    "seek_reads": 0,
+    "capture_count": 1,
+    "releases": 0,
+    "remaining_grab_state": 0,
+    "backend": [
+      "FFMPEG"
+    ],
+    "native_set_calls": []
+  },
+  "single-keyframe/safe/before": {
+    "mode": "safe",
+    "failure": false,
+    "cancel": "before",
+    "seconds": 1.3613078240014147,
+    "returned": null,
+    "exception": "PipelineCancelled",
+    "rows": [
+      {
+        "t_start": 600,
+        "t_end": 600,
+        "cbox": [
+          100,
+          70,
+          164,
+          118
+        ],
+        "category": "face",
+        "text": "synthetic",
+        "confidence": 0.95,
+        "aoff": [
+          0.0,
+          0.0
+        ],
+        "last_seen": 0.0,
+        "dense": true,
+        "track": 1,
+        "person": -1,
+        "poly": []
+      },
+      {
+        "t_start": 600.2,
+        "t_end": 600.2,
+        "cbox": [
+          101,
+          70,
+          165,
+          118
+        ],
+        "category": "face",
+        "text": "synthetic",
+        "confidence": 0.95,
+        "aoff": [
+          0.0,
+          0.0
+        ],
+        "last_seen": 0.0,
+        "dense": true,
+        "track": 1,
+        "person": -1,
+        "poly": []
+      },
+      {
+        "t_start": 600.3,
+        "t_end": 600.3,
+        "cbox": [
+          101,
+          70,
+          165,
+          118
+        ],
+        "category": "face",
+        "text": "synthetic",
+        "confidence": 0.95,
+        "aoff": [
+          0.0,
+          0.0
+        ],
+        "last_seen": 0.0,
+        "dense": true,
+        "track": 1,
+        "person": -1,
+        "poly": []
+      }
+    ],
+    "row_sha256": "d9a2f06b6075f692f5530fb6522e228af1ea4cb2b8885ba8ac49b3a6ee1e470a",
+    "useful_markers": [],
+    "seeks": [
+      {
+        "target": 17872,
+        "ok": true,
+        "seconds": 1.3576483460019517,
+        "next_frame": 17872.0
+      }
+    ],
+    "reads": 1,
+    "seek_reads": 1,
+    "capture_count": 1,
+    "releases": 0,
+    "remaining_grab_state": 1,
+    "backend": [
+      "FFMPEG"
+    ],
+    "native_set_calls": [
+      {
+        "property": 0,
+        "value": 595700.0,
+        "ok": true,
+        "seconds": 1.3556408939984976
+      }
+    ]
+  },
+  "single-keyframe/safe/timed": {
+    "mode": "safe",
+    "failure": false,
+    "cancel": "timed",
+    "seconds": 1.3425223350022861,
+    "returned": null,
+    "exception": "PipelineCancelled",
+    "rows": [
+      {
+        "t_start": 600,
+        "t_end": 600,
+        "cbox": [
+          100,
+          70,
+          164,
+          118
+        ],
+        "category": "face",
+        "text": "synthetic",
+        "confidence": 0.95,
+        "aoff": [
+          0.0,
+          0.0
+        ],
+        "last_seen": 0.0,
+        "dense": true,
+        "track": 1,
+        "person": -1,
+        "poly": []
+      },
+      {
+        "t_start": 600.2,
+        "t_end": 600.2,
+        "cbox": [
+          101,
+          70,
+          165,
+          118
+        ],
+        "category": "face",
+        "text": "synthetic",
+        "confidence": 0.95,
+        "aoff": [
+          0.0,
+          0.0
+        ],
+        "last_seen": 0.0,
+        "dense": true,
+        "track": 1,
+        "person": -1,
+        "poly": []
+      },
+      {
+        "t_start": 600.3,
+        "t_end": 600.3,
+        "cbox": [
+          101,
+          70,
+          165,
+          118
+        ],
+        "category": "face",
+        "text": "synthetic",
+        "confidence": 0.95,
+        "aoff": [
+          0.0,
+          0.0
+        ],
+        "last_seen": 0.0,
+        "dense": true,
+        "track": 1,
+        "person": -1,
+        "poly": []
+      }
+    ],
+    "row_sha256": "d9a2f06b6075f692f5530fb6522e228af1ea4cb2b8885ba8ac49b3a6ee1e470a",
+    "useful_markers": [],
+    "seeks": [
+      {
+        "target": 17872,
+        "ok": true,
+        "seconds": 1.3387811669999792,
+        "next_frame": 17872.0
+      }
+    ],
+    "reads": 1,
+    "seek_reads": 1,
+    "capture_count": 1,
+    "releases": 0,
+    "remaining_grab_state": 1,
+    "backend": [
+      "FFMPEG"
+    ],
+    "native_set_calls": [
+      {
+        "property": 0,
+        "value": 595700.0,
+        "ok": true,
+        "seconds": 1.3367901649980922
+      }
+    ]
+  },
+  "single-keyframe/safe-cleanup/before": {
+    "mode": "safe-cleanup",
+    "failure": false,
+    "cancel": "before",
+    "seconds": 0.0051317210018169135,
+    "returned": null,
+    "exception": "PipelineCancelled",
+    "rows": [
+      {
+        "t_start": 600,
+        "t_end": 600,
+        "cbox": [
+          100,
+          70,
+          164,
+          118
+        ],
+        "category": "face",
+        "text": "synthetic",
+        "confidence": 0.95,
+        "aoff": [
+          0.0,
+          0.0
+        ],
+        "last_seen": 0.0,
+        "dense": true,
+        "track": 1,
+        "person": -1,
+        "poly": []
+      },
+      {
+        "t_start": 600.2,
+        "t_end": 600.2,
+        "cbox": [
+          101,
+          70,
+          165,
+          118
+        ],
+        "category": "face",
+        "text": "synthetic",
+        "confidence": 0.95,
+        "aoff": [
+          0.0,
+          0.0
+        ],
+        "last_seen": 0.0,
+        "dense": true,
+        "track": 1,
+        "person": -1,
+        "poly": []
+      },
+      {
+        "t_start": 600.3,
+        "t_end": 600.3,
+        "cbox": [
+          101,
+          70,
+          165,
+          118
+        ],
+        "category": "face",
+        "text": "synthetic",
+        "confidence": 0.95,
+        "aoff": [
+          0.0,
+          0.0
+        ],
+        "last_seen": 0.0,
+        "dense": true,
+        "track": 1,
+        "person": -1,
+        "poly": []
+      }
+    ],
+    "row_sha256": "d9a2f06b6075f692f5530fb6522e228af1ea4cb2b8885ba8ac49b3a6ee1e470a",
+    "useful_markers": [],
+    "seeks": [],
+    "reads": 0,
+    "seek_reads": 0,
+    "capture_count": 1,
+    "releases": 1,
+    "remaining_grab_state": 0,
+    "backend": [],
+    "native_set_calls": []
+  },
+  "single-keyframe/safe-cleanup/timed": {
+    "mode": "safe-cleanup",
+    "failure": false,
+    "cancel": "timed",
+    "seconds": 1.3573925310010964,
+    "returned": null,
+    "exception": "PipelineCancelled",
+    "rows": [
+      {
+        "t_start": 600,
+        "t_end": 600,
+        "cbox": [
+          100,
+          70,
+          164,
+          118
+        ],
+        "category": "face",
+        "text": "synthetic",
+        "confidence": 0.95,
+        "aoff": [
+          0.0,
+          0.0
+        ],
+        "last_seen": 0.0,
+        "dense": true,
+        "track": 1,
+        "person": -1,
+        "poly": []
+      },
+      {
+        "t_start": 600.2,
+        "t_end": 600.2,
+        "cbox": [
+          101,
+          70,
+          165,
+          118
+        ],
+        "category": "face",
+        "text": "synthetic",
+        "confidence": 0.95,
+        "aoff": [
+          0.0,
+          0.0
+        ],
+        "last_seen": 0.0,
+        "dense": true,
+        "track": 1,
+        "person": -1,
+        "poly": []
+      },
+      {
+        "t_start": 600.3,
+        "t_end": 600.3,
+        "cbox": [
+          101,
+          70,
+          165,
+          118
+        ],
+        "category": "face",
+        "text": "synthetic",
+        "confidence": 0.95,
+        "aoff": [
+          0.0,
+          0.0
+        ],
+        "last_seen": 0.0,
+        "dense": true,
+        "track": 1,
+        "person": -1,
+        "poly": []
+      }
+    ],
+    "row_sha256": "d9a2f06b6075f692f5530fb6522e228af1ea4cb2b8885ba8ac49b3a6ee1e470a",
+    "useful_markers": [],
+    "seeks": [
+      {
+        "target": 17872,
+        "ok": true,
+        "seconds": 1.3515004539985966,
+        "next_frame": 17872.0
+      }
+    ],
+    "reads": 1,
+    "seek_reads": 1,
+    "capture_count": 1,
+    "releases": 1,
+    "remaining_grab_state": 0,
+    "backend": [],
+    "native_set_calls": [
+      {
+        "property": 0,
+        "value": 595700.0,
+        "ok": true,
+        "seconds": 1.3494851129980816
+      }
+    ]
+  }
+}

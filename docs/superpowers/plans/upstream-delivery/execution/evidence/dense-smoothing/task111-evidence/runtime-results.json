@@ -1,0 +1,28 @@
+{
+  "before": {
+    "returned": [
+      1,
+      5,
+      1.25
+    ],
+    "rows": 10,
+    "decoded_frames": 130,
+    "decoded_sha256": "99047cfa56bb1b128e3477a60d00003ee48b9377dea2c644a6140351e699c1d2"
+  },
+  "after": {
+    "returned": [
+      1,
+      5,
+      1.25
+    ],
+    "rows": 10,
+    "decoded_frames": 130,
+    "decoded_sha256": "99047cfa56bb1b128e3477a60d00003ee48b9377dea2c644a6140351e699c1d2"
+  },
+  "pipeline": {
+    "engine": "tesseract",
+    "selected_categories": "ssn",
+    "report_rows": 1,
+    "decoded_frames": 20
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "base": "5d3a15ae683c08f368d6ba4bd0d2d77b4e7b8e2f",
+  "evidence": "source-isolated load_report/write_report projection; no video or HTTP",
+  "original_rows": [
+    {
+      "index": 0,
+      "text": "synthetic-row-0",
+      "enabled": true
+    },
+    {
+      "index": 1,
+      "text": "synthetic-row-1",
+      "enabled": false
+    },
+    {
+      "index": 2,
+      "text": "synthetic-row-2",
+      "enabled": true
+    }
+  ],
+  "projected_rows": [
+    {
+      "index": 0,
+      "text": "synthetic-row-0",
+      "enabled": true
+    },
+    {
+      "index": 1,
+      "text": "synthetic-row-2",
+      "enabled": true
+    }
+  ],
+  "settings_shim": "_settings_dict returns {}; irrelevant to row projection"
+}

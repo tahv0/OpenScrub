@@ -108,6 +108,28 @@ Proposed contract: `get_snapshot(job_id, report_path, source_identity) -> (docum
 - [ ] **V:** Run `python -m pytest test_openscrub.py tests/test_thumbnail_io.py -q`, relevant P06 tests if a dependency, build, and planned benchmark `--scenario reports` / `--scenario thumbnails`. Exercise S06 and confirm no new personal-data lifetime.
 - [ ] **D/R/L:** PR body distinguishes cold gains from unchanged warm behavior, lists memory/correctness limits, and provides the exact before/after report sizes. If accurate snapshot identity requires a shared prerequisite, declare it instead of silently stacking on the full integration branch.
 
+### P08A — invalidate stale thumbnail pixels and browser URLs
+
+**What / why:** Give derived thumbnails an identity tied to their report, actual source and live job. Actual pinned routes return visibly stale blue/yellow/green/magenta crops after a box edit, same-size/same-mtime atomic report replacement, normalized-source selection and same-path source replacement. Their existing public one-hour HTTP cache can also retain a successful obsolete URL. This is a demonstrated correctness issue independent of report-cache speed.
+
+**When:** Separate PR before P08B, with the necessary P06B lifecycle/publication interfaces declared as prerequisites. Avoid duplicating that coordination or depending on the complete assembled application.
+
+- [ ] **E/S:** Preserve the actual-route baseline in the execution evidence: three warm hits perform zero JSON parses; four parallel cold misses parse four times. Inventory all crop inputs, report/source replacement and both demand/pre-generation producers. Decide a small derived identity and compatible unversioned-URL cache policy; file size or size+mtime alone is insufficient.
+- [ ] **I:** Keep validated warm hits free of report parsing. Tie client URLs/HTTP validators to the requested revision, and reject/discard obsolete pending fills rather than serve new pixels under an old immutable identity. A coarse report revision may invalidate decision/audio-only updates initially; document that tradeoff. Remove obsolete derived files without creating a persistent plaintext history.
+- [ ] **I:** Select the normalized source before launching pre-generation. Capture and revalidate source/report/job identity at publication, sharing the same contract with demand generation. Stage JPEG output and discard stale work through the lifecycle boundary; use bounded retry/metadata refresh. Unlinking a JPEG in the save route alone does not cover browser caches, external replacement or a late worker.
+- [ ] **V/D:** Verify actual crop pixels after box/time/fps/cum/source/index changes, conditional HTTP responses and browser revisits. Interleave demand/pre-generation with publication, cancel/rescan, deletion/retention and vault transitions. Preserve defaults and warm-path parsing cost; report in-process/platform limits. No large-report throughput claim without measurements.
+
+### P08B — retain measured read-only report snapshots within a budget
+
+**What / why:** Share parsing among the demonstrated cold/read-only consumers while retaining fresh mutable documents for edits/tracking/render transactions. Repeated parse counts establish work, but not enough latency or memory benefit to justify a cache by themselves.
+
+**When:** After representative cold-consumer timing/RSS evidence, and after the required lifecycle/transaction interfaces. It may close without implementation if admission overhead outweighs useful reuse.
+
+- [ ] **E/S:** Measure identical 1k/10k/100k report workloads before/after, including parallel cold metadata/thumbnail requests. Select only useful read-only consumers. Do not globally replace `_load_job_report` with a shared mutable tree.
+- [ ] **I:** Single-flight by verified opened-report/source/job identity; fence fills before and after parsing. Keep retained nested data immutable and transaction documents independent. Surface corrupt-current-report errors rather than silently returning an older revision. Oversized entries bypass retention correctly; bound concurrent fills and active-reader lifetime separately.
+- [ ] **I:** Define the proposed 128 MiB limit as an owned retained-object admission budget, including cache metadata, not raw JSON bytes or process RSS. An identity-deduplicated size walk of the final retained representation can occur once at admission; charge its cost to the cold path, cache the result and avoid per-hit deep walks. Explain conservative cross-entry shared-object accounting. Transient parse/freeze buffers, active readers and allocators still require separate RSS measurement.
+- [ ] **V/D:** Preserve warm-no-parse, same-size replacement, mutation isolation, corrupt-report recovery, eviction/oversized bypass and vault invalidation regressions. An evicted entry may remain referenced by active work; lifecycle ownership must drain it before a successful transition. Publish measured cold benefit and admission/memory costs with exact SHAs; no RSS-ceiling or secure heap-erasure claim.
+
 ## P09 — visible-first thumbnail scheduling
 
 **What:** Limit mounted cards/image requests and prioritize the current viewport while preserving complete group decisions.

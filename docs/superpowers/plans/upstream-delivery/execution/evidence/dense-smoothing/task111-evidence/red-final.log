@@ -1,0 +1,544 @@
+F.FFFFFFFFFFFFFF.F.F                                                     [100%]
+=================================== FAILURES ===================================
+_________ test_prefix_and_gap_avoid_retrieval_without_changing_frames __________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7c3c3592ce00>
+
+    def test_prefix_and_gap_avoid_retrieval_without_changing_frames(monkeypatch):
+        cap = Capture()
+        converted = install_capture(monkeypatch, cap)
+        dets = [detection(6), detection(12, 2)]
+        assert openscrub.smooth_dense_tracks(dets, 10, "synthetic") == (0, 0, .5)
+        needed = list(range(16, 63)) + list(range(76, 121))
+        assert converted == needed
+>       assert cap.reads == needed
+E       assert [0, 1, 2, 3, 4, 5, ...] == [16, 17, 18, 19, 20, 21, ...]
+E         
+E         At index 0 diff: 0 != 16
+E         Left contains 29 more items, first extra item: 92
+E         Use -v to get more diff
+
+tests/test_dense_smoothing_io.py:75: AssertionError
+_ test_eof_or_failed_advance_stops_without_later_mislabeled_frames[kwargs0-grabs0-reads0-converted0] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7c3c3592cc20>
+kwargs = {'frames': 10}, grabs = [0, 1, 2, 3, 4, 5, ...], reads = []
+converted = []
+
+    @pytest.mark.parametrize("kwargs,grabs,reads,converted", [
+        ({"frames": 10}, list(range(11)), [], []),
+        ({"fail_grab": 7}, list(range(8)), [], []),
+        ({"fail_read": 20}, list(range(16)), list(range(16, 21)), list(range(16, 20))),
+        ({"frames": 20}, list(range(16)), list(range(16, 21)), list(range(16, 20))),
+    ])
+    def test_eof_or_failed_advance_stops_without_later_mislabeled_frames(
+            monkeypatch, kwargs, grabs, reads, converted):
+        cap = Capture(**kwargs)
+        seen = install_capture(monkeypatch, cap)
+        dets = [detection(6), detection(12, 2)]
+        assert openscrub.smooth_dense_tracks(dets, 10, "synthetic") == (0, 0, .5)
+>       assert (cap.grabs, cap.reads, seen) == (grabs, reads, converted)
+E       assert ([], [0, 1, 2..., 5, ...], []) == ([0, 1, 2, 3,... ...], [], [])
+E         
+E         At index 0 diff: [] != [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+E         Use -v to get more diff
+
+tests/test_dense_smoothing_io.py:106: AssertionError
+_ test_eof_or_failed_advance_stops_without_later_mislabeled_frames[kwargs1-grabs1-reads1-converted1] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7c3c3592c860>
+kwargs = {'fail_grab': 7}, grabs = [0, 1, 2, 3, 4, 5, ...], reads = []
+converted = []
+
+    @pytest.mark.parametrize("kwargs,grabs,reads,converted", [
+        ({"frames": 10}, list(range(11)), [], []),
+        ({"fail_grab": 7}, list(range(8)), [], []),
+        ({"fail_read": 20}, list(range(16)), list(range(16, 21)), list(range(16, 20))),
+        ({"frames": 20}, list(range(16)), list(range(16, 21)), list(range(16, 20))),
+    ])
+    def test_eof_or_failed_advance_stops_without_later_mislabeled_frames(
+            monkeypatch, kwargs, grabs, reads, converted):
+        cap = Capture(**kwargs)
+        seen = install_capture(monkeypatch, cap)
+        dets = [detection(6), detection(12, 2)]
+        assert openscrub.smooth_dense_tracks(dets, 10, "synthetic") == (0, 0, .5)
+>       assert (cap.grabs, cap.reads, seen) == (grabs, reads, converted)
+E       assert ([], [0, 1, 2... 20, 21, ...]) == ([0, 1, 2, 3,... ...], [], [])
+E         
+E         At index 0 diff: [] != [0, 1, 2, 3, 4, 5, 6, 7]
+E         Use -v to get more diff
+
+tests/test_dense_smoothing_io.py:106: AssertionError
+_ test_eof_or_failed_advance_stops_without_later_mislabeled_frames[kwargs2-grabs2-reads2-converted2] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7c3c35930320>
+kwargs = {'fail_read': 20}, grabs = [0, 1, 2, 3, 4, 5, ...]
+reads = [16, 17, 18, 19, 20], converted = [16, 17, 18, 19]
+
+    @pytest.mark.parametrize("kwargs,grabs,reads,converted", [
+        ({"frames": 10}, list(range(11)), [], []),
+        ({"fail_grab": 7}, list(range(8)), [], []),
+        ({"fail_read": 20}, list(range(16)), list(range(16, 21)), list(range(16, 20))),
+        ({"frames": 20}, list(range(16)), list(range(16, 21)), list(range(16, 20))),
+    ])
+    def test_eof_or_failed_advance_stops_without_later_mislabeled_frames(
+            monkeypatch, kwargs, grabs, reads, converted):
+        cap = Capture(**kwargs)
+        seen = install_capture(monkeypatch, cap)
+        dets = [detection(6), detection(12, 2)]
+        assert openscrub.smooth_dense_tracks(dets, 10, "synthetic") == (0, 0, .5)
+>       assert (cap.grabs, cap.reads, seen) == (grabs, reads, converted)
+E       assert ([], [0, 1, 2..., 17, 18, 19]) == ([0, 1, 2, 3,..., 17, 18, 19])
+E         
+E         At index 0 diff: [] != [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+E         Use -v to get more diff
+
+tests/test_dense_smoothing_io.py:106: AssertionError
+_ test_eof_or_failed_advance_stops_without_later_mislabeled_frames[kwargs3-grabs3-reads3-converted3] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7c3c359334d0>
+kwargs = {'frames': 20}, grabs = [0, 1, 2, 3, 4, 5, ...]
+reads = [16, 17, 18, 19, 20], converted = [16, 17, 18, 19]
+
+    @pytest.mark.parametrize("kwargs,grabs,reads,converted", [
+        ({"frames": 10}, list(range(11)), [], []),
+        ({"fail_grab": 7}, list(range(8)), [], []),
+        ({"fail_read": 20}, list(range(16)), list(range(16, 21)), list(range(16, 20))),
+        ({"frames": 20}, list(range(16)), list(range(16, 21)), list(range(16, 20))),
+    ])
+    def test_eof_or_failed_advance_stops_without_later_mislabeled_frames(
+            monkeypatch, kwargs, grabs, reads, converted):
+        cap = Capture(**kwargs)
+        seen = install_capture(monkeypatch, cap)
+        dets = [detection(6), detection(12, 2)]
+        assert openscrub.smooth_dense_tracks(dets, 10, "synthetic") == (0, 0, .5)
+>       assert (cap.grabs, cap.reads, seen) == (grabs, reads, converted)
+E       assert ([], [0, 1, 2..., 17, 18, 19]) == ([0, 1, 2, 3,..., 17, 18, 19])
+E         
+E         At index 0 diff: [] != [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+E         Use -v to get more diff
+
+tests/test_dense_smoothing_io.py:106: AssertionError
+_______ test_cancellation_in_prefix_keeps_checkpoints_and_releases[0-0] ________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7c3c359353a0>
+cancel_after = 0, advances = 0
+
+    @pytest.mark.parametrize("cancel_after,advances", [(0, 0), (1, 90), (91, 180)])
+    def test_cancellation_in_prefix_keeps_checkpoints_and_releases(
+            monkeypatch, cancel_after, advances):
+        cap = Capture(frames=500)
+        install_capture(monkeypatch, cap)
+    
+        class Cancel(openscrub.Callbacks):
+            def cancelled(self):
+                return cap.pos >= cancel_after
+    
+        with pytest.raises(openscrub.PipelineCancelled):
+            openscrub.smooth_dense_tracks([detection(30)], 10, "synthetic", cb=Cancel())
+        assert cap.pos == advances
+        assert cap.reads == []
+>       assert cap.releases == 1
+E       assert 0 == 1
+E        +  where 0 = <test_dense_smoothing_io.Capture object at 0x7c3c35935370>.releases
+
+tests/test_dense_smoothing_io.py:124: AssertionError
+_______ test_cancellation_in_prefix_keeps_checkpoints_and_releases[1-90] _______
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7c3c359343b0>
+cancel_after = 1, advances = 90
+
+    @pytest.mark.parametrize("cancel_after,advances", [(0, 0), (1, 90), (91, 180)])
+    def test_cancellation_in_prefix_keeps_checkpoints_and_releases(
+            monkeypatch, cancel_after, advances):
+        cap = Capture(frames=500)
+        install_capture(monkeypatch, cap)
+    
+        class Cancel(openscrub.Callbacks):
+            def cancelled(self):
+                return cap.pos >= cancel_after
+    
+        with pytest.raises(openscrub.PipelineCancelled):
+            openscrub.smooth_dense_tracks([detection(30)], 10, "synthetic", cb=Cancel())
+        assert cap.pos == advances
+>       assert cap.reads == []
+E       assert [0, 1, 2, 3, 4, 5, ...] == []
+E         
+E         Left contains 90 more items, first extra item: 0
+E         Use -v to get more diff
+
+tests/test_dense_smoothing_io.py:123: AssertionError
+______ test_cancellation_in_prefix_keeps_checkpoints_and_releases[91-180] ______
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7c3c35934290>
+cancel_after = 91, advances = 180
+
+    @pytest.mark.parametrize("cancel_after,advances", [(0, 0), (1, 90), (91, 180)])
+    def test_cancellation_in_prefix_keeps_checkpoints_and_releases(
+            monkeypatch, cancel_after, advances):
+        cap = Capture(frames=500)
+        install_capture(monkeypatch, cap)
+    
+        class Cancel(openscrub.Callbacks):
+            def cancelled(self):
+                return cap.pos >= cancel_after
+    
+        with pytest.raises(openscrub.PipelineCancelled):
+            openscrub.smooth_dense_tracks([detection(30)], 10, "synthetic", cb=Cancel())
+        assert cap.pos == advances
+>       assert cap.reads == []
+E       assert [0, 1, 2, 3, 4, 5, ...] == []
+E         
+E         Left contains 180 more items, first extra item: 0
+E         Use -v to get more diff
+
+tests/test_dense_smoothing_io.py:123: AssertionError
+____________ test_decoder_released_when_processing_raises[isOpened] ____________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7c3c35934260>
+failure = 'isOpened'
+
+    @pytest.mark.parametrize("failure", ["isOpened", "get", "read", "grab", "convert", "matching", "progress", "final_progress"])
+    def test_decoder_released_when_processing_raises(monkeypatch, failure):
+        cap = Capture()
+        install_capture(monkeypatch, cap)
+    
+        def broken(*args, **kwargs):
+            raise RuntimeError("injected failure")
+    
+        cb = openscrub.Callbacks()
+        if failure in ("isOpened", "get", "read", "grab"):
+            monkeypatch.setattr(cap, failure, broken)
+        elif failure == "progress":
+            cb.progress = broken
+        elif failure == "final_progress":
+            cb.progress = lambda stage, done, total: broken() if done == total else None
+        elif failure == "convert":
+            monkeypatch.setattr(openscrub.cv2, "cvtColor", broken)
+        else:
+            # Real textured pixels reach the actual template-matching branch.
+            rng = np.random.default_rng(8)
+            frame = rng.integers(0, 255, (64, 96, 3), dtype=np.uint8)
+            monkeypatch.setattr(cap, "read", lambda: (True, frame))
+            monkeypatch.setattr(openscrub.cv2, "matchTemplate", broken)
+        with pytest.raises(RuntimeError, match="injected failure"):
+            openscrub.smooth_dense_tracks([detection(6 if failure == "grab" else 2)],
+                                         10, "synthetic", cb=cb)
+>       assert cap.releases == 1
+E       assert 0 == 1
+E        +  where 0 = <test_dense_smoothing_io.Capture object at 0x7c3c35934500>.releases
+
+tests/test_dense_smoothing_io.py:153: AssertionError
+______________ test_decoder_released_when_processing_raises[get] _______________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7c3c3592f350>
+failure = 'get'
+
+    @pytest.mark.parametrize("failure", ["isOpened", "get", "read", "grab", "convert", "matching", "progress", "final_progress"])
+    def test_decoder_released_when_processing_raises(monkeypatch, failure):
+        cap = Capture()
+        install_capture(monkeypatch, cap)
+    
+        def broken(*args, **kwargs):
+            raise RuntimeError("injected failure")
+    
+        cb = openscrub.Callbacks()
+        if failure in ("isOpened", "get", "read", "grab"):
+            monkeypatch.setattr(cap, failure, broken)
+        elif failure == "progress":
+            cb.progress = broken
+        elif failure == "final_progress":
+            cb.progress = lambda stage, done, total: broken() if done == total else None
+        elif failure == "convert":
+            monkeypatch.setattr(openscrub.cv2, "cvtColor", broken)
+        else:
+            # Real textured pixels reach the actual template-matching branch.
+            rng = np.random.default_rng(8)
+            frame = rng.integers(0, 255, (64, 96, 3), dtype=np.uint8)
+            monkeypatch.setattr(cap, "read", lambda: (True, frame))
+            monkeypatch.setattr(openscrub.cv2, "matchTemplate", broken)
+        with pytest.raises(RuntimeError, match="injected failure"):
+            openscrub.smooth_dense_tracks([detection(6 if failure == "grab" else 2)],
+                                         10, "synthetic", cb=cb)
+>       assert cap.releases == 1
+E       assert 0 == 1
+E        +  where 0 = <test_dense_smoothing_io.Capture object at 0x7c3c3592dee0>.releases
+
+tests/test_dense_smoothing_io.py:153: AssertionError
+______________ test_decoder_released_when_processing_raises[read] ______________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7c3c35927f50>
+failure = 'read'
+
+    @pytest.mark.parametrize("failure", ["isOpened", "get", "read", "grab", "convert", "matching", "progress", "final_progress"])
+    def test_decoder_released_when_processing_raises(monkeypatch, failure):
+        cap = Capture()
+        install_capture(monkeypatch, cap)
+    
+        def broken(*args, **kwargs):
+            raise RuntimeError("injected failure")
+    
+        cb = openscrub.Callbacks()
+        if failure in ("isOpened", "get", "read", "grab"):
+            monkeypatch.setattr(cap, failure, broken)
+        elif failure == "progress":
+            cb.progress = broken
+        elif failure == "final_progress":
+            cb.progress = lambda stage, done, total: broken() if done == total else None
+        elif failure == "convert":
+            monkeypatch.setattr(openscrub.cv2, "cvtColor", broken)
+        else:
+            # Real textured pixels reach the actual template-matching branch.
+            rng = np.random.default_rng(8)
+            frame = rng.integers(0, 255, (64, 96, 3), dtype=np.uint8)
+            monkeypatch.setattr(cap, "read", lambda: (True, frame))
+            monkeypatch.setattr(openscrub.cv2, "matchTemplate", broken)
+        with pytest.raises(RuntimeError, match="injected failure"):
+            openscrub.smooth_dense_tracks([detection(6 if failure == "grab" else 2)],
+                                         10, "synthetic", cb=cb)
+>       assert cap.releases == 1
+E       assert 0 == 1
+E        +  where 0 = <test_dense_smoothing_io.Capture object at 0x7c3c35927590>.releases
+
+tests/test_dense_smoothing_io.py:153: AssertionError
+______________ test_decoder_released_when_processing_raises[grab] ______________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7c3c35933980>
+failure = 'grab'
+
+    @pytest.mark.parametrize("failure", ["isOpened", "get", "read", "grab", "convert", "matching", "progress", "final_progress"])
+    def test_decoder_released_when_processing_raises(monkeypatch, failure):
+        cap = Capture()
+        install_capture(monkeypatch, cap)
+    
+        def broken(*args, **kwargs):
+            raise RuntimeError("injected failure")
+    
+        cb = openscrub.Callbacks()
+        if failure in ("isOpened", "get", "read", "grab"):
+            monkeypatch.setattr(cap, failure, broken)
+        elif failure == "progress":
+            cb.progress = broken
+        elif failure == "final_progress":
+            cb.progress = lambda stage, done, total: broken() if done == total else None
+        elif failure == "convert":
+            monkeypatch.setattr(openscrub.cv2, "cvtColor", broken)
+        else:
+            # Real textured pixels reach the actual template-matching branch.
+            rng = np.random.default_rng(8)
+            frame = rng.integers(0, 255, (64, 96, 3), dtype=np.uint8)
+            monkeypatch.setattr(cap, "read", lambda: (True, frame))
+            monkeypatch.setattr(openscrub.cv2, "matchTemplate", broken)
+>       with pytest.raises(RuntimeError, match="injected failure"):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE RuntimeError
+
+tests/test_dense_smoothing_io.py:150: Failed
+____________ test_decoder_released_when_processing_raises[convert] _____________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7c3c35936ea0>
+failure = 'convert'
+
+    @pytest.mark.parametrize("failure", ["isOpened", "get", "read", "grab", "convert", "matching", "progress", "final_progress"])
+    def test_decoder_released_when_processing_raises(monkeypatch, failure):
+        cap = Capture()
+        install_capture(monkeypatch, cap)
+    
+        def broken(*args, **kwargs):
+            raise RuntimeError("injected failure")
+    
+        cb = openscrub.Callbacks()
+        if failure in ("isOpened", "get", "read", "grab"):
+            monkeypatch.setattr(cap, failure, broken)
+        elif failure == "progress":
+            cb.progress = broken
+        elif failure == "final_progress":
+            cb.progress = lambda stage, done, total: broken() if done == total else None
+        elif failure == "convert":
+            monkeypatch.setattr(openscrub.cv2, "cvtColor", broken)
+        else:
+            # Real textured pixels reach the actual template-matching branch.
+            rng = np.random.default_rng(8)
+            frame = rng.integers(0, 255, (64, 96, 3), dtype=np.uint8)
+            monkeypatch.setattr(cap, "read", lambda: (True, frame))
+            monkeypatch.setattr(openscrub.cv2, "matchTemplate", broken)
+        with pytest.raises(RuntimeError, match="injected failure"):
+            openscrub.smooth_dense_tracks([detection(6 if failure == "grab" else 2)],
+                                         10, "synthetic", cb=cb)
+>       assert cap.releases == 1
+E       assert 0 == 1
+E        +  where 0 = <test_dense_smoothing_io.Capture object at 0x7c3c35937020>.releases
+
+tests/test_dense_smoothing_io.py:153: AssertionError
+____________ test_decoder_released_when_processing_raises[matching] ____________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7c3c35936540>
+failure = 'matching'
+
+    @pytest.mark.parametrize("failure", ["isOpened", "get", "read", "grab", "convert", "matching", "progress", "final_progress"])
+    def test_decoder_released_when_processing_raises(monkeypatch, failure):
+        cap = Capture()
+        install_capture(monkeypatch, cap)
+    
+        def broken(*args, **kwargs):
+            raise RuntimeError("injected failure")
+    
+        cb = openscrub.Callbacks()
+        if failure in ("isOpened", "get", "read", "grab"):
+            monkeypatch.setattr(cap, failure, broken)
+        elif failure == "progress":
+            cb.progress = broken
+        elif failure == "final_progress":
+            cb.progress = lambda stage, done, total: broken() if done == total else None
+        elif failure == "convert":
+            monkeypatch.setattr(openscrub.cv2, "cvtColor", broken)
+        else:
+            # Real textured pixels reach the actual template-matching branch.
+            rng = np.random.default_rng(8)
+            frame = rng.integers(0, 255, (64, 96, 3), dtype=np.uint8)
+            monkeypatch.setattr(cap, "read", lambda: (True, frame))
+            monkeypatch.setattr(openscrub.cv2, "matchTemplate", broken)
+        with pytest.raises(RuntimeError, match="injected failure"):
+            openscrub.smooth_dense_tracks([detection(6 if failure == "grab" else 2)],
+                                         10, "synthetic", cb=cb)
+>       assert cap.releases == 1
+E       assert 0 == 1
+E        +  where 0 = <test_dense_smoothing_io.Capture object at 0x7c3c35935580>.releases
+
+tests/test_dense_smoothing_io.py:153: AssertionError
+____________ test_decoder_released_when_processing_raises[progress] ____________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7c3c3593cb30>
+failure = 'progress'
+
+    @pytest.mark.parametrize("failure", ["isOpened", "get", "read", "grab", "convert", "matching", "progress", "final_progress"])
+    def test_decoder_released_when_processing_raises(monkeypatch, failure):
+        cap = Capture()
+        install_capture(monkeypatch, cap)
+    
+        def broken(*args, **kwargs):
+            raise RuntimeError("injected failure")
+    
+        cb = openscrub.Callbacks()
+        if failure in ("isOpened", "get", "read", "grab"):
+            monkeypatch.setattr(cap, failure, broken)
+        elif failure == "progress":
+            cb.progress = broken
+        elif failure == "final_progress":
+            cb.progress = lambda stage, done, total: broken() if done == total else None
+        elif failure == "convert":
+            monkeypatch.setattr(openscrub.cv2, "cvtColor", broken)
+        else:
+            # Real textured pixels reach the actual template-matching branch.
+            rng = np.random.default_rng(8)
+            frame = rng.integers(0, 255, (64, 96, 3), dtype=np.uint8)
+            monkeypatch.setattr(cap, "read", lambda: (True, frame))
+            monkeypatch.setattr(openscrub.cv2, "matchTemplate", broken)
+        with pytest.raises(RuntimeError, match="injected failure"):
+            openscrub.smooth_dense_tracks([detection(6 if failure == "grab" else 2)],
+                                         10, "synthetic", cb=cb)
+>       assert cap.releases == 1
+E       assert 0 == 1
+E        +  where 0 = <test_dense_smoothing_io.Capture object at 0x7c3c3593cc80>.releases
+
+tests/test_dense_smoothing_io.py:153: AssertionError
+_________ test_failed_open_is_released_and_preserves_no_video_behavior _________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7c3c3e3e75c0>
+
+    def test_failed_open_is_released_and_preserves_no_video_behavior(monkeypatch):
+        cap = Capture(opened=False)
+        install_capture(monkeypatch, cap)
+        actual = [detection(6)]
+        expected = [detection(6)]
+        want = openscrub.smooth_dense_tracks(expected, 10, None)
+        assert openscrub.smooth_dense_tracks(actual, 10, "unopenable") == want
+        assert [asdict(d) for d in actual] == [asdict(d) for d in expected]
+        assert cap.reads == cap.grabs == []
+>       assert cap.releases == 1
+E       assert 0 == 1
+E        +  where 0 = <test_dense_smoothing_io.Capture object at 0x7c3c3e3e76e0>.releases
+
+tests/test_dense_smoothing_io.py:165: AssertionError
+_________ test_marked_video_preserves_matching_and_complete_detections _________
+
+tmp_path = PosixPath('/tmp/openscrub-task111/red/test_marked_video_preserves_ma0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7c3c3e3e7530>
+
+    def test_marked_video_preserves_matching_and_complete_detections(tmp_path, monkeypatch):
+        """Lossless marked pixels catch skipped/duplicated frames and onset changes."""
+        import hashlib
+        import json
+    
+        path = str(tmp_path / "marked.avi")
+        rng = np.random.default_rng(111)
+        patch = rng.integers(0, 256, (32, 32, 3), dtype=np.uint8)
+        writer = cv2.VideoWriter(path, cv2.VideoWriter_fourcc(*"FFV1"), 10, (128, 96))
+        assert writer.isOpened()
+        try:
+            for index in range(130):
+                frame = np.full((96, 128, 3), 60, np.uint8)
+                frame[:8, :] = index
+                if 50 <= index <= 70:
+                    x = 40 + (index - 50) // 5 * 2
+                    frame[40:72, x:x + 32] = patch
+                writer.write(frame)
+        finally:
+            writer.release()
+        native = cv2.VideoCapture(path)
+        assert native.isOpened()
+    
+        class Counted:
+            def __init__(self):
+                self.reads = self.grabs = self.releases = 0
+    
+            def __getattr__(self, name):
+                return getattr(native, name)
+    
+            def read(self):
+                self.reads += 1
+                return native.read()
+    
+            def grab(self):
+                self.grabs += 1
+                return native.grab()
+    
+            def set(self, *args):
+                pytest.fail("smoothing must retain sequential access")
+    
+            def release(self):
+                self.releases += 1
+                native.release()
+    
+        cap = Counted()
+        seen = install_capture(monkeypatch, cap)
+        dets = [openscrub.Detection(t, t, (44, 40, 76, 72), "face", "synthetic", .95,
+                                    dense=True, track=1, poly=()) for t in (6., 6.2, 6.3)]
+        assert openscrub.smooth_dense_tracks(dets, 10, path) == (1, 5, 1.25)
+        assert seen == list(range(16, 61))
+>       assert (cap.reads, cap.grabs, cap.releases) == (45, 16, 1)
+E       assert (61, 0, 1) == (45, 16, 1)
+E         
+E         At index 0 diff: 61 != 45
+E         Use -v to get more diff
+
+tests/test_dense_smoothing_io.py:226: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_dense_smoothing_io.py::test_prefix_and_gap_avoid_retrieval_without_changing_frames
+FAILED tests/test_dense_smoothing_io.py::test_eof_or_failed_advance_stops_without_later_mislabeled_frames[kwargs0-grabs0-reads0-converted0]
+FAILED tests/test_dense_smoothing_io.py::test_eof_or_failed_advance_stops_without_later_mislabeled_frames[kwargs1-grabs1-reads1-converted1]
+FAILED tests/test_dense_smoothing_io.py::test_eof_or_failed_advance_stops_without_later_mislabeled_frames[kwargs2-grabs2-reads2-converted2]
+FAILED tests/test_dense_smoothing_io.py::test_eof_or_failed_advance_stops_without_later_mislabeled_frames[kwargs3-grabs3-reads3-converted3]
+FAILED tests/test_dense_smoothing_io.py::test_cancellation_in_prefix_keeps_checkpoints_and_releases[0-0]
+FAILED tests/test_dense_smoothing_io.py::test_cancellation_in_prefix_keeps_checkpoints_and_releases[1-90]
+FAILED tests/test_dense_smoothing_io.py::test_cancellation_in_prefix_keeps_checkpoints_and_releases[91-180]
+FAILED tests/test_dense_smoothing_io.py::test_decoder_released_when_processing_raises[isOpened]
+FAILED tests/test_dense_smoothing_io.py::test_decoder_released_when_processing_raises[get]
+FAILED tests/test_dense_smoothing_io.py::test_decoder_released_when_processing_raises[read]
+FAILED tests/test_dense_smoothing_io.py::test_decoder_released_when_processing_raises[grab]
+FAILED tests/test_dense_smoothing_io.py::test_decoder_released_when_processing_raises[convert]
+FAILED tests/test_dense_smoothing_io.py::test_decoder_released_when_processing_raises[matching]
+FAILED tests/test_dense_smoothing_io.py::test_decoder_released_when_processing_raises[progress]
+FAILED tests/test_dense_smoothing_io.py::test_failed_open_is_released_and_preserves_no_video_behavior
+FAILED tests/test_dense_smoothing_io.py::test_marked_video_preserves_matching_and_complete_detections
+17 failed, 3 passed in 0.18s

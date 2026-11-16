@@ -1,0 +1,160 @@
+{
+  "gop30": {
+    "command": [
+      "ffmpeg",
+      "-nostdin",
+      "-hide_banner",
+      "-loglevel",
+      "debug",
+      "-benchmark",
+      "-threads",
+      "1",
+      "-ss",
+      "595.733333333",
+      "-i",
+      "/tmp/openscrub-late-window-20261116/gop30.mp4",
+      "-an",
+      "-threads",
+      "1",
+      "-frames:v",
+      "129",
+      "-f",
+      "null",
+      "-"
+    ],
+    "excerpts": [
+      "bench: utime=0.028s stime=0.021s rtime=0.032s",
+      "bench: maxrss=64696KiB",
+      "[in#0/mov,mp4,m4a,3gp,3g2,mj2 @ 0x5601fa095c80]   Input stream #0:0 (video): 164 packets read (190043 bytes); 153 frames decoded; 0 decode errors; "
+    ],
+    "marker_seek_checks": [
+      {
+        "requested_frame": 30,
+        "actual_marker": 30,
+        "helper_success": true,
+        "backend": "FFMPEG",
+        "decoder_threads": 16.0,
+        "native_set_calls": [
+          {
+            "property": 0,
+            "value": 966.6666666666666,
+            "ok": true,
+            "seconds": 0.010304573999746935
+          }
+        ],
+        "python_reads": 2
+      },
+      {
+        "requested_frame": 9000,
+        "actual_marker": 9000,
+        "helper_success": true,
+        "backend": "FFMPEG",
+        "decoder_threads": 16.0,
+        "native_set_calls": [
+          {
+            "property": 0,
+            "value": 299966.6666666666,
+            "ok": true,
+            "seconds": 0.007578763998026261
+          }
+        ],
+        "python_reads": 2
+      },
+      {
+        "requested_frame": 17872,
+        "actual_marker": 17872,
+        "helper_success": true,
+        "backend": "FFMPEG",
+        "decoder_threads": 16.0,
+        "native_set_calls": [
+          {
+            "property": 0,
+            "value": 595700.0,
+            "ok": true,
+            "seconds": 0.00636959799885517
+          }
+        ],
+        "python_reads": 2
+      }
+    ]
+  },
+  "single-keyframe": {
+    "command": [
+      "ffmpeg",
+      "-nostdin",
+      "-hide_banner",
+      "-loglevel",
+      "debug",
+      "-benchmark",
+      "-threads",
+      "1",
+      "-ss",
+      "595.733333333",
+      "-i",
+      "/tmp/openscrub-late-window-20261116/single-keyframe.mp4",
+      "-an",
+      "-threads",
+      "1",
+      "-frames:v",
+      "129",
+      "-f",
+      "null",
+      "-"
+    ],
+    "excerpts": [
+      "bench: utime=1.107s stime=1.081s rtime=1.723s",
+      "bench: maxrss=115292KiB",
+      "[in#0/mov,mp4,m4a,3gp,3g2,mj2 @ 0x56d85e271c80]   Input stream #0:0 (video): 18014 packets read (2495643 bytes); 18003 frames decoded; 0 decode errors; "
+    ],
+    "marker_seek_checks": [
+      {
+        "requested_frame": 30,
+        "actual_marker": 30,
+        "helper_success": true,
+        "backend": "FFMPEG",
+        "decoder_threads": 16.0,
+        "native_set_calls": [
+          {
+            "property": 0,
+            "value": 966.6666666666666,
+            "ok": true,
+            "seconds": 0.006316826998954639
+          }
+        ],
+        "python_reads": 2
+      },
+      {
+        "requested_frame": 9000,
+        "actual_marker": 9000,
+        "helper_success": true,
+        "backend": "FFMPEG",
+        "decoder_threads": 16.0,
+        "native_set_calls": [
+          {
+            "property": 0,
+            "value": 299966.6666666666,
+            "ok": true,
+            "seconds": 0.6769523080001818
+          }
+        ],
+        "python_reads": 2
+      },
+      {
+        "requested_frame": 17872,
+        "actual_marker": 17872,
+        "helper_success": true,
+        "backend": "FFMPEG",
+        "decoder_threads": 16.0,
+        "native_set_calls": [
+          {
+            "property": 0,
+            "value": 595700.0,
+            "ok": true,
+            "seconds": 1.3523384149993944
+          }
+        ],
+        "python_reads": 2
+      }
+    ]
+  }
+}

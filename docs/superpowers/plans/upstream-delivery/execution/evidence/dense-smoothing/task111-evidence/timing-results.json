@@ -1,0 +1,2728 @@
+{
+  "started_utc": "2026-11-16T23:04:42.117192+00:00",
+  "sources": {
+    "before": {
+      "revision": "e21ebdf6e3ee46e6c65050dc956a9a3459152269",
+      "path": "/tmp/openscrub-task111/before/openscrub.py",
+      "sha256": "0e4f0f9a7846080f591038d021aaf3ca6f01201d83ac32bbdc273f53d5067ee7"
+    },
+    "after": {
+      "revision": "f19be5fe3b9176e568ea7bf761493bd267fee95e",
+      "path": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py",
+      "sha256": "2f0aea827ad88a394a3420d3f88755308506ec17dfb8bf9ea30b3b1a3696ebf0"
+    }
+  },
+  "environment": {
+    "python": "3.12.16",
+    "platform": "Linux-6.18.58.1-microsoft-standard-WSL2-x86_64-with-glibc2.43",
+    "opencv": "4.14.0",
+    "numpy": "2.5.5",
+    "cv_threads": 1
+  },
+  "clips": {
+    "gop30": {
+      "media_path": "/tmp/openscrub-late-window-20261116/gop30.mp4",
+      "media_sha256": "366eab01e0974f9e7d36d3e36593a26c3e3f6d71ee0b8fff254b486d62c89a35",
+      "reference": {
+        "rows": [
+          {
+            "t_start": 600,
+            "t_end": 600.0166666666667,
+            "cbox": [
+              100,
+              70,
+              164,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 0.0,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 600.2,
+            "t_end": 600.2166666666667,
+            "cbox": [
+              101,
+              70,
+              165,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 0.0,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 600.3,
+            "t_end": 600.55,
+            "cbox": [
+              101,
+              70,
+              165,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 0.0,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 600.0166666666667,
+            "t_end": 600.0666666666667,
+            "cbox": [
+              100,
+              70,
+              164,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 600.0166666666667,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 600.0666666666667,
+            "t_end": 600.1333333333333,
+            "cbox": [
+              100,
+              70,
+              164,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 600.0666666666667,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 600.1333333333333,
+            "t_end": 600.2,
+            "cbox": [
+              100,
+              70,
+              165,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 600.1333333333333,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 600.2166666666667,
+            "t_end": 600.25,
+            "cbox": [
+              101,
+              70,
+              165,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 600.2166666666667,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 600.25,
+            "t_end": 600.3,
+            "cbox": [
+              101,
+              70,
+              165,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 600.25,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 599.9333333333333,
+            "t_end": 600.0,
+            "cbox": [
+              100,
+              70,
+              164,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 599.9333333333333,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 599.8666666666666,
+            "t_end": 599.9333333333333,
+            "cbox": [
+              100,
+              70,
+              164,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 599.8666666666666,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 599.7999999999998,
+            "t_end": 599.8666666666666,
+            "cbox": [
+              100,
+              70,
+              164,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 599.7999999999998,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 599.7333333333331,
+            "t_end": 599.7999999999998,
+            "cbox": [
+              98,
+              70,
+              162,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 599.7333333333331,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 599.6666666666664,
+            "t_end": 599.7333333333331,
+            "cbox": [
+              98,
+              70,
+              162,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 599.6666666666664,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 599.5999999999997,
+            "t_end": 599.6666666666664,
+            "cbox": [
+              98,
+              70,
+              162,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 599.5999999999997,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 599.533333333333,
+            "t_end": 599.5999999999997,
+            "cbox": [
+              98,
+              70,
+              162,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 599.533333333333,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 599.4666666666662,
+            "t_end": 599.533333333333,
+            "cbox": [
+              98,
+              70,
+              162,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 599.4666666666662,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 599.3999999999995,
+            "t_end": 599.4666666666662,
+            "cbox": [
+              98,
+              70,
+              162,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 599.3999999999995,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 599.3333333333328,
+            "t_end": 599.3999999999995,
+            "cbox": [
+              96,
+              70,
+              160,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 599.3333333333328,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 599.2666666666661,
+            "t_end": 599.3333333333328,
+            "cbox": [
+              96,
+              70,
+              160,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 599.2666666666661,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 599.1999999999994,
+            "t_end": 599.2666666666661,
+            "cbox": [
+              96,
+              70,
+              160,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 599.1999999999994,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 599.1333333333326,
+            "t_end": 599.1999999999994,
+            "cbox": [
+              96,
+              70,
+              160,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 599.1333333333326,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 599.0666666666659,
+            "t_end": 599.1333333333326,
+            "cbox": [
+              96,
+              70,
+              160,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 599.0666666666659,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 598.9999999999992,
+            "t_end": 599.0666666666659,
+            "cbox": [
+              96,
+              70,
+              160,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 598.9999999999992,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 598.9333333333325,
+            "t_end": 598.9999999999992,
+            "cbox": [
+              94,
+              70,
+              158,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 598.9333333333325,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 598.8666666666658,
+            "t_end": 598.9333333333325,
+            "cbox": [
+              94,
+              70,
+              158,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 598.8666666666658,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 598.799999999999,
+            "t_end": 598.8666666666658,
+            "cbox": [
+              94,
+              70,
+              158,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 598.799999999999,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 598.7333333333323,
+            "t_end": 598.799999999999,
+            "cbox": [
+              94,
+              70,
+              158,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 598.7333333333323,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 598.6666666666656,
+            "t_end": 598.7333333333323,
+            "cbox": [
+              94,
+              70,
+              158,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 598.6666666666656,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 598.5999999999989,
+            "t_end": 598.6666666666656,
+            "cbox": [
+              94,
+              70,
+              158,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 598.5999999999989,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 598.5333333333322,
+            "t_end": 598.5999999999989,
+            "cbox": [
+              92,
+              70,
+              156,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 598.5333333333322,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 598.4666666666654,
+            "t_end": 598.5333333333322,
+            "cbox": [
+              92,
+              70,
+              156,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 598.4666666666654,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 598.3999999999987,
+            "t_end": 598.4666666666654,
+            "cbox": [
+              92,
+              70,
+              156,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 598.3999999999987,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 598.333333333332,
+            "t_end": 598.3999999999987,
+            "cbox": [
+              92,
+              70,
+              156,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 598.333333333332,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 598.2666666666653,
+            "t_end": 598.333333333332,
+            "cbox": [
+              92,
+              70,
+              156,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 598.2666666666653,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 598.1999999999986,
+            "t_end": 598.2666666666653,
+            "cbox": [
+              92,
+              70,
+              156,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 598.1999999999986,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 598.1333333333318,
+            "t_end": 598.1999999999986,
+            "cbox": [
+              90,
+              70,
+              154,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 598.1333333333318,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 598.0666666666651,
+            "t_end": 598.1333333333318,
+            "cbox": [
+              90,
+              70,
+              154,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 598.0666666666651,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 597.7499999999984,
+            "t_end": 598.0666666666651,
+            "cbox": [
+              90,
+              70,
+              154,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 597.9999999999984,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          }
+        ],
+        "markers": [
+          17872,
+          17873,
+          17874,
+          17875,
+          17876,
+          17877,
+          17878,
+          17879,
+          17880,
+          17881,
+          17882,
+          17883,
+          17884,
+          17885,
+          17886,
+          17887,
+          17888,
+          17889,
+          17890,
+          17891,
+          17892,
+          17893,
+          17894,
+          17895,
+          17896,
+          17897,
+          17898,
+          17899,
+          17900,
+          17901,
+          17902,
+          17903,
+          17904,
+          17905,
+          17906,
+          17907,
+          17908,
+          17909,
+          17910,
+          17911,
+          17912,
+          17913,
+          17914,
+          17915,
+          17916,
+          17917,
+          17918,
+          17919,
+          17920,
+          17921,
+          17922,
+          17923,
+          17924,
+          17925,
+          17926,
+          17927,
+          17928,
+          17929,
+          17930,
+          17931,
+          17932,
+          17933,
+          17934,
+          17935,
+          17936,
+          17937,
+          17938,
+          17939,
+          17940,
+          17941,
+          17942,
+          17943,
+          17944,
+          17945,
+          17946,
+          17947,
+          17948,
+          17949,
+          17950,
+          17951,
+          17952,
+          17953,
+          17954,
+          17955,
+          17956,
+          17957,
+          17958,
+          17959,
+          17960,
+          17961,
+          17962,
+          17963,
+          17964,
+          17965,
+          17966,
+          17967,
+          17968,
+          17969,
+          17970,
+          17971,
+          17972,
+          17973,
+          17974,
+          17975,
+          17976,
+          17977,
+          17978,
+          17979,
+          17980,
+          17981,
+          17982,
+          17983,
+          17984,
+          17985,
+          17986,
+          17987,
+          17988,
+          17989,
+          17990,
+          17991,
+          17992,
+          17993,
+          17994,
+          17995,
+          17996,
+          17997,
+          17998,
+          17999,
+          18000
+        ]
+      },
+      "runs": [
+        {
+          "seconds": 5.6078814629981935,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "reads": 18001,
+          "grabs": 0,
+          "sets": 0,
+          "captures": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "rows_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "source": "before",
+          "phase": "warmup",
+          "pair": 0,
+          "matches_reference_rows_and_markers": true
+        },
+        {
+          "seconds": 1.7999760040002002,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "reads": 129,
+          "grabs": 17872,
+          "sets": 0,
+          "captures": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "rows_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "source": "after",
+          "phase": "warmup",
+          "pair": 0,
+          "matches_reference_rows_and_markers": true
+        },
+        {
+          "seconds": 1.7995429610018618,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "reads": 129,
+          "grabs": 17872,
+          "sets": 0,
+          "captures": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "rows_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "source": "after",
+          "phase": "warmup",
+          "pair": 1,
+          "matches_reference_rows_and_markers": true
+        },
+        {
+          "seconds": 5.553227118001814,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "reads": 18001,
+          "grabs": 0,
+          "sets": 0,
+          "captures": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "rows_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "source": "before",
+          "phase": "warmup",
+          "pair": 1,
+          "matches_reference_rows_and_markers": true
+        },
+        {
+          "seconds": 5.504594684996846,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "reads": 18001,
+          "grabs": 0,
+          "sets": 0,
+          "captures": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "rows_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "source": "before",
+          "phase": "warmup",
+          "pair": 2,
+          "matches_reference_rows_and_markers": true
+        },
+        {
+          "seconds": 1.8046807550017547,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "reads": 129,
+          "grabs": 17872,
+          "sets": 0,
+          "captures": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "rows_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "source": "after",
+          "phase": "warmup",
+          "pair": 2,
+          "matches_reference_rows_and_markers": true
+        },
+        {
+          "seconds": 5.529397796999547,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "reads": 18001,
+          "grabs": 0,
+          "sets": 0,
+          "captures": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "rows_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "source": "before",
+          "phase": "sample",
+          "pair": 0,
+          "matches_reference_rows_and_markers": true
+        },
+        {
+          "seconds": 1.7973045370017644,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "reads": 129,
+          "grabs": 17872,
+          "sets": 0,
+          "captures": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "rows_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "source": "after",
+          "phase": "sample",
+          "pair": 0,
+          "matches_reference_rows_and_markers": true
+        },
+        {
+          "seconds": 1.811115893000533,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "reads": 129,
+          "grabs": 17872,
+          "sets": 0,
+          "captures": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "rows_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "source": "after",
+          "phase": "sample",
+          "pair": 1,
+          "matches_reference_rows_and_markers": true
+        },
+        {
+          "seconds": 5.529710271999647,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "reads": 18001,
+          "grabs": 0,
+          "sets": 0,
+          "captures": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "rows_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "source": "before",
+          "phase": "sample",
+          "pair": 1,
+          "matches_reference_rows_and_markers": true
+        },
+        {
+          "seconds": 5.535446695997962,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "reads": 18001,
+          "grabs": 0,
+          "sets": 0,
+          "captures": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "rows_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "source": "before",
+          "phase": "sample",
+          "pair": 2,
+          "matches_reference_rows_and_markers": true
+        },
+        {
+          "seconds": 1.792093867999938,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "reads": 129,
+          "grabs": 17872,
+          "sets": 0,
+          "captures": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "rows_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "source": "after",
+          "phase": "sample",
+          "pair": 2,
+          "matches_reference_rows_and_markers": true
+        },
+        {
+          "seconds": 1.7972714610004914,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "reads": 129,
+          "grabs": 17872,
+          "sets": 0,
+          "captures": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "rows_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "source": "after",
+          "phase": "sample",
+          "pair": 3,
+          "matches_reference_rows_and_markers": true
+        },
+        {
+          "seconds": 5.544440727997426,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "reads": 18001,
+          "grabs": 0,
+          "sets": 0,
+          "captures": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "rows_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "source": "before",
+          "phase": "sample",
+          "pair": 3,
+          "matches_reference_rows_and_markers": true
+        },
+        {
+          "seconds": 5.530690165000124,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "reads": 18001,
+          "grabs": 0,
+          "sets": 0,
+          "captures": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "rows_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "source": "before",
+          "phase": "sample",
+          "pair": 4,
+          "matches_reference_rows_and_markers": true
+        },
+        {
+          "seconds": 1.814184586997726,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "reads": 129,
+          "grabs": 17872,
+          "sets": 0,
+          "captures": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "rows_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "source": "after",
+          "phase": "sample",
+          "pair": 4,
+          "matches_reference_rows_and_markers": true
+        }
+      ],
+      "cancellation": {
+        "before/before": {
+          "seconds": 0.0038421309982368257,
+          "returned": null,
+          "exception": "PipelineCancelled",
+          "reads": 0,
+          "grabs": 0,
+          "sets": 0,
+          "captures": 1,
+          "releases": 0,
+          "remaining_grab_state": 0,
+          "rows_sha256": "d9a2f06b6075f692f5530fb6522e228af1ea4cb2b8885ba8ac49b3a6ee1e470a"
+        },
+        "before/timed": {
+          "seconds": 0.03474166299929493,
+          "returned": null,
+          "exception": "PipelineCancelled",
+          "reads": 90,
+          "grabs": 0,
+          "sets": 0,
+          "captures": 1,
+          "releases": 0,
+          "remaining_grab_state": 0,
+          "rows_sha256": "b877d3900060d2124709bcb4feea4252b2e506e158e3efd10dec1a7f2f980679"
+        },
+        "after/before": {
+          "seconds": 0.004956607001076918,
+          "returned": null,
+          "exception": "PipelineCancelled",
+          "reads": 0,
+          "grabs": 0,
+          "sets": 0,
+          "captures": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "rows_sha256": "d9a2f06b6075f692f5530fb6522e228af1ea4cb2b8885ba8ac49b3a6ee1e470a"
+        },
+        "after/timed": {
+          "seconds": 0.025522717001877027,
+          "returned": null,
+          "exception": "PipelineCancelled",
+          "reads": 0,
+          "grabs": 180,
+          "sets": 0,
+          "captures": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "rows_sha256": "b877d3900060d2124709bcb4feea4252b2e506e158e3efd10dec1a7f2f980679"
+        }
+      },
+      "median_seconds": {
+        "before": 5.530690165000124,
+        "after": 1.7973045370017644
+      }
+    },
+    "single-keyframe": {
+      "media_path": "/tmp/openscrub-late-window-20261116/single-keyframe.mp4",
+      "media_sha256": "a90a6f8e3b4a289fc0c958c23733119e134a22c51ca171fcf625073b2cae175e",
+      "reference": {
+        "rows": [
+          {
+            "t_start": 600,
+            "t_end": 600.0166666666667,
+            "cbox": [
+              100,
+              70,
+              164,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 0.0,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 600.2,
+            "t_end": 600.2166666666667,
+            "cbox": [
+              101,
+              70,
+              165,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 0.0,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 600.3,
+            "t_end": 600.55,
+            "cbox": [
+              101,
+              70,
+              165,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 0.0,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 600.0166666666667,
+            "t_end": 600.0666666666667,
+            "cbox": [
+              100,
+              70,
+              164,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 600.0166666666667,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 600.0666666666667,
+            "t_end": 600.1333333333333,
+            "cbox": [
+              100,
+              70,
+              164,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 600.0666666666667,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 600.1333333333333,
+            "t_end": 600.2,
+            "cbox": [
+              100,
+              70,
+              165,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 600.1333333333333,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 600.2166666666667,
+            "t_end": 600.25,
+            "cbox": [
+              101,
+              70,
+              165,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 600.2166666666667,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 600.25,
+            "t_end": 600.3,
+            "cbox": [
+              101,
+              70,
+              165,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 600.25,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 599.9333333333333,
+            "t_end": 600.0,
+            "cbox": [
+              100,
+              70,
+              164,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 599.9333333333333,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 599.8666666666666,
+            "t_end": 599.9333333333333,
+            "cbox": [
+              100,
+              70,
+              164,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 599.8666666666666,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 599.7999999999998,
+            "t_end": 599.8666666666666,
+            "cbox": [
+              100,
+              70,
+              164,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 599.7999999999998,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 599.7333333333331,
+            "t_end": 599.7999999999998,
+            "cbox": [
+              98,
+              70,
+              162,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 599.7333333333331,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 599.6666666666664,
+            "t_end": 599.7333333333331,
+            "cbox": [
+              98,
+              70,
+              162,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 599.6666666666664,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 599.5999999999997,
+            "t_end": 599.6666666666664,
+            "cbox": [
+              98,
+              70,
+              162,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 599.5999999999997,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 599.533333333333,
+            "t_end": 599.5999999999997,
+            "cbox": [
+              98,
+              70,
+              162,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 599.533333333333,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 599.4666666666662,
+            "t_end": 599.533333333333,
+            "cbox": [
+              98,
+              70,
+              162,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 599.4666666666662,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 599.3999999999995,
+            "t_end": 599.4666666666662,
+            "cbox": [
+              98,
+              70,
+              162,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 599.3999999999995,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 599.3333333333328,
+            "t_end": 599.3999999999995,
+            "cbox": [
+              96,
+              70,
+              160,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 599.3333333333328,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 599.2666666666661,
+            "t_end": 599.3333333333328,
+            "cbox": [
+              96,
+              70,
+              160,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 599.2666666666661,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 599.1999999999994,
+            "t_end": 599.2666666666661,
+            "cbox": [
+              96,
+              70,
+              160,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 599.1999999999994,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 599.1333333333326,
+            "t_end": 599.1999999999994,
+            "cbox": [
+              96,
+              70,
+              160,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 599.1333333333326,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 599.0666666666659,
+            "t_end": 599.1333333333326,
+            "cbox": [
+              96,
+              70,
+              160,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 599.0666666666659,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 598.9999999999992,
+            "t_end": 599.0666666666659,
+            "cbox": [
+              96,
+              70,
+              160,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 598.9999999999992,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 598.9333333333325,
+            "t_end": 598.9999999999992,
+            "cbox": [
+              94,
+              70,
+              158,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 598.9333333333325,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 598.8666666666658,
+            "t_end": 598.9333333333325,
+            "cbox": [
+              94,
+              70,
+              158,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 598.8666666666658,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 598.799999999999,
+            "t_end": 598.8666666666658,
+            "cbox": [
+              94,
+              70,
+              158,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 598.799999999999,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 598.7333333333323,
+            "t_end": 598.799999999999,
+            "cbox": [
+              94,
+              70,
+              158,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 598.7333333333323,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 598.6666666666656,
+            "t_end": 598.7333333333323,
+            "cbox": [
+              94,
+              70,
+              158,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 598.6666666666656,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 598.5999999999989,
+            "t_end": 598.6666666666656,
+            "cbox": [
+              94,
+              70,
+              158,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 598.5999999999989,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 598.5333333333322,
+            "t_end": 598.5999999999989,
+            "cbox": [
+              92,
+              70,
+              156,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 598.5333333333322,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 598.4666666666654,
+            "t_end": 598.5333333333322,
+            "cbox": [
+              92,
+              70,
+              156,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 598.4666666666654,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 598.3999999999987,
+            "t_end": 598.4666666666654,
+            "cbox": [
+              92,
+              70,
+              156,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 598.3999999999987,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 598.333333333332,
+            "t_end": 598.3999999999987,
+            "cbox": [
+              92,
+              70,
+              156,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 598.333333333332,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 598.2666666666653,
+            "t_end": 598.333333333332,
+            "cbox": [
+              92,
+              70,
+              156,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 598.2666666666653,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 598.1999999999986,
+            "t_end": 598.2666666666653,
+            "cbox": [
+              92,
+              70,
+              156,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 598.1999999999986,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 598.1333333333318,
+            "t_end": 598.1999999999986,
+            "cbox": [
+              90,
+              70,
+              154,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 598.1333333333318,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 598.0666666666651,
+            "t_end": 598.1333333333318,
+            "cbox": [
+              90,
+              70,
+              154,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 598.0666666666651,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          },
+          {
+            "t_start": 597.7499999999984,
+            "t_end": 598.0666666666651,
+            "cbox": [
+              90,
+              70,
+              154,
+              118
+            ],
+            "category": "face",
+            "text": "synthetic",
+            "confidence": 0.95,
+            "aoff": [
+              0.0,
+              0.0
+            ],
+            "last_seen": 597.9999999999984,
+            "dense": true,
+            "track": 1,
+            "person": -1,
+            "poly": []
+          }
+        ],
+        "markers": [
+          17872,
+          17873,
+          17874,
+          17875,
+          17876,
+          17877,
+          17878,
+          17879,
+          17880,
+          17881,
+          17882,
+          17883,
+          17884,
+          17885,
+          17886,
+          17887,
+          17888,
+          17889,
+          17890,
+          17891,
+          17892,
+          17893,
+          17894,
+          17895,
+          17896,
+          17897,
+          17898,
+          17899,
+          17900,
+          17901,
+          17902,
+          17903,
+          17904,
+          17905,
+          17906,
+          17907,
+          17908,
+          17909,
+          17910,
+          17911,
+          17912,
+          17913,
+          17914,
+          17915,
+          17916,
+          17917,
+          17918,
+          17919,
+          17920,
+          17921,
+          17922,
+          17923,
+          17924,
+          17925,
+          17926,
+          17927,
+          17928,
+          17929,
+          17930,
+          17931,
+          17932,
+          17933,
+          17934,
+          17935,
+          17936,
+          17937,
+          17938,
+          17939,
+          17940,
+          17941,
+          17942,
+          17943,
+          17944,
+          17945,
+          17946,
+          17947,
+          17948,
+          17949,
+          17950,
+          17951,
+          17952,
+          17953,
+          17954,
+          17955,
+          17956,
+          17957,
+          17958,
+          17959,
+          17960,
+          17961,
+          17962,
+          17963,
+          17964,
+          17965,
+          17966,
+          17967,
+          17968,
+          17969,
+          17970,
+          17971,
+          17972,
+          17973,
+          17974,
+          17975,
+          17976,
+          17977,
+          17978,
+          17979,
+          17980,
+          17981,
+          17982,
+          17983,
+          17984,
+          17985,
+          17986,
+          17987,
+          17988,
+          17989,
+          17990,
+          17991,
+          17992,
+          17993,
+          17994,
+          17995,
+          17996,
+          17997,
+          17998,
+          17999,
+          18000
+        ]
+      },
+      "runs": [
+        {
+          "seconds": 5.518288919000042,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "reads": 18001,
+          "grabs": 0,
+          "sets": 0,
+          "captures": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "rows_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "source": "before",
+          "phase": "warmup",
+          "pair": 0,
+          "matches_reference_rows_and_markers": true
+        },
+        {
+          "seconds": 1.3856271619988547,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "reads": 129,
+          "grabs": 17872,
+          "sets": 0,
+          "captures": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "rows_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "source": "after",
+          "phase": "warmup",
+          "pair": 0,
+          "matches_reference_rows_and_markers": true
+        },
+        {
+          "seconds": 1.3749403439978778,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "reads": 129,
+          "grabs": 17872,
+          "sets": 0,
+          "captures": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "rows_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "source": "after",
+          "phase": "warmup",
+          "pair": 1,
+          "matches_reference_rows_and_markers": true
+        },
+        {
+          "seconds": 5.493341716999566,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "reads": 18001,
+          "grabs": 0,
+          "sets": 0,
+          "captures": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "rows_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "source": "before",
+          "phase": "warmup",
+          "pair": 1,
+          "matches_reference_rows_and_markers": true
+        },
+        {
+          "seconds": 5.48889384100039,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "reads": 18001,
+          "grabs": 0,
+          "sets": 0,
+          "captures": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "rows_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "source": "before",
+          "phase": "warmup",
+          "pair": 2,
+          "matches_reference_rows_and_markers": true
+        },
+        {
+          "seconds": 1.387727757999528,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "reads": 129,
+          "grabs": 17872,
+          "sets": 0,
+          "captures": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "rows_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "source": "after",
+          "phase": "warmup",
+          "pair": 2,
+          "matches_reference_rows_and_markers": true
+        },
+        {
+          "seconds": 5.524841063997883,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "reads": 18001,
+          "grabs": 0,
+          "sets": 0,
+          "captures": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "rows_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "source": "before",
+          "phase": "sample",
+          "pair": 0,
+          "matches_reference_rows_and_markers": true
+        },
+        {
+          "seconds": 1.3868662320019212,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "reads": 129,
+          "grabs": 17872,
+          "sets": 0,
+          "captures": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "rows_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "source": "after",
+          "phase": "sample",
+          "pair": 0,
+          "matches_reference_rows_and_markers": true
+        },
+        {
+          "seconds": 1.3926696050002647,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "reads": 129,
+          "grabs": 17872,
+          "sets": 0,
+          "captures": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "rows_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "source": "after",
+          "phase": "sample",
+          "pair": 1,
+          "matches_reference_rows_and_markers": true
+        },
+        {
+          "seconds": 5.460098305997235,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "reads": 18001,
+          "grabs": 0,
+          "sets": 0,
+          "captures": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "rows_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "source": "before",
+          "phase": "sample",
+          "pair": 1,
+          "matches_reference_rows_and_markers": true
+        },
+        {
+          "seconds": 5.453763531000732,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "reads": 18001,
+          "grabs": 0,
+          "sets": 0,
+          "captures": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "rows_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "source": "before",
+          "phase": "sample",
+          "pair": 2,
+          "matches_reference_rows_and_markers": true
+        },
+        {
+          "seconds": 1.3687251000010292,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "reads": 129,
+          "grabs": 17872,
+          "sets": 0,
+          "captures": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "rows_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "source": "after",
+          "phase": "sample",
+          "pair": 2,
+          "matches_reference_rows_and_markers": true
+        },
+        {
+          "seconds": 1.4031486370004131,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "reads": 129,
+          "grabs": 17872,
+          "sets": 0,
+          "captures": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "rows_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "source": "after",
+          "phase": "sample",
+          "pair": 3,
+          "matches_reference_rows_and_markers": true
+        },
+        {
+          "seconds": 5.491271645001689,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "reads": 18001,
+          "grabs": 0,
+          "sets": 0,
+          "captures": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "rows_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "source": "before",
+          "phase": "sample",
+          "pair": 3,
+          "matches_reference_rows_and_markers": true
+        },
+        {
+          "seconds": 5.479826686998422,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "reads": 18001,
+          "grabs": 0,
+          "sets": 0,
+          "captures": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "rows_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "source": "before",
+          "phase": "sample",
+          "pair": 4,
+          "matches_reference_rows_and_markers": true
+        },
+        {
+          "seconds": 1.3736074749976979,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "reads": 129,
+          "grabs": 17872,
+          "sets": 0,
+          "captures": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "rows_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "source": "after",
+          "phase": "sample",
+          "pair": 4,
+          "matches_reference_rows_and_markers": true
+        }
+      ],
+      "cancellation": {
+        "before/before": {
+          "seconds": 0.0037799730016558897,
+          "returned": null,
+          "exception": "PipelineCancelled",
+          "reads": 0,
+          "grabs": 0,
+          "sets": 0,
+          "captures": 1,
+          "releases": 0,
+          "remaining_grab_state": 0,
+          "rows_sha256": "d9a2f06b6075f692f5530fb6522e228af1ea4cb2b8885ba8ac49b3a6ee1e470a"
+        },
+        "before/timed": {
+          "seconds": 0.034607964000315405,
+          "returned": null,
+          "exception": "PipelineCancelled",
+          "reads": 90,
+          "grabs": 0,
+          "sets": 0,
+          "captures": 1,
+          "releases": 0,
+          "remaining_grab_state": 0,
+          "rows_sha256": "b877d3900060d2124709bcb4feea4252b2e506e158e3efd10dec1a7f2f980679"
+        },
+        "after/before": {
+          "seconds": 0.005023076999350451,
+          "returned": null,
+          "exception": "PipelineCancelled",
+          "reads": 0,
+          "grabs": 0,
+          "sets": 0,
+          "captures": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "rows_sha256": "d9a2f06b6075f692f5530fb6522e228af1ea4cb2b8885ba8ac49b3a6ee1e470a"
+        },
+        "after/timed": {
+          "seconds": 0.02717178799866815,
+          "returned": null,
+          "exception": "PipelineCancelled",
+          "reads": 0,
+          "grabs": 270,
+          "sets": 0,
+          "captures": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "rows_sha256": "b877d3900060d2124709bcb4feea4252b2e506e158e3efd10dec1a7f2f980679"
+        }
+      },
+      "median_seconds": {
+        "before": 5.479826686998422,
+        "after": 1.3868662320019212
+      }
+    }
+  },
+  "finished_utc": "2026-11-16T23:06:36.042438+00:00",
+  "process_peak_rss_kib": 131364
+}

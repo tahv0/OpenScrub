@@ -1,0 +1,933 @@
+{
+  "base": "e21ebdf6e3ee46e6c65050dc956a9a3459152269",
+  "started_utc": "2026-11-16T22:09:02.511248+00:00",
+  "clips": {
+    "gop30": {
+      "warmups": [
+        [
+          {
+            "mode": "base",
+            "failure": false,
+            "cancel": false,
+            "seconds": 5.570508375003556,
+            "returned": [
+              2,
+              30,
+              2.25
+            ],
+            "exception": null,
+            "row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+            "seeks": [],
+            "reads": 18001,
+            "seek_reads": 0,
+            "grabs": 0,
+            "capture_count": 1,
+            "releases": 1,
+            "remaining_grab_state": 0,
+            "backend": [],
+            "native_set_calls": [],
+            "matches_reference_rows_and_markers": true
+          },
+          {
+            "mode": "grab",
+            "failure": false,
+            "cancel": false,
+            "seconds": 1.8415341729996726,
+            "returned": [
+              2,
+              30,
+              2.25
+            ],
+            "exception": null,
+            "row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+            "seeks": [],
+            "reads": 129,
+            "seek_reads": 0,
+            "grabs": 17872,
+            "capture_count": 1,
+            "releases": 1,
+            "remaining_grab_state": 0,
+            "backend": [],
+            "native_set_calls": [],
+            "matches_reference_rows_and_markers": true
+          }
+        ],
+        [
+          {
+            "mode": "base",
+            "failure": false,
+            "cancel": false,
+            "seconds": 5.517990068001382,
+            "returned": [
+              2,
+              30,
+              2.25
+            ],
+            "exception": null,
+            "row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+            "seeks": [],
+            "reads": 18001,
+            "seek_reads": 0,
+            "grabs": 0,
+            "capture_count": 1,
+            "releases": 1,
+            "remaining_grab_state": 0,
+            "backend": [],
+            "native_set_calls": [],
+            "matches_reference_rows_and_markers": true
+          },
+          {
+            "mode": "grab",
+            "failure": false,
+            "cancel": false,
+            "seconds": 1.8047450779995415,
+            "returned": [
+              2,
+              30,
+              2.25
+            ],
+            "exception": null,
+            "row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+            "seeks": [],
+            "reads": 129,
+            "seek_reads": 0,
+            "grabs": 17872,
+            "capture_count": 1,
+            "releases": 1,
+            "remaining_grab_state": 0,
+            "backend": [],
+            "native_set_calls": [],
+            "matches_reference_rows_and_markers": true
+          }
+        ],
+        [
+          {
+            "mode": "base",
+            "failure": false,
+            "cancel": false,
+            "seconds": 5.492130719998386,
+            "returned": [
+              2,
+              30,
+              2.25
+            ],
+            "exception": null,
+            "row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+            "seeks": [],
+            "reads": 18001,
+            "seek_reads": 0,
+            "grabs": 0,
+            "capture_count": 1,
+            "releases": 1,
+            "remaining_grab_state": 0,
+            "backend": [],
+            "native_set_calls": [],
+            "matches_reference_rows_and_markers": true
+          },
+          {
+            "mode": "grab",
+            "failure": false,
+            "cancel": false,
+            "seconds": 1.8009795100006158,
+            "returned": [
+              2,
+              30,
+              2.25
+            ],
+            "exception": null,
+            "row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+            "seeks": [],
+            "reads": 129,
+            "seek_reads": 0,
+            "grabs": 17872,
+            "capture_count": 1,
+            "releases": 1,
+            "remaining_grab_state": 0,
+            "backend": [],
+            "native_set_calls": [],
+            "matches_reference_rows_and_markers": true
+          }
+        ]
+      ],
+      "runs": [
+        {
+          "mode": "base",
+          "failure": false,
+          "cancel": false,
+          "seconds": 5.665949542999442,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "seeks": [],
+          "reads": 18001,
+          "seek_reads": 0,
+          "grabs": 0,
+          "capture_count": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "backend": [],
+          "native_set_calls": [],
+          "matches_reference_rows_and_markers": true
+        },
+        {
+          "mode": "grab",
+          "failure": false,
+          "cancel": false,
+          "seconds": 1.8349633470024855,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "seeks": [],
+          "reads": 129,
+          "seek_reads": 0,
+          "grabs": 17872,
+          "capture_count": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "backend": [],
+          "native_set_calls": [],
+          "matches_reference_rows_and_markers": true
+        },
+        {
+          "mode": "grab",
+          "failure": false,
+          "cancel": false,
+          "seconds": 1.8675082119989384,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "seeks": [],
+          "reads": 129,
+          "seek_reads": 0,
+          "grabs": 17872,
+          "capture_count": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "backend": [],
+          "native_set_calls": [],
+          "matches_reference_rows_and_markers": true
+        },
+        {
+          "mode": "base",
+          "failure": false,
+          "cancel": false,
+          "seconds": 5.5649654809967615,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "seeks": [],
+          "reads": 18001,
+          "seek_reads": 0,
+          "grabs": 0,
+          "capture_count": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "backend": [],
+          "native_set_calls": [],
+          "matches_reference_rows_and_markers": true
+        },
+        {
+          "mode": "base",
+          "failure": false,
+          "cancel": false,
+          "seconds": 5.57266109199918,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "seeks": [],
+          "reads": 18001,
+          "seek_reads": 0,
+          "grabs": 0,
+          "capture_count": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "backend": [],
+          "native_set_calls": [],
+          "matches_reference_rows_and_markers": true
+        },
+        {
+          "mode": "grab",
+          "failure": false,
+          "cancel": false,
+          "seconds": 1.8159828730022127,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "seeks": [],
+          "reads": 129,
+          "seek_reads": 0,
+          "grabs": 17872,
+          "capture_count": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "backend": [],
+          "native_set_calls": [],
+          "matches_reference_rows_and_markers": true
+        },
+        {
+          "mode": "grab",
+          "failure": false,
+          "cancel": false,
+          "seconds": 1.8333438699992257,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "seeks": [],
+          "reads": 129,
+          "seek_reads": 0,
+          "grabs": 17872,
+          "capture_count": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "backend": [],
+          "native_set_calls": [],
+          "matches_reference_rows_and_markers": true
+        },
+        {
+          "mode": "base",
+          "failure": false,
+          "cancel": false,
+          "seconds": 5.548963502998959,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "seeks": [],
+          "reads": 18001,
+          "seek_reads": 0,
+          "grabs": 0,
+          "capture_count": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "backend": [],
+          "native_set_calls": [],
+          "matches_reference_rows_and_markers": true
+        },
+        {
+          "mode": "base",
+          "failure": false,
+          "cancel": false,
+          "seconds": 5.5669631870005105,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "seeks": [],
+          "reads": 18001,
+          "seek_reads": 0,
+          "grabs": 0,
+          "capture_count": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "backend": [],
+          "native_set_calls": [],
+          "matches_reference_rows_and_markers": true
+        },
+        {
+          "mode": "grab",
+          "failure": false,
+          "cancel": false,
+          "seconds": 1.8129238600013196,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "seeks": [],
+          "reads": 129,
+          "seek_reads": 0,
+          "grabs": 17872,
+          "capture_count": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "backend": [],
+          "native_set_calls": [],
+          "matches_reference_rows_and_markers": true
+        }
+      ],
+      "cancellation": {
+        "base/before": {
+          "mode": "base",
+          "failure": false,
+          "cancel": "before",
+          "seconds": 0.0035809500004688744,
+          "returned": null,
+          "exception": "PipelineCancelled",
+          "row_sha256": "d9a2f06b6075f692f5530fb6522e228af1ea4cb2b8885ba8ac49b3a6ee1e470a",
+          "seeks": [],
+          "reads": 0,
+          "seek_reads": 0,
+          "grabs": 0,
+          "capture_count": 1,
+          "releases": 0,
+          "remaining_grab_state": 0,
+          "backend": [
+            "FFMPEG"
+          ],
+          "native_set_calls": []
+        },
+        "base/timed": {
+          "mode": "base",
+          "failure": false,
+          "cancel": "timed",
+          "seconds": 0.034672537996812025,
+          "returned": null,
+          "exception": "PipelineCancelled",
+          "row_sha256": "b877d3900060d2124709bcb4feea4252b2e506e158e3efd10dec1a7f2f980679",
+          "seeks": [],
+          "reads": 90,
+          "seek_reads": 0,
+          "grabs": 0,
+          "capture_count": 1,
+          "releases": 0,
+          "remaining_grab_state": 0,
+          "backend": [
+            "FFMPEG"
+          ],
+          "native_set_calls": []
+        },
+        "grab/before": {
+          "mode": "grab",
+          "failure": false,
+          "cancel": "before",
+          "seconds": 0.005093613999633817,
+          "returned": null,
+          "exception": "PipelineCancelled",
+          "row_sha256": "d9a2f06b6075f692f5530fb6522e228af1ea4cb2b8885ba8ac49b3a6ee1e470a",
+          "seeks": [],
+          "reads": 0,
+          "seek_reads": 0,
+          "grabs": 0,
+          "capture_count": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "backend": [],
+          "native_set_calls": []
+        },
+        "grab/timed": {
+          "mode": "grab",
+          "failure": false,
+          "cancel": "timed",
+          "seconds": 0.025798844999371795,
+          "returned": null,
+          "exception": "PipelineCancelled",
+          "row_sha256": "b877d3900060d2124709bcb4feea4252b2e506e158e3efd10dec1a7f2f980679",
+          "seeks": [],
+          "reads": 0,
+          "seek_reads": 0,
+          "grabs": 180,
+          "capture_count": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "backend": [],
+          "native_set_calls": []
+        }
+      },
+      "reference_row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+      "median_seconds": {
+        "base": 5.5669631870005105,
+        "grab": 1.8333438699992257
+      }
+    },
+    "single-keyframe": {
+      "warmups": [
+        [
+          {
+            "mode": "base",
+            "failure": false,
+            "cancel": false,
+            "seconds": 5.493032681999466,
+            "returned": [
+              2,
+              30,
+              2.25
+            ],
+            "exception": null,
+            "row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+            "seeks": [],
+            "reads": 18001,
+            "seek_reads": 0,
+            "grabs": 0,
+            "capture_count": 1,
+            "releases": 1,
+            "remaining_grab_state": 0,
+            "backend": [],
+            "native_set_calls": [],
+            "matches_reference_rows_and_markers": true
+          },
+          {
+            "mode": "grab",
+            "failure": false,
+            "cancel": false,
+            "seconds": 1.391977389997919,
+            "returned": [
+              2,
+              30,
+              2.25
+            ],
+            "exception": null,
+            "row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+            "seeks": [],
+            "reads": 129,
+            "seek_reads": 0,
+            "grabs": 17872,
+            "capture_count": 1,
+            "releases": 1,
+            "remaining_grab_state": 0,
+            "backend": [],
+            "native_set_calls": [],
+            "matches_reference_rows_and_markers": true
+          }
+        ],
+        [
+          {
+            "mode": "base",
+            "failure": false,
+            "cancel": false,
+            "seconds": 5.524386515000515,
+            "returned": [
+              2,
+              30,
+              2.25
+            ],
+            "exception": null,
+            "row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+            "seeks": [],
+            "reads": 18001,
+            "seek_reads": 0,
+            "grabs": 0,
+            "capture_count": 1,
+            "releases": 1,
+            "remaining_grab_state": 0,
+            "backend": [],
+            "native_set_calls": [],
+            "matches_reference_rows_and_markers": true
+          },
+          {
+            "mode": "grab",
+            "failure": false,
+            "cancel": false,
+            "seconds": 1.3998826360002568,
+            "returned": [
+              2,
+              30,
+              2.25
+            ],
+            "exception": null,
+            "row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+            "seeks": [],
+            "reads": 129,
+            "seek_reads": 0,
+            "grabs": 17872,
+            "capture_count": 1,
+            "releases": 1,
+            "remaining_grab_state": 0,
+            "backend": [],
+            "native_set_calls": [],
+            "matches_reference_rows_and_markers": true
+          }
+        ],
+        [
+          {
+            "mode": "base",
+            "failure": false,
+            "cancel": false,
+            "seconds": 5.4854580870014615,
+            "returned": [
+              2,
+              30,
+              2.25
+            ],
+            "exception": null,
+            "row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+            "seeks": [],
+            "reads": 18001,
+            "seek_reads": 0,
+            "grabs": 0,
+            "capture_count": 1,
+            "releases": 1,
+            "remaining_grab_state": 0,
+            "backend": [],
+            "native_set_calls": [],
+            "matches_reference_rows_and_markers": true
+          },
+          {
+            "mode": "grab",
+            "failure": false,
+            "cancel": false,
+            "seconds": 1.3770323119970271,
+            "returned": [
+              2,
+              30,
+              2.25
+            ],
+            "exception": null,
+            "row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+            "seeks": [],
+            "reads": 129,
+            "seek_reads": 0,
+            "grabs": 17872,
+            "capture_count": 1,
+            "releases": 1,
+            "remaining_grab_state": 0,
+            "backend": [],
+            "native_set_calls": [],
+            "matches_reference_rows_and_markers": true
+          }
+        ]
+      ],
+      "runs": [
+        {
+          "mode": "base",
+          "failure": false,
+          "cancel": false,
+          "seconds": 5.51628802200139,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "seeks": [],
+          "reads": 18001,
+          "seek_reads": 0,
+          "grabs": 0,
+          "capture_count": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "backend": [],
+          "native_set_calls": [],
+          "matches_reference_rows_and_markers": true
+        },
+        {
+          "mode": "grab",
+          "failure": false,
+          "cancel": false,
+          "seconds": 1.3810425529991335,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "seeks": [],
+          "reads": 129,
+          "seek_reads": 0,
+          "grabs": 17872,
+          "capture_count": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "backend": [],
+          "native_set_calls": [],
+          "matches_reference_rows_and_markers": true
+        },
+        {
+          "mode": "grab",
+          "failure": false,
+          "cancel": false,
+          "seconds": 1.4116189739979745,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "seeks": [],
+          "reads": 129,
+          "seek_reads": 0,
+          "grabs": 17872,
+          "capture_count": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "backend": [],
+          "native_set_calls": [],
+          "matches_reference_rows_and_markers": true
+        },
+        {
+          "mode": "base",
+          "failure": false,
+          "cancel": false,
+          "seconds": 5.534414231999108,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "seeks": [],
+          "reads": 18001,
+          "seek_reads": 0,
+          "grabs": 0,
+          "capture_count": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "backend": [],
+          "native_set_calls": [],
+          "matches_reference_rows_and_markers": true
+        },
+        {
+          "mode": "base",
+          "failure": false,
+          "cancel": false,
+          "seconds": 5.521539050001593,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "seeks": [],
+          "reads": 18001,
+          "seek_reads": 0,
+          "grabs": 0,
+          "capture_count": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "backend": [],
+          "native_set_calls": [],
+          "matches_reference_rows_and_markers": true
+        },
+        {
+          "mode": "grab",
+          "failure": false,
+          "cancel": false,
+          "seconds": 1.4000822580019303,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "seeks": [],
+          "reads": 129,
+          "seek_reads": 0,
+          "grabs": 17872,
+          "capture_count": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "backend": [],
+          "native_set_calls": [],
+          "matches_reference_rows_and_markers": true
+        },
+        {
+          "mode": "grab",
+          "failure": false,
+          "cancel": false,
+          "seconds": 1.4099565899996378,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "seeks": [],
+          "reads": 129,
+          "seek_reads": 0,
+          "grabs": 17872,
+          "capture_count": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "backend": [],
+          "native_set_calls": [],
+          "matches_reference_rows_and_markers": true
+        },
+        {
+          "mode": "base",
+          "failure": false,
+          "cancel": false,
+          "seconds": 5.485725210997771,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "seeks": [],
+          "reads": 18001,
+          "seek_reads": 0,
+          "grabs": 0,
+          "capture_count": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "backend": [],
+          "native_set_calls": [],
+          "matches_reference_rows_and_markers": true
+        },
+        {
+          "mode": "base",
+          "failure": false,
+          "cancel": false,
+          "seconds": 5.454764267000428,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "seeks": [],
+          "reads": 18001,
+          "seek_reads": 0,
+          "grabs": 0,
+          "capture_count": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "backend": [],
+          "native_set_calls": [],
+          "matches_reference_rows_and_markers": true
+        },
+        {
+          "mode": "grab",
+          "failure": false,
+          "cancel": false,
+          "seconds": 1.3795827529975213,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "seeks": [],
+          "reads": 129,
+          "seek_reads": 0,
+          "grabs": 17872,
+          "capture_count": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "backend": [],
+          "native_set_calls": [],
+          "matches_reference_rows_and_markers": true
+        }
+      ],
+      "cancellation": {
+        "base/before": {
+          "mode": "base",
+          "failure": false,
+          "cancel": "before",
+          "seconds": 0.0036174099986965302,
+          "returned": null,
+          "exception": "PipelineCancelled",
+          "row_sha256": "d9a2f06b6075f692f5530fb6522e228af1ea4cb2b8885ba8ac49b3a6ee1e470a",
+          "seeks": [],
+          "reads": 0,
+          "seek_reads": 0,
+          "grabs": 0,
+          "capture_count": 1,
+          "releases": 0,
+          "remaining_grab_state": 0,
+          "backend": [
+            "FFMPEG"
+          ],
+          "native_set_calls": []
+        },
+        "base/timed": {
+          "mode": "base",
+          "failure": false,
+          "cancel": "timed",
+          "seconds": 0.03468244600298931,
+          "returned": null,
+          "exception": "PipelineCancelled",
+          "row_sha256": "b877d3900060d2124709bcb4feea4252b2e506e158e3efd10dec1a7f2f980679",
+          "seeks": [],
+          "reads": 90,
+          "seek_reads": 0,
+          "grabs": 0,
+          "capture_count": 1,
+          "releases": 0,
+          "remaining_grab_state": 0,
+          "backend": [
+            "FFMPEG"
+          ],
+          "native_set_calls": []
+        },
+        "grab/before": {
+          "mode": "grab",
+          "failure": false,
+          "cancel": "before",
+          "seconds": 0.004981717000191566,
+          "returned": null,
+          "exception": "PipelineCancelled",
+          "row_sha256": "d9a2f06b6075f692f5530fb6522e228af1ea4cb2b8885ba8ac49b3a6ee1e470a",
+          "seeks": [],
+          "reads": 0,
+          "seek_reads": 0,
+          "grabs": 0,
+          "capture_count": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "backend": [],
+          "native_set_calls": []
+        },
+        "grab/timed": {
+          "mode": "grab",
+          "failure": false,
+          "cancel": "timed",
+          "seconds": 0.027675815003021853,
+          "returned": null,
+          "exception": "PipelineCancelled",
+          "row_sha256": "b877d3900060d2124709bcb4feea4252b2e506e158e3efd10dec1a7f2f980679",
+          "seeks": [],
+          "reads": 0,
+          "seek_reads": 0,
+          "grabs": 270,
+          "capture_count": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "backend": [],
+          "native_set_calls": []
+        }
+      },
+      "reference_row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+      "median_seconds": {
+        "base": 5.51628802200139,
+        "grab": 1.4000822580019303
+      }
+    }
+  },
+  "finished_utc": "2026-11-16T22:10:59.887279+00:00"
+}

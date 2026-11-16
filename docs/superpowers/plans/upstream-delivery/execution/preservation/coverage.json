@@ -1,0 +1,41 @@
+{
+  "upstream": "5d3a15ae683c08f368d6ba4bd0d2d77b4e7b8e2f",
+  "donor": "b4d0c75f25d91510fe1692f901d11853dc7db005",
+  "date": "2026-11-17",
+  "historical_commits": 500,
+  "core_commits": 180,
+  "noncore_commits": 320,
+  "merge_commits": 62,
+  "exact_disjoint_inventory_partition": true,
+  "dispositions": {
+    "already-upstream": 11,
+    "exclude-artifact-retain-contract": 154,
+    "historical-support-only": 28,
+    "mapped-owned": 132,
+    "removed-system-only": 113,
+    "superseded": 2,
+    "support-owned": 60
+  },
+  "retained_owning_gates": 346,
+  "source_closure_or_repair_only": 154,
+  "initial_inventory_evidence_counts_historical": {
+    "hunk-inventory": 10,
+    "metadata-path-hunk-inventory": 463,
+    "path-inventory": 3,
+    "source-compared": 5,
+    "source-inspected-subset": 18,
+    "source-isolated-probe": 1
+  },
+  "initial_inventory_disposition_counts_historical": {
+    "PR": 19,
+    "already upstream": 5,
+    "downstream": 2,
+    "investigate": 469,
+    "removed-system-only": 5
+  },
+  "limits": [
+    "Production-source disposition is not implementation, reproduction or acceptance.",
+    "Selected support-test scope for three large introductions and two associated merges is recorded explicitly.",
+    "Runtime S01-S06 and owning candidate validation gates remain open."
+  ]
+}

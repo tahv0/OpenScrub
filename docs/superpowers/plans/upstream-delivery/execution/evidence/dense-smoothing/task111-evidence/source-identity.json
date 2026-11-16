@@ -1,0 +1,12 @@
+{
+  "e21ebdf6e3ee46e6c65050dc956a9a3459152269": {
+    "module": "/tmp/openscrub-task111/before/openscrub.py",
+    "sha256": "0e4f0f9a7846080f591038d021aaf3ca6f01201d83ac32bbdc273f53d5067ee7",
+    "matches_git_blob": true
+  },
+  "f19be5fe3b9176e568ea7bf761493bd267fee95e": {
+    "module": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py",
+    "sha256": "2f0aea827ad88a394a3420d3f88755308506ec17dfb8bf9ea30b3b1a3696ebf0",
+    "matches_git_blob": true
+  }
+}

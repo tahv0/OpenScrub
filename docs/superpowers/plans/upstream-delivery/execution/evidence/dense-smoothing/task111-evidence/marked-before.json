@@ -1,0 +1,223 @@
+(1, 5, 1.25) 10 2c61c2352afd72a6f69ea46398b3947eaf00b80e82609d9148c3368b805ba050
+[
+  {
+    "t_start": 6.0,
+    "t_end": 6.05,
+    "cbox": [
+      44,
+      40,
+      76,
+      72
+    ],
+    "category": "face",
+    "text": "synthetic",
+    "confidence": 0.95,
+    "aoff": [
+      0.0,
+      0.0
+    ],
+    "last_seen": 0.0,
+    "dense": true,
+    "track": 1,
+    "person": -1,
+    "poly": []
+  },
+  {
+    "t_start": 6.2,
+    "t_end": 6.3,
+    "cbox": [
+      44,
+      40,
+      76,
+      72
+    ],
+    "category": "face",
+    "text": "synthetic",
+    "confidence": 0.95,
+    "aoff": [
+      0.0,
+      0.0
+    ],
+    "last_seen": 0.0,
+    "dense": true,
+    "track": 1,
+    "person": -1,
+    "poly": []
+  },
+  {
+    "t_start": 6.3,
+    "t_end": 6.55,
+    "cbox": [
+      44,
+      40,
+      76,
+      72
+    ],
+    "category": "face",
+    "text": "synthetic",
+    "confidence": 0.95,
+    "aoff": [
+      0.0,
+      0.0
+    ],
+    "last_seen": 0.0,
+    "dense": true,
+    "track": 1,
+    "person": -1,
+    "poly": []
+  },
+  {
+    "t_start": 6.05,
+    "t_end": 6.1,
+    "cbox": [
+      44,
+      40,
+      76,
+      72
+    ],
+    "category": "face",
+    "text": "synthetic",
+    "confidence": 0.95,
+    "aoff": [
+      0.0,
+      0.0
+    ],
+    "last_seen": 6.05,
+    "dense": true,
+    "track": 1,
+    "person": -1,
+    "poly": []
+  },
+  {
+    "t_start": 6.1,
+    "t_end": 6.2,
+    "cbox": [
+      44,
+      40,
+      76,
+      72
+    ],
+    "category": "face",
+    "text": "synthetic",
+    "confidence": 0.95,
+    "aoff": [
+      0.0,
+      0.0
+    ],
+    "last_seen": 6.1,
+    "dense": true,
+    "track": 1,
+    "person": -1,
+    "poly": []
+  },
+  {
+    "t_start": 5.8,
+    "t_end": 6.0,
+    "cbox": [
+      42,
+      40,
+      74,
+      72
+    ],
+    "category": "face",
+    "text": "synthetic",
+    "confidence": 0.95,
+    "aoff": [
+      0.0,
+      0.0
+    ],
+    "last_seen": 5.8,
+    "dense": true,
+    "track": 1,
+    "person": -1,
+    "poly": []
+  },
+  {
+    "t_start": 5.6,
+    "t_end": 5.8,
+    "cbox": [
+      42,
+      40,
+      74,
+      72
+    ],
+    "category": "face",
+    "text": "synthetic",
+    "confidence": 0.95,
+    "aoff": [
+      0.0,
+      0.0
+    ],
+    "last_seen": 5.6,
+    "dense": true,
+    "track": 1,
+    "person": -1,
+    "poly": []
+  },
+  {
+    "t_start": 5.3999999999999995,
+    "t_end": 5.6,
+    "cbox": [
+      40,
+      40,
+      72,
+      72
+    ],
+    "category": "face",
+    "text": "synthetic",
+    "confidence": 0.95,
+    "aoff": [
+      0.0,
+      0.0
+    ],
+    "last_seen": 5.3999999999999995,
+    "dense": true,
+    "track": 1,
+    "person": -1,
+    "poly": []
+  },
+  {
+    "t_start": 5.199999999999999,
+    "t_end": 5.3999999999999995,
+    "cbox": [
+      40,
+      40,
+      72,
+      72
+    ],
+    "category": "face",
+    "text": "synthetic",
+    "confidence": 0.95,
+    "aoff": [
+      0.0,
+      0.0
+    ],
+    "last_seen": 5.199999999999999,
+    "dense": true,
+    "track": 1,
+    "person": -1,
+    "poly": []
+  },
+  {
+    "t_start": 4.749999999999999,
+    "t_end": 5.199999999999999,
+    "cbox": [
+      40,
+      40,
+      72,
+      72
+    ],
+    "category": "face",
+    "text": "synthetic",
+    "confidence": 0.95,
+    "aoff": [
+      0.0,
+      0.0
+    ],
+    "last_seen": 4.999999999999999,
+    "dense": true,
+    "track": 1,
+    "person": -1,
+    "poly": []
+  }
+]

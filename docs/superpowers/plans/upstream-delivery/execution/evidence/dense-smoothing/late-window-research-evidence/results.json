@@ -1,0 +1,8360 @@
+{
+  "base": "e21ebdf6e3ee46e6c65050dc956a9a3459152269",
+  "source_sha256": "0e4f0f9a7846080f591038d021aaf3ca6f01201d83ac32bbdc273f53d5067ee7",
+  "started_utc": "2026-11-16T22:03:01.269547+00:00",
+  "environment": {
+    "python": "3.12.16",
+    "opencv": "4.14.0",
+    "numpy": "2.5.5",
+    "platform": "Linux-6.18.58.1-microsoft-standard-WSL2-x86_64-with-glibc2.43",
+    "cpu": "AMD Ryzen 7 5800X3D 8-Core Processor",
+    "cv2_threads": 1,
+    "ffmpeg": "ffmpeg version 8.0.1-3ubuntu2 Copyright (c) 2000-2025 the FFmpeg developers"
+  },
+  "configuration": {
+    "fps": 30,
+    "dimensions": [
+      256,
+      144
+    ],
+    "frames": 18300,
+    "window_start": 590,
+    "detection_seconds": [
+      600,
+      600.2,
+      600.3
+    ],
+    "seed": 20261116,
+    "cache": "fresh capture and namespace each invocation; OS file cache uncontrolled/warm; no cache drop"
+  },
+  "clips": {
+    "gop30": {
+      "metadata": {
+        "stream": {
+          "index": 0,
+          "codec_name": "h264",
+          "codec_long_name": "H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10",
+          "profile": "High",
+          "codec_type": "video",
+          "codec_tag_string": "avc1",
+          "codec_tag": "0x31637661",
+          "width": 256,
+          "height": 144,
+          "coded_width": 256,
+          "coded_height": 144,
+          "has_b_frames": 2,
+          "pix_fmt": "yuv420p",
+          "level": 12,
+          "chroma_location": "left",
+          "field_order": "progressive",
+          "refs": 1,
+          "is_avc": "true",
+          "nal_length_size": "4",
+          "id": "0x1",
+          "r_frame_rate": "30/1",
+          "avg_frame_rate": "30/1",
+          "time_base": "1/15360",
+          "start_pts": 0,
+          "start_time": "0.000000",
+          "duration_ts": 9369600,
+          "duration": "610.000000",
+          "bit_rate": "235468",
+          "bits_per_raw_sample": "8",
+          "nb_frames": "18300",
+          "extradata_size": 45,
+          "disposition": {
+            "default": 1,
+            "dub": 0,
+            "original": 0,
+            "comment": 0,
+            "lyrics": 0,
+            "karaoke": 0,
+            "forced": 0,
+            "hearing_impaired": 0,
+            "visual_impaired": 0,
+            "clean_effects": 0,
+            "attached_pic": 0,
+            "timed_thumbnails": 0,
+            "non_diegetic": 0,
+            "captions": 0,
+            "descriptions": 0,
+            "metadata": 0,
+            "dependent": 0,
+            "still_image": 0,
+            "multilayer": 0
+          },
+          "tags": {
+            "language": "und",
+            "handler_name": "VideoHandler",
+            "vendor_id": "[0][0][0][0]",
+            "encoder": "Lavc62.11.100 libx264"
+          }
+        },
+        "format": {
+          "filename": "/tmp/openscrub-late-window-20261116/gop30.mp4",
+          "nb_streams": 1,
+          "nb_programs": 0,
+          "nb_stream_groups": 0,
+          "format_name": "mov,mp4,m4a,3gp,3g2,mj2",
+          "format_long_name": "QuickTime / MOV",
+          "start_time": "0.000000",
+          "duration": "610.000000",
+          "size": "18134863",
+          "bit_rate": "237834",
+          "probe_score": 100,
+          "tags": {
+            "major_brand": "isom",
+            "minor_version": "512",
+            "compatible_brands": "isomiso2avc1mp41",
+            "encoder": "Lavf62.3.100"
+          }
+        },
+        "frame_count": 18300,
+        "keyframes": [
+          0,
+          30,
+          60,
+          90,
+          120,
+          150,
+          180,
+          210,
+          240,
+          270,
+          300,
+          330,
+          360,
+          390,
+          420,
+          450,
+          480,
+          510,
+          540,
+          570,
+          600,
+          630,
+          660,
+          690,
+          720,
+          750,
+          780,
+          810,
+          840,
+          870,
+          900,
+          930,
+          960,
+          990,
+          1020,
+          1050,
+          1080,
+          1110,
+          1140,
+          1170,
+          1200,
+          1230,
+          1260,
+          1290,
+          1320,
+          1350,
+          1380,
+          1410,
+          1440,
+          1470,
+          1500,
+          1530,
+          1560,
+          1590,
+          1620,
+          1650,
+          1680,
+          1710,
+          1740,
+          1770,
+          1800,
+          1830,
+          1860,
+          1890,
+          1920,
+          1950,
+          1980,
+          2010,
+          2040,
+          2070,
+          2100,
+          2130,
+          2160,
+          2190,
+          2220,
+          2250,
+          2280,
+          2310,
+          2340,
+          2370,
+          2400,
+          2430,
+          2460,
+          2490,
+          2520,
+          2550,
+          2580,
+          2610,
+          2640,
+          2670,
+          2700,
+          2730,
+          2760,
+          2790,
+          2820,
+          2850,
+          2880,
+          2910,
+          2940,
+          2970,
+          3000,
+          3030,
+          3060,
+          3090,
+          3120,
+          3150,
+          3180,
+          3210,
+          3240,
+          3270,
+          3300,
+          3330,
+          3360,
+          3390,
+          3420,
+          3450,
+          3480,
+          3510,
+          3540,
+          3570,
+          3600,
+          3630,
+          3660,
+          3690,
+          3720,
+          3750,
+          3780,
+          3810,
+          3840,
+          3870,
+          3900,
+          3930,
+          3960,
+          3990,
+          4020,
+          4050,
+          4080,
+          4110,
+          4140,
+          4170,
+          4200,
+          4230,
+          4260,
+          4290,
+          4320,
+          4350,
+          4380,
+          4410,
+          4440,
+          4470,
+          4500,
+          4530,
+          4560,
+          4590,
+          4620,
+          4650,
+          4680,
+          4710,
+          4740,
+          4770,
+          4800,
+          4830,
+          4860,
+          4890,
+          4920,
+          4950,
+          4980,
+          5010,
+          5040,
+          5070,
+          5100,
+          5130,
+          5160,
+          5190,
+          5220,
+          5250,
+          5280,
+          5310,
+          5340,
+          5370,
+          5400,
+          5430,
+          5460,
+          5490,
+          5520,
+          5550,
+          5580,
+          5610,
+          5640,
+          5670,
+          5700,
+          5730,
+          5760,
+          5790,
+          5820,
+          5850,
+          5880,
+          5910,
+          5940,
+          5970,
+          6000,
+          6030,
+          6060,
+          6090,
+          6120,
+          6150,
+          6180,
+          6210,
+          6240,
+          6270,
+          6300,
+          6330,
+          6360,
+          6390,
+          6420,
+          6450,
+          6480,
+          6510,
+          6540,
+          6570,
+          6600,
+          6630,
+          6660,
+          6690,
+          6720,
+          6750,
+          6780,
+          6810,
+          6840,
+          6870,
+          6900,
+          6930,
+          6960,
+          6990,
+          7020,
+          7050,
+          7080,
+          7110,
+          7140,
+          7170,
+          7200,
+          7230,
+          7260,
+          7290,
+          7320,
+          7350,
+          7380,
+          7410,
+          7440,
+          7470,
+          7500,
+          7530,
+          7560,
+          7590,
+          7620,
+          7650,
+          7680,
+          7710,
+          7740,
+          7770,
+          7800,
+          7830,
+          7860,
+          7890,
+          7920,
+          7950,
+          7980,
+          8010,
+          8040,
+          8070,
+          8100,
+          8130,
+          8160,
+          8190,
+          8220,
+          8250,
+          8280,
+          8310,
+          8340,
+          8370,
+          8400,
+          8430,
+          8460,
+          8490,
+          8520,
+          8550,
+          8580,
+          8610,
+          8640,
+          8670,
+          8700,
+          8730,
+          8760,
+          8790,
+          8820,
+          8850,
+          8880,
+          8910,
+          8940,
+          8970,
+          9000,
+          9030,
+          9060,
+          9090,
+          9120,
+          9150,
+          9180,
+          9210,
+          9240,
+          9270,
+          9300,
+          9330,
+          9360,
+          9390,
+          9420,
+          9450,
+          9480,
+          9510,
+          9540,
+          9570,
+          9600,
+          9630,
+          9660,
+          9690,
+          9720,
+          9750,
+          9780,
+          9810,
+          9840,
+          9870,
+          9900,
+          9930,
+          9960,
+          9990,
+          10020,
+          10050,
+          10080,
+          10110,
+          10140,
+          10170,
+          10200,
+          10230,
+          10260,
+          10290,
+          10320,
+          10350,
+          10380,
+          10410,
+          10440,
+          10470,
+          10500,
+          10530,
+          10560,
+          10590,
+          10620,
+          10650,
+          10680,
+          10710,
+          10740,
+          10770,
+          10800,
+          10830,
+          10860,
+          10890,
+          10920,
+          10950,
+          10980,
+          11010,
+          11040,
+          11070,
+          11100,
+          11130,
+          11160,
+          11190,
+          11220,
+          11250,
+          11280,
+          11310,
+          11340,
+          11370,
+          11400,
+          11430,
+          11460,
+          11490,
+          11520,
+          11550,
+          11580,
+          11610,
+          11640,
+          11670,
+          11700,
+          11730,
+          11760,
+          11790,
+          11820,
+          11850,
+          11880,
+          11910,
+          11940,
+          11970,
+          12000,
+          12030,
+          12060,
+          12090,
+          12120,
+          12150,
+          12180,
+          12210,
+          12240,
+          12270,
+          12300,
+          12330,
+          12360,
+          12390,
+          12420,
+          12450,
+          12480,
+          12510,
+          12540,
+          12570,
+          12600,
+          12630,
+          12660,
+          12690,
+          12720,
+          12750,
+          12780,
+          12810,
+          12840,
+          12870,
+          12900,
+          12930,
+          12960,
+          12990,
+          13020,
+          13050,
+          13080,
+          13110,
+          13140,
+          13170,
+          13200,
+          13230,
+          13260,
+          13290,
+          13320,
+          13350,
+          13380,
+          13410,
+          13440,
+          13470,
+          13500,
+          13530,
+          13560,
+          13590,
+          13620,
+          13650,
+          13680,
+          13710,
+          13740,
+          13770,
+          13800,
+          13830,
+          13860,
+          13890,
+          13920,
+          13950,
+          13980,
+          14010,
+          14040,
+          14070,
+          14100,
+          14130,
+          14160,
+          14190,
+          14220,
+          14250,
+          14280,
+          14310,
+          14340,
+          14370,
+          14400,
+          14430,
+          14460,
+          14490,
+          14520,
+          14550,
+          14580,
+          14610,
+          14640,
+          14670,
+          14700,
+          14730,
+          14760,
+          14790,
+          14820,
+          14850,
+          14880,
+          14910,
+          14940,
+          14970,
+          15000,
+          15030,
+          15060,
+          15090,
+          15120,
+          15150,
+          15180,
+          15210,
+          15240,
+          15270,
+          15300,
+          15330,
+          15360,
+          15390,
+          15420,
+          15450,
+          15480,
+          15510,
+          15540,
+          15570,
+          15600,
+          15630,
+          15660,
+          15690,
+          15720,
+          15750,
+          15780,
+          15810,
+          15840,
+          15870,
+          15900,
+          15930,
+          15960,
+          15990,
+          16020,
+          16050,
+          16080,
+          16110,
+          16140,
+          16170,
+          16200,
+          16230,
+          16260,
+          16290,
+          16320,
+          16350,
+          16380,
+          16410,
+          16440,
+          16470,
+          16500,
+          16530,
+          16560,
+          16590,
+          16620,
+          16650,
+          16680,
+          16710,
+          16740,
+          16770,
+          16800,
+          16830,
+          16860,
+          16890,
+          16920,
+          16950,
+          16980,
+          17010,
+          17040,
+          17070,
+          17100,
+          17130,
+          17160,
+          17190,
+          17220,
+          17250,
+          17280,
+          17310,
+          17340,
+          17370,
+          17400,
+          17430,
+          17460,
+          17490,
+          17520,
+          17550,
+          17580,
+          17610,
+          17640,
+          17670,
+          17700,
+          17730,
+          17760,
+          17790,
+          17820,
+          17850,
+          17880,
+          17910,
+          17940,
+          17970,
+          18000,
+          18030,
+          18060,
+          18090,
+          18120,
+          18150,
+          18180,
+          18210,
+          18240,
+          18270
+        ],
+        "first_pts": "0.000000",
+        "last_pts": "609.966667",
+        "pts_step_min": 0.033332999999970525,
+        "pts_step_max": 0.03333400000008169
+      },
+      "warmups": [
+        [
+          {
+            "mode": "base",
+            "failure": false,
+            "cancel": false,
+            "seconds": 5.547994429001847,
+            "returned": [
+              2,
+              30,
+              2.25
+            ],
+            "exception": null,
+            "row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+            "seeks": [],
+            "reads": 18001,
+            "seek_reads": 0,
+            "capture_count": 1,
+            "releases": 1,
+            "remaining_grab_state": 0,
+            "backend": [],
+            "native_set_calls": [],
+            "matches_reference_rows": true,
+            "matches_reference_useful_markers": true
+          },
+          {
+            "mode": "safe",
+            "failure": false,
+            "cancel": false,
+            "seconds": 0.07216191099723801,
+            "returned": [
+              2,
+              30,
+              2.25
+            ],
+            "exception": null,
+            "row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+            "seeks": [
+              {
+                "target": 17872,
+                "ok": true,
+                "seconds": 0.00882350900064921,
+                "next_frame": 17872.0
+              }
+            ],
+            "reads": 130,
+            "seek_reads": 1,
+            "capture_count": 1,
+            "releases": 1,
+            "remaining_grab_state": 1,
+            "backend": [],
+            "native_set_calls": [
+              {
+                "property": 0,
+                "value": 595700.0,
+                "ok": true,
+                "seconds": 0.006726718998834258
+              }
+            ],
+            "matches_reference_rows": true,
+            "matches_reference_useful_markers": true
+          }
+        ],
+        [
+          {
+            "mode": "base",
+            "failure": false,
+            "cancel": false,
+            "seconds": 5.619651720000547,
+            "returned": [
+              2,
+              30,
+              2.25
+            ],
+            "exception": null,
+            "row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+            "seeks": [],
+            "reads": 18001,
+            "seek_reads": 0,
+            "capture_count": 1,
+            "releases": 1,
+            "remaining_grab_state": 0,
+            "backend": [],
+            "native_set_calls": [],
+            "matches_reference_rows": true,
+            "matches_reference_useful_markers": true
+          },
+          {
+            "mode": "safe",
+            "failure": false,
+            "cancel": false,
+            "seconds": 0.0721512510026514,
+            "returned": [
+              2,
+              30,
+              2.25
+            ],
+            "exception": null,
+            "row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+            "seeks": [
+              {
+                "target": 17872,
+                "ok": true,
+                "seconds": 0.008187830000679241,
+                "next_frame": 17872.0
+              }
+            ],
+            "reads": 130,
+            "seek_reads": 1,
+            "capture_count": 1,
+            "releases": 1,
+            "remaining_grab_state": 1,
+            "backend": [],
+            "native_set_calls": [
+              {
+                "property": 0,
+                "value": 595700.0,
+                "ok": true,
+                "seconds": 0.0061775100002705585
+              }
+            ],
+            "matches_reference_rows": true,
+            "matches_reference_useful_markers": true
+          }
+        ],
+        [
+          {
+            "mode": "base",
+            "failure": false,
+            "cancel": false,
+            "seconds": 5.537663410999812,
+            "returned": [
+              2,
+              30,
+              2.25
+            ],
+            "exception": null,
+            "row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+            "seeks": [],
+            "reads": 18001,
+            "seek_reads": 0,
+            "capture_count": 1,
+            "releases": 1,
+            "remaining_grab_state": 0,
+            "backend": [],
+            "native_set_calls": [],
+            "matches_reference_rows": true,
+            "matches_reference_useful_markers": true
+          },
+          {
+            "mode": "safe",
+            "failure": false,
+            "cancel": false,
+            "seconds": 0.06746573200143757,
+            "returned": [
+              2,
+              30,
+              2.25
+            ],
+            "exception": null,
+            "row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+            "seeks": [
+              {
+                "target": 17872,
+                "ok": true,
+                "seconds": 0.00822367099681287,
+                "next_frame": 17872.0
+              }
+            ],
+            "reads": 130,
+            "seek_reads": 1,
+            "capture_count": 1,
+            "releases": 1,
+            "remaining_grab_state": 1,
+            "backend": [],
+            "native_set_calls": [
+              {
+                "property": 0,
+                "value": 595700.0,
+                "ok": true,
+                "seconds": 0.006163521000416949
+              }
+            ],
+            "matches_reference_rows": true,
+            "matches_reference_useful_markers": true
+          }
+        ]
+      ],
+      "runs": [
+        {
+          "mode": "base",
+          "failure": false,
+          "cancel": false,
+          "seconds": 5.489893566998944,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "seeks": [],
+          "reads": 18001,
+          "seek_reads": 0,
+          "capture_count": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "backend": [],
+          "native_set_calls": [],
+          "matches_reference_rows": true,
+          "matches_reference_useful_markers": true
+        },
+        {
+          "mode": "safe",
+          "failure": false,
+          "cancel": false,
+          "seconds": 0.06698675000006915,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "seeks": [
+            {
+              "target": 17872,
+              "ok": true,
+              "seconds": 0.008183440997527214,
+              "next_frame": 17872.0
+            }
+          ],
+          "reads": 130,
+          "seek_reads": 1,
+          "capture_count": 1,
+          "releases": 1,
+          "remaining_grab_state": 1,
+          "backend": [],
+          "native_set_calls": [
+            {
+              "property": 0,
+              "value": 595700.0,
+              "ok": true,
+              "seconds": 0.006104249998315936
+            }
+          ],
+          "matches_reference_rows": true,
+          "matches_reference_useful_markers": true
+        },
+        {
+          "mode": "safe",
+          "failure": false,
+          "cancel": false,
+          "seconds": 0.06722027599971625,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "seeks": [
+            {
+              "target": 17872,
+              "ok": true,
+              "seconds": 0.00833969899758813,
+              "next_frame": 17872.0
+            }
+          ],
+          "reads": 130,
+          "seek_reads": 1,
+          "capture_count": 1,
+          "releases": 1,
+          "remaining_grab_state": 1,
+          "backend": [],
+          "native_set_calls": [
+            {
+              "property": 0,
+              "value": 595700.0,
+              "ok": true,
+              "seconds": 0.006314498001302127
+            }
+          ],
+          "matches_reference_rows": true,
+          "matches_reference_useful_markers": true
+        },
+        {
+          "mode": "base",
+          "failure": false,
+          "cancel": false,
+          "seconds": 5.5188362279986904,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "seeks": [],
+          "reads": 18001,
+          "seek_reads": 0,
+          "capture_count": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "backend": [],
+          "native_set_calls": [],
+          "matches_reference_rows": true,
+          "matches_reference_useful_markers": true
+        },
+        {
+          "mode": "base",
+          "failure": false,
+          "cancel": false,
+          "seconds": 5.518025289999059,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "seeks": [],
+          "reads": 18001,
+          "seek_reads": 0,
+          "capture_count": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "backend": [],
+          "native_set_calls": [],
+          "matches_reference_rows": true,
+          "matches_reference_useful_markers": true
+        },
+        {
+          "mode": "safe",
+          "failure": false,
+          "cancel": false,
+          "seconds": 0.06883531799758202,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "seeks": [
+            {
+              "target": 17872,
+              "ok": true,
+              "seconds": 0.008178268999472493,
+              "next_frame": 17872.0
+            }
+          ],
+          "reads": 130,
+          "seek_reads": 1,
+          "capture_count": 1,
+          "releases": 1,
+          "remaining_grab_state": 1,
+          "backend": [],
+          "native_set_calls": [
+            {
+              "property": 0,
+              "value": 595700.0,
+              "ok": true,
+              "seconds": 0.006132678998255869
+            }
+          ],
+          "matches_reference_rows": true,
+          "matches_reference_useful_markers": true
+        },
+        {
+          "mode": "safe",
+          "failure": false,
+          "cancel": false,
+          "seconds": 0.07064937399991322,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "seeks": [
+            {
+              "target": 17872,
+              "ok": true,
+              "seconds": 0.008580730001995107,
+              "next_frame": 17872.0
+            }
+          ],
+          "reads": 130,
+          "seek_reads": 1,
+          "capture_count": 1,
+          "releases": 1,
+          "remaining_grab_state": 1,
+          "backend": [],
+          "native_set_calls": [
+            {
+              "property": 0,
+              "value": 595700.0,
+              "ok": true,
+              "seconds": 0.006463384001108352
+            }
+          ],
+          "matches_reference_rows": true,
+          "matches_reference_useful_markers": true
+        },
+        {
+          "mode": "base",
+          "failure": false,
+          "cancel": false,
+          "seconds": 5.488142965001316,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "seeks": [],
+          "reads": 18001,
+          "seek_reads": 0,
+          "capture_count": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "backend": [],
+          "native_set_calls": [],
+          "matches_reference_rows": true,
+          "matches_reference_useful_markers": true
+        },
+        {
+          "mode": "base",
+          "failure": false,
+          "cancel": false,
+          "seconds": 5.519688938999025,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "seeks": [],
+          "reads": 18001,
+          "seek_reads": 0,
+          "capture_count": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "backend": [],
+          "native_set_calls": [],
+          "matches_reference_rows": true,
+          "matches_reference_useful_markers": true
+        },
+        {
+          "mode": "safe",
+          "failure": false,
+          "cancel": false,
+          "seconds": 0.06702761899941834,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "seeks": [
+            {
+              "target": 17872,
+              "ok": true,
+              "seconds": 0.00844097500157659,
+              "next_frame": 17872.0
+            }
+          ],
+          "reads": 130,
+          "seek_reads": 1,
+          "capture_count": 1,
+          "releases": 1,
+          "remaining_grab_state": 1,
+          "backend": [],
+          "native_set_calls": [
+            {
+              "property": 0,
+              "value": 595700.0,
+              "ok": true,
+              "seconds": 0.0063982050014601555
+            }
+          ],
+          "matches_reference_rows": true,
+          "matches_reference_useful_markers": true
+        }
+      ],
+      "median_seconds": {
+        "base": 5.518025289999059,
+        "safe": 0.06722027599971625
+      },
+      "reference_rows": [
+        {
+          "t_start": 600,
+          "t_end": 600.0166666666667,
+          "cbox": [
+            100,
+            70,
+            164,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 0.0,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 600.2,
+          "t_end": 600.2166666666667,
+          "cbox": [
+            101,
+            70,
+            165,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 0.0,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 600.3,
+          "t_end": 600.55,
+          "cbox": [
+            101,
+            70,
+            165,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 0.0,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 600.0166666666667,
+          "t_end": 600.0666666666667,
+          "cbox": [
+            100,
+            70,
+            164,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 600.0166666666667,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 600.0666666666667,
+          "t_end": 600.1333333333333,
+          "cbox": [
+            100,
+            70,
+            164,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 600.0666666666667,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 600.1333333333333,
+          "t_end": 600.2,
+          "cbox": [
+            100,
+            70,
+            165,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 600.1333333333333,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 600.2166666666667,
+          "t_end": 600.25,
+          "cbox": [
+            101,
+            70,
+            165,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 600.2166666666667,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 600.25,
+          "t_end": 600.3,
+          "cbox": [
+            101,
+            70,
+            165,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 600.25,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.9333333333333,
+          "t_end": 600.0,
+          "cbox": [
+            100,
+            70,
+            164,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.9333333333333,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.8666666666666,
+          "t_end": 599.9333333333333,
+          "cbox": [
+            100,
+            70,
+            164,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.8666666666666,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.7999999999998,
+          "t_end": 599.8666666666666,
+          "cbox": [
+            100,
+            70,
+            164,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.7999999999998,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.7333333333331,
+          "t_end": 599.7999999999998,
+          "cbox": [
+            98,
+            70,
+            162,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.7333333333331,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.6666666666664,
+          "t_end": 599.7333333333331,
+          "cbox": [
+            98,
+            70,
+            162,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.6666666666664,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.5999999999997,
+          "t_end": 599.6666666666664,
+          "cbox": [
+            98,
+            70,
+            162,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.5999999999997,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.533333333333,
+          "t_end": 599.5999999999997,
+          "cbox": [
+            98,
+            70,
+            162,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.533333333333,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.4666666666662,
+          "t_end": 599.533333333333,
+          "cbox": [
+            98,
+            70,
+            162,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.4666666666662,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.3999999999995,
+          "t_end": 599.4666666666662,
+          "cbox": [
+            98,
+            70,
+            162,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.3999999999995,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.3333333333328,
+          "t_end": 599.3999999999995,
+          "cbox": [
+            96,
+            70,
+            160,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.3333333333328,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.2666666666661,
+          "t_end": 599.3333333333328,
+          "cbox": [
+            96,
+            70,
+            160,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.2666666666661,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.1999999999994,
+          "t_end": 599.2666666666661,
+          "cbox": [
+            96,
+            70,
+            160,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.1999999999994,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.1333333333326,
+          "t_end": 599.1999999999994,
+          "cbox": [
+            96,
+            70,
+            160,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.1333333333326,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.0666666666659,
+          "t_end": 599.1333333333326,
+          "cbox": [
+            96,
+            70,
+            160,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.0666666666659,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.9999999999992,
+          "t_end": 599.0666666666659,
+          "cbox": [
+            96,
+            70,
+            160,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.9999999999992,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.9333333333325,
+          "t_end": 598.9999999999992,
+          "cbox": [
+            94,
+            70,
+            158,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.9333333333325,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.8666666666658,
+          "t_end": 598.9333333333325,
+          "cbox": [
+            94,
+            70,
+            158,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.8666666666658,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.799999999999,
+          "t_end": 598.8666666666658,
+          "cbox": [
+            94,
+            70,
+            158,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.799999999999,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.7333333333323,
+          "t_end": 598.799999999999,
+          "cbox": [
+            94,
+            70,
+            158,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.7333333333323,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.6666666666656,
+          "t_end": 598.7333333333323,
+          "cbox": [
+            94,
+            70,
+            158,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.6666666666656,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.5999999999989,
+          "t_end": 598.6666666666656,
+          "cbox": [
+            94,
+            70,
+            158,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.5999999999989,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.5333333333322,
+          "t_end": 598.5999999999989,
+          "cbox": [
+            92,
+            70,
+            156,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.5333333333322,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.4666666666654,
+          "t_end": 598.5333333333322,
+          "cbox": [
+            92,
+            70,
+            156,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.4666666666654,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.3999999999987,
+          "t_end": 598.4666666666654,
+          "cbox": [
+            92,
+            70,
+            156,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.3999999999987,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.333333333332,
+          "t_end": 598.3999999999987,
+          "cbox": [
+            92,
+            70,
+            156,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.333333333332,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.2666666666653,
+          "t_end": 598.333333333332,
+          "cbox": [
+            92,
+            70,
+            156,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.2666666666653,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.1999999999986,
+          "t_end": 598.2666666666653,
+          "cbox": [
+            92,
+            70,
+            156,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.1999999999986,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.1333333333318,
+          "t_end": 598.1999999999986,
+          "cbox": [
+            90,
+            70,
+            154,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.1333333333318,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.0666666666651,
+          "t_end": 598.1333333333318,
+          "cbox": [
+            90,
+            70,
+            154,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.0666666666651,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 597.7499999999984,
+          "t_end": 598.0666666666651,
+          "cbox": [
+            90,
+            70,
+            154,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 597.9999999999984,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        }
+      ],
+      "reference_useful_markers": [
+        17872,
+        17873,
+        17874,
+        17875,
+        17876,
+        17877,
+        17878,
+        17879,
+        17880,
+        17881,
+        17882,
+        17883,
+        17884,
+        17885,
+        17886,
+        17887,
+        17888,
+        17889,
+        17890,
+        17891,
+        17892,
+        17893,
+        17894,
+        17895,
+        17896,
+        17897,
+        17898,
+        17899,
+        17900,
+        17901,
+        17902,
+        17903,
+        17904,
+        17905,
+        17906,
+        17907,
+        17908,
+        17909,
+        17910,
+        17911,
+        17912,
+        17913,
+        17914,
+        17915,
+        17916,
+        17917,
+        17918,
+        17919,
+        17920,
+        17921,
+        17922,
+        17923,
+        17924,
+        17925,
+        17926,
+        17927,
+        17928,
+        17929,
+        17930,
+        17931,
+        17932,
+        17933,
+        17934,
+        17935,
+        17936,
+        17937,
+        17938,
+        17939,
+        17940,
+        17941,
+        17942,
+        17943,
+        17944,
+        17945,
+        17946,
+        17947,
+        17948,
+        17949,
+        17950,
+        17951,
+        17952,
+        17953,
+        17954,
+        17955,
+        17956,
+        17957,
+        17958,
+        17959,
+        17960,
+        17961,
+        17962,
+        17963,
+        17964,
+        17965,
+        17966,
+        17967,
+        17968,
+        17969,
+        17970,
+        17971,
+        17972,
+        17973,
+        17974,
+        17975,
+        17976,
+        17977,
+        17978,
+        17979,
+        17980,
+        17981,
+        17982,
+        17983,
+        17984,
+        17985,
+        17986,
+        17987,
+        17988,
+        17989,
+        17990,
+        17991,
+        17992,
+        17993,
+        17994,
+        17995,
+        17996,
+        17997,
+        17998,
+        17999,
+        18000
+      ]
+    },
+    "single-keyframe": {
+      "metadata": {
+        "stream": {
+          "index": 0,
+          "codec_name": "h264",
+          "codec_long_name": "H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10",
+          "profile": "High",
+          "codec_type": "video",
+          "codec_tag_string": "avc1",
+          "codec_tag": "0x31637661",
+          "width": 256,
+          "height": 144,
+          "coded_width": 256,
+          "coded_height": 144,
+          "has_b_frames": 2,
+          "pix_fmt": "yuv420p",
+          "level": 12,
+          "chroma_location": "left",
+          "field_order": "progressive",
+          "refs": 1,
+          "is_avc": "true",
+          "nal_length_size": "4",
+          "id": "0x1",
+          "r_frame_rate": "30/1",
+          "avg_frame_rate": "30/1",
+          "time_base": "1/15360",
+          "start_pts": 0,
+          "start_time": "0.000000",
+          "duration_ts": 9369600,
+          "duration": "610.000000",
+          "bit_rate": "33413",
+          "bits_per_raw_sample": "8",
+          "nb_frames": "18300",
+          "extradata_size": 45,
+          "disposition": {
+            "default": 1,
+            "dub": 0,
+            "original": 0,
+            "comment": 0,
+            "lyrics": 0,
+            "karaoke": 0,
+            "forced": 0,
+            "hearing_impaired": 0,
+            "visual_impaired": 0,
+            "clean_effects": 0,
+            "attached_pic": 0,
+            "timed_thumbnails": 0,
+            "non_diegetic": 0,
+            "captions": 0,
+            "descriptions": 0,
+            "metadata": 0,
+            "dependent": 0,
+            "still_image": 0,
+            "multilayer": 0
+          },
+          "tags": {
+            "language": "und",
+            "handler_name": "VideoHandler",
+            "vendor_id": "[0][0][0][0]",
+            "encoder": "Lavc62.11.100 libx264"
+          }
+        },
+        "format": {
+          "filename": "/tmp/openscrub-late-window-20261116/single-keyframe.mp4",
+          "nb_streams": 1,
+          "nb_programs": 0,
+          "nb_stream_groups": 0,
+          "format_name": "mov,mp4,m4a,3gp,3g2,mj2",
+          "format_long_name": "QuickTime / MOV",
+          "start_time": "0.000000",
+          "duration": "610.000000",
+          "size": "2724556",
+          "bit_rate": "35731",
+          "probe_score": 100,
+          "tags": {
+            "major_brand": "isom",
+            "minor_version": "512",
+            "compatible_brands": "isomiso2avc1mp41",
+            "encoder": "Lavf62.3.100"
+          }
+        },
+        "frame_count": 18300,
+        "keyframes": [
+          0
+        ],
+        "first_pts": "0.000000",
+        "last_pts": "609.966667",
+        "pts_step_min": 0.033332999999970525,
+        "pts_step_max": 0.03333400000008169
+      },
+      "warmups": [
+        [
+          {
+            "mode": "base",
+            "failure": false,
+            "cancel": false,
+            "seconds": 5.500305107998429,
+            "returned": [
+              2,
+              30,
+              2.25
+            ],
+            "exception": null,
+            "row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+            "seeks": [],
+            "reads": 18001,
+            "seek_reads": 0,
+            "capture_count": 1,
+            "releases": 1,
+            "remaining_grab_state": 0,
+            "backend": [],
+            "native_set_calls": [],
+            "matches_reference_rows": true,
+            "matches_reference_useful_markers": true
+          },
+          {
+            "mode": "safe",
+            "failure": false,
+            "cancel": false,
+            "seconds": 1.4032380620010372,
+            "returned": [
+              2,
+              30,
+              2.25
+            ],
+            "exception": null,
+            "row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+            "seeks": [
+              {
+                "target": 17872,
+                "ok": true,
+                "seconds": 1.3404883189978136,
+                "next_frame": 17872.0
+              }
+            ],
+            "reads": 130,
+            "seek_reads": 1,
+            "capture_count": 1,
+            "releases": 1,
+            "remaining_grab_state": 1,
+            "backend": [],
+            "native_set_calls": [
+              {
+                "property": 0,
+                "value": 595700.0,
+                "ok": true,
+                "seconds": 1.3383732399997825
+              }
+            ],
+            "matches_reference_rows": true,
+            "matches_reference_useful_markers": true
+          }
+        ],
+        [
+          {
+            "mode": "base",
+            "failure": false,
+            "cancel": false,
+            "seconds": 5.478311645998474,
+            "returned": [
+              2,
+              30,
+              2.25
+            ],
+            "exception": null,
+            "row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+            "seeks": [],
+            "reads": 18001,
+            "seek_reads": 0,
+            "capture_count": 1,
+            "releases": 1,
+            "remaining_grab_state": 0,
+            "backend": [],
+            "native_set_calls": [],
+            "matches_reference_rows": true,
+            "matches_reference_useful_markers": true
+          },
+          {
+            "mode": "safe",
+            "failure": false,
+            "cancel": false,
+            "seconds": 1.4199617839985876,
+            "returned": [
+              2,
+              30,
+              2.25
+            ],
+            "exception": null,
+            "row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+            "seeks": [
+              {
+                "target": 17872,
+                "ok": true,
+                "seconds": 1.359263722999458,
+                "next_frame": 17872.0
+              }
+            ],
+            "reads": 130,
+            "seek_reads": 1,
+            "capture_count": 1,
+            "releases": 1,
+            "remaining_grab_state": 1,
+            "backend": [],
+            "native_set_calls": [
+              {
+                "property": 0,
+                "value": 595700.0,
+                "ok": true,
+                "seconds": 1.3573132329984219
+              }
+            ],
+            "matches_reference_rows": true,
+            "matches_reference_useful_markers": true
+          }
+        ],
+        [
+          {
+            "mode": "base",
+            "failure": false,
+            "cancel": false,
+            "seconds": 5.464942262999102,
+            "returned": [
+              2,
+              30,
+              2.25
+            ],
+            "exception": null,
+            "row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+            "seeks": [],
+            "reads": 18001,
+            "seek_reads": 0,
+            "capture_count": 1,
+            "releases": 1,
+            "remaining_grab_state": 0,
+            "backend": [],
+            "native_set_calls": [],
+            "matches_reference_rows": true,
+            "matches_reference_useful_markers": true
+          },
+          {
+            "mode": "safe",
+            "failure": false,
+            "cancel": false,
+            "seconds": 1.3789439230022253,
+            "returned": [
+              2,
+              30,
+              2.25
+            ],
+            "exception": null,
+            "row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+            "seeks": [
+              {
+                "target": 17872,
+                "ok": true,
+                "seconds": 1.3188454090013693,
+                "next_frame": 17872.0
+              }
+            ],
+            "reads": 130,
+            "seek_reads": 1,
+            "capture_count": 1,
+            "releases": 1,
+            "remaining_grab_state": 1,
+            "backend": [],
+            "native_set_calls": [
+              {
+                "property": 0,
+                "value": 595700.0,
+                "ok": true,
+                "seconds": 1.3167971490001946
+              }
+            ],
+            "matches_reference_rows": true,
+            "matches_reference_useful_markers": true
+          }
+        ]
+      ],
+      "runs": [
+        {
+          "mode": "base",
+          "failure": false,
+          "cancel": false,
+          "seconds": 5.470593162001023,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "seeks": [],
+          "reads": 18001,
+          "seek_reads": 0,
+          "capture_count": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "backend": [],
+          "native_set_calls": [],
+          "matches_reference_rows": true,
+          "matches_reference_useful_markers": true
+        },
+        {
+          "mode": "safe",
+          "failure": false,
+          "cancel": false,
+          "seconds": 1.404751825000858,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "seeks": [
+            {
+              "target": 17872,
+              "ok": true,
+              "seconds": 1.344816067998181,
+              "next_frame": 17872.0
+            }
+          ],
+          "reads": 130,
+          "seek_reads": 1,
+          "capture_count": 1,
+          "releases": 1,
+          "remaining_grab_state": 1,
+          "backend": [],
+          "native_set_calls": [
+            {
+              "property": 0,
+              "value": 595700.0,
+              "ok": true,
+              "seconds": 1.3428214769992337
+            }
+          ],
+          "matches_reference_rows": true,
+          "matches_reference_useful_markers": true
+        },
+        {
+          "mode": "safe",
+          "failure": false,
+          "cancel": false,
+          "seconds": 1.4181137260020478,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "seeks": [
+            {
+              "target": 17872,
+              "ok": true,
+              "seconds": 1.3560246000015468,
+              "next_frame": 17872.0
+            }
+          ],
+          "reads": 130,
+          "seek_reads": 1,
+          "capture_count": 1,
+          "releases": 1,
+          "remaining_grab_state": 1,
+          "backend": [],
+          "native_set_calls": [
+            {
+              "property": 0,
+              "value": 595700.0,
+              "ok": true,
+              "seconds": 1.3537508139997954
+            }
+          ],
+          "matches_reference_rows": true,
+          "matches_reference_useful_markers": true
+        },
+        {
+          "mode": "base",
+          "failure": false,
+          "cancel": false,
+          "seconds": 5.650853889997961,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "seeks": [],
+          "reads": 18001,
+          "seek_reads": 0,
+          "capture_count": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "backend": [],
+          "native_set_calls": [],
+          "matches_reference_rows": true,
+          "matches_reference_useful_markers": true
+        },
+        {
+          "mode": "base",
+          "failure": false,
+          "cancel": false,
+          "seconds": 5.536005693000334,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "seeks": [],
+          "reads": 18001,
+          "seek_reads": 0,
+          "capture_count": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "backend": [],
+          "native_set_calls": [],
+          "matches_reference_rows": true,
+          "matches_reference_useful_markers": true
+        },
+        {
+          "mode": "safe",
+          "failure": false,
+          "cancel": false,
+          "seconds": 1.403428908000933,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "seeks": [
+            {
+              "target": 17872,
+              "ok": true,
+              "seconds": 1.3431696770021517,
+              "next_frame": 17872.0
+            }
+          ],
+          "reads": 130,
+          "seek_reads": 1,
+          "capture_count": 1,
+          "releases": 1,
+          "remaining_grab_state": 1,
+          "backend": [],
+          "native_set_calls": [
+            {
+              "property": 0,
+              "value": 595700.0,
+              "ok": true,
+              "seconds": 1.3410550480002712
+            }
+          ],
+          "matches_reference_rows": true,
+          "matches_reference_useful_markers": true
+        },
+        {
+          "mode": "safe",
+          "failure": false,
+          "cancel": false,
+          "seconds": 1.4043627280007058,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "seeks": [
+            {
+              "target": 17872,
+              "ok": true,
+              "seconds": 1.3425774240022292,
+              "next_frame": 17872.0
+            }
+          ],
+          "reads": 130,
+          "seek_reads": 1,
+          "capture_count": 1,
+          "releases": 1,
+          "remaining_grab_state": 1,
+          "backend": [],
+          "native_set_calls": [
+            {
+              "property": 0,
+              "value": 595700.0,
+              "ok": true,
+              "seconds": 1.3402603869981249
+            }
+          ],
+          "matches_reference_rows": true,
+          "matches_reference_useful_markers": true
+        },
+        {
+          "mode": "base",
+          "failure": false,
+          "cancel": false,
+          "seconds": 5.546259197999461,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "seeks": [],
+          "reads": 18001,
+          "seek_reads": 0,
+          "capture_count": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "backend": [],
+          "native_set_calls": [],
+          "matches_reference_rows": true,
+          "matches_reference_useful_markers": true
+        },
+        {
+          "mode": "base",
+          "failure": false,
+          "cancel": false,
+          "seconds": 5.562241365001682,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "seeks": [],
+          "reads": 18001,
+          "seek_reads": 0,
+          "capture_count": 1,
+          "releases": 1,
+          "remaining_grab_state": 0,
+          "backend": [],
+          "native_set_calls": [],
+          "matches_reference_rows": true,
+          "matches_reference_useful_markers": true
+        },
+        {
+          "mode": "safe",
+          "failure": false,
+          "cancel": false,
+          "seconds": 1.423420189999888,
+          "returned": [
+            2,
+            30,
+            2.25
+          ],
+          "exception": null,
+          "row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+          "seeks": [
+            {
+              "target": 17872,
+              "ok": true,
+              "seconds": 1.3629736820003018,
+              "next_frame": 17872.0
+            }
+          ],
+          "reads": 130,
+          "seek_reads": 1,
+          "capture_count": 1,
+          "releases": 1,
+          "remaining_grab_state": 1,
+          "backend": [],
+          "native_set_calls": [
+            {
+              "property": 0,
+              "value": 595700.0,
+              "ok": true,
+              "seconds": 1.36087536299965
+            }
+          ],
+          "matches_reference_rows": true,
+          "matches_reference_useful_markers": true
+        }
+      ],
+      "median_seconds": {
+        "base": 5.546259197999461,
+        "safe": 1.404751825000858
+      },
+      "reference_rows": [
+        {
+          "t_start": 600,
+          "t_end": 600.0166666666667,
+          "cbox": [
+            100,
+            70,
+            164,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 0.0,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 600.2,
+          "t_end": 600.2166666666667,
+          "cbox": [
+            101,
+            70,
+            165,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 0.0,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 600.3,
+          "t_end": 600.55,
+          "cbox": [
+            101,
+            70,
+            165,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 0.0,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 600.0166666666667,
+          "t_end": 600.0666666666667,
+          "cbox": [
+            100,
+            70,
+            164,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 600.0166666666667,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 600.0666666666667,
+          "t_end": 600.1333333333333,
+          "cbox": [
+            100,
+            70,
+            164,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 600.0666666666667,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 600.1333333333333,
+          "t_end": 600.2,
+          "cbox": [
+            100,
+            70,
+            165,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 600.1333333333333,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 600.2166666666667,
+          "t_end": 600.25,
+          "cbox": [
+            101,
+            70,
+            165,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 600.2166666666667,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 600.25,
+          "t_end": 600.3,
+          "cbox": [
+            101,
+            70,
+            165,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 600.25,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.9333333333333,
+          "t_end": 600.0,
+          "cbox": [
+            100,
+            70,
+            164,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.9333333333333,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.8666666666666,
+          "t_end": 599.9333333333333,
+          "cbox": [
+            100,
+            70,
+            164,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.8666666666666,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.7999999999998,
+          "t_end": 599.8666666666666,
+          "cbox": [
+            100,
+            70,
+            164,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.7999999999998,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.7333333333331,
+          "t_end": 599.7999999999998,
+          "cbox": [
+            98,
+            70,
+            162,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.7333333333331,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.6666666666664,
+          "t_end": 599.7333333333331,
+          "cbox": [
+            98,
+            70,
+            162,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.6666666666664,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.5999999999997,
+          "t_end": 599.6666666666664,
+          "cbox": [
+            98,
+            70,
+            162,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.5999999999997,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.533333333333,
+          "t_end": 599.5999999999997,
+          "cbox": [
+            98,
+            70,
+            162,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.533333333333,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.4666666666662,
+          "t_end": 599.533333333333,
+          "cbox": [
+            98,
+            70,
+            162,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.4666666666662,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.3999999999995,
+          "t_end": 599.4666666666662,
+          "cbox": [
+            98,
+            70,
+            162,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.3999999999995,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.3333333333328,
+          "t_end": 599.3999999999995,
+          "cbox": [
+            96,
+            70,
+            160,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.3333333333328,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.2666666666661,
+          "t_end": 599.3333333333328,
+          "cbox": [
+            96,
+            70,
+            160,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.2666666666661,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.1999999999994,
+          "t_end": 599.2666666666661,
+          "cbox": [
+            96,
+            70,
+            160,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.1999999999994,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.1333333333326,
+          "t_end": 599.1999999999994,
+          "cbox": [
+            96,
+            70,
+            160,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.1333333333326,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.0666666666659,
+          "t_end": 599.1333333333326,
+          "cbox": [
+            96,
+            70,
+            160,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.0666666666659,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.9999999999992,
+          "t_end": 599.0666666666659,
+          "cbox": [
+            96,
+            70,
+            160,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.9999999999992,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.9333333333325,
+          "t_end": 598.9999999999992,
+          "cbox": [
+            94,
+            70,
+            158,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.9333333333325,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.8666666666658,
+          "t_end": 598.9333333333325,
+          "cbox": [
+            94,
+            70,
+            158,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.8666666666658,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.799999999999,
+          "t_end": 598.8666666666658,
+          "cbox": [
+            94,
+            70,
+            158,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.799999999999,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.7333333333323,
+          "t_end": 598.799999999999,
+          "cbox": [
+            94,
+            70,
+            158,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.7333333333323,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.6666666666656,
+          "t_end": 598.7333333333323,
+          "cbox": [
+            94,
+            70,
+            158,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.6666666666656,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.5999999999989,
+          "t_end": 598.6666666666656,
+          "cbox": [
+            94,
+            70,
+            158,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.5999999999989,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.5333333333322,
+          "t_end": 598.5999999999989,
+          "cbox": [
+            92,
+            70,
+            156,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.5333333333322,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.4666666666654,
+          "t_end": 598.5333333333322,
+          "cbox": [
+            92,
+            70,
+            156,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.4666666666654,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.3999999999987,
+          "t_end": 598.4666666666654,
+          "cbox": [
+            92,
+            70,
+            156,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.3999999999987,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.333333333332,
+          "t_end": 598.3999999999987,
+          "cbox": [
+            92,
+            70,
+            156,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.333333333332,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.2666666666653,
+          "t_end": 598.333333333332,
+          "cbox": [
+            92,
+            70,
+            156,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.2666666666653,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.1999999999986,
+          "t_end": 598.2666666666653,
+          "cbox": [
+            92,
+            70,
+            156,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.1999999999986,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.1333333333318,
+          "t_end": 598.1999999999986,
+          "cbox": [
+            90,
+            70,
+            154,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.1333333333318,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.0666666666651,
+          "t_end": 598.1333333333318,
+          "cbox": [
+            90,
+            70,
+            154,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.0666666666651,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 597.7499999999984,
+          "t_end": 598.0666666666651,
+          "cbox": [
+            90,
+            70,
+            154,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 597.9999999999984,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        }
+      ],
+      "reference_useful_markers": [
+        17872,
+        17873,
+        17874,
+        17875,
+        17876,
+        17877,
+        17878,
+        17879,
+        17880,
+        17881,
+        17882,
+        17883,
+        17884,
+        17885,
+        17886,
+        17887,
+        17888,
+        17889,
+        17890,
+        17891,
+        17892,
+        17893,
+        17894,
+        17895,
+        17896,
+        17897,
+        17898,
+        17899,
+        17900,
+        17901,
+        17902,
+        17903,
+        17904,
+        17905,
+        17906,
+        17907,
+        17908,
+        17909,
+        17910,
+        17911,
+        17912,
+        17913,
+        17914,
+        17915,
+        17916,
+        17917,
+        17918,
+        17919,
+        17920,
+        17921,
+        17922,
+        17923,
+        17924,
+        17925,
+        17926,
+        17927,
+        17928,
+        17929,
+        17930,
+        17931,
+        17932,
+        17933,
+        17934,
+        17935,
+        17936,
+        17937,
+        17938,
+        17939,
+        17940,
+        17941,
+        17942,
+        17943,
+        17944,
+        17945,
+        17946,
+        17947,
+        17948,
+        17949,
+        17950,
+        17951,
+        17952,
+        17953,
+        17954,
+        17955,
+        17956,
+        17957,
+        17958,
+        17959,
+        17960,
+        17961,
+        17962,
+        17963,
+        17964,
+        17965,
+        17966,
+        17967,
+        17968,
+        17969,
+        17970,
+        17971,
+        17972,
+        17973,
+        17974,
+        17975,
+        17976,
+        17977,
+        17978,
+        17979,
+        17980,
+        17981,
+        17982,
+        17983,
+        17984,
+        17985,
+        17986,
+        17987,
+        17988,
+        17989,
+        17990,
+        17991,
+        17992,
+        17993,
+        17994,
+        17995,
+        17996,
+        17997,
+        17998,
+        17999,
+        18000
+      ]
+    }
+  },
+  "faults": {
+    "failed_seek_base": {
+      "mode": "base",
+      "failure": true,
+      "cancel": false,
+      "seconds": 5.590022307998879,
+      "returned": [
+        2,
+        30,
+        2.25
+      ],
+      "exception": null,
+      "rows": [
+        {
+          "t_start": 600,
+          "t_end": 600.0166666666667,
+          "cbox": [
+            100,
+            70,
+            164,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 0.0,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 600.2,
+          "t_end": 600.2166666666667,
+          "cbox": [
+            101,
+            70,
+            165,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 0.0,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 600.3,
+          "t_end": 600.55,
+          "cbox": [
+            101,
+            70,
+            165,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 0.0,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 600.0166666666667,
+          "t_end": 600.0666666666667,
+          "cbox": [
+            100,
+            70,
+            164,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 600.0166666666667,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 600.0666666666667,
+          "t_end": 600.1333333333333,
+          "cbox": [
+            100,
+            70,
+            164,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 600.0666666666667,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 600.1333333333333,
+          "t_end": 600.2,
+          "cbox": [
+            100,
+            70,
+            165,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 600.1333333333333,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 600.2166666666667,
+          "t_end": 600.25,
+          "cbox": [
+            101,
+            70,
+            165,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 600.2166666666667,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 600.25,
+          "t_end": 600.3,
+          "cbox": [
+            101,
+            70,
+            165,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 600.25,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.9333333333333,
+          "t_end": 600.0,
+          "cbox": [
+            100,
+            70,
+            164,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.9333333333333,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.8666666666666,
+          "t_end": 599.9333333333333,
+          "cbox": [
+            100,
+            70,
+            164,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.8666666666666,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.7999999999998,
+          "t_end": 599.8666666666666,
+          "cbox": [
+            100,
+            70,
+            164,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.7999999999998,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.7333333333331,
+          "t_end": 599.7999999999998,
+          "cbox": [
+            98,
+            70,
+            162,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.7333333333331,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.6666666666664,
+          "t_end": 599.7333333333331,
+          "cbox": [
+            98,
+            70,
+            162,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.6666666666664,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.5999999999997,
+          "t_end": 599.6666666666664,
+          "cbox": [
+            98,
+            70,
+            162,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.5999999999997,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.533333333333,
+          "t_end": 599.5999999999997,
+          "cbox": [
+            98,
+            70,
+            162,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.533333333333,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.4666666666662,
+          "t_end": 599.533333333333,
+          "cbox": [
+            98,
+            70,
+            162,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.4666666666662,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.3999999999995,
+          "t_end": 599.4666666666662,
+          "cbox": [
+            98,
+            70,
+            162,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.3999999999995,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.3333333333328,
+          "t_end": 599.3999999999995,
+          "cbox": [
+            96,
+            70,
+            160,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.3333333333328,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.2666666666661,
+          "t_end": 599.3333333333328,
+          "cbox": [
+            96,
+            70,
+            160,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.2666666666661,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.1999999999994,
+          "t_end": 599.2666666666661,
+          "cbox": [
+            96,
+            70,
+            160,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.1999999999994,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.1333333333326,
+          "t_end": 599.1999999999994,
+          "cbox": [
+            96,
+            70,
+            160,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.1333333333326,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.0666666666659,
+          "t_end": 599.1333333333326,
+          "cbox": [
+            96,
+            70,
+            160,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.0666666666659,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.9999999999992,
+          "t_end": 599.0666666666659,
+          "cbox": [
+            96,
+            70,
+            160,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.9999999999992,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.9333333333325,
+          "t_end": 598.9999999999992,
+          "cbox": [
+            94,
+            70,
+            158,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.9333333333325,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.8666666666658,
+          "t_end": 598.9333333333325,
+          "cbox": [
+            94,
+            70,
+            158,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.8666666666658,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.799999999999,
+          "t_end": 598.8666666666658,
+          "cbox": [
+            94,
+            70,
+            158,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.799999999999,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.7333333333323,
+          "t_end": 598.799999999999,
+          "cbox": [
+            94,
+            70,
+            158,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.7333333333323,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.6666666666656,
+          "t_end": 598.7333333333323,
+          "cbox": [
+            94,
+            70,
+            158,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.6666666666656,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.5999999999989,
+          "t_end": 598.6666666666656,
+          "cbox": [
+            94,
+            70,
+            158,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.5999999999989,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.5333333333322,
+          "t_end": 598.5999999999989,
+          "cbox": [
+            92,
+            70,
+            156,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.5333333333322,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.4666666666654,
+          "t_end": 598.5333333333322,
+          "cbox": [
+            92,
+            70,
+            156,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.4666666666654,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.3999999999987,
+          "t_end": 598.4666666666654,
+          "cbox": [
+            92,
+            70,
+            156,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.3999999999987,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.333333333332,
+          "t_end": 598.3999999999987,
+          "cbox": [
+            92,
+            70,
+            156,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.333333333332,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.2666666666653,
+          "t_end": 598.333333333332,
+          "cbox": [
+            92,
+            70,
+            156,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.2666666666653,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.1999999999986,
+          "t_end": 598.2666666666653,
+          "cbox": [
+            92,
+            70,
+            156,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.1999999999986,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.1333333333318,
+          "t_end": 598.1999999999986,
+          "cbox": [
+            90,
+            70,
+            154,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.1333333333318,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.0666666666651,
+          "t_end": 598.1333333333318,
+          "cbox": [
+            90,
+            70,
+            154,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.0666666666651,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 597.7499999999984,
+          "t_end": 598.0666666666651,
+          "cbox": [
+            90,
+            70,
+            154,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 597.9999999999984,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        }
+      ],
+      "row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+      "useful_markers": [
+        17872,
+        17873,
+        17874,
+        17875,
+        17876,
+        17877,
+        17878,
+        17879,
+        17880,
+        17881,
+        17882,
+        17883,
+        17884,
+        17885,
+        17886,
+        17887,
+        17888,
+        17889,
+        17890,
+        17891,
+        17892,
+        17893,
+        17894,
+        17895,
+        17896,
+        17897,
+        17898,
+        17899,
+        17900,
+        17901,
+        17902,
+        17903,
+        17904,
+        17905,
+        17906,
+        17907,
+        17908,
+        17909,
+        17910,
+        17911,
+        17912,
+        17913,
+        17914,
+        17915,
+        17916,
+        17917,
+        17918,
+        17919,
+        17920,
+        17921,
+        17922,
+        17923,
+        17924,
+        17925,
+        17926,
+        17927,
+        17928,
+        17929,
+        17930,
+        17931,
+        17932,
+        17933,
+        17934,
+        17935,
+        17936,
+        17937,
+        17938,
+        17939,
+        17940,
+        17941,
+        17942,
+        17943,
+        17944,
+        17945,
+        17946,
+        17947,
+        17948,
+        17949,
+        17950,
+        17951,
+        17952,
+        17953,
+        17954,
+        17955,
+        17956,
+        17957,
+        17958,
+        17959,
+        17960,
+        17961,
+        17962,
+        17963,
+        17964,
+        17965,
+        17966,
+        17967,
+        17968,
+        17969,
+        17970,
+        17971,
+        17972,
+        17973,
+        17974,
+        17975,
+        17976,
+        17977,
+        17978,
+        17979,
+        17980,
+        17981,
+        17982,
+        17983,
+        17984,
+        17985,
+        17986,
+        17987,
+        17988,
+        17989,
+        17990,
+        17991,
+        17992,
+        17993,
+        17994,
+        17995,
+        17996,
+        17997,
+        17998,
+        17999,
+        18000
+      ],
+      "seeks": [],
+      "reads": 18001,
+      "seek_reads": 0,
+      "capture_count": 1,
+      "releases": 1,
+      "remaining_grab_state": 0,
+      "backend": [],
+      "native_set_calls": []
+    },
+    "cancel_base": {
+      "mode": "base",
+      "failure": false,
+      "cancel": true,
+      "seconds": 0.03513490800105501,
+      "returned": null,
+      "exception": "PipelineCancelled",
+      "rows": [
+        {
+          "t_start": 600,
+          "t_end": 600.0166666666667,
+          "cbox": [
+            100,
+            70,
+            164,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 0.0,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 600.2,
+          "t_end": 600.2166666666667,
+          "cbox": [
+            101,
+            70,
+            165,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 0.0,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 600.3,
+          "t_end": 600.3,
+          "cbox": [
+            101,
+            70,
+            165,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 0.0,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        }
+      ],
+      "row_sha256": "b877d3900060d2124709bcb4feea4252b2e506e158e3efd10dec1a7f2f980679",
+      "useful_markers": [],
+      "seeks": [],
+      "reads": 90,
+      "seek_reads": 0,
+      "capture_count": 1,
+      "releases": 0,
+      "remaining_grab_state": 0,
+      "backend": [
+        "FFMPEG"
+      ],
+      "native_set_calls": []
+    },
+    "failed_seek_donor": {
+      "mode": "donor",
+      "failure": true,
+      "cancel": false,
+      "seconds": 2.8932058440004766,
+      "returned": [
+        2,
+        0,
+        0.25
+      ],
+      "exception": null,
+      "rows": [
+        {
+          "t_start": 599.75,
+          "t_end": 600.0166666666667,
+          "cbox": [
+            100,
+            70,
+            164,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 0.0,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 600.2,
+          "t_end": 600.2166666666667,
+          "cbox": [
+            101,
+            70,
+            165,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 0.0,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 600.3,
+          "t_end": 600.55,
+          "cbox": [
+            101,
+            70,
+            165,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 0.0,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 600.0166666666667,
+          "t_end": 600.0666666666667,
+          "cbox": [
+            100,
+            70,
+            164,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 600.0166666666667,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 600.0666666666667,
+          "t_end": 600.1333333333333,
+          "cbox": [
+            100,
+            70,
+            164,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 600.0666666666667,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 600.1333333333333,
+          "t_end": 600.2,
+          "cbox": [
+            100,
+            70,
+            165,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 600.1333333333333,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 600.2166666666667,
+          "t_end": 600.25,
+          "cbox": [
+            101,
+            70,
+            165,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 600.2166666666667,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 600.25,
+          "t_end": 600.3,
+          "cbox": [
+            101,
+            70,
+            165,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 600.25,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        }
+      ],
+      "row_sha256": "9069fc7c2bbee358879491347a5b3e2325f5cfec6e8103f6aa188aa9c237625f",
+      "useful_markers": [],
+      "seeks": [
+        {
+          "target": 17872,
+          "ok": false,
+          "seconds": 0.009553407002385939,
+          "next_frame": 9001.0
+        }
+      ],
+      "reads": 9301,
+      "seek_reads": 1,
+      "capture_count": 1,
+      "releases": 1,
+      "remaining_grab_state": 1,
+      "backend": [],
+      "native_set_calls": [
+        {
+          "property": 1,
+          "value": 9000,
+          "ok": true,
+          "seconds": 0.0076169159983692225
+        }
+      ]
+    },
+    "cancel_donor": {
+      "mode": "donor",
+      "failure": false,
+      "cancel": true,
+      "seconds": 0.01226752100046724,
+      "returned": null,
+      "exception": "PipelineCancelled",
+      "rows": [
+        {
+          "t_start": 600,
+          "t_end": 600,
+          "cbox": [
+            100,
+            70,
+            164,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 0.0,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 600.2,
+          "t_end": 600.2,
+          "cbox": [
+            101,
+            70,
+            165,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 0.0,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 600.3,
+          "t_end": 600.3,
+          "cbox": [
+            101,
+            70,
+            165,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 0.0,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        }
+      ],
+      "row_sha256": "d9a2f06b6075f692f5530fb6522e228af1ea4cb2b8885ba8ac49b3a6ee1e470a",
+      "useful_markers": [],
+      "seeks": [
+        {
+          "target": 17872,
+          "ok": true,
+          "seconds": 0.008550823000405217,
+          "next_frame": 17872.0
+        }
+      ],
+      "reads": 1,
+      "seek_reads": 1,
+      "capture_count": 1,
+      "releases": 0,
+      "remaining_grab_state": 1,
+      "backend": [
+        "FFMPEG"
+      ],
+      "native_set_calls": [
+        {
+          "property": 0,
+          "value": 595700.0,
+          "ok": true,
+          "seconds": 0.006576952000614256
+        }
+      ]
+    },
+    "failed_seek_safe": {
+      "mode": "safe",
+      "failure": true,
+      "cancel": false,
+      "seconds": 5.592429816999356,
+      "returned": [
+        2,
+        30,
+        2.25
+      ],
+      "exception": null,
+      "rows": [
+        {
+          "t_start": 600,
+          "t_end": 600.0166666666667,
+          "cbox": [
+            100,
+            70,
+            164,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 0.0,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 600.2,
+          "t_end": 600.2166666666667,
+          "cbox": [
+            101,
+            70,
+            165,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 0.0,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 600.3,
+          "t_end": 600.55,
+          "cbox": [
+            101,
+            70,
+            165,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 0.0,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 600.0166666666667,
+          "t_end": 600.0666666666667,
+          "cbox": [
+            100,
+            70,
+            164,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 600.0166666666667,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 600.0666666666667,
+          "t_end": 600.1333333333333,
+          "cbox": [
+            100,
+            70,
+            164,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 600.0666666666667,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 600.1333333333333,
+          "t_end": 600.2,
+          "cbox": [
+            100,
+            70,
+            165,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 600.1333333333333,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 600.2166666666667,
+          "t_end": 600.25,
+          "cbox": [
+            101,
+            70,
+            165,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 600.2166666666667,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 600.25,
+          "t_end": 600.3,
+          "cbox": [
+            101,
+            70,
+            165,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 600.25,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.9333333333333,
+          "t_end": 600.0,
+          "cbox": [
+            100,
+            70,
+            164,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.9333333333333,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.8666666666666,
+          "t_end": 599.9333333333333,
+          "cbox": [
+            100,
+            70,
+            164,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.8666666666666,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.7999999999998,
+          "t_end": 599.8666666666666,
+          "cbox": [
+            100,
+            70,
+            164,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.7999999999998,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.7333333333331,
+          "t_end": 599.7999999999998,
+          "cbox": [
+            98,
+            70,
+            162,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.7333333333331,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.6666666666664,
+          "t_end": 599.7333333333331,
+          "cbox": [
+            98,
+            70,
+            162,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.6666666666664,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.5999999999997,
+          "t_end": 599.6666666666664,
+          "cbox": [
+            98,
+            70,
+            162,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.5999999999997,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.533333333333,
+          "t_end": 599.5999999999997,
+          "cbox": [
+            98,
+            70,
+            162,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.533333333333,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.4666666666662,
+          "t_end": 599.533333333333,
+          "cbox": [
+            98,
+            70,
+            162,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.4666666666662,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.3999999999995,
+          "t_end": 599.4666666666662,
+          "cbox": [
+            98,
+            70,
+            162,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.3999999999995,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.3333333333328,
+          "t_end": 599.3999999999995,
+          "cbox": [
+            96,
+            70,
+            160,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.3333333333328,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.2666666666661,
+          "t_end": 599.3333333333328,
+          "cbox": [
+            96,
+            70,
+            160,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.2666666666661,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.1999999999994,
+          "t_end": 599.2666666666661,
+          "cbox": [
+            96,
+            70,
+            160,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.1999999999994,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.1333333333326,
+          "t_end": 599.1999999999994,
+          "cbox": [
+            96,
+            70,
+            160,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.1333333333326,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.0666666666659,
+          "t_end": 599.1333333333326,
+          "cbox": [
+            96,
+            70,
+            160,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.0666666666659,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.9999999999992,
+          "t_end": 599.0666666666659,
+          "cbox": [
+            96,
+            70,
+            160,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.9999999999992,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.9333333333325,
+          "t_end": 598.9999999999992,
+          "cbox": [
+            94,
+            70,
+            158,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.9333333333325,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.8666666666658,
+          "t_end": 598.9333333333325,
+          "cbox": [
+            94,
+            70,
+            158,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.8666666666658,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.799999999999,
+          "t_end": 598.8666666666658,
+          "cbox": [
+            94,
+            70,
+            158,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.799999999999,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.7333333333323,
+          "t_end": 598.799999999999,
+          "cbox": [
+            94,
+            70,
+            158,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.7333333333323,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.6666666666656,
+          "t_end": 598.7333333333323,
+          "cbox": [
+            94,
+            70,
+            158,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.6666666666656,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.5999999999989,
+          "t_end": 598.6666666666656,
+          "cbox": [
+            94,
+            70,
+            158,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.5999999999989,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.5333333333322,
+          "t_end": 598.5999999999989,
+          "cbox": [
+            92,
+            70,
+            156,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.5333333333322,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.4666666666654,
+          "t_end": 598.5333333333322,
+          "cbox": [
+            92,
+            70,
+            156,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.4666666666654,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.3999999999987,
+          "t_end": 598.4666666666654,
+          "cbox": [
+            92,
+            70,
+            156,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.3999999999987,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.333333333332,
+          "t_end": 598.3999999999987,
+          "cbox": [
+            92,
+            70,
+            156,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.333333333332,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.2666666666653,
+          "t_end": 598.333333333332,
+          "cbox": [
+            92,
+            70,
+            156,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.2666666666653,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.1999999999986,
+          "t_end": 598.2666666666653,
+          "cbox": [
+            92,
+            70,
+            156,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.1999999999986,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.1333333333318,
+          "t_end": 598.1999999999986,
+          "cbox": [
+            90,
+            70,
+            154,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.1333333333318,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.0666666666651,
+          "t_end": 598.1333333333318,
+          "cbox": [
+            90,
+            70,
+            154,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.0666666666651,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 597.7499999999984,
+          "t_end": 598.0666666666651,
+          "cbox": [
+            90,
+            70,
+            154,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 597.9999999999984,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        }
+      ],
+      "row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+      "useful_markers": [
+        17872,
+        17873,
+        17874,
+        17875,
+        17876,
+        17877,
+        17878,
+        17879,
+        17880,
+        17881,
+        17882,
+        17883,
+        17884,
+        17885,
+        17886,
+        17887,
+        17888,
+        17889,
+        17890,
+        17891,
+        17892,
+        17893,
+        17894,
+        17895,
+        17896,
+        17897,
+        17898,
+        17899,
+        17900,
+        17901,
+        17902,
+        17903,
+        17904,
+        17905,
+        17906,
+        17907,
+        17908,
+        17909,
+        17910,
+        17911,
+        17912,
+        17913,
+        17914,
+        17915,
+        17916,
+        17917,
+        17918,
+        17919,
+        17920,
+        17921,
+        17922,
+        17923,
+        17924,
+        17925,
+        17926,
+        17927,
+        17928,
+        17929,
+        17930,
+        17931,
+        17932,
+        17933,
+        17934,
+        17935,
+        17936,
+        17937,
+        17938,
+        17939,
+        17940,
+        17941,
+        17942,
+        17943,
+        17944,
+        17945,
+        17946,
+        17947,
+        17948,
+        17949,
+        17950,
+        17951,
+        17952,
+        17953,
+        17954,
+        17955,
+        17956,
+        17957,
+        17958,
+        17959,
+        17960,
+        17961,
+        17962,
+        17963,
+        17964,
+        17965,
+        17966,
+        17967,
+        17968,
+        17969,
+        17970,
+        17971,
+        17972,
+        17973,
+        17974,
+        17975,
+        17976,
+        17977,
+        17978,
+        17979,
+        17980,
+        17981,
+        17982,
+        17983,
+        17984,
+        17985,
+        17986,
+        17987,
+        17988,
+        17989,
+        17990,
+        17991,
+        17992,
+        17993,
+        17994,
+        17995,
+        17996,
+        17997,
+        17998,
+        17999,
+        18000
+      ],
+      "seeks": [
+        {
+          "target": 17872,
+          "ok": false,
+          "seconds": 0.009465866998652928,
+          "next_frame": 9001.0
+        }
+      ],
+      "reads": 18002,
+      "seek_reads": 1,
+      "capture_count": 2,
+      "releases": 2,
+      "remaining_grab_state": 0,
+      "backend": [],
+      "native_set_calls": [
+        {
+          "property": 1,
+          "value": 9000,
+          "ok": true,
+          "seconds": 0.007509045000915648
+        }
+      ]
+    },
+    "cancel_safe": {
+      "mode": "safe",
+      "failure": false,
+      "cancel": true,
+      "seconds": 0.012607936001586495,
+      "returned": null,
+      "exception": "PipelineCancelled",
+      "rows": [
+        {
+          "t_start": 600,
+          "t_end": 600,
+          "cbox": [
+            100,
+            70,
+            164,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 0.0,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 600.2,
+          "t_end": 600.2,
+          "cbox": [
+            101,
+            70,
+            165,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 0.0,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 600.3,
+          "t_end": 600.3,
+          "cbox": [
+            101,
+            70,
+            165,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 0.0,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        }
+      ],
+      "row_sha256": "d9a2f06b6075f692f5530fb6522e228af1ea4cb2b8885ba8ac49b3a6ee1e470a",
+      "useful_markers": [],
+      "seeks": [
+        {
+          "target": 17872,
+          "ok": true,
+          "seconds": 0.008868508000887232,
+          "next_frame": 17872.0
+        }
+      ],
+      "reads": 1,
+      "seek_reads": 1,
+      "capture_count": 1,
+      "releases": 0,
+      "remaining_grab_state": 1,
+      "backend": [
+        "FFMPEG"
+      ],
+      "native_set_calls": [
+        {
+          "property": 0,
+          "value": 595700.0,
+          "ok": true,
+          "seconds": 0.006886537001264514
+        }
+      ]
+    },
+    "failed_seek_safe-cleanup": {
+      "mode": "safe-cleanup",
+      "failure": true,
+      "cancel": false,
+      "seconds": 5.578061545002129,
+      "returned": [
+        2,
+        30,
+        2.25
+      ],
+      "exception": null,
+      "rows": [
+        {
+          "t_start": 600,
+          "t_end": 600.0166666666667,
+          "cbox": [
+            100,
+            70,
+            164,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 0.0,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 600.2,
+          "t_end": 600.2166666666667,
+          "cbox": [
+            101,
+            70,
+            165,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 0.0,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 600.3,
+          "t_end": 600.55,
+          "cbox": [
+            101,
+            70,
+            165,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 0.0,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 600.0166666666667,
+          "t_end": 600.0666666666667,
+          "cbox": [
+            100,
+            70,
+            164,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 600.0166666666667,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 600.0666666666667,
+          "t_end": 600.1333333333333,
+          "cbox": [
+            100,
+            70,
+            164,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 600.0666666666667,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 600.1333333333333,
+          "t_end": 600.2,
+          "cbox": [
+            100,
+            70,
+            165,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 600.1333333333333,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 600.2166666666667,
+          "t_end": 600.25,
+          "cbox": [
+            101,
+            70,
+            165,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 600.2166666666667,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 600.25,
+          "t_end": 600.3,
+          "cbox": [
+            101,
+            70,
+            165,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 600.25,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.9333333333333,
+          "t_end": 600.0,
+          "cbox": [
+            100,
+            70,
+            164,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.9333333333333,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.8666666666666,
+          "t_end": 599.9333333333333,
+          "cbox": [
+            100,
+            70,
+            164,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.8666666666666,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.7999999999998,
+          "t_end": 599.8666666666666,
+          "cbox": [
+            100,
+            70,
+            164,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.7999999999998,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.7333333333331,
+          "t_end": 599.7999999999998,
+          "cbox": [
+            98,
+            70,
+            162,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.7333333333331,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.6666666666664,
+          "t_end": 599.7333333333331,
+          "cbox": [
+            98,
+            70,
+            162,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.6666666666664,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.5999999999997,
+          "t_end": 599.6666666666664,
+          "cbox": [
+            98,
+            70,
+            162,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.5999999999997,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.533333333333,
+          "t_end": 599.5999999999997,
+          "cbox": [
+            98,
+            70,
+            162,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.533333333333,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.4666666666662,
+          "t_end": 599.533333333333,
+          "cbox": [
+            98,
+            70,
+            162,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.4666666666662,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.3999999999995,
+          "t_end": 599.4666666666662,
+          "cbox": [
+            98,
+            70,
+            162,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.3999999999995,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.3333333333328,
+          "t_end": 599.3999999999995,
+          "cbox": [
+            96,
+            70,
+            160,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.3333333333328,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.2666666666661,
+          "t_end": 599.3333333333328,
+          "cbox": [
+            96,
+            70,
+            160,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.2666666666661,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.1999999999994,
+          "t_end": 599.2666666666661,
+          "cbox": [
+            96,
+            70,
+            160,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.1999999999994,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.1333333333326,
+          "t_end": 599.1999999999994,
+          "cbox": [
+            96,
+            70,
+            160,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.1333333333326,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.0666666666659,
+          "t_end": 599.1333333333326,
+          "cbox": [
+            96,
+            70,
+            160,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.0666666666659,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.9999999999992,
+          "t_end": 599.0666666666659,
+          "cbox": [
+            96,
+            70,
+            160,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.9999999999992,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.9333333333325,
+          "t_end": 598.9999999999992,
+          "cbox": [
+            94,
+            70,
+            158,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.9333333333325,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.8666666666658,
+          "t_end": 598.9333333333325,
+          "cbox": [
+            94,
+            70,
+            158,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.8666666666658,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.799999999999,
+          "t_end": 598.8666666666658,
+          "cbox": [
+            94,
+            70,
+            158,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.799999999999,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.7333333333323,
+          "t_end": 598.799999999999,
+          "cbox": [
+            94,
+            70,
+            158,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.7333333333323,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.6666666666656,
+          "t_end": 598.7333333333323,
+          "cbox": [
+            94,
+            70,
+            158,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.6666666666656,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.5999999999989,
+          "t_end": 598.6666666666656,
+          "cbox": [
+            94,
+            70,
+            158,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.5999999999989,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.5333333333322,
+          "t_end": 598.5999999999989,
+          "cbox": [
+            92,
+            70,
+            156,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.5333333333322,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.4666666666654,
+          "t_end": 598.5333333333322,
+          "cbox": [
+            92,
+            70,
+            156,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.4666666666654,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.3999999999987,
+          "t_end": 598.4666666666654,
+          "cbox": [
+            92,
+            70,
+            156,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.3999999999987,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.333333333332,
+          "t_end": 598.3999999999987,
+          "cbox": [
+            92,
+            70,
+            156,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.333333333332,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.2666666666653,
+          "t_end": 598.333333333332,
+          "cbox": [
+            92,
+            70,
+            156,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.2666666666653,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.1999999999986,
+          "t_end": 598.2666666666653,
+          "cbox": [
+            92,
+            70,
+            156,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.1999999999986,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.1333333333318,
+          "t_end": 598.1999999999986,
+          "cbox": [
+            90,
+            70,
+            154,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.1333333333318,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.0666666666651,
+          "t_end": 598.1333333333318,
+          "cbox": [
+            90,
+            70,
+            154,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.0666666666651,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 597.7499999999984,
+          "t_end": 598.0666666666651,
+          "cbox": [
+            90,
+            70,
+            154,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 597.9999999999984,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        }
+      ],
+      "row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+      "useful_markers": [
+        17872,
+        17873,
+        17874,
+        17875,
+        17876,
+        17877,
+        17878,
+        17879,
+        17880,
+        17881,
+        17882,
+        17883,
+        17884,
+        17885,
+        17886,
+        17887,
+        17888,
+        17889,
+        17890,
+        17891,
+        17892,
+        17893,
+        17894,
+        17895,
+        17896,
+        17897,
+        17898,
+        17899,
+        17900,
+        17901,
+        17902,
+        17903,
+        17904,
+        17905,
+        17906,
+        17907,
+        17908,
+        17909,
+        17910,
+        17911,
+        17912,
+        17913,
+        17914,
+        17915,
+        17916,
+        17917,
+        17918,
+        17919,
+        17920,
+        17921,
+        17922,
+        17923,
+        17924,
+        17925,
+        17926,
+        17927,
+        17928,
+        17929,
+        17930,
+        17931,
+        17932,
+        17933,
+        17934,
+        17935,
+        17936,
+        17937,
+        17938,
+        17939,
+        17940,
+        17941,
+        17942,
+        17943,
+        17944,
+        17945,
+        17946,
+        17947,
+        17948,
+        17949,
+        17950,
+        17951,
+        17952,
+        17953,
+        17954,
+        17955,
+        17956,
+        17957,
+        17958,
+        17959,
+        17960,
+        17961,
+        17962,
+        17963,
+        17964,
+        17965,
+        17966,
+        17967,
+        17968,
+        17969,
+        17970,
+        17971,
+        17972,
+        17973,
+        17974,
+        17975,
+        17976,
+        17977,
+        17978,
+        17979,
+        17980,
+        17981,
+        17982,
+        17983,
+        17984,
+        17985,
+        17986,
+        17987,
+        17988,
+        17989,
+        17990,
+        17991,
+        17992,
+        17993,
+        17994,
+        17995,
+        17996,
+        17997,
+        17998,
+        17999,
+        18000
+      ],
+      "seeks": [
+        {
+          "target": 17872,
+          "ok": false,
+          "seconds": 0.009433356000954518,
+          "next_frame": 9001.0
+        }
+      ],
+      "reads": 18002,
+      "seek_reads": 1,
+      "capture_count": 2,
+      "releases": 2,
+      "remaining_grab_state": 0,
+      "backend": [],
+      "native_set_calls": [
+        {
+          "property": 1,
+          "value": 9000,
+          "ok": true,
+          "seconds": 0.007516312998632202
+        }
+      ]
+    },
+    "cancel_safe-cleanup": {
+      "mode": "safe-cleanup",
+      "failure": false,
+      "cancel": true,
+      "seconds": 0.013974008998047793,
+      "returned": null,
+      "exception": "PipelineCancelled",
+      "rows": [
+        {
+          "t_start": 600,
+          "t_end": 600,
+          "cbox": [
+            100,
+            70,
+            164,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 0.0,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 600.2,
+          "t_end": 600.2,
+          "cbox": [
+            101,
+            70,
+            165,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 0.0,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 600.3,
+          "t_end": 600.3,
+          "cbox": [
+            101,
+            70,
+            165,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 0.0,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        }
+      ],
+      "row_sha256": "d9a2f06b6075f692f5530fb6522e228af1ea4cb2b8885ba8ac49b3a6ee1e470a",
+      "useful_markers": [],
+      "seeks": [
+        {
+          "target": 17872,
+          "ok": true,
+          "seconds": 0.008318357999087311,
+          "next_frame": 17872.0
+        }
+      ],
+      "reads": 1,
+      "seek_reads": 1,
+      "capture_count": 1,
+      "releases": 1,
+      "remaining_grab_state": 0,
+      "backend": [],
+      "native_set_calls": [
+        {
+          "property": 0,
+          "value": 595700.0,
+          "ok": true,
+          "seconds": 0.00628291799876024
+        }
+      ]
+    },
+    "normal_safe-cleanup": {
+      "mode": "safe-cleanup",
+      "failure": false,
+      "cancel": false,
+      "seconds": 0.06761268800255493,
+      "returned": [
+        2,
+        30,
+        2.25
+      ],
+      "exception": null,
+      "rows": [
+        {
+          "t_start": 600,
+          "t_end": 600.0166666666667,
+          "cbox": [
+            100,
+            70,
+            164,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 0.0,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 600.2,
+          "t_end": 600.2166666666667,
+          "cbox": [
+            101,
+            70,
+            165,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 0.0,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 600.3,
+          "t_end": 600.55,
+          "cbox": [
+            101,
+            70,
+            165,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 0.0,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 600.0166666666667,
+          "t_end": 600.0666666666667,
+          "cbox": [
+            100,
+            70,
+            164,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 600.0166666666667,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 600.0666666666667,
+          "t_end": 600.1333333333333,
+          "cbox": [
+            100,
+            70,
+            164,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 600.0666666666667,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 600.1333333333333,
+          "t_end": 600.2,
+          "cbox": [
+            100,
+            70,
+            165,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 600.1333333333333,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 600.2166666666667,
+          "t_end": 600.25,
+          "cbox": [
+            101,
+            70,
+            165,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 600.2166666666667,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 600.25,
+          "t_end": 600.3,
+          "cbox": [
+            101,
+            70,
+            165,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 600.25,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.9333333333333,
+          "t_end": 600.0,
+          "cbox": [
+            100,
+            70,
+            164,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.9333333333333,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.8666666666666,
+          "t_end": 599.9333333333333,
+          "cbox": [
+            100,
+            70,
+            164,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.8666666666666,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.7999999999998,
+          "t_end": 599.8666666666666,
+          "cbox": [
+            100,
+            70,
+            164,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.7999999999998,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.7333333333331,
+          "t_end": 599.7999999999998,
+          "cbox": [
+            98,
+            70,
+            162,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.7333333333331,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.6666666666664,
+          "t_end": 599.7333333333331,
+          "cbox": [
+            98,
+            70,
+            162,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.6666666666664,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.5999999999997,
+          "t_end": 599.6666666666664,
+          "cbox": [
+            98,
+            70,
+            162,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.5999999999997,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.533333333333,
+          "t_end": 599.5999999999997,
+          "cbox": [
+            98,
+            70,
+            162,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.533333333333,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.4666666666662,
+          "t_end": 599.533333333333,
+          "cbox": [
+            98,
+            70,
+            162,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.4666666666662,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.3999999999995,
+          "t_end": 599.4666666666662,
+          "cbox": [
+            98,
+            70,
+            162,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.3999999999995,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.3333333333328,
+          "t_end": 599.3999999999995,
+          "cbox": [
+            96,
+            70,
+            160,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.3333333333328,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.2666666666661,
+          "t_end": 599.3333333333328,
+          "cbox": [
+            96,
+            70,
+            160,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.2666666666661,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.1999999999994,
+          "t_end": 599.2666666666661,
+          "cbox": [
+            96,
+            70,
+            160,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.1999999999994,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.1333333333326,
+          "t_end": 599.1999999999994,
+          "cbox": [
+            96,
+            70,
+            160,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.1333333333326,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 599.0666666666659,
+          "t_end": 599.1333333333326,
+          "cbox": [
+            96,
+            70,
+            160,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 599.0666666666659,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.9999999999992,
+          "t_end": 599.0666666666659,
+          "cbox": [
+            96,
+            70,
+            160,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.9999999999992,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.9333333333325,
+          "t_end": 598.9999999999992,
+          "cbox": [
+            94,
+            70,
+            158,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.9333333333325,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.8666666666658,
+          "t_end": 598.9333333333325,
+          "cbox": [
+            94,
+            70,
+            158,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.8666666666658,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.799999999999,
+          "t_end": 598.8666666666658,
+          "cbox": [
+            94,
+            70,
+            158,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.799999999999,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.7333333333323,
+          "t_end": 598.799999999999,
+          "cbox": [
+            94,
+            70,
+            158,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.7333333333323,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.6666666666656,
+          "t_end": 598.7333333333323,
+          "cbox": [
+            94,
+            70,
+            158,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.6666666666656,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.5999999999989,
+          "t_end": 598.6666666666656,
+          "cbox": [
+            94,
+            70,
+            158,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.5999999999989,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.5333333333322,
+          "t_end": 598.5999999999989,
+          "cbox": [
+            92,
+            70,
+            156,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.5333333333322,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.4666666666654,
+          "t_end": 598.5333333333322,
+          "cbox": [
+            92,
+            70,
+            156,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.4666666666654,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.3999999999987,
+          "t_end": 598.4666666666654,
+          "cbox": [
+            92,
+            70,
+            156,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.3999999999987,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.333333333332,
+          "t_end": 598.3999999999987,
+          "cbox": [
+            92,
+            70,
+            156,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.333333333332,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.2666666666653,
+          "t_end": 598.333333333332,
+          "cbox": [
+            92,
+            70,
+            156,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.2666666666653,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.1999999999986,
+          "t_end": 598.2666666666653,
+          "cbox": [
+            92,
+            70,
+            156,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.1999999999986,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.1333333333318,
+          "t_end": 598.1999999999986,
+          "cbox": [
+            90,
+            70,
+            154,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.1333333333318,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 598.0666666666651,
+          "t_end": 598.1333333333318,
+          "cbox": [
+            90,
+            70,
+            154,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 598.0666666666651,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        },
+        {
+          "t_start": 597.7499999999984,
+          "t_end": 598.0666666666651,
+          "cbox": [
+            90,
+            70,
+            154,
+            118
+          ],
+          "category": "face",
+          "text": "synthetic",
+          "confidence": 0.95,
+          "aoff": [
+            0.0,
+            0.0
+          ],
+          "last_seen": 597.9999999999984,
+          "dense": true,
+          "track": 1,
+          "person": -1,
+          "poly": []
+        }
+      ],
+      "row_sha256": "0df780727712a9bce2d76498f31c29428798e1ca7f5e1b09ef7c17c05851bca0",
+      "useful_markers": [
+        17872,
+        17873,
+        17874,
+        17875,
+        17876,
+        17877,
+        17878,
+        17879,
+        17880,
+        17881,
+        17882,
+        17883,
+        17884,
+        17885,
+        17886,
+        17887,
+        17888,
+        17889,
+        17890,
+        17891,
+        17892,
+        17893,
+        17894,
+        17895,
+        17896,
+        17897,
+        17898,
+        17899,
+        17900,
+        17901,
+        17902,
+        17903,
+        17904,
+        17905,
+        17906,
+        17907,
+        17908,
+        17909,
+        17910,
+        17911,
+        17912,
+        17913,
+        17914,
+        17915,
+        17916,
+        17917,
+        17918,
+        17919,
+        17920,
+        17921,
+        17922,
+        17923,
+        17924,
+        17925,
+        17926,
+        17927,
+        17928,
+        17929,
+        17930,
+        17931,
+        17932,
+        17933,
+        17934,
+        17935,
+        17936,
+        17937,
+        17938,
+        17939,
+        17940,
+        17941,
+        17942,
+        17943,
+        17944,
+        17945,
+        17946,
+        17947,
+        17948,
+        17949,
+        17950,
+        17951,
+        17952,
+        17953,
+        17954,
+        17955,
+        17956,
+        17957,
+        17958,
+        17959,
+        17960,
+        17961,
+        17962,
+        17963,
+        17964,
+        17965,
+        17966,
+        17967,
+        17968,
+        17969,
+        17970,
+        17971,
+        17972,
+        17973,
+        17974,
+        17975,
+        17976,
+        17977,
+        17978,
+        17979,
+        17980,
+        17981,
+        17982,
+        17983,
+        17984,
+        17985,
+        17986,
+        17987,
+        17988,
+        17989,
+        17990,
+        17991,
+        17992,
+        17993,
+        17994,
+        17995,
+        17996,
+        17997,
+        17998,
+        17999,
+        18000
+      ],
+      "seeks": [
+        {
+          "target": 17872,
+          "ok": true,
+          "seconds": 0.008002924001630163,
+          "next_frame": 17872.0
+        }
+      ],
+      "reads": 130,
+      "seek_reads": 1,
+      "capture_count": 1,
+      "releases": 1,
+      "remaining_grab_state": 0,
+      "backend": [],
+      "native_set_calls": [
+        {
+          "property": 0,
+          "value": 595700.0,
+          "ok": true,
+          "seconds": 0.006008361997373868
+        }
+      ]
+    }
+  },
+  "finished_utc": "2026-11-16T22:05:08.006651+00:00"
+}

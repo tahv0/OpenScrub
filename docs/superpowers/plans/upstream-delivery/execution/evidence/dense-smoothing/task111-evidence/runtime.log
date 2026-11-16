@@ -1,0 +1,43 @@
+      encoder: libx264 (CPU)
+      encoder: libx264 (CPU)
+[1/4] OCR engine   (openscrub v1.0.96)
+      using TesseractBackend
+[2/4] Detectors
+      names: skipped (name category not selected)
+[3/4] Scanning (every 0.5s or 60px of scroll, self-tuning to screen activity and scroll speed)
+  t=   0.00s  1 PII region(s): ssn
+  t=   1.00s  1 PII region(s): ssn
+      reverse pass: 2 additional near-miss region(s) from remembered PII
+      2 OCR scans | 9 raw hits -> 1 merged regions | 0 memory recalls, 1 strings remembered
+[4/4] Rendering -> /tmp/openscrub-task111/engine-redacted.mp4
+      encoder: libx264 (CPU)
+      audit report: /tmp/openscrub-task111/engine-report.json (contains PII text — protect it)
+done.
+{
+  "before": {
+    "returned": [
+      1,
+      5,
+      1.25
+    ],
+    "rows": 10,
+    "decoded_frames": 130,
+    "decoded_sha256": "99047cfa56bb1b128e3477a60d00003ee48b9377dea2c644a6140351e699c1d2"
+  },
+  "after": {
+    "returned": [
+      1,
+      5,
+      1.25
+    ],
+    "rows": 10,
+    "decoded_frames": 130,
+    "decoded_sha256": "99047cfa56bb1b128e3477a60d00003ee48b9377dea2c644a6140351e699c1d2"
+  },
+  "pipeline": {
+    "engine": "tesseract",
+    "selected_categories": "ssn",
+    "report_rows": 1,
+    "decoded_frames": 20
+  }
+}
