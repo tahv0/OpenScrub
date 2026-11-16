@@ -55,16 +55,21 @@ def _guard(function):
             # when exact source frame, box, crop and corners still match.
             # Do not classify archive revisions, journal conflicts, or changed
             # source provenance as recoverable thumbnail conflicts.
-            stale = {
-                'This displayed picture is no longer a valid cached sample.':
-                    'cache_evicted',
-                'The finding changed. Reload its picture.':
-                    'preview_token_changed',
-            }
-            if error.code == 409 and error.description in stale:
+            if error.code == 409:
+                # Preserve the long-standing prefix match: the server appends
+                # "Reload its preview." to the missing-JPEG exception. Exact
+                # equality here would downgrade the existing typed 409 to
+                # a generic HTML error and prevent browser recovery.
+                if error.description.startswith(
+                        'This displayed picture is no longer a valid cached sample.'):
+                    reason = 'cache_evicted'
+                elif error.description == 'The finding changed. Reload its picture.':
+                    reason = 'preview_token_changed'
+                else:
+                    raise
                 return jsonify(error=error.description,
                                conflict='stale_preview',
-                               reason=stale[error.description]), 409
+                               reason=reason), 409
             raise
         except (KeyError, FileNotFoundError):
             return jsonify(error='This saved finding is no longer available.'), 404
