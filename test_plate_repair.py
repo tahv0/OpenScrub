@@ -255,6 +255,10 @@ def test_stale_confirmed_preview_can_be_rehydrated_without_losing_repair(
         db.execute("UPDATE settings SET value=value-1 WHERE key='count'")
         db.execute("UPDATE settings SET value=value-? WHERE key='bytes'",
                    (sum(row),))
+    # A newer bounded in-process JPEG lease now keeps a served image
+    # confirmable after disk eviction. Simulate that lease expiring as well
+    # (e.g. a restarted server) to cover the *cold refresh* recovery path.
+    finding_previews.clear_retained(job_dir)
     stale = client.post(f'/api/jobs/{jid}/confirm/0', json=dict(
         label='positive', preview_token=first['preview_token'],
         preview_key=first['key']))
@@ -370,6 +374,10 @@ def test_real_browser_can_migrate_rejected_corner_draft_into_valid_box(
             conflict:true,archiveConflict:false,version:1,drag:null,
             draw(){}};
           img._quadEdit=s;PLATE_EDITS.set(meta.i,s);
+          // This fixture manually constructs an otherwise real browser
+          // editor. Unlike initPlateCorners(), it must explicitly wire
+          // the click handler before testing the retry-button pathway.
+          retry.onclick=()=>retryPlateSave(s);
           plateStatus(s,'Not saved · stale preview',true);
         }""")
         assert card.get_by_role('button', name='Repair detector box (keep corners)').is_visible()
@@ -450,6 +458,9 @@ def test_real_browser_can_redraw_when_new_source_box_was_rejected(review_server)
            error:new Error('Current picture could not be loaded.'),
            conflict:true,archiveConflict:false,version:3,drag:null,draw(){}};
           img._quadEdit=s;PLATE_EDITS.set(0,s);
+          // Manually injected corner editors lack the real initializer's
+          // retry listener. Attach it so this click exercises the product.
+          s.retry.onclick=()=>retryPlateSave(s);
           const button=card.querySelector('.plate-repair-button');
           button.dataset.forceRecover='1';button.hidden=false;
           button.textContent='Inspect current frame & redraw (keep draft)';
