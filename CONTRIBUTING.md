@@ -17,13 +17,17 @@ Thanks for helping! A few rules keep this privacy tool trustworthy.
 
     git clone https://github.com/austinmabry/OpenScrub
     cd OpenScrub
-    pip install -e . && pip install pytest
+    pip install -e . && pip install pytest build
     # system tools: tesseract-ocr + ffmpeg (see README)
 
 ## Before you open a PR
 
-    python -m pytest test_openscrub.py -q      # must be green
+    python -m pytest test_openscrub.py tests -q  # root suite + focused regressions
     python -m build                            # full sdist->wheel build
+
+Focused regressions belong in `tests/test_<topic>.py`; keep the existing root
+suite. Save As behavior tests execute the real embedded JavaScript with Node.js
+(18+), which must be on PATH for local and CI runs.
 
 For web UI changes, also boot `python openscrub_web.py` and click through
 what you touched — and note the PAGE string is a normal (non-raw) Python
