@@ -401,6 +401,84 @@ def test_real_browser_can_migrate_rejected_corner_draft_into_valid_box(
         browser.close()
 
 
+
+def test_real_browser_can_redraw_when_new_source_box_was_rejected(review_server):
+    """When a new source box differs, don't transplant the old draft.
+
+    The browser has a stale visible sample and dirty polygon. An attempted
+    background refresh sees a changed off-frame detector box, which must
+    offer a distinct explicit exact-frame redraw from a blank canvas.
+    """
+    sync_api = pytest.importorskip('playwright.sync_api')
+    url, report = review_server
+    doc = json.loads(report.read_text())
+    doc['detections'][0]['cbox'] = [-50, 120, 420, 220]
+    stop_review.atomic_report(str(report), doc)
+    with sync_api.sync_playwright() as pw:
+        browser = browser_instance(pw)
+        page = browser.new_page(viewport={'width': 1440, 'height': 950})
+        page.set_default_timeout(30000)
+        errors = []
+        page.on('pageerror',lambda e:errors.append(str(e)))
+        requests, posts = [], []
+        load_browser_page(page,url,requests,posts)
+        page.get_by_role('link',name='Synthetic review fixture',exact=True).click()
+        card = page.locator('#det0')
+        card.scroll_into_view_if_needed()
+        redraw = card.get_by_role('button',name='Redraw plate area')
+        redraw.wait_for(state='visible',timeout=90000)
+        page.evaluate("""() => {
+          const img=document.querySelector('#det0 img'),meta=img._plateMeta;
+          const card=img.closest('.det');
+          // The previous displayed image came from a different detector box.
+          const older={...meta,box:[180,120,420,220],
+            frame_source_token:'old-frame-box-proof',
+            geometry_outside_frame:false};
+          img._plateMeta=older;
+          const s={i:0,job:CUR,img,card,
+           status:card.querySelector('.quad-status'),
+           retry:card.querySelector('.quad-retry'),
+           meta:older,displayCrop:older.crop.slice(),
+           points:[[180,120],[420,120],[420,220],[180,220]],
+           saved:older.points.map(p=>p.slice()),dirty:true,
+           pending:{edit_id:'definitely-rejected'},knownRejectedEditId:'definitely-rejected',
+           error:new Error('Current picture could not be loaded.'),
+           conflict:true,archiveConflict:false,version:3,drag:null,draw(){}};
+          img._quadEdit=s;PLATE_EDITS.set(0,s);
+          const button=card.querySelector('.plate-repair-button');
+          button.dataset.forceRecover='1';button.hidden=false;
+          button.textContent='Inspect current frame & redraw (keep draft)';
+          plateStatus(s,'Current source geometry differs; original draft preserved.',true);
+        }""")
+        card.get_by_role('button',name='Inspect current frame & redraw (keep draft)').click()
+        modal=page.get_by_role('dialog',name='Redraw plate area on exact original frame')
+        modal.wait_for(timeout=90000)
+        assert modal.get_by_role('button',name='Save replacement · this frame only').is_disabled(), (
+            'Old corners from a different source box must not be auto-imported')
+        assert modal.get_by_role('button',name='Drag box').is_disabled()
+        canvas=modal.locator('canvas')
+        bounds=canvas.bounding_box()
+        page.mouse.move(bounds['x']+180/640*bounds['width'],
+                        bounds['y']+120/360*bounds['height'])
+        page.mouse.down()
+        page.mouse.move(bounds['x']+420/640*bounds['width'],
+                        bounds['y']+220/360*bounds['height'],steps=6)
+        page.mouse.up()
+        assert modal.get_by_role('button',name='Save replacement · this frame only').is_enabled()
+        modal.get_by_role('button',name='Save replacement · this frame only').click()
+        modal.wait_for(state='detached',timeout=90000)
+        page.wait_for_function(
+            "document.querySelector('#det0 img')._plateMeta?.source_repaired===true",
+            timeout=90000)
+        assert page.evaluate('PLATE_EDITS.get(0).dirty') is False
+        with web.app.test_client() as client:
+            state=client.get('/api/jobs/inline-fixture/finding-review-state/0').get_json()
+            assert state['saved_detector_box_repair'] is True
+            assert state['source_box'][0] >= 0
+        assert not errors, errors
+        browser.close()
+
+
 def test_repair_is_revision_safe_and_idempotent(broken_plate):
     client, jid, report, _, job, _ = broken_plate
     before = report.read_bytes()
