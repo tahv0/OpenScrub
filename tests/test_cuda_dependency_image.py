@@ -72,9 +72,16 @@ class PersistentCudaDependencyImageTests(unittest.TestCase):
         self.assertNotIn("--target app", script)
         self.assertNotIn("--tag $appImage", script)
         self.assertIn("docker --context $dockerContext compose --progress plain", script)
-        self.assertIn("compose.windows-cuda.yml build", script)
-        self.assertNotIn("compose.windows-cuda.yml build --builder", script)
-        self.assertIn("docker --context $dockerContext compose -f", script)
+        # The helper must include the training overlay in both build and
+        # startup; with only the first two files, the trainer's Python/checkpoint
+        # variables disappear when the wrapper replaces the container.
+        for name in ("compose.windows-test.yml", "compose.windows-cuda.yml",
+                     "compose.windows-training.yml"):
+            self.assertIn(f"'-f', '{name}'", script)
+        self.assertEqual(script.count("@composeFiles"), 2)
+        self.assertIn("compose --progress plain @composeFiles build", script)
+        self.assertIn("compose @composeFiles up -d --no-build", script)
+        self.assertNotIn("compose --progress plain @composeFiles build --builder", script)
         self.assertIn("up -d --no-build", script)
         self.assertIn('--builder $builderName --progress plain --load', script)
         self.assertIn('--load', script)
