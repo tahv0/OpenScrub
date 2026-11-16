@@ -486,6 +486,10 @@ def test_changed_plate_corners_outgrow_cached_crop_and_still_confirm(review_serv
         doc = json.loads(report.read_text())
         doc['detections'][0]['plate_quad'] = [
             [-.5, -.5], [1.5, -.5], [1.5, 1.5], [-.5, 1.5]]
+        # This emulates a real human-corrected region. An unmarked old
+        # polygon is intentionally treated as untrusted detector coverage.
+        doc['detections'][0]['human_region_confirmed'] = True
+        doc['detections'][0]['plate_boundary_source'] = 'human_corners'
         report.write_text(json.dumps(doc))
         again = client.get(path)
         assert again.status_code == 200, again.get_data(as_text=True)
