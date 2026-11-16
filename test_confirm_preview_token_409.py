@@ -99,3 +99,27 @@ def test_real_browser_auto_retries_typed_same_picture_conflict_once(
             'detections'][0]['human_confirmation']['label'] == 'positive'
         assert not errors, errors
         browser.close()
+
+
+
+def test_evicted_jpeg_409_is_still_structured_with_full_server_message():
+    """Never regress the existing long-message prefix into an HTML 409."""
+    from flask import abort
+    from werkzeug.exceptions import Conflict
+
+    def error_result(message):
+        @findings_web._guard
+        def simulated():
+            abort(409, description=message)
+        with web.app.test_request_context():
+            return simulated()
+
+    message = ('This displayed picture is no longer a valid cached sample. '
+               'Reload its preview.')
+    response, status = error_result(message)
+    assert status == 409
+    assert response.get_json() == dict(error=message,
+                                       conflict='stale_preview',
+                                       reason='cache_evicted')
+    with pytest.raises(Conflict):
+        error_result('Unrelated source video or archive revision changed.')
