@@ -2097,6 +2097,12 @@ function saveStatus(d,message){
  document.querySelectorAll("button[data-save-edits]").forEach(b=>{b.disabled=!!d.busy;});
 }
 function trimReviewDraft(d){
+ const b=d.editor;
+ // Clean audio is fetched display state even when other edit kinds are pending.
+ // An in-flight audio submission may make a toggle-back a newer pending choice.
+ if(!d.audioInFlight&&sameEdit(b.audio,b.audioSaved)){
+  b.audio=[];b.audioSaved=[];b.audioLoaded=false;
+ }
  if(!d.busy&&!hasReviewEdits(d)){
   d.en={};d.editor=emptyEditor();
  }
@@ -2984,11 +2990,12 @@ async function saveAndRender(){
   box_overrides:b.ov,time_overrides:b.times});
  // Plain review must never wipe audio that the editor has not loaded.
  if(b.audioLoaded&&!sameEdit(b.audio,b.audioSaved)){payload.audio=copyEdit(b.audio);}
+ d.audioInFlight=payload.audio!==undefined;
  d.busy=true;saveStatus(d,"Saving edits… You can keep editing; newer edits stay pending.");
  let saved=false;
  try{
   const result=await reviewPost(`api/jobs/${id}/detections`,payload);
-  saved=true;
+  saved=true;d.audioInFlight=false;
   acknowledgeMap(d.enabled,payload.enabled);
   acknowledgeMap(b.ov,payload.box_overrides);acknowledgeMap(b.times,payload.time_overrides);
   acknowledgeAdds(d.manual,manRefs,man);acknowledgeAdds(b.adds,addRefs,adds);
@@ -3022,10 +3029,13 @@ async function saveAndRender(){
   }
   return true;
  }catch(e){
+  // A failed response leaves the audio baseline uncertain. Retain even a
+  // newer toggle-back to the old baseline and deliberately send it on retry.
+  if(!saved&&payload.audio!==undefined)b.audioSaved=null;
   saveStatus(d,(saved?"Edits saved; render was not confirmed. Retry with Save to render. ":
    "Save was not confirmed; drafts retained. Retry with Save. ")+e.message);
   return false;
- }finally{d.busy=false;saveStatus(d,d.status);if(d!==EDITS)trimReviewDraft(d);}
+ }finally{d.audioInFlight=false;d.busy=false;saveStatus(d,d.status);if(d!==EDITS)trimReviewDraft(d);}
 }
 async function loadPersist(){
  const a=await (await fetch("api/allowlist")).json();

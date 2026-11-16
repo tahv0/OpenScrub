@@ -242,3 +242,86 @@ def test_pending_playback_metadata_cannot_start_after_switch():
     let played=false;const video=elements.get('beVid');Object.assign(video,{readyState:0,play:async()=>{played=true},pause(){}});
     const p=beTogglePlay();openJob('B');video.onloadedmetadata();await p;
     if(played)throw Error('old video started after job switch');""")
+
+
+PENDING_AUDIO_SETUP = """
+setup();EDITS.enabled={};MAN.length=0;BE.adds=[];BE.ov={};BE.times={};
+BE.audioSaved=copyEdit(BE.audio);beTLDraw=()=>{};
+const kind=KIND;
+if(kind==='enabled')applyDet(1,false);
+if(kind==='manual')MAN.push({t_start:0,t_end:1,screen_box:[1,2,30,40]});
+if(kind==='box')BE.ov[1]=[5,6,30,40];
+if(kind==='time')BE.times[1]=[0.2,1];
+if(kind==='editor_manual')BE.adds.push({t0:0,t1:1,tref:0,box:[5,6,30,40]});
+"""
+
+
+@pytest.mark.parametrize("kind", ["enabled", "manual", "box", "time", "editor_manual"])
+def test_revisit_refreshes_clean_audio_with_non_audio_draft_pending(kind):
+    run_js(PENDING_AUDIO_SETUP.replace("KIND", json.dumps(kind)) + """
+    openJob('B');openJob('A');const load=tlInit();
+    await reply({detections:[],audio_redactions:[{t0:5,t1:6,mode:'mute'}]});await load;
+    BE.audio.push({t0:7,t1:8,mode:'bleep'});const save=saveAndRender();
+    if(JSON.stringify(calls.at(-1).body.audio)!==JSON.stringify([
+      {t0:5,t1:6,mode:'mute'},{t0:7,t1:8,mode:'bleep'}]))throw Error('revisited audio used stale clean cache');
+    const sent=calls.at(-1).body;
+    if(kind==='enabled'&&sent.enabled[1]!==false)throw Error('pending enabled choice lost');
+    if((kind==='manual'||kind==='editor_manual')&&sent.manual.length!==1)throw Error('pending manual lost');
+    if(kind==='box'&&!sent.box_overrides[1])throw Error('pending box lost');
+    if(kind==='time'&&!sent.time_overrides[1])throw Error('pending time lost');
+    await reply();await reply();await save;
+    """)
+
+
+@pytest.mark.parametrize("kind", ["enabled", "manual", "box", "time", "editor_manual"])
+@pytest.mark.parametrize("change", ["add", "remove", "modify"])
+def test_revisit_preserves_dirty_audio_with_non_audio_draft_pending(kind, change):
+    run_js(PENDING_AUDIO_SETUP.replace("KIND", json.dumps(kind)) + """
+    const change=CHANGE;
+    if(change==='add')BE.audio.push({t0:2,t1:3,mode:'bleep'});
+    if(change==='remove')BE.audio.splice(0,1);
+    if(change==='modify')BE.audio[0].t1=2;
+    const draft=JSON.stringify(BE.audio);openJob('B');openJob('A');const load=tlInit();
+    await reply({detections:[],audio_redactions:[{t0:5,t1:6,mode:'mute'}]});await load;
+    if(JSON.stringify(BE.audio)!==draft)throw Error('revisit overwrote dirty audio');
+    const save=saveAndRender();if(JSON.stringify(calls.at(-1).body.audio)!==draft)throw Error('dirty audio not submitted');
+    await reply();await reply();await save;
+    """.replace("CHANGE", json.dumps(change)))
+
+
+def test_revisit_refreshes_clean_audio_during_non_audio_save():
+    run_js(PENDING_AUDIO_SETUP.replace("KIND", json.dumps("enabled")) + """
+    const save=saveAndRender();openJob('B');openJob('A');const load=tlInit();
+    const saving=queue.shift();await reply({detections:[],audio_redactions:[{t0:5,t1:6,mode:'mute'}]});await load;
+    if(BE.audio[0].t0!==5)throw Error('non-audio save retained stale clean audio');
+    saving.resolve(response());await tick();await save;
+    if(calls.some(c=>c.url.endsWith('/render')))throw Error('revisited view rendered');
+    """)
+
+
+def test_audio_toggle_back_during_save_survives_revisit_and_ack():
+    run_js(PENDING_AUDIO_SETUP.replace("KIND", json.dumps("enabled")) + """
+    const baseline=copyEdit(BE.audio);BE.audio.push({t0:2,t1:3,mode:'bleep'});
+    const save=saveAndRender();BE.audio=copyEdit(baseline);openJob('B');openJob('A');
+    const load=tlInit();const saving=queue.shift();
+    await reply({detections:[],audio_redactions:[{t0:5,t1:6,mode:'mute'}]});await load;
+    saving.resolve(response());await tick();await save;
+    if(!sameEdit(BE.audio,baseline)||!hasReviewEdits(EDITS))throw Error('audio toggle-back lost during acknowledgement');
+    const retry=saveAndRender();if(!sameEdit(calls.at(-1).body.audio,baseline))throw Error('audio toggle-back not submitted');
+    await reply();await reply();await retry;
+    """)
+
+
+@pytest.mark.parametrize("failure", ["network", "423"])
+def test_audio_toggle_back_survives_unacknowledged_save_and_revisit(failure):
+    run_js(PENDING_AUDIO_SETUP.replace("KIND", json.dumps("enabled")) + """
+    const baseline=copyEdit(BE.audio);BE.audio.push({t0:2,t1:3,mode:'bleep'});
+    const save=saveAndRender();BE.audio=copyEdit(baseline);openJob('B');
+    if(FAILURE==='network')queue.shift().reject(Error('offline'));
+    else await reply({error:'busy'},423);
+    await tick();await save;openJob('A');
+    const load=tlInit();await reply({detections:[],audio_redactions:[{t0:5,t1:6,mode:'mute'}]});await load;
+    if(!sameEdit(BE.audio,baseline))throw Error('unacknowledged audio toggle-back lost');
+    const retry=saveAndRender();if(!sameEdit(calls.at(-1).body.audio,baseline))throw Error('unacknowledged audio toggle-back omitted');
+    await reply();await reply();await retry;
+    """.replace("FAILURE", json.dumps(failure)))
