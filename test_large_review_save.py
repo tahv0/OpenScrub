@@ -309,7 +309,8 @@ def test_empty_review_save_acknowledges_previously_confirmed_journal_without_rew
                       lambda *a, **k: pytest.fail('No-delta Save rewrote report'))
         response = client.post('/api/jobs/%s/detections' % jid,
             json={'enabled': {}, 'verified_labels': {}, 'output_choices': {},
-                  'manual': [], 'box_overrides': {}, 'time_overrides': {}})
+                  'manual': [], 'box_overrides': {}, 'time_overrides': {},
+                  'defer_report_write': True})
     assert response.status_code == 200, response.get_data(as_text=True)
     receipt = response.get_json()
     assert receipt['ok'] and receipt['changed'] is False
@@ -342,6 +343,7 @@ def test_sparse_output_only_save_is_journaled_without_rewriting_source_report(pl
     before = path.read_bytes()
     payload = {'enabled': {'3': False, '5': True},
                'output_choices': {'3': True, '5': True},
+               'defer_report_write': True,
                'verified_labels': {}, 'manual': [],
                'box_overrides': {}, 'time_overrides': {}}
     with monkeypatch.context() as guard:
@@ -371,3 +373,25 @@ def test_sparse_output_only_save_is_journaled_without_rewriting_source_report(pl
     assert saved[3]['verified_label'] == 'plate'
     assert saved[3]['plate_quad'] == row['plate_quad']
     assert saved[3]['enabled'] is False and saved[5]['output_choice_explicit'] is True
+
+
+
+def test_no_delta_save_only_still_materializes_all_journal_confirmations(plate_job):
+    """Save-only callers keep the existing report.json publication contract."""
+    import review_journal
+    client, jid, path, _ = plate_job
+    job = web.JOBS[jid]
+    row = json.loads(path.read_text())['detections'][0]
+    review_journal.write(job['dir'], row, 0, {
+        'enabled': False, 'verified_label': 'not_plate',
+        'human_confirmation': {'label':'negative', 'category':'plate','source':'explicit'}})
+    # No render-intent opt-in: do not return a lightweight journal-only receipt.
+    response = client.post('/api/jobs/%s/detections' % jid, json={
+        'enabled': {}, 'output_choices': {}, 'verified_labels': {},
+        'manual': [], 'box_overrides': {}, 'time_overrides': {}})
+    assert response.status_code == 200
+    assert response.get_json()['ok']
+    assert response.get_json().get('journal_deferred') is None
+    stored = json.loads(path.read_text())['detections'][0]
+    assert stored['enabled'] is False and stored['verified_label'] == 'not_plate'
+    assert not review_journal.has_changes(job['dir'])
