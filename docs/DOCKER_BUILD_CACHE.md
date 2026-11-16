@@ -44,7 +44,9 @@ again. The separate training venv is intentional; there is no reason to
 reinstall it for normal application edits.
 
 From the repository root, use the checked-in wrapper for initial setup and
-subsequent updates:
+subsequent updates. It includes **all three Compose overlays** (Windows test,
+CUDA, and training) when building and starting the application, so the trainer
+Python and trusted checkpoint paths remain configured after a restart:
 
 ```powershell
 git switch integration/all-prs
@@ -80,8 +82,10 @@ The wrapper:
    or `requirements*.txt` / pinned model-prefetch code changes (or when
    `-ForceDependencies` is explicitly provided). Application source edits
    and later Dockerfile instructions do not affect this fingerprint.
-4. Starts your existing Windows test Compose service. Its media/data volume
-   paths and NVIDIA GPU reservation are unchanged.
+4. Starts your Windows test service with the CUDA **and training** overlays.
+   The original media/data mounts and GPU reservation remain unchanged, while
+   training environment paths and IPC settings are preserved. `-BuildOnly`
+   still builds without replacing the running container.
 
 For build-only, use `.\scripts\build-windows-cuda.ps1 -BuildOnly`; after
 changing the CUDA base or dependencies, use `-ForceDependencies` if you want
