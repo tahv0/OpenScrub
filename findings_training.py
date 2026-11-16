@@ -115,6 +115,7 @@ def training_corpus_summary(model_root, model_id):
     samples = lineage.get('samples') if isinstance(lineage, dict) else None
     if (not isinstance(lineage, dict) or lineage.get('schema') != 1
             or lineage.get('model_id') != model_id
+            or lineage.get('model_sha256') != info['model_sha256']
             or not isinstance(samples, dict)
             or len(samples) != info['example_count']):
         raise models.ModelError('Invalid saved model training corpus metadata')
@@ -124,6 +125,7 @@ def training_corpus_summary(model_root, model_id):
     for sid, sample in samples.items():
         if (not isinstance(sid, str) or not models._HASH.fullmatch(sid)
                 or not isinstance(sample, dict)
+                or not isinstance(sample.get('label'), str)
                 or sample.get('label') not in counts):
             raise models.ModelError('Invalid saved model training example metadata')
         source = sample.get('source')
