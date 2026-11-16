@@ -3280,6 +3280,8 @@ def _fast_review_choices(job, edits, started, parsed):
     if not isinstance(enabled, dict) or not isinstance(output, dict):
         return None
     path = os.path.join(job['dir'], 'report.json')
+    if not os.path.isfile(path):
+        return None  # Never acknowledge a job with no authoritative scan report.
     # A no-delta save still means something: all previous Is/Not and polygon
     # acknowledgments are durable. Let the render worker publish the journal.
     if not enabled and not output:
