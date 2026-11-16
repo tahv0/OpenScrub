@@ -159,6 +159,14 @@ def key(row, index):
     return 'row', category, int(index)
 
 
+def _next_output_choice_sequence(db):
+    """Durable ordering of output-only clicks and later human classifications."""
+    state = db.execute("SELECT value FROM meta WHERE name='output_choice_sequence'").fetchone()
+    sequence = (int(state[0]) if state is not None else 0) + 1
+    _set(db, 'output_choice_sequence', sequence)
+    return sequence
+
+
 def patch_row(row, index, groups, anchors):
     group = groups.get(key(row, index))
     anchor = anchors.get(index)
@@ -176,8 +184,19 @@ def patch_row(row, index, groups, anchors):
             confirmation['propagated'] = index != source_index
             result['human_confirmation'] = confirmation
     if anchor:
+        # A later Is/Not classification must win over an earlier batch
+        # Blur/Keep click. Source-row corners and other anchor metadata are
+        # independent and must still survive. Unversioned legacy anchors
+        # keep their historical precedence.
+        group_seq = group[1].get('_output_choice_seq', 0) if group else 0
+        anchor_seq = anchor.get('_output_choice_seq', 0)
+        older_output = bool(anchor_seq and group_seq > anchor_seq)
+        output_fields = {'enabled', 'output_choice_explicit',
+                         'plate_verification_override', 'plate_verification',
+                         'human_confirmation'}
         result.update({field: value for field, value in anchor.items()
-                       if not field.startswith('_')})
+                       if not field.startswith('_') and
+                       not (older_output and field in output_fields)})
         if (group is None or index == group[0]) and 'human_confirmation' in result:
             receipt_id = anchor.get('confirmed_finding_id', result.get('confirmed_finding_id'))
             receipt_revision = anchor.get('confirmed_finding_revision')
@@ -310,6 +329,8 @@ def write(directory, row, index, group_fields, anchor_fields=None):
                 anchor_index = previous[0] if previous else index
             db.execute('BEGIN IMMEDIATE')
             _set(db, 'baseline', current if meta.get('baseline') is None else meta['baseline'])
+            if 'human_confirmation' in group_fields:
+                patch['_output_choice_seq'] = _next_output_choice_sequence(db)
             db.execute(
                 'INSERT INTO groups(kind,category,member,anchor,patch) VALUES (?,?,?,?,?) '
                 'ON CONFLICT(kind,category,member) DO UPDATE SET '
@@ -358,11 +379,13 @@ def write_output_anchors(directory, patches):
             db.execute('BEGIN IMMEDIATE')
             _set(db, 'baseline', current if meta.get('baseline') is None
                  else meta['baseline'])
+            sequence = _next_output_choice_sequence(db)
             for index, fields in sorted(patches.items()):
                 previous = db.execute('SELECT patch FROM anchors WHERE row_index=?',
                                       (index,)).fetchone()
                 patch = json.loads(previous[0]) if previous else {}
                 patch.update(fields)
+                patch['_output_choice_seq'] = sequence
                 db.execute(
                     'INSERT INTO anchors(row_index,patch) VALUES (?,?) '
                     'ON CONFLICT(row_index) DO UPDATE SET patch=excluded.patch',
