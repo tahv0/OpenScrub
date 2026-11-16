@@ -151,11 +151,25 @@ Proposed contract: `get_snapshot(job_id, report_path, source_identity) -> (docum
 
 **Files / contract:** Initially benchmark/profile evidence only. Candidate owners are existing scan callbacks/preview publication and `run_scan`; implementation files/tests are named after the demonstrated function, not a new subsystem in advance.
 
-- [ ] **E:** Preserve the generic `smooth_dense_tracks` initial-seek hunk hidden in mixed donor `ccff62f`. The B03 source-isolated probe observed 17,873 reads before useful processing at a 600-second start versus one after a simulated successful seek; this is operation-count evidence, not real-video throughput. Reproduce with actual late-window video, verified frame identity and failed-seek fallback before extracting an independent fix. Preserve this behavior when P18 resumes a long scan.
+- [ ] **E:** Preserve the generic requirement behind the `smooth_dense_tracks` initial-seek hunk hidden in mixed donor `ccff62f`: avoid unnecessary work before a late processing window. The B03 source-isolated probe observed 17,873 reads before useful processing at a 600-second start versus one after a simulated successful seek; that is operation-count evidence. Real-video research found the seek fast but cancellation-delaying on a single-keyframe file, so do not port that mechanism unchanged. P11A below evaluates the smaller sequential alternative. Preserve the validated benefit when P18 resumes a long scan.
 - [ ] **E:** Profile fixed-content early/middle/late intervals and separate OCR/model work from callback/report costs. Compare against Austin's current indexed/batched PhiMemory behavior.
 - [ ] **S/I:** If a specific growing operation exists, write a deterministic work-count regression and extract only the constant/bounded-work change. If not, close P11 as already fixed or removed-system-only with source/profile evidence.
 - [ ] **V/D:** Run the owning function's tests, full suite/build and the same scan workload. State actual model/provider/settings and coverage. Do not describe improved ETA as throughput improvement.
 - [ ] **R/L:** Submit only a concrete measured fix; otherwise update the preservation ledger so the historical optimization remains accounted for without extra production code.
+
+### P11A — skip retrieval of unused dense-smoothing frames
+
+**What:** Keep sequential decoding but use `VideoCapture.grab()` for frames outside every needed gray-cache span, retrieving pixels only for frames the onset matching actually uses. Release the decoder on all exits.
+
+**Why:** Current smoothing retrieves and allocates every prefix frame even when a detection first appears ten minutes into a video. Real 610-second, 256×144 CFR short-GOP and single-keyframe experiments found identical source markers and all Detection fields with the sequential alternative. Unlike the initial-seek candidate, it retains the existing periodic cancellation checks during prefix processing. The research results are evidence for implementation, not a shipped improvement or a general 4K guarantee.
+
+**When:** Independent W2 performance PR after the real-video baseline; may target Austin plus the test-only prerequisite without P06 or optional modes. The broader P11/S05 investigation remains open.
+
+- [ ] **E/S:** Pin the source and record short-GOP/single-keyframe before/after samples, actual read/grab/seek counts, source markers, complete detection equality and timed cancellation. Keep the rejected seek's cancellation result as the reason for choosing sequential decoding; do not claim to skip codec prefix decoding.
+- [ ] **I:** Add meaningful regressions under `tests/test_dense_smoothing_io.py`, then change only the existing sequential cache fill and necessary decoder cleanup. Keep logical frame indices, cache spans/eviction, matching thresholds, margins, interpolation, grace padding, report schema and default policies unchanged. A failed grab/read must stop consistently without mislabeling later frames.
+- [ ] **I:** Preserve cancellation checkpoints through skipped frames and release the capture in `finally` on success, EOF, cancellation and exceptions. Do not add seek state, a decoder subprocess, new dependency or a background thread to this focused change.
+- [ ] **V/D:** Run the owning tests, existing suite, full build and marked real-video comparisons. Include a small repeatable recipe/measurement tool under `benchmark/` only as needed for this scenario. Report operation counts separately from wall time and codec work, with resolution/GOP/frame identity, three warm-ups/five samples and memory/cleanup limits. Keep generated video outside Git.
+- [ ] **R/L:** PR lead: late dense-track smoothing should avoid retrieving frames it never uses. Cite measured results at exact before/after commits and retain cancellation/frame-correctness evidence. Keep broader scan-history, ETA and stop/review changes separate.
 
 ## Review focus
 

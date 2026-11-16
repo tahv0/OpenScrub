@@ -133,6 +133,28 @@ For ordinary file responses, use the valid response `Content-Length` matching th
 
 **Execution refinement:** The pinned writer inventory also found unguarded tracker admission, render admission, retention and vault transitions. Split lifecycle ownership from latest-document transactions if one diff becomes hard to review. A per-job lock must not be held through video processing or output hashing. Any new server busy rejection must follow P07's browser HTTP-failure handling, so a rejected save retains drafts and never triggers rendering. Cancellation should signal compute immediately; its acknowledgement must serialize with final publication if claiming that no cancelled operation can publish afterward. The concrete source inventory and deterministic schedules live in the local execution evidence, `report-transaction-research.md`; they are a design, not passing tests.
 
+#### P06B.1 — job-file lifetime and vault admission
+
+**What / why:** Give file operations a bounded ownership lifetime so vault transitions, deletion and retention cannot start between an admission check and the operation's final file access. Current phase-only checks omit background tracking, thumbnail generation, saves and streamed responses.
+
+**When:** After P06A, P06D and P07a; deliver as a separate prerequisite if combining it with transactions makes review difficult. This does not yet claim to preserve two overlapping edits.
+
+- [ ] **E/S:** Inventory actual request/background ownership and choose one documented lock order. Keep a lifecycle guard for short admission/transition decisions; do not hold it or the report lock throughout inference, decoding, output hashing or network transfer. A small private helper is justified only if it gives these repeated owners one clear interface.
+- [ ] **I:** Close admissions during vault transitions and condemned-job cleanup; recheck identity/state after acquiring the guard. Track work until cleanup actually finishes. Initialize internal state consistently for new and rehydrated jobs. Unlock must not advertise readiness during partial decryption; transition failures must not admit file mutations into a partially transformed store.
+- [ ] **I:** Make manual lock, auto-lock and shutdown share the same busy decision. Preserve existing retention age and deletion-marker/retry behavior while skipping active work. Cancellation signals computation promptly while ownership remains active until cleanup finishes; never join a worker while holding a shared lock. P06B.2 owns the stronger cancellation/publication ordering and per-job generation check.
+- [ ] **V/D:** Use deterministic actual-route staging/lock, delete/restart, retention, tracker/thumbnail and failed-transition cases. If streamed-file protection is included, verify exactly-once release on normal completion/disconnect through actual WSGI, preserving Range and Content-Length. Record in-process scope and unavailable Windows behavior. PR lead: background work must finish before its files can be encrypted or removed.
+
+#### P06B.2 — latest-document edit and tracking transactions
+
+**What / why:** Serialize each job's complete read/apply/publish operation and mutation admission so two successful requests retain both changes, and a render cannot overwrite a newer accepted edit.
+
+**When:** After the required lifecycle foundation and P07a error handling. Declare those prerequisites in the PR; do not bundle unrelated browser features.
+
+- [ ] **I:** Add a stable per-job transaction lock; load fresh data inside it, apply only the supplied fields, publish and derive the success response from the committed snapshot. Keep different jobs independent. Failure releases locks/ownership and leaves the previous valid report available.
+- [ ] **I:** Reserve the existing single-tracker slot atomically, compute outside the lock, then reload, allocate the next track ID and append inside the final transaction. Preserve ordinary manual/audio/time/box choices and reject stale/cancelled completions.
+- [ ] **I:** Reserve queued/running scan/render ownership before work starts. Reject conflicting edits/tracking with a clear busy response, and reject render admission while tracking owns the job. Use a narrow final web publication callback only where needed to validate operation identity/cancellation after computation; engine/CLI defaults must remain independent of web state.
+- [ ] **V/D:** Exercise two sparse saves, combined fields, tracking-versus-edit in both orders, simultaneous tracker admissions, render admission versus save and cancellation during publication. Prove no obsolete publication after the defined cancel acknowledgement and no deadlock on failure. PR lead: successful overlapping review updates should both survive. Report serialization/memory tuning remains P06C.
+
 ### P06C — reduce demonstrated save work
 
 **What / why / when:** Reduce serialization/request work that remains costly on realistic large reports; only after S01 baseline and P06 correctness are stable.
