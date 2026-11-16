@@ -7362,7 +7362,9 @@ async function loadReview(signal=null,phase=SHELLPH){
    <button class="sec" style="padding:3px 8px;font-size:12px"
     onclick="setAll('${cat}',true)">Blur all</button>
    <button class="sec" style="padding:3px 8px;font-size:12px"
-    onclick="setAll('${cat}',false)">Keep all visible</button></h3><div class="grid3" data-review-category="${cat}">`;
+    onclick="setAll('${cat}',false)">Keep all visible</button></h3>
+    ${cat==="plate"?'<p class="review-copy plate-tracking-disclosure">Groups combine detected sightings. Corner edits are reused relative to each detected rectangle; they do not automatically follow all four corners through changing perspective. Inspect the video before rendering.</p>':""}
+    <div class="grid3" data-review-category="${cat}">`;
   const lazy=items.length>REVIEW_PAGE_THRESHOLD,pending=[];
   for(const [ordinal,x] of items.entries()){
    REVIEW_DISPLAY_META[x.i]=x;
@@ -7370,7 +7372,7 @@ async function loadReview(signal=null,phase=SHELLPH){
     <div class="${x.category==="plate"?"plate-preview":"finding-preview"}">
     <img id="thumb${x.i}" data-preview-url="api/jobs/${job}/finding-preview/${x.i}" alt="Original detection preview"
      class="${x.category==="plate"?"plate-edit-thumb":""}"
-     title="${x.category==="plate"?"Drag numbered corners; autosaved to this track":"Enlarge detection"}"
+     title="${x.category==="plate"?"Drag corners; saved relative to detected boxes in this group, not visually tracked frame by frame":"Enlarge detection"}"
      style="cursor:${x.category==="plate"?"pointer":"zoom-in"}"
      onclick="${x.category==="plate"?"":"zoomDet("+x.i+")"}"
      onpointerdown="${x.category==="plate"?"event.stopPropagation()":""}"
@@ -7380,7 +7382,7 @@ async function loadReview(signal=null,phase=SHELLPH){
     <small class="preview-status" role="status">Preview not loaded</small>
     <button class="sec preview-retry" hidden onclick="retryReviewPreview(this)">Retry preview</button>
     ${x.category==="plate"?'<small class="source-frame-note review-copy" role="status"></small><button type="button" class="sec source-frame-exact" hidden onclick="loadExactReviewFrame(this)">Load exact source frame</button><button type="button" class="sec plate-repair-button" hidden onclick="openPlateRepair(this)">Redraw plate area</button>':""}
-    ${x.category==="plate"?'<small class="quad-status" role="status" title="Corners apply to this detected track. Review changing perspective. Keyboard: select corner 1–4, use arrows; Ctrl+Z undoes.">Corners autosave to track</small><button type="button" class="sec quad-retry" hidden>Retry save</button>':""}
+    ${x.category==="plate"?'<small class="quad-status" role="status" title="The same relative four-corner shape is reused on existing detector boxes in this group; this does not optically track the plate through the video. Keyboard: select corner 1–4, use arrows; Ctrl+Z undoes.">Corners autosave to group boxes</small><button type="button" class="sec quad-retry" hidden>Retry save</button>':""}
     <div>${plateVerificationBadge(x)}${x.learning_conflict?'<span class="badge" title="The original coverage was retained where the learned model could not make a reliable refinement">Model disagreement — review</span> ':""}${plateFallbackText(x)?`<span class="badge" style="white-space:normal">${plateFallbackText(x)}</span> `:""}${x.shaped?'<span class="badge" title="Thumbnail rectangle is a selection guide; open to inspect the mask and any exclusions">shaped mask</span> ':""}${x.personcard?`<b>Person ${x.person+1}</b> — one decision for ALL their appearances`:`"${sectionEscape(x.text)}"`}${x.frames?` <span class="badge">×${x.frames} frames</span>`:""}${x.confidence?` <span class="badge" title="detector confidence — not a human decision">${Math.round(x.confidence*100)}%</span>`:""} <br>${x.t_start.toFixed(1)}–${x.t_end.toFixed(1)}s</div>
     ${plateTextBadge(x)}
     <div class="review-similar-slot" id="similar${x.i}"></div>
