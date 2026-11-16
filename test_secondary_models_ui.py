@@ -290,3 +290,73 @@ def test_candidate_check_save_and_explicit_library_mode_in_browser(secondary_ui_
         evidence.mkdir(parents=True, exist_ok=True)
         page.locator('#learnedPlateModelControls').screenshot(path=str(evidence / ('secondary-mode-%d.png' % width)))
         browser.close()
+
+
+
+def test_verifier_badge_uses_exact_representative_score_and_shows_small_numbers():
+    """A different group's low-scored frame must not label the pictured row."""
+    script = r'''
+const assert=require('node:assert/strict');
+const sectionEscape=value=>String(value).replace(/</g,'&lt;');
+''' + page_between('function plateVerificationGroupSummary(', 'async function checkPlateDetections(') + r'''
+const low={i:100,frame_index:1121,plate_verification:{
+  decision:'retain',score:3e-7,threshold:2.2351741790771484e-7,mode:'review',
+  applied:false,source_frame:1121}};
+const bad={i:101,frame_index:1106,plate_verification:{
+  decision:'suggest_not_plate',score:0,threshold:2.2351741790771484e-7,mode:'review',
+  applied:false,source_frame:1106}};
+const untouched={i:102,frame_index:1130};
+const rep=plateVerificationRepresentative(low,[bad,low,untouched]);
+assert.equal(rep.i,100);
+assert.equal(rep.plate_verification.score,3e-7);
+assert.deepEqual(rep.plate_verification_group,{total:3,checked:2,below:1,filtered:0});
+const label=plateVerificationBadge(rep);
+assert.match(label,/Model retained/);
+assert.match(label,/Scored detector frame 1121/);
+assert.match(label,/Checker raw score 3\.000e-7/);
+assert.match(label,/cutoff 2\.235e-7 \(at\/above cutoff\)/);
+assert.match(label,/Group: 2\/3 sightings checked, 1 below cutoff/);
+assert.ok(!label.includes('plate score 0%'));
+assert.ok(!label.includes('Scored detector frame 1106'));
+assert.ok(!label.includes('Model suggests false positive'));
+assert.match(plateVerificationBadge(plateVerificationRepresentative(untouched,[bad,low,untouched])),
+ /No checker score for this representative detection/);
+const lowDetail=plateVerificationBadge(bad);
+assert.match(lowDetail,/Model suggests false positive/);
+assert.match(lowDetail,/Checker raw score 0/);
+assert.match(lowDetail,/below cutoff/);
+assert.match(lowDetail,/Scored detector frame 1106/);
+assert.equal(formatPlateVerifierScore(NaN),'not available');
+assert.equal(formatPlateVerifierScore(0),'0');
+assert.equal(formatPlateVerifierScore(.81),'0.81');
+assert.equal(formatPlateVerifierScore(2.2351741790771484e-7),'2.235e-7');
+'''
+    run_node(script)
+
+
+def test_verifier_result_includes_frame_and_indexed_and_legacy_listings_match(checker_job):
+    import review_preview_index as idx
+    client, job, report, _ = checker_job
+    from test_secondary_models_web import run_check
+    run_check(client, job, 'review')
+    result = client.get('/api/jobs/%s/detections' % job['id'])
+    assert result.status_code == 200
+    first = result.get_json()
+    assert first['detections'][0]['frame_index'] == 2
+    assert first['detections'][0]['plate_verification']['source_frame'] == 2
+    assert first['detections'][1]['plate_verification']['source_frame'] == 8
+    assert idx.prepare(report, json.loads(report.read_text()))
+    cached = client.get('/api/jobs/%s/detections' % job['id'])
+    assert cached.status_code == 200
+    assert cached.get_json() == first
+
+
+
+def test_review_labels_detector_separately_and_explains_group_tracking_limit():
+    page = web.PAGE
+    assert 'Detector ${Math.round(x.confidence*100)}%' in page
+    assert 'Checker raw score ' in page
+    assert 'Groups combine detector sightings;' in page
+    assert 'they do not visually track all four plate corners' in page
+    assert 'Corners autosave; check other frames' in page
+    assert 'estimate new perspective corners for every frame' in page

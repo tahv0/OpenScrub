@@ -122,6 +122,7 @@ def public_item(index, d):
     """Stable, lightweight detection fields already exposed by /detections."""
     return dict(i=index, category=d.get('category', ''), text=d.get('text', ''),
                 t_start=d['t_start'], t_end=round(d['t_end'], 2),
+                frame_index=d.get('frame_index', -1),
                 enabled=d.get('enabled', True),
                 track=d.get('track', -1), person=d.get('person', -1),
                 confidence=d.get('confidence', 0),

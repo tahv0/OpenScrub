@@ -49,6 +49,13 @@ The distinction matters:
 | A model or OCR suggestion | Machine evidence to review. It is not a human training label. |
 
 For a tracked object, the review choice can apply to its grouped appearances.
+**Grouping is not automatic full-frame visual tracking:** the scanner groups
+detector sightings and uses continuity coverage across short gaps, but a
+four-corner edit on a representative image does not prove those same four
+physical plate edges have been visually followed through rotation, occlusion
+or changing perspective. Inspect coverage at multiple points in the original
+video before rendering; the separate **Track object** editor follows a
+user-selected region rather than estimating independent plate-corner motion.
 Only the picture you explicitly confirmed is archived as a human example;
 automatically propagated frames do not multiply the training labels. If you
 adjust an already confirmed example, the saved example receives a new revision.

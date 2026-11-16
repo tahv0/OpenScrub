@@ -2317,6 +2317,7 @@ def job_detections(jid):
     for i, d in enumerate(doc["detections"]):
         items.append({"i": i, "category": d["category"], "text": d["text"],
                       "t_start": d["t_start"], "t_end": round(d["t_end"], 2),
+                      "frame_index": d.get("frame_index", -1),
                       "enabled": d.get("enabled", True),
                       "track": d.get("track", -1),
                       "person": d.get("person", -1),
@@ -4017,6 +4018,10 @@ progress{width:100%;height:12px;accent-color:var(--acc)}
 
 .det.selected{outline:2px dashed #60a5fa;outline-offset:2px}
 .review-copy{font-size:13px;color:#cbd5e1;line-height:1.5;margin:0 0 10px}
+.plate-verification-detail{font-size:11px;line-height:1.4;overflow-wrap:anywhere;margin:6px 0;color:#cbd5e1}
+.plate-verification-detail strong,.plate-verification-detail small{display:block;font-size:11px;line-height:1.45}
+.plate-verification-detail strong{color:#e2e8f0;font-weight:600}
+.plate-verification-group{display:block;font-size:11px;line-height:1.4;overflow-wrap:anywhere;margin:5px 0}
 .det-status{font-weight:600;margin:7px 0 5px}
 .det-status.blur{color:#fca5a5}
 .det-status.keep{color:#6ee7b7}
@@ -4831,11 +4836,14 @@ async function loadBoxEdit(fromReview){
    select — red means hidden, green means visible, and yellow dashed is only the detector proposal. Drag inside to move, a corner to resize, edit its from/to times,
    or remove its blur. &#65291; Add box: drag a static region. &#8857; Track object:
    drag the timeline handles to the part of the video you care about, scrub
-   to a frame where the object is clear, draw a box around it — it will be
-   followed and blurred through the window. &#9645; Draw plate: choose the
-   time window, then click its four corners clockwise (top-left, top-right,
-   bottom-right, bottom-left) to create a tracked, perspective-tight plate
-   mask and a local verified training sample. &#128263; Audio span: drag
+   to a frame where the object is clear, draw a box around it — the
+   tracking box is followed and blurred through the window. &#9645; Draw plate:
+   choose the time window, then click its corners clockwise (top-left,
+   top-right, bottom-right, bottom-left). The tracker follows the enclosing
+   box and reuses your seed corner shape relative to it; it does NOT
+   estimate new perspective corners for every frame. Inspect the resulting
+   motion and explicitly confirm the source-frame plate before trusting it
+   as a training example. &#128263; Audio span: drag
    on the timeline's bottom lane to silence (or bleep) that stretch of sound.</p>`;
  const img=document.getElementById("beImg");
  img.onload=()=>{if(BE.playing)return;const cv=document.getElementById("beCv");
@@ -5564,7 +5572,7 @@ async function loadReviewPreview(state,task,cacheOnly){
     "Use Redraw plate area on this exact source frame before trusted training."
    :borrowed?
    "Showing cached frame "+meta.frame+" instead of detection frame "+
-   meta.requested_frame+". Load the exact source frame before confirming this finding."
+   meta.requested_frame+". A checker score belongs to the detector source frame, not this cached picture. Load the exact source frame before confirming this finding."
    :meta?.source_repaired?
    "Saved detector box correction for source frame "+meta.frame+
    ". Other frames in the group can still have their own uncorrected proposals."
@@ -7082,11 +7090,57 @@ function updatePlateVerifierCandidate(){
  if(!validated&&mode.value==="filter")mode.value="review";
  note.textContent=verifierAssessmentText(candidate?.assessment);
 }
+function plateVerificationGroupSummary(members){
+ // Scores belong to individual original detector sightings, not group cards.
+ const checked=members.filter(row=>row.plate_verification&&
+  Number.isFinite(row.plate_verification.score));
+ return {total:members.length,checked:checked.length,
+  below:checked.filter(row=>row.plate_verification.decision!=="retain").length,
+  filtered:checked.filter(row=>row.plate_verification.applied===true).length};
+}
+function plateVerificationRepresentative(best,members){
+ // Keep the pictured detection's own checker result. A group-level summary
+ // is separate and must never donate another frame's score or decision.
+ return {...best,plate_verification:best.plate_verification||null,
+  plate_verification_group:plateVerificationGroupSummary(members)};
+}
+function formatPlateVerifierScore(value){
+ // Raw proposal-associated model score, not a calibrated percentage.
+ if(!Number.isFinite(value)||value<0||value>1)return "not available";
+ if(value===0)return "0";
+ return value<.001?value.toExponential(3):String(Number(value.toPrecision(4)));
+}
 function plateVerificationBadge(row){
- const marker=row.plate_verification;if(!marker)return "";
- const label=marker.applied?"Model filtered":marker.decision==="suggest_not_plate"?"Model suggests false positive":"Model retained";
- const score=Number.isFinite(marker.score)?` · plate score ${Math.round(marker.score*100)}%`:"";
- return `<span class="badge plate-verification-badge" title="Secondary model decision; this is not a human label">${sectionEscape(label+" · "+(marker.mode||"review")+score)}</span> `;
+ const marker=row.plate_verification,group=row.plate_verification_group;
+ if(!marker&&!(group&&group.checked))return "";
+ let html="";
+ if(marker){
+  const label=marker.applied?"Model filtered":marker.decision==="suggest_not_plate"?
+   "Model suggests false positive":"Model retained";
+  const mode=marker.mode==="filter"?"filter":"review";
+  const frame=Number.isInteger(marker.source_frame)&&marker.source_frame>=0?
+   marker.source_frame:Number.isInteger(row.frame_index)&&row.frame_index>=0?
+   row.frame_index:null;
+  const hasCutoff=Number.isFinite(marker.threshold)&&marker.threshold>0;
+  const relation=hasCutoff&&Number.isFinite(marker.score)?
+   marker.score<marker.threshold?"below cutoff":"at/above cutoff":"comparison unavailable";
+  const scoredFrame=frame===null?"Source frame not recorded":"Scored detector frame "+frame;
+  html='<div class="plate-verification-detail" role="note" title="Secondary model score for one original detector proposal, not a calibrated probability or human label.">'
+   +'<strong class="plate-verification-badge">'+sectionEscape(label+" · "+mode)+'</strong>'
+   +'<small>Checker raw score '+sectionEscape(formatPlateVerifierScore(marker.score))
+   +(hasCutoff?'; cutoff '+sectionEscape(formatPlateVerifierScore(marker.threshold))+' ('+relation+')':'')+'</small>'
+   +'<small>'+sectionEscape(scoredFrame)+' · '
+   +(mode==="review"?"review suggestion only; blur unchanged":"validated filtering mode")
+   +' · not a probability</small></div>';
+ }
+ if(group&&group.total>1&&group.checked){
+  const other=marker?"Score above belongs to the representative detection only.":
+   "No checker score for this representative detection.";
+  html+='<small class="plate-verification-group review-copy">Group: '
+   +group.checked+'/'+group.total+' sightings checked, '+group.below
+   +' below cutoff, '+group.filtered+' auto-filtered. '+other+'</small>';
+ }
+ return html;
 }
 async function checkPlateDetections(){
  const job=CUR,view=JOBVIEW;
@@ -7290,9 +7344,8 @@ async function loadReview(signal=null,phase=SHELLPH){
    const sampled=LEARNING_SELECTION?members.find(m=>LEARNING_SELECTION.has(m.i)):null;
    let best=sampled||members[0];     // use the sampler's representative frame
    // The first exact sighting normally has its compact scan-time crop.
-   const rep={...best};
+   const rep=cat==="plate"?plateVerificationRepresentative(best,members):{...best};
    rep.learning_conflict=members.some(m=>m.learning_conflict)?"Model disagreement — review this track":"";
-   rep.plate_verification=(members.find(m=>m.plate_verification?.applied)||members.find(m=>m.plate_verification?.decision==="suggest_not_plate")||best).plate_verification;
    rep.t_start=members[0].t_start;
    rep.t_end=members[members.length-1].t_end;
    rep.frames=members.length;
@@ -7308,11 +7361,13 @@ async function loadReview(signal=null,phase=SHELLPH){
   items.sort((a,b)=>((b.personcard?1:0)-(a.personcard?1:0))||a.t_start-b.t_start);
   if(!items.length)continue;
   REVIEW_CATEGORY_GROUPS[cat]=items.map(item=>item.i);
-  html+=`<h3 style="margin:10px 0 6px">${CATDN[cat]||cat} <span class="badge">${items.length}</span>
+  html+=`${cat==="plate"?'<p class="review-copy plate-tracking-disclosure">Groups combine detector sightings; they do not visually track all four plate corners through every frame. Inspect motion and coverage before rendering.</p>':""}
+    <h3 style="margin:10px 0 6px">${CATDN[cat]||cat} <span class="badge">${items.length}</span>
    <button class="sec" style="padding:3px 8px;font-size:12px"
     onclick="setAll('${cat}',true)">Blur all</button>
    <button class="sec" style="padding:3px 8px;font-size:12px"
-    onclick="setAll('${cat}',false)">Keep all visible</button></h3><div class="grid3" data-review-category="${cat}">`;
+    onclick="setAll('${cat}',false)">Keep all visible</button></h3>
+    <div class="grid3" data-review-category="${cat}">`;
   const lazy=items.length>REVIEW_PAGE_THRESHOLD,pending=[];
   for(const [ordinal,x] of items.entries()){
    REVIEW_DISPLAY_META[x.i]=x;
@@ -7320,7 +7375,7 @@ async function loadReview(signal=null,phase=SHELLPH){
     <div class="${x.category==="plate"?"plate-preview":"finding-preview"}">
     <img id="thumb${x.i}" data-preview-url="api/jobs/${job}/finding-preview/${x.i}" alt="Original detection preview"
      class="${x.category==="plate"?"plate-edit-thumb":""}"
-     title="${x.category==="plate"?"Drag numbered corners; autosaved to this track":"Enlarge detection"}"
+     title="${x.category==="plate"?"Edit the displayed plate corners; this alone does not track perspective across the video":"Enlarge detection"}"
      style="cursor:${x.category==="plate"?"pointer":"zoom-in"}"
      onclick="${x.category==="plate"?"":"zoomDet("+x.i+")"}"
      onpointerdown="${x.category==="plate"?"event.stopPropagation()":""}"
@@ -7330,8 +7385,8 @@ async function loadReview(signal=null,phase=SHELLPH){
     <small class="preview-status" role="status">Preview not loaded</small>
     <button class="sec preview-retry" hidden onclick="retryReviewPreview(this)">Retry preview</button>
     ${x.category==="plate"?'<small class="source-frame-note review-copy" role="status"></small><button type="button" class="sec source-frame-exact" hidden onclick="loadExactReviewFrame(this)">Load exact source frame</button><button type="button" class="sec plate-repair-button" hidden onclick="openPlateRepair(this)">Redraw plate area</button>':""}
-    ${x.category==="plate"?'<small class="quad-status" role="status" title="Corners apply to this detected track. Review changing perspective. Keyboard: select corner 1–4, use arrows; Ctrl+Z undoes.">Corners autosave to track</small><button type="button" class="sec quad-retry" hidden>Retry save</button>':""}
-    <div>${plateVerificationBadge(x)}${x.learning_conflict?'<span class="badge" title="The original coverage was retained where the learned model could not make a reliable refinement">Model disagreement — review</span> ':""}${plateFallbackText(x)?`<span class="badge" style="white-space:normal">${plateFallbackText(x)}</span> `:""}${x.shaped?'<span class="badge" title="Thumbnail rectangle is a selection guide; open to inspect the mask and any exclusions">shaped mask</span> ':""}${x.personcard?`<b>Person ${x.person+1}</b> — one decision for ALL their appearances`:`"${sectionEscape(x.text)}"`}${x.frames?` <span class="badge">×${x.frames} frames</span>`:""}${x.confidence?` <span class="badge" title="detector confidence — not a human decision">${Math.round(x.confidence*100)}%</span>`:""} <br>${x.t_start.toFixed(1)}–${x.t_end.toFixed(1)}s</div>
+    ${x.category==="plate"?'<small class="quad-status" role="status" title="Corners are saved, but the shape is not optically tracked through the video. Inspect other frames. Keyboard: select corner 1–4, use arrows; Ctrl+Z undoes.">Corners autosave; check other frames</small><button type="button" class="sec quad-retry" hidden>Retry save</button>':""}
+    <div>${plateVerificationBadge(x)}${x.learning_conflict?'<span class="badge" title="The original coverage was retained where the learned model could not make a reliable refinement">Model disagreement — review</span> ':""}${plateFallbackText(x)?`<span class="badge" style="white-space:normal">${plateFallbackText(x)}</span> `:""}${x.shaped?'<span class="badge" title="Thumbnail rectangle is a selection guide; open to inspect the mask and any exclusions">shaped mask</span> ':""}${x.personcard?`<b>Person ${x.person+1}</b> — one decision for ALL their appearances`:`"${sectionEscape(x.text)}"`}${x.frames?` <span class="badge">×${x.frames} frames</span>`:""}${x.confidence?` <span class="badge" title="detector confidence — not a human decision">Detector ${Math.round(x.confidence*100)}%</span>`:""} <br>${x.t_start.toFixed(1)}–${x.t_end.toFixed(1)}s</div>
     ${plateTextBadge(x)}
     <div class="review-similar-slot" id="similar${x.i}"></div>
     <div class="finding-confirm" role="group" aria-label="Human classification">
