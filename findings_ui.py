@@ -325,5 +325,26 @@ function showTrainingResult(job){
  panel.replaceChildren();const title=document.createElement('h3');title.textContent=job.name||'Named plate model';panel.append(title);
  const copy=document.createElement('p');copy.className='findings-copy';copy.textContent=result?'Saved automatically as a new named model. Select it in Scan Setup to use it on another video. Review its assessment before enabling automatic filtering.':job.error||'Training selected confirmed plate examples. Progress and training logs appear above.';panel.append(copy);
  if(result){const assessment=document.createElement('pre');assessment.className='findings-copy';assessment.style.whiteSpace='pre-wrap';assessment.textContent=JSON.stringify(result.assessment||result.validation||{},null,2);panel.append(assessment);}
+ if(job.phase==='error'){
+  const advice=document.createElement('p');advice.className='findings-copy';
+  advice.textContent='If training completed and exported a model before an error, you can finalize that saved candidate without repeating the CUDA training epochs. Incomplete or changed artifacts are refused.';
+  panel.append(advice);
+  const button=document.createElement('button');
+  button.textContent='Finish existing trained candidate (no retraining)';
+  button.onclick=async()=>{
+   button.disabled=true;
+   const status=document.createElement('p');status.className='findings-note';status.setAttribute('role','status');panel.append(status);
+   try{
+    await reviewRequest('api/jobs/'+encodeURIComponent(job.id)+'/finalize-trained-model',{
+     method:'POST',headers:{'Content-Type':'application/json'},body:'{}',timeoutMs:120000});
+    status.textContent='Validating saved candidate and training snapshots. No training epochs will run.';
+    if(typeof openJob==='function')await openJob(job.id);
+   }catch(error){
+    status.textContent='Could not finalize the retained candidate: '+error.message;
+    status.classList.add('findings-error');button.disabled=false;
+   }
+  };
+  panel.append(button);
+ }
 }
 """

@@ -336,3 +336,83 @@ def test_legacy_auto_publication_preserves_parent_and_removed_pixel_exposure(tmp
     assert set(parent['lineage']['training_groups']) <= set(child['lineage']['training_groups'])
     assert all(item in child['lineage']['training_exposure'] for item in parent['lineage']['training_exposure'])
     assert child['lineage']['split_history'][:1]==parent['lineage']['split_history']
+
+
+
+def test_run_receipt_stays_compact_with_3000_selected_revisions():
+    ft = module()
+    import learned_models as lm
+    selected = {hashlib.sha256(str(i).encode()).hexdigest(): 1 for i in range(3000)}
+    meta = ft._run_metadata('Highway training', selected)
+    assert meta['selected_revisions_count'] == 3000
+    assert len(json.dumps(meta).encode()) < lm._MANIFEST_LIMIT
+    assert 'expected_revisions' not in meta
+    assert ft._run_metadata('Highway training', dict(reversed(list(selected.items())))) == meta
+    assert ft._run_metadata('Highway training', dict(selected, extra=2)) != meta
+
+
+def test_finalizes_existing_candidate_after_publication_failure_without_retraining(tmp_path, monkeypatch):
+    ft = module()
+    import confirmed_findings as cf
+    import learned_models as lm
+    data = examples(tmp_path)
+    monkeypatch.setattr(cf, 'training_snapshot', lambda *a, **k: data)
+    checkpoint = tmp_path / 'base.pt'; checkpoint.write_bytes(b'trusted local base')
+    monkeypatch.setenv('OPENSCRUB_TRAIN_WEIGHTS', str(checkpoint))
+    request = {'name': 'Recover saved model',
+               'example_ids': [i['id'] for i in data],
+               'expected_revisions': {i['id']: i['revision'] for i in data},
+               'license_accepted': True}
+    job = make_job(tmp_path / 'failed-named')
+    job.update(kind='model_training', phase='learning', learning_request=request)
+    actual_save = lm.save_candidate
+    attempts = []
+    def reject_publish(*args, **kwargs):
+        attempts.append(True)
+        raise lm.ModelError('simulated final publish failure')
+    monkeypatch.setattr(lm, 'save_candidate', reject_publish)
+    with pytest.raises(lm.ModelError, match='final publish'):
+        ft.run(job, tmp_path / 'confirmed', tmp_path / 'models', request, train=trainer)
+    assert attempts == [True]
+    job['phase'] = 'error'
+    stages = list((Path(job['dir']) / 'learning' / 'passes').glob('pass-*'))
+    assert len(stages) == 1
+    stage = stages[0]
+    assert list((stage / 'versions').glob('v*/model.onnx'))
+    assert not (stage / 'result.json').exists()
+    assert (stage / 'corpus' / 'examples.json').is_file()
+    monkeypatch.setattr(lm, 'save_candidate', actual_save)
+    monkeypatch.setattr(ft.session, 'run_training', lambda *a, **k:
+                        pytest.fail('Recovery must not train another model'))
+    result = ft.finalize_retained(job, tmp_path / 'models')
+    assert result['name'] == 'Recover saved model'
+    assert result['training_info']['trainable']
+    assert (stage / 'result.json').is_file()
+    assert lm.list_models(tmp_path / 'models')[0]['id'] == result['model_id']
+    assert ft.resolve_parent(tmp_path / 'models', result['model_id'])['lineage']['samples']
+    assert ft.finalize_retained(job, tmp_path / 'models')['model_id'] == result['model_id']
+    assert len(lm.list_models(tmp_path / 'models')) == 1
+
+
+def test_recovery_rejects_tampered_candidate_without_creating_library_entry(tmp_path, monkeypatch):
+    ft = module()
+    import confirmed_findings as cf
+    import learned_models as lm
+    data = examples(tmp_path)
+    monkeypatch.setattr(cf, 'training_snapshot', lambda *a, **k: data)
+    base = tmp_path / 'base.pt'; base.write_bytes(b'base')
+    monkeypatch.setenv('OPENSCRUB_TRAIN_WEIGHTS', str(base))
+    request = {'name': 'Tamper guard', 'license_accepted': True,
+               'expected_revisions': {i['id']: i['revision'] for i in data}}
+    job = make_job(tmp_path / 'failed')
+    job.update(kind='model_training', phase='learning', learning_request=request)
+    monkeypatch.setattr(lm, 'save_candidate',
+                        lambda *a, **k: (_ for _ in ()).throw(lm.ModelError('simulated')))
+    with pytest.raises(lm.ModelError, match='simulated'):
+        ft.run(job, tmp_path / 'confirmed', tmp_path / 'models', request, train=trainer)
+    job['phase'] = 'error'
+    path = next(Path(job['dir']).glob('learning/passes/*/versions/*/model.onnx'))
+    path.write_bytes(path.read_bytes() + b'tampered')
+    with pytest.raises(ValueError, match='hash'):
+        ft.finalize_retained(job, tmp_path / 'models')
+    assert not (tmp_path / 'models').exists()

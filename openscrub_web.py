@@ -869,6 +869,8 @@ def worker():
         try:
             if action == "learn_examples":
                 findings_web.perform_training(job)
+            elif action == "finalize_examples":
+                findings_web.perform_finalize(job)
             elif action == "learn":
                 perform_learning(job)
             elif action == "verify":

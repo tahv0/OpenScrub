@@ -1110,6 +1110,24 @@ def perform_training(job):
         _state(job)
 
 
+def perform_finalize(job):
+    """Publish an intact saved named-model candidate, not a second CUDA run."""
+    cb = _web.WebCallbacks(job)
+    try:
+        result = training.finalize_retained(job, _web.learned_models_root(), cb.log)
+        job.update(phase='model_ready', progress=1., error=None, training_result=result)
+        cb.log('Saved retained named model: ' + result['name'])
+    except InterruptedError:
+        job.update(phase='cancelled', error=None)
+        cb.log('Model finalization cancelled; saved candidate kept.')
+    except Exception as error:
+        _web.diagnostics.exception('confirmed_findings_finalize_failed', job)
+        job.update(phase='error', error=str(error))
+        cb.log('Saved model finalization stopped: ' + str(error))
+    finally:
+        _state(job)
+
+
 def recover_training(jid, jdir):
     path = Path(jdir)/'training_job.json'
     if not path.is_file():
@@ -1225,6 +1243,24 @@ def install(app, web):
         if result is None:
             abort(404)
         return Response(result[1],mimetype='image/jpeg',headers={'Cache-Control':'no-store'})
+
+    @app.post('/api/jobs/<jid>/finalize-trained-model')
+    @_guard
+    @web._serialize_review_edit
+    def findings_finalize_model(jid):
+        job = _web.JOBS.get(jid)
+        if job is None:
+            return jsonify(error='Named training job not found'), 404
+        if job.get('kind') != 'model_training' or job.get('phase') != 'error':
+            return jsonify(error='Only a failed named-model training job can finalize an existing candidate'), 409
+        if _web.vault_locked():
+            return jsonify(error='Unlock the vault to finalize the retained model'), 423
+        job.update(phase='learning', error=None, learning={
+            'stage': 'checking', 'message': 'Validating retained trained candidate; no new training epochs'})
+        _state(job)
+        web.WORK_Q.put((jid, 'finalize_examples'))
+        return jsonify(ok=True, id=jid, phase='learning')
+
 
     @app.post('/api/findings/train')
     @_guard

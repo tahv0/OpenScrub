@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 import hashlib
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import shutil
 import unicodedata
 import uuid
@@ -406,6 +406,20 @@ def session_feedback(job, doc, store, group_for):
     return managed, plans
 
 
+def _run_metadata(name, expected_revisions=None):
+    """Keep run metadata compact even with thousands of confirmed findings.
+
+    The full revision set is still pinned in training_job.json and in the
+    frozen corpus/examples.json, so no evidence is lost by hashing it here.
+    """
+    result = {'schema': 1, 'name': name}
+    if expected_revisions is not None:
+        encoded = json.dumps(sorted(expected_revisions.items()), separators=(',', ':')).encode('utf-8')
+        result['selected_revisions_count'] = len(expected_revisions)
+        result['selected_revisions_sha256'] = hashlib.sha256(encoded).hexdigest()
+    return result
+
+
 def run(job, findings_root, model_root, settings, log=None, train=None):
     import confirmed_findings
     log = log or (lambda message: None)
@@ -417,19 +431,16 @@ def run(job, findings_root, model_root, settings, log=None, train=None):
         [item['video']['name'] for item in selected]), 'Model name', 80, required=True)
     session.update_learning(job, 'collecting', 'Freezing confirmed examples', name=name)
     stage = session.private_dir(Path(job['dir']) / 'learning' / 'passes' / ('pass-' + uuid.uuid4().hex[:12]))
-    run_metadata = {'schema': 1, 'name': name}
-    if 'expected_revisions' in settings:
-        expected = settings['expected_revisions']
+    expected = settings.get('expected_revisions')
+    if expected is not None:
         if (not isinstance(expected, dict) or any(not isinstance(k, str) or type(v) is not int or v < 1
-                                                 for k,v in expected.items())):
+                                                  for k,v in expected.items())):
             raise models.ModelError('Expected example revisions must map selected IDs to positive revision numbers')
-        run_metadata['expected_revisions'] = dict(expected)
-        session.atomic_json(stage / 'run.json', run_metadata)
         current = {record['id']: record['revision'] for record in selected}
         if current != expected:
             raise models.ModelError('Selected confirmed examples changed revision or were revoked after queuing; refresh your selection before training')
-    else:
-        session.atomic_json(stage / 'run.json', run_metadata)
+    run_metadata = _run_metadata(name, expected)
+    session.atomic_json(stage / 'run.json', run_metadata)
     parent = resolve_parent(model_root, settings.get('parent_model_id'))
     selected, parent, reconciliation = _reconcile(findings_root, selected, parent)
     corpus, samples = _freeze(stage, selected, parent)
@@ -471,4 +482,140 @@ def run(job, findings_root, model_root, settings, log=None, train=None):
     session.atomic_json(stage / 'result.json', result)
     session.update_learning(job, 'complete', 'Named plate checker saved', name=name, model_id=manifest['id'])
     log('Saved named plate checker: ' + name)
+    return result
+
+
+def finalize_retained(job, model_root, log=None):
+    """Finish an already-trained named checker without starting CUDA training.
+
+    Only a failed named-model job with an exact published candidate, its frozen
+    checked training corpus and the original selected revisions is eligible.
+    All model/dataset hashes and the held-out checker gate are re-evaluated.
+    This does not read source videos or collect new training examples.
+    """
+    if job.get('kind') != 'model_training' or job.get('phase') not in ('error', 'learning'):
+        raise models.ModelError('Only a failed named-model job can finalize its saved candidate')
+    settings = job.get('learning_request')
+    if not isinstance(settings, dict) or settings.get('license_accepted') is not True:
+        raise models.ModelError('Missing original named-model training request')
+    expected = settings.get('expected_revisions')
+    if (not isinstance(expected, dict) or not expected or
+            any(not isinstance(i, str) or type(v) is not int or v < 1
+                for i, v in expected.items())):
+        raise models.ModelError('Cannot recover without the original selected revision snapshot')
+    root = models._directory(Path(job['dir']) / 'learning' / 'passes')
+    completed = []
+    for stage in root.iterdir():
+        if not stage.is_dir() or not candidates._PASS.fullmatch(stage.name):
+            continue
+        runpath = stage / 'run.json'
+        if not runpath.is_file():
+            continue
+        run = models._json(models._read_file(runpath, candidates._RUN_METADATA_LIMIT))
+        candidate_id = run.get('candidate_id')
+        if (isinstance(candidate_id, str) and
+                candidate_id.startswith(stage.name + ':')):
+            completed.append((stage, run, candidate_id))
+    if len(completed) != 1:
+        raise models.ModelError('Expected exactly one completed retained training candidate for this failed job')
+    stage, run, candidate_id = completed[0]
+    name = models._text(settings.get('name'), 'Training name', 80, required=True)
+    if run.get('name') != name:
+        raise models.ModelError('Retained candidate belongs to another training request')
+    if 'expected_revisions' in run and run['expected_revisions'] != expected:
+        raise models.ModelError('Retained run revision snapshot differs from the original request')
+    if 'selected_revisions_sha256' in run:
+        receipt = _run_metadata(name, expected)
+        if (run.get('selected_revisions_count') != receipt['selected_revisions_count']
+                or run['selected_revisions_sha256'] != receipt['selected_revisions_sha256']):
+            raise models.ModelError('Retained run selection fingerprint changed')
+    candidate = candidates.load_candidate(job['dir'], candidate_id)
+    if candidate['folder'].parent.parent != stage:
+        raise models.ModelError('Retained candidate does not belong to this training pass')
+
+    result_path = stage / 'result.json'
+    if result_path.is_file():
+        result = models._json(models._read_file(result_path, 1024 * 1024))
+        if (result.get('candidate_id') != candidate_id or
+                result.get('status') != 'complete' or
+                not isinstance(result.get('model_id'), str)):
+            raise models.ModelError('Retained model result does not match this candidate')
+        manifest, _ = models._load_directory(Path(model_root) / result['model_id'])
+        if manifest['model_sha256'] != candidate['model_sha256'] or not training_info(model_root, manifest['id'])['trainable']:
+            raise models.ModelError('Previously published model or its local training state failed verification')
+        return result
+
+    corpus = models._directory(stage / 'corpus')
+    frozen = models._json(models._read_file(corpus / 'examples.json', models.MAX_MODEL_BYTES))
+    samples = frozen.get('samples')
+    if (frozen.get('schema') != 1 or not isinstance(samples, dict) or not samples):
+        raise models.ModelError('Frozen example snapshot is missing or invalid')
+    revisions = {}
+    for sid, sample in samples.items():
+        if not isinstance(sid, str) or not models._HASH.fullmatch(sid) or not isinstance(sample, dict):
+            raise models.ModelError('Invalid retained example identity')
+        if sample.get('image') != 'images/' + sid + '.jpg':
+            raise models.ModelError('Retained example image path does not match its identity')
+        source = sample.get('source')
+        if not isinstance(source, dict):
+            raise models.ModelError('Retained example lacks confirmed provenance')
+        if source.get('id') in expected:
+            if (source.get('revision') != expected[source['id']]
+                    or source.get('category') != 'plate'
+                    or source.get('explicit') is not True):
+                raise models.ModelError('Retained confirmed example revision no longer matches the queued request')
+            revisions[source['id']] = source['revision']
+    if revisions != expected:
+        raise models.ModelError('Retained training set does not contain every originally selected revision')
+
+    splits_doc = models._json(models._read_file(stage / 'dataset' / 'split-groups.json', 32 * 1024 * 1024))
+    splits = splits_doc.get('groups')
+    if (splits_doc.get('schema') != 1 or not isinstance(splits, dict)
+            or set(splits) != {sample.get('group') for sample in samples.values()}
+            or any(split not in ('train', 'val') for split in splits.values())):
+        raise models.ModelError('Frozen training/validation group split is inconsistent')
+    manifest_bytes = models._read_file(stage / 'dataset' / 'manifest.jsonl', candidates._DATASET_MANIFEST_LIMIT)
+    for line in manifest_bytes.splitlines():
+        row = models._json(line)
+        image = row.get('image')
+        if not isinstance(image, str):
+            raise models.ModelError('Invalid recovered training image reference')
+        sid = PurePosixPath(image).stem
+        if (sid not in samples or row.get('job') != samples[sid].get('group')
+                or row.get('label') != samples[sid].get('label')
+                or row.get('split') != splits[row['job']]):
+            raise models.ModelError('Retained dataset no longer matches its frozen examples')
+
+    parent = resolve_parent(model_root, settings.get('parent_model_id'))
+    lineage = parent['lineage'] or {}
+    signatures = _signatures(corpus, samples)
+    inherited = lineage.get('training_exposure', [])
+    groups = set(lineage.get('training_groups', []))
+    groups.update(_exposed_groups(signatures, inherited))
+    groups.update(group for group, split in splits.items() if split == 'train')
+    exposure = _accumulate_exposure(inherited, signatures, groups)
+    history = deepcopy(lineage.get('split_history', []))
+    history.append({'run_id': stage.name, 'groups': splits,
+                    'examples': {sid: s['source'].get('revision') for sid,s in samples.items()},
+                    'archive_reconciliation': {'recovered_from_frozen_corpus': True}})
+
+    cancelled = job['cancel'].is_set
+    if cancelled():
+        raise InterruptedError('Model finalization cancelled; candidate retained')
+    session.update_learning(job, 'checking', 'Validating saved candidate without training again', name=name)
+    candidates.record_mask_assessment(job['dir'], candidate['folder'], 'failed',
+        'Named verifier training; no mask-tightening acceptance claim')
+    assessment = candidates.evaluate(job['dir'], candidate_id, cancelled=cancelled,
+        progress=lambda done,total: session.update_learning(job, done=done,total=total,unit='checks'))
+    if cancelled():
+        raise InterruptedError('Model finalization cancelled; candidate retained')
+    manifest = models.save_candidate(model_root, job['dir'], candidate_id, name,
+        publication_hook=lambda manifest, checked: _retain(model_root, manifest, checked,
+            corpus, samples, groups, history, parent['parent_model_id'], exposure))
+    result = {'status': 'complete', 'candidate_id': candidate_id, 'model_id': manifest['id'],
+              'name': name, 'assessment': assessment, 'model': manifest,
+              'training_info': training_info(model_root, manifest['id'])}
+    session.atomic_json(result_path, result)
+    session.update_learning(job, 'complete', 'Saved existing named plate checker', name=name, model_id=manifest['id'])
+    (log or (lambda message: None))('Finalized saved candidate without retraining: ' + name)
     return result

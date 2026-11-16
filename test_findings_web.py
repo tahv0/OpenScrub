@@ -611,3 +611,28 @@ def test_bulk_selection_rejects_unrelated_exclusions_and_unreviewed_rows(finding
     assert wrong.status_code == 400
     assert client.get('/api/findings/selection?label=negative').get_json()['total'] == 0
     assert saved['id'] not in selection['excluded_ids']
+
+
+
+def test_failed_named_job_can_queue_saved_candidate_finalization_without_training(findings_job, monkeypatch):
+    client, original, _, _ = findings_job
+    job = web.new_job('', {}, 'Recover training')
+    job.update(kind='model_training', phase='error',
+               error='Model file exceeds its size limit',
+               learning_request={'license_accepted': True, 'name': 'Recover training'})
+    web.findings_web._state(job)
+    queued = []
+    monkeypatch.setattr(web.WORK_Q, 'put', queued.append)
+    url = f'/api/jobs/{job["id"]}/finalize-trained-model'
+    response = client.post(url, json={})
+    assert response.status_code == 200, response.get_data(as_text=True)
+    assert queued == [(job['id'], 'finalize_examples')]
+    assert job['phase'] == 'learning' and job['error'] is None
+    assert 'no new training epochs' in job['learning']['message']
+    assert client.post(url, json={}).status_code == 409
+    assert client.post(f'/api/jobs/{original["id"]}/finalize-trained-model',
+                       json={}).status_code == 409
+    assert client.post('/api/jobs/nonexistent/finalize-trained-model',
+                       json={}).status_code == 404
+    persisted = json.loads((Path(job['dir']) / 'training_job.json').read_text())
+    assert persisted['phase'] == 'learning'

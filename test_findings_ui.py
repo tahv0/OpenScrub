@@ -26,7 +26,7 @@ const nodes=new Map();
 function node(id){if(!nodes.has(id))nodes.set(id,{id,value:'',checked:false,disabled:false,hidden:false,innerHTML:'',textContent:'',style:{},dataset:{},options:[],
  classList:{toggle(){}},replaceChildren(...items){this.options=items;this.children=items;this.value=items[0]?.value||''},add(o){this.options.push(o)},append(o){(this.children??=[]).push(o)},
  querySelectorAll(){return []},scrollIntoView(){},remove(){nodes.delete(id)}});return nodes.get(id)}
-const document={getElementById:node,createElement:tag=>({tag,style:{},dataset:{},textContent:'',append(){},replaceChildren(){}})};
+const document={getElementById:node,createElement:tag=>({tag,style:{},dataset:{},textContent:'',attributes:{},classList:{add(){}},setAttribute(name,value){this.attributes[name]=value},append(){},replaceChildren(){}})};
 function Option(text,value){this.text=text;this.value=value}
 let location={hash:'#findings'},CUR='job-a',JOBVIEW=1;
 let calls=[],opened=[],refreshed=0;
@@ -297,4 +297,25 @@ assert.deepEqual(opened,['trained-job']);
 node('findingsClear').onclick();
 assert.equal(FINDINGS.scope,null);
 assert.equal(FINDINGS.selected.size,0);
+""")
+
+
+
+def test_failed_named_training_displays_no_epoch_finalization_action():
+    run_ui(r"""
+const errorJob={id:'failed-id',kind:'model_training',phase:'error',
+ name:'Garage training',error:'Model file exceeds its size limit'};
+showTrainingResult(errorJob);
+const panel=node('findingsTrainingResult');
+const action=(panel.children||[]).find(x=>x.tag==='button');
+assert.ok(action);
+assert.match(action.textContent,/no retraining/i);
+reviewRequest=async(url,options)=>{calls.push({url,options});return {data:{ok:true}}};
+await action.onclick();
+assert.equal(calls.length,1);
+assert.equal(calls[0].url,'api/jobs/failed-id/finalize-trained-model');
+assert.equal(calls[0].options.method,'POST');
+assert.deepEqual(opened,['failed-id']);
+showTrainingResult({...errorJob,phase:'model_ready',training_result:{assessment:{status:'validated'}}});
+assert.equal((node('findingsTrainingResult').children||[]).filter(x=>x.tag==='button').length,0);
 """)

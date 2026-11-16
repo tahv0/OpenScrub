@@ -263,3 +263,33 @@ def test_mask_assessment_records_only_exact_verified_candidate(tmp_path):
         lc.record_mask_assessment(job, tmp_path, 'passed', 'Wrong location')
     with pytest.raises(ValueError):
         lc.record_mask_assessment(job, folder, 'accepted_for_everything', 'Unknown meaning')
+
+
+
+def test_legacy_large_run_receipt_does_not_hide_a_completed_candidate(tmp_path):
+    lc = candidates()
+    job, folder = candidate_job(tmp_path)
+    run = folder.parent.parent / 'run.json'
+    # Old bulk selections serialized every chosen revision here, not in the
+    # 64 KiB portable model manifest. Keep these already-trained runs readable.
+    old = {'schema': 1, 'name': 'Garage camera',
+           'expected_revisions': {
+               hashlib.sha256(str(index).encode()).hexdigest(): 1
+               for index in range(3000)}}
+    run.write_text(json.dumps(old), encoding='utf-8')
+    assert run.stat().st_size > learned_models._MANIFEST_LIMIT
+    assert run.stat().st_size < lc._RUN_METADATA_LIMIT
+    loaded = lc.load_candidate(job, CANDIDATE_ID)
+    assert loaded['name'] == 'Garage camera'
+    assert lc.list_candidates(job)[0]['id'] == CANDIDATE_ID
+
+
+def test_run_receipt_still_has_a_distinct_upper_bound(tmp_path):
+    lc = candidates()
+    job, folder = candidate_job(tmp_path)
+    run = folder.parent.parent / 'run.json'
+    with run.open('wb') as out:
+        out.truncate(lc._RUN_METADATA_LIMIT + 1)
+    with pytest.raises(learned_models.ModelError, match='size limit'):
+        lc.load_candidate(job, CANDIDATE_ID)
+    assert lc.list_candidates(job) == []
