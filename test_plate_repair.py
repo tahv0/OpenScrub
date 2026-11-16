@@ -275,6 +275,132 @@ def test_stale_confirmed_preview_can_be_rehydrated_without_losing_repair(
     assert confirmed.get_json()['finding']['label'] == 'positive'
 
 
+
+def test_saved_box_survives_preview_eviction_and_exposes_true_review_state(
+        broken_plate):
+    """The Review journal, not the JPEG cache, owns the saved detector box."""
+    client, jid, report, job_dir, job, doc = broken_plate
+    status_url = f'/api/jobs/{jid}/finding-review-state/0'
+    before = client.get(status_url)
+    assert before.status_code == 200, before.get_data(as_text=True)
+    state = before.get_json()
+    assert state['saved_detector_box_repair'] is False
+    assert state['saved_corner_adjustment'] is False
+    assert state['geometry_outside_source_frame'] is True
+
+    _, _, payload = view_and_payload(broken_plate)
+    fixed = client.post(f'/api/jobs/{jid}/plate-repair/0', json=payload)
+    assert fixed.status_code == 200, fixed.get_data(as_text=True)
+    saved = client.get(status_url)
+    assert saved.status_code == 200, saved.get_data(as_text=True)
+    state = saved.get_json()
+    assert state['saved_detector_box_repair'] is True
+    assert state['saved_corner_adjustment'] is True
+    assert state['detector_box_repair_frame'] == payload['frame']
+    assert state['geometry_outside_source_frame'] is False
+    assert state['confirmed_label'] is None
+    assert state['exact_preview_cached'] is True
+    assert state['journal_has_unpublished_changes'] is True
+    source_box = state['source_box']
+
+    picture = client.get(f'/api/jobs/{jid}/finding-preview/0?cache_only=1')
+    assert picture.status_code == 200
+    meta = json.loads(picture.headers['X-Finding-Geometry'])
+    dbpath = job_dir / 'compact_previews' / 'index.sqlite3'
+    with sqlite3.connect(dbpath) as db:
+        row = db.execute('SELECT length(jpeg), length(CAST(metadata AS BLOB)) '
+                         'FROM previews WHERE key=?', (meta['key'],)).fetchone()
+        assert row
+        db.execute('DELETE FROM previews WHERE key=?', (meta['key'],))
+        db.execute("UPDATE settings SET value=value-1 WHERE key='count'")
+        db.execute("UPDATE settings SET value=value-? WHERE key='bytes'",
+                   (sum(row),))
+    lost_picture = client.get(status_url)
+    assert lost_picture.status_code == 200
+    still_saved = lost_picture.get_json()
+    assert still_saved['saved_detector_box_repair'] is True
+    assert still_saved['source_box'] == source_box
+    assert still_saved['saved_plate_quad'] == state['saved_plate_quad']
+    assert still_saved['exact_preview_cached'] is False
+
+    assert review_journal.publish(job_dir)
+    published = client.get(status_url)
+    assert published.status_code == 200
+    assert published.get_json()['saved_detector_box_repair'] is True
+    assert published.get_json()['source_box'] == source_box
+
+
+def test_real_browser_can_migrate_rejected_corner_draft_into_valid_box(
+        review_server):
+    """A definite 409 with off-frame box must not trap a saved-looking draft.
+
+    Exercise real Flask + Chromium, not a stand-in request handler. The
+    synthetic video contains an actual plate drawn into the image.
+    """
+    sync_api = pytest.importorskip('playwright.sync_api')
+    url, report = review_server
+    doc = json.loads(report.read_text())
+    doc['detections'][0]['cbox'] = [-50, 120, 420, 220]
+    stop_review.atomic_report(str(report), doc)
+    with sync_api.sync_playwright() as pw:
+        browser = browser_instance(pw)
+        page = browser.new_page(viewport={'width': 1440, 'height': 950})
+        page.set_default_timeout(30000)
+        errors = []
+        page.on('pageerror', lambda error: errors.append(str(error)))
+        requests, posts = [], []
+        load_browser_page(page, url, requests, posts)
+        page.get_by_role('link', name='Synthetic review fixture',
+                         exact=True).click()
+        card = page.locator('#det0')
+        card.scroll_into_view_if_needed()
+        redraw = card.get_by_role('button', name='Redraw plate area')
+        redraw.wait_for(state='visible', timeout=90000)
+        # Reproduce the browser-only dirty draft retained after a definite
+        # failed corner POST; no mock source geometry or thumbnail bytes.
+        page.evaluate("""() => {
+          const img=document.querySelector('#det0 img'),meta=img._plateMeta;
+          const card=img.closest('.det'),status=card.querySelector('.quad-status');
+          const retry=card.querySelector('.quad-retry');
+          const points=[[180,120],[420,120],[420,220],[180,220]];
+          const s={i:meta.i,job:CUR,img,card,status,retry,
+            meta,displayCrop:meta.crop.slice(),points:points.map(p=>p.slice()),
+            saved:meta.points.map(p=>p.slice()),dirty:true,pending:{edit_id:'rejected'},
+            error:Object.assign(new Error('Stale source crop'),{status:409}),
+            conflict:true,archiveConflict:false,version:1,drag:null,
+            draw(){}};
+          img._quadEdit=s;PLATE_EDITS.set(meta.i,s);
+          plateStatus(s,'Not saved · stale preview',true);
+        }""")
+        assert card.get_by_role('button', name='Repair detector box (keep corners)').is_visible()
+        card.get_by_role('button', name='Repair detector box (keep corners)').click()
+        modal = page.get_by_role('dialog', name='Redraw plate area on exact original frame')
+        modal.wait_for(timeout=90000)
+        assert 'Recovered your unsaved four corners' in modal.inner_text()
+        assert modal.get_by_role('button', name='Four corners').is_disabled()
+        assert modal.get_by_role('button', name='Save replacement · this frame only').is_enabled()
+        modal.get_by_role('button', name='Save replacement · this frame only').click()
+        modal.wait_for(state='detached', timeout=90000)
+        page.wait_for_function(
+            "document.querySelector('#det0 img')._plateMeta?.source_repaired===true",
+            timeout=90000)
+        state = page.evaluate("""() => ({
+          dirty:PLATE_EDITS.get(0)?.dirty,
+          box:document.querySelector('#det0 img')._plateMeta.box
+        })""")
+        assert state['dirty'] is False
+        assert state['box'][0] >= 0
+        assert state['box'][2] <= 640
+        assert card.get_by_role('button', name='✓ Is a plate').is_enabled()
+        with web.app.test_client() as client:
+            source = client.get('/api/jobs/inline-fixture/finding-review-state/0').get_json()
+            assert source['saved_detector_box_repair'] is True
+            assert source['saved_corner_adjustment'] is True
+            assert source['confirmed_label'] is None
+        assert not errors, errors
+        browser.close()
+
+
 def test_repair_is_revision_safe_and_idempotent(broken_plate):
     client, jid, report, _, job, _ = broken_plate
     before = report.read_bytes()
