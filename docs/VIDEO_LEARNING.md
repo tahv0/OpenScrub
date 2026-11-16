@@ -47,8 +47,11 @@ docker compose @compose up -d
 
 The downloader verifies SHA256 and never replaces an existing mismatched file.
 The checkpoint is downloaded, not bundled in the OpenScrub repository/image.
-Keep all three Compose files on subsequent build/up/run commands. Hard-refresh
-the browser after recreating the service. Optional readiness check:
+Keep all three Compose files on subsequent manual build/up/run commands.
+The retained-image PowerShell wrapper `scripts/build-windows-cuda.ps1` also
+includes these same three overlays for both build and start; `-BuildOnly`
+continues to avoid replacing an active container. Hard-refresh the browser
+after recreating the service. Optional readiness check:
 
 ```powershell
 docker compose @compose exec openscrub /opt/openscrub-training/bin/python -c "import torch; print(torch.__version__, torch.cuda.is_available()); assert torch.cuda.is_available(); print(torch.cuda.get_device_name(0))"
