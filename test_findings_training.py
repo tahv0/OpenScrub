@@ -535,7 +535,8 @@ def test_inherited_corpus_summary_reuses_original_positive_negative_labels_witho
 
     # Only the immutable receipt is checked on the read-only summary.
     lineage = tmp_path / 'learned_model_training' / first['model_id'] / 'lineage.json'
-    lineage.write_bytes(lineage.read_bytes() + b' ')
+    saved_lineage = lineage.read_bytes()
+    lineage.write_bytes(b'[' + saved_lineage[1:])  # same-size tamper; hash must still be checked
     with pytest.raises(ValueError, match='lineage changed'):
         ft.training_corpus_summary(root, first['model_id'])
 
