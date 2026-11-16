@@ -427,3 +427,60 @@ def test_repeated_stale_representative_conflict_recovers_by_loading_exact_frame(
             "detections"][0]["human_confirmation"]["label"] == "positive"
         assert not errors, errors
         browser.close()
+
+
+def test_offframe_stale_409_allows_only_safe_explicit_draft_reload():
+    """Execute the actual browser source checks for an unsaved-corner 409.
+
+    An evicted compact JPEG can be safely replaced ONLY when this is an
+    explicit recovery of the same source/frame/box/crop/baseline polygon.
+    Other frames or edits must keep the previous picture and draft.
+    """
+    import shutil
+    import subprocess
+    if not shutil.which('node'):
+        pytest.skip('Node is not available')
+    source = web.APP_JS
+    comparisons = source[source.index('function plateSameSourceCorners('):
+                         source.index('function plateQuadValid(')]
+    recovery = source[source.index('function reviewMayRebindOffframeDraft('):
+                      source.index('async function loadReviewPreview(')]
+    assert '!reviewMayRebindOffframeDraft(img,meta,currentDraft)' in source
+    assert 's.img._reviewRebindingDraft=true' in source
+    assert 'delete s.img._reviewRebindingDraft' in source
+    js = r"""
+const assert=require('node:assert/strict');
+""" + comparisons + recovery + r"""
+const original={frame:14410,width:3840,height:2160,
+ box:[100,200,500,330],crop:[80,180,520,350],
+ points:[[110,210],[490,210],[490,320],[110,320]],
+ frame_source_token:'sha-source-bound-proof',source_token:'old-jpeg-proof',
+ key:'old-jpeg'};
+const replacement={...original, geometry_outside_frame:true,
+ frame_source_token:'sha-source-bound-proof',source_token:'new-jpeg-proof',
+ key:'new-jpeg'};
+const draft={meta:original, dirty:true, pending:{id:'known-409'},
+ drag:null,points:[[115,215],[485,215],[485,315],[115,315]]};
+const img={};
+assert.equal(reviewMayRebindOffframeDraft(img,replacement,draft),false,
+ 'Background prefetch must not rebind a dirty editor.');
+img._reviewRebindingDraft=true;
+assert.equal(reviewMayRebindOffframeDraft(img,replacement,draft),true,
+ 'Explicit 409 recovery may replace a JPEG for the same original pixels.');
+const changedFrame={...replacement,frame:14411};
+assert.equal(reviewMayRebindOffframeDraft(img,changedFrame,draft),false);
+const changedSource={...replacement,frame_source_token:'other-video'};
+assert.equal(reviewMayRebindOffframeDraft(img,changedSource,draft),false);
+const changedBox={...replacement,box:[100,200,600,330]};
+assert.equal(reviewMayRebindOffframeDraft(img,changedBox,draft),false);
+const changedCrop={...replacement,crop:[0,0,3840,2160]};
+assert.equal(reviewMayRebindOffframeDraft(img,changedCrop,draft),false);
+const changedBaseline={...replacement,points:[[112,210],[490,210],[490,320],[110,320]]};
+assert.equal(reviewMayRebindOffframeDraft(img,changedBaseline,draft),false);
+const outsideDraft={...draft,points:[[115,215],[900,215],[900,315],[115,315]]};
+assert.equal(reviewMayRebindOffframeDraft(img,replacement,outsideDraft),false);
+assert.equal(reviewMayRebindOffframeDraft(img,replacement,{...draft,drag:{}}),false);
+"""
+    result = subprocess.run(['node','-e',js],capture_output=True,text=True,
+                            timeout=15)
+    assert result.returncode == 0, result.stderr
