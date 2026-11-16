@@ -5515,9 +5515,17 @@ async function loadReviewPreview(state,task,cacheOnly){
   if(meta?.geometry_outside_frame && currentDraft &&
      (currentDraft.dirty||currentDraft.pending||currentDraft.drag)&&
      !reviewMayRebindOffframeDraft(img,meta,currentDraft)){
-   // Source geometry may still be invalid, or a different crop/frame is
-   // proposed. Preserve the original pixels and unsaved vertices.
-   if(status)status.textContent="Source geometry is outside the video. Keep or back up your unsaved corners before changing pictures.";
+   // The source box/quad might have changed *after* the older JPEG was shown.
+   // Do not replace that picture beneath unsaved vertices. Instead offer an
+   // explicit CURRENT-frame full-image redraw; no old polygon is transferred
+   // automatically to a changed source identity.
+   const recovery=card.querySelector(".plate-repair-button");
+   if(recovery){
+    recovery.hidden=false;
+    recovery.dataset.forceRecover="1";
+    recovery.textContent="Inspect current frame & redraw (keep draft)";
+   }
+   if(status)status.textContent="Current source geometry differs from this displayed picture. Your original corners are preserved. Inspect the exact frame and redraw the box.";
    return;
   }
   // Decode a replacement off-DOM first. A failed/aborted refresh must leave
@@ -5537,7 +5545,11 @@ async function loadReviewPreview(state,task,cacheOnly){
   const exactButton=card.querySelector(".source-frame-exact");
   const outside=meta?.geometry_outside_frame===true;
   const repair=card.querySelector(".plate-repair-button");
-  if(repair)repair.hidden=!(outside&&meta?.exact_frame===true&&!borrowed);
+  if(repair){
+   repair.hidden=!(outside&&meta?.exact_frame===true&&!borrowed);
+   repair.textContent="Redraw plate area";
+   delete repair.dataset.forceRecover;
+  }
   if(hint)hint.textContent=outside
    ?"Detector box/corners extend outside the video frame. "+
     (borrowed?"Showing cached frame "+meta.frame+" instead of detection frame "+
@@ -5762,17 +5774,26 @@ async function openPlateRepair(button){
  const card=button.closest(".det"),img=card?.querySelector("img[data-preview-url]");
  const selected=img?._plateMeta,job=CUR,view=JOBVIEW;
  const status=card?.querySelector(".source-frame-note");
- if(!selected?.geometry_outside_frame||!selected.frame_source_token)return;
- if(selected.match==="representative"||selected.frame!==selected.requested_frame){
+ if(!selected)return;
+ const forced=button.dataset.forceRecover==="1";
+ if(!forced&&(!selected.geometry_outside_frame||!selected.frame_source_token))return;
+ if(!forced&&(selected.match==="representative"||
+              selected.frame!==selected.requested_frame)){
   if(status)status.textContent="Load the exact source frame before redrawing.";return;
  }
  const old=PLATE_EDITS.get(selected.i);
- const imported=recoverableOffframePlateDraft(selected,old);
- if(PLATE_SAVE||old?.drag||(old&&(old.dirty||old.pending)&&!imported)){
-  if(status)status.textContent="A corner save is still pending or this draft belongs to a different source. Back up the draft before redrawing.";
+ const imported=!forced&&recoverableOffframePlateDraft(selected,old);
+ // A definitely rejected edit may be superseded by an EXPLICIT redraw on
+ // the current exact frame. The older polygon is only imported when its
+ // original frame/box identity matches. In all other cases start blank.
+ const rejected=!!(old?.dirty&&!old.archiveConflict&&
+  (old.error?.status===409||
+   (old.knownRejectedEditId&&old.pending?.edit_id===old.knownRejectedEditId)));
+ if(PLATE_SAVE||old?.drag||(old&&(old.dirty||old.pending)&&!imported&&!(forced&&rejected))){
+  if(status)status.textContent="A corner save may still be in flight, or the draft belongs to another source. Back it up before changing the detector box.";
   return;
  }
- const originalDraftVersion=imported?old.version:null;
+ const originalDraftVersion=(imported||(forced&&rejected))?old.version:null;
  button.disabled=true;button.textContent="Loading exact source frame…";
  let url=null,dialog=null,saving=false,closed=false;
  try{
@@ -5783,9 +5804,12 @@ async function openPlateRepair(button){
   const geom=JSON.parse(response.headers.get("X-Repair-Geometry")||"null");
   // The full-frame redraw token is independent of the disposable compact
   // JPEG key. Verify the actual source frame instead of a cache entry.
-  if(!geom||geom.frame!==selected.frame||
-     geom.frame_source_token!==selected.frame_source_token)
-   throw new Error("Source frame changed; reload the original preview.");
+  if(!geom||
+     (forced
+      ?geom.frame!==selected.requested_frame
+      :(geom.frame!==selected.frame||
+        geom.frame_source_token!==selected.frame_source_token)))
+   throw new Error("Source frame changed; reload Review before redrawing.");
   url=URL.createObjectURL(data);
   const photo=new Image();photo.src=url;await photo.decode();
   if(CUR!==job||JOBVIEW!==view||!button.isConnected)return;
@@ -5951,7 +5975,8 @@ async function openPlateRepair(button){
     // Durable confirmation from the backend supersedes only this exact
     // failed draft, not a newer edit made while the full-frame dialog was
     // open. Never clear the old draft on timeout, refusal, or Cancel.
-    if(imported&&PLATE_EDITS.get(selected.i)===old&&old.version===originalDraftVersion){
+    if((imported||(forced&&rejected))&&PLATE_EDITS.get(selected.i)===old&&
+       old.version===originalDraftVersion){
      old.pending=null;old.error=null;old.conflict=false;
      old.archiveConflict=false;old.needsSourceReview=false;
      old.saved=plateCopy(data.points);old.points=plateCopy(data.points);
@@ -5996,6 +6021,9 @@ async function openPlateRepair(button){
   if(imported){
    points=plateCopy(old.points);
    draw();
+  }else if(forced&&rejected){
+   hint.textContent="The original draft belongs to an older picture. "+
+    "It stays untouched until you draw and save a NEW area on this verified source frame.";
   }
   setZoom(1);
  }catch(error){
@@ -6123,7 +6151,9 @@ function updatePlateSaveIssues(){
 }
 function plateStatus(s,text,retry=false){
  s.status.textContent=text;s.retry.hidden=!retry;
+ const recover=s.card?.querySelector(".plate-repair-button");
  s.retry.textContent=s.archiveConflict?"Confirm Is / Not again":
+  s.dirty&&recover?.dataset.forceRecover==="1"?"Inspect current frame & redraw (keep draft)":
   s.meta?.geometry_outside_frame&&s.dirty?"Repair detector box (keep corners)":
   s.needsSourceReview?"Save on refreshed picture":
   s.conflict?"Refresh picture (keep corners)":"Retry save";
@@ -6374,6 +6404,7 @@ function pumpPlateSaves(){
     s.draw();plateStatus(s,"Saved example changed · choose Is / Not to confirm this adjustment.",true);return;
    }
    if(error.status===409&&!error.details?.current_archive){
+    s.knownRejectedEditId=pending?.edit_id||null;
     // First try the cheap same-crop token refresh. If a cache entry was
     // evicted/replaced, automatically reload actual pixels and preserve the
     // human corners. Retry ONLY for an identical bound source frame; a
@@ -6426,6 +6457,10 @@ async function flushPlateSaves(){
 }
 async function retryPlateSave(s){
  if(s.archiveConflict){dismissFindingConfirmation(s.i);return;}
+ const forced=s.card?.querySelector(".plate-repair-button");
+ if(s.dirty&&forced?.dataset.forceRecover==="1"&&!forced.hidden){
+  await openPlateRepair(forced);return;
+ }
  if(s.meta?.geometry_outside_frame&&s.dirty){
   const repair=s.card?.querySelector(".plate-repair-button");
   if(repair&&!repair.hidden){
