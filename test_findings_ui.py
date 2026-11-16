@@ -319,3 +319,73 @@ assert.deepEqual(opened,['failed-id']);
 showTrainingResult({...errorJob,phase:'model_ready',training_result:{assessment:{status:'validated'}}});
 assert.equal((node('findingsTrainingResult').children||[]).filter(x=>x.tag==='button').length,0);
 """)
+
+
+
+def test_continue_parent_shows_exact_old_positive_negative_counts_without_new_training():
+    run_ui(r"""
+const parent=node('findingsParent');parent.value='previous-model';
+const summary={model_id:'previous-model',total:3070,positive:70,negative:3000,
+  human_quads:43,source_videos:2,status:'retained_snapshot'};
+reviewRequest=async(url,options)=>{
+ calls.push({url,options});return {data:{summary}};
+};
+await describeFindingParent();
+assert.equal(calls.length,1);
+assert.equal(calls[0].url,'api/jobs/learned-models/previous-model/training-corpus');
+assert.ok(node('findingsParentStatus').textContent.includes('Reuse 3070 saved examples'));
+assert.ok(node('findingsParentStatus').textContent.includes('70 positive plates · 3000 negatives'));
+assert.ok(node('findingsParentStatus').textContent.includes('existing training checkpoint'));
+assert.ok(node('findingsParentStatus').textContent.includes('Tracked predictions are not automatically trusted'));
+assert.ok(!calls.some(c=>c.url==='api/findings/train'));
+parent.value='';
+await describeFindingParent();
+assert.ok(node('findingsParentStatus').textContent.includes('start a fresh training lineage'));
+assert.equal(calls.length,1);
+""")
+
+
+def test_parent_selection_discards_late_outdated_corpus_response():
+    run_ui(r"""
+const parent=node('findingsParent');parent.value='first';
+let resolve;
+reviewRequest=(url)=>new Promise(r=>{resolve=r});
+const pending=describeFindingParent();
+parent.value='';
+await describeFindingParent();
+resolve({data:{summary:{model_id:'first',total:10,positive:1,negative:9,
+  human_quads:0,source_videos:1}}});
+await pending;
+assert.ok(node('findingsParentStatus').textContent.includes('Configured base checkpoint'));
+assert.ok(!node('findingsParentStatus').textContent.includes('Reuse 10'));
+""")
+
+
+def test_parent_summary_api_is_read_only_and_fails_closed_for_unavailable_parent(tmp_path, monkeypatch):
+    import findings_training as ft
+    import learned_models as lm
+    import confirmed_findings
+    from test_findings_training import examples, make_job, trainer
+    source=examples(tmp_path)
+    monkeypatch.setattr(confirmed_findings, 'training_snapshot', lambda *a, **k: source)
+    base=tmp_path/'base.pt';base.write_bytes(b'base')
+    monkeypatch.setenv('OPENSCRUB_TRAIN_WEIGHTS', str(base))
+    result=ft.run(make_job(tmp_path/'training-job'), tmp_path/'findings',
+                  tmp_path/'models', {'name':'Prior plate evidence',
+                  'license_accepted':True}, train=trainer)
+    model_id=result['model_id']
+    monkeypatch.setattr(web,'learned_models_root',lambda:tmp_path/'models')
+    monkeypatch.setattr(web,'vault_locked',lambda:False)
+    client=web.app.test_client()
+    path='/api/jobs/learned-models/'+model_id+'/training-corpus'
+    with monkeypatch.context() as guard:
+        guard.setattr(ft.candidates,'_hash_file',
+            lambda *a,**k:pytest.fail('Summary must not hash 32 inherited JPEGs'))
+        response=client.get(path)
+    assert response.status_code==200, response.get_data(as_text=True)
+    value=response.get_json()['summary']
+    assert value['positive']==16 and value['negative']==16
+    assert value['source_videos']==2
+    assert client.get('/api/jobs/learned-models/invalid/training-corpus').status_code==400
+    monkeypatch.setattr(web,'vault_locked',lambda:True)
+    assert client.get(path).status_code==423
