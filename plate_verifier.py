@@ -217,7 +217,8 @@ def review_report(video, doc, model, assessment, mode='review', cancelled=None,
                 applied = low and mode == 'filter'
                 decision = 'suppress' if applied else 'suggest_not_plate' if low else 'retain'
                 row['plate_verification'] = dict(decision=decision, score=score,
-                    threshold=gate['threshold'], mode=mode, applied=applied, previous_enabled=previous)
+                    threshold=gate['threshold'], mode=mode, applied=applied,
+                    previous_enabled=previous, source_frame=index)
                 if applied:
                     row['enabled'] = False
                 stats['suggested'] += int(low)
