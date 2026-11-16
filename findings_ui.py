@@ -55,7 +55,7 @@ HTML = r"""
  <div id="findingEditor" class="card" hidden></div>
  <div class="card" aria-labelledby="findingsTrainingTitle">
   <h3 id="findingsTrainingTitle">Train a named plate model</h3>
-  <p class="findings-copy">Only selected confirmed plate examples are used. Select examples from another video explicitly to include them. Training creates a new version and keeps previous models. More examples do not guarantee better accuracy.</p>
+  <p class="findings-copy">Train from your selected confirmed examples, optionally continuing a previously saved local model. Start from a locally trained model to inherit its frozen positives, negatives and checkpoint; your new confirmed examples are added and corrected/revoked findings are reconciled. Training creates a separate model version. Unreviewed tracking predictions are never trusted training labels.</p>
   <p id="findingsSelection" class="findings-note" role="status">No plate examples selected.</p>
   <div class="findings-fields"><label>Model name (optional)<input id="findingsModelName" maxlength="80" placeholder="Automatic name from selected videos and UTC time"></label><label>Start from<select id="findingsParent"><option value="">Configured base checkpoint</option></select></label></div>
   <p id="findingsParentStatus" class="findings-copy" role="status"></p>
@@ -68,7 +68,7 @@ HTML = r"""
 
 SCRIPT = r"""
 // Confirmed library state is independent of the currently opened scan job.
-const FINDINGS={offset:0,limit:24,total:0,items:[],selected:new Map(),scope:null,selectionRequest:0,request:0,editorRequest:0,editor:null,bound:false,training:false,parentRequest:0};
+const FINDINGS={offset:0,limit:24,total:0,items:[],selected:new Map(),scope:null,selectionRequest:0,request:0,editorRequest:0,editor:null,bound:false,training:false,parentRequest:0,parentSummaryRequest:0};
 const FINDINGS_QUEUES=new Map();
 function findingEscape(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function findingTime(value){const n=Number(value);return Number.isFinite(n)?n.toFixed(2)+' s':'Unknown time';}
@@ -153,6 +153,7 @@ function bindConfirmedFindings(){
  document.getElementById('findingsSelectAll').onclick=selectAllMatchingFindings;
  document.getElementById('findingsClear').onclick=()=>{FINDINGS.selectionRequest++;FINDINGS.selected.clear();FINDINGS.scope=null;renderConfirmedFindings();};
  document.getElementById('findingsLicense').onchange=findingSelection;
+ document.getElementById('findingsParent').onchange=describeFindingParent;
  document.getElementById('findingsTrain').onclick=trainConfirmedFindings;
  const list=document.getElementById('findingsList');
  list.onchange=event=>{const id=event.target.dataset.selectFinding;if(!id)return;const item=FINDINGS.items.find(i=>i.id===id);if(!item||item.category!=='plate')return;if(findingInScope(item)){FINDINGS.selected.delete(id);if(event.target.checked)FINDINGS.scope.excluded.delete(id);else FINDINGS.scope.excluded.set(id,item.label);}else if(event.target.checked)FINDINGS.selected.set(id,item);else FINDINGS.selected.delete(id);findingSelection();};
@@ -193,6 +194,29 @@ function openFindingsForVideo(videoId){
  // No examples from this or any other video are selected implicitly.
  if(location.hash==='#findings')loadConfirmedFindings();else location.hash='#findings';
 }
+async function describeFindingParent(){
+ const request=++FINDINGS.parentSummaryRequest;
+ const id=document.getElementById('findingsParent').value;
+ if(!id){
+  findingNotice('findingsParentStatus','Configured base checkpoint: start a fresh training lineage. Choose your earlier locally trained model here to reuse its frozen examples and checkpoint.');
+  return;
+ }
+ findingNotice('findingsParentStatus','Reading previous model training example counts (no source video scan)…');
+ try{
+  const {data}=await reviewRequest('api/jobs/learned-models/'+encodeURIComponent(id)+'/training-corpus',{timeoutMs:30000});
+  if(request!==FINDINGS.parentSummaryRequest||document.getElementById('findingsParent').value!==id)return;
+  const s=data.summary||{};
+  if(s.model_id!==id||!['positive','negative','total','source_videos','human_quads'].every(k=>Number.isSafeInteger(s[k])&&s[k]>=0)||s.positive+s.negative!==s.total)
+   throw new Error('Invalid retained training corpus summary');
+  findingNotice('findingsParentStatus',
+   'Reuse '+s.total+' saved examples: '+s.positive+' positive plates · '+s.negative+
+   ' negatives, from '+s.source_videos+' source video(s); '+s.human_quads+
+   ' positives have human-corrected corners. The existing training checkpoint is reused. New confirmed examples are added; current corrections/revocations are reconciled when training starts. Tracked predictions are not automatically trusted.');
+ }catch(error){
+  if(request===FINDINGS.parentSummaryRequest&&document.getElementById('findingsParent').value===id)
+   findingNotice('findingsParentStatus','Unable to inspect the saved parent corpus: '+error.message+' (select a valid locally trained model before training).',true);
+ }
+}
 async function loadFindingsParents(){
  const request=++FINDINGS.parentRequest;
  try{
@@ -201,7 +225,7 @@ async function loadFindingsParents(){
   select.replaceChildren(new Option('Configured base checkpoint',''));
   for(const model of data.models||[])if(model.training?.trainable===true)select.add(new Option(model.name,model.id));
   select.value=Array.from(select.options).some(o=>o.value===chosen)?chosen:'';
-  findingNotice('findingsParentStatus','Only locally trainable models are listed. Imported inference-only models cannot start training.');
+  await describeFindingParent();
  }catch(error){if(request===FINDINGS.parentRequest)findingNotice('findingsParentStatus','Could not load parent models: '+error.message,true);}
 }
 async function trainConfirmedFindings(){
