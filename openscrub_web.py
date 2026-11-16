@@ -3187,6 +3187,16 @@ def learned_model_list():
     return jsonify({"models": models})
 
 
+@app.get("/api/jobs/learned-models/<model_id>/training-corpus")
+@_serialize_review_edit
+def learned_model_training_corpus(model_id):
+    """Inspect a frozen locally retained parent without reading training images."""
+    if vault_locked():
+        abort(423, description='Unlock the vault before inspecting saved training data.')
+    summary = findings_web.training.training_corpus_summary(learned_models_root(), model_id)
+    return jsonify(summary=summary)
+
+
 @app.route("/api/jobs/<jid>/plate-verifier", methods=["POST"])
 @_serialize_review_edit
 def job_plate_verifier(jid):
