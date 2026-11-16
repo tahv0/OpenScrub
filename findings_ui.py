@@ -16,7 +16,12 @@ CSS = r"""
 #findingsview input[type=checkbox]{width:18px;height:18px;flex:0 0 auto;accent-color:#2563eb}
 .findings-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px;margin:14px 0}
 .finding-card{border:1px solid #334155;border-radius:9px;min-width:0;overflow:hidden;background:var(--bg)}
-.finding-card img{display:block;width:100%;height:118px;object-fit:contain;background:#0b1220}
+.finding-card-picture{position:relative;height:118px;background:#0b1220}
+.finding-card-picture img{display:block;width:100%;height:100%;object-fit:contain}
+.finding-card-picture svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.finding-detector-box{fill:none;stroke:#eab308;stroke-width:1.7;stroke-dasharray:5 3;vector-effect:non-scaling-stroke}
+.finding-human-quad{fill:#22c55e20;stroke:#22c55e;stroke-width:2.3;vector-effect:non-scaling-stroke}
+.finding-geometry-note{display:block;font-size:11px;color:var(--mut);margin-top:6px}
 .finding-body{padding:10px;font-size:13px;overflow-wrap:anywhere}
 .finding-body strong{display:block;margin-bottom:5px}.finding-label{display:block;color:#bfdbfe;margin:7px 0;font-weight:600}
 .finding-body label{display:flex;align-items:center;gap:8px;margin:9px 0}
@@ -29,7 +34,7 @@ CSS = r"""
 .finding-corners label{display:flex;align-items:center;gap:6px;font-size:12px;min-width:0}.finding-corners input{width:70px!important}
 .findings-license{display:flex;align-items:flex-start;gap:9px;font-size:13px;line-height:1.5;margin:14px 0}
 .pending-findings{margin:16px 0;padding:16px}.pending-findings .findings-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr));max-height:400px;overflow:auto}.pending-findings img{height:88px}
-@media(max-width:500px){#findingsview{padding:0 10px 20px}#findingsview .card{padding:13px}.findings-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.finding-card img{height:95px}.finding-body{padding:8px;font-size:12px}.finding-corners{grid-template-columns:1fr}.findings-row>*{max-width:100%}}
+@media(max-width:500px){#findingsview{padding:0 10px 20px}#findingsview .card{padding:13px}.findings-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.finding-card-picture{height:95px}.finding-body{padding:8px;font-size:12px}.finding-corners{grid-template-columns:1fr}.findings-row>*{max-width:100%}}
 """
 
 HTML = r"""
@@ -42,8 +47,8 @@ HTML = r"""
    <label>Category<select id="findingsCategory"><option value="">All categories</option><option value="plate">Plate</option><option value="face">Face</option><option value="person">Person</option><option value="text">Text</option></select></label>
    <label>Confirmation<select id="findingsLabel"><option value="">Positive and negative</option><option value="positive">Positive — Is a …</option><option value="negative">Negative — Not a …</option></select></label>
   </div>
-  <div class="findings-row"><button type="button" class="sec" id="findingsRefresh">Refresh findings</button><button type="button" class="sec" id="findingsSelectPage">Select plate examples on this page</button><button type="button" class="sec" id="findingsClear">Clear selection</button></div>
-  <p id="findingsStatus" class="findings-note" role="status" aria-live="polite"></p>
+  <div class="findings-row"><button type="button" class="sec" id="findingsRefresh">Refresh findings</button><button type="button" class="sec" id="findingsSelectPage">Select plate examples on this page</button><button type="button" class="sec" id="findingsSelectAll">Select all matching plate examples</button><button type="button" class="sec" id="findingsClear">Clear selection</button></div>
+  <p id="findingsStatus" class="findings-note" role="status" aria-live="polite"></p><p class="findings-copy">Gallery outlines: dashed yellow = original detector box; solid green = saved, human-confirmed four-corner geometry. Outlines sit over the unaltered JPEG and are not painted into training pixels.</p>
   <div id="findingsList" class="findings-grid"></div>
   <div class="findings-row"><button type="button" class="sec" id="findingsPrevious">Previous page</button><span id="findingsPage" class="findings-copy"></span><button type="button" class="sec" id="findingsNext">Next page</button></div>
  </div>
@@ -63,34 +68,94 @@ HTML = r"""
 
 SCRIPT = r"""
 // Confirmed library state is independent of the currently opened scan job.
-const FINDINGS={offset:0,limit:24,total:0,items:[],selected:new Map(),request:0,editorRequest:0,editor:null,bound:false,training:false,parentRequest:0};
+const FINDINGS={offset:0,limit:24,total:0,items:[],selected:new Map(),scope:null,selectionRequest:0,request:0,editorRequest:0,editor:null,bound:false,training:false,parentRequest:0};
 const FINDINGS_QUEUES=new Map();
 function findingEscape(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function findingTime(value){const n=Number(value);return Number.isFinite(n)?n.toFixed(2)+' s':'Unknown time';}
 function findingLabel(item){return (item.label==='positive'?'Confirmed ':'Not a ')+(item.category||'finding');}
 function findingImageURL(id){return 'api/findings/'+encodeURIComponent(id)+'/image';}
+function findingInScope(item, scope=FINDINGS.scope){
+ return !!(scope&&item.category==='plate'&&(!scope.video_id||item.video_id===scope.video_id)&&(!scope.label||item.label===scope.label));
+}
+function findingIsSelected(item){
+ return FINDINGS.selected.has(item.id)||(findingInScope(item)&&!FINDINGS.scope.excluded.has(item.id));
+}
+function findingGalleryShape(item){
+ if(item.category!=='plate')return '';
+ const crop=item.crop?.box,box=item.box;
+ if(!Array.isArray(crop)||crop.length!==4||!Array.isArray(box)||box.length!==4)return '';
+ const cc=crop.map(Number),bb=box.map(Number);
+ if([...cc,...bb].some(n=>!Number.isFinite(n))||cc[2]<=cc[0]||cc[3]<=cc[1])return '';
+ const rect='<rect class="finding-detector-box" x="'+bb[0]+'" y="'+bb[1]+'" width="'+(bb[2]-bb[0])+'" height="'+(bb[3]-bb[1])+'"></rect>';
+ const raw=item.shape_confirmed===true&&Array.isArray(item.points)&&item.points.length===4?item.points:null;
+ const points=raw&&raw.every(p=>Array.isArray(p)&&p.length===2&&p.every(n=>Number.isFinite(Number(n))))?raw.map(p=>p.map(Number)):null;
+ const quad=points?'<polygon class="finding-human-quad" points="'+points.map(p=>p.join(',')).join(' ')+'"></polygon>':'';
+ const name=points?'Human-confirmed corners and original detector box':'Original detector box';
+ return '<svg viewBox="'+cc[0]+' '+cc[1]+' '+(cc[2]-cc[0])+' '+(cc[3]-cc[1])+'" preserveAspectRatio="xMidYMid meet" role="img" aria-label="'+name+'">'+rect+quad+'</svg>';
+}
 function findingCard(item){
- const id=findingEscape(item.id),plate=item.category==='plate';
- return `<article class="finding-card" data-finding="${id}"><img loading="lazy" decoding="async" src="${findingEscape(findingImageURL(item.id))}" alt="Saved ${findingEscape(item.category)} finding"><div class="finding-body"><strong>${findingEscape(item.video?.name||'Video')}</strong><span>Frame ${findingEscape(item.frame)} · ${findingTime(item.time)}</span><span class="finding-label">${findingEscape(findingLabel(item))}</span>${plate?`<label><input type="checkbox" data-select-finding="${id}" ${FINDINGS.selected.has(item.id)?'checked':''}>Use for plate training</label>`:'<p class="findings-copy">Stored confirmation; plate training only.</p>'}<button type="button" class="sec" data-edit-finding="${id}">Edit confirmation</button></div></article>`;
+ const id=findingEscape(item.id),plate=item.category==='plate',human=plate&&item.shape_confirmed===true&&Array.isArray(item.points)&&item.points.length===4;
+ const geometry=plate?'<span class="finding-geometry-note">'+(human?'Human-confirmed corners (green) + detector box (yellow)':'Original detector box (yellow)')+'</span>':'';
+ return `<article class="finding-card" data-finding="${id}"><div class="finding-card-picture"><img loading="lazy" decoding="async" src="${findingEscape(findingImageURL(item.id))}" alt="Saved ${findingEscape(item.category)} finding">${findingGalleryShape(item)}</div><div class="finding-body"><strong>${findingEscape(item.video?.name||'Video')}</strong><span>Frame ${findingEscape(item.frame)} · ${findingTime(item.time)}</span><span class="finding-label">${findingEscape(findingLabel(item))}</span>${geometry}${plate?`<label><input type="checkbox" data-select-finding="${id}" ${findingIsSelected(item)?'checked':''}>Use for plate training</label>`:'<p class="findings-copy">Stored confirmation; plate training only.</p>'}<button type="button" class="sec" data-edit-finding="${id}">Edit confirmation</button></div></article>`;
 }
 function findingNotice(id,message,error=false){const node=document.getElementById(id);if(node){node.textContent=message;node.classList.toggle('findings-error',error);}}
 function findingSelection(){
- const rows=[...FINDINGS.selected.values()],videos=new Set(rows.map(i=>i.video_id));
- findingNotice('findingsSelection',rows.length?`${rows.length} plate example${rows.length===1?'':'s'} selected from ${videos.size} video${videos.size===1?'':'s'}. ${rows.filter(i=>i.label==='positive').length} positive · ${rows.filter(i=>i.label==='negative').length} negative. Selection stays when changing filters or pages.`:'No plate examples selected.');
- const train=document.getElementById('findingsTrain');if(train)train.disabled=FINDINGS.training||!rows.length||!document.getElementById('findingsLicense').checked;
+ const extras=[...FINDINGS.selected.values()],scope=FINDINGS.scope;
+ const excluded=scope?[...scope.excluded.values()]:[];
+ const scoped=scope?scope.total-excluded.length:0,total=scoped+extras.length;
+ const positives=(scope?scope.positive-excluded.filter(label=>label==='positive').length:0)+extras.filter(i=>i.label==='positive').length;
+ const negatives=(scope?scope.negative-excluded.filter(label=>label==='negative').length:0)+extras.filter(i=>i.label==='negative').length;
+ const videos=new Set(extras.map(i=>i.video_id));
+ const source=scope?(scope.video_id?'this video':'all videos')+' matching '+(scope.label||'positive/negative')+' confirmations':'';
+ let description=total?total+' plate example'+(total===1?'':'s')+' selected. '+positives+' positive · '+negatives+' negative. ':'No plate examples selected.';
+ if(scope)description+='Bulk selection: '+source+' ('+scope.video_count+' matching video(s), '+excluded.length+' excluded). '+extras.length+' extra page selection(s). ';
+ else if(total)description+='From '+videos.size+' video'+(videos.size===1?'':'s')+'. ';
+ description+='Selection remains when changing pages or filters.';
+ findingNotice('findingsSelection',description);
+ const train=document.getElementById('findingsTrain');
+ if(train)train.disabled=FINDINGS.training||!total||!document.getElementById('findingsLicense').checked;
+}
+async function selectAllMatchingFindings(){
+ const category=document.getElementById('findingsCategory').value;
+ if(category&&category!=='plate'){
+  findingNotice('findingsStatus','Choose Plate or All categories to select plate training examples.',true);return;
+ }
+ const video_id=document.getElementById('findingsVideo').value||null;
+ const label=document.getElementById('findingsLabel').value||null;
+ const request=++FINDINGS.selectionRequest,params=new URLSearchParams();
+ if(video_id)params.set('video_id',video_id);
+ if(label)params.set('label',label);
+ findingNotice('findingsStatus','Counting confirmed plate examples across all matching pages…');
+ try{
+  const {data}=await reviewRequest('api/findings/selection?'+params.toString());
+  if(request!==FINDINGS.selectionRequest)return;
+  if(!data.total){findingNotice('findingsStatus','No explicitly confirmed plates match these filters.');return;}
+  const where=video_id?'this video':'all videos';
+  const prompt='Select all '+data.total+' confirmed plate examples from '+where+' ('+data.positive+' positive, '+data.negative+' negative)? This replaces the previous bulk scope; manually added examples outside the new scope are kept.';
+  if(!confirm(prompt))return;
+  if(request!==FINDINGS.selectionRequest)return;
+  const scope={...data,excluded:new Map()};
+  for(const [id,item] of FINDINGS.selected)if(findingInScope(item,scope))FINDINGS.selected.delete(id);
+  FINDINGS.scope=scope;
+  renderConfirmedFindings();
+  findingNotice('findingsStatus','Selected all '+data.total+' matching confirmed plate examples across pages. Uncheck any visible example to exclude it. No unreviewed detector findings were included.');
+ }catch(error){
+  if(request===FINDINGS.selectionRequest)findingNotice('findingsStatus','Bulk selection could not be loaded: '+error.message,true);
+ }
 }
 function bindConfirmedFindings(){
  if(FINDINGS.bound)return;FINDINGS.bound=true;
- for(const id of ['findingsVideo','findingsCategory','findingsLabel'])document.getElementById(id).onchange=()=>{FINDINGS.offset=0;loadConfirmedFindings();};
+ for(const id of ['findingsVideo','findingsCategory','findingsLabel'])document.getElementById(id).onchange=()=>{FINDINGS.selectionRequest++;FINDINGS.offset=0;loadConfirmedFindings();};
  document.getElementById('findingsRefresh').onclick=()=>loadConfirmedFindings();
  document.getElementById('findingsPrevious').onclick=()=>{FINDINGS.offset=Math.max(0,FINDINGS.offset-FINDINGS.limit);loadConfirmedFindings();};
  document.getElementById('findingsNext').onclick=()=>{FINDINGS.offset+=FINDINGS.limit;loadConfirmedFindings();};
- document.getElementById('findingsSelectPage').onclick=()=>{for(const item of FINDINGS.items)if(item.category==='plate')FINDINGS.selected.set(item.id,item);renderConfirmedFindings();};
- document.getElementById('findingsClear').onclick=()=>{FINDINGS.selected.clear();renderConfirmedFindings();};
+ document.getElementById('findingsSelectPage').onclick=()=>{for(const item of FINDINGS.items)if(item.category==='plate'){if(findingInScope(item))FINDINGS.scope.excluded.delete(item.id);else FINDINGS.selected.set(item.id,item);}renderConfirmedFindings();};
+ document.getElementById('findingsSelectAll').onclick=selectAllMatchingFindings;
+ document.getElementById('findingsClear').onclick=()=>{FINDINGS.selectionRequest++;FINDINGS.selected.clear();FINDINGS.scope=null;renderConfirmedFindings();};
  document.getElementById('findingsLicense').onchange=findingSelection;
  document.getElementById('findingsTrain').onclick=trainConfirmedFindings;
  const list=document.getElementById('findingsList');
- list.onchange=event=>{const id=event.target.dataset.selectFinding;if(!id)return;const item=FINDINGS.items.find(i=>i.id===id);if(event.target.checked&&item?.category==='plate')FINDINGS.selected.set(id,item);else FINDINGS.selected.delete(id);findingSelection();};
+ list.onchange=event=>{const id=event.target.dataset.selectFinding;if(!id)return;const item=FINDINGS.items.find(i=>i.id===id);if(!item||item.category!=='plate')return;if(findingInScope(item)){FINDINGS.selected.delete(id);if(event.target.checked)FINDINGS.scope.excluded.delete(id);else FINDINGS.scope.excluded.set(id,item.label);}else if(event.target.checked)FINDINGS.selected.set(id,item);else FINDINGS.selected.delete(id);findingSelection();};
  list.onclick=event=>{const button=event.target.closest('[data-edit-finding]');if(button)openFindingEditor(button.dataset.editFinding);};
 }
 function renderConfirmedFindings(){
@@ -98,6 +163,7 @@ function renderConfirmedFindings(){
  document.getElementById('findingsPrevious').disabled=FINDINGS.offset===0;
  document.getElementById('findingsNext').disabled=FINDINGS.offset+FINDINGS.items.length>=FINDINGS.total;
  document.getElementById('findingsSelectPage').disabled=!FINDINGS.items.some(i=>i.category==='plate');
+ document.getElementById('findingsSelectAll').disabled=!['','plate'].includes(document.getElementById('findingsCategory').value);
  document.getElementById('findingsPage').textContent=FINDINGS.total?`${FINDINGS.offset+1}–${FINDINGS.offset+FINDINGS.items.length} of ${FINDINGS.total}`:'0 examples';
  findingSelection();
 }
@@ -123,7 +189,7 @@ async function loadConfirmedFindings(){
 function openFindingsForVideo(videoId){
  bindConfirmedFindings();const select=document.getElementById('findingsVideo');
  if(!Array.from(select.options).some(o=>o.value===videoId))select.add(new Option('Current video',videoId));
- select.value=videoId;FINDINGS.offset=0;
+ select.value=videoId;FINDINGS.offset=0;FINDINGS.selectionRequest++;
  // No examples from this or any other video are selected implicitly.
  if(location.hash==='#findings')loadConfirmedFindings();else location.hash='#findings';
 }
@@ -139,17 +205,27 @@ async function loadFindingsParents(){
  }catch(error){if(request===FINDINGS.parentRequest)findingNotice('findingsParentStatus','Could not load parent models: '+error.message,true);}
 }
 async function trainConfirmedFindings(){
- const ids=[...FINDINGS.selected.keys()],accepted=document.getElementById('findingsLicense').checked;
- if(FINDINGS.training)return;if(!ids.length||!accepted){findingNotice('findingsTrainStatus','Select plate examples and acknowledge the training terms.',true);return;}
+ const ids=[...FINDINGS.selected.keys()],scope=FINDINGS.scope,accepted=document.getElementById('findingsLicense').checked;
+ const scopeCount=scope?scope.total-scope.excluded.size:0;
+ if(FINDINGS.training)return;
+ if(!ids.length&&!scopeCount||!accepted){
+  findingNotice('findingsTrainStatus','Select confirmed plate examples and acknowledge the training terms.',true);return;
+ }
  const body={example_ids:ids,name:document.getElementById('findingsModelName').value.trim(),parent_model_id:document.getElementById('findingsParent').value||null,license_accepted:true};
- FINDINGS.training=true;findingSelection();findingNotice('findingsTrainStatus','Starting named training from selected plate examples…');
+ if(scope)body.selection={category:'plate',video_id:scope.video_id,label:scope.label,snapshot:scope.snapshot,excluded_ids:[...scope.excluded.keys()]};
+ const revisions={};
+ for(const item of FINDINGS.selected.values())if(Number.isInteger(item.revision)&&item.revision>0)revisions[item.id]=item.revision;
+ if(Object.keys(revisions).length)body.expected_revisions=revisions;
+ FINDINGS.training=true;findingSelection();findingNotice('findingsTrainStatus','Validating selected revisions and starting named model training…');
  try{
   const {data}=await reviewRequest('api/findings/train',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),timeoutMs:120000});
   findingNotice('findingsTrainStatus','Training queued: '+data.name+'. Follow progress in the job.');
   if(typeof refreshLearnedModels==='function')refreshLearnedModels();
   location.hash='';if(typeof openJob==='function')await openJob(data.id);
- }catch(error){findingNotice('findingsTrainStatus','Training could not start: '+error.message,true);}
- finally{FINDINGS.training=false;findingSelection();}
+ }catch(error){
+  const retry=error.status===409?' Confirmed findings or training setup changed; review the message and reselect matching examples if the snapshot is stale.':'';
+  findingNotice('findingsTrainStatus','Training could not start: '+error.message+retry,true);
+ }finally{FINDINGS.training=false;findingSelection();}
 }
 function findingSourcePoint(crop,rect,x,y){return [Math.max(crop[0],Math.min(crop[2],crop[0]+(x-rect.left)*(crop[2]-crop[0])/rect.width)),Math.max(crop[1],Math.min(crop[3],crop[1]+(y-rect.top)*(crop[3]-crop[1])/rect.height))];}
 function findingConvex(points){

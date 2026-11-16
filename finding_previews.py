@@ -177,12 +177,43 @@ def _fits(points, crop):
     return all(crop[0] <= x <= crop[2] and crop[1] <= y <= crop[3] for x, y in points)
 
 
-def _metadata(row, frame_index, fps, width, height, offset, crop, source=None):
+def _outside_source_frame(box, points, width, height):
+    """A clipped source preview must never make off-frame detection geometry valid."""
+    return (box[0] < 0 or box[1] < 0 or box[2] > width or box[3] > height
+            or any(x < 0 or x > width or y < 0 or y > height for x, y in points))
+
+
+def _visible_points_fit(points, crop, width, height):
+    """All corners that actually lie on the source image must fit the JPEG."""
+    return all(not (0 <= x <= width and 0 <= y <= height)
+               or (crop[0] <= x <= crop[2] and crop[1] <= y <= crop[3])
+               for x, y in points)
+
+
+def _compatible_crop(meta, points):
+    if _fits(points, meta['crop']):
+        return True
+    # Only an explicitly generated, source-frame-verified fallback may
+    # reuse a crop that cannot contain off-frame vertices. Scan-time crops
+    # and a different polygon must still miss and cannot become evidence.
+    return (meta.get('geometry_outside_frame') is True
+            and meta.get('points') == points
+            and _outside_source_frame(meta['box'], points,
+                                      meta['width'], meta['height'])
+            and _visible_points_fit(points, meta['crop'],
+                                    meta['width'], meta['height']))
+
+
+def _metadata(row, frame_index, fps, width, height, offset, crop, source=None,
+              *, allow_off_frame=False):
     content = _box(row['cbox'])
     box = [content[0]+offset[0], content[1]+offset[1],
            content[2]+offset[0], content[3]+offset[1]]
     points = _points(row, box)
-    if not _fits(points, crop):
+    off_frame = _outside_source_frame(box, points, width, height)
+    if not _fits(points, crop) and not (
+            allow_off_frame and off_frame
+            and _visible_points_fit(points, crop, width, height)):
         raise ValueError('preview geometry lies outside the crop')
     category, track = str(row.get('category', '')), int(row.get('track', -1))
     key = _hash([frame_index, fps, width, height, content, offset, category,
@@ -201,6 +232,10 @@ def _metadata(row, frame_index, fps, width, height, offset, crop, source=None):
                              text=meta['text'], track=track,
                              confidence=float(row.get('confidence', 0)))
     meta['preview_token'] = _hash([key, points])
+    if off_frame:
+        # This is a view-only original-frame crop, NOT a repaired polygon.
+        # Keep the unmodified proposal/vertices for a later explicit rescan.
+        meta['geometry_outside_frame'] = True
     if source is not None and len(_json(source).encode()) > 4096:
         raise ValueError('preview source identity is too large')
     return meta
@@ -449,6 +484,8 @@ def lookup(job_dir, row, render_state, *, allow_representative=False, preferred_
                 if selected is None:
                     return None
                 return (dict(meta, points=points,
+                             geometry_outside_frame=_outside_source_frame(
+                                 meta['box'], points, meta['width'], meta['height']),
                              preview_token=_hash([meta['key'], points]),
                              match=kind, requested_frame=index), bytes(selected[0]))
 
@@ -488,7 +525,7 @@ def lookup(job_dir, row, render_state, *, allow_representative=False, preferred_
                 if not (exact_sample or representative):
                     return None
                 points = _points(row, meta['box'])
-                if not _fits(points, meta['crop']):
+                if not _compatible_crop(meta, points):
                     return None
                 return image(rowid, meta, points, 'exact' if exact_sample else 'representative')
 
@@ -501,7 +538,7 @@ def lookup(job_dir, row, render_state, *, allow_representative=False, preferred_
                         or meta['fps'] != fps):
                     continue
                 points = _points(row, meta['box'])
-                if _fits(points, meta['crop']):
+                if _compatible_crop(meta, points):
                     return image(rowid, meta, points, 'exact')
             if not allow_representative:
                 return None
@@ -534,7 +571,7 @@ def lookup(job_dir, row, render_state, *, allow_representative=False, preferred_
                 if f >= len(render_state['cum']) or _offset(render_state['cum'][f]) != meta['offset']:
                     continue
                 points = _points(row, meta['box'])
-                if _fits(points, meta['crop']):
+                if _compatible_crop(meta, points):
                     return image(rowid, meta, points, 'representative')
         except (ValueError, TypeError, KeyError):
             return None
@@ -767,24 +804,33 @@ def store(job_dir, row, render_state, meta, pixels):
             or crop[2] > width or crop[3] > height
             or tuple(pixels.shape[:2]) != (crop[3]-crop[1], crop[2]-crop[0])):
         raise ValueError('legacy crop dimensions do not match source mapping')
-    result = _metadata(row, index, fps, width, height, offset, crop, meta.get('source'))
+    result = _metadata(row, index, fps, width, height, offset, crop,
+                       meta.get('source'), allow_off_frame=True)
     if 'box' in meta and _box(meta['box']) != result['box']:
         raise ValueError('legacy box does not match source mapping')
     result, jpeg = _encode(result, pixels)
     with _LOCK:
         db = _db(job_dir, create=True)
         try:
+            if db.execute('SELECT 1 FROM previews WHERE key=?', (result['key'],)).fetchone():
+                # A scan-time sample has the same frame/box key but its old
+                # crop can exclude newly corrected corners. Never overwrite
+                # that JPEG under the SAME opaque key: a pending human
+                # confirmation may still refer to its exact displayed pixels.
+                # Publish this verified, larger crop under a distinct,
+                # deterministic sample key instead.
+                result['key'] = _hash(['explicit-crop-v1', result['key'], result['crop']])
+                result['source_token'] = result['key']
+                result['preview_token'] = _hash([result['key'], result['points']])
             if not _insert_explicit(db, 'legacy:'+result['key'], result, jpeg):
                 db.commit()
-                cached = image(job_dir, result['key'])
-                if cached is not None:
-                    # The same source/box key cannot acknowledge a different
-                    # crop or polygon that the persisted pixels do not cover.
-                    reusable = lookup(job_dir, row, render_state)
-                    if reusable is not None:
-                        return reusable
-                    raise ValueError('existing preview crop is incompatible with geometry')
-                raise PreviewLimitError('compact preview cache is full')
+                # A concurrent explicit request may have published the
+                # identical crop. Recheck compatibility rather than claiming
+                # that an unrelated existing JPEG satisfies these corners.
+                reusable = lookup(job_dir, row, render_state)
+                if reusable is not None:
+                    return reusable
+                raise PreviewLimitError('compact preview cache cannot retain this crop')
             db.commit()
         finally:
             db.close()

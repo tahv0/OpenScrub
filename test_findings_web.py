@@ -550,6 +550,69 @@ def test_final_track_uses_cached_scan_representative_without_video_decode(findin
     assert all(r['verified_label'] == 'plate' for r in stored)
 
 
+def test_bulk_scope_train_queues_only_selected_revision_pinned_ids(findings_job, monkeypatch):
+    import confirmed_findings as cf
+    from test_confirmed_findings import video as make_video, finding as make_finding, jpeg
+    client, _, _, _ = findings_job
+    root = Path(web.JOBS_DIR) / 'confirmed_findings'
+    positive = cf.record(root, make_video(), make_finding(frame=10), jpeg())
+    negative = cf.record(root, make_video(), make_finding(frame=11, label='negative'), jpeg())
+    cf.record(root, make_video(sha256='c' * 64), make_finding(), jpeg())
+    scope = client.get('/api/findings/selection?video_id=' + 'a' * 64)
+    assert scope.status_code == 200, scope.get_data(as_text=True)
+    preview = scope.get_json()
+    assert (preview['total'], preview['positive'], preview['negative'],
+            preview['video_count']) == (2, 1, 1, 1)
+    assert 'ids' not in preview and 'revisions' not in preview
+    queued = []
+    monkeypatch.setattr(web.WORK_Q, 'put', queued.append)
+    monkeypatch.setattr(web.findings_web.training, 'resolve_parent',
+                        lambda *args: {'weights': '/trusted/checkpoint.pt'})
+    monkeypatch.setattr(web.learning_session, 'preflight',
+                        lambda **kwargs: {'ready': True, 'problems': []})
+    selection = dict(category='plate', video_id='a' * 64, label=None,
+                     snapshot=preview['snapshot'], excluded_ids=[negative['id']])
+    request = dict(license_accepted=True, selection=selection, example_ids=[],
+                   name='Garage scoped learning')
+    result = client.post('/api/findings/train', json=request)
+    assert result.status_code == 200, result.get_data(as_text=True)
+    train_job = web.JOBS[result.get_json()['id']]
+    assert train_job['learning_request']['example_ids'] == [positive['id']]
+    assert train_job['learning_request']['expected_revisions'] == {positive['id']: 1}
+    assert queued == [(train_job['id'], 'learn_examples')]
+    assert train_job['kind'] == 'model_training'
+    # An excluded negative changed after confirmation of the matching set.
+    cf.update_finding(root, negative['id'], label='positive', expected_revision=1)
+    stale = client.post('/api/findings/train', json=request)
+    assert stale.status_code == 409
+    assert len(queued) == 1
+    # The individual manual-selection path also rejects stale displayed revisions.
+    manual = client.post('/api/findings/train',
+                         json={'license_accepted': True, 'example_ids': [negative['id']],
+                               'expected_revisions': {negative['id']: 1},
+                               'name': 'stale manual'})
+    assert manual.status_code == 409
+    assert len(queued) == 1
+
+
+def test_bulk_selection_rejects_unrelated_exclusions_and_unreviewed_rows(findings_job):
+    import confirmed_findings as cf
+    from test_confirmed_findings import video as make_video, finding as make_finding, jpeg
+    client, job, _, _ = findings_job
+    root = Path(web.JOBS_DIR) / 'confirmed_findings'
+    assert client.get('/api/findings/selection').get_json()['total'] == 0
+    saved = cf.record(root, make_video(), make_finding(), jpeg())
+    preview = client.get('/api/findings/selection?label=positive').get_json()
+    assert preview['total'] == 1  # Raw detection rows are not confirmations.
+    selection = dict(category='plate', label='positive', video_id=None,
+                     snapshot=preview['snapshot'], excluded_ids=['d' * 64])
+    wrong = client.post('/api/findings/train',
+                        json={'license_accepted': True, 'selection': selection})
+    assert wrong.status_code == 400
+    assert client.get('/api/findings/selection?label=negative').get_json()['total'] == 0
+    assert saved['id'] not in selection['excluded_ids']
+
+
 def test_corners_apply_only_to_confirmed_source_frame_not_entire_plate_track(findings_job):
     """One group decision, distinct exact-frame polygons, and no fake training labels."""
     client, job, _, report = findings_job

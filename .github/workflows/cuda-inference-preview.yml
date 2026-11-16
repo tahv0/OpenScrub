@@ -1,0 +1,66 @@
+name: CUDA inference-only preview contract
+
+on:
+  pull_request:
+    paths:
+      - 'Dockerfile.cuda'
+      - 'Dockerfile.cuda.inference'
+      - 'docker/generate_cuda_inference.py'
+      - 'scripts/build-windows-cuda-inference.ps1'
+      - 'docs/CUDA_INFERENCE_IMAGE_PREVIEW.md'
+      - 'tests/test_cuda_inference_preview.py'
+      - 'tests/test_windows_cuda_inference_preview.ps1'
+      - '.github/workflows/cuda-inference-preview.yml'
+  workflow_dispatch:
+
+jobs:
+  inference-preview:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check generated CUDA Dockerfile matches authoritative runtime installs
+        run: |
+          python3 docker/generate_cuda_inference.py --check
+          python3 -m unittest discover -s tests -p test_cuda_inference_preview.py -v
+      - uses: docker/setup-buildx-action@v4
+      - name: Validate both experimental BuildKit targets without installing CUDA packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker buildx build --call=targets -f Dockerfile.cuda.inference . | tee /tmp/openscrub-inference-targets
+          grep -q 'cuda_inference_deps' /tmp/openscrub-inference-targets
+          grep -q 'app (default)' /tmp/openscrub-inference-targets
+          docker buildx build --call=check -f Dockerfile.cuda.inference .
+      - name: Parse Windows preview builder
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            'scripts/build-windows-cuda-inference.ps1', [ref]$tokens, [ref]$errors
+          ) | Out-Null
+          if ($errors.Count) {
+            $errors | Format-List
+            exit 1
+          }
+      - name: Parse and run mocked Windows cold/warm inference builder
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            'tests/test_windows_cuda_inference_preview.ps1', [ref]$tokens, [ref]$errors
+          ) | Out-Null
+          if ($errors.Count) {
+            $errors | Format-List
+            exit 1
+          }
+          ./tests/test_windows_cuda_inference_preview.ps1
+      - name: Assert production Windows Compose retains the full CUDA variant
+        shell: bash
+        run: |
+          set -euo pipefail
+          ! grep -q 'Dockerfile.cuda.inference' compose.windows-cuda.yml
+          grep -q 'dockerfile: Dockerfile.cuda' compose.windows-cuda.yml

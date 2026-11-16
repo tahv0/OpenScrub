@@ -233,14 +233,49 @@ def test_huge_source_crop_is_downscaled_with_separate_axis_factors(previews, tmp
         assert source_y == pytest.approx(image_y/meta['scale_y']+meta['crop'][1])
 
 
-def test_store_does_not_acknowledge_incompatible_existing_crop(previews, tmp_path):
-    previews.capture(tmp_path, frame(), 3, 10., [row()])
-    edited = row(); edited['plate_quad'] = [[-1,-1], [2,-1], [2,2], [-1,2]]
+def test_expanded_crop_gets_distinct_key_without_replacing_old_pixels(previews, tmp_path):
+    """Old scan JPEG remains immutable; exact expanded corners become reviewable."""
+    original = row()
+    original_pixels = frame()
+    previews.capture(tmp_path, original_pixels, 3, 10., [original])
+    old, old_jpeg = previews.lookup(tmp_path, original, state())
+    edited = row()
+    edited['plate_quad'] = [[-1,-1], [2,-1], [2,2], [-1,2]]
     assert previews.lookup(tmp_path, edited, state()) is None
+    new_pixels = np.full((400, 500, 3), 219, np.uint8)
     meta = dict(width=1600, height=900, frame=3, t=.3,
                 box=[120.,100.,240.,150.], crop=[0,0,500,400])
-    with pytest.raises(ValueError, match='incompatible'):
-        previews.store(tmp_path, edited, state(), meta, np.zeros((400,500,3), np.uint8))
+    refreshed, jpeg = previews.store(tmp_path, edited, state(), meta, new_pixels)
+    assert refreshed['key'] != old['key']
+    assert refreshed['crop'] == [0,0,500,400]
+    assert refreshed['preview_token'] != old['preview_token']
+    assert jpeg != old_jpeg
+    assert previews.lookup(tmp_path, edited, state(), preferred_key=old['key'],
+                           allow_representative=True) is None
+    matching, same_jpeg = previews.lookup(tmp_path, edited, state())
+    assert matching['key'] == refreshed['key'] and same_jpeg == jpeg
+    assert previews.lookup(tmp_path, edited, state(), preferred_key=refreshed['key'],
+                           allow_representative=True)[1] == jpeg
+    assert previews.lookup(tmp_path, original, state())[1] == old_jpeg
+    assert previews.image(tmp_path, old['key'])[1] == old_jpeg
+    # An identical explicit request is idempotent and does not duplicate the
+    # larger JPEG or touch the original scan-time sample.
+    duplicate, duplicate_jpeg = previews.store(tmp_path, edited, state(), meta, new_pixels)
+    assert duplicate['key'] == refreshed['key'] and duplicate_jpeg == jpeg
+    assert previews.pending(tmp_path)['total'] == 2
+
+
+def test_expanded_crop_is_not_reused_for_a_different_source_frame(previews, tmp_path):
+    previews.capture(tmp_path, frame(), 3, 10., [row()])
+    moved = row(frame=4)
+    moved['plate_quad'] = [[-1,-1], [2,-1], [2,2], [-1,2]]
+    expanded = dict(width=1600, height=900, frame=4, crop=[0,0,500,400])
+    fresh, _ = previews.store(tmp_path, moved, state(), expanded,
+                              np.zeros((400,500,3), np.uint8))
+    assert fresh['frame'] == 4
+    assert previews.lookup(tmp_path, moved, state())[0]['frame'] == 4
+    assert previews.lookup(tmp_path, row(), state())[0]['frame'] == 3
+
 
 
 def test_saturated_cache_does_not_keep_writing_every_frame(previews, tmp_path, monkeypatch):

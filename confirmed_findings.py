@@ -411,6 +411,58 @@ def forget(root, id, expected_revision=None):
     return dict(id=entry['id'], revision=entry['revision'], revoked=True)
 
 
+
+def plate_selection(root, *, video_id=None, label=None, expected_snapshot=None,
+                    excluded_ids=()):
+    """Revision-pinned, page-independent selection of explicit plate examples.
+
+    The digest covers *all* matching identities, revisions and labels, including
+    later-excluded examples. A changed or forgotten matching record, or a newly
+    confirmed one, invalidates a previously reviewed bulk selection. No JPEGs
+    or source videos are read to preview the selection.
+    """
+    if video_id is not None:
+        _hash(video_id, 'video identity')
+    if label is not None:
+        _label(label)
+    if not isinstance(excluded_ids, (list, tuple)) or len(excluded_ids) > 10000:
+        raise ValueError('Provide at most 10000 excluded example IDs')
+    excluded = {_hash(identity, 'excluded finding ID') for identity in excluded_ids}
+    with _db(root) as conn:
+        entries = [json.loads(row[0]) for row in conn.execute('SELECT value FROM findings')]
+    matched = sorted((
+        entry for entry in entries
+        if not entry.get('revoked') and entry.get('explicit') is True
+        and entry['category'] == 'plate'
+        and (video_id is None or entry['video_id'] == video_id)
+        and (label is None or entry['label'] == label)
+        and entry['label'] in ('positive', 'negative')
+    ), key=lambda entry: entry['id'])
+    snapshot = hashlib.sha256(_json([
+        'confirmed-plate-selection-v1', video_id, label,
+        [[entry['id'], entry['revision'], entry['label']] for entry in matched]
+    ]).encode('utf-8')).hexdigest()
+    if expected_snapshot is not None:
+        _hash(expected_snapshot, 'selection snapshot')
+        if snapshot != expected_snapshot:
+            raise ConflictError(
+                'Matching confirmed findings changed after selection. '
+                'Review the filters and select all matching examples again.')
+    matching_ids = {entry['id'] for entry in matched}
+    if not excluded.issubset(matching_ids):
+        raise ValueError('Excluded examples must belong to the selected matching scope')
+    selected = [entry for entry in matched if entry['id'] not in excluded]
+    return dict(snapshot=snapshot, video_id=video_id, category='plate', label=label,
+                total=len(matched),
+                positive=sum(entry['label'] == 'positive' for entry in matched),
+                negative=sum(entry['label'] == 'negative' for entry in matched),
+                video_count=len({entry['video_id'] for entry in matched}),
+                selected_total=len(selected),
+                selected_positive=sum(entry['label'] == 'positive' for entry in selected),
+                selected_negative=sum(entry['label'] == 'negative' for entry in selected),
+                ids=[entry['id'] for entry in selected],
+                revisions={entry['id']: entry['revision'] for entry in selected})
+
 def training_snapshot(root, ids=None, video_ids=None, category='plate'):
     """Return detached revision-frozen values and verified immutable JPEG paths."""
     if category is not None:

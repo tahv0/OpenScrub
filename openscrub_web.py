@@ -1994,14 +1994,26 @@ def review_error(error):
     return response
 
 
-def _review_process(command):
+def _review_process(command, timeout=None):
+    # Normal reads retain the 10-second bounded decoder. A *user-initiated*
+    # long retry gets one longer deadline, not an unbounded worker. ffprobe
+    # and other consumers keep their original short timeout.
+    deadline = _REVIEW_TIMEOUT if timeout is None else max(
+        _REVIEW_TIMEOUT, min(60.0, float(timeout)))
     try:
         result = subprocess.run(command, capture_output=True,
-                                timeout=_REVIEW_TIMEOUT)
+                                timeout=deadline)
     except subprocess.TimeoutExpired:
-        diagnostics.exception("preview_process_timeout", tool=os.path.basename(str(command[0])), timeout_seconds=_REVIEW_TIMEOUT)
-        abort(504, description="Preview decoding timed out. Retry this finding; "
-              "a video with very sparse keyframes may need a seekable scan copy.")
+        diagnostics.exception("preview_process_timeout",
+                              tool=os.path.basename(str(command[0])),
+                              timeout_seconds=deadline)
+        abort(504, description=(
+            "This source frame still cannot be decoded within the longer "
+            "60-second attempt. The original detection keeps its automatic "
+            "protection; a seekable normalized source copy may be needed."
+            if deadline > _REVIEW_TIMEOUT else
+            "Preview decoding timed out after 10 seconds. Use Retry preview "
+            "to attempt one longer, bounded exact-frame decode."))
     except OSError:
         diagnostics.exception("preview_process_start_failed", tool=os.path.basename(str(command[0])))
         abort(503, description="FFmpeg and ffprobe are required for review previews.")
@@ -2040,7 +2052,7 @@ def _review_probe(path, identity):
     return info
 
 
-def _read_review_frame(path, index, exact=True):
+def _read_review_frame(path, index, exact=True, crop=None, decode_timeout=None):
     """Accurate seek on the CFR scan video, verified by the decoded frame PTS.
 
     Indexed/narrow review requires normalized CFR input. Refuse unverifiable
@@ -2055,11 +2067,19 @@ def _read_review_frame(path, index, exact=True):
         abort(423)
     identity = _video_identity(path)
     key = identity + ("frame" if exact else "time", index)
+    def from_cached(frame):
+        if crop is None:
+            return frame.copy()
+        x1, y1, x2, y2 = crop
+        if not (0 <= x1 < x2 <= frame.shape[1] and
+                0 <= y1 < y2 <= frame.shape[0]):
+            abort(422, description="Preview crop is outside source frame.")
+        return frame[y1:y2, x1:x2].copy()
     with _REVIEW_CACHE_LOCK:
         cached = _REVIEW_FRAMES.get(key)
         if cached is not None:
             _REVIEW_FRAMES.move_to_end(key)
-            return cached.copy()  # callers may paint a mask on their image
+            return from_cached(cached)  # original full-frame cache is read-only
     if not _REVIEW_WORK_LOCK.acquire(blocking=False):
         abort(503, description="Another preview is decoding. Retry this finding.")
     try:
@@ -2068,20 +2088,35 @@ def _read_review_frame(path, index, exact=True):
         with _REVIEW_CACHE_LOCK:
             cached = _REVIEW_FRAMES.get(key)
             if cached is not None:
-                return cached.copy()
+                return from_cached(cached)
         info = _review_probe(path, identity)
         if exact and not info["cfr"]:
             abort(422, description="Exact review needs a constant-frame-rate scan copy.")
+        # Pixel-space crop is taken *after* showinfo measures the original
+        # frame PTS, never before source identity verification. Cropping before
+        # the PPM pipe avoids transporting full 4K RGB frames for tiny cards.
+        if crop is not None:
+            x1, y1, x2, y2 = crop
+            if (not all(isinstance(v, int) for v in crop) or
+                    not (0 <= x1 < x2 <= info["width"] and
+                         0 <= y1 < y2 <= info["height"])):
+                abort(422, description="Preview crop is outside source frame.")
+            video_filter = ("showinfo,format=rgb24,crop=w=%d:h=%d:x=%d:y=%d:exact=1"
+                            % (x2-x1, y2-y1, x1, y1))
+        else:
+            video_filter = "showinfo"
         # Seek slightly before the target to avoid rounding it to the next frame.
         target = max(0.0, (index-.1) / info["fps"]) if exact else index
         # PPM transports lossless pixels without compressing a full 4K PNG
         # just to decode it again before extracting a small plate crop.
-        result = _review_process([
+        command = [
             "ffmpeg", "-hide_banner", "-loglevel", "info", "-nostdin",
             "-threads", "1", "-filter_threads", "1", "-copyts", "-ss", "%.9f" % target,
             "-i", path, "-map", "0:v:0", "-an", "-sn",
-            "-vf", "showinfo", "-frames:v", "1", "-vsync", "0",
-            "-threads", "1", "-f", "image2pipe", "-vcodec", "ppm", "pipe:1"])
+            "-vf", video_filter, "-frames:v", "1", "-vsync", "0",
+            "-threads", "1", "-f", "image2pipe", "-vcodec", "ppm", "pipe:1"]
+        result = (_review_process(command) if decode_timeout is None
+                  else _review_process(command, timeout=decode_timeout))
         log = result.stderr.decode("utf-8", errors="replace")
         match = re.search(r"\bn:\s*0\s+pts:\s*(-?\d+)\s+pts_time:", log)
         timebase = re.search(r"config in time_base:\s*(\d+/\d+)", log)
@@ -2096,6 +2131,12 @@ def _read_review_frame(path, index, exact=True):
         frame = cv2.imdecode(np.frombuffer(result.stdout, np.uint8), cv2.IMREAD_COLOR)
         if frame is None:
             return None
+        if crop is not None:
+            # The filter must return precisely the requested source-space
+            # geometry. Never save or label a padded/shrunk/shifted crop.
+            if frame.shape[:2] != (y2-y1, x2-x1):
+                abort(422, description="Exact source crop dimensions differ.")
+            return frame
         with _REVIEW_CACHE_LOCK:
             if frame.nbytes <= _REVIEW_FRAME_BYTES:
                 _REVIEW_FRAMES[key] = frame
@@ -2106,16 +2147,19 @@ def _read_review_frame(path, index, exact=True):
         _REVIEW_WORK_LOCK.release()
 
 
-def _read_exact_frame(path, index):
-    return _read_review_frame(path, index, exact=True)
+def _read_exact_frame(path, index, *, crop=None, decode_timeout=None):
+    return _read_review_frame(path, index, exact=True,
+                              crop=crop, decode_timeout=decode_timeout)
 
 
-def _frame_at(job, t, rstate, frame_index=None):
+def _frame_at(job, t, rstate, frame_index=None, *, crop=None, decode_timeout=None):
     if frame_index is not None:
-        return _read_exact_frame(job["video"], frame_index)
-    # Legacy, time-based findings may come from deliberately unnormalized VFR.
-    # Keep that path timestamp-based; indexed review remains strictly verified.
-    return _read_review_frame(job["video"], max(0.0, float(t)), exact=False)
+        return _read_exact_frame(job["video"], frame_index,
+                                 crop=crop, decode_timeout=decode_timeout)
+    # Legacy VFR requests remain timestamp-based and are not classified as
+    # exact-frame training examples.
+    return _read_review_frame(job["video"], max(0.0, float(t)), exact=False,
+                              crop=crop, decode_timeout=decode_timeout)
 
 
 @app.route("/api/jobs/<jid>/mediainfo")
@@ -2602,7 +2646,16 @@ def _plate_editor_crop(box, points, width, height):
     x2 = min(width, int(np.ceil(cx + radius)))
     y2 = min(height, int(np.ceil(cy + radius)))
     if x2 <= x1 or y2 <= y1:
-        abort(400, description="Plate is outside the video frame")
+        # Even a wholly off-screen legacy proposal should show the nearest
+        # ORIGINAL source pixels for inspection. No geometry is moved: the
+        # compact preview marks it view-only and forbids trusted labels/edits.
+        cx, cy = max(0., min(float(width), cx)), max(0., min(float(height), cy))
+        x1 = max(0, int(np.floor(cx - radius)))
+        y1 = max(0, int(np.floor(cy - radius)))
+        x2 = min(width, int(np.ceil(cx + radius)))
+        y2 = min(height, int(np.ceil(cy + radius)))
+        if x2 <= x1 or y2 <= y1:
+            abort(400, description="Source frame has no visible preview pixels")
     return [x1, y1, x2, y2]
 
 
@@ -5251,10 +5304,27 @@ function clearReviewPreviews(){
 function drawPlateThumbnail(img){
  if(!img._plateMeta||!img.naturalWidth)return;
  const existing=img._quadEdit;
- if(existing&&!existing.dirty&&!existing.drag&&existing.meta!==img._plateMeta){
-  // An exact source-frame request can replace a borrowed cached thumbnail.
-  // Rebind a CLEAN editor to the actual new image and its own coordinates.
-  existing.meta=img._plateMeta;existing.displayCrop=img._plateMeta.crop.slice();
+ if(img._plateMeta.geometry_outside_frame){
+  const status=img.closest(".det")?.querySelector(".quad-status");
+  if(status)status.textContent="Corners outside source frame · use Redraw plate area";
+  // Displaying original pixels is safe, but editing off-frame polygon is not.
+  // Preserve an outstanding human draft rather than silently deleting it.
+  if(existing&&!existing.dirty&&!existing.pending&&!existing.drag){
+   existing.events.abort();
+   if(existing.observer)existing.observer.disconnect();
+   PLATE_EDITS.delete(existing.i);delete img._quadEdit;
+   const cv=img.closest(".plate-preview")?.querySelector("canvas");
+   if(cv){cv.width=cv.width;cv.style.pointerEvents="none";}
+  }
+  return;
+ }
+ if(existing&&!existing.dirty&&!existing.drag&&!existing.pending&&
+    existing.meta!==img._plateMeta){
+  // Switching from a borrowed group JPEG to the exact detection frame
+  // must rebind a CLEAN editor to the actual new image and its geometry.
+  // Never overwrite a pending/failed human polygon.
+  existing.meta=img._plateMeta;
+  existing.displayCrop=img._plateMeta.crop.slice();
   existing.points=plateCopy(img._plateMeta.points);
   existing.saved=plateCopy(img._plateMeta.points);
  }
@@ -5268,6 +5338,34 @@ function updateReviewPreloadStatus(state){
  el.textContent=ready
   ?ready+" pictures ready · Preparing more before you scroll…"
   :"Preparing review pictures before you scroll…";
+}
+function reviewTimedOutImages(){
+ if(typeof document.querySelectorAll!=="function")return [];
+ return [...document.querySelectorAll("#review img[data-preview-url]")]
+  .filter(img=>img._previewFailureType==="timeout"&&!img.closest("[hidden]"));
+}
+function updateReviewTimedOutButton(){
+ if(typeof document.getElementById!=="function")return;
+ const button=document.getElementById("reviewRetryTimedOut");
+ if(!button)return;
+ const failed=reviewTimedOutImages();
+ button.hidden=failed.length===0;
+ const busy=failed.filter(img=>!!img._previewTask).length;
+ button.disabled=!!busy&&busy===failed.length;
+ button.textContent=busy
+  ?"Retrying timed-out pictures ("+failed.length+" remaining)…"
+  :"Retry timed-out pictures ("+failed.length+")";
+}
+function retryTimedOutReviewPreviews(){
+ for(const img of reviewTimedOutImages()){
+  if(img._previewTask)continue;
+  img._previewLongRetry=true;
+  img._plateMeta=null;
+  // Existing single cold-decoder lane keeps one extended attempt active
+  // at a time. Cached thumbnails continue loading separately.
+  queueReviewPreview(img,true);
+ }
+ updateReviewTimedOutButton();
 }
 function queueReviewPreview(img, priority=false){
  const state=REVIEW_MEDIA;
@@ -5300,13 +5398,21 @@ async function loadReviewPreview(state,task,cacheOnly){
  let missing=false,retryBusy=false,ok=false,url=null;
  try{
   const original=img.dataset.previewUrl;
-  const base=img._forceExactPreview?
+  const originalWithFrame=img._forceExactPreview?
    original+(original.includes("?")?"&":"?")+"exact=1":original;
+  const base=img._previewLongRetry?
+   originalWithFrame+(originalWithFrame.includes("?")?"&":"?")+"retry_decode=1":originalWithFrame;
   const target=cacheOnly?base+(base.includes("?")?"&":"?")+"cache_only=1":base;
   const {response,data}=await reviewRequest(target,{signal:ctl.signal,timeoutMs:cacheOnly?15000:120000},"blob");
   if(REVIEW_MEDIA!==state||!img.isConnected)return;
   if(cacheOnly&&response.status===204){missing=true;return;}
   const raw=response.headers.get("X-Plate-Geometry"),meta=raw?JSON.parse(raw):null;
+  const currentDraft=img._quadEdit;
+  if(meta?.geometry_outside_frame && currentDraft &&
+     (currentDraft.dirty||currentDraft.pending||currentDraft.drag)){
+   if(status)status.textContent="Source geometry is outside the video. Keep or back up your unsaved corners before changing pictures.";
+   return;
+  }
   // Decode a replacement off-DOM first. A failed/aborted refresh must leave
   // the usable old image in place rather than turn the finding blank.
   url=URL.createObjectURL(data);state.urls.add(url);
@@ -5318,50 +5424,75 @@ async function loadReviewPreview(state,task,cacheOnly){
   url=null;
   if(REVIEW_MEDIA!==state||!img.isConnected)return;
   const borrowed=!!(meta?.match==="representative"&&
-      Number.isInteger(meta.frame)&&Number.isInteger(meta.requested_frame)&&
-      meta.frame!==meta.requested_frame);
+   Number.isInteger(meta.frame)&&Number.isInteger(meta.requested_frame)&&
+   meta.frame!==meta.requested_frame);
   img._previewUnsafeGeometry=borrowed;
   const hint=card.querySelector(".source-frame-note");
   const exactButton=card.querySelector(".source-frame-exact");
-  if(hint)hint.textContent=borrowed?
-   "The cached picture is source frame "+meta.frame+", but this detection is on frame "+
-   meta.requested_frame+". Load the exact frame before adjusting corners.":"";
+  const outside=meta?.geometry_outside_frame===true;
+  const repair=card.querySelector(".plate-repair-button");
+  if(repair)repair.hidden=!(outside&&meta?.exact_frame===true&&!borrowed);
+  if(hint)hint.textContent=outside
+   ?"Detector box/corners extend outside the video frame. "+
+    (borrowed?"Showing cached frame "+meta.frame+" instead of detection frame "+
+      meta.requested_frame+". Load exact frame to inspect the actual sighting. "
+      :"Original source pixels only. ")+
+    "Use Redraw plate area on this exact source frame before trusted training."
+   :borrowed?
+   "Showing cached frame "+meta.frame+" instead of detection frame "+
+   meta.requested_frame+". Load the exact frame before adjusting corners or confirming this finding.":"";
   if(exactButton)exactButton.hidden=!borrowed;
   drawPlateThumbnail(img);
-  if(meta?.classification_allowed===false){
+  if(meta){
    if(typeof FINDING_META!=="undefined"&&FINDING_META[meta.i]){
-    FINDING_META[meta.i].classification_allowed=false;
-    FINDING_META[meta.i].classification_note=meta.classification_note;
+    FINDING_META[meta.i].classification_allowed=meta.classification_allowed!==false;
+    FINDING_META[meta.i].classification_note=meta.classification_note||"";
+    FINDING_META[meta.i].source_repaired=!!meta.source_repaired;
+    if(meta.source_repaired)FINDING_META[meta.i].fallback_reason="";
    }
-   card.querySelectorAll('.finding-confirm button').forEach(button=>button.disabled=true);
-   const note=card.querySelector('[id^="vlabel"]');if(note)note.textContent=meta.classification_note;
+   card.querySelectorAll('.finding-confirm button').forEach(button=>
+    button.disabled=meta.classification_allowed===false||
+     CONFIRM_PENDING.has(meta.i)||PLATE_REVIEW_BUSY);
+   const note=card.querySelector('[id^="vlabel"]');
+   if(note)note.textContent=meta.classification_allowed===false?
+    meta.classification_note:findingStatus(meta.i);
   }
   if(status)status.textContent="";
   if(typeof reviewSimilarFingerprint==="function")reviewSimilarFingerprint(img);
-  ok=true;img._previewLoaded=true;
+  ok=true;img._previewLoaded=true;img._previewLongRetry=false;
+  img._previewFailureType=null;
   state.loadedImages.add(img);
   updateReviewPreloadStatus(state);
  }catch(error){
   if(REVIEW_MEDIA===state&&img.isConnected){
+   img._previewFailureType=error.status===504?"timeout":null;
    if(error.status===503&&(task.busyRetries||0)<2){
     task.busyRetries=(task.busyRetries||0)+1;
     task.readyAt=Date.now()+250*2**task.busyRetries;retryBusy=true;
     if(status)status.textContent="Decoder busy — retrying preview…";
     return;
    }
-   if(status)status.textContent=error.name==="AbortError"
-    ?"Preview timed out. Retry when ready.":"Preview unavailable: "+error.message;
-   if(retry){retry.hidden=false;retry.textContent="Retry preview";}
+   if(status)status.textContent=error.status===504
+    ?(img._previewLongRetry
+      ?"Exact source preview still timed out after the extended attempt. Automatic redaction remains enabled unless deliberately changed."
+      :"Source frame took too long to decode. Retry preview for a longer attempt.")
+    :error.name==="AbortError"?"Preview timed out. Retry when ready."
+    :"Preview unavailable: "+error.message;
+   if(retry){retry.hidden=false;retry.textContent=error.status===504
+    ?"Retry preview (up to 60s)":"Retry preview";}
   }
  }finally{
   if(url){state.urls.delete(url);URL.revokeObjectURL(url);}
   state[counter]--;state.controllers.delete(ctl);
   if((missing||retryBusy)&&REVIEW_MEDIA===state&&img.isConnected){
-   if(missing&&status)status.textContent="Loading source preview…";
+   if(missing&&status)status.textContent=img._previewLongRetry
+    ?"Loading source preview with a longer, bounded decode…"
+    :"Loading source preview…";
    const queue=retryBusy&&cacheOnly?state.cacheQueue:state.queue;
    if(task.priority)queue.unshift(task);else queue.push(task);
   }else{img._previewTask=null;task.resolve(ok);}
   pumpReviewPreviews(state);
+  updateReviewTimedOutButton();
  }
 }
 function reviewPreviewRank(task){
@@ -5425,7 +5556,7 @@ function initReviewPreviews(){
  pumpReviewPreviews(state);
 }
 // Retain all decisions/group memberships, but mount card elements progressively.
-function appendReviewPage(cat,selectedOnly=false){
+function appendReviewPage(cat,selectedOnly=false,targetIndex=null){
  const panel=document.getElementById("review"),pending=REVIEW_PENDING_PAGES[cat];
  if(!panel||!pending||!pending.length)return 0;
  const grid=[...panel.querySelectorAll("[data-review-category]")]
@@ -5433,8 +5564,9 @@ function appendReviewPage(cat,selectedOnly=false){
  if(!grid)return 0;
  const added=[];
  for(let k=0;k<pending.length&&added.length<(selectedOnly?Infinity:REVIEW_PAGE_SIZE);){
-  const entry=pending[k],members=TRKMEM[entry.i]||[entry.i];
-  if(selectedOnly&&(!LEARNING_SELECTION||!members.some(i=>LEARNING_SELECTION.has(i)))){k++;continue;}
+  const entry=pending[k];
+  if(targetIndex!==null&&entry.i!==targetIndex){k++;continue;}
+  if(!reviewMatchesFilter(entry.i,cat)){k++;continue;}
   added.push(entry);pending.splice(k,1);
  }
  if(added.length){
@@ -5442,7 +5574,7 @@ function appendReviewPage(cat,selectedOnly=false){
   for(const item of added){
    const i=item.i,card=document.getElementById("det"+i);
    if(!card)continue;
-   card.hidden=!!LEARNING_SELECTION&&!(TRKMEM[i]||[i]).some(m=>LEARNING_SELECTION.has(m));
+   card.hidden=!reviewMatchesFilter(i,cat);
    card.classList.toggle("off",!EN[i]);
    const bb=document.getElementById("bb"+i);if(bb)bb.innerHTML=detChoices(i);
    const note=document.getElementById("vlabel"+i);if(note)note.innerHTML=findingStatus(i);
@@ -5458,8 +5590,9 @@ function appendReviewPage(cat,selectedOnly=false){
  const more=[...panel.querySelectorAll(".review-more")]
   .find(node=>node.dataset.reviewMore===cat);
  if(more){
-  more.hidden=!!LEARNING_SELECTION||!pending.length;
-  more.textContent="Load more "+(CATDN[cat]||cat)+" ("+pending.length+" remaining)";
+  const remaining=pending.filter(item=>reviewMatchesFilter(item.i,cat)).length;
+  more.hidden=!!LEARNING_SELECTION||!remaining;
+  more.textContent="Load more "+(CATDN[cat]||cat)+" ("+remaining+" remaining)";
  }
  return added.length;
 }
@@ -5478,26 +5611,262 @@ function initReviewPages(){
   buttons.forEach(button=>panel._moreObserver.observe(button));
  }
 }
-function loadExactPlateFrame(button){
+function loadExactReviewFrame(button){
  const card=button.closest(".det"),img=card?.querySelector("img[data-preview-url]");
  if(!img)return;
- const edit=img._quadEdit;
- if(edit&&(edit.dirty||edit.drag)){
-  const status=card.querySelector(".source-frame-note");
-  if(status)status.textContent="Preserve or resolve your unsaved corner draft before switching source frames.";
+ const edit=img._quadEdit,warning=card.querySelector(".source-frame-note");
+ if(edit&&(edit.dirty||edit.pending||edit.drag)){
+  if(warning)warning.textContent="Preserve or resolve your unsaved corner draft before changing source frames.";
   return;
  }
  img._forceExactPreview=true;
  img._plateMeta=null;
- button.disabled=true;button.textContent="Loading exact source frame…";
- queueReviewPreview(img,true).finally(()=>{
-  if(button.isConnected){button.disabled=false;button.textContent="Load exact frame for corners";}
+ button.disabled=true;button.textContent="Loading exact frame…";
+ queueReviewPreview(img,true).then(ok=>{
+  if(!ok&&warning)warning.textContent="Exact source frame did not load. Retry without changing your corners.";
+ }).finally(()=>{
+  if(button.isConnected){button.disabled=false;button.textContent="Load exact source frame";}
  });
+}
+
+function validPlateRepair(points,geom){
+ return Array.isArray(points)&&points.length===4&&
+  points.every(p=>p.length===2&&p.every(Number.isFinite)&&
+   p[0]>=0&&p[0]<=geom.width&&p[1]>=0&&p[1]<=geom.height)&&plateQuadValid(points);
+}
+async function openPlateRepair(button){
+ const card=button.closest(".det"),img=card?.querySelector("img[data-preview-url]");
+ const selected=img?._plateMeta,job=CUR,view=JOBVIEW;
+ const status=card?.querySelector(".source-frame-note");
+ if(!selected?.geometry_outside_frame||!selected.frame_source_token)return;
+ if(selected.match==="representative"||selected.frame!==selected.requested_frame){
+  if(status)status.textContent="Load the exact source frame before redrawing.";return;
+ }
+ const old=PLATE_EDITS.get(selected.i);
+ if(old&&(old.dirty||old.pending||old.drag)){
+  if(status)status.textContent="Preserve the unsaved corner draft before redrawing.";return;
+ }
+ button.disabled=true;button.textContent="Loading exact source frame…";
+ let url=null,dialog=null,saving=false,closed=false;
+ try{
+  const {response,data}=await reviewRequest(
+   "api/jobs/"+encodeURIComponent(job)+"/plate-repair/"+selected.i+"/frame",
+   {timeoutMs:120000},"blob");
+  if(CUR!==job||JOBVIEW!==view||!button.isConnected)return;
+  const geom=JSON.parse(response.headers.get("X-Repair-Geometry")||"null");
+  // The full-frame redraw token is independent of the disposable compact
+  // JPEG key. Verify the actual source frame instead of a cache entry.
+  if(!geom||geom.frame!==selected.frame||
+     geom.frame_source_token!==selected.frame_source_token)
+   throw new Error("Source frame changed; reload the original preview.");
+  url=URL.createObjectURL(data);
+  const photo=new Image();photo.src=url;await photo.decode();
+  if(CUR!==job||JOBVIEW!==view||!button.isConnected)return;
+  const add=(parent,tag,label,style)=>{
+   const el=document.createElement(tag);
+   if(label!==null)el.textContent=label;
+   if(style)el.style.cssText=style;
+   parent.appendChild(el);return el;
+  };
+  dialog=add(document.body,"div",null,
+   "position:fixed;inset:0;z-index:11000;background:rgba(2,6,23,.94);"+
+   "display:flex;align-items:center;justify-content:center;padding:8px");
+  dialog.setAttribute("role","dialog");dialog.setAttribute("aria-modal","true");
+  dialog.setAttribute("aria-label","Redraw plate area on exact original frame");
+  const panel=add(dialog,"section",null,
+   "background:#111827;color:#e5e7eb;border:1px solid #475569;border-radius:10px;"+
+   "width:min(1150px,100%);max-height:96vh;display:flex;flex-direction:column;gap:8px;padding:12px");
+  add(panel,"strong","Redraw plate · exact frame "+geom.frame);
+  add(panel,"p","The old detector box is outside the video. Drag a new box or click "+
+   "four perspective corners. Zoom and pan as needed. Only this source frame "+
+   "will be changed; choose Is / Not afterward.",
+   "font-size:13px;margin:0");
+  const tools=add(panel,"div",null,"display:flex;flex-wrap:wrap;gap:6px;align-items:center");
+  const box=add(tools,"button","Drag box");
+  const corners=add(tools,"button","Four corners");
+  const clear=add(tools,"button","Clear");
+  const less=add(tools,"button","− Zoom");
+  const more=add(tools,"button","+ Zoom");
+  const zoomNote=add(tools,"span","100%","font-size:12px;color:#cbd5e1");
+  const scroller=add(panel,"div",null,
+   "overflow:auto;min-height:120px;max-height:67vh;flex:1 1 auto;"+
+   "border:1px solid #64748b;background:#080f1d");
+  const stage=add(scroller,"div",null,"position:relative;display:inline-block;vertical-align:top");
+  photo.draggable=false;
+  photo.style.cssText="display:block;max-width:none;height:auto;user-select:none;pointer-events:none";
+  stage.appendChild(photo);
+  const canvas=add(stage,"canvas",null,
+   "position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor:crosshair");
+  canvas.tabIndex=0;canvas.setAttribute("aria-label","Draw replacement plate on exact frame");
+  const hint=add(panel,"small","Drag a box around the entire plate.",
+   "font-size:12px;color:#cbd5e1;min-height:1.4em");
+  const buttons=add(panel,"div",null,"display:flex;gap:8px;justify-content:flex-end");
+  const cancel=add(buttons,"button","Cancel");
+  const save=add(buttons,"button","Save replacement · this frame only");save.disabled=true;
+  let mode="box",points=[],drag=null,zoom=1,requestBody=null;
+  const baseWidth=Math.min(geom.width,Math.max(290,Math.min(1050,window.innerWidth-70)));
+  const fromEvent=e=>{
+   const b=canvas.getBoundingClientRect();
+   return [Math.max(0,Math.min(geom.width,(e.clientX-b.left)/b.width*geom.width)),
+           Math.max(0,Math.min(geom.height,(e.clientY-b.top)/b.height*geom.height))];
+  };
+  const quadFrom=(a,b)=>[
+   [Math.min(a[0],b[0]),Math.min(a[1],b[1])],
+   [Math.max(a[0],b[0]),Math.min(a[1],b[1])],
+   [Math.max(a[0],b[0]),Math.max(a[1],b[1])],
+   [Math.min(a[0],b[0]),Math.max(a[1],b[1])]];
+  function draw(){
+   canvas.width=Math.max(1,Math.round(photo.clientWidth));
+   canvas.height=Math.max(1,Math.round(photo.clientHeight));
+   const ctx=canvas.getContext("2d");if(!ctx)return;
+   ctx.clearRect(0,0,canvas.width,canvas.height);
+   const shown=drag?quadFrom(drag.start,drag.end):points;
+   if(shown.length){
+    ctx.beginPath();
+    shown.forEach((p,k)=>{
+     const x=p[0]/geom.width*canvas.width,y=p[1]/geom.height*canvas.height;
+     if(k)ctx.lineTo(x,y);else ctx.moveTo(x,y);
+    });
+    if(shown.length===4)ctx.closePath();
+    ctx.fillStyle="rgba(239,68,68,.16)";ctx.strokeStyle="#22d3ee";ctx.lineWidth=2;
+    ctx.fill();ctx.stroke();
+    shown.forEach((p,k)=>{
+     const x=p[0]/geom.width*canvas.width,y=p[1]/geom.height*canvas.height;
+     ctx.beginPath();ctx.arc(x,y,6,0,Math.PI*2);ctx.fillStyle="#f8fafc";ctx.fill();
+     ctx.fillStyle="#0f172a";ctx.font="bold 10px sans-serif";ctx.textAlign="center";
+     ctx.fillText(String(k+1),x,y+3);
+    });
+   }
+   const valid=validPlateRepair(points,geom);
+   save.disabled=saving||!valid;
+   const verifying=geom.source_verification==="pending"?
+    " Source integrity is being checked in the background.":"";
+   hint.textContent=(mode==="box"
+    ?(valid?"Box ready. Save to replace this one-frame detection.":"Drag a box around the plate.")
+    :(valid?"Four corners ready. Verify that the entire plate is covered."
+      :"Click all four corners clockwise ("+points.length+"/4)."))+verifying;
+  }
+  const reset=()=>{points=[];drag=null;requestBody=null;draw();};
+  const choose=value=>{
+   if(saving)return;
+   mode=value;box.disabled=mode==="box";corners.disabled=mode==="corners";reset();
+  };
+  box.onclick=()=>choose("box");corners.onclick=()=>choose("corners");clear.onclick=reset;
+  const setZoom=value=>{
+   zoom=Math.max(1,Math.min(6,value));
+   photo.style.width=Math.round(baseWidth*zoom)+"px";
+   zoomNote.textContent=Math.round(zoom*100)+"%";
+   requestAnimationFrame(draw);
+  };
+  less.onclick=()=>setZoom(zoom/1.5);
+  more.onclick=()=>setZoom(zoom*1.5);
+  canvas.addEventListener("pointerdown",e=>{
+   if(saving||e.button!==0||mode!=="box")return;
+   e.preventDefault();drag={start:fromEvent(e),end:fromEvent(e),id:e.pointerId};
+   canvas.setPointerCapture(e.pointerId);draw();
+  });
+  canvas.addEventListener("pointermove",e=>{
+   if(drag&&drag.id===e.pointerId&&!saving){drag.end=fromEvent(e);draw();}
+  });
+  canvas.addEventListener("pointerup",e=>{
+   if(!drag||drag.id!==e.pointerId||saving)return;
+   drag.end=fromEvent(e);points=quadFrom(drag.start,drag.end);drag=null;
+   requestBody=null;
+   if(canvas.hasPointerCapture(e.pointerId))canvas.releasePointerCapture(e.pointerId);
+   draw();
+  });
+  canvas.addEventListener("pointercancel",()=>{drag=null;draw();});
+  canvas.addEventListener("click",e=>{
+   if(mode!=="corners"||saving)return;
+   if(points.length===4)points=[];
+   points.push(fromEvent(e));requestBody=null;draw();
+  });
+  function close(){
+   if(closed||saving)return;
+   closed=true;document.removeEventListener("keydown",onKey);
+   dialog.remove();dialog=null;URL.revokeObjectURL(url);url=null;
+   if(button.isConnected){button.disabled=false;button.textContent="Redraw plate area";}
+  }
+  const onKey=e=>{if(e.key==="Escape"){e.preventDefault();close();}};
+  document.addEventListener("keydown",onKey);cancel.onclick=close;
+  save.onclick=async()=>{
+   if(saving||!validPlateRepair(points,geom))return;
+   saving=true;cancel.disabled=true;save.disabled=true;
+   hint.textContent="Saving corrected frame geometry…";
+   try{
+    // If the acknowledgment is lost, retry the SAME idempotent payload.
+    const body=requestBody||(requestBody={
+     edit_id:Date.now().toString(36)+"-"+Math.random().toString(36).slice(2),
+     points:points.map(p=>p.slice()),frame:geom.frame,
+     preview_token:geom.preview_token,frame_source_token:geom.frame_source_token});
+    let data,completed=false;
+    // The huge original-source hash runs off the image GET. A pending 503 is
+    // a definite non-write: retry the SAME edit ID until verification finishes.
+    for(let check=0;check<180;check++){
+     if(CUR!==job||JOBVIEW!==view)throw new Error("The selected Review changed.");
+     try{
+      ({data}=await reviewRequest("api/jobs/"+encodeURIComponent(job)+
+       "/plate-repair/"+selected.i,{method:"POST",
+       headers:{"Content-Type":"application/json"},body:JSON.stringify(body),timeoutMs:120000}));
+      completed=true;break;
+     }catch(error){
+      if(error.status!==503||!String(error.message).includes(
+       "Original video verification is still running"))throw error;
+      hint.textContent="Verifying the original video in the background. Your "+
+       "corners are preserved; saving resumes when verification completes…";
+      await new Promise(resolve=>setTimeout(resolve,2000));
+     }
+    }
+    if(!completed||!data?.ok)
+     throw new Error("Source verification is still pending. Your corners are preserved; retry Save.");
+    saving=false;cancel.disabled=false;close();
+    if(CUR!==job||JOBVIEW!==view)return;
+    // A redrawn region is NOT a classification. Continue protection and
+    // require an explicit Is / Not on the newly verified source picture.
+    const row=FINDING_META[selected.i];
+    if(row){row.human_region_confirmed=true;row.verified_label="";
+     row.human_confirmation=null;row.confirmed_finding_id=null;
+     row.confirmed_finding_revision=null;row.classification_allowed=false;
+     row.classification_note="Loading the corrected source-frame preview…";}
+    if(REVIEW_DISPLAY_META[selected.i])
+     REVIEW_DISPLAY_META[selected.i].human_region_confirmed=true;
+    VLBL[selected.i]="";EN[selected.i]=true;delete OUTPUT_CHOICES[selected.i];
+    if(REVIEW_BASE?.job===job){
+     REVIEW_BASE.enabled[selected.i]=true;REVIEW_BASE.labels[selected.i]="";
+     if(REVIEW_BASE.output_choices)delete REVIEW_BASE.output_choices[selected.i];
+    }
+    const bb=document.getElementById("bb"+selected.i);
+    if(bb)bb.innerHTML=detChoices(selected.i);
+    updateReviewOverlayLabel(selected.i);
+    const label=document.getElementById("vlabel"+selected.i);
+    if(label)label.textContent="New area saved for this frame; loading verified picture…";
+    img._plateMeta=null;img._previewLoaded=false;img._forceExactPreview=true;
+    // If the prepared crop was evicted, use the explicit extended exact seek.
+    img._previewLongRetry=true;
+    if(!await queueReviewPreview(img,true)&&status)
+     status.textContent="Correction saved. Retry the exact preview to confirm it.";
+    plateUnloadGuard();
+   }catch(error){
+    saving=false;cancel.disabled=false;
+    draw();hint.textContent="Save failed: "+error.message+". Corners preserved; retry Save.";
+   }
+  };
+  choose("box");setZoom(1);
+ }catch(error){
+  if(status)status.textContent="Could not open redraw: "+error.message;
+ }finally{
+  if(!dialog&&url)URL.revokeObjectURL(url);
+  if(button.isConnected&&!dialog){button.disabled=false;button.textContent="Redraw plate area";}
+ }
 }
 function retryReviewPreview(button){
  const img=button.closest(".det").querySelector("img[data-preview-url]");
  if(img){
-  button.disabled=true;button.textContent="Loading preview…";
+  // A normal cold decode has a strict 10s FFmpeg deadline. Do not repeat
+  // the exact same doomed attempt: on an explicit click, use one bounded 60s
+  // original-frame crop decode instead, with the SAME source-PTS checks.
+  img._previewLongRetry=true;
+  button.disabled=true;button.textContent="Loading source crop (longer attempt)…";
   img._plateMeta=null;
   queueReviewPreview(img,true).finally(()=>{if(button.isConnected)button.disabled=false;});
  }
@@ -5611,7 +5980,15 @@ function plateStatus(s,text,retry=false){
  s.retry.textContent=s.archiveConflict?"Confirm Is / Not again":
   s.needsSourceReview?"Save on refreshed picture":s.conflict?"Refresh picture (keep corners)":"Retry save";
  if(s.card)s.card.classList.toggle("corner-save-error",!!(s.dirty&&s.error));
+ // A rejected AREA save needs an explicit discard control even though it
+ // must not create a phantom failed human classification.
+ const dismiss=document.getElementById("findingDismiss"+s.i);
+ if(dismiss&&!CONFIRM_FAILED.has(s.i)){
+  dismiss.hidden=!s.archiveConflict;
+  if(s.archiveConflict)dismiss.textContent="Discard this unsaved adjustment";
+ }
  updatePlateSaveIssues();
+ if(typeof scheduleReviewStatusFilter==="function")scheduleReviewStatusFilter();
 }
 function schedulePlateSaves(){
  clearTimeout(PLATE_TIMER);PLATE_TIMER=null;plateUnloadGuard();
@@ -5638,7 +6015,7 @@ function commitPlateGesture(s,before){
  plateStatus(s,"Saving…");schedulePlateSaves();
 }
 function syncPlateTrack(s){
- if(s.meta.track<0)return;
+ if(s.meta.source_repaired||s.meta.track<0)return;
  const b=s.meta.box,q=s.meta.points.map(([x,y])=>[(x-b[0])/(b[2]-b[0]),(y-b[1])/(b[3]-b[1])]);
  for(const other of PLATE_EDITS.values()){
   if(other===s||other.job!==s.job||other.meta.track!==s.meta.track)continue;
@@ -5729,6 +6106,12 @@ async function refreshPlateDraft(s){
  if(s.refreshBusy||s.drag)return;
  s.refreshBusy=true;
  const originalMeta=s.meta,originalPoints=plateCopy(s.points);
+ // An explicit retry can use one bounded longer source decode. Preserve the
+ // displayed pixels and draft until the new picture is verified.
+ if(originalMeta?.source_repaired||s.conflict){
+  s.img._forceExactPreview=true;
+  s.img._previewLongRetry=true;
+ }
  plateStatus(s,"Refreshing picture without discarding your corners…",true);
  // Refresh JPEG pixels as well as metadata: corners must be inspected on the
  // actual current image before they can be deliberately rebound.
@@ -5750,6 +6133,10 @@ async function refreshPlateDraft(s){
   s.points=originalPoints;s.dirty=true;
   if(same){
    s.error=null;s.needsSourceReview=false;s.readyAt=0;
+   const failed=CONFIRM_FAILED.get(s.i);
+   if(failed?.status===409&&failed?.details?.conflict==="stale_preview"){
+    CONFIRM_FAILED.delete(s.i);updateConfirmationIssues();
+   }
    plateStatus(s,"Picture is unchanged · retrying saved corners…");
    schedulePlateSaves();
   }else{
@@ -5784,7 +6171,7 @@ function pumpPlateSaves(){
    if(!pending){
     // Keep a request/ID only after an uncertain result, not a definite 503.
     pending=s.pending={points:plateCopy(s.points),preview_token:s.meta.preview_token,preview_key:s.meta.key,compact:!!s.meta.compact,
-     apply_track:true,autosave:true,edit_id:Date.now().toString(36)+"-"+(++PLATE_SERIAL)+"-"+Math.random().toString(36).slice(2),
+     apply_track:!s.meta.source_repaired,autosave:true,edit_id:Date.now().toString(36)+"-"+(++PLATE_SERIAL)+"-"+Math.random().toString(36).slice(2),
      version:s.version,label:VLBL[s.i]};
    }
    // Unlike a preview fetch, a durable report transaction may need tens of
@@ -5830,14 +6217,16 @@ function pumpPlateSaves(){
    s.draw();plateStatus(s,s.dirty?"Saving…":data.reconfirmation_required
     ?"Saved new corners · image identity changed, confirm Is / Not again"
     :data.classification_required?"Saved area · choose Is / Not to confirm"
-    :s.meta.track>=0?"Saved corners for this source frame":"Saved");
+    :s.meta.source_repaired?"Saved this exact frame"
+    :s.meta.track>=0?"Saved to track":"Saved");
    if(!s.dirty&&CUR===s.job&&document.getElementById("beCv"))beRefresh();
   }catch(error){
    if(!s.dirty||(pending&&s.pending!==pending))return;
    if(error.status===409&&error.details?.current_archive){
     rememberFindingConflict(s.i,error.details.current_archive);
     s.pending=null;s.error=error;s.conflict=false;s.archiveConflict=true;
-    showFindingFailure(s.i,error);
+    // The AREA save has a distinct draft/error: it did not attempt Is/Not.
+    // Never register a phantom failed confirmation in CONFIRM_FAILED.
     s.draw();plateStatus(s,"Saved example changed · choose Is / Not to confirm this adjustment.",true);return;
    }
    if(error.status===409&&!error.details?.current_archive){
@@ -5942,8 +6331,12 @@ function initPlateCorners(img){
   x.fill();x.stroke();x.setLineDash([]);
   const b=s.meta.box,bx1=(b[0]-c[0])*sx,by1=(b[1]-c[1])*sy,
         bx2=(b[2]-c[0])*sx,by2=(b[3]-c[1])*sy;
-  x.strokeStyle=REVIEW_OVERLAY_COLORS.proposal;x.lineWidth=1.5;x.setLineDash([6,4]);
-  x.strokeRect(bx1,by1,bx2-bx1,by2-by1);x.setLineDash([]);
+  if(!s.meta.source_repaired){
+   // Once a person replaces the detector anchor, the new enclosing box is
+   // human geometry, NOT a primary YOLO proposal. Do not mislabel it yellow.
+   x.strokeStyle=REVIEW_OVERLAY_COLORS.proposal;x.lineWidth=1.5;x.setLineDash([6,4]);
+   x.strokeRect(bx1,by1,bx2-bx1,by2-by1);x.setLineDash([]);
+  }
   if(state.machineSuggestion&&state.enabled){
    x.strokeStyle=REVIEW_OVERLAY_COLORS.visible;x.lineWidth=1.5;x.setLineDash([5,4]);
    const inset=3;x.strokeRect(bx1+inset,by1+inset,Math.max(0,bx2-bx1-2*inset),Math.max(0,by2-by1-2*inset));
@@ -6021,7 +6414,9 @@ function initPlateCorners(img){
  },options);
  s.observer=typeof ResizeObserver!=="undefined"?new ResizeObserver(s.draw):null;
  if(s.observer)s.observer.observe(img);
- plateStatus(s,"Drag corners · autosaves");s.draw();updateReviewOverlayLabel(s.i);return s;
+ plateStatus(s,meta.source_repaired
+  ?"Corners apply to this exact source frame · autosaves"
+  :"Drag corners · autosaves");s.draw();updateReviewOverlayLabel(s.i);return s;
 }
 document.addEventListener("visibilitychange",()=>{
  if(document.hidden){for(const s of PLATE_EDITS.values())if(s.dirty&&!s.error)s.readyAt=0;pumpPlateSaves();}
@@ -6168,30 +6563,170 @@ function sampleReviewGroups(rows,fraction=.1,labels={}){
  }
  return {indices,fraction,unit:"finding_group",eligible_groups:groups.size,selected_groups:indices.length};
 }
+let REVIEW_STATUS_FILTER="all",REVIEW_TYPE_FILTER="all",REVIEW_OUTPUT_FILTER="all";
+let REVIEW_STATUS_FILTER_JOB=null,REVIEW_FILTER_TIMER=null;
+function reviewGroupStatus(i){
+ const members=TRKMEM[i]||[i];
+ const handled=members.every(m=>!!OUTPUT_CHOICES[m]||!!reviewFindingLabel(m));
+ const pending=members.some(m=>{
+  const edit=PLATE_EDITS.get(m);
+  return !!((edit&&(edit.dirty||edit.pending||edit.drag))||CONFIRM_PENDING.has(m)||CONFIRM_FAILED.has(m));
+ });
+ return {handled,pending};
+}
+function reviewSampleMatches(i,cat){
+ return !LEARNING_SELECTION||(cat==="plate"&&
+  (TRKMEM[i]||[i]).some(m=>LEARNING_SELECTION.has(m)));
+}
+function reviewTypeMatches(cat,type=REVIEW_TYPE_FILTER){
+ return type==="all"||(type==="plate"?cat==="plate":cat!=="plate");
+}
+function reviewOutputFlags(i){
+ const members=TRKMEM[i]||[i];
+ let blur=false,visible=false;
+ for(const m of members){
+  if(EN[m]===false)visible=true;else blur=true;
+  if(blur&&visible)break;
+ }
+ return {blur,visible};
+}
+function reviewOutputMatches(i,output=REVIEW_OUTPUT_FILTER){
+ if(output==="all")return true;
+ const flags=reviewOutputFlags(i);
+ return output==="blur"?flags.blur:flags.visible;
+}
+function reviewStatusMatches(status,mode=REVIEW_STATUS_FILTER){
+ if(mode==="unreviewed")return !status.handled||status.pending;
+ if(mode==="reviewed")return status.handled&&!status.pending;
+ if(mode==="pending")return status.pending;
+ return true;
+}
+function reviewMatchesFilter(i,cat){
+ if(!reviewSampleMatches(i,cat)||!reviewTypeMatches(cat)||
+    !reviewOutputMatches(i))return false;
+ return reviewStatusMatches(reviewGroupStatus(i));
+}
+function setReviewViewFilter(kind,mode){
+ const options={status:["all","unreviewed","reviewed","pending"],
+  type:["all","plate","other"],output:["all","blur","visible"]};
+ const controls={status:"reviewStatusFilter",type:"reviewTypeFilter",
+  output:"reviewOutputFilter"};
+ if(!options[kind]?.includes(mode))return false;
+ if([...PLATE_EDITS.values()].some(s=>s.drag)){
+  reviewSaveStatus("Finish dragging the corner before changing the view.",true);
+  const control=document.getElementById(controls[kind]);
+  if(control)control.value=kind==="status"?REVIEW_STATUS_FILTER:
+   kind==="type"?REVIEW_TYPE_FILTER:REVIEW_OUTPUT_FILTER;
+  return false;
+ }
+ if(kind==="status")REVIEW_STATUS_FILTER=mode;
+ else if(kind==="type")REVIEW_TYPE_FILTER=mode;
+ else REVIEW_OUTPUT_FILTER=mode;
+ clearSel();
+ return applyReviewGroupFilter();
+}
+function setReviewStatusFilter(mode){return setReviewViewFilter("status",mode);}
+function setReviewTypeFilter(mode){return setReviewViewFilter("type",mode);}
+function setReviewOutputFilter(mode){return setReviewViewFilter("output",mode);}
+function reviewViewIsFiltered(){
+ return REVIEW_STATUS_FILTER!=="all"||REVIEW_TYPE_FILTER!=="all"||
+  REVIEW_OUTPUT_FILTER!=="all";
+}
+function scheduleReviewStatusFilter(){
+ if(!reviewViewIsFiltered()||REVIEW_FILTER_TIMER!==null)return;
+ REVIEW_FILTER_TIMER=setTimeout(()=>{REVIEW_FILTER_TIMER=null;applyReviewGroupFilter();},100);
+}
 function applyReviewGroupFilter(){
  const panel=document.getElementById("review");
  if(!panel||panel._sampleJob!==CUR||panel._sampleView!==JOBVIEW)return false;
- clearSel();
  const selected=LEARNING_SELECTION;
- // Group sampling must reveal representative cards beyond the first page.
- if(selected)for(const cat of Object.keys(REVIEW_PENDING_PAGES))appendReviewPage(cat,true);
+ // Count review GROUPS from metadata, not mounted thumbnail cards.
+ // Each selector shows totals under the OTHER active selectors.
+ const statuses={all:0,unreviewed:0,reviewed:0,pending:0};
+ const types={all:0,plate:0,other:0};
+ const outputs={all:0,blur:0,visible:0};
+ const perCategory={},allGroups=Object.values(REVIEW_CATEGORY_GROUPS)
+  .reduce((n,indices)=>n+indices.length,0);
+ let matched=0;
+ for(const [cat,indices] of Object.entries(REVIEW_CATEGORY_GROUPS)){
+  for(const i of indices){
+   if(!reviewSampleMatches(i,cat))continue;
+   const state=reviewGroupStatus(i);
+   const statusOK=reviewStatusMatches(state);
+   const typeOK=reviewTypeMatches(cat);
+   const flags=reviewOutputFlags(i);
+   const outputOK=REVIEW_OUTPUT_FILTER==="all"||
+    (REVIEW_OUTPUT_FILTER==="blur"?flags.blur:flags.visible);
+   if(typeOK&&outputOK){
+    statuses.all++;
+    if(!state.handled||state.pending)statuses.unreviewed++;
+    else statuses.reviewed++;
+    if(state.pending)statuses.pending++;
+   }
+   if(statusOK&&outputOK){
+    types.all++;types[cat==="plate"?"plate":"other"]++;
+   }
+   if(statusOK&&typeOK){
+    outputs.all++;if(flags.blur)outputs.blur++;
+    if(flags.visible)outputs.visible++;
+   }
+   if(typeOK&&outputOK&&statusOK){
+    matched++;perCategory[cat]=(perCategory[cat]||0)+1;
+   }
+  }
+ }
+ // Keep lazy pagination: show matching results from deferred groups without
+ // loading the images of every excluded detection on a 271k-row review.
+ for(const cat of Object.keys(REVIEW_PENDING_PAGES)){
+  if(!reviewTypeMatches(cat))continue;
+  const mounted=[...panel.querySelectorAll("[data-review-category] .det")]
+   .filter(card=>card.dataset.cat===cat&&reviewMatchesFilter(Number(card.id.slice(3)),cat)).length;
+  if(selected)appendReviewPage(cat,true);
+  else if(reviewViewIsFiltered()&&mounted<REVIEW_PAGE_SIZE)appendReviewPage(cat);
+ }
  let shown=0;
- panel.querySelectorAll(".det").forEach(card=>{
+ panel.querySelectorAll("[data-review-category] .det").forEach(card=>{
   const i=Number(card.id.slice(3));
-  card.hidden=!!selected&&(card.dataset.cat!=="plate"||!(TRKMEM[i]||[i]).some(m=>selected.has(m)));
+  card.hidden=!reviewMatchesFilter(i,card.dataset.cat);
   if(!card.hidden)shown++;
  });
  panel.querySelectorAll("[data-review-category]").forEach(grid=>{
-  const count=grid.querySelectorAll(".det:not([hidden])").length;
-  grid.hidden=count===0;
-  const heading=grid.previousElementSibling;heading.hidden=count===0;
-  heading.querySelector(".badge").textContent=count;
+  const cat=grid.dataset.reviewCategory;
+  const n=perCategory[cat]||0;
+  grid.hidden=n===0;
+  const heading=grid.previousElementSibling;heading.hidden=n===0;
+  heading.querySelector(".badge").textContent=n;
  });
  panel.querySelectorAll(".review-more").forEach(button=>{
-  button.hidden=!!selected||!(REVIEW_PENDING_PAGES[button.dataset.reviewMore]||[]).length;
+  const cat=button.dataset.reviewMore;
+  const pending=(REVIEW_PENDING_PAGES[cat]||[]).filter(item=>reviewMatchesFilter(item.i,cat)).length;
+  button.hidden=!!selected||pending===0;
+  button.textContent="Load more "+(CATDN[cat]||cat)+" ("+pending+" remaining)";
  });
  const zones=panel.querySelector("#reviewZones");if(zones)zones.hidden=!!selected;
- const all=panel.querySelector("#reviewShowAll");if(all)all.hidden=!selected;
+ const all=panel.querySelector("#reviewShowAll");if(all)all.hidden=!selected&&!reviewViewIsFiltered();
+ for(const [id,chosen,options] of [
+  ["reviewStatusFilter",REVIEW_STATUS_FILTER,[
+   ["all","All"],["unreviewed","Needs review"],["reviewed","Handled"],["pending","Unsaved / failed"]
+  ]],["reviewTypeFilter",REVIEW_TYPE_FILTER,[
+   ["all","All detected types"],["plate","License plates"],["other","Other sensitive areas"]
+  ]],["reviewOutputFilter",REVIEW_OUTPUT_FILTER,[
+   ["all","All outputs"],["blur","Will be blurred"],["visible","Will remain visible"]
+  ]]
+ ]){
+  const control=panel.querySelector("#"+id);
+  if(!control)continue;
+  control.value=chosen;
+  const counts=id==="reviewStatusFilter"?statuses:
+   id==="reviewTypeFilter"?types:outputs;
+  for(const [value,label] of options){
+   const option=control.querySelector('option[value="'+value+'"]');
+   if(option)option.textContent=label+" ("+counts[value]+")";
+  }
+ }
+ const filtered=panel.querySelector("#reviewFilterSummary");
+ if(filtered)filtered.textContent=matched+" of "+allGroups+
+  " review groups match. Filters only change the view; saved choices and corner drafts stay intact.";
  const summary=panel.querySelector("#reviewSampleSummary");
  if(summary){
   summary.hidden=!selected;
@@ -6202,8 +6737,6 @@ function applyReviewGroupFilter(){
     "the most uncertain in each batch is selected. This only filters the view; unsaved edits are kept.";
   }
  }
- // Keep existing images/editors and autosaves alive. Drop hidden queued images
- // without aborting unrelated requests or decoding every preview again.
  if(typeof reviewSimilarRender==="function")reviewSimilarRender();
  return true;
 }
@@ -6217,10 +6750,12 @@ function reviewUncertain(){
  }
  const data=sampleReviewGroups(panel._sampleRows,.1,VLBL);
  LEARNING_SELECTION=new Set(data.indices);LEARNING_SELECTION_JOB=CUR;LEARNING_SAMPLE_INFO=data;
+ REVIEW_STATUS_FILTER="all";REVIEW_TYPE_FILTER="all";REVIEW_OUTPUT_FILTER="all";clearSel();
  return applyReviewGroupFilter();
 }
 function reviewAllFindings(){
- LEARNING_SELECTION=null;
+ LEARNING_SELECTION=null;REVIEW_STATUS_FILTER="all";
+ REVIEW_TYPE_FILTER="all";REVIEW_OUTPUT_FILTER="all";clearSel();
  return applyReviewGroupFilter();
 }
 async function rollbackLearning(){
@@ -6433,6 +6968,8 @@ async function loadReview(signal=null,phase=SHELLPH){
  const acceptedMask=!!(d.learning&&d.learning.active&&d.learning.active.model);
  const verification=d.verification||(d.verification_history||[]).at(-1);
  if(LEARNING_SELECTION_JOB!==CUR)LEARNING_SELECTION=null;
+ if(REVIEW_STATUS_FILTER_JOB!==CUR){REVIEW_STATUS_FILTER="all";REVIEW_TYPE_FILTER="all";
+  REVIEW_OUTPUT_FILTER="all";REVIEW_STATUS_FILTER_JOB=CUR;}
  const groups={}; const zdrop=[]; TRKMEM={};
  REVIEW_BASE={job,enabled:{},labels:{},output_choices:{}};
  FINDING_META={};REVIEW_DISPLAY_META={};OUTPUT_CHOICES={};OUTPUT_VERSION={};
@@ -6460,7 +6997,31 @@ async function loadReview(signal=null,phase=SHELLPH){
   <button type="button" class="sec" onclick="reviewUncertain()">Review 10% of plate groups</button>
   <button type="button" class="sec" id="reviewSimilarToggle" onclick="toggleReviewSimilarity()">Group similar pictures</button>
   <button type="button" id="reviewShowAll" class="sec" hidden onclick="reviewAllFindings()">Show all findings</button>
+  <button type="button" id="reviewRetryTimedOut" class="sec" hidden
+   onclick="retryTimedOutReviewPreviews()">Retry timed-out pictures</button>
  </div>
+ <div class="row" style="margin-bottom:6px;align-items:center;flex-wrap:wrap;gap:8px 12px">
+  <label for="reviewStatusFilter">Review status</label>
+  <select id="reviewStatusFilter" style="max-width:205px" onchange="setReviewStatusFilter(this.value)">
+   <option value="all">All</option>
+   <option value="unreviewed">Needs review</option>
+   <option value="reviewed">Handled</option>
+   <option value="pending">Unsaved / failed</option>
+  </select>
+  <label for="reviewTypeFilter">Detection type</label>
+  <select id="reviewTypeFilter" style="max-width:220px" onchange="setReviewTypeFilter(this.value)">
+   <option value="all">All detected types</option>
+   <option value="plate">License plates</option>
+   <option value="other">Other sensitive areas</option>
+  </select>
+  <label for="reviewOutputFilter">Output</label>
+  <select id="reviewOutputFilter" style="max-width:220px" onchange="setReviewOutputFilter(this.value)">
+   <option value="all">All outputs</option>
+   <option value="blur">Will be blurred</option>
+   <option value="visible">Will remain visible</option>
+  </select>
+ </div>
+ <small id="reviewFilterSummary" class="review-copy" role="status" aria-live="polite"></small>
  <details id="knownPlateSearch" style="margin-bottom:12px"><summary>Find examples using known plate numbers</summary>
   <p class="review-copy">Optional local OCR search. Enter the number(s) you expect, one per line. Full matches count more strongly than fragments. It tries rotated, upside-down, mirrored and perspective-corrected views, then adds possible matches to review. Confirm examples before training.</p>
   <label for="knownPlateTexts">Known plate numbers</label><textarea id="knownPlateTexts" rows="2" maxlength="400" placeholder="ABC-123" autocomplete="off" spellcheck="false" style="width:100%;box-sizing:border-box"></textarea>
@@ -6499,6 +7060,7 @@ async function loadReview(signal=null,phase=SHELLPH){
  <small id="reviewPreloadStatus" class="review-copy" role="status" aria-live="off">Preparing review pictures before you scroll…</small>
  <p id="reviewSaveStatus" class="review-copy review-save-status" role="status" aria-live="polite">Review choices loaded from disk.</p>
  <div id="plateSaveIssues" class="review-copy" role="status" aria-live="polite" hidden></div>
+ <div id="confirmationSaveIssues" class="review-copy" role="alert" aria-live="polite" hidden></div>
  <p class="review-copy">Training uses saved corrections and the original detectors. It does not guarantee that undetected plates have been found. Review the output.</p>
  ${reviewOverlayLegendHTML()}
  <p class="review-copy">Yellow is the primary detector proposal. Red is the effective area that will be concealed; it keeps four-corner rotation, skew and perspective. Green stays visible. Labels identify human corrections, learned masks and safe fallbacks.</p>
@@ -6592,10 +7154,9 @@ async function loadReview(signal=null,phase=SHELLPH){
     ${x.category==="plate"?'<div id="plateOverlay'+x.i+'" class="plate-output-badge"></div>':""}
     <small class="preview-status" role="status">Preview not loaded</small>
     <button class="sec preview-retry" hidden onclick="retryReviewPreview(this)">Retry preview</button>
-    ${x.category==="plate"?'<small class="source-frame-note review-copy" role="status"></small><button class="sec source-frame-exact" type="button" hidden onclick="loadExactPlateFrame(this)">Load exact frame for corners</button>':""}
-    ${x.category==="plate"?'<small class="quad-status" role="status" title="Corners apply only to this exact source frame. Group-wide Is/Not and Blur/Keep choices are separate. Keyboard: select 1–4, use arrows; Ctrl+Z undoes.">Corners autosave to track</small><button type="button" class="sec quad-retry" hidden>Retry save</button>':""}
+    ${x.category==="plate"?'<small class="source-frame-note review-copy" role="status"></small><button type="button" class="sec source-frame-exact" hidden onclick="loadExactReviewFrame(this)">Load exact frame for corners</button><button type="button" class="sec plate-repair-button" hidden onclick="openPlateRepair(this)">Redraw plate area</button>':""}
+    ${x.category==="plate"?'<small class="quad-status" role="status" title="Corners apply only to this exact source frame. Group-wide Is/Not and Blur/Keep choices are separate. Keyboard: select corner 1–4, use arrows; Ctrl+Z undoes.">Corners autosave to track</small><button type="button" class="sec quad-retry" hidden>Retry save</button>':""}
     <div>${plateVerificationBadge(x)}${plateBoundaryBadge(x)}${x.learning_conflict?'<span class="badge" title="The original coverage was retained where the learned model could not make a reliable refinement">Model disagreement — review</span> ':""}${plateFallbackText(x)?`<span class="badge" style="white-space:normal">${plateFallbackText(x)}</span> `:""}${x.shaped?'<span class="badge" title="Thumbnail rectangle is a selection guide; open to inspect the mask and any exclusions">shaped mask</span> ':""}${x.personcard?`<b>Person ${x.person+1}</b> — one decision for ALL their appearances`:`"${sectionEscape(x.text)}"`}${x.frames?` <span class="badge">×${x.frames} frames</span>`:""}${x.confidence?` <span class="badge" title="detector confidence — not a human decision">${Math.round(x.confidence*100)}%</span>`:""} <br>${x.t_start.toFixed(1)}–${x.t_end.toFixed(1)}s</div>
-    ${x.boundarySummary?`<p class="review-copy">${sectionEscape(x.boundarySummary)}</p>`:""}
     ${plateTextBadge(x)}
     <div class="review-similar-slot" id="similar${x.i}"></div>
     <div class="finding-confirm" role="group" aria-label="Human classification">
@@ -6634,11 +7195,11 @@ async function loadReview(signal=null,phase=SHELLPH){
   panel._sampleJob=job;panel._sampleView=view;
  }
  updatePlateVerifierCandidate();
- if(LEARNING_SELECTION)applyReviewGroupFilter();
+ applyReviewGroupFilter();
  if(typeof updateReviewOverlayLabel==="function"&&typeof REVIEW_DISPLAY_META!=="undefined"){
   for(const key of Object.keys(REVIEW_DISPLAY_META))updateReviewOverlayLabel(Number(key));
  }
- initMarquee();initReviewPreviews();initReviewPages();
+ initMarquee();initReviewPreviews();initReviewPages();updateConfirmationIssues();
  if(typeof reviewSimilarRender==="function"&&typeof REVIEW_SIMILAR_ENABLED!=="undefined"&&REVIEW_SIMILAR_ENABLED)reviewSimilarRender();
  return true;
 }
@@ -6675,13 +7236,76 @@ function rememberFindingConflict(i,current){
   row.confirmed_finding_revision=current.revision;
  }
 }
+function revealFailedConfirmation(i){
+ // Reveal one failed card without reloading Review or discarding pending edits.
+ if(typeof reviewAllFindings==="function")reviewAllFindings();
+ let card=document.getElementById("det"+i);
+ if(!card&&typeof REVIEW_PENDING_PAGES!=="undefined"){
+  for(const [cat,pending] of Object.entries(REVIEW_PENDING_PAGES)){
+   if(pending.some(entry=>entry.i===i)){
+    appendReviewPage(cat,false,i);card=document.getElementById("det"+i);break;
+   }
+  }
+ }
+ if(!card)return false;
+ if(typeof REVIEW_SIMILAR_GROUPS!=="undefined"){
+  for(const [root,members] of REVIEW_SIMILAR_GROUPS){
+   if(members.includes(i)){
+    REVIEW_SIMILAR_EXPANDED.add(root);
+    if(typeof reviewSimilarRender==="function")reviewSimilarRender();
+    break;
+   }
+  }
+ }
+ for(let el=card;el&&el.id!=="review";el=el.parentElement){
+  el.hidden=false;if(el.tagName==="DETAILS")el.open=true;
+ }
+ card.scrollIntoView({block:"center"});
+ const control=card.querySelector(".finding-confirm button");
+ if(control)control.focus({preventScroll:true});
+ return true;
+}
+function updateConfirmationIssues(){
+ const panel=document.getElementById("confirmationSaveIssues");if(!panel)return;
+ panel.replaceChildren();panel.hidden=CONFIRM_FAILED.size===0;
+ if(!CONFIRM_FAILED.size)return;
+ const title=document.createElement("strong");
+ title.textContent=CONFIRM_FAILED.size+" unsuccessful human confirmation"+
+  (CONFIRM_FAILED.size===1?"":"s")+". Resolve these before rendering or training.";
+ panel.appendChild(title);
+ for(const [i,error] of CONFIRM_FAILED){
+  const row=document.createElement("div");row.className="row";
+  const show=document.createElement("button");show.type="button";show.className="sec";
+  show.textContent="Show finding #"+i;show.onclick=()=>revealFailedConfirmation(i);
+  row.appendChild(show);
+  if(error?.reviewAttemptedLabel==="positive"||error?.reviewAttemptedLabel==="negative"){
+   const label=error.reviewAttemptedLabel;
+   const retry=document.createElement("button");retry.type="button";retry.className="sec";
+   retry.textContent="Retry "+(label==="positive"?"Is":"Not")+" "+findingNoun(i);
+   retry.onclick=()=>{revealFailedConfirmation(i);confirmFinding(i,label);};
+   row.appendChild(retry);
+  }
+  if([400,409].includes(error?.status)||error?.beforeWrite){
+   const dismiss=document.createElement("button");dismiss.type="button";dismiss.className="sec";
+   dismiss.textContent=PLATE_EDITS.get(i)?.archiveConflict
+    ?"Discard rejected corner adjustment":"Keep current review choice";
+   dismiss.onclick=()=>dismissFindingConfirmation(i);
+   row.appendChild(dismiss);
+  }
+  const details=document.createElement("span");
+  const code=Number.isInteger(error?.status)?"HTTP "+error.status+" · ":"";
+  details.textContent=code+(error?.message||"Confirmation not acknowledged");
+  row.appendChild(details);panel.appendChild(row);
+ }
+}
 function showFindingFailure(i,error){
  CONFIRM_FAILED.set(i,error);
  const current=error.details?.current_archive,note=document.getElementById('vlabel'+i);
  if(current)rememberFindingConflict(i,current);
  const reason=current?(current.revoked?'This saved example was forgotten.':
   'The saved example now says '+(current.label==='positive'?'Is ':'Not ')+findingNoun(i)+'.'):error.message;
- if(note)note.textContent='Not saved · '+reason+' Click Is / Not to confirm your current decision.';
+ if(note)note.textContent=([400,409].includes(error.status)||error.beforeWrite?'Not saved':'Save not confirmed')+
+  ' · '+reason+' Click Is / Not to confirm your current decision.';
  const dismiss=document.getElementById('findingDismiss'+i);
  if(dismiss){
   // A definite rejection can be dismissed. An uncertain network result must
@@ -6689,21 +7313,32 @@ function showFindingFailure(i,error){
   dismiss.hidden=![400,409].includes(error.status)&&!error.beforeWrite;
   dismiss.textContent=PLATE_EDITS.get(i)?.archiveConflict?'Discard this unsaved adjustment':'Keep current review choice';
  }
+ updateConfirmationIssues();
+ if(typeof scheduleReviewStatusFilter==='function')scheduleReviewStatusFilter();
 }
 function dismissFindingConfirmation(i){
  if(CONFIRM_PENDING.has(i))return;
  const error=CONFIRM_FAILED.get(i);
  if(error&&![400,409].includes(error.status)&&!error.beforeWrite)return;
- const edit=PLATE_EDITS.get(i);
- if(edit?.archiveConflict){
+ const edit=PLATE_EDITS.get(i),hadCornerConflict=!!edit?.archiveConflict;
+ if(hadCornerConflict){
+  // Discard only the rejected AREA polygon, never an independent human
+  // classification failure that may have happened on the same finding.
   edit.pending=null;edit.version++;edit.dirty=false;edit.error=null;
   edit.archiveConflict=false;edit.conflict=false;edit.points=plateCopy(edit.saved);
   edit.draw();plateStatus(edit,'Saved area · current review choice kept');schedulePlateSaves();
  }
- CONFIRM_FAILED.delete(i);
- const note=document.getElementById('vlabel'+i);if(note)note.innerHTML=findingStatus(i);
- const dismiss=document.getElementById('findingDismiss'+i);if(dismiss)dismiss.hidden=true;
- plateUnloadGuard();
+ const keepClassificationFailure=hadCornerConflict&&!!error?.reviewAttemptedLabel;
+ if(!keepClassificationFailure)CONFIRM_FAILED.delete(i);
+ const note=document.getElementById('vlabel'+i);
+ if(note)note.innerHTML=keepClassificationFailure?'Confirmation not saved · retry Is / Not or keep the current review choice.':findingStatus(i);
+ const dismiss=document.getElementById('findingDismiss'+i);
+ if(dismiss){
+  dismiss.hidden=!keepClassificationFailure;
+  if(keepClassificationFailure)dismiss.textContent='Keep current review choice';
+ }
+ updateConfirmationIssues();
+ plateUnloadGuard();if(typeof scheduleReviewStatusFilter==="function")scheduleReviewStatusFilter();
 }
 async function reloadStaleFindingForConfirmation(card,edit,shown){
  // Never reclassify a different JPEG simply because the person clicked the
@@ -6712,6 +7347,11 @@ async function reloadStaleFindingForConfirmation(card,edit,shown){
  const img=edit?.img||card?.querySelector('img[data-preview-url]');
  if(!img||!shown)return null;
  img._plateMeta=null;
+ // Preserve the original borrowed-frame recovery contract: first rehydrate
+ // the exact JPEG that the user really saw. A human-repaired source anchor,
+ // however, MUST reload its own frame, never borrow a sibling's pixels.
+ if(shown?.source_repaired)img._forceExactPreview=true;
+ img._previewLongRetry=true;
  let loaded=false;
  try{loaded=await queueReviewPreview(img,true);}catch(_){}
  const latest=img._plateMeta;
@@ -6721,11 +7361,22 @@ async function reloadStaleFindingForConfirmation(card,edit,shown){
  const same=(plateSamePreviewSource(shown,latest)||
   plateSameSourceFrame(shown,latest))&&
   plateCornersInsideCrop(shown.points,latest.crop);
- if(edit&&!edit.dirty&&!edit.drag){
-  // This is the preview now actually shown; never keep the old key alive
-  // in a non-dirty editor after a refresh, regardless of rebindability.
+ if(edit&&!edit.drag){
+  // This is the preview now actually shown. A failed area draft may still
+  // contain the OLD key: leaving it there causes Is/Not to hit the same
+  // stale-preview 409 forever even after a new picture has loaded.
+  const oldDraft=edit.dirty?plateCopy(edit.points):null;
   edit.meta=latest;edit.displayCrop=latest.crop.slice();
-  edit.points=plateCopy(latest.points);edit.saved=plateCopy(latest.points);
+  edit.saved=plateCopy(latest.points);
+  edit.points=oldDraft||plateCopy(latest.points);
+  if(oldDraft&&!same){
+   // Keep the user's unsaved points but NEVER transfer them into the new
+   // source image as confirmed geometry. The next Is/Not click is explicit
+   // approval of the newly displayed image; area edits need separate review.
+   edit.pending=null;edit.needsSourceReview=true;edit.conflict=false;
+   edit.error=new Error('Picture changed. Inspect it before confirming; review the corners separately.');
+   plateStatus(edit,'New picture loaded · corner draft preserved; inspect before trying Is / Not again.',true);
+  }
   edit.draw();
  }
  return {latest,same};
@@ -6742,7 +7393,8 @@ function confirmFinding(i,label){
   return CONFIRM_CHAIN;
  }
  const members=TRKMEM[i]||[i],versions=Object.fromEntries(members.map(m=>[m,OUTPUT_VERSION[m]||0]));
- const job=CUR,view=JOBVIEW;CONFIRM_PENDING.add(i);CONFIRM_FAILED.delete(i);plateUnloadGuard();
+ const job=CUR,view=JOBVIEW;CONFIRM_PENDING.add(i);CONFIRM_FAILED.delete(i);
+ updateConfirmationIssues();plateUnloadGuard();
  const card=document.getElementById('det'+i),note=document.getElementById('vlabel'+i);
  const dismiss=document.getElementById('findingDismiss'+i);if(dismiss)dismiss.hidden=true;
  if(note)note.textContent='Saving confirmation…';
@@ -6758,8 +7410,15 @@ function confirmFinding(i,label){
      await (PLATE_SAVE||pumpPlateSaves());
      if(edit.dirty&&!edit.error)await new Promise(resolve=>setTimeout(resolve,100));
     }
-    if(edit.dirty||edit.error)
-     throw edit.archiveConflict?edit.error:Object.assign(new Error('Save or reload this area adjustment before confirming.'),{beforeWrite:true});
+    // A NEW archive-revision conflict discovered during the flush still
+    // requires another explicit click; never reconfirm a newer human label
+    // as a side effect of the previous click.
+    if(edit.archiveConflict)throw edit.error||new Error('Saved example changed. Choose Is / Not again.');
+    // Human classification is separate from a four-corner adjustment.
+    // If that save failed, still allow an explicit Is-a-plate decision
+    // using the authenticated displayed source sample, but NEVER include
+    // or acknowledge the unsaved draft polygon as archived geometry.
+    // A stale or changed picture is independently rejected by the API.
    }else if(PLATE_SAVE)await PLATE_SAVE;
    if(CUR!==job||JOBVIEW!==view)return;
    const displayed=edit?.meta||card?.querySelector('img[data-preview-url]')?._plateMeta;
@@ -6770,27 +7429,27 @@ function confirmFinding(i,label){
    if(displayed?.key)body.preview_key=displayed.key;
    if(label==='positive'&&edit?.archiveConflict)body.points=plateCopy(edit.points);
    const editVersion=edit?.version;
-   // The review writer refuses with 503 *before writing* if another save
-   // holds its lock. Only this specific safe refusal may be retried; never
-   // resubmit uncertain 5xx/network failures or stale human confirmations.
-   const submit=async()=>{
-    for(let busy=0;;busy++){
-     try{
-      return await reviewRequest('api/jobs/'+job+'/confirm/'+i,{method:'POST',
-       headers:{'Content-Type':'application/json'},body:JSON.stringify(body),timeoutMs:120000});
-     }catch(error){
-      if(error.status!==503||!String(error.message).includes('Another review edit is saving')||busy>=8)
-       throw error;
-      if(note)note.textContent='Another review edit is saving · waiting to confirm…';
-      await new Promise(resolve=>setTimeout(resolve,Math.min(1600,200*2**busy)));
-      if(CUR!==job||JOBVIEW!==view)
-       throw Object.assign(new Error('Review changed while waiting to confirm.'),{beforeWrite:true});
+   const areaStillUnsaved=label==='positive'&&!!edit?.dirty&&!edit.archiveConflict;
+   const submit=()=>reviewRequest('api/jobs/'+job+'/confirm/'+i,{method:'POST',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify(body),timeoutMs:120000});
+   // The review edit lock returns this exact 503 BEFORE entering the
+   // confirmation handler. A bounded replay of the same source-bound
+   // request is safe; never auto-retry a timeout, other 5xx, or 409.
+   const submitWithBusyRetry=async()=>{
+    for(let attempt=0;;attempt++){
+     try{return await submit();}
+     catch(error){
+      if(attempt>=3||error.status!==503||
+         !String(error.message||"").startsWith("Another review edit is saving. Retry shortly.")||
+         CUR!==job||JOBVIEW!==view)throw error;
+      if(note)note.textContent="Another review edit is saving · retrying confirmation…";
+      await new Promise(resolve=>setTimeout(resolve,[150,400,900][attempt]));
      }
     }
    };
    let data;
    try{
-    ({data}=await submit());
+    ({data}=await submitWithBusyRetry());
    }catch(error){
     if(error.status!==409||error.details?.conflict!=='stale_preview'||!displayed)
      throw error;
@@ -6803,7 +7462,7 @@ function confirmFinding(i,label){
     }
     body.preview_token=recovery.latest.preview_token;
     body.preview_key=recovery.latest.key;
-    ({data}=await submit()); // one source-bound retry, never loop on 409
+    ({data}=await submitWithBusyRetry()); // one source-bound retry, never loop on 409
    }
    if(CUR!==job||JOBVIEW!==view)return;
    for(const m of members){
@@ -6819,21 +7478,35 @@ function confirmFinding(i,label){
    }
    Object.assign(FINDING_META[i],{confirmed_finding_id:data.finding.id,confirmed_finding_revision:data.finding.revision});
    if(edit&&data.preview){
-    Object.assign(edit.meta,data.preview);edit.img._plateMeta=edit.meta;
-    edit.saved=plateCopy(edit.meta.points);syncPlateTrack(edit);
-    if(edit.version===editVersion&&!edit.drag){
-     edit.points=plateCopy(edit.saved);edit.pending=null;edit.dirty=false;
-     edit.error=null;edit.conflict=false;edit.archiveConflict=false;
+    if(areaStillUnsaved&&edit.dirty){
+     // The label was saved without the failed corner adjustment. Keep the
+     // original displayed image, coordinates, local error and retry control;
+     // replacing them with server metadata would falsely claim that the
+     // user's unsaved polygon was accepted. Only renew an identity token
+     // when it still describes the SAME displayed source JPEG and corners.
+     if(plateSamePreviewSource(edit.meta,data.preview)){
+      edit.meta.preview_token=data.preview.preview_token;
+      edit.img._plateMeta=edit.meta;
+     }
+     edit.draw();
+     plateStatus(edit,'Plate classification saved · corner adjustment still not saved.',true);
+    }else{
+     Object.assign(edit.meta,data.preview);edit.img._plateMeta=edit.meta;
+     edit.saved=plateCopy(edit.meta.points);syncPlateTrack(edit);
+     if(edit.version===editVersion&&!edit.drag){
+      edit.points=plateCopy(edit.saved);edit.pending=null;edit.dirty=false;
+      edit.error=null;edit.conflict=false;edit.archiveConflict=false;
+     }
+     edit.draw();plateStatus(edit,edit.dirty?'Saving…':'Saved area · confirmation stored');
     }
-    edit.draw();plateStatus(edit,edit.dirty?'Saving…':'Saved area · confirmation stored');
    }
    CONFIRM_FAILED.delete(i);
    if(note)note.innerHTML=findingStatus(i);
    if(typeof reviewSimilarRender==="function"&&typeof REVIEW_SIMILAR_ENABLED!=="undefined"&&REVIEW_SIMILAR_ENABLED)reviewSimilarRender();
    card?.querySelectorAll('.finding-confirm button').forEach((button,index)=>button.setAttribute('aria-pressed',index===(label==='positive'?0:1)));
    if(document.getElementById('beCv'))beRefresh();
-  }catch(error){showFindingFailure(i,error);}
-  finally{CONFIRM_PENDING.delete(i);card?.querySelectorAll('button').forEach(button=>button.disabled=FINDING_META[i]?.classification_allowed===false&&!!button.closest('.finding-confirm'));plateUnloadGuard();}
+  }catch(error){error.reviewAttemptedLabel=label;showFindingFailure(i,error);}
+  finally{CONFIRM_PENDING.delete(i);card?.querySelectorAll('button').forEach(button=>button.disabled=FINDING_META[i]?.classification_allowed===false&&!!button.closest('.finding-confirm'));updateConfirmationIssues();plateUnloadGuard();if(typeof scheduleReviewStatusFilter==="function")scheduleReviewStatusFilter();}
  });
  return CONFIRM_CHAIN;
 }
@@ -6847,18 +7520,20 @@ function applyDet(i,blur,preserveLabel=false){
   if(t)t.classList.toggle("off",!blur);
   if(typeof redrawReviewOverlay==="function")redrawReviewOverlay(m);
  }
- markReviewChanged();
+ markReviewChanged();if(typeof scheduleReviewStatusFilter==="function")scheduleReviewStatusFilter();
  if(document.getElementById("beCv")){beRefresh();}
 }
 function setAll(cat,on){
  // In a paged category, bulk choices must include every group, not merely
  // the 48 currently mounted cards. Never silently omit unseen detections.
- if(REVIEW_PENDING_PAGES[cat]&&!LEARNING_SELECTION){
-  for(const i of REVIEW_CATEGORY_GROUPS[cat]||[])
+ if(REVIEW_PENDING_PAGES[cat]&&(!LEARNING_SELECTION||REVIEW_STATUS_FILTER!=="all")){
+  for(const i of REVIEW_CATEGORY_GROUPS[cat]||[]){
+   if(!reviewMatchesFilter(i,cat))continue;
    for(const m of TRKMEM[i]||[i]){
     EN[m]=on;OUTPUT_CHOICES[m]=true;
     OUTPUT_VERSION[m]=(OUTPUT_VERSION[m]||0)+1;
    }
+  }
   document.querySelectorAll("#review .det").forEach(card=>{
    if(card.dataset.cat!==cat)return;
    const i=Number(card.id.slice(3));
@@ -6866,7 +7541,7 @@ function setAll(cat,on){
    const bb=document.getElementById("bb"+i);if(bb)bb.innerHTML=detChoices(i);
    redrawReviewOverlay(i);
   });
-  markReviewChanged();
+  markReviewChanged();if(typeof scheduleReviewStatusFilter==="function")scheduleReviewStatusFilter();
   if(document.getElementById("beCv"))beRefresh();
   return;
  }
@@ -6963,7 +7638,21 @@ async function saveAndRender(saveOnly=false){
  try{
   reviewSaveStatus("Saving review…");
   await CONFIRM_CHAIN;
-  if(CONFIRM_FAILED.size){reviewSaveStatus('A confirmation was not saved. Retry its Is / Not choice, or dismiss its rejected change, before training or rendering.',true);return false;}
+  if(CONFIRM_FAILED.size){
+  // Preserve independent Blur/Keep choices, but do not render or start learning
+  // while a human confirmation remains unresolved. No polygons or labels from
+  // failed confirmation requests are silently committed.
+  updateConfirmationIssues();
+  const failed=CONFIRM_FAILED.size;
+  const saved=await persistReview(true,job,view,true);
+  if(CUR!==job||JOBVIEW!==view)return false;
+  reviewSaveStatus(saved?
+   "Other review choices saved to disk, but "+failed+" human confirmation(s) need review. "+
+   "Use the list above to retry Is / Not or dismiss a definitely rejected change. Rendering/training is blocked.":
+   "Could not confirm saving other review choices. "+failed+
+   " human confirmation(s) need review before rendering/training.",true);
+  return false;
+ }
   if([...PLATE_EDITS.values()].some(s=>s.drag)){
    reviewSaveStatus("Finish dragging the corner first. Review has not been saved.",true);return false;
   }
@@ -7042,7 +7731,14 @@ async function persistReview(saveOnly=false,job=CUR,view=JOBVIEW,choicesOnly=fal
  if(CUR!==job||JOBVIEW!==view)return false;
  if(!choicesOnly)MAN=[];
  if(reviewChoicesPending()){
-  reviewSaveStatus("Earlier choices saved. Newer changes are not saved; save again before leaving.",true);return false;
+  // Only a choices-only backup may finish while failed Is/Not confirmations
+  // remain. This path never renders, trains or asserts those labels succeeded.
+  const unresolved=choicesOnly&&typeof CONFIRM_FAILED!=="undefined"&&
+   CONFIRM_FAILED.size>0&&REVIEW_VERSION===REVIEW_SAVED&&
+   typeof CONFIRM_PENDING!=="undefined"&&CONFIRM_PENDING.size===0;
+  if(!unresolved){
+   reviewSaveStatus("Earlier choices saved. Newer changes are not saved; save again before leaving.",true);return false;
+  }
  }
  if(saveOnly||SHELLPH==="paused"){
   reviewSaveStatus(choicesOnly?"Review choices saved to disk.":"Review edits saved to disk.");

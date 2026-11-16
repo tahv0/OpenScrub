@@ -337,6 +337,38 @@ def write(directory, row, index, group_fields, anchor_fields=None):
             _READ_CACHE.pop(str(database), None)
 
 
+
+def write_anchor(directory, index, fields):
+    """Commit one source-row correction without touching any track decisions.
+
+    Review groups carry Is/Not and output choices. A replacement source box or
+    four-point polygon belongs ONLY to the exact frame the reviewer saw;
+    copying it to siblings would misblur moving/rotating plates. This shares
+    the same revision/crash-recovery fences as `write`.
+    """
+    if type(index) is not int or index < 0 or not isinstance(fields, dict) or not fields:
+        raise ValueError('A source-row correction requires an index and fields.')
+    with _lock(directory):
+        database, report = _paths(directory)
+        with closing(_connection(database, create=True)) as db:
+            current = _stamp(report)
+            meta = _meta(db)
+            _recover(db, report, meta, current)
+            prior = db.execute('SELECT patch FROM anchors WHERE row_index=?',
+                               (index,)).fetchone()
+            patch = json.loads(prior[0]) if prior else {}
+            patch.update(fields)
+            db.execute('BEGIN IMMEDIATE')
+            _set(db, 'baseline', current if meta.get('baseline') is None
+                 else meta['baseline'])
+            db.execute(
+                'INSERT INTO anchors(row_index,patch) VALUES (?,?) '
+                'ON CONFLICT(row_index) DO UPDATE SET patch=excluded.patch',
+                (index, json.dumps(patch, separators=(',', ':'))))
+            db.commit()
+            _READ_CACHE.pop(str(database), None)
+
+
 def publish(directory, document=None):
     """Atomically materialize pending corrections, then retire the journal.
 

@@ -95,7 +95,9 @@ function reviewSimilarRender(){
  const panel=document.getElementById("review");if(!panel)return;
  const enabled=REVIEW_SIMILAR_ENABLED&&!LEARNING_SELECTION;
  const entries=enabled?[...REVIEW_SIMILAR_HASHES.values()].filter(e=>
-  !!document.getElementById("det"+e.i)).sort((a,b)=>a.start-b.start||a.i-b.i):[];
+  !!document.getElementById("det"+e.i)&&
+  (typeof reviewMatchesFilter!=="function"||reviewMatchesFilter(e.i,"plate")))
+  .sort((a,b)=>a.start-b.start||a.i-b.i):[];
  const clusters=[];
  for(const entry of entries){
   const same=clusters.find(c=>reviewSimilarMatch(entry,c[0]));
@@ -136,7 +138,9 @@ function reviewSimilarRender(){
   for(const id of members.slice(1))childRoot.set(id,root);
  for(const card of panel.querySelectorAll('.det[data-cat="plate"]')){
   const i=Number(card.id.slice(3)),root=childRoot.get(i);
-  const excluded=!!LEARNING_SELECTION&&!(TRKMEM[i]||[i]).some(m=>LEARNING_SELECTION.has(m));
+  const excluded=typeof reviewMatchesFilter==="function"
+   ?!reviewMatchesFilter(i,"plate")
+   :!!LEARNING_SELECTION&&!(TRKMEM[i]||[i]).some(m=>LEARNING_SELECTION.has(m));
   card.hidden=excluded||(enabled&&root!==undefined&&!REVIEW_SIMILAR_EXPANDED.has(root));
  }
  for(const slot of panel.querySelectorAll(".review-similar-slot")){

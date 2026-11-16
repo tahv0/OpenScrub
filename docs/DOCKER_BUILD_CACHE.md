@@ -1,5 +1,31 @@
 # Faster Docker rebuilds on Windows (CUDA)
 
+## Optional inference-only size experiment (does not replace OpenScrub)
+
+The regular Windows CUDA image still includes the training environment.
+To measure an *inference-only* image without touching the running container,
+use the opt-in `scripts/build-windows-cuda-inference.ps1` helper and
+[CUDA inference preview guide](CUDA_INFERENCE_IMAGE_PREVIEW.md). It creates
+separate `openscrub-cuda-inference*:local` tags and never changes the
+`openscrub-cuda-deps:local` image or Windows Compose defaults. A real GPU
+scan and size comparison are required before switching the running app.
+
+
+## Measure image size before changing dependencies
+
+For a **read-only** report of installed training, inference, CUDA, OpenCV
+and model assets in the retained image, use:
+
+```powershell
+.\scripts\audit-windows-cuda.ps1 -DockerContext desktop-linux -Output 'D:\OpenScrubTest\cuda-audit.json'
+```
+
+This does not rebuild the image, download packages, touch user datasets or
+delete anything. See [CUDA image audit and shared-layer architecture](CUDA_SHARED_LAYER_ARCHITECTURE.md)
+for the future inference/trainer split, duplicate-library safeguards and
+disk-size acceptance criteria.
+
+
 The Windows Compose overlay builds the **local checkout** with `Dockerfile.cuda`.
 Buildx/BuildKit is included with modern Docker Desktop.
 

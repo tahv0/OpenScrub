@@ -77,10 +77,57 @@ regions, but these approximate frame matches cannot be saved as exact training
 examples. The card explains when a new scan is needed to obtain frame-indexed
 findings for confirmation.
 
+## Filter detected types and what will actually be blurred
+
+Review offers three independent **view-only** filters: **Review status**
+(All / Needs review / Handled / Unsaved or failed), **Detection type**
+(All / License plates / Other sensitive areas), and **Output**
+(All / Will be blurred / Will remain visible). Combine them to inspect,
+for example, only plate detections whose effective output will be blurred,
+or other detected areas currently set to stay visible.
+
+Output comes from the actual current enabled/disabled Review choices,
+including unsaved Blur/Keep edits, **not** confidence scores or only
+confirmed training labels. A group with different output choices across
+its frames can appear in both output views. The totals count groups, not
+individual frames; each selector's counts reflect the other active filters.
+Lazy pages mount matching cards on demand without loading unrelated images.
+The existing 10% plate sample, visual similarity grouping, and unsaved
+corner drafts remain intact. **Show all findings** resets every view filter.
+Filtering by output never changes a blur, confirms a training example,
+saves a choice, or exempts another detection from rendering protection.
+
+## Filter the Review queue without changing decisions
+
+The **Show findings** selector in Review has **All**, **Needs review**,
+**Handled**, and **Unsaved / failed**, with counts of review groups (not
+individual frames). Needs review shows groups that lack an explicit human
+output choice or Is/Not confirmation for any member, plus any group with a
+pending or failed corner edit or human confirmation. A group partially reviewed
+across its frames stays in Needs review. Handled shows complete groups without
+outstanding draft/confirmation errors; Unsaved / failed focuses the exceptions.
+
+This is strictly a browser-side view filter: changing it never confirms a
+finding, disables protection, saves choices, or discards unsaved corner drafts.
+Status updates as you use Blur/Keep and Is/Not, so handled groups drop from
+the Needs review view. The existing 10% plate sampler is separate; **Show all
+findings** resets both filters. Bulk category choices while filtered apply only
+to matching review groups; other hidden findings retain their decisions.
+Very large Review pages mount matching cards on demand without decoding all
+the filtered-out images. Zone-excluded warnings remain in their separate
+section and are not counted as ordinary review groups.
+
 ## Browse, correct, and forget saved examples
 
 Open **Findings** and filter by video, category, or positive/negative label.
 Each card shows its source video name, frame/time, confirmation, and saved JPEG.
+In the gallery, **dashed yellow** outlines the original detector box;
+**solid green** outlines saved human-confirmed four-corner plate geometry when
+present. Both are drawn over the original **unredacted JPEG**, never painted
+into the training pixels. A card that only shows yellow has no saved
+human-confirmed quadrilateral; opening **Edit confirmation** lets you check
+and correct it.
+
 Choose **Edit confirmation** to change the label or, for plates, adjust the
 corners. **Save confirmation** writes a new revision. The editor only uses the
 saved picture; it does not load or play the source video.
@@ -106,16 +153,84 @@ edit. This dismisses that rejected action while preserving your other work.
 Changes to the library do not globally rewrite existing independent job review
 decisions.
 
+## Recover a timed-out saved picture
+
+Review normally uses compact scan-time JPEGs without reopening the source
+video. If a requested frame has no cached JPEG, the bounded source reader
+decodes **only its source-coordinate crop** instead of transporting a full
+uncompressed 4K frame. Its original frame PTS is verified before the crop
+can become a Review image or confirmed training example. A picture from
+the wrong frame, crop, video or source timeline is never substituted.
+
+An uncached decoder has a normal 10-second limit. If it reports HTTP 504,
+the card shows **Retry preview (up to 60s)**; the reviewer may also select
+**Retry timed-out pictures** to queue the currently visible failures in one
+click, using only one cold source decoder at a time. These user-initiated
+retries have a bounded 60-second deadline and do not change automatic blur
+coverage, the detector group, draft corners or the human classification.
+Successful crops are persisted to the existing compact-preview cache, so
+subsequent Review visits can use the JPEG without reopening video.
+If the longer decode fails, the card reports that a seekable normalized
+source copy may be required. A failed image remains unconfirmed for training
+and does **not** imply a false positive.
+
+## Resolve blocked review saves before rendering or learning
+
+An unsuccessful **Is a … / Not a …** confirmation is different from an
+unsaved four-corner adjustment. If a confirmation fails, Review displays an
+**Unsuccessful human confirmations** list near the top, with the affected
+finding number, the server error, **Show finding**, and an explicit retry of the
+label you originally chose. **Show finding** reveals the card even if a filter,
+similarity group, or deferred page had hidden it. A rejected HTTP 400/409
+confirmation can also be explicitly dismissed, preserving the current saved
+review choice; an uncertain network error cannot be silently dismissed.
+
+The **corner draft** error list remains independent. A corner archive-revision
+conflict must not masquerade as a failed Is/Not confirmation. A rejected corner
+polygon stays in the browser until it is corrected or deliberately discarded.
+
+When a finding displays a **cached representative image from another frame**
+(for example, finding frame 2305 shows cached frame 2332), Review clearly
+identifies both frames and offers **Load exact source frame**. This explicit
+request bypasses track-neighbor fallback, decodes that specific frame only if
+no matching scan-time JPEG exists, and binds its preview token to the actual
+picture. A clean corner editor is reloaded with the exact frame's geometry;
+a pending manual polygon is never silently transferred. Inspect the exact
+picture and explicitly choose **Is / Not** again. No human label is
+automatically carried from the borrowed thumbnail to an uninspected frame.
+An absent source or decoder failure leaves the previous image and any
+unsaved draft intact and blocks unverified training evidence.
+Render and video-specific training must still wait for all polygon edits and
+human confirmation requests to be settled. **Save edits** can safely preserve
+other Blur/Keep choices during a confirmation failure, but this limited save
+does not acknowledge the rejected example, start rendering, train a model or
+save an unsaved corner polygon. Retry the failed Is/Not choice from its
+source-bound image, or deliberately dismiss a definitely rejected change
+before trying again.
+
 ## Train a named model from accumulated examples
 
 The Findings library can store several categories, but this training workflow
 currently trains **plate models**.
 
-1. In Findings, select **Use for plate training** on the examples you want.
-   **Select plate examples on this page** selects the visible page only.
-   Selection stays when changing filters or pages; check the positive,
-   negative, and video counts before starting. Examples from other videos are
-   included only when you select them or retain them through a chosen parent.
+1. In Findings, choose the **Video**, **Category** (Plate, or All
+   categories), and **Confirmation** (positive, negative, or both) filters.
+   **Select all matching plate examples** explicitly selects the entire matching
+   set across *every page*; the count preview shows positive/negative totals
+   and how many videos match before you confirm. Only already-confirmed plates
+   can be selected, not unreviewed detector findings. You can uncheck any
+   visible matching example to **exclude** it, or use **Clear selection** to
+   start over. The counts display these exclusions and any manually added
+   examples. A bulk scope stays pinned to its original video/label filters
+   even when you browse other pages or filters; manually added examples from
+   other videos are kept separately.
+   **Select plate examples on this page** still selects only the current page.
+   The backend validates the exact matching IDs and revisions when training is
+   queued; if someone adds, edits, reclassifies, or forgets a matching example,
+   the old bulk selection is rejected with HTTP 409 rather than silently using
+   a changed dataset. Review and reselect the scope, including any exclusions.
+   Examples from other videos are included only if explicitly selected or
+   inherited from a chosen locally trainable parent.
 2. Under **Train a named plate model**, enter a model name or leave it blank.
    The automatic name uses the video name and UTC timestamp for one video,
    or **Confirmed findings** and a timestamp for a selection across videos.
