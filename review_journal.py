@@ -341,6 +341,10 @@ def write(directory, row, index, group_fields, anchor_fields=None):
                                    (index,)).fetchone()
                 updated = json.loads(prior[0]) if prior else {}
                 updated.update(anchor_fields)
+                if any(field in anchor_fields for field in
+                       ('enabled', 'output_choice_explicit', 'human_confirmation')):
+                    updated['_output_choice_seq'] = patch.get('_output_choice_seq',
+                        _next_output_choice_sequence(db))
                 db.execute(
                     'INSERT INTO anchors(row_index,patch) VALUES (?,?) '
                     'ON CONFLICT(row_index) DO UPDATE SET patch=excluded.patch',
@@ -414,6 +418,9 @@ def write_anchor(directory, index, fields):
             patch = json.loads(prior[0]) if prior else {}
             patch.update(fields)
             db.execute('BEGIN IMMEDIATE')
+            if any(field in fields for field in
+                   ('enabled', 'output_choice_explicit', 'human_confirmation')):
+                patch['_output_choice_seq'] = _next_output_choice_sequence(db)
             _set(db, 'baseline', current if meta.get('baseline') is None
                  else meta['baseline'])
             db.execute(
