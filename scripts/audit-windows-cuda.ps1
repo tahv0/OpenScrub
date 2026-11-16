@@ -50,6 +50,13 @@ $jsonText = $jsonLines -join "`n"
 $report = $jsonText | ConvertFrom-Json
 if ($Output) {
     $target = [System.IO.Path]::GetFullPath($Output)
+    # The requested report directory may not exist yet (e.g. D:\OpenScrubTest).
+    # Create only the parent of the explicitly supplied output file, never
+    # modify container data, Docker images, or user media.
+    $parent = [System.IO.Path]::GetDirectoryName($target)
+    if (-not [string]::IsNullOrWhiteSpace($parent)) {
+        [System.IO.Directory]::CreateDirectory($parent) | Out-Null
+    }
     [System.IO.File]::WriteAllText($target, $jsonText, (New-Object System.Text.UTF8Encoding($false)))
     Write-Host "Audit report saved: $target"
 }
