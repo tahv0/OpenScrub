@@ -3336,9 +3336,21 @@ def _fast_review_choices(job, edits, started, parsed):
          round((loaded-parsed)*1000, 2),
          round((applied-loaded)*1000, 2),
          round((written-applied)*1000, 2))))
+    # Preserve the preexisting "allowlist this recurring name?" suggestion
+    # without full-report materialization; compute it from the same effective
+    # indexed listing plus this batch's explicit changes.
+    names = {}
+    for index, row in enumerate(rows):
+        if row.get('category') == 'name':
+            text = row.get('text')
+            if isinstance(text, str):
+                names.setdefault(text, []).append(
+                    patches.get(index, {}).get('enabled', row.get('enabled', True)))
+    suggested = sorted(text for text, states in names.items()
+                       if len(states) >= 2 and not any(states))
     response = jsonify({'ok': True, 'total': len(rows), 'changed': bool(patches),
                         'journal_deferred': review_journal.has_changes(job['dir']),
-                        'suggest_allowlist': [], 'timings_ms': timings})
+                        'suggest_allowlist': suggested, 'timings_ms': timings})
     response.headers['Server-Timing'] = ', '.join(
         '%s;dur=%.2f' % (stage, duration) for stage, duration in timings.items())
     return response
