@@ -274,14 +274,17 @@ explicitly asks permission to discard the unsaved shape.
 
 ### Durable Review saves on large jobs
 
-A Review Save containing **no new unsaved changes** now acknowledges the
-already-durable Is/Not confirmations and exact-frame corner edits directly,
-without rewriting the entire 4K report in the HTTP request. Those decisions
-remain in the journal until a report-consuming action, including Render,
-atomically publishes them into report.json.
+For **Save edits & render**, a Review Save containing no new unsaved
+changes now acknowledges the already-durable Is/Not confirmations and
+exact-frame corner edits directly, without rewriting the entire 4K report
+inside the HTTP request. Those decisions remain in the journal until the
+render worker atomically publishes them into report.json. **Save review edits
+only** preserves its existing contract: it materializes report.json before
+acknowledging success.
 
-When a current, revision-bound Review listing is available, a batch of new,
-explicit Blur/Keep choices can also be saved in one small SQLite transaction.
+For render-intent saves with a current, revision-bound Review listing, a
+batch of new, explicit Blur/Keep choices can also be saved in one small SQLite
+transaction.
 These per-row output choices are overlaid on the display and later published
 at the render/report boundary. A later Is/Not confirmation takes precedence
 without deleting saved exact-frame corners; a later deliberate Blur/Keep
