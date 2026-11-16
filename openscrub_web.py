@@ -3260,6 +3260,89 @@ def learned_model_delete(model_id):
     return jsonify({"ok": True})
 
 
+
+def _fast_review_choices(job, edits, started, parsed):
+    """Durably ACK simple Review choices; defer huge report publish until render.
+
+    All Is/Not classifications and corner edits were already acknowledged
+    independently by the crash-safe journal. Rewriting 4K/100k-row reports
+    merely to confirm a zero-delta Save can exceed the browser's two-minute
+    deadline. Exact-row output-only deltas also use a single journal transaction
+    when a revision-fenced cached Review listing is available.
+    """
+    if (not isinstance(edits, dict) or
+            any(edits.get(field) for field in
+                ('manual', 'box_overrides', 'time_overrides', 'verified_labels')) or
+            'audio' in edits):
+        return None
+    enabled = edits.get('enabled') or {}
+    output = edits.get('output_choices') or {}
+    if not isinstance(enabled, dict) or not isinstance(output, dict):
+        return None
+    path = os.path.join(job['dir'], 'report.json')
+    # A no-delta save still means something: all previous Is/Not and polygon
+    # acknowledgments are durable. Let the render worker publish the journal.
+    if not enabled and not output:
+        now = time.perf_counter()
+        timings = {'parse': round((parsed-started)*1000, 2),
+                   'load': 0., 'apply': 0., 'write': round((now-parsed)*1000, 2)}
+        response = jsonify({'ok': True, 'total': None, 'changed': False,
+                            'journal_deferred': review_journal.has_changes(job['dir']),
+                            'suggest_allowlist': [], 'timings_ms': timings})
+        response.headers['Server-Timing'] = ', '.join(
+            '%s;dur=%.2f' % (stage, duration) for stage, duration in timings.items())
+        return response
+    # Only requests carrying explicitly clicked Blur/Keep decisions may
+    # enter this fast path. Legacy full-state edits retain the original path.
+    if (not output or set(enabled) != set(output) or len(enabled) > 10000
+            or any(value is not True for value in output.values())):
+        return None
+    static = review_preview_index.read_listing(path)
+    if static is None:
+        return None
+    listed = json.loads(static)
+    if review_journal.has_changes(job['dir']):
+        listed = review_journal.overlay_listing(job['dir'], listed)
+    rows = listed['detections']
+    loaded = time.perf_counter()
+    patches = {}
+    for index_text, wanted in enabled.items():
+        if (not isinstance(index_text, str) or
+                not re.fullmatch(r'\d{1,12}', index_text)):
+            return None
+        index = int(index_text)
+        if index >= len(rows):
+            return None
+        row = rows[index]
+        desired = bool(wanted)
+        if desired == bool(row.get('enabled', True)) and row.get('output_choice_explicit') is True:
+            continue
+        fields = {'enabled': desired, 'output_choice_explicit': True}
+        if row.get('category') == 'plate':
+            fields['plate_verification_override'] = True
+            if row.get('plate_verification'):
+                fields['plate_verification'] = None
+            confirmation = row.get('human_confirmation')
+            if (isinstance(confirmation, dict) and
+                    confirmation.get('source') == 'confirmed_findings'):
+                fields['human_confirmation'] = dict(confirmation, source='explicit')
+        patches[index] = fields
+    applied = time.perf_counter()
+    if patches:
+        review_journal.write_output_anchors(job['dir'], patches)
+    written = time.perf_counter()
+    timings = dict(zip(('parse', 'load', 'apply', 'write'),
+        (round((parsed-started)*1000, 2),
+         round((loaded-parsed)*1000, 2),
+         round((applied-loaded)*1000, 2),
+         round((written-applied)*1000, 2))))
+    response = jsonify({'ok': True, 'total': len(rows), 'changed': bool(patches),
+                        'journal_deferred': review_journal.has_changes(job['dir']),
+                        'suggest_allowlist': [], 'timings_ms': timings})
+    response.headers['Server-Timing'] = ', '.join(
+        '%s;dur=%.2f' % (stage, duration) for stage, duration in timings.items())
+    return response
+
 @app.route("/api/jobs/<jid>/detections", methods=["POST"])
 @_serialize_review_edit
 def job_save_edits(jid):
@@ -3270,6 +3353,9 @@ def job_save_edits(jid):
     started = time.perf_counter()
     edits = request.get_json(force=True)
     parsed = time.perf_counter()
+    faster = _fast_review_choices(job, edits, started, parsed)
+    if faster is not None:
+        return faster
     # A deliberate Save is a report boundary; normal Is/Not and corner
     # clicks never rewrite the long scan timeline.
     journal_published = _review_journal_snapshot(job)
