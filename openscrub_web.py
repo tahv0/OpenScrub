@@ -4018,6 +4018,10 @@ progress{width:100%;height:12px;accent-color:var(--acc)}
 
 .det.selected{outline:2px dashed #60a5fa;outline-offset:2px}
 .review-copy{font-size:13px;color:#cbd5e1;line-height:1.5;margin:0 0 10px}
+.plate-verification-detail{font-size:11px;line-height:1.4;overflow-wrap:anywhere;margin:6px 0;color:#cbd5e1}
+.plate-verification-detail strong,.plate-verification-detail small{display:block;font-size:11px;line-height:1.45}
+.plate-verification-detail strong{color:#e2e8f0;font-weight:600}
+.plate-verification-group{display:block;font-size:11px;line-height:1.4;overflow-wrap:anywhere;margin:5px 0}
 .det-status{font-weight:600;margin:7px 0 5px}
 .det-status.blur{color:#fca5a5}
 .det-status.keep{color:#6ee7b7}
@@ -5565,7 +5569,7 @@ async function loadReviewPreview(state,task,cacheOnly){
     "Use Redraw plate area on this exact source frame before trusted training."
    :borrowed?
    "Showing cached frame "+meta.frame+" instead of detection frame "+
-   meta.requested_frame+". Load the exact source frame before confirming this finding."
+   meta.requested_frame+". A checker score belongs to the detector source frame, not this cached picture. Load the exact source frame before confirming this finding."
    :meta?.source_repaired?
    "Saved detector box correction for source frame "+meta.frame+
    ". Other frames in the group can still have their own uncorrected proposals."
