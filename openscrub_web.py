@@ -2317,6 +2317,7 @@ def job_detections(jid):
     for i, d in enumerate(doc["detections"]):
         items.append({"i": i, "category": d["category"], "text": d["text"],
                       "t_start": d["t_start"], "t_end": round(d["t_end"], 2),
+                      "frame_index": d.get("frame_index", -1),
                       "enabled": d.get("enabled", True),
                       "track": d.get("track", -1),
                       "person": d.get("person", -1),
