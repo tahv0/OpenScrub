@@ -16,6 +16,7 @@ from scripts import download_training_checkpoint as checkpoint
 FINDINGS_MODULES = (
     "confirmed_findings", "finding_previews", "findings_training",
     "findings_web", "findings_ui", "plate_text_hints", "plate_text_web",
+    "plate_boundaries",
 )
 
 

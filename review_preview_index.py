@@ -134,6 +134,7 @@ def public_item(index, d):
                 learning_conflict=d.get('learning_conflict', ''),
                 learning_score=d.get('learning_score'),
                 plate_verification=d.get('plate_verification'),
+                plate_boundary_source=d.get('plate_boundary_source', ''),
                 fallback_reason=d.get('fallback_reason', ''),
                 human_region_confirmed=bool(d.get('human_region_confirmed')),
                 zone_dropped=bool(d.get('zone_dropped')),

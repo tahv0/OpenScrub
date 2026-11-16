@@ -50,6 +50,7 @@ import video_learning
 import learned_models
 import learning_candidates
 import plate_verifier
+import plate_boundaries
 import zones_ui
 import openscrub_logging as diagnostics
 import finding_previews
@@ -2324,6 +2325,7 @@ def job_detections(jid):
                       "learning_conflict": d.get("learning_conflict", ""),
                       "learning_score": d.get("learning_score"),
                       "plate_verification": d.get("plate_verification"),
+                      "plate_boundary_source": d.get("plate_boundary_source", ""),
                       "fallback_reason": d.get("fallback_reason", ""),
                       "human_region_confirmed": bool(d.get("human_region_confirmed")),
                       "zone_dropped": bool(d.get("zone_dropped")),
@@ -2354,13 +2356,20 @@ def job_detections(jid):
 def _review_detections(job, doc):
     """Compute rendered coverage while retaining all report row indices."""
     rows = doc["detections"]
+    fps = (doc.get("render_state") or {}).get("fps")
+    def safe_poly(row):
+        if (row.get("category") == "plate" and row.get("frame_index", -1) < 0
+                and plate_boundaries.quad_source_frame(row, fps) >= 0):
+            return ()
+        return row.get("poly") or ()
     dets = [openscrub.Detection(
         r["t_start"], r["t_end"], tuple(r["cbox"]), r["category"],
         r.get("text", ""), r.get("confidence", 1.0),
         tuple(r.get("aoff", (0, 0))), dense=r.get("dense", False),
-        track=r.get("track", -1), poly=r.get("poly") or (),
+        track=r.get("track", -1), poly=safe_poly(r),
         poly_holes=r.get("poly_holes") or (), mask_pad=r.get("mask_pad", -1),
-        plate_quad=tuple(tuple(pt) for pt in (r.get("plate_quad") or ())))
+        plate_quad=tuple(tuple(pt) for pt in plate_boundaries.trusted_plate_quad(r)),
+        plate_quad_frame=plate_boundaries.quad_source_frame(r, fps))
         for r in rows]
     coverage, pad, _ = _job_mask_options(job)
     if coverage not in ("tight", "box", "concealed"):
@@ -2381,14 +2390,15 @@ def _review_detections(job, doc):
     for row, det in zip(rows, effective):
         copy = dict(row)
         copy.update(cbox=det.cbox, poly=det.poly, poly_holes=det.poly_holes,
-                    mask_pad=det.mask_pad)
+                    mask_pad=det.mask_pad, plate_quad=det.plate_quad,
+                    plate_quad_frame=det.plate_quad_frame)
         copy["_coverage_box"] = (coverage in ("box", "concealed") and
                                   det.dense and det.category in ("person", "manual"))
         result.append(copy)
     return result
 
 
-def _review_mask_data(d, ox, oy, shape, job, doc):
+def _review_mask_data(d, ox, oy, shape, job, doc, frame_index=None):
     """Rasterize the effective mask at the review frame coordinates."""
     box = [d["cbox"][0] + ox, d["cbox"][1] + oy,
            d["cbox"][2] + ox, d["cbox"][3] + oy]
@@ -2403,7 +2413,9 @@ def _review_mask_data(d, ox, oy, shape, job, doc):
     drift = 0 if d.get("category") == "plate" and d.get("frame_index", -1) >= 0 and d.get("poly") else min(24.0, 0.05 * (abs(ox-anchor[0]) + abs(oy-anchor[1])))
     pad = base + drift
     region = (box[0]-pad, box[1]-pad, box[2]+pad, box[3]+pad)
-    if d.get("category") == "plate" and len(d.get("plate_quad") or ()) == 4:
+    if (d.get("category") == "plate" and len(d.get("plate_quad") or ()) == 4
+            and (int(d.get("plate_quad_frame", -1)) < 0
+                 or int(d.get("plate_quad_frame")) == frame_index)):
         quad = openscrub._plate_quad_pixels(box, d["plate_quad"])
         tight = (min(p[0] for p in quad)-2, min(p[1] for p in quad)-2,
                  max(p[0] for p in quad)+2, max(p[1] for p in quad)+2)
@@ -2417,8 +2429,8 @@ def _review_mask_data(d, ox, oy, shape, job, doc):
     return openscrub.rasterize_region_mask(shape, region, kind)
 
 
-def _review_mask(d, ox, oy, shape, job, doc):
-    data = _review_mask_data(d, ox, oy, shape, job, doc)
+def _review_mask(d, ox, oy, shape, job, doc, frame_index=None):
+    data = _review_mask_data(d, ox, oy, shape, job, doc, frame_index)
     if data is None:
         return []
     region, mask = data
@@ -2514,7 +2526,7 @@ def job_detframe(jid, i):
         abort(404)
     x1, y1 = int(d["cbox"][0] + ox), int(d["cbox"][1] + oy)
     x2, y2 = int(d["cbox"][2] + ox), int(d["cbox"][3] + oy)
-    data = _review_mask_data(d, ox, oy, frame.shape, job, doc)
+    data = _review_mask_data(d, ox, oy, frame.shape, job, doc, fidx)
     if data is not None:
         region, mask = data
         xlo, ylo, xhi, yhi = region
@@ -2881,10 +2893,11 @@ def job_plate_quad(jid, i):
         box = meta["box"]
         bw, bh = box[2]-box[0], box[3]-box[1]
         q = [[round((float(x)-box[0])/bw, 6), round((float(y)-box[1])/bh, 6)] for x, y in p]
-        apply_track, tid = autosave or payload.get("apply_track") is True, d.get("track", -1)
-        applied = sum(1 for j, row in enumerate(doc["detections"])
-                      if j == i or (apply_track and tid >= 0 and row.get("track", -1) == tid
-                                    and row.get("category") == "plate"))
+        # Four-corner geometry is source-frame-specific. Classification may
+        # apply to the track, but copying one narrow quad to later rotations
+        # could expose license characters. The old apply_track flag is now
+        # intentionally limited to the selected source row.
+        applied = 1
         sample_key = (hashlib.sha256(json.dumps([
             _video_identity(job["video"]), i, meta["frame"]]).encode()).hexdigest()
                       if autosave else None)
@@ -2920,13 +2933,12 @@ def job_plate_quad(jid, i):
             pixels = frame[y1:y2, x1:x2].copy()
         d["verified_label"] = "plate"
         changed = 0
-        for j, row in enumerate(doc["detections"]):
-            if j == i or (apply_track and tid >= 0 and row.get("track", -1) == tid
-                          and row.get("category") == "plate"):
-                _human_plate_override(row)
-                row["plate_quad"] = q
-                row.pop("plate_edit_receipt", None)
-                changed += 1
+        _human_plate_override(d)
+        d.update(plate_quad=q, plate_boundary_source="human_corners",
+                 plate_quad_frame=(int(meta["frame"]) if int(d.get("frame_index", -1)) < 0 else -1),
+                 human_region_confirmed=True, poly=[], poly_holes=[], mask_pad=0)
+        d.pop("plate_edit_receipt", None)
+        changed = 1
         if autosave:
             d["plate_edit_receipt"] = {"id": edit_id, "source": sample_key,
                                        "token": payload.get("preview_token")}
@@ -3006,7 +3018,7 @@ def job_boxes_at(jid):
                           "plate_quad": d.get("plate_quad") or [],
                           "fallback_reason": d.get("fallback_reason", ""),
                           "shaped": bool(d.get("poly")),
-                          "mask_contours": _review_mask(d, ox, oy, shape, job, doc),
+                          "mask_contours": _review_mask(d, ox, oy, shape, job, doc, fidx),
                           "t_start": d["t_start"], "t_end": d["t_end"],
                           "box": [d["cbox"][0] + ox, d["cbox"][1] + oy,
                                   d["cbox"][2] + ox, d["cbox"][3] + oy]})
@@ -3478,26 +3490,36 @@ def job_track_object(jid):
                     "confidence": round(float(score), 3),
                     "aoff": [ox, oy], "last_seen": t,
                     "dense": True, "track": tid, "enabled": True,
-                    "plate_quad": (quad_req or []),
+                    "frame_index": -1,  # preserve time-spanning redaction between tracker samples
+                    "plate_quad": [],
+                    "plate_boundary_source": ("tracked_box_fallback" if quad_req is not None else ""),
                     "poly": ([[[float(x), float(y)] for x, y in c]
                               for c in poly] if quad_req is None else [])})
+            if quad_req is not None:
+                # The tracker returns boxes, not four physical plate corners.
+                # Keep every other time instant protected by its own box.
+                # Only the exact human-drawn source instant may use the
+                # manually provided quadrilateral.
+                source_frame = int(round(t_ref * fps))
+                seed = min(new, key=lambda row: abs(row["last_seen"]-t_ref))
+                if int(round(seed["last_seen"] * fps)) == source_frame:
+                    seed["plate_quad"] = quad_req
+                    seed["plate_quad_frame"] = source_frame
+                    seed["plate_boundary_source"] = "human_corners"
             # grace pads: cover the sub-sample sliver at both ends
             new[0]["t_start"] = max(0.0, new[0]["t_start"] - 0.25)
             new[-1]["t_end"] += 0.25
             seed_index = len(doc["detections"])
             doc["detections"].extend(new)
             if quad_req is not None and require_confirmation:
-                # Drawing records an area, not an Is a plate decision. Only
-                # the actual drawn source instant has human-provided corners;
-                # other tracked positions remain geometric predictions.
-                seed = min(new, key=lambda row: abs(row["last_seen"]-t_ref))
-                if abs(seed["last_seen"]-t_ref) < 1e-6:
+                # Drawing records an area, not an Is-a-plate decision.
+                if seed.get("plate_quad"):
                     seed["human_region_confirmed"] = True
             elif quad_req is not None:
-                # The drawn reference is reviewed; propagated frames aren't.
-                nearest = min(range(len(new)),
-                              key=lambda k: abs(new[k]["t_start"]-t_ref))
-                new[nearest]["verified_label"] = "plate"
+                # An actual drawn reference is reviewed. Never promote a
+                # nearby predicted tracked box to a human-labeled plate.
+                if seed.get("plate_quad"):
+                    seed["verified_label"] = "plate"
             if quad_req is not None and not require_confirmation:
                 frame = _frame_at(job, t_ref, rs)
                 if frame is not None:
@@ -5404,6 +5426,7 @@ async function loadReviewPreview(state,task,cacheOnly){
   const borrowed=!!(meta?.match==="representative"&&
    Number.isInteger(meta.frame)&&Number.isInteger(meta.requested_frame)&&
    meta.frame!==meta.requested_frame);
+  img._previewUnsafeGeometry=borrowed;
   const hint=card.querySelector(".source-frame-note");
   const exactButton=card.querySelector(".source-frame-exact");
   const outside=meta?.geometry_outside_frame===true;
@@ -5417,7 +5440,7 @@ async function loadReviewPreview(state,task,cacheOnly){
     "Use Redraw plate area on this exact source frame before trusted training."
    :borrowed?
    "Showing cached frame "+meta.frame+" instead of detection frame "+
-   meta.requested_frame+". Load the exact source frame before confirming this finding.":"";
+   meta.requested_frame+". Load the exact frame before adjusting corners or confirming this finding.":"";
   if(exactButton)exactButton.hidden=!borrowed;
   drawPlateThumbnail(img);
   if(meta){
@@ -5996,8 +6019,12 @@ function syncPlateTrack(s){
  const b=s.meta.box,q=s.meta.points.map(([x,y])=>[(x-b[0])/(b[2]-b[0]),(y-b[1])/(b[3]-b[1])]);
  for(const other of PLATE_EDITS.values()){
   if(other===s||other.job!==s.job||other.meta.track!==s.meta.track)continue;
+  // A TRACK is not a geometry identity. Its plate may rotate or become
+  // foreshortened from one source frame to the next. Reuse corners only
+  // when the immutable sampled JPEG and original detector box are identical.
+  if(other.meta.frame!==s.meta.frame||other.meta.key!==s.meta.key||
+     JSON.stringify(other.meta.box)!==JSON.stringify(b))continue;
   other.refreshBeforeSave=true;
-  // Keep an unsubmitted human adjustment; only refresh untouched siblings.
   if(!other.dirty&&!other.drag&&!other.pending){
    const box=other.meta.box;
    other.saved=q.map(([x,y])=>[box[0]+x*(box[2]-box[0]),box[1]+y*(box[3]-box[1])]);
@@ -6169,10 +6196,14 @@ function pumpPlateSaves(){
     FINDING_META[s.i].confirmed_finding_revision=data.finding.revision;
    s.saved=plateCopy(s.meta.points);s.failures=0;s.conflictAttempts=0;
    s.samePictureRefreshAttempts=0;s.needsSourceReview=false;
-   if(typeof FINDING_META!=="undefined"&&FINDING_META[s.i])
+   if(typeof FINDING_META!=="undefined"&&FINDING_META[s.i]){
     FINDING_META[s.i].human_region_confirmed=true;
+    FINDING_META[s.i].plate_boundary_source='human_corners';
+   }
    if(typeof REVIEW_DISPLAY_META!=="undefined"&&REVIEW_DISPLAY_META[s.i])
     REVIEW_DISPLAY_META[s.i].human_region_confirmed=true;
+   const boundary=document.getElementById('boundary'+s.i);
+   if(boundary)boundary.textContent='Boundary · Human corrected corners · this frame';
    syncPlateTrack(s);
    if(s.pending!==pending)return; // A newer Not-a-plate decision wins.
    applyReboundFindingState(s,data);
@@ -6341,7 +6372,12 @@ function initPlateCorners(img){
  }
  s.cancelDrag=()=>finish(null,true);
  cv.addEventListener("pointerdown",e=>{
-  e.stopPropagation();if(e.button!==0||s.drag||PLATE_REVIEW_BUSY||CONFIRM_PENDING.has(s.i))return;
+  e.stopPropagation();
+  if(img._previewUnsafeGeometry){
+   plateStatus(s,"Load the exact source frame before changing its corners.");
+   return;
+  }
+  if(e.button!==0||s.drag||PLATE_REVIEW_BUSY||CONFIRM_PENDING.has(s.i))return;
   const k=nearest(e);if(k<0)return;
   e.preventDefault();QEDIT=s;s.selected=k;
   const at=point(e),p=s.points[k],c=s.displayCrop;
@@ -6363,7 +6399,7 @@ function initPlateCorners(img){
  cv.addEventListener("keydown",e=>{
   QEDIT=s;
   if(e.key==="Escape"){s.cancelDrag();return;}
-  if(s.drag||PLATE_REVIEW_BUSY||CONFIRM_PENDING.has(s.i))return;
+  if(s.drag||img._previewUnsafeGeometry||PLATE_REVIEW_BUSY||CONFIRM_PENDING.has(s.i))return;
   if(/^[1-4]$/.test(e.key)){s.selected=Number(e.key)-1;e.preventDefault();return;}
   const before=plateCopy(s.points),c=s.displayCrop;
   if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="z"&&s.undo){s.points=plateCopy(s.undo);}
@@ -6846,6 +6882,23 @@ function updatePlateVerifierCandidate(){
  if(!validated&&mode.value==="filter")mode.value="review";
  note.textContent=verifierAssessmentText(candidate?.assessment);
 }
+function plateBoundaryName(row){
+ if(row.plate_boundary_source==='human_corners')return 'Human corrected corners · this frame';
+ if(row.plate_boundary_source==='learned_perspective')return 'Learned perspective boundary · this frame';
+ if(row.plate_boundary_source==='learned_rotated_box')return 'Learned rotated rectangle · this frame';
+ if(row.plate_boundary_source==='tracked_box_fallback')return 'Tracked detector box · corners not tracked';
+ if(row.plate_boundary_source==='detector_fallback')return 'Detector box · learned outline rejected';
+ if(row.plate_boundary_source==='lettering_mask')return 'Existing lettering mask';
+ if(row.human_region_confirmed)return 'Human corrected corners · this frame';
+ if(row.shaped)return 'Existing shaped mask';
+ return 'YOLO detector rectangle · not physical plate edges';
+}
+function plateBoundaryBadge(row){
+ if(row.category!=='plate')return '';
+ return '<span class="badge plate-boundary-source" id="boundary'+row.i+'" '+
+  'title="This provenance describes only this source frame, not every frame of the group">'+
+  sectionEscape('Boundary · '+plateBoundaryName(row))+'</span> ';
+}
 function plateVerificationBadge(row){
  const marker=row.plate_verification;if(!marker)return "";
  const label=marker.applied?"Model filtered":marker.decision==="suggest_not_plate"?"Model suggests false positive":"Model retained";
@@ -7062,8 +7115,16 @@ async function loadReview(signal=null,phase=SHELLPH){
    rep.frames=members.length;
    rep.fallbacks=[...new Set(members.map(m=>m.fallback_reason).filter(Boolean))];
    rep.fallbackCount=members.filter(m=>m.fallback_reason).length;
-   rep.human_region_confirmed=members.some(m=>m.human_region_confirmed);
-   rep.shaped=members.some(m=>m.shaped);
+   // Image overlays describe the SELECTED frame, not a different member.
+   rep.human_region_confirmed=!!best.human_region_confirmed;
+   rep.shaped=!!best.shaped;
+   if(cat==='plate'&&members.length>1){
+    const learned=members.filter(m=>String(m.plate_boundary_source||'').startsWith('learned_')).length;
+    const manual=members.filter(m=>m.plate_boundary_source==='human_corners'||m.human_region_confirmed).length;
+    rep.boundarySummary='Group geometry: '+learned+' learned source frames, '+
+     manual+' human-corrected frames, '+(members.length-learned-manual)+
+     ' other frames (detector/lettering fallback). Each frame keeps its own redaction.';
+   }
    rep.personcard=key[0]==="p";
    TRKMEM[rep.i]=members.map(m=>m.i);
    items.push(rep);
@@ -7084,7 +7145,7 @@ async function loadReview(signal=null,phase=SHELLPH){
     <div class="${x.category==="plate"?"plate-preview":"finding-preview"}">
     <img id="thumb${x.i}" data-preview-url="api/jobs/${job}/finding-preview/${x.i}" alt="Original detection preview"
      class="${x.category==="plate"?"plate-edit-thumb":""}"
-     title="${x.category==="plate"?"Drag numbered corners; autosaved to this track":"Enlarge detection"}"
+     title="${x.category==="plate"?"Drag numbered corners; only this source frame receives the corrected geometry":"Enlarge detection"}"
      style="cursor:${x.category==="plate"?"pointer":"zoom-in"}"
      onclick="${x.category==="plate"?"":"zoomDet("+x.i+")"}"
      onpointerdown="${x.category==="plate"?"event.stopPropagation()":""}"
@@ -7093,9 +7154,9 @@ async function loadReview(signal=null,phase=SHELLPH){
     ${x.category==="plate"?'<div id="plateOverlay'+x.i+'" class="plate-output-badge"></div>':""}
     <small class="preview-status" role="status">Preview not loaded</small>
     <button class="sec preview-retry" hidden onclick="retryReviewPreview(this)">Retry preview</button>
-    ${x.category==="plate"?'<small class="source-frame-note review-copy" role="status"></small><button type="button" class="sec source-frame-exact" hidden onclick="loadExactReviewFrame(this)">Load exact source frame</button><button type="button" class="sec plate-repair-button" hidden onclick="openPlateRepair(this)">Redraw plate area</button>':""}
-    ${x.category==="plate"?'<small class="quad-status" role="status" title="Corners apply to this detected track. Review changing perspective. Keyboard: select corner 1–4, use arrows; Ctrl+Z undoes.">Corners autosave to track</small><button type="button" class="sec quad-retry" hidden>Retry save</button>':""}
-    <div>${plateVerificationBadge(x)}${x.learning_conflict?'<span class="badge" title="The original coverage was retained where the learned model could not make a reliable refinement">Model disagreement — review</span> ':""}${plateFallbackText(x)?`<span class="badge" style="white-space:normal">${plateFallbackText(x)}</span> `:""}${x.shaped?'<span class="badge" title="Thumbnail rectangle is a selection guide; open to inspect the mask and any exclusions">shaped mask</span> ':""}${x.personcard?`<b>Person ${x.person+1}</b> — one decision for ALL their appearances`:`"${sectionEscape(x.text)}"`}${x.frames?` <span class="badge">×${x.frames} frames</span>`:""}${x.confidence?` <span class="badge" title="detector confidence — not a human decision">${Math.round(x.confidence*100)}%</span>`:""} <br>${x.t_start.toFixed(1)}–${x.t_end.toFixed(1)}s</div>
+    ${x.category==="plate"?'<small class="source-frame-note review-copy" role="status"></small><button type="button" class="sec source-frame-exact" hidden onclick="loadExactReviewFrame(this)">Load exact frame for corners</button><button type="button" class="sec plate-repair-button" hidden onclick="openPlateRepair(this)">Redraw plate area</button>':""}
+    ${x.category==="plate"?'<small class="quad-status" role="status" title="Corners apply only to this exact source frame. Group-wide Is/Not and Blur/Keep choices are separate. Keyboard: select corner 1–4, use arrows; Ctrl+Z undoes.">Corners autosave to track</small><button type="button" class="sec quad-retry" hidden>Retry save</button>':""}
+    <div>${plateVerificationBadge(x)}${plateBoundaryBadge(x)}${x.learning_conflict?'<span class="badge" title="The original coverage was retained where the learned model could not make a reliable refinement">Model disagreement — review</span> ':""}${plateFallbackText(x)?`<span class="badge" style="white-space:normal">${plateFallbackText(x)}</span> `:""}${x.shaped?'<span class="badge" title="Thumbnail rectangle is a selection guide; open to inspect the mask and any exclusions">shaped mask</span> ':""}${x.personcard?`<b>Person ${x.person+1}</b> — one decision for ALL their appearances`:`"${sectionEscape(x.text)}"`}${x.frames?` <span class="badge">×${x.frames} frames</span>`:""}${x.confidence?` <span class="badge" title="detector confidence — not a human decision">${Math.round(x.confidence*100)}%</span>`:""} <br>${x.t_start.toFixed(1)}–${x.t_end.toFixed(1)}s</div>
     ${plateTextBadge(x)}
     <div class="review-similar-slot" id="similar${x.i}"></div>
     <div class="finding-confirm" role="group" aria-label="Human classification">
@@ -7379,7 +7440,7 @@ function confirmFinding(i,label){
      try{return await submit();}
      catch(error){
       if(attempt>=3||error.status!==503||
-         !/^Another review edit is saving\\. Retry shortly\\./.test(error.message||"")||
+         !String(error.message||"").startsWith("Another review edit is saving. Retry shortly.")||
          CUR!==job||JOBVIEW!==view)throw error;
       if(note)note.textContent="Another review edit is saving · retrying confirmation…";
       await new Promise(resolve=>setTimeout(resolve,[150,400,900][attempt]));

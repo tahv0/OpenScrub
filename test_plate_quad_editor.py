@@ -83,6 +83,7 @@ def test_four_corner_drag_save_creates_verified_sample(plate_job):
     saved = json.loads(report.read_text(encoding="utf-8"))["detections"][0]
     assert saved["verified_label"] == "plate"
     assert len(saved["plate_quad"]) == 4
+    assert saved["plate_quad_frame"] == 2, 'wider time interval must remain box-protected'
     assert saved["plate_quad"][0][0] == pytest.approx((54-45)/92, abs=1e-6)
     labels = job_dir / "plate_annotations" / "annotations.jsonl"
     assert labels.is_file()
@@ -141,3 +142,26 @@ def test_rotated_four_corners_save_as_normalized_polygon(plate_job):
     for p, q in zip(stored["plate_quad"], expected):
         assert p == pytest.approx(q, abs=1e-6)
     assert stored["verified_label"] == "plate"
+
+
+def test_legacy_corner_autosave_does_not_copy_perspective_to_track_siblings(plate_job):
+    client, jid, report, _ = plate_job
+    doc = json.loads(report.read_text())
+    other = dict(doc['detections'][0],t_start=.5,t_end=.8,last_seen=.6,
+                 cbox=[40,60,125,110],frame_index=6,
+                 plate_quad=[],verified_label='')
+    doc['detections'].append(other)
+    report.write_text(json.dumps(doc))
+    original=[[54.,77.],[126.,74.],[129.,91.],[52.,94.]]
+    result=client.post(f'/api/jobs/{jid}/plate_quad/0',
+        json={'points':original,'apply_track':True})
+    assert result.status_code==200,result.get_data(as_text=True)
+    assert result.get_json()['applied']==1
+    rows=json.loads(report.read_text())['detections']
+    assert len(rows[0]['plate_quad'])==4
+    assert rows[0]['plate_boundary_source']=='human_corners'
+    assert rows[0]['human_region_confirmed'] is True
+    assert rows[1].get('plate_quad') == []
+    assert rows[1].get('plate_boundary_source') in (None,'detector_fallback')
+    assert rows[1].get('human_region_confirmed') is not True
+    assert rows[1]['enabled'] is True

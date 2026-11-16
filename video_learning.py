@@ -12,6 +12,7 @@ from pathlib import Path
 
 import cv2
 import numpy as np
+import plate_boundaries
 
 
 def _frame(row, rs):
@@ -323,23 +324,59 @@ class CropRefiner:
 
 
 def conservative_quad(mask):
-    """Use one inspectable four-corner outline, shared by validation and rendering."""
-    padded=cv2.dilate(mask.astype(np.uint8),np.ones((3,3),np.uint8))
-    contours,_=cv2.findContours(padded,cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
-    if not contours:return None,None
-    allpoints=np.concatenate(contours)
-    hull=cv2.convexHull(allpoints)
-    proposal=cv2.approxPolyDP(hull,.005*cv2.arcLength(hull,True),True).reshape(-1,2)
-    filled=np.zeros_like(padded)
-    if len(proposal)==4:
-        cv2.fillConvexPoly(filled,proposal.astype(np.int32),1)
-    if len(proposal)!=4 or np.logical_and(padded,filled==0).any():
-        proposal=cv2.boxPoints(cv2.minAreaRect(allpoints))
-    center=proposal.mean(axis=0)
-    proposal=proposal[np.argsort(np.arctan2(proposal[:,1]-center[1],proposal[:,0]-center[0]))]
-    proposal=np.roll(proposal,-int(np.argmin(proposal.sum(axis=1))),axis=0)
-    filled[:]=0;cv2.fillConvexPoly(filled,np.rint(proposal).astype(np.int32),1)
-    return proposal,filled
+    """Legacy shared mask coverage/quad API, now perspective-aware."""
+    return plate_boundaries.conservative_quad(mask)
+
+
+def _fallback_plate_boundary(row, reason):
+    """A missing/unsafe learned outline must NEVER make output visible."""
+    if row.get('human_region_confirmed'):
+        return
+    # Old learned quads might not have provenance. Do not carry them over
+    # after a newly selected model failed to cover the present source frame.
+    if row.get('plate_quad'):
+        row.update(poly=[], poly_holes=[], plate_quad=[], mask_pad=-1)
+    row['plate_boundary_source'] = (
+        'lettering_mask' if row.get('poly') else 'detector_fallback')
+    row['learning_conflict'] = reason
+    row['enabled'] = row.get('enabled', True)  # never suppress an uncertain plate
+
+
+def _guard_temporal_plate_boundaries(rows, fps):
+    """Reject contradictory adjacent learned quads, never infer new narrow ones.
+
+    All geometry is per source frame. This only REMOVES an implausible narrow
+    learned outline; the frame's own detector box stays fully protected.
+    """
+    tracks = {}
+    for row in rows:
+        if (row.get('category') == 'plate' and row.get('track', -1) >= 0
+                and str(row.get('plate_boundary_source', '')).startswith('learned_')
+                and not row.get('human_region_confirmed')):
+            tracks.setdefault(row['track'], []).append(row)
+    rejected = set()
+    for members in tracks.values():
+        members.sort(key=lambda row: row.get('frame_index', -1))
+        for a, b in zip(members, members[1:]):
+            fa, fb = a.get('frame_index', -1), b.get('frame_index', -1)
+            if fa < 0 or fb <= fa or fb - fa > max(2, round(float(fps) * .25)):
+                continue
+            pa, pb = np.asarray(a['plate_quad']), np.asarray(b['plate_quad'])
+            if pa.shape != (4, 2) or pb.shape != (4, 2):
+                continue
+            if np.max(np.abs(pa - pb)) > .48:
+                # Only the learned outlines are untrustworthy. Preserve the
+                # underlying detector evidence and all human decisions.
+                rejected.add(id(a))
+                rejected.add(id(b))
+    count = 0
+    for members in tracks.values():
+        for row in members:
+            if id(row) in rejected:
+                _fallback_plate_boundary(
+                    row, 'learned corners jump between adjacent frames; detector coverage retained')
+                count += 1
+    return count
 
 
 def refine_report(video, doc, model, threshold=.8, cancelled=None, progress=None,
@@ -354,7 +391,9 @@ def refine_report(video, doc, model, threshold=.8, cancelled=None, progress=None
     if not cap.isOpened():
         raise ValueError('Cannot open video for the learning refinement pass')
     result=deepcopy(doc);rs=result['render_state'];targets={}
-    stats={'model_calls':0,'refined':0,'disagreements':0,'decoded_frames':0}
+    stats={'model_calls':0,'refined':0,'disagreements':0,'decoded_frames':0,
+           'perspective':0,'rotated_box':0,'boundary_fallbacks':0,'unstable':0,
+           'human_preserved':0}
     start,index,end=0,0,len(rs['cum'])
     try:
         fps=cap.get(cv2.CAP_PROP_FPS)
@@ -385,29 +424,43 @@ def refine_report(video, doc, model, threshold=.8, cancelled=None, progress=None
             if not ok: break
             stats['decoded_frames']+=1
             for row in targets.get(index,[]):
+                if row.get('human_region_confirmed') and len(row.get('plate_quad') or []) == 4:
+                    row['plate_boundary_source'] = 'human_corners'
+                    stats['human_preserved'] += 1
+                    continue
                 b=_screen_box(row,rs,index)
                 x1,y1,x2,y2=crop_bounds(b,image.shape)
                 if x2<=x1 or y2<=y1: raise ValueError('Invalid learning proposal crop')
                 mask,score=model.predict(image[y1:y2,x1:x2]);stats['model_calls']+=1
                 row['learning_score']=score
                 if mask is None or score < threshold:
-                    row['learning_conflict']='learned model uncertain; original coverage retained'
-                    stats['disagreements']+=1;continue
-                points,covered=conservative_quad(mask)
+                    _fallback_plate_boundary(row, 'learned model uncertain; original coverage retained')
+                    stats['disagreements']+=1
+                    stats['boundary_fallbacks']+=1
+                    continue
+                points,method,reason=plate_boundaries.safe_plate_boundary(
+                    mask,b,(x1,y1),image.shape)
                 w,h=b[2]-b[0],b[3]-b[1]
-                if points is None or w<=0 or h<=0:
-                    row['learning_conflict']='invalid learned mask; original coverage retained'
-                    stats['disagreements']+=1;continue
-                # A confident adjacent object's mask is not a refinement of
-                # this proposal. Keep the original coverage in that case.
-                center=points.mean(axis=0)+[x1,y1]
-                if not (b[0]<=center[0]<=b[2] and b[1]<=center[1]<=b[3]):
-                    row['learning_conflict']='mask belongs outside proposal; original coverage retained'
-                    stats['disagreements']+=1;continue
+                if points is None:
+                    _fallback_plate_boundary(row, reason+'; detector coverage retained')
+                    stats['disagreements']+=1
+                    stats['boundary_fallbacks']+=1
+                    continue
                 quad=[[(float(x)+x1-b[0])/w,(float(y)+y1-b[1])/h] for x,y in points]
-                row.update(poly=[quad],poly_holes=[],plate_quad=quad,mask_pad=0,
-                           frame_index=index,learning_conflict='',fallback_reason='')
+                # A legacy time-spanning row must stay enabled for its WHOLE
+                # interval. Narrowing it to frame_index=index would make the
+                # other frames unredacted. Instead, apply the narrow learned
+                # polygon only at this evaluated source frame; everywhere
+                # else the active detector box still protects the interval.
+                source_bound=(int(row.get('frame_index', -1)) < 0)
+                row.update(poly=[] if source_bound else [quad],poly_holes=[],
+                           plate_quad=quad,mask_pad=0,
+                           plate_quad_frame=index if source_bound else -1,
+                           learning_conflict='',fallback_reason='',
+                           plate_boundary_source=('learned_perspective' if method=='perspective'
+                                                  else 'learned_rotated_box'))
                 stats['refined']+=1
+                stats[method]+=1
             index+=1
             if progress and (index-start)%30==0:progress(index-start,end-start)
         if targets and max(targets)>=index:
@@ -415,6 +468,11 @@ def refine_report(video, doc, model, threshold=.8, cancelled=None, progress=None
         if index < end:
             raise ValueError('Refinement decoder did not cover the scan timeline')
         if progress:progress(index-start,end-start)
+        stats['unstable']=_guard_temporal_plate_boundaries(result['detections'],rs['fps'])
+        if stats['unstable']:
+            stats['refined']-=stats['unstable']
+            stats['disagreements']+=stats['unstable']
+            stats['boundary_fallbacks']+=stats['unstable']
         return result,stats
     finally:
         cap.release()

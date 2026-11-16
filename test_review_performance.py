@@ -419,9 +419,10 @@ def test_track_geometry_refresh_reuses_original_crop(plate_job, monkeypatch):
     refreshed = client.get(urls[1])
     assert refreshed.status_code == 200
     data = refreshed.get_json()
-    assert data['points'][0][0] == pytest.approx(points[0][0], abs=.001)
+    assert data['points'] == second['points'], (
+        'A sibling sample at a different source frame must retain its own corners')
     assert data['crop'] == second['crop']
-    assert data['preview_token'] != second['preview_token']
+    assert data['preview_token'] == second['preview_token']
     assert data['source_token'] == second['source_token']
 
 

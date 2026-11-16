@@ -68,7 +68,9 @@ def test_drawn_plate_stays_a_draft_until_explicit_classification(drawn_job, monk
     assert job['trackbg'] == {'state': 'done', 'added': 3, 'error': None}
     doc = json.loads(path.read_text())
     rows = doc['detections']
-    assert all(row['plate_quad'] == QUAD and row['enabled'] for row in rows)
+    assert all(row['enabled'] for row in rows)
+    assert [row.get('plate_quad') or [] for row in rows] == [[], QUAD, []], (
+        'Tracked boxes are valid group coverage; only the drawn source frame has human corners')
     assert all(not row.get('verified_label') and not row.get('human_confirmation') for row in rows)
     assert [row.get('human_region_confirmed', False) for row in rows] == [False, True, False]
     assert not (Path(job['dir']) / 'plate_annotations').exists()

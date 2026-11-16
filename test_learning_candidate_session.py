@@ -141,6 +141,19 @@ def test_post_rescan_quality_outcome_retains_candidate_and_previous_review(plate
         fresh = deepcopy(original)
         if outcome == 'no_proposals':
             fresh['detections'] = []
+        else:
+            # The original source frame has confirmed human corners and is
+            # intentionally exempt from machine refinement. Add a separate,
+            # unconfirmed source-frame proposal to exercise a model that
+            # genuinely sees a candidate but produces no usable refinement.
+            row = dict(fresh['detections'][0])
+            row.update(track=901, frame_index=6, t_start=.6, t_end=.7,
+                       last_seen=.6, cbox=[132,66,195,96],
+                       plate_quad=[], verified_label='',
+                       human_region_confirmed=False,
+                       plate_boundary_source='', poly=[], poly_holes=[],
+                       mask_pad=-1)
+            fresh['detections'].append(row)
         return fresh
     with pytest.raises(rejection_type()) as caught:
         ls.run_session(job, lambda i: web._read_exact_frame(job['video'], i), scan,

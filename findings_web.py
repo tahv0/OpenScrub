@@ -16,6 +16,7 @@ from werkzeug.exceptions import HTTPException
 
 import confirmed_findings as library
 import finding_previews as previews
+import plate_boundaries
 import findings_training as training
 import learning_session
 import stop_review
@@ -162,6 +163,8 @@ def preview(job, index, doc=None, cache_only=False, preferred_key=None,
     # Match the canonical report frame even when a legacy fractional timestamp
     # would be rounded differently by the generic cache's time-based lookup.
     cache_row = dict(row,frame_index=frame)
+    if row.get('category') == 'plate' and not plate_boundaries.trusted_plate_quad(row):
+        cache_row['plate_quad'] = []
     if preferred_key is not None:
         # An in-flight cache fill may add a newer exact sample, but must not
         # change the source JPEG of a human decision already being saved.
@@ -180,7 +183,7 @@ def preview(job, index, doc=None, cache_only=False, preferred_key=None,
     if cached is None and cache_only:
         return None
     box = list(map(float, video_learning._screen_box(row, rs, frame)))
-    q = row.get('plate_quad') or ((0., 0.), (1., 0.), (1., 1.), (0., 1.))
+    q = cache_row.get('plate_quad') or ((0., 0.), (1., 0.), (1., 1.), (0., 1.))
     points = [[box[0]+x*(box[2]-box[0]), box[1]+y*(box[3]-box[1])] for x,y in q]
     if cached is None:
         # Legacy jobs may need one bounded CPU decode. All subsequent thumbnail,
@@ -540,6 +543,14 @@ def _video(job, doc, meta):
                 total_frames=int(identity.get('total_frames') or len(doc['render_state']['cum'])))
 
 
+def _require_exact_corners(row, rs, meta, payload):
+    """A borrowed cached neighbor cannot authorize a narrow quad in another frame."""
+    if (payload.get('points') is not None
+            and int(meta['frame']) != video_learning._frame(row, rs)):
+        raise library.ConflictError(
+            'This picture is from another frame. Load the exact source frame before editing corners.')
+
+
 def _shape(points, meta):
     try:
         value = np.asarray(points, dtype=float)
@@ -744,12 +755,14 @@ def _journal_confirm(job, index, payload, doc, trace=None, rebind=False):
                       plate_verification_override=True,
                       _remove_plate_verification=True)
     if payload.get('points') is not None:
+        _require_exact_corners(row, doc['render_state'], meta, payload)
         meta['points'] = _shape(payload['points'], meta)
         box = meta['box']
         row['plate_quad'] = [[(x-box[0])/(box[2]-box[0]), (y-box[1])/(box[3]-box[1])]
                              for x,y in meta['points']]
         row['human_region_confirmed'] = True
-        fields['plate_quad'] = row['plate_quad']
+        row['plate_boundary_source'] = 'human_corners'
+        row['plate_quad_frame'] = (int(meta['frame']) if int(row.get('frame_index', -1)) < 0 else -1)
     # Archive evidence first. If the later small SQLite transaction fails,
     # retrying the same evidence is idempotent and no false saved ACK is sent.
     if trace: trace.enter('archive')
@@ -772,7 +785,13 @@ def _journal_confirm(job, index, payload, doc, trace=None, rebind=False):
         anchor.update(plate_quad=[], human_region_confirmed=False,
                       poly=[], poly_holes=[], mask_pad=-1)
     if payload.get('points') is not None:
-        anchor['human_region_confirmed'] = True
+        # Classification is group-wide; geometry belongs to this frame only.
+        anchor.update(human_region_confirmed=True,
+                      plate_quad=row['plate_quad'],
+                      plate_quad_frame=row['plate_quad_frame'],
+                      plate_boundary_source='human_corners',
+                      poly=[], poly_holes=[], mask_pad=0,
+                      _remove_plate_verification=True)
     if trace: trace.enter('journal_commit')
     review_journal.write(job['dir'], row, index, fields, anchor)
     if trace: trace.mark('journal_commit')
@@ -796,6 +815,7 @@ def _journal_region(job, index, payload, doc):
     row = dict(doc['detections'][index])
     if row['category'] != 'plate':
         raise ValueError('Four-corner area editing currently applies to plate findings.')
+    _require_exact_corners(row, doc['render_state'], meta, payload)
     points = _shape(payload.get('points'),meta)
     box = meta['box']
     quad = [[round((x-box[0])/(box[2]-box[0]),6),
@@ -809,7 +829,7 @@ def _journal_region(job, index, payload, doc):
         if (receipt.get('source') != meta['source_token'] or row.get('plate_quad') != quad
                 or receipt.get('token') != payload.get('preview_token')):
             raise library.ConflictError('Edit identifier belongs to different corners.')
-        return dict(ok=True,applied=_journal_members(doc,index),verified_samples_added=0,
+        return dict(ok=True,applied=1,verified_samples_added=0,
                     preview=meta,verified_label=row.get('verified_label',''),
                     classification_required=not bool((row.get('human_confirmation') or {}).get('label')),
                     reconfirmation_required=bool(receipt.get('reconfirmation_required')),
@@ -819,13 +839,19 @@ def _journal_region(job, index, payload, doc):
     confirmed = row.get('human_confirmation') or {}
     row['plate_quad'] = quad
     row['human_region_confirmed'] = True
+    row['plate_quad_frame'] = (int(meta['frame']) if int(row.get('frame_index', -1)) < 0 else -1)
     meta['points'] = points
     archive = None
     if (row.get('confirmed_finding_id')
             and confirmed.get('label') in ('positive','negative')
             and not confirmed.get('propagated')):
         archive = _archived(job, doc, row, meta, jpeg, confirmed['label'])
-    anchor = dict(human_region_confirmed=True)
+    anchor = dict(human_region_confirmed=True, plate_quad=quad,
+                  plate_quad_frame=row['plate_quad_frame'],
+                  plate_boundary_source='human_corners',
+                  poly=[], poly_holes=[], mask_pad=0,
+                  plate_verification_override=True,
+                  _remove_plate_verification=True)
     if edit_id:
         anchor['compact_edit_receipt'] = dict(
             id=edit_id,source=meta['source_token'],token=payload.get('preview_token'))
@@ -833,21 +859,18 @@ def _journal_region(job, index, payload, doc):
         anchor.update(confirmed_finding_id=archive['id'],
                       confirmed_finding_revision=archive['revision'])
     if row.get('source_repair_receipt'):
-        anchor.update(plate_quad=quad, plate_verification_override=True,
-                      plate_verification=None)
+        # Repaired frames have an independent source-row override.
         review_journal.write_anchor(job['dir'], index, anchor)
     else:
-        review_journal.write(job['dir'],row,index,dict(
-            plate_quad=quad, plate_verification_override=True,
-            _remove_plate_verification=True),anchor)
+        # Exact-frame corners must not enter the shared group patch.
+        review_journal.write(job['dir'], row, index, {}, anchor)
     meta['preview_token'] = _token(doc,row,meta['frame'],meta.get('key'))
     elapsed = time.monotonic()-started
     if elapsed >= 3:
         _web.diagnostics.event('review_corner_save_slow',job,
             total_ms=round(elapsed*1000), report_write_ms=0,
             rows=_journal_members(doc,index), mode='sqlite_journal')
-    return dict(ok=True, applied=(1 if row.get('source_repair_receipt')
-                                  else _journal_members(doc,index)),
+    return dict(ok=True, applied=1,
                 verified_samples_added=0, finding=archive, preview=meta,
                 verified_label=row.get('verified_label',''),
                 classification_required=not bool(confirmed.get('label')),
@@ -913,11 +936,14 @@ def confirm(job, index, payload):
         if payload.get('preview_token') not in (None, meta['preview_token']):
             abort(409, description='The finding changed. Reload its picture.')
         if payload.get('points') is not None:
+            _require_exact_corners(row, doc['render_state'], meta, payload)
             meta['points'] = _shape(payload['points'], meta)
             box = meta['box']
             row['plate_quad'] = [[(x-box[0])/(box[2]-box[0]),(y-box[1])/(box[3]-box[1])]
                                  for x,y in meta['points']]
             row['human_region_confirmed'] = True
+            row['plate_quad_frame'] = (int(meta['frame']) if int(row.get('frame_index', -1)) < 0 else -1)
+            row['plate_boundary_source'] = 'human_corners'
         trace.enter('propagate_group')
         for i, member in _members(doc, index):
             _web._human_plate_override(member)
@@ -927,8 +953,12 @@ def confirm(job, index, payload):
                                                 source='explicit', propagated=i != index)
             if row['category'] == 'plate':
                 member['verified_label'] = 'plate' if label == 'positive' else 'not_plate'
-                if payload.get('points') is not None:
-                    member['plate_quad'] = row['plate_quad']
+                if payload.get('points') is not None and i == index:
+                    member.update(plate_quad=row['plate_quad'],
+                                  plate_quad_frame=row['plate_quad_frame'],
+                                  plate_boundary_source='human_corners',
+                                  human_region_confirmed=True,
+                                  poly=[], poly_holes=[], mask_pad=0)
         trace.mark('propagate_group')
         trace.enter('section_guard')
         _guard_section(job, before, doc)
@@ -983,6 +1013,7 @@ def region(job, index, payload):
     row = doc['detections'][index]
     if row['category'] != 'plate':
         raise ValueError('Four-corner area editing currently applies to plate findings.')
+    _require_exact_corners(row, doc['render_state'], meta, payload)
     points = _shape(payload.get('points'), meta)
     box = meta['box']
     quad = [[round((x-box[0])/(box[2]-box[0]),6),round((y-box[1])/(box[3]-box[1]),6)] for x,y in points]
@@ -1007,11 +1038,12 @@ def region(job, index, payload):
                     cleared_indices=receipt.get('cleared_indices') or [])
     if payload.get('preview_token') not in (None, meta['preview_token']):
         raise library.ConflictError('This finding changed. Reload its picture before saving.')
-    for _, member in members:
-        _web._human_plate_override(member)
-        member['plate_quad'] = quad
-        member.pop('compact_edit_receipt',None)
-    row['human_region_confirmed'] = True
+    # Other track frames may have a different rotation or perspective.
+    _web._human_plate_override(row)
+    row.update(plate_quad=quad, plate_boundary_source='human_corners',
+               plate_quad_frame=(int(meta['frame']) if int(row.get('frame_index', -1)) < 0 else -1),
+               human_region_confirmed=True, poly=[], poly_holes=[], mask_pad=0)
+    row.pop('compact_edit_receipt',None)
     meta['points'] = points
     cleared_indices = []
     if moved_identity:
@@ -1066,7 +1098,7 @@ def region(job, index, payload):
             report_write_ms=round((time.monotonic()-writing)*1000),
             rows=len(doc['detections']), report_mb=report_mb)
     meta['preview_token'] = _token(doc,row,meta['frame'],meta.get('key'))
-    return dict(ok=True, applied=len(members), verified_samples_added=0,
+    return dict(ok=True, applied=1, verified_samples_added=0,
                 finding=entry, preview=meta, verified_label=row.get('verified_label',''),
                 classification_required=moved_identity or not bool(confirmed.get('label')),
                 reconfirmation_required=moved_identity,

@@ -103,3 +103,45 @@ def test_local_export_uses_review_labels_not_time_sampling(tmp_path):
     labels = list((target / "labels" / "train").glob("*.txt"))
     assert len(labels) == 2
     assert len([p for p in labels if p.read_text().strip()]) == 1
+
+
+def test_frame_local_corner_geometry_never_interrupts_tracked_redaction():
+    """The tracked box stays active between samples; only one frame may be narrow."""
+    quad=((.1,.2),(.9,.1),(.8,.85),(.15,.9))
+    d=openscrub.Detection(.2,.6,(20,20,100,50),'plate','plate',.9,
+                         dense=True,track=8,plate_quad=quad,
+                         plate_quad_frame=4,frame_index=-1)
+    active=[i for i in range(2,7) if openscrub._sample_active(d,i,i/10)]
+    assert active==[2,3,4,5,6], 'no unredacted gaps between tracker samples'
+    assert [i for i in active if openscrub._plate_quad_active(d,i)]==[4]
+    assert all(not openscrub._plate_quad_active(d,i) for i in (2,3,5,6))
+    assert openscrub._plate_quad_active(d,4)
+
+
+def test_ordinary_frame_bound_learned_quad_keeps_original_eligibility():
+    d=openscrub.Detection(.2,.3,(20,20,100,50),'plate','plate',.9,
+                         dense=True,track=8,plate_quad=((0,0),(1,0),(1,1),(0,1)),
+                         frame_index=2)
+    assert openscrub._sample_active(d,2,.2)
+    assert not openscrub._sample_active(d,3,.3)
+    assert openscrub._plate_quad_active(d,2)
+
+
+def test_old_spanning_human_polygon_conceals_only_its_source_frame(tmp_path):
+    """Legacy interval-wide quad duplicates may not make intervening frames narrow."""
+    import json
+    quad = [[.1,.1],[.9,.1],[.9,.8],[.1,.8]]
+    doc = {'render_state': {'fps':10,'cum':[[0,0]]*10},
+           'detections':[dict(t_start=.2,t_end=.6,last_seen=.4,
+                              cbox=[20,20,100,50],category='plate',
+                              text='plate',confidence=.9,track=8,
+                              dense=True,plate_quad=quad,
+                              human_region_confirmed=True,
+                              verified_label='plate',enabled=True)]}
+    path=tmp_path/'old-human-quad.json';path.write_text(json.dumps(doc))
+    dets,_,_=openscrub.load_report(str(path))
+    d=dets[0]
+    assert d.plate_quad_frame==4
+    assert [i for i in range(2,7) if openscrub._sample_active(d,i,i/10)]==[2,3,4,5,6]
+    assert [i for i in range(2,7) if openscrub._plate_quad_active(d,i)]==[4]
+    assert not d.poly

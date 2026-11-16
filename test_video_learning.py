@@ -203,3 +203,109 @@ def test_negative_track_covers_new_intermediate_samples_without_extending_its_li
     new=report([row(i,[10+i-2,10,50+i-2,30]) for i in (2,3,4,5,6,9)])
     result=vl.apply_constraints(new,vl.capture_constraints(old))
     assert [r['enabled'] for r in result['detections']]==[False]*5+[True]
+
+
+def test_refiner_uses_distinct_perspective_corners_for_moving_plate_frames(tmp_path):
+    vl = learning()
+    path = tmp_path/'angled.avi'
+    writer = cv2.VideoWriter(str(path),cv2.VideoWriter_fourcc(*'MJPG'),10,(160,80))
+    for _ in range(10):
+        writer.write(np.full((80,160,3),130,np.uint8))
+    writer.release()
+
+    class Segmentation:
+        calls = 0
+        def predict(self, crop):
+            self.calls += 1
+            m = np.zeros(crop.shape[:2],np.uint8)
+            if self.calls == 1:
+                q = np.array([[29,22],[83,26],[80,50],[32,46]],np.int32)
+            else:
+                q = np.array([[34,20],[84,25],[79,49],[29,47]],np.int32)
+            cv2.fillConvexPoly(m,q,1)
+            return m,.97
+
+    model = Segmentation()
+    doc = report([row(2,[20,20,90,54]),row(3,[20,20,90,54])])
+    result,stats = vl.refine_report(path,doc,model,threshold=.8)
+    a,b = result['detections']
+    assert stats['refined'] == 2 and stats['boundary_fallbacks'] == 0
+    assert a['plate_boundary_source'] == b['plate_boundary_source'] == 'learned_perspective'
+    assert a['plate_quad'] != b['plate_quad']
+    assert a['poly'] == [a['plate_quad']]
+    assert b['poly'] == [b['plate_quad']]
+    assert a['frame_index'] == 2 and b['frame_index'] == 3
+    assert all(r['enabled'] for r in result['detections'])
+    assert not any(r.get('human_region_confirmed') for r in result['detections'])
+    assert doc['detections'][0].get('plate_boundary_source') is None
+
+
+def test_low_segmentation_score_restores_safe_detector_coverage(tmp_path):
+    vl=learning()
+    path=tmp_path/'fallback.avi'
+    writer=cv2.VideoWriter(str(path),cv2.VideoWriter_fourcc(*'MJPG'),10,(160,80))
+    for _ in range(10):writer.write(np.full((80,160,3),120,np.uint8))
+    writer.release()
+    doc=report([row(2,[20,20,90,54],plate_quad=[[.2,.2],[.8,.2],[.8,.8],[.2,.8]],
+                    plate_boundary_source='learned_perspective',
+                    poly=[[[.2,.2],[.8,.2],[.8,.8],[.2,.8]]],mask_pad=0)])
+    class Uncertain:
+        def predict(self,crop):
+            m=np.zeros(crop.shape[:2],np.uint8)
+            cv2.rectangle(m,(30,20),(82,51),1,-1)
+            return m,.03
+    out,stats=vl.refine_report(path,doc,Uncertain(),threshold=.8)
+    r=out['detections'][0]
+    assert r['enabled'] is True
+    assert not r['plate_quad'] and not r['poly']
+    assert r['mask_pad']==-1
+    assert r['plate_boundary_source']=='detector_fallback'
+    assert stats['boundary_fallbacks']==1 and stats['refined']==0
+
+
+def test_refiner_never_reclassifies_or_replaces_human_adjusted_frame(tmp_path):
+    vl=learning()
+    path=tmp_path/'human.avi'
+    writer=cv2.VideoWriter(str(path),cv2.VideoWriter_fourcc(*'MJPG'),10,(160,80))
+    for _ in range(10):writer.write(np.full((80,160,3),120,np.uint8))
+    writer.release()
+    original=[[.1,.2],[.8,.1],[.9,.8],[.2,.9]]
+    doc=report([row(2,[20,20,90,54],plate_quad=original,
+                    human_region_confirmed=True,verified_label='plate')])
+    class NeverPredict:
+        def predict(self,crop):
+            raise AssertionError('A human-corrected source frame must stay authoritative')
+    out,stats=vl.refine_report(path,doc,NeverPredict(),threshold=.8)
+    assert out['detections'][0]['plate_quad']==original
+    assert out['detections'][0]['plate_boundary_source']=='human_corners'
+    assert stats['human_preserved']==1 and stats['model_calls']==0
+
+
+def test_time_spanning_refined_plate_keeps_full_box_on_unevaluated_frames(tmp_path):
+    """A single learned sample cannot turn a multi-frame protective box into a gap."""
+    vl=learning()
+    import openscrub
+    path=tmp_path/'time-spanning.avi'
+    writer=cv2.VideoWriter(str(path),cv2.VideoWriter_fourcc(*'MJPG'),10,(160,80))
+    for _ in range(10):writer.write(np.full((80,160,3),130,np.uint8))
+    writer.release()
+    detection=row(2,[20,20,90,54])
+    detection.update(frame_index=-1,t_start=.2,t_end=.6,last_seen=.2)
+    doc=report([detection])
+    class Segmentation:
+        def predict(self,crop):
+            m=np.zeros(crop.shape[:2],np.uint8)
+            cv2.fillConvexPoly(m,np.array([[29,22],[83,26],[80,50],[32,46]],np.int32),1)
+            return m,.97
+    out,stats=vl.refine_report(path,doc,Segmentation(),threshold=.8)
+    result=out['detections'][0]
+    assert stats['refined']==1
+    assert result['frame_index']==-1
+    assert result['plate_quad_frame']==2
+    assert not result['poly'], 'no polygon to cover other unevaluated frames'
+    assert len(result['plate_quad'])==4
+    d=openscrub.Detection(.2,.6,tuple(result['cbox']),'plate','plate',.9,
+                          dense=True,track=7,plate_quad=tuple(tuple(pt) for pt in result['plate_quad']),
+                          plate_quad_frame=result['plate_quad_frame'],frame_index=result['frame_index'])
+    assert all(openscrub._sample_active(d,i,i/10) for i in range(2,7))
+    assert [i for i in range(2,7) if openscrub._plate_quad_active(d,i)]==[2]

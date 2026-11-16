@@ -611,3 +611,106 @@ def test_bulk_selection_rejects_unrelated_exclusions_and_unreviewed_rows(finding
     assert wrong.status_code == 400
     assert client.get('/api/findings/selection?label=negative').get_json()['total'] == 0
     assert saved['id'] not in selection['excluded_ids']
+
+
+def test_corners_apply_only_to_confirmed_source_frame_not_entire_plate_track(findings_job):
+    """One group decision, distinct exact-frame polygons, and no fake training labels."""
+    client, job, _, report = findings_job
+    doc = json.loads(report.read_text())
+    assert len(doc['detections']) >= 2
+    doc['detections'][1]['track'] = doc['detections'][0]['track']
+    report.write_text(json.dumps(doc))
+    one = f'/api/jobs/{job["id"]}/finding-preview/0'
+    original = client.get(one)
+    assert original.status_code == 200
+    meta = json.loads(original.headers['X-Finding-Geometry'])
+    corners = [list(pt) for pt in meta['points']]
+    corners[0][0] += 1
+    response = client.post(f'/api/jobs/{job["id"]}/plate_quad/0', json={
+        'compact':True,'autosave':True,'apply_track':True,'edit_id':'source-frame-only',
+        'points':corners,'preview_token':meta['preview_token'],'preview_key':meta['key']})
+    assert response.status_code == 200, response.get_data(as_text=True)
+    assert response.get_json()['applied'] == 1
+    saved = web._load_job_report(job)['detections']
+    assert len(saved[0]['plate_quad']) == 4
+    assert saved[0]['plate_boundary_source'] == 'human_corners'
+    assert saved[0]['human_region_confirmed'] is True
+    assert not saved[1].get('plate_quad')
+    assert not saved[1].get('human_region_confirmed')
+    assert not saved[1].get('verified_label')
+    # The human label (unlike geometry) is applied to the whole track.
+    positive = client.post(f'/api/jobs/{job["id"]}/confirm/0',
+                           json={'label':'positive'})
+    assert positive.status_code == 200, positive.get_data(as_text=True)
+    confirmed = web._load_job_report(job)['detections']
+    assert confirmed[0]['verified_label'] == confirmed[1]['verified_label'] == 'plate'
+    assert confirmed[0]['plate_boundary_source'] == 'human_corners'
+    assert not confirmed[1].get('plate_quad')
+    assert not confirmed[1].get('human_region_confirmed')
+    assert client.get('/api/findings').get_json()['total'] == 1
+
+
+def test_confirmation_supplied_corners_do_not_become_track_wide_segmentation(findings_job):
+    client, job, _, report = findings_job
+    doc = json.loads(report.read_text())
+    doc['detections'][1]['track'] = doc['detections'][0]['track']
+    report.write_text(json.dumps(doc))
+    old = client.get(f'/api/jobs/{job["id"]}/finding-preview/0')
+    assert old.status_code == 200
+    meta = json.loads(old.headers['X-Finding-Geometry'])
+    corners = [list(p) for p in meta['points']]
+    corners[0][0] += 1
+    result = client.post(f'/api/jobs/{job["id"]}/confirm/0', json={
+        'label':'positive','points':corners,
+        'preview_token':meta['preview_token'],'preview_key':meta['key']})
+    assert result.status_code == 200, result.get_data(as_text=True)
+    current = web._load_job_report(job)['detections']
+    assert current[0]['plate_boundary_source'] == 'human_corners'
+    assert current[0]['human_region_confirmed'] is True
+    assert not current[1].get('plate_quad')
+    assert not current[1].get('human_region_confirmed')
+    assert current[1]['verified_label'] == 'plate'
+
+
+def test_cached_neighbor_cannot_save_narrow_corners_until_exact_frame_loaded(findings_job):
+    """A frame-2 thumbnail cannot place a narrow polygon on frame 8."""
+    client, job, _, report = findings_job
+    doc = json.loads(report.read_text())
+    doc['detections'][1]['track'] = doc['detections'][0]['track']
+    report.write_text(json.dumps(doc))
+    base = f'/api/jobs/{job["id"]}/finding-preview'
+    first = client.get(base+'/0')
+    assert first.status_code == 200
+    original = json.loads(first.headers['X-Finding-Geometry'])
+    near = client.get(base+'/1?cache_only=1')
+    assert near.status_code == 200
+    borrowed = json.loads(near.headers['X-Finding-Geometry'])
+    assert borrowed['match'] == 'representative'
+    assert borrowed['frame'] == original['frame']
+    assert borrowed['requested_frame'] == doc['detections'][1]['frame_index']
+    assert borrowed['frame'] != borrowed['requested_frame']
+    corners = [list(pt) for pt in borrowed['points']]
+    corners[0][0] += 1
+    refused = client.post(f'/api/jobs/{job["id"]}/finding-region/1',json={
+        'points':corners,'preview_key':borrowed['key'],
+        'preview_token':borrowed['preview_token']})
+    assert refused.status_code == 409, refused.get_data(as_text=True)
+    assert 'exact source frame' in refused.get_json()['error']
+    assert not web._load_job_report(job)['detections'][1].get('plate_quad')
+    exact = client.get(base+'/1?exact=1')
+    assert exact.status_code == 200, exact.get_data(as_text=True)
+    own = json.loads(exact.headers['X-Finding-Geometry'])
+    assert own['frame'] == doc['detections'][1]['frame_index']
+    assert own.get('match') in (None, 'exact'), 'fresh exact-frame crops have no lookup match tag'
+    assert own['key'] != borrowed['key']
+    points = [list(pt) for pt in own['points']]
+    points[0][0] += 1
+    saved = client.post(f'/api/jobs/{job["id"]}/finding-region/1',json={
+        'points':points,'preview_key':own['key'],
+        'preview_token':own['preview_token']})
+    assert saved.status_code == 200, saved.get_data(as_text=True)
+    rows = web._load_job_report(job)['detections']
+    assert not rows[0].get('plate_quad')
+    assert rows[1]['plate_quad'] and rows[1]['plate_boundary_source']=='human_corners'
+    assert not rows[0].get('human_region_confirmed')
+    assert rows[1]['human_region_confirmed']
