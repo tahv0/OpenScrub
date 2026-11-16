@@ -166,7 +166,10 @@ def encrypt_tree(key, root):
     n = 0
     for p in list(_walk_files(root)):
         if p.endswith(".tmp"):
-            os.remove(p)                       # leftover from a crash
+            try:
+                os.remove(p)                   # leftover from a crash
+            except FileNotFoundError:
+                pass                           # published since enumeration
         elif not is_encrypted(p):
             encrypt_file(key, p)
             n += 1
@@ -178,7 +181,10 @@ def decrypt_tree(key, root):
     n = 0
     for p in list(_walk_files(root)):
         if p.endswith(".tmp"):
-            os.remove(p)
+            try:
+                os.remove(p)
+            except FileNotFoundError:
+                pass                           # published since enumeration
         elif is_encrypted(p):
             decrypt_file(key, p)
             n += 1
