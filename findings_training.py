@@ -99,6 +99,54 @@ def resolve_parent(model_root, model_id=None):
             'parent_model_id': model_id}
 
 
+def training_corpus_summary(model_root, model_id):
+    """Read-only counts for a locally retained parent, without opening images.
+
+    A model is eligible only if its detached lineage receipt is bound to the
+    published model manifest. Full checkpoint/image integrity is deliberately
+    checked at training time by resolve_parent; this view is NOT a claim that
+    unreviewed tracker predictions are trusted or that all files were rehashed.
+    """
+    folder, info = _local_metadata(model_root, model_id)
+    payload = models._read_file(folder / 'lineage.json', 32 * 1024 * 1024)
+    if hashlib.sha256(payload).hexdigest() != info['lineage_sha256']:
+        raise models.ModelError('The saved model training lineage changed')
+    lineage = models._json(payload)
+    samples = lineage.get('samples') if isinstance(lineage, dict) else None
+    if (not isinstance(lineage, dict) or lineage.get('schema') != 1
+            or lineage.get('model_id') != model_id
+            or lineage.get('model_sha256') != info['model_sha256']
+            or not isinstance(samples, dict)
+            or len(samples) != info['example_count']):
+        raise models.ModelError('Invalid saved model training corpus metadata')
+    counts = {'positive': 0, 'negative': 0}
+    confirmed_quads = 0
+    videos = set()
+    for sid, sample in samples.items():
+        if (not isinstance(sid, str) or not models._HASH.fullmatch(sid)
+                or not isinstance(sample, dict)
+                or not isinstance(sample.get('label'), str)
+                or sample.get('label') not in counts):
+            raise models.ModelError('Invalid saved model training example metadata')
+        source = sample.get('source')
+        if not isinstance(source, dict) or not isinstance(source.get('video_id'), str):
+            raise models.ModelError('Invalid saved model training example provenance')
+        counts[sample['label']] += 1
+        confirmed_quads += int(sample.get('label') == 'positive' and
+                               sample.get('quality') == 'human_quad')
+        videos.add(source['video_id'])
+    return {
+        'model_id': model_id,
+        'total': len(samples),
+        'positive': counts['positive'],
+        'negative': counts['negative'],
+        'human_quads': confirmed_quads,
+        'source_videos': len(videos),
+        'parent_model_id': lineage.get('parent_model_id'),
+        'status': 'retained_snapshot',
+    }
+
+
 def training_info(model_root, model_id):
     try:
         _, info = _local_metadata(model_root, model_id)

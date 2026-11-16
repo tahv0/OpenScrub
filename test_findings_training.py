@@ -493,3 +493,60 @@ def test_finalizes_legacy_rounded_proposal_without_running_new_epochs(tmp_path, 
     assert result['assessment']['held_out_positive'] == sum(row['label'] == 'positive' for row in rows)
     assert result['assessment']['held_out_negative'] == sum(row['label'] == 'negative' for row in rows)
     assert result['assessment']['status'] == 'review_only'
+
+
+
+def test_inherited_corpus_summary_reuses_original_positive_negative_labels_without_opening_images(tmp_path, monkeypatch):
+    """Summary is cheap; the subsequent named training verifies every artifact."""
+    ft = module()
+    import confirmed_findings
+    import learning_candidates as lc
+    data = examples(tmp_path)
+    monkeypatch.setattr(confirmed_findings, 'training_snapshot', lambda *a, **k: data)
+    base = tmp_path / 'base.pt'
+    base.write_bytes(b'trusted checkpoint')
+    monkeypatch.setenv('OPENSCRUB_TRAIN_WEIGHTS', str(base))
+    first = ft.run(make_job(tmp_path / 'first-run'), tmp_path / 'findings',
+                   tmp_path / 'models', {'name': 'Original evidence',
+                   'license_accepted': True}, train=trainer)
+    root = tmp_path / 'models'
+    expected = {'model_id': first['model_id'], 'total': 32,
+                'positive': 16, 'negative': 16, 'human_quads': 0,
+                'source_videos': 2, 'parent_model_id': None,
+                'status': 'retained_snapshot'}
+    def no_hash(*a, **k):
+        pytest.fail('Read-only lineage counts must not hash or reopen training images')
+    with monkeypatch.context() as guard:
+        guard.setattr(lc, '_hash_file', no_hash)
+        guard.setattr(cv2, 'imread', no_hash)
+        assert ft.training_corpus_summary(root, first['model_id']) == expected
+
+    # The parent itself carries all original labels and locally trained weights.
+    # A future run can freeze those samples with no original video or crop decode.
+    parent = ft.resolve_parent(root, first['model_id'])
+    stage = tmp_path / 'next-corpus'
+    stage.mkdir()
+    corpus, retained = ft._freeze(stage, [], parent)
+    assert len(retained) == 32
+    assert sum(row['label'] == 'positive' for row in retained.values()) == 16
+    assert sum(row['label'] == 'negative' for row in retained.values()) == 16
+    assert Path(parent['weights']).is_file()
+    assert len(list((corpus / 'images').glob('*.jpg'))) == 32
+
+    # Only the immutable receipt is checked on the read-only summary.
+    lineage = tmp_path / 'learned_model_training' / first['model_id'] / 'lineage.json'
+    saved_lineage = lineage.read_bytes()
+    lineage.write_bytes(b'[' + saved_lineage[1:])  # same-size tamper; hash must still be checked
+    with pytest.raises(ValueError, match='lineage changed'):
+        ft.training_corpus_summary(root, first['model_id'])
+
+
+def test_inherited_corpus_summary_requires_locally_trainable_saved_model(tmp_path):
+    from test_learning_candidates import candidate_job, CANDIDATE_ID
+    import learning_candidates as lc
+    import learned_models as lm
+    original, _ = candidate_job(tmp_path)
+    lc.evaluate(original, CANDIDATE_ID)
+    imported = lm.save_candidate(tmp_path / 'models', original, CANDIDATE_ID, 'Inference only')
+    with pytest.raises(ValueError, match='checkpoint'):
+        module().training_corpus_summary(tmp_path / 'models', imported['id'])
