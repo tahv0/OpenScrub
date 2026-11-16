@@ -113,7 +113,8 @@ def training_corpus_summary(model_root, model_id):
         raise models.ModelError('The saved model training lineage changed')
     lineage = models._json(payload)
     samples = lineage.get('samples') if isinstance(lineage, dict) else None
-    if (lineage.get('schema') != 1 or lineage.get('model_id') != model_id
+    if (not isinstance(lineage, dict) or lineage.get('schema') != 1
+            or lineage.get('model_id') != model_id
             or not isinstance(samples, dict)
             or len(samples) != info['example_count']):
         raise models.ModelError('Invalid saved model training corpus metadata')
