@@ -6305,28 +6305,45 @@ def write_report(path, args, state, output_path=None):
     if output_path and os.path.exists(output_path):
         prov["output"] = os.path.abspath(output_path)
         prov["output_sha256"] = sha256_file(output_path)
-    doc = {
-        "provenance": prov,
-        "render_state": {
-            "fps": state["fps"],
-            "cum": [[round(x, 1), round(y, 1)] for x, y in state["cum"]],
-            "bands": [[round(x, 1), round(y, 1)] for x, y in state["bands"]],
-        },
-        "detections": ([dict(asdict(d), enabled=True)
-                        for d in state["detections"]]
-                       + [dict(asdict(d), enabled=False, zone_dropped=True)
-                          for d in state.get("zdropped", [])]),
-    }
-    # additive field: audio redaction spans survive report round-trips (the
-    # web review stores them here; the render-end rewrite must not drop them)
+    source = state.get("source_report")
+    if source is not None:
+        # A render consumes enabled Detection objects, but publishes the full
+        # review document: Keep choices, row positions and unknown fields are
+        # user data, not a serialization of the render subset.
+        doc = dict(source)
+        previous = dict(source.get("provenance", {}))
+        settings = dict(previous.get("settings", {}))
+        settings.update(prov["settings"])
+        prov["settings"] = settings
+        # Output hashes/paths must describe this render, never an older one.
+        previous.pop("output", None)
+        previous.pop("output_sha256", None)
+        previous.update(prov)
+        doc["provenance"] = previous
+    else:
+        doc = {
+            "provenance": prov,
+            "render_state": {
+                "fps": state["fps"],
+                "cum": [[round(x, 1), round(y, 1)] for x, y in state["cum"]],
+                "bands": [[round(x, 1), round(y, 1)] for x, y in state["bands"]],
+            },
+            "detections": ([dict(asdict(d), enabled=True)
+                            for d in state["detections"]]
+                           + [dict(asdict(d), enabled=False, zone_dropped=True)
+                              for d in state.get("zdropped", [])]),
+        }
+        if state.get("audio_suggestions"):
+            doc["audio_suggestions"] = state["audio_suggestions"]
+        if state.get("audio_transcript"):
+            doc["audio_transcript"] = state["audio_transcript"]
     aspans = getattr(args, "audio_spans", None)
-    if aspans:
+    if ((source is None and aspans)
+            or (source is not None and state.get("audio_redactions_overridden"))):
+        # An explicit empty list clears saved spans. Otherwise preserve the raw
+        # saved representation, including additive fields on individual spans.
         doc["audio_redactions"] = [
-            {"t0": a, "t1": b, "mode": m} for a, b, m in aspans]
-    if state.get("audio_suggestions"):
-        doc["audio_suggestions"] = state["audio_suggestions"]
-    if state.get("audio_transcript"):
-        doc["audio_transcript"] = state["audio_transcript"]
+            {"t0": a, "t1": b, "mode": m} for a, b, m in (aspans or [])]
     atomic_report(path, doc)
 
 
@@ -6336,6 +6353,11 @@ def load_report(path):
     dropped."""
     with open(path, encoding="utf-8") as f:
         doc = json.load(f)
+    return _decode_report(doc)
+
+
+def _decode_report(doc):
+    """Decode the enabled render subset of one already-read report snapshot."""
     if isinstance(doc, list):
         rows, state, prov = doc, None, {}
     else:
@@ -6351,13 +6373,11 @@ def load_report(path):
             confidence=float(r.get("confidence", 1.0)),
             aoff=tuple(r.get("aoff", (0.0, 0.0))),
             last_seen=float(r.get("last_seen", r["t_start"])),
-            # dense/track must survive the round trip: rendering rewrites the
-            # report from rehydrated detections, and losing track ids here
-            # exploded the re-opened review into one card per frame sample
+            # Preserve grouping in the enabled subset used by the renderer.
             dense=bool(r.get("dense", False)),
             track=int(r.get("track", -1)),
             person=int(r.get("person", -1)),
-            poly=tuple(r.get("poly") or ())))
+            poly=tuple(copy.deepcopy(r.get("poly") or ()))))
     return dets, state, prov
 
 
@@ -8443,6 +8463,7 @@ def run_render(args, state, cb=None):
             cb.log("      spoken-PII: %d suggested span(s) applied as "
                    "mute (--audio-pii-apply)" % len(sugg))
             args.audio_spans = aspans
+            state["audio_redactions_overridden"] = True
     mt = (getattr(args, "mute_audio_tracks", "") or "").strip()
     mute_tracks = ("all" if mt == "all"
                    else tuple(int(x) for x in mt.split(",") if x.strip()))
@@ -8508,28 +8529,18 @@ def run_pipeline(args, cb=None):
                                              args.audio_redact_mode)
     if getattr(args, "from_report", None):
         cb.log(f"[1/2] Loading detections from {args.from_report}")
-        dets, rstate, prov = load_report(args.from_report)
-        try:
-            with open(args.from_report, encoding="utf-8") as _f:
-                _adoc = json.load(_f)
-                rstate["audio_suggestions"] = (
-                    _adoc.get("audio_suggestions") or [])
-                # keep the transcript through the render-end report
-                # rewrite — load_report drops unknown fields
-                rstate["audio_transcript"] = (
-                    _adoc.get("audio_transcript") or [])
-        except Exception:
-            pass
-        # audio redactions ride in the report (the web review writes them
-        # there); CLI --audio-redact, when given, wins
-        if not getattr(args, "audio_spans", None):
+        # Read once so geometry, choices, audio and provenance come from the
+        # same snapshot. The raw document stays separate from render objects.
+        with open(args.from_report, encoding="utf-8") as f:
+            source = json.load(f)
+        dets, rstate, prov = _decode_report(source)
+        audio_overridden = getattr(args, "audio_spans", None) is not None
+        if not audio_overridden and isinstance(source, dict):
             try:
-                with open(args.from_report, encoding="utf-8") as f:
-                    _doc = json.load(f)
                 args.audio_spans = [
                     (float(s["t0"]), float(s["t1"]), s.get("mode", "mute"))
-                    for s in _doc.get("audio_redactions", [])]
-            except Exception:
+                    for s in source.get("audio_redactions", [])]
+            except (TypeError, ValueError, KeyError):
                 pass
         orig = prov.get("original_input")
         if orig and os.path.exists(orig) \
@@ -8552,6 +8563,9 @@ def run_pipeline(args, cb=None):
                  "cum": [tuple(v) for v in rstate["cum"]],
                  "bands": [tuple(v) for v in rstate["bands"]],
                  "detections": dets, "input_sha256": in_sha,
+                 "source_report": source,
+                 "audio_redactions_overridden": audio_overridden,
+                 "audio_suggestions": copy.deepcopy(source.get("audio_suggestions")),
                  "stats": {"scans": 0, "raw_hits": 0, "regions": len(dets),
                            "recalls": 0, "remembered": 0}}
         return run_render(args, state, cb)
