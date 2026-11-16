@@ -521,17 +521,17 @@ def test_inherited_corpus_summary_reuses_original_positive_negative_labels_witho
         guard.setattr(cv2, 'imread', no_hash)
         assert ft.training_corpus_summary(root, first['model_id']) == expected
 
-    # Parent selection still uses the original checkpoint and full evidence:
-    # this is a fresh candidate, not a replacement of the original model.
-    second = ft.run(make_job(tmp_path / 'second-run'), tmp_path / 'findings',
-                    root, {'name': 'Follow-on evidence',
-                    'parent_model_id': first['model_id'],
-                    'license_accepted': True}, train=trainer)
-    inherited = ft.training_corpus_summary(root, second['model_id'])
-    assert inherited['total'] == 32
-    assert inherited['positive'] == 16 and inherited['negative'] == 16
-    assert inherited['parent_model_id'] == first['model_id']
-    assert second['model_id'] != first['model_id']
+    # The parent itself carries all original labels and locally trained weights.
+    # A future run can freeze those samples with no original video or crop decode.
+    parent = ft.resolve_parent(root, first['model_id'])
+    stage = tmp_path / 'next-corpus'
+    stage.mkdir()
+    corpus, retained = ft._freeze(stage, [], parent)
+    assert len(retained) == 32
+    assert sum(row['label'] == 'positive' for row in retained.values()) == 16
+    assert sum(row['label'] == 'negative' for row in retained.values()) == 16
+    assert Path(parent['weights']).is_file()
+    assert len(list((corpus / 'images').glob('*.jpg'))) == 32
 
     # Only the immutable receipt is checked on the read-only summary.
     lineage = tmp_path / 'learned_model_training' / first['model_id'] / 'lineage.json'
