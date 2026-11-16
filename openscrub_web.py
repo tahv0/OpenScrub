@@ -7095,6 +7095,12 @@ function plateVerificationGroupSummary(members){
   below:checked.filter(row=>row.plate_verification.decision!=="retain").length,
   filtered:checked.filter(row=>row.plate_verification.applied===true).length};
 }
+function plateVerificationRepresentative(best,members){
+ // Keep the pictured detection's own checker result. A group-level summary
+ // is separate and must never donate another frame's score or decision.
+ return {...best,plate_verification:best.plate_verification||null,
+  plate_verification_group:plateVerificationGroupSummary(members)};
+}
 function formatPlateVerifierScore(value){
  // Raw proposal-associated model score, not a calibrated percentage.
  if(!Number.isFinite(value)||value<0||value>1)return "not available";
@@ -7335,9 +7341,8 @@ async function loadReview(signal=null,phase=SHELLPH){
    const sampled=LEARNING_SELECTION?members.find(m=>LEARNING_SELECTION.has(m.i)):null;
    let best=sampled||members[0];     // use the sampler's representative frame
    // The first exact sighting normally has its compact scan-time crop.
-   const rep={...best};
+   const rep=cat==="plate"?plateVerificationRepresentative(best,members):{...best};
    rep.learning_conflict=members.some(m=>m.learning_conflict)?"Model disagreement — review this track":"";
-   rep.plate_verification_group=plateVerificationGroupSummary(members);
    rep.t_start=members[0].t_start;
    rep.t_end=members[members.length-1].t_end;
    rep.frames=members.length;
