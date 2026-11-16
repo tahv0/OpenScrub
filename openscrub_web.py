@@ -5801,9 +5801,23 @@ async function openPlateRepair(button){
  button.disabled=true;button.textContent="Loading exact source frame…";
  let url=null,dialog=null,saving=false,closed=false;
  try{
-  const {response,data}=await reviewRequest(
-   "api/jobs/"+encodeURIComponent(job)+"/plate-repair/"+selected.i+"/frame",
-   {timeoutMs:120000},"blob");
+  // Explicit redraw should not fail forever while background prefetch has
+  // the single decoder lane. A 503 is a definite non-decode; bound retries
+  // here without changing source frame, user draft, or save payload.
+  let response,data;
+  for(let attempt=0;attempt<12;attempt++){
+   try{
+    ({response,data}=await reviewRequest(
+     "api/jobs/"+encodeURIComponent(job)+"/plate-repair/"+selected.i+"/frame",
+     {timeoutMs:120000},"blob"));
+    break;
+   }catch(error){
+    if(error.status!==503||attempt===11)throw error;
+    if(status)status.textContent="Source decoder is busy · retrying the same exact frame…";
+    await new Promise(resolve=>setTimeout(resolve,Math.min(1500,200*(attempt+1))));
+    if(CUR!==job||JOBVIEW!==view||!button.isConnected)return;
+   }
+  }
   if(CUR!==job||JOBVIEW!==view||!button.isConnected)return;
   const geom=JSON.parse(response.headers.get("X-Repair-Geometry")||"null");
   // The full-frame redraw token is independent of the disposable compact
