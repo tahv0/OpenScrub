@@ -187,3 +187,40 @@ def test_http_confirmation_commits_without_report_rewrite(plate_job,tmp_path,mon
     assert journal.has_changes(job_dir)
     assert journal.publish(job_dir)
     assert json.loads(report.read_text())['detections'][0]['verified_label']=='not_plate'
+
+
+
+def test_batched_output_anchors_keep_human_confirmations_and_publish_atomically(tmp_path):
+    import review_journal as journal
+    import stop_review
+    root = tmp_path / 'review'
+    root.mkdir()
+    report = root / 'report.json'
+    rows = [dict(category='plate', track=8, person=-1, enabled=True,
+                 output_choice_explicit=False,
+                 verified_label='plate',
+                 plate_quad=[[0,0],[1,0],[1,1],[0,1]],
+                 human_confirmation={'label':'positive','source':'explicit'})
+            for _ in range(6)]
+    stop_review.atomic_report(report, {'detections': rows})
+    journal.write_output_anchors(root, {
+        1: {'enabled': False, 'output_choice_explicit': True,
+            'plate_verification_override': True},
+        2: {'enabled': False, 'output_choice_explicit': True,
+            'plate_verification_override': True},
+    })
+    assert journal.has_changes(root)
+    untouched = json.loads(report.read_text())['detections']
+    assert all(row['enabled'] is True for row in untouched)
+    patched = journal.apply(root, json.loads(report.read_text()))['detections']
+    assert patched[1]['enabled'] is False and patched[2]['enabled'] is False
+    assert patched[0]['enabled'] is True and patched[5]['enabled'] is True
+    assert patched[1]['plate_quad'] == rows[1]['plate_quad']
+    assert patched[1]['human_confirmation']['label'] == 'positive'
+    assert journal.publish(root) is True
+    stored = json.loads(report.read_text())['detections']
+    assert stored[1]['enabled'] is False and stored[2]['enabled'] is False
+    assert stored[0]['enabled'] is True and not journal.has_changes(root)
+    with pytest.raises(ValueError, match='Invalid batch'):
+        journal.write_output_anchors(root, {-1:{'enabled':True}})
+    assert not journal.has_changes(root)
