@@ -600,8 +600,8 @@ Numbers on a fixed corpus mean the corpus no longer finds leaks — not
 that leaks are impossible. The benchmark README lists every defect the
 harness caught (all fixed and regression-pinned), and the rules for
 quoting these numbers honestly. The shipped test suite
-(`pytest test_openscrub.py`) exercises the same end-to-end pipeline on
-synthetic videos — for this tool a regression is not a bug, it's a leak,
+(`python -m pytest -q`, collecting root and `tests/` regressions) exercises
+the same end-to-end pipeline on synthetic videos — for this tool a regression is not a bug, it's a leak,
 so the suite must stay green on every change.
 
 ## Feature notes
