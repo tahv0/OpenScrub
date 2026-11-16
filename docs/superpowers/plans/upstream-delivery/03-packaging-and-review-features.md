@@ -88,6 +88,7 @@ Preserve upstream defaults, entry points, security refreshes, declared Python fl
 **Files / contract:** Relevant rasterization/render-setting/frame-readiness functions in `openscrub.py` / `openscrub_web.py`; `tests/test_review_render_alignment.py`. Share a small existing-owner helper only where it removes divergent geometry; avoid a generic graphics abstraction.
 
 - [ ] **E:** Reproduce each candidate on current upstream: configured padding, clipped face ellipse, pending manual edit, dense-track frame, or asynchronous image/mask mismatch. Close already-fixed cases explicitly; preserve Austin's newer close-up face margins.
+- [ ] **E:** Inspect the generic HDR silhouette and invalid-polygon hunks in compound-mask donor `8697c28` separately. Test sparse/edge masks at odd origins against every touched chroma cell, plus NaN/infinite/malformed geometry through actual render. The donor's all-filled-square fixture alone does not establish a regression. Exclude compound-hole schema/training dependencies; deliver independently proven fixes separately.
 - [ ] **I:** Add a pixel/geometry regression per actual mismatch and a wrong-frame response case. The assertion compares the relevant mask/output pixels rather than mirroring the helper's implementation.
 - [ ] **I:** Extract only the necessary coverage/settings/identity fix. A behavior-preserving helper extraction can be its own commit before the bugfix; no compound-hole, silhouette-training or plate-quad dependency.
 - [ ] **V:** Run `python -m pytest test_openscrub.py tests/test_review_render_alignment.py -q`, build, affected browser checks and real synthetic SDR/HDR render where applicable.
@@ -102,6 +103,8 @@ Preserve upstream defaults, entry points, security refreshes, declared Python fl
 **When:** W3 after essential P16 frame/geometry prerequisites; explicitly welcomed in #22. Use early `617c9ac7` / editor `5c0782f` and integrated equivalents. The source-frame lessons from unmerged PR #70 are evidence, not a pre-merged feature.
 
 **Files / contract:** Existing editor/render/report code; `tests/test_plate_quad.py`, `tests/test_plate_quad_editor.py`, `tests/test_plate_quad_render.py`. Proposed additive geometry records four normalized points in the inspected source-frame coordinate system plus source/frame provenance; append optional dataclass fields to preserve positional callers. Keep the exact conversion contract in the PR so preview, persisted points and renderer agree.
+
+Preserve useful disclosure from mixed donor `eedef89`: a saved plate quad/group is not proof of perspective tracking through every frame. Retain plain detector/output wording where useful, excluding custom checker scores and learned-filter state. This belongs in P17's UI/docs review and O02's separately verified tracking contract.
 
 - [ ] **E/S:** Specify the stored quad coordinate convention, source dimensions/frame/time and migration behavior before editing code. Current upstream reports without quad fields remain valid. Experimental fork jobs are not silently migrated.
 - [ ] **I:** Add tests for ordered/convex finite points, degenerate/out-of-frame geometry, source/normalization transforms, report round-trip and positional constructor compatibility. Add a moving plate case proving the same relative quad is not blindly stretched across later boxes.

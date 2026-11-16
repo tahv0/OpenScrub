@@ -113,6 +113,8 @@ For ordinary file responses, use the valid response `Content-Length` matching th
 
 **Files / contract:** `job_save_edits` and all actual report writers it can overlap; `tests/test_large_report_io.py`; `benchmark/review_io.py`. Keep a one-owner helper local initially. When shared, use `openscrub_internal.reports.atomic_report(path, report) -> None`: same-directory publication, raise on failure, never acknowledge incomplete persistence. A per-job transaction covers **read → apply → publish**, not just the final write. Do not introduce a database, training fields or a general repository layer.
 
+**B03 extraction follow-ups:** Include ordinary tracking publication in the writer inventory: mixed section donor `08f432b` reloads the latest report before appending tracked rows, but allocates a track ID earlier, so collision/revision tests still matter. Also reproduce scan → Keep some detections → render → reopen: training donor `db9a142` restores original review rows after rendering, while upstream's load/render/write path may discard disabled rows and stable indices. Preserve that generic requirement under a separate report-round-trip fix if confirmed; do not import `learning_session` to obtain it.
+
 ### P06A — atomic report publication
 
 **What / why / when:** Prevent an interrupted write from replacing a valid report with partial JSON; first P06 correctness PR after the full handler reproducer exists.

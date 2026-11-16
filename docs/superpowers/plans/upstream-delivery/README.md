@@ -21,6 +21,8 @@
 - Use synthetic fixtures. Add new tests under `tests/`, measurements under `benchmark/`, and justified runtime extractions under a single proposed private namespace `openscrub_internal/`.
 - No helper package, frontend toolchain, database or broad reorganization merely to make the repository look cleaner.
 
+Current implementation progress and local PR drafts are recorded in the [execution record](execution/status.md). Future task checkboxes below remain open until their actual checks and review are complete.
+
 ## Read these documents together
 
 | Document | What it supplies |
@@ -80,7 +82,7 @@ The task cards below specify their own **what**, **why**, **when**, implementati
 **When:** W0 before application verification; minimal test-discovery changes travel with the first owning PR, not as a broad infrastructure prerequisite.
 
 - [ ] **E:** Read the then-current contribution guide and dependency files. Record Python, FFmpeg, Node/browser availability and inference providers. Install the existing declared development/runtime requirements into an isolated environment at implementation time; do not add training dependencies.
-- [ ] **I:** Keep `test_openscrub.py` in place. For a new test file use `python -m pytest test_openscrub.py tests/test_<topic>.py -q`; add the same collection to the relevant contribution instructions/CI rather than relying on an unexecuted folder.
+- [ ] **I:** Keep `test_openscrub.py` in place. For a new test file use `python -m pytest test_openscrub.py tests/test_<topic>.py -q`; add the same collection to contribution instructions and an existing test CI job if present. The researched upstream has no test CI job, so P01 updates documented discovery and sdist inclusion without adding an unrelated CI pipeline.
 - [ ] **V:** Run baseline `python -m pytest test_openscrub.py -q` and `python -m build` (sdist then wheel). For each UI change parse the evaluated embedded scripts with Node and exercise the affected browser interaction. For engine changes render a synthetic clip.
 - [ ] **D:** Record skips, missing hardware/models and existing failures separately. Keep actual output/counts with the tested SHA; never replace them with the fork's historical test counts.
 

@@ -143,7 +143,7 @@ Proposed contract: `get_snapshot(job_id, report_path, source_identity) -> (docum
 
 ## P11 — remaining scan overhead investigation
 
-**What:** Identify any upstream scan/preview work that grows unnecessarily with accumulated history, beyond the already-fixed PhiMemory implementation.
+**What:** Identify upstream scan/preview work that grows unnecessarily with accumulated history or decodes an unused prefix, beyond the already-fixed PhiMemory implementation.
 
 **Why:** The user wants the long-scan improvements retained, but `a11a3926` optimizes a cache that upstream does not have. Reintroducing that system would defeat the cleanup.
 
@@ -151,6 +151,7 @@ Proposed contract: `get_snapshot(job_id, report_path, source_identity) -> (docum
 
 **Files / contract:** Initially benchmark/profile evidence only. Candidate owners are existing scan callbacks/preview publication and `run_scan`; implementation files/tests are named after the demonstrated function, not a new subsystem in advance.
 
+- [ ] **E:** Preserve the generic `smooth_dense_tracks` initial-seek hunk hidden in mixed donor `ccff62f`. The B03 source-isolated probe observed 17,873 reads before useful processing at a 600-second start versus one after a simulated successful seek; this is operation-count evidence, not real-video throughput. Reproduce with actual late-window video, verified frame identity and failed-seek fallback before extracting an independent fix. Preserve this behavior when P18 resumes a long scan.
 - [ ] **E:** Profile fixed-content early/middle/late intervals and separate OCR/model work from callback/report costs. Compare against Austin's current indexed/batched PhiMemory behavior.
 - [ ] **S/I:** If a specific growing operation exists, write a deterministic work-count regression and extract only the constant/bounded-work change. If not, close P11 as already fixed or removed-system-only with source/profile evidence.
 - [ ] **V/D:** Run the owning function's tests, full suite/build and the same scan workload. State actual model/provider/settings and coverage. Do not describe improved ETA as throughput improvement.
