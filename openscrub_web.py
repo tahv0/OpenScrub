@@ -7358,12 +7358,12 @@ async function loadReview(signal=null,phase=SHELLPH){
   items.sort((a,b)=>((b.personcard?1:0)-(a.personcard?1:0))||a.t_start-b.t_start);
   if(!items.length)continue;
   REVIEW_CATEGORY_GROUPS[cat]=items.map(item=>item.i);
-  html+=`<h3 style="margin:10px 0 6px">${CATDN[cat]||cat} <span class="badge">${items.length}</span>
+  html+=`${cat==="plate"?'<p class="review-copy plate-tracking-disclosure">Groups combine detector sightings; they do not visually track all four plate corners through every frame. Inspect motion and coverage before rendering.</p>':""}
+    <h3 style="margin:10px 0 6px">${CATDN[cat]||cat} <span class="badge">${items.length}</span>
    <button class="sec" style="padding:3px 8px;font-size:12px"
     onclick="setAll('${cat}',true)">Blur all</button>
    <button class="sec" style="padding:3px 8px;font-size:12px"
     onclick="setAll('${cat}',false)">Keep all visible</button></h3>
-    ${cat==="plate"?'<p class="review-copy plate-tracking-disclosure">Groups combine detector sightings; they do not visually track all four plate corners through every frame. Inspect motion and coverage before rendering.</p>':""}
     <div class="grid3" data-review-category="${cat}">`;
   const lazy=items.length>REVIEW_PAGE_THRESHOLD,pending=[];
   for(const [ordinal,x] of items.entries()){
