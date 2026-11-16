@@ -239,7 +239,7 @@ currently trains **plate models**.
    saved examples and training history forward alongside your new selection.
    The UI shows the previous model's exact retained positive/negative counts,
    source-video count and human-corrected polygon count, reading only the
-   signed local lineage metadata (not thousands of image files or source video
+   hash-bound local lineage metadata (not thousands of image files or source video
    frames). The stored checkpoint is reused for the next fine-tune.
    Existing corrections and revocations are reconciled before the next
    training snapshot. The count preview describes the saved parent corpus,
