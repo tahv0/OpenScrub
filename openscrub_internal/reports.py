@@ -1,0 +1,40 @@
+"""Publish complete report JSON without truncating the previous report."""
+import json
+import os
+import tempfile
+
+
+def atomic_report(path, report) -> None:
+    """Stage private UTF-8 JSON beside *path*, sync, close, then replace it.
+
+    A failure before replacement leaves the previous report intact and raises.
+    Readers opening the path see a complete old or new report on filesystems
+    supporting atomic replacement. This does not serialize read/apply/write
+    transactions or guarantee power-loss durability: the directory is not
+    fsynced, and filesystem/network storage guarantees vary. On Windows an open
+    destination may prevent replacement; that failure is propagated. Temporary
+    files use the vault's .tmp crash-cleanup convention. POSIX staging permissions
+    are 0600; Windows access restrictions also depend on the directory ACL.
+    """
+    path = os.path.abspath(path)
+    staged = None
+    try:
+        # NamedTemporaryFile creates exclusively with restrictive permissions.
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8",
+                                         dir=os.path.dirname(path),
+                                         prefix=".report-", suffix=".tmp",
+                                         delete=False) as stream:
+            staged = stream.name
+            json.dump(report, stream, indent=1)
+            stream.flush()
+            os.fsync(stream.fileno())
+        # Close first: Windows cannot rename an open staging file.
+        os.replace(staged, path)
+    finally:
+        if staged is not None:
+            try:
+                os.unlink(staged)
+            except OSError:
+                # After replace the name is gone. On cleanup failure leave a
+                # .tmp for vault crash cleanup without masking the write error.
+                pass

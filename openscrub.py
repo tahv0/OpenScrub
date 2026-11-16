@@ -37,6 +37,8 @@ from dataclasses import dataclass, asdict
 import cv2
 import numpy as np
 
+from openscrub_internal.reports import atomic_report
+
 VERSION = "1.0.96"
 
 # ----------------------------------------------------------------------------
@@ -6325,12 +6327,7 @@ def write_report(path, args, state, output_path=None):
         doc["audio_suggestions"] = state["audio_suggestions"]
     if state.get("audio_transcript"):
         doc["audio_transcript"] = state["audio_transcript"]
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(doc, f, indent=1)
-    try:
-        os.chmod(path, 0o600)
-    except OSError:
-        pass
+    atomic_report(path, doc)
 
 
 def load_report(path):

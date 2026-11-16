@@ -40,6 +40,7 @@ from flask import (Flask, Response, abort, jsonify, redirect, request,
                    send_file)
 
 import openscrub
+from openscrub_internal.reports import atomic_report
 import zones_ui
 
 
@@ -1332,8 +1333,7 @@ def job_save_edits(jid):
                       else "mute")}
             for s in (edits.get("audio") or [])
             if float(s.get("t1", 0)) > float(s.get("t0", 0)) >= 0]
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(doc, f, indent=1)
+    atomic_report(path, doc)
     # suggest allowlisting any string whose EVERY instance was disabled —
     # the review just taught us it's a recurring false positive
     per = {}
@@ -1423,8 +1423,7 @@ def job_track_object(jid):
             new[-1]["t_end"] += 0.25
             doc["detections"].extend(new)
             path = os.path.join(job["dir"], "report.json")
-            with open(path, "w", encoding="utf-8") as f:
-                json.dump(doc, f, indent=1)
+            atomic_report(path, doc)
             job["log"].append(
                 "      tracked object: %d position(s), %.1f-%.1fs "
                 "(review card added)" % (len(new),
