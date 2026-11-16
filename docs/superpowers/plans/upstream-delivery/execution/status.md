@@ -1,6 +1,6 @@
 # Upstream delivery execution record
 
-Updated 2026-11-16. User selected supervisor-led execution with GPT-6.1 Sol high implementers and subagents. This is a local delivery record, not an upstream PR body or a claim that the whole plan is complete.
+Updated 2026-11-17 (Europe/Helsinki). User selected supervisor-led execution with GPT-6.1 Sol high implementers and subagents. This is a local delivery record, not an upstream PR body or a claim that the whole plan is complete.
 
 ## Preserved references
 
@@ -16,6 +16,7 @@ Updated 2026-11-16. User selected supervisor-led execution with GPT-6.1 Sol high
 | --- | --- | --- | --- |
 | P01 | `pr/save-as-progress` / `ca0f2ce7458347afd2e6156a97df580b6623767a` | Preserve working streaming Save As; show accepted written/total bytes, progress, rate/elapsed/estimated remaining time and honest waiting/finalizing/failure states. | Independent review PASS/APPROVE. 24 new tests pass; root+feature 157 pass plus the known pre-existing logging assertion. Build/evaluated JS pass. Chromium real HTTP→OPFS saves exactly 256 MiB, with one pending write, job switching, stalls and close delay; desktop/mobile exercised. Local [PR draft](pr-drafts/save-as-progress.md). Not published/merged. |
 | B02a | `pr/tracker-handoff-regression` / `e21ebdf6e3ee46e6c65050dc956a9a3459152269` | Replace a brittle log-message assertion with an explicit post-occlusion sample check; retain the actual geometric identity-protection assertions. Production tracker is unchanged. | Independent review PASS/PASS. Original test fails, correction passes, disabling only the size guard makes the corrected test fail on larger-target adoption. Full 134-test suite and sdist→wheel build pass. Separate [PR draft](pr-drafts/tracker-handoff-regression.md); suitable as the small test prerequisite before other submissions. Not published/merged. |
+| P06A | `pr/atomic-report-publication` / `c7cf1f0` + `66787aa09a958154e81e75f9bdc54d9788feb843` | Shared same-directory atomic report publication preserves the last valid JSON on failed saves. Narrow vault cleanup compatibility handles a staging file that disappears after successful publication. | Independent review plus fix review approved. Original head: 147 full-suite passes, build/real HTTP/restart/synthetic scan-render/package/updater checks. Follow-up: 23 focused/root-vault passes, 21 installed-wheel passes, rebuilt sdist/wheel. Exact concurrency regression encrypts all remaining files and decrypts them unchanged. Local [PR draft](pr-drafts/atomic-report-publication.md). Full transaction/vault coordination remains P06B. |
 
 Save As's OS-native picker was controlled at the browser boundary, with a real OPFS writer. Actual OS dialogs, other engines, Windows permissions and multi-GB files were not tested. Its successful 256 MiB run is a functional scenario, not a throughput benchmark or proof of constant whole-browser RSS.
 
@@ -37,6 +38,6 @@ Instrumented saves measured 1k/10k/100k ordinary reports. At 100k, 54,078,012 by
 
 ## Next delivery work
 
-P06A atomic report publication is next, with a small shared private report helper and its distribution changes. P06B concurrency, P06C measured no-op/serialization savings, P07 retry/browser state and ordinary render round-trip preservation remain separate. P02–P05 and later P/O cards retain their original scope and place in the queue. No option changes upstream defaults.
+Next is P06D review-document preservation through rendering, then P07a browser save snapshot/error handling before P06B introduces server busy-state rejections. P06B lifecycle ownership and latest-document transactions may be separate prerequisite PRs. P06C measured no-op/serialization savings and P07b request replay remain separate. P02–P05 and later P/O cards retain their scope. Read-only P11 research is testing late-window seek on real marked short-GOP and single-keyframe video; no performance improvement is claimed yet. No option changes upstream defaults.
 
 For new local candidates, the reviewed two-line B02a test correction may be an explicitly declared common verification prerequisite; no other feature is thereby required. Before submission, refresh Austin's main and present each PR against its actual accepted prerequisite. C01 will test the selected combination; C02 adoption and external publication remain separate operations.

@@ -109,7 +109,7 @@ For ordinary file responses, use the valid response `Content-Length` matching th
 
 **Why:** R05/R06 show concrete correctness problems, while the original fork throughput explanation does not directly describe upstream. A correct report is more valuable than merely acknowledging the request sooner.
 
-**When:** Begin regressions in W1, deliver in W2 as ready. P06A/B/C are potential separate PRs within the P06 family. P06C is conditional on measured benefit. P07 may follow the shared transaction contract.
+**When:** Begin regressions in W1, deliver in W2 as ready. P06A/B/C/D are separate candidates within the P06 family. P06C is conditional on measured benefit. P06D can follow atomic publication before transaction integration, since it establishes the complete review document that later transactions must preserve. P07 may follow the shared transaction contract.
 
 **Files / contract:** `job_save_edits` and all actual report writers it can overlap; `tests/test_large_report_io.py`; `benchmark/review_io.py`. Keep a one-owner helper local initially. When shared, use `openscrub_internal.reports.atomic_report(path, report) -> None`: same-directory publication, raise on failure, never acknowledge incomplete persistence. A per-job transaction covers **read → apply → publish**, not just the final write. Do not introduce a database, training fields or a general repository layer.
 
@@ -131,6 +131,8 @@ For ordinary file responses, use the valid response `Content-Length` matching th
 - [ ] **I:** Add `test_overlapping_sparse_saves_preserve_both_choices` and a tracking/manual-edit overlap case with controlled interleaving. A per-job lock must encompass loading the latest committed report, applying the payload and publication. Coordinate every relevant writer rather than protecting only one endpoint.
 - [ ] **V/D:** Verify no deadlock during cancellation/deletion/vault operations and no loss of audio/manual/time edits. Run the P06 suite/build and concurrent HTTP cases. PR lead: independent review updates should survive overlapping requests; explain writer scope and concurrency limitations.
 
+**Execution refinement:** The pinned writer inventory also found unguarded tracker admission, render admission, retention and vault transitions. Split lifecycle ownership from latest-document transactions if one diff becomes hard to review. A per-job lock must not be held through video processing or output hashing. Any new server busy rejection must follow P07's browser HTTP-failure handling, so a rejected save retains drafts and never triggers rendering. Cancellation should signal compute immediately; its acknowledgement must serialize with final publication if claiming that no cancelled operation can publish afterward. The concrete source inventory and deterministic schedules live in the local execution evidence, `report-transaction-research.md`; they are a design, not passing tests.
+
 ### P06C — reduce demonstrated save work
 
 **What / why / when:** Reduce serialization/request work that remains costly on realistic large reports; only after S01 baseline and P06 correctness are stable.
@@ -139,13 +141,29 @@ For ordinary file responses, use the valid response `Content-Length` matching th
 - [ ] **I:** Add a no-op regression preserving report bytes/revision and one sparse-change preservation case. Use batched serialization/compact output only if it improves the recorded workload without excessive temporary memory. Do not avoid necessary persistence or silently drop fields for speed.
 - [ ] **V/D:** Run `python -m pytest test_openscrub.py tests/test_large_report_io.py -q`, `python benchmark/review_io.py --scenario saves --rows 1000 10000 100000`, full build and relevant browser checks. The benchmark CLI is a planned interface, not an existing command. PR body reports timings, bytes, memory, samples and environment at exact before/after SHAs; close this candidate if no worthwhile upstream gain exists.
 
+### P06D — preserve the review document through rendering
+
+**What:** Keep every review row and its original position when an existing report is rendered, including Keep choices, zone-dropped rows, manual shapes, tracking/group identifiers and additive fields. Preserve audio suggestions/transcript alongside redaction spans.
+
+**Why:** A real synthetic render on Austin's baseline changed ten review rows into seven by discarding disabled detections. All remaining row indices shifted, and the saved audio suggestions/transcript disappeared. Reopening the actual detections route confirmed the loss. A render should consume the enabled subset without replacing the user's full review document with that subset.
+
+**When:** W2, after P06A if using its publisher; before P06B's final writer integration where useful. This is a focused content-preservation PR, separate from transaction locking, request replay and serialization performance. It extracts the generic requirement discovered in mixed training donor `db9a142`, without importing its training/session helper.
+
+**Files / contract:** Existing engine report read/decode/write and from-report rendering in `openscrub.py`, plus `tests/test_report_roundtrip.py`. Keep the existing public `load_report(path)` return contract and its enabled-only render semantics. Retain raw review data separately from the decoded render subset. Preserve additive fields without interpreting them as new behavior. Newly calculated output provenance and explicit CLI audio overrides must remain accurate; do not copy stale output metadata over the new render's result.
+
+- [ ] **E/I:** Add a failing real render/reopen regression based on the confirmed ten-row fixture. Include disabled ordinary and zone-dropped rows, enabled/disabled manual geometry, dense track/person values, additive row/top-level metadata, audio suggestions/transcript and spans. Assert original row order/choices/fields survive while only enabled rows reach rendering.
+- [ ] **I:** Read a coherent report snapshot for from-report rendering, retain the complete review representation for report publication, and update only fields that this render legitimately owns. Preserve the ordinary scan-to-report path and legacy plain-list loading behavior; a legacy list still lacks render state and must receive the existing actionable error for render-only use.
+- [ ] **I:** Cover empty metadata, different source/destination report paths, explicit audio override, successive renders, and failures before report publication. Keep source bytes unchanged when rendering to a separate report. Do not add training identifiers or deduplicate/reorder rows.
+- [ ] **V:** Run the existing suite plus the new regressions and full sdist-to-wheel build. Render synthetic footage through `run_pipeline`, verify the resulting video frames, then reopen the saved report through the actual Flask route in a fresh process. Record that metadata preservation alone does not establish audible mute/bleep quality or concurrent-writer safety.
+- [ ] **D/R/L:** PR lead: Keep choices and review grouping should survive rendering and reopening. Include the concrete 10→7 before / 10→10 after case and audio metadata checks. Declare P06A dependency when used; P06B owns overlaps with edits/tracking/vault/deletion.
+
 ## P07 — preserve choices and make retry safe
 
 **What:** Bind saving/rendering to the initiating job and edit snapshot, preserve newer drafts, and avoid duplicating manual regions after a lost response.
 
 **Why:** R03 shows mutable globals across awaits; R06 demonstrates replay appends the same manual addition twice. A timeout or failed response must not become lost work, duplicate work or rendering the wrong job.
 
-**When:** Reproduce in W1; deliver independently or after P06B's transaction contract in W2. Split browser-state and replay changes into two PRs if they are independently reviewable. Donors: ordinary save subset of `90e67b6`, `5e967404`, `test_release_reliability.py`.
+**When:** Reproduce in W1. Deliver browser-state/HTTP-failure handling independently before P06B introduces busy-state rejections; deliver manual replay after P06B's transaction contract in W2. Keep these as separate PRs. Donors: ordinary save subset of `90e67b6`, `5e967404`, `test_release_reliability.py`.
 
 **Files / contract:** `saveAndRender`, current edit arrays/maps and `job_save_edits`; `tests/test_review_save_failures.py`. Capture job/view plus submitted values; clear only acknowledged edits that have not changed since submission. Proposed replay contract: a stable per-addition `manual_id` generated once by the new UI and persisted additively in the detection. A retry with that ID and identical geometry is a no-op; incompatible reuse is an explicit error. Legacy clients without IDs retain their existing schema behavior. No journal/database or inference label.
 
