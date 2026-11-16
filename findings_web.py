@@ -1255,13 +1255,23 @@ def install(app, web):
     @app.get('/api/jobs/<jid>/finding-preview/<int:index>')
     @_guard
     def finding_preview(jid,index):
-        result = preview(_job(jid),index,
+        job = _job(jid)
+        result = preview(job,index,
                          cache_only=request.args.get('cache_only')=='1',
                          exact_only=request.args.get('exact')=='1',
                          retry_decode=request.args.get('retry_decode')=='1')
         if result is None:
             return Response(status=204,headers={'Cache-Control':'no-store'})
         _,_,meta,jpeg = result
+        # The on-disk thumbnail is a bounded, disposable cache. Hold only
+        # actual server-issued JPEGs seen by Review in a separate tiny RAM
+        # lease so a later Is/Not click can revalidate its exact source after
+        # SQLite eviction. Retaining under the vault's reader gate prevents
+        # plaintext JPEGs being pinned after encryption begins.
+        with web._REVIEW_PICTURE_GATE.reader():
+            if web.vault_locked():
+                abort(423)
+            previews.retain(job['dir'], meta, jpeg)
         response = Response(jpeg,mimetype='image/jpeg',headers={'Cache-Control':'no-store'})
         response.headers['X-Finding-Geometry'] = json.dumps(meta,separators=(',',':'))
         response.headers['X-Plate-Geometry'] = response.headers['X-Finding-Geometry']
