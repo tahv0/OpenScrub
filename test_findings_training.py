@@ -416,3 +416,33 @@ def test_recovery_rejects_tampered_candidate_without_creating_library_entry(tmp_
     with pytest.raises(ValueError, match='hash'):
         ft.finalize_retained(job, tmp_path / 'models')
     assert not (tmp_path / 'models').exists()
+
+
+def test_exported_baseline_at_saved_crop_edge_stays_within_unit_interval():
+    ft = module()
+    # Exact real-valued bounds: the former successive / scale / image_width
+    # can produce a coordinate 1 ULP larger than 1.0 for this crop.
+    x1, x2, pixels = 465.62560479711726, 539.1788518524656, 476
+    old = ((x2 - x1) / ((x2 - x1) / pixels) / pixels)
+    assert old > 1, 'Regression fixture must exercise the original rounding'
+    record = {'box': [x1, 20, x2, 100],
+              'crop': {'box': [x1, 10, x2, 100],
+                       'width': pixels, 'height': 180,
+                       'scale_x': (x2-x1) / pixels, 'scale_y': 90 / 180},
+              'points': None, 'shape_confirmed': False}
+    points, proposal, quality = ft._geometry(record)
+    assert quality == 'human_region'
+    assert proposal == [0., 10/90, 1., 1.]
+    assert points == [[0., 10/90], [1., 10/90],
+                      [1., 1.], [0., 1.]]
+    assert all(0 <= value <= 1 for value in proposal)
+
+
+def test_exported_baseline_cannot_hide_outside_crop_proposal():
+    ft = module()
+    crop = {'box': [100, 100, 300, 200], 'width': 200, 'height': 100,
+            'scale_x': 1, 'scale_y': 1}
+    record = {'box': [90, 120, 290, 190], 'crop': crop,
+              'points': None, 'shape_confirmed': False}
+    with pytest.raises(ValueError, match='outside its stored crop'):
+        ft._geometry(record)
