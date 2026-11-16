@@ -375,7 +375,12 @@ def test_real_browser_can_migrate_rejected_corner_draft_into_valid_box(
         assert card.get_by_role('button', name='Repair detector box (keep corners)').is_visible()
         card.get_by_role('button', name='Repair detector box (keep corners)').click()
         modal = page.get_by_role('dialog', name='Redraw plate area on exact original frame')
-        modal.wait_for(timeout=90000)
+        try:
+            modal.wait_for(timeout=30000)
+        except Exception:
+            message = card.locator('.source-frame-note').inner_text()
+            saving = card.locator('.quad-status').inner_text()
+            assert False, f'Full-frame recovery did not open: {message}; {saving}'
         assert 'Recovered your unsaved four corners' in modal.inner_text()
         assert modal.get_by_role('button', name='Four corners').is_disabled()
         assert modal.get_by_role('button', name='Save replacement · this frame only').is_enabled()
@@ -450,7 +455,10 @@ def test_real_browser_can_redraw_when_new_source_box_was_rejected(review_server)
           button.textContent='Inspect current frame & redraw (keep draft)';
           plateStatus(s,'Current source geometry differs; original draft preserved.',true);
         }""")
-        card.get_by_role('button',name='Inspect current frame & redraw (keep draft)').click()
+        # The retry action and the full-frame recovery action share the
+        # same accessible label. Exercise the former explicitly, not an
+        # ambiguous locator that matches both buttons.
+        card.locator('.quad-retry').click()
         modal=page.get_by_role('dialog',name='Redraw plate area on exact original frame')
         modal.wait_for(timeout=90000)
         assert modal.get_by_role('button',name='Save replacement · this frame only').is_disabled(), (
