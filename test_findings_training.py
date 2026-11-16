@@ -484,5 +484,12 @@ def test_finalizes_legacy_rounded_proposal_without_running_new_epochs(tmp_path, 
     result = ft.finalize_retained(job, tmp_path / 'models')
     assert result['status'] == 'complete'
     assert result['training_info']['trainable']
-    assert result['assessment']['held_out_positive'] >= 4
-    assert result['assessment']['held_out_negative'] >= 2
+    # The synthetic splitter has only three independent held-out positives.
+    # Recovery must retain/evaluate them all, not pretend that the separate
+    # four-positive gate was met or turn review-only into filtering approval.
+    rows = [json.loads(line) for line in next(
+        Path(job['dir']).glob('learning/passes/*/dataset/manifest.jsonl')).read_text().splitlines()
+        if line.strip() and json.loads(line)['split'] == 'val']
+    assert result['assessment']['held_out_positive'] == sum(row['label'] == 'positive' for row in rows)
+    assert result['assessment']['held_out_negative'] == sum(row['label'] == 'negative' for row in rows)
+    assert result['assessment']['status'] == 'review_only'
