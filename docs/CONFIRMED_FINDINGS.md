@@ -237,7 +237,13 @@ currently trains **plate models**.
 3. Choose **Configured base checkpoint** to start a new training lineage, or
    select a locally trainable model under **Start from**. A parent carries its
    saved examples and training history forward alongside your new selection.
-   Existing corrections are reconciled before the next training snapshot.
+   The UI shows the previous model's exact retained positive/negative counts,
+   source-video count and human-corrected polygon count, reading only the
+   signed local lineage metadata (not thousands of image files or source video
+   frames). The stored checkpoint is reused for the next fine-tune.
+   Existing corrections and revocations are reconciled before the next
+   training snapshot. The count preview describes the saved parent corpus,
+   not a promise that every example will remain eligible after reconciliation.
 4. Acknowledge the optional training framework terms, then choose **Train
    selected plate examples**. The job view shows collection, training,
    validation, and completion progress. The optional local training environment
@@ -245,6 +251,27 @@ currently trains **plate models**.
 5. Once training succeeds, the new named checker is saved in the learned model
    library. Choose it under **Learned plate model** in Scan Setup when you want
    to use it. Previous models remain available.
+
+### Keep an existing model and its old training examples
+
+Your previously trained plate checker preserves a local, integrity-bound
+`weights.pt` checkpoint and frozen JPEG training corpus next to the model
+library. To continue learning, select **Start from → your saved local model**,
+then select *new* confirmed examples and train a new named version. All eligible
+inherited positive and negative examples are included in the frozen corpus
+without rescanning old source videos. The previous model stays available.
+
+This is especially useful after human review of new visual plate tracks.
+**Tracker predictions are untrusted proposals, not positive training labels.**
+Accepting a few source-verified keyframes, or explicitly approving a tracked
+segment after spot-checks, must precede promotion to the Confirmed findings
+library. A long sequence of almost-identical frames from one plate does not
+provide hundreds of independent validation cases; related tracks/visual
+duplicates must remain in the same train/validation group. Prefer a diverse
+collection of real plate appearances over thousands of automatically generated
+near-duplicates. To reduce unwanted blur, prioritize genuine hard negatives
+from hands, tools, vehicle trim and road scenery without suppressing
+unconfirmed objects based on a weak confidence percentage.
 
 Confirmed plate rectangles are usable for the named checker; a manually
 verified four-corner polygon provides stronger shape information. Mask-focused
