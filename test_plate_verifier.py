@@ -169,6 +169,7 @@ def test_review_suggests_filter_suppresses_and_preserves_original_input(tmp_path
     assert 'verified_label' not in result
     assert result['plate_verification']['decision'] == decision
     assert result['plate_verification']['previous_enabled'] is True
+    assert result['plate_verification']['source_frame'] == 1
     assert result['plate_verification']['applied'] is (mode == 'filter')
     assert stats['decoded_frames'] == 3 and stats['model_calls'] == stats['checked'] == 1
     assert stats['suppressed'] == suppressed and stats['suggested'] == 1
