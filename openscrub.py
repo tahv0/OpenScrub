@@ -1439,181 +1439,187 @@ def smooth_dense_tracks(dets, fps, video, cum=None, win_start=0.0, cb=None):
                          ref.category, ref.text, ref.confidence, o,
                          last_seen=t0, dense=True, track=tid, poly=ref.poly)
 
-    cap = cv2.VideoCapture(video) if video else None
-    if cap is not None and not cap.isOpened():
-        cap = None
+    capture = cv2.VideoCapture(video) if video else None
+    try:
+        cap = capture
+        if cap is not None and not cap.isOpened():
+            cap = None
 
-    _fps_g = (cap.get(cv2.CAP_PROP_FPS) or 30.0) if cap is not None else 30.0
+        _fps_g = (cap.get(cv2.CAP_PROP_FPS) or 30.0) if cap is not None else 30.0
 
-    # The onset walks probe BACKWARD from each track's first sample, one
-    # POS_MSEC seek per probe. On a normal file each seek decodes from a
-    # nearby keyframe; a real 4K export with ONE keyframe (common from
-    # screen recorders and render pipelines) decoded the file from frame
-    # ZERO on every probe — ~37 probes x 75 tracks made a 10-second clip
-    # take hours. Every track's onset is known BEFORE the walks start, so
-    # decode the video ONCE, sequentially (the renderer's access pattern,
-    # correct and fast on any file), caching half-scale grays only for
-    # frames inside some track's walk span and evicting behind the
-    # onset-sorted processing order. Memory stays bounded by one span
-    # (~LEAD_MAX seconds of half-scale grays), not the file.
-    gray_cache = {}
-    _seq = {"pos": 0}
-    _span_lo = {}                # frame index -> lowest span start needing it
-    if cap is not None and tracks:
-        for samples in tracks.values():
-            t0 = min(d.t_start for d in samples)
-            lo_t = max(0.0, t0 - LEAD_MAX - 0.2, win_start - 0.01)
-            lo = max(0, int(lo_t * _fps_g) - 2)
-            hi = int(round(t0 * _fps_g)) + 2
-            for k in range(lo, hi + 1):
-                _span_lo[k] = min(_span_lo.get(k, lo), lo)
+        # The onset walks probe BACKWARD from each track's first sample, one
+        # POS_MSEC seek per probe. On a normal file each seek decodes from a
+        # nearby keyframe; a real 4K export with ONE keyframe (common from
+        # screen recorders and render pipelines) decoded the file from frame
+        # ZERO on every probe — ~37 probes x 75 tracks made a 10-second clip
+        # take hours. Every track's onset is known BEFORE the walks start, so
+        # decode the video ONCE, sequentially (the renderer's access pattern,
+        # correct and fast on any file), caching half-scale grays only for
+        # frames inside some track's walk span and evicting behind the
+        # onset-sorted processing order. Memory stays bounded by one span
+        # (~LEAD_MAX seconds of half-scale grays), not the file.
+        gray_cache = {}
+        _seq = {"pos": 0}
+        _span_lo = {}                # frame index -> lowest span start needing it
+        if cap is not None and tracks:
+            for samples in tracks.values():
+                t0 = min(d.t_start for d in samples)
+                lo_t = max(0.0, t0 - LEAD_MAX - 0.2, win_start - 0.01)
+                lo = max(0, int(lo_t * _fps_g) - 2)
+                hi = int(round(t0 * _fps_g)) + 2
+                for k in range(lo, hi + 1):
+                    _span_lo[k] = min(_span_lo.get(k, lo), lo)
 
-    def _fill_to(k_end):
-        # sequential read, caching grays for needed frames; never seeks
-        while _seq["pos"] <= k_end:
-            if _seq["pos"] % 90 == 0 and cb.cancelled():
-                raise PipelineCancelled()
-            ok, fr = cap.read()
-            if not ok:
-                _seq["pos"] = 10 ** 9    # EOF: stop trying
-                return
-            idx = _seq["pos"]
-            _seq["pos"] += 1
-            if idx in _span_lo:
-                g = cv2.resize(cv2.cvtColor(fr, cv2.COLOR_BGR2GRAY), None,
-                               fx=SCALE, fy=SCALE)
-                gray_cache[idx] = cv2.GaussianBlur(g, (3, 3), 0)
+        def _fill_to(k_end):
+            # Advance sequentially; retrieve pixels only for needed frames.
+            while _seq["pos"] <= k_end:
+                if _seq["pos"] % 90 == 0 and cb.cancelled():
+                    raise PipelineCancelled()
+                if _seq["pos"] in _span_lo:
+                    ok, fr = cap.read()
+                else:
+                    ok, fr = cap.grab(), None
+                if not ok:
+                    _seq["pos"] = 10 ** 9    # EOF: stop trying
+                    return
+                idx = _seq["pos"]
+                _seq["pos"] += 1
+                if idx in _span_lo:
+                    g = cv2.resize(cv2.cvtColor(fr, cv2.COLOR_BGR2GRAY), None,
+                                   fx=SCALE, fy=SCALE)
+                    gray_cache[idx] = cv2.GaussianBlur(g, (3, 3), 0)
 
-    def _gray(t):
-        if cap is None:
+        def _gray(t):
+            if cap is None:
+                return None
+            k = int(round(t * _fps_g))
+            if k not in gray_cache and k >= _seq["pos"] - 1:
+                _fill_to(k)
+            # light smoothing happened at cache time: sub-pixel motion at this
+            # scale decorrelates fine texture (measured 1.0 -> 0.48 on a
+            # half-pixel offset); a smoothed match stays >0.8 present, ~0 absent
+            for kk in (k, k - 1, k + 1):     # PTS rounding tolerance
+                if kk in gray_cache:
+                    return gray_cache[kk]
             return None
-        k = int(round(t * _fps_g))
-        if k not in gray_cache and k >= _seq["pos"] - 1:
-            _fill_to(k)
-        # light smoothing happened at cache time: sub-pixel motion at this
-        # scale decorrelates fine texture (measured 1.0 -> 0.48 on a
-        # half-pixel offset); a smoothed match stays >0.8 present, ~0 absent
-        for kk in (k, k - 1, k + 1):     # PTS rounding tolerance
-            if kk in gray_cache:
-                return gray_cache[kk]
-        return None
 
-    def _evict_below(k):
-        for kk in [kk for kk in gray_cache if kk < k]:
-            del gray_cache[kk]
+        def _evict_below(k):
+            for kk in [kk for kk in gray_cache if kk < k]:
+                del gray_cache[kk]
 
-    # This is the longest silent stretch of a dense scan (the onset walk-back
-    # re-reads the video per track), so report progress: the bar moves via
-    # the "post" stage and the log shows a time-gated track counter.
-    cb = cb or Callbacks()
-    n_total = len(tracks)
-    _last_log = time.time()
-    n_gaps, n_lead, lead_s = 0, 0, 0.0
-    added = []
-    # onset order makes the sequential cache a single forward pass: every
-    # later track's span starts at or after this one's, so frames behind
-    # the current span are never needed again
-    _order = sorted(tracks.items(),
-                    key=lambda kv: min(d.t_start for d in kv[1]))
-    for n_done, (tid, samples) in enumerate(_order):
-        if cb.cancelled():
-            raise PipelineCancelled()
-        _evict_below(max(0, int((min(d.t_start for d in samples)
-                                 - LEAD_MAX - 0.3) * _fps_g)))
-        cb.progress("post", n_done, n_total)
-        if time.time() - _last_log >= 3.0:
-            _last_log = time.time()
-            cb.log("        …track %d/%d (matching each track's onset "
-                   "backward through the video)" % (n_done + 1, n_total))
-        samples.sort(key=lambda d: d.t_start)
+        # This is the longest silent stretch of a dense scan (the onset walk-back
+        # re-reads the video per track), so report progress: the bar moves via
+        # the "post" stage and the log shows a time-gated track counter.
+        cb = cb or Callbacks()
+        n_total = len(tracks)
+        _last_log = time.time()
+        n_gaps, n_lead, lead_s = 0, 0, 0.0
+        added = []
+        # onset order makes the sequential cache a single forward pass: every
+        # later track's span starts at or after this one's, so frames behind
+        # the current span are never needed again
+        _order = sorted(tracks.items(),
+                        key=lambda kv: min(d.t_start for d in kv[1]))
+        for n_done, (tid, samples) in enumerate(_order):
+            if cb.cancelled():
+                raise PipelineCancelled()
+            _evict_below(max(0, int((min(d.t_start for d in samples)
+                                     - LEAD_MAX - 0.3) * _fps_g)))
+            cb.progress("post", n_done, n_total)
+            if time.time() - _last_log >= 3.0:
+                _last_log = time.time()
+                cb.log("        …track %d/%d (matching each track's onset "
+                       "backward through the video)" % (n_done + 1, n_total))
+            samples.sort(key=lambda d: d.t_start)
 
-        # 1. flicker gaps: chain, and interpolate the box across the gap
-        for a, b in zip(samples, samples[1:]):
-            gap = b.t_start - a.t_start
-            if gap <= frame_period * 1.5:
-                a.t_end = max(a.t_end, b.t_start)
-                continue
-            if gap > CHAIN_MAX:
-                continue        # sustained absence: never bridge blind
-            A, B = _screen(a), _screen(b)
-            # >= 2 sub-steps, and step 0 is interpolated too. The old code
-            # used ONE step for a 2-frame gap and stretched the earlier
-            # sample's OWN box over the in-between frame (and did the same
-            # over step 0 of every longer gap), so a moving face's blur
-            # lagged a frame behind it. With --dense-face-stride 2 that is
-            # EVERY other frame: measured on a synthetic moving-face clip,
-            # stride 2 under-covered ~40% of moving-face frames (medium
-            # face 98% -> 60%). Every in-between frame is now covered by
-            # the union of the interpolated positions bracketing it; the
-            # sample's own frame keeps its tight detector box.
-            steps = min(12, max(2, int(round(gap / (2 * frame_period)))))
-            ts = [a.t_start + gap * i / steps for i in range(steps + 1)]
-            pos = [tuple(A[k] + (B[k] - A[k]) * i / steps for k in range(4))
-                   for i in range(steps + 1)]
-            a.t_end = max(a.t_end, a.t_start + 0.5 * frame_period)
-            for i in range(steps):
-                # union with the next step's box so movement WITHIN the
-                # step stays covered
-                u = tuple(min(pos[i][k], pos[i + 1][k]) if k < 2 else
-                          max(pos[i][k], pos[i + 1][k]) for k in range(4))
-                t0 = ts[i] if i else a.t_start + 0.5 * frame_period
-                added.append(_mk(t0, ts[i + 1], u, a, tid))
-            n_gaps += 1
+            # 1. flicker gaps: chain, and interpolate the box across the gap
+            for a, b in zip(samples, samples[1:]):
+                gap = b.t_start - a.t_start
+                if gap <= frame_period * 1.5:
+                    a.t_end = max(a.t_end, b.t_start)
+                    continue
+                if gap > CHAIN_MAX:
+                    continue        # sustained absence: never bridge blind
+                A, B = _screen(a), _screen(b)
+                # >= 2 sub-steps, and step 0 is interpolated too. The old code
+                # used ONE step for a 2-frame gap and stretched the earlier
+                # sample's OWN box over the in-between frame (and did the same
+                # over step 0 of every longer gap), so a moving face's blur
+                # lagged a frame behind it. With --dense-face-stride 2 that is
+                # EVERY other frame: measured on a synthetic moving-face clip,
+                # stride 2 under-covered ~40% of moving-face frames (medium
+                # face 98% -> 60%). Every in-between frame is now covered by
+                # the union of the interpolated positions bracketing it; the
+                # sample's own frame keeps its tight detector box.
+                steps = min(12, max(2, int(round(gap / (2 * frame_period)))))
+                ts = [a.t_start + gap * i / steps for i in range(steps + 1)]
+                pos = [tuple(A[k] + (B[k] - A[k]) * i / steps for k in range(4))
+                       for i in range(steps + 1)]
+                a.t_end = max(a.t_end, a.t_start + 0.5 * frame_period)
+                for i in range(steps):
+                    # union with the next step's box so movement WITHIN the
+                    # step stays covered
+                    u = tuple(min(pos[i][k], pos[i + 1][k]) if k < 2 else
+                              max(pos[i][k], pos[i + 1][k]) for k in range(4))
+                    t0 = ts[i] if i else a.t_start + 0.5 * frame_period
+                    added.append(_mk(t0, ts[i + 1], u, a, tid))
+                n_gaps += 1
 
-        # 2. onset: template-match the first sample backwards to the
-        # object's true first visible frame
-        first = samples[0]
-        g0 = _gray(first.t_start)
-        walked = first
-        if g0 is not None:
-            sb = _screen(first)
-            x1, y1 = int(sb[0] * SCALE), int(sb[1] * SCALE)
-            x2, y2 = int(sb[2] * SCALE), int(sb[3] * SCALE)
-            gh, gw = g0.shape[:2]
-            x1, y1, x2, y2 = max(0, x1), max(0, y1), min(gw, x2), min(gh, y2)
-            tmpl = g0[y1:y2, x1:x2] if (x2 - x1 >= 8 and y2 - y1 >= 8) else None
-            if tmpl is not None and float(tmpl.std()) > 4:
-                th_, tw_ = tmpl.shape
-                box = list(sb)
-                t = first.t_start
-                step = 2 * frame_period
-                while (first.t_start - t < LEAD_MAX
-                       and t - step >= max(0.0, win_start - 0.01)):
-                    t -= step
-                    g = _gray(t)
-                    if g is None:
-                        break
-                    m = int(max(10, 0.6 * max(tw_, th_)))
-                    rx1 = max(0, int(box[0] * SCALE) - m)
-                    ry1 = max(0, int(box[1] * SCALE) - m)
-                    rx2 = min(g.shape[1], int(box[2] * SCALE) + m)
-                    ry2 = min(g.shape[0], int(box[3] * SCALE) + m)
-                    if rx2 - rx1 < tw_ or ry2 - ry1 < th_:
-                        break   # clipped at the frame edge: object entering
-                    res = cv2.matchTemplate(g[ry1:ry2, rx1:rx2], tmpl,
-                                            cv2.TM_CCOEFF_NORMED)
-                    _, mx, _, loc = cv2.minMaxLoc(res)
-                    if mx < THR:
-                        break   # genuinely not there yet
-                    nx = (rx1 + loc[0]) / SCALE
-                    ny = (ry1 + loc[1]) / SCALE
-                    box = [nx, ny, nx + (sb[2] - sb[0]), ny + (sb[3] - sb[1])]
-                    walked = _mk(t, t + step, tuple(box), first, tid)
-                    added.append(walked)
-                    n_lead += 1
-                    lead_s += step
+            # 2. onset: template-match the first sample backwards to the
+            # object's true first visible frame
+            first = samples[0]
+            g0 = _gray(first.t_start)
+            walked = first
+            if g0 is not None:
+                sb = _screen(first)
+                x1, y1 = int(sb[0] * SCALE), int(sb[1] * SCALE)
+                x2, y2 = int(sb[2] * SCALE), int(sb[3] * SCALE)
+                gh, gw = g0.shape[:2]
+                x1, y1, x2, y2 = max(0, x1), max(0, y1), min(gw, x2), min(gh, y2)
+                tmpl = g0[y1:y2, x1:x2] if (x2 - x1 >= 8 and y2 - y1 >= 8) else None
+                if tmpl is not None and float(tmpl.std()) > 4:
+                    th_, tw_ = tmpl.shape
+                    box = list(sb)
+                    t = first.t_start
+                    step = 2 * frame_period
+                    while (first.t_start - t < LEAD_MAX
+                           and t - step >= max(0.0, win_start - 0.01)):
+                        t -= step
+                        g = _gray(t)
+                        if g is None:
+                            break
+                        m = int(max(10, 0.6 * max(tw_, th_)))
+                        rx1 = max(0, int(box[0] * SCALE) - m)
+                        ry1 = max(0, int(box[1] * SCALE) - m)
+                        rx2 = min(g.shape[1], int(box[2] * SCALE) + m)
+                        ry2 = min(g.shape[0], int(box[3] * SCALE) + m)
+                        if rx2 - rx1 < tw_ or ry2 - ry1 < th_:
+                            break   # clipped at the frame edge: object entering
+                        res = cv2.matchTemplate(g[ry1:ry2, rx1:rx2], tmpl,
+                                                cv2.TM_CCOEFF_NORMED)
+                        _, mx, _, loc = cv2.minMaxLoc(res)
+                        if mx < THR:
+                            break   # genuinely not there yet
+                        nx = (rx1 + loc[0]) / SCALE
+                        ny = (ry1 + loc[1]) / SCALE
+                        box = [nx, ny, nx + (sb[2] - sb[0]), ny + (sb[3] - sb[1])]
+                        walked = _mk(t, t + step, tuple(box), first, tid)
+                        added.append(walked)
+                        n_lead += 1
+                        lead_s += step
 
-        # 3. grace pads: cover the sub-threshold sliver at both ends
-        pre = walked.t_start
-        walked.t_start = max(0.0, win_start, walked.t_start - GRACE)
-        lead_s += pre - walked.t_start
-        samples[-1].t_end += GRACE
+            # 3. grace pads: cover the sub-threshold sliver at both ends
+            pre = walked.t_start
+            walked.t_start = max(0.0, win_start, walked.t_start - GRACE)
+            lead_s += pre - walked.t_start
+            samples[-1].t_end += GRACE
 
-    if cap is not None:
-        cap.release()
-    cb.progress("post", n_total, n_total)
-    dets.extend(added)
-    return (n_gaps, n_lead, lead_s)
+        cb.progress("post", n_total, n_total)
+        dets.extend(added)
+        return (n_gaps, n_lead, lead_s)
+    finally:
+        if capture is not None:
+            capture.release()
 
 
 VITTRACK_URL = ("https://media.githubusercontent.com/media/opencv/opencv_zoo/"
