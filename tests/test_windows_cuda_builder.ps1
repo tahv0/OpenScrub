@@ -53,13 +53,13 @@ function AssertCommands($context, $depsCount, $composeBuilds, $composeUps) {
     })
     $build = @($global:MockDockerCalls | Where-Object {
         $_ -match ($prefix + 'compose --progress plain ') -and
-        $_ -match ' compose.windows-cuda.yml build$'
+        $_ -match ' -f compose.windows-test.yml -f compose.windows-cuda.yml -f compose.windows-training.yml build$'
     })
     $up = @($global:MockDockerCalls | Where-Object {
         $_ -match ($prefix + 'compose -f ') -and
         # A PowerShell function mock's argument binder can consume the -d
         # switch; the static test separately checks the actual script has it.
-        $_ -match ' compose.windows-cuda.yml up(?: -d)? --no-build$'
+        $_ -match ' -f compose.windows-test.yml -f compose.windows-cuda.yml -f compose.windows-training.yml up(?: -d)? --no-build$'
     })
     if ($dep.Count -ne $depsCount -or $build.Count -ne $composeBuilds -or $up.Count -ne $composeUps) {
         throw "Wrong command counts in ${context}: deps=$($dep.Count), compose-build=$($build.Count), up=$($up.Count). Calls: $($global:MockDockerCalls -join '; ')"
