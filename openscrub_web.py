@@ -7083,11 +7083,51 @@ function updatePlateVerifierCandidate(){
  if(!validated&&mode.value==="filter")mode.value="review";
  note.textContent=verifierAssessmentText(candidate?.assessment);
 }
+function plateVerificationGroupSummary(members){
+ // Scores belong to individual original detector sightings, not group cards.
+ const checked=members.filter(row=>row.plate_verification&&
+  Number.isFinite(row.plate_verification.score));
+ return {total:members.length,checked:checked.length,
+  below:checked.filter(row=>row.plate_verification.decision!=="retain").length,
+  filtered:checked.filter(row=>row.plate_verification.applied===true).length};
+}
+function formatPlateVerifierScore(value){
+ // Raw proposal-associated model score, not a calibrated percentage.
+ if(!Number.isFinite(value)||value<0||value>1)return "not available";
+ if(value===0)return "0";
+ return value<.001?value.toExponential(3):String(Number(value.toPrecision(4)));
+}
 function plateVerificationBadge(row){
- const marker=row.plate_verification;if(!marker)return "";
- const label=marker.applied?"Model filtered":marker.decision==="suggest_not_plate"?"Model suggests false positive":"Model retained";
- const score=Number.isFinite(marker.score)?` · plate score ${Math.round(marker.score*100)}%`:"";
- return `<span class="badge plate-verification-badge" title="Secondary model decision; this is not a human label">${sectionEscape(label+" · "+(marker.mode||"review")+score)}</span> `;
+ const marker=row.plate_verification,group=row.plate_verification_group;
+ if(!marker&&!(group&&group.checked))return "";
+ let html="";
+ if(marker){
+  const label=marker.applied?"Model filtered":marker.decision==="suggest_not_plate"?
+   "Model suggests false positive":"Model retained";
+  const mode=marker.mode==="filter"?"filter":"review";
+  const frame=Number.isInteger(marker.source_frame)&&marker.source_frame>=0?
+   marker.source_frame:Number.isInteger(row.frame_index)&&row.frame_index>=0?
+   row.frame_index:null;
+  const hasCutoff=Number.isFinite(marker.threshold)&&marker.threshold>0;
+  const relation=hasCutoff&&Number.isFinite(marker.score)?
+   marker.score<marker.threshold?"below cutoff":"at/above cutoff":"comparison unavailable";
+  const scoredFrame=frame===null?"Source frame not recorded":"Scored detector frame "+frame;
+  html='<div class="plate-verification-detail" role="note" title="Secondary model score for one original detector proposal, not a calibrated probability or human label.">'
+   +'<strong class="plate-verification-badge">'+sectionEscape(label+" · "+mode)+'</strong>'
+   +'<small>Checker raw score '+sectionEscape(formatPlateVerifierScore(marker.score))
+   +(hasCutoff?'; cutoff '+sectionEscape(formatPlateVerifierScore(marker.threshold))+' ('+relation+')':'')+'</small>'
+   +'<small>'+sectionEscape(scoredFrame)+' · '
+   +(mode==="review"?"review suggestion only; blur unchanged":"validated filtering mode")
+   +' · not a probability</small></div>';
+ }
+ if(group&&group.total>1&&group.checked){
+  const other=marker?"Score above belongs to the representative detection only.":
+   "No checker score for this representative detection.";
+  html+='<small class="plate-verification-group review-copy">Group: '
+   +group.checked+'/'+group.total+' sightings checked, '+group.below
+   +' below cutoff, '+group.filtered+' auto-filtered. '+other+'</small>';
+ }
+ return html;
 }
 async function checkPlateDetections(){
  const job=CUR,view=JOBVIEW;
@@ -7293,7 +7333,7 @@ async function loadReview(signal=null,phase=SHELLPH){
    // The first exact sighting normally has its compact scan-time crop.
    const rep={...best};
    rep.learning_conflict=members.some(m=>m.learning_conflict)?"Model disagreement — review this track":"";
-   rep.plate_verification=(members.find(m=>m.plate_verification?.applied)||members.find(m=>m.plate_verification?.decision==="suggest_not_plate")||best).plate_verification;
+   rep.plate_verification_group=plateVerificationGroupSummary(members);
    rep.t_start=members[0].t_start;
    rep.t_end=members[members.length-1].t_end;
    rep.frames=members.length;
