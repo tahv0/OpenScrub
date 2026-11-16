@@ -446,3 +446,43 @@ def test_exported_baseline_cannot_hide_outside_crop_proposal():
               'points': None, 'shape_confirmed': False}
     with pytest.raises(ValueError, match='outside its stored crop'):
         ft._geometry(record)
+
+
+def test_finalizes_legacy_rounded_proposal_without_running_new_epochs(tmp_path, monkeypatch):
+    """Recovery evaluates the original frozen legacy manifest, not a new scan."""
+    ft = module()
+    import confirmed_findings as cf
+    import learned_models as lm
+    source = examples(tmp_path)
+    monkeypatch.setattr(cf, 'training_snapshot', lambda *a, **k: source)
+    base = tmp_path / 'trusted-base.pt'
+    base.write_bytes(b'trusted')
+    monkeypatch.setenv('OPENSCRUB_TRAIN_WEIGHTS', str(base))
+    request = {'name': 'Old crop edge',
+               'example_ids': [s['id'] for s in source],
+               'expected_revisions': {s['id']: s['revision'] for s in source},
+               'license_accepted': True}
+    job = make_job(tmp_path / 'recovery-job')
+    job.update(kind='model_training', phase='learning', learning_request=request)
+    def old_exporter(dataset, versions, weights, job, settings):
+        result = trainer(dataset, versions, weights, job, settings)
+        manifest = dataset / 'manifest.jsonl'
+        rows = [json.loads(row) for row in manifest.read_text().splitlines()]
+        held_out = next(row for row in rows if row['split'] == 'val')
+        held_out['baseline_box'] = [.1, .1, 1.0000000000000002, .9]
+        manifest.write_text(''.join(json.dumps(row) + '\n' for row in rows))
+        return result
+    actual_save = lm.save_candidate
+    monkeypatch.setattr(lm, 'save_candidate',
+                        lambda *a, **k: (_ for _ in ()).throw(lm.ModelError('simulated publish failure')))
+    with pytest.raises(lm.ModelError, match='simulated publish failure'):
+        ft.run(job, tmp_path / 'findings', tmp_path / 'models', request, train=old_exporter)
+    job['phase'] = 'error'
+    monkeypatch.setattr(lm, 'save_candidate', actual_save)
+    monkeypatch.setattr(ft.session, 'run_training',
+                        lambda *args: pytest.fail('Recovery must never launch training'))
+    result = ft.finalize_retained(job, tmp_path / 'models')
+    assert result['status'] == 'complete'
+    assert result['training_info']['trainable']
+    assert result['assessment']['held_out_positive'] >= 4
+    assert result['assessment']['held_out_negative'] >= 2
