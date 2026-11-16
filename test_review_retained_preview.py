@@ -70,9 +70,10 @@ def test_issued_image_remains_confirmable_after_compact_cache_eviction(
         assert saved.status_code == 200, saved.get_data(as_text=True)[:500]
         assert saved.get_json()['finding']['label'] == 'positive'
         assert saved.get_json()['finding']['frame'] == meta['frame']
-        assert original_report != report.read_bytes() or (
-            # Journal path may legitimately defer full report publication.
-            saved.get_json().get('ok') or True)
+        assert original_report != report.read_bytes()
+        persisted = json.loads(report.read_text())['detections'][0]
+        assert persisted['human_confirmation']['label'] == 'positive'
+        assert persisted['confirmed_finding_id']
     finally:
         previews.clear_retained()
 
@@ -122,8 +123,6 @@ def test_session_jpeg_leases_are_bounded_and_vault_purgeable(
         assert not previews._RETAINED
         assert previews._RETAINED_BYTES == 0
         # Vault lock must erase plaintext leases *before* encrypt_tree.
-        assert ('finding_previews.clear_retained()'
-                in web._vault_lock_now.__code__.co_names or
-                'clear_retained' in web._vault_lock_now.__code__.co_names)
+        assert 'clear_retained' in web._vault_lock_now.__code__.co_names
     finally:
         previews.clear_retained()
