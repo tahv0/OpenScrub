@@ -359,3 +359,4 @@ def test_review_labels_detector_separately_and_explains_group_tracking_limit():
     assert 'Groups combine detector sightings;' in page
     assert 'they do not visually track all four plate corners' in page
     assert 'Corners autosave; check other frames' in page
+    assert 'estimate new perspective corners for every frame' in page
