@@ -329,6 +329,47 @@ def write(directory, row, index, group_fields, anchor_fields=None):
 
 
 
+
+def write_output_anchors(directory, patches):
+    """Atomically save explicit per-row Blur/Keep decisions without report rewrite.
+
+    Unlike group-bound human classifications, per-row output decisions remain
+    attached to their exact detection index. Existing human geometry and labels
+    are left untouched. One SQLite transaction/fsync covers the entire batch;
+    render or report export later publishes the journal into report.json.
+    """
+    if (not isinstance(patches, dict) or len(patches) > 10000
+            or any(type(index) is not int or index < 0
+                   or not isinstance(fields, dict) or
+                   not fields or set(fields) - {
+                       'enabled', 'output_choice_explicit',
+                       'plate_verification_override', 'plate_verification',
+                       'human_confirmation'}
+                   for index, fields in patches.items())):
+        raise ValueError('Invalid batch of explicit Review output choices')
+    if not patches:
+        return
+    with _lock(directory):
+        database, report = _paths(directory)
+        with closing(_connection(database, create=True)) as db:
+            current = _stamp(report)
+            meta = _meta(db)
+            _recover(db, report, meta, current)
+            db.execute('BEGIN IMMEDIATE')
+            _set(db, 'baseline', current if meta.get('baseline') is None
+                 else meta['baseline'])
+            for index, fields in sorted(patches.items()):
+                previous = db.execute('SELECT patch FROM anchors WHERE row_index=?',
+                                      (index,)).fetchone()
+                patch = json.loads(previous[0]) if previous else {}
+                patch.update(fields)
+                db.execute(
+                    'INSERT INTO anchors(row_index,patch) VALUES (?,?) '
+                    'ON CONFLICT(row_index) DO UPDATE SET patch=excluded.patch',
+                    (index, json.dumps(patch, separators=(',', ':'))))
+            db.commit()
+            _READ_CACHE.pop(str(database), None)
+
 def write_anchor(directory, index, fields):
     """Commit one source-row correction without touching any track decisions.
 
