@@ -5469,13 +5469,26 @@ function queueReviewPreview(img, priority=false){
  if(!state.batching)pumpReviewPreviews(state);
  return task.promise;
 }
+function plateSameBoundSourceGeometry(a,b){
+ // The compact crop is disposable. The original source + exact frame +
+ // detector anchor + baseline polygon prove identity even if a new crop is
+ // wider or shifted. A changed crop still needs human inspection before
+ // transferring an unsaved label or adjustment.
+ return !!(a?.frame_source_token&&b?.frame_source_token&&
+  a.frame_source_token===b.frame_source_token&&
+  a.frame===b.frame&&a.width===b.width&&a.height===b.height&&
+  JSON.stringify(a.box)===JSON.stringify(b.box)&&
+  plateSameSourceCorners(a.points,b.points));
+}
 function reviewMayRebindOffframeDraft(img,meta,edit){
  // Only an explicit 409 recovery can replace a displayed JPEG while its
  // local corners are unsaved. Background prefetch must never do this.
- // Equality requires a source-bound token, exact frame, box, crop and
- // archived baseline geometry; do not infer sameness from the visible plate.
+ // A wider or shifted replacement crop is safe to DISPLAY on the same
+ // verified original frame, but it must not silently authorize a SAVE or
+ // trusted classification; refreshPlateDraft/reloadStaleFinding distinguish
+ // crop changes and request deliberate approval.
  return !!(img._reviewRebindingDraft&&!edit.drag&&meta&&
-  (plateSamePreviewSource(edit.meta,meta)||plateSameSourceFrame(edit.meta,meta))&&
+  plateSameBoundSourceGeometry(edit.meta,meta)&&
   plateCornersInsideCrop(edit.points,meta.crop));
 }
 async function loadReviewPreview(state,task,cacheOnly){
@@ -5721,6 +5734,18 @@ function loadExactReviewFrame(button){
  });
 }
 
+function recoverableOffframePlateDraft(meta,edit){
+ // A definite 409 rejected the old corner request BEFORE writing it.
+ // Only a matching exact source frame can migrate this draft into a newly
+ // drawn *detector box*. In-flight/uncertain network saves and changed
+ // archived examples must never be superseded by this recovery.
+ return !!(meta?.geometry_outside_frame&&meta.exact_frame&&
+  meta.frame===meta.requested_frame&&meta.frame_source_token&&
+  edit?.dirty&&!edit.drag&&!edit.archiveConflict&&
+  (edit.error?.status===409||edit.needsSourceReview)&&
+  plateSameBoundSourceGeometry(meta,edit.meta)&&
+  validPlateRepair(edit.points,meta));
+}
 function validPlateRepair(points,geom){
  return Array.isArray(points)&&points.length===4&&
   points.every(p=>p.length===2&&p.every(Number.isFinite)&&
@@ -5735,9 +5760,12 @@ async function openPlateRepair(button){
   if(status)status.textContent="Load the exact source frame before redrawing.";return;
  }
  const old=PLATE_EDITS.get(selected.i);
- if(old&&(old.dirty||old.pending||old.drag)){
-  if(status)status.textContent="Preserve the unsaved corner draft before redrawing.";return;
+ const imported=recoverableOffframePlateDraft(selected,old);
+ if(PLATE_SAVE||old?.drag||(old&&(old.dirty||old.pending)&&!imported)){
+  if(status)status.textContent="A corner save is still pending or this draft belongs to a different source. Back up the draft before redrawing.";
+  return;
  }
+ const originalDraftVersion=imported?old.version:null;
  button.disabled=true;button.textContent="Loading exact source frame…";
  let url=null,dialog=null,saving=false,closed=false;
  try{
@@ -5911,12 +5939,23 @@ async function openPlateRepair(button){
     }
     if(!completed||!data?.ok)
      throw new Error("Source verification is still pending. Your corners are preserved; retry Save.");
+    // Durable confirmation from the backend supersedes only this exact
+    // failed draft, not a newer edit made while the full-frame dialog was
+    // open. Never clear the old draft on timeout, refusal, or Cancel.
+    if(imported&&PLATE_EDITS.get(selected.i)===old&&old.version===originalDraftVersion){
+     old.pending=null;old.error=null;old.conflict=false;
+     old.archiveConflict=false;old.needsSourceReview=false;
+     old.saved=plateCopy(data.points);old.points=plateCopy(data.points);
+     old.dirty=false;
+     plateStatus(old,"Replacement detector box saved for this source frame.");
+     schedulePlateSaves();
+    }
     saving=false;cancel.disabled=false;close();
     if(CUR!==job||JOBVIEW!==view)return;
     // A redrawn region is NOT a classification. Continue protection and
     // require an explicit Is / Not on the newly verified source picture.
     const row=FINDING_META[selected.i];
-    if(row){row.human_region_confirmed=true;row.verified_label="";
+    if(row){row.human_region_confirmed=true;row.source_repaired=true;row.verified_label="";
      row.human_confirmation=null;row.confirmed_finding_id=null;
      row.confirmed_finding_revision=null;row.classification_allowed=false;
      row.classification_note="Loading the corrected source-frame preview…";}
@@ -5931,7 +5970,8 @@ async function openPlateRepair(button){
     if(bb)bb.innerHTML=detChoices(selected.i);
     updateReviewOverlayLabel(selected.i);
     const label=document.getElementById("vlabel"+selected.i);
-    if(label)label.textContent="New area saved for this frame; loading verified picture…";
+    if(label)label.textContent="Detector box saved for source frame "+data.frame+"; loading the corrected picture…";
+    if(button.isConnected)button.hidden=true;
     img._plateMeta=null;img._previewLoaded=false;img._forceExactPreview=true;
     // If the prepared crop was evicted, use the explicit extended exact seek.
     img._previewLongRetry=true;
@@ -5943,7 +5983,14 @@ async function openPlateRepair(button){
     draw();hint.textContent="Save failed: "+error.message+". Corners preserved; retry Save.";
    }
   };
-  choose("box");setZoom(1);
+  choose(imported?"corners":"box");
+  if(imported){
+   points=plateCopy(old.points);
+   draw();
+   hint.textContent="Recovered your unsaved four corners on this verified full frame. "+
+    "Check their position before saving the replacement detector box.";
+  }
+  setZoom(1);
  }catch(error){
   if(status)status.textContent="Could not open redraw: "+error.message;
  }finally{
@@ -6070,7 +6117,9 @@ function updatePlateSaveIssues(){
 function plateStatus(s,text,retry=false){
  s.status.textContent=text;s.retry.hidden=!retry;
  s.retry.textContent=s.archiveConflict?"Confirm Is / Not again":
-  s.needsSourceReview?"Save on refreshed picture":s.conflict?"Refresh picture (keep corners)":"Retry save";
+  s.meta?.geometry_outside_frame&&s.dirty?"Repair detector box (keep corners)":
+  s.needsSourceReview?"Save on refreshed picture":
+  s.conflict?"Refresh picture (keep corners)":"Retry save";
  if(s.card)s.card.classList.toggle("corner-save-error",!!(s.dirty&&s.error));
  // A rejected AREA save needs an explicit discard control even though it
  // must not create a phantom failed human classification.
@@ -6370,6 +6419,14 @@ async function flushPlateSaves(){
 }
 async function retryPlateSave(s){
  if(s.archiveConflict){dismissFindingConfirmation(s.i);return;}
+ if(s.meta?.geometry_outside_frame&&s.dirty){
+  const repair=s.card?.querySelector(".plate-repair-button");
+  if(repair&&!repair.hidden){
+   await openPlateRepair(repair);return;
+  }
+  plateStatus(s,"This detector box is outside the source frame. Load its exact frame and repair the box; your corners are preserved.",true);
+  return;
+ }
  if(s.needsSourceReview){
   if(!confirm("Save these four corners to the NEW picture now displayed? Review all corners first. The old confirmed training example will not be transferred."))return;
   if(!plateQuadValid(s.points)){plateStatus(s,"Correct the four corners before saving.",true);return;}
