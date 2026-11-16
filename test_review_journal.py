@@ -187,3 +187,92 @@ def test_http_confirmation_commits_without_report_rewrite(plate_job,tmp_path,mon
     assert journal.has_changes(job_dir)
     assert journal.publish(job_dir)
     assert json.loads(report.read_text())['detections'][0]['verified_label']=='not_plate'
+
+
+
+def test_batched_output_anchors_keep_human_confirmations_and_publish_atomically(tmp_path):
+    import review_journal as journal
+    import stop_review
+    root = tmp_path / 'review'
+    root.mkdir()
+    report = root / 'report.json'
+    rows = [dict(category='plate', track=8, person=-1, enabled=True,
+                 output_choice_explicit=False,
+                 verified_label='plate',
+                 plate_quad=[[0,0],[1,0],[1,1],[0,1]],
+                 human_confirmation={'label':'positive','source':'explicit'})
+            for _ in range(6)]
+    stop_review.atomic_report(report, {'detections': rows})
+    journal.write_output_anchors(root, {
+        1: {'enabled': False, 'output_choice_explicit': True,
+            'plate_verification_override': True},
+        2: {'enabled': False, 'output_choice_explicit': True,
+            'plate_verification_override': True},
+    })
+    assert journal.has_changes(root)
+    untouched = json.loads(report.read_text())['detections']
+    assert all(row['enabled'] is True for row in untouched)
+    patched = journal.apply(root, json.loads(report.read_text()))['detections']
+    assert patched[1]['enabled'] is False and patched[2]['enabled'] is False
+    assert patched[0]['enabled'] is True and patched[5]['enabled'] is True
+    assert patched[1]['plate_quad'] == rows[1]['plate_quad']
+    assert patched[1]['human_confirmation']['label'] == 'positive'
+    assert journal.publish(root) is True
+    stored = json.loads(report.read_text())['detections']
+    assert stored[1]['enabled'] is False and stored[2]['enabled'] is False
+    assert stored[0]['enabled'] is True and not journal.has_changes(root)
+    with pytest.raises(ValueError, match='Invalid batch'):
+        journal.write_output_anchors(root, {-1:{'enabled':True}})
+    assert not journal.has_changes(root)
+
+
+def test_later_human_confirmations_override_earlier_output_batches(tmp_path):
+    import review_journal as j
+    import stop_review
+    path = tmp_path / 'report.json'
+    rows = [dict(category='plate', track=7, person=-1, enabled=True,
+                 output_choice_explicit=False, verified_label='',
+                 cbox=[10, 20, 50, 40], plate_quad=[])
+            for _ in range(3)]
+    stop_review.atomic_report(path, {'detections': rows})
+    # Reviewer says Keep visible on a group, then confirms it really IS a
+    # plate. Later confirmation must restore protection for every member.
+    j.write_output_anchors(tmp_path, {i:{'enabled':False,
+        'output_choice_explicit':True,'plate_verification_override':True}
+        for i in range(3)})
+    j.write(tmp_path, rows[0], 0, dict(enabled=True, output_choice_explicit=True,
+        verified_label='plate', human_confirmation=dict(label='positive',
+        category='plate',source='explicit')),
+        dict(human_region_confirmed=True,plate_quad=[[0,0],[1,0],[1,1],[0,1]]))
+    current = j.apply(tmp_path, json.loads(path.read_text()))['detections']
+    assert all(row['enabled'] is True for row in current)
+    assert all(row['verified_label'] == 'plate' for row in current)
+    assert current[0]['plate_quad'] == [[0,0],[1,0],[1,1],[0,1]]
+    assert current[0]['human_confirmation']['label'] == 'positive'
+    # A subsequent intentional output-only Keep visible click wins again,
+    # without erasing the human label or the saved source-frame corners.
+    j.write_output_anchors(tmp_path, {1:{'enabled':False,
+        'output_choice_explicit':True,'plate_verification_override':True}})
+    current = j.apply(tmp_path, json.loads(path.read_text()))['detections']
+    assert current[1]['enabled'] is False
+    assert current[1]['verified_label'] == 'plate'
+    assert current[0]['enabled'] is True and current[2]['enabled'] is True
+    j.publish(tmp_path)
+    stored = json.loads(path.read_text())['detections']
+    assert [r['enabled'] for r in stored] == [True, False, True]
+
+
+def test_later_source_row_output_repair_outranks_old_group_choice(tmp_path):
+    import review_journal as j
+    import stop_review
+    path = tmp_path / 'report.json'
+    row = dict(category='plate',track=1,person=-1,enabled=True,
+        verified_label='',cbox=[0,0,10,10])
+    stop_review.atomic_report(path, {'detections':[row]})
+    j.write_output_anchors(tmp_path, {0:{'enabled':False,
+        'output_choice_explicit':True}})
+    j.write(tmp_path,row,0,dict(enabled=True, output_choice_explicit=True,
+        human_confirmation={'label':'positive','category':'plate','source':'explicit'}))
+    j.write_anchor(tmp_path,0,{'enabled':False,'output_choice_explicit':True})
+    current=j.apply(tmp_path,json.loads(path.read_text()))['detections'][0]
+    assert current['enabled'] is False and current['human_confirmation']['label']=='positive'

@@ -284,3 +284,114 @@ def test_region_draft_requires_explicit_label_and_output_preserves_confirmation(
             assert client.get('/api/findings').get_json()==archived, 'Output changes must not rewrite archived classification'
         assert not dialogs and not errors,(dialogs,errors)
         browser.close()
+
+
+
+def test_empty_review_save_acknowledges_previously_confirmed_journal_without_rewriting(plate_job, monkeypatch):
+    """Thousands of prior Is/Not decisions must not force a 120s report save."""
+    import review_journal
+    client, jid, path, _ = plate_job
+    job = web.JOBS[jid]
+    doc = json.loads(path.read_text())
+    row = doc['detections'][0]
+    # Human-confirmed choices have their own durable SQLite receipt.
+    review_journal.write(job['dir'], row, 0, {
+        'enabled': False, 'verified_label': 'not_plate',
+        'human_confirmation': {'label': 'negative', 'category': 'plate',
+                               'source': 'explicit'}})
+    before = path.read_bytes()
+    with monkeypatch.context() as guard:
+        guard.setattr(web, '_review_journal_snapshot',
+                      lambda *a, **k: pytest.fail('No-delta Save materialized a huge report'))
+        guard.setattr(web, '_load_job_report',
+                      lambda *a, **k: pytest.fail('No-delta Save parsed a huge report'))
+        guard.setattr(stop_review, 'atomic_report',
+                      lambda *a, **k: pytest.fail('No-delta Save rewrote report'))
+        response = client.post('/api/jobs/%s/detections' % jid,
+            json={'enabled': {}, 'verified_labels': {}, 'output_choices': {},
+                  'manual': [], 'box_overrides': {}, 'time_overrides': {},
+                  'defer_report_write': True})
+    assert response.status_code == 200, response.get_data(as_text=True)
+    receipt = response.get_json()
+    assert receipt['ok'] and receipt['changed'] is False
+    assert receipt['journal_deferred'] is True
+    assert path.read_bytes() == before
+    assert review_journal.has_changes(job['dir'])
+    assert web._load_job_report(job)['detections'][0]['verified_label'] == 'not_plate'
+    # The separate render worker materializes all existing confirmed decisions.
+    assert web._review_journal_snapshot(job) is True
+    stored = json.loads(path.read_text())['detections'][0]
+    assert stored['verified_label'] == 'not_plate' and stored['enabled'] is False
+    assert not review_journal.has_changes(job['dir'])
+
+
+def test_sparse_output_only_save_is_journaled_without_rewriting_source_report(plate_job, monkeypatch):
+    """A new Blur/Keep click also gets an exact durable receipt with no huge JSON write."""
+    import review_journal
+    import review_preview_index
+    client, jid, path, _ = plate_job
+    job = web.JOBS[jid]
+    doc = json.loads(path.read_text())
+    row = doc['detections'][0]
+    row['verified_label'] = 'plate'
+    row['human_confirmation'] = {'label': 'positive', 'category': 'plate',
+                                 'source': 'explicit'}
+    row['plate_quad'] = [[0., 0.], [1., 0.], [1., 1.], [0., 1.]]
+    doc['detections'] = [dict(row, track=n) for n in range(12)]
+    path.write_text(json.dumps(doc))
+    assert review_preview_index.publish_listing(path, doc)
+    before = path.read_bytes()
+    payload = {'enabled': {'3': False, '5': True},
+               'output_choices': {'3': True, '5': True},
+               'defer_report_write': True,
+               'verified_labels': {}, 'manual': [],
+               'box_overrides': {}, 'time_overrides': {}}
+    with monkeypatch.context() as guard:
+        guard.setattr(web, '_review_journal_snapshot',
+                      lambda *a, **k: pytest.fail('Output-only Save materialized report'))
+        guard.setattr(web, '_load_job_report',
+                      lambda *a, **k: pytest.fail('Output-only Save parsed report'))
+        guard.setattr(stop_review, 'atomic_report',
+                      lambda *a, **k: pytest.fail('Output-only Save rewrote report'))
+        response = client.post('/api/jobs/%s/detections' % jid, json=payload)
+    assert response.status_code == 200, response.get_data(as_text=True)
+    receipt = response.get_json()
+    assert receipt['changed'] is True and receipt['journal_deferred']
+    assert path.read_bytes() == before
+    # GET overlays the journal on the original indexed listing.
+    listing = client.get('/api/jobs/%s/detections' % jid).get_json()
+    assert listing['detections'][3]['enabled'] is False
+    assert listing['detections'][3]['output_choice_explicit'] is True
+    assert listing['detections'][5]['output_choice_explicit'] is True
+    effective = web._load_job_report(job)['detections']
+    assert effective[3]['verified_label'] == 'plate'
+    assert effective[3]['plate_quad'] == row['plate_quad']
+    assert effective[3]['enabled'] is False
+    assert all(effective[n]['enabled'] is True for n in [0, 1, 2, 4, 6])
+    assert review_journal.publish(job['dir']) is True
+    saved = json.loads(path.read_text())['detections']
+    assert saved[3]['verified_label'] == 'plate'
+    assert saved[3]['plate_quad'] == row['plate_quad']
+    assert saved[3]['enabled'] is False and saved[5]['output_choice_explicit'] is True
+
+
+
+def test_no_delta_save_only_still_materializes_all_journal_confirmations(plate_job):
+    """Save-only callers keep the existing report.json publication contract."""
+    import review_journal
+    client, jid, path, _ = plate_job
+    job = web.JOBS[jid]
+    row = json.loads(path.read_text())['detections'][0]
+    review_journal.write(job['dir'], row, 0, {
+        'enabled': False, 'verified_label': 'not_plate',
+        'human_confirmation': {'label':'negative', 'category':'plate','source':'explicit'}})
+    # No render-intent opt-in: do not return a lightweight journal-only receipt.
+    response = client.post('/api/jobs/%s/detections' % jid, json={
+        'enabled': {}, 'output_choices': {}, 'verified_labels': {},
+        'manual': [], 'box_overrides': {}, 'time_overrides': {}})
+    assert response.status_code == 200
+    assert response.get_json()['ok']
+    assert response.get_json().get('journal_deferred') is None
+    stored = json.loads(path.read_text())['detections'][0]
+    assert stored['enabled'] is False and stored['verified_label'] == 'not_plate'
+    assert not review_journal.has_changes(job['dir'])
