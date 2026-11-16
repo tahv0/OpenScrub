@@ -20,6 +20,8 @@ from pathlib import Path
 import re
 import sqlite3
 import threading
+import time
+from collections import OrderedDict
 
 import cv2
 import numpy as np
@@ -40,6 +42,14 @@ MAX_BYTES = _preview_budget()
 MAX_PER_CAPTURE = 12
 _LOCK = threading.RLock()
 _SCHEMA_READY = set()
+# A small bounded session-only lease for JPEGs actually served to Review.
+# Disk previews are evictable; an Is/Not click must not be stranded when the
+# compact cache evicts its original picture during long 4K sessions.
+_RETAINED = OrderedDict()
+_RETAINED_BYTES = 0
+_RETAINED_MAX_BYTES = 64 * 1024 * 1024
+_RETAINED_MAX_ITEMS = 2048
+_RETAINED_SECONDS = 2 * 60 * 60
 _KEY = re.compile(r'[a-f0-9]{64}\Z')
 
 
@@ -476,7 +486,10 @@ def lookup(job_dir, row, render_state, *, allow_representative=False, preferred_
     with _LOCK:
         db = _db(job_dir)
         if db is None:
-            return None
+            return (_remembered_lookup(job_dir, row, render_state, index, fps,
+                        offset, content, category, track, preferred_key,
+                        allow_representative)
+                    if preferred_key is not None else None)
         try:
             def image(rowid, meta, points, kind):
                 selected = db.execute(
@@ -504,7 +517,10 @@ def lookup(job_dir, row, render_state, *, allow_representative=False, preferred_
                     'SELECT rowid,metadata FROM previews WHERE key=?',
                     (preferred_key,)).fetchone()
                 if record is None:
-                    return None
+                    return _remembered_lookup(
+                        job_dir, row, render_state, index, fps, offset,
+                        content, category, track, preferred_key,
+                        allow_representative)
                 rowid, serialized = record
                 meta = json.loads(serialized)
                 if meta.get('category') != category or meta.get('fps') != fps:
@@ -579,6 +595,101 @@ def lookup(job_dir, row, render_state, *, allow_representative=False, preferred_
             db.close()
     return None
 
+
+
+def retain(job_dir, meta, jpeg):
+    """Keep server-issued source JPEGs in bounded RAM; never browser pixels.
+
+    The caller must hold the vault's shared picture lease; this memory is
+    explicitly cleared before vault encryption. No persistent cache growth.
+    """
+    global _RETAINED_BYTES
+    key = meta.get('key') if isinstance(meta, dict) else None
+    if (not isinstance(key, str) or not _KEY.fullmatch(key)
+            or not isinstance(jpeg, (bytes, bytearray))):
+        return
+    size = len(jpeg) + len(_json(meta).encode('utf-8'))
+    if not 0 < size <= _RETAINED_MAX_BYTES:
+        return
+    ident = (str(Path(job_dir).resolve()), key)
+    with _LOCK:
+        previous = _RETAINED.pop(ident, None)
+        if previous:
+            _RETAINED_BYTES -= previous[2]
+        _RETAINED[ident] = (dict(meta), bytes(jpeg), size, time.monotonic())
+        _RETAINED_BYTES += size
+        now = time.monotonic()
+        while _RETAINED:
+            oldest = next(iter(_RETAINED.values()))
+            if (len(_RETAINED) <= _RETAINED_MAX_ITEMS and
+                    _RETAINED_BYTES <= _RETAINED_MAX_BYTES and
+                    now - oldest[3] <= _RETAINED_SECONDS):
+                break
+            _RETAINED_BYTES -= _RETAINED.popitem(last=False)[1][2]
+
+
+def clear_retained(job_dir=None):
+    """Forget plaintext Review evidence on vault lock or job deletion."""
+    global _RETAINED_BYTES
+    with _LOCK:
+        if job_dir is None:
+            _RETAINED.clear()
+            _RETAINED_BYTES = 0
+            return
+        directory = str(Path(job_dir).resolve())
+        for key in [k for k in _RETAINED if k[0] == directory]:
+            _RETAINED_BYTES -= _RETAINED.pop(key)[2]
+
+
+def _remembered_lookup(job_dir, row, state, index, fps, offset,
+                       content, category, track, preferred_key,
+                       allow_representative):
+    """Revalidate a pinned JPEG with the SAME source/geometry guards as disk.
+
+    This fallback applies only to the explicit preview_key sent with a human
+    action. A remembered sample cannot silently become another source frame,
+    box, crop or plate polygon, and no label is inferred from the memory hit.
+    """
+    global _RETAINED_BYTES
+    ident = (str(Path(job_dir).resolve()), preferred_key)
+    saved = _RETAINED.get(ident)
+    if saved is None:
+        return None
+    meta, jpeg, size, issued = saved
+    if time.monotonic() - issued > _RETAINED_SECONDS:
+        _RETAINED_BYTES -= _RETAINED.pop(ident)[2]
+        return None
+    try:
+        if (meta.get('key') != preferred_key or
+                meta.get('category') != category or meta.get('fps') != fps):
+            return None
+        stored_frame = int(meta['frame'])
+        if not 0 <= stored_frame < len(state['cum']):
+            return None
+        exact = (stored_frame == index and
+                 meta.get('content_box') == content and meta.get('offset') == offset)
+        same_track = track >= 0 and int(meta.get('track', -1)) == track
+        same_region = (track < 0 and
+                       str(row.get('text', ''))[:1024] == meta.get('text') and
+                       float(row['t_start']) <= float(meta['t']) <= float(row['t_end']) and
+                       _iou(content, meta['content_box']) >= .5)
+        representative = (allow_representative and stored_frame != index and
+                          (same_track or same_region) and
+                          _offset(state['cum'][stored_frame]) == _offset(meta['offset']))
+        if not (exact or representative):
+            return None
+        points = _points(row, meta['box'])
+        if not _compatible_crop(meta, points):
+            return None
+        _RETAINED.move_to_end(ident)
+        return (dict(meta, points=points,
+                     geometry_outside_frame=_outside_source_frame(
+                         meta['box'], points, meta['width'], meta['height']),
+                     preview_token=_hash([meta['key'], points]),
+                     match='exact' if exact else 'representative',
+                     requested_frame=index), jpeg)
+    except (ValueError, TypeError, KeyError, OverflowError):
+        return None
 
 def _iou(a, b):
     ix = max(0., min(a[2], b[2]) - max(a[0], b[0]))

@@ -433,8 +433,9 @@ def test_offframe_stale_409_allows_only_safe_explicit_draft_reload():
     """Execute the actual browser source checks for an unsaved-corner 409.
 
     An evicted compact JPEG can be safely replaced ONLY when this is an
-    explicit recovery of the same source/frame/box/crop/baseline polygon.
-    Other frames or edits must keep the previous picture and draft.
+    explicit recovery of the same verified source/frame/box.
+    Changed crops or saved baseline corners can be displayed for review but
+    are NOT permission to auto-confirm the old shape. Other frames remain blocked.
     """
     import shutil
     import subprocess
@@ -443,7 +444,7 @@ def test_offframe_stale_409_allows_only_safe_explicit_draft_reload():
     source = web.APP_JS
     comparisons = source[source.index('function plateSameSourceCorners('):
                          source.index('function plateQuadValid(')]
-    recovery = source[source.index('function reviewMayRebindOffframeDraft('):
+    recovery = source[source.index('function plateSameBoundSourceGeometry('):
                       source.index('async function loadReviewPreview(')]
     assert '!reviewMayRebindOffframeDraft(img,meta,currentDraft)' in source
     assert 's.img._reviewRebindingDraft=true' in source
@@ -460,7 +461,8 @@ const replacement={...original, geometry_outside_frame:true,
  frame_source_token:'sha-source-bound-proof',source_token:'new-jpeg-proof',
  key:'new-jpeg'};
 const draft={meta:original, dirty:true, pending:{id:'known-409'},
- drag:null,points:[[115,215],[485,215],[485,315],[115,315]]};
+ error:{status:409},drag:null,
+ points:[[115,215],[485,215],[485,315],[115,315]]};
 const img={};
 assert.equal(reviewMayRebindOffframeDraft(img,replacement,draft),false,
  'Background prefetch must not rebind a dirty editor.');
@@ -474,12 +476,20 @@ assert.equal(reviewMayRebindOffframeDraft(img,changedSource,draft),false);
 const changedBox={...replacement,box:[100,200,600,330]};
 assert.equal(reviewMayRebindOffframeDraft(img,changedBox,draft),false);
 const changedCrop={...replacement,crop:[0,0,3840,2160]};
-assert.equal(reviewMayRebindOffframeDraft(img,changedCrop,draft),false);
+assert.equal(reviewMayRebindOffframeDraft(img,changedCrop,draft),true,
+ 'Same source frame, enlarged crop: display and require human review.');
+assert.equal(plateSameSourceFrame(original,changedCrop),false,
+ 'A changed crop must never auto-authorize the previous classification.');
 const changedBaseline={...replacement,points:[[112,210],[490,210],[490,320],[110,320]]};
-assert.equal(reviewMayRebindOffframeDraft(img,changedBaseline,draft),false);
+assert.equal(reviewMayRebindOffframeDraft(img,changedBaseline,draft),true,
+ 'Newly persisted corners can be shown on the same source frame.');
+assert.equal(plateSameSourceFrame(original,changedBaseline),false,
+ 'A changed saved polygon must never silently confirm the old shape.');
 const outsideDraft={...draft,points:[[115,215],[900,215],[900,315],[115,315]]};
 assert.equal(reviewMayRebindOffframeDraft(img,replacement,outsideDraft),false);
 assert.equal(reviewMayRebindOffframeDraft(img,replacement,{...draft,drag:{}}),false);
+assert.equal(reviewMayRebindOffframeDraft(img,replacement,{...draft,error:null}),false,
+ 'A pending save with an uncertain result cannot silently rebind.');
 """
     result = subprocess.run(['node','-e',js],capture_output=True,text=True,
                             timeout=15)

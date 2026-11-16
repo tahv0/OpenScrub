@@ -554,6 +554,21 @@ def _video(job, doc, meta):
                 total_frames=int(identity.get('total_frames') or len(doc['render_state']['cum'])))
 
 
+def _points_for_state(quad, box):
+    """Only read the persisted polygon; never infer a human correction."""
+    if not quad:
+        quad = ((0., 0.), (1., 0.), (1., 1.), (0., 1.))
+    if not isinstance(quad, (list, tuple)) or len(quad) != 4:
+        return [[box[0],box[1]], [box[2],box[1]],
+                [box[2],box[3]], [box[0],box[3]]]
+    try:
+        return [[box[0]+float(x)*(box[2]-box[0]),
+                 box[1]+float(y)*(box[3]-box[1])] for x,y in quad]
+    except (TypeError, ValueError):
+        return [[box[0],box[1]], [box[2],box[1]],
+                [box[2],box[3]], [box[0],box[3]]]
+
+
 def _shape(points, meta):
     try:
         value = np.asarray(points, dtype=float)
@@ -1188,16 +1203,75 @@ def install(app, web):
         return Response(library.image_path(root(),identity).read_bytes(),mimetype='image/jpeg',
                         headers={'Cache-Control':'no-store'})
 
+    @app.get('/api/jobs/<jid>/finding-review-state/<int:index>')
+    @_guard
+    @web._serialize_review_read
+    def finding_review_state(jid, index):
+        """Small, read-only proof of saved geometry without video decoding.
+
+        The picture cache is disposable; Review's report/journal is not.
+        Distinguish a real saved source-box repair from a four-corner edit
+        (which does not itself change the detector box) and a browser-only
+        unsaved draft. This endpoint does not create or promote evidence.
+        """
+        job = _job(jid)
+        doc = web._load_preview_report(job)
+        if not 0 <= index < len(doc.get('detections', [])):
+            abort(404)
+        row = doc['detections'][index]
+        rs = doc['render_state']
+        frame = video_learning._frame(row, rs)
+        if not 0 <= frame < len(rs['cum']):
+            abort(400, description='Finding is outside the scan timeline.')
+        source_box = [float(v) for v in video_learning._screen_box(row, rs, frame)]
+        quad = row.get('plate_quad') or []
+        points = _points_for_state(quad, source_box)
+        source_info = doc.get('source_identity') or {}
+        width, height = source_info.get('width'), source_info.get('height')
+        off_frame = None
+        if (isinstance(width, (int, float)) and width > 0
+                and isinstance(height, (int, float)) and height > 0):
+            off_frame = previews._outside_source_frame(
+                source_box, points, width, height)
+        exact = previews.lookup(job['dir'], dict(row, frame_index=frame), rs)
+        receipt = row.get('source_repair_receipt') or {}
+        return jsonify(
+            finding_index=index, source_frame=frame,
+            source_box=source_box, saved_plate_quad=quad,
+            saved_corner_adjustment=bool(row.get('human_region_confirmed')),
+            saved_detector_box_repair=bool(receipt),
+            detector_box_repair_frame=receipt.get('frame'),
+            geometry_outside_source_frame=off_frame,
+            confirmed_label=(row.get('human_confirmation') or {}).get('label'),
+            confirmed_finding_archived=bool(row.get('confirmed_finding_id')),
+            exact_preview_cached=exact is not None,
+            journal_has_unpublished_changes=review_journal.has_changes(job['dir']),
+            note=('The source box was redrawn for this exact row.'
+                  if receipt else
+                  'Four corners alone do not change the detector source box.'
+                  if row.get('human_region_confirmed') else
+                  'There is no saved manual box or four-corner edit on this row.'))
+
     @app.get('/api/jobs/<jid>/finding-preview/<int:index>')
     @_guard
     def finding_preview(jid,index):
-        result = preview(_job(jid),index,
+        job = _job(jid)
+        result = preview(job,index,
                          cache_only=request.args.get('cache_only')=='1',
                          exact_only=request.args.get('exact')=='1',
                          retry_decode=request.args.get('retry_decode')=='1')
         if result is None:
             return Response(status=204,headers={'Cache-Control':'no-store'})
         _,_,meta,jpeg = result
+        # The on-disk thumbnail is a bounded, disposable cache. Hold only
+        # actual server-issued JPEGs seen by Review in a separate tiny RAM
+        # lease so a later Is/Not click can revalidate its exact source after
+        # SQLite eviction. Retaining under the vault's reader gate prevents
+        # plaintext JPEGs being pinned after encryption begins.
+        with web._REVIEW_PICTURE_GATE.reader():
+            if web.vault_locked():
+                abort(423)
+            previews.retain(job['dir'], meta, jpeg)
         response = Response(jpeg,mimetype='image/jpeg',headers={'Cache-Control':'no-store'})
         response.headers['X-Finding-Geometry'] = json.dumps(meta,separators=(',',':'))
         response.headers['X-Plate-Geometry'] = response.headers['X-Finding-Geometry']

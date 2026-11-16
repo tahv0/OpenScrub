@@ -179,48 +179,50 @@ def test_source_frame_proof_distinguishes_legacy_null_video_hashes():
 
 
 def test_evicted_displayed_image_can_be_reloaded_and_saved_with_same_frame_binding(review_server):
-    """A preloaded JPEG can be evicted before the human saves four corners.
+    """A disk-evicted JPEG still authorizes the original source-bound edit.
 
-    The old opaque key must fail closed. A freshly decoded source frame can
-    safely authorize a new request only if the backend proves the same
-    immutable source frame and original detection geometry.
+    A tiny bounded process lease pins JPEG bytes actually served to Review.
+    Unlike the old 409-then-4K-decode behavior, the old opaque key should now
+    accept a saved quad ONLY when it still names the same original image,
+    source frame, detector geometry, and old polygon.
     """
     import sqlite3
+    import finding_previews
 
     _, path = review_server
     job = web.JOBS['inline-fixture']
-    with web.app.test_client() as client:
-        initial = client.get('/api/jobs/inline-fixture/finding-preview/0?cache_only=1')
-        assert initial.status_code == 200
-        shown = json.loads(initial.headers['X-Finding-Geometry'])
-        assert shown['key'] and shown['frame_source_token']
-        stale_body = dict(compact=True, autosave=True, edit_id='evicted-draft',
-                          points=[[185, 125], [415, 125], [415, 215], [185, 215]],
-                          preview_key=shown['key'],
-                          preview_token=shown['preview_token'])
-        database = Path(job['dir']) / 'compact_previews' / 'index.sqlite3'
-        with sqlite3.connect(database) as db:
-            assert db.execute('DELETE FROM previews WHERE key=?',
-                              (shown['key'],)).rowcount == 1
-            db.commit()
-        refused = client.post('/api/jobs/inline-fixture/plate_quad/0', json=stale_body)
-        assert refused.status_code == 409
-        assert refused.get_json()['conflict'] == 'stale_preview'
-        assert not web._load_job_report(job)['detections'][0].get('plate_quad')
+    finding_previews.clear_retained(job['dir'])
+    try:
+        with web.app.test_client() as client:
+            initial = client.get('/api/jobs/inline-fixture/finding-preview/0?cache_only=1')
+            assert initial.status_code == 200
+            shown = json.loads(initial.headers['X-Finding-Geometry'])
+            assert shown['key'] and shown['frame_source_token']
+            payload = dict(compact=True, autosave=True, edit_id='evicted-draft',
+                           points=[[185, 125], [415, 125], [415, 215], [185, 215]],
+                           preview_key=shown['key'],
+                           preview_token=shown['preview_token'])
+            database = Path(job['dir']) / 'compact_previews' / 'index.sqlite3'
+            with sqlite3.connect(database) as db:
+                assert db.execute('DELETE FROM previews WHERE key=?',
+                                  (shown['key'],)).rowcount == 1
+                db.commit()
 
-        refreshed = client.get('/api/jobs/inline-fixture/finding-preview/0')
-        assert refreshed.status_code == 200, refreshed.get_data(as_text=True)[:150]
-        current = json.loads(refreshed.headers['X-Finding-Geometry'])
-        assert current['frame_source_token'] == shown['frame_source_token']
-        assert current['frame'] == shown['frame'] and current['box'] == shown['box']
+            # The user still sees the exact issued image, and nothing about
+            # its original detector/frame/quad changed. No cold seek is needed.
+            saved = client.post('/api/jobs/inline-fixture/plate_quad/0', json=payload)
+            assert saved.status_code == 200, saved.get_data(as_text=True)[:300]
+            assert saved.get_json()['ok']
+            assert web._load_job_report(job)['detections'][0]['human_region_confirmed']
+            assert not web._load_job_report(job)['detections'][0].get('verified_label')
 
-        stale_body.update(preview_key=current['key'],
-                          preview_token=current['preview_token'],
-                          edit_id='rebound-source-verified')
-        saved = client.post('/api/jobs/inline-fixture/plate_quad/0', json=stale_body)
-        assert saved.status_code == 200, saved.get_data(as_text=True)[:300]
-        assert saved.get_json()['ok']
-        assert web._load_job_report(job)['detections'][0]['human_region_confirmed']
+            # A second request with the original stale polygon is not
+            # permission to overwrite a newer persisted human adjustment.
+            obsolete = client.post('/api/jobs/inline-fixture/plate_quad/0',
+                                   json=dict(payload, edit_id='old-other-edit'))
+            assert obsolete.status_code == 409
+    finally:
+        finding_previews.clear_retained(job['dir'])
 
 
 def test_large_group_single_http_confirmation_has_stable_preview_token(review_server):

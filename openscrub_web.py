@@ -1298,6 +1298,8 @@ def job_delete(jid):
     if dependency:
         return jsonify({"error": dependency}), 409
     if _reap_job_dir(job["dir"], jid):
+        # The job's in-process JPEG leases are not part of the removed files.
+        finding_previews.clear_retained(job["dir"])
         with JOBS_LOCK:
             JOBS.pop(jid, None)
         return jsonify({"ok": True})
@@ -1309,6 +1311,8 @@ def job_delete(jid):
             f.write(str(time.time()))
     except OSError:
         pass
+    # Also clear copies of dismissed jobs pending physical deletion.
+    finding_previews.clear_retained(job["dir"])
     with JOBS_LOCK:
         JOBS.pop(jid, None)
 
@@ -5469,13 +5473,27 @@ function queueReviewPreview(img, priority=false){
  if(!state.batching)pumpReviewPreviews(state);
  return task.promise;
 }
+function plateSameBoundSourceGeometry(a,b){
+ // The source-bound frame token intentionally excludes mutable plate_quad.
+ // We may DISPLAY a replacement crop for the same verified source/frame/box
+ // after a newer save changed the polygon. The old human draft is preserved;
+ // confirmation and corner writes still require explicit approval on that
+ // new image and never auto-transfer a changed polygon.
+ return !!(a?.frame_source_token&&b?.frame_source_token&&
+  a.frame_source_token===b.frame_source_token&&
+  a.frame===b.frame&&a.width===b.width&&a.height===b.height&&
+  JSON.stringify(a.box)===JSON.stringify(b.box));
+}
 function reviewMayRebindOffframeDraft(img,meta,edit){
  // Only an explicit 409 recovery can replace a displayed JPEG while its
  // local corners are unsaved. Background prefetch must never do this.
- // Equality requires a source-bound token, exact frame, box, crop and
- // archived baseline geometry; do not infer sameness from the visible plate.
+ // A wider or shifted replacement crop is safe to DISPLAY on the same
+ // verified original frame, but it must not silently authorize a SAVE or
+ // trusted classification; refreshPlateDraft/reloadStaleFinding distinguish
+ // crop changes and request deliberate approval.
  return !!(img._reviewRebindingDraft&&!edit.drag&&meta&&
-  (plateSamePreviewSource(edit.meta,meta)||plateSameSourceFrame(edit.meta,meta))&&
+  (!edit.pending||edit.error?.status===409)&&
+  plateSameBoundSourceGeometry(edit.meta,meta)&&
   plateCornersInsideCrop(edit.points,meta.crop));
 }
 async function loadReviewPreview(state,task,cacheOnly){
@@ -5501,9 +5519,17 @@ async function loadReviewPreview(state,task,cacheOnly){
   if(meta?.geometry_outside_frame && currentDraft &&
      (currentDraft.dirty||currentDraft.pending||currentDraft.drag)&&
      !reviewMayRebindOffframeDraft(img,meta,currentDraft)){
-   // Source geometry may still be invalid, or a different crop/frame is
-   // proposed. Preserve the original pixels and unsaved vertices.
-   if(status)status.textContent="Source geometry is outside the video. Keep or back up your unsaved corners before changing pictures.";
+   // The source box/quad might have changed *after* the older JPEG was shown.
+   // Do not replace that picture beneath unsaved vertices. Instead offer an
+   // explicit CURRENT-frame full-image redraw; no old polygon is transferred
+   // automatically to a changed source identity.
+   const recovery=card.querySelector(".plate-repair-button");
+   if(recovery){
+    recovery.hidden=false;
+    recovery.dataset.forceRecover="1";
+    recovery.textContent="Inspect current frame & redraw (keep draft)";
+   }
+   if(status)status.textContent="Current source geometry differs from this displayed picture. Your original corners are preserved. Inspect the exact frame and redraw the box.";
    return;
   }
   // Decode a replacement off-DOM first. A failed/aborted refresh must leave
@@ -5523,16 +5549,26 @@ async function loadReviewPreview(state,task,cacheOnly){
   const exactButton=card.querySelector(".source-frame-exact");
   const outside=meta?.geometry_outside_frame===true;
   const repair=card.querySelector(".plate-repair-button");
-  if(repair)repair.hidden=!(outside&&meta?.exact_frame===true&&!borrowed);
+  if(repair){
+   repair.hidden=!(outside&&meta?.exact_frame===true&&!borrowed);
+   repair.textContent="Redraw plate area";
+   delete repair.dataset.forceRecover;
+  }
   if(hint)hint.textContent=outside
    ?"Detector box/corners extend outside the video frame. "+
     (borrowed?"Showing cached frame "+meta.frame+" instead of detection frame "+
       meta.requested_frame+". Load exact frame to inspect the actual sighting. "
       :"Original source pixels only. ")+
+    (typeof FINDING_META!=="undefined"&&FINDING_META[meta.i]?.human_region_confirmed?
+     "Previously saved corners do not replace an out-of-frame detector box. ":"")+
     "Use Redraw plate area on this exact source frame before trusted training."
    :borrowed?
    "Showing cached frame "+meta.frame+" instead of detection frame "+
-   meta.requested_frame+". Load the exact source frame before confirming this finding.":"";
+   meta.requested_frame+". Load the exact source frame before confirming this finding."
+   :meta?.source_repaired?
+   "Saved detector box correction for source frame "+meta.frame+
+   ". Other frames in the group can still have their own uncorrected proposals."
+   :"";
   if(exactButton)exactButton.hidden=!borrowed;
   drawPlateThumbnail(img);
   if(meta){
@@ -5721,6 +5757,18 @@ function loadExactReviewFrame(button){
  });
 }
 
+function recoverableOffframePlateDraft(meta,edit){
+ // A definite 409 rejected the old corner request BEFORE writing it.
+ // Only a matching exact source frame can migrate this draft into a newly
+ // drawn *detector box*. In-flight/uncertain network saves and changed
+ // archived examples must never be superseded by this recovery.
+ return !!(meta?.geometry_outside_frame&&meta.exact_frame&&
+  meta.frame===meta.requested_frame&&meta.frame_source_token&&
+  edit?.dirty&&!edit.drag&&!edit.archiveConflict&&
+  (edit.error?.status===409||edit.needsSourceReview)&&
+  plateSameBoundSourceGeometry(meta,edit.meta)&&
+  validPlateRepair(edit.points,meta));
+}
 function validPlateRepair(points,geom){
  return Array.isArray(points)&&points.length===4&&
   points.every(p=>p.length===2&&p.every(Number.isFinite)&&
@@ -5730,27 +5778,56 @@ async function openPlateRepair(button){
  const card=button.closest(".det"),img=card?.querySelector("img[data-preview-url]");
  const selected=img?._plateMeta,job=CUR,view=JOBVIEW;
  const status=card?.querySelector(".source-frame-note");
- if(!selected?.geometry_outside_frame||!selected.frame_source_token)return;
- if(selected.match==="representative"||selected.frame!==selected.requested_frame){
+ if(!selected)return;
+ const forced=button.dataset.forceRecover==="1";
+ if(!forced&&(!selected.geometry_outside_frame||!selected.frame_source_token))return;
+ if(!forced&&(selected.match==="representative"||
+              selected.frame!==selected.requested_frame)){
   if(status)status.textContent="Load the exact source frame before redrawing.";return;
  }
  const old=PLATE_EDITS.get(selected.i);
- if(old&&(old.dirty||old.pending||old.drag)){
-  if(status)status.textContent="Preserve the unsaved corner draft before redrawing.";return;
+ const imported=!forced&&recoverableOffframePlateDraft(selected,old);
+ // A definitely rejected edit may be superseded by an EXPLICIT redraw on
+ // the current exact frame. The older polygon is only imported when its
+ // original frame/box identity matches. In all other cases start blank.
+ const rejected=!!(old?.dirty&&!old.archiveConflict&&
+  (old.error?.status===409||
+   (old.knownRejectedEditId&&old.pending?.edit_id===old.knownRejectedEditId)));
+ if(PLATE_SAVE||old?.drag||(old&&(old.dirty||old.pending)&&!imported&&!(forced&&rejected))){
+  if(status)status.textContent="A corner save may still be in flight, or the draft belongs to another source. Back it up before changing the detector box.";
+  return;
  }
+ const originalDraftVersion=(imported||(forced&&rejected))?old.version:null;
  button.disabled=true;button.textContent="Loading exact source frame…";
  let url=null,dialog=null,saving=false,closed=false;
  try{
-  const {response,data}=await reviewRequest(
-   "api/jobs/"+encodeURIComponent(job)+"/plate-repair/"+selected.i+"/frame",
-   {timeoutMs:120000},"blob");
+  // Explicit redraw should not fail forever while background prefetch has
+  // the single decoder lane. A 503 is a definite non-decode; bound retries
+  // here without changing source frame, user draft, or save payload.
+  let response,data;
+  for(let attempt=0;attempt<12;attempt++){
+   try{
+    ({response,data}=await reviewRequest(
+     "api/jobs/"+encodeURIComponent(job)+"/plate-repair/"+selected.i+"/frame",
+     {timeoutMs:120000},"blob"));
+    break;
+   }catch(error){
+    if(error.status!==503||attempt===11)throw error;
+    if(status)status.textContent="Source decoder is busy · retrying the same exact frame…";
+    await new Promise(resolve=>setTimeout(resolve,Math.min(1500,200*(attempt+1))));
+    if(CUR!==job||JOBVIEW!==view||!button.isConnected)return;
+   }
+  }
   if(CUR!==job||JOBVIEW!==view||!button.isConnected)return;
   const geom=JSON.parse(response.headers.get("X-Repair-Geometry")||"null");
   // The full-frame redraw token is independent of the disposable compact
   // JPEG key. Verify the actual source frame instead of a cache entry.
-  if(!geom||geom.frame!==selected.frame||
-     geom.frame_source_token!==selected.frame_source_token)
-   throw new Error("Source frame changed; reload the original preview.");
+  if(!geom||
+     (forced
+      ?geom.frame!==selected.requested_frame
+      :(geom.frame!==selected.frame||
+        geom.frame_source_token!==selected.frame_source_token)))
+   throw new Error("Source frame changed; reload Review before redrawing.");
   url=URL.createObjectURL(data);
   const photo=new Image();photo.src=url;await photo.decode();
   if(CUR!==job||JOBVIEW!==view||!button.isConnected)return;
@@ -5833,7 +5910,9 @@ async function openPlateRepair(button){
    save.disabled=saving||!valid;
    const verifying=geom.source_verification==="pending"?
     " Source integrity is being checked in the background.":"";
-   hint.textContent=(mode==="box"
+   hint.textContent=(imported&&valid?
+    "Recovered your unsaved four corners. Review the placement on this full frame. ":"")+
+    (mode==="box"
     ?(valid?"Box ready. Save to replace this one-frame detection.":"Drag a box around the plate.")
     :(valid?"Four corners ready. Verify that the entire plate is covered."
       :"Click all four corners clockwise ("+points.length+"/4)."))+verifying;
@@ -5911,12 +5990,24 @@ async function openPlateRepair(button){
     }
     if(!completed||!data?.ok)
      throw new Error("Source verification is still pending. Your corners are preserved; retry Save.");
+    // Durable confirmation from the backend supersedes only this exact
+    // failed draft, not a newer edit made while the full-frame dialog was
+    // open. Never clear the old draft on timeout, refusal, or Cancel.
+    if((imported||(forced&&rejected))&&PLATE_EDITS.get(selected.i)===old&&
+       old.version===originalDraftVersion){
+     old.pending=null;old.error=null;old.conflict=false;
+     old.archiveConflict=false;old.needsSourceReview=false;
+     old.saved=plateCopy(data.points);old.points=plateCopy(data.points);
+     old.dirty=false;
+     plateStatus(old,"Replacement detector box saved for this source frame.");
+     schedulePlateSaves();
+    }
     saving=false;cancel.disabled=false;close();
     if(CUR!==job||JOBVIEW!==view)return;
     // A redrawn region is NOT a classification. Continue protection and
     // require an explicit Is / Not on the newly verified source picture.
     const row=FINDING_META[selected.i];
-    if(row){row.human_region_confirmed=true;row.verified_label="";
+    if(row){row.human_region_confirmed=true;row.source_repaired=true;row.verified_label="";
      row.human_confirmation=null;row.confirmed_finding_id=null;
      row.confirmed_finding_revision=null;row.classification_allowed=false;
      row.classification_note="Loading the corrected source-frame preview…";}
@@ -5931,7 +6022,8 @@ async function openPlateRepair(button){
     if(bb)bb.innerHTML=detChoices(selected.i);
     updateReviewOverlayLabel(selected.i);
     const label=document.getElementById("vlabel"+selected.i);
-    if(label)label.textContent="New area saved for this frame; loading verified picture…";
+    if(label)label.textContent="Detector box saved for source frame "+data.frame+"; loading the corrected picture…";
+    if(button.isConnected)button.hidden=true;
     img._plateMeta=null;img._previewLoaded=false;img._forceExactPreview=true;
     // If the prepared crop was evicted, use the explicit extended exact seek.
     img._previewLongRetry=true;
@@ -5943,7 +6035,15 @@ async function openPlateRepair(button){
     draw();hint.textContent="Save failed: "+error.message+". Corners preserved; retry Save.";
    }
   };
-  choose("box");setZoom(1);
+  choose(imported?"corners":"box");
+  if(imported){
+   points=plateCopy(old.points);
+   draw();
+  }else if(forced&&rejected){
+   hint.textContent="The original draft belongs to an older picture. "+
+    "It stays untouched until you draw and save a NEW area on this verified source frame.";
+  }
+  setZoom(1);
  }catch(error){
   if(status)status.textContent="Could not open redraw: "+error.message;
  }finally{
@@ -6069,8 +6169,12 @@ function updatePlateSaveIssues(){
 }
 function plateStatus(s,text,retry=false){
  s.status.textContent=text;s.retry.hidden=!retry;
+ const recover=s.card?.querySelector(".plate-repair-button");
  s.retry.textContent=s.archiveConflict?"Confirm Is / Not again":
-  s.needsSourceReview?"Save on refreshed picture":s.conflict?"Refresh picture (keep corners)":"Retry save";
+  s.dirty&&recover?.dataset.forceRecover==="1"?"Inspect current frame & redraw (keep draft)":
+  s.meta?.geometry_outside_frame&&s.dirty?"Repair detector box (keep corners)":
+  s.needsSourceReview?"Save on refreshed picture":
+  s.conflict?"Refresh picture (keep corners)":"Retry save";
  if(s.card)s.card.classList.toggle("corner-save-error",!!(s.dirty&&s.error));
  // A rejected AREA save needs an explicit discard control even though it
  // must not create a phantom failed human classification.
@@ -6318,6 +6422,7 @@ function pumpPlateSaves(){
     s.draw();plateStatus(s,"Saved example changed · choose Is / Not to confirm this adjustment.",true);return;
    }
    if(error.status===409&&!error.details?.current_archive){
+    s.knownRejectedEditId=pending?.edit_id||null;
     // First try the cheap same-crop token refresh. If a cache entry was
     // evicted/replaced, automatically reload actual pixels and preserve the
     // human corners. Retry ONLY for an identical bound source frame; a
@@ -6370,6 +6475,18 @@ async function flushPlateSaves(){
 }
 async function retryPlateSave(s){
  if(s.archiveConflict){dismissFindingConfirmation(s.i);return;}
+ const forced=s.card?.querySelector(".plate-repair-button");
+ if(s.dirty&&forced?.dataset.forceRecover==="1"&&!forced.hidden){
+  await openPlateRepair(forced);return;
+ }
+ if(s.meta?.geometry_outside_frame&&s.dirty){
+  const repair=s.card?.querySelector(".plate-repair-button");
+  if(repair&&!repair.hidden){
+   await openPlateRepair(repair);return;
+  }
+  plateStatus(s,"This detector box is outside the source frame. Load its exact frame and repair the box; your corners are preserved.",true);
+  return;
+ }
  if(s.needsSourceReview){
   if(!confirm("Save these four corners to the NEW picture now displayed? Review all corners first. The old confirmed training example will not be transferred."))return;
   if(!plateQuadValid(s.points)){plateStatus(s,"Correct the four corners before saving.",true);return;}
@@ -8326,6 +8443,9 @@ def _vault_lock_now():
                     _REVIEW_FRAMES.clear()
                     _REVIEW_PROBES.clear()
                     _REVIEW_REPORTS.clear()
+                    # Unencrypted source JPEGs from active Review sessions
+                    # must not outlive a vault lock.
+                    finding_previews.clear_retained()
                     review_journal._READ_CACHE.clear()
                     review_journal._COUNT_CACHE.clear()
                     n = vault.encrypt_tree(key, JOBS_DIR)
