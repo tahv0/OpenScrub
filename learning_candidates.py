@@ -22,6 +22,10 @@ _HASH = re.compile(r'[0-9a-f]{64}')
 _ASSESSMENT = 'secondary_assessment.json'
 _MASK_ASSESSMENT = 'mask_assessment.json'
 _DATASET_MANIFEST_LIMIT = 16 * 1024 * 1024
+# Legacy named training runs serialized thousands of selected revisions into
+# run.json. This is not the portable 64 KiB model manifest; read it with a
+# distinct bounded limit so completed candidates remain recoverable.
+_RUN_METADATA_LIMIT = 16 * 1024 * 1024
 
 
 def _action(function):
@@ -104,7 +108,7 @@ def _metadata(job_dir, candidate_id):
             raise models.ModelError('Candidate artifacts must be regular files')
     run = stage / 'run.json'
     if run.exists():
-        display_name = models._json(models._read_file(run, models._MANIFEST_LIMIT)).get('name')
+        display_name = models._json(models._read_file(run, _RUN_METADATA_LIMIT)).get('name')
         display_name = models._text(display_name, 'Candidate name', 80, required=True)
     else:
         from findings_training import default_name
