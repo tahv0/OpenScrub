@@ -49,13 +49,27 @@ def _guard(function):
         except review_journal.ConflictError as error:
             return jsonify(error=str(error)), 409
         except HTTPException as error:
-            # A displayed JPEG can be evicted by bounded background prefetch.
-            # Return a machine-readable recovery hint so the browser may
-            # reload the JPEG without sacrificing the user's unsaved draft.
-            if error.code == 409 and error.description.startswith(
-                    'This displayed picture is no longer a valid cached sample.'):
+            # Both a missing immutable JPEG and an expired preview_token
+            # reject BEFORE changing any label or training archive. Tell the
+            # browser to refresh the actual displayed pixels and retry only
+            # when exact source frame, box, crop and corners still match.
+            # Do not classify archive revisions, journal conflicts, or changed
+            # source provenance as recoverable thumbnail conflicts.
+            if error.code == 409:
+                # Preserve the long-standing prefix match: the server appends
+                # "Reload its preview." to the missing-JPEG exception. Exact
+                # equality here would downgrade the existing typed 409 to
+                # a generic HTML error and prevent browser recovery.
+                if error.description.startswith(
+                        'This displayed picture is no longer a valid cached sample.'):
+                    reason = 'cache_evicted'
+                elif error.description == 'The finding changed. Reload its picture.':
+                    reason = 'preview_token_changed'
+                else:
+                    raise
                 return jsonify(error=error.description,
-                               conflict='stale_preview'), 409
+                               conflict='stale_preview',
+                               reason=reason), 409
             raise
         except (KeyError, FileNotFoundError):
             return jsonify(error='This saved finding is no longer available.'), 404

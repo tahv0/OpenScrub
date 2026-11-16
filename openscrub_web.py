@@ -5366,6 +5366,15 @@ function queueReviewPreview(img, priority=false){
  if(!state.batching)pumpReviewPreviews(state);
  return task.promise;
 }
+function reviewMayRebindOffframeDraft(img,meta,edit){
+ // Only an explicit 409 recovery can replace a displayed JPEG while its
+ // local corners are unsaved. Background prefetch must never do this.
+ // Equality requires a source-bound token, exact frame, box, crop and
+ // archived baseline geometry; do not infer sameness from the visible plate.
+ return !!(img._reviewRebindingDraft&&!edit.drag&&meta&&
+  (plateSamePreviewSource(edit.meta,meta)||plateSameSourceFrame(edit.meta,meta))&&
+  plateCornersInsideCrop(edit.points,meta.crop));
+}
 async function loadReviewPreview(state,task,cacheOnly){
  const img=task.img, counter=cacheOnly?"cacheActive":"active";
  state[counter]++;
@@ -5387,7 +5396,10 @@ async function loadReviewPreview(state,task,cacheOnly){
   const raw=response.headers.get("X-Plate-Geometry"),meta=raw?JSON.parse(raw):null;
   const currentDraft=img._quadEdit;
   if(meta?.geometry_outside_frame && currentDraft &&
-     (currentDraft.dirty||currentDraft.pending||currentDraft.drag)){
+     (currentDraft.dirty||currentDraft.pending||currentDraft.drag)&&
+     !reviewMayRebindOffframeDraft(img,meta,currentDraft)){
+   // Source geometry may still be invalid, or a different crop/frame is
+   // proposed. Preserve the original pixels and unsaved vertices.
    if(status)status.textContent="Source geometry is outside the video. Keep or back up your unsaved corners before changing pictures.";
    return;
   }
@@ -6078,6 +6090,7 @@ async function recoverPlate409(s,pending){
 async function refreshPlateDraft(s){
  if(s.refreshBusy||s.drag)return;
  s.refreshBusy=true;
+ s.img._reviewRebindingDraft=true;
  const originalMeta=s.meta,originalPoints=plateCopy(s.points);
  // An explicit retry can use one bounded longer source decode. Preserve the
  // displayed pixels and draft until the new picture is verified.
@@ -6124,7 +6137,10 @@ async function refreshPlateDraft(s){
   s.points=originalPoints;
   s.error=error;s.conflict=true;
   plateStatus(s,"Still not saved — "+error.message+". Draft preserved.",true);
- }finally{s.refreshBusy=false;plateUnloadGuard();}
+ }finally{
+  delete s.img._reviewRebindingDraft;
+  s.refreshBusy=false;plateUnloadGuard();
+ }
 }
 function pumpPlateSaves(){
  if(PLATE_SAVE)return PLATE_SAVE;
@@ -7286,6 +7302,7 @@ async function reloadStaleFindingForConfirmation(card,edit,shown){
  const img=edit?.img||card?.querySelector('img[data-preview-url]');
  if(!img||!shown)return null;
  img._plateMeta=null;
+ img._reviewRebindingDraft=true;
  // Preserve the original borrowed-frame recovery contract: first rehydrate
  // the exact JPEG that the user really saw. A human-repaired source anchor,
  // however, MUST reload its own frame, never borrow a sibling's pixels.
@@ -7293,6 +7310,7 @@ async function reloadStaleFindingForConfirmation(card,edit,shown){
  img._previewLongRetry=true;
  let loaded=false;
  try{loaded=await queueReviewPreview(img,true);}catch(_){}
+ finally{delete img._reviewRebindingDraft;}
  const latest=img._plateMeta;
  if(!loaded||!latest){
   img._plateMeta=shown;return null;
