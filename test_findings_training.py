@@ -416,3 +416,80 @@ def test_recovery_rejects_tampered_candidate_without_creating_library_entry(tmp_
     with pytest.raises(ValueError, match='hash'):
         ft.finalize_retained(job, tmp_path / 'models')
     assert not (tmp_path / 'models').exists()
+
+
+def test_exported_baseline_at_saved_crop_edge_stays_within_unit_interval():
+    ft = module()
+    # Exact real-valued bounds: the former successive / scale / image_width
+    # can produce a coordinate 1 ULP larger than 1.0 for this crop.
+    x1, x2, pixels = 465.62560479711726, 539.1788518524656, 476
+    old = ((x2 - x1) / ((x2 - x1) / pixels) / pixels)
+    assert old > 1, 'Regression fixture must exercise the original rounding'
+    record = {'box': [x1, 20, x2, 100],
+              'crop': {'box': [x1, 10, x2, 100],
+                       'width': pixels, 'height': 180,
+                       'scale_x': (x2-x1) / pixels, 'scale_y': 90 / 180},
+              'points': None, 'shape_confirmed': False}
+    points, proposal, quality = ft._geometry(record)
+    assert quality == 'human_region'
+    assert proposal == [0., 10/90, 1., 1.]
+    assert points == [[0., 10/90], [1., 10/90],
+                      [1., 1.], [0., 1.]]
+    assert all(0 <= value <= 1 for value in proposal)
+
+
+def test_exported_baseline_cannot_hide_outside_crop_proposal():
+    ft = module()
+    crop = {'box': [100, 100, 300, 200], 'width': 200, 'height': 100,
+            'scale_x': 1, 'scale_y': 1}
+    record = {'box': [90, 120, 290, 190], 'crop': crop,
+              'points': None, 'shape_confirmed': False}
+    with pytest.raises(ValueError, match='outside its stored crop'):
+        ft._geometry(record)
+
+
+def test_finalizes_legacy_rounded_proposal_without_running_new_epochs(tmp_path, monkeypatch):
+    """Recovery evaluates the original frozen legacy manifest, not a new scan."""
+    ft = module()
+    import confirmed_findings as cf
+    import learned_models as lm
+    source = examples(tmp_path)
+    monkeypatch.setattr(cf, 'training_snapshot', lambda *a, **k: source)
+    base = tmp_path / 'trusted-base.pt'
+    base.write_bytes(b'trusted')
+    monkeypatch.setenv('OPENSCRUB_TRAIN_WEIGHTS', str(base))
+    request = {'name': 'Old crop edge',
+               'example_ids': [s['id'] for s in source],
+               'expected_revisions': {s['id']: s['revision'] for s in source},
+               'license_accepted': True}
+    job = make_job(tmp_path / 'recovery-job')
+    job.update(kind='model_training', phase='learning', learning_request=request)
+    def old_exporter(dataset, versions, weights, job, settings):
+        result = trainer(dataset, versions, weights, job, settings)
+        manifest = dataset / 'manifest.jsonl'
+        rows = [json.loads(row) for row in manifest.read_text().splitlines()]
+        held_out = next(row for row in rows if row['split'] == 'val')
+        held_out['baseline_box'] = [.1, .1, 1.0000000000000002, .9]
+        manifest.write_text(''.join(json.dumps(row) + '\n' for row in rows))
+        return result
+    actual_save = lm.save_candidate
+    monkeypatch.setattr(lm, 'save_candidate',
+                        lambda *a, **k: (_ for _ in ()).throw(lm.ModelError('simulated publish failure')))
+    with pytest.raises(lm.ModelError, match='simulated publish failure'):
+        ft.run(job, tmp_path / 'findings', tmp_path / 'models', request, train=old_exporter)
+    job['phase'] = 'error'
+    monkeypatch.setattr(lm, 'save_candidate', actual_save)
+    monkeypatch.setattr(ft.session, 'run_training',
+                        lambda *args: pytest.fail('Recovery must never launch training'))
+    result = ft.finalize_retained(job, tmp_path / 'models')
+    assert result['status'] == 'complete'
+    assert result['training_info']['trainable']
+    # The synthetic splitter has only three independent held-out positives.
+    # Recovery must retain/evaluate them all, not pretend that the separate
+    # four-positive gate was met or turn review-only into filtering approval.
+    rows = [json.loads(line) for line in next(
+        Path(job['dir']).glob('learning/passes/*/dataset/manifest.jsonl')).read_text().splitlines()
+        if line.strip() and json.loads(line)['split'] == 'val']
+    assert result['assessment']['held_out_positive'] == sum(row['label'] == 'positive' for row in rows)
+    assert result['assessment']['held_out_negative'] == sum(row['label'] == 'negative' for row in rows)
+    assert result['assessment']['status'] == 'review_only'

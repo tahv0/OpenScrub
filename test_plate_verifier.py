@@ -285,3 +285,46 @@ def test_section_pass_only_changes_rows_inside_bounds_and_checks_identity(tmp_pa
     doc['source_identity']['input_sha256'] = '0' * 64
     with pytest.raises(ValueError, match='source'):
         verifier().review_report(path, doc, model, assessment(), frame_range=(1, 2))
+
+
+def test_heldout_scoring_clamps_float_roundoff_without_dropping_examples(tmp_path):
+    import plate_verifier as pv
+    root = dataset(tmp_path)
+    manifest = root / 'manifest.jsonl'
+    records = [json.loads(line) for line in manifest.read_text().splitlines()]
+    # Former two-step exporter normalization can create this representation
+    # for an original detector box touching its saved crop right/bottom edge.
+    records[0]['baseline_box'] = [.25, .25, 1.0000000000000002, 1.0000000000000002]
+    records[-1]['baseline_box'] = [-2.220446049250313e-16, .25, .75, .75]
+    manifest.write_text(''.join(json.dumps(row) + '\n' for row in records))
+    checked = []
+    class EdgeScoreModel:
+        def predict_proposal(self, image, box):
+            h, w = image.shape[:2]
+            assert 0 <= box[0] < box[2] <= w
+            assert 0 <= box[1] < box[3] <= h
+            checked.append(list(box))
+            return None, float(image[0, 0, 0]) / 255
+    result = pv.assess(EdgeScoreModel(), root)
+    assert result['status'] == 'validated'
+    assert (result['held_out_positive'], result['held_out_negative']) == (4, 2)
+    assert len(checked) == 6
+    assert checked[0] == [5, 5, 20, 20]
+    assert checked[-1] == [0, 5, 15, 15]
+
+
+@pytest.mark.parametrize('bad', [
+    [-1e-4, .25, .75, .75],
+    [.25, .25, 1.0001, .75],
+    [.25, .25, .25, .75],
+    [1.0000000000000002, .25, 1.0000000000000004, .75],
+    [.75, .25, .25, .75],
+    [0., 0., float('nan'), 1.],
+    [0., 0., float('inf'), 1.],
+    [0., 0., 1.],
+    'invalid',
+])
+def test_heldout_proposal_rejects_meaningful_invalid_or_degenerate_boxes(bad):
+    import plate_verifier as pv
+    with pytest.raises(ValueError, match='Invalid held-out verifier proposal box'):
+        pv._heldout_proposal_box(bad)

@@ -59,6 +59,29 @@ def _score(model, image, box):
     return float(score)
 
 
+# Treat only sub-pixel floating-point normalization noise as roundoff.
+# Real outside-crop proposals and degenerate boxes remain invalid.
+_PROPOSAL_BOUNDARY_EPS = 1e-6
+
+
+def _heldout_proposal_box(value, sample_number=None):
+    """Clamp only negligible normalized-boundary drift, never bad geometry."""
+    try:
+        box = np.asarray(value, dtype=np.float64)
+    except (TypeError, ValueError) as error:
+        raise ValueError('Invalid held-out verifier proposal box') from error
+    if (box.shape != (4,) or not np.isfinite(box).all() or
+            np.any(box < -_PROPOSAL_BOUNDARY_EPS) or
+            np.any(box > 1 + _PROPOSAL_BOUNDARY_EPS)):
+        raise ValueError('Invalid held-out verifier proposal box')
+    # Old exporter divided by image scale and then image width separately;
+    # right/bottom crop-edge coordinates sometimes became 1.0000000000000002.
+    bounded = np.clip(box, 0., 1.)
+    if bounded[2] <= bounded[0] or bounded[3] <= bounded[1]:
+        raise ValueError('Invalid held-out verifier proposal box')
+    return bounded
+
+
 def assess(model, dataset, cancelled=None, progress=None):
     """Count every held-out positive, including empty/low-score predictions."""
     root = Path(dataset).resolve(strict=True)
@@ -86,10 +109,7 @@ def assess(model, dataset, cancelled=None, progress=None):
         image = cv2.imread(str(image_path))
         if image is None:
             raise ValueError('Unreadable held-out verifier crop')
-        box = np.asarray(record['baseline_box'], dtype=np.float64)
-        if (box.shape != (4,) or not np.isfinite(box).all() or np.any(box < 0) or np.any(box > 1)
-                or box[2] <= box[0] or box[3] <= box[1]):
-            raise ValueError('Invalid held-out verifier proposal box')
+        box = _heldout_proposal_box(record.get('baseline_box'))
         h, w = image.shape[:2]
         scores[record['label']].append(_score(model, image, box * [w, h, w, h]))
         if progress:

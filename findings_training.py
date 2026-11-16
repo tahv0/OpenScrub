@@ -118,7 +118,18 @@ def _geometry(record):
             or not np.isfinite(baseline).all() or not np.isfinite(scale).all()
             or (scale <= 0).any() or not np.isfinite(size).all() or (size <= 0).any()):
         raise models.ModelError('Invalid confirmed crop coordinate transform')
-    baseline = ((baseline.reshape(2, 2) - box[:2]) / scale / size).reshape(-1)
+    # Use a single direct crop-span division. The former
+    # (point - origin) / scale / image_size could round a valid right/bottom
+    # crop edge to 1.0000000000000002 and break held-out evaluation.
+    crop_span = box[2:] - box[:2]
+    if (crop_span <= 0).any():
+        raise models.ModelError('Invalid confirmed crop coordinate transform')
+    baseline = ((baseline.reshape(2, 2) - box[:2]) / crop_span).reshape(-1)
+    # Do not silently accept genuinely outside-crop detector proposals.
+    if ((baseline < -1e-6).any() or (baseline > 1.000001).any() or
+            baseline[2] <= baseline[0] or baseline[3] <= baseline[1]):
+        raise models.ModelError('Confirmed plate geometry falls outside its stored crop')
+    baseline = np.clip(baseline, 0, 1)
     points = record.get('points') if record.get('shape_confirmed') else None
     quality = 'human_quad' if points is not None else 'human_region'
     if points is None:

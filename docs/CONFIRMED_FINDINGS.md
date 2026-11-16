@@ -253,6 +253,29 @@ That workflow also accepts an optional **Training run name** and retains a
 successfully published candidate as a named model. See
 [Video-specific learning](VIDEO_LEARNING.md) for its acceptance rules.
 
+### Held-out proposal box rounding in previously trained candidates
+
+An older training exporter could normalize an original plate detector box via
+multiple floating-point divisions. At the right or bottom edge of the saved
+crop, this can produce a value infinitesimally greater than 1. The independent
+secondary verifier previously raised **Invalid held-out verifier proposal box**
+and stopped publication after the trained ONNX candidate was already saved.
+
+The held-out verifier now accepts only negligible (1e-6) normalized coordinate
+drift and clamps it to the exact crop boundary before scoring. It still evaluates
+**every held-out positive and negative** and rejects missing, reversed,
+non-finite, degenerate, or meaningfully out-of-bounds proposal boxes. New training
+exports calculate normalized boxes directly from the crop span to avoid the
+rounding issue. This does not tighten a mask, create new human evidence, alter
+saved crops, or turn a review-only checker into an automatically filtering model.
+
+For an existing failed job, reopen the same **Finish existing trained candidate
+(no retraining)** action after updating OpenScrub. Keep the job and its saved
+learning pass until a model is successfully published. A valid pre-existing
+candidate does not need a fresh scan or another 40 training epochs. If the
+error persists with the new verifier, investigate the genuinely invalid
+normalized geometry rather than weakening the assessment requirements.
+
 ### Recover a completed model after a publication error
 
 Large named-model selections formerly wrote every selected finding/revision to
