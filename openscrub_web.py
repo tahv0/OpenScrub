@@ -5542,10 +5542,16 @@ async function loadReviewPreview(state,task,cacheOnly){
     (borrowed?"Showing cached frame "+meta.frame+" instead of detection frame "+
       meta.requested_frame+". Load exact frame to inspect the actual sighting. "
       :"Original source pixels only. ")+
+    (FINDING_META?.[meta.i]?.human_region_confirmed?
+     "Previously saved corners do not replace an out-of-frame detector box. ":"")+
     "Use Redraw plate area on this exact source frame before trusted training."
    :borrowed?
    "Showing cached frame "+meta.frame+" instead of detection frame "+
-   meta.requested_frame+". Load the exact source frame before confirming this finding.":"";
+   meta.requested_frame+". Load the exact source frame before confirming this finding."
+   :meta?.source_repaired?
+   "Saved detector box correction for source frame "+meta.frame+
+   ". Other frames in the group can still have their own uncorrected proposals."
+   :"";
   if(exactButton)exactButton.hidden=!borrowed;
   drawPlateThumbnail(img);
   if(meta){
@@ -5861,7 +5867,9 @@ async function openPlateRepair(button){
    save.disabled=saving||!valid;
    const verifying=geom.source_verification==="pending"?
     " Source integrity is being checked in the background.":"";
-   hint.textContent=(mode==="box"
+   hint.textContent=(imported&&valid?
+    "Recovered your unsaved four corners. Review the placement on this full frame. ":"")+
+    (mode==="box"
     ?(valid?"Box ready. Save to replace this one-frame detection.":"Drag a box around the plate.")
     :(valid?"Four corners ready. Verify that the entire plate is covered."
       :"Click all four corners clockwise ("+points.length+"/4)."))+verifying;
@@ -5987,8 +5995,6 @@ async function openPlateRepair(button){
   if(imported){
    points=plateCopy(old.points);
    draw();
-   hint.textContent="Recovered your unsaved four corners on this verified full frame. "+
-    "Check their position before saving the replacement detector box.";
   }
   setZoom(1);
  }catch(error){
