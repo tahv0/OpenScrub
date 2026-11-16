@@ -349,3 +349,13 @@ def test_verifier_result_includes_frame_and_indexed_and_legacy_listings_match(ch
     cached = client.get('/api/jobs/%s/detections' % job['id'])
     assert cached.status_code == 200
     assert cached.get_json() == first
+
+
+
+def test_review_labels_detector_separately_and_explains_group_tracking_limit():
+    page = web.PAGE
+    assert 'Detector ${Math.round(x.confidence*100)}%' in page
+    assert 'Checker raw score ' in page
+    assert 'Groups combine detector sightings;' in page
+    assert 'they do not visually track all four plate corners' in page
+    assert 'Corners autosave; check other frames' in page
