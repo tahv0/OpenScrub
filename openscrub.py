@@ -25,6 +25,7 @@ import copy
 import datetime
 import hashlib
 import json
+import math
 import os
 import re
 import shutil
@@ -3178,6 +3179,64 @@ def blur_region(frame, x1, y1, x2, y2, mode, shape="rect"):
         frame[y1:y2, x1:x2] = filled
 
 
+def _silhouette_mask(polys, poly_box, x1i, y1i, rw, rh):
+    """Rasterize usable contours, or request the caller's known-box fallback.
+
+    Validate before int32 conversion; out-of-box coordinates remain legal for
+    OpenCV clipping. Noncollinearity uses exact integer arithmetic rather than
+    signed contour area, which can be zero for usable self-intersections.
+    """
+    if polys is None:
+        return None
+    mask = np.zeros((rh, rw), np.uint8)
+    try:
+        box = np.asarray(poly_box, dtype=np.float64)
+        if box.shape != (4,) or not np.isfinite(box).all():
+            return None
+        pbx1, pby1, pbx2, pby2 = map(float, box)
+        if pbx2 <= pbx1 or pby2 <= pby1:
+            return None
+        pbw, pbh = max(1.0, pbx2 - pbx1), max(1.0, pby2 - pby1)
+        if not math.isfinite(pbw) or not math.isfinite(pbh):
+            return None
+        for pts in polys:
+            points = np.asarray(pts, dtype=np.float64)
+            if points.shape == (0,):  # existing empty-component behaviour
+                continue
+            if points.ndim != 2 or points.shape[1] != 2 or not np.isfinite(points).all():
+                return None
+            if len(points) < 3:
+                continue
+            vertices = []
+            for qx, qy in points:
+                px = float(qx) * pbw + pbx1
+                py = float(qy) * pbh + pby1
+                if not math.isfinite(px) or not math.isfinite(py):
+                    return None
+                vx, vy = int(round(px)) - x1i, int(round(py)) - y1i
+                if not (-2147483648 <= vx <= 2147483647 and
+                        -2147483648 <= vy <= 2147483647):
+                    return None
+                vertices.append((vx, vy))
+            ax, ay = vertices[0]
+            second = next((v for v in vertices[1:] if v != (ax, ay)), None)
+            if second is None:
+                return None
+            bx, by = second
+            if not any((bx - ax) * (cy - ay) != (by - ay) * (cx - ax)
+                       for cx, cy in vertices):
+                return None
+            cv2.fillPoly(mask, [np.array(vertices, np.int32)], 255)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    except cv2.error as exc:
+        if exc.code not in (cv2.Error.StsBadArg, cv2.Error.StsOutOfRange,
+                            cv2.Error.StsAssert):
+            raise
+        return None
+    return mask if mask.any() else None
+
+
 def blur_silhouette(frame, x1, y1, x2, y2, mode, polys, poly_box,
                     pad_px=0):
     """Redact ONLY the pixels inside a detection's silhouette polygon(s) —
@@ -3194,21 +3253,10 @@ def blur_silhouette(frame, x1, y1, x2, y2, mode, polys, poly_box,
     x2i, y2i = min(w, int(x2)), min(h, int(y2))
     if x2i <= x1i or y2i <= y1i:
         return
-    if not polys:
-        blur_region(frame, x1, y1, x2, y2, mode)
-        return
-    pbx1, pby1, pbx2, pby2 = poly_box
-    pbw, pbh = max(1.0, pbx2 - pbx1), max(1.0, pby2 - pby1)
     rw, rh = x2i - x1i, y2i - y1i
-    mask = np.zeros((rh, rw), np.uint8)
-    for pts in polys:
-        arr = np.array([[int(round(float(qx) * pbw + pbx1)) - x1i,
-                         int(round(float(qy) * pbh + pby1)) - y1i]
-                        for qx, qy in pts], np.int32)
-        if len(arr) >= 3:
-            cv2.fillPoly(mask, [arr], 255)
-    if not mask.any():
-        blur_region(frame, x1, y1, x2, y2, mode)   # fail closed
+    mask = _silhouette_mask(polys, poly_box, x1i, y1i, rw, rh)
+    if mask is None:
+        blur_region(frame, x1, y1, x2, y2, mode)     # fail closed over the known region
         return
     if pad_px > 0:
         k = 2 * int(pad_px) + 1
@@ -3693,21 +3741,10 @@ def _blur_silhouette_yuv10(y, u, v, x1, y1, x2, y2, mode, polys,
     x2i, y2i = min(w, int(x2)), min(h, int(y2))
     if x2i <= x1i or y2i <= y1i:
         return
-    if not polys:
-        _blur_yuv10(y, u, v, x1, y1, x2, y2, mode)
-        return
-    pbx1, pby1, pbx2, pby2 = poly_box
-    pbw, pbh = max(1.0, pbx2 - pbx1), max(1.0, pby2 - pby1)
     rw, rh = x2i - x1i, y2i - y1i
-    mask = np.zeros((rh, rw), np.uint8)
-    for pts in polys:
-        arr = np.array([[int(round(float(qx) * pbw + pbx1)) - x1i,
-                         int(round(float(qy) * pbh + pby1)) - y1i]
-                        for qx, qy in pts], np.int32)
-        if len(arr) >= 3:
-            cv2.fillPoly(mask, [arr], 255)
-    if not mask.any():
-        _blur_yuv10(y, u, v, x1, y1, x2, y2, mode)     # fail closed
+    mask = _silhouette_mask(polys, poly_box, x1i, y1i, rw, rh)
+    if mask is None:
+        _blur_yuv10(y, u, v, x1, y1, x2, y2, mode)     # fail closed over the known region
         return
     if pad_px > 0:
         k = 2 * int(pad_px) + 1
