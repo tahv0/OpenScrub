@@ -196,3 +196,28 @@ def test_metadata_uncertainty_preserves_observed_fallback_capability():
     assert result["state"] == "uncertain"
     assert result["fallback_usable"]
     assert not result["healthy"]
+
+
+@pytest.mark.parametrize("runtime,wheel", [("5.0.0", "4.14.0.94"), ("4.14.0", "5.0.0.93"),
+                                          ("unknown", "5.0.0.93"), (None, "5.0.0.93")])
+def test_normal_repair_requires_runtime_wheel_agreement(runtime, wheel):
+    data = snap(version=runtime, distributions={"opencv-python": wheel})
+    hint = opencv_repair_hint(data, "/selected/python")
+    assert "--force-reinstall" not in hint
+    assert "Reconcile cv2 ownership" in hint
+    assert "/selected/python" in hint
+    assert not assess_opencv(data)["healthy"]
+
+
+@pytest.mark.parametrize("runtime,wheel,capability", [
+    ("5.0.0", "5.0.0.93", "missing_api"),
+    ("4.14.0", "4.14.0.94", "missing_api"),
+    ("4.14.0", "4.14.0.94", "missing_xml"),
+    ("4.14.0", "4.14.0.94", "classifier_error"),
+    ("4.14.0", "4.14.0.94", "empty_classifier"),
+])
+def test_agreeing_sole_normal_wheel_keeps_deliberate_repair(runtime, wheel, capability):
+    hint = opencv_repair_hint(snap(version=runtime, distributions={"opencv-python": wheel},
+                                  capability=capability), "/selected/python")
+    assert '/selected/python -m pip install --force-reinstall "opencv-python<5"' in hint
+    assert "Rerun health checks" in hint
