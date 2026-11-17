@@ -1,0 +1,228 @@
+  2612	function emptyEditor(){return {t:0,ox:0,oy:0,boxes:[],sel:-1,ov:{},dis:{},times:{},adds:[],
+  2613	 add:false,addAnchor:null,drag:null,scale:1,dur:10,
+  2614	 audio:[],audioSaved:[],audioLoaded:false};}
+  2615	function sameEdit(a,b){return JSON.stringify(a)===JSON.stringify(b);}
+  2616	function copyEdit(a){return JSON.parse(JSON.stringify(a));}
+  2617	function ownsView(id,gen){return CUR===id&&VIEW_GEN===gen;}
+  2618	function saveStatus(d,message){
+  2619	 d.status=message;
+  2620	 if(d!==EDITS)return;
+  2621	 const el=document.getElementById("reviewSaveStatus");if(el)el.textContent=message;
+  2622	 document.querySelectorAll("button[data-save-edits]").forEach(b=>{b.disabled=!!d.busy;});
+  2623	}
+  2624	function trimReviewDraft(d){
+  2625	 const b=d.editor;
+  2626	 // Clean audio is fetched display state even when other edit kinds are pending.
+  2627	 // An in-flight audio submission may make a toggle-back a newer pending choice.
+  2628	 if(!d.audioInFlight&&sameEdit(b.audio,b.audioSaved)){
+  2629	  b.audio=[];b.audioSaved=[];b.audioLoaded=false;
+  2630	 }
+  2631	 if(!d.busy&&!hasReviewEdits(d)){
+  2632	  d.en={};d.editor=emptyEditor();
+  2633	 }
+  2634	}
+  2635	function hasReviewEdits(d){
+  2636	 const b=d.editor;
+  2637	 return Object.keys(d.enabled).length||d.manual.length||b.adds.length||
+  2638	  Object.keys(b.ov).length||Object.keys(b.times).length||
+  2639	  !sameEdit(b.audio,b.audioSaved);
+  2800	async function loadBoxEdit(fromReview){
+  2801	 const id=CUR,gen=VIEW_GEN,editor=BE;
+  2802	 showPanel(fromReview?"boxedit_rev":"boxedit");
+  2803	 const mi=await (await fetch(`api/jobs/${id}/mediainfo`)).json();
+  2804	 if(!ownsView(id,gen)||BE!==editor)return;
+  2805	 // in review: the slot right under the Preview button; on done: the actions slot
+  2806	 let c=document.getElementById("beslot")||document.getElementById("beslot_done");
+  2807	 if(!c){c=document.createElement("div");c.id="beslot";c.style.width="100%";
+  2808	  (document.getElementById("review")||document.getElementById("jobcard")||detail)
+  2809	   .appendChild(c);}
+  2810	 Object.assign(BE,{dur:mi.duration,win:[0,mi.duration],trk:false,muteArm:false,tlDrag:null,
+  2811	     audioSel:-1,tlspans:[]});
+  2812	
+  2813	 c.innerHTML=`<div class="row" style="margin-top:8px">
+  2814	  <button class="sec" id="bePlay" style="padding:3px 11px" title="Play the video with live boxes — pause to edit them" onclick="beTogglePlay()">&#9654;</button>t=
+  2815	  <input type="range" id="beT" min="0" max="${Math.max(0.2,mi.duration-0.1).toFixed(1)}"
+  2816	   step="0.1" value="0" style="flex:1" oninput="beScrub()"><span id="beL">0s</span></div>
+  2817	  <div style="position:relative;display:inline-block;max-width:100%">
+  2818	   <img id="beImg" style="max-width:100%;border-radius:8px">
+  2852	 const img=document.getElementById("beImg");
+  2853	 img.onload=()=>{if(!ownsView(id,gen)||BE!==editor||document.getElementById("beImg")!==img||BE.playing)return;const cv=document.getElementById("beCv");
+  2854	  cv.width=img.clientWidth;cv.height=img.clientHeight;
+  2855	  BE.scale=img.clientWidth/(img.naturalWidth||1);beDraw();};
+  2856	 const bv=document.getElementById("beVid");
+  2857	 const stop=()=>{if(ownsView(id,gen)&&BE===editor&&document.getElementById("beVid")===bv&&BE.playing)bePlayStop();};
+  2858	 bv.addEventListener("pause",stop);bv.addEventListener("ended",stop);
+  2859	 saveStatus(EDITS,EDITS.status);
+  2860	 beHook();tlHook();await tlInit();
+  2861	 if(ownsView(id,gen)&&BE===editor)beScrub();
+  2865	async function beTogglePlay(){
+  2866	 const id=CUR,gen=VIEW_GEN,editor=BE;
+  2867	 const v=document.getElementById("beVid"),img=document.getElementById("beImg");
+  2868	 if(!v)return;
+  2869	 const current=()=>ownsView(id,gen)&&BE===editor&&document.getElementById("beVid")===v;
+  2870	 if(BE.playing){v.pause();return;}          // the pause handler cleans up
+  2871	 if(!v.src)v.src=`api/jobs/${CUR}/video`;
+  2872	 BE.playing=true;
+  2873	 v.style.display="block";img.style.display="none";
+  2874	 // boxes are view-only while playing: freeze pointer edits so a moving
+  2875	 // box can't be grabbed mid-flight
+  2876	 const cv=document.getElementById("beCv");cv.style.pointerEvents="none";
+  2877	 document.getElementById("bePlay").innerHTML="&#10074;&#10074;";
+  2904	  if(!inFlight&&now-lastQ>150){
+  2905	   inFlight=true;lastQ=now;
+  2906	   fetch(`api/jobs/${id}/boxes_at?t=${BE.t.toFixed(2)}&all=1`)
+  2907	    .then(r=>r.json())
+  2908	    .then(d=>{if(!current())return;BE.ox=d.ox;BE.oy=d.oy;BE.raw=d.boxes;beFilter();})
+  2909	    .catch(()=>{}).finally(()=>{inFlight=false;});
+  2910	  }
+  2911	  beDraw();beTLDraw();
+  2912	  requestAnimationFrame(step);
+  2913	 };
+  2914	 requestAnimationFrame(step);
+  2915	}
+  2916	function bePlayStop(){
+  2917	 BE.playing=false;
+  2918	 const v=document.getElementById("beVid");
+  2919	 if(v){try{v.pause();}catch(e){}v.style.display="none";}
+  2920	 const img=document.getElementById("beImg");if(img)img.style.display="";
+  2921	 const b=document.getElementById("bePlay");if(b)b.innerHTML="&#9654;";
+  2922	 const cv=document.getElementById("beCv");if(cv)cv.style.pointerEvents="auto";
+  2923	 beScrub();   // crisp frame + authoritative boxes at the pause point
+  2924	}
+  3052	function beTrackMode(){
+  3053	 BE.trk=!BE.trk;BE.add=false;BE.addAnchor=null;BE.muteArm=false;
+  3054	 document.getElementById("beTrk").classList.toggle("on",BE.trk);
+  3055	 document.getElementById("beAdd").classList.remove("on");
+  3056	 document.getElementById("beMute").classList.remove("on");
+  3057	}
+  3058	async function beTrackGo(box){
+  3059	 const st=document.getElementById("beTrkSt");st.style.display="inline";
+  3060	 st.textContent=`tracking ${BE.win[0].toFixed(1)}–${BE.win[1].toFixed(1)}s…`;
+  3061	 const r=await fetch(`api/jobs/${CUR}/track_object`,{method:"POST",
+  3062	  headers:{"Content-Type":"application/json"},
+  3063	  body:JSON.stringify({box,t_ref:BE.t,t0:BE.win[0],t1:BE.win[1]})});
+  3064	 if(!r.ok){st.textContent="tracking failed to start";return;}
+  3065	 const poll=setInterval(async()=>{
+  3066	  const d=await (await fetch(`api/jobs/${CUR}/track_status`)).json();
+  3067	  if(d.state!=="running"){
+  3068	   clearInterval(poll);
+  3069	   st.textContent=d.error?("⚠ "+d.error)
+  3070	    :`tracked ✓ ${d.added} position(s) — review card added`;
+  3071	   if(!d.error){await tlInit();beScrub();
+  3072	    if(document.getElementById("review"))loadReview();}
+  3073	  }
+  3074	 },1500);
+  3075	}
+  3076	async function beScrub(){
+  3077	 const id=CUR,gen=VIEW_GEN,editor=BE;
+  3078	 const sl=document.getElementById("beT");if(!sl)return; // editor was closed
+  3079	 if(BE.playing){               // dragging the slider while playing = seek
+  3080	  const v=document.getElementById("beVid");
+  3081	  if(v)v.currentTime=+sl.value;
+  3082	  return;                      // the rAF loop keeps label/boxes in sync
+  3083	 }
+  3084	 BE.sel=-1;document.getElementById("beRm").style.display="none";
+  3085	 document.getElementById("beTimes").style.display="none";
+  3086	 BE.t=+document.getElementById("beT").value;
+  3087	 document.getElementById("beL").textContent=BE.t.toFixed(1)+"s";
+  3088	 document.getElementById("beImg").src=`api/jobs/${CUR}/frame_at?t=${BE.t}`;
+  3089	 const d=await (await fetch(`api/jobs/${id}/boxes_at?t=${BE.t}&all=1`)).json();
+  3090	 if(!ownsView(id,gen)||BE!==editor)return;
+  3091	 BE.ox=d.ox;BE.oy=d.oy;BE.raw=d.boxes;
+  3092	 beFilter();beDraw();beTLDraw();
+  3142	function beApplyTimes(){
+  3143	 if(BE.sel<0)return;
+  3144	 const t0=+document.getElementById("beT0").value,
+  3145	       t1=+document.getElementById("beT1").value;
+  3146	 if(!(t1>t0&&t0>=0)){alert("'to' must be after 'from'.");return;}
+  3147	 BE.times[BE.sel]=[t0,Math.min(t1,BE.dur)];
+  3148	 const b=BE.boxes.find(x=>x.i===BE.sel);
+  3149	 if(b){b.t_start=t0;b.t_end=t1;}
+  3168	function beHook(){
+  3169	 const cv=document.getElementById("beCv");
+  3170	 const pt=e=>{const r=cv.getBoundingClientRect();
+  3171	  return[(e.clientX-r.left)/BE.scale,(e.clientY-r.top)/BE.scale];};
+  3172	 cv.addEventListener("pointerdown",e=>{
+  3173	  const p=pt(e);cv.setPointerCapture(e.pointerId);
+  3174	  if(BE.trk){
+  3175	   // Track object: same two-click box draw as Add box, but on completion
+  3176	   // the region is template-tracked through the active timeline window
+  3177	   if(!BE.addAnchor){BE.addAnchor=p;BE.addFloat=p;}
+  3178	   else{
+  3179	    const a=BE.addAnchor,q=p;BE.addAnchor=null;BE.addFloat=null;
+  3180	    const box=[Math.min(a[0],q[0]),Math.min(a[1],q[1]),
+  3181	               Math.max(a[0],q[0]),Math.max(a[1],q[1])];
+  3182	    BE.trk=false;document.getElementById("beTrk").classList.remove("on");
+  3183	    if(box[2]-box[0]>10&&box[3]-box[1]>10)beTrackGo(box);
+  3184	    beDraw();
+  3188	  if(BE.add){
+  3189	   if(!BE.addAnchor){BE.addAnchor=p;BE.addFloat=p;}
+  3190	   else{
+  3191	    const a=BE.addAnchor,q=p;BE.addAnchor=null;BE.addFloat=null;
+  3192	    const box=[Math.min(a[0],q[0]),Math.min(a[1],q[1]),
+  3193	               Math.max(a[0],q[0]),Math.max(a[1],q[1])];
+  3194	    if(box[2]-box[0]>6&&box[3]-box[1]>6){
+  3195	     const t0=Math.max(0,+(BE.t-0.5).toFixed(1)),
+  3196	           t1=Math.min(BE.dur,+(BE.t+3).toFixed(1));
+  3197	     const fr=prompt("Blur this region FROM (seconds):",t0);
+  3198	     if(fr===null){beDraw();return;}
+  3199	     const to=prompt("...TO (seconds):",t1);
+  3200	     if(to===null){beDraw();return;}
+  3201	     try{
+  3202	      BE.adds.push({manual_id:manualId(),box,t0:Math.max(0,+fr||0),
+  3203	                    t1:Math.min(BE.dur,+to||t1),tref:BE.t});
+  3204	     }catch(e){saveStatus(EDITS,"Could not add box: "+e.message);}
+  3228	 cv.addEventListener("pointermove",e=>{
+  3229	  if(BE.add&&BE.addAnchor){BE.addFloat=pt(e);beDraw();return;}
+  3230	  if(!BE.drag||BE.sel<0)return;
+  3231	  const p=pt(e),b=BE.boxes.find(x=>x.i===BE.sel);if(!b)return;
+  3232	  let[a1,b1,a2,b2]=b.box;
+  3233	  if(BE.drag.kind==="move"){
+  3234	   const w0=a2-a1,h0=b2-b1;a1=p[0]-BE.drag.off[0];b1=p[1]-BE.drag.off[1];
+  3235	   a2=a1+w0;b2=b1+h0;
+  3236	  }else{
+  3237	   if(BE.drag.ci===0){a1=p[0];b1=p[1];}
+  3238	   if(BE.drag.ci===1){a2=p[0];b1=p[1];}
+  3239	   if(BE.drag.ci===2){a1=p[0];b2=p[1];}
+  3240	   if(BE.drag.ci===3){a2=p[0];b2=p[1];}
+  3241	  }
+  3242	  b.box=[Math.min(a1,a2),Math.min(b1,b2),Math.max(a1,a2),Math.max(b1,b2)];
+  3243	  BE.ov[BE.sel]=[b.box[0]-BE.ox,b.box[1]-BE.oy,b.box[2]-BE.ox,b.box[3]-BE.oy];
+  3244	  beDraw();
+  3245	 });
+  3246	 cv.addEventListener("pointerup",()=>{BE.drag=null;});
+  3510	function acknowledgeMap(current,submitted){
+  3511	 for(const [key,value] of Object.entries(submitted))
+  3512	  if(sameEdit(current[key],value))delete current[key];
+  3513	}
+  3514	function acknowledgeAdds(current,refs,submitted){
+  3515	 for(let i=current.length-1;i>=0;i--){
+  3516	  const index=refs.indexOf(current[i]);
+  3517	  if(index>=0&&sameEdit(current[i],submitted[index]))current.splice(i,1);
+  3518	 }
+  3519	}
+  3520	async function saveAndRender(){
+  3521	 const id=CUR,gen=VIEW_GEN,d=EDITS;
+  3522	 if(!id||!d||d.busy)return false;
+  3523	 const b=d.editor;
+  3524	 try{
+  3525	  // Compatibility drafts acquire an identity once, on the original object.
+  3526	  for(const a of [...d.manual,...b.adds])if(!Object.prototype.hasOwnProperty.call(a,"manual_id"))a.manual_id=manualId();
+  3527	 }catch(e){saveStatus(d,"Could not save edits: "+e.message);return false;}
+  3528	 const manRefs=[...d.manual],addRefs=[...b.adds];
+  3529	 const man=copyEdit(d.manual),adds=copyEdit(b.adds);
+  3530	 const payload=copyEdit({enabled:d.enabled,manual:[...man,...adds.map(a=>({
+  3531	  manual_id:a.manual_id,t_start:a.t0,t_end:a.t1,t_ref:a.tref,screen_box:a.box}))],
+  3532	  box_overrides:b.ov,time_overrides:b.times});
+  3533	 // Plain review must never wipe audio that the editor has not loaded.
+  3534	 if(b.audioLoaded&&!sameEdit(b.audio,b.audioSaved)){payload.audio=copyEdit(b.audio);}
+  3535	 d.audioInFlight=payload.audio!==undefined;
+  3536	 d.busy=true;saveStatus(d,"Saving edits… You can keep editing; newer edits stay pending.");
+  3537	 let saved=false;
+  3538	 try{
+  3539	  const result=await reviewPost(`api/jobs/${id}/detections`,payload);
+  3540	  saved=true;d.audioInFlight=false;
+  3541	  acknowledgeMap(d.enabled,payload.enabled);
+  3542	  acknowledgeMap(b.ov,payload.box_overrides);acknowledgeMap(b.times,payload.time_overrides);
+  3543	  acknowledgeAdds(d.manual,manRefs,man);acknowledgeAdds(b.adds,addRefs,adds);
+  3544	  if(payload.audio!==undefined)b.audioSaved=copyEdit(payload.audio);

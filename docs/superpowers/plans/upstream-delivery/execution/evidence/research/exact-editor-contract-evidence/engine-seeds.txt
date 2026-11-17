@@ -1,0 +1,228 @@
+  1704	def _grab_frame(cap, t, fps):
+  1705	    """Fetch the frame at time t from an open VideoCapture, ROBUSTLY.
+  1706	
+  1707	    Seeks are NEVER trusted. `cap.set(POS_MSEC/POS_FRAMES)` lies on some
+  1708	    codec/build combos: one build FAILS the read outright (h264_nvenc
+  1709	    HDR copies in the CUDA image — every deep seek returned nothing, a
+  1710	    tracking window silently failed to seed), another SUCCEEDS but lands
+  1711	    many seconds early (a real box landed a 20.3s seek at ~4s; the
+  1712	    tracker then followed the wrong moment of the video with perfect
+  1713	    confidence and the blur 'flew away' off the subject). After every
+  1714	    positioning, the decoded packet's own PTS (CAP_PROP_POS_MSEC after
+  1715	    read — it comes from the bitstream and cannot lie) is compared to
+  1716	    the request; an early landing is repaired by decoding forward, a
+  1717	    late one by seeking earlier, ultimately from frame 0 — the
+  1718	    renderer's sequential access pattern, correct on any decodable
+  1719	    file. Returns the frame or None."""
+  1720	    fps = fps or 30.0
+  1721	    target = int(round(max(t, 0.0) * fps))
+  1722	    st = _grab_state.setdefault(id(cap), {"pos": None, "slow": False})
+  1723	
+  1724	    def _done(fr):
+  1725	        st["pos"] = target + 1          # cap will read target+1 next
+  1726	        return fr
+  1727	
+  1728	    def _pts_frame():
+  1729	        # index of the frame just decoded, from the reported packet PTS;
+  1730	        # -1 when the build reports nothing usable (then we trust frame
+  1731	        # arithmetic instead). POS_MSEC after read() is the NEXT frame's
+  1732	        # time on most builds, the just-read frame's on others — the ±1
+  1733	        # tolerance at the call sites absorbs the difference.
+  1734	        try:
+  1735	            ms = float(cap.get(cv2.CAP_PROP_POS_MSEC))
+  1736	        except Exception:
+  1737	            return -1
+  1738	        if ms <= 0:
+  1739	            return -1
+  1740	        return int(round(ms * fps / 1000.0)) - 1
+  1896	def _seek_cap(cap, frame_idx, fps):
+  1897	    """Position cap so the NEXT read() returns frame_idx — VERIFIED via
+  1898	    _grab_frame's PTS check (a bare cap.set can land seconds early on
+  1899	    some builds and every frame decoded after it is then mislabeled).
+  1900	    Returns False when the position cannot be reached."""
+  1901	    frame_idx = max(0, int(frame_idx))
+  1902	    if frame_idx == 0:
+  1903	        return bool(cap.set(cv2.CAP_PROP_POS_FRAMES, 0.0))
+  1904	    fps = fps or 30.0
+  1905	    return _grab_frame(cap, (frame_idx - 1) / fps, fps) is not None
+  1919	def _track_person_dense(video, box, t_ref, t0, t1, det, log,
+  1920	                        step_frames=2, cancelled=None):
+  1938	    cap = cv2.VideoCapture(video)
+  1939	    if not cap.isOpened():
+  1940	        return []
+  1941	    fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+  1942	    step = max(1, int(step_frames)) / fps
+  1943	    t_ref = min(max(t_ref, t0), t1)
+  1944	    W = cap.get(cv2.CAP_PROP_FRAME_WIDTH) or 0
+  1945	    H = cap.get(cv2.CAP_PROP_FRAME_HEIGHT) or 0
+  1946	
+  1947	    def _frame(t):
+  1948	        return _grab_frame(cap, t, fps)
+  1961	        dbox = tuple(float(v) for v in box)
+  1962	        darea = max((dbox[2] - dbox[0]) * (dbox[3] - dbox[1]), 1e-9)
+  1963	        # the user pointed at something REAL: one unreadable or
+  1964	        # motion-blurred frame at exactly t_ref must not kill the track
+  1965	        # (a real scan lost a whole window this way). Try t_ref first,
+  1966	        # then nearby frames inside the window.
+  1967	        best, bsc, seed_t = None, 0.0, t_ref
+  1968	        read_fail = 0
+  1969	        for dt in (0.0, 0.33, -0.33, 0.66, -0.66, 1.0, -1.0):
+  1970	            ts = t_ref + dt
+  1971	            if ts < t0 - 1e-6 or ts > t1 + 1e-6:
+  1972	                continue
+  1973	            fr0 = _frame(ts)
+  1974	            if fr0 is None:
+  1975	                read_fail += 1
+  1976	                continue
+  1977	            for d in det.find(fr0):
+  1978	                db = tuple(float(v) for v in d[:4])
+  1979	                ovx = max(0.0, min(dbox[2], db[2]) - max(dbox[0], db[0]))
+  1980	                ovy = max(0.0, min(dbox[3], db[3]) - max(dbox[1], db[1]))
+  1981	                # IoU plus how much of the DRAWN box the object covers —
+  1982	                # a tight torso-only box around a full body seeds cleanly
+  1983	                sc = _iou(dbox, db) + 0.5 * (ovx * ovy) / darea
+  1984	                if sc > bsc:
+  1985	                    best, bsc = d, sc
+  1986	            if best is not None and bsc >= 0.15:
+  1987	                seed_t = ts
+  1988	                seed_frame = fr0
+  1989	                if dt:
+  1990	                    log("      track: seeded %.2fs away from the marked "
+  1991	                        "frame (the marked frame had no clear detection)"
+  1992	                        % abs(dt))
+  1993	                break
+  1994	        if read_fail:
+  1995	            log("      track: NOTE — %d frame read(s) failed near t=%.1fs"
+  1996	                % (read_fail, t_ref))
+  1997	        if best is None or bsc < 0.15:
+  1998	            return []
+  1999	        t_ref = seed_t
+  2016	        seed = tuple(float(v) for v in best[:4])
+  2017	        samples = [(t_ref, seed, float(best[4]), _poly(best), tcls)]
+  2031	        def _anchor_init(frame, b):
+  2032	            if vit is None:
+  2033	                return None
+  2034	            try:
+  2035	                tk = vit()
+  2036	                sm = cv2.resize(frame, None, fx=sc2, fy=sc2)
+  2037	                tk.init(sm, (int(b[0] * sc2), int(b[1] * sc2),
+  2038	                             max(8, int((b[2] - b[0]) * sc2)),
+  2039	                             max(8, int((b[3] - b[1]) * sc2))))
+  2040	                return tk
+  2041	            except Exception:
+  2042	                return None
+  2043	        for direction in (1, -1):
+  2044	            cur = list(seed)
+  2045	            held = False
+  2046	            hold_t = 0.0        # seconds spent frozen (grace timer)
+  2047	            det_gap = 0.0       # seconds since the last DETECTOR hit
+  2048	            last_poly = _poly(best)     # most recent live silhouette
+  2049	            watching = False    # dormant: subject hidden, no blur, but
+  2050	                                # keep scanning for its re-emergence
+  2051	            bystanders = []     # same-class objects VISIBLE while ours
+  2052	                                # was hidden — by the cannot-link
+  2053	                                # principle they can never BE it
+  2054	            ref_hist = _crop_hist(seed_frame, seed, _poly(best)) \
+  2055	                if appid else None
+  2056	            trk = _anchor_init(seed_frame, seed)
+  2057	            # reference size for the size-flip guard: grows fast, shrinks
+  2062	            t = t_ref
+  2063	            if direction == 1:  # forward: sequential reads, no re-seeking
+  2064	                # robust prime: positions the decoder just past t_ref's
+  2065	                # frame even when random POS_MSEC seek fails on this file
+  2066	                _grab_frame(cap, t_ref, fps)
+  2067	                rev = None
+  2440	def track_manual_region(video, box, t_ref, t0, t1, cb=None,
+  2441	                        step_frames=2, thr=0.55, scale=0.5,
+  2442	                        person_det=None):
+  2466	    log = (cb.log if cb else print)
+  2467	    cap = cv2.VideoCapture(video)
+  2468	    try:
+  2469	        if not cap.isOpened():
+  2470	            return []
+  2471	        fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+  2472	        step = max(1, int(step_frames)) / fps
+  2473	        t_ref = min(max(t_ref, t0), t1)
+  2474	        W = cap.get(cv2.CAP_PROP_FRAME_WIDTH) or 0
+  2475	        H = cap.get(cv2.CAP_PROP_FRAME_HEIGHT) or 0
+  2476	
+  2477	        def _frame(t):
+  2478	            return _grab_frame(cap, t, fps)
+  2491	        if person_det is not None:
+  2492	            # a drawn box that CONTAINS A PERSON gets detector-driven
+  2493	            # tracking: body-tight boxes + silhouettes every frame, immune
+  2494	            # to the scale/appearance drift that plagues generic trackers
+  2495	            try:
+  2496	                # detector masks are repainted at every sample; at the default
+  2497	                # 2-frame cadence the outline visibly STEPS/flickers at half
+  2498	                # the frame rate (real footage) — detect EVERY frame instead
+  2499	                ps = _track_person_dense(video, box, t_ref, t0, t1,
+  2500	                                         person_det, log, step_frames=1,
+  2501	                                         cancelled=(cb.cancelled if cb else None))
+  2502	            except Exception as e:
+  2503	                log("      track: person-detector path failed (%s) — using "
+  2504	                    "the generic tracker" % e)
+  2505	                ps = []
+  2506	            if ps:
+  2507	                live = sum(1 for x in ps if x[2] > 0.0) / float(len(ps))
+  2508	                if live >= 0.5:
+  2509	                    return ps
+  2510	                # the detector barely sees this object (marginal class, odd
+  2511	                # angle) — frozen coverage would win over live tracking.
+  2512	                # The generic tracker follows pixels and will do better.
+  2513	                log("      track: the detector only saw the object in %d%% "
+  2514	                    "of frames — using the generic tracker instead"
+  2515	                    % round(live * 100))
+  2516	            else:
+  2517	                log("      track: nothing recognizable under the drawn box — "
+  2518	                    "tracking the region as a generic object")
+  2519	
+  2520	        samples = [(t_ref, (float(box[0]), float(box[1]),
+  2521	                            float(box[2]), float(box[3])), 1.0)]
+  2538	        vit = _vittrack_factory(log)
+  2539	        if vit is not None:
+  2540	            fr0 = None
+  2541	            for dt in (0.0, 0.066, -0.066, 0.33, -0.33, 1.0):
+  2542	                ts = t_ref + dt
+  2543	                if ts < t0 - 1e-6 or ts > t1 + 1e-6:
+  2544	                    continue
+  2545	                fr0 = _frame(ts)
+  2546	                if fr0 is not None:
+  2547	                    t_ref = ts
+  2548	                    break
+  2549	            if fr0 is None:
+  2550	                log("      track: could not READ the video near t=%.1fs — "
+  2551	                    "cannot start tracking there (is the clip shorter than "
+  2552	                    "expected?)" % t_ref)
+  2553	                return []
+  2554	            sm0 = cv2.resize(fr0, None, fx=scale, fy=scale)
+  2555	            for direction in (1, -1):
+  2556	                trk = vit()
+  2557	                trk.init(sm0, (int(box[0] * scale), int(box[1] * scale),
+  2558	                               max(8, int((box[2] - box[0]) * scale)),
+  2559	                               max(8, int((box[3] - box[1]) * scale))))
+  2562	                t = t_ref
+  2563	                if direction == 1:  # forward: sequential reads, no re-seeking
+  2564	                    # robust prime: positions the decoder just past t_ref's
+  2565	                    # frame even when random POS_MSEC seek fails on this file
+  2566	                    _grab_frame(cap, t_ref, fps)
+  2567	                    rev = None
+  2639	        # ---- template fallback (no TrackerVit / no model) ----------------
+  2640	        def _gray(t):
+  2641	            fr = _frame(t)
+  2642	            if fr is None:
+  2643	                return None
+  2644	            g = cv2.resize(cv2.cvtColor(fr, cv2.COLOR_BGR2GRAY), None,
+  2645	                           fx=scale, fy=scale)
+  2646	            return cv2.GaussianBlur(g, (3, 3), 0)
+  2647	
+  2648	        g0 = _gray(t_ref)
+  2649	        if g0 is None:
+  2650	            return []
+  2651	        gh, gw = g0.shape[:2]
+  2652	        x1 = max(0, int(box[0] * scale)); y1 = max(0, int(box[1] * scale))
+  2653	        x2 = min(gw, int(box[2] * scale)); y2 = min(gh, int(box[3] * scale))
+  2654	        if x2 - x1 < 8 or y2 - y1 < 8:
+  2655	            log("      track: region too small to track reliably")
+  2656	            return []
+  2657	        tmpl0 = g0[y1:y2, x1:x2]

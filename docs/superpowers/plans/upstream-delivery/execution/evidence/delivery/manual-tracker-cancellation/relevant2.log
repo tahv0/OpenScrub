@@ -1,0 +1,253 @@
+TASK110_ACTIVE_SOURCE {"python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]", "sources": {"openscrub": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py", "sha256": "d80e682d3cbd2e6a091b3e9308fed51d995bb40f426553d3c081971cd16612ad"}, "openscrub_web": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", "sha256": "7762f0314df5e11e46a570af54cd20e928953e7bf92d55da7d648dad36e0fce2"}, "zones_ui": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/zones_ui.py", "sha256": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7"}}}
+........................................................................ [ 45%]
+..............................E...E.................................E... [ 91%]
+..............                                                           [100%]
+==================================== ERRORS ====================================
+_____ ERROR at setup of test_real_socket_save_track_real_render_and_reopen _____
+
+store = namespace(root=PosixPath('/tmp/openscrub-task110/relevant2-tmp/test_real_socket_save_track_re0/data'), jobs=PosixPath(...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x76c6701a5ee0>, url='/api/jobs/d420ae155e28')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x76c6b3978890>
+
+    @pytest.fixture
+    def socket_api(store, monkeypatch):
+        import http.client
+        from cheroot import wsgi
+        ready = threading.Event()
+        servers, errors = [], []
+        real = wsgi.Server.prepare
+        def prepare(server):
+            real(server)
+            servers.append(server)
+            ready.set()
+        monkeypatch.setattr(wsgi.Server, 'prepare', prepare)
+        def serve():
+            try:
+                web._serve('127.0.0.1', 0, None)
+            except BaseException as error:
+                errors.append(error)
+                ready.set()
+        thread = threading.Thread(target=serve)
+        thread.start()
+        try:
+>           assert ready.wait(8) and not errors, errors
+E           AssertionError: [OSError("No socket could be created -- (('127.0.0.1', 0): [Errno 1] Operation not permitted)")]
+E           assert (True and not [OSError("No socket could be created -- (('127.0.0.1', 0): [Errno 1] Operation not permitted)")])
+E            +  where True = wait(8)
+E            +    where wait = <threading.Event at 0x76c6b3978f20: set>.wait
+
+tests/test_report_transactions.py:543: AssertionError
+
+During handling of the above exception, another exception occurred:
+
+store = namespace(root=PosixPath('/tmp/openscrub-task110/relevant2-tmp/test_real_socket_save_track_re0/data'), jobs=PosixPath(...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x76c6701a5ee0>, url='/api/jobs/d420ae155e28')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x76c6b3978890>
+
+    @pytest.fixture
+    def socket_api(store, monkeypatch):
+        import http.client
+        from cheroot import wsgi
+        ready = threading.Event()
+        servers, errors = [], []
+        real = wsgi.Server.prepare
+        def prepare(server):
+            real(server)
+            servers.append(server)
+            ready.set()
+        monkeypatch.setattr(wsgi.Server, 'prepare', prepare)
+        def serve():
+            try:
+                web._serve('127.0.0.1', 0, None)
+            except BaseException as error:
+                errors.append(error)
+                ready.set()
+        thread = threading.Thread(target=serve)
+        thread.start()
+        try:
+            assert ready.wait(8) and not errors, errors
+            port = servers[0].socket.getsockname()[1]
+            def api(method, path, payload=None):
+                connection = http.client.HTTPConnection('127.0.0.1', port, timeout=8)
+                try:
+                    body = json.dumps(payload) if payload is not None else None
+                    connection.request(method, path, body=body, headers={
+                        'Content-Type': 'application/json', 'Connection': 'close'})
+                    result = connection.getresponse()
+                    return result.status, dict(result.getheaders()), result.read()
+                finally:
+                    connection.close()
+            yield api
+        finally:
+            for server in servers:
+                server.stop()
+            join(thread)
+>           assert not errors
+E           assert not [OSError("No socket could be created -- (('127.0.0.1', 0): [Errno 1] Operation not permitted)")]
+
+tests/test_report_transactions.py:560: AssertionError
+___ ERROR at setup of test_committed_http_response_lost_then_identical_retry ___
+
+store = namespace(root=PosixPath('/tmp/openscrub-task110/relevant2-tmp/test_committed_http_response_l0/data'), jobs=PosixPath(...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x76c6b39f8360>, url='/api/jobs/26a1060dd336')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x76c6b397fd10>
+
+    @pytest.fixture
+    def socket_api(store, monkeypatch):
+        import http.client
+        from cheroot import wsgi
+        ready = threading.Event()
+        servers, errors = [], []
+        real = wsgi.Server.prepare
+        def prepare(server):
+            real(server)
+            servers.append(server)
+            ready.set()
+        monkeypatch.setattr(wsgi.Server, 'prepare', prepare)
+        def serve():
+            try:
+                web._serve('127.0.0.1', 0, None)
+            except BaseException as error:
+                errors.append(error)
+                ready.set()
+        thread = threading.Thread(target=serve)
+        thread.start()
+        try:
+>           assert ready.wait(8) and not errors, errors
+E           AssertionError: [OSError("No socket could be created -- (('127.0.0.1', 0): [Errno 1] Operation not permitted)")]
+E           assert (True and not [OSError("No socket could be created -- (('127.0.0.1', 0): [Errno 1] Operation not permitted)")])
+E            +  where True = wait(8)
+E            +    where wait = <threading.Event at 0x76c6b39185c0: set>.wait
+
+tests/test_report_transactions.py:543: AssertionError
+
+During handling of the above exception, another exception occurred:
+
+store = namespace(root=PosixPath('/tmp/openscrub-task110/relevant2-tmp/test_committed_http_response_l0/data'), jobs=PosixPath(...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x76c6b39f8360>, url='/api/jobs/26a1060dd336')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x76c6b397fd10>
+
+    @pytest.fixture
+    def socket_api(store, monkeypatch):
+        import http.client
+        from cheroot import wsgi
+        ready = threading.Event()
+        servers, errors = [], []
+        real = wsgi.Server.prepare
+        def prepare(server):
+            real(server)
+            servers.append(server)
+            ready.set()
+        monkeypatch.setattr(wsgi.Server, 'prepare', prepare)
+        def serve():
+            try:
+                web._serve('127.0.0.1', 0, None)
+            except BaseException as error:
+                errors.append(error)
+                ready.set()
+        thread = threading.Thread(target=serve)
+        thread.start()
+        try:
+            assert ready.wait(8) and not errors, errors
+            port = servers[0].socket.getsockname()[1]
+            def api(method, path, payload=None):
+                connection = http.client.HTTPConnection('127.0.0.1', port, timeout=8)
+                try:
+                    body = json.dumps(payload) if payload is not None else None
+                    connection.request(method, path, body=body, headers={
+                        'Content-Type': 'application/json', 'Connection': 'close'})
+                    result = connection.getresponse()
+                    return result.status, dict(result.getheaders()), result.read()
+                finally:
+                    connection.close()
+            yield api
+        finally:
+            for server in servers:
+                server.stop()
+            join(thread)
+>           assert not errors
+E           assert not [OSError("No socket could be created -- (('127.0.0.1', 0): [Errno 1] Operation not permitted)")]
+
+tests/test_report_transactions.py:560: AssertionError
+_ ERROR at setup of test_real_render_and_fresh_server_process_preserve_creation_and_current_choices _
+
+store = namespace(root=PosixPath('/tmp/openscrub-task110/relevant2-tmp/test_real_render_and_fresh_ser0/data'), jobs=PosixPath(...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x76c66ff98d60>, url='/api/jobs/e0326bfd909e')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x76c6b398e750>
+
+    @pytest.fixture
+    def socket_api(store, monkeypatch):
+        import http.client
+        from cheroot import wsgi
+        ready = threading.Event()
+        servers, errors = [], []
+        real = wsgi.Server.prepare
+        def prepare(server):
+            real(server)
+            servers.append(server)
+            ready.set()
+        monkeypatch.setattr(wsgi.Server, 'prepare', prepare)
+        def serve():
+            try:
+                web._serve('127.0.0.1', 0, None)
+            except BaseException as error:
+                errors.append(error)
+                ready.set()
+        thread = threading.Thread(target=serve)
+        thread.start()
+        try:
+>           assert ready.wait(8) and not errors, errors
+E           AssertionError: [OSError("No socket could be created -- (('127.0.0.1', 0): [Errno 1] Operation not permitted)")]
+E           assert (True and not [OSError("No socket could be created -- (('127.0.0.1', 0): [Errno 1] Operation not permitted)")])
+E            +  where True = wait(8)
+E            +    where wait = <threading.Event at 0x76c6b3978c80: set>.wait
+
+tests/test_report_transactions.py:543: AssertionError
+
+During handling of the above exception, another exception occurred:
+
+store = namespace(root=PosixPath('/tmp/openscrub-task110/relevant2-tmp/test_real_render_and_fresh_ser0/data'), jobs=PosixPath(...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x76c66ff98d60>, url='/api/jobs/e0326bfd909e')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x76c6b398e750>
+
+    @pytest.fixture
+    def socket_api(store, monkeypatch):
+        import http.client
+        from cheroot import wsgi
+        ready = threading.Event()
+        servers, errors = [], []
+        real = wsgi.Server.prepare
+        def prepare(server):
+            real(server)
+            servers.append(server)
+            ready.set()
+        monkeypatch.setattr(wsgi.Server, 'prepare', prepare)
+        def serve():
+            try:
+                web._serve('127.0.0.1', 0, None)
+            except BaseException as error:
+                errors.append(error)
+                ready.set()
+        thread = threading.Thread(target=serve)
+        thread.start()
+        try:
+            assert ready.wait(8) and not errors, errors
+            port = servers[0].socket.getsockname()[1]
+            def api(method, path, payload=None):
+                connection = http.client.HTTPConnection('127.0.0.1', port, timeout=8)
+                try:
+                    body = json.dumps(payload) if payload is not None else None
+                    connection.request(method, path, body=body, headers={
+                        'Content-Type': 'application/json', 'Connection': 'close'})
+                    result = connection.getresponse()
+                    return result.status, dict(result.getheaders()), result.read()
+                finally:
+                    connection.close()
+            yield api
+        finally:
+            for server in servers:
+                server.stop()
+            join(thread)
+>           assert not errors
+E           assert not [OSError("No socket could be created -- (('127.0.0.1', 0): [Errno 1] Operation not permitted)")]
+
+tests/test_report_transactions.py:560: AssertionError
+=========================== short test summary info ============================
+ERROR tests/test_report_transactions.py::test_real_socket_save_track_real_render_and_reopen
+ERROR tests/test_manual_addition_replay.py::test_committed_http_response_lost_then_identical_retry
+ERROR tests/test_manual_addition_replay.py::test_real_render_and_fresh_server_process_preserve_creation_and_current_choices
+155 passed, 144 deselected, 3 errors in 13.68s

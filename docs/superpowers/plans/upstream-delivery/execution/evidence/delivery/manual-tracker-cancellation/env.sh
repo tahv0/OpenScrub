@@ -1,0 +1,10 @@
+. /tmp/openscrub-baseline-20261116/env-opencv4.sh
+export PYTHONPATH=/tmp/openscrub-task110:$PWD
+export PYTEST_PLUGINS=task110_isolation
+export PYTEST_DISABLE_PLUGIN_AUTOLOAD=1
+export PYTEST_ADDOPTS=''
+export TMPDIR=/tmp/openscrub-task110/tmp
+export XDG_CACHE_HOME=/tmp/openscrub-task110/cache
+export XDG_CONFIG_HOME=/tmp/openscrub-task110/config
+export UV_CACHE_DIR=/tmp/openscrub-task110/cache/uv
+export PYTHONNOUSERSITE=1

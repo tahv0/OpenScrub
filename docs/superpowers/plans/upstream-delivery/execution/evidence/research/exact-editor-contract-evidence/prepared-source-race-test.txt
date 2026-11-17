@@ -1,0 +1,51 @@
+   845	def test_tracker_rejects_source_prepared_before_scan_normalization_finishes(store, monkeypatch):
+   846	    scanning, finish_scan = threading.Event(), threading.Event()
+   847	    prepared, finish_prepare = threading.Event(), threading.Event()
+   848	    normalized = Path(store.job['dir']) / 'normalized.avi'
+   849	    normalized.write_bytes(b'synthetic normalized video')
+   850	    background, responses = [], []
+   851	    real_start = web._start_owned_thread
+   852	    def start(*args):
+   853	        thread = real_start(*args)
+   854	        background.append(thread)
+   855	        return thread
+   856	    monkeypatch.setattr(web, '_start_owned_thread', start)
+   857	    def scan(args, cb):
+   858	        scanning.set()
+   859	        assert finish_scan.wait(8)
+   860	        args.original_video, args.video = args.video, str(normalized)
+   861	        return dict(fps=10, cum=[[1,2]], bands=[[0,0]], detections=[], stats={})
+   862	    monkeypatch.setattr(openscrub, 'run_scan', scan)
+   863	    monkeypatch.setattr(openscrub, 'PersonDetector', lambda *a, **kw: None)
+   864	    monkeypatch.setattr(openscrub, 'track_manual_region', lambda *a, **kw: [(0, [1,2,8,9], .9)])
+   865	    real_own = web._own_files
+   866	    def own(job=None, work=False):
+   867	        lease = real_own(job, work)
+   868	        if work and threading.current_thread().name == 'late-tracker-source':
+   869	            prepared.set()
+   870	            assert finish_prepare.wait(8)
+   871	        return lease
+   872	    monkeypatch.setattr(web, '_own_files', own)
+   873	    store.job['phase'] = 'error'
+   874	    assert request('post', store.url + '/retry').status_code == 200
+   875	    worker = run_worker()
+   876	    tracker_call = threading.Thread(name='late-tracker-source', target=lambda: responses.append(track(store)))
+   877	    try:
+   878	        assert scanning.wait(5)
+   879	        tracker_call.start()
+   880	        assert prepared.wait(5)
+   881	        finish_scan.set()
+   882	        join(worker)
+   883	        for thread in background:
+   884	            join(thread)
+   885	        assert store.job['video'] == str(normalized)
+   886	    finally:
+   887	        finish_scan.set()
+   888	        finish_prepare.set()
+   889	        join(worker)
+   890	        if tracker_call.ident:
+   891	            join(tracker_call)
+   892	        for thread in background:
+   893	            join(thread)
+   894	    assert responses[0].status_code == 409
+   895	    assert json.loads(store.path.read_text())['detections'] == []

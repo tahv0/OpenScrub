@@ -1,0 +1,263 @@
+  1507	def _load_job_report(job):
+  1508	    with open(os.path.join(job["dir"], "report.json"), encoding="utf-8") as f:
+  1509	        return json.load(f)
+  1510	
+  1511	
+  1512	def _frame_at(job, t, rstate):
+  1513	    cap = cv2.VideoCapture(_job_video(job))
+  1514	    try:
+  1515	        fps = rstate["fps"]
+  1516	        cap.set(cv2.CAP_PROP_POS_FRAMES, int(t * fps))
+  1517	        ok, frame = cap.read()
+  1518	        return frame if ok else None
+  1519	    finally:
+  1520	        cap.release()
+  1583	def job_boxes_at(jid):
+  1584	    """Active blur boxes (screen coords) at time t, plus the scroll offset so
+  1585	    the client can convert edited boxes back to content coordinates."""
+  1586	    job = JOBS.get(jid) or abort(404)
+  1587	    doc = _load_job_report(job)
+  1588	    rs = doc["render_state"]
+  1589	    t = float(request.args.get("t", 0))
+  1590	    fidx = min(int(t * rs["fps"]), len(rs["cum"]) - 1)
+  1591	    ox, oy = rs["cum"][fidx]
+  1592	    boxes = []
+  1593	    want_all = request.args.get("all") == "1"
+  1594	    for i, d in enumerate(doc["detections"]):
+  1595	        if not (d["t_start"] - 0.01 <= t <= d["t_end"] + 0.01):
+  1596	            continue
+  1597	        if not want_all and not d.get("enabled", True):
+  1598	            continue
+  1599	        if True:
+  1600	            boxes.append({"i": i, "category": d["category"],
+  1601	                          "enabled": d.get("enabled", True),
+  1602	                          "text": d.get("text", ""),
+  1603	                          "t_start": d["t_start"], "t_end": d["t_end"],
+  1604	                          "box": [d["cbox"][0] + ox, d["cbox"][1] + oy,
+  1605	                                  d["cbox"][2] + ox, d["cbox"][3] + oy]})
+  1606	    return jsonify({"t": t, "ox": ox, "oy": oy, "boxes": boxes})
+  1661	def job_frame_at(jid):
+  1662	    job = JOBS.get(jid) or abort(404)
+  1663	    t = max(0.0, float(request.args.get("t", 0)))
+  1664	    path = (job["output"] if request.args.get("src") == "output"
+  1665	            and job.get("output") else _job_video(job))
+  1666	    cap = cv2.VideoCapture(path)
+  1667	    # seek by TIMESTAMP, not frame index: the original upload is often VFR
+  1668	    # (iPhone), where index = t*fps drifts out of sync with the CFR output
+  1669	    # and can overshoot the file entirely (broken compare pane)
+  1670	    try:
+  1671	        frame = None
+  1672	        for tt in (t, max(0.0, t - 0.34), max(0.0, t - 1.0), 0.0):
+  1673	            cap.set(cv2.CAP_PROP_POS_MSEC, tt * 1000)
+  1674	            ok, fr = cap.read()
+  1675	            if ok:
+  1676	                frame = fr
+  1677	                break   # walk back instead of 404ing at the very end of the file
+  1678	            if tt == 0.0:
+  1679	                break
+  1680	    finally:
+  1681	        cap.release()
+  1682	    if frame is None:
+  1683	        abort(404)
+  1684	    ok, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 82])
+  1685	    return Response(buf.tobytes(), mimetype="image/jpeg")
+  1702	def _valid_manual_creation(value):
+  1703	    """Only immutable, finite creation records can establish replay equality."""
+  1704	    def numbers(items, size):
+  1705	        try:
+  1706	            return (isinstance(items, list) and len(items) == size
+  1707	                    and all(type(v) in (int, float) and math.isfinite(v)
+  1708	                            for v in items))
+  1709	        except OverflowError:
+  1710	            return False
+  1711	    return (isinstance(value, dict)
+  1712	            and set(value) == {"t_start", "t_end", "cbox", "aoff"}
+  1713	            and numbers([value["t_start"], value["t_end"]], 2)
+  1714	            and numbers(value["cbox"], 4)
+  1715	            and all(type(v) is int for v in value["cbox"])
+  1716	            and numbers(value["aoff"], 2))
+  1717	
+  1718	
+  1719	@app.route("/api/jobs/<jid>/detections", methods=["POST"])
+  1720	def job_save_edits(jid):
+  1721	    job = JOBS.get(jid) or abort(404)
+  1722	    edits = request.get_json(force=True)
+  1723	    path = os.path.join(job["dir"], "report.json")
+  1724	    with FILES.initialize(job).report_lock:
+  1725	        _edit_gate(job)
+  1726	        try:
+  1727	            doc = _load_job_report(job)
+  1728	        except FileNotFoundError:
+  1729	            abort(404, "job report not found")
+  1730	        enabled = edits.get("enabled", {})
+  1731	        for i, d in enumerate(doc["detections"]):
+  1732	            if str(i) in enabled:
+  1733	                d["enabled"] = bool(enabled[str(i)])
+  1734	        for i, box in (edits.get("box_overrides") or {}).items():
+  1735	            i = int(i)
+  1736	            if 0 <= i < len(doc["detections"]) and len(box) == 4:
+  1737	                doc["detections"][i]["cbox"] = [float(v) for v in box]
+  1738	        for i, span in (edits.get("time_overrides") or {}).items():
+  1739	            i = int(i)
+  1740	            if 0 <= i < len(doc["detections"]) and len(span) == 2:
+  1741	                t0, t1 = float(span[0]), float(span[1])
+  1742	                if t1 > t0 >= 0:
+  1743	                    doc["detections"][i]["t_start"] = t0
+  1744	                    doc["detections"][i]["t_end"] = t1
+  1745	                    doc["detections"][i]["last_seen"] = min(
+  1746	                        max(doc["detections"][i].get("last_seen", t0), t0), t1)
+  1747	        rs = doc["render_state"]
+  1748	        # Read identities from this transaction's latest raw document. Never
+  1749	        # reconstruct creation from a row's mutable current geometry/choices.
+  1750	        identified = {}
+  1751	        for d in doc["detections"]:
+  1752	            identity = d.get("manual_id")
+  1753	            if isinstance(identity, str):
+  1754	                identified.setdefault(identity, []).append(d)
+  1755	        for m in edits.get("manual", []):
+  1756	            has_id = "manual_id" in m
+  1757	            identity = m.get("manual_id")
+  1758	            if has_id and (not isinstance(identity, str) or
+  1759	                           re.fullmatch(r"[A-Za-z0-9._:-]{1,128}", identity) is None):
+  1760	                return jsonify(error="Invalid manual_id: expected 1–128 ASCII letters, digits or ._:-"), 400
+  1761	            try:
+  1762	                t0 = float(m["t_start"]); t1 = float(m["t_end"])
+  1763	                tref = float(m.get("t_ref", t0))
+  1764	                b = m["screen_box"]
+  1765	                if has_id and (len(b) != 4 or not all(math.isfinite(v) for v in [t0, t1, tref, *b])):
+  1766	                    raise ValueError("non-finite creation or invalid box")
+  1767	                fidx = min(int(tref * rs["fps"]), len(rs["cum"]) - 1)
+  1768	                ox, oy = rs["cum"][fidx]
+  1769	                creation = {"t_start": t0, "t_end": t1,
+  1770	                            "cbox": [int(b[0] - ox), int(b[1] - oy),
+  1771	                                     int(b[2] - ox), int(b[3] - oy)],
+  1772	                            "aoff": [ox, oy]}
+  1773	                if has_id and not _valid_manual_creation(creation):
+  1774	                    raise ValueError("invalid effective creation")
+  1775	            except (KeyError, TypeError, ValueError, OverflowError, IndexError):
+  1776	                if has_id:
+  1777	                    return jsonify(error="Invalid manual creation: finite times, four coordinates and two offsets required"), 400
+  1778	                raise
+  1779	            if has_id and identity in identified:
+  1780	                rows = identified[identity]
+  1781	                if (len(rows) != 1 or not _valid_manual_creation(rows[0].get("manual_creation"))
+  1782	                        or rows[0]["manual_creation"] != creation):
+  1783	                    return jsonify(error="manual_id conflict: creation differs, is missing/invalid, or matches multiple rows"), 409
+  1784	                continue
+  1785	            row = dict(creation, category="manual", text="user-drawn", confidence=1.0,
+  1786	                       last_seen=t0, enabled=True)
+  1787	            if has_id:
+  1788	                # Separate lists keep later indexed edits independent of creation.
+  1789	                row.update(manual_id=identity, manual_creation={
+  1790	                    **creation, "cbox": list(creation["cbox"]), "aoff": list(creation["aoff"])})
+  1791	                identified[identity] = [row]
+  1792	            doc["detections"].append(row)
+  1793	        if "audio" in edits:
+  1794	            # audio redaction spans (mute/bleep): stored in the report so the
+  1795	            # --from-report render applies them and re-renders keep them
+  1796	            doc["audio_redactions"] = [
+  1797	                {"t0": float(s["t0"]), "t1": float(s["t1"]),
+  1798	                 "mode": (s.get("mode") if s.get("mode") in ("mute", "bleep")
+  1799	                          else "mute")}
+  1800	                for s in (edits.get("audio") or [])
+  1801	                if float(s.get("t1", 0)) > float(s.get("t0", 0)) >= 0]
+  1802	        atomic_report(path, doc)
+  1803	        # suggest allowlisting any string whose EVERY instance was disabled —
+  1804	        # the review just taught us it's a recurring false positive
+  1805	        per = {}
+  1806	        for d in doc["detections"]:
+  1807	            if d["category"] in ("name",):
+  1808	                per.setdefault(d["text"], []).append(d.get("enabled", True))
+  1809	        suggest = sorted(t for t, states in per.items()
+  1810	                         if len(states) >= 2 and not any(states))
+  1811	        return jsonify({"ok": True, "total": len(doc["detections"]),
+  1812	                        "suggest_allowlist": suggest})
+  1822	    job = JOBS.get(jid) or abort(404)
+  1823	    p = request.get_json(force=True)
+  1824	    try:
+  1825	        box = [float(v) for v in p["box"]]
+  1826	        t_ref, t0, t1 = (float(p["t_ref"]), float(p["t0"]), float(p["t1"]))
+  1827	    except (KeyError, TypeError, ValueError):
+  1828	        abort(400)
+  1829	    if len(box) != 4 or not (t1 > t0 >= 0) or not (t0 <= t_ref <= t1):
+  1830	        abort(400)
+  1831	    st = {"state": "running", "added": 0, "error": None}
+  1832	    files = FILES.initialize(job)
+  1833	    current, operation = job.get("video"), files.operation
+  1834	    lease = _own_files(job, work=True)
+  1835	    try:
+  1836	        with files.report_lock:
+  1837	            _edit_gate(job)
+  1838	            if job.get("video") != current or files.operation is not operation:
+  1839	                abort(409, "job operation or source changed — retry tracking")
+  1840	            if ((files.tracker is not None and not files.tracker.released)
+  1841	                    or job.get("trackbg", {}).get("state") == "running"):
+  1842	                abort(409, "tracking already in progress")
+  1843	            if job["cancel"].is_set():
+  1844	                if files.work > 1:
+  1845	                    abort(409, "cancelled job work is still cleaning up")
+  1846	                job["cancel"].clear()
+  1847	            lease.operation = threading.Event()
+  1848	            files.operation = lease.operation
+  1849	            job["cancel"] = lease.operation
+  1850	            files.tracker = lease
+  1851	            job["trackbg"] = st
+  1852	    except BaseException:
+  1853	        lease.release()
+  1854	        raise
+  1863	            det = None
+  1864	            try:
+  1865	                # same person-model resolution the scan uses: the panel
+  1866	                # selection first, then the engine's default ladder
+  1867	                mid = load_model_select().get("person")
+  1868	                p = find_model_file("%s.onnx" % mid) if mid else None
+  1869	                det = openscrub.PersonDetector(L(), model_path=p,
+  1870	                                               thresh=0.2)
+  1871	                if det.net is None and det.ort is None:
+  1872	                    det = None
+  1873	            except Exception:
+  1874	                det = None
+  1875	            samples = openscrub.track_manual_region(
+  1876	                lease.source, box, t_ref, t0, t1, cb=L(), person_det=det)
+  1877	            with files.report_lock:
+  1878	                if (not _operation_valid(job, lease)
+  1879	                        or job.get("trackbg") is not st or lease.operation.is_set()):
+  1880	                    return
+  1881	                if not samples:
+  1882	                    st.update(state="done", added=0,
+  1883	                              error="could not track that region — try a "
+  1884	                                    "larger box or a frame where it's clearer")
+  1885	                    return
+  1886	                doc = _load_job_report(job)
+  1887	                rs = doc["render_state"]
+  1888	                fps = float(rs["fps"]) or 30.0
+  1889	                step = 2.0 / fps
+  1890	                tid = max([d.get("track", -1) for d in doc["detections"]
+  1891	                           if isinstance(d.get("track", -1), int)] + [-1]) + 1
+  1892	                new = []
+  1893	                tcls = samples[0][4] if len(samples[0]) > 4 else None
+  1894	                label = ("tracked %s" % openscrub.COCO_NAMES[tcls]
+  1895	                         if tcls is not None
+  1896	                         and 0 <= tcls < len(openscrub.COCO_NAMES)
+  1897	                         else "tracked object")
+  1898	                for s in samples:
+  1899	                    t, b, score = s[0], s[1], s[2]
+  1900	                    poly = s[3] if len(s) > 3 and s[3] else ()
+  1901	                    fidx = min(int(t * fps), len(rs["cum"]) - 1)
+  1902	                    ox, oy = rs["cum"][fidx]
+  1903	                    new.append({
+  1904	                        "t_start": t, "t_end": t + step * 1.2,
+  1905	                        "cbox": [int(b[0] - ox), int(b[1] - oy),
+  1906	                                 int(b[2] - ox), int(b[3] - oy)],
+  1907	                        "category": "manual", "text": label,
+  1908	                        "confidence": round(float(score), 3),
+  1909	                        "aoff": [ox, oy], "last_seen": t,
+  1910	                        "dense": True, "track": tid, "enabled": True,
+  1911	                        "poly": [[[float(x), float(y)] for x, y in c]
+  1912	                                 for c in poly]})
+  1913	                # grace pads: cover the sub-sample sliver at both ends
+  1914	                new[0]["t_start"] = max(0.0, new[0]["t_start"] - 0.25)
+  1915	                new[-1]["t_end"] += 0.25
+  1916	                doc["detections"].extend(new)
+  1917	                path = os.path.join(job["dir"], "report.json")
+  1918	                atomic_report(path, doc)

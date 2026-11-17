@@ -1,0 +1,26 @@
+TASK110_ACTIVE_SOURCE {"python": "3.9.25 (main, Oct 31 2025, 23:00:23) \n[Clang 21.1.4 ]", "sources": {"openscrub": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py", "sha256": "d80e682d3cbd2e6a091b3e9308fed51d995bb40f426553d3c081971cd16612ad"}, "openscrub_web": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", "sha256": "7762f0314df5e11e46a570af54cd20e928953e7bf92d55da7d648dad36e0fce2"}, "zones_ui": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/zones_ui.py", "sha256": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7"}}}
+..F..................................................................... [ 42%]
+........................................................................ [ 85%]
+........................                                                 [100%]
+=================================== FAILURES ===================================
+_ test_ncc_cancels_after_forward_or_backward_completed_match_without_later_grab[1-2-3] _
+
+media = (PosixPath('/tmp/openscrub-task110/python39-3-tmp/test_ncc_cancels_after_forward0/steady.avi'), PosixPath('/tmp/openscrub-task110/python39-3-tmp/test_ncc_cancels_after_forward0/lost.avi'))
+match_at = 1, grabs = 2, reads = 3
+
+    @pytest.mark.parametrize('match_at,grabs,reads', [(1,2,3), (22,9,16)])
+    def test_ncc_cancels_after_forward_or_backward_completed_match_without_later_grab(media, match_at, grabs, reads):
+        probe = Probe(trigger='match_return')
+        probe.match_at = match_at
+        with observed(probe), pytest.raises(engine.PipelineCancelled) as error:
+            track(media[0], probe)
+        assert type(error.value) is engine.PipelineCancelled
+        assert probe.after == dict(grabs=0, reads=0, matches=2, hold_appends=0)
+        assert probe.count['grabs'] == grabs
+>       assert probe.count['reads'] == reads
+E       assert 5 == 3
+
+tests/test_manual_tracker_cancel.py:250: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_manual_tracker_cancel.py::test_ncc_cancels_after_forward_or_backward_completed_match_without_later_grab[1-2-3]
+1 failed, 167 passed in 13.52s

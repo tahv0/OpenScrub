@@ -1,0 +1,83 @@
+   970	        job["phase"] = "scanning" if action == "scan" else "rendering"
+   971	    cb = WebCallbacks(job, owner.operation)
+   972	    def publish_report(path, doc):
+   973	        with files.report_lock:
+   974	            if not _operation_valid(job, owner) or owner.operation.is_set():
+   975	                raise openscrub.PipelineCancelled()
+   976	            atomic_report(path, doc)
+   977	    cb.publish_report = publish_report
+   978	    source = owner.source if owner is not None else job["video"]
+   979	    try:
+   980	        if action == "scan":
+   981	            job["log"].append("— scan started —")
+   982	            args = build_args(dict(job, video=source))
+   983	            state = openscrub.run_scan(args, cb)
+   984	            openscrub.write_report(os.path.join(job["dir"], "report.json"),
+   985	                                  args, state, publisher=cb.publish_report)
+   986	            with files.report_lock:
+   987	                if not _operation_valid(job, owner):
+   988	                    return
+   989	                job["stats"] = state["stats"]
+   990	            try:
+   991	                prov = _load_job_report(job).get("provenance", {})
+   992	                if (prov.get("vfr_normalized")
+   993	                        and os.path.exists(prov.get("input", ""))):
+   994	                    _update_job_source(job, prov["input"], owner)
+   995	                    job["log"].append(
+   996	                        "using CFR-normalized file for previews/thumbnails")
+   997	            except Exception:
+   998	                pass
+   999	            thumbnail_owner = _own_files(job, work=True)
+  1000	            def _pregen(jb=job, video=thumbnail_owner.source):
+  1067	            _start_owned_thread(_pregen, thumbnail_owner)
+  1068	            next_owner = (_prepare_work(job, "render")
+  1069	                          if job["options"].get("skip_review") else None)
+  1070	            ticket = None
+  1071	            try:
+  1072	                with files.report_lock:
+  1073	                    if not _operation_valid(job, owner):
+  1074	                        return
+  1075	                    if next_owner is not None:
+  1076	                        job["log"].append("review skipped — rendering all detections")
+  1077	                        ticket = _reserve_queue_locked(job, "render", next_owner)
+  1078	                    else:
+  1079	                        job["phase"] = "review"
+  1080	                    job["progress"] = 0.5
+  1081	                    job["eta"] = None
+  1082	            finally:
+  1083	                if next_owner is not None and ticket is None:
+  1084	                    next_owner.release()
+  1085	            if ticket is not None:
+  1086	                enqueue(job, "render", ticket)
+  1087	        elif action == "render":
+  1088	            if not owner.report_input:  # compatibility with older queue entries
+  1089	                _select_render_input(job, owner)
+  1090	            args = build_args(dict(job, video=owner.source), for_render=True)
+  1091	            args._report_input = owner.source
+  1092	            res = openscrub.run_pipeline(args, cb)
+  1093	            with files.report_lock:
+  1094	                if not _operation_valid(job, owner):
+  1095	                    return
+  1096	                job["output"] = res["output"]
+  1097	                job["phase"] = "done"
+  1098	                job["progress"] = 1.0
+  1099	                job["eta"] = None
+  1100	    except openscrub.PipelineCancelled:
+  1101	        with files.report_lock:
+  1102	            if _operation_valid(job, owner):
+  1103	                job["phase"] = "cancelled"
+  1104	                job["error"] = "cancelled by user"
+  1105	    except BaseException as e:
+  1106	        msg = str(e) or type(e).__name__
+  1107	        if isinstance(e, SystemExit):
+  1108	            msg = "the job stopped unexpectedly (exit %s)" % (e.code,)
+  1109	        with files.report_lock:
+  1110	            if _operation_valid(job, owner):
+  1111	                job["phase"] = "error"
+  1112	                job["error"] = msg
+  1113	                job["log"].append(f"ERROR: {msg}")
+  1114	    finally:
+  1115	        with files.report_lock:
+  1116	            if _operation_valid(job, owner):
+  1117	                job["eta"] = None
+  1118	

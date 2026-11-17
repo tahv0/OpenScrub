@@ -1,0 +1,260 @@
+  6052	def _settings_dict(args):
+  6053	    skip = {"video", "output", "report", "from_report", "batch", "config",
+  6054	            "_report_input"}
+  6055	    out = {k: v for k, v in vars(args).items()
+  6056	           if k not in skip and isinstance(v, (str, int, float, bool, list,
+  6057	                                               tuple, type(None)))}
+  6058	    mm = getattr(args, "mode_map", None)
+  6059	    if isinstance(mm, dict) and mm:
+  6060	        out["mode_map"] = ",".join(f"{k}={v}" for k, v in sorted(mm.items()))
+  6061	    return out
+  6286	def write_report(path, args, state, output_path=None, publisher=None):
+  6287	    prov = {
+  6288	        "tool": "openscrub", "version": VERSION,
+  6289	        "timestamp": datetime.datetime.now().astimezone().isoformat(),
+  6290	        "input": os.path.abspath(args.video),
+  6291	        "input_sha256": state.get("input_sha256"),
+  6292	        "original_input": (os.path.abspath(args.original_video)
+  6293	                           if getattr(args, "original_video", None) else None),
+  6294	        "vfr_normalized": bool(getattr(args, "original_video", None)),
+  6295	        "hdr_tonemapped": bool(getattr(args, "hdr_tonemapped", False)),
+  6296	        "hdr_output": bool(getattr(args, "hdr_source", None)),
+  6321	        doc = {
+  6322	            "provenance": prov,
+  6323	            "render_state": {
+  6324	                "fps": state["fps"],
+  6325	                "cum": [[round(x, 1), round(y, 1)] for x, y in state["cum"]],
+  6326	                "bands": [[round(x, 1), round(y, 1)] for x, y in state["bands"]],
+  6327	            },
+  6402	def probe_vfr(path):
+  6403	    """-> (is_vfr, avg_fps). Screen recorders (OBS, Game Bar) often produce
+  6404	    VFR video; the pipeline's frame->time mapping assumes CFR, so VFR input
+  6405	    causes blur-timing drift and audio desync unless normalized first."""
+  6406	    if not shutil.which("ffprobe"):
+  6407	        return False, None
+  6408	    rc, out, _ = 0, "", ""
+  6409	    try:
+  6410	        p = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0",
+  6411	                            "-show_entries",
+  6412	                            "stream=r_frame_rate,avg_frame_rate",
+  6413	                            "-of", "json", path],
+  6414	                           capture_output=True, text=True, timeout=30)
+  6415	        rc, out = p.returncode, p.stdout
+  6416	    except Exception:
+  6417	        return False, None
+  6418	    if rc != 0 or not out:
+  6419	        return False, None
+  6420	    try:
+  6421	        st = json.loads(out)["streams"][0]
+  6422	        def frac(s):
+  6423	            a, _, b = s.partition("/")
+  6424	            return float(a) / float(b or 1) if float(b or 1) else 0.0
+  6425	        r, avg = frac(st.get("r_frame_rate", "0/1")), frac(st.get("avg_frame_rate", "0/1"))
+  6426	    except Exception:
+  6427	        return False, None
+  6428	    if r <= 0 or avg <= 0:
+  6429	        return False, avg or None
+  6430	    return abs(r - avg) / max(r, avg) > 0.005, avg
+  6482	def _count_video_frames(path):
+  6483	    """Exact decoded frame count (full decode via ffprobe), or None."""
+  6484	    try:
+  6485	        out = subprocess.run(
+  6486	            ["ffprobe", "-v", "error", "-count_frames",
+  6487	             "-select_streams", "v:0",
+  6488	             "-show_entries", "stream=nb_read_frames",
+  6489	             "-of", "csv=p=0", path],
+  6490	            capture_output=True, text=True).stdout.strip()
+  6491	        return int(out.split(",")[0]) if out else None
+  6492	    except Exception:
+  6493	        return None
+  6494	
+  6495	
+  6496	def _scan_copy_matches(ref, copy, tol=2):
+  6497	    """(ok, n_ref, n_copy) — a 1:1 (non-resampling) scan copy must carry
+  6498	    exactly the source's frames: the scan reads it by frame INDEX, so a
+  6499	    single dropped or duplicated frame silently shifts every detection
+  6500	    made after it onto the wrong output frames (misplaced blur — seen on
+  6501	    a real GPU box whose NVENC copy desynced). Counting requires a full
+  6502	    decode of both files; that cost is nothing next to the scan itself
+  6503	    and it is the only check that catches the failure."""
+  6504	    n_ref, n_cp = _count_video_frames(ref), _count_video_frames(copy)
+  6505	    if n_ref is None or n_cp is None:
+  6506	        return True, n_ref, n_cp        # can't measure — don't block
+  6507	    return abs(n_ref - n_cp) <= tol, n_ref, n_cp
+  6510	def normalize_vfr(args, cb):
+  6511	    """Intake normalization: VFR input is transcoded to CFR (frame->time
+  6512	    mapping assumes CFR); HDR input additionally gets a tone-mapped SDR
+  6513	    BT.709 copy for SCANNING (detectors are 8-bit, and naive decode washes
+  6514	    colors out). When the output should stay HDR (--hdr-output match, the
+  6515	    default), a 10-bit CFR HDR source is kept for the render and
+  6516	    args.hdr_source/hdr_encoder/hdr_tags are set. Reuses NVENC when
+  6517	    available. No-op for CFR SDR input."""
+  6518	    if getattr(args, "no_vfr_fix", False) or getattr(args, "vfr", "auto") == "ignore":
+  6519	        return
+  6520	    is_vfr, avg = probe_vfr(args.video)
+  6521	    is_hdr, hdesc = probe_hdr(args.video)
+  6522	    if is_hdr and not (_ffmpeg_has("zscale") and _ffmpeg_has("tonemap")):
+  6523	        cb.log(f"      NOTE: input looks HDR ({hdesc}) but this ffmpeg build "
+  6524	               "lacks the zscale/tonemap filters — processing without tone "
+  6525	               "mapping; colors may look washed out in the output.")
+  6526	        is_hdr = False
+  6527	    if not is_vfr and not is_hdr:
+  6528	        return
+  6529	    target = int(round(avg)) if avg and 10 <= avg <= 120 else 30
+  6530	    out_ref = args.output or os.path.splitext(args.video)[0] + "_redacted.mp4"
+  6531	    base = os.path.join(os.path.dirname(os.path.abspath(out_ref)),
+  6532	                        os.path.splitext(os.path.basename(args.video))[0])
+  6533	    src0 = args.video
+  6534	
+  6535	    def _cached(path):
+  6536	        return (os.path.exists(path)
+  6537	                and os.path.getmtime(path) > os.path.getmtime(src0))
+  6538	
+  6539	    def _encode(inp, outp, cfr, tonemap, vargs, extra=None):
+  6540	        tmargs = (["-vf", _TONEMAP_VF, "-color_primaries", "bt709",
+  6541	                   "-color_trc", "bt709", "-colorspace", "bt709"]
+  6542	                  if tonemap else [])
+  6543	        attempts = ([["-fps_mode", "cfr", "-r", str(target)],
+  6544	                     ["-vsync", "cfr", "-r", str(target)]] if cfr else [[]])
+  6574	            if p.returncode == 0:
+  6575	                return
+  6576	            stderr_tail = (err or "").strip()[-300:]
+  6577	        raise RuntimeError("input normalization failed: " + stderr_tail)
+  6578	
+  6579	    codec = nvenc_available(getattr(args, "encoder", "auto"), cb)
+  6580	    sdr_vargs = ((["-c:v", "h264_nvenc", "-preset", "p4", "-cq", "18"]
+  6581	                  if codec == "h264_nvenc" else
+  6582	                  ["-c:v", "h264_qsv", "-preset", "medium",
+  6583	                   "-global_quality", "18"]
+  6584	                  if codec == "h264_qsv" else
+  6585	                  ["-c:v", "libx264", "-crf", "18", "-preset", "fast"])
+  6586	                 + ["-pix_fmt", "yuv420p"])
+  6587	    if is_vfr:
+  6588	        cb.log(f"      input is VFR (avg {avg:.2f} fps) — normalizing to CFR "
+  6589	               f"{target} fps first")
+  6590	
+  6591	    if not is_hdr:
+  6592	        fixed = base + ".cfr.mp4"
+  6593	        if _cached(fixed):
+  6594	            cb.log(f"      reusing existing {os.path.basename(fixed)}")
+  6595	        else:
+  6596	            _encode(src0, fixed, cfr=True, tonemap=False, vargs=sdr_vargs)
+  6597	        args.original_video = src0
+  6598	        args.hdr_tonemapped = False
+  6599	        args.video = fixed
+  6600	        return
+  6612	    # 1. the timeline the whole job runs on: CFR, still 10-bit HDR when the
+  6613	    #    output should stay HDR (VFR HDR sources need this extra pass so the
+  6614	    #    scan copy and the render source share exact frame times)
+  6615	    hdr_src = src0
+  6616	    if is_vfr:
+  6617	        if want_hdr:
+  6618	            hdr_src = base + ".cfr.hdr.mp4"
+  6619	            if _cached(hdr_src):
+  6637	    # 2. tone-mapped SDR copy for scanning (and for the output when the
+  6638	    #    user chose SDR / no 10-bit encoder exists)
+  6639	    sdr = base + ".sdr.mp4"
+  6640	    cb.log(f"      input is {hdesc} HDR — tone-mapping a copy to SDR "
+  6641	           "(BT.709) for detection"
+  6642	           + ("" if want_hdr else "; output will be SDR"))
+  6643	    if _cached(sdr):
+  6644	        cb.log(f"      reusing existing {os.path.basename(sdr)}")
+  6645	    else:
+  6646	        sdr_ref = hdr_src or src0
+  6647	        sdr_cfr = is_vfr and hdr_src is None
+  6648	        _encode(sdr_ref, sdr, cfr=sdr_cfr, tonemap=True, vargs=sdr_vargs)
+  6649	        if not sdr_cfr:
+  6650	            # fail closed: the scan trusts this copy's frame indexes as
+  6651	            # timestamps. A GPU encode that drops or duplicates even a few
+  6652	            # frames shifts every later detection onto the wrong output
+  6653	            # frames — blur lands beside the subject with no error
+  6654	            # anywhere. Verify the copy 1:1; redo on the CPU encoder if
+  6655	            # it lies; refuse to scan if even that can't match.
+  6656	            ok, n_ref, n_cp = _scan_copy_matches(sdr_ref, sdr)
+  6657	            if not ok:
+  6667	                _encode(sdr_ref, sdr, cfr=False, tonemap=True,
+  6668	                        vargs=["-c:v", "libx264", "-crf", "18",
+  6669	                               "-preset", "fast", "-pix_fmt", "yuv420p"])
+  6670	                ok, n_ref, n_cp = _scan_copy_matches(sdr_ref, sdr)
+  6671	                if not ok:
+  6672	                    try:
+  6673	                        os.remove(sdr)
+  6674	                    except OSError:
+  6675	                        pass
+  6676	                    raise RuntimeError(
+  6677	                        "scan copy could not be created with a faithful "
+  6678	                        f"timeline ({n_cp} vs {n_ref} frames) — refusing "
+  6679	                        "to scan a desynced copy (blur would land at the "
+  6680	                        "wrong times)")
+  6681	
+  6682	    args.original_video = src0
+  6683	    args.hdr_tonemapped = True
+  6684	    args.video = sdr
+  6685	    if want_hdr:
+  6686	        args.hdr_source = hdr_src if hdr_src else src0
+  6687	        args.hdr_encoder = henc
+  6688	        args.hdr_tags = color_tags(args.hdr_source)
+  7175	def run_scan(args, cb=None):
+  7176	    """Scan pass only: OCR + face detection + tracking. Returns a state dict
+  7177	    consumed by run_render (and serialized into --report files)."""
+  7178	    cb = cb or Callbacks()
+  7179	    if not args.video or not os.path.exists(args.video):
+  7180	        raise RuntimeError(f"input not found: {args.video}")
+  7181	    # normalize attributes that may be absent when args come from an older
+  7182	    # embedder (GUI/web) rather than _prep_args
+  7183	    for attr, default in (("ignore_regions", []), ("config", None),
+  7184	                          ("from_report", None), ("face_expand", 0.15),
+  7185	                          ("no_vfr_fix", False)):
+  7186	        if not hasattr(args, attr):
+  7187	            setattr(args, attr, default)
+  7188	    normalize_vfr(args, cb)
+  7343	    cb.log(f"[3/4] Scanning (every {args.sample_interval}s or {args.scan_trigger}px of scroll"
+  7344	           + (", self-tuning to screen activity and scroll speed)"
+  7345	              if getattr(args, "adaptive", "on") != "off" else ")"))
+  7346	    cap = cv2.VideoCapture(args.video)
+  7347	    fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+  7348	    total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+  7349	    vw = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+  7350	    vh = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+  7351	    step = max(1, int(round(fps * args.sample_interval)))
+  7592	    idx = 0
+  7593	    dense_now = []
+  7594	    # Fast-skip: when scroll tracking is off (camera footage, face/plate/
+  7595	    # manual jobs — exactly the "one person 16 minutes in" case), frames
+  7596	    # before the detection window carry no information we need, so SEEK past
+  7597	    # them instead of decoding them. cum/bands get zero rows for the skipped
+  7598	    # indices (render min-guards its lookups). With tracking ON the frames
+  7599	    # must be decoded sequentially — offsets accumulate — so no skip there.
+  7600	    if win_start > 1.0 and not track_on:
+  7601	        skip_n = max(0, int(win_start * fps) - 1)
+  7602	        if _seek_cap(cap, skip_n, fps):
+  7603	            cum.extend([(0.0, 0.0)] * skip_n)
+  7604	            bands.extend([(0.0, 0.0)] * skip_n)
+  7605	            idx = skip_n
+  7606	            cb.log(f"      fast-skip: jumped straight to {win_start:.1f}s — "
+  7607	                   f"{skip_n} frame(s) before the window are not decoded")
+  7608	        else:
+  7609	            cap.release()
+  7610	            cap = cv2.VideoCapture(args.video)  # unseekable: decode it all
+  7611	            cb.log("      fast-skip unavailable on this file — decoding "
+  7612	                   "from the start")
+  7613	    while True:
+  7614	        if idx % 30 == 0 and cb.cancelled():
+  7615	            cap.release()
+  7616	            raise PipelineCancelled()
+  7617	        ok, frame = cap.read()
+  7618	        if not ok:
+  7619	            break
+  7620	        cx, cy = tracker.step(frame) if track_on else (0.0, 0.0)
+  7621	        cum.append((cx, cy))
+  7622	
+  7623	        t_now = idx / fps
+  7624	        if not any(w0 <= t_now <= w1 for w0, w1 in dwin):
+  8441	    return {"fps": fps, "cum": cum, "bands": bands, "detections": detections,
+  8442	            "zdropped": zdropped, "audio_suggestions": audio_sugg,
+  8443	            "audio_transcript": audio_tx,
+  8444	            "input_sha256": sha256_file(args.video),
+  8445	            "stats": {"scans": n_scans, "raw_hits": len(raw),
+  8446	                      "regions": len(detections), "recalls": n_recalled,
+  8447	                      "remembered": len(memory.items) if memory else 0,
+  8448	                      "zone_dropped": zone_dropped}}

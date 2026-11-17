@@ -1,0 +1,177 @@
+   733	class Detection:
+   734	    t_start: float
+   735	    t_end: float
+   736	    cbox: tuple          # box in CONTENT coordinates (x1,y1,x2,y2)
+   737	    category: str
+   738	    text: str
+   739	    confidence: float
+   740	    aoff: tuple = (0.0, 0.0)   # cumulative offset when detected (drift anchor)
+   741	    last_seen: float = 0.0     # time of last positive sighting (t_end incl. hold)
+   742	    dense: bool = False        # per-frame dense-face detection: never merged
+   743	                               # across positions (it tracks a moving face)
+   744	    track: int = -1            # dense detections of the same physical object
+   745	                               # share a track id, so review shows ONE item
+   746	                               # per face instead of hundreds of frames
+   747	    person: int = -1           # face tracks clustered by facial IDENTITY
+   748	                               # (SFace embeddings): one review decision per
+   749	                               # PERSON, applied to all their appearances
+   750	    poly: tuple = ()           # silhouette contour(s) from a segmentation
+   751	                               # model, points NORMALIZED to cbox (0..1) —
+   752	                               # render blurs ONLY inside them (person
+   753	                               # category); empty = plain box redaction
+   754	
+  3993	        u = buf[ysz:ysz + csz].reshape(h // 2, w // 2)
+  3994	        v = buf[ysz + csz:].reshape(h // 2, w // 2)
+  3995	        t = idx / fps
+  3996	        ox, oy = cum[min(idx, len(cum) - 1)]
+  3997	
+  3998	        act = [d for d in buckets.get(int(t), [])
+  3999	               if d.t_start - 0.01 <= t <= d.t_end + 0.01]
+  4000	        for d in _dedupe_dense(act):
+  4001	            drift = min(24.0, 0.05 * (abs(ox - d.aoff[0]) + abs(oy - d.aoff[1])))
+  4002	            px = pad + drift
+  4003	            if d.poly:
+  4004	                _blur_silhouette_yuv10(
+  4005	                    y, u, v, d.cbox[0] + ox - px, d.cbox[1] + oy - px,
+  4006	                    d.cbox[2] + ox + px, d.cbox[3] + oy + px,
+  4007	                    _mode_for(d.category), d.poly,
+  4008	                    (d.cbox[0] + ox, d.cbox[1] + oy,
+  4009	                     d.cbox[2] + ox, d.cbox[3] + oy), pad_px=px)
+  4199	        t = idx / fps
+  4200	        if clip:
+  4201	            if t < clip[0] - 1e-6:          # seek undershoot guard
+  4202	                idx += 1
+  4203	                continue
+  4204	            if clip[1] is not None and t > clip[1] + 1e-6:
+  4205	                break                       # keep-window over: stop encoding
+  4206	        ox, oy = cum[min(idx, len(cum) - 1)]
+  4207	
+  4208	        # 1. tracked PII boxes, translated by scroll offset
+  4209	        act = [d for d in buckets.get(int(t), [])
+  4210	               if d.t_start - 0.01 <= t <= d.t_end + 0.01]
+  4211	        for d in _dedupe_dense(act):
+  4212	            # drift allowance: residual tracking error grows (slowly) with
+  4213	            # distance scrolled since detection — expand the box to cover it
+  4214	            drift = min(24.0, 0.05 * (abs(ox - d.aoff[0]) + abs(oy - d.aoff[1])))
+  4215	            px = pad + drift
+  4216	            x1 = d.cbox[0] + ox - px
+  4217	            y1 = d.cbox[1] + oy - px
+  4218	            x2 = d.cbox[2] + ox + px
+  4219	            y2 = d.cbox[3] + oy + px
+  4220	            pbox = (d.cbox[0] + ox, d.cbox[1] + oy,
+  4221	                    d.cbox[2] + ox, d.cbox[3] + oy)
+  6286	def write_report(path, args, state, output_path=None, publisher=None):
+  6287	    prov = {
+  6288	        "tool": "openscrub", "version": VERSION,
+  6289	        "timestamp": datetime.datetime.now().astimezone().isoformat(),
+  6290	        "input": os.path.abspath(args.video),
+  6291	        "input_sha256": state.get("input_sha256"),
+  6292	        "original_input": (os.path.abspath(args.original_video)
+  6293	                           if getattr(args, "original_video", None) else None),
+  6294	        "vfr_normalized": bool(getattr(args, "original_video", None)),
+  6295	        "hdr_tonemapped": bool(getattr(args, "hdr_tonemapped", False)),
+  6296	        "hdr_output": bool(getattr(args, "hdr_source", None)),
+  6297	        "metadata_stripped": True,   # renders pass -map_metadata -1
+  6298	        "zones": getattr(args, "zones_data", None),
+  6299	        "windows": getattr(args, "windows_data", None),
+  6300	        "settings": _settings_dict(args),
+  6301	    }
+  6302	    if output_path and os.path.exists(output_path):
+  6303	        prov["output"] = os.path.abspath(output_path)
+  6304	        prov["output_sha256"] = sha256_file(output_path)
+  6305	    source = state.get("source_report")
+  6306	    if source is not None:
+  6307	        # A render consumes enabled Detection objects, but publishes the full
+  6308	        # review document: Keep choices, row positions and unknown fields are
+  6309	        # user data, not a serialization of the render subset.
+  6310	        doc = dict(source)
+  6311	        previous = dict(source.get("provenance", {}))
+  6312	        settings = dict(previous.get("settings", {}))
+  6313	        settings.update(prov["settings"])
+  6314	        prov["settings"] = settings
+  6315	        # Output hashes/paths must describe this render, never an older one.
+  6316	        previous.pop("output", None)
+  6317	        previous.pop("output_sha256", None)
+  6318	        previous.update(prov)
+  6319	        doc["provenance"] = previous
+  6320	    else:
+  6321	        doc = {
+  6322	            "provenance": prov,
+  6323	            "render_state": {
+  6324	                "fps": state["fps"],
+  6325	                "cum": [[round(x, 1), round(y, 1)] for x, y in state["cum"]],
+  6326	                "bands": [[round(x, 1), round(y, 1)] for x, y in state["bands"]],
+  6327	            },
+  6328	            "detections": ([dict(asdict(d), enabled=True)
+  6329	                            for d in state["detections"]]
+  6358	def _decode_report(doc):
+  6359	    """Decode the enabled render subset of one already-read report snapshot."""
+  6360	    if isinstance(doc, list):
+  6361	        rows, state, prov = doc, None, {}
+  6362	    else:
+  6363	        rows, state, prov = doc.get("detections", []), doc.get("render_state"), \
+  6364	            doc.get("provenance", {})
+  6365	    dets = []
+  6366	    for r in rows:
+  6367	        if not r.get("enabled", True):
+  6368	            continue
+  6369	        dets.append(Detection(
+  6370	            t_start=float(r["t_start"]), t_end=float(r["t_end"]),
+  6371	            cbox=tuple(r["cbox"]), category=r["category"], text=r["text"],
+  6372	            confidence=float(r.get("confidence", 1.0)),
+  6373	            aoff=tuple(r.get("aoff", (0.0, 0.0))),
+  6374	            last_seen=float(r.get("last_seen", r["t_start"])),
+  6375	            # Preserve grouping in the enabled subset used by the renderer.
+  6376	            dense=bool(r.get("dense", False)),
+  6377	            track=int(r.get("track", -1)),
+  6378	            person=int(r.get("person", -1)),
+  6379	            poly=tuple(copy.deepcopy(r.get("poly") or ()))))
+  6380	    return dets, state, prov
+  8530	    if getattr(args, "from_report", None):
+  8531	        cb.log(f"[1/2] Loading detections from {args.from_report}")
+  8532	        # Read once so geometry, choices, audio and provenance come from the
+  8533	        # same snapshot. The raw document stays separate from render objects.
+  8534	        with open(args.from_report, encoding="utf-8") as f:
+  8535	            source = json.load(f)
+  8536	        dets, rstate, prov = _decode_report(source)
+  8537	        audio_overridden = getattr(args, "audio_spans", None) is not None
+  8538	        if not audio_overridden and isinstance(source, dict):
+  8539	            try:
+  8540	                args.audio_spans = [
+  8541	                    (float(s["t0"]), float(s["t1"]), s.get("mode", "mute"))
+  8542	                    for s in source.get("audio_redactions", [])]
+  8543	            except (TypeError, ValueError, KeyError):
+  8544	                pass
+  8545	        selected_input = getattr(args, "_report_input", None)
+  8546	        if selected_input is not None:
+  8547	            # An in-process caller already selected/owns this exact input.
+  8548	            # Do not follow newer provenance into a source it did not admit.
+  8549	            args.video = selected_input
+  8550	        else:
+  8551	            orig = prov.get("original_input")
+  8552	            if orig and os.path.exists(orig) \
+  8553	                    and os.path.abspath(orig) != os.path.abspath(args.video):
+  8554	                # re-renders must start from the TRUE original so intake can
+  8555	                # re-derive the HDR/CFR context (cached intermediates are
+  8556	                # reused). Rendering straight from the tone-mapped scan copy
+  8557	                # silently downgraded HDR jobs to SDR output.
+  8558	                args.video = orig
+  8559	        normalize_vfr(args, cb)
+  8560	        if rstate is None:
+  8561	            raise RuntimeError("report has no render_state — re-run a scan "
+  8562	                               "with --report using openscrub v4+")
+  8563	        cb.log(f"      {len(dets)} enabled detections")
+  8564	        in_sha = sha256_file(args.video)
+  8565	        if prov.get("input_sha256") and prov["input_sha256"] != in_sha:
+  8566	            cb.log("      WARNING: input file differs from the one this report "
+  8567	                   "was made from (sha256 mismatch) — blur positions may be wrong")
+  8568	        state = {"fps": rstate["fps"],
+  8569	                 "cum": [tuple(v) for v in rstate["cum"]],
+  8570	                 "bands": [tuple(v) for v in rstate["bands"]],
+  8571	                 "detections": dets, "input_sha256": in_sha,
+  8572	                 "source_report": source,
+  8573	                 "audio_redactions_overridden": audio_overridden,
+  8574	                 "audio_suggestions": copy.deepcopy(source.get("audio_suggestions")),
+  8575	                 "stats": {"scans": 0, "raw_hits": 0, "regions": len(dets),
+  8576	                           "recalls": 0, "remembered": 0}}
+  8577	        return run_render(args, state, cb)

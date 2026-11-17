@@ -1,0 +1,29 @@
+TASK110_ACTIVE_SOURCE {"python": "3.9.25 (main, Oct 31 2025, 23:00:23) \n[Clang 21.1.4 ]", "sources": {"openscrub": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py", "sha256": "d80e682d3cbd2e6a091b3e9308fed51d995bb40f426553d3c081971cd16612ad"}, "openscrub_web": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", "sha256": "7762f0314df5e11e46a570af54cd20e928953e7bf92d55da7d648dad36e0fce2"}, "zones_ui": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/zones_ui.py", "sha256": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7"}}}
+.......................F................................................ [ 42%]
+........................................................................ [ 85%]
+........................                                                 [100%]
+=================================== FAILURES ===================================
+______ test_vit_final_return_observes_cancellation_after_last_loop_check _______
+
+media = (PosixPath('/tmp/openscrub-task110/python39-2-tmp/test_vit_final_return_observes0/steady.avi'), PosixPath('/tmp/openscrub-task110/python39-2-tmp/test_vit_final_return_observes0/lost.avi'))
+
+    def test_vit_final_return_observes_cancellation_after_last_loop_check(media):
+        probe = Probe(trigger='vit_final_break')
+        updates = []
+        class Vit:
+            def init(self, *args):
+                pass
+            def update(self, frame):
+                updates.append(None)
+                return True, (16,16,16,16)
+            def getTrackingScore(self):
+                return 1.
+        with observed(probe) as stack, pytest.raises(engine.PipelineCancelled):
+            stack.enter_context(patch.object(engine, '_vittrack_factory', lambda log: Vit))
+>           track(media[0], probe)
+E           Failed: DID NOT RAISE <class 'openscrub.PipelineCancelled'>
+
+tests/test_manual_tracker_cancel.py:351: Failed
+=========================== short test summary info ============================
+FAILED tests/test_manual_tracker_cancel.py::test_vit_final_return_observes_cancellation_after_last_loop_check
+1 failed, 167 passed in 13.54s

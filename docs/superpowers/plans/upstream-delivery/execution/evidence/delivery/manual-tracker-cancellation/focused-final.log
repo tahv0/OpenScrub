@@ -1,0 +1,12 @@
+TASK110_ACTIVE_SOURCE {"python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]", "sources": {"openscrub": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py", "sha256": "d80e682d3cbd2e6a091b3e9308fed51d995bb40f426553d3c081971cd16612ad"}, "openscrub_web": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", "sha256": "7762f0314df5e11e46a570af54cd20e928953e7bf92d55da7d648dad36e0fce2"}, "zones_ui": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/zones_ui.py", "sha256": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7"}}}
+      downloading VitTrack model (~0.7 MB, one time)…
+      VitTrack download failed (manual cancellation tests prohibit model downloads) — using template tracker
+.      downloading VitTrack model (~0.7 MB, one time)…
+      VitTrack download failed (manual cancellation tests prohibit model downloads) — using template tracker
+      track: LOST the object at t=1.4s — holding the last box to the window edge (review and trim if needed)
+      track: LOST the object at t=1.4s — holding the last box to the window edge (review and trim if needed)
+.MANUAL_CANCEL_COUNTS {"match_at": 1, "counts": {"grabs": 2, "reads": 3, "matches": 3, "hold_appends": 0, "callback_polls": 4}, "after": {"grabs": 0, "reads": 0, "matches": 2, "hold_appends": 0}}
+.MANUAL_CANCEL_COUNTS {"match_at": 22, "counts": {"grabs": 9, "reads": 16, "matches": 24, "hold_appends": 0, "callback_polls": 12}, "after": {"grabs": 0, "reads": 0, "matches": 2, "hold_appends": 0}}
+.....................MANUAL_WEB_COUNTS {"counts": {"grabs": 2, "reads": 3, "matches": 3, "hold_appends": 0, "callback_polls": 0}, "after": {"grabs": 0, "reads": 0, "matches": 2, "hold_appends": 0}, "captures": [{"releases": 1, "open": false, "owner_at_release": [1]}], "owners": 0, "work": 0, "threads_alive": 0}
+.
+25 passed in 0.47s

@@ -1,0 +1,32 @@
+     5	[project]
+     6	name = "OpenScrub"
+     7	dynamic = ["version"]
+     8	description = "Local, GPU-accelerated redaction for video and screen recordings — blur, black-box, or mosaic faces, names, and any regex-matchable PII, with human review."
+     9	readme = "README.md"
+    10	requires-python = ">=3.9"
+    11	license = { file = "LICENSE" }
+    36	dependencies = [
+    37	    "opencv-python",
+    38	    "numpy",
+    90	[tool.hatch.build.targets.wheel]
+    91	include = [
+    92	    "openscrub_internal",
+    93	    "openscrub.py",
+    94	    "openscrub_web.py",
+    95	    "zones_ui.py",
+    96	    "openscrub_setup.py",
+    97	    "openscrub_update.py",
+    98	    "openscrub_vault.py",
+    99	]
+   100	
+   101	[tool.hatch.build.targets.sdist]
+   102	include = [
+   103	    "openscrub_internal",
+   104	    "plate_models.json",
+   105	    "face_models.json",
+   106	    "person_models.json",
+   107	    "assets/openscrub.ico",
+   108	    "openscrub.py",
+   109	    "openscrub_setup.py",
+   110	    "openscrub_update.py",
+   111	    "openscrub_vault.py",

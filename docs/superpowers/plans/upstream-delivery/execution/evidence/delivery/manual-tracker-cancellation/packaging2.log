@@ -1,0 +1,11 @@
+{
+  "base": "12919c96c6f7558136b50d7b4d85e5e6b62f1971",
+  "sdist_exact_files": 28,
+  "wheel_exact_python_files": 9,
+  "all_python39_grammar": true,
+  "unchanged_pyproject_and_tracker_signature_defaults": true,
+  "engine_delta_confined_to_track_manual_region": true,
+  "frozen_files": 126,
+  "engine_sha256": "d80e682d3cbd2e6a091b3e9308fed51d995bb40f426553d3c081971cd16612ad",
+  "test_sha256": "7ac9c0d1ca52ee97a97a6596699f83eb6fb8ef0e13bbf5ea89189f75d335547a"
+}

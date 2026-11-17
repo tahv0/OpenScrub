@@ -1,0 +1,10 @@
+Traceback (most recent call last):
+  File "/tmp/openscrub-task110/check_packaging.py", line 23, in <module>
+    assert archive.extractfile(prefix+'/'+n).read()==(root/n).read_bytes(),n
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/python/cpython-3.12.16-linux-x86_64-gnu/lib/python3.12/tarfile.py", line 2503, in extractfile
+    tarinfo = self.getmember(member)
+              ^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/python/cpython-3.12.16-linux-x86_64-gnu/lib/python3.12/tarfile.py", line 2075, in getmember
+    raise KeyError("filename %r not found" % name)
+KeyError: "filename 'openscrub-1.0.96/benchmark/corpus.py' not found"

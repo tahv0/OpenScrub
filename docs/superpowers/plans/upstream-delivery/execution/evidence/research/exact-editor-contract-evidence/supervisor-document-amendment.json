@@ -1,0 +1,9 @@
+{
+  "change": "Append supervisor adoption only; preserve opaque additive report values and bound equality projection cost.",
+  "agent_report_sha256": "834112b30d2a85c551cebefc127487b3dbc4b7b936b24e83bb8690c139c32f99",
+  "current_report_sha256": "879d74137b633bcda9d71024bc58b6490040370b35ec8adeab0b18b84aa8d0a5",
+  "original_bytes": 62457,
+  "current_bytes": 63327,
+  "original_prefix_verified": true,
+  "runtime_evidence_changed": false
+}

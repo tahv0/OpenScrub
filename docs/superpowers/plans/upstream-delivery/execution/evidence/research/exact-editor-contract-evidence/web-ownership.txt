@@ -1,0 +1,247 @@
+   328	class FilesBusy(RuntimeError):
+   329	    pass
+   330	
+   331	
+   332	def _validate_files_locked(job=None):
+   333	    # Admission always rechecks after waiting for the transition guard.
+   334	    if vault_locked():
+   335	        abort(423, "vault is locked or needs recovery — unlock it to access jobs")
+   336	    if job is not None:
+   337	        with JOBS_LOCK:
+   338	            if not any(current is job for current in JOBS.values()):
+   339	                abort(404)
+   340	        if FILES.initialize(job).closed:
+   341	            abort(409, "job is being deleted")
+   342	
+   343	
+   344	def _source_job_locked(canonical, missing_ok=False):
+   345	    root = os.path.realpath(JOBS_DIR).rstrip(os.sep) + os.sep
+   346	    if not canonical.startswith(root):
+   347	        return None
+   348	    jid = canonical[len(root):].split(os.sep, 1)[0]
+   349	    with JOBS_LOCK:
+   350	        source_job = JOBS.get(jid)
+   351	    if source_job is None:
+   352	        if missing_ok:
+   353	            return None
+   354	        abort(404, "source job is no longer available")
+   355	    _validate_files_locked(source_job)
+   356	    return source_job
+   357	
+   358	
+   359	def _reserve_files_locked(job=None, work=False, read_source=True, source=None):
+   360	    source = (os.path.realpath(source if source is not None else job["video"])
+   361	              if read_source and job and (source is not None or job.get("video")) else None)
+   362	    source_job = _source_job_locked(source) if source else None
+   363	    lease = FILES.reserve(job, work)
+   364	    lease.source = source
+   365	    if source_job is not None and source_job is not job:
+   366	        lease.related.append(FILES.reserve(source_job))
+   367	    return lease
+   433	def _job_video(job):
+   434	    # Requests use their admitted source even if scan normalization updates
+   435	    # the live job while a decoder is waiting. Worker/thread callers snapshot
+   436	    # their own lease's source before starting work.
+   437	    if has_request_context():
+   438	        lease = g.get("file_owner")
+   439	        if lease is not None and lease.state is FILES.initialize(job):
+   440	            return lease.source or job.get("video")
+   441	    return job.get("video")
+   442	
+   443	
+   444	def _update_job_source(job, path, owner):
+   445	    canonical = os.path.realpath(path)
+   446	    with VAULT_LOCK:
+   447	        _validate_files_locked(job)
+   448	        source_job = _source_job_locked(canonical)
+   449	        if source_job is not None and source_job is not job:
+   450	            # Reserve before following a changed normalized input. This stays
+   451	            # with the worker through its final report/provenance access.
+   452	            if owner is not None and all(
+   453	                    token.state is not FILES.initialize(source_job)
+   454	                    for token in [owner] + owner.related):
+   455	                owner.related.append(FILES.reserve(source_job))
+   456	        job["video"] = canonical
+   457	
+   490	def new_job(video_path, options, name):
+   491	    with _own_files():
+   492	        return _new_job(video_path, options, name)
+   493	
+   494	
+   495	def _new_job(video_path, options, name):
+   496	    jid = uuid.uuid4().hex[:12]
+   497	    jdir = os.path.join(JOBS_DIR, jid)
+   498	    os.makedirs(jdir, exist_ok=True)
+   499	    job = {
+   500	        "id": jid, "dir": jdir, "video": video_path, "name": name,
+   501	        "options": options, "phase": "queued", "progress": 0.0,
+   502	        "eta": None, "size": 0,
+   503	        "log": [], "error": None, "output": None, "created": time.time(),
+   504	        "cancel": threading.Event(), "stats": {}, "qgen": 0,
+   505	    }
+   506	    FILES.initialize(job)
+   507	    # keep the job's settings beside its upload: a scan that never finished
+   508	    # has no report to recover them from, and a Retry after a restart then
+   509	    # ran with DEFAULT settings (all categories) instead of the user's own
+   510	    try:
+   511	        with open(os.path.join(jdir, OPTIONS_FILE), "w",
+   512	                  encoding="utf-8") as f:
+   513	            json.dump(options, f)
+   514	    except (OSError, TypeError, ValueError):
+   515	        pass
+   516	    with VAULT_LOCK:
+   517	        with JOBS_LOCK:
+   518	            JOBS[jid] = job
+   519	        if has_request_context() and g.get("file_owner") is not None:
+   520	            g.setdefault("file_children", []).append(FILES.reserve(job, work=True))
+   521	    return job
+   802	def _report_current(job):
+   803	    """Identity lookup only; caller owns report_lock and a file lifetime.
+   804	
+   805	    Admission takes VAULT_LOCK -> JOBS_LOCK and releases both before this
+   806	    boundary. Never acquire VAULT_LOCK (including lease release) inside it.
+   807	    """
+   808	    with JOBS_LOCK:
+   809	        if not any(current is job for current in JOBS.values()):
+   810	            abort(404)
+   811	        if FILES.initialize(job).closed:
+   812	            abort(409, "job is being deleted")
+   813	
+   814	
+   815	def _edit_gate(job):
+   816	    _report_current(job)
+   817	    if FILES.initialize(job).active is not None or job.get("phase") in _ACTIVE_PHASES:
+   818	        abort(409, "job work is queued, running or still cleaning up")
+   819	
+   820	
+   821	def _operation_valid(job, owner):
+   822	    files = FILES.initialize(job)
+   823	    with JOBS_LOCK:
+   824	        return (any(current is job for current in JOBS.values()) and not files.closed
+   825	                and owner.operation is not None
+   826	                and files.operation is owner.operation)
+   827	
+   828	
+   829	def _begin_operation(job, owner):
+   830	    files = FILES.initialize(job)
+   831	    owner.operation = threading.Event()
+   832	    files.operation = owner.operation
+   833	    job["cancel"] = owner.operation
+   834	    files.active = owner
+   835	
+   836	
+   837	def _finish_operation(job, owner):
+   838	    # Release lifecycle ownership outside the report transaction. Keep the
+   839	    # mutation gate closed until actual worker cleanup/release has completed.
+   840	    owner.release()
+   841	    if job is None:  # a cancelled ticket's job may already have been deleted
+   842	        return
+   843	    files = FILES.initialize(job)
+   844	    with files.report_lock:
+   845	        if files.active is owner:
+   970	        job["phase"] = "scanning" if action == "scan" else "rendering"
+   971	    cb = WebCallbacks(job, owner.operation)
+   972	    def publish_report(path, doc):
+   973	        with files.report_lock:
+   974	            if not _operation_valid(job, owner) or owner.operation.is_set():
+   975	                raise openscrub.PipelineCancelled()
+   976	            atomic_report(path, doc)
+   977	    cb.publish_report = publish_report
+   978	    source = owner.source if owner is not None else job["video"]
+   979	    try:
+   980	        if action == "scan":
+   981	            job["log"].append("— scan started —")
+   982	            args = build_args(dict(job, video=source))
+   983	            state = openscrub.run_scan(args, cb)
+   984	            openscrub.write_report(os.path.join(job["dir"], "report.json"),
+   985	                                  args, state, publisher=cb.publish_report)
+   986	            with files.report_lock:
+   987	                if not _operation_valid(job, owner):
+   988	                    return
+   989	                job["stats"] = state["stats"]
+   990	            try:
+   991	                prov = _load_job_report(job).get("provenance", {})
+   992	                if (prov.get("vfr_normalized")
+   993	                        and os.path.exists(prov.get("input", ""))):
+   994	                    _update_job_source(job, prov["input"], owner)
+   995	                    job["log"].append(
+   996	                        "using CFR-normalized file for previews/thumbnails")
+   997	            except Exception:
+   998	                pass
+   999	            thumbnail_owner = _own_files(job, work=True)
+  1000	            def _pregen(jb=job, video=thumbnail_owner.source):
+  1181	def enforce_vault_lock():
+  1182	    """Admit file work before intake parsing or a view captures a job."""
+  1183	    if request.endpoint == "allowlist":
+  1184	        g.file_owner = _own_files()  # shared file lives directly in JOBS_DIR
+  1185	        return
+  1186	    if request.path.startswith("/api/jobs"):
+  1187	        # Deletion closes admissions itself, without becoming its own busy owner.
+  1188	        if request.endpoint == "job_delete":
+  1189	            with VAULT_LOCK:
+  1190	                _validate_files_locked()
+  1191	            return
+  1192	        with VAULT_LOCK:
+  1193	            jid = (request.view_args or {}).get("jid")
+  1194	            job = JOBS.get(jid) if jid is not None else None
+  1195	            if jid is not None and job is None:
+  1196	                abort(404)
+  1197	            _validate_files_locked(job)
+  1198	            read_source = request.endpoint in {
+  1199	                "job_retry", "job_render", "job_track_object", "job_mediainfo",
+  1200	                "job_detframe", "job_thumb", "job_frame_at", "job_video_stream"}
+  1201	            g.file_owner = _reserve_files_locked(job, read_source=read_source)
+  1202	
+  1203	
+  1204	@app.after_request
+  1205	def _finish_file_response(response):
+  1206	    for child in g.pop("file_children", []):
+  1207	        child.release()
+  1208	    lease = g.pop("file_owner", None)
+  1209	    if lease is not None:
+  1210	        if response.direct_passthrough:
+  1211	            response.response = OwnedIterable(response.response, lease)
+  1212	        else:
+  1213	            lease.release()  # detached JSON/JPEG bytes no longer read job files
+  1214	    return response
+  1215	
+  1216	
+  1217	@app.teardown_request
+  1218	def _release_failed_request(error):
+  1219	    for child in g.pop("file_children", []):
+  1220	        child.release()
+  1221	    lease = g.pop("file_owner", None)
+  1222	    if lease is not None:
+  1223	        lease.release()
+  4510	            with open(rep, encoding="utf-8") as f:
+  4511	                prov = json.load(f).get("provenance", {})
+  4512	            video = prov.get("input")
+  4513	            if not video or not os.path.exists(video):
+  4514	                continue
+  4515	            out = os.path.join(jdir, "output.mp4")
+  4516	            has_out = os.path.exists(out)
+  4517	            job = {
+  4518	                "id": jid, "dir": jdir, "video": video,
+  4519	                "name": os.path.basename(prov.get("original_input")
+  4520	                                          or video),
+  4521	                "options": prov.get("settings", {}) or {},
+  4522	                "phase": "done" if has_out else "review",
+  4523	                "progress": 1.0 if has_out else 0.5,
+  4524	                "log": ["(recovered after server restart)"],
+  4525	                "error": None, "output": out if has_out else None,
+  4526	                "created": os.path.getmtime(jdir),
+  4527	                "cancel": threading.Event(), "stats": {},
+  4528	            }
+  4529	            try:
+  4530	                # original upload size, for the editor's duplicate-upload
+  4531	                # warning (prov input may be the normalized scan copy)
+  4532	                orig = next((os.path.join(jdir, "input" + e)
+  4533	                             for e in sorted(MEDIA_EXTS)
+  4534	                             if os.path.exists(
+  4535	                                 os.path.join(jdir, "input" + e))), video)
+  4536	                job["size"] = os.path.getsize(orig)
+  4537	            except OSError:
+  4538	                pass
+  4539	            FILES.initialize(job)
+  4540	            with JOBS_LOCK:
+  4541	                JOBS[jid] = job

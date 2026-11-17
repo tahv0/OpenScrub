@@ -1,0 +1,52 @@
+    30	def test_committed_http_response_lost_then_identical_retry(store, socket_api):
+    31	    payload = {'manual': [addition()]}
+    32	    # Deliberately discard a completed HTTP response, as an injected browser
+    33	    # response failure would. This is not a real transport-disconnect test.
+    34	    assert socket_api('POST', store.url + '/detections', payload)[0] == 200
+    35	    assert len(saved(store)['detections']) == 2
+    36	    assert socket_api('POST', store.url + '/detections', payload)[0] == 200
+    37	    assert len(saved(store)['detections']) == 2
+    38	    assert saved(store)['detections'][1]['manual_creation'] == {
+    39	        't_start': 0., 't_end': 1., 'cbox': [2, 3, 20, 30], 'aoff': [0, 0]}
+    40	
+    41	
+    42	def test_replay_preserves_previously_committed_indexed_changes(store):
+    43	    assert post(store, [addition()]).status_code == 200
+    44	    changes = dict(enabled={'1': False}, box_overrides={'1': [9, 8, 35, 45]},
+    45	                   time_overrides={'1': [.2, 2]}, audio=[{'t0': 0, 't1': .5}])
+    46	    assert post(store, [], **changes).status_code == 200
+    47	    row = copy.deepcopy(saved(store)['detections'][1])
+    48	    for _ in range(2):
+    49	        assert post(store, [addition()], **changes).status_code == 200
+    50	        assert saved(store)['detections'][1] == row
+    51	        assert len(saved(store)['detections']) == 2
+    87	@pytest.mark.parametrize('existing', [False, True])
+    88	def test_incompatible_id_reuse_atomically_rejects_other_edits(store, existing):
+    89	    if existing:
+    90	        assert post(store, [addition()]).status_code == 200
+    91	    before = store.path.read_bytes()
+    92	    response = post(store, [addition(), addition(t_end=3)], enabled={'0': False},
+    93	                    audio=[{'t0': 0, 't1': .8}])
+    94	    assert response.status_code == 409 and response.json['error']
+    95	    assert store.path.read_bytes() == before
+   145	def test_effective_normalization_reference_default_and_untrusted_creation(store):
+   146	    doc = saved(store)
+   147	    doc['render_state'] = {'fps': 2, 'cum': [[0,0],[10,20],[10,20]]}
+   148	    store.path.write_text(json.dumps(doc))
+   149	    first = addition(t_start='.5', t_end='2', screen_box=[12.9,23.8,30.2,50.7], manual_creation={'fake': True})
+   150	    assert post(store, [first]).status_code == 200
+   151	    assert post(store, [addition(t_start=.5, t_end=2., t_ref=.9, screen_box=[12.1,23.1,30.9,50.1])]).status_code == 200
+   152	    row = saved(store)['detections'][1]
+   153	    assert row['manual_creation'] == {'t_start': .5, 't_end': 2., 'cbox': [2,3,20,30], 'aoff': [10,20]}
+   154	    assert len(saved(store)['detections']) == 2
+   155	    assert post(store, [addition(t_start=.5, t_end=2, t_ref=0, screen_box=[2,3,20,30])]).status_code == 409
+   156	    assert saved(store)['custom'] == {'preserved': True}
+   157	
+   158	
+   159	@pytest.mark.parametrize('offset', [[0], [0, float('inf')], ['bad', 0]])
+   160	def test_identified_creation_rejects_invalid_report_offset(store, offset):
+   161	    doc = saved(store); doc['render_state']['cum'] = [offset]
+   162	    store.path.write_text(json.dumps(doc)); before = store.path.read_bytes()
+   163	    response = post(store, [addition()])
+   164	    assert response.status_code == 400 and response.json['error']
+   165	    assert store.path.read_bytes() == before

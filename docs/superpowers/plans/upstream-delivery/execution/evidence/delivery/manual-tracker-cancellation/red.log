@@ -1,0 +1,423 @@
+TASK110_ACTIVE_SOURCE {"python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]", "sources": {"openscrub": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py", "sha256": "275de34766d3d64592222be5633906a3dcd2557ce78e2dd7b7d6fb8075fd0355"}, "openscrub_web": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", "sha256": "7762f0314df5e11e46a570af54cd20e928953e7bf92d55da7d648dad36e0fce2"}, "zones_ui": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/zones_ui.py", "sha256": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7"}}}
+..FFFFFFFF.....FFFF.FF..F                                                [100%]
+=================================== FAILURES ===================================
+_ test_ncc_cancels_after_forward_or_backward_completed_match_without_later_grab[1-2-3] _
+
+media = (PosixPath('/tmp/openscrub-task110/red-tmp/test_ncc_cancels_after_forward0/steady.avi'), PosixPath('/tmp/openscrub-task110/red-tmp/test_ncc_cancels_after_forward0/lost.avi'))
+match_at = 1, grabs = 2, reads = 3
+
+    @pytest.mark.parametrize('match_at,grabs,reads', [(1,2,3), (22,9,12)])
+    def test_ncc_cancels_after_forward_or_backward_completed_match_without_later_grab(media, match_at, grabs, reads):
+        probe = Probe(trigger='match_return')
+        probe.match_at = match_at
+>       with observed(probe), pytest.raises(engine.PipelineCancelled) as error:
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE PipelineCancelled
+
+tests/test_manual_tracker_cancel.py:218: Failed
+_ test_ncc_cancels_after_forward_or_backward_completed_match_without_later_grab[22-9-12] _
+
+media = (PosixPath('/tmp/openscrub-task110/red-tmp/test_ncc_cancels_after_forward1/steady.avi'), PosixPath('/tmp/openscrub-task110/red-tmp/test_ncc_cancels_after_forward1/lost.avi'))
+match_at = 22, grabs = 9, reads = 12
+
+    @pytest.mark.parametrize('match_at,grabs,reads', [(1,2,3), (22,9,12)])
+    def test_ncc_cancels_after_forward_or_backward_completed_match_without_later_grab(media, match_at, grabs, reads):
+        probe = Probe(trigger='match_return')
+        probe.match_at = match_at
+>       with observed(probe), pytest.raises(engine.PipelineCancelled) as error:
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE PipelineCancelled
+
+tests/test_manual_tracker_cancel.py:218: Failed
+_ test_natural_loss_cancels_at_held_coverage_and_final_backward_return[hold_log-0-3] _
+
+media = (PosixPath('/tmp/openscrub-task110/red-tmp/test_natural_loss_cancels_at_h0/steady.avi'), PosixPath('/tmp/openscrub-task110/red-tmp/test_natural_loss_cancels_at_h0/lost.avi'))
+trigger = 'hold_log', held = 0, matches = 3
+
+    @pytest.mark.parametrize('trigger,held,matches', [
+        ('hold_log',0,3), ('hold_append1',1,3), ('hold_append14',14,6)])
+    def test_natural_loss_cancels_at_held_coverage_and_final_backward_return(media, trigger, held, matches):
+        probe = Probe(trigger=trigger)
+>       with observed(probe), pytest.raises(engine.PipelineCancelled) as error:
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE PipelineCancelled
+
+tests/test_manual_tracker_cancel.py:231: Failed
+_ test_natural_loss_cancels_at_held_coverage_and_final_backward_return[hold_append1-1-3] _
+
+media = (PosixPath('/tmp/openscrub-task110/red-tmp/test_natural_loss_cancels_at_h1/steady.avi'), PosixPath('/tmp/openscrub-task110/red-tmp/test_natural_loss_cancels_at_h1/lost.avi'))
+trigger = 'hold_append1', held = 1, matches = 3
+
+    @pytest.mark.parametrize('trigger,held,matches', [
+        ('hold_log',0,3), ('hold_append1',1,3), ('hold_append14',14,6)])
+    def test_natural_loss_cancels_at_held_coverage_and_final_backward_return(media, trigger, held, matches):
+        probe = Probe(trigger=trigger)
+>       with observed(probe), pytest.raises(engine.PipelineCancelled) as error:
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE PipelineCancelled
+
+tests/test_manual_tracker_cancel.py:231: Failed
+_ test_natural_loss_cancels_at_held_coverage_and_final_backward_return[hold_append14-14-6] _
+
+media = (PosixPath('/tmp/openscrub-task110/red-tmp/test_natural_loss_cancels_at_h2/steady.avi'), PosixPath('/tmp/openscrub-task110/red-tmp/test_natural_loss_cancels_at_h2/lost.avi'))
+trigger = 'hold_append14', held = 14, matches = 6
+
+    @pytest.mark.parametrize('trigger,held,matches', [
+        ('hold_log',0,3), ('hold_append1',1,3), ('hold_append14',14,6)])
+    def test_natural_loss_cancels_at_held_coverage_and_final_backward_return(media, trigger, held, matches):
+        probe = Probe(trigger=trigger)
+>       with observed(probe), pytest.raises(engine.PipelineCancelled) as error:
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE PipelineCancelled
+
+tests/test_manual_tracker_cancel.py:231: Failed
+___ test_precancelled_request_precedes_invalid_input_without_capture[valid] ____
+
+media = (PosixPath('/tmp/openscrub-task110/red-tmp/test_precancelled_request_prec0/steady.avi'), PosixPath('/tmp/openscrub-task110/red-tmp/test_precancelled_request_prec0/lost.avi'))
+kind = 'valid'
+
+    @pytest.mark.parametrize('kind', ['valid','missing','small'])
+    def test_precancelled_request_precedes_invalid_input_without_capture(media, kind):
+        probe = Probe()
+        probe.mark_cancel()
+        video = media[0] if kind != 'missing' else media[0].with_name('missing.avi')
+        box = (0,0,4,4) if kind == 'small' else (32,32,64,64)
+>       with observed(probe), pytest.raises(engine.PipelineCancelled) as error:
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE PipelineCancelled
+
+tests/test_manual_tracker_cancel.py:245: Failed
+__ test_precancelled_request_precedes_invalid_input_without_capture[missing] ___
+
+media = (PosixPath('/tmp/openscrub-task110/red-tmp/test_precancelled_request_prec1/steady.avi'), PosixPath('/tmp/openscrub-task110/red-tmp/test_precancelled_request_prec1/lost.avi'))
+kind = 'missing'
+
+    @pytest.mark.parametrize('kind', ['valid','missing','small'])
+    def test_precancelled_request_precedes_invalid_input_without_capture(media, kind):
+        probe = Probe()
+        probe.mark_cancel()
+        video = media[0] if kind != 'missing' else media[0].with_name('missing.avi')
+        box = (0,0,4,4) if kind == 'small' else (32,32,64,64)
+>       with observed(probe), pytest.raises(engine.PipelineCancelled) as error:
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE PipelineCancelled
+
+tests/test_manual_tracker_cancel.py:245: Failed
+___ test_precancelled_request_precedes_invalid_input_without_capture[small] ____
+
+media = (PosixPath('/tmp/openscrub-task110/red-tmp/test_precancelled_request_prec2/steady.avi'), PosixPath('/tmp/openscrub-task110/red-tmp/test_precancelled_request_prec2/lost.avi'))
+kind = 'small'
+
+    @pytest.mark.parametrize('kind', ['valid','missing','small'])
+    def test_precancelled_request_precedes_invalid_input_without_capture(media, kind):
+        probe = Probe()
+        probe.mark_cancel()
+        video = media[0] if kind != 'missing' else media[0].with_name('missing.avi')
+        box = (0,0,4,4) if kind == 'small' else (32,32,64,64)
+>       with observed(probe), pytest.raises(engine.PipelineCancelled) as error:
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE PipelineCancelled
+
+tests/test_manual_tracker_cancel.py:245: Failed
+_ test_person_handoff_observes_cancellation_without_generic_fallback[raise_cancel] _
+
+media = (PosixPath('/tmp/openscrub-task110/red-tmp/test_person_handoff_observes_c0/steady.avi'), PosixPath('/tmp/openscrub-task110/red-tmp/test_person_handoff_observes_c0/lost.avi'))
+mode = 'raise_cancel'
+
+    @pytest.mark.parametrize('mode', ['raise_cancel','return_live','return_empty','return_held'])
+    def test_person_handoff_observes_cancellation_without_generic_fallback(media, mode):
+        probe = Probe()
+        def helper(*args, **kwargs):
+            probe.mark_cancel()
+            if mode == 'raise_cancel':
+                raise engine.PipelineCancelled('person boundary')
+            return [] if mode == 'return_empty' else [(1.4,(32,32,64,64), 0. if mode == 'return_held' else 1.)]
+>       with observed(probe) as stack, pytest.raises(engine.PipelineCancelled) as error:
+                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE PipelineCancelled
+
+tests/test_manual_tracker_cancel.py:274: Failed
+_ test_person_handoff_observes_cancellation_without_generic_fallback[return_live] _
+
+media = (PosixPath('/tmp/openscrub-task110/red-tmp/test_person_handoff_observes_c1/steady.avi'), PosixPath('/tmp/openscrub-task110/red-tmp/test_person_handoff_observes_c1/lost.avi'))
+mode = 'return_live'
+
+    @pytest.mark.parametrize('mode', ['raise_cancel','return_live','return_empty','return_held'])
+    def test_person_handoff_observes_cancellation_without_generic_fallback(media, mode):
+        probe = Probe()
+        def helper(*args, **kwargs):
+            probe.mark_cancel()
+            if mode == 'raise_cancel':
+                raise engine.PipelineCancelled('person boundary')
+            return [] if mode == 'return_empty' else [(1.4,(32,32,64,64), 0. if mode == 'return_held' else 1.)]
+>       with observed(probe) as stack, pytest.raises(engine.PipelineCancelled) as error:
+                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE PipelineCancelled
+
+tests/test_manual_tracker_cancel.py:274: Failed
+_ test_person_handoff_observes_cancellation_without_generic_fallback[return_empty] _
+
+media = (PosixPath('/tmp/openscrub-task110/red-tmp/test_person_handoff_observes_c2/steady.avi'), PosixPath('/tmp/openscrub-task110/red-tmp/test_person_handoff_observes_c2/lost.avi'))
+mode = 'return_empty'
+
+    @pytest.mark.parametrize('mode', ['raise_cancel','return_live','return_empty','return_held'])
+    def test_person_handoff_observes_cancellation_without_generic_fallback(media, mode):
+        probe = Probe()
+        def helper(*args, **kwargs):
+            probe.mark_cancel()
+            if mode == 'raise_cancel':
+                raise engine.PipelineCancelled('person boundary')
+            return [] if mode == 'return_empty' else [(1.4,(32,32,64,64), 0. if mode == 'return_held' else 1.)]
+>       with observed(probe) as stack, pytest.raises(engine.PipelineCancelled) as error:
+                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE PipelineCancelled
+
+tests/test_manual_tracker_cancel.py:274: Failed
+_ test_person_handoff_observes_cancellation_without_generic_fallback[return_held] _
+
+media = (PosixPath('/tmp/openscrub-task110/red-tmp/test_person_handoff_observes_c3/steady.avi'), PosixPath('/tmp/openscrub-task110/red-tmp/test_person_handoff_observes_c3/lost.avi'))
+mode = 'return_held'
+
+    @pytest.mark.parametrize('mode', ['raise_cancel','return_live','return_empty','return_held'])
+    def test_person_handoff_observes_cancellation_without_generic_fallback(media, mode):
+        probe = Probe()
+        def helper(*args, **kwargs):
+            probe.mark_cancel()
+            if mode == 'raise_cancel':
+                raise engine.PipelineCancelled('person boundary')
+            return [] if mode == 'return_empty' else [(1.4,(32,32,64,64), 0. if mode == 'return_held' else 1.)]
+>       with observed(probe) as stack, pytest.raises(engine.PipelineCancelled) as error:
+                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE PipelineCancelled
+
+tests/test_manual_tracker_cancel.py:274: Failed
+_______ test_cancellation_during_model_factory_stops_before_seed[False] ________
+
+media = (PosixPath('/tmp/openscrub-task110/red-tmp/test_cancellation_during_model0/steady.avi'), PosixPath('/tmp/openscrub-task110/red-tmp/test_cancellation_during_model0/lost.avi'))
+vit = False
+
+    @pytest.mark.parametrize('vit', [False, True])
+    def test_cancellation_during_model_factory_stops_before_seed(media, vit):
+        probe = Probe()
+        def factory(log):
+            probe.mark_cancel()
+            return object() if vit else None
+>       with observed(probe) as stack, pytest.raises(engine.PipelineCancelled):
+                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE PipelineCancelled
+
+tests/test_manual_tracker_cancel.py:298: Failed
+________ test_cancellation_during_model_factory_stops_before_seed[True] ________
+
+media = (PosixPath('/tmp/openscrub-task110/red-tmp/test_cancellation_during_model1/steady.avi'), PosixPath('/tmp/openscrub-task110/red-tmp/test_cancellation_during_model1/lost.avi'))
+vit = True
+
+    @pytest.mark.parametrize('vit', [False, True])
+    def test_cancellation_during_model_factory_stops_before_seed(media, vit):
+        probe = Probe()
+        def factory(log):
+            probe.mark_cancel()
+            return object() if vit else None
+        with observed(probe) as stack, pytest.raises(engine.PipelineCancelled):
+            stack.enter_context(patch.object(engine, '_vittrack_factory', factory))
+>           track(media[0], probe)
+
+tests/test_manual_tracker_cancel.py:300: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_manual_tracker_cancel.py:194: in track
+    return engine.track_manual_region(str(video), kwargs.pop('box', (32,32,64,64)),
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+video = '/tmp/openscrub-task110/red-tmp/test_cancellation_during_model1/steady.avi'
+box = (32, 32, 64, 64), t_ref = 1.4, t0 = 0, t1 = 2.8
+cb = <test_manual_tracker_cancel.Probe object at 0x7835f5a6ee70>
+step_frames = 2, thr = 0.55, scale = 0.5, person_det = None
+
+    def track_manual_region(video, box, t_ref, t0, t1, cb=None,
+                            step_frames=2, thr=0.55, scale=0.5,
+                            person_det=None):
+        """Track a user-drawn screen-space box through [t0, t1], starting
+        from its appearance at t_ref and walking both directions. This powers
+        targeted redaction: circle anything the detectors don't know (a
+        tattoo, a badge, a specific person) on one frame, pick the time
+        window, and the blur follows it.
+    
+        Primary engine: cv2.TrackerVit (learned tracker, auto-downloaded
+        pinned model) — survives scale change, turning, and appearance drift
+        that plain template matching cannot (a subject walking toward the
+        camera killed the old matcher in ~1s; VitTrack held the full clip).
+        Fallback engine: multi-scale template matching (NCC on half-scale
+        smoothed grayscale, template refresh gated on confidence >0.80).
+    
+        FAIL CLOSED on loss: when the engine loses the object mid-frame, the
+        box FREEZES in place and coverage continues to the window edge — the
+        blur may go stale but it never silently vanishes (the old behaviour
+        ended the span, un-blurring the subject; a real user hit this).
+        Coverage only ENDS early when the object visibly leaves the frame
+        (frozen box touching the frame edge). Held samples carry score 0.0
+        so review can show where the lock was lost.
+    
+        Returns [(t, (x1, y1, x2, y2), score), ...] sorted by t — screen-space
+        boxes, one per step_frames. Empty if the video/box is unusable."""
+        log = (cb.log if cb else print)
+        cap = cv2.VideoCapture(video)
+        try:
+            if not cap.isOpened():
+                return []
+            fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+            step = max(1, int(step_frames)) / fps
+            t_ref = min(max(t_ref, t0), t1)
+            W = cap.get(cv2.CAP_PROP_FRAME_WIDTH) or 0
+            H = cap.get(cv2.CAP_PROP_FRAME_HEIGHT) or 0
+    
+            def _frame(t):
+                return _grab_frame(cap, t, fps)
+    
+            def _left_frame(b):
+                # the object is gone only when the box CENTER walks off-screen —
+                # a box mid-dip can balloon to touch every edge while the object
+                # is still dead centre (seen on real footage)
+                cx, cy = (b[0] + b[2]) / 2, (b[1] + b[3]) / 2
+                return not (0.02 * W < cx < 0.98 * W and 0.02 * H < cy < 0.98 * H)
+    
+            if (box[2] - box[0]) * scale < 8 or (box[3] - box[1]) * scale < 8:
+                log("      track: region too small to track reliably")
+                return []
+    
+            if person_det is not None:
+                # a drawn box that CONTAINS A PERSON gets detector-driven
+                # tracking: body-tight boxes + silhouettes every frame, immune
+                # to the scale/appearance drift that plagues generic trackers
+                try:
+                    # detector masks are repainted at every sample; at the default
+                    # 2-frame cadence the outline visibly STEPS/flickers at half
+                    # the frame rate (real footage) — detect EVERY frame instead
+                    ps = _track_person_dense(video, box, t_ref, t0, t1,
+                                             person_det, log, step_frames=1,
+                                             cancelled=(cb.cancelled if cb else None))
+                except Exception as e:
+                    log("      track: person-detector path failed (%s) — using "
+                        "the generic tracker" % e)
+                    ps = []
+                if ps:
+                    live = sum(1 for x in ps if x[2] > 0.0) / float(len(ps))
+                    if live >= 0.5:
+                        return ps
+                    # the detector barely sees this object (marginal class, odd
+                    # angle) — frozen coverage would win over live tracking.
+                    # The generic tracker follows pixels and will do better.
+                    log("      track: the detector only saw the object in %d%% "
+                        "of frames — using the generic tracker instead"
+                        % round(live * 100))
+                else:
+                    log("      track: nothing recognizable under the drawn box — "
+                        "tracking the region as a generic object")
+    
+            samples = [(t_ref, (float(box[0]), float(box[1]),
+                                float(box[2]), float(box[3])), 1.0)]
+            _last_log = time.time()
+    
+            def _hold_rest(t, cur, direction, out):
+                """Fail-closed coverage: freeze the box and emit it to the window
+            edge (unless the object left the frame — nothing to protect)."""
+                if _left_frame(cur):
+                    log("      track: object left the frame at t=%.1fs — "
+                        "coverage ends there" % t)
+                    return
+                log("      track: LOST the object at t=%.1fs — holding the last "
+                    "box to the window edge (review and trim if needed)" % t)
+                t2 = t + direction * step
+                while t0 - 1e-6 <= t2 <= t1 + 1e-6:
+                    out.append((t2, (cur[0], cur[1], cur[2], cur[3]), 0.0))
+                    t2 += direction * step
+    
+            vit = _vittrack_factory(log)
+            if vit is not None:
+                fr0 = None
+                for dt in (0.0, 0.066, -0.066, 0.33, -0.33, 1.0):
+                    ts = t_ref + dt
+                    if ts < t0 - 1e-6 or ts > t1 + 1e-6:
+                        continue
+                    fr0 = _frame(ts)
+                    if fr0 is not None:
+                        t_ref = ts
+                        break
+                if fr0 is None:
+                    log("      track: could not READ the video near t=%.1fs — "
+                        "cannot start tracking there (is the clip shorter than "
+                        "expected?)" % t_ref)
+                    return []
+                sm0 = cv2.resize(fr0, None, fx=scale, fy=scale)
+                for direction in (1, -1):
+>                   trk = vit()
+                          ^^^^^
+E                   TypeError: 'object' object is not callable
+
+openscrub.py:2556: TypeError
+_ test_actual_flask_tracker_cancel_delete_preserves_source_until_capture_cleanup _
+
+media = (PosixPath('/tmp/openscrub-task110/red-tmp/test_actual_flask_tracker_canc0/steady.avi'), PosixPath('/tmp/openscrub-task110/red-tmp/test_actual_flask_tracker_canc0/lost.avi'))
+tmp_path = PosixPath('/tmp/openscrub-task110/red-tmp/test_actual_flask_tracker_canc0')
+
+    def test_actual_flask_tracker_cancel_delete_preserves_source_until_capture_cleanup(media, tmp_path):
+        gate, release_gate = threading.Event(), threading.Event()
+        threads = []
+        with ExitStack() as stack:
+            root = tmp_path / 'web'
+            for name, value in dict(_data_root=lambda: str(root), JOBS_DIR=str(root/'jobs'),
+                                    JOBS={}, WORK_Q=queue.Queue(),
+                                    WORKER={'current': None, 'thread': None}, VAULT={'key':None},
+                                    TOKEN=None, MODEL_SELECT_PATH=str(root/'model_select.json')).items():
+                stack.enter_context(patch.object(web, name, value))
+            stack.enter_context(patch.object(web, 'FILES', type(web.FILES)(web.VAULT_LOCK)))
+            job = web.new_job('', {}, 'synthetic.avi')
+            source = Path(job['dir'])/'input.avi'
+            shutil.copyfile(media[0], source)
+            job.update(video=str(source), phase='review')
+            report = Path(job['dir'])/'report.json'
+            report.write_text(json.dumps(dict(provenance={'input':str(source)}, detections=[],
+                                             render_state={'fps':10,'cum':[[0,0]]*31})))
+            original_report = report.read_bytes()
+            probe = Probe(gate=gate, owner=lambda: web.FILES.count)
+            probe.release_gate = release_gate
+            probe.hooks(stack)
+            # Avoid unrelated person-model construction; track_manual_region is real.
+            stack.enter_context(patch.object(engine, 'PersonDetector', lambda *a,**k: None))
+            start = web._start_owned_thread
+            def remember(*args):
+                thread = start(*args)
+                threads.append(thread)
+                return thread
+            stack.enter_context(patch.object(web, '_start_owned_thread', remember))
+            url = '/api/jobs/' + job['id']
+            try:
+                assert request('post', url+'/track_object', json=dict(box=[32,32,64,64],t_ref=1.4,t0=0,t1=2.8))[0] == 200
+                assert probe.entered.wait(8)
+                probe.event = job['cancel']  # admitted operation's actual Event
+                assert request('post', url+'/cancel')[0] == 200
+                assert probe.event.is_set()
+                probe.cancel_snapshot = dict(probe.count)
+                status, value = request('get', url+'/track_status')
+                assert status == 200
+>               assert value['done'] and value['added'] == 0 and value['error'] == 'cancelled by user'
+                       ^^^^^^^^^^^^^
+E               KeyError: 'done'
+
+tests/test_manual_tracker_cancel.py:382: KeyError
+=========================== short test summary info ============================
+FAILED tests/test_manual_tracker_cancel.py::test_ncc_cancels_after_forward_or_backward_completed_match_without_later_grab[1-2-3]
+FAILED tests/test_manual_tracker_cancel.py::test_ncc_cancels_after_forward_or_backward_completed_match_without_later_grab[22-9-12]
+FAILED tests/test_manual_tracker_cancel.py::test_natural_loss_cancels_at_held_coverage_and_final_backward_return[hold_log-0-3]
+FAILED tests/test_manual_tracker_cancel.py::test_natural_loss_cancels_at_held_coverage_and_final_backward_return[hold_append1-1-3]
+FAILED tests/test_manual_tracker_cancel.py::test_natural_loss_cancels_at_held_coverage_and_final_backward_return[hold_append14-14-6]
+FAILED tests/test_manual_tracker_cancel.py::test_precancelled_request_precedes_invalid_input_without_capture[valid]
+FAILED tests/test_manual_tracker_cancel.py::test_precancelled_request_precedes_invalid_input_without_capture[missing]
+FAILED tests/test_manual_tracker_cancel.py::test_precancelled_request_precedes_invalid_input_without_capture[small]
+FAILED tests/test_manual_tracker_cancel.py::test_person_handoff_observes_cancellation_without_generic_fallback[raise_cancel]
+FAILED tests/test_manual_tracker_cancel.py::test_person_handoff_observes_cancellation_without_generic_fallback[return_live]
+FAILED tests/test_manual_tracker_cancel.py::test_person_handoff_observes_cancellation_without_generic_fallback[return_empty]
+FAILED tests/test_manual_tracker_cancel.py::test_person_handoff_observes_cancellation_without_generic_fallback[return_held]
+FAILED tests/test_manual_tracker_cancel.py::test_cancellation_during_model_factory_stops_before_seed[False]
+FAILED tests/test_manual_tracker_cancel.py::test_cancellation_during_model_factory_stops_before_seed[True]
+FAILED tests/test_manual_tracker_cancel.py::test_actual_flask_tracker_cancel_delete_preserves_source_until_capture_cleanup
+15 failed, 10 passed in 0.78s
