@@ -360,3 +360,50 @@ def test_stderr_close_failure_preserves_primary_or_fails_success(
             assert str(held.value) == 'stderr close sentinel'
         assert files and all(obj.closed for obj in files)
         assert_closed(observed)
+
+
+def test_fallback_cancel_preserves_existing_dangling_destination(
+        source, tmp_path, monkeypatch):
+    """Resource cleanup must preserve the original exists-before-unlink policy."""
+    output = tmp_path / 'previous.mp4'
+    target = tmp_path / 'absent.mp4'
+    try:
+        output.symlink_to(target)
+    except (OSError, NotImplementedError):
+        pytest.skip('symlink creation unavailable')
+    monkeypatch.setattr(app, 'nvenc_available', lambda *a: None)
+
+    class Callbacks(app.Callbacks):
+        def cancelled(self):
+            return True
+
+    with owners(monkeypatch) as observed:
+        with pytest.raises(app.PipelineCancelled) as held:
+            render('fallback', source, output, Callbacks())
+        assert held.value.__traceback__ is not None
+        assert output.is_symlink() and output.readlink() == target
+        assert not target.exists()
+        assert_closed(observed)
+
+
+@pytest.mark.parametrize('kind', ['sdr', 'hdr', 'fallback'])
+def test_setup_callback_cancellation_does_not_newly_delete_prior_output(
+        kind, source, tmp_path, monkeypatch):
+    """A setup callback exception never widens the existing checkpoint policy."""
+    output = tmp_path / 'previous.mp4'
+    output.write_bytes(b'untouched regular prior output')
+    if kind == 'fallback':
+        monkeypatch.setattr(app, 'nvenc_available', lambda *a: None)
+    sentinel = app.PipelineCancelled('setup callback')
+
+    class Callbacks(app.Callbacks):
+        def log(self, message):
+            raise sentinel
+
+    with owners(monkeypatch) as observed:
+        with pytest.raises(app.PipelineCancelled) as held:
+            render(kind, source, output, Callbacks())
+        assert held.value is sentinel and sentinel.__traceback__ is not None
+        assert output.read_bytes() == b'untouched regular prior output'
+        assert not observed[2] and not observed[1]  # pre-write acquisition
+        assert_closed(observed)
