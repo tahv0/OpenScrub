@@ -3,6 +3,7 @@
 Harness containment runs only after production assertions; no GC dependency.
 """
 from contextlib import contextmanager
+import json
 import os
 from pathlib import Path
 import shutil
@@ -323,8 +324,9 @@ def test_abort_kills_and_reaps_only_owned_stubborn_child(
 
 @pytest.mark.parametrize('kind', ['sdr', 'hdr'])
 @pytest.mark.parametrize('primary', [False, True])
+@pytest.mark.parametrize('caller_handling', [False, True])
 def test_stderr_close_failure_preserves_primary_or_fails_success(
-        kind, primary, source, tmp_path, monkeypatch, request):
+        kind, primary, caller_handling, source, tmp_path, monkeypatch, request):
     """Final close failure fails success and cannot mask a callback sentinel."""
     actual_file = app.tempfile.TemporaryFile
     files = []
@@ -350,14 +352,29 @@ def test_stderr_close_failure_preserves_primary_or_fails_success(
 
     with owners(monkeypatch) as observed:
         monkeypatch.setattr(app.tempfile, 'TemporaryFile', ErrorFile)
-        with pytest.raises((Sentinel, OSError)) as held:
-            render(kind, source, tmp_path / 'out.mp4', Callbacks())
-        if primary:
-            assert held.value is sentinel
-            assert 'stderr close sentinel' in ' '.join(
-                held.value.render_cleanup_errors)
+        def attempt():
+            with pytest.raises((Sentinel, OSError)) as held:
+                render(kind, source, tmp_path / 'out.mp4', Callbacks())
+            return held.value
+
+        caller_error = ValueError('handled caller exception')
+        if caller_handling:
+            try:
+                raise caller_error
+            except ValueError:
+                error = attempt()
         else:
-            assert str(held.value) == 'stderr close sentinel'
+            error = attempt()
+        print('CALLER_PRIMARY_STATE ' + json.dumps(dict(
+            kind=kind, caller_handling=caller_handling, render_primary=primary,
+            caller_annotated=hasattr(caller_error, 'render_cleanup_errors'),
+            raised_type=type(error).__name__, callback_identity=error is sentinel)))
+        assert not hasattr(caller_error, 'render_cleanup_errors')
+        if primary:
+            assert error is sentinel
+            assert 'stderr close sentinel' in ' '.join(error.render_cleanup_errors)
+        else:
+            assert str(error) == 'stderr close sentinel'
         assert files and all(obj.closed for obj in files)
         assert_closed(observed)
 
@@ -406,4 +423,108 @@ def test_setup_callback_cancellation_does_not_newly_delete_prior_output(
         assert held.value is sentinel and sentinel.__traceback__ is not None
         assert output.read_bytes() == b'untouched regular prior output'
         assert not observed[2] and not observed[1]  # pre-write acquisition
+        assert_closed(observed)
+
+
+@pytest.mark.parametrize('kind', ['sdr', 'hdr'])
+@pytest.mark.parametrize('encoder_fails', [False, True])
+def test_stdin_close_error_keeps_zero_exit_failure_or_encoder_diagnostic(
+        kind, encoder_fails, tmp_path, monkeypatch):
+    """An exact real close followed by OSError cannot silently become success."""
+    src = tmp_path / 'small.mp4'
+    subprocess.run(['ffmpeg', '-v', 'error', '-y', '-f', 'lavfi', '-i',
+                    'color=c=blue:s=16x16:r=3:d=1', '-c:v', 'mpeg4', str(src)],
+                   check=True, capture_output=True, timeout=30)
+    output = tmp_path / 'missing' / 'out.mp4' if encoder_fails else tmp_path / 'out.mp4'
+    close_error = OSError('stdin close sentinel')
+    calls = []
+    held = []
+    with owners(monkeypatch) as observed:
+        class Callbacks(app.Callbacks):
+            def progress(self, stage, done, total):
+                enc, = [p for p in observed[2] if 'pipe:0' in p.args]
+                actual_close = enc.stdin.close
+
+                def close():
+                    if calls:
+                        return actual_close()
+                    calls.append(True)
+                    try:
+                        actual_close()
+                    finally:
+                        raise close_error
+
+                monkeypatch.setattr(enc.stdin, 'close', close)
+
+        try:
+            render(kind, src, output, Callbacks())
+        except BaseException as error:
+            held.append(error)
+        assert len(held) == 1
+        assert held[0].__traceback__ is not None and calls == [True]
+        enc, = [p for p in observed[2] if 'pipe:0' in p.args]
+        if encoder_fails:
+            assert type(held[0]) is RuntimeError
+            assert 'encode' in str(held[0]) and 'No such file or directory' in str(held[0])
+            assert enc.returncode != 0
+            assert 'stdin close sentinel' in ' '.join(held[0].render_cleanup_errors)
+        else:
+            assert held[0] is close_error
+            assert enc.returncode == 0 and output.is_file()
+        print('STDIN_CLOSE_STATE ' + json.dumps(dict(
+            kind=kind, encoder_fails=encoder_fails, returncode=enc.returncode,
+            pipe_closed=enc.stdin.closed, original_close_primary=held[0] is close_error,
+            waits=enc.wait_timeouts, error=str(held[0]))))
+        # A reported close failure uses only bounded status/shutdown waits.
+        assert enc.wait_timeouts and all(t is not None for t in enc.wait_timeouts)
+        assert_closed(observed)
+
+
+@pytest.mark.parametrize('kind', ['sdr', 'hdr'])
+@pytest.mark.parametrize('wait_fails', [False, True])
+def test_stdin_close_error_before_eof_uses_bounded_abort(
+        kind, wait_fails, source, tmp_path, monkeypatch):
+    """A still-open owned endpoint must not lead to an unbounded status wait."""
+    close_error = OSError('stdin still open sentinel')
+    injected, wait_injections = [], []
+    held = []
+    with owners(monkeypatch) as observed:
+        class Callbacks(app.Callbacks):
+            def progress(self, stage, done, total):
+                enc, = [p for p in observed[2] if 'pipe:0' in p.args]
+                actual_close, actual_wait = enc.stdin.close, enc.wait
+
+                def close():
+                    if not injected:
+                        injected.append(True)
+                        raise close_error  # deliberately before real EOF
+                    return actual_close()
+
+                def wait(*args, **kwargs):
+                    # Fail fast at this exact owned operation on the old path,
+                    # rather than hanging the harness behind a missing EOF.
+                    assert kwargs.get('timeout') is not None, 'unbounded wait after close failure'
+                    if wait_fails and not wait_injections:
+                        wait_injections.append(True)
+                        raise OSError('status wait sentinel')
+                    return actual_wait(*args, **kwargs)
+
+                monkeypatch.setattr(enc.stdin, 'close', close)
+                monkeypatch.setattr(enc, 'wait', wait)
+
+        try:
+            render(kind, source, tmp_path / 'out.mp4', Callbacks())
+        except BaseException as error:
+            held.append(error)
+        assert len(held) == 1 and held[0] is close_error
+        assert close_error.__traceback__ is not None and injected == [True]
+        enc, = [p for p in observed[2] if 'pipe:0' in p.args]
+        assert enc.returncode != 0
+        if wait_fails:
+            assert 'status wait sentinel' in ' '.join(close_error.render_cleanup_errors)
+        print('STDIN_ABORT_STATE ' + json.dumps(dict(
+            kind=kind, wait_fails=wait_fails, returncode=enc.returncode,
+            pipe_closed=enc.stdin.closed, original_close_primary=held[0] is close_error,
+            waits=enc.wait_timeouts)))
+        assert enc.wait_timeouts and all(t is not None for t in enc.wait_timeouts)
         assert_closed(observed)
