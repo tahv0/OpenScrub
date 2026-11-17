@@ -3310,7 +3310,7 @@ async function refreshCycle(cycle){
     sharing. This tool is best-effort, not a compliance guarantee.</div>
     <div id="compare" style="width:100%"></div>
     <div id="beslot_done" style="width:100%"></div>`;
-  document.getElementById("actions").innerHTML=a;
+  const actions=document.getElementById("actions");beUnmountIn(actions);actions.innerHTML=a;
   if(j.phase!="scanning")img.style.display="none";
  }
  renderExportProgress();
