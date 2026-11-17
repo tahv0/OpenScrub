@@ -2910,7 +2910,7 @@ class ReviewScheduler{
     if(menuEl){menuEl.remove();menuEl=null;}if(selSet.size)showSelMenu(12,12);
    }this.schedule();
   });
-  this.listen(window,'pagehide',()=>this.dispose());
+  this.listen(window,'pagehide',()=>this.dispose({suspend:true}));
   this.layout();
  }
  schedule(){if(!this.owns()||this.frame)return;
@@ -2931,6 +2931,15 @@ class ReviewScheduler{
    const r=b.card.getBoundingClientRect();
    if(r.bottom>0&&r.top<window.innerHeight&&(!best||r.top<best.top))best={id:b.id,top:r.top};
   }return best;
+ }
+ // Reconcile siblings around the actual focused subtree. Moving its other
+ // siblings preserves native Tab order without detaching the focused ancestor.
+ orderNodes(parent,nodes,active){
+  let next=null;
+  for(let n=nodes.length-1;n>=0;n--){const node=nodes[n];
+   if(!node.contains(active)&&node.nextElementSibling!==next)parent.insertBefore(node,next);
+   next=node;
+  }
  }
  layout(){
   if(!this.owns()||this.gesture)return;
@@ -2996,12 +3005,14 @@ class ReviewScheduler{
    const pinIndex=pin===null?-1:section.ids.indexOf(pin),pinRow=pinIndex<0?-1:Math.floor(pinIndex/section.columns);
    for(const [n,row]of section.rows)if(!rows.has(n)&&n!==pinRow){this.observer.unobserve(row);row.remove();section.rows.delete(n);}
    const needed=new Set(rows);if(pinRow>=0)needed.add(pinRow);
+   const orderedRows=[];
    for(const n of [...needed].sort((a,b)=>a-b)){
     let row=section.rows.get(n);
     if(!row){row=document.createElement('div');row.className='grid3 reviewrow';section.el.appendChild(row);
      section.rows.set(n,row);this.observer.observe(row);}
+    orderedRows.push(row);
     row.style.top=section.prefix[n]+'px';row.dataset.pin=String(!rows.has(n)?1:0);
-    const ids=section.ids.slice(n*section.columns,(n+1)*section.columns);
+    const ids=section.ids.slice(n*section.columns,(n+1)*section.columns),orderedCards=[];
     for(const [col,id]of ids.entries()){
      if(!desired.has(id)&&id!==pin)continue;
      let b=this.bindings.get(id);
@@ -3010,12 +3021,14 @@ class ReviewScheduler{
       const card=holder.firstElementChild,img=card.querySelector('img');
       b={id,card,img,token:{},url:null,op:null};this.bindings.set(id,b);
      }
-     if(b.card.parentElement!==row)row.appendChild(b.card);
+     if(b.card.parentElement!==row)row.appendChild(b.card);orderedCards.push(b.card);
      b.card.style.gridColumn=String(col+1);b.card.dataset.focusPin=String(id===pin?1:0);
      b.card.classList.toggle('selected',selSet.has(id));refreshDet(id);
     }
+    this.orderNodes(row,orderedCards,active);
    }
    for(const spacer of section.spacers)spacer.remove();section.spacers=[];
+   this.orderNodes(section.el,orderedRows,active);
    // Constant before/after spacers (plus a focused row, if any). Offscreen
    // rows are numeric heights only; no per-group placeholder/HTML is kept.
    const ns=[...rows].sort((a,b)=>a-b),first=ns[0]??0,last=ns.at(-1)??-1;
@@ -3114,24 +3127,35 @@ class ReviewScheduler{
    if(REVIEW_SCHED?.owns())REVIEW_SCHED.updateQueue();
   }
  }
- dispose(){
-  if(this.disposed)return;this.disposed=true;
+ dispose({suspend=false}={}){
+  if(this.disposed){if(!suspend){this.retries.clear();this.suspended=false;}return;}
+  this.disposed=true;this.suspended=suspend;
   if(this.frame)cancelAnimationFrame(this.frame);this.frame=0;
   this.observer?.disconnect();this.listeners.splice(0).forEach(remove=>remove());
   this.selectionCleanup?.();this.selectionCleanup=null;
   const wrap=this.root.querySelector?.('#detwrap');if(wrap)delete wrap.dataset.mq;
   for(const b of [...this.bindings.values()])this.retire(b);
+  for(const section of this.sections){
+   for(const row of section.rows.values())row.remove();section.rows.clear();
+   for(const spacer of section.spacers)spacer.remove();section.spacers=[];
+  }
   for(const r of this.retries.values())if(r.timer)clearTimeout(r.timer);
-  this.retries.clear();this.eligible.clear();this.queue=[];
+  // A hidden page keeps only numeric retry history for this exact view.
+  // Timers/bindings/controllers belong to the retired scheduler, never resume.
+  this.retries=suspend?new Map([...this.retries].map(([id,r])=>
+   [id,{failures:r.failures,readyAt:r.readyAt,timer:0}])):new Map();
+  this.eligible.clear();this.queue=[];
   clearSel();if(marqEl){marqEl.remove();marqEl=null;}mStart=null;
  }
 }
 // Back/forward-cache restoration reuses this view's complete metadata/drafts.
 window.addEventListener?.('pageshow',()=>{
  const s=REVIEW_SCHED;
- if(s?.disposed&&ownsView(s.jobId,s.viewGen)&&s.root.isConnected&&document.getElementById('review')===s.root){
+ if(s?.disposed&&s.suspended&&ownsView(s.jobId,s.viewGen)&&s.root.isConnected&&document.getElementById('review')===s.root){
   REVIEW_SCHED=new ReviewScheduler(s.jobId,s.viewGen,s.root,s.meta);
-  REVIEW_SCHED.matching=s.matching;REVIEW_SCHED.start();initMarquee();
+  REVIEW_SCHED.matching=s.matching;REVIEW_SCHED.retries=s.retries;
+  s.retries=new Map();s.suspended=false;
+  REVIEW_SCHED.start();initMarquee();
  }
 });
 function detLabel(s){return String(s).replace(/[&<>"\']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","\'":"&#39;"}[c]));}
