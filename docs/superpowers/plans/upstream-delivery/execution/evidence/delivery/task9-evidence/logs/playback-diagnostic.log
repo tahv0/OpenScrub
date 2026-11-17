@@ -1,0 +1,40 @@
+{
+  playing: true,
+  paused: true,
+  ready: 0,
+  network: 1,
+  time: 0,
+  duration: NaN,
+  error: null,
+  src: 'http://127.0.0.1:18509/api/jobs/small/video'
+}
+{
+  playing: true,
+  paused: true,
+  ready: 0,
+  network: 1,
+  time: 0,
+  duration: NaN,
+  error: null,
+  src: 'http://127.0.0.1:18509/api/jobs/small/video'
+}
+{
+  playing: true,
+  paused: true,
+  ready: 0,
+  network: 1,
+  time: 0,
+  duration: NaN,
+  error: null,
+  src: 'http://127.0.0.1:18509/api/jobs/small/video'
+}
+{
+  playing: true,
+  paused: true,
+  ready: 0,
+  network: 1,
+  time: 0,
+  duration: NaN,
+  error: null,
+  src: 'http://127.0.0.1:18509/api/jobs/small/video'
+}

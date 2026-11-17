@@ -1,0 +1,8 @@
+{
+  "file": "server-observations.json",
+  "raw_bytes": 124224,
+  "gzip_bytes": 13180,
+  "raw_sha256": "a9835bb24035609d654004c2dc8b38bd29808d17095d1fa4896f63450d17202a",
+  "gzip_sha256": "e63243a5213582149c1d07588fb68c1fb1d76642738daf9fa942f17ee6eee0e9",
+  "decoded_and_reparsed": true
+}

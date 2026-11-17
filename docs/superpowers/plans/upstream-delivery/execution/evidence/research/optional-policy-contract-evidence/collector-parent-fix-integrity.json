@@ -1,0 +1,8 @@
+{
+  "path": ".superpowers/sdd/README/optional-policy-contract-evidence/collect_sources.py",
+  "original_sha256": "56e7af12cad97a6bd1737b5ba4a00d32fb768a740121d29c1f1e148899b56682",
+  "original_size": 1281,
+  "new_sha256": "1b3a201e51f4805167732c6c6a46047f940925cb22fdac9f57119ae73a3919c2",
+  "new_size": 1363,
+  "change": "Explicit task-owned scratch/evidence parent creation; separately requested supervisor correction."
+}

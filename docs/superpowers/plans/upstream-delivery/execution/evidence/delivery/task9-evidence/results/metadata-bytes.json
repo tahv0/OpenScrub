@@ -1,0 +1,16 @@
+[
+  {
+    "label": "base-small",
+    "bytes": 3322,
+    "rows": 20,
+    "sha256": "e2cf48edd48d425da2e346fd5b0eac62e93c83b2c93b7c6b0065e70818d9b638",
+    "status": 200
+  },
+  {
+    "label": "candidate-large",
+    "bytes": 304628,
+    "rows": 1802,
+    "sha256": "6fb7824f640ed5d4f67df0ca55e42b9279ff10e9cd85142fa237a5c6185aa4b0",
+    "status": 200
+  }
+]

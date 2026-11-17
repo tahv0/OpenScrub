@@ -1,0 +1,34 @@
+[
+  {
+    "job": "small",
+    "groups": 12,
+    "rows": 20,
+    "bytes": 10763,
+    "sha256": "bf5c2f4fa7eceb6fb94dd1e3f07ccdb873d6f172881bec6184bacf9c6d735a3e",
+    "dir": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task9/runtime/server-base/openscrub_jobs/1cbe78e56292"
+  },
+  {
+    "job": "beta",
+    "groups": 3,
+    "rows": 6,
+    "bytes": 6194,
+    "sha256": "68954abbc57407f3bb3214ca39b4f6948d24baaa98b79707186ed412da74fa01",
+    "dir": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task9/runtime/server-base/openscrub_jobs/dc721052dcb9"
+  },
+  {
+    "job": "cold",
+    "groups": 3,
+    "rows": 6,
+    "bytes": 6194,
+    "sha256": "023919b5e253ba988a7d11b3063918b6fce6e14816531739101186b87b51e7f6",
+    "dir": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task9/runtime/server-base/openscrub_jobs/d7f6dec6a615"
+  },
+  {
+    "job": "empty",
+    "groups": 0,
+    "rows": 0,
+    "bytes": 4216,
+    "sha256": "e497ae9779bfc3f15578cf2a796c97b66b9cf46c82f12d1072fac776ff671472",
+    "dir": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task9/runtime/server-base/openscrub_jobs/8024c72890ff"
+  }
+]

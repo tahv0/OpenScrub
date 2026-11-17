@@ -1,0 +1,18 @@
+[
+  {
+    "job": "warm",
+    "groups": 3,
+    "rows": 6,
+    "bytes": 6196,
+    "sha256": "059165fd1557e66781b172b6664be2def441c75bcf490c392423b773564c9971",
+    "dir": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task9/runtime/server-counts/openscrub_jobs/5b8ed42ad804"
+  },
+  {
+    "job": "cold",
+    "groups": 3,
+    "rows": 6,
+    "bytes": 6196,
+    "sha256": "e248ac7a588c3bfed180b570e0622b29a4ba9730a204f76e0bdc323968e8b73c",
+    "dir": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task9/runtime/server-counts/openscrub_jobs/094a1e8e6f2e"
+  }
+]

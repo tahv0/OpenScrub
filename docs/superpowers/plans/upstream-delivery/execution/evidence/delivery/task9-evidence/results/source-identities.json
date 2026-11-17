@@ -1,0 +1,8 @@
+{
+  "openscrub.py": "0e4f0f9a7846080f591038d021aaf3ca6f01201d83ac32bbdc273f53d5067ee7",
+  "openscrub_web.py": "7889b6f16e0989e95e263fa7bd5fd377a1056ebc818fe3c0c394d5df17fdd99b",
+  "tests/test_thumbnail_scheduling.py": "718245a57229140121fdc2362ffe667316265499cadeaa73a158ee713eebd194",
+  "tests/test_review_choices.py": "29080142232fae1134ecba4eb3bda4d952930a78e63178c9bf744181e1ef98bc",
+  "tests/test_review_save_failures.py": "c6bf3cae32bace8f71114bd886c1ba8059d33fe26774677fdefcea2e9f16292b",
+  "pyproject.toml": "b0da1993170924d246d18ced2bc2cb53242111d4e824e8fe8bc70da1e342d684"
+}

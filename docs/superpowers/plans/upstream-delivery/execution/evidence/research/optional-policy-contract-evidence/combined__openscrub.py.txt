@@ -1,0 +1,1018 @@
+# combined/openscrub.py (line numbers are original pinned source; see source-manifest.json)
+
+## L102–L119
+102:                     or RE_DATE.search(t)
+103:                     or sum(ch.isdigit() for ch in s) >= 6)
+104:         for i in range(len(data["text"])):
+105:             txt = normalize_ocr_text(data["text"][i].strip())
+106:             conf = float(data["conf"][i]) if data["conf"][i] not in ("-1", -1) else 0.0
+107:             if not txt:
+108:                 continue
+109:             # low-confidence words are normally dropped, but words that are
+110:             # structurally PII-shaped (emails, phones, SSNs, dates, long
+111:             # digit runs) are rescued: a misread MRN is still an MRN
+112:             if conf < 40 and not (conf >= 5 and phi_shaped(txt)):
+113:                 continue
+114:             x, y, w, h = data["left"][i], data["top"][i], data["width"][i], data["height"][i]
+115:             out.append((txt, (x, y, x + w, y + h), conf / 100.0))
+116:         return out
+117: 
+118: 
+119: class PaddleBackend(OcrBackend):
+
+## L734–L753
+734: class Detection:
+735:     t_start: float
+736:     t_end: float
+737:     cbox: tuple          # box in CONTENT coordinates (x1,y1,x2,y2)
+738:     category: str
+739:     text: str
+740:     confidence: float
+741:     aoff: tuple = (0.0, 0.0)   # cumulative offset when detected (drift anchor)
+742:     last_seen: float = 0.0     # time of last positive sighting (t_end incl. hold)
+743:     dense: bool = False        # per-frame dense-face detection: never merged
+744:                                # across positions (it tracks a moving face)
+745:     track: int = -1            # dense detections of the same physical object
+746:                                # share a track id, so review shows ONE item
+747:                                # per face instead of hundreds of frames
+748:     person: int = -1           # face tracks clustered by facial IDENTITY
+749:                                # (SFace embeddings): one review decision per
+750:                                # PERSON, applied to all their appearances
+751:     poly: tuple = ()           # silhouette contour(s) from a segmentation
+752:                                # model, points NORMALIZED to cbox (0..1) —
+753:                                # render blurs ONLY inside them (person
+
+## L1343–L1390
+1343: def assign_dense_tracks(dets, max_gap=0.6, reach=1.6):
+1344:     """Group dense per-frame detections into tracks: consecutive samples of
+1345:     the same physical object (a face crossing the frame) get one track id.
+1346:     Purely additive metadata — rendering still uses each per-frame box; the
+1347:     review UI collapses a track into a single keep/blur decision.
+1348: 
+1349:     Two association defenses (the same hardening face identity-grouping
+1350:     needed on crowd footage):
+1351:     - TEMPORAL CANNOT-LINK: a track can absorb at most one sample per
+1352:       timestamp — two detections in the SAME frame are different physical
+1353:       objects by definition. Without this, three people on a boat merged
+1354:       into one review card, and enabling it blurred all of them.
+1355:     - Category-scaled reach: 1.6x box size is calibrated for FACES.
+1356:       A full-body person box is most of the frame tall, so 1.6x its size
+1357:       let different people chain together; person tracks associate within
+1358:       0.5x instead (still generous across detector-flicker gaps —
+1359:       smooth_dense_tracks bridges those explicitly)."""
+1360:     tracks = []          # [id, category, last_t, last_box]
+1361:     next_id = 0
+1362:     for d in sorted((x for x in dets if getattr(x, "dense", False)),
+1363:                     key=lambda x: x.t_start):
+1364:         bx = d.cbox
+1365:         cx0 = (bx[0] + bx[2]) / 2
+1366:         cy0 = (bx[1] + bx[3]) / 2
+1367:         size = max(bx[2] - bx[0], bx[3] - bx[1], 1)
+1368:         r = 0.5 if d.category == "person" else reach
+1369:         best = None
+1370:         for tr in tracks:
+1371:             if tr[1] != d.category or d.t_start - tr[2] > max_gap:
+1372:                 continue
+1373:             if d.t_start - tr[2] < 1e-6:
+1374:                 continue         # co-temporal: already holds a sample here
+1375:             lb = tr[3]
+1376:             lcx = (lb[0] + lb[2]) / 2
+1377:             lcy = (lb[1] + lb[3]) / 2
+1378:             dist = ((cx0 - lcx) ** 2 + (cy0 - lcy) ** 2) ** 0.5
+1379:             if dist <= r * size and (best is None or dist < best[0]):
+1380:                 best = (dist, tr)
+1381:         if best is None:
+1382:             tracks.append([next_id, d.category, d.t_start, bx])
+1383:             d.track = next_id
+1384:             next_id += 1
+1385:         else:
+1386:             tr = best[1]
+1387:             tr[2], tr[3] = d.t_start, bx
+1388:             d.track = tr[0]
+1389:     return next_id
+1390: 
+
+## L1392–L1443
+1392: def smooth_dense_tracks(dets, fps, video, cum=None, win_start=0.0, cb=None):
+1393:     """Make each dense track leak-free from true first appearance to exit.
+1394: 
+1395:     Dense samples are instantaneous per-frame boxes; three gaps remain
+1396:     between them and continuous cover of a moving object:
+1397:       1. detector flicker — frames mid-track where the detector missed the
+1398:          object. The box is INTERPOLATED between the surrounding samples, so
+1399:          the blur moves with the object instead of vanishing (or hanging at
+1400:          a stale position).
+1401:       2. onset — the detector needs a few clear frames before its first hit,
+1402:          exposing the object as it enters. The first sample's pixels are
+1403:          template-matched BACKWARD through the file (the same visual match
+1404:          deep backtrack uses) and synthetic samples are added down to the
+1405:          earliest frame that still matches, plus a short unconditional
+1406:          grace pad below detection threshold.
+1407:       3. exit — mirror grace pad after the last sample.
+1408:     Every addition is a dense sample on the same track id, so review still
+1409:     shows one card per physical object. Fail closed: only ever adds cover.
+1410:     Returns (interpolated_gaps, leadin_samples, leadin_seconds)."""
+1411:     GRACE = 0.25        # s of unconditional pad at track onset/exit
+1412:     CHAIN_MAX = 0.75    # s: longest flicker gap interpolated (matches the
+1413:     #                     assign_dense_tracks max_gap, with slack)
+1414:     LEAD_MAX = 4.0      # s: farthest the onset walk seeks back
+1415:     SCALE = 0.5         # match deep backtrack's working resolution
+1416:     THR = 0.58          # TM_CCOEFF_NORMED bar (same as face backtrack)
+1417:     frame_period = 1.0 / max(fps, 1.0)
+1418: 
+1419:     tracks = {}
+1420:     for d in dets:
+1421:         if getattr(d, "dense", False) and getattr(d, "track", -1) >= 0:
+1422:             tracks.setdefault(d.track, []).append(d)
+1423:     if not tracks:
+1424:         return (0, 0, 0.0)
+1425: 
+1426:     def _off(t):
+1427:         if not cum:
+1428:             return (0.0, 0.0)
+1429:         return cum[min(int(t * fps), len(cum) - 1)]
+1430: 
+1431:     def _screen(d):
+1432:         return (d.cbox[0] + d.aoff[0], d.cbox[1] + d.aoff[1],
+1433:                 d.cbox[2] + d.aoff[0], d.cbox[3] + d.aoff[1])
+1434: 
+1435:     def _mk(t0, t1, sbox, ref, tid):
+1436:         o = _off(t0)
+1437:         return Detection(t0, t1,
+1438:                          (int(sbox[0] - o[0]), int(sbox[1] - o[1]),
+1439:                           int(sbox[2] - o[0]), int(sbox[3] - o[1])),
+1440:                          ref.category, ref.text, ref.confidence, o,
+1441:                          last_seen=t0, dense=True, track=tid, poly=ref.poly)
+1442: 
+1443:     capture = cv2.VideoCapture(video) if video else None
+
+## L1536–L1569
+1536:             # 1. flicker gaps: chain, and interpolate the box across the gap
+1537:             for a, b in zip(samples, samples[1:]):
+1538:                 gap = b.t_start - a.t_start
+1539:                 if gap <= frame_period * 1.5:
+1540:                     a.t_end = max(a.t_end, b.t_start)
+1541:                     continue
+1542:                 if gap > CHAIN_MAX:
+1543:                     continue        # sustained absence: never bridge blind
+1544:                 A, B = _screen(a), _screen(b)
+1545:                 # >= 2 sub-steps, and step 0 is interpolated too. The old code
+1546:                 # used ONE step for a 2-frame gap and stretched the earlier
+1547:                 # sample's OWN box over the in-between frame (and did the same
+1548:                 # over step 0 of every longer gap), so a moving face's blur
+1549:                 # lagged a frame behind it. With --dense-face-stride 2 that is
+1550:                 # EVERY other frame: measured on a synthetic moving-face clip,
+1551:                 # stride 2 under-covered ~40% of moving-face frames (medium
+1552:                 # face 98% -> 60%). Every in-between frame is now covered by
+1553:                 # the union of the interpolated positions bracketing it; the
+1554:                 # sample's own frame keeps its tight detector box.
+1555:                 steps = min(12, max(2, int(round(gap / (2 * frame_period)))))
+1556:                 ts = [a.t_start + gap * i / steps for i in range(steps + 1)]
+1557:                 pos = [tuple(A[k] + (B[k] - A[k]) * i / steps for k in range(4))
+1558:                        for i in range(steps + 1)]
+1559:                 a.t_end = max(a.t_end, a.t_start + 0.5 * frame_period)
+1560:                 for i in range(steps):
+1561:                     # union with the next step's box so movement WITHIN the
+1562:                     # step stays covered
+1563:                     u = tuple(min(pos[i][k], pos[i + 1][k]) if k < 2 else
+1564:                               max(pos[i][k], pos[i + 1][k]) for k in range(4))
+1565:                     t0 = ts[i] if i else a.t_start + 0.5 * frame_period
+1566:                     added.append(_mk(t0, ts[i + 1], u, a, tid))
+1567:                 n_gaps += 1
+1568: 
+1569:             # 2. onset: template-match the first sample backwards to the
+
+## L1602–L1624
+1602:                         if mx < THR:
+1603:                             break   # genuinely not there yet
+1604:                         nx = (rx1 + loc[0]) / SCALE
+1605:                         ny = (ry1 + loc[1]) / SCALE
+1606:                         box = [nx, ny, nx + (sb[2] - sb[0]), ny + (sb[3] - sb[1])]
+1607:                         walked = _mk(t, t + step, tuple(box), first, tid)
+1608:                         added.append(walked)
+1609:                         n_lead += 1
+1610:                         lead_s += step
+1611: 
+1612:             # 3. grace pads: cover the sub-threshold sliver at both ends
+1613:             pre = walked.t_start
+1614:             walked.t_start = max(0.0, win_start, walked.t_start - GRACE)
+1615:             lead_s += pre - walked.t_start
+1616:             samples[-1].t_end += GRACE
+1617: 
+1618:         cb.progress("post", n_total, n_total)
+1619:         dets.extend(added)
+1620:         return (n_gaps, n_lead, lead_s)
+1621:     finally:
+1622:         if capture is not None:
+1623:             capture.release()
+1624: 
+
+## L2447–L2472
+2447: def track_manual_region(video, box, t_ref, t0, t1, cb=None,
+2448:                         step_frames=2, thr=0.55, scale=0.5,
+2449:                         person_det=None):
+2450:     """Track a user-drawn screen-space box through [t0, t1], starting
+2451:     from its appearance at t_ref and walking both directions. This powers
+2452:     targeted redaction: circle anything the detectors don't know (a
+2453:     tattoo, a badge, a specific person) on one frame, pick the time
+2454:     window, and the blur follows it.
+2455: 
+2456:     Primary engine: cv2.TrackerVit (learned tracker, auto-downloaded
+2457:     pinned model) — survives scale change, turning, and appearance drift
+2458:     that plain template matching cannot (a subject walking toward the
+2459:     camera killed the old matcher in ~1s; VitTrack held the full clip).
+2460:     Fallback engine: multi-scale template matching (NCC on half-scale
+2461:     smoothed grayscale, template refresh gated on confidence >0.80).
+2462: 
+2463:     FAIL CLOSED on loss: when the engine loses the object mid-frame, the
+2464:     box FREEZES in place and coverage continues to the window edge — the
+2465:     blur may go stale but it never silently vanishes (the old behaviour
+2466:     ended the span, un-blurring the subject; a real user hit this).
+2467:     Coverage only ENDS early when the object visibly leaves the frame
+2468:     (frozen box touching the frame edge). Held samples carry score 0.0
+2469:     so review can show where the lock was lost.
+2470: 
+2471:     Returns [(t, (x1, y1, x2, y2), score), ...] sorted by t — screen-space
+2472:     boxes, one per step_frames. Empty if the video/box is unusable."""
+
+## L2506–L2569
+2506:             # a drawn box that CONTAINS A PERSON gets detector-driven
+2507:             # tracking: body-tight boxes + silhouettes every frame, immune
+2508:             # to the scale/appearance drift that plagues generic trackers
+2509:             try:
+2510:                 # detector masks are repainted at every sample; at the default
+2511:                 # 2-frame cadence the outline visibly STEPS/flickers at half
+2512:                 # the frame rate (real footage) — detect EVERY frame instead
+2513:                 ps = _track_person_dense(video, box, t_ref, t0, t1,
+2514:                                          person_det, log, step_frames=1,
+2515:                                          cancelled=(cb.cancelled if cb else None))
+2516:             except PipelineCancelled:
+2517:                 raise
+2518:             except Exception as e:
+2519:                 log("      track: person-detector path failed (%s) — using "
+2520:                     "the generic tracker" % e)
+2521:                 ps = []
+2522:             _check_cancelled()
+2523:             if ps:
+2524:                 live = sum(1 for x in ps if x[2] > 0.0) / float(len(ps))
+2525:                 if live >= 0.5:
+2526:                     return ps
+2527:                 # the detector barely sees this object (marginal class, odd
+2528:                 # angle) — frozen coverage would win over live tracking.
+2529:                 # The generic tracker follows pixels and will do better.
+2530:                 log("      track: the detector only saw the object in %d%% "
+2531:                     "of frames — using the generic tracker instead"
+2532:                     % round(live * 100))
+2533:             else:
+2534:                 log("      track: nothing recognizable under the drawn box — "
+2535:                     "tracking the region as a generic object")
+2536: 
+2537:         samples = [(t_ref, (float(box[0]), float(box[1]),
+2538:                             float(box[2]), float(box[3])), 1.0)]
+2539:         _last_log = time.time()
+2540: 
+2541:         def _hold_rest(t, cur, direction, out):
+2542:             """Fail-closed coverage: freeze the box and emit it to the window
+2543:         edge (unless the object left the frame — nothing to protect)."""
+2544:             if _left_frame(cur):
+2545:                 log("      track: object left the frame at t=%.1fs — "
+2546:                     "coverage ends there" % t)
+2547:                 return
+2548:             log("      track: LOST the object at t=%.1fs — holding the last "
+2549:                 "box to the window edge (review and trim if needed)" % t)
+2550:             t2 = t + direction * step
+2551:             while t0 - 1e-6 <= t2 <= t1 + 1e-6:
+2552:                 _check_cancelled()
+2553:                 out.append((t2, (cur[0], cur[1], cur[2], cur[3]), 0.0))
+2554:                 t2 += direction * step
+2555: 
+2556:         vit = _vittrack_factory(log)
+2557:         _check_cancelled()
+2558:         if vit is not None:
+2559:             fr0 = None
+2560:             for dt in (0.0, 0.066, -0.066, 0.33, -0.33, 1.0):
+2561:                 ts = t_ref + dt
+2562:                 if ts < t0 - 1e-6 or ts > t1 + 1e-6:
+2563:                     continue
+2564:                 fr0 = _frame(ts)
+2565:                 if fr0 is not None:
+2566:                     t_ref = ts
+2567:                     break
+2568:             if fr0 is None:
+2569:                 log("      track: could not READ the video near t=%.1fs — "
+
+## L2614–L2654
+2614:                     if ok:
+2615:                         x, y, w, h = bb
+2616:                         nb = [x / scale, y / scale,
+2617:                               (x + w) / scale, (y + h) / scale]
+2618:                     if nb is not None and score >= 0.30:
+2619:                         cur = nb
+2620:                         held = False
+2621:                         if _left_frame(cur):
+2622:                             log("      track: object left the frame at "
+2623:                                 "t=%.1fs — coverage ends there" % t2)
+2624:                             break
+2625:                         samples.append((t2, tuple(cur), score))
+2626:                     elif nb is not None and score >= 0.15:
+2627:                         # uncertain: the box may be loose OR drifting. Blur
+2628:                         # the UNION of it and the last confident box — covers
+2629:                         # either way (over-blur beats under-blur) — and keep
+2630:                         # following so a re-lock resumes cleanly.
+2631:                         if not held:
+2632:                             held = True
+2633:                             log("      track: weak lock at t=%.1fs — blur "
+2634:                                 "widens to cover the uncertainty until the "
+2635:                                 "tracker re-locks" % t2)
+2636:                         u = (min(cur[0], nb[0]), min(cur[1], nb[1]),
+2637:                              max(cur[2], nb[2]), max(cur[3], nb[3]))
+2638:                         samples.append((t2, u, 0.0))
+2639:                     else:
+2640:                         # truly lost: do NOT move the blur on a guess —
+2641:                         # freeze it; the tracker keeps looking each frame and
+2642:                         # resumes the moment it re-locks (score recovers)
+2643:                         if not held:
+2644:                             held = True
+2645:                             log("      track: LOST the object at t=%.1fs — "
+2646:                                 "blur holds its last position until the "
+2647:                                 "tracker re-acquires" % t2)
+2648:                         samples.append((t2, tuple(cur), 0.0))
+2649:                     if time.time() - _last_log >= 3.0:
+2650:                         _last_log = time.time()
+2651:                         log("        …tracking %s to t=%.1fs (%d samples)"
+2652:                             % ("forward" if direction > 0 else "backward",
+2653:                                t2, len(samples)))
+2654:                     t = t2
+
+## L2709–L2729
+2709:                     tm = tmpl if f == 1.0 else cv2.resize(tmpl, (tw2, th2))
+2710:                     res = cv2.matchTemplate(g[ry1:ry2, rx1:rx2], tm,
+2711:                                             cv2.TM_CCOEFF_NORMED)
+2712:                     _, mx, _, loc = cv2.minMaxLoc(res)
+2713:                     if best is None or mx > best[0]:
+2714:                         best = (mx, rx1 + loc[0], ry1 + loc[1], f, tw2, th2)
+2715:                 if best is None or best[0] < thr:
+2716:                     _hold_rest(t, cur, direction, samples)
+2717:                     break
+2718:                 mx, gx, gy, f, tw2, th2 = best
+2719:                 s_cum *= f
+2720:                 nx, ny = gx / scale, gy / scale
+2721:                 cur = [nx, ny, nx + tw2 / scale, ny + th2 / scale]
+2722:                 samples.append((t2, (cur[0], cur[1], cur[2], cur[3]),
+2723:                                 float(mx)))
+2724:                 if mx > 0.80:           # confident: adopt current appearance
+2725:                     cand = g[gy:gy + th2, gx:gx + tw2]
+2726:                     if cand.shape == (th2, tw2):
+2727:                         tmpl = cand.copy()
+2728:                 if time.time() - _last_log >= 3.0:
+2729:                     _last_log = time.time()
+
+## L2935–L2944
+2935: def merge_detections(dets, hold, scans=None, bridge_gap=4.0, fuzz=None,
+2936:                      gap_check=None):
+2937:     """Chain detections of the same category whose content boxes overlap.
+2938: 
+2939:     Short gaps (within `hold`) chain unconditionally, as before. Longer gaps
+2940:     up to `bridge_gap` seconds are BRIDGED — kept blurred straight through —
+2941:     unless an intermediate scan positively saw different, readable text in
+2942:     that region (i.e. the content genuinely changed). An empty or unreadable
+2943:     region during the gap is treated as an OCR miss and stays covered:
+2944:     fail closed, never flash PII."""
+
+## L2985–L3034
+2985:     for d in dets:
+2986:         d.last_seen = d.t_start
+2987:         if getattr(d, 'dense', False):
+2988:             merged.append(d)
+2989:             continue
+2990:         if not getattr(d, "dense", False):
+2991:             # dense samples keep their sub-frame hold: stamping them with the
+2992:             # multi-second OCR hold leaves every PAST position blurred for
+2993:             # `hold` seconds — a trail of stale boxes marching away from a
+2994:             # moving face. Their continuity across detector flicker and the
+2995:             # onset gap is handled per-track by smooth_dense_tracks().
+2996:             d.t_end = d.t_start + hold
+2997:         for m in reversed(mergeable):
+2998:             if m.category != d.category or not boxes_overlap(m.cbox, d.cbox):
+2999:                 continue
+3000:             if getattr(d, "dense", False) or getattr(m, "dense", False):
+3001:                 # dense face boxes are per-frame position samples of a possibly
+3002:                 # moving face — never merge them, or the bounding box balloons
+3003:                 # to cover the whole path. Each stands alone with its short
+3004:                 # hold, so the blur rides the face frame by frame.
+3005:                 continue
+3006:             # different readable text in the same spot is a DIFFERENT object
+3007:             # (e.g. names sliding through one row of an inner-scrolling list)
+3008:             # — never fuse them, or the region's text and its frames diverge
+3009:             if fuzz and m.text and d.text:
+3010:                 _mn = PhiMemory.norm(m.text)
+3011:                 _dn = PhiMemory.norm(d.text)
+3012:                 if (fuzz.ratio(_mn, _dn) < 70
+3013:                         and fuzz.partial_ratio(_mn, _dn) < 85):
+3014:                     continue
+3015:             gap = d.t_start - m.last_seen
+3016:             ok = gap <= hold
+3017:             if not ok and not contradicted(m, m.last_seen, d.t_start):
+3018:                 if gap <= bridge_gap:
+3019:                     ok = True
+3020:                 elif gap_check is not None:
+3021:                     # beyond the configured bridge: ask the pixels. The file
+3022:                     # is checked at points inside the gap — bridge any length
+3023:                     # of gap the content verifiably persisted through, refuse
+3024:                     # if it visibly changed. The knob stops mattering.
+3025:                     ok = gap_check(m, m.last_seen, d.t_start)
+3026:             if ok:
+3027:                 m.last_seen = max(m.last_seen, d.t_start)
+3028:                 m.t_end = max(m.t_end, d.t_end)
+3029:                 m.cbox = (min(m.cbox[0], d.cbox[0]), min(m.cbox[1], d.cbox[1]),
+3030:                           max(m.cbox[2], d.cbox[2]), max(m.cbox[3], d.cbox[3]))
+3031:                 break
+3032:         else:
+3033:             merged.append(d)
+3034:             mergeable.append(d)
+
+## L3036–L3075
+3036:     # Tail extension: a span ends `hold` after its LAST positive detection,
+3037:     # but the text often outlives that detection — under heavy compression
+3038:     # the final scans read only fragments ('4111.' '1111-1111' '1111'),
+3039:     # which fail the full pattern yet are strong evidence the string is
+3040:     # still on screen (the benchmark's compressed card leaked exactly this
+3041:     # tail). Walk the scans PAST each span's last sighting: while a scan's
+3042:     # words in the region fuzzy-match the span text (the same same-word
+3043:     # test contradicted() uses), the content verifiably persisted — extend
+3044:     # coverage through that scan. A scan with no matching read stops the
+3045:     # walk, so a real scene change never accretes stale blur.
+3046:     if scans and fuzz:
+3047:         for m in merged:
+3048:             if getattr(m, "dense", False) or not m.text:
+3049:                 continue
+3050:             mx1, my1, mx2, my2 = m.cbox
+3051:             mt = PhiMemory.norm(m.text)
+3052:             for st, _cum, words in scans:
+3053:                 if st <= m.last_seen + 0.01:
+3054:                     continue
+3055:                 if st - m.last_seen > bridge_gap:
+3056:                     break
+3057:                 support = False
+3058:                 for txt, (x1, y1, x2, y2), conf in words:
+3059:                     if conf < 0.5:
+3060:                         continue
+3061:                     cxm = (x1 + x2) / 2
+3062:                     cym = (y1 + y2) / 2
+3063:                     if not (mx1 - 6 <= cxm <= mx2 + 6
+3064:                             and my1 - 4 <= cym <= my2 + 4):
+3065:                         continue
+3066:                     n = PhiMemory.norm(txt)
+3067:                     if len(n) >= 3 and (fuzz.ratio(n, mt) >= 70
+3068:                                         or fuzz.partial_ratio(n, mt) >= 85):
+3069:                         support = True
+3070:                         break
+3071:                 if not support:
+3072:                     break
+3073:                 m.last_seen = st
+3074:                 m.t_end = max(m.t_end, st + hold)
+3075:     return merged
+
+## L3860–L3892
+3860:     if cb:
+3861:         cb.log("      coverage: %s — silhouettes replaced with %s"
+3862:                % (coverage, "full detection boxes" if coverage == "box"
+3863:                   else "gliding oversized boxes (body shape and walking "
+3864:                        "gait concealed)"))
+3865:     return out
+3866: 
+3867: 
+3868: def _dedupe_dense(act):
+3869:     """Dense track samples are POSITION SNAPSHOTS whose spans carry a
+3870:     small grace overlap; a frame covered by TWO snapshots of the same
+3871:     object would get blurred twice at slightly offset positions — the
+3872:     output then pulses at half the frame rate (visible flicker on real
+3873:     footage). Keep only the latest-started snapshot per track."""
+3874:     latest = {}
+3875:     for d in act:
+3876:         if d.dense and d.track >= 0:
+3877:             p = latest.get(d.track)
+3878:             if p is None or d.t_start > p.t_start:
+3879:                 latest[d.track] = d
+3880:     if not latest:
+3881:         return act
+3882:     return [d for d in act
+3883:             if not (d.dense and d.track >= 0 and latest[d.track] is not d)]
+3884: 
+3885: 
+3886: def _suppress_textless_bands(bands, n_raw_hits):
+3887:     """-> (bands, suppressed). Safety bands exist to cover unscanned TEXT
+3888:     scrolling into view. A scan whose OCR found ZERO text in any sampled
+3889:     frame has proven there is nothing for bands to protect — but camera
+3890:     bob still fakes scroll offsets on handheld footage that
+3891:     probe_camera_motion reads as static (too steady to look like a
+3892:     camera), and a real selfie job (address category, no on-screen text)
+
+## L4022–L4032
+4022:         stdin=subprocess.PIPE, stderr=ff_err)
+4023: 
+4024:     buckets = {}
+4025:     for d in detections:
+4026:         for s in range(int(d.t_start), int(d.t_end) + 2):
+4027:             buckets.setdefault(s, []).append(d)
+4028: 
+4029:     ysz, csz = w * h, (w // 2) * (h // 2)
+4030:     fbytes = (ysz + 2 * csz) * 2
+4031: 
+4032:     def cleanup_partial():
+
+## L4061–L4081
+4061:         t = idx / fps
+4062:         ox, oy = cum[min(idx, len(cum) - 1)]
+4063: 
+4064:         act = [d for d in buckets.get(int(t), [])
+4065:                if d.t_start - 0.01 <= t <= d.t_end + 0.01]
+4066:         for d in _dedupe_dense(act):
+4067:             drift = min(24.0, 0.05 * (abs(ox - d.aoff[0]) + abs(oy - d.aoff[1])))
+4068:             px = pad + drift
+4069:             if d.poly:
+4070:                 _blur_silhouette_yuv10(
+4071:                     y, u, v, d.cbox[0] + ox - px, d.cbox[1] + oy - px,
+4072:                     d.cbox[2] + ox + px, d.cbox[3] + oy + px,
+4073:                     _mode_for(d.category), d.poly,
+4074:                     (d.cbox[0] + ox, d.cbox[1] + oy,
+4075:                      d.cbox[2] + ox, d.cbox[3] + oy), pad_px=px)
+4076:             else:
+4077:                 _blur_yuv10(y, u, v, d.cbox[0] + ox - px, d.cbox[1] + oy - px,
+4078:                             d.cbox[2] + ox + px, d.cbox[3] + oy + px,
+4079:                             _mode_for(d.category),
+4080:                             shape=("ellipse" if d.category == "face"
+4081:                                    and face_shape == "ellipse" else "rect"))
+
+## L4226–L4237
+4226:                               fps, (w, h))
+4227: 
+4228:     buckets = {}
+4229:     for d in detections:
+4230:         for s in range(int(d.t_start), int(d.t_end) + 2):
+4231:             buckets.setdefault(s, []).append(d)
+4232: 
+4233:     def cleanup_partial():
+4234:         cap.release()
+4235:         if proc is not None:
+4236:             try:
+4237:                 proc.stdin.close()
+
+## L4272–L4303
+4272:         ox, oy = cum[min(idx, len(cum) - 1)]
+4273: 
+4274:         # 1. tracked PII boxes, translated by scroll offset
+4275:         act = [d for d in buckets.get(int(t), [])
+4276:                if d.t_start - 0.01 <= t <= d.t_end + 0.01]
+4277:         for d in _dedupe_dense(act):
+4278:             # drift allowance: residual tracking error grows (slowly) with
+4279:             # distance scrolled since detection — expand the box to cover it
+4280:             drift = min(24.0, 0.05 * (abs(ox - d.aoff[0]) + abs(oy - d.aoff[1])))
+4281:             px = pad + drift
+4282:             x1 = d.cbox[0] + ox - px
+4283:             y1 = d.cbox[1] + oy - px
+4284:             x2 = d.cbox[2] + ox + px
+4285:             y2 = d.cbox[3] + oy + px
+4286:             pbox = (d.cbox[0] + ox, d.cbox[1] + oy,
+4287:                     d.cbox[2] + ox, d.cbox[3] + oy)
+4288:             if preview:
+4289:                 cv2.rectangle(frame, (int(max(0, x1)), int(max(0, y1))),
+4290:                               (int(min(w, x2)), int(min(h, y2))), (0, 0, 255), 2)
+4291:                 for pts in (d.poly or ()):
+4292:                     arr = np.array(
+4293:                         [[int(float(qx) * (pbox[2] - pbox[0]) + pbox[0]),
+4294:                           int(float(qy) * (pbox[3] - pbox[1]) + pbox[1])]
+4295:                          for qx, qy in pts], np.int32)
+4296:                     if len(arr) >= 3:
+4297:                         cv2.polylines(frame, [arr], True, (0, 0, 255), 2)
+4298:                 label = d.category
+4299:                 if draw_scores and d.category == "face":
+4300:                     label = f"face {d.confidence:.2f}"
+4301:                 cv2.putText(frame, label, (int(max(0, x1)), int(max(12, y1 - 4))),
+4302:                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
+4303:             elif d.poly:
+
+## L5079–L5095
+5079:             self.net.setInput(blob)
+5080:             try:
+5081:                 out = self.net.forward()
+5082:             except Exception as e:
+5083:                 # passed the load-time self-test but died on a real frame
+5084:                 # anyway: rescue onto onnxruntime (or raise, fail closed)
+5085:                 self._cv2_midscan_rescue(e)
+5086:                 inp = np.ascontiguousarray(
+5087:                     canvas[:, :, ::-1].transpose(2, 0, 1)[None]
+5088:                 ).astype(np.float32)
+5089:                 inp /= 255.0
+5090:                 out = self.ort.run(self._ort_out, {self._ort_in: inp})[0]
+5091:         return self._decode(np.asarray(out), s, w, h)
+5092: 
+5093:     def _decode(self, out, s, w, h):
+5094:         """Turn a raw model output tensor into [(x1,y1,x2,y2,conf)] full-frame
+5095:         boxes. Backend-agnostic (OpenCV DNN and onnxruntime feed the same
+
+## L5118–L5161
+5118:         # ONNX emits end2end as (batch,N,C), so after stripping batch the LAST
+5119:         # axis is the attribute axis (C in {6,7}) and rows are axis 0. Accept a
+5120:         # transposed export (C on axis 0) only when the other axis is clearly a
+5121:         # box count (larger, and not the 8400-anchor raw head).
+5122:         a, b = out.shape
+5123:         cols = None
+5124:         if b in (6, 7):
+5125:             rows, cols = out, b
+5126:         elif a in (6, 7) and b != 8400 and b > a:
+5127:             rows, cols = out.T, a
+5128: 
+5129:         res = []
+5130:         if cols is not None:
+5131:             for r in rows:
+5132:                 if cols == 7:      # batch,x1,y1,x2,y2,class,score
+5133:                     x1, y1, x2, y2, score = (float(r[1]), float(r[2]),
+5134:                                              float(r[3]), float(r[4]),
+5135:                                              float(r[6]))
+5136:                     kls = float(r[5])
+5137:                 else:              # x1,y1,x2,y2,score,class
+5138:                     x1, y1, x2, y2, score = (float(r[0]), float(r[1]),
+5139:                                              float(r[2]), float(r[3]),
+5140:                                              float(r[4]))
+5141:                     kls = float(r[5]) if len(r) > 5 else 0.0
+5142:                 # multi-class COCO models (person): keep ONLY the wanted
+5143:                 # class — unless want_any (object tracking) keeps them all
+5144:                 if (not self.want_any and self.WANT_CLASS is not None
+5145:                         and int(kls) != self.WANT_CLASS):
+5146:                     continue
+5147:                 if score < self.thresh:
+5148:                     continue
+5149:                 # scale from letterboxed INPUT-space back to full frame
+5150:                 bx1, by1, bx2, by2 = x1 / s, y1 / s, x2 / s, y2 / s
+5151:                 bw, bh = bx2 - bx1, by2 - by1
+5152:                 ex, ey = bw * self.expand, bh * self.expand
+5153:                 row = (max(0.0, bx1 - ex), max(0.0, by1 - ey),
+5154:                        min(float(w), bx2 + ex), min(float(h), by2 + ey),
+5155:                        round(score, 3))
+5156:                 res.append(row + ((), int(kls)) if self.want_any else row)
+5157:             return res
+5158: 
+5159:         # raw YOLOv8 head: (5, 8400) -> transpose to per-box rows
+5160:         if out.shape[0] < out.shape[1]:
+5161:             out = out.T
+
+## L5162–L5194
+5162:         nc = out.shape[1] - 4
+5163:         boxes, scores, klss = [], [], []
+5164:         for row in out:
+5165:             if self.want_any and nc > 1:
+5166:                 kls = int(np.argmax(row[4:4 + nc]))
+5167:                 score = float(row[4 + kls])
+5168:             else:
+5169:                 kls = self.WANT_CLASS or 0
+5170:                 score = float(row[4 + kls])
+5171:             if score < self.thresh:
+5172:                 continue
+5173:             cx, cy, bw, bh = row[0], row[1], row[2], row[3]
+5174:             x = (cx - bw / 2) / s
+5175:             y = (cy - bh / 2) / s
+5176:             boxes.append([int(x), int(y), int(bw / s), int(bh / s)])
+5177:             scores.append(score)
+5178:             klss.append(kls)
+5179:         if not boxes:
+5180:             return []
+5181:         # class-aware NMS (offset trick): a ball held by a person must not
+5182:         # be suppressed by the person's box
+5183:         nboxes = ([[b[0] + k * 8192, b[1] + k * 8192, b[2], b[3]]
+5184:                    for b, k in zip(boxes, klss)]
+5185:                   if self.want_any else boxes)
+5186:         idxs = cv2.dnn.NMSBoxes(nboxes, scores, self.thresh, self.nms)
+5187:         for i in np.array(idxs).flatten():
+5188:             bx, by, bw, bh = boxes[i]
+5189:             ex, ey = int(bw * self.expand), int(bh * self.expand)
+5190:             x1 = max(0, bx - ex); y1 = max(0, by - ey)
+5191:             x2 = min(w, bx + bw + ex); y2 = min(h, by + bh + ey)
+5192:             row = (float(x1), float(y1), float(x2), float(y2), scores[i])
+5193:             res.append(row + ((), klss[i]) if self.want_any else row)
+5194:         return res
+
+## L5252–L5258
+5252: 
+5253: def _ctc_greedy_decode(logits, charmap, space_thresh=0.01, with_pos=False):
+5254:     """Greedy CTC decode (pure, unit-tested) for the PP-OCR recognizer.
+5255:     Per-timestep argmax, collapse consecutive repeats, drop blank
+5256:     (index 0), map indices through charmap. `charmap[0]` is the blank.
+5257:     Returns (text, mean confidence over the kept, non-blank steps).
+5258: 
+
+## L6118–L6128
+6118: def _settings_dict(args):
+6119:     skip = {"video", "output", "report", "from_report", "batch", "config",
+6120:             "_report_input"}
+6121:     out = {k: v for k, v in vars(args).items()
+6122:            if k not in skip and isinstance(v, (str, int, float, bool, list,
+6123:                                                tuple, type(None)))}
+6124:     mm = getattr(args, "mode_map", None)
+6125:     if isinstance(mm, dict) and mm:
+6126:         out["mode_map"] = ",".join(f"{k}={v}" for k, v in sorted(mm.items()))
+6127:     return out
+6128: 
+
+## L6371–L6404
+6371:     source = state.get("source_report")
+6372:     if source is not None:
+6373:         # A render consumes enabled Detection objects, but publishes the full
+6374:         # review document: Keep choices, row positions and unknown fields are
+6375:         # user data, not a serialization of the render subset.
+6376:         doc = dict(source)
+6377:         previous = dict(source.get("provenance", {}))
+6378:         settings = dict(previous.get("settings", {}))
+6379:         settings.update(prov["settings"])
+6380:         prov["settings"] = settings
+6381:         # Output hashes/paths must describe this render, never an older one.
+6382:         previous.pop("output", None)
+6383:         previous.pop("output_sha256", None)
+6384:         previous.update(prov)
+6385:         doc["provenance"] = previous
+6386:     else:
+6387:         doc = {
+6388:             "provenance": prov,
+6389:             "render_state": {
+6390:                 "fps": state["fps"],
+6391:                 "cum": [[round(x, 1), round(y, 1)] for x, y in state["cum"]],
+6392:                 "bands": [[round(x, 1), round(y, 1)] for x, y in state["bands"]],
+6393:             },
+6394:             "detections": ([dict(asdict(d), enabled=True)
+6395:                             for d in state["detections"]]
+6396:                            + [dict(asdict(d), enabled=False, zone_dropped=True)
+6397:                               for d in state.get("zdropped", [])]),
+6398:         }
+6399:         if state.get("audio_suggestions"):
+6400:             doc["audio_suggestions"] = state["audio_suggestions"]
+6401:         if state.get("audio_transcript"):
+6402:             doc["audio_transcript"] = state["audio_transcript"]
+6403:     aspans = getattr(args, "audio_spans", None)
+6404:     if ((source is None and aspans)
+
+## L6424–L6450
+6424: def _decode_report(doc):
+6425:     """Decode the enabled render subset of one already-read report snapshot."""
+6426:     if isinstance(doc, list):
+6427:         rows, state, prov = doc, None, {}
+6428:     else:
+6429:         rows, state, prov = doc.get("detections", []), doc.get("render_state"), \
+6430:             doc.get("provenance", {})
+6431:     dets = []
+6432:     for r in rows:
+6433:         if not r.get("enabled", True):
+6434:             continue
+6435:         dets.append(Detection(
+6436:             t_start=float(r["t_start"]), t_end=float(r["t_end"]),
+6437:             cbox=tuple(r["cbox"]), category=r["category"], text=r["text"],
+6438:             confidence=float(r.get("confidence", 1.0)),
+6439:             aoff=tuple(r.get("aoff", (0.0, 0.0))),
+6440:             last_seen=float(r.get("last_seen", r["t_start"])),
+6441:             # Preserve grouping in the enabled subset used by the renderer.
+6442:             dense=bool(r.get("dense", False)),
+6443:             track=int(r.get("track", -1)),
+6444:             person=int(r.get("person", -1)),
+6445:             poly=tuple(copy.deepcopy(r.get("poly") or ()))))
+6446:     return dets, state, prov
+6447: 
+6448: 
+6449: # ----------------------------------------------------------------------------
+6450: # Variable frame rate (VFR) handling
+
+## L6860–L6865
+6860:     ap.add_argument("--plate-threshold", type=float, default=0.35,
+6861:                     help="license-plate detector confidence cutoff (0-1). "
+6862:                          "Default 0.35.")
+6863:     ap.add_argument("--person-model", default=None,
+6864:                     help="path to a YOLO person-detection ONNX model (see "
+6865:                          "person_models.json). If omitted, OpenScrub looks "
+
+## L7307–L7333
+7307:     facer = (FaceDetector(cb, expand=args.face_expand,
+7308:                           thresh=getattr(args, "face_threshold", 0.6),
+7309:                           model_path=getattr(args, "face_model", None))
+7310:              if "face" in cats else None)
+7311:     plater = (PlateDetector(cb, model_path=getattr(args, "plate_model", None),
+7312:                             thresh=getattr(args, "plate_threshold", 0.35))
+7313:               if "plate" in cats else None)
+7314:     if plater is not None and getattr(args, "plate_threshold", 0.35) > 0.35:
+7315:         # raising the cutoff trades false plates (hands, labels, signs)
+7316:         # for missed ones — and a missed plate is never blurred. Say so.
+7317:         cb.log("      plate threshold %.2f (default 0.35): fewer false "
+7318:                "plates, but real plates the detector is less sure of are "
+7319:                "NOT blurred — check the output carefully"
+7320:                % args.plate_threshold)
+7321:     # Issue #18: a plate-only job on a fresh install ran with NO plate
+7322:     # model — the category was silently inert and the job "succeeded"
+7323:     # having looked for nothing. The recommended registry model is MIT
+7324:     # and sha256-pinned, so a missing plate model now self-heals exactly
+7325:     # like YuNet: fetched unattended on first use. (The Docker images
+7326:     # bake it in, so this normally fires only on pip/source installs.)
+7327:     # An explicitly chosen --plate-model is never substituted.
+7328:     if (plater is not None and not plater.available()
+7329:             and not getattr(args, "plate_model", None)
+7330:             and autofetch_plate_model(cb)):
+7331:         plater = PlateDetector(cb,
+7332:                                thresh=getattr(args, "plate_threshold", 0.35))
+7333:     personer = (PersonDetector(cb,
+
+## L7761–L7787
+7761:         # per-frame license-plate detection: plates on dashcam/CCTV footage move
+7762:         # fast, so (like dense faces) we re-detect every frame at the true
+7763:         # position rather than tracking. Only runs if a plate model is loaded.
+7764:         if (plater is not None and plater.available() and "plate" in cats
+7765:                 and idx % max(1, dense_stride) == 0):
+7766:             phold = 0.3 * max(1, dense_stride) / fps
+7767:             _psc = _scope_at(t_now)
+7768:             _pzr = _psc.get("plate")
+7769:             for (px1, py1, px2, py2, pconf) in (
+7770:                     _maybe_tiled(lambda f: plater.find(f, detect_scale),
+7771:                                  frame, plater.INPUT, tile_mode)
+7772:                     if "plate" in _psc else []):
+7773:                 if _pzr and not in_any_zone((px1, py1, px2, py2), _pzr):
+7774:                     continue
+7775:                 if in_ignore_region((px1, py1, px2, py2),
+7776:                                     args.ignore_regions):
+7777:                     continue
+7778:                 raw.append(Detection(
+7779:                     t_now, t_now + phold,
+7780:                     (int(px1 - cx), int(py1 - cy),
+7781:                      int(px2 - cx), int(py2 - cy)),
+7782:                     "plate", "plate", round(pconf, 3), (cx, cy),
+7783:                     dense=True))
+7784:                 dense_now.append((px1, py1, px2, py2))
+7785:         # per-frame full-body person detection: bodies move like faces do, so
+7786:         # (like dense faces/plates) re-detect every frame at the true
+7787:         # position. Only runs if a person model is loaded — INERT otherwise.
+
+## L8362–L8402
+8362:     detections = merge_detections(raw, hold=hold, scans=scans,
+8363:                                   bridge_gap=args.bridge_gap, fuzz=_fuzz,
+8364:                                   gap_check=_gap_check)
+8365:     zdropped = merge_detections(zdrop_raw, hold=hold, scans=scans,
+8366:                                 bridge_gap=args.bridge_gap, fuzz=_fuzz,
+8367:                                 gap_check=_gap_check) if zdrop_raw else []
+8368:     if _gap_cap["cap"] is not None:
+8369:         _gap_cap["cap"].release()
+8370:     n_tracks = assign_dense_tracks(detections)
+8371:     if n_tracks:
+8372:         cb.log(f"      dense tracking: {sum(1 for d in detections if d.dense)}"
+8373:                f" per-frame samples grouped into {n_tracks} track(s) "
+8374:                "for review")
+8375:         cb.log(f"      dense continuity: smoothing {n_tracks} track(s) — "
+8376:                "interpolating flicker gaps and walking each onset back "
+8377:                "through the video (the slow part of a dense scan)…")
+8378:         n_gaps, n_lead, lead_s = smooth_dense_tracks(
+8379:             detections, fps, args.video, cum=cum, win_start=win_start,
+8380:             cb=cb)
+8381:         if n_gaps or n_lead or lead_s:
+8382:             cb.log(f"      dense continuity: {n_gaps} flicker gap(s) "
+8383:                    f"interpolated; onsets walked back {lead_s:.2f}s total "
+8384:                    f"({n_lead} pre-detection sample(s) matched in the file)")
+8385:         try:
+8386:             n_emb, n_people = group_persons(detections, args.video, cb)
+8387:             if n_people:
+8388:                 cb.log(f"      person grouping: {n_emb} face track(s) "
+8389:                        f"identity-matched into {n_people} person(s) — "
+8390:                        "review shows one card per person")
+8391:         except Exception as e:
+8392:             cb.log(f"      person grouping unavailable ({e}) — review "
+8393:                    "shows per-track cards instead")
+8394:     if track_jobs:
+8395:         # user-marked objects from the Scan Setup editor: template-track
+8396:         # each drawn box through its window (both directions from the frame
+8397:         # it was drawn on) and add the path as a dense manual track — one
+8398:         # review card per object, blurred wherever it went. Same recipe as
+8399:         # the review-stage "Track object" tool.
+8400:         cb.log(f"      tracked objects: following {len(track_jobs)} "
+8401:                "user-drawn box(es) through their window(s)…")
+8402:         # a person model turns drawn-box tracking into body-tight person
+
+## L8425–L8456
+8425:         step_t = 2.0 / max(fps, 1.0)
+8426:         for (tt0, tt1, tbox, tref) in track_jobs:
+8427:             samples = track_manual_region(args.video, tbox, tref, tt0, tt1,
+8428:                                           cb=cb, person_det=track_det)
+8429:             if not samples:
+8430:                 cb.log("      tracked object: could not lock onto the "
+8431:                        f"region at {tref:.1f}s — draw a larger box or pick "
+8432:                        "a frame where the object is clearer")
+8433:                 continue
+8434:             new = []
+8435:             tcls = samples[0][4] if len(samples[0]) > 4 else None
+8436:             label = ("tracked %s" % COCO_NAMES[tcls]
+8437:                      if tcls is not None and 0 <= tcls < len(COCO_NAMES)
+8438:                      else "tracked object")
+8439:             for s in samples:
+8440:                 t, b, score = s[0], s[1], s[2]
+8441:                 poly = tuple(s[3]) if len(s) > 3 and s[3] else ()
+8442:                 fidx = min(int(t * fps), len(cum) - 1) if cum else 0
+8443:                 ox, oy = cum[fidx] if cum else (0.0, 0.0)
+8444:                 new.append(Detection(
+8445:                     t, t + step_t * 1.2,
+8446:                     (int(b[0] - ox), int(b[1] - oy),
+8447:                      int(b[2] - ox), int(b[3] - oy)),
+8448:                     "manual", label, round(float(score), 3),
+8449:                     (ox, oy), last_seen=t, dense=True, track=tid,
+8450:                     poly=poly))
+8451:             # grace pads: cover the sub-sample sliver at both ends
+8452:             new[0].t_start = max(0.0, new[0].t_start - 0.25)
+8453:             new[-1].t_end += 0.25
+8454:             detections.extend(new)
+8455:             cb.log(f"      tracked object: {len(new)} position(s), "
+8456:                    f"{new[0].t_start:.1f}-{new[-1].t_end:.1f}s "
+
+## L8504–L8514
+8504:             nlp=getattr(namer, "nlp", None) if namer else None,
+8505:             custom_res=custom_res, phrases=phrases)
+8506: 
+8507:     return {"fps": fps, "cum": cum, "bands": bands, "detections": detections,
+8508:             "zdropped": zdropped, "audio_suggestions": audio_sugg,
+8509:             "audio_transcript": audio_tx,
+8510:             "input_sha256": sha256_file(args.video),
+8511:             "stats": {"scans": n_scans, "raw_hits": len(raw),
+8512:                       "regions": len(detections), "recalls": n_recalled,
+8513:                       "remembered": len(memory.items) if memory else 0,
+8514:                       "zone_dropped": zone_dropped}}
+
+## L8554–L8580
+8554:     dets_r = apply_coverage(state["detections"],
+8555:                             getattr(args, "coverage", "tight"), cb)
+8556:     out_q = getattr(args, "out_quality", "archival") or "archival"
+8557:     if out_q != "archival":
+8558:         cb.log(f"      output quality: {out_q} (smaller file; archival is "
+8559:                "the visually-lossless default)")
+8560:     if getattr(args, "hdr_source", None) and not args.preview:
+8561:         render_hdr(args.hdr_source, dst, dets_r, state["cum"],
+8562:                    state["bands"], state["fps"], pad=args.pad, mode=args.mode,
+8563:                    encoder=args.hdr_encoder,
+8564:                    tags=getattr(args, "hdr_tags", {}),
+8565:                    face_shape=getattr(args, "face_shape", "ellipse"),
+8566:                    mode_map=getattr(args, "mode_map", None),
+8567:                    audio_spans=aspans, mute_tracks=mute_tracks, cb=cb,
+8568:                    out_quality=out_q,
+8569:                    audio_lanes=getattr(args, "audio_lane_count", None))
+8570:     else:
+8571:         render(args.video, dst, dets_r, state["cum"],
+8572:                state["bands"],
+8573:                state["fps"], pad=args.pad, mode=args.mode, preview=args.preview,
+8574:                mode_map=getattr(args, "mode_map", None),
+8575:                draw_scores=bool(getattr(args, "draw_scores", False)),
+8576:                vcodec=getattr(args, "codec", "h264"),
+8577:                face_shape=getattr(args, "face_shape", "ellipse"),
+8578:                encoder=args.encoder, audio_spans=aspans, clip=clip,
+8579:                mute_tracks=mute_tracks, cb=cb, out_quality=out_q,
+8580:                audio_lanes=getattr(args, "audio_lane_count", None))
+
+## L8596–L8646
+8596:     if getattr(args, "from_report", None):
+8597:         cb.log(f"[1/2] Loading detections from {args.from_report}")
+8598:         # Read once so geometry, choices, audio and provenance come from the
+8599:         # same snapshot. The raw document stays separate from render objects.
+8600:         with open(args.from_report, encoding="utf-8") as f:
+8601:             source = json.load(f)
+8602:         dets, rstate, prov = _decode_report(source)
+8603:         audio_overridden = getattr(args, "audio_spans", None) is not None
+8604:         if not audio_overridden and isinstance(source, dict):
+8605:             try:
+8606:                 args.audio_spans = [
+8607:                     (float(s["t0"]), float(s["t1"]), s.get("mode", "mute"))
+8608:                     for s in source.get("audio_redactions", [])]
+8609:             except (TypeError, ValueError, KeyError):
+8610:                 pass
+8611:         selected_input = getattr(args, "_report_input", None)
+8612:         if selected_input is not None:
+8613:             # An in-process caller already selected/owns this exact input.
+8614:             # Do not follow newer provenance into a source it did not admit.
+8615:             args.video = selected_input
+8616:         else:
+8617:             orig = prov.get("original_input")
+8618:             if orig and os.path.exists(orig) \
+8619:                     and os.path.abspath(orig) != os.path.abspath(args.video):
+8620:                 # re-renders must start from the TRUE original so intake can
+8621:                 # re-derive the HDR/CFR context (cached intermediates are
+8622:                 # reused). Rendering straight from the tone-mapped scan copy
+8623:                 # silently downgraded HDR jobs to SDR output.
+8624:                 args.video = orig
+8625:         normalize_vfr(args, cb)
+8626:         if rstate is None:
+8627:             raise RuntimeError("report has no render_state — re-run a scan "
+8628:                                "with --report using openscrub v4+")
+8629:         cb.log(f"      {len(dets)} enabled detections")
+8630:         in_sha = sha256_file(args.video)
+8631:         if prov.get("input_sha256") and prov["input_sha256"] != in_sha:
+8632:             cb.log("      WARNING: input file differs from the one this report "
+8633:                    "was made from (sha256 mismatch) — blur positions may be wrong")
+8634:         state = {"fps": rstate["fps"],
+8635:                  "cum": [tuple(v) for v in rstate["cum"]],
+8636:                  "bands": [tuple(v) for v in rstate["bands"]],
+8637:                  "detections": dets, "input_sha256": in_sha,
+8638:                  "source_report": source,
+8639:                  "audio_redactions_overridden": audio_overridden,
+8640:                  "audio_suggestions": copy.deepcopy(source.get("audio_suggestions")),
+8641:                  "stats": {"scans": 0, "raw_hits": 0, "regions": len(dets),
+8642:                            "recalls": 0, "remembered": 0}}
+8643:         return run_render(args, state, cb)
+8644:     state = run_scan(args, cb)
+8645:     return run_render(args, state, cb)
+8646: 

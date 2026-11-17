@@ -1,0 +1,28 @@
+# combined/openscrub_gui.py (line numbers are original pinned source; see source-manifest.json)
+
+## L406–L430
+406:             raise ValueError("Select at least one PHI category.")
+407: 
+408:         argv = [src, "--engine", self.engine_var.get(),
+409:                 "--device", self.device_var.get(),
+410:                 "--encoder", self.encoder_var.get(),
+411:                 "--mode", self.mode_var.get(),
+412:                 "--sample-interval", str(self.sample_var.get()),
+413:                 "--scan-trigger", str(self.trigger_var.get()),
+414:                 "--pad", str(int(self.pad_var.get())),
+415:                 "--bridge-gap", str(self.bridge_var.get()),
+416:                 "--face-expand", str(self.face_expand_var.get()),
+417:                 "--skip-start", str(self.skip_start_var.get()),
+418:                 "--skip-end", str(self.skip_end_var.get()),
+419:                 "--mrn-regex", self.mrn_var.get(),
+420:                 "--categories", ",".join(cats)]
+421:         if self.out_var.get().strip():
+422:             argv += ["-o", self.out_var.get().strip()]
+423:         if self.report_var.get().strip():
+424:             argv += ["--report", self.report_var.get().strip()]
+425:         if self.preview_mode.get():
+426:             argv.append("--preview")
+427:         if self.no_memory.get():
+428:             argv.append("--no-memory")
+429:         if self.no_ner.get():
+430:             argv.append("--no-ner")

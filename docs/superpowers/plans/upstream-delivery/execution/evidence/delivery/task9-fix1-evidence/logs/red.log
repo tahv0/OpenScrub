@@ -1,0 +1,157 @@
+TASK9_IMPORT {"executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python", "opencv": "4.14.0", "python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]", "source": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py", "source_sha256": "0e4f0f9a7846080f591038d021aaf3ca6f01201d83ac32bbdc273f53d5067ee7"}
+........FFFF                                                             [100%]
+=================================== FAILURES ===================================
+__ test_upward_rows_and_width_repartition_keep_dom_order_and_focused_control ___
+
+    def test_upward_rows_and_width_repartition_keep_dom_order_and_focused_control():
+>       run(STRUCTURE + """ReviewScheduler.prototype.updateQueue=function(){};
+        const s=structure();eq(domIds(),[12,13,14,15,16,17]);
+        gridTop=-2000;s.layout();eq(domIds(),[8,9,10,11,12,13]);
+        const control=s.bindings.get(12).button||s.bindings.get(12).card.button;
+        control.focus();gridWidth=400;s.layout();
+        eq(domIds(),[...domIds()].sort((a,b)=>a-b));
+        if(document.activeElement!==control||!control.isConnected)throw Error('repartition replaced/lost focused control');
+        gridWidth=200;s.layout();eq(domIds(),[...domIds()].sort((a,b)=>a-b));
+        if(document.activeElement!==control)throw Error('focused row reorder lost focus');
+        """)
+
+tests/test_thumbnail_scheduling.py:213: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "\nvar gridTop=-3000,gridWidth=200;\nclass PrimitiveNode{\n constructor(type='div'){\n  this.type=type;this.children=[...ds()].sort((a,b)=>a-b));\n    if(document.activeElement!==control)throw Error('focused row reorder lost focus');\n    "
+
+    def run(scenario):
+        node = shutil.which('node')
+        if not node:
+            pytest.skip('Node is needed to evaluate the embedded review JavaScript')
+        script = 'const SOURCE=' + json.dumps(app_js()) + ';const SCENARIO=' + json.dumps(PRIMITIVES + scenario) + ';' + LIFECYCLE_HARNESS
+        result = subprocess.run([node, '-e', script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: Error: [12,13,8,9,10,11] != [8,9,10,11,12,13]
+E             at eq (evalmachine.<anonymous>:4:65)
+E             at evalmachine.<anonymous>:58:30
+E             at evalmachine.<anonymous>:65:7
+E             at Script.runInContext (node:vm:149:12)
+E             at Object.runInContext (node:vm:301:6)
+E             at run ([eval]:29:38)
+E             at [eval]:31:18
+E             at [eval]:31:56
+E             at [eval]:32:4
+E             at runScriptInThisContext (node:internal/vm:209:10)
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...  at [eval]:31:18\n    at [eval]:31:56\n    at [eval]:32:4\n    at runScriptInThisContext (node:internal/vm:209:10)\n').returncode
+
+tests/test_thumbnail_scheduling.py:38: AssertionError
+__________ test_pagehide_pageshow_releases_all_owned_rows_and_spacers __________
+
+    def test_pagehide_pageshow_releases_all_owned_rows_and_spacers():
+>       run(STRUCTURE + """ReviewScheduler.prototype.updateQueue=function(){};gridTop=100;structure(1);
+        eq(structureCounts(),{rows:1,spacers:2,cards:1});
+        for(let n=0;n<3;n++){
+         const old=REVIEW_SCHED;windowEvents.get('pagehide')();
+         eq(structureCounts(),{rows:0,spacers:0,cards:0});
+         eq([old.sections[0].rows.size,old.sections[0].spacers.length,old.bindings.size,old.listeners.length],[0,0,0,0]);
+         windowEvents.get('pageshow')();eq(structureCounts(),{rows:1,spacers:2,cards:1});
+        }
+        """)
+
+tests/test_thumbnail_scheduling.py:226: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "\nvar gridTop=-3000,gridWidth=200;\nclass PrimitiveNode{\n constructor(type='div'){\n  this.type=type;this.children=[...ength],[0,0,0,0]);\n     windowEvents.get('pageshow')();eq(structureCounts(),{rows:1,spacers:2,cards:1});\n    }\n    "
+
+    def run(scenario):
+        node = shutil.which('node')
+        if not node:
+            pytest.skip('Node is needed to evaluate the embedded review JavaScript')
+        script = 'const SOURCE=' + json.dumps(app_js()) + ';const SCENARIO=' + json.dumps(PRIMITIVES + scenario) + ';' + LIFECYCLE_HARNESS
+        result = subprocess.run([node, '-e', script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: Error: {"rows":1,"spacers":2,"cards":0} != {"rows":0,"spacers":0,"cards":0}
+E             at eq (evalmachine.<anonymous>:4:65)
+E             at evalmachine.<anonymous>:60:6
+E             at evalmachine.<anonymous>:64:7
+E             at Script.runInContext (node:vm:149:12)
+E             at Object.runInContext (node:vm:301:6)
+E             at run ([eval]:29:38)
+E             at [eval]:31:18
+E             at [eval]:31:56
+E             at [eval]:32:4
+E             at runScriptInThisContext (node:internal/vm:209:10)
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...  at [eval]:31:18\n    at [eval]:31:56\n    at [eval]:32:4\n    at runScriptInThisContext (node:internal/vm:209:10)\n').returncode
+
+tests/test_thumbnail_scheduling.py:38: AssertionError
+_ test_pagehide_pageshow_preserves_exhausted_view_budget_without_old_bindings __
+
+    def test_pagehide_pageshow_preserves_exhausted_view_budget_without_old_bindings():
+>       run(NETWORK + STRUCTURE + """gridTop=100;const s=structure(1);
+        for(const delay of [600,1200,1800]){tasks.at(-1).reject(Error('network'));await tick();advance(delay);await tick();}
+        tasks.at(-1).reject(Error('network'));await tick();eq(tasks.length,4);eq(s.retries.get(1).failures,4);
+        for(let n=0;n<3;n++){
+         const old=REVIEW_SCHED,oldBinding=old.bindings.get(1);windowEvents.get('pagehide')();
+         eq(old.retries.get(1).failures,4);eq(old.bindings.size,0);eq(timers.size,0);
+         windowEvents.get('pageshow')();eq(REVIEW_SCHED.retries.get(1).failures,4);eq(tasks.length,4);
+         if(REVIEW_SCHED.bindings.get(1)===oldBinding)throw Error('old binding retained on restore');
+        }
+        disposeReview();structure(1);eq(REVIEW_SCHED.retries.get(1).failures,0);eq(tasks.length,5);
+        """)
+
+tests/test_thumbnail_scheduling.py:238: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "\nvar tasks=[],timers=new Map(),clock=0,serial=0,created=[],revoked=[];\nDate.now=()=>clock;setTimeout=(fn,ms)=>{cons...store');\n    }\n    disposeReview();structure(1);eq(REVIEW_SCHED.retries.get(1).failures,0);eq(tasks.length,5);\n    "
+
+    def run(scenario):
+        node = shutil.which('node')
+        if not node:
+            pytest.skip('Node is needed to evaluate the embedded review JavaScript')
+        script = 'const SOURCE=' + json.dumps(app_js()) + ';const SCENARIO=' + json.dumps(PRIMITIVES + scenario) + ';' + LIFECYCLE_HARNESS
+        result = subprocess.run([node, '-e', script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: TypeError: Cannot read properties of undefined (reading 'failures')
+E             at evalmachine.<anonymous>:83:27
+E             at async [eval]:31:12
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme... read properties of undefined (reading 'failures')\n    at evalmachine.<anonymous>:83:27\n    at async [eval]:31:12\n").returncode
+
+tests/test_thumbnail_scheduling.py:38: AssertionError
+_ test_pagehide_pageshow_preserves_retry_deadline_and_recreates_only_live_timer _
+
+    def test_pagehide_pageshow_preserves_retry_deadline_and_recreates_only_live_timer():
+>       run(NETWORK + STRUCTURE + """gridTop=100;structure(1);tasks[0].reject(Error('network'));await tick();
+        const stale=[...timers.values()][0].fn;advance(200);windowEvents.get('pagehide')();eq(timers.size,0);
+        windowEvents.get('pageshow')();eq(REVIEW_SCHED.retries.get(1).readyAt,600);eq(timers.size,1);
+        stale();eq(tasks.length,1);advance(399);eq(tasks.length,1);advance(1);await tick();eq(tasks.length,2);
+        """)
+
+tests/test_thumbnail_scheduling.py:252: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = '\nvar tasks=[],timers=new Map(),clock=0,serial=0,created=[],revoked=[];\nDate.now=()=>clock;setTimeout=(fn,ms)=>{cons...,1);\n    stale();eq(tasks.length,1);advance(399);eq(tasks.length,1);advance(1);await tick();eq(tasks.length,2);\n    '
+
+    def run(scenario):
+        node = shutil.which('node')
+        if not node:
+            pytest.skip('Node is needed to evaluate the embedded review JavaScript')
+        script = 'const SOURCE=' + json.dumps(app_js()) + ';const SCENARIO=' + json.dumps(PRIMITIVES + scenario) + ';' + LIFECYCLE_HARNESS
+        result = subprocess.run([node, '-e', script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: Error: 0 != 600
+E             at eq (evalmachine.<anonymous>:4:65)
+E             at evalmachine.<anonymous>:80:36
+E             at async [eval]:31:12
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...0 != 600\n    at eq (evalmachine.<anonymous>:4:65)\n    at evalmachine.<anonymous>:80:36\n    at async [eval]:31:12\n').returncode
+
+tests/test_thumbnail_scheduling.py:38: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_thumbnail_scheduling.py::test_upward_rows_and_width_repartition_keep_dom_order_and_focused_control
+FAILED tests/test_thumbnail_scheduling.py::test_pagehide_pageshow_releases_all_owned_rows_and_spacers
+FAILED tests/test_thumbnail_scheduling.py::test_pagehide_pageshow_preserves_exhausted_view_budget_without_old_bindings
+FAILED tests/test_thumbnail_scheduling.py::test_pagehide_pageshow_preserves_retry_deadline_and_recreates_only_live_timer
+4 failed, 8 passed in 1.45s

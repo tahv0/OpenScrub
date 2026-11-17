@@ -1,0 +1,38 @@
+# combined/pyproject.toml (line numbers are original pinned source; see source-manifest.json)
+
+## L79–L113
+79: [tool.hatch.build.targets.wheel.force-include]
+80: "plate_models.json" = "plate_models.json"
+81: "face_models.json" = "face_models.json"
+82: "person_models.json" = "person_models.json"
+83: # third-party model licenses + copyright notices. Lands at the top of
+84: # site-packages beside the registries, so it gets a project-prefixed name
+85: # that can't collide with another package's notices file.
+86: "THIRD_PARTY_NOTICES.md" = "openscrub_THIRD_PARTY_NOTICES.md"
+87: # branded icon for the Start Menu shortcut openscrub-setup creates
+88: "assets/openscrub.ico" = "openscrub.ico"
+89: 
+90: [tool.hatch.build.targets.wheel]
+91: include = [
+92:     "openscrub_internal",
+93:     "openscrub.py",
+94:     "openscrub_web.py",
+95:     "zones_ui.py",
+96:     "openscrub_setup.py",
+97:     "openscrub_update.py",
+98:     "openscrub_vault.py",
+99: ]
+100: 
+101: [tool.hatch.build.targets.sdist]
+102: include = [
+103:     "openscrub_internal",
+104:     "plate_models.json",
+105:     "face_models.json",
+106:     "person_models.json",
+107:     "assets/openscrub.ico",
+108:     "openscrub.py",
+109:     "openscrub_setup.py",
+110:     "openscrub_update.py",
+111:     "openscrub_vault.py",
+112:     "openscrub_web.py",
+113:     "zones_ui.py",

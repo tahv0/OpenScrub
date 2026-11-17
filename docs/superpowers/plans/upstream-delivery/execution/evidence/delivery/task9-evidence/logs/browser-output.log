@@ -1,0 +1,12 @@
+AssertionError [ERR_ASSERTION]: row2 last_seen
+
+0.2 !== 0
+
+    at /home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task9/browser/output.cjs:33:84 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: 0.2,
+  expected: 0,
+  operator: 'deepStrictEqual',
+  diff: 'simple'
+}

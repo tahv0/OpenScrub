@@ -1,0 +1,13 @@
+Review probe setup failures (transcribed from the tool outputs; not original raw logs)
+
+1. Initial scheduler extraction invoked python, which was absent: /bin/bash: python: command not found. The dependent node command then reported MODULE_NOT_FOUND. Extraction was repeated with python3 and succeeded; no product test ran in the failed attempt.
+
+2. Initial static Chromium launch with no prepared LD_LIBRARY_PATH failed loading libnspr4.so. Temporary profile was under /home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task9/tmp/playwright_chromiumdev_profile-J1jWjz; Playwright cleaned its temporary directory.
+
+3. Baseline-only prepared library path also lacked libnspr4.so, both sandboxed (profile-GgStFa) and approved escalated (profile-9gwQYt). Each process exited127 and Playwright cleaned temporary directories.
+
+4. Adding /tmp/openscrub-save-as-20261116/tools/usr/lib/x86_64-linux-gnu resolved shared libraries. Sandboxed launch then failed: FATAL:content/browser/sandbox_host_linux.cc:41 Check failed: . shutdown: Operation not permitted (1). Temporary profile-yozlvi remained under the same task9 TMPDIR and was cleaned by Playwright.
+
+5. Final approved escalated static probe used:
+LD_LIBRARY_PATH=/tmp/openscrub-save-as-20261116/tools/usr/lib/x86_64-linux-gnu:/tmp/openscrub-baseline-20261116/tools/usr/lib/x86_64-linux-gnu node /home/tahv0/src/OpenScrub/.superpowers/sdd/README/task9-review-scratch/css-card-probe.cjs
+Exit0. Result retained in css-card-result.json. Script closes browser in finally. No Flask/server/application runtime was started, no network product routes were used, and no packages were installed. Browser TMPDIR was assigned before Playwright import; temporary state was under the authorized task9 runtime scratch.

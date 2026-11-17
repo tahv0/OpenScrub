@@ -1,0 +1,14 @@
+AssertionError [ERR_ASSERTION]: {"error":null,"eta":null,"has_output":false,"id":"small","log_len":1,"log_tail":["[1/2] Loading detections from /home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task9/runtime/server-candidate/openscrub_jobs/ebc8fa29231b/report.json"],"name":"Synthetic small","phase":"rendering","progress":1,"size":0,"stats":{}}
++ actual - expected
+
++ 'rendering'
+- 'done'
+
+    at /home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task9/browser/output.cjs:43:99 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: 'rendering',
+  expected: 'done',
+  operator: 'strictEqual',
+  diff: 'simple'
+}

@@ -1,0 +1,6 @@
+* Getting build dependencies for sdist...
+
+ERROR Unmet dependencies (checked against /tmp/openscrub-baseline-20261116/venv-opencv4/bin/python):
+	hatchling -> tomlkit>=0.11.1
+		wanted: >=0.11.1
+		found: not installed

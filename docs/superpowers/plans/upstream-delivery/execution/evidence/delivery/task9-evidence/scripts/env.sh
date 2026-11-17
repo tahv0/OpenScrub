@@ -1,0 +1,12 @@
+. /tmp/openscrub-baseline-20261116/env-opencv4.sh
+export TASK9_ROOT=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task9
+export TASK9_SOURCE=/home/tahv0/.codex/worktrees/c832/OpenScrub
+export PYTHONPATH="$TASK9_ROOT/harness:$TASK9_SOURCE"
+export PYTEST_PLUGINS=task9_isolation
+export TMPDIR="$TASK9_ROOT/tmp"
+export UV_CACHE_DIR="$TASK9_ROOT/runtime/uv-cache"
+export XDG_CACHE_HOME="$TASK9_ROOT/runtime/profile/cache"
+export XDG_CONFIG_HOME="$TASK9_ROOT/runtime/profile/config"
+export XDG_DATA_HOME="$TASK9_ROOT/runtime/profile/data"
+export OPENSCRUB_BASELINE_MODEL_DIR="$TASK9_ROOT/runtime/models"
+export PATH=/tmp/openscrub-save-as-20261116/node22/bin:$PATH

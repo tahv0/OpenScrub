@@ -1,0 +1,26 @@
+{
+  "boundary": "Controlled PageTransitionEvent replay; not observed BFCache navigation",
+  "before": {
+    "anchor": {
+      "id": 77,
+      "top": -199
+    },
+    "scroll": 4445,
+    "height": 8478
+  },
+  "hidden": {
+    "scroll": 4445,
+    "height": 8478,
+    "rows": 0,
+    "spacers": 0
+  },
+  "after": {
+    "anchor": {
+      "id": 77,
+      "top": -199
+    },
+    "target": -199,
+    "scroll": 4445,
+    "height": 8478
+  }
+}

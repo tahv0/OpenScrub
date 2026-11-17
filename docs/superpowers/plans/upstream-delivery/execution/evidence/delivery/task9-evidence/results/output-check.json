@@ -1,0 +1,50 @@
+{
+  "regions": [
+    {
+      "region": "kept-ordinary0",
+      "blurred": false,
+      "mean_absolute_error": 3.255639097744361,
+      "output_mean": 119.88220551378446
+    },
+    {
+      "region": "kept-hidden-member1",
+      "blurred": false,
+      "mean_absolute_error": 3.251851851851852,
+      "output_mean": 122.02407407407408
+    },
+    {
+      "region": "selected-moved-member2",
+      "blurred": true,
+      "mean_absolute_error": 121.50771604938272,
+      "output_mean": 0.009259259259259259
+    },
+    {
+      "region": "selected-zone18",
+      "blurred": true,
+      "mean_absolute_error": 120.5501253132832,
+      "output_mean": 0.08395989974937343
+    },
+    {
+      "region": "kept-zone19",
+      "blurred": false,
+      "mean_absolute_error": 3.244360902255639,
+      "output_mean": 121.44736842105263
+    },
+    {
+      "region": "additive-manual",
+      "blurred": true,
+      "mean_absolute_error": 121.5436507936508,
+      "output_mean": 0.0
+    },
+    {
+      "region": "unrelated",
+      "blurred": false,
+      "mean_absolute_error": 3.2083333333333335,
+      "output_mean": 120.84083333333334
+    }
+  ],
+  "pre_render_rows": 21,
+  "after_render_rows": 18,
+  "known_P06D_row_loss": true,
+  "output_bytes": 201688
+}

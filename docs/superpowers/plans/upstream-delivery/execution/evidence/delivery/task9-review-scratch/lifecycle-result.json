@@ -1,0 +1,21 @@
+{
+  "source_sha256": "7889b6f16e0989e95e263fa7bd5fd377a1056ebc818fe3c0c394d5df17fdd99b",
+  "before": {
+    "rows": 1,
+    "spacers": 2,
+    "cards": 1,
+    "retryFailures": 4
+  },
+  "hidden": {
+    "rows": 1,
+    "spacers": 2,
+    "cards": 0,
+    "retryFailures": null
+  },
+  "restored": {
+    "rows": 2,
+    "spacers": 4,
+    "cards": 1,
+    "retryFailures": null
+  }
+}

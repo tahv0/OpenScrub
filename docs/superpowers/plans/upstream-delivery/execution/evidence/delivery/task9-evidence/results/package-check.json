@@ -1,0 +1,27 @@
+{
+  "sdist:openscrub.py": "exact",
+  "sdist:openscrub_web.py": "exact",
+  "sdist:zones_ui.py": "exact",
+  "sdist:openscrub_vault.py": "exact",
+  "sdist:tests/test_thumbnail_scheduling.py": "exact",
+  "sdist:tests/test_review_choices.py": "exact",
+  "sdist:tests/test_review_save_failures.py": "exact",
+  "sdist:test_openscrub.py": "exact",
+  "wheel:openscrub.py": "exact",
+  "wheel:openscrub_web.py": "exact",
+  "wheel:zones_ui.py": "exact",
+  "wheel:openscrub_vault.py": "exact",
+  "wheel:openscrub_setup.py": "exact",
+  "wheel:openscrub_update.py": "exact",
+  "wheel:face_models.json": "exact",
+  "wheel:plate_models.json": "exact",
+  "wheel:person_models.json": "exact",
+  "openscrub-1.0.96.tar.gz": {
+    "bytes": 541048,
+    "sha256": "0e0314c570e6bfee294937c1dfb65bc1161183a60a57833d982f0a7f05c9e1c1"
+  },
+  "openscrub-1.0.96-py3-none-any.whl": {
+    "bytes": 442079,
+    "sha256": "2b342d433434cf131e1f842d203f4629583f8ef84c5e04952f1eb3f96b90ebfd"
+  }
+}

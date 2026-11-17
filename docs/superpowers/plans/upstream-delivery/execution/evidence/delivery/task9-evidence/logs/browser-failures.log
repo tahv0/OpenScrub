@@ -1,0 +1,10 @@
+locator.click: Error: strict mode violation: locator('details summary') resolved to 2 elements:
+    1) <summary>Advanced settings ▸</summary> aka getByText('Advanced settings ▸')
+    2) <summary>⚠ 2 detection(s) outside your zones — choose outp…</summary> aka getByText('⚠ 2 detection(s) outside your')
+
+Call log:
+[2m  - waiting for locator('details summary')[22m
+
+    at /home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task9/browser/failures.cjs:4:36 {
+  log: [ "  - waiting for locator('details summary')" ]
+}

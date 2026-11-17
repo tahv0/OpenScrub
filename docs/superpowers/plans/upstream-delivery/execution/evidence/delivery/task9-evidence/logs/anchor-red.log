@@ -1,0 +1,13 @@
+{"before":{"id":866,"top":-54},"after":{"anchor":{"id":780,"top":-285.5}}}
+AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+
+  assert.ok(after.target!==undefined&&Math.abs(after.target-before.top)<3)
+
+    at /home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task9/browser/anchor.cjs:2:689 {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: '==',
+  diff: 'simple'
+}

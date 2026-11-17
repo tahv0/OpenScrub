@@ -1,0 +1,10 @@
+{
+  "web": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py",
+  "web_sha256": "435ee74b112635a9694333fafc9460b3f454d371760f3aba1c4d4fa4875e4563",
+  "PAGE_sha256": "8dc91cdf482ba9117777aa3723695477d54925223099bac11d2c610c91aa1483",
+  "rows": 182,
+  "ordinary_groups": 180,
+  "zones": 2,
+  "cache": "all actual cached JPEG hits; no cold decoder work",
+  "port": 18513
+}

@@ -1,0 +1,18 @@
+{
+  "attempts": 4,
+  "before": {
+    "x": 32,
+    "y": 145,
+    "width": 178.140625,
+    "height": 283
+  },
+  "after": {
+    "x": 32,
+    "y": 145,
+    "width": 178.140625,
+    "height": 283
+  },
+  "editingUsable": true,
+  "zoneBoundaryFocus": "kb4",
+  "errors": []
+}

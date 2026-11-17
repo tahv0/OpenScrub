@@ -1,0 +1,29 @@
+# combined/zones_ui.py (line numbers are original pinned source; see source-manifest.json)
+
+## L176–L180
+176:   <div><label>Face threshold <span class="qm" data-tip="How sure the face detector must be before it blurs something (0-1, default 0.6). Lower it to catch small, distant, turned or partly hidden faces - you may get a few false faces, which you can reject in review. Raise it only if many non-faces are being flagged; a missed face is never blurred.">?</span></label><input type="number" id="fthr" value="0.6" step="0.05" min="0" max="1"></div>
+177:   <div><label>Face expand <span class="qm" data-tip="Grow each detected face box by this fraction before blurring (0.15 = 15% larger). Default 0.15. Close-up faces (filling roughly 15-30% or more of the frame) automatically get more, up to 0.45, so the neck and collar under the face are covered too - those can still identify someone. Raise it if hairlines, ears or chins show around the edge of face blurs.">?</span></label><input type="number" id="fex" value="0.15" step="0.05"></div>
+178:   <div><label>Plate threshold <span class="qm" data-tip="How sure the plate detector must be before it blurs something (0.05-0.95, default 0.35). Raise it if hands, labels or signs keep getting flagged as plates; lower it if real plates are missed. Higher values mean more missed plates - a false plate can be rejected in review, but a missed plate is never blurred, so raise it in small steps and check the output.">?</span></label><input type="number" id="pthr" value="0.35" step="0.05" min="0.05" max="0.95"></div>
+179:   <div><label>Face mask shape <span class="qm" data-tip="Shape of face blurs. ellipse follows the face's oval (looks natural, less background blurred). rect is a classic rectangle that also covers the corners - a little safer for faces at odd angles.">?</span></label><select id="fshape"><option>ellipse</option>
+180:    <option>rect</option></select></div>
+
+## L1170–L1188
+1170:    +"NOTHING this scan.\n\nDownload one in Settings → Detection "
+1171:    +"models.\n\nStart anyway?"))return;
+1172:  // iOS Safari can hand back a <select> with NO selection (value ""),
+1173:  // e.g. after restoring the page — the server then got engine:"" (a real
+1174:  // job hung on it). Put any such select back on its page default first.
+1175:  document.querySelectorAll("select").forEach(s=>{
+1176:   if(s.selectedIndex<0&&s.options.length){
+1177:    const d=[...s.options].findIndex(op=>op.defaultSelected);
+1178:    s.selectedIndex=d>=0?d:0;}});
+1179:  const o={
+1180:   engine:$("engine").value,device:$("device").value,encoder:$("encoder").value,
+1181:   mode:$("mode").value,coverage:$("coverage").value,sample_interval:+$("si").value,scan_trigger:+$("st").value,
+1182:   pad:+$("pad").value,bridge_gap:+$("bgap").value,
+1183:   face_expand:+$("fex").value,face_threshold:+$("fthr").value,
+1184:   plate_threshold:$("pthr").value.trim()===""?null:+$("pthr").value,
+1185:   face_shape:$("fshape").value,detect_scale:+$("dscale").value,
+1186:   scan_speed:$("sspeed").value,
+1187:   hdr_output:$("hdrout").value,codec:$("vcodec").value,
+1188:   out_format:$("outfmt").value,

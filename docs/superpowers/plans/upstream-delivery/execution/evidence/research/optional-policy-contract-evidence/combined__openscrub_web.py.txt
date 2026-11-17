@@ -1,0 +1,463 @@
+# combined/openscrub_web.py (line numbers are original pinned source; see source-manifest.json)
+
+## L498–L517
+498: def _new_job(video_path, options, name):
+499:     jid = uuid.uuid4().hex[:12]
+500:     jdir = os.path.join(JOBS_DIR, jid)
+501:     os.makedirs(jdir, exist_ok=True)
+502:     job = {
+503:         "id": jid, "dir": jdir, "video": video_path, "name": name,
+504:         "options": options, "phase": "queued", "progress": 0.0,
+505:         "eta": None, "size": 0,
+506:         "log": [], "error": None, "output": None, "created": time.time(),
+507:         "cancel": threading.Event(), "stats": {}, "qgen": 0,
+508:     }
+509:     FILES.initialize(job)
+510:     # keep the job's settings beside its upload: a scan that never finished
+511:     # has no report to recover them from, and a Retry after a restart then
+512:     # ran with DEFAULT settings (all categories) instead of the user's own
+513:     try:
+514:         with open(os.path.join(jdir, OPTIONS_FILE), "w",
+515:                   encoding="utf-8") as f:
+516:             json.dump(options, f)
+517:     except (OSError, TypeError, ValueError):
+
+## L672–L691
+672: def build_args(job, for_render=False):
+673:     o = job["options"]
+674:     jdir = job["dir"]
+675:     argv = [job["video"],
+676:             "--engine", o.get("engine", "auto"),
+677:             "--device", o.get("device", "auto"),
+678:             "--encoder", o.get("encoder", "auto"),
+679:             "--mode", o.get("mode", "blur"),
+680:             "--coverage", o.get("coverage", "tight"),
+681:             "--mode-map", o.get("mode_map", ""),
+682:             "--sample-interval", str(o.get("sample_interval", 0.5)),
+683:             "--scan-trigger", str(o.get("scan_trigger", 60)),
+684:             "--pad", str(o.get("pad", 8)),
+685:             "--bridge-gap", str(o.get("bridge_gap", 4.0)),
+686:             "--face-expand", str(o.get("face_expand", 0.15)),
+687:             "--face-threshold", str(o.get("face_threshold", 0.6)),
+688:             "--plate-threshold", _plate_threshold(o.get("plate_threshold")),
+689:             "--detect-scale", str(o.get("detect_scale", 1.0)),
+690:             "--skip-start", str(o.get("skip_start", 0)),
+691:             "--skip-end", str(o.get("skip_end", 0)),
+
+## L811–L824
+811: def _plate_threshold(v):
+812:     """Editor's plate confidence cutoff, clamped to 0.05-0.95: above that
+813:     the detector finds (almost) nothing — a silent fail-OPEN — and below
+814:     it everything is a plate. Unset/garbage -> the engine default."""
+815:     try:
+816:         f = float(v)
+817:     except (TypeError, ValueError):
+818:         return "0.35"
+819:     if not math.isfinite(f):
+820:         return "0.35"
+821:     return str(min(0.95, max(0.05, f)))
+822: 
+823: 
+824: def _sanitize_argv(parser, argv, job=None):
+
+## L1620–L1640
+1620: 
+1621: 
+1622: @app.route("/api/jobs/<jid>/detections")
+1623: def job_detections(jid):
+1624:     job = JOBS.get(jid) or abort(404)
+1625:     doc = _load_job_report(job)
+1626:     items = []
+1627:     for i, d in enumerate(doc["detections"]):
+1628:         items.append({"i": i, "category": d["category"], "text": d["text"],
+1629:                       "t_start": d["t_start"], "t_end": round(d["t_end"], 2),
+1630:                       "enabled": d.get("enabled", True),
+1631:                       "track": d.get("track", -1),
+1632:                       "person": d.get("person", -1),
+1633:                       "confidence": d.get("confidence", 0),
+1634:                       "zone_dropped": bool(d.get("zone_dropped"))})
+1635:     return jsonify({"detections": items,
+1636:                     "fps": doc["render_state"]["fps"],
+1637:                     "duration": len(doc["render_state"]["cum"]) /
+1638:                                 doc["render_state"]["fps"]})
+1639: 
+1640: 
+
+## L1663–L1689
+1663: @app.route("/api/jobs/<jid>/boxes_at")
+1664: def job_boxes_at(jid):
+1665:     """Active blur boxes (screen coords) at time t, plus the scroll offset so
+1666:     the client can convert edited boxes back to content coordinates."""
+1667:     job = JOBS.get(jid) or abort(404)
+1668:     doc = _load_job_report(job)
+1669:     rs = doc["render_state"]
+1670:     t = float(request.args.get("t", 0))
+1671:     fidx = min(int(t * rs["fps"]), len(rs["cum"]) - 1)
+1672:     ox, oy = rs["cum"][fidx]
+1673:     boxes = []
+1674:     want_all = request.args.get("all") == "1"
+1675:     for i, d in enumerate(doc["detections"]):
+1676:         if not (d["t_start"] - 0.01 <= t <= d["t_end"] + 0.01):
+1677:             continue
+1678:         if not want_all and not d.get("enabled", True):
+1679:             continue
+1680:         if True:
+1681:             boxes.append({"i": i, "category": d["category"],
+1682:                           "enabled": d.get("enabled", True),
+1683:                           "text": d.get("text", ""),
+1684:                           "t_start": d["t_start"], "t_end": d["t_end"],
+1685:                           "box": [d["cbox"][0] + ox, d["cbox"][1] + oy,
+1686:                                   d["cbox"][2] + ox, d["cbox"][3] + oy]})
+1687:     return jsonify({"t": t, "ox": ox, "oy": oy, "boxes": boxes})
+1688: 
+1689: 
+
+## L1821–L1865
+1821: 
+1822: 
+1823: @app.route("/api/jobs/<jid>/detections", methods=["POST"])
+1824: def job_save_edits(jid):
+1825:     job = JOBS.get(jid) or abort(404)
+1826:     edits = request.get_json(force=True)
+1827:     path = os.path.join(job["dir"], "report.json")
+1828:     with FILES.initialize(job).report_lock:
+1829:         _edit_gate(job)
+1830:         try:
+1831:             doc = _load_job_report(job)
+1832:         except FileNotFoundError:
+1833:             abort(404, "job report not found")
+1834:         # Remember only effective assignment destinations, before their first
+1835:         # assignment. Aliased indices may change then restore the same field.
+1836:         missing = object()
+1837:         touched = {}
+1838:         def assign(target, key, value):
+1839:             destination = (id(target), key)
+1840:             if destination not in touched:
+1841:                 touched[destination] = (target, key, target.get(key, missing))
+1842:             target[key] = value
+1843: 
+1844:         original_count = len(doc["detections"])
+1845:         enabled = edits.get("enabled", {})
+1846:         for i, d in enumerate(doc["detections"]):
+1847:             if str(i) in enabled:
+1848:                 assign(d, "enabled", bool(enabled[str(i)]))
+1849:         for i, box in (edits.get("box_overrides") or {}).items():
+1850:             i = int(i)
+1851:             if 0 <= i < len(doc["detections"]) and len(box) == 4:
+1852:                 assign(doc["detections"][i], "cbox", [float(v) for v in box])
+1853:         for i, span in (edits.get("time_overrides") or {}).items():
+1854:             i = int(i)
+1855:             if 0 <= i < len(doc["detections"]) and len(span) == 2:
+1856:                 t0, t1 = float(span[0]), float(span[1])
+1857:                 if t1 > t0 >= 0:
+1858:                     assign(doc["detections"][i], "t_start", t0)
+1859:                     assign(doc["detections"][i], "t_end", t1)
+1860:                     assign(doc["detections"][i], "last_seen", min(
+1861:                         max(doc["detections"][i].get("last_seen", t0), t0), t1))
+1862:         rs = doc["render_state"]
+1863:         # Read identities from this transaction's latest raw document. Never
+1864:         # reconstruct creation from a row's mutable current geometry/choices.
+1865:         identified = {}
+
+## L1890–L1921
+1890:             except (KeyError, TypeError, ValueError, OverflowError, IndexError):
+1891:                 if has_id:
+1892:                     return jsonify(error="Invalid manual creation: finite times, four coordinates and two offsets required"), 400
+1893:                 raise
+1894:             if has_id and identity in identified:
+1895:                 rows = identified[identity]
+1896:                 if (len(rows) != 1 or not _valid_manual_creation(rows[0].get("manual_creation"))
+1897:                         or rows[0]["manual_creation"] != creation):
+1898:                     return jsonify(error="manual_id conflict: creation differs, is missing/invalid, or matches multiple rows"), 409
+1899:                 continue
+1900:             row = dict(creation, category="manual", text="user-drawn", confidence=1.0,
+1901:                        last_seen=t0, enabled=True)
+1902:             if has_id:
+1903:                 # Separate lists keep later indexed edits independent of creation.
+1904:                 row.update(manual_id=identity, manual_creation={
+1905:                     **creation, "cbox": list(creation["cbox"]), "aoff": list(creation["aoff"])})
+1906:                 identified[identity] = [row]
+1907:             doc["detections"].append(row)
+1908:         if "audio" in edits:
+1909:             # audio redaction spans (mute/bleep): stored in the report so the
+1910:             # --from-report render applies them and re-renders keep them
+1911:             assign(doc, "audio_redactions", [
+1912:                 {"t0": float(s["t0"]), "t1": float(s["t1"]),
+1913:                  "mode": (s.get("mode") if s.get("mode") in ("mute", "bleep")
+1914:                           else "mute")}
+1915:                 for s in (edits.get("audio") or [])
+1916:                 if float(s.get("t1", 0)) > float(s.get("t0", 0)) >= 0])
+1917:         if (len(doc["detections"]) != original_count
+1918:                 or any(original is missing or not _same_json_value(original, target[key])
+1919:                        for target, key, original in touched.values())):
+1920:             atomic_report(path, doc)
+1921:         # suggest allowlisting any string whose EVERY instance was disabled —
+
+## L1991–L2038
+1991:             except Exception:
+1992:                 det = None
+1993:             samples = openscrub.track_manual_region(
+1994:                 lease.source, box, t_ref, t0, t1, cb=L(), person_det=det)
+1995:             with files.report_lock:
+1996:                 if (not _operation_valid(job, lease)
+1997:                         or job.get("trackbg") is not st or lease.operation.is_set()):
+1998:                     return
+1999:                 if not samples:
+2000:                     st.update(state="done", added=0,
+2001:                               error="could not track that region — try a "
+2002:                                     "larger box or a frame where it's clearer")
+2003:                     return
+2004:                 doc = _load_job_report(job)
+2005:                 rs = doc["render_state"]
+2006:                 fps = float(rs["fps"]) or 30.0
+2007:                 step = 2.0 / fps
+2008:                 tid = max([d.get("track", -1) for d in doc["detections"]
+2009:                            if isinstance(d.get("track", -1), int)] + [-1]) + 1
+2010:                 new = []
+2011:                 tcls = samples[0][4] if len(samples[0]) > 4 else None
+2012:                 label = ("tracked %s" % openscrub.COCO_NAMES[tcls]
+2013:                          if tcls is not None
+2014:                          and 0 <= tcls < len(openscrub.COCO_NAMES)
+2015:                          else "tracked object")
+2016:                 for s in samples:
+2017:                     t, b, score = s[0], s[1], s[2]
+2018:                     poly = s[3] if len(s) > 3 and s[3] else ()
+2019:                     fidx = min(int(t * fps), len(rs["cum"]) - 1)
+2020:                     ox, oy = rs["cum"][fidx]
+2021:                     new.append({
+2022:                         "t_start": t, "t_end": t + step * 1.2,
+2023:                         "cbox": [int(b[0] - ox), int(b[1] - oy),
+2024:                                  int(b[2] - ox), int(b[3] - oy)],
+2025:                         "category": "manual", "text": label,
+2026:                         "confidence": round(float(score), 3),
+2027:                         "aoff": [ox, oy], "last_seen": t,
+2028:                         "dense": True, "track": tid, "enabled": True,
+2029:                         "poly": [[[float(x), float(y)] for x, y in c]
+2030:                                  for c in poly]})
+2031:                 # grace pads: cover the sub-sample sliver at both ends
+2032:                 new[0]["t_start"] = max(0.0, new[0]["t_start"] - 0.25)
+2033:                 new[-1]["t_end"] += 0.25
+2034:                 doc["detections"].extend(new)
+2035:                 path = os.path.join(job["dir"], "report.json")
+2036:                 atomic_report(path, doc)
+2037:                 job["log"].append(
+2038:                     "      tracked object: %d position(s), %.1f-%.1fs "
+
+## L3290–L3310
+3290:  apikey:"#0891b2",ipaddr:"#65a30d",plate:"#7c3aed",face:"#ec4899",
+3291:  person:"#0ea5e9",manual:"#eab308"};
+3292: async function tlInit(){
+3293:  const id=CUR,gen=VIEW_GEN,editor=BE;
+3294:  // one fetch of the full report: detection spans for the lanes (dense
+3295:  // tracks collapse to one span per track) + stored audio redactions
+3296:  try{
+3297:   const response=await fetch(`api/jobs/${id}/report`);
+3298:   if(!response.ok)throw Error("could not load audio");
+3299:   const doc=await response.json();
+3300:   if(!ownsView(id,gen)||BE!==editor)return;
+3301:   const per={};
+3302:   for(const d of (doc.detections||[])){
+3303:    if(d.enabled===false)continue;
+3304:    const key=d.category+((d.track??-1)>=0?(":t"+d.track):(":i"+Math.random()));
+3305:    const s=per[key]||(per[key]={cat:d.category,t0:d.t_start,t1:d.t_end});
+3306:    s.t0=Math.min(s.t0,d.t_start);s.t1=Math.max(s.t1,d.t_end);
+3307:   }
+3308:   BE.tlspans=Object.values(per);
+3309:   if(!BE.audioLoaded){
+3310:    const stored=(doc.audio_redactions||[]).map(s=>({t0:s.t0,t1:s.t1,mode:s.mode||"mute"}));
+
+## L3454–L3468
+3454:  beFilter();beDraw();beTLDraw();
+3455: }
+3456: function beFilter(){
+3457:  BE.boxes=(BE.raw||[]).filter(b=>{
+3458:   const on=(b.i in EN)?EN[b.i]:b.enabled;   // live: review toggles apply here
+3459:   return on;
+3460:  }).map(b=>{
+3461:   let bb=b;
+3462:   if(BE.ov[b.i]){const o=BE.ov[b.i];
+3463:    bb={...b,box:[o[0]+BE.ox,o[1]+BE.oy,o[2]+BE.ox,o[3]+BE.oy]};}
+3464:   if(BE.times[b.i]){bb={...bb,t_start:BE.times[b.i][0],t_end:BE.times[b.i][1]};}
+3465:   return bb;
+3466:  });
+3467: }
+3468: function beDraw(){
+
+## L3624–L3628
+3624: function beRemove(){
+3625:  if(BE.sel<0)return;
+3626:  applyDet(BE.sel,false);   // syncs thumbnail + refilters editor
+3627:  BE.sel=-1;
+3628:  document.getElementById("beRm").style.display="none";
+
+## L3681–L3689
+3681:  const d=await r.json();
+3682:  if(!ownsView(id,gen)||
+3683:     (auto&&(REVIEW_REQUEST!==request||AUTO_REVIEW!==auto||PHPH!=="review")))return;
+3684:  if(auto)auto.state="ready";
+3685:  DUR=d.duration;
+3686:  const groups={}; const zdrop=[]; TRKMEM={}; ROWCARD={};
+3687:  d.detections.forEach(x=>{
+3688:   EN[x.i]=(x.i in EDITS.enabled)?EDITS.enabled[x.i]:x.enabled;
+3689:   if(x.zone_dropped){zdrop.push(x);return;}
+
+## L3717–L3742
+3717:  }
+3718:  for(const[cat,rawItems] of Object.entries(groups)){
+3719:   // collapse dense tracks: one card per physical object, not per frame
+3720:   const byGroup={},items=[];
+3721:   for(const x of rawItems){
+3722:    // identity first: one card per PERSON (all their tracks); then per
+3723:    // track; ungrouped detections stand alone
+3724:    const key=x.person>=0?("p"+x.person):(x.track>=0?("t"+x.track):null);
+3725:    if(key){(byGroup[key]=byGroup[key]||[]).push(x);}
+3726:    else{TRKMEM[x.i]=[x.i];items.push(x);}
+3727:   }
+3728:   for(const [key,members] of Object.entries(byGroup)){
+3729:    members.sort((a,b)=>a.t_start-b.t_start);
+3730:    let best=members[0];             // clearest thumbnail = highest-confidence
+3731:    for(const m of members)if((m.confidence||0)>(best.confidence||0))best=m;
+3732:    const rep={...best};
+3733:    rep.t_start=members[0].t_start;
+3734:    rep.t_end=members[members.length-1].t_end;
+3735:    rep.frames=members.length;
+3736:    rep.personcard=key[0]==="p";
+3737:    TRKMEM[rep.i]=members.map(m=>m.i);
+3738:    items.push(rep);
+3739:   }
+3740:   // person cards first, then everything else chronologically
+3741:   items.sort((a,b)=>((b.personcard?1:0)-(a.personcard?1:0))||a.t_start-b.t_start);
+3742:   html+=`<h3 style="margin:10px 0 6px">${CATDN[cat]||cat} <span class="badge">${items.length}</span>
+
+## L3783–L3810
+3783:    onclick="applyDet(${i},false)">Keep visible</button></div>`;
+3784: }
+3785: function refreshDet(i){
+3786:  const members=TRKMEM[i]||[i],blurred=members.reduce((n,m)=>n+(EN[m]?1:0),0);
+3787:  const kept=members.length-blurred;
+3788:  const state=document.getElementById("ds"+i),card=document.getElementById("det"+i);
+3789:  if(state)state.textContent=kept===0?"Will be blurred":blurred===0?"Will stay visible":
+3790:   `Mixed — ${blurred} will be blurred; ${kept} will stay visible`;
+3791:  const blur=document.getElementById("bb"+i),keep=document.getElementById("kb"+i);
+3792:  if(blur)blur.setAttribute("aria-pressed",String(kept===0));
+3793:  if(keep)keep.setAttribute("aria-pressed",String(blurred===0));
+3794:  if(card)card.classList.toggle("off",blurred===0);
+3795: }
+3796: function applyDet(i,blur){
+3797:  const cards=new Set();
+3798:  for(const m of (TRKMEM[i]||[i])){
+3799:   EN[m]=blur;EDITS.enabled[m]=blur;
+3800:   cards.add(ROWCARD[m]??m);
+3801:  }
+3802:  // Record explicit intent, including a choice equal to the loaded value.
+3803:  if(!EDITS.busy)saveStatus(EDITS,"Unsaved edits — save to include them in the render.");
+3804:  cards.forEach(refreshDet);
+3805:  if(document.getElementById("beCv")){beFilter();beDraw();}   // live sync
+3806: }
+3807: function setAll(cat,on){document.querySelectorAll(`.det[data-cat=${cat}]`)
+3808:  .forEach(el=>applyDet(+el.id.slice(3),on));}
+3809: function thumbRetry(img){
+3810:  const n=+(img.dataset.r||0);
+
+## L3868–L3868
+3868: function bulkSet(blur){selSet.forEach(i=>applyDet(i,blur));clearSel();}
+
+## L3902–L3940
+3902: function acknowledgeMap(current,submitted){
+3903:  for(const [key,value] of Object.entries(submitted))
+3904:   if(sameEdit(current[key],value))delete current[key];
+3905: }
+3906: function acknowledgeAdds(current,refs,submitted){
+3907:  for(let i=current.length-1;i>=0;i--){
+3908:   const index=refs.indexOf(current[i]);
+3909:   if(index>=0&&sameEdit(current[i],submitted[index]))current.splice(i,1);
+3910:  }
+3911: }
+3912: async function saveAndRender(){
+3913:  const id=CUR,gen=VIEW_GEN,d=EDITS;
+3914:  if(!id||!d||d.busy)return false;
+3915:  const b=d.editor;
+3916:  try{
+3917:   // Compatibility drafts acquire an identity once, on the original object.
+3918:   for(const a of [...d.manual,...b.adds])if(!Object.prototype.hasOwnProperty.call(a,"manual_id"))a.manual_id=manualId();
+3919:  }catch(e){saveStatus(d,"Could not save edits: "+e.message);return false;}
+3920:  const manRefs=[...d.manual],addRefs=[...b.adds];
+3921:  const man=copyEdit(d.manual),adds=copyEdit(b.adds);
+3922:  const payload=copyEdit({enabled:d.enabled,manual:[...man,...adds.map(a=>({
+3923:   manual_id:a.manual_id,t_start:a.t0,t_end:a.t1,t_ref:a.tref,screen_box:a.box}))],
+3924:   box_overrides:b.ov,time_overrides:b.times});
+3925:  // Plain review must never wipe audio that the editor has not loaded.
+3926:  if(b.audioLoaded&&!sameEdit(b.audio,b.audioSaved)){payload.audio=copyEdit(b.audio);}
+3927:  d.audioInFlight=payload.audio!==undefined;
+3928:  d.busy=true;saveStatus(d,"Saving edits… You can keep editing; newer edits stay pending.");
+3929:  let saved=false;
+3930:  try{
+3931:   const result=await reviewPost(`api/jobs/${id}/detections`,payload);
+3932:   saved=true;d.audioInFlight=false;
+3933:   acknowledgeMap(d.enabled,payload.enabled);
+3934:   acknowledgeMap(b.ov,payload.box_overrides);acknowledgeMap(b.times,payload.time_overrides);
+3935:   acknowledgeAdds(d.manual,manRefs,man);acknowledgeAdds(b.adds,addRefs,adds);
+3936:   if(payload.audio!==undefined)b.audioSaved=copyEdit(payload.audio);
+3937:   // A switched-away view never opens a confirmation or changes current UI.
+3938:   if(!ownsView(id,gen)){
+3939:    saveStatus(d,"Edits saved. Review pending edits, then save to render this job.");return false;
+3940:   }
+
+## L3948–L3973
+3948:    saveStatus(d,"Edits saved. Review pending edits, then save to render this job."+allowError);return false;
+3949:   }
+3950:   if(hasReviewEdits(d)){
+3951:    saveStatus(d,"Submitted edits saved. Newer edits are still pending — save again to include them before rendering."+allowError);return false;
+3952:   }
+3953:   saveStatus(d,"Edits saved; requesting render…");
+3954:   await reviewPost(`api/jobs/${id}/render`);
+3955:   // Edits can also arrive while the render request is pending.
+3956:   if(hasReviewEdits(d)){
+3957:    saveStatus(d,"Render started with submitted edits. Newer edits are pending — save again to render them."+allowError);return true;
+3958:   }
+3959:   saveStatus(d,"Rendering with saved edits…"+allowError);
+3960:   if(ownsView(id,gen)){
+3961:    const rv=document.getElementById("review");if(rv)rv.remove();
+3962:    const c=document.getElementById("beslot_done");if(c)c.innerHTML="rendering with your edits…";
+3963:   }
+3964:   return true;
+3965:  }catch(e){
+3966:   // A failed response leaves the audio baseline uncertain. Retain even a
+3967:   // newer toggle-back to the old baseline and deliberately send it on retry.
+3968:   if(!saved&&payload.audio!==undefined)b.audioSaved=null;
+3969:   saveStatus(d,(saved?"Edits saved; render was not confirmed. Retry with Save to render. ":
+3970:    "Save was not confirmed; drafts retained. Retry with Save. ")+e.message);
+3971:   return false;
+3972:  }finally{d.audioInFlight=false;d.busy=false;saveStatus(d,d.status);if(d!==EDITS)trimReviewDraft(d);}
+3973: }
+
+## L4148–L4155
+4148: """
+4149: 
+4150: PAGE = (zones_ui.ZONES_PAGE
+4151:         .replace("%%FAVICON%%", FAVICON_URI)
+4152:         .replace("%%LOGO%%", LOGO_URI)
+4153:         .replace("%%WORDMARK%%", WORDMARK_URI)
+4154:         .replace("%%APP_CSS%%", APP_CSS)
+4155:         .replace("%%JOBS_HTML%%", JOBS_HTML)
+
+## L4870–L4888
+4870:             except OSError:
+4871:                 size = 0
+4872:             opts = {}
+4873:             try:
+4874:                 with open(os.path.join(jdir, OPTIONS_FILE),
+4875:                           encoding="utf-8") as f:
+4876:                     opts = json.load(f)
+4877:                 if not isinstance(opts, dict):
+4878:                     opts = {}
+4879:             except (OSError, ValueError):
+4880:                 opts = {}
+4881:             job = {
+4882:                 "id": jid, "dir": jdir, "video": up,
+4883:                 "name": os.path.basename(up), "options": opts,
+4884:                 "phase": "error", "progress": 0.0, "size": size,
+4885:                 "log": ["(recovered after server restart — the scan had "
+4886:                         "not completed)"],
+4887:                 "error": "recovered after a server restart before the "
+4888:                          "scan finished — Retry re-runs it with "

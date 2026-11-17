@@ -1,0 +1,25 @@
+{
+  "viewport": [
+    390,
+    844
+  ],
+  "touchScroll": {
+    "before": 1445,
+    "after": 2060,
+    "delta": 615,
+    "marquee": 0
+  },
+  "enlargedOriginal": {
+    "width": 640,
+    "height": 360,
+    "src": "http://127.0.0.1:18509/api/jobs/large/detframe/6"
+  },
+  "deleteLifecycle": {
+    "disposed": true,
+    "bindings": 0,
+    "listeners": 0,
+    "draftRemoved": true,
+    "current": null
+  },
+  "errors": []
+}

@@ -1,0 +1,70 @@
+# donor/openscrub_web.py (line numbers are original pinned source; see source-manifest.json)
+
+## L2437–L2470
+2437: def _human_plate_override(row):
+2438:     """Explicit choices supersede a machine decision without inventing a label."""
+2439:     changed = False
+2440:     confirmation = row.get('human_confirmation')
+2441:     if isinstance(confirmation, dict) and confirmation.get('source') == 'confirmed_findings':
+2442:         confirmation['source'] = 'explicit'
+2443:         changed = True
+2444:     if row.get("category") != "plate":
+2445:         return changed
+2446:     marker = row.pop("plate_verification", None)
+2447:     if marker and marker.get("applied"):
+2448:         previous = marker.get("previous_enabled", True)
+2449:         row["enabled"] = previous if type(previous) is bool else True
+2450:     changed |= bool(marker) or row.get("plate_verification_override") is not True
+2451:     row["plate_verification_override"] = True
+2452:     return changed
+2453: 
+2454: 
+2455: def _apply_detection_edits(doc, edits, cutoff=None):
+2456:     """Apply the same pending changes for preview and save, in memory."""
+2457:     enabled = edits.get("enabled", {})
+2458:     changed = False
+2459:     for i, d in enumerate(doc["detections"]):
+2460:         explicit_output = (edits.get('output_choices') or {}).get(str(i)) is True
+2461:         if explicit_output:
+2462:             changed |= _human_plate_override(d)
+2463:             changed |= not bool(d.get('output_choice_explicit'))
+2464:             d['output_choice_explicit'] = True
+2465:         if str(i) in enabled:
+2466:             if d.get("enabled", True) != bool(enabled[str(i)]):
+2467:                 changed |= _human_plate_override(d)
+2468:             d["enabled"] = bool(enabled[str(i)])
+2469:     for i, box in (edits.get("box_overrides") or {}).items():
+2470:         i = int(i)
+
+## L7038–L7068
+7038:  const liveReview=!row||(REVIEW_BASE?.job===CUR);
+7039:  const raw=row||FINDING_META[i]||{},display=row?{}:(REVIEW_DISPLAY_META[i]||{});
+7040:  const marker=raw.plate_verification||display.plate_verification||{};
+7041:  const draft=(liveReview&&Object.prototype.hasOwnProperty.call(VLBL,i)&&VLBL[i]!=="clear")?VLBL[i]:"";
+7042:  const verified=draft||raw.verified_label||display.verified_label||"";
+7043:  const confirmation=raw.human_confirmation?.label||display.human_confirmation?.label||"";
+7044:  const enabled=(liveReview&&Object.prototype.hasOwnProperty.call(EN,i))?!!EN[i]:(row?row.enabled!==false:raw.enabled!==false);
+7045:  const explicit=(liveReview&&!!OUTPUT_CHOICES[i])||!!raw.output_choice_explicit||!!display.output_choice_explicit;
+7046:  const humanNegative=confirmation==="negative"||verified==="not_plate";
+7047:  const humanPositive=confirmation==="positive"||verified==="plate";
+7048:  const humanRegion=!!(raw.human_region_confirmed||display.human_region_confirmed);
+7049:  const machineFiltered=marker.decision==="suppress"&&marker.applied===true&&!humanNegative&&!explicit;
+7050:  const machineSuggestion=marker.decision==="suggest_not_plate"&&!humanNegative&&!explicit;
+7051:  const conflict=raw.learning_conflict||display.learning_conflict||"";
+7052:  const fallback=raw.fallback_reason||display.fallback_reason||"";
+7053:  const shaped=!!(raw.shaped||display.shaped||row?.shaped);
+7054:  const learnedScore=raw.learning_score??display.learning_score;
+7055:  let source="Detector coverage";
+7056:  if(humanNegative)source="Human confirmed · not a plate";
+7057:  else if(humanRegion)source="Human corrected corners";
+7058:  else if(humanPositive)source="Human confirmed · plate";
+7059:  else if(explicit)source=enabled?"Human choice · hidden":"Human choice · visible";
+7060:  else if(machineFiltered)source="Learned model · filtered false positive";
+7061:  else if(machineSuggestion)source="Learned model · suggests false positive";
+7062:  else if(conflict)source="Fallback · detector box";
+7063:  else if(fallback)source="Fallback · full plate coverage";
+7064:  else if(Number.isFinite(learnedScore)&&shaped)source="Learned mask";
+7065:  else if(shaped)source="Shaped redaction";
+7066:  return {enabled,explicit,humanNegative,humanPositive,humanRegion,machineFiltered,
+7067:          machineSuggestion,conflict,fallback,shaped,source};
+7068: }

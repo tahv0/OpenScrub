@@ -1,0 +1,20 @@
+const fs=require('node:fs');const assert=require('node:assert/strict');
+const ROOT='/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task9';
+process.env.TMPDIR=ROOT+'/tmp';process.env.PLAYWRIGHT_BROWSERS_PATH='/tmp/openscrub-save-as-20261116/browsers';
+const{chromium}=require('/tmp/openscrub-save-as-20261116/node_modules/playwright');
+(async()=>{const browser=await chromium.launch({headless:true});
+const page=await browser.newPage({viewport:{width:1365,height:950}}),errors=[];
+page.on('pageerror',e=>errors.push(e.stack));page.on('console',e=>{if(['error','warning'].includes(e.type()))console.log('console',e.text())});
+await page.goto('http://127.0.0.1:18509');await page.evaluate(()=>openJob('large'));
+await page.waitForSelector('#jobcard');await page.evaluate(()=>loadReview());
+await page.locator('[data-review-next]').scrollIntoViewIfNeeded();await page.waitForTimeout(400);
+const facts=()=>page.evaluate(()=>({cards:document.querySelectorAll('#detwrap .det').length,images:document.querySelectorAll('#detwrap img').length,rows:document.querySelectorAll('.reviewrow').length,spacers:document.querySelectorAll('.reviewspacer').length,
+ flight:THUMB_FLIGHTS.size,queue:REVIEW_SCHED.queue.length,bindings:REVIEW_SCHED.bindings.size,ids:REVIEW_SCHED.normalIds,columns:REVIEW_SCHED.sections.map(s=>s.columns),visible:[...REVIEW_SCHED.bindings.values()].filter(b=>{const r=b.card.getBoundingClientRect();return r.bottom>55&&r.top<innerHeight}).map(b=>b.id),loaded:[...REVIEW_SCHED.bindings.values()].filter(b=>b.img.complete&&b.img.naturalWidth>0).map(b=>b.id),range:document.querySelector('[data-review-range]').textContent,scroll:scrollY,height:document.documentElement.scrollHeight,viewport:[innerWidth,innerHeight]}));
+console.log('initial',JSON.stringify(await facts()));
+await page.evaluate(()=>scrollTo(0,document.documentElement.scrollHeight));await page.waitForTimeout(600);console.log('last',JSON.stringify(await facts()));
+await page.evaluate(()=>scrollTo(0,document.querySelector('#detwrap').getBoundingClientRect().top+scrollY));await page.waitForTimeout(600);console.log('first',JSON.stringify(await facts()));
+await page.evaluate(()=>document.body.style.zoom='1.25');await page.waitForTimeout(600);console.log('zoom',JSON.stringify(await facts()));console.log('actual-cols',await page.locator('.reviewrow').first().evaluate(e=>getComputedStyle(e).gridTemplateColumns));await page.evaluate(()=>document.body.style.zoom='1');
+await page.setViewportSize({width:390,height:844});await page.waitForTimeout(600);console.log('narrow',JSON.stringify(await facts()));
+await page.screenshot({path:ROOT+'/evidence/narrow.png'});
+fs.writeFileSync(ROOT+'/evidence/layout-diagnostic-errors.json',JSON.stringify(errors));console.log('errors',JSON.stringify(errors));await browser.close();
+})().catch(e=>{console.error(e);process.exitCode=1});

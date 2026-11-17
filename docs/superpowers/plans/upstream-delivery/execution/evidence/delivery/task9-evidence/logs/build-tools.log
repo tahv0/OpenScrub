@@ -1,0 +1,9 @@
+Looking in links: /tmp/openscrub-task620/build-wheelhouse
+Processing /tmp/openscrub-task620/build-wheelhouse/hatchling-1.33.0-py3-none-any.whl
+Processing /tmp/openscrub-task620/build-wheelhouse/packaging-26.3-py3-none-any.whl
+Processing /tmp/openscrub-task620/build-wheelhouse/pathspec-1.1.1-py3-none-any.whl
+Processing /tmp/openscrub-task620/build-wheelhouse/pluggy-1.7.0-py3-none-any.whl
+Processing /tmp/openscrub-task620/build-wheelhouse/trove_classifiers-2026.9.21.13-py3-none-any.whl
+Installing collected packages: trove-classifiers, pluggy, pathspec, packaging, hatchling
+
+Successfully installed hatchling-1.33.0 packaging-26.3 pathspec-1.1.1 pluggy-1.7.0 trove-classifiers-2026.9.21.13

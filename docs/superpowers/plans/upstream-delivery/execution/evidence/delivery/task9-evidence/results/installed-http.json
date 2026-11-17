@@ -1,0 +1,14 @@
+[
+  {
+    "path": "/",
+    "status": 200,
+    "bytes": 228652,
+    "sha256": "abbcef1e30a68e0ca569c9fd9466bac04301860b5b56b884a905a80185c2835c"
+  },
+  {
+    "path": "/api/jobs",
+    "status": 200,
+    "bytes": 3,
+    "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+  }
+]

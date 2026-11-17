@@ -1,0 +1,860 @@
+{
+  "provenance": {
+    "tool": "openscrub",
+    "version": "1.0.96",
+    "timestamp": "2026-11-17T14:07:53.808865+02:00",
+    "input": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task9/runtime/server-candidate/synthetic.mp4",
+    "input_sha256": "be36ff993e2a458f29091e0bfd8d6267c0b59e74832914056234842af080f4e6",
+    "original_input": null,
+    "vfr_normalized": false,
+    "hdr_tonemapped": false,
+    "hdr_output": false,
+    "metadata_stripped": true,
+    "zones": null,
+    "windows": null,
+    "settings": {
+      "allow_names": null,
+      "extra_names": null,
+      "engine": "tesseract",
+      "device": "cpu",
+      "encoder": "x264",
+      "no_ner": false,
+      "heuristic_names": "auto",
+      "sample_interval": 0.5,
+      "scan_trigger": 60.0,
+      "pad": 0,
+      "no_vfr_fix": false,
+      "out_quality": "archival",
+      "codec": "h264",
+      "hdr_output": "match",
+      "tile": "auto",
+      "face_heads": false,
+      "dense_faces": false,
+      "dense_face_stride": 1,
+      "scan_speed": "thorough",
+      "plate_model": null,
+      "face_shape": "rect",
+      "face_model": null,
+      "plate_threshold": 0.35,
+      "person_model": null,
+      "person_threshold": 0.5,
+      "face_threshold": 0.6,
+      "draw_scores": false,
+      "detect_scale": 1.0,
+      "face_expand": 0.0,
+      "coverage": "tight",
+      "mode": "box",
+      "mrn_regex": "",
+      "scroll_track": "auto",
+      "adaptive": "on",
+      "phrase": [],
+      "phrases": null,
+      "custom_regex": [],
+      "bridge_gap": 4.0,
+      "no_memory": false,
+      "preview": false,
+      "detect_windows": "",
+      "detect_windows_frac": "",
+      "clip_frac": "",
+      "mute_audio_tracks": "",
+      "audio_lane_count": null,
+      "clip_start": 0.0,
+      "clip_end": 0.0,
+      "audio_pii": false,
+      "audio_pii_model": "base",
+      "audio_pii_apply": false,
+      "audio_redact": "",
+      "audio_redact_mode": "mute",
+      "overwrite": false,
+      "backtrack_window": 2.5,
+      "no_backtrack": false,
+      "skip_start": 0.0,
+      "skip_end": 0.0,
+      "zones": null,
+      "windows": null,
+      "ignore_region": [],
+      "ocr_upscale": "auto",
+      "paranoid": false,
+      "vfr": "auto",
+      "categories": [
+        "face",
+        "person",
+        "plate",
+        "email",
+        "mrn"
+      ],
+      "ignore_regions": [],
+      "zones_data": null,
+      "windows_data": null,
+      "audio_spans": [
+        [
+          0.5,
+          0.7,
+          "mute"
+        ],
+        [
+          1.5,
+          2.0,
+          "bleep"
+        ]
+      ]
+    },
+    "output": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task9/runtime/server-candidate/openscrub_jobs/ebc8fa29231b/output.mp4",
+    "output_sha256": "054fa8dd2221f4471139935ca221f9fa7800149acbedd0f776d616f21bc0e3bf"
+  },
+  "render_state": {
+    "fps": 10.0,
+    "cum": [
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ]
+    ],
+    "bands": [
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ]
+    ]
+  },
+  "detections": [
+    {
+      "t_start": 0.2,
+      "t_end": 3.5,
+      "cbox": [
+        85.0,
+        23.0,
+        109.0,
+        53.0
+      ],
+      "category": "face",
+      "text": "ordinary 1",
+      "confidence": 0.9,
+      "aoff": [
+        0,
+        0
+      ],
+      "last_seen": 0.2,
+      "dense": true,
+      "track": 1,
+      "person": -1,
+      "poly": [],
+      "enabled": true
+    },
+    {
+      "t_start": 0.1,
+      "t_end": 3.8,
+      "cbox": [
+        115,
+        15,
+        139,
+        45
+      ],
+      "category": "face",
+      "text": "ordinary 2",
+      "confidence": 0.8,
+      "aoff": [
+        0,
+        0
+      ],
+      "last_seen": 0.0,
+      "dense": false,
+      "track": -1,
+      "person": -1,
+      "poly": [],
+      "enabled": true
+    },
+    {
+      "t_start": 0.1,
+      "t_end": 3.8,
+      "cbox": [
+        165,
+        15,
+        189,
+        45
+      ],
+      "category": "person",
+      "text": "ordinary 3",
+      "confidence": 0.8,
+      "aoff": [
+        0,
+        0
+      ],
+      "last_seen": 0.0,
+      "dense": true,
+      "track": 3,
+      "person": 3,
+      "poly": [],
+      "enabled": true
+    },
+    {
+      "t_start": 0.11,
+      "t_end": 3.8099999999999996,
+      "cbox": [
+        165,
+        15,
+        189,
+        45
+      ],
+      "category": "person",
+      "text": "ordinary 3",
+      "confidence": 0.9,
+      "aoff": [
+        0,
+        0
+      ],
+      "last_seen": 0.0,
+      "dense": true,
+      "track": 3,
+      "person": 3,
+      "poly": [],
+      "enabled": true
+    },
+    {
+      "t_start": 0.1,
+      "t_end": 3.8,
+      "cbox": [
+        215,
+        15,
+        239,
+        45
+      ],
+      "category": "person",
+      "text": "ordinary 4",
+      "confidence": 0.8,
+      "aoff": [
+        0,
+        0
+      ],
+      "last_seen": 0.0,
+      "dense": false,
+      "track": -1,
+      "person": 4,
+      "poly": [],
+      "enabled": true
+    },
+    {
+      "t_start": 0.1,
+      "t_end": 3.8,
+      "cbox": [
+        265,
+        15,
+        289,
+        45
+      ],
+      "category": "plate",
+      "text": "ordinary 5 variable text wraps naturally in this card with extra meaningful detail",
+      "confidence": 0.8,
+      "aoff": [
+        0,
+        0
+      ],
+      "last_seen": 0.0,
+      "dense": true,
+      "track": 5,
+      "person": -1,
+      "poly": [],
+      "enabled": true
+    },
+    {
+      "t_start": 0.11,
+      "t_end": 3.8099999999999996,
+      "cbox": [
+        265,
+        15,
+        289,
+        45
+      ],
+      "category": "plate",
+      "text": "ordinary 5 variable text wraps naturally in this card with extra meaningful detail",
+      "confidence": 0.9,
+      "aoff": [
+        0,
+        0
+      ],
+      "last_seen": 0.0,
+      "dense": true,
+      "track": 5,
+      "person": -1,
+      "poly": [],
+      "enabled": true
+    },
+    {
+      "t_start": 0.1,
+      "t_end": 3.8,
+      "cbox": [
+        315,
+        15,
+        339,
+        45
+      ],
+      "category": "plate",
+      "text": "ordinary 6",
+      "confidence": 0.8,
+      "aoff": [
+        0,
+        0
+      ],
+      "last_seen": 0.0,
+      "dense": false,
+      "track": -1,
+      "person": -1,
+      "poly": [],
+      "enabled": true
+    },
+    {
+      "t_start": 0.1,
+      "t_end": 3.8,
+      "cbox": [
+        365,
+        15,
+        389,
+        45
+      ],
+      "category": "plate",
+      "text": "ordinary 7",
+      "confidence": 0.8,
+      "aoff": [
+        0,
+        0
+      ],
+      "last_seen": 0.0,
+      "dense": true,
+      "track": 7,
+      "person": -1,
+      "poly": [],
+      "enabled": true
+    },
+    {
+      "t_start": 0.11,
+      "t_end": 3.8099999999999996,
+      "cbox": [
+        365,
+        15,
+        389,
+        45
+      ],
+      "category": "plate",
+      "text": "ordinary 7",
+      "confidence": 0.9,
+      "aoff": [
+        0,
+        0
+      ],
+      "last_seen": 0.0,
+      "dense": true,
+      "track": 7,
+      "person": -1,
+      "poly": [],
+      "enabled": true
+    },
+    {
+      "t_start": 0.1,
+      "t_end": 3.8,
+      "cbox": [
+        415,
+        15,
+        439,
+        45
+      ],
+      "category": "email",
+      "text": "ordinary 8",
+      "confidence": 0.8,
+      "aoff": [
+        0,
+        0
+      ],
+      "last_seen": 0.0,
+      "dense": false,
+      "track": -1,
+      "person": -1,
+      "poly": [],
+      "enabled": true
+    },
+    {
+      "t_start": 0.1,
+      "t_end": 3.8,
+      "cbox": [
+        465,
+        15,
+        489,
+        45
+      ],
+      "category": "email",
+      "text": "ordinary 9",
+      "confidence": 0.8,
+      "aoff": [
+        0,
+        0
+      ],
+      "last_seen": 0.0,
+      "dense": true,
+      "track": 9,
+      "person": -1,
+      "poly": [],
+      "enabled": true
+    },
+    {
+      "t_start": 0.11,
+      "t_end": 3.8099999999999996,
+      "cbox": [
+        465,
+        15,
+        489,
+        45
+      ],
+      "category": "email",
+      "text": "ordinary 9",
+      "confidence": 0.9,
+      "aoff": [
+        0,
+        0
+      ],
+      "last_seen": 0.0,
+      "dense": true,
+      "track": 9,
+      "person": -1,
+      "poly": [],
+      "enabled": true
+    },
+    {
+      "t_start": 0.1,
+      "t_end": 3.8,
+      "cbox": [
+        515,
+        15,
+        539,
+        45
+      ],
+      "category": "mrn",
+      "text": "ordinary 10 variable text wraps naturally in this card with extra meaningful detail",
+      "confidence": 0.8,
+      "aoff": [
+        0,
+        0
+      ],
+      "last_seen": 0.0,
+      "dense": false,
+      "track": -1,
+      "person": -1,
+      "poly": [],
+      "enabled": true
+    },
+    {
+      "t_start": 0.1,
+      "t_end": 3.8,
+      "cbox": [
+        565,
+        15,
+        589,
+        45
+      ],
+      "category": "mrn",
+      "text": "ordinary 11",
+      "confidence": 0.8,
+      "aoff": [
+        0,
+        0
+      ],
+      "last_seen": 0.0,
+      "dense": true,
+      "track": 11,
+      "person": -1,
+      "poly": [],
+      "enabled": true
+    },
+    {
+      "t_start": 0.11,
+      "t_end": 3.8099999999999996,
+      "cbox": [
+        565,
+        15,
+        589,
+        45
+      ],
+      "category": "mrn",
+      "text": "ordinary 11",
+      "confidence": 0.9,
+      "aoff": [
+        0,
+        0
+      ],
+      "last_seen": 0.0,
+      "dense": true,
+      "track": 11,
+      "person": -1,
+      "poly": [],
+      "enabled": true
+    },
+    {
+      "t_start": 0.1,
+      "t_end": 3.8,
+      "cbox": [
+        15,
+        315,
+        39,
+        345
+      ],
+      "category": "face",
+      "text": "outside zone 0",
+      "confidence": 0.8,
+      "aoff": [
+        0,
+        0
+      ],
+      "last_seen": 0.0,
+      "dense": false,
+      "track": -1,
+      "person": -1,
+      "poly": [],
+      "enabled": true
+    },
+    {
+      "t_start": 0.5,
+      "t_end": 2.5,
+      "cbox": [
+        550,
+        280,
+        590,
+        310
+      ],
+      "category": "manual",
+      "text": "user-drawn",
+      "confidence": 1.0,
+      "aoff": [
+        0,
+        0
+      ],
+      "last_seen": 0.5,
+      "dense": false,
+      "track": -1,
+      "person": -1,
+      "poly": [],
+      "enabled": true
+    }
+  ],
+  "audio_redactions": [
+    {
+      "t0": 0.5,
+      "t1": 0.7,
+      "mode": "mute"
+    },
+    {
+      "t0": 1.5,
+      "t1": 2.0,
+      "mode": "bleep"
+    }
+  ]
+}

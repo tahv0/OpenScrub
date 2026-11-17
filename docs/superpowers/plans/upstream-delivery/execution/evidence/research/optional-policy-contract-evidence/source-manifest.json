@@ -1,0 +1,82 @@
+[
+  {
+    "label": "combined",
+    "commit": "4b9bd7e576a8ae30369672b4b4722fc9752e233f",
+    "path": "openscrub.py",
+    "sha256": "89b3e84e28ba7065489cc1355cfeadaa4f04f0adf3bcbc19503ff01957e3f7e8",
+    "bytes": 419321,
+    "lines": 8701
+  },
+  {
+    "label": "combined",
+    "commit": "4b9bd7e576a8ae30369672b4b4722fc9752e233f",
+    "path": "openscrub_web.py",
+    "sha256": "0fc4669a086265bc3c0dd05e895a3abfed18eda7544124f8408dfeade450a330",
+    "bytes": 306395,
+    "lines": 5206
+  },
+  {
+    "label": "combined",
+    "commit": "4b9bd7e576a8ae30369672b4b4722fc9752e233f",
+    "path": "openscrub_gui.py",
+    "sha256": "2fee837398620f351e6770a19c1016d5af3104350a1bec744ba42a611e2c9965",
+    "bytes": 23102,
+    "lines": 555
+  },
+  {
+    "label": "combined",
+    "commit": "4b9bd7e576a8ae30369672b4b4722fc9752e233f",
+    "path": "openscrub_internal/reports.py",
+    "sha256": "eec9d568fc18f08ee35469ba864c5526120ae11152e8fe6f4d15007ab42d2427",
+    "bytes": 2095,
+    "lines": 43
+  },
+  {
+    "label": "combined",
+    "commit": "4b9bd7e576a8ae30369672b4b4722fc9752e233f",
+    "path": "pyproject.toml",
+    "sha256": "3ecd05dbda7fac26ea284a03248c321a301b8268446d94dccc32aa3073fbf652",
+    "bytes": 4192,
+    "lines": 130
+  },
+  {
+    "label": "combined",
+    "commit": "4b9bd7e576a8ae30369672b4b4722fc9752e233f",
+    "path": "zones_ui.py",
+    "sha256": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7",
+    "bytes": 65948,
+    "lines": 1252
+  },
+  {
+    "label": "austin",
+    "commit": "5d3a15ae683c08f368d6ba4bd0d2d77b4e7b8e2f",
+    "path": "openscrub.py",
+    "sha256": "0e4f0f9a7846080f591038d021aaf3ca6f01201d83ac32bbdc273f53d5067ee7",
+    "bytes": 413860,
+    "lines": 8618
+  },
+  {
+    "label": "austin",
+    "commit": "5d3a15ae683c08f368d6ba4bd0d2d77b4e7b8e2f",
+    "path": "openscrub_web.py",
+    "sha256": "9835e1137abee62c0a78e2669ed8bae7059e36bf4bed9f5c7a44f0eb8b40ed3a",
+    "bytes": 256131,
+    "lines": 4080
+  },
+  {
+    "label": "donor",
+    "commit": "b4d0c75f25d91510fe1692f901d11853dc7db005",
+    "path": "openscrub.py",
+    "sha256": "95dfca85a954ac465b473d2682ff641d5d27352d1a5a3e6576f2496d8b5dbe98",
+    "bytes": 433368,
+    "lines": 8972
+  },
+  {
+    "label": "donor",
+    "commit": "b4d0c75f25d91510fe1692f901d11853dc7db005",
+    "path": "openscrub_web.py",
+    "sha256": "606e13082e5341da01506349f26331773037415da56ea3a8814587a3d6539736",
+    "bytes": 543219,
+    "lines": 9405
+  }
+]

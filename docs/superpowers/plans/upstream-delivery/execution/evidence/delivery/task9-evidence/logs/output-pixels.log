@@ -1,0 +1,51 @@
+TASK9_IMPORT {"executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python", "opencv": "4.14.0", "python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]", "source": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py", "source_sha256": "0e4f0f9a7846080f591038d021aaf3ca6f01201d83ac32bbdc273f53d5067ee7"}
+{
+  "regions": [
+    {
+      "region": "kept-ordinary0",
+      "blurred": false,
+      "mean_absolute_error": 3.255639097744361,
+      "output_mean": 119.88220551378446
+    },
+    {
+      "region": "kept-hidden-member1",
+      "blurred": false,
+      "mean_absolute_error": 3.251851851851852,
+      "output_mean": 122.02407407407408
+    },
+    {
+      "region": "selected-moved-member2",
+      "blurred": true,
+      "mean_absolute_error": 121.50771604938272,
+      "output_mean": 0.009259259259259259
+    },
+    {
+      "region": "selected-zone18",
+      "blurred": true,
+      "mean_absolute_error": 120.5501253132832,
+      "output_mean": 0.08395989974937343
+    },
+    {
+      "region": "kept-zone19",
+      "blurred": false,
+      "mean_absolute_error": 3.244360902255639,
+      "output_mean": 121.44736842105263
+    },
+    {
+      "region": "additive-manual",
+      "blurred": true,
+      "mean_absolute_error": 121.5436507936508,
+      "output_mean": 0.0
+    },
+    {
+      "region": "unrelated",
+      "blurred": false,
+      "mean_absolute_error": 3.2083333333333335,
+      "output_mean": 120.84083333333334
+    }
+  ],
+  "pre_render_rows": 21,
+  "after_render_rows": 18,
+  "known_P06D_row_loss": true,
+  "output_bytes": 201688
+}
