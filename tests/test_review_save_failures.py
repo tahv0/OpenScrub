@@ -30,7 +30,7 @@ for(const id of ['detail','beslot','review','reviewSaveStatus'])elements.set(id,
 const ctx=vm.createContext({elements,console,Set,Map,JSON,Date,Math,Promise,
  document:{getElementById:id=>elements.get(id)||null,querySelector:s=>elements.get(s.slice(1))||null,
  querySelectorAll:()=>[],addEventListener(){},createElement:el},
- detail:elements.get('detail'),window:{},setInterval:()=>1,clearInterval(){},setTimeout(){},
+ detail:elements.get('detail'),window:{addEventListener(){}},setInterval:()=>1,clearInterval(){},setTimeout(){},
  confirm:()=>false,alert(){},fetch:async()=>({ok:true,json:async()=>({})})});
 // Skip startup I/O only; every function under test is evaluated from the Python string.
 vm.runInContext(SOURCE.slice(0,SOURCE.indexOf('loadPersist();loadCertInfo();loadJobs();setInterval(loadJobs,5000);')).replace(/^refreshModelPanel\(\);renderTiers\(\);$/m,''),ctx);

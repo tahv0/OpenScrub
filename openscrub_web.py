@@ -2083,6 +2083,84 @@ let CUR=null, EN={}, MAN=[], DUR=0, POLL=null, PHIST=[], PHPH="", LOGN=0, SHELLP
 // Drafts live only in this page; late acknowledgements reconcile their owner,
 // but may never publish into, or start rendering from, a different view.
 let VIEW_GEN=0, EDITS=null;
+// Polling owns one metadata -> log cycle, using the existing view identity.
+let POLL_CYCLE=null, POLL_FAILURES=0, AUTO_REVIEW=null, REVIEW_REQUEST=null;
+function pollStatus(message){
+ const el=document.getElementById("pollStatus");
+ if(el&&el.textContent!==message)el.textContent=message;
+}
+function stopPolling(){
+ if(POLL){clearTimeout(POLL.handle);POLL=null;}
+ const old=POLL_CYCLE;POLL_CYCLE=null;
+ if(old)old.controller.abort();
+}
+function schedulePoll(id,gen,delay){
+ if(!ownsView(id,gen)||document.hidden)return;
+ if(POLL)clearTimeout(POLL.handle);
+ const timer={id,gen};POLL=timer;
+ timer.handle=setTimeout(()=>{
+  if(POLL!==timer||!ownsView(id,gen))return;
+  POLL=null;refresh();
+ },delay);
+}
+// Only metadata/log use this deadline. Race body consumption too: abort alone
+// cannot settle a transport/body that ignores it. Losing work has no UI effects.
+async function pollJson(url,cycle){
+ const controller=new AbortController(),signal=cycle.controller.signal;
+ let deadline,onCancel;
+ const stopped=new Promise((_,reject)=>{
+  const fail=message=>{controller.abort();reject(new Error(message));};
+  onCancel=()=>fail("Polling cancelled");
+  signal.addEventListener("abort",onCancel,{once:true});
+  deadline=setTimeout(()=>fail("Polling timed out"),15000);
+  if(signal.aborted)onCancel();
+ });
+ const operation=(async()=>{
+  const r=await fetch(url,{signal:controller.signal});
+  if(!r.ok)throw new Error("Polling HTTP "+r.status);
+  return await r.json();
+ })();
+ try{return await Promise.race([operation,stopped]);}
+ finally{clearTimeout(deadline);signal.removeEventListener("abort",onCancel);}
+}
+function refresh(){
+ if(!CUR||document.hidden)return;
+ if(POLL_CYCLE)return POLL_CYCLE.promise;
+ if(POLL){clearTimeout(POLL.handle);POLL=null;}
+ const cycle={id:CUR,gen:VIEW_GEN,controller:new AbortController()};
+ POLL_CYCLE=cycle;
+ cycle.promise=(async()=>{
+  let delay=900;
+  try{
+   await refreshCycle(cycle);
+   if(POLL_CYCLE!==cycle||!ownsView(cycle.id,cycle.gen))return;
+   POLL_FAILURES=0;pollStatus("");
+  }catch(e){
+   if(POLL_CYCLE!==cycle||!ownsView(cycle.id,cycle.gen))return;
+   delay=Math.min(10000,900*Math.pow(2,Math.min(POLL_FAILURES++,4)));
+   pollStatus("Job updates interrupted — retrying in "+(delay/1000)+" s.");
+  }finally{
+   if(POLL_CYCLE===cycle&&ownsView(cycle.id,cycle.gen)){
+    POLL_CYCLE=null;
+    // Chained after completion: request duration adds to the healthy 900 ms.
+    schedulePoll(cycle.id,cycle.gen,delay);
+   }
+  }
+ })();
+ return cycle.promise;
+}
+function wakePolling(){
+ if(!CUR||document.hidden)return;
+ // A pending immediate wake already coalesces focus/pageshow/online bursts.
+ if(POLL&&POLL.wake)return;
+ stopPolling();
+ schedulePoll(CUR,VIEW_GEN,0);if(POLL)POLL.wake=true;
+}
+document.addEventListener("visibilitychange",()=>{
+ if(document.hidden)stopPolling();else wakePolling();
+});
+window.addEventListener("pagehide",stopPolling);
+for(const event of ["focus","pageshow","online"])window.addEventListener(event,wakePolling);
 const REVIEW_DRAFTS=new Map();
 function emptyEditor(){return {t:0,ox:0,oy:0,boxes:[],sel:-1,ov:{},dis:{},times:{},adds:[],
  add:false,addAnchor:null,drag:null,scale:1,dur:10,
@@ -2144,7 +2222,7 @@ async function delJob(id){
   alert(m);return;
  }
  REVIEW_DRAFTS.delete(id);
- if(CUR===id){VIEW_GEN++;CUR=null;EDITS=null;if(POLL)clearInterval(POLL);detail.innerHTML="";}
+ if(CUR===id){stopPolling();VIEW_GEN++;CUR=null;EDITS=null;AUTO_REVIEW=null;REVIEW_REQUEST=null;detail.innerHTML="";}
  JOBSJSON="";loadJobs();
 }
 async function openJob(id){
@@ -2157,17 +2235,17 @@ async function openJob(id){
   delete b.tlspans;delete b.audioSugg;delete b.audioTx;b.playing=false;
   trimReviewDraft(EDITS);
  }
+ stopPolling();POLL_FAILURES=0;AUTO_REVIEW=null;REVIEW_REQUEST=null;
  VIEW_GEN++;CUR=id;
  EDITS=REVIEW_DRAFTS.get(id);
  if(!EDITS){EDITS={en:{},enabled:{},manual:[],editor:emptyEditor(),busy:false,status:""};
   REVIEW_DRAFTS.set(id,EDITS);}
  EN=EDITS.en;MAN=EDITS.manual;BE=EDITS.editor;
  PHIST=[];PHPH="";LOGN=0;SHELLPH=null;
- detail.innerHTML='<div id="reviewSaveStatus" role="status" aria-live="polite" style="margin:8px 0;color:#fbbf24"></div>';
+ detail.innerHTML='<div id="pollStatus" role="status" aria-live="polite" style="margin:8px 0;color:#fbbf24"></div><div id="reviewSaveStatus" role="status" aria-live="polite" style="margin:8px 0;color:#fbbf24"></div>';
  saveStatus(EDITS,EDITS.status);
 
- if(POLL)clearInterval(POLL);
- POLL=setInterval(refresh,900); refresh();
+ refresh();
 }
 
 function shellHtml(j){
@@ -2183,11 +2261,13 @@ function shellHtml(j){
  </div>`;
 }
 
-async function refresh(){
- if(!CUR)return;
- const id=CUR,gen=VIEW_GEN;
- const j=await (await fetch("api/jobs/"+id)).json();
- if(!ownsView(id,gen))return;
+async function refreshCycle(cycle){
+ const {id,gen}=cycle;
+ const current=()=>ownsView(id,gen)&&POLL_CYCLE===cycle;
+ const j=await pollJson("api/jobs/"+id,cycle);
+ if(!ownsView(id,gen)||!current())return;
+ if(!j||typeof j.name!=="string"||typeof j.phase!=="string"||
+    typeof j.progress!=="number"||!Number.isFinite(j.progress))throw new Error("Invalid job update");
  if(SHELLPH===null){
   detail.insertAdjacentHTML("afterbegin",shellHtml(j));SHELLPH="";
   const im=document.getElementById("pimg");
@@ -2201,7 +2281,12 @@ async function refresh(){
  // client-side extrapolation from bar movement stays only as a fallback
  // (rehydrated jobs mid-phase), with its history reset on phase change so
  // it never extrapolates a scan-speed rate across the render phase.
- if(PHPH!==j.phase){PHIST=[];PHPH=j.phase;}
+ if(PHPH!==j.phase){
+  PHIST=[];PHPH=j.phase;
+  // Phase eligibility is separate from view identity. Leave-and-return creates
+  // a new token; slow same-phase review requests remain eligible.
+  AUTO_REVIEW=j.phase==="review"?{id,gen,state:"idle"}:null;
+ }
  PHIST.push([Date.now(),j.progress]); if(PHIST.length>40)PHIST.shift();
  let sec=null;
  if(typeof j.eta==="number"&&j.progress<1)sec=j.eta;
@@ -2216,15 +2301,28 @@ async function refresh(){
  // incremental log append with stick-to-bottom (respects manual scroll-up)
  const lg=document.getElementById("log");
  const stick=lg.scrollTop+lg.clientHeight>=lg.scrollHeight-40;
- const nl=await (await fetch(`api/jobs/${id}/log?from=${LOGN}`)).json();
- if(!ownsView(id,gen))return;
- if(LOGN===0&&nl.len>400){LOGN=nl.len-400;nl.lines=nl.lines.slice(-400);}
+ let nl=await pollJson(`api/jobs/${id}/log?from=${LOGN}`,cycle);
+ if(!ownsView(id,gen)||!current())return;
+ const validLog=n=>n&&Number.isInteger(n.from)&&n.from>=0&&
+  Number.isInteger(n.len)&&n.len>=0&&Array.isArray(n.lines)&&
+  n.lines.every(line=>typeof line==="string");
+ if(!validLog(nl))throw new Error("Invalid log update");
+ if(nl.len<LOGN){
+  lg.textContent="";LOGN=0;
+  if(nl.len){
+   nl=await pollJson(`api/jobs/${id}/log?from=0`,cycle);
+   if(!ownsView(id,gen)||!current())return;
+   if(!validLog(nl))throw new Error("Invalid log update");
+  }
+ }
+ if(nl.from!==LOGN&&nl.len!==0)throw new Error("Invalid log cursor");
+ if(LOGN===0&&nl.len>400)nl.lines=nl.lines.slice(-400);
  if(nl.lines.length){
   const NL=String.fromCharCode(10);
   lg.textContent+=(lg.textContent?NL:"")+nl.lines.join(NL);
-  LOGN=nl.len;
   if(stick)lg.scrollTop=lg.scrollHeight;
  }
+ LOGN=nl.len;
 
  // live preview: swap src in place (browser keeps old frame until new loads)
  const img=document.getElementById("pimg");
@@ -2253,7 +2351,7 @@ async function refresh(){
    // so open it directly — both on a live scan finishing and on
    // selecting a job that is already waiting in review
    a="";
-   loadReview();
+   // Automatic review starts below, outside the bounded polling cycle.
   }
   if(j.phase=="done"&&j.has_output)
    a=`<a href="api/jobs/${CUR}/download"><button>Download redacted video</button></a>
@@ -2267,6 +2365,14 @@ async function refresh(){
     <div id="beslot_done" style="width:100%"></div>`;
   document.getElementById("actions").innerHTML=a;
   if(j.phase!="scanning")img.style.display="none";
+ }
+ if(AUTO_REVIEW&&AUTO_REVIEW.state==="idle"){
+  const auto=AUTO_REVIEW;auto.state="loading";
+  loadReview(auto).catch(()=>{
+   if(AUTO_REVIEW===auto&&ownsView(id,gen)){
+    auto.state="idle";pollStatus("Review could not load — retrying job updates.");
+   }
+  });
  }
  loadJobs();
 }
@@ -2774,11 +2880,15 @@ function cmpShow(){
  document.getElementById("cmpR").src=`api/jobs/${CUR}/frame_at?t=${t}&src=output`;
 }
 
-async function loadReview(){
- const id=CUR,gen=VIEW_GEN;
+async function loadReview(auto=null){
+ const id=CUR,gen=VIEW_GEN,request={};REVIEW_REQUEST=request;
  showPanel("review");
- const d=await (await fetch(`api/jobs/${id}/detections`)).json();
- if(!ownsView(id,gen))return;
+ const r=await fetch(`api/jobs/${id}/detections`);
+ if(!r.ok)throw new Error("Review HTTP "+r.status);
+ const d=await r.json();
+ if(!ownsView(id,gen)||
+    (auto&&(REVIEW_REQUEST!==request||AUTO_REVIEW!==auto||PHPH!=="review")))return;
+ if(auto)auto.state="ready";
  DUR=d.duration;
  const groups={}; const zdrop=[]; TRKMEM={};
  d.detections.forEach(x=>{
