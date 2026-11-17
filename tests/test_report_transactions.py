@@ -216,7 +216,7 @@ def test_tracker_latest_id_and_offsets_survive_save(store, tracker):
         doc['detections'][-1]['track'] = 42
         doc['render_state']['fps'] = 10
         doc['render_state']['cum'] = [[2,3]] * 30
-        web.atomic_report(str(store.path), doc)
+        web._publish_job_report_locked(store.job, str(store.path), doc)
     release.set()
     join(threads[0])
     doc = json.loads(store.path.read_text())

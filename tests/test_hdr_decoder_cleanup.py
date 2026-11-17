@@ -189,7 +189,7 @@ def test_hdr_partial_cleanup_closes_pipes_with_retained_traceback(
             frames.append(tb.tb_frame.f_code)
             tb = tb.tb_next
         assert openscrub.run_render.__code__ in frames
-        assert openscrub.render_hdr.__code__ in frames
+        assert openscrub._render_hdr_into.__code__ in frames
         if failure == "cancel":
             assert type(error) is openscrub.PipelineCancelled
         else:
@@ -209,14 +209,14 @@ def test_hdr_success_keeps_source_bytes_frames_and_tags(
     output = tmp_path / "success.mp4"
     args, state = _args_state(source, output)
     captured = []
-    lines, start = inspect.getsourcelines(openscrub.render_hdr)
+    lines, start = inspect.getsourcelines(openscrub._render_hdr_into)
     tree = ast.parse("".join(lines))
     write_line, = [start + n.lineno - 1 for n in ast.walk(tree)
                    if isinstance(n, ast.Expr) and isinstance(n.value, ast.Call)
                    and ast.unparse(n.value.func) == "enc.stdin.write"]
 
     def trace(frame, event, arg):
-        if frame.f_code is openscrub.render_hdr.__code__:
+        if frame.f_code is openscrub._render_hdr_into.__code__:
             if event == "line" and frame.f_lineno == write_line:
                 captured.append(frame.f_locals["buf"].tobytes())
             return trace
