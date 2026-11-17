@@ -1,0 +1,840 @@
+
+6ae212a35b094fc9466f1616afb2c5bb5c0497f8:openscrub_web.py:274-277
+  274 TOKEN = None
+  275 JOBS = {}          # id -> job dict
+  276 JOBS_LOCK = threading.Lock()
+  277 WORK_Q = queue.Queue()
+
+6ae212a35b094fc9466f1616afb2c5bb5c0497f8:openscrub_web.py:325-377
+  325 def new_job(video_path, options, name):
+  326     jid = uuid.uuid4().hex[:12]
+  327     jdir = os.path.join(JOBS_DIR, jid)
+  328     os.makedirs(jdir, exist_ok=True)
+  329     job = {
+  330         "id": jid, "dir": jdir, "video": video_path, "name": name,
+  331         "options": options, "phase": "queued", "progress": 0.0,
+  332         "eta": None, "size": 0,
+  333         "log": [], "error": None, "output": None, "created": time.time(),
+  334         "cancel": threading.Event(), "stats": {}, "qgen": 0,
+  335     }
+  336     # keep the job's settings beside its upload: a scan that never finished
+  337     # has no report to recover them from, and a Retry after a restart then
+  338     # ran with DEFAULT settings (all categories) instead of the user's own
+  339     try:
+  340         with open(os.path.join(jdir, OPTIONS_FILE), "w",
+  341                   encoding="utf-8") as f:
+  342             json.dump(options, f)
+  343     except (OSError, TypeError, ValueError):
+  344         pass
+  345     with JOBS_LOCK:
+  346         JOBS[jid] = job
+  347     return job
+  348 
+  349 
+  350 def job_public(job):
+  351     return {k: job[k] for k in ("id", "name", "phase", "progress", "error",
+  352                                 "stats")} | {
+  353         "eta": job.get("eta"),      # .get(): jobs rehydrated from disk lack it
+  354         # input size: lets the editor warn before re-uploading a file that
+  355         # is ALREADY on the server (issue #16 — each retry re-uploaded the
+  356         # same 18 GB until the disk filled)
+  357         "size": job.get("size") or 0,
+  358         "log_tail": job["log"][-30:],
+  359         "log_len": len(job["log"]),
+  360         "has_output": bool(job["output"] and os.path.exists(job["output"])),
+  361     }
+  362 
+  363 
+  364 class WebCallbacks(openscrub.Callbacks):
+  365     wants_frames = True
+  366 
+  367     def __init__(self, job):
+  368         self.job = job
+  369         self._last_frame = 0.0
+  370         self._stage = None          # ETA state: current stage,
+  371         self._t0 = 0.0              # when it started,
+  372         self._cur0 = 0             # its first cur value,
+  373         self._eta = None            # and the smoothed estimate
+  374 
+  375     def log(self, msg):
+  376         self.job["log"].append(msg)
+  377 
+
+6ae212a35b094fc9466f1616afb2c5bb5c0497f8:openscrub_web.py:610-619
+  610             msg = "omitted"
+  611         else:
+  612             out[i + 1] = str(a.default)
+  613             msg = "using the default %r" % (a.default,)
+  614             i += 2
+  615         if job is not None and isinstance(job.get("log"), list):
+  616             job["log"].append("NOTE: setting %s=%r is not valid — %s"
+  617                               % (a.option_strings[0], v, msg))
+  618     return out
+  619 
+
+6ae212a35b094fc9466f1616afb2c5bb5c0497f8:openscrub_web.py:625-682
+  625 
+  626 
+  627 def enqueue(job, action):
+  628     """Queue a job action. Each enqueue bumps the job's generation, and the
+  629     worker skips any queue entry whose generation is stale — so cancelling
+  630     a queued job (which bumps it too) really removes it from the line, and
+  631     a Retry after a Cancel can't run the scan twice."""
+  632     with JOBS_LOCK:
+  633         job["qgen"] = job.get("qgen", 0) + 1
+  634         gen = job["qgen"]
+  635     WORK_Q.put((job["id"], action, gen))
+  636 
+  637 
+  638 def worker():
+  639     """Run queued jobs forever. NOTHING may end this loop: it is the
+  640     server's only worker, and when it died (a SystemExit from argparse —
+  641     which a thread swallows silently) the job froze at "scanning" with an
+  642     empty log, Cancel was ignored and every later job queued forever until
+  643     the container was restarted. Every per-job failure, BaseException
+  644     included, now fails that job loudly and the loop carries on."""
+  645     while True:
+  646         try:
+  647             item = WORK_Q.get()
+  648         except BaseException:          # pragma: no cover — queue can't fail
+  649             time.sleep(1)
+  650             continue
+  651         if item is None:               # explicit stop (tests); the watchdog
+  652             WORK_Q.task_done()         # starts a fresh worker in production
+  653             return
+  654         try:
+  655             jid, action = item[0], item[1]
+  656             gen = item[2] if len(item) > 2 else None
+  657             with JOBS_LOCK:
+  658                 job = JOBS.get(jid)
+  659                 stale = (job is None
+  660                          or (gen is not None and gen != job.get("qgen", 0))
+  661                          or job.get("phase") == "cancelled")
+  662                 if not stale:
+  663                     WORKER["current"] = jid
+  664             if not stale:
+  665                 _run_job(job, action)
+  666         except BaseException as e:     # belt and braces: never die
+  667             print(f"[web] worker: unexpected {type(e).__name__}: {e}",
+  668                   flush=True)
+  669         finally:
+  670             WORKER["current"] = None
+  671             WORK_Q.task_done()
+  672 
+  673 
+  674 def _run_job(job, action):
+  675     jid = job["id"]
+  676     cb = WebCallbacks(job)
+  677     try:
+  678         if action == "scan":
+  679             job["phase"] = "scanning"
+  680             job["log"].append("— scan started —")
+  681             args = build_args(job)
+  682             state = openscrub.run_scan(args, cb)
+
+6ae212a35b094fc9466f1616afb2c5bb5c0497f8:openscrub_web.py:740-823
+  740                         cv2.rectangle(crop, (pad, pad),
+  741                                       (crop.shape[1] - pad,
+  742                                        crop.shape[0] - pad),
+  743                                       (0, 0, 255), 2)
+  744                         cv2.imwrite(cch, crop,
+  745                                     [cv2.IMWRITE_JPEG_QUALITY, 80])
+  746                     cap.release()
+  747                     jb["log"].append("thumbnails pre-generated "
+  748                                      f"({len(todo)})")
+  749                 except Exception:
+  750                     pass
+  751             threading.Thread(target=_pregen, daemon=True).start()
+  752             try:
+  753                 prov = _load_job_report(job).get("provenance", {})
+  754                 if (prov.get("vfr_normalized")
+  755                         and os.path.exists(prov.get("input", ""))):
+  756                     job["video"] = prov["input"]
+  757                     job["log"].append(
+  758                         "using CFR-normalized file for previews/thumbnails")
+  759             except Exception:
+  760                 pass
+  761             if job["options"].get("skip_review"):
+  762                 job["log"].append("review skipped — rendering all detections")
+  763                 job["phase"] = "queued_render"
+  764                 enqueue(job, "render")
+  765             else:
+  766                 job["phase"] = "review"
+  767             job["progress"] = 0.5
+  768             job["eta"] = None
+  769         elif action == "render":
+  770             job["phase"] = "rendering"
+  771             args = build_args(job, for_render=True)
+  772             res = openscrub.run_pipeline(args, cb)
+  773             job["output"] = res["output"]
+  774             # refresh report with output hash
+  775             dets, rstate, prov = openscrub.load_report(
+  776                 os.path.join(job["dir"], "report.json"))
+  777             job["phase"] = "done"
+  778             job["progress"] = 1.0
+  779             job["eta"] = None
+  780     except openscrub.PipelineCancelled:
+  781         job["phase"] = "cancelled"
+  782         job["error"] = "cancelled by user"
+  783     except BaseException as e:
+  784         # BaseException, not Exception: a SystemExit (argparse) or any other
+  785         # non-Exception escaping here used to kill the worker thread silently
+  786         msg = str(e) or type(e).__name__
+  787         if isinstance(e, SystemExit):
+  788             msg = "the job stopped unexpectedly (exit %s)" % (e.code,)
+  789         job["phase"] = "error"
+  790         job["error"] = msg
+  791         job["log"].append(f"ERROR: {msg}")
+  792     finally:
+  793         job["eta"] = None       # a dead/paused job must not show "~N left"
+  794 
+  795 
+  796 def start_worker():
+  797     t = threading.Thread(target=worker, daemon=True, name="job-worker")
+  798     WORKER["thread"] = t
+  799     t.start()
+  800     return t
+  801 
+  802 
+  803 def check_worker():
+  804     """Watchdog step: if the worker thread is gone, fail the job it was
+  805     running (it can never finish now) and start a fresh worker so the
+  806     queue keeps moving. Returns True when it had to restart one."""
+  807     t = WORKER.get("thread")
+  808     if t is not None and t.is_alive():
+  809         return False
+  810     jid = WORKER.get("current")
+  811     with JOBS_LOCK:
+  812         job = JOBS.get(jid) if jid else None
+  813         if job is not None and job.get("phase") in _ACTIVE_PHASES:
+  814             job["phase"] = "error"
+  815             job["eta"] = None
+  816             job["error"] = ("the job worker stopped unexpectedly — the "
+  817                             "server restarted it; Retry re-runs the scan "
+  818                             "with the file already on the server")
+  819             job["log"].append("ERROR: " + job["error"])
+  820     WORKER["current"] = None
+  821     if t is not None:
+  822         print("[web] job worker was not running — restarted it", flush=True)
+  823     start_worker()
+
+6ae212a35b094fc9466f1616afb2c5bb5c0497f8:openscrub_web.py:952-957
+  952 
+  953 @app.route("/api/jobs")
+  954 def list_jobs():
+  955     with JOBS_LOCK:
+  956         js = sorted(JOBS.values(), key=lambda j: -j["created"])
+  957     return jsonify([job_public(j) for j in js])
+
+6ae212a35b094fc9466f1616afb2c5bb5c0497f8:openscrub_web.py:1031-1071
+ 1031 @app.route("/api/jobs/<jid>/retry", methods=["POST"])
+ 1032 def job_retry(jid):
+ 1033     """Re-run a failed or cancelled job's SCAN, reusing the file that is
+ 1034     already on the server. Before this existed, the only path after an
+ 1035     error was Start scan — which uploaded the same multi-GB file into a
+ 1036     fresh job dir on every attempt until the disk filled (issue #16)."""
+ 1037     with JOBS_LOCK:
+ 1038         job = JOBS.get(jid)
+ 1039         if job is None:
+ 1040             abort(404)
+ 1041         if job["phase"] not in ("error", "cancelled"):
+ 1042             return jsonify({"error": "only a failed or cancelled job can "
+ 1043                                      "be retried"}), 409
+ 1044         if not (job.get("video") and os.path.exists(job["video"])):
+ 1045             return jsonify({"error": "the job's video file is no longer "
+ 1046                                      "on the server — start a new "
+ 1047                                      "scan"}), 410
+ 1048         job["cancel"].clear()
+ 1049         job["error"] = None
+ 1050         job["output"] = None
+ 1051         job["progress"] = 0.0
+ 1052         job["eta"] = None
+ 1053         job["phase"] = "queued"
+ 1054         job["log"].append("— retrying scan (reusing the file already on "
+ 1055                           "the server — nothing is re-uploaded) —")
+ 1056     enqueue(job, "scan")
+ 1057     return jsonify({"ok": True})
+ 1058 
+ 1059 
+ 1060 @app.route("/api/jobs/<jid>")
+ 1061 def job_status(jid):
+ 1062     job = JOBS.get(jid) or abort(404)
+ 1063     return jsonify(job_public(job))
+ 1064 
+ 1065 
+ 1066 @app.route("/api/jobs/<jid>/log")
+ 1067 def job_log(jid):
+ 1068     job = JOBS.get(jid) or abort(404)
+ 1069     frm = max(0, int(request.args.get("from", 0)))
+ 1070     return jsonify({"from": frm, "lines": job["log"][frm:],
+ 1071                     "len": len(job["log"])})
+
+6ae212a35b094fc9466f1616afb2c5bb5c0497f8:openscrub_web.py:1083-1100
+ 1083 @app.route("/api/jobs/<jid>/cancel", methods=["POST"])
+ 1084 def job_cancel(jid):
+ 1085     """Cancel a job. The job the worker is RUNNING stops cooperatively at
+ 1086     its next checkpoint. Any other active job (still queued, or orphaned by
+ 1087     a worker that died) is cancelled on the spot — before, Cancel only set
+ 1088     a flag the worker checks mid-scan, so a job the worker never picked up
+ 1089     could never be cancelled (or deleted: delete refuses active jobs)."""
+ 1090     job = JOBS.get(jid) or abort(404)
+ 1091     job["cancel"].set()
+ 1092     with JOBS_LOCK:
+ 1093         if (WORKER.get("current") != jid
+ 1094                 and job.get("phase") in _ACTIVE_PHASES):
+ 1095             job["qgen"] = job.get("qgen", 0) + 1   # void its queue entry
+ 1096             job["phase"] = "cancelled"
+ 1097             job["error"] = "cancelled by user"
+ 1098             job["eta"] = None
+ 1099             job["log"].append("— cancelled —")
+ 1100     return jsonify({"ok": True})
+
+6ae212a35b094fc9466f1616afb2c5bb5c0497f8:openscrub_web.py:1367-1375
+ 1367     st = {"state": "running", "added": 0, "error": None}
+ 1368     job["trackbg"] = st
+ 1369 
+ 1370     def _run():
+ 1371         try:
+ 1372             class L(openscrub.Callbacks):
+ 1373                 def log(self, m):
+ 1374                     job["log"].append(m)
+ 1375             det = None
+
+6ae212a35b094fc9466f1616afb2c5bb5c0497f8:openscrub_web.py:1424-1437
+ 1424             doc["detections"].extend(new)
+ 1425             path = os.path.join(job["dir"], "report.json")
+ 1426             with open(path, "w", encoding="utf-8") as f:
+ 1427                 json.dump(doc, f, indent=1)
+ 1428             job["log"].append(
+ 1429                 "      tracked object: %d position(s), %.1f-%.1fs "
+ 1430                 "(review card added)" % (len(new),
+ 1431                                          new[0]["t_start"], new[-1]["t_end"]))
+ 1432             st.update(state="done", added=len(new))
+ 1433         except Exception as e:
+ 1434             st.update(state="done", added=0, error=str(e))
+ 1435 
+ 1436     threading.Thread(target=_run, daemon=True).start()
+ 1437     return jsonify({"ok": True})
+
+6ae212a35b094fc9466f1616afb2c5bb5c0497f8:openscrub_web.py:2080-2118
+ 2080 let CUR=null, EN={}, MAN=[], DUR=0, POLL=null, PHIST=[], PHPH="", LOGN=0, SHELLPH=null, JOBSJSON="";
+ 2081 
+ 2082 // VIEW_GEN advances on every openJob (including A -> B -> A) and removal.
+ 2083 // Drafts live only in this page; late acknowledgements reconcile their owner,
+ 2084 // but may never publish into, or start rendering from, a different view.
+ 2085 let VIEW_GEN=0, EDITS=null;
+ 2086 // Polling owns one metadata -> log cycle, using the existing view identity.
+ 2087 let POLL_CYCLE=null, POLL_FAILURES=0, AUTO_REVIEW=null, REVIEW_REQUEST=null;
+ 2088 function pollStatus(message){
+ 2089  const el=document.getElementById("pollStatus");
+ 2090  if(el&&el.textContent!==message)el.textContent=message;
+ 2091 }
+ 2092 function stopPolling(){
+ 2093  if(POLL){clearTimeout(POLL.handle);POLL=null;}
+ 2094  const old=POLL_CYCLE;POLL_CYCLE=null;
+ 2095  if(old)old.controller.abort();
+ 2096 }
+ 2097 function schedulePoll(id,gen,delay){
+ 2098  if(!ownsView(id,gen)||document.hidden)return;
+ 2099  if(POLL)clearTimeout(POLL.handle);
+ 2100  const timer={id,gen};POLL=timer;
+ 2101  timer.handle=setTimeout(()=>{
+ 2102   if(POLL!==timer||!ownsView(id,gen))return;
+ 2103   POLL=null;refresh();
+ 2104  },delay);
+ 2105 }
+ 2106 // Only metadata/log use this deadline. Race body consumption too: abort alone
+ 2107 // cannot settle a transport/body that ignores it. Losing work has no UI effects.
+ 2108 async function pollJson(url,cycle){
+ 2109  const controller=new AbortController(),signal=cycle.controller.signal;
+ 2110  let deadline,onCancel;
+ 2111  const stopped=new Promise((_,reject)=>{
+ 2112   const fail=message=>{controller.abort();reject(new Error(message));};
+ 2113   onCancel=()=>fail("Polling cancelled");
+ 2114   signal.addEventListener("abort",onCancel,{once:true});
+ 2115   deadline=setTimeout(()=>fail("Polling timed out"),15000);
+ 2116   if(signal.aborted)onCancel();
+ 2117  });
+ 2118  const operation=(async()=>{
+
+6ae212a35b094fc9466f1616afb2c5bb5c0497f8:openscrub_web.py:2126-2163
+ 2126 function refresh(){
+ 2127  if(!CUR||document.hidden)return;
+ 2128  if(POLL_CYCLE)return POLL_CYCLE.promise;
+ 2129  if(POLL){clearTimeout(POLL.handle);POLL=null;}
+ 2130  const cycle={id:CUR,gen:VIEW_GEN,controller:new AbortController()};
+ 2131  POLL_CYCLE=cycle;
+ 2132  cycle.promise=(async()=>{
+ 2133   let delay=900;
+ 2134   try{
+ 2135    await refreshCycle(cycle);
+ 2136    if(POLL_CYCLE!==cycle||!ownsView(cycle.id,cycle.gen))return;
+ 2137    POLL_FAILURES=0;pollStatus("");
+ 2138   }catch(e){
+ 2139    if(POLL_CYCLE!==cycle||!ownsView(cycle.id,cycle.gen))return;
+ 2140    delay=Math.min(10000,900*Math.pow(2,Math.min(POLL_FAILURES++,4)));
+ 2141    pollStatus("Job updates interrupted — retrying in "+(delay/1000)+" s.");
+ 2142   }finally{
+ 2143    if(POLL_CYCLE===cycle&&ownsView(cycle.id,cycle.gen)){
+ 2144     POLL_CYCLE=null;
+ 2145     // Chained after completion: request duration adds to the healthy 900 ms.
+ 2146     schedulePoll(cycle.id,cycle.gen,delay);
+ 2147    }
+ 2148   }
+ 2149  })();
+ 2150  return cycle.promise;
+ 2151 }
+ 2152 function wakePolling(){
+ 2153  if(!CUR||document.hidden)return;
+ 2154  // A pending immediate wake already coalesces focus/pageshow/online bursts.
+ 2155  if(POLL&&POLL.wake)return;
+ 2156  stopPolling();
+ 2157  schedulePoll(CUR,VIEW_GEN,0);if(POLL)POLL.wake=true;
+ 2158 }
+ 2159 document.addEventListener("visibilitychange",()=>{
+ 2160  if(document.hidden)stopPolling();else wakePolling();
+ 2161 });
+ 2162 window.addEventListener("pagehide",stopPolling);
+ 2163 for(const event of ["focus","pageshow","online"])window.addEventListener(event,wakePolling);
+
+6ae212a35b094fc9466f1616afb2c5bb5c0497f8:openscrub_web.py:2210-2214
+ 2210 async function retryJob(id){
+ 2211  const r=await fetch("api/jobs/"+id+"/retry",{method:"POST"});
+ 2212  let j={};try{j=await r.json();}catch(e){}
+ 2213  if(!r.ok){alert(j.error||"could not retry the job");return;}
+ 2214  JOBSJSON="";loadJobs();if(typeof openJob==="function")openJob(id);
+
+6ae212a35b094fc9466f1616afb2c5bb5c0497f8:openscrub_web.py:2238-2248
+ 2238  stopPolling();POLL_FAILURES=0;AUTO_REVIEW=null;REVIEW_REQUEST=null;
+ 2239  VIEW_GEN++;CUR=id;
+ 2240  EDITS=REVIEW_DRAFTS.get(id);
+ 2241  if(!EDITS){EDITS={en:{},enabled:{},manual:[],editor:emptyEditor(),busy:false,status:""};
+ 2242   REVIEW_DRAFTS.set(id,EDITS);}
+ 2243  EN=EDITS.en;MAN=EDITS.manual;BE=EDITS.editor;
+ 2244  PHIST=[];PHPH="";LOGN=0;SHELLPH=null;
+ 2245  detail.innerHTML='<div id="pollStatus" role="status" aria-live="polite" style="margin:8px 0;color:#fbbf24"></div><div id="reviewSaveStatus" role="status" aria-live="polite" style="margin:8px 0;color:#fbbf24"></div>';
+ 2246  saveStatus(EDITS,EDITS.status);
+ 2247 
+ 2248  refresh();
+
+6ae212a35b094fc9466f1616afb2c5bb5c0497f8:openscrub_web.py:2301-2325
+ 2301  // incremental log append with stick-to-bottom (respects manual scroll-up)
+ 2302  const lg=document.getElementById("log");
+ 2303  const stick=lg.scrollTop+lg.clientHeight>=lg.scrollHeight-40;
+ 2304  let nl=await pollJson(`api/jobs/${id}/log?from=${LOGN}`,cycle);
+ 2305  if(!ownsView(id,gen)||!current())return;
+ 2306  const validLog=n=>n&&Number.isInteger(n.from)&&n.from>=0&&
+ 2307   Number.isInteger(n.len)&&n.len>=0&&Array.isArray(n.lines)&&
+ 2308   n.lines.every(line=>typeof line==="string");
+ 2309  if(!validLog(nl))throw new Error("Invalid log update");
+ 2310  if(nl.len<LOGN){
+ 2311   lg.textContent="";LOGN=0;
+ 2312   if(nl.len){
+ 2313    nl=await pollJson(`api/jobs/${id}/log?from=0`,cycle);
+ 2314    if(!ownsView(id,gen)||!current())return;
+ 2315    if(!validLog(nl))throw new Error("Invalid log update");
+ 2316   }
+ 2317  }
+ 2318  if(nl.from!==LOGN&&nl.len!==0)throw new Error("Invalid log cursor");
+ 2319  if(LOGN===0&&nl.len>400)nl.lines=nl.lines.slice(-400);
+ 2320  if(nl.lines.length){
+ 2321   const NL=String.fromCharCode(10);
+ 2322   lg.textContent+=(lg.textContent?NL:"")+nl.lines.join(NL);
+ 2323   if(stick)lg.scrollTop=lg.scrollHeight;
+ 2324  }
+ 2325  LOGN=nl.len;
+
+6ae212a35b094fc9466f1616afb2c5bb5c0497f8:openscrub_web.py:3337-3337
+ 3337 UPD = {"running": False, "log": [], "ok": None, "cache": (0.0, None)}
+
+6ae212a35b094fc9466f1616afb2c5bb5c0497f8:openscrub_web.py:3387-3413
+ 3387     with UPD_LOCK:
+ 3388         if UPD["running"]:
+ 3389             return jsonify({"started": False, "reason": "already running"})
+ 3390         UPD["running"], UPD["log"], UPD["ok"] = True, [], None
+ 3391 
+ 3392     def _go():
+ 3393         def log(msg):
+ 3394             with UPD_LOCK:
+ 3395                 UPD["log"].append(str(msg))
+ 3396         try:
+ 3397             openscrub_update.run_update(log=log)
+ 3398             ok = True
+ 3399         except Exception as e:
+ 3400             log("update failed: %s" % e)
+ 3401             ok = False
+ 3402         with UPD_LOCK:
+ 3403             UPD["ok"], UPD["running"] = ok, False
+ 3404 
+ 3405     threading.Thread(target=_go, daemon=True).start()
+ 3406     return jsonify({"started": True})
+ 3407 
+ 3408 
+ 3409 @app.route("/api/update_status")
+ 3410 def update_status():
+ 3411     with UPD_LOCK:
+ 3412         return jsonify({"running": UPD["running"], "ok": UPD["ok"],
+ 3413                         "log": list(UPD["log"])})
+
+6ae212a35b094fc9466f1616afb2c5bb5c0497f8:openscrub_web.py:3674-3685
+ 3674 _EXT = {"state": "idle", "target": "", "log": []}
+ 3675 
+ 3676 
+ 3677 @app.route("/api/extras")
+ 3678 def extras_status():
+ 3679     frozen = bool(getattr(sys, "frozen", False))
+ 3680     items = [{"id": k, "label": v["label"], "desc": v["desc"],
+ 3681               "installed": (False if frozen else v["check"]())}
+ 3682              for k, v in EXTRAS.items()]
+ 3683     return jsonify({"frozen": frozen, "items": items,
+ 3684                     "state": _EXT["state"], "target": _EXT["target"],
+ 3685                     "log": _EXT["log"][-4:]})
+
+6ae212a35b094fc9466f1616afb2c5bb5c0497f8:openscrub_web.py:3703-3715
+ 3703             cmds += [[sys.executable] + p for p in spec["post"]]
+ 3704             for cmd in cmds:
+ 3705                 _EXT["log"].append("$ " + " ".join(cmd[1:]))
+ 3706                 r = subprocess.run(cmd, capture_output=True, text=True)
+ 3707                 if r.returncode != 0:
+ 3708                     tail = (r.stderr or r.stdout or "").strip().splitlines()
+ 3709                     _EXT["log"] += tail[-3:] or ["exit %d" % r.returncode]
+ 3710                     _EXT["state"] = "error"
+ 3711                     return
+ 3712             _EXT["log"].append("done — takes effect on the next scan")
+ 3713             _EXT["state"] = "done"
+ 3714         except Exception as e:
+ 3715             _EXT["log"].append(str(e))
+
+6ae212a35b094fc9466f1616afb2c5bb5c0497f8:openscrub_web.py:3954-3967
+ 3954     except Exception:
+ 3955         return "127.0.0.1"
+ 3956 
+ 3957 
+ 3958 def rehydrate_jobs():
+ 3959     """Re-register jobs found on disk after a restart. A job with a report
+ 3960     is a reviewable job; one with an output file is a finished one — either
+ 3961     way the person's work survives the server going down."""
+ 3962     n = 0
+ 3963     for jid in sorted(os.listdir(JOBS_DIR)):
+ 3964         jdir = os.path.join(JOBS_DIR, jid)
+ 3965         rep = os.path.join(jdir, "report.json")
+ 3966         if not os.path.isdir(jdir):
+ 3967             continue
+
+6ae212a35b094fc9466f1616afb2c5bb5c0497f8:openscrub_web.py:4001-4022
+ 4001                 opts = {}
+ 4002             job = {
+ 4003                 "id": jid, "dir": jdir, "video": up,
+ 4004                 "name": os.path.basename(up), "options": opts,
+ 4005                 "phase": "error", "progress": 0.0, "size": size,
+ 4006                 "log": ["(recovered after server restart — the scan had "
+ 4007                         "not completed)"],
+ 4008                 "error": "recovered after a server restart before the "
+ 4009                          "scan finished — Retry re-runs it with "
+ 4010                          + ("its original settings" if opts else
+ 4011                             "default settings")
+ 4012                          + " (the uploaded file was kept), or "
+ 4013                          "Delete frees its disk space",
+ 4014                 "output": None, "created": os.path.getmtime(jdir),
+ 4015                 "cancel": threading.Event(), "stats": {},
+ 4016             }
+ 4017             with JOBS_LOCK:
+ 4018                 JOBS[jid] = job
+ 4019             n += 1
+ 4020             continue
+ 4021         try:
+ 4022             with open(rep, encoding="utf-8") as f:
+
+6ae212a35b094fc9466f1616afb2c5bb5c0497f8:openscrub_web.py:4029-4050
+ 4029             job = {
+ 4030                 "id": jid, "dir": jdir, "video": video,
+ 4031                 "name": os.path.basename(prov.get("original_input")
+ 4032                                           or video),
+ 4033                 "options": prov.get("settings", {}) or {},
+ 4034                 "phase": "done" if has_out else "review",
+ 4035                 "progress": 1.0 if has_out else 0.5,
+ 4036                 "log": ["(recovered after server restart)"],
+ 4037                 "error": None, "output": out if has_out else None,
+ 4038                 "created": os.path.getmtime(jdir),
+ 4039                 "cancel": threading.Event(), "stats": {},
+ 4040             }
+ 4041             try:
+ 4042                 # original upload size, for the editor's duplicate-upload
+ 4043                 # warning (prov input may be the normalized scan copy)
+ 4044                 orig = next((os.path.join(jdir, "input" + e)
+ 4045                              for e in sorted(MEDIA_EXTS)
+ 4046                              if os.path.exists(
+ 4047                                  os.path.join(jdir, "input" + e))), video)
+ 4048                 job["size"] = os.path.getsize(orig)
+ 4049             except OSError:
+ 4050                 pass
+
+6ae212a35b094fc9466f1616afb2c5bb5c0497f8:openscrub_web.py:4067-4075
+ 4067         if os.path.exists(os.path.join(p, DELETE_MARKER)):
+ 4068             _reap_job_dir(p, jid, retries=1)     # condemned: age-independent
+ 4069             continue
+ 4070         if os.path.getmtime(p) < cutoff:
+ 4071             _sh.rmtree(p, ignore_errors=True)
+ 4072             with JOBS_LOCK:
+ 4073                 JOBS.pop(jid, None)
+ 4074 
+ 4075 
+
+6ae212a35b094fc9466f1616afb2c5bb5c0497f8:openscrub.py:3436-3445
+ 3436 class Callbacks:
+ 3437     """Hooks for embedding the pipeline (GUI, batch runner, tests).
+ 3438     The default implementation reproduces the CLI's print behavior."""
+ 3439     wants_frames = False   # set True to receive scan_frame() calls
+ 3440 
+ 3441     def log(self, msg):
+ 3442         print(msg, flush=True)
+ 3443 
+ 3444     def progress(self, stage, current, total):
+ 3445         pass  # stage is "scan" or "render"
+
+6ae212a35b094fc9466f1616afb2c5bb5c0497f8:openscrub.py:8404-8409
+ 8404     if recall_counts:
+ 8405         top = sorted(recall_counts.items(), key=lambda kv: -kv[1])[:8]
+ 8406         cb.log("      top recalled strings (check for false positives): "
+ 8407                + ", ".join(f"'{k}'x{v}" for k, v in top))
+ 8408 
+ 8409     bands, _bsup = _suppress_textless_bands(bands, len(raw))
+
+6ae212a35b094fc9466f1616afb2c5bb5c0497f8:openscrub_gui.py:97-106
+   97 class GuiCallbacks(openscrub.Callbacks):
+   98     """Thread-safe: pushes events onto a queue the UI thread drains."""
+   99     wants_frames = True
+  100 
+  101     def __init__(self, q, cancel_event):
+  102         self.q = q
+  103         self.cancel_event = cancel_event
+  104 
+  105     def log(self, msg):
+  106         self.q.put(("log", msg))
+
+6ae212a35b094fc9466f1616afb2c5bb5c0497f8:openscrub_gui.py:488-492
+  488     def _log(self, msg):
+  489         self.log.config(state="normal")
+  490         self.log.insert("end", msg + "\n")
+  491         self.log.see("end")
+  492         self.log.config(state="disabled")
+
+6ae212a35b094fc9466f1616afb2c5bb5c0497f8:openscrub_gui.py:507-514
+  507     def _drain_queue(self):
+  508         try:
+  509             while True:
+  510                 item = self.q.get_nowait()
+  511                 kind = item[0]
+  512                 if kind == "log":
+  513                     self._log(item[1])
+  514                 elif kind == "progress":
+
+6ae212a35b094fc9466f1616afb2c5bb5c0497f8:pyproject.toml:9-12
+    9 readme = "README.md"
+   10 requires-python = ">=3.9"
+   11 license = { file = "LICENSE" }
+   12 authors = [{ name = "Austin Mabry" }]
+
+6ae212a35b094fc9466f1616afb2c5bb5c0497f8:pyproject.toml:80-89
+   80 "plate_models.json" = "plate_models.json"
+   81 "face_models.json" = "face_models.json"
+   82 "person_models.json" = "person_models.json"
+   83 # third-party model licenses + copyright notices. Lands at the top of
+   84 # site-packages beside the registries, so it gets a project-prefixed name
+   85 # that can't collide with another package's notices file.
+   86 "THIRD_PARTY_NOTICES.md" = "openscrub_THIRD_PARTY_NOTICES.md"
+   87 # branded icon for the Start Menu shortcut openscrub-setup creates
+   88 "assets/openscrub.ico" = "openscrub.ico"
+   89 
+
+6ae212a35b094fc9466f1616afb2c5bb5c0497f8:pyproject.toml:106-153
+  106     "openscrub.py",
+  107     "openscrub_setup.py",
+  108     "openscrub_update.py",
+  109     "openscrub_vault.py",
+  110     "openscrub_web.py",
+  111     "zones_ui.py",
+  112     "install.py",
+  113     "requirements.txt",
+  114     "README.md",
+  115     "LICENSE",
+  116     "NOTICE",
+  117     "THIRD_PARTY_NOTICES.md",
+  118     "test_openscrub.py",
+  119     "tests/",
+  120 ]
+  121 
+  122 [tool.pytest.ini_options]
+  123 testpaths = ["test_openscrub.py", "tests"]
+
+6ae212a35b094fc9466f1616afb2c5bb5c0497f8:Dockerfile:59-64
+   59 # ---- app layers: tiny, change every release
+   60 COPY pyproject.toml README.md LICENSE NOTICE THIRD_PARTY_NOTICES.md plate_models.json face_models.json person_models.json ./
+   61 COPY openscrub.py openscrub_web.py openscrub_setup.py openscrub_update.py \
+   62      openscrub_vault.py zones_ui.py install.py test_openscrub.py ./
+   63 COPY assets/openscrub.ico assets/
+   64 RUN pip install --no-cache-dir --no-deps .
+
+6ae212a35b094fc9466f1616afb2c5bb5c0497f8:Dockerfile.cuda:131-136
+  131 # ---- app layers: tiny, change every release
+  132 COPY pyproject.toml README.md LICENSE NOTICE THIRD_PARTY_NOTICES.md plate_models.json face_models.json person_models.json ./
+  133 COPY openscrub.py openscrub_web.py openscrub_setup.py openscrub_update.py \
+  134      openscrub_vault.py zones_ui.py install.py test_openscrub.py ./
+  135 COPY assets/openscrub.ico assets/
+  136 RUN pip install --no-cache-dir --no-deps .
+
+6ae212a35b094fc9466f1616afb2c5bb5c0497f8:Dockerfile.intel:93-98
+   93 # ---- app layers: tiny, change every release
+   94 COPY pyproject.toml README.md LICENSE NOTICE THIRD_PARTY_NOTICES.md plate_models.json face_models.json person_models.json ./
+   95 COPY openscrub.py openscrub_web.py openscrub_setup.py openscrub_update.py \
+   96      openscrub_vault.py zones_ui.py install.py test_openscrub.py ./
+   97 COPY assets/openscrub.ico assets/
+   98 RUN pip install --no-cache-dir --no-deps .
+
+6ae212a35b094fc9466f1616afb2c5bb5c0497f8:windows/openscrub.spec:59-76
+   59     datas=DATAS, hiddenimports=HIDDEN, excludes=EXCLUDES,
+   60 )
+   61 a_cli = Analysis(
+   62     [os.path.join(ROOT, "openscrub.py")],
+   63     pathex=[ROOT], binaries=_ort_bins,
+   64     datas=DATAS, hiddenimports=_ort_hidden, excludes=EXCLUDES,
+   65 )
+   66 
+   67 pyz_web = PYZ(a_web.pure)
+   68 pyz_cli = PYZ(a_cli.pure)
+   69 
+   70 exe_web = EXE(
+   71     pyz_web, a_web.scripts, [],
+   72     exclude_binaries=True, name="openscrub-web", icon=ICON,
+   73     console=True,        # the console shows the access URL and the log
+   74 )
+   75 exe_cli = EXE(
+   76     pyz_cli, a_cli.scripts, [],
+
+6ae212a35b094fc9466f1616afb2c5bb5c0497f8:openscrub_update.py:140-181
+  140 def update_source(latest, log):
+  141     log("updating folder install at %s …" % HERE)
+  142     # download the sdist and verify it against the hash PyPI publishes
+  143     log("  downloading %s" % latest["sdist_url"])
+  144     with urllib.request.urlopen(latest["sdist_url"], timeout=60) as r:
+  145         blob = r.read()
+  146     digest = hashlib.sha256(blob).hexdigest()
+  147     if not latest["sha256"] or digest != latest["sha256"]:
+  148         raise RuntimeError(
+  149             "sdist SHA-256 mismatch (expected %s, got %s) — aborting, "
+  150             "nothing was changed" % (latest["sha256"] or "<none>", digest))
+  151     log("  sha256 verified (%s…)" % digest[:16])
+  152 
+  153     stamp = time.strftime("%Y%m%d-%H%M%S")
+  154     bak = os.path.join(HERE, "backups",
+  155                        "pre-update-%s-%s" % (current_version(), stamp))
+  156     staged = 0
+  157     with tarfile.open(fileobj=io.BytesIO(blob), mode="r:gz") as tar:
+  158         members = [m for m in tar.getmembers() if m.isfile()]
+  159         for m in members:
+  160             # strip the leading 'OpenScrub-x.y.z/' directory
+  161             rel = m.name.split("/", 1)[1] if "/" in m.name else m.name
+  162             if not rel or rel.startswith("."):
+  163                 continue
+  164             top = rel.split("/", 1)[0]
+  165             if top in PRESERVE or os.path.basename(rel) == "PKG-INFO":
+  166                 continue
+  167             data = tar.extractfile(m).read()
+  168             dest = os.path.join(HERE, *rel.split("/"))
+  169             tmp = dest + ".new"
+  170             os.makedirs(os.path.dirname(dest), exist_ok=True)
+  171             with open(tmp, "wb") as f:
+  172                 f.write(data)
+  173             if rel in ("plate_models.json", "face_models.json",
+  174                        "person_models.json") \
+  175                     and os.path.exists(dest):
+  176                 _merge_registry_file(dest, tmp, log)
+  177             if os.path.exists(dest):
+  178                 os.makedirs(os.path.join(bak, os.path.dirname(rel))
+  179                             if os.path.dirname(rel) else bak, exist_ok=True)
+  180                 shutil.copy2(dest, os.path.join(bak, *rel.split("/")))
+  181             os.replace(tmp, dest)
+
+6ae212a35b094fc9466f1616afb2c5bb5c0497f8:tests/test_job_polling_node.py:119-126
+  119 def test_authoritative_empty_shrunk_cursor_initial_tail_and_scroll():
+  120     run_js("""openJob('A');await reply(job());await reply(log(Array.from({length:405},(_,i)=>'L'+i),405,0));
+  121     const lg=elements.get('log');assert.equal(lg.textContent.split('\\n').length,400);assert.ok(lg.textContent.startsWith('L5\\n'));
+  122     assert.equal(LOGN,405);assert.equal(lg.scrollTop,100);lg.scrollTop=0;lg.scrollHeight=1000;
+  123     await advance(900);await reply(job());await reply(log([],1,405));
+  124     assert.equal(lg.textContent,'');assert.equal(LOGN,0);assert.ok(queue[0].url.endsWith('from=0'));
+  125     await reply(log(['new'],1,0));assert.equal(lg.textContent,'new');assert.equal(LOGN,1);assert.equal(lg.scrollTop,0);
+  126     await advance(900);await cycle();assert.equal(LOGN,0,'empty len=0 is authoritative');""")
+
+6ae212a35b094fc9466f1616afb2c5bb5c0497f8:tests/test_job_polling_browser.py:18-28
+   18 @pytest.fixture
+   19 def polling_http(monkeypatch, tmp_path):
+   20     import openscrub_web as web
+   21 
+   22     monkeypatch.setattr(web, 'JOBS', {})
+   23     monkeypatch.setattr(web, 'JOBS_DIR', str(tmp_path))
+   24     for jid in ('A', 'B'):
+   25         job = web.new_job('', {}, 'synthetic job ' + jid)
+   26         web.JOBS.pop(job['id'])
+   27         job.update(id=jid, phase='queued', progress=.2, log=['log-' + jid])
+   28         web.JOBS[jid] = job
+
+6ae212a35b094fc9466f1616afb2c5bb5c0497f8:tests/test_job_polling_browser.py:58-64
+   58                 # The real production metadata/log routes supply the JSON body.
+   59                 with web.app.test_client() as client:
+   60                     result = client.get(self.path)
+   61                 payload = result.data
+   62                 content_type = result.content_type
+   63             kind = 'log' if path.endswith('/log') else 'meta'
+   64             held = path.startswith('/api/jobs/A') and state['kind'] == kind
+
+6ae212a35b094fc9466f1616afb2c5bb5c0497f8:tests/test_job_polling_browser.py:119-127
+  119   if(q.pass===kind&&req.method()==='GET')return route.continue();
+  120   if(/thumb|detframe|frame_at|preview.jpg/.test(kind))return route.fulfill({contentType:'image/png',body:tiny});
+  121   let body=kind==='meta'?meta(id,q.phase,q.progress):kind==='log'?{from:+u.searchParams.get('from'),lines:q.logs[id].slice(+u.searchParams.get('from')),len:q.logs[id].length}:
+  122    kind==='detections'?{duration:10,detections:[{i:0,category:'mrn',text:'review-'+id,enabled:true,t_start:0,t_end:1,track:-1,person:-1}]}:
+  123    kind==='mediainfo'?{duration:10,width:320,height:180}:kind==='report'?{detections:[],audio_redactions:[{t0:1,t1:2,mode:'mute'}]}:{ok:true};
+  124   const plan=q.plans.find(p=>!p.used&&p.kind===kind&&(!p.id||p.id===id));
+  125   if(plan){plan.used=true;if(plan.body)body=plan.body;if(plan.abort)return route.abort('failed');
+  126    if(plan.hold)await new Promise(resolve=>q.held.push({id,kind,release:resolve}));}
+  127   await route.fulfill({status:plan?.status||200,contentType:'application/json',body:plan?.raw??JSON.stringify(body)}).catch(()=>{});
+
+6ae212a35b094fc9466f1616afb2c5bb5c0497f8:tests/test_job_polling_browser.py:185-190
+  185  const q=await setup('cursor-tail-scroll-reset');q.logs.A=Array.from({length:405},(_,i)=>'L'+i);
+  186  await q.page.evaluate(()=>openJob('A'));await wait(async()=>await q.page.evaluate(()=>LOGN===405));
+  187  assert.equal((await q.page.locator('#log').innerText()).split('\n').length,400);assert.match(await q.page.locator('#log').innerText(),/^L5\n/);
+  188  await q.page.locator('#log').evaluate(e=>e.scrollTop=0);q.logs.A=['new'];await advance(q);await wait(async()=>await q.page.evaluate(()=>LOGN===1));
+  189  assert.equal(await q.page.locator('#log').innerText(),'new');assert.ok(q.events.filter(e=>e.kind==='log').at(-1).query==='?from=0');
+  190  q.logs.A=[];await advance(q);await wait(async()=>await q.page.evaluate(()=>LOGN===0));assert.equal(await q.page.locator('#log').innerText(),'');await finish(q);
+
+6ae212a35b094fc9466f1616afb2c5bb5c0497f8:test_openscrub.py:488-489
+  488     job = {"video": str(tmp_path / "x.mp4"), "dir": str(tmp_path), "log": [],
+  489            "options": {}}
+
+6ae212a35b094fc9466f1616afb2c5bb5c0497f8:test_openscrub.py:665-666
+  665     job = {"video": str(tmp_path / "x.mp4"), "dir": str(tmp_path), "log": [],
+  666            "options": {"categories": "phrase",
+
+6ae212a35b094fc9466f1616afb2c5bb5c0497f8:test_openscrub.py:3620-3629
+ 3620     import openscrub_web as w
+ 3621     job = {"video": str(tmp_path / "x.mp4"), "dir": str(tmp_path), "log": [],
+ 3622            "options": {"engine": "", "device": None, "mode": "smudge",
+ 3623                        "pad": None, "detect_scale": "nan",
+ 3624                        "face_threshold": "", "scan_speed": "fastest"}}
+ 3625     a = w.build_args(job)
+ 3626     assert (a.engine, a.device, a.mode) == ("auto", "auto", "blur")
+ 3627     assert a.pad == 8 and a.detect_scale == 0.5     # fastest still applies
+ 3628     assert a.face_threshold == 0.6
+ 3629     assert any("--engine" in l and "not valid" in l for l in job["log"])
+
+6ae212a35b094fc9466f1616afb2c5bb5c0497f8:test_openscrub.py:3680-3690
+ 3680         assert client.post(f"/api/jobs/{c['id']}/retry").status_code == 200
+ 3681         w.WORK_Q.put(None)             # stop marker: worker exits after
+ 3682         t = threading.Thread(target=w.worker, daemon=True)
+ 3683         t.start()
+ 3684         t.join(10)
+ 3685         assert not t.is_alive()
+ 3686         assert a["phase"] == "error" and "stopped unexpectedly" in a["error"]
+ 3687         assert any(l.startswith("ERROR:") for l in a["log"])
+ 3688         assert b["phase"] == "error" and b["error"] == "second job ran", \
+ 3689             "the worker must survive job A and run job B"
+ 3690         assert ran.count(c["id"]) == 1, "retried job must run exactly once"

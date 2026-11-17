@@ -1,0 +1,11 @@
+{
+  "sdist_exact_sources_tests_and_browser_assets": true,
+  "wheel_exact_product_sources": true,
+  "python39_grammar": true,
+  "evaluated_js_parse": true,
+  "unchanged_engine_requirements_project_defaults": true,
+  "artifacts": {
+    "openscrub-1.0.96-py3-none-any.whl": "5ccfe709c1f5a9a3af4d00e223356ce6d0cd2c76b430a65e46194371889f30ad",
+    "openscrub-1.0.96.tar.gz": "b9854579a8317d6d55eb9140f27f47ba04b716743dde98bab5e714088bebcc09"
+  }
+}

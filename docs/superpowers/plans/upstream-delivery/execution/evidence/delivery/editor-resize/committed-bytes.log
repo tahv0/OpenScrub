@@ -1,0 +1,8 @@
+{
+  "base": "92124753736e287ac800af91f0ac96f3e96c01be",
+  "head": "47e9f6d5614365e00d899c87df6c209cd7aaabf6",
+  "clean": true,
+  "committed_manifest_files": 9,
+  "exact_final_test_bytes_fail_on_baseline": true,
+  "wheel_and_installed_source_match_commit": true
+}

@@ -1,0 +1,51 @@
+TASK164_ACTIVE_SOURCE {"python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]", "sources": {"openscrub": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py", "sha256": "0e4f0f9a7846080f591038d021aaf3ca6f01201d83ac32bbdc273f53d5067ee7"}, "openscrub_web": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", "sha256": "4503e1fa3941de9c26d68187eef16838a1dae5d9d2ba28105081cfbb105e2516"}, "zones_ui": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/zones_ui.py", "sha256": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7"}}}
+F..............................................................          [100%]
+=================================== FAILURES ===================================
+__________________ test_editor_live_resize_pixels_and_pointer __________________
+
+tmp_path = PosixPath('/tmp/openscrub-task164/tmp/pytest-of-tahv0/pytest-2/test_editor_live_resize_pixels0')
+
+    def test_editor_live_resize_pixels_and_pointer(tmp_path):
+        if not os.environ.get("OPENSCRUB_PLAYWRIGHT_MODULE") or not os.environ.get("OPENSCRUB_CHROMIUM") or not shutil.which("node"):
+            pytest.skip("Set OPENSCRUB_PLAYWRIGHT_MODULE and OPENSCRUB_CHROMIUM for real-page QA")
+        artifacts = Path(os.environ.get("OPENSCRUB_RESIZE_ARTIFACTS", str(tmp_path)))
+        artifacts.mkdir(parents=True, exist_ok=True)
+        with socket.socket() as sock:
+            sock.bind(("127.0.0.1", 0))
+            port = sock.getsockname()[1]
+        log = artifacts / "server.log"
+        env = os.environ.copy()
+        env["OPENSCRUB_NO_AUTOFETCH"] = "1"
+        with log.open("w") as output:
+            server = subprocess.Popen([sys.executable, str(ROOT / "tests/editor_resize_server.py"),
+                                       str(ROOT), str(artifacts / "runtime"), str(port)],
+                                      cwd=ROOT, env=env, stdout=output, stderr=subprocess.STDOUT)
+            try:
+                for _ in range(150):
+                    if server.poll() is not None:
+                        pytest.fail(log.read_text())
+                    try:
+                        urllib.request.urlopen(f"http://127.0.0.1:{port}/api/jobs", timeout=.5).close()
+                        break
+                    except OSError:
+                        time.sleep(.1)
+                else:
+                    pytest.fail("resize server did not start: " + log.read_text())
+                result = subprocess.run(["node", str(ROOT / "tests/editor_resize_browser.cjs"),
+                                         f"http://127.0.0.1:{port}", str(artifacts)],
+                                        env=env, capture_output=True, text=True, timeout=180)
+                (artifacts / "browser.log").write_text(result.stdout + result.stderr)
+>               assert result.returncode == 0, result.stdout + result.stderr
+E               AssertionError: page.waitForFunction: Timeout 30000ms exceeded.
+E                     at /home/tahv0/.codex/worktrees/c832/OpenScrub/tests/editor_resize_browser.cjs:110:50 {
+E                   log: [],
+E                   name: 'TimeoutError'
+E                 }
+E                 
+E               assert 1 == 0
+E                +  where 1 = CompletedProcess(args=['node', '/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/editor_resize_browser.cjs', 'http://...hv0/.codex/worktrees/c832/OpenScrub/tests/editor_resize_browser.cjs:110:50 {\n  log: [],\n  name: 'TimeoutError'\n}\n").returncode
+
+tests/test_editor_resize.py:48: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_editor_resize.py::test_editor_live_resize_pixels_and_pointer
+1 failed, 62 passed in 40.59s

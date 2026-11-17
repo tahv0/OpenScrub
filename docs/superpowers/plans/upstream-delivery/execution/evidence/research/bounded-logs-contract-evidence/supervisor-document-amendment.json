@@ -1,0 +1,9 @@
+{
+  "document": "bounded-logs-contract-research.md",
+  "original_sha256": "aec24e913150fdbffc20aad4b7119c2da5b458c24191e0216650d5090fe41bdf",
+  "current_sha256": "95d20ae80d5e467fd6ca3cf1082d95c2d144056b0a83d459033d6d289a0ef442",
+  "append_only": true,
+  "change": "Adopts initial caps and exact P03 dependency; removes speculative clear API, separates browser retention and predeclares measured-cost escalation budgets. No product/runtime evidence changed.",
+  "original_bytes": 27559,
+  "current_bytes": 29809
+}

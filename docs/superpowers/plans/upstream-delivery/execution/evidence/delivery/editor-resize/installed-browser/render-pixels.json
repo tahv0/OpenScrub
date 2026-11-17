@@ -1,0 +1,20 @@
+{
+  "source_box": [
+    186.25789465247504,
+    123.44236557312857,
+    401.50787862272387,
+    275.94235221462185
+  ],
+  "scanline_y": 172,
+  "actual_dark_edges": [
+    184,
+    402
+  ],
+  "dark_core_fraction": 1.0,
+  "edge_tolerance_source_px": 3,
+  "decoded_shape": [
+    360,
+    640,
+    3
+  ]
+}

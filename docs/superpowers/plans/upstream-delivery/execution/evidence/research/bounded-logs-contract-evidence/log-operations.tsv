@@ -1,0 +1,33 @@
+source_commit	6ae212a35b094fc9466f1616afb2c5bb5c0497f8
+file	openscrub_web.py
+line	source
+333	"log": [], "error": None, "output": None, "created": time.time(),
+358	"log_tail": job["log"][-30:],
+359	"log_len": len(job["log"]),
+376	self.job["log"].append(msg)
+615	if job is not None and isinstance(job.get("log"), list):
+616	job["log"].append("NOTE: setting %s=%r is not valid — %s"
+680	job["log"].append("— scan started —")
+747	jb["log"].append("thumbnails pre-generated "
+757	job["log"].append(
+762	job["log"].append("review skipped — rendering all detections")
+791	job["log"].append(f"ERROR: {msg}")
+819	job["log"].append("ERROR: " + job["error"])
+1054	job["log"].append("— retrying scan (reusing the file already on "
+1070	return jsonify({"from": frm, "lines": job["log"][frm:],
+1071	"len": len(job["log"])})
+1099	job["log"].append("— cancelled —")
+1374	job["log"].append(m)
+1428	job["log"].append(
+3337	UPD = {"running": False, "log": [], "ok": None, "cache": (0.0, None)}
+3390	UPD["running"], UPD["log"], UPD["ok"] = True, [], None
+3395	UPD["log"].append(str(msg))
+3413	"log": list(UPD["log"])})
+3674	_EXT = {"state": "idle", "target": "", "log": []}
+3685	"log": _EXT["log"][-4:]})
+3705	_EXT["log"].append("$ " + " ".join(cmd[1:]))
+3709	_EXT["log"] += tail[-3:] or ["exit %d" % r.returncode]
+3712	_EXT["log"].append("done — takes effect on the next scan")
+3715	_EXT["log"].append(str(e))
+4006	"log": ["(recovered after server restart — the scan had "
+4036	"log": ["(recovered after server restart)"],

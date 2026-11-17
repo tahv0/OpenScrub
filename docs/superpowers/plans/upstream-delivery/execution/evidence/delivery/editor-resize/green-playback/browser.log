@@ -1,0 +1,19 @@
+dialog: Blur this region FROM (seconds):
+dialog: ...TO (seconds):
+{"dpr":1,"edgeError":0.8125,"hit":0,"states":["desktop","mobile-live","desktop-grown","fractional","video-mobile","mobile-edited"],"errors":[],"warnings":["Canvas2D: Multiple readback operations using getImageData are faster with the willReadFrequently attribute set to true. See: https://html.spec.whatwg.org/multipage/canvas.html#concept-canvas-will-read-frequently"]}
+dialog: Blur this region FROM (seconds):
+dialog: ...TO (seconds):
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
++ actual - expected
+
++ 'queued_render'
+- 'done'
+
+    at /home/tahv0/.codex/worktrees/c832/OpenScrub/tests/editor_resize_browser.cjs:149:9 {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: 'queued_render',
+  expected: 'done',
+  operator: 'strictEqual',
+  diff: 'simple'
+}

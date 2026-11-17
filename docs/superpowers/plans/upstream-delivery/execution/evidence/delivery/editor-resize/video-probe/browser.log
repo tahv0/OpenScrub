@@ -1,0 +1,7 @@
+dialog: Blur this region FROM (seconds):
+dialog: ...TO (seconds):
+page.waitForFunction: Timeout 30000ms exceeded.
+    at /home/tahv0/.codex/worktrees/c832/OpenScrub/tests/editor_resize_browser.cjs:112:12 {
+  log: [],
+  name: 'TimeoutError'
+}

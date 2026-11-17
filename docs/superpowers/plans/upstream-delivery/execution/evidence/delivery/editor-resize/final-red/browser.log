@@ -1,0 +1,9 @@
+AssertionError [ERR_ASSERTION]: painted edge drift 167.8125 CSS px; visible target hit -1
+    at /tmp/openscrub-task164/final-red-source/tests/editor_resize_browser.cjs:54:1 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: '==',
+  diff: 'simple'
+}

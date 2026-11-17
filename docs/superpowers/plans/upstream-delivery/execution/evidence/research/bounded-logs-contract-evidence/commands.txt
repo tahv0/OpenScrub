@@ -1,0 +1,51 @@
+Scope: source-only research. No product/test execution, imports, browser, builds,
+installs, models/decoders, network, branch/index/worktree mutation or publication.
+Only fixed Git objects and designated planning/SDD documents were read.
+
+Fixed source identity:
+  6ae212a35b094fc9466f1616afb2c5bb5c0497f8
+Immediate parent (git rev-list --parents -n 1 <fixed-sha>):
+  92124753736e287ac800af91f0ac96f3e96c01be
+Source chain inspected by immutable git log: P03 -> P07a prerequisites; not 4b9.
+
+Reproduce export without checkout/index/ref mutation:
+  mkdir -p /tmp/openscrub-bounded-logs-contract/source
+  git -C /home/tahv0/src/OpenScrub archive 6ae212a35b094fc9466f1616afb2c5bb5c0497f8 | tar -x -C /tmp/openscrub-bounded-logs-contract/source
+
+Inventory commands run inside that export (ordinary shell text reads only):
+  rg -n 'log|_worker|watchdog|retry|recover' openscrub_web.py
+  rg -n 'log_tail|log_len|retryJob|LOGN|"log"' --glob '*.py' --glob '*.md' .
+  rg -n 'log_cb|log_callback|log_fn|def log|log\(' openscrub.py openscrub_gui.py
+  rg -n 'COPY|pyproject|openscrub_internal' Dockerfile Dockerfile.cuda Dockerfile.intel openscrub_update.py
+  rg -n 'copytree|rglob|walk|extract|archive|zip' openscrub_update.py openscrub_setup.py
+  nl -ba <each fixed-source path> | sed -n '<anchor start>,<anchor end>p'
+  cat pyproject.toml
+  cat windows/openscrub.spec
+
+Designated planning/context reads only (current documentation, not fixed product):
+  docs/superpowers/plans/upstream-delivery/README.md
+  docs/superpowers/plans/upstream-delivery/03-packaging-and-review-features.md (P12/P12A/P12B/global scope)
+  .superpowers/sdd/README/plan-path
+  .superpowers/sdd/README/diagnostics-scope-research.md
+  .superpowers/sdd/README/diagnostics-scope-brief.md
+The earlier 1,208-entry result was reused, not re-probed.
+
+Evidence collector:
+  python3 /tmp/openscrub-bounded-logs-contract/collect_source_evidence.py
+This task-owned script only reads archive text, computes SHA-256, resolves each
+fixed Git blob via git rev-parse <sha>:<path>, and writes the listed evidence.
+It does not import product/test modules, launch services, or run assertions on
+runtime behavior. A copy is retained as collect_source_evidence.py.
+The initial `python` invocation found no executable; `python3` ran this static
+collector successfully. This is not a product-environment/runtime check.
+
+Artifacts:
+  source-identity.json : immutable commit, blob IDs, file SHA-256 hashes
+  source-anchors.txt   : selected static source with fixed-SHA/line anchors
+  log-operations.tsv  : complete lexical job/updater/installer log owner sites
+  collect_source_evidence.py : reproducible static-only collector
+
+Not performed: numerical-limit calibration, Python allocation/RSS/timing
+measurement, producer/HTTP/browser execution, restart acceptance, package builds,
+installed startup, Docker builds, Windows/frozen acceptance. The report describes
+future gates; none are represented as completed evidence.

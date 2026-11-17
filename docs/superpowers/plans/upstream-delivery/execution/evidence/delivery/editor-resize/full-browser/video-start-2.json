@@ -1,0 +1,9 @@
+{
+  "playing": true,
+  "ready": 4,
+  "network": 1,
+  "src": "http://127.0.0.1:37811/api/jobs/resize/video",
+  "preload": "none",
+  "transform": true,
+  "canPlay": "maybe"
+}

@@ -1,0 +1,10 @@
+{
+  "base": "92124753736e287ac800af91f0ac96f3e96c01be",
+  "web_sha256": "cb3b5fccffb2105982a914c2002d419519bceacf2c8bf3c2bb33ea13eb43b038",
+  "test_files": {
+    "tests/editor_resize_server.py": "ebf19da6b23a88e30b8a11a6962d4c4a54fd2359bb62838cca2d7caaa2de3e93",
+    "tests/editor_resize_browser.cjs": "8999449141dc4484ef01bee98959fb2799c06106da06b8afb4323dd74be6fa10",
+    "tests/test_editor_resize.py": "bf84bfe36dca633c67b08775548db1c7e7a29c7219ae56904b6f1c21aa53b8b5",
+    "tests/test_review_save_failures.py": "7dc12855d5caf05b2f5be4c4f757fa0ccad9c4c98854f27332d2343220bfd4df"
+  }
+}
