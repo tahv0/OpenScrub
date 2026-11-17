@@ -8171,7 +8171,12 @@ def run_scan(args, cb=None):
                 # First-scan sanity: a text-dense frame that OCR read nothing
                 # from means a broken OCR setup — say so in minute one, not
                 # after a 40-minute render.
-                _edges = cv2.Canny(small, 60, 180)
+                _sanity_small = small
+                if _sanity_small is None:
+                    _sanity_small = cv2.resize(
+                        cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY), None,
+                        fx=BT_SCALE, fy=BT_SCALE)
+                _edges = cv2.Canny(_sanity_small, 60, 180)
                 if float((_edges > 0).mean()) > 0.02:
                     cb.log("      *** OCR SANITY WARNING: the first scan read "
                            "almost no text, but the frame looks text-dense. "
