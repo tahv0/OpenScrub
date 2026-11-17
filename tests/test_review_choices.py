@@ -13,9 +13,17 @@ from test_review_save_failures import HARNESS, app_js
 
 DOM = r"""
 var mounted='';
+// Choice tests mount emitted cards directly; the owning scheduling tests and
+// real browser cover admission/geometry. This adapter contains no choice logic.
+ReviewScheduler.prototype.start=function(){
+ for(const section of this.meta.sections)for(const c of section.cards){const html=reviewCard(c);mount(html);}
+ for(const id of this.meta.byId.keys())refreshDet(id);
+};
+ReviewScheduler.prototype.schedule=function(){};
+ReviewScheduler.prototype.listen=function(){};
 document.querySelectorAll=s=>[...elements.values()].filter(e=>e.id?.startsWith('det')&&
  e.dataset.cat===s.match(/data-cat=([^\]]+)/)?.[1]);
-function mount(html){mounted=html;
+function mount(html){mounted+=html;
  for(const tag of html.matchAll(/<[^>]+\bid="([^"]+)"[^>]*>/g)){
   const e=document.createElement('div');e.id=tag[1];e.attrs={};
   e.setAttribute=(k,v)=>e.attrs[k]=String(v);e.getAttribute=k=>e.attrs[k];
