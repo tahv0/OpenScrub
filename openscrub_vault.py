@@ -1,4 +1,3 @@
-from openscrub_internal.render_delivery import _is_discardable_render_stage
 #!/usr/bin/env python3
 """openscrub_vault.py — password-based at-rest encryption for the job store.
 
@@ -25,6 +24,8 @@ leave plaintext on disk — pair this with OS-level disk encryption
 THERE IS NO PASSWORD RESET. Losing the password makes encrypted files
 permanently unrecoverable — that is the entire point of the feature.
 """
+
+from openscrub_internal.render_delivery import _is_discardable_render_stage
 
 import base64
 import json

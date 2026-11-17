@@ -187,9 +187,12 @@ class _RenderDelivery:
         if self.recovery_required:
             # Necessary leftovers remain discoverable; the report stage may
             # still be owned by its context, so deliberately do not exit it.
-            self._stack.pop_all()
+            self._stack.close()
             return
-        self._stack.close()
+        try:
+            self._stack.close()
+        except Exception as error:
+            self.cleanup_diagnostics.append(type(error).__name__)
         for path in [self.video_stage, self.video_stage + '.noaudio.mp4', self._descriptor] + [old['backup'] for old in self._old]:
             if path is not None:
                 try:

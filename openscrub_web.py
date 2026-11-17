@@ -41,7 +41,7 @@ from flask import (Flask, Response, abort, jsonify, redirect, request, g,
                    send_file, has_request_context)
 
 import openscrub
-from openscrub_internal.reports import atomic_report, _staged_report
+from openscrub_internal.reports import _staged_report
 from openscrub_internal.render_delivery import _DeliveryRecoveryError, _has_render_recovery
 from openscrub_internal.lifetimes import FileOwners, OwnedIterable
 import zones_ui
@@ -354,6 +354,7 @@ def _source_job_locked(canonical, missing_ok=False):
             return None
         abort(404, "source job is no longer available")
     _validate_files_locked(source_job)
+    _recovery_gate(source_job)
     return source_job
 
 
@@ -1159,7 +1160,11 @@ def _run_job(job, action, owner=None):
                         return
                     job.update(output=res["output"], phase="done", progress=1.0, eta=None)
     except openscrub.PipelineCancelled:
+        recovery = _has_render_recovery(job["dir"])
         with files.report_lock:
+            if recovery:
+                files.recovery_required = True
+                job.update(phase="error", error="render delivery requires recovery", eta=None)
             if not committed and not files.recovery_required and _operation_valid(job, owner):
                 job["phase"] = "cancelled"
                 job["error"] = "cancelled by user"
@@ -1167,7 +1172,11 @@ def _run_job(job, action, owner=None):
         msg = str(e) or type(e).__name__
         if isinstance(e, SystemExit):
             msg = "the job stopped unexpectedly (exit %s)" % (e.code,)
+        recovery = _has_render_recovery(job["dir"])
         with files.report_lock:
+            if recovery:
+                files.recovery_required = True
+                job.update(phase="error", error="render delivery requires recovery", eta=None)
             if not committed and not files.recovery_required and _operation_valid(job, owner):
                 job["phase"] = "error"
                 job["error"] = msg
@@ -1820,7 +1829,12 @@ def job_frame_at(jid):
 
 def _send_open_file(path, **options):
     """One opened generation supplies body, metadata, conditional and Range."""
-    stream = open(path, "rb")
+    if not path:
+        abort(404)
+    try:
+        stream = open(path, "rb")
+    except FileNotFoundError:
+        abort(404)
     response = None
     try:
         st = os.fstat(stream.fileno())
