@@ -177,9 +177,11 @@ Preserve the pinned CUDA path: OpenCV and opencv_contrib4.10.0 built together un
 
 #### P16C-R — close all owned renderer resources
 
-- [ ] **E/S/I:** Cover acquisition through final wait with explicit ownership and cleanup for captures/VideoWriter, both children, all pipe endpoints and temporary stderr. Include partial construction, geometry/callback exceptions, cancellation, write failure and nonzero encoder exit. Preserve primary exceptions and useful encoder diagnostics; bounded terminate/wait/kill fallback must act only on owned children.
-- [ ] **V:** Keep exception tracebacks alive while asserting explicit closure and reaping, with tiny actual SDR/HDR/setup/mid-frame/final-wait cases and successful controls. Harness cleanup must be distinguished from production cleanup. N09's already-reaped-child/decoder-pipe case is a smaller prerequisite, not proof of this broader contract.
+- [x] **E/S/I:** Cover acquisition through final wait with explicit ownership and cleanup for captures/VideoWriter, both children, all pipe endpoints and temporary stderr. Include partial construction, geometry/callback exceptions, cancellation, write failure and nonzero encoder exit. Preserve primary exceptions and useful encoder diagnostics; bounded terminate/wait/kill fallback must act only on owned children.
+- [x] **V:** Keep exception tracebacks alive while asserting explicit closure and reaping, with tiny actual SDR/HDR/setup/mid-frame/final-wait cases and successful controls. Harness cleanup must be distinguished from production cleanup. N09's already-reaped-child/decoder-pipe case is a smaller prerequisite, not proof of this broader contract.
 - [ ] **D/R/L:** Keep resource closure separate from path deletion: newly handled pre-write errors must not newly delete untouched prior output. State that cleanup alone cannot restore a final path already written by the encoder. P16C-P owns final-path preservation; this PR may land first with that limit explicit.
+
+**Local delivery complete:** [Task1632](execution/evidence/delivery/task-1632-report.md) and its [scoped approval](execution/evidence/delivery/task-1632-fix1-review.md) close both review findings at70ec464; [PR draft](execution/pr-drafts/render-resource-cleanup.md) is ready for later publication. Actual3.12/3.9 each pass64 affected controls; final exact package/defaults/CLI/listening HTTP pass. The earlier full174 is explicitly historical at e9. This proves owned cleanup/error handling within the tested boundaries; previous output can still be overwritten under the existing direct-destination policy until P.
 
 #### P16C-P — stage output before the final owned publication
 

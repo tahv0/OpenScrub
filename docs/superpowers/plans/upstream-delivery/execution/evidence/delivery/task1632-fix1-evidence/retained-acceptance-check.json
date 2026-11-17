@@ -1,0 +1,20 @@
+{
+  "head": "70ec464ca70b5e49751d778890f56029dced0b8a",
+  "indexed_logs_verified": 12,
+  "package_exit_codes": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "sdist_selected_files_verified": 11,
+  "wheel_selected_files_verified": 6,
+  "installed_selected_files_verified": 6,
+  "focused_runs_retained_without_rerun": [
+    "fix1-focused312",
+    "fix1-focused39"
+  ],
+  "runtime_lock_absent": true
+}

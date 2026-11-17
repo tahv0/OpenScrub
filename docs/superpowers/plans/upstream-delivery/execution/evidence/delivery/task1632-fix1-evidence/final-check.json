@@ -1,0 +1,51 @@
+{
+  "base": "8e70af446caa5ed37e0e36c029925d5caf08f943",
+  "head": "70ec464ca70b5e49751d778890f56029dced0b8a",
+  "clean": true,
+  "selected_files_equal_git": 23,
+  "production_sha256": "9365c47bdc74bf5fc7496ffca62600861367fd968530664dc58f6710ca00037d",
+  "tests_sha256": "0d93b9eec719a73cc30a36332ef0758af767c604f6518e7f1c945cdb52a44607",
+  "only_changed_runtime_functions": [
+    "render_hdr",
+    "render"
+  ],
+  "child_shutdown_helper_unchanged": true,
+  "shared_tooling_unchanged": true,
+  "contracts": {
+    "render": {
+      "public_args_defaults_equal": true,
+      "selected_original_calls_equal": true,
+      "removal_block_equal": true,
+      "recognized_removal_sites": [
+        [
+          "ExceptHandler",
+          "(BrokenPipeError, OSError)"
+        ],
+        [
+          "If",
+          "idx % 30 == 0 and cb.cancelled()"
+        ]
+      ]
+    },
+    "render_hdr": {
+      "public_args_defaults_equal": true,
+      "selected_original_calls_equal": true,
+      "removal_block_equal": true,
+      "recognized_removal_sites": [
+        [
+          "ExceptHandler",
+          "(BrokenPipeError, OSError)"
+        ],
+        [
+          "If",
+          "idx % 30 == 0 and cb.cancelled()"
+        ]
+      ]
+    }
+  },
+  "historical_full_suite": {
+    "head": "e9fd0d39bd9c10ddbaa121e9c91cc504921c5afb",
+    "current_source": false,
+    "result": "174 passed, 5 historical inapplicable skips; not repeated in fix1"
+  }
+}

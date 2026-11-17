@@ -1,0 +1,62 @@
+{
+  "source": "/home/tahv0/.codex/worktrees/c832/OpenScrub",
+  "base": "ded411cbec308333d1416ae3d58b4f6e918d7849",
+  "head": "cb7b7ff8577aa4e7c0db48916179a1521fb4b412",
+  "policy": "development",
+  "files": {
+    "CONTRIBUTING.md": "2149d74989dc9c86424701fed324095641da6a32a8566776b935e9d3913c229a",
+    "benchmark/corpus.py": "3e44a55997f7562a210395ccfb2ff57b8d542c98120a84f2e31551c9f768801c",
+    "benchmark/reid.py": "90f897de2de600e654f73113e19bfda0818c638692fc3867e917c56d4a9bdc40",
+    "benchmark/score.py": "68d1c8967c8d52a9523b30497e84e47c8ea7430fcfadfef26cf1241e9bc4fb84",
+    "docker/prefetch_models.py": "52dccfe881be5fac26836c9e0944d7e91d3d6e5456a561443c7154a111b6c3ca",
+    "face_models.json": "406434d10478ba15845c509c3b9cc292874935e87cf2e6f07a5396598d9d700b",
+    "fetch_plate_models.py": "da0a63c3ff96d9bd2f67fad513c880d973b27a09c23080eb53f0be5fe9974ef2",
+    "install.py": "bdb1cfb39368d212c9a65384264533cbf7c825b5c261f7c2f2b42cfb8e02cbeb",
+    "openscrub.py": "ef5b50b6a3219b3f745c88b605c4e1728f06c765f7fc7b83e02004f49c5f2c55",
+    "openscrub_gui.py": "2fee837398620f351e6770a19c1016d5af3104350a1bec744ba42a611e2c9965",
+    "openscrub_setup.py": "d0362a038f8182e8fae510100085bb087f09f7e5cf7e11a780a24390b3037eaf",
+    "openscrub_update.py": "4d6a20f75d985a119f8421227c3bd88b17fd1b8eed44e353b127b5b49e733d55",
+    "openscrub_vault.py": "cc2db6a35d0b934502f1400b0d3a5b1f23ff8f63e6d24f9fc6fc4ab7baaebf82",
+    "openscrub_web.py": "9835e1137abee62c0a78e2669ed8bae7059e36bf4bed9f5c7a44f0eb8b40ed3a",
+    "person_models.json": "8abc33e5c1d03e43fa4dcedb4d2052ff363f2f1c1fa3630b67b0339f6cdd0685",
+    "plate_models.json": "4637fabd1e5f7bc6f9c69f495070e071d14e381e0f0a33c63974cdb5241d6a87",
+    "pyproject.toml": "2e12042427cd7390e3cbd29f882d1bda6e0eca39b7dccf6ddf43b304b438b36b",
+    "test_openscrub.py": "06cb21ce47e9b93dad5334bf15564fe9f74e2ab93881a017febcf4978b8ec3d1",
+    "tests/test_hdr_decoder_cleanup.py": "5422b3e78c8d048e93c86d82c5881e2e10296078f7c3f74f6064501d380c5f36",
+    "tests/test_render_resources.py": "4d451e8e30eaec83da69b5cf4f0a4050d45d6686a12e041bdbe53476a9151f69",
+    "tools/make_icons.py": "914205627bc4bbcbf66fcac7fc84975c84c95cbf04b6dcb4d9482a04145ad297",
+    "tools/make_wordmark.py": "e0c33edc1762cef9b75aa802bf8190bc2b044424fcaae3769438b2de28f788ed",
+    "zones_ui.py": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7"
+  },
+  "python": {
+    "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+    "version": [
+      3,
+      12,
+      16
+    ]
+  },
+  "free_bytes": 803048960000,
+  "prerequisites": [
+    {
+      "path": "/tmp/openscrub-baseline-20261116/tools/usr/bin/ffmpeg",
+      "sha256": "bdf6aabffdba7411edff8d36c389d695257fcdf823d196020176e117612862f6"
+    },
+    {
+      "path": "/tmp/openscrub-baseline-20261116/tools/usr/bin/ffprobe",
+      "sha256": "a6dac1e9e8631e04075d06854cc4069308aec279bb04683b4a0bca5e4f54b2fe"
+    },
+    {
+      "path": "/tmp/openscrub-baseline-20261116/tools/usr/bin/tesseract",
+      "sha256": "644efa639b77a21b1096a6ced155112f0c730d05c7db871d52f4b2eb16bdf42a"
+    },
+    {
+      "path": "/tmp/openscrub-baseline-20261116/synthetic-data/models-opencv4/face_detection_yunet_2023mar.onnx",
+      "sha256": "8f2383e4dd3cfbb4553ea8718107fc0423210dc964f9f4280604804ed2552fa4"
+    },
+    {
+      "path": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/task1631-evidence/adapters/task1631_fixture.py",
+      "sha256": "89ecc8bfceca7b4f10d454b7afe374dfb9e4a18a7ca0cf93a8de0a8444a9b5b3"
+    }
+  ]
+}

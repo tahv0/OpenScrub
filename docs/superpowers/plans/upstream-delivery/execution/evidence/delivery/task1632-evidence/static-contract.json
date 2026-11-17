@@ -1,0 +1,12 @@
+{
+  "render": {
+    "public_signature_defaults_equal": true,
+    "selected_spawn_metadata_writer_encoder_mask_audio_diagnostic_calls_equal": true,
+    "selected_calls": 15
+  },
+  "render_hdr": {
+    "public_signature_defaults_equal": true,
+    "selected_spawn_metadata_writer_encoder_mask_audio_diagnostic_calls_equal": true,
+    "selected_calls": 11
+  }
+}

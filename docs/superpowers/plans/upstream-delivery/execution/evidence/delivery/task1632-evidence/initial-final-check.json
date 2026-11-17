@@ -1,0 +1,24 @@
+{
+  "head": "cb7b7ff8577aa4e7c0db48916179a1521fb4b412",
+  "base": "ded411cbec308333d1416ae3d58b4f6e918d7849",
+  "clean": true,
+  "selected_committed_file_hashes_equal": 23,
+  "production_sha256": "d5e74bacb992ed87b0034b496b6b38276a73e874a8fb9afa70a4d4ab66690c56",
+  "full_suite_head": "e9fd0d39bd9c10ddbaa121e9c91cc504921c5afb",
+  "full_suite_production_equal": true,
+  "later_changed_files": [
+    "tests/test_render_resources.py"
+  ],
+  "public_source_checks": {
+    "render": {
+      "public_signature_defaults_equal": true,
+      "selected_spawn_metadata_writer_encoder_mask_audio_diagnostic_calls_equal": true,
+      "selected_calls": 15
+    },
+    "render_hdr": {
+      "public_signature_defaults_equal": true,
+      "selected_spawn_metadata_writer_encoder_mask_audio_diagnostic_calls_equal": true,
+      "selected_calls": 11
+    }
+  }
+}

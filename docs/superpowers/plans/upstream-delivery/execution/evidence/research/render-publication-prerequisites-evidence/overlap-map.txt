@@ -1,0 +1,173 @@
+=== test_baseline..p06c2 ===
+diff --git a/openscrub.py b/openscrub.py
+--- a/openscrub.py
++++ b/openscrub.py
+@@ -39,0 +40,2 @@ import numpy as np
+@@ -2466,7 +2468,22 @@ def track_manual_region(video, box, t_ref, t0, t1, cb=None,
+@@ -2474,2 +2491,28 @@ def track_manual_region(video, box, t_ref, t0, t1, cb=None,
+@@ -2477,6 +2520,3 @@ def track_manual_region(video, box, t_ref, t0, t1, cb=None,
+@@ -2484,4 +2524,13 @@ def track_manual_region(video, box, t_ref, t0, t1, cb=None,
+@@ -2489,29 +2538,100 @@ def track_manual_region(video, box, t_ref, t0, t1, cb=None,
+@@ -2519,3 +2639,8 @@ def track_manual_region(video, box, t_ref, t0, t1, cb=None,
+@@ -2523,30 +2648,8 @@ def track_manual_region(video, box, t_ref, t0, t1, cb=None,
+@@ -2554 +2657,5 @@ def track_manual_region(video, box, t_ref, t0, t1, cb=None,
+@@ -2556,6 +2663,3 @@ def track_manual_region(video, box, t_ref, t0, t1, cb=None,
+@@ -2563,10 +2666,0 @@ def track_manual_region(video, box, t_ref, t0, t1, cb=None,
+@@ -2574,2 +2667,0 @@ def track_manual_region(video, box, t_ref, t0, t1, cb=None,
+@@ -2579,11 +2671,2 @@ def track_manual_region(video, box, t_ref, t0, t1, cb=None,
+@@ -2591,39 +2674,33 @@ def track_manual_region(video, box, t_ref, t0, t1, cb=None,
+@@ -2636 +2712,0 @@ def track_manual_region(video, box, t_ref, t0, t1, cb=None,
+@@ -2639,18 +2715 @@ def track_manual_region(video, box, t_ref, t0, t1, cb=None,
+@@ -2658,61 +2716,0 @@ def track_manual_region(video, box, t_ref, t0, t1, cb=None,
+@@ -6055 +6053,2 @@ def _settings_dict(args):
+@@ -6287 +6286 @@ def transcribe_audio_pii(video, cats, cb, model_size="base", nlp=None,
+@@ -6306,14 +6305,32 @@ def write_report(path, args, state, output_path=None):
+@@ -6321 +6338,4 @@ def write_report(path, args, state, output_path=None):
+@@ -6323,11 +6343,4 @@ def write_report(path, args, state, output_path=None):
+@@ -6341,0 +6355,5 @@ def load_report(path):
+@@ -6357,3 +6375 @@ def load_report(path):
+@@ -6363 +6379 @@ def load_report(path):
+@@ -8448,0 +8465 @@ def run_render(args, state, cb=None):
+@@ -8499 +8516,2 @@ def run_render(args, state, cb=None):
+@@ -8514,15 +8532,7 @@ def run_pipeline(args, cb=None):
+@@ -8530,2 +8539,0 @@ def run_pipeline(args, cb=None):
+@@ -8534,2 +8542,2 @@ def run_pipeline(args, cb=None):
+@@ -8537,8 +8545,14 @@ def run_pipeline(args, cb=None):
+@@ -8557,0 +8572,3 @@ def run_pipeline(args, cb=None):
+
+=== test_baseline..r_old_review_head_pending ===
+diff --git a/openscrub.py b/openscrub.py
+--- a/openscrub.py
++++ b/openscrub.py
+@@ -3886,0 +3887,50 @@ def _rate_cap_args(codec, out_quality, w, h, fps):
+@@ -3900,84 +3950,45 @@ def render_hdr(src, dst, detections, cum, bands, fps, pad, mode,
+@@ -3985,48 +3996,77 @@ def render_hdr(src, dst, detections, cum, bands, fps, pad, mode,
+@@ -4033,0 +4074,17 @@ def render_hdr(src, dst, detections, cum, bands, fps, pad, mode,
+@@ -4035 +4092 @@ def render_hdr(src, dst, detections, cum, bands, fps, pad, mode,
+@@ -4037,23 +4094,36 @@ def render_hdr(src, dst, detections, cum, bands, fps, pad, mode,
+@@ -4074,35 +4144,81 @@ def render(src, dst, detections, cum, bands, fps, pad, mode, preview,
+@@ -4110,72 +4226,97 @@ def render(src, dst, detections, cum, bands, fps, pad, mode, preview,
+@@ -4183,74 +4324,9 @@ def render(src, dst, detections, cum, bands, fps, pad, mode, preview,
+@@ -4258,9 +4334,6 @@ def render(src, dst, detections, cum, bands, fps, pad, mode, preview,
+@@ -4267,0 +4341,3 @@ def render(src, dst, detections, cum, bands, fps, pad, mode, preview,
+@@ -4270 +4346 @@ def render(src, dst, detections, cum, bands, fps, pad, mode, preview,
+@@ -4272,3 +4348,4 @@ def render(src, dst, detections, cum, bands, fps, pad, mode, preview,
+@@ -4276,2 +4352,0 @@ def render(src, dst, detections, cum, bands, fps, pad, mode, preview,
+@@ -4279,21 +4354,32 @@ def render(src, dst, detections, cum, bands, fps, pad, mode, preview,
+
+=== r_old_review_head_pending..r_fix_pending_review ===
+diff --git a/openscrub.py b/openscrub.py
+index 3739d1d..0443278 100644
+--- a/openscrub.py
++++ b/openscrub.py
+@@ -3952,0 +3953 @@ def render_hdr(src, dst, detections, cum, bands, fps, pad, mode,
++    primary = None
+@@ -4093,3 +4094,16 @@ def render_hdr(src, dst, detections, cum, bands, fps, pad, mode,
+-        except (BrokenPipeError, OSError):
+-            pass                        # exit code + stderr say why below
+-        rc = enc.wait()
++        except OSError as close_error:
++            # A failed close may not have delivered EOF. Bound only this
++            # exceptional status wait; healthy finalization has no timeout.
++            try:
++                rc = enc.wait(timeout=2)
++            except subprocess.TimeoutExpired:
++                cleanup_errors.extend(_stop_render_children((dec, enc)))
++                raise close_error  # forced termination is not an encoder cause
++            except Exception as wait_error:
++                cleanup_errors.append(wait_error)
++                raise close_error
++            if rc == 0:
++                raise  # retain a close error even after successful encoding
++            cleanup_errors.append(close_error)  # encoder diagnostics stay primary
++        else:
++            rc = enc.wait()
+@@ -4100,0 +4115,3 @@ def render_hdr(src, dst, detections, cum, bands, fps, pad, mode,
++    except BaseException as error:
++        primary = error
++        raise
+@@ -4102 +4118,0 @@ def render_hdr(src, dst, detections, cum, bands, fps, pad, mode,
+-        primary = sys.exc_info()[1]
+@@ -4146,0 +4163 @@ def render(src, dst, detections, cum, bands, fps, pad, mode, preview,
++    primary = None
+@@ -4347,3 +4364,16 @@ def render(src, dst, detections, cum, bands, fps, pad, mode, preview,
+-            except (BrokenPipeError, OSError):
+-                pass                        # exit code + stderr say why below
+-            rc = proc.wait()
++            except OSError as close_error:
++                # A failed close may not have delivered EOF. Bound only this
++                # exceptional status wait; healthy finalization has no timeout.
++                try:
++                    rc = proc.wait(timeout=2)
++                except subprocess.TimeoutExpired:
++                    cleanup_errors.extend(_stop_render_children((proc,)))
++                    raise close_error  # forced termination is not an encoder cause
++                except Exception as wait_error:
++                    cleanup_errors.append(wait_error)
++                    raise close_error
++                if rc == 0:
++                    raise  # retain a close error even after successful encoding
++                cleanup_errors.append(close_error)  # encoder diagnostics stay primary
++            else:
++                rc = proc.wait()
+@@ -4356,0 +4387,3 @@ def render(src, dst, detections, cum, bands, fps, pad, mode, preview,
++    except BaseException as error:
++        primary = error
++        raise
+@@ -4358 +4390,0 @@ def render(src, dst, detections, cum, bands, fps, pad, mode, preview,
+-        primary = sys.exc_info()[1]
+
+=== test_baseline..p06c2 ===
+diff --git a/CONTRIBUTING.md b/CONTRIBUTING.md
+index 2abc14f..979e0c3 100644
+--- a/CONTRIBUTING.md
++++ b/CONTRIBUTING.md
+@@ -25 +25 @@ Thanks for helping! A few rules keep this privacy tool trustworthy.
+-    python -m pytest test_openscrub.py -q      # must be green
++    python -m pytest test_openscrub.py tests/ -q      # must be green
+diff --git a/pyproject.toml b/pyproject.toml
+index 2a60019..0bd8a91 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -91,0 +92 @@ include = [
++    "openscrub_internal",
+@@ -101,0 +103 @@ include = [
++    "openscrub_internal",
+@@ -118,0 +121,2 @@ include = [
++    "tests",
++    "benchmark",
+@@ -119,0 +124,3 @@ include = [
++
++[tool.pytest.ini_options]
++testpaths = ["test_openscrub.py", "tests"]
+
+=== test_baseline..n09 ===
+diff --git a/CONTRIBUTING.md b/CONTRIBUTING.md
+index 2abc14f..74c6ced 100644
+--- a/CONTRIBUTING.md
++++ b/CONTRIBUTING.md
+@@ -25 +25 @@ Thanks for helping! A few rules keep this privacy tool trustworthy.
+-    python -m pytest test_openscrub.py -q      # must be green
++    python -m pytest -q                        # all discovered tests must be green
+@@ -27,0 +28,5 @@ Thanks for helping! A few rules keep this privacy tool trustworthy.
++The discovered suite includes `test_openscrub.py` and `tests/`. The HDR
++cleanup regressions use synthetic media and real FFmpeg/ffprobe with libx265;
++they skip when those tools are unavailable. Child-reaping observations require
++POSIX, and the injected encoder-exit case also requires `waitid`/`WNOWAIT`.
++
+diff --git a/pyproject.toml b/pyproject.toml
+index 2a60019..c8c8200 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -118,0 +119,2 @@ include = [
++    "tests/",
++    "CONTRIBUTING.md",
+
+=== Serializer whole-commit dependencies ===
+ benchmark/README.md                |  11 ++++
+ benchmark/review_io.py             | 107 +++++++++++++++++++++++++++----------
+ openscrub_internal/reports.py      |   5 +-
+ tests/test_large_report_io.py      |  27 +++++-----
+ tests/test_report_serialization.py |  81 ++++++++++++++++++++++++++++
+ tests/test_report_transactions.py  |   5 +-
+ 6 files changed, 195 insertions(+), 41 deletions(-)

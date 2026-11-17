@@ -1,0 +1,34 @@
+{
+  "sdist": {
+    "file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1632/runs/fix1-package/dist/openscrub-1.0.96.tar.gz",
+    "sha256": "755c0f147dbb3d2eaa915471f591bd92c42b07fe9335841ef98d3edd631eac81",
+    "bytes": 534037
+  },
+  "wheel": {
+    "file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1632/runs/fix1-package/wheel/openscrub-1.0.96-py3-none-any.whl",
+    "sha256": "153237d7023b13f3b1372cc93feba9b20f9be52916e2a74709e9fdb78fbdb6a8",
+    "bytes": 435567
+  },
+  "sdist_files": [
+    "openscrub.py",
+    "openscrub_web.py",
+    "zones_ui.py",
+    "openscrub_setup.py",
+    "openscrub_update.py",
+    "openscrub_vault.py",
+    "pyproject.toml",
+    "test_openscrub.py",
+    "tests/test_hdr_decoder_cleanup.py",
+    "tests/test_render_resources.py",
+    "CONTRIBUTING.md"
+  ],
+  "wheel_files": [
+    "openscrub.py",
+    "openscrub_web.py",
+    "zones_ui.py",
+    "openscrub_setup.py",
+    "openscrub_update.py",
+    "openscrub_vault.py"
+  ],
+  "requires_python": ">=3.9"
+}

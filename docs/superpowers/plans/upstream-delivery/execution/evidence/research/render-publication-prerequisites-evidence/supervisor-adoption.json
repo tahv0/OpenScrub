@@ -1,0 +1,7 @@
+{
+  "original_bytes": 44087,
+  "original_sha256": "244fb8557b5f04c3f67cf177d4b5a08e0589c84558909c8c490efa420bb097e3",
+  "approved_r": "70ec464ca70b5e49751d778890f56029dced0b8a",
+  "review": "task-1632-fix1-review.md",
+  "kind": "supervisor source-plan adoption; no new runtime claim"
+}

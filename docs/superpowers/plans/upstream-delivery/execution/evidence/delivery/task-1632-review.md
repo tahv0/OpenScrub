@@ -1,0 +1,45 @@
+# Task1632 / P16C-R independent task review
+
+## Spec Compliance
+
+- ❌ Issues found: the required failure-on-cleanup-error behavior is incomplete. Both renderers can swallow a cleanup failure when invoked while the caller handles an exception (`openscrub.py:4102`, `openscrub.py:4358`), and both normal EOF paths discard independent encoder-stdin close errors (`openscrub.py:4093`, `openscrub.py:4347`). These are Important findings below.
+- ✅ The remaining reviewed scope matches the brief: ownership starts before capture acquisition and covers setup, metadata, frame work, callbacks, encoder diagnostics and final logging; the shared abort helper signals owned children before buffered closes and attempts bounded wait/kill/reap (`openscrub.py:3887`, `openscrub.py:3950`, `openscrub.py:4144`). Healthy EOF waits remain unbounded (`openscrub.py:4089`, `openscrub.py:4095`, `openscrub.py:4349`). Failed-open fallback writers now fail before replacement (`openscrub.py:4233`).
+- ✅ Deletion remains limited to the original cancellation checkpoints and write-handler `(BrokenPipeError, OSError)` branches (`openscrub.py:4027`, `openscrub.py:4076`, `openscrub.py:4249`, `openscrub.py:4325`). Independent resource shutdown precedes deletion; both final blocks retain the legacy `os.path.exists` guard (`openscrub.py:4114`, `openscrub.py:4370`). There is no widened outer exception handler that deletes arbitrary setup failures. The dangling-destination and three setup-callback cancellation controls exercise the intended boundary (`tests/test_render_resources.py:365`, `tests/test_render_resources.py:390`).
+- ✅ No dependency, public signature/default, geometry/mask/codec/audio, unrelated subprocess, G validation or P publication change appears in the two-file diff. R does not restore overwritten destinations or establish staged publication.
+- ⚠️ Native-call interruption, universally successful OS termination/reaping, Windows/GPU behavior and later C01 composition are outside this evidence. No stronger guarantee is inferred from the bounded child helper.
+
+## Strengths
+
+- The ownership changes remain local to the two renderers and one small reused child helper. Independent capture/writer/stderr releases continue after child-cleanup errors; diagnostic construction precedes stderr closure (`openscrub.py:4080`, `openscrub.py:4103`, `openscrub.py:4330`, `openscrub.py:4359`). Secondary diagnostics are bounded and Python 3.9 compatible (`openscrub.py:4125`, `openscrub.py:4381`).
+- Tests retain actual OpenCV handles, FFmpeg children, pipes and exception tracebacks. Production assertions precede unconditional harness containment; POSIX `waitpid` confirms reaping (`tests/test_render_resources.py:117`, `tests/test_render_resources.py:152`). The stubborn owned child covers initial wait/terminate failures and kill fallback (`tests/test_render_resources.py:276`); final stderr-close errors cover both primary preservation and otherwise-successful failure (`tests/test_render_resources.py:326`).
+- The evidence distinguishes the earlier full-suite source, final development bytes, final frozen Python 3.9, and final package acceptance. It does not relabel the older full run as final (`task1632-evidence/runs/full/preflight.json:4`, `task1632-evidence/runs/final-policy312/preflight.json:4`, `task1632-evidence/runs/final-policy39/preflight.json:4`).
+
+## Issues
+
+### Critical (Must Fix)
+
+- None found.
+
+### Important (Should Fix)
+
+1. **Track a render-local primary exception instead of using ambient exception state.** `openscrub.py:4102` and `openscrub.py:4358` use `sys.exc_info()[1]` in `finally`. Python carries a caller's currently handled exception into a called function: `except SomeError: render(...)` can therefore produce a non-None `primary` even when rendering itself completed normally. If a final release/close then fails, these blocks attach `render_cleanup_errors` to that unrelated caller exception and return successfully. This violates the explicit requirement that a meaningful cleanup failure with no render primary must fail. Initialize a local primary and set it only in an exception handler surrounding this render's owned work, preserving the actual raised object. Add SDR/HDR controls that call an otherwise-successful render inside a caller `except` and inject the existing exact stderr-close failure; assert that cleanup error is raised and the caller exception is not annotated. A standalone Python check of this exact `sys.exc_info`/finally mechanism reproduced successful return plus annotation of the caller's handled ValueError; no product execution was needed.
+
+2. **Do not discard an independent encoder stdin-close failure on successful finalization.** `openscrub.py:4093` and `openscrub.py:4347` catch every `OSError` from the normal `enc.stdin.close()` / `proc.stdin.close()` and discard it. If closing the real endpoint reports an independent I/O error after releasing the handle, and the encoder exits zero, the later helper's idempotent close succeeds; no error reaches `cleanup_errors`, and the render reports success. The preserved baseline catch was intended to let encoder status/stderr explain broken pipes, but this task explicitly owns normal close failures too. Retain the close error and surface meaningful independent failures when there is no primary, while preserving useful encoder diagnostics when encoder failure is the cause. Add exact owned stdin-close failure controls for both renderers, with a real successfully closing pipe and zero encoder exit, analogous to the existing stderr-close tests. Existing tests exercise final waits and stderr close, not this close-error branch.
+
+### Minor (Nice to Have)
+
+- `task1632-evidence/build-tools.log:1`: the offline backend setup emits a disabled-cache warning because it inherits an unwritable default pip cache. It is explained in the report and is not a product failure or a new blocker. Future task adapters can set an owned pip cache or explicitly disable caching to keep this setup output pristine; no shared-helper change is requested here.
+
+## Actual Checks and Limits
+
+- Read the task reviewer prompt, 29-line brief, complete implementer report, and supplied 1,327-line diff once in four bounded, nonoverlapping chunks. Base/head reviewed: `ded411cbec308333d1416ae3d58b4f6e918d7849` → `8e70af446caa5ed37e0e36c029925d5caf08f943`. No Git diff regeneration, source/index/branch mutation, publication, suites, builds or servers were run.
+- Checked named provenance risks by hashing bytes, without rereading changed-file code: all 23 selected native source files match the final frozen manifest, including engine SHA256 `ef5b50b6a3219b3f745c88b605c4e1728f06c765f7fc7b83e02004f49c5f2c55` and resource tests SHA256 `4d451e8e30eaec83da69b5cf4f0a4050d45d6686a12e041bdbe53476a9151f69`. All 31 indexed retained logs match their recorded sizes/hashes. All four canonical helper components match `helper-identity.json`'s reviewed 081816d identities. No outside-diff product code was read.
+- Inspected retained source/import preflights and result logs: full `e9fd0d3` is 174 passed/5 skipped on actual 3.12; applicable-case development selection is 37 passed; frozen `cb7b7ff` floor is 48 passed/126 deselected on actual 3.9. Final 3.12 development and final frozen 3.9 resource/N09 logs each show 44 passed with the identical final engine/test hashes above. `final-check.json` records the full-to-final production delta as only the two restored legacy existence guards; this agrees with the supplied change history and final guard hunks. I did not rerun that full suite or independently regenerate the intermediate Git delta.
+- Independently hashed the existing final sdist (532789 bytes, SHA256 `32379ee113506d3a1e4d32958c653af8993d5db87a81033b84e739d302a51093`) and wheel (435323 bytes, SHA256 `afccff503fbac5340810d26ddb070831df483d80d4364ee07b6c76d9319fe54b`). All 11 configured sdist members and six wheel runtime members match the final frozen source manifest. The retained command/result records show wheel construction from the extracted sdist, offline no-deps install, unchanged `>=3.9`, installed defaults/import identities, CLI exit zero, real loopback `/api/jobs` and `/` 200 responses, and server cleanup zero (`task1632-evidence/runs/package-final/package-identities.json:1`, `task1632-evidence/runs/package-final/logs/installed-1.log:3`). Earlier package evidence remains separate.
+- The only executable review probe was a standalone Python language-semantics check for finding 1; it imported no product modules and acquired no product resources. Finding 2 follows directly from the catch-and-discard path; the existing retained runs do not answer that exact fault. Product regression controls requested above remain necessary.
+
+## Assessment
+
+**Task quality:** Needs fixes.
+
+**Reasoning:** Resource ownership, shutdown ordering, narrow output policy and retained real-resource evidence are strong. Two finalization error paths still violate the task's explicit failure semantics, so approval should wait for focused fixes and owning regression evidence.

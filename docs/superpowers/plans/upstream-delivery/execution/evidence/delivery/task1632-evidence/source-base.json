@@ -1,0 +1,18 @@
+{
+  "purpose": "Supervisor source-only Task1632 base pins, not runtime acceptance",
+  "base": "ded411cbec308333d1416ae3d58b4f6e918d7849",
+  "files": {
+    "openscrub.py": {
+      "bytes": 413920,
+      "sha256": "dbba61eebd93d17adae37d8f1ece2d8a29170d2534734010b751d904076fc480"
+    },
+    "openscrub_web.py": {
+      "bytes": 256131,
+      "sha256": "9835e1137abee62c0a78e2669ed8bae7059e36bf4bed9f5c7a44f0eb8b40ed3a"
+    },
+    "pyproject.toml": {
+      "bytes": 4049,
+      "sha256": "2e12042427cd7390e3cbd29f882d1bda6e0eca39b7dccf6ddf43b304b438b36b"
+    }
+  }
+}

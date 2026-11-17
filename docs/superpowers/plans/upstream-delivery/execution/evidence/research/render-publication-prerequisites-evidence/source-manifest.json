@@ -1,0 +1,521 @@
+{
+  "kind": "source-only; no product imports/tests/runtime probes",
+  "refs": {
+    "test_baseline": {
+      "sha": "e21ebdf6e3ee46e6c65050dc956a9a3459152269",
+      "parents_subject": "5d3a15ae683c08f368d6ba4bd0d2d77b4e7b8e2f test: assert size-jump handoff geometry instead of suppressed log"
+    },
+    "p06a": {
+      "sha": "c7cf1f02d98742e93a728e4b1e94d8c6bd02c318",
+      "parents_subject": "e21ebdf6e3ee46e6c65050dc956a9a3459152269 Preserve complete reports with atomic publication"
+    },
+    "p06a_vault_fix": {
+      "sha": "66787aa09a958154e81e75f9bdc54d9788feb843",
+      "parents_subject": "c7cf1f02d98742e93a728e4b1e94d8c6bd02c318 Tolerate vanished report stages during vault cleanup"
+    },
+    "p06d": {
+      "sha": "7063082ef2a2ff5e56d9aafacff9bd43363b05b3",
+      "parents_subject": "66787aa09a958154e81e75f9bdc54d9788feb843 Preserve complete review reports through rendering"
+    },
+    "p07a_composed": {
+      "sha": "7f82f3ac901b85bdb630ce4a006a3c4064c96a62",
+      "parents_subject": "7063082ef2a2ff5e56d9aafacff9bd43363b05b3 Bind review saves to job views and submitted edit snapshots"
+    },
+    "p07a_audio_fix_composed": {
+      "sha": "3795d49f6293baf7b8c35534862a4881447e1b16",
+      "parents_subject": "7f82f3ac901b85bdb630ce4a006a3c4064c96a62 Refresh clean review audio independently of pending edits"
+    },
+    "p06b1": {
+      "sha": "4479b57612f4e5c463d31900f76277a5fcebb8a9",
+      "parents_subject": "3795d49f6293baf7b8c35534862a4881447e1b16 Protect web job files throughout active work and vault transitions"
+    },
+    "p06b1_source_fix": {
+      "sha": "c697d5a686d4dccbdf4f474567628d5d24e75a03",
+      "parents_subject": "4479b57612f4e5c463d31900f76277a5fcebb8a9 Own selected render sources and shared allowlist access"
+    },
+    "p06b2": {
+      "sha": "f2cdf4813c86296644911f3f0b09bfc56d3e03c5",
+      "parents_subject": "c697d5a686d4dccbdf4f474567628d5d24e75a03 Serialize report edits and validate worker publication"
+    },
+    "p07b": {
+      "sha": "12919c96c6f7558136b50d7b4d85e5e6b62f1971",
+      "parents_subject": "f2cdf4813c86296644911f3f0b09bfc56d3e03c5 Make ordinary manual additions safe to replay"
+    },
+    "p06c1": {
+      "sha": "3457efac574d74a7d2377cbc0d44bb0b87462c3a",
+      "parents_subject": "12919c96c6f7558136b50d7b4d85e5e6b62f1971 Skip publication for effectively unchanged report saves"
+    },
+    "p06c2": {
+      "sha": "4a62e49d2f0896b737081cc92e1f92e9bcaee93f",
+      "parents_subject": "3457efac574d74a7d2377cbc0d44bb0b87462c3a Stream readable report publication through the public encoder iterator"
+    },
+    "n09": {
+      "sha": "ded411cbec308333d1416ae3d58b4f6e918d7849",
+      "parents_subject": "e21ebdf6e3ee46e6c65050dc956a9a3459152269 fix: close HDR decoder pipe during partial cleanup"
+    },
+    "r_initial_pending": {
+      "sha": "e9fd0d39bd9c10ddbaa121e9c91cc504921c5afb",
+      "parents_subject": "ded411cbec308333d1416ae3d58b4f6e918d7849 fix: release owned render resources across exceptional exits"
+    },
+    "r_test_selection_pending": {
+      "sha": "cb7b7ff8577aa4e7c0db48916179a1521fb4b412",
+      "parents_subject": "e9fd0d39bd9c10ddbaa121e9c91cc504921c5afb test: select applicable renderer ownership cases"
+    },
+    "r_old_review_head_pending": {
+      "sha": "8e70af446caa5ed37e0e36c029925d5caf08f943",
+      "parents_subject": "cb7b7ff8577aa4e7c0db48916179a1521fb4b412 fix: retain legacy partial-output removal guards"
+    },
+    "r_fix_pending_review": {
+      "sha": "70ec464ca70b5e49751d778890f56029dced0b8a",
+      "parents_subject": "8e70af446caa5ed37e0e36c029925d5caf08f943 fix: preserve render-local finalization failures"
+    },
+    "g_reviewed_c01_only": {
+      "sha": "83af23b5fd3c5922d0d476ba2a6ae21a3598ced2",
+      "parents_subject": "7415e5a7526696a33f78a8c209bf062239a31d1c Preserve finite negative frame-count metadata"
+    },
+    "c01_validation_target_only": {
+      "sha": "4b9bd7e576a8ae30369672b4b4722fc9752e233f",
+      "parents_subject": "533919313d293d2fab8fc15407c8a30d4dbca1a6 Reconcile combined HDR oracle and cover default report rendering"
+    }
+  },
+  "files": [
+    {
+      "ref": "4a62e49d2f0896b737081cc92e1f92e9bcaee93f",
+      "path": "openscrub.py",
+      "git_blob": "9a9c82d7eb8075510e5c2dbbbe63be3c943a399f",
+      "sha256": "275de34766d3d64592222be5633906a3dcd2557ce78e2dd7b7d6fb8075fd0355",
+      "bytes": 416014
+    },
+    {
+      "ref": "4a62e49d2f0896b737081cc92e1f92e9bcaee93f",
+      "path": "openscrub_web.py",
+      "git_blob": "faf7825690c770d05105d3de4767a6b90d39e856",
+      "sha256": "fc0eea772aec5b9ecba7a957b260e8e3121937f98fd6ff785c8df6dc9788c5a5",
+      "bytes": 289250
+    },
+    {
+      "ref": "4a62e49d2f0896b737081cc92e1f92e9bcaee93f",
+      "path": "openscrub_vault.py",
+      "git_blob": "f2ad09ee35849dfe497efc54a8cbd2042d117c41",
+      "sha256": "da1b7fe4da389352fbc594abddcc563278b26009d8f342d4154ffa305bf4dfa4",
+      "bytes": 6963
+    },
+    {
+      "ref": "4a62e49d2f0896b737081cc92e1f92e9bcaee93f",
+      "path": "openscrub_internal/lifetimes.py",
+      "git_blob": "992adfb357631f69792f22e437a3b1d61e2a7ca8",
+      "sha256": "dbfc317c1c878b8e8a599391578504c44a8964199f2cdae6e2ed60a6336d6743",
+      "bytes": 2934
+    },
+    {
+      "ref": "4a62e49d2f0896b737081cc92e1f92e9bcaee93f",
+      "path": "openscrub_internal/reports.py",
+      "git_blob": "e6b6ca1403e98ac4f692c527e40f78088f3c501d",
+      "sha256": "eec9d568fc18f08ee35469ba864c5526120ae11152e8fe6f4d15007ab42d2427",
+      "bytes": 2095
+    },
+    {
+      "ref": "4a62e49d2f0896b737081cc92e1f92e9bcaee93f",
+      "path": "pyproject.toml",
+      "git_blob": "0bd8a916c86fc1944a085c6876624608894a380d",
+      "sha256": "8dd54eac39911da742cfc24638b4c1fdb7c2137cc0d4a99fe1c5e482e71479f9",
+      "bytes": 4164
+    },
+    {
+      "ref": "4a62e49d2f0896b737081cc92e1f92e9bcaee93f",
+      "path": "CONTRIBUTING.md",
+      "git_blob": "979e0c3545793d0c90e9375fbe34c3ece05dd10b",
+      "sha256": "52e148265ad14d17885855d481aee734faba0848b0be2586aac9239704f160b4",
+      "bytes": 1356
+    },
+    {
+      "ref": "4a62e49d2f0896b737081cc92e1f92e9bcaee93f",
+      "path": "Dockerfile",
+      "git_blob": "4fa7c30fcd70fed78cb574a1d78e384ca1dde9dd",
+      "sha256": "5758071c9c9bafe7790433745ac83d09f2d415e4bdc9212df4b8de31a244edc6",
+      "bytes": 5043
+    },
+    {
+      "ref": "4a62e49d2f0896b737081cc92e1f92e9bcaee93f",
+      "path": "Dockerfile.intel",
+      "git_blob": "b8527e243702e91d9fa8da8d603e41a87ec5663a",
+      "sha256": "00fa8162b3aae5821d0b9447b1a30f8c3d0cb047a2da892cf0da5a90cbe3f2fc",
+      "bytes": 7118
+    },
+    {
+      "ref": "4a62e49d2f0896b737081cc92e1f92e9bcaee93f",
+      "path": "Dockerfile.cuda",
+      "git_blob": "3098e9e4e7fad8b934bb9457fd581cbc245f91ac",
+      "sha256": "0bafced0ec898bf1da0086a6075e6e7c332245bf28d0a8a2445d2305d050216b",
+      "bytes": 9391
+    },
+    {
+      "ref": "4a62e49d2f0896b737081cc92e1f92e9bcaee93f",
+      "path": "openscrub_update.py",
+      "git_blob": "eff077ebf7785927c4aaea4b7502863e0398ea4b",
+      "sha256": "4d6a20f75d985a119f8421227c3bd88b17fd1b8eed44e353b127b5b49e733d55",
+      "bytes": 9255
+    },
+    {
+      "ref": "8e70af446caa5ed37e0e36c029925d5caf08f943",
+      "path": "openscrub.py",
+      "git_blob": "3739d1d1199d4304cc39976b41bf800ec96752f0",
+      "sha256": "ef5b50b6a3219b3f745c88b605c4e1728f06c765f7fc7b83e02004f49c5f2c55",
+      "bytes": 419335
+    },
+    {
+      "ref": "8e70af446caa5ed37e0e36c029925d5caf08f943",
+      "path": "openscrub_web.py",
+      "git_blob": "61589a6ebe0950ea5b0364e6d27dec01e3346e3b",
+      "sha256": "9835e1137abee62c0a78e2669ed8bae7059e36bf4bed9f5c7a44f0eb8b40ed3a",
+      "bytes": 256131
+    },
+    {
+      "ref": "8e70af446caa5ed37e0e36c029925d5caf08f943",
+      "path": "openscrub_vault.py",
+      "git_blob": "bd907929d0921a05c2c9b6afe5b268bc24d82ceb",
+      "sha256": "cc2db6a35d0b934502f1400b0d3a5b1f23ff8f63e6d24f9fc6fc4ab7baaebf82",
+      "bytes": 6695
+    },
+    {
+      "ref": "8e70af446caa5ed37e0e36c029925d5caf08f943",
+      "path": "pyproject.toml",
+      "git_blob": "c8c8200f2fe96edc78d057f06c2b04d8af987ece",
+      "sha256": "2e12042427cd7390e3cbd29f882d1bda6e0eca39b7dccf6ddf43b304b438b36b",
+      "bytes": 4049
+    },
+    {
+      "ref": "8e70af446caa5ed37e0e36c029925d5caf08f943",
+      "path": "CONTRIBUTING.md",
+      "git_blob": "74c6ced367063d84968520b5d00bc6bbb1fbcfd7",
+      "sha256": "2149d74989dc9c86424701fed324095641da6a32a8566776b935e9d3913c229a",
+      "bytes": 1676
+    },
+    {
+      "ref": "8e70af446caa5ed37e0e36c029925d5caf08f943",
+      "path": "Dockerfile",
+      "git_blob": "fa72409396fffca03e21fdded251ebad63fa1089",
+      "sha256": "cb7148141b842eea809d33b05c389522124963739ef992c95c769f6d700c800c",
+      "bytes": 4998
+    },
+    {
+      "ref": "8e70af446caa5ed37e0e36c029925d5caf08f943",
+      "path": "Dockerfile.intel",
+      "git_blob": "c0ddc15fbd3b2fe952510957255dcd87b43073f6",
+      "sha256": "d3ff7ec60107bcb2cdb1e1f72ca3ea7aadcd5b49f29da1a19402fce028aa3e6d",
+      "bytes": 7073
+    },
+    {
+      "ref": "8e70af446caa5ed37e0e36c029925d5caf08f943",
+      "path": "Dockerfile.cuda",
+      "git_blob": "b872a49efd3bd0e57ea861b2fe19df098d2549e5",
+      "sha256": "c434b90d62c605520b456ff450bebec2ee9229932c0e7a71e3a54ae83d208466",
+      "bytes": 9346
+    },
+    {
+      "ref": "8e70af446caa5ed37e0e36c029925d5caf08f943",
+      "path": "openscrub_update.py",
+      "git_blob": "eff077ebf7785927c4aaea4b7502863e0398ea4b",
+      "sha256": "4d6a20f75d985a119f8421227c3bd88b17fd1b8eed44e353b127b5b49e733d55",
+      "bytes": 9255
+    },
+    {
+      "ref": "70ec464ca70b5e49751d778890f56029dced0b8a",
+      "path": "openscrub.py",
+      "git_blob": "04432785b8239c2660892685e8f4ff6f9cc6f3d1",
+      "sha256": "9365c47bdc74bf5fc7496ffca62600861367fd968530664dc58f6710ca00037d",
+      "bytes": 420811
+    },
+    {
+      "ref": "70ec464ca70b5e49751d778890f56029dced0b8a",
+      "path": "openscrub_web.py",
+      "git_blob": "61589a6ebe0950ea5b0364e6d27dec01e3346e3b",
+      "sha256": "9835e1137abee62c0a78e2669ed8bae7059e36bf4bed9f5c7a44f0eb8b40ed3a",
+      "bytes": 256131
+    },
+    {
+      "ref": "70ec464ca70b5e49751d778890f56029dced0b8a",
+      "path": "openscrub_vault.py",
+      "git_blob": "bd907929d0921a05c2c9b6afe5b268bc24d82ceb",
+      "sha256": "cc2db6a35d0b934502f1400b0d3a5b1f23ff8f63e6d24f9fc6fc4ab7baaebf82",
+      "bytes": 6695
+    },
+    {
+      "ref": "70ec464ca70b5e49751d778890f56029dced0b8a",
+      "path": "pyproject.toml",
+      "git_blob": "c8c8200f2fe96edc78d057f06c2b04d8af987ece",
+      "sha256": "2e12042427cd7390e3cbd29f882d1bda6e0eca39b7dccf6ddf43b304b438b36b",
+      "bytes": 4049
+    },
+    {
+      "ref": "70ec464ca70b5e49751d778890f56029dced0b8a",
+      "path": "CONTRIBUTING.md",
+      "git_blob": "74c6ced367063d84968520b5d00bc6bbb1fbcfd7",
+      "sha256": "2149d74989dc9c86424701fed324095641da6a32a8566776b935e9d3913c229a",
+      "bytes": 1676
+    },
+    {
+      "ref": "70ec464ca70b5e49751d778890f56029dced0b8a",
+      "path": "Dockerfile",
+      "git_blob": "fa72409396fffca03e21fdded251ebad63fa1089",
+      "sha256": "cb7148141b842eea809d33b05c389522124963739ef992c95c769f6d700c800c",
+      "bytes": 4998
+    },
+    {
+      "ref": "70ec464ca70b5e49751d778890f56029dced0b8a",
+      "path": "Dockerfile.intel",
+      "git_blob": "c0ddc15fbd3b2fe952510957255dcd87b43073f6",
+      "sha256": "d3ff7ec60107bcb2cdb1e1f72ca3ea7aadcd5b49f29da1a19402fce028aa3e6d",
+      "bytes": 7073
+    },
+    {
+      "ref": "70ec464ca70b5e49751d778890f56029dced0b8a",
+      "path": "Dockerfile.cuda",
+      "git_blob": "b872a49efd3bd0e57ea861b2fe19df098d2549e5",
+      "sha256": "c434b90d62c605520b456ff450bebec2ee9229932c0e7a71e3a54ae83d208466",
+      "bytes": 9346
+    },
+    {
+      "ref": "70ec464ca70b5e49751d778890f56029dced0b8a",
+      "path": "openscrub_update.py",
+      "git_blob": "eff077ebf7785927c4aaea4b7502863e0398ea4b",
+      "sha256": "4d6a20f75d985a119f8421227c3bd88b17fd1b8eed44e353b127b5b49e733d55",
+      "bytes": 9255
+    },
+    {
+      "ref": "ded411cbec308333d1416ae3d58b4f6e918d7849",
+      "path": "openscrub.py",
+      "git_blob": "fa4f6c4e652bca0b25af50435a25050b3a2bc1da",
+      "sha256": "dbba61eebd93d17adae37d8f1ece2d8a29170d2534734010b751d904076fc480",
+      "bytes": 413920
+    },
+    {
+      "ref": "ded411cbec308333d1416ae3d58b4f6e918d7849",
+      "path": "openscrub_web.py",
+      "git_blob": "61589a6ebe0950ea5b0364e6d27dec01e3346e3b",
+      "sha256": "9835e1137abee62c0a78e2669ed8bae7059e36bf4bed9f5c7a44f0eb8b40ed3a",
+      "bytes": 256131
+    },
+    {
+      "ref": "ded411cbec308333d1416ae3d58b4f6e918d7849",
+      "path": "openscrub_vault.py",
+      "git_blob": "bd907929d0921a05c2c9b6afe5b268bc24d82ceb",
+      "sha256": "cc2db6a35d0b934502f1400b0d3a5b1f23ff8f63e6d24f9fc6fc4ab7baaebf82",
+      "bytes": 6695
+    },
+    {
+      "ref": "ded411cbec308333d1416ae3d58b4f6e918d7849",
+      "path": "pyproject.toml",
+      "git_blob": "c8c8200f2fe96edc78d057f06c2b04d8af987ece",
+      "sha256": "2e12042427cd7390e3cbd29f882d1bda6e0eca39b7dccf6ddf43b304b438b36b",
+      "bytes": 4049
+    },
+    {
+      "ref": "ded411cbec308333d1416ae3d58b4f6e918d7849",
+      "path": "CONTRIBUTING.md",
+      "git_blob": "74c6ced367063d84968520b5d00bc6bbb1fbcfd7",
+      "sha256": "2149d74989dc9c86424701fed324095641da6a32a8566776b935e9d3913c229a",
+      "bytes": 1676
+    },
+    {
+      "ref": "ded411cbec308333d1416ae3d58b4f6e918d7849",
+      "path": "Dockerfile",
+      "git_blob": "fa72409396fffca03e21fdded251ebad63fa1089",
+      "sha256": "cb7148141b842eea809d33b05c389522124963739ef992c95c769f6d700c800c",
+      "bytes": 4998
+    },
+    {
+      "ref": "ded411cbec308333d1416ae3d58b4f6e918d7849",
+      "path": "Dockerfile.intel",
+      "git_blob": "c0ddc15fbd3b2fe952510957255dcd87b43073f6",
+      "sha256": "d3ff7ec60107bcb2cdb1e1f72ca3ea7aadcd5b49f29da1a19402fce028aa3e6d",
+      "bytes": 7073
+    },
+    {
+      "ref": "ded411cbec308333d1416ae3d58b4f6e918d7849",
+      "path": "Dockerfile.cuda",
+      "git_blob": "b872a49efd3bd0e57ea861b2fe19df098d2549e5",
+      "sha256": "c434b90d62c605520b456ff450bebec2ee9229932c0e7a71e3a54ae83d208466",
+      "bytes": 9346
+    },
+    {
+      "ref": "ded411cbec308333d1416ae3d58b4f6e918d7849",
+      "path": "openscrub_update.py",
+      "git_blob": "eff077ebf7785927c4aaea4b7502863e0398ea4b",
+      "sha256": "4d6a20f75d985a119f8421227c3bd88b17fd1b8eed44e353b127b5b49e733d55",
+      "bytes": 9255
+    },
+    {
+      "ref": "83af23b5fd3c5922d0d476ba2a6ae21a3598ced2",
+      "path": "openscrub.py",
+      "git_blob": "8101e206571f1b2318827a66b5019e6542d6d62d",
+      "sha256": "870c217e517e55b812158768c96f2e85c77e41176c625cd4acca83c3afe6e06f",
+      "bytes": 420026
+    },
+    {
+      "ref": "83af23b5fd3c5922d0d476ba2a6ae21a3598ced2",
+      "path": "openscrub_web.py",
+      "git_blob": "61589a6ebe0950ea5b0364e6d27dec01e3346e3b",
+      "sha256": "9835e1137abee62c0a78e2669ed8bae7059e36bf4bed9f5c7a44f0eb8b40ed3a",
+      "bytes": 256131
+    },
+    {
+      "ref": "83af23b5fd3c5922d0d476ba2a6ae21a3598ced2",
+      "path": "openscrub_vault.py",
+      "git_blob": "bd907929d0921a05c2c9b6afe5b268bc24d82ceb",
+      "sha256": "cc2db6a35d0b934502f1400b0d3a5b1f23ff8f63e6d24f9fc6fc4ab7baaebf82",
+      "bytes": 6695
+    },
+    {
+      "ref": "83af23b5fd3c5922d0d476ba2a6ae21a3598ced2",
+      "path": "pyproject.toml",
+      "git_blob": "2f1d3e9c54c7fba2effb5473da9b9a819a242c95",
+      "sha256": "a5f3bedc2bed50c0ba9df10c7ce1c7f2525905ba11fcbd00410fb573e451c6ae",
+      "bytes": 4049
+    },
+    {
+      "ref": "83af23b5fd3c5922d0d476ba2a6ae21a3598ced2",
+      "path": "CONTRIBUTING.md",
+      "git_blob": "2abc14fb17b91b798d900d718feb13e8f5013739",
+      "sha256": "ce0ab04a15a6373018800d24e7ee553dddc92a156eac45ecfb1c8c4c1d9824a3",
+      "bytes": 1349
+    },
+    {
+      "ref": "83af23b5fd3c5922d0d476ba2a6ae21a3598ced2",
+      "path": "Dockerfile",
+      "git_blob": "fa72409396fffca03e21fdded251ebad63fa1089",
+      "sha256": "cb7148141b842eea809d33b05c389522124963739ef992c95c769f6d700c800c",
+      "bytes": 4998
+    },
+    {
+      "ref": "83af23b5fd3c5922d0d476ba2a6ae21a3598ced2",
+      "path": "Dockerfile.intel",
+      "git_blob": "c0ddc15fbd3b2fe952510957255dcd87b43073f6",
+      "sha256": "d3ff7ec60107bcb2cdb1e1f72ca3ea7aadcd5b49f29da1a19402fce028aa3e6d",
+      "bytes": 7073
+    },
+    {
+      "ref": "83af23b5fd3c5922d0d476ba2a6ae21a3598ced2",
+      "path": "Dockerfile.cuda",
+      "git_blob": "b872a49efd3bd0e57ea861b2fe19df098d2549e5",
+      "sha256": "c434b90d62c605520b456ff450bebec2ee9229932c0e7a71e3a54ae83d208466",
+      "bytes": 9346
+    },
+    {
+      "ref": "83af23b5fd3c5922d0d476ba2a6ae21a3598ced2",
+      "path": "openscrub_update.py",
+      "git_blob": "eff077ebf7785927c4aaea4b7502863e0398ea4b",
+      "sha256": "4d6a20f75d985a119f8421227c3bd88b17fd1b8eed44e353b127b5b49e733d55",
+      "bytes": 9255
+    },
+    {
+      "ref": "4b9bd7e576a8ae30369672b4b4722fc9752e233f",
+      "path": "openscrub.py",
+      "git_blob": "71c0d47c2864a637bb53a522b14896a47b539439",
+      "sha256": "89b3e84e28ba7065489cc1355cfeadaa4f04f0adf3bcbc19503ff01957e3f7e8",
+      "bytes": 419321
+    },
+    {
+      "ref": "4b9bd7e576a8ae30369672b4b4722fc9752e233f",
+      "path": "openscrub_web.py",
+      "git_blob": "30aca965bedeb0d41a3c3475a41603f21705086e",
+      "sha256": "0fc4669a086265bc3c0dd05e895a3abfed18eda7544124f8408dfeade450a330",
+      "bytes": 306395
+    },
+    {
+      "ref": "4b9bd7e576a8ae30369672b4b4722fc9752e233f",
+      "path": "openscrub_vault.py",
+      "git_blob": "f2ad09ee35849dfe497efc54a8cbd2042d117c41",
+      "sha256": "da1b7fe4da389352fbc594abddcc563278b26009d8f342d4154ffa305bf4dfa4",
+      "bytes": 6963
+    },
+    {
+      "ref": "4b9bd7e576a8ae30369672b4b4722fc9752e233f",
+      "path": "openscrub_internal/lifetimes.py",
+      "git_blob": "992adfb357631f69792f22e437a3b1d61e2a7ca8",
+      "sha256": "dbfc317c1c878b8e8a599391578504c44a8964199f2cdae6e2ed60a6336d6743",
+      "bytes": 2934
+    },
+    {
+      "ref": "4b9bd7e576a8ae30369672b4b4722fc9752e233f",
+      "path": "openscrub_internal/reports.py",
+      "git_blob": "e6b6ca1403e98ac4f692c527e40f78088f3c501d",
+      "sha256": "eec9d568fc18f08ee35469ba864c5526120ae11152e8fe6f4d15007ab42d2427",
+      "bytes": 2095
+    },
+    {
+      "ref": "4b9bd7e576a8ae30369672b4b4722fc9752e233f",
+      "path": "pyproject.toml",
+      "git_blob": "d4a51b0a140b3f76ba114701fb104e8a788eb7ea",
+      "sha256": "3ecd05dbda7fac26ea284a03248c321a301b8268446d94dccc32aa3073fbf652",
+      "bytes": 4192
+    },
+    {
+      "ref": "4b9bd7e576a8ae30369672b4b4722fc9752e233f",
+      "path": "CONTRIBUTING.md",
+      "git_blob": "380d603c0dc9c9d73630a9cb7525f3293ded25f4",
+      "sha256": "2c8c74ff52cea6b49958a0774c42539341326eeea33c7c02316355f55fcad799",
+      "bytes": 2745
+    },
+    {
+      "ref": "4b9bd7e576a8ae30369672b4b4722fc9752e233f",
+      "path": "Dockerfile",
+      "git_blob": "4fa7c30fcd70fed78cb574a1d78e384ca1dde9dd",
+      "sha256": "5758071c9c9bafe7790433745ac83d09f2d415e4bdc9212df4b8de31a244edc6",
+      "bytes": 5043
+    },
+    {
+      "ref": "4b9bd7e576a8ae30369672b4b4722fc9752e233f",
+      "path": "Dockerfile.intel",
+      "git_blob": "b8527e243702e91d9fa8da8d603e41a87ec5663a",
+      "sha256": "00fa8162b3aae5821d0b9447b1a30f8c3d0cb047a2da892cf0da5a90cbe3f2fc",
+      "bytes": 7118
+    },
+    {
+      "ref": "4b9bd7e576a8ae30369672b4b4722fc9752e233f",
+      "path": "Dockerfile.cuda",
+      "git_blob": "3098e9e4e7fad8b934bb9457fd581cbc245f91ac",
+      "sha256": "0bafced0ec898bf1da0086a6075e6e7c332245bf28d0a8a2445d2305d050216b",
+      "bytes": 9391
+    },
+    {
+      "ref": "4b9bd7e576a8ae30369672b4b4722fc9752e233f",
+      "path": "openscrub_update.py",
+      "git_blob": "eff077ebf7785927c4aaea4b7502863e0398ea4b",
+      "sha256": "4d6a20f75d985a119f8421227c3bd88b17fd1b8eed44e353b127b5b49e733d55",
+      "bytes": 9255
+    }
+  ],
+  "local_files": [
+    {
+      "path": "docs/superpowers/plans/upstream-delivery/03-packaging-and-review-features.md",
+      "sha256": "090ee7d07d9992b392995ab936498778368abb53e686a3a242e0598232bd582a",
+      "bytes": 52923
+    },
+    {
+      "path": ".superpowers/sdd/README/render-delivery-contract-research.md",
+      "sha256": "c824c6ae433d212ffad314206cfe9db6f4ed1ff1c31171e301c0b0ca9b3c16da",
+      "bytes": 60841
+    },
+    {
+      "path": "docs/superpowers/plans/upstream-delivery/execution/tooling/README.md",
+      "sha256": "1dec8419daf134313cd85312aabf8bd94b63093fc562fa5bf831ce92214109af",
+      "bytes": 11291
+    },
+    {
+      "path": "docs/superpowers/plans/upstream-delivery/execution/tooling/verify.py",
+      "sha256": "354cf49b0c83d11f3945137fbdffc3ac6b2793f1217ac39a9b62270097940067",
+      "bytes": 14591
+    },
+    {
+      "path": "docs/superpowers/plans/upstream-delivery/execution/tooling/verification_hook.py",
+      "sha256": "4b25e217fcf8fc2ada1147a9c26ff5cdb51884809328854d4dafd3b36fb8e5a0",
+      "bytes": 6130
+    },
+    {
+      "path": "docs/superpowers/plans/upstream-delivery/execution/tooling/sitecustomize.py",
+      "sha256": "035c1187d46c85ce2c3f3c092822d8171c3b67e99a7270717a12169b2c3be302",
+      "bytes": 310
+    }
+  ]
+}

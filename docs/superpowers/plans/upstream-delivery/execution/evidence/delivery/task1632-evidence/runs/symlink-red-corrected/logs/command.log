@@ -1,0 +1,40 @@
+DEFAULT_PATHS {"jobs": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_jobs", "models": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1632/runs/symlink-red-corrected/profile/.openscrub/models"}
+ACTIVE_SOURCE {"executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python", "python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]", "sources": {"openscrub": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py", "sha256": "d5e74bacb992ed87b0034b496b6b38276a73e874a8fb9afa70a4d4ab66690c56"}, "openscrub_setup": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_setup.py", "sha256": "d0362a038f8182e8fae510100085bb087f09f7e5cf7e11a780a24390b3037eaf"}, "openscrub_update": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_update.py", "sha256": "4d6a20f75d985a119f8421227c3bd88b17fd1b8eed44e353b127b5b49e733d55"}, "openscrub_vault": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_vault.py", "sha256": "cc2db6a35d0b934502f1400b0d3a5b1f23ff8f63e6d24f9fc6fc4ab7baaebf82"}, "openscrub_web": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", "sha256": "9835e1137abee62c0a78e2669ed8bae7059e36bf4bed9f5c7a44f0eb8b40ed3a"}, "zones_ui": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/zones_ui.py", "sha256": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7"}}}
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_________ test_fallback_cancel_preserves_existing_dangling_destination _________
+
+source = PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1632/runs/symlink-red-corrected/pytest/test_fallback_cancel_preserves0/input.mp4')
+tmp_path = PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1632/runs/symlink-red-corrected/pytest/test_fallback_cancel_preserves0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7545b13395b0>
+
+    def test_fallback_cancel_preserves_existing_dangling_destination(
+            source, tmp_path, monkeypatch):
+        """Resource cleanup must preserve the original exists-before-unlink policy."""
+        output = tmp_path / 'previous.mp4'
+        target = tmp_path / 'absent.mp4'
+        try:
+            output.symlink_to(target)
+        except (OSError, NotImplementedError):
+            pytest.skip('symlink creation unavailable')
+        monkeypatch.setattr(app, 'nvenc_available', lambda *a: None)
+    
+        class Callbacks(app.Callbacks):
+            def cancelled(self):
+                return True
+    
+        with owners(monkeypatch) as observed:
+            with pytest.raises(app.PipelineCancelled) as held:
+                render('fallback', source, output, Callbacks())
+            assert held.value.__traceback__ is not None
+>           assert output.is_symlink() and output.readlink() == target
+E           AssertionError: assert (False)
+E            +  where False = is_symlink()
+E            +    where is_symlink = PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1632/runs/symlink-red-corrected/pytest/test_fallback_cancel_preserves0/previous.mp4').is_symlink
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_resources.py:384: AssertionError
+----------------------------- Captured stdout call -----------------------------
+      encoder: OpenCV mp4v (ffmpeg not found — no audio!)
+=========================== short test summary info ============================
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_render_resources.py::test_fallback_cancel_preserves_existing_dangling_destination
+1 failed, 37 deselected in 0.10s

@@ -1,0 +1,259 @@
+{
+  "abort-red": [
+    {
+      "file": "runs/abort-red/logs/command.log",
+      "bytes": 4207,
+      "sha256": "93ab7a4b20fc1516340b15ff6a448775eab6691bfaa1dd61eef4554aeec2848e",
+      "results": [
+        "1 failed, 2 passed, 35 deselected in 4.90s"
+      ]
+    }
+  ],
+  "applicable": [
+    {
+      "file": "runs/applicable/logs/command.log",
+      "bytes": 1485,
+      "sha256": "c0a2b7cad477f56ecb523cd8d11e0a4e4d3ccd4182c13b3a77ba45236ae00c51",
+      "results": [
+        "37 passed in 7.58s"
+      ]
+    }
+  ],
+  "environment312": [
+    {
+      "file": "runs/environment312/logs/command.log",
+      "bytes": 1585,
+      "sha256": "544765d1d1fc8f9251ad0142451310eca95564b7160755884d1272fb951b6dfd",
+      "results": []
+    }
+  ],
+  "environment39": [
+    {
+      "file": "runs/environment39/logs/command.log",
+      "bytes": 1578,
+      "sha256": "33c7645b229d4833f10947b77e1235db4dfd5037091b9bd9f554eb513e127795",
+      "results": []
+    }
+  ],
+  "final-policy312": [
+    {
+      "file": "runs/final-policy312/logs/command.log",
+      "bytes": 1490,
+      "sha256": "05e1bac32f00c94512457fa5eb3e58bddacbebf52e6899389cabfe26d1c39ee8",
+      "results": [
+        "44 passed in 8.44s"
+      ]
+    }
+  ],
+  "final-policy39": [
+    {
+      "file": "runs/final-policy39/logs/command.log",
+      "bytes": 1482,
+      "sha256": "ffef0ee0ade3e3b7b4340846b236e5090e04a4bffdf5d87eb055fff0ce4a5030",
+      "results": [
+        "44 passed in 9.33s"
+      ]
+    }
+  ],
+  "finalization": [
+    {
+      "file": "runs/finalization/logs/command.log",
+      "bytes": 1501,
+      "sha256": "dc3fd20a08cd6dcf10db09712583fafccabe81816871af383905e0e26f1922c8",
+      "results": [
+        "7 passed, 35 deselected in 0.78s"
+      ]
+    }
+  ],
+  "floor": [
+    {
+      "file": "runs/floor/logs/command.log",
+      "bytes": 1490,
+      "sha256": "c16849dbb109331cbbc3b69a8625bfc7510393c09870a3db6d1bb29cb33942dc",
+      "results": [
+        "48 passed, 126 deselected in 22.59s"
+      ]
+    }
+  ],
+  "focused-final": [
+    {
+      "file": "runs/focused-final/logs/command.log",
+      "bytes": 1516,
+      "sha256": "7a4d1f92dface6a3d814fefb8b1bd153ee47300eb58024950adbe521db35290a",
+      "results": [
+        "44 passed, 5 skipped, 126 deselected in 20.79s"
+      ]
+    }
+  ],
+  "full": [
+    {
+      "file": "runs/full/logs/command.log",
+      "bytes": 1662,
+      "sha256": "17d626382398bd2a95434c2430e441f7bee8f8618a88785ac7828720ef6f3772",
+      "results": [
+        "174 passed, 5 skipped in 79.32s (0:01:19)"
+      ]
+    }
+  ],
+  "green1": [
+    {
+      "file": "runs/green1/logs/command.log",
+      "bytes": 4755,
+      "sha256": "eda72d09a16201a16122ef6dae580dabb5279be1cd50034dabda674e7acdbf16",
+      "results": [
+        "1 failed, 24 passed, 2 skipped in 1.88s"
+      ]
+    }
+  ],
+  "green2": [
+    {
+      "file": "runs/green2/logs/command.log",
+      "bytes": 1492,
+      "sha256": "9fc28fdf0f392ca580bcb58777c9cf7dc4a8108e1e0a6bc3d8c1d9508d876e27",
+      "results": [
+        "31 passed, 5 skipped in 2.90s"
+      ]
+    }
+  ],
+  "green3": [
+    {
+      "file": "runs/green3/logs/command.log",
+      "bytes": 2906,
+      "sha256": "28ae8f89c930da3aaeeb1ef695e1379ebcb23f7f3484b29a0c13973731f2d22d",
+      "results": [
+        "1 failed, 41 passed, 5 skipped, 126 deselected in 16.60s"
+      ]
+    }
+  ],
+  "package": [
+    {
+      "file": "runs/package/logs/install.log",
+      "bytes": 1313,
+      "sha256": "5e11b543936334f80fd1071514b0315c666f4ec044c95ebee4b0d0a46e99ad81",
+      "results": []
+    },
+    {
+      "file": "runs/package/logs/installed-0.log",
+      "bytes": 19832,
+      "sha256": "d3ed3d7219f04e21e87704ea0f7f0882193e9e3d533ebcb27e0830a97fe4f9ee",
+      "results": []
+    },
+    {
+      "file": "runs/package/logs/installed-1.log",
+      "bytes": 1892,
+      "sha256": "7073e7d1ad61d044493be3a24a80c011613d28487cf00af4d0f4c88610b79bb4",
+      "results": [
+        "SERVER_CLEANUP 0"
+      ]
+    },
+    {
+      "file": "runs/package/logs/installed-defaults.log",
+      "bytes": 1781,
+      "sha256": "77e75d3a8ad55035b5e59cf6bf3d30cc01b44d28d0b77f61b0a6b0521fe2fa03",
+      "results": []
+    },
+    {
+      "file": "runs/package/logs/listening-server.log",
+      "bytes": 2326,
+      "sha256": "07e2d0dd997133d4a7aee73c17e1ca822306aa18c962502d7cc3e13356f0788d",
+      "results": []
+    },
+    {
+      "file": "runs/package/logs/sdist.log",
+      "bytes": 3642,
+      "sha256": "3a5c73f79c5996304ffadde566b290340c0ff3b0d4a4b7b0fe9cead9ef2aea37",
+      "results": []
+    },
+    {
+      "file": "runs/package/logs/wheel-from-sdist.log",
+      "bytes": 3652,
+      "sha256": "928022e04128acfa3461c5a7abb885b10ed91a163744ce870b16925ce4098e75",
+      "results": []
+    }
+  ],
+  "package-final": [
+    {
+      "file": "runs/package-final/logs/install.log",
+      "bytes": 1313,
+      "sha256": "16f6bedec927319ba5c67ca3d785f93cb70953d6e39e1ff4fb7480df0b6f193d",
+      "results": []
+    },
+    {
+      "file": "runs/package-final/logs/installed-0.log",
+      "bytes": 19880,
+      "sha256": "993304ac929bb8ebbfead81e6f22d9c293369fcee7b679027830629f3afb8d77",
+      "results": []
+    },
+    {
+      "file": "runs/package-final/logs/installed-1.log",
+      "bytes": 1940,
+      "sha256": "839ef90e09efc4915dbd08cfe927b3bf0e0959440f95ae359ecd97f7c4d27968",
+      "results": [
+        "SERVER_CLEANUP 0"
+      ]
+    },
+    {
+      "file": "runs/package-final/logs/installed-defaults.log",
+      "bytes": 1829,
+      "sha256": "2858d8298887ca6e1dff5d7127d725ced062302f425e494f4749e75edeeced47",
+      "results": []
+    },
+    {
+      "file": "runs/package-final/logs/listening-server.log",
+      "bytes": 2380,
+      "sha256": "c17b391dc0717eb8146d375bfbe55cb1e0bdaf40c118df325f823ce3f2dc4b37",
+      "results": []
+    },
+    {
+      "file": "runs/package-final/logs/sdist.log",
+      "bytes": 3642,
+      "sha256": "4640734817878f397ef559e1c5573c055cddc5bc22d40527a2db1556602b5025",
+      "results": []
+    },
+    {
+      "file": "runs/package-final/logs/wheel-from-sdist.log",
+      "bytes": 3652,
+      "sha256": "effbfa5ccfdcea13357681e1237aa512a23b9c6d4cff5ce50ce0c87b811ba9d5",
+      "results": []
+    }
+  ],
+  "policy-green": [
+    {
+      "file": "runs/policy-green/logs/command.log",
+      "bytes": 1487,
+      "sha256": "3f1965ad23be97bf14b3e1b204e597600102bf91ba28466aa0734879ab4d6404",
+      "results": [
+        "38 passed in 7.75s"
+      ]
+    }
+  ],
+  "red": [
+    {
+      "file": "runs/red/logs/command.log",
+      "bytes": 101269,
+      "sha256": "41cc474e33d5e572790966d6fa48bb18a1863f51b04f9323acaf37ccf17ab74a",
+      "results": [
+        "        \"\"\"A real failed-open VideoWriter must fail instead of replacing the output.\"\"\"",
+        "23 failed, 2 passed, 2 skipped in 2.14s"
+      ]
+    }
+  ],
+  "symlink-red": [
+    {
+      "file": "runs/symlink-red/logs/command.log",
+      "bytes": 3598,
+      "sha256": "8b8f4db0dd7b182385c60548f20e8e04db88c9dc9cdcc8b9835377b2eb228f33",
+      "results": []
+    }
+  ],
+  "symlink-red-corrected": [
+    {
+      "file": "runs/symlink-red-corrected/logs/command.log",
+      "bytes": 3758,
+      "sha256": "8fe42de73a91350a2757d3ea6b843875887a3d7f2e53c7c7531a884904dbca2f",
+      "results": [
+        "1 failed, 37 deselected in 0.10s"
+      ]
+    }
+  ]
+}

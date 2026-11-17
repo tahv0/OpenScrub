@@ -1,0 +1,28 @@
+{
+  "render": {
+    "only_existing_recognized_branches": [
+      [
+        "ExceptHandler",
+        "(BrokenPipeError, OSError)"
+      ],
+      [
+        "If",
+        "idx % 30 == 0 and cb.cancelled()"
+      ]
+    ],
+    "legacy_exists_guard_restored": true
+  },
+  "render_hdr": {
+    "only_existing_recognized_branches": [
+      [
+        "ExceptHandler",
+        "(BrokenPipeError, OSError)"
+      ],
+      [
+        "If",
+        "idx % 30 == 0 and cb.cancelled()"
+      ]
+    ],
+    "legacy_exists_guard_restored": true
+  }
+}

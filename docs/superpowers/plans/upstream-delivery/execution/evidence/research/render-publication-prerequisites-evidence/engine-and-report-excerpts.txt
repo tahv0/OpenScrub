@@ -1,0 +1,328 @@
+=== 4a62e49d2f0896b737081cc92e1f92e9bcaee93f:openscrub.py:6286-6346 ===
+6286: def write_report(path, args, state, output_path=None, publisher=None):
+6287:     prov = {
+6288:         "tool": "openscrub", "version": VERSION,
+6289:         "timestamp": datetime.datetime.now().astimezone().isoformat(),
+6290:         "input": os.path.abspath(args.video),
+6291:         "input_sha256": state.get("input_sha256"),
+6292:         "original_input": (os.path.abspath(args.original_video)
+6293:                            if getattr(args, "original_video", None) else None),
+6294:         "vfr_normalized": bool(getattr(args, "original_video", None)),
+6295:         "hdr_tonemapped": bool(getattr(args, "hdr_tonemapped", False)),
+6296:         "hdr_output": bool(getattr(args, "hdr_source", None)),
+6297:         "metadata_stripped": True,   # renders pass -map_metadata -1
+6298:         "zones": getattr(args, "zones_data", None),
+6299:         "windows": getattr(args, "windows_data", None),
+6300:         "settings": _settings_dict(args),
+6301:     }
+6302:     if output_path and os.path.exists(output_path):
+6303:         prov["output"] = os.path.abspath(output_path)
+6304:         prov["output_sha256"] = sha256_file(output_path)
+6305:     source = state.get("source_report")
+6306:     if source is not None:
+6307:         # A render consumes enabled Detection objects, but publishes the full
+6308:         # review document: Keep choices, row positions and unknown fields are
+6309:         # user data, not a serialization of the render subset.
+6310:         doc = dict(source)
+6311:         previous = dict(source.get("provenance", {}))
+6312:         settings = dict(previous.get("settings", {}))
+6313:         settings.update(prov["settings"])
+6314:         prov["settings"] = settings
+6315:         # Output hashes/paths must describe this render, never an older one.
+6316:         previous.pop("output", None)
+6317:         previous.pop("output_sha256", None)
+6318:         previous.update(prov)
+6319:         doc["provenance"] = previous
+6320:     else:
+6321:         doc = {
+6322:             "provenance": prov,
+6323:             "render_state": {
+6324:                 "fps": state["fps"],
+6325:                 "cum": [[round(x, 1), round(y, 1)] for x, y in state["cum"]],
+6326:                 "bands": [[round(x, 1), round(y, 1)] for x, y in state["bands"]],
+6327:             },
+6328:             "detections": ([dict(asdict(d), enabled=True)
+6329:                             for d in state["detections"]]
+6330:                            + [dict(asdict(d), enabled=False, zone_dropped=True)
+6331:                               for d in state.get("zdropped", [])]),
+6332:         }
+6333:         if state.get("audio_suggestions"):
+6334:             doc["audio_suggestions"] = state["audio_suggestions"]
+6335:         if state.get("audio_transcript"):
+6336:             doc["audio_transcript"] = state["audio_transcript"]
+6337:     aspans = getattr(args, "audio_spans", None)
+6338:     if ((source is None and aspans)
+6339:             or (source is not None and state.get("audio_redactions_overridden"))):
+6340:         # An explicit empty list clears saved spans. Otherwise preserve the raw
+6341:         # saved representation, including additive fields on individual spans.
+6342:         doc["audio_redactions"] = [
+6343:             {"t0": a, "t1": b, "mode": m} for a, b, m in (aspans or [])]
+6344:     # Construction and output hashing precede an optional caller-owned final
+6345:     # publication boundary. CLI/GUI and old callback callers keep atomic bytes.
+6346:     (publisher or atomic_report)(path, doc)
+
+=== 4a62e49d2f0896b737081cc92e1f92e9bcaee93f:openscrub.py:8451-8465 ===
+8451: def run_render(args, state, cb=None):
+8452:     cb = cb or Callbacks()
+8453:     dst = args.output or os.path.splitext(args.video)[0] + (
+8454:         "_preview.mp4" if args.preview else "_redacted.mp4")
+8455:     cb.log(f"[4/4] Rendering -> {dst}")
+8456:     aspans = getattr(args, "audio_spans", None)
+8457:     if getattr(args, "audio_pii_apply", False):
+8458:         sugg = state.get("audio_suggestions") or []
+8459:         if sugg:
+8460:             aspans = list(aspans or []) + [
+8461:                 (s["t0"], s["t1"], "mute") for s in sugg]
+8462:             cb.log("      spoken-PII: %d suggested span(s) applied as "
+8463:                    "mute (--audio-pii-apply)" % len(sugg))
+8464:             args.audio_spans = aspans
+8465:             state["audio_redactions_overridden"] = True
+
+=== 4a62e49d2f0896b737081cc92e1f92e9bcaee93f:openscrub.py:8488-8520 ===
+8488:     dets_r = apply_coverage(state["detections"],
+8489:                             getattr(args, "coverage", "tight"), cb)
+8490:     out_q = getattr(args, "out_quality", "archival") or "archival"
+8491:     if out_q != "archival":
+8492:         cb.log(f"      output quality: {out_q} (smaller file; archival is "
+8493:                "the visually-lossless default)")
+8494:     if getattr(args, "hdr_source", None) and not args.preview:
+8495:         render_hdr(args.hdr_source, dst, dets_r, state["cum"],
+8496:                    state["bands"], state["fps"], pad=args.pad, mode=args.mode,
+8497:                    encoder=args.hdr_encoder,
+8498:                    tags=getattr(args, "hdr_tags", {}),
+8499:                    face_shape=getattr(args, "face_shape", "ellipse"),
+8500:                    mode_map=getattr(args, "mode_map", None),
+8501:                    audio_spans=aspans, mute_tracks=mute_tracks, cb=cb,
+8502:                    out_quality=out_q,
+8503:                    audio_lanes=getattr(args, "audio_lane_count", None))
+8504:     else:
+8505:         render(args.video, dst, dets_r, state["cum"],
+8506:                state["bands"],
+8507:                state["fps"], pad=args.pad, mode=args.mode, preview=args.preview,
+8508:                mode_map=getattr(args, "mode_map", None),
+8509:                draw_scores=bool(getattr(args, "draw_scores", False)),
+8510:                vcodec=getattr(args, "codec", "h264"),
+8511:                face_shape=getattr(args, "face_shape", "ellipse"),
+8512:                encoder=args.encoder, audio_spans=aspans, clip=clip,
+8513:                mute_tracks=mute_tracks, cb=cb, out_quality=out_q,
+8514:                audio_lanes=getattr(args, "audio_lane_count", None))
+8515:     if args.report:
+8516:         write_report(args.report, args, state, output_path=dst,
+8517:                      publisher=getattr(cb, "publish_report", None))
+8518:         cb.log(f"      audit report: {args.report} (contains PII text — protect it)")
+8519:     cb.log("done.")
+8520:     return dict(state["stats"], output=dst)
+
+=== 4a62e49d2f0896b737081cc92e1f92e9bcaee93f:openscrub.py:6052-6061 ===
+6052: def _settings_dict(args):
+6053:     skip = {"video", "output", "report", "from_report", "batch", "config",
+6054:             "_report_input"}
+6055:     out = {k: v for k, v in vars(args).items()
+6056:            if k not in skip and isinstance(v, (str, int, float, bool, list,
+6057:                                                tuple, type(None)))}
+6058:     mm = getattr(args, "mode_map", None)
+6059:     if isinstance(mm, dict) and mm:
+6060:         out["mode_map"] = ",".join(f"{k}={v}" for k, v in sorted(mm.items()))
+6061:     return out
+
+=== 4a62e49d2f0896b737081cc92e1f92e9bcaee93f:openscrub_internal/reports.py:1-43 ===
+1: """Publish complete report JSON without truncating the previous report."""
+2: import json
+3: import os
+4: import tempfile
+5: 
+6: 
+7: def atomic_report(path, report) -> None:
+8:     """Stage private UTF-8 JSON beside *path*, sync, close, then replace it.
+9: 
+10:     A failure before replacement leaves the previous report intact and raises.
+11:     Readers opening the path see a complete old or new report on filesystems
+12:     supporting atomic replacement. This does not serialize read/apply/write
+13:     transactions or guarantee power-loss durability: the directory is not
+14:     fsynced, and filesystem/network storage guarantees vary. On Windows an open
+15:     destination may prevent replacement; that failure is propagated. Temporary
+16:     files use the vault's .tmp crash-cleanup convention. POSIX staging permissions
+17:     are 0600; Windows access restrictions also depend on the directory ACL.
+18:     """
+19:     path = os.path.abspath(path)
+20:     staged = None
+21:     try:
+22:         # NamedTemporaryFile creates exclusively with restrictive permissions.
+23:         with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8",
+24:                                          dir=os.path.dirname(path),
+25:                                          prefix=".report-", suffix=".tmp",
+26:                                          delete=False) as stream:
+27:             staged = stream.name
+28:             # Consume the public encoder iterator in TextIOWrapper rather than
+29:             # dispatching one Python stream.write call for every JSON token.
+30:             # Tokens remain streamed; a single large string is still one token.
+31:             stream.writelines(json.JSONEncoder(indent=1).iterencode(report))
+32:             stream.flush()
+33:             os.fsync(stream.fileno())
+34:         # Close first: Windows cannot rename an open staging file.
+35:         os.replace(staged, path)
+36:     finally:
+37:         if staged is not None:
+38:             try:
+39:                 os.unlink(staged)
+40:             except OSError:
+41:                 # After replace the name is gone. On cleanup failure leave a
+42:                 # .tmp for vault crash cleanup without masking the write error.
+43:                 pass
+
+=== 70ec464ca70b5e49751d778890f56029dced0b8a:openscrub.py:3887-3894 ===
+3887: def _stop_render_children(children):
+3888:     """Abort only these render children, then close their owned pipe ends.
+3889: 
+3890:     This bound applies after Python regains control, never to native IO.
+3891:     Normal EOF/final encoder waits remain unbounded in the renderers.
+3892:     """
+3893:     children = [child for child in children if child is not None]
+3894:     errors = []
+
+=== 70ec464ca70b5e49751d778890f56029dced0b8a:openscrub.py:3937-3962 ===
+3937: def render_hdr(src, dst, detections, cum, bands, fps, pad, mode,
+3938:                encoder, tags, band_margin=25, progress_every=60, cb=None,
+3939:                mode_map=None, face_shape="ellipse", audio_spans=None,
+3940:                mute_tracks=(), out_quality="archival", audio_lanes=None):
+3941:     """render(), but 10-bit end to end: decode the HDR source to raw
+3942:     yuv420p10le, blur the planes in place, encode 10-bit HEVC with the
+3943:     source's color tags (PQ/HLG + BT.2020) carried over. `hvc1` tagging
+3944:     keeps QuickTime/Apple players happy. No preview mode — previews use
+3945:     the SDR copy."""
+3946:     mode_map = mode_map or {}
+3947:     def _mode_for(cat):
+3948:         return mode_map.get(cat, mode)
+3949:     cb = cb or Callbacks()
+3950:     meta = dec = enc = ff_err = None
+3951:     remove_partial = False
+3952:     cleanup_errors = []
+3953:     primary = None
+3954:     try:
+3955:         meta = cv2.VideoCapture(src)
+3956:         w = int(meta.get(cv2.CAP_PROP_FRAME_WIDTH))
+3957:         h = int(meta.get(cv2.CAP_PROP_FRAME_HEIGHT))
+3958:         total = int(meta.get(cv2.CAP_PROP_FRAME_COUNT))
+3959:         meta.release()
+3960:         meta = None
+3961:         cb.log(f"      encoder: {encoder} 10-bit"
+3962:                + (" (GPU)" if encoder.endswith(("_nvenc", "_qsv")) else " (CPU)"))
+
+=== 70ec464ca70b5e49751d778890f56029dced0b8a:openscrub.py:4090-4145 ===
+4090:         dec.wait()
+4091:         cb.progress("render", max(total, idx), max(total, idx))
+4092:         try:
+4093:             enc.stdin.close()
+4094:         except OSError as close_error:
+4095:             # A failed close may not have delivered EOF. Bound only this
+4096:             # exceptional status wait; healthy finalization has no timeout.
+4097:             try:
+4098:                 rc = enc.wait(timeout=2)
+4099:             except subprocess.TimeoutExpired:
+4100:                 cleanup_errors.extend(_stop_render_children((dec, enc)))
+4101:                 raise close_error  # forced termination is not an encoder cause
+4102:             except Exception as wait_error:
+4103:                 cleanup_errors.append(wait_error)
+4104:                 raise close_error
+4105:             if rc == 0:
+4106:                 raise  # retain a close error even after successful encoding
+4107:             cleanup_errors.append(close_error)  # encoder diagnostics stay primary
+4108:         else:
+4109:             rc = enc.wait()
+4110:         if rc != 0:
+4111:             raise _ffmpeg_failure(ff_err, "HDR encode", rc)
+4112:         cb.log(f"      HDR preserved: 10-bit HEVC, color tags "
+4113:                + (", ".join(f"{k.lstrip('-')}={v}" for k, v in (tags or {}).items())
+4114:                   or "(none in source)"))
+4115:     except BaseException as error:
+4116:         primary = error
+4117:         raise
+4118:     finally:
+4119:         cleanup_errors.extend(_stop_render_children((dec, enc)))
+4120:         for resource, action in ((meta, "release"), (ff_err, "close")):
+4121:             if resource is not None:
+4122:                 try:
+4123:                     getattr(resource, action)()
+4124:                 except BaseException as error:
+4125:                     cleanup_errors.append(error)
+4126:         # Closure and the existing cancellation/write-error deletion policy
+4127:         # are separate: arbitrary setup/frame errors must not unlink dst.
+4128:         if remove_partial:
+4129:             for path in (dst,):
+4130:                 if path and os.path.exists(path):
+4131:                     try:
+4132:                         os.remove(path)
+4133:                     except OSError:
+4134:                         pass
+4135:         if cleanup_errors:
+4136:             if primary is None:
+4137:                 raise cleanup_errors[0]
+4138:             # Python 3.9 has neither add_note nor ExceptionGroup. Preserve
+4139:             # the actual primary exception and expose bounded diagnostics.
+4140:             try:
+4141:                 primary.render_cleanup_errors = tuple(
+4142:                     f"{type(error).__name__}: {str(error)[:300]}"
+4143:                     for error in cleanup_errors[:8])
+4144:             except BaseException:
+4145:                 pass
+
+=== 70ec464ca70b5e49751d778890f56029dced0b8a:openscrub.py:4358-4416 ===
+4358:         cap.release()
+4359:         cap = None
+4360:         cb.progress("render", total, total)
+4361:         if proc is not None:
+4362:             try:
+4363:                 proc.stdin.close()
+4364:             except OSError as close_error:
+4365:                 # A failed close may not have delivered EOF. Bound only this
+4366:                 # exceptional status wait; healthy finalization has no timeout.
+4367:                 try:
+4368:                     rc = proc.wait(timeout=2)
+4369:                 except subprocess.TimeoutExpired:
+4370:                     cleanup_errors.extend(_stop_render_children((proc,)))
+4371:                     raise close_error  # forced termination is not an encoder cause
+4372:                 except Exception as wait_error:
+4373:                     cleanup_errors.append(wait_error)
+4374:                     raise close_error
+4375:                 if rc == 0:
+4376:                     raise  # retain a close error even after successful encoding
+4377:                 cleanup_errors.append(close_error)  # encoder diagnostics stay primary
+4378:             else:
+4379:                 rc = proc.wait()
+4380:             if rc != 0:
+4381:                 raise _ffmpeg_failure(ff_err, "video encode", rc,
+4382:                                       hint=gpu_hint)
+4383:         else:
+4384:             out.release()
+4385:             out = None
+4386:             os.replace(tmp_video, dst)
+4387:     except BaseException as error:
+4388:         primary = error
+4389:         raise
+4390:     finally:
+4391:         cleanup_errors.extend(_stop_render_children((proc,)))
+4392:         for resource, action in ((cap, "release"), (out, "release"), (ff_err, "close")):
+4393:             if resource is not None:
+4394:                 try:
+4395:                     getattr(resource, action)()
+4396:                 except BaseException as error:
+4397:                     cleanup_errors.append(error)
+4398:         # Closure and the existing cancellation/write-error deletion policy
+4399:         # are separate: arbitrary setup/frame errors must not unlink dst.
+4400:         if remove_partial:
+4401:             for path in (dst, tmp_video):
+4402:                 if path and os.path.exists(path):
+4403:                     try:
+4404:                         os.remove(path)
+4405:                     except OSError:
+4406:                         pass
+4407:         if cleanup_errors:
+4408:             if primary is None:
+4409:                 raise cleanup_errors[0]
+4410:             # Python 3.9 has neither add_note nor ExceptionGroup. Preserve
+4411:             # the actual primary exception and expose bounded diagnostics.
+4412:             try:
+4413:                 primary.render_cleanup_errors = tuple(
+4414:                     f"{type(error).__name__}: {str(error)[:300]}"
+4415:                     for error in cleanup_errors[:8])
+4416:             except BaseException:

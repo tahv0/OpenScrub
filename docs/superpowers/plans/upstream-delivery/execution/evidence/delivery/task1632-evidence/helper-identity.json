@@ -1,0 +1,22 @@
+{
+  "reviewed_commit": "081816d93d6aaa18944fc88f251040cf11d4135f",
+  "byte_equal": true,
+  "files": {
+    "docs/superpowers/plans/upstream-delivery/execution/tooling/verify.py": {
+      "bytes": 14591,
+      "sha256": "354cf49b0c83d11f3945137fbdffc3ac6b2793f1217ac39a9b62270097940067"
+    },
+    "docs/superpowers/plans/upstream-delivery/execution/tooling/verification_hook.py": {
+      "bytes": 6130,
+      "sha256": "4b25e217fcf8fc2ada1147a9c26ff5cdb51884809328854d4dafd3b36fb8e5a0"
+    },
+    "docs/superpowers/plans/upstream-delivery/execution/tooling/sitecustomize.py": {
+      "bytes": 310,
+      "sha256": "035c1187d46c85ce2c3f3c092822d8171c3b67e99a7270717a12169b2c3be302"
+    },
+    "docs/superpowers/plans/upstream-delivery/execution/tooling/README.md": {
+      "bytes": 11291,
+      "sha256": "1dec8419daf134313cd85312aabf8bd94b63093fc562fa5bf831ce92214109af"
+    }
+  }
+}

@@ -1,0 +1,102 @@
+{
+  "fix1-covering-green": [
+    {
+      "file": "runs/fix1-covering-green/logs/command.log",
+      "bytes": 1509,
+      "sha256": "c0f832ce3e2e45f111d47d3cf00a9178e69a6e1101e09451605b9bda4b3eee4c",
+      "summaries": [
+        "14 passed, 37 deselected in 9.57s"
+      ]
+    }
+  ],
+  "fix1-focused312": [
+    {
+      "file": "runs/fix1-focused312/logs/command.log",
+      "bytes": 7203,
+      "sha256": "363258f3875a5bcc3db02c6039905289ac7d24f1d2d6856fc33e6a36c17590a7",
+      "summaries": [
+        "STDIN_CLOSE_STATE {\"kind\": \"sdr\", \"encoder_fails\": true, \"returncode\": 254, \"pipe_closed\": true, \"original_close_primary\": false, \"waits\": [2, 2], \"error\": \"video encode failed (ffmpeg exit 254): [out#0/mp4 @ 0x591ba6938580] Error opening output /home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1632/runs/fix1-focused312/pytest/test_stdin_close_error_keeps_z2/missing/out.mp4: No such file or directory | Error opening output file /home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1632/runs/fix1-focused312/pytest/test_stdin_close_error_keeps_z2/missing/out.mp4. | Error opening output files: No such file or directory\"}",
+        "STDIN_CLOSE_STATE {\"kind\": \"hdr\", \"encoder_fails\": true, \"returncode\": 254, \"pipe_closed\": true, \"original_close_primary\": false, \"waits\": [2, 2], \"error\": \"HDR encode failed (ffmpeg exit 254): [out#0/mp4 @ 0x5ac6a8409580] Error opening output /home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1632/runs/fix1-focused312/pytest/test_stdin_close_error_keeps_z3/missing/out.mp4: No such file or directory | Error opening output file /home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1632/runs/fix1-focused312/pytest/test_stdin_close_error_keeps_z3/missing/out.mp4. | Error opening output files: No such file or directory\"}",
+        "64 passed, 126 deselected in 33.11s"
+      ]
+    }
+  ],
+  "fix1-focused39": [
+    {
+      "file": "runs/fix1-focused39/logs/command.log",
+      "bytes": 7184,
+      "sha256": "01d9327c850b11389f542cb888185c66948811349d2c5b0d1202121a0796a79f",
+      "summaries": [
+        "STDIN_CLOSE_STATE {\"kind\": \"sdr\", \"encoder_fails\": true, \"returncode\": 254, \"pipe_closed\": true, \"original_close_primary\": false, \"waits\": [2, 2], \"error\": \"video encode failed (ffmpeg exit 254): [out#0/mp4 @ 0x6365fc027640] Error opening output /home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1632/runs/fix1-focused39/pytest/test_stdin_close_error_keeps_z2/missing/out.mp4: No such file or directory | Error opening output file /home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1632/runs/fix1-focused39/pytest/test_stdin_close_error_keeps_z2/missing/out.mp4. | Error opening output files: No such file or directory\"}",
+        "STDIN_CLOSE_STATE {\"kind\": \"hdr\", \"encoder_fails\": true, \"returncode\": 254, \"pipe_closed\": true, \"original_close_primary\": false, \"waits\": [2, 2], \"error\": \"HDR encode failed (ffmpeg exit 254): [out#0/mp4 @ 0x5e3860145580] Error opening output /home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1632/runs/fix1-focused39/pytest/test_stdin_close_error_keeps_z3/missing/out.mp4: No such file or directory | Error opening output file /home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1632/runs/fix1-focused39/pytest/test_stdin_close_error_keeps_z3/missing/out.mp4. | Error opening output files: No such file or directory\"}",
+        "64 passed, 126 deselected in 33.45s"
+      ]
+    }
+  ],
+  "fix1-package": [
+    {
+      "file": "runs/fix1-package/logs/install.log",
+      "bytes": 1313,
+      "sha256": "fcff343f16d56feb94387d80292519928aa4b6264562ae0bb6946d3b1bbabdb2",
+      "summaries": []
+    },
+    {
+      "file": "runs/fix1-package/logs/installed-0.log",
+      "bytes": 19872,
+      "sha256": "14386204871b7ef511c12467395cbd64bfa94032e055685102dbbad00581a7a6",
+      "summaries": []
+    },
+    {
+      "file": "runs/fix1-package/logs/installed-1.log",
+      "bytes": 1932,
+      "sha256": "3117bb8cdad6145626afb5d64b9d92cbc86fdd2ef5cbb7b2ba2acbb0272fc276",
+      "summaries": [
+        "SERVER_CLEANUP 0"
+      ]
+    },
+    {
+      "file": "runs/fix1-package/logs/installed-defaults.log",
+      "bytes": 1821,
+      "sha256": "567dff51c42199c5baba5817a6896f789cd1ace1fd5b3dab34f92e6514edad1c",
+      "summaries": []
+    },
+    {
+      "file": "runs/fix1-package/logs/listening-server.log",
+      "bytes": 2371,
+      "sha256": "34dd56c61dc6fc917f7835b145aae97c2094f9f41a580869507d1e0241790a40",
+      "summaries": []
+    },
+    {
+      "file": "runs/fix1-package/logs/sdist.log",
+      "bytes": 3642,
+      "sha256": "5cc011b7fff6a27197aa75556efcc6bd4fad3c901383996efc5da9a669a9820f",
+      "summaries": []
+    },
+    {
+      "file": "runs/fix1-package/logs/wheel-from-sdist.log",
+      "bytes": 3652,
+      "sha256": "6c3c35fc757ef90b9df59a8f2a5b5bd9715a9dfc4b393b2d977587d08af6ed5d",
+      "summaries": []
+    }
+  ],
+  "fix1-primary-green": [
+    {
+      "file": "runs/fix1-primary-green/logs/command.log",
+      "bytes": 1507,
+      "sha256": "cffea0ac90600fa3ca2cc3c36298701255096fad6a5ee0ab405ebc6272e1a815",
+      "summaries": [
+        "8 passed, 43 deselected in 0.99s"
+      ]
+    }
+  ],
+  "fix1-red": [
+    {
+      "file": "runs/fix1-red/logs/command.log",
+      "bytes": 30395,
+      "sha256": "c287e5249be31327195a3d685e004d0b7bf231b88fcc0512163e9a626bdea952",
+      "summaries": [
+        "8 failed, 6 passed, 37 deselected in 1.62s"
+      ]
+    }
+  ]
+}

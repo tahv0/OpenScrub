@@ -1,0 +1,135 @@
+=== 4a62e49d2f0896b737081cc92e1f92e9bcaee93f:openscrub_vault.py:158-204 ===
+158: def _walk_files(root):
+159:     for dirpath, _dirs, files in os.walk(root):
+160:         for f in files:
+161:             yield os.path.join(dirpath, f)
+162: 
+163: 
+164: def encrypt_tree(key, root):
+165:     """Encrypt every not-yet-encrypted file under root. Returns count."""
+166:     n = 0
+167:     for p in list(_walk_files(root)):
+168:         if p.endswith(".tmp"):
+169:             try:
+170:                 os.remove(p)                   # leftover from a crash
+171:             except FileNotFoundError:
+172:                 pass                           # published since enumeration
+173:         elif not is_encrypted(p):
+174:             encrypt_file(key, p)
+175:             n += 1
+176:     return n
+177: 
+178: 
+179: def decrypt_tree(key, root):
+180:     """Decrypt every encrypted file under root. Returns count."""
+181:     n = 0
+182:     for p in list(_walk_files(root)):
+183:         if p.endswith(".tmp"):
+184:             try:
+185:                 os.remove(p)
+186:             except FileNotFoundError:
+187:                 pass                           # published since enumeration
+188:         elif is_encrypted(p):
+189:             decrypt_file(key, p)
+190:             n += 1
+191:     return n
+192: 
+193: 
+194: def tree_locked_state(root):
+195:     """-> (n_encrypted, n_plain) under root (ignores .tmp leftovers)."""
+196:     enc = plain = 0
+197:     for p in _walk_files(root):
+198:         if p.endswith(".tmp"):
+199:             continue
+200:         if is_encrypted(p):
+201:             enc += 1
+202:         else:
+203:             plain += 1
+204:     return enc, plain
+
+=== 4a62e49d2f0896b737081cc92e1f92e9bcaee93f:pyproject.toml:90-126 ===
+90: [tool.hatch.build.targets.wheel]
+91: include = [
+92:     "openscrub_internal",
+93:     "openscrub.py",
+94:     "openscrub_web.py",
+95:     "zones_ui.py",
+96:     "openscrub_setup.py",
+97:     "openscrub_update.py",
+98:     "openscrub_vault.py",
+99: ]
+100: 
+101: [tool.hatch.build.targets.sdist]
+102: include = [
+103:     "openscrub_internal",
+104:     "plate_models.json",
+105:     "face_models.json",
+106:     "person_models.json",
+107:     "assets/openscrub.ico",
+108:     "openscrub.py",
+109:     "openscrub_setup.py",
+110:     "openscrub_update.py",
+111:     "openscrub_vault.py",
+112:     "openscrub_web.py",
+113:     "zones_ui.py",
+114:     "install.py",
+115:     "requirements.txt",
+116:     "README.md",
+117:     "LICENSE",
+118:     "NOTICE",
+119:     "THIRD_PARTY_NOTICES.md",
+120:     "test_openscrub.py",
+121:     "tests",
+122:     "benchmark",
+123: ]
+124: 
+125: [tool.pytest.ini_options]
+126: testpaths = ["test_openscrub.py", "tests"]
+
+=== 4a62e49d2f0896b737081cc92e1f92e9bcaee93f:openscrub_update.py:157-181 ===
+157:     with tarfile.open(fileobj=io.BytesIO(blob), mode="r:gz") as tar:
+158:         members = [m for m in tar.getmembers() if m.isfile()]
+159:         for m in members:
+160:             # strip the leading 'OpenScrub-x.y.z/' directory
+161:             rel = m.name.split("/", 1)[1] if "/" in m.name else m.name
+162:             if not rel or rel.startswith("."):
+163:                 continue
+164:             top = rel.split("/", 1)[0]
+165:             if top in PRESERVE or os.path.basename(rel) == "PKG-INFO":
+166:                 continue
+167:             data = tar.extractfile(m).read()
+168:             dest = os.path.join(HERE, *rel.split("/"))
+169:             tmp = dest + ".new"
+170:             os.makedirs(os.path.dirname(dest), exist_ok=True)
+171:             with open(tmp, "wb") as f:
+172:                 f.write(data)
+173:             if rel in ("plate_models.json", "face_models.json",
+174:                        "person_models.json") \
+175:                     and os.path.exists(dest):
+176:                 _merge_registry_file(dest, tmp, log)
+177:             if os.path.exists(dest):
+178:                 os.makedirs(os.path.join(bak, os.path.dirname(rel))
+179:                             if os.path.dirname(rel) else bak, exist_ok=True)
+180:                 shutil.copy2(dest, os.path.join(bak, *rel.split("/")))
+181:             os.replace(tmp, dest)
+
+=== 4a62e49d2f0896b737081cc92e1f92e9bcaee93f:Dockerfile:60-64 ===
+60: COPY pyproject.toml README.md LICENSE NOTICE THIRD_PARTY_NOTICES.md plate_models.json face_models.json person_models.json ./
+61: COPY openscrub.py openscrub_web.py openscrub_setup.py openscrub_update.py \
+62:      openscrub_vault.py zones_ui.py install.py test_openscrub.py ./
+63: COPY openscrub_internal/ openscrub_internal/
+64: COPY assets/openscrub.ico assets/
+
+=== 4a62e49d2f0896b737081cc92e1f92e9bcaee93f:Dockerfile.intel:94-98 ===
+94: COPY pyproject.toml README.md LICENSE NOTICE THIRD_PARTY_NOTICES.md plate_models.json face_models.json person_models.json ./
+95: COPY openscrub.py openscrub_web.py openscrub_setup.py openscrub_update.py \
+96:      openscrub_vault.py zones_ui.py install.py test_openscrub.py ./
+97: COPY openscrub_internal/ openscrub_internal/
+98: COPY assets/openscrub.ico assets/
+
+=== 4a62e49d2f0896b737081cc92e1f92e9bcaee93f:Dockerfile.cuda:132-136 ===
+132: COPY pyproject.toml README.md LICENSE NOTICE THIRD_PARTY_NOTICES.md plate_models.json face_models.json person_models.json ./
+133: COPY openscrub.py openscrub_web.py openscrub_setup.py openscrub_update.py \
+134:      openscrub_vault.py zones_ui.py install.py test_openscrub.py ./
+135: COPY openscrub_internal/ openscrub_internal/
+136: COPY assets/openscrub.ico assets/
