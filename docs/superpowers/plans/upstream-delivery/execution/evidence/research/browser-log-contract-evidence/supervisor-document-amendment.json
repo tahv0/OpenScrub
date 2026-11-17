@@ -1,0 +1,9 @@
+{
+  "kind": "append-only-supervisor-adoption",
+  "original_sha256": "9d4423134b7a381cda7873ced714072aae886fe26fb1e4435e5919ffb29d973e",
+  "original_bytes": 22424,
+  "current_sha256": "b6a0e861073576233e2a56fbd5f704c55bf91efabfab088527eb003a7017254c",
+  "current_bytes": 24455,
+  "original_prefix_unchanged": true,
+  "reason": "Adopt initial limits/scroll calibration; defer source-unowned font hook; specify selection ownership and empirical percentile evidence."
+}

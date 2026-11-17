@@ -1,0 +1,522 @@
+diff --git a/benchmark/README.md b/benchmark/README.md
+index 1d45948..80c80d0 100644
+--- a/benchmark/README.md
++++ b/benchmark/README.md
+@@ -322,3 +322,29 @@ unassisted one.
+   second is a claim about footage nobody has run yet.
+ - Publish the failures next to the successes. A tool that says where it
+   struggles is the one worth believing.
++
++
++### Reverse recall finalization comparison
++
++`reverse_recall.py` compares complete modules from two offline source exports:
++
++```sh
++python benchmark/reverse_recall.py --base /path/to/base --head /path/to/head --output /tmp/reverse.json
++```
++
++It validates deterministic email primary detections and memory construction at
++the actual matcher boundary, then measures reverse recall and reverse plus merge
++separately. Fresh mutable fixtures are prepared outside timing; normal GC stays
++enabled. Each of three fixed cases (heterogeneous lengths with unmatched words,
++same-length worst case, repeated early winner) gets three warmups and five
++alternating base/head samples. The JSON retains every output, mutation, digest
++and timing; tracing/allocation observations run after all timing. Coordinate
++exclusive owned workloads before running. Five samples do not establish a p95.
++
++This isolates post-scan work, including the temporary index and ordering costs.
++The combination excludes inference, scanning, scope filtering, report writing,
++backtracking and dense processing; it is not an end-to-end/default/4K claim.
++Same-length candidates still require a full walk; a tiny repeated memory can
++regress. The index retains O(memory) references and insertion serials until the
++reverse call returns. Allocation observations exclude prebuilt inputs/strings
++and do not establish a process RSS ceiling.
+diff --git a/benchmark/reverse_recall.py b/benchmark/reverse_recall.py
+new file mode 100644
+index 0000000..44b7356
+--- /dev/null
++++ b/benchmark/reverse_recall.py
+@@ -0,0 +1,153 @@
++"""Offline full-module reverse/finalization comparison; no model inference."""
++import argparse, collections, dataclasses, gc, hashlib, importlib.util, inspect, json
++import pathlib, random, statistics, sys, time, tracemalloc
++from rapidfuzz import fuzz
++
++def load(name, root):
++    path = pathlib.Path(root).resolve() / 'openscrub.py'
++    spec = importlib.util.spec_from_file_location(name, path)
++    module = importlib.util.module_from_spec(spec)
++    sys.modules[name] = module
++    spec.loader.exec_module(module)
++    assert pathlib.Path(module.__file__).resolve() == path
++    module.cv2.setNumThreads(1)
++    return module
++
++
++def fixture(module, mode, n):
++    memory = module.PhiMemory()
++    raw, scans, misses = [], [], []
++    for i in range(n):
++        rng = random.Random(83011 + (0 if mode == 'repeated' else i))
++        size = 4 + (i * 17) % 77 if mode == 'heterogeneous' else 24
++        text = ''.join(rng.choice('abcdefghijklmnopqrstuvwxyz') for _ in range(size)) + '@sample.invalid'
++        miss = ('unmatched' if mode != 'same_length' else
++                ''.join(rng.choice('abcdefghijklmnopqrstuvwxyz') for _ in range(len(text))))
++        assert len(module.PhiMemory.norm(miss)) >= 4 and module.PhiMemory.norm(miss) not in module.STOPWORDS
++        words = [(text, (8, 8, 150, 28), .99), (miss, (8, 40, 150, 60), .99)]
++        t = i / 3
++        found = module.detect_phi(words, module.group_lines(words), t, (0., 0.), None, None)
++        assert len(found) == 1 and found[0].text == text and found[0].category == 'email'
++        assert memory.recall(miss) is None
++        raw.extend(found)
++        for d in found:
++            memory.add(d.text, d.category)
++        scans.append((t, (0., 0.), words))
++        misses.append(miss)
++    assert len(memory.items) == (1 if mode == 'repeated' else n)
++    assert all(memory.recall(w) is None for w in misses)
++    return scans, memory, raw
++
++
++def invoke(module, boundary, fixture_data):
++    scans, memory, raw = fixture_data
++    extra = module.reverse_pass(scans, memory, {'email'}, None)
++    if boundary == 'reverse':
++        return extra, extra
++    return module.merge_detections(raw + extra, hold=1/3 + .3, scans=scans, fuzz=fuzz), extra
++
++
++def values(result, extra, fixture_data):
++    scans, memory, raw = fixture_data
++    return dict(result=[dataclasses.asdict(d) for d in result],
++                raw_after=[dataclasses.asdict(d) for d in raw],
++                extra_after=[dataclasses.asdict(d) for d in extra],
++                memory_items=list(memory.items.items()), counts=list(memory.counts.items()))
++
++
++def digest(value):
++    return hashlib.sha256(json.dumps(value, sort_keys=True).encode()).hexdigest()
++
++
++def measure_work(module, data):
++    lines, start = inspect.getsourcelines(module.reverse_pass)
++    candidate = next(start + i for i, line in enumerate(lines) if line.strip() == 'if cat not in cats:')
++    construction = next((start+i for i,line in enumerate(lines)
++                         if line.strip().startswith('if type(key) is not str')), None)
++    counts = collections.Counter()
++    retained = {}
++    def trace(frame, event, arg):
++        if frame.f_code is module.reverse_pass.__code__:
++            if event == 'line':
++                if frame.f_lineno == candidate: counts['candidate_visits'] += 1
++                if frame.f_lineno == construction: counts['construction_entries'] += 1
++            elif event == 'return':
++                buckets = frame.f_locals.get('buckets')
++                if buckets:
++                    lists = [entries for by_length in buckets for entries in by_length.values()]
++                    entries = [entry for bucket in lists for entry in bucket]
++                    retained.update(entries=len(entries), buckets=len(lists),
++                        index_bytes_shallow=(sys.getsizeof(buckets) +
++                            sum(sys.getsizeof(d) for d in buckets) +
++                            sum(sys.getsizeof(b) for b in lists) +
++                            sum(sys.getsizeof(e) + sys.getsizeof(e[0]) for e in entries)))
++        return trace
++    sys.settrace(trace)
++    try:
++        result, extra = invoke(module, 'reverse', data)
++    finally:
++        sys.settrace(None)
++    return dict(counts=counts, live_index_at_return=retained, output_sha256=digest(values(result, extra, data)))
++
++
++def main():
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument('--base', required=True)
++    parser.add_argument('--head', required=True)
++    parser.add_argument('--output', required=True)
++    parser.add_argument('--scans', type=int, default=500)
++    args = parser.parse_args()
++    modules = {'base': load('reverse_base', args.base), 'head': load('reverse_head', args.head)}
++    assert gc.isenabled()
++    report = dict(python=sys.version, executable=sys.executable, gc_enabled=gc.isenabled(),
++                  settings=dict(scans=args.scans, seed=83011, warmups=3, samples=5,
++                                categories=['email'], hold=1/3+.3, lenient=76),
++                  source_sha256={label: hashlib.sha256(pathlib.Path(m.__file__).read_bytes()).hexdigest()
++                                 for label,m in modules.items()},
++                  benchmark_sha256=hashlib.sha256(pathlib.Path(__file__).read_bytes()).hexdigest(), cases=[])
++    # Timing finishes for EVERY case before tracing/allocation instrumentation starts.
++    for mode in ['heterogeneous', 'same_length', 'repeated']:
++        row = dict(case=mode, boundaries={})
++        data = fixture(modules['base'], mode, args.scans)
++        row['input_scans'] = data[0]
++        row['fixture'] = dict(scans=len(data[0]), words=sum(len(s[2]) for s in data[0]),
++            memory=len(data[1].items), primary=len(data[2]), eligible_words=sum(1 for scan in data[0] for word,_,_ in scan[2] if len(modules['base'].PhiMemory.norm(word))>=4 and modules['base'].PhiMemory.norm(word) not in modules['base'].STOPWORDS),
++            key_lengths=dict(collections.Counter(map(len,data[1].items))))
++        for boundary in ['reverse', 'reverse_plus_merge']:
++            runs = []
++            expected = None
++            for rep in range(8):
++                order = ['base', 'head'] if rep % 2 == 0 else ['head', 'base']
++                for label in order:
++                    module = modules[label]
++                    data = fixture(module, mode, args.scans)
++                    start = time.perf_counter_ns()
++                    result, extra = invoke(module, boundary, data)
++                    elapsed = time.perf_counter_ns() - start
++                    value = values(result, extra, data)
++                    if expected is None: expected = value
++                    assert value == expected, (mode, boundary, rep, label)
++                    runs.append(dict(repetition=rep, warmup=rep<3, module=label,
++                                     ns=elapsed, output_sha256=digest(value), value=value))
++            medians = {label: statistics.median(r['ns'] for r in runs
++                       if not r['warmup'] and r['module']==label) for label in modules}
++            row['boundaries'][boundary] = dict(median_ns=medians, runs=runs)
++            print(mode, boundary, medians, flush=True)
++        report['cases'].append(row)
++    for row in report['cases']:
++        row['instrumentation'] = {}
++        for label,module in modules.items():
++            data = fixture(module,row['case'],args.scans)
++            work = measure_work(module,data)
++            data = fixture(module,row['case'],args.scans)
++            tracemalloc.start()
++            result, extra = invoke(module,'reverse',data)
++            current, peak = tracemalloc.get_traced_memory()
++            tracemalloc.stop()
++            work['reverse_tracemalloc_bytes'] = dict(current=current,peak=peak)
++            work['allocation_output_sha256'] = digest(values(result,extra,data))
++            row['instrumentation'][label] = work
++    pathlib.Path(args.output).write_text(json.dumps(report,indent=2)+'\n')
++
++if __name__ == '__main__':
++    main()
+diff --git a/openscrub.py b/openscrub.py
+index f02b4d0..17494d4 100644
+--- a/openscrub.py
++++ b/openscrub.py
+@@ -7099,7 +7099,10 @@ def reverse_pass(scans, memory, cats, namer, lenient=76):
+     already confirmed elsewhere in the video; gating rules still apply so a
+     one-off false positive can't spread."""
+     from rapidfuzz import fuzz
++    from heapq import merge
+     extra = []
++    buckets = None
++    prepared = False
+     for t, cum, words in scans:
+         for w, cbox, conf in words:
+             n = PhiMemory.norm(w)
+@@ -7107,7 +7110,39 @@ def reverse_pass(scans, memory, cats, namer, lenient=76):
+                 continue
+             if namer and namer._allowed(w):
+                 continue
+-            for k, cat in memory.items.items():
++            if not prepared:
++                prepared = True
++                # Read the current mapping, rather than PhiMemory's forward
++                # caches: ordinary callers can edit items before this pass.
++                # Malformed gate data must still fail in original candidate
++                # order, even for a key the length index would exclude.
++                if (type(memory.items) is dict
++                        and type(getattr(memory, "counts", None)) is dict
++                        and type(getattr(memory, "name_sightings", None)) is int
++                        and all(type(count) is int for count in memory.counts.values())):
++                    alpha, digits = {}, {}
++                    for serial, (key, category) in enumerate(memory.items.items()):
++                        if type(key) is not str or type(category) is not str:
++                            break
++                        target = digits if key.isdigit() else alpha
++                        target.setdefault(len(key), []).append((serial, key, category))
++                    else:
++                        buckets = alpha, digits
++            if buckets is None:
++                # Keep original traversal/error behavior for malformed data
++                # and mappings with their own ordering/iteration behavior.
++                candidates = ((0, key, category)
++                              for key, category in memory.items.items())
++            elif n.isdigit():
++                candidates = buckets[1].get(len(n), ())
++            else:
++                matching = [buckets[0][size] for size in range(len(n) - 2, len(n) + 3)
++                            if size in buckets[0]]
++                # Each bucket is ordered by the mapping's insertion serial.
++                # A fuzzy match inserted earlier must beat a later exact one.
++                candidates = (merge(*matching) if len(matching) > 1
++                              else matching[0] if matching else ())
++            for _, k, cat in candidates:
+                 if cat not in cats:
+                     continue
+                 if memory._gated(k, cat) is None:
+diff --git a/pyproject.toml b/pyproject.toml
+index 2a60019..46d3f73 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -116,4 +116,7 @@ include = [
+     "NOTICE",
+     "THIRD_PARTY_NOTICES.md",
+     "test_openscrub.py",
++    "tests/test_reverse_recall_index.py",
++    "benchmark/reverse_recall.py",
++    "benchmark/README.md",
+ ]
+diff --git a/tests/test_reverse_recall_index.py b/tests/test_reverse_recall_index.py
+new file mode 100644
+index 0000000..2cf8ec9
+--- /dev/null
++++ b/tests/test_reverse_recall_index.py
+@@ -0,0 +1,255 @@
++"""Reverse recall contracts at the real module boundary, independent of indexing."""
++from collections import OrderedDict
++from dataclasses import asdict
++
++import pytest
++import openscrub as core
++
++
++def remembered(*pairs):
++    memory = core.PhiMemory()
++    for word, category in pairs:
++        memory.add(word, category)
++    return memory
++
++
++def scan(*words):
++    return [(0., (0., 0.), [(w, (1, 2, 11, 12), .99) for w in words])]
++
++
++def record(text, category, t=0., box=(1, 2, 11, 12), confidence=.99,
++           offset=(0., 0.)):
++    return dict(t_start=t, t_end=t, cbox=box, category=category, text=text,
++                confidence=confidence, aoff=offset, last_seen=0., dense=False,
++                track=-1, person=-1, poly=())
++
++
++def observed(scans, memory, cats=None, namer=None, **kwargs):
++    return [asdict(d) for d in core.reverse_pass(
++        scans, memory, {'email', 'phone', 'mrn', 'name'} if cats is None else cats,
++        namer, **kwargs)]
++
++
++@pytest.mark.parametrize('cats,expected', [
++    ({'email', 'phone', 'mrn'}, 'email'), ({'phone', 'mrn'}, 'phone')])
++def test_earlier_fuzzy_key_beats_later_exact_across_lengths(cats, expected):
++    # Sorting length buckets or taking an exact shortcut changes the category.
++    memory = remembered(('alphaaa', 'email'), ('alpha', 'phone'), ('alphaa', 'mrn'))
++    assert observed(scan('alphaa'), memory, cats) == [record('alphaa', expected)]
++
++
++def test_under_gate_match_does_not_hide_later_eligible_winner():
++    memory = remembered(('alphaaa', 'name'), ('alpha', 'phone'))
++    assert observed(scan('alphaa'), memory) == [record('alphaa', 'phone')]
++    memory.add('ALPHAAA', 'mrn')  # Increment count without changing category/order.
++    assert observed(scan('alphaa'), memory) == [record('alphaa', 'name')]
++
++
++@pytest.mark.parametrize('key,query,hit', [
++    ('12345678', '12345678', True), ('12345678', '12345699', True),
++    ('12345678', '12345999', False), ('12345678', '123456789', False),
++    ('12345678', '1234567x', False), ('1234567x', '12345678', False),
++    ('１２３４５６７８', '１２３４５６９９', True),
++    ('¹²³⁴', '¹²³⁹', True), ('1234', '１２３４', False),
++])
++def test_numeric_two_mismatch_rule_keeps_unicode_digit_semantics(key, query, hit):
++    memory = remembered((key, 'mrn'))
++    assert observed(scan(query), memory) == ([record(query, 'mrn')] if hit else [])
++
++
++@pytest.mark.parametrize('key,query,lenient,hit', [
++    ('abcdef', 'abcd', 76, True), ('abcdefg', 'abcd', 0, False),
++    ('abcd', 'abcdef', 76, True), ('abcd', 'abcdefg', 0, False),
++    ('abc', 'abcd', 76, True), ('abcde', 'abxde', 80, True),
++    ('abcde', 'abxde', 80.01, False), ('abcdefg', 'abcxefg', 76, True),
++    ('abcdefg', 'abcxefg', 72, True),
++    ('abcdefgh', 'abxxefgh', 72, True), ('abcdefgh', 'abxxefgh', 76, False),
++])
++def test_alpha_length_and_inclusive_score_boundaries(key, query, lenient, hit):
++    memory = remembered((key, 'email'))
++    assert observed(scan(query), memory, lenient=lenient) == (
++        [record(query, 'email')] if hit else [])
++
++
++def test_normalization_allowlist_and_short_stopword_filtering():
++    memory = remembered(('alphaa', 'email'), ('active', 'email'), ('abc', 'email'))
++    namer = core.NameDetector(use_ner=False)
++    namer.allow = {'alphaa'}
++    assert observed(scan('(Alphaa.)', 'active', 'abc'), memory, namer=namer) == []
++    assert observed(scan('(Alphaa.)'), memory) == [record('(Alphaa.)', 'email')]
++
++
++def test_allowlist_receives_original_word_before_lookup():
++    # A caller's exact-word allowlist must not accidentally receive normalized text.
++    class OriginalWordAllowlist:
++        def _allowed(self, word):
++            return word == '(Alphaa.)'
++    memory = remembered(('alphaa', 'email'))
++    assert observed(scan('(Alphaa.)', 'alphaa'), memory,
++                    namer=OriginalWordAllowlist()) == [record('alphaa', 'email')]
++
++
++def test_unordered_one_shot_scans_keep_duplicates_conversion_and_all_defaults():
++    memory = remembered(('alphaa', 'email'))
++    scans = iter([(2., [3.5, -2.], [('Alphaa', (-1.9, 2.9, 11.1, 12.9), -.12356)] * 2),
++                  (0., [0., 1.], [('alphaa', (1, 2, 11, 12), .12356)]),
++                  (2., [3.5, -2.], [('ALPHAA', (1, 2, 11, 12), .9999)])])
++    assert observed(scans, memory) == [
++        record('Alphaa', 'email', 2., (-1, 2, 11, 12), -.124, (3.5, -2.)),
++        record('Alphaa', 'email', 2., (-1, 2, 11, 12), -.124, (3.5, -2.)),
++        record('alphaa', 'email', 0., confidence=.124, offset=(0., 1.)),
++        record('ALPHAA', 'email', 2., confidence=1., offset=(3.5, -2.))]
++
++
++def test_pre_call_mapping_and_count_mutations_are_visible_every_invocation():
++    memory = remembered(('alphaaa', 'name'), ('alpha', 'phone'))
++    assert observed(scan('alphaa'), memory) == [record('alphaa', 'phone')]
++    memory.items['alphaaa'] = 'email'
++    memory.items.pop('alpha')
++    memory.items['alphaa'] = 'mrn'
++    assert observed(scan('alphaa'), memory) == [record('alphaa', 'email')]
++    memory.items['alphaaa'] = 'name'
++    memory.counts['alphaaa'] = 2
++    assert observed(scan('alphaa'), memory) == [record('alphaa', 'name')]
++    memory.items.pop('alphaaa')
++    assert observed(scan('alphaa'), memory) == [record('alphaa', 'mrn')]
++
++
++@pytest.mark.parametrize('mapping', [dict, OrderedDict])
++def test_malformed_key_retains_category_gate_and_original_failure(mapping):
++    memory = remembered(('alphaa', 'email'))
++    memory.items = mapping([(None, 'phone'), ('alphaa', 'email')])
++    assert observed(scan('alphaa'), memory, {'email'}) == [record('alphaa', 'email')]
++    with pytest.raises(AttributeError):
++        observed(scan('alphaa'), memory, {'phone', 'email'})
++    assert observed([], memory) == []
++    assert observed(scan('abc', 'active'), memory) == []
++
++
++def test_nonstring_category_is_not_silently_dropped_or_eagerly_raised():
++    memory = remembered(('alphaa', 'email'))
++    memory.items['zzzz'] = []
++    assert observed(scan('alphaa'), memory) == [record('alphaa', 'email')]
++    with pytest.raises(TypeError):
++        observed(scan('nomatch'), memory)
++
++
++@pytest.mark.parametrize('box,confidence,error', [
++    (('bad', 2, 11, 12), .9, ValueError), ((1, 2, 11, 12), 'bad', ValueError)])
++def test_conversion_failures_only_occur_for_matched_words(box, confidence, error):
++    memory = remembered(('alphaa', 'email'))
++    assert observed([(0., (0., 0.), [('nomatch', box, confidence)])], memory) == []
++    with pytest.raises(error):
++        observed([(0., (0., 0.), [('alphaa', box, confidence)])], memory)
++
++
++def test_custom_mapping_iteration_order_keeps_its_original_priority():
++    class ReverseItems(dict):
++        def items(self):
++            return reversed(list(super().items()))
++    memory = remembered(('alphaaa', 'email'), ('alphaa', 'mrn'))
++    memory.items = ReverseItems(memory.items)
++    assert observed(scan('alphaa'), memory) == [record('alphaa', 'mrn')]
++
++
++def test_missing_mapping_is_only_accessed_for_an_eligible_word():
++    memory = core.PhiMemory()
++    memory.items = None
++    assert observed([], memory) == []
++    assert observed(scan('abc', 'active'), memory) == []
++    with pytest.raises(AttributeError):
++        observed(scan('alphaa'), memory)
++
++
++def test_controlled_ocr_scan_reverse_and_report_keep_accepted_and_zone_dropped(tmp_path, monkeypatch):
++    """Inference is controlled; scan, primary matching, reverse, merge/report are real."""
++    import json
++    import numpy as np
++
++    video = tmp_path / 'fixed.avi'
++    writer = core.cv2.VideoWriter(str(video), core.cv2.VideoWriter_fourcc(*'FFV1'),
++                                  6., (160, 96))
++    assert writer.isOpened()
++    frame = np.random.default_rng(1411).integers(0, 256, (96, 160, 3), dtype=np.uint8)
++    for _ in range(12):
++        writer.write(frame)
++    writer.release()
++
++    class ControlledOCR:
++        calls = 0
++        def read(self, image):
++            # Four altered characters: reverse's76 passes, forward's82 fails.
++            words = (['abcdef@sample.invalid', 'ghijkl@sample.invalid']
++                     if self.calls == 0 else
++                     ['zzzdef#sample.invalid', 'zzzikl#sample.invalid'])
++            self.calls += 1
++            return [(words[0], (8, 8, 70, 28), .99),
++                    (words[1], (90, 8, 150, 28), .99),
++                    ('active', (8, 40, 70, 60), .99)]
++
++    ocr = ControlledOCR()
++    monkeypatch.setattr(core, 'make_ocr', lambda *args, **kwargs: ocr)
++    parser = core.build_parser()
++    args = core._prep_args(parser.parse_args([
++        str(video), '--categories', 'email', '--engine', 'tesseract',
++        '--sample-interval', '0.3333333333333333', '--scroll-track', 'off',
++        '--adaptive', 'off', '--ocr-upscale', 'off', '--no-vfr-fix',
++        '--no-backtrack']), parser)
++    args.zones_data = {'email': [(0., 0., .5, 1.)]}
++
++    class Quiet(core.Callbacks):
++        def log(self, message):
++            pass
++
++    state = core.run_scan(args, Quiet())
++    assert ocr.calls == 6
++    assert state['stats'] == dict(scans=6, raw_hits=7, regions=1, recalls=0,
++                                  remembered=2, zone_dropped={'email': 7})
++    accepted = dict(record('abcdef@sample.invalid', 'email', box=(8, 8, 70, 28)),
++                    t_end=2.3, last_seen=5/3)
++    dropped = dict(record('ghijkl@sample.invalid', 'email', box=(90, 8, 150, 28)),
++                   t_end=2.3, last_seen=5/3)
++    assert [asdict(d) for d in state['detections']] == [accepted]
++    assert [asdict(d) for d in state['zdropped']] == [dropped]
++    report = tmp_path / 'report.json'
++    core.write_report(str(report), args, state)
++    document = json.loads(report.read_text())
++    assert document['detections'] == json.loads(json.dumps([
++        dict(accepted, enabled=True), dict(dropped, enabled=False, zone_dropped=True)]))
++    assert document['render_state'] == dict(fps=6., cum=[[0., 0.]] * 12,
++                                           bands=[[0., 0.]] * 12)
++
++
++@pytest.mark.parametrize('malformed,error', [
++    ('count', TypeError), ('counts_mapping', AttributeError), ('threshold', TypeError)])
++def test_malformed_gate_data_keeps_errors_before_length_rejection(malformed, error):
++    memory = remembered(('a-much-longer-remembered-name', 'name'), ('alphaa', 'email'))
++    if malformed == 'count':
++        memory.counts['a-much-longer-remembered-name'] = None
++    elif malformed == 'counts_mapping':
++        memory.counts = None
++    else:
++        memory.name_sightings = None
++    # Category rejection comes first, even for malformed name gate data.
++    assert observed(scan('alphaa'), memory, {'email'}) == [record('alphaa', 'email')]
++    with pytest.raises(error):
++        observed(scan('alphaa'), memory, {'email', 'name'})
++
++
++def test_defaultdict_counts_and_changed_sighting_threshold_keep_gate_meaning():
++    from collections import defaultdict
++    memory = remembered(('alphaaa', 'name'), ('alphaaa', 'name'), ('alpha', 'phone'))
++    memory.counts = defaultdict(int, memory.counts)
++    assert observed(scan('alphaa'), memory) == [record('alphaa', 'name')]
++    memory.name_sightings = 3
++    assert observed(scan('alphaa'), memory) == [record('alphaa', 'phone')]
++    assert dict(memory.counts) == {'alphaaa': 2, 'alpha': 1}
++
++
++def test_missing_gate_attributes_do_not_break_an_immediate_earlier_winner():
++    memory = remembered(('alphaa', 'email'), ('a-much-longer-name', 'name'))
++    del memory.counts
++    del memory.name_sightings
++    assert observed(scan('alphaa'), memory) == [record('alphaa', 'email')]
++    with pytest.raises(AttributeError):
++        observed(scan('nomatch'), memory)

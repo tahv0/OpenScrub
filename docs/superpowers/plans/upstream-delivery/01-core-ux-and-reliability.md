@@ -83,6 +83,16 @@ For ordinary file responses, use the valid response `Content-Length` matching th
 - [ ] **I/V:** Verify ordinary punctuation, ampersands, quotation marks and Unicode names display unchanged as text without altering surrounding element structure or job-selection behavior. Use benign fixture names and actual emitted UI functions; no executable filename probes or broad security audit. Preserve accessible title/list text and exercise normal job switching.
 - [ ] **D/R/L:** Explain the literal-name display correction with concrete benign examples, source provenance and exact validation. No external security report or publication is authorized by this card.
 
+## N12 — preserve first-scan sanity checks without backtracking
+
+**What / why:** An ordinary `--no-backtrack` scan whose first OCR result contains fewer than three words can pass an unset image to Canny and fail before returning a report. The [source handoff](execution/evidence/research/first-scan-sanity-research.md) ties a retained controlled-OCR failure to the unchanged pinned upstream owner. Actual pretrained-OCR prevalence has not been measured.
+
+**When:** A small separate reliability PR before further performance work. It needs only the reviewed B02a verification prerequisite; reverse-recall indexing is not a dependency.
+
+- [ ] **E/I:** Reproduce the exact-base crash through actual decoding, `run_scan`, Canny and report output, controlling only OCR at its existing inference boundary. Reuse the existing small grayscale image when available, otherwise construct it lazily inside the low-word-count sanity guard. Preserve disabled backtracking, first-scan gating, Canny thresholds, edge-density threshold and warning behavior.
+- [ ] **V/D:** Cover zero/one/two words, edge-rich and edge-free input, enabled-backtracking and three-word controls, and later sparse OCR. Preserve complete detections/report output; run focused/full/floor/package checks. No broad exception suppression, unconditional extra per-frame work, model-quality claim or unrelated index changes.
+- [ ] **R/L:** Keep a focused PR describing the ordinary flag/first-scan trigger and verified warning/report behavior. Native-platform/inference prevalence and upstream submission remain separate.
+
 ## P03 — resilient progress polling
 
 **What:** Bound metadata/log requests and reject stale responses after job/view changes.

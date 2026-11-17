@@ -1,0 +1,26 @@
+Requirements reads (original planning artifacts; not pinned product evidence):
+cat .superpowers/sdd/README/browser-log-contract-brief.md
+cat .superpowers/sdd/README/bounded-logs-contract-research.md
+cat .superpowers/sdd/README/task-3-report.md
+rg -n -A 40 -B 12 P12C docs/superpowers/plans/upstream-delivery/03-packaging-and-review-features.md
+
+Pinned product reads/exports:
+git rev-parse 6ae212a35b094fc9466f1616afb2c5bb5c0497f8^{commit}
+git show 6ae212a35b094fc9466f1616afb2c5bb5c0497f8:openscrub_web.py
+git show 6ae212a35b094fc9466f1616afb2c5bb5c0497f8:tests/test_job_polling_browser.py
+git show 6ae212a35b094fc9466f1616afb2c5bb5c0497f8:tests/test_job_polling_node.py
+git show 6ae212a35b094fc9466f1616afb2c5bb5c0497f8:docs/superpowers/plans/upstream-delivery/03-packaging-and-review-features.md
+  Result: path absent at pinned commit; read original planning file as requirements only.
+mkdir -p /tmp/openscrub-browser-logs-contract/source .superpowers/sdd/README/browser-log-contract-evidence
+git archive 6ae212a35b094fc9466f1616afb2c5bb5c0497f8 openscrub_web.py tests/test_job_polling_browser.py tests/test_job_polling_node.py | tar -x -C /tmp/openscrub-browser-logs-contract/source
+python .superpowers/sdd/README/browser-log-contract-evidence/collect_source_evidence.py
+  Result: python command not found; no product execution attempted.
+python3 .superpowers/sdd/README/browser-log-contract-evidence/collect_source_evidence.py
+  Result: compact source evidence generated; pinned export equality checked.
+
+Artifact-only final verification:
+python3 .superpowers/sdd/README/browser-log-contract-evidence/collect_source_evidence.py
+python3 .superpowers/sdd/README/browser-log-contract-evidence/verify_artifacts.py
+sha256sum -c .superpowers/sdd/README/browser-log-contract-evidence/SHA256SUMS
+
+No product tests or runtime/cost commands were run. Reported production polling behavior is a source finding; candidate numbers/scroll behavior are proposals.

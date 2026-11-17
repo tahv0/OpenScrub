@@ -1,0 +1,23 @@
+{
+  "heterogeneous": {
+    "counts": {
+      "candidate_visits": 116928
+    },
+    "live_index_at_return": {},
+    "output_sha256": "cb0f7722787ba52d50de0080ddfdae94f35f5cb8c4a8ac4431e3bc0bd131bd7b"
+  },
+  "same_length": {
+    "counts": {
+      "candidate_visits": 375250
+    },
+    "live_index_at_return": {},
+    "output_sha256": "fbf693c14e261529c45bbadae28dbe559cbe8dbe72a35e05db0a4e184fc07928"
+  },
+  "repeated": {
+    "counts": {
+      "candidate_visits": 500
+    },
+    "live_index_at_return": {},
+    "output_sha256": "6a04872211feda79b143f94675d2b1b5858a4ff022c7f10d362ff0c63ff25caa"
+  }
+}

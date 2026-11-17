@@ -1,0 +1,8 @@
+{
+  "python": "3.9.25 (main, Oct 31 2025, 23:00:23) \n[Clang 21.1.4 ]",
+  "executable": "/tmp/openscrub-python39-20261117/venv/bin/python",
+  "opencv": "4.14.0",
+  "numpy": "2.0.2",
+  "rapidfuzz": "3.13.0",
+  "pytest": "8.4.2"
+}

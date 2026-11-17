@@ -1,0 +1,19 @@
+Looking in links: /tmp/openscrub-task620/build-wheelhouse
+Processing /tmp/openscrub-task620/build-wheelhouse/hatchling-1.33.0-py3-none-any.whl
+Processing /tmp/openscrub-task620/build-wheelhouse/packaging-26.3-py3-none-any.whl (from hatchling)
+Processing /tmp/openscrub-task620/build-wheelhouse/pathspec-1.1.1-py3-none-any.whl (from hatchling)
+Processing /tmp/openscrub-task620/build-wheelhouse/pluggy-1.7.0-py3-none-any.whl (from hatchling)
+Processing /tmp/openscrub-task620/build-wheelhouse/tomlkit-0.15.2-py3-none-any.whl (from hatchling)
+Processing /tmp/openscrub-task620/build-wheelhouse/trove_classifiers-2026.9.21.13-py3-none-any.whl (from hatchling)
+Installing collected packages: trove-classifiers, tomlkit, pluggy, pathspec, packaging, hatchling
+
+Successfully installed hatchling-1.33.0 packaging-26.3 pathspec-1.1.1 pluggy-1.7.0 tomlkit-0.15.2 trove-classifiers-2026.9.21.13
+* Getting build dependencies for sdist...
+* Building sdist...
+Successfully built openscrub-1.0.96.tar.gz
+* Getting build dependencies for wheel...
+* Building wheel...
+Successfully built openscrub-1.0.96-py3-none-any.whl
+Processing /tmp/openscrub-task113/dist/openscrub-1.0.96-py3-none-any.whl
+Installing collected packages: openscrub
+Successfully installed openscrub-1.0.96

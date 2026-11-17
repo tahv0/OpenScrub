@@ -1,0 +1,118 @@
+.....................F...FF...                                           [100%]
+=================================== FAILURES ===================================
+__________ test_normalization_allowlist_and_short_stopword_filtering ___________
+
+    def test_normalization_allowlist_and_short_stopword_filtering():
+        memory = remembered(('alphaa', 'email'), ('ready', 'email'), ('abc', 'email'))
+        namer = core.NameDetector(use_ner=False)
+        namer.allow = {'alphaa'}
+>       assert observed(scan('(Alphaa.)', 'ready', 'abc'), memory, namer=namer) == []
+E       AssertionError: assert [{'t_start': ...'email', ...}] == []
+E         
+E         Left contains one more item: {'t_start': 0.0, 't_end': 0.0, 'cbox': (1, 2, 11, 12), 'category': 'email', ...}
+E         Use -v to get more diff
+
+/tmp/openscrub-task113/test_reverse_recall_index.py:77: AssertionError
+_____ test_malformed_key_retains_category_gate_and_original_failure[dict] ______
+
+mapping = <class 'dict'>
+
+    @pytest.mark.parametrize('mapping', [dict, OrderedDict])
+    def test_malformed_key_retains_category_gate_and_original_failure(mapping):
+        memory = remembered(('alphaa', 'email'))
+        memory.items = mapping([(None, 'phone'), ('alphaa', 'email')])
+        assert observed(scan('alphaa'), memory, {'email'}) == [record('alphaa', 'email')]
+        with pytest.raises(AttributeError):
+            observed(scan('alphaa'), memory, {'phone', 'email'})
+        assert observed([], memory) == []
+>       assert observed(scan('abc', 'ready'), memory) == []
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+/tmp/openscrub-task113/test_reverse_recall_index.py:125: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/tmp/openscrub-task113/test_reverse_recall_index.py:28: in observed
+    return [asdict(d) for d in core.reverse_pass(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scans = [(0.0, (0.0, 0.0), [('abc', (1, 2, 11, 12), 0.99), ('ready', (1, 2, 11, 12), 0.99)])]
+memory = <openscrub.PhiMemory object at 0x7ca866317020>
+cats = {'email', 'mrn', 'name', 'phone'}, namer = None, lenient = 76
+
+    def reverse_pass(scans, memory, cats, namer, lenient=76):
+        """After the scan, re-search every OCR'd word against remembered PII at
+        a more lenient threshold. Catches near-misses (OCR misreads) of strings
+        already confirmed elsewhere in the video; gating rules still apply so a
+        one-off false positive can't spread."""
+        from rapidfuzz import fuzz
+        extra = []
+        for t, cum, words in scans:
+            for w, cbox, conf in words:
+                n = PhiMemory.norm(w)
+                if len(n) < 4 or n in STOPWORDS:
+                    continue
+                if namer and namer._allowed(w):
+                    continue
+                for k, cat in memory.items.items():
+                    if cat not in cats:
+                        continue
+                    if memory._gated(k, cat) is None:
+                        continue
+>                   if k.isdigit() or n.isdigit():
+                       ^^^^^^^^^
+E                   AttributeError: 'NoneType' object has no attribute 'isdigit'
+
+openscrub.py:7115: AttributeError
+__ test_malformed_key_retains_category_gate_and_original_failure[OrderedDict] __
+
+mapping = <class 'collections.OrderedDict'>
+
+    @pytest.mark.parametrize('mapping', [dict, OrderedDict])
+    def test_malformed_key_retains_category_gate_and_original_failure(mapping):
+        memory = remembered(('alphaa', 'email'))
+        memory.items = mapping([(None, 'phone'), ('alphaa', 'email')])
+        assert observed(scan('alphaa'), memory, {'email'}) == [record('alphaa', 'email')]
+        with pytest.raises(AttributeError):
+            observed(scan('alphaa'), memory, {'phone', 'email'})
+        assert observed([], memory) == []
+>       assert observed(scan('abc', 'ready'), memory) == []
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+/tmp/openscrub-task113/test_reverse_recall_index.py:125: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/tmp/openscrub-task113/test_reverse_recall_index.py:28: in observed
+    return [asdict(d) for d in core.reverse_pass(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scans = [(0.0, (0.0, 0.0), [('abc', (1, 2, 11, 12), 0.99), ('ready', (1, 2, 11, 12), 0.99)])]
+memory = <openscrub.PhiMemory object at 0x7ca866317290>
+cats = {'email', 'mrn', 'name', 'phone'}, namer = None, lenient = 76
+
+    def reverse_pass(scans, memory, cats, namer, lenient=76):
+        """After the scan, re-search every OCR'd word against remembered PII at
+        a more lenient threshold. Catches near-misses (OCR misreads) of strings
+        already confirmed elsewhere in the video; gating rules still apply so a
+        one-off false positive can't spread."""
+        from rapidfuzz import fuzz
+        extra = []
+        for t, cum, words in scans:
+            for w, cbox, conf in words:
+                n = PhiMemory.norm(w)
+                if len(n) < 4 or n in STOPWORDS:
+                    continue
+                if namer and namer._allowed(w):
+                    continue
+                for k, cat in memory.items.items():
+                    if cat not in cats:
+                        continue
+                    if memory._gated(k, cat) is None:
+                        continue
+>                   if k.isdigit() or n.isdigit():
+                       ^^^^^^^^^
+E                   AttributeError: 'NoneType' object has no attribute 'isdigit'
+
+openscrub.py:7115: AttributeError
+=========================== short test summary info ============================
+FAILED ../../../../../../tmp/openscrub-task113/test_reverse_recall_index.py::test_normalization_allowlist_and_short_stopword_filtering
+FAILED ../../../../../../tmp/openscrub-task113/test_reverse_recall_index.py::test_malformed_key_retains_category_gate_and_original_failure[dict]
+FAILED ../../../../../../tmp/openscrub-task113/test_reverse_recall_index.py::test_malformed_key_retains_category_gate_and_original_failure[OrderedDict]
+3 failed, 27 passed in 0.30s

@@ -28,7 +28,7 @@ Current implementation progress and local PR drafts are recorded in the [executi
 | Document | What it supplies |
 | --- | --- |
 | [Decisions and research](decisions-and-research.md) | What the user chose, what Austin requested, verified source findings, probe results and remaining uncertainty. |
-| [Core UX and reliability](01-core-ux-and-reliability.md) | P01–P07: downloads, choices, polling, ETA, preview publication and report/save correctness; separate N08 input and N11 filename-display candidates. |
+| [Core UX and reliability](01-core-ux-and-reliability.md) | P01–P07: downloads, choices, polling, ETA, preview publication and report/save correctness; separate N08 input, N11 filename-display and N12 first-scan sanity candidates. |
 | [Large-video performance](02-large-video-performance.md) | P08–P11, shared scale fixtures and measurement contracts. |
 | [Packaging and review features](03-packaging-and-review-features.md) | P12–P18: diagnostics, builds, inference setup, view filters, preview fidelity, manual quads and checkpoints; separate N09 HDR pipe cleanup. |
 | [Optional assistance](04-optional-assistance.md) | O01–O05: confidence/continuity policy, seeded tracking, OCR search, boundary evaluation and lettering-only mode. |

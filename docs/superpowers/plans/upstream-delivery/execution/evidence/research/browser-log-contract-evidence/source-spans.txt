@@ -1,0 +1,411 @@
+
+## 6ae212a35b094fc9466f1616afb2c5bb5c0497f8:openscrub_web.py:325-376
+325	def new_job(video_path, options, name):
+326	    jid = uuid.uuid4().hex[:12]
+327	    jdir = os.path.join(JOBS_DIR, jid)
+328	    os.makedirs(jdir, exist_ok=True)
+329	    job = {
+330	        "id": jid, "dir": jdir, "video": video_path, "name": name,
+331	        "options": options, "phase": "queued", "progress": 0.0,
+332	        "eta": None, "size": 0,
+333	        "log": [], "error": None, "output": None, "created": time.time(),
+334	        "cancel": threading.Event(), "stats": {}, "qgen": 0,
+335	    }
+336	    # keep the job's settings beside its upload: a scan that never finished
+337	    # has no report to recover them from, and a Retry after a restart then
+338	    # ran with DEFAULT settings (all categories) instead of the user's own
+339	    try:
+340	        with open(os.path.join(jdir, OPTIONS_FILE), "w",
+341	                  encoding="utf-8") as f:
+342	            json.dump(options, f)
+343	    except (OSError, TypeError, ValueError):
+344	        pass
+345	    with JOBS_LOCK:
+346	        JOBS[jid] = job
+347	    return job
+348	
+349	
+350	def job_public(job):
+351	    return {k: job[k] for k in ("id", "name", "phase", "progress", "error",
+352	                                "stats")} | {
+353	        "eta": job.get("eta"),      # .get(): jobs rehydrated from disk lack it
+354	        # input size: lets the editor warn before re-uploading a file that
+355	        # is ALREADY on the server (issue #16 — each retry re-uploaded the
+356	        # same 18 GB until the disk filled)
+357	        "size": job.get("size") or 0,
+358	        "log_tail": job["log"][-30:],
+359	        "log_len": len(job["log"]),
+360	        "has_output": bool(job["output"] and os.path.exists(job["output"])),
+361	    }
+362	
+363	
+364	class WebCallbacks(openscrub.Callbacks):
+365	    wants_frames = True
+366	
+367	    def __init__(self, job):
+368	        self.job = job
+369	        self._last_frame = 0.0
+370	        self._stage = None          # ETA state: current stage,
+371	        self._t0 = 0.0              # when it started,
+372	        self._cur0 = 0             # its first cur value,
+373	        self._eta = None            # and the smoothed estimate
+374	
+375	    def log(self, msg):
+376	        self.job["log"].append(msg)
+
+## 6ae212a35b094fc9466f1616afb2c5bb5c0497f8:openscrub_web.py:1060-1071
+1060	@app.route("/api/jobs/<jid>")
+1061	def job_status(jid):
+1062	    job = JOBS.get(jid) or abort(404)
+1063	    return jsonify(job_public(job))
+1064	
+1065	
+1066	@app.route("/api/jobs/<jid>/log")
+1067	def job_log(jid):
+1068	    job = JOBS.get(jid) or abort(404)
+1069	    frm = max(0, int(request.args.get("from", 0)))
+1070	    return jsonify({"from": frm, "lines": job["log"][frm:],
+1071	                    "len": len(job["log"])})
+
+## 6ae212a35b094fc9466f1616afb2c5bb5c0497f8:openscrub_web.py:1793-1794
+1793	#log{background:#020617;color:#cbd5e1;font:12px/1.4 ui-monospace,Consolas,monospace;
+1794	 padding:10px;border-radius:8px;height:180px;overflow:auto;white-space:pre-wrap}
+
+## 6ae212a35b094fc9466f1616afb2c5bb5c0497f8:openscrub_web.py:2080-2163
+2080	let CUR=null, EN={}, MAN=[], DUR=0, POLL=null, PHIST=[], PHPH="", LOGN=0, SHELLPH=null, JOBSJSON="";
+2081	
+2082	// VIEW_GEN advances on every openJob (including A -> B -> A) and removal.
+2083	// Drafts live only in this page; late acknowledgements reconcile their owner,
+2084	// but may never publish into, or start rendering from, a different view.
+2085	let VIEW_GEN=0, EDITS=null;
+2086	// Polling owns one metadata -> log cycle, using the existing view identity.
+2087	let POLL_CYCLE=null, POLL_FAILURES=0, AUTO_REVIEW=null, REVIEW_REQUEST=null;
+2088	function pollStatus(message){
+2089	 const el=document.getElementById("pollStatus");
+2090	 if(el&&el.textContent!==message)el.textContent=message;
+2091	}
+2092	function stopPolling(){
+2093	 if(POLL){clearTimeout(POLL.handle);POLL=null;}
+2094	 const old=POLL_CYCLE;POLL_CYCLE=null;
+2095	 if(old)old.controller.abort();
+2096	}
+2097	function schedulePoll(id,gen,delay){
+2098	 if(!ownsView(id,gen)||document.hidden)return;
+2099	 if(POLL)clearTimeout(POLL.handle);
+2100	 const timer={id,gen};POLL=timer;
+2101	 timer.handle=setTimeout(()=>{
+2102	  if(POLL!==timer||!ownsView(id,gen))return;
+2103	  POLL=null;refresh();
+2104	 },delay);
+2105	}
+2106	// Only metadata/log use this deadline. Race body consumption too: abort alone
+2107	// cannot settle a transport/body that ignores it. Losing work has no UI effects.
+2108	async function pollJson(url,cycle){
+2109	 const controller=new AbortController(),signal=cycle.controller.signal;
+2110	 let deadline,onCancel;
+2111	 const stopped=new Promise((_,reject)=>{
+2112	  const fail=message=>{controller.abort();reject(new Error(message));};
+2113	  onCancel=()=>fail("Polling cancelled");
+2114	  signal.addEventListener("abort",onCancel,{once:true});
+2115	  deadline=setTimeout(()=>fail("Polling timed out"),15000);
+2116	  if(signal.aborted)onCancel();
+2117	 });
+2118	 const operation=(async()=>{
+2119	  const r=await fetch(url,{signal:controller.signal});
+2120	  if(!r.ok)throw new Error("Polling HTTP "+r.status);
+2121	  return await r.json();
+2122	 })();
+2123	 try{return await Promise.race([operation,stopped]);}
+2124	 finally{clearTimeout(deadline);signal.removeEventListener("abort",onCancel);}
+2125	}
+2126	function refresh(){
+2127	 if(!CUR||document.hidden)return;
+2128	 if(POLL_CYCLE)return POLL_CYCLE.promise;
+2129	 if(POLL){clearTimeout(POLL.handle);POLL=null;}
+2130	 const cycle={id:CUR,gen:VIEW_GEN,controller:new AbortController()};
+2131	 POLL_CYCLE=cycle;
+2132	 cycle.promise=(async()=>{
+2133	  let delay=900;
+2134	  try{
+2135	   await refreshCycle(cycle);
+2136	   if(POLL_CYCLE!==cycle||!ownsView(cycle.id,cycle.gen))return;
+2137	   POLL_FAILURES=0;pollStatus("");
+2138	  }catch(e){
+2139	   if(POLL_CYCLE!==cycle||!ownsView(cycle.id,cycle.gen))return;
+2140	   delay=Math.min(10000,900*Math.pow(2,Math.min(POLL_FAILURES++,4)));
+2141	   pollStatus("Job updates interrupted — retrying in "+(delay/1000)+" s.");
+2142	  }finally{
+2143	   if(POLL_CYCLE===cycle&&ownsView(cycle.id,cycle.gen)){
+2144	    POLL_CYCLE=null;
+2145	    // Chained after completion: request duration adds to the healthy 900 ms.
+2146	    schedulePoll(cycle.id,cycle.gen,delay);
+2147	   }
+2148	  }
+2149	 })();
+2150	 return cycle.promise;
+2151	}
+2152	function wakePolling(){
+2153	 if(!CUR||document.hidden)return;
+2154	 // A pending immediate wake already coalesces focus/pageshow/online bursts.
+2155	 if(POLL&&POLL.wake)return;
+2156	 stopPolling();
+2157	 schedulePoll(CUR,VIEW_GEN,0);if(POLL)POLL.wake=true;
+2158	}
+2159	document.addEventListener("visibilitychange",()=>{
+2160	 if(document.hidden)stopPolling();else wakePolling();
+2161	});
+2162	window.addEventListener("pagehide",stopPolling);
+2163	for(const event of ["focus","pageshow","online"])window.addEventListener(event,wakePolling);
+
+## 6ae212a35b094fc9466f1616afb2c5bb5c0497f8:openscrub_web.py:2170-2170
+2170	function ownsView(id,gen){return CUR===id&&VIEW_GEN===gen;}
+
+## 6ae212a35b094fc9466f1616afb2c5bb5c0497f8:openscrub_web.py:2210-2274
+2210	async function retryJob(id){
+2211	 const r=await fetch("api/jobs/"+id+"/retry",{method:"POST"});
+2212	 let j={};try{j=await r.json();}catch(e){}
+2213	 if(!r.ok){alert(j.error||"could not retry the job");return;}
+2214	 JOBSJSON="";loadJobs();if(typeof openJob==="function")openJob(id);
+2215	}
+2216	async function delJob(id){
+2217	 if(!confirm("Delete this job and ALL of its files — upload, report, and rendered output?\\n\\nThis cannot be undone."))return;
+2218	 const r=await fetch("api/jobs/"+id,{method:"DELETE"});
+2219	 if(!r.ok){
+2220	  let m="could not delete the job";
+2221	  try{const e=await r.json();m=e.error||e.description||m;}catch(_){}
+2222	  alert(m);return;
+2223	 }
+2224	 REVIEW_DRAFTS.delete(id);
+2225	 if(CUR===id){stopPolling();VIEW_GEN++;CUR=null;EDITS=null;AUTO_REVIEW=null;REVIEW_REQUEST=null;detail.innerHTML="";}
+2226	 JOBSJSON="";loadJobs();
+2227	}
+2228	async function openJob(id){
+2229	 const video=document.getElementById("beVid");
+2230	 if(video){try{video.pause();}catch(e){}}
+2231	 if(EDITS){
+2232	  // Retain edit bookkeeping, not fetched box/report/transcript display data.
+2233	  EDITS.en={};
+2234	  const b=EDITS.editor;delete b.raw;b.boxes=[];
+2235	  delete b.tlspans;delete b.audioSugg;delete b.audioTx;b.playing=false;
+2236	  trimReviewDraft(EDITS);
+2237	 }
+2238	 stopPolling();POLL_FAILURES=0;AUTO_REVIEW=null;REVIEW_REQUEST=null;
+2239	 VIEW_GEN++;CUR=id;
+2240	 EDITS=REVIEW_DRAFTS.get(id);
+2241	 if(!EDITS){EDITS={en:{},enabled:{},manual:[],editor:emptyEditor(),busy:false,status:""};
+2242	  REVIEW_DRAFTS.set(id,EDITS);}
+2243	 EN=EDITS.en;MAN=EDITS.manual;BE=EDITS.editor;
+2244	 PHIST=[];PHPH="";LOGN=0;SHELLPH=null;
+2245	 detail.innerHTML='<div id="pollStatus" role="status" aria-live="polite" style="margin:8px 0;color:#fbbf24"></div><div id="reviewSaveStatus" role="status" aria-live="polite" style="margin:8px 0;color:#fbbf24"></div>';
+2246	 saveStatus(EDITS,EDITS.status);
+2247	
+2248	 refresh();
+2249	}
+2250	
+2251	function shellHtml(j){
+2252	 return `<div class="card" id="jobcard"><h2>${j.name}
+2253	  <span class="badge" id="ph"></span><small id="eta"></small></h2>
+2254	 <progress id="prog" value="0" max="1"></progress>
+2255	 <div class="row" id="actions" style="margin-top:8px"></div>
+2256	 <div style="margin-top:8px;text-align:center"><img id="pimg"
+2257	   style="max-width:100%;border-radius:8px;display:none;margin:0 auto"></div>
+2258	 <div id="pcap" style="font-size:12px;color:#94a3b8"></div>
+2259	 <div id="log" style="margin-top:8px"></div>
+2260	 <div class="warn" id="warnbox" style="display:none;margin-top:8px"></div>
+2261	 </div>`;
+2262	}
+2263	
+2264	async function refreshCycle(cycle){
+2265	 const {id,gen}=cycle;
+2266	 const current=()=>ownsView(id,gen)&&POLL_CYCLE===cycle;
+2267	 const j=await pollJson("api/jobs/"+id,cycle);
+2268	 if(!ownsView(id,gen)||!current())return;
+2269	 if(!j||typeof j.name!=="string"||typeof j.phase!=="string"||
+2270	    typeof j.progress!=="number"||!Number.isFinite(j.progress))throw new Error("Invalid job update");
+2271	 if(SHELLPH===null){
+2272	  detail.insertAdjacentHTML("afterbegin",shellHtml(j));SHELLPH="";
+2273	  const im=document.getElementById("pimg");
+2274	  im.onload=()=>{im.style.display="block";};   // show only once a real frame arrives
+
+## 6ae212a35b094fc9466f1616afb2c5bb5c0497f8:openscrub_web.py:2301-2325
+2301	 // incremental log append with stick-to-bottom (respects manual scroll-up)
+2302	 const lg=document.getElementById("log");
+2303	 const stick=lg.scrollTop+lg.clientHeight>=lg.scrollHeight-40;
+2304	 let nl=await pollJson(`api/jobs/${id}/log?from=${LOGN}`,cycle);
+2305	 if(!ownsView(id,gen)||!current())return;
+2306	 const validLog=n=>n&&Number.isInteger(n.from)&&n.from>=0&&
+2307	  Number.isInteger(n.len)&&n.len>=0&&Array.isArray(n.lines)&&
+2308	  n.lines.every(line=>typeof line==="string");
+2309	 if(!validLog(nl))throw new Error("Invalid log update");
+2310	 if(nl.len<LOGN){
+2311	  lg.textContent="";LOGN=0;
+2312	  if(nl.len){
+2313	   nl=await pollJson(`api/jobs/${id}/log?from=0`,cycle);
+2314	   if(!ownsView(id,gen)||!current())return;
+2315	   if(!validLog(nl))throw new Error("Invalid log update");
+2316	  }
+2317	 }
+2318	 if(nl.from!==LOGN&&nl.len!==0)throw new Error("Invalid log cursor");
+2319	 if(LOGN===0&&nl.len>400)nl.lines=nl.lines.slice(-400);
+2320	 if(nl.lines.length){
+2321	  const NL=String.fromCharCode(10);
+2322	  lg.textContent+=(lg.textContent?NL:"")+nl.lines.join(NL);
+2323	  if(stick)lg.scrollTop=lg.scrollHeight;
+2324	 }
+2325	 LOGN=nl.len;
+
+## 6ae212a35b094fc9466f1616afb2c5bb5c0497f8:tests/test_job_polling_browser.py:18-83
+18	@pytest.fixture
+19	def polling_http(monkeypatch, tmp_path):
+20	    import openscrub_web as web
+21	
+22	    monkeypatch.setattr(web, 'JOBS', {})
+23	    monkeypatch.setattr(web, 'JOBS_DIR', str(tmp_path))
+24	    for jid in ('A', 'B'):
+25	        job = web.new_job('', {}, 'synthetic job ' + jid)
+26	        web.JOBS.pop(job['id'])
+27	        job.update(id=jid, phase='queued', progress=.2, log=['log-' + jid])
+28	        web.JOBS[jid] = job
+29	    gate = threading.Event()
+30	    state = {'kind': None, 'entered': 0, 'released': 0}
+31	
+32	    class Handler(BaseHTTPRequestHandler):
+33	        def log_message(self, *_):
+34	            pass
+35	
+36	        def do_POST(self):
+37	            data = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
+38	            if data.get('release'):
+39	                gate.set()
+40	            if data.get('kind'):
+41	                gate.clear()
+42	                state['kind'] = data['kind']
+43	            payload = json.dumps(state).encode()
+44	            self.send_response(200)
+45	            self.send_header('Content-Length', str(len(payload)))
+46	            self.end_headers()
+47	            self.wfile.write(payload)
+48	
+49	        def do_GET(self):
+50	            path = urlsplit(self.path).path
+51	            if path == '/':
+52	                payload = web.PAGE.replace('%%VERSION%%', web.openscrub.VERSION).encode()
+53	                content_type = 'text/html'
+54	            elif path == '/__qa__/state':
+55	                payload = json.dumps(state).encode()
+56	                content_type = 'application/json'
+57	            else:
+58	                # The real production metadata/log routes supply the JSON body.
+59	                with web.app.test_client() as client:
+60	                    result = client.get(self.path)
+61	                payload = result.data
+62	                content_type = result.content_type
+63	            kind = 'log' if path.endswith('/log') else 'meta'
+64	            held = path.startswith('/api/jobs/A') and state['kind'] == kind
+65	            if held:
+66	                state['kind'] = None
+67	                state['entered'] += 1
+68	            self.send_response(200)
+69	            self.send_header('Content-Type', content_type)
+70	            self.send_header('Content-Length', str(len(payload)))
+71	            if held:
+72	                self.send_header('X-QA-Body-Gate', kind)
+73	            self.end_headers()
+74	            try:
+75	                if held:
+76	                    self.wfile.write(payload[:1])
+77	                    self.wfile.flush()
+78	                    gate.wait(15)
+79	                    state['released'] += 1
+80	                    self.wfile.write(payload[1:])
+81	                else:
+82	                    self.wfile.write(payload)
+83	            except (BrokenPipeError, ConnectionResetError):
+
+## 6ae212a35b094fc9466f1616afb2c5bb5c0497f8:tests/test_job_polling_browser.py:102-132
+102	async function wait(fn){for(let i=0;i<150;i++){if(await fn())return;await pause(20)}throw Error('bounded condition expired')}
+103	const meta=(id,phase='queued',progress=.2)=>({id,name:'synthetic job '+id,phase,progress,eta:null,error:null,has_output:true});
+104	const tiny=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=','base64');
+105	(async()=>{
+106	const browser=await chromium.launch({headless:true,args:['--no-sandbox']});
+107	async function setup(name){
+108	 const page=await browser.newPage({viewport:{width:1280,height:950}});
+109	 const q={name,page,events:[],held:[],plans:[],errors:[],console:[],phase:'queued',progress:.2,logs:{A:['log-A'],B:['log-B']}};
+110	 page.on('pageerror',e=>q.errors.push(e.message));page.on('console',m=>{if(['error','warning'].includes(m.type()))q.console.push(m.text())});
+111	 page.on('dialog',d=>d.accept());await page.clock.install();
+112	 await page.route('**/api/**',async route=>{
+113	  const req=route.request(),u=new URL(req.url()),m=u.pathname.match(/^\/api\/jobs\/([^/]+)(?:\/(.*))?$/);
+114	  if(!m){let body={};if(u.pathname==='/api/jobs')body=[];
+115	   if(u.pathname==='/api/quality_tier')body={tiers:[],current:'fast'};
+116	   if(u.pathname==='/api/persist')body={enabled:false,count:0};
+117	   return route.fulfill({json:body})}
+118	  const [,id,tail]=m,kind=tail||'meta';q.events.push({id,kind,query:u.search,method:req.method()});
+119	  if(q.pass===kind&&req.method()==='GET')return route.continue();
+120	  if(/thumb|detframe|frame_at|preview.jpg/.test(kind))return route.fulfill({contentType:'image/png',body:tiny});
+121	  let body=kind==='meta'?meta(id,q.phase,q.progress):kind==='log'?{from:+u.searchParams.get('from'),lines:q.logs[id].slice(+u.searchParams.get('from')),len:q.logs[id].length}:
+122	   kind==='detections'?{duration:10,detections:[{i:0,category:'mrn',text:'review-'+id,enabled:true,t_start:0,t_end:1,track:-1,person:-1}]}:
+123	   kind==='mediainfo'?{duration:10,width:320,height:180}:kind==='report'?{detections:[],audio_redactions:[{t0:1,t1:2,mode:'mute'}]}:{ok:true};
+124	  const plan=q.plans.find(p=>!p.used&&p.kind===kind&&(!p.id||p.id===id));
+125	  if(plan){plan.used=true;if(plan.body)body=plan.body;if(plan.abort)return route.abort('failed');
+126	   if(plan.hold)await new Promise(resolve=>q.held.push({id,kind,release:resolve}));}
+127	  await route.fulfill({status:plan?.status||200,contentType:'application/json',body:plan?.raw??JSON.stringify(body)}).catch(()=>{});
+128	 });
+129	 await page.goto(base);await page.clock.pauseAt(await page.evaluate(()=>Date.now()+100));assert.equal(await page.title(),'OpenScrub');assert.match(await page.locator('body').innerText(),/OpenScrub/);
+130	 return q;
+131	}
+132	const status=q=>q.page.locator('#pollStatus').innerText();
+
+## 6ae212a35b094fc9466f1616afb2c5bb5c0497f8:tests/test_job_polling_browser.py:184-193
+184	 {
+185	 const q=await setup('cursor-tail-scroll-reset');q.logs.A=Array.from({length:405},(_,i)=>'L'+i);
+186	 await q.page.evaluate(()=>openJob('A'));await wait(async()=>await q.page.evaluate(()=>LOGN===405));
+187	 assert.equal((await q.page.locator('#log').innerText()).split('\n').length,400);assert.match(await q.page.locator('#log').innerText(),/^L5\n/);
+188	 await q.page.locator('#log').evaluate(e=>e.scrollTop=0);q.logs.A=['new'];await advance(q);await wait(async()=>await q.page.evaluate(()=>LOGN===1));
+189	 assert.equal(await q.page.locator('#log').innerText(),'new');assert.ok(q.events.filter(e=>e.kind==='log').at(-1).query==='?from=0');
+190	 q.logs.A=[];await advance(q);await wait(async()=>await q.page.evaluate(()=>LOGN===0));assert.equal(await q.page.locator('#log').innerText(),'');await finish(q);
+191	 }
+192	 for(const mode of ['done','return','same','failure','manual']){
+193	 const q=await setup('automatic-review-'+mode);q.phase='review';q.plans.push({kind:'detections',hold:true,abort:false});
+
+## 6ae212a35b094fc9466f1616afb2c5bb5c0497f8:tests/test_job_polling_browser.py:205-212
+205	 const q=await setup('lifecycle-wake-and-Austin-help-preview');await opened(q);
+206	 await q.page.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,get:()=>true});document.dispatchEvent(new Event('visibilitychange'))});
+207	 const n=q.events.length;await advance(q,20000);assert.equal(q.events.length,n);
+208	 await q.page.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,get:()=>false});document.dispatchEvent(new Event('visibilitychange'));for(const e of ['focus','pageshow','online'])window.dispatchEvent(new Event(e))});
+209	 await advance(q,0);await wait(()=>q.events.length===n+2);
+210	 assert.ok(await q.page.locator('.qm').count()>0);await q.page.locator('summary').filter({hasText:'Advanced settings'}).click();await q.page.locator('.qm:visible').first().click();
+211	 assert.ok(await q.page.locator('.qm.open').count()>0);
+212	 q.phase='review';await advance(q);await wait(async()=>await q.page.locator('#review').count()===1);
+
+## 6ae212a35b094fc9466f1616afb2c5bb5c0497f8:tests/test_job_polling_node.py:16-25
+16	 insertAdjacentHTML(pos,html){for(const m of html.matchAll(/id="([^"]+)"/g))elements.set(m[1],el());},
+17	 set innerHTML(html){this._html=html;if(this===elements.get('detail')){
+18	 for(const k of [...elements.keys()])if(k!=='detail')elements.delete(k);}
+19	 this.insertAdjacentHTML('',html)}, get innerHTML(){return this._html||''}}}
+20	elements.set('detail',el());
+21	let now=0,seq=0;const timers=new Map();
+22	const listen=(type,fn)=>(events[type]??=[]).push(fn);
+23	const ctx=vm.createContext({console,AbortController,Set,Map,Promise,JSON,Math,Date,
+24	 document:{hidden:false,getElementById:id=>elements.get(id)||null,querySelectorAll:()=>[],
+25	 addEventListener:listen,createElement:el},window:{addEventListener:listen},detail:elements.get('detail'),
+
+## 6ae212a35b094fc9466f1616afb2c5bb5c0497f8:tests/test_job_polling_node.py:119-127
+119	def test_authoritative_empty_shrunk_cursor_initial_tail_and_scroll():
+120	    run_js("""openJob('A');await reply(job());await reply(log(Array.from({length:405},(_,i)=>'L'+i),405,0));
+121	    const lg=elements.get('log');assert.equal(lg.textContent.split('\\n').length,400);assert.ok(lg.textContent.startsWith('L5\\n'));
+122	    assert.equal(LOGN,405);assert.equal(lg.scrollTop,100);lg.scrollTop=0;lg.scrollHeight=1000;
+123	    await advance(900);await reply(job());await reply(log([],1,405));
+124	    assert.equal(lg.textContent,'');assert.equal(LOGN,0);assert.ok(queue[0].url.endsWith('from=0'));
+125	    await reply(log(['new'],1,0));assert.equal(lg.textContent,'new');assert.equal(LOGN,1);assert.equal(lg.scrollTop,0);
+126	    await advance(900);await cycle();assert.equal(LOGN,0,'empty len=0 is authoritative');""")
+127	
+
+## 6ae212a35b094fc9466f1616afb2c5bb5c0497f8:tests/test_job_polling_node.py:143-150
+143	def test_hide_wake_bursts_cancel_and_coalesce():
+144	    run_js("""openJob('A');const old=queue.shift();document.hidden=true;emit('visibilitychange');await tick();
+145	    assert.equal(old.options.signal.aborted,true);await advance(20000);assert.equal(calls.length,1);
+146	    document.hidden=false;emit('visibilitychange');emit('focus');emit('pageshow');emit('online');await advance(0);
+147	    assert.equal(calls.length,2);old.resolve(response(job('done',1)));await tick();await cycle();
+148	    emit('focus');emit('online');await advance(0);assert.equal(calls.length,4);refresh();assert.equal(calls.length,4);
+149	    assert.ok(calls.every(c=>!c.options.method));""")
+150	

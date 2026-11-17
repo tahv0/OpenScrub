@@ -1,0 +1,97 @@
+{
+  "product_commit": "6ae212a35b094fc9466f1616afb2c5bb5c0497f8",
+  "source_only": true,
+  "product_execution": false,
+  "scope": "Three explicitly named product files; no native checkout reads",
+  "files": [
+    {
+      "path": "openscrub_web.py",
+      "blob": "a8903862d00bdf068a59cf5e9c5ac3c6223884d2",
+      "sha256": "5c975b08b81bccb79661bac10e68ac286ac1f45aa3560b39517db4f0cc19aae0",
+      "bytes": 266902,
+      "export": "/tmp/openscrub-browser-logs-contract/source/openscrub_web.py",
+      "spans": [
+        [
+          325,
+          376
+        ],
+        [
+          1060,
+          1071
+        ],
+        [
+          1793,
+          1794
+        ],
+        [
+          2080,
+          2163
+        ],
+        [
+          2170,
+          2170
+        ],
+        [
+          2210,
+          2274
+        ],
+        [
+          2301,
+          2325
+        ]
+      ]
+    },
+    {
+      "path": "tests/test_job_polling_browser.py",
+      "blob": "f18886599d1a5cc9d6ed1e12238309df724652ce",
+      "sha256": "5a269af8d092467cce8c7a3a2b10aa01ac065cebc4b8c0f31a568aed0b72688b",
+      "bytes": 15496,
+      "export": "/tmp/openscrub-browser-logs-contract/source/tests/test_job_polling_browser.py",
+      "spans": [
+        [
+          18,
+          83
+        ],
+        [
+          102,
+          132
+        ],
+        [
+          184,
+          193
+        ],
+        [
+          205,
+          212
+        ]
+      ]
+    },
+    {
+      "path": "tests/test_job_polling_node.py",
+      "blob": "64e76e16d60fe44192e492e74bbfa93e42d956df",
+      "sha256": "debccaa24a36e2ae6b388b135eabfc2d7fe1fdbda7e10fd6cb4132d78d1e4f8a",
+      "bytes": 10324,
+      "export": "/tmp/openscrub-browser-logs-contract/source/tests/test_job_polling_node.py",
+      "spans": [
+        [
+          16,
+          25
+        ],
+        [
+          119,
+          127
+        ],
+        [
+          143,
+          150
+        ]
+      ]
+    }
+  ],
+  "requirements_not_product_evidence": [
+    "/home/tahv0/src/OpenScrub/docs/superpowers/plans/upstream-delivery/03-packaging-and-review-features.md",
+    "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/browser-log-contract-brief.md",
+    "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/bounded-logs-contract-research.md",
+    "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/task-3-report.md"
+  ]
+}

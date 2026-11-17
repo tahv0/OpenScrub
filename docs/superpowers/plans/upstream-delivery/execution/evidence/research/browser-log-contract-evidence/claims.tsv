@@ -1,0 +1,17 @@
+kind	claim	evidence_or_required_gate
+source	Initial tail is last400 callback entries, later textContent append has no trim	openscrub_web.py:2301-2325
+source	Metadata slices last30 independently	openscrub_web.py:350-361
+source	Display is fixed-height scrolling pre-wrap div	openscrub_web.py:1793-1794,2251-2262
+source	Open/retry/delete owns display reset/disposal	openscrub_web.py:2210-2248
+source	Stick decision currently precedes awaited body	openscrub_web.py:2303-2305
+source	Production metadata/log HTTP fixture exists but default schedules mock arrays	tests/test_job_polling_browser.py:18-83,102-132
+source	Node geometry is stubbed, not real layout	tests/test_job_polling_node.py:16-25
+prerequisite	P12B atomic absolute cursor/epoch schema and 2000/512KiB/8KiB server bounds	bounded-logs-contract-research.md including supervisor amendment; not implemented at pinned source
+proposal	800 entries and 2MiB represented UTF-16 text	Needs supervisor disposition and actual browser calibration
+proposal	8192 UTF-16 units per displayed entry with bounded-prefix defensive suffix	Compliant P12B entry already fits; noncompliant transport parsing remains outside display bound
+proposal	Bounded stable entry spans with LF text delimiters	Needs actual copy/selection/layout verification
+proposal	Retained anchor preserved, evicted anchor to oldest retained, resets to bottom	Needs actual browser layout/scroll/resize evidence
+unrun	Baseline/P12B-only many-poll display growth reproduction	Actual production producer-to-HTTP-to-PAGE path
+unrun	Candidate count/text/DOM/copy/time and responsiveness evidence	Future exclusive runtime slot, realistic and adversarial synthetic fixtures
+unrun	P12B real overflow/replacement/restart and stale/future recovery	Actual reviewed P12B producer/routes plus held-body ownership schedules
+unrun	Cross-browser selection/copy/accessibility/resize and native background behavior	Record platform/tool versions and outstanding platforms

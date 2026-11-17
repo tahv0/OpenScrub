@@ -1,0 +1,70 @@
+FFF                                                                      [100%]
+=================================== FAILURES ===================================
+_ test_malformed_gate_data_keeps_errors_before_length_rejection[count-TypeError] _
+
+malformed = 'count', error = <class 'TypeError'>
+
+    @pytest.mark.parametrize('malformed,error', [
+        ('count', TypeError), ('counts_mapping', AttributeError), ('threshold', TypeError)])
+    def test_malformed_gate_data_keeps_errors_before_length_rejection(malformed, error):
+        memory = remembered(('a-much-longer-remembered-name', 'name'), ('alphaa', 'email'))
+        if malformed == 'count':
+            memory.counts['a-much-longer-remembered-name'] = None
+        elif malformed == 'counts_mapping':
+            memory.counts = None
+        else:
+            memory.name_sightings = None
+        # Category rejection comes first, even for malformed name gate data.
+        assert observed(scan('alphaa'), memory, {'email'}) == [record('alphaa', 'email')]
+>       with pytest.raises(error):
+             ^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE TypeError
+
+../test_reverse_recall_index.py:235: Failed
+_ test_malformed_gate_data_keeps_errors_before_length_rejection[counts_mapping-AttributeError] _
+
+malformed = 'counts_mapping', error = <class 'AttributeError'>
+
+    @pytest.mark.parametrize('malformed,error', [
+        ('count', TypeError), ('counts_mapping', AttributeError), ('threshold', TypeError)])
+    def test_malformed_gate_data_keeps_errors_before_length_rejection(malformed, error):
+        memory = remembered(('a-much-longer-remembered-name', 'name'), ('alphaa', 'email'))
+        if malformed == 'count':
+            memory.counts['a-much-longer-remembered-name'] = None
+        elif malformed == 'counts_mapping':
+            memory.counts = None
+        else:
+            memory.name_sightings = None
+        # Category rejection comes first, even for malformed name gate data.
+        assert observed(scan('alphaa'), memory, {'email'}) == [record('alphaa', 'email')]
+>       with pytest.raises(error):
+             ^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE AttributeError
+
+../test_reverse_recall_index.py:235: Failed
+_ test_malformed_gate_data_keeps_errors_before_length_rejection[threshold-TypeError] _
+
+malformed = 'threshold', error = <class 'TypeError'>
+
+    @pytest.mark.parametrize('malformed,error', [
+        ('count', TypeError), ('counts_mapping', AttributeError), ('threshold', TypeError)])
+    def test_malformed_gate_data_keeps_errors_before_length_rejection(malformed, error):
+        memory = remembered(('a-much-longer-remembered-name', 'name'), ('alphaa', 'email'))
+        if malformed == 'count':
+            memory.counts['a-much-longer-remembered-name'] = None
+        elif malformed == 'counts_mapping':
+            memory.counts = None
+        else:
+            memory.name_sightings = None
+        # Category rejection comes first, even for malformed name gate data.
+        assert observed(scan('alphaa'), memory, {'email'}) == [record('alphaa', 'email')]
+>       with pytest.raises(error):
+             ^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE TypeError
+
+../test_reverse_recall_index.py:235: Failed
+=========================== short test summary info ============================
+FAILED ../test_reverse_recall_index.py::test_malformed_gate_data_keeps_errors_before_length_rejection[count-TypeError]
+FAILED ../test_reverse_recall_index.py::test_malformed_gate_data_keeps_errors_before_length_rejection[counts_mapping-AttributeError]
+FAILED ../test_reverse_recall_index.py::test_malformed_gate_data_keeps_errors_before_length_rejection[threshold-TypeError]
+3 failed, 35 deselected in 0.09s

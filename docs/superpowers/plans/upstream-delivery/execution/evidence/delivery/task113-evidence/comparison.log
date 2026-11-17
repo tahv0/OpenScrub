@@ -1,0 +1,6 @@
+heterogeneous reverse {'base': 49238012, 'head': 7070409}
+heterogeneous reverse_plus_merge {'base': 53592324, 'head': 9375835}
+same_length reverse {'base': 146477335, 'head': 148951730}
+same_length reverse_plus_merge {'base': 682879809, 'head': 690279095}
+repeated reverse {'base': 1170428, 'head': 1325978}
+repeated reverse_plus_merge {'base': 2855555, 'head': 2807765}
