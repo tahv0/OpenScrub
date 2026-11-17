@@ -159,11 +159,21 @@ def execute(command, root, env, label):
 
 def python_command(cfg, root, args):
     require(bool(args), 'run requires Python arguments after --')
-    require(not any(a in ('-I', '-E', '-S') or a.startswith('-I') for a in args), 'Python flags that bypass the startup guard are forbidden')
-    if args[:2] == ['-m', 'pytest']:
-        require(not any(a.startswith(('--basetemp', '-n', '--numprocesses', '--dist')) or 'cache_dir=' in a for a in args), 'pytest ownership overrides/parallel workers are forbidden')
-        args = args + ['--basetemp=' + str(root / 'pytest'), '-o', 'cache_dir=' + str(root / 'cache/pytest')]
-    return [cfg['python']] + args
+    # Deliberately narrow interpreter contract: individual -B/-u flags only.
+    # Parse these before finding the workload; never scan its own CLI options.
+    offset = 0
+    while offset < len(args) and args[offset] in ('-B', '-u'):
+        offset += 1
+    workload = args[offset:]
+    require(bool(workload), 'interpreter prefix requires a script, -c code or -m module')
+    require(workload[0] in ('-c', '-m') or not workload[0].startswith('-'),
+            'unsupported interpreter prefix; only individual -B/-u options are supported')
+    if workload[0] in ('-c', '-m'):
+        require(len(workload) >= 2 and bool(workload[1]), 'interpreter prefix requires a code/module argument')
+    if workload[:2] == ['-m', 'pytest']:
+        require(not any(a.startswith(('--basetemp', '-n', '--numprocesses', '--dist')) or 'cache_dir=' in a for a in workload[2:]), 'pytest ownership overrides/parallel workers are forbidden')
+        workload = workload + ['--basetemp=' + str(root / 'pytest'), '-o', 'cache_dir=' + str(root / 'cache/pytest')]
+    return [cfg['python']] + args[:offset] + workload
 
 
 def package(cfg, root):

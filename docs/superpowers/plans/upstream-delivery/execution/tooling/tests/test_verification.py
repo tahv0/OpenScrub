@@ -2,6 +2,7 @@
 import hashlib
 import json
 import os
+import runpy
 from pathlib import Path
 import subprocess
 import sys
@@ -145,6 +146,90 @@ subprocess.run([sys.executable, '-c', 'import sample,sys; from pathlib import Pa
         result = self.invoke()
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('hash mismatch', result.stderr)
+
+    def file_origin_case(self, installed=False, child=False, module=False):
+        selected = self.source
+        if module:
+            sample = self.source / 'sample.py'
+            sample.write_text("VALUE = 17\nif __name__ == '__main__':\n from pathlib import Path\n import sys\n assert Path(__file__) == Path(sys.argv[1]) / 'sample.py'\n print('MODULE_SELECTED_17', __file__)\n")
+            self.config['files']['sample.py'] = hashlib.sha256(sample.read_bytes()).hexdigest()
+        if installed:
+            selected = self.root / 'target'
+            selected.mkdir()
+            (selected / 'sample.py').write_bytes((self.source / 'sample.py').read_bytes())
+            self.config.update(installed_target=str(selected), mode='installed', excluded_paths=[str(self.source)])
+        adapter = self.root / 'adapter'
+        adapter.mkdir()
+        (adapter / 'sample.py').write_text('VALUE = 99\n')
+        probe = """import sample, sys
+from pathlib import Path
+print('EXECUTED_IMPORT', sample.__file__, sample.VALUE, flush=True)
+assert sample.VALUE == 17, (sample.__file__, sample.VALUE)
+assert Path(sample.__file__) == Path(sys.argv[1]) / 'sample.py'
+"""
+        if child:
+            children = adapter / 'children'
+            children.mkdir()
+            (children / 'sample.py').write_text('VALUE = 101\n')
+            (children / 'probe.py').write_text(probe)
+            if module:
+                # -m normally adds the current directory after sitecustomize too.
+                entry = """import subprocess, sys
+from pathlib import Path
+Path('sample.py').write_text('VALUE = 99\\n')
+subprocess.run([sys.executable, '-m', 'sample', sys.argv[2]], check=True)
+"""
+            else:
+                entry = "import subprocess, sys\nsubprocess.run([sys.executable, sys.argv[1], sys.argv[2]], check=True)\n"
+            (adapter / 'main.py').write_text(entry)
+            command = [str(adapter / 'main.py'), str(children / 'probe.py'), str(selected)]
+        else:
+            (adapter / 'main.py').write_text(probe)
+            command = [str(adapter / 'main.py'), str(selected)]
+        result = self.invoke(command=command)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('MODULE_SELECTED_17 ' + str(selected / 'sample.py') if module else 'EXECUTED_IMPORT ' + str(selected / 'sample.py') + ' 17', result.stdout)
+
+    def test_file_adapter_keeps_selected_source(self):
+        self.file_origin_case()
+
+    def test_file_adapter_keeps_installed_source(self):
+        self.file_origin_case(installed=True)
+
+    def test_file_child_keeps_selected_source(self):
+        self.file_origin_case(child=True)
+
+    def test_file_child_keeps_installed_source(self):
+        self.file_origin_case(installed=True, child=True)
+
+    def test_module_child_keeps_selected_source(self):
+        self.file_origin_case(child=True, module=True)
+
+    def test_module_child_keeps_installed_source(self):
+        self.file_origin_case(installed=True, child=True, module=True)
+
+    def test_prefixed_pytest_uses_owned_basetemp_and_cache(self):
+        test = self.source / 'test_prefixed.py'
+        test.write_text("import os\nfrom pathlib import Path\ndef test_owned(tmp_path, pytestconfig):\n root = Path(os.environ['VERIFY_RUN'])\n assert tmp_path.is_relative_to(root / 'pytest')\n assert pytestconfig.cache._cachedir == root / 'cache/pytest'\n")
+        result = self.invoke(command=['-B', '-u', '-m', 'pytest', str(test), '-q'])
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('1 passed', result.stdout)
+
+    def test_prefixed_pytest_refuses_workers_and_ownership_overrides(self):
+        build_command = runpy.run_path(str(TOOL))['python_command']
+        for options in (['-n', '2'], ['--numprocesses=2'], ['--dist', 'load'],
+                        ['--basetemp', str(self.root / 'other')], ['-o', 'cache_dir=other']):
+            with self.subTest(options=options):
+                with self.assertRaisesRegex(ValueError, 'ownership overrides/parallel workers'):
+                    build_command(self.config, self.root / 'scratch/run', ['-B', '-u', '-m', 'pytest', 'fixture.py'] + options)
+
+    def test_unsupported_and_combined_interpreter_options_are_rejected(self):
+        build_command = runpy.run_path(str(TOOL))['python_command']
+        for options in (['-Es', '-c', 'pass'], ['-sE', '-m', 'pytest'], ['-IS', '-c', 'pass'],
+                        ['-B', '-S', '-c', 'pass'], ['-Bu', '-c', 'pass'], ['-X', 'dev', '-c', 'pass']):
+            with self.subTest(options=options):
+                with self.assertRaises(ValueError):
+                    build_command(self.config, self.root / 'scratch/run', options)
 
     def test_source_default_jobs_can_be_checkout_relative_before_retargeting(self):
         engine = self.source / 'openscrub.py'

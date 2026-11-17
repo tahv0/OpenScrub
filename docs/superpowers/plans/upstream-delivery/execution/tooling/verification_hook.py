@@ -5,6 +5,7 @@ Python audit hooks are not an OS sandbox; native processes are not contained.
 """
 import hashlib
 from importlib.machinery import PathFinder
+from importlib.util import spec_from_file_location
 import json
 import os
 from pathlib import Path
@@ -79,6 +80,19 @@ def configure():
         if actual != cfg['files'][relative]:
             raise RuntimeError('selected import hash mismatch: ' + str(expected))
         identities[name] = {'file': str(expected), 'sha256': actual}
+    class SelectedSourceFinder:
+        # CPython prepends a script/cwd path after sitecustomize. Keep declared
+        # imports pinned when actually resolved, in this process and children.
+        def find_spec(self, fullname, path=None, target=None):
+            relative = cfg['modules'].get(fullname)
+            if relative is None:
+                return None
+            expected = selected / relative
+            if hashlib.sha256(expected.read_bytes()).hexdigest() != cfg['files'][relative]:
+                raise ImportError('selected import hash mismatch: ' + str(expected))
+            return spec_from_file_location(fullname, expected)
+
+    sys.meta_path.insert(0, SelectedSourceFinder())
     if cfg.get('configure_app'):
         import openscrub
         import openscrub_web as web
