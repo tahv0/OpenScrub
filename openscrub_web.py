@@ -1864,19 +1864,25 @@ def _send_job_source(job, **options):
         state = snapshot["source_state"] or snapshot["state"]
         owner = snapshot["source_job"] or job
         response = error = None
-        with state.report_lock:
-            _report_current(owner)
-            _recovery_gate(owner)
-            try:
-                response = _send_open_file(snapshot["path"], **options)
-            except Exception as caught:
-                error = caught
-        if _frame_source_current(snapshot):
-            if error is not None:
-                raise error
-            return response
-        if response is not None:
-            response.close()
+        try:
+            with state.report_lock:
+                _report_current(owner)
+                _recovery_gate(owner)
+                try:
+                    response = _send_open_file(snapshot["path"], **options)
+                except Exception as caught:
+                    error = caught
+            if _frame_source_current(snapshot):
+                if error is not None:
+                    raise error
+                validated = response
+                response = None  # hand off only a successfully validated response
+                return validated
+        finally:
+            # A stale attempt or validation exception still owns its response.
+            # Close after leaving the source lock, before request leases release.
+            if response is not None:
+                response.close()
     abort(409, "output changed during frame read; retry")
 
 
