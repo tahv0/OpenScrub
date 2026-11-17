@@ -329,3 +329,58 @@ def test_vault_roundtrip_keeps_recovery_and_only_discards_reserved_stages(tmp_pa
     assert all(not (tmp_path/name).exists() for name in discarded)
     assert vault.decrypt_tree(key,str(tmp_path))==len(retained)
     assert all((tmp_path/name).read_bytes()==b'sensitive' for name in retained)
+
+
+def test_terminal_assignment_failure_restores_pair_and_fields(store,monkeypatch):
+    import openscrub_web as web
+    store.doc['render_state']['bands']=[[0,0]]*30;store.path.write_text(json.dumps(store.doc))
+    old_report=store.path.read_bytes();output=Path(store.job['dir'])/'output.mp4';output.write_bytes(b'old video')
+    primary=RuntimeError('terminal assignment sentinel')
+    class FailOnce(dict):
+        failed=False
+        def __setitem__(self,key,value):
+            if key=='phase' and value=='done' and not self.failed:
+                self.failed=True;raise primary
+            return super().__setitem__(key,value)
+    job=FailOnce(store.job);job['output']=str(output);web.JOBS[job['id']]=job;store.job=job
+    monkeypatch.setattr(app,'normalize_vfr',lambda *args:None)
+    monkeypatch.setattr(app,'_render_into',lambda src,dst,*args,**kwargs:Path(dst).write_bytes(b'new'))
+    web._run_job(job,'render')
+    assert job['phase']=='error' and job['error']==str(primary)
+    assert job['output']==str(output) and output.read_bytes()==b'old video'
+    assert store.path.read_bytes()==old_report and web.FILES.initialize(job).output_epoch==4
+
+
+def test_acknowledged_cancel_prevents_pair_mutation(store,monkeypatch):
+    import openscrub_web as web
+    from openscrub_internal import render_delivery as delivery
+    from test_job_lifecycle import request
+    store.doc['render_state']['bands']=[[0,0]]*30;store.path.write_text(json.dumps(store.doc))
+    old_report=store.path.read_bytes();output=Path(store.job['dir'])/'output.mp4';output.write_bytes(b'old video')
+    store.job['output']=str(output)
+    monkeypatch.setattr(app,'normalize_vfr',lambda *args:None)
+    monkeypatch.setattr(app,'_render_into',lambda src,dst,*args,**kwargs:Path(dst).write_bytes(b'new'))
+    real=delivery._RenderDelivery.prepare_rollback
+    def prepare(owned):
+        real(owned)
+        assert request('post',store.url+'/cancel').status_code==200
+        assert store.job['phase']=='cancelled'
+    monkeypatch.setattr(delivery._RenderDelivery,'prepare_rollback',prepare)
+    web._run_job(store.job,'render')
+    assert output.read_bytes()==b'old video' and store.path.read_bytes()==old_report
+    assert web.FILES.initialize(store.job).output_epoch==0
+
+
+def test_postcommit_pipeline_notification_cannot_relabel_web_success(store,monkeypatch):
+    import openscrub_web as web
+    store.doc['render_state']['bands']=[[0,0]]*30;store.path.write_text(json.dumps(store.doc))
+    monkeypatch.setattr(app,'normalize_vfr',lambda *args:None)
+    monkeypatch.setattr(app,'_render_into',lambda src,dst,*args,**kwargs:Path(dst).write_bytes(b'new'))
+    real=app.run_pipeline
+    def pipeline(*args,**kwargs):
+        real(*args,**kwargs)
+        raise OSError('postcommit notification')
+    monkeypatch.setattr(app,'run_pipeline',pipeline)
+    web._run_job(store.job,'render')
+    assert store.job['phase']=='done' and store.job['error'] is None
+    assert Path(store.job['output']).read_bytes()==b'new'
