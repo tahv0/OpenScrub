@@ -7099,7 +7099,10 @@ def reverse_pass(scans, memory, cats, namer, lenient=76):
     already confirmed elsewhere in the video; gating rules still apply so a
     one-off false positive can't spread."""
     from rapidfuzz import fuzz
+    from heapq import merge
     extra = []
+    buckets = None
+    prepared = False
     for t, cum, words in scans:
         for w, cbox, conf in words:
             n = PhiMemory.norm(w)
@@ -7107,7 +7110,39 @@ def reverse_pass(scans, memory, cats, namer, lenient=76):
                 continue
             if namer and namer._allowed(w):
                 continue
-            for k, cat in memory.items.items():
+            if not prepared:
+                prepared = True
+                # Read the current mapping, rather than PhiMemory's forward
+                # caches: ordinary callers can edit items before this pass.
+                # Malformed gate data must still fail in original candidate
+                # order, even for a key the length index would exclude.
+                if (type(memory.items) is dict
+                        and type(getattr(memory, "counts", None)) is dict
+                        and type(getattr(memory, "name_sightings", None)) is int
+                        and all(type(count) is int for count in memory.counts.values())):
+                    alpha, digits = {}, {}
+                    for serial, (key, category) in enumerate(memory.items.items()):
+                        if type(key) is not str or type(category) is not str:
+                            break
+                        target = digits if key.isdigit() else alpha
+                        target.setdefault(len(key), []).append((serial, key, category))
+                    else:
+                        buckets = alpha, digits
+            if buckets is None:
+                # Keep original traversal/error behavior for malformed data
+                # and mappings with their own ordering/iteration behavior.
+                candidates = ((0, key, category)
+                              for key, category in memory.items.items())
+            elif n.isdigit():
+                candidates = buckets[1].get(len(n), ())
+            else:
+                matching = [buckets[0][size] for size in range(len(n) - 2, len(n) + 3)
+                            if size in buckets[0]]
+                # Each bucket is ordered by the mapping's insertion serial.
+                # A fuzzy match inserted earlier must beat a later exact one.
+                candidates = (merge(*matching) if len(matching) > 1
+                              else matching[0] if matching else ())
+            for _, k, cat in candidates:
                 if cat not in cats:
                     continue
                 if memory._gated(k, cat) is None:

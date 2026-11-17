@@ -116,4 +116,7 @@ include = [
     "NOTICE",
     "THIRD_PARTY_NOTICES.md",
     "test_openscrub.py",
+    "tests/test_reverse_recall_index.py",
+    "benchmark/reverse_recall.py",
+    "benchmark/README.md",
 ]

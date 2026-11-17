@@ -322,3 +322,29 @@ unassisted one.
   second is a claim about footage nobody has run yet.
 - Publish the failures next to the successes. A tool that says where it
   struggles is the one worth believing.
+
+
+### Reverse recall finalization comparison
+
+`reverse_recall.py` compares complete modules from two offline source exports:
+
+```sh
+python benchmark/reverse_recall.py --base /path/to/base --head /path/to/head --output /tmp/reverse.json
+```
+
+It validates deterministic email primary detections and memory construction at
+the actual matcher boundary, then measures reverse recall and reverse plus merge
+separately. Fresh mutable fixtures are prepared outside timing; normal GC stays
+enabled. Each of three fixed cases (heterogeneous lengths with unmatched words,
+same-length worst case, repeated early winner) gets three warmups and five
+alternating base/head samples. The JSON retains every output, mutation, digest
+and timing; tracing/allocation observations run after all timing. Coordinate
+exclusive owned workloads before running. Five samples do not establish a p95.
+
+This isolates post-scan work, including the temporary index and ordering costs.
+The combination excludes inference, scanning, scope filtering, report writing,
+backtracking and dense processing; it is not an end-to-end/default/4K claim.
+Same-length candidates still require a full walk; a tiny repeated memory can
+regress. The index retains O(memory) references and insertion serials until the
+reverse call returns. Allocation observations exclude prebuilt inputs/strings
+and do not establish a process RSS ceiling.
