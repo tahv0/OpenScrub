@@ -1,0 +1,36 @@
+{
+  "head": "3795d49f6293baf7b8c35534862a4881447e1b16",
+  "python39_grammar_all_packaged_python": true,
+  "evaluated_app_js_node_parse": true,
+  "sdist_exact_bytes": [
+    "openscrub.py",
+    "openscrub_web.py",
+    "openscrub_internal/__init__.py",
+    "openscrub_internal/reports.py",
+    "tests/test_large_report_io.py",
+    "tests/test_report_roundtrip.py",
+    "tests/test_review_save_failures.py",
+    "tests/test_vault_cleanup.py",
+    "test_openscrub.py",
+    "pyproject.toml",
+    "README.md"
+  ],
+  "wheel_exact_bytes": [
+    "openscrub.py",
+    "openscrub_web.py",
+    "openscrub_internal/__init__.py",
+    "openscrub_internal/reports.py"
+  ],
+  "sdist_added_vs_p06d_build": [
+    "tests/test_review_save_failures.py"
+  ],
+  "wheel_added_vs_p06d_build": [],
+  "project_and_build_requirements_unchanged": true,
+  "web_python_imports_unchanged": true,
+  "source_sha256": {
+    "openscrub.py": "b13f1ac4b25d983de9ff4cc6afa3472308ec87d9005e943bc27251a051a31c41",
+    "openscrub_web.py": "68af1c834fe9ee28e5bf572656ad05a2e8f60f4d158a62681bbf38012d013752",
+    "openscrub_internal/__init__.py": "c35c063c010e329c5dad13782e7b67438ed4b2d1faf975d4f01be2773a18e022",
+    "openscrub_internal/reports.py": "e8a7429c0b5430ee290f6635ca5d5a93445d3f0fe9bb0f58e57fec891ee01b7f"
+  }
+}

@@ -1,0 +1,8 @@
+3.9.25 (main, Oct 31 2025, 23:00:23) 
+[Clang 21.1.4 ]
+Linux-6.18.58.1-microsoft-standard-WSL2-x86_64-with-glibc2.43
+OpenCV 4.14.0 NumPy 2.0.2 ONNXRuntime 1.19.2
+installed engine /tmp/openscrub-python39-20261117/venv/lib/python3.9/site-packages/openscrub.py
+web /tmp/openscrub-python39-20261117/venv/lib/python3.9/site-packages/openscrub_web.py
+isolated profile /tmp/openscrub-python39-20261117/runtime/profile
+all core/test/build imports passed

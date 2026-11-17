@@ -23,10 +23,10 @@ clearing seek state. Pre/post cancellation checks cannot eliminate the native
 delay. Do not ship that hunk unchanged or silently accept the hidden delay.
 This research does not authorize a broad decoder subsystem.
 
-The related contracts are N01 in [core-semantic-audit.md](core-semantic-audit.md),
+The related contracts are N01 in [core-semantic-audit.md](../../preservation/core-semantic-audit.md),
 the earlier [fake-decoder probe](probe_dense_smoothing_prefix.py) and its
 [operation counts](dense-smoothing-prefix-results.json), and P11/S04/S06 in
-[the large-video plan](../../../docs/superpowers/plans/upstream-delivery/02-large-video-performance.md).
+[the large-video plan](../../../02-large-video-performance.md).
 The earlier 17,873-to-1 count stops at the first grayscale conversion. The real
 function below runs to completion; its 18,001-to-130 read counts measure a
 different, explicitly complete operation.

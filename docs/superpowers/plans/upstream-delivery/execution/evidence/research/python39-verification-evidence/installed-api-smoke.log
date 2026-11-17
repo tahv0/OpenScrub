@@ -1,0 +1,12 @@
+installed 3.9.25 /tmp/openscrub-python39-20261117/venv/lib/python3.9/site-packages/openscrub.py
+synthetic OpenCV/NumPy PNG roundtrip: 32x24 exact
+GET / -> 200; UI present; no-store
+GET /api/jobs -> 200; list
+GET /api/models/face -> 200; dict
+GET /api/model_status -> 200; dict
+GET /api/vault -> 200; dict
+POST /api/jobs synthetic missing path -> 400
+GET /zones -> redirect /
+explicit outward model fetch blocked before networking
+outward socket audit policy rejects external address
+no model files downloaded; API smoke passed

@@ -1,0 +1,3 @@
+# Temporary validation-only constraint; the pinned source metadata is unchanged.
+# B02b proposes this cap separately due to the established OpenCV 5 fallback gap.
+opencv-python<5

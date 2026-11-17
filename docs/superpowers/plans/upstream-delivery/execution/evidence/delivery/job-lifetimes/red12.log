@@ -1,0 +1,28 @@
+.F                                                                       [100%]
+=================================== FAILURES ===================================
+____ test_shutdown_hook_does_not_reacquire_held_lifecycle_mutex[JOBS_LOCK] _____
+
+store = namespace(root=PosixPath('/tmp/openscrub-task621/red12-tmp/test_shutdown_hook_does_not_re1/data'), jobs=PosixPath('/tm...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x79f32f3a96c0>, url='/api/jobs/5634cee27438')
+capsys = <_pytest.capture.CaptureFixture object at 0x79f3666c8230>
+held = 'JOBS_LOCK'
+
+    @pytest.mark.parametrize("held", ["VAULT_LOCK", "JOBS_LOCK"])
+    def test_shutdown_hook_does_not_reacquire_held_lifecycle_mutex(store, capsys, held):
+        store.enable()
+        done = threading.Event()
+        def signal_context():
+            with getattr(web, held):
+                web._vault_lock_atexit()
+            done.set()
+        t = threading.Thread(target=signal_context, daemon=True)
+        t.start()
+>       assert done.wait(2), 'shutdown hook self-deadlocked on ' + held
+E       AssertionError: shutdown hook self-deadlocked on JOBS_LOCK
+E       assert False
+E        +  where False = wait(2)
+E        +    where wait = <threading.Event at 0x79f3666c9850: unset>.wait
+
+tests/test_job_lifecycle.py:205: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_job_lifecycle.py::test_shutdown_hook_does_not_reacquire_held_lifecycle_mutex[JOBS_LOCK]
+1 failed, 1 passed, 37 deselected in 2.29s

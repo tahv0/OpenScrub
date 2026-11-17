@@ -1,0 +1,14 @@
+{
+  "commit": "e21ebdf6e3ee46e6c65050dc956a9a3459152269",
+  "tree": "795af785b672d397d2e287b5b963c10dcc4dbdf8",
+  "export": "/tmp/openscrub-frame-identity-baseline-20261117",
+  "export_command": "git archive e21ebdf6e3ee46e6c65050dc956a9a3459152269 --output=/tmp/openscrub-frame-identity-baseline-20261117.tar; tar -xf ... -C /tmp/openscrub-frame-identity-baseline-20261117",
+  "sha256": {
+    "openscrub.py": "0e4f0f9a7846080f591038d021aaf3ca6f01201d83ac32bbdc273f53d5067ee7",
+    "openscrub_web.py": "9835e1137abee62c0a78e2669ed8bae7059e36bf4bed9f5c7a44f0eb8b40ed3a",
+    "openscrub-frame-identity-baseline-20261117.tar": "c44d383d99f4c3f9857331dfd8dda23ee5080abb6a57b5809dba9a586b2de17f"
+  },
+  "venv": "/tmp/openscrub-baseline-20261116/venv-opencv4",
+  "models": "task-local model dir; _fetch_model raises; OPENSCRUB_NO_AUTOFETCH=1",
+  "product_changes": false
+}

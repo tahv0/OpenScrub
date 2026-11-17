@@ -1,0 +1,8 @@
+.....................                                                    [100%]
+=============================== warnings summary ===============================
+openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/_pytest/cacheprovider.py:487
+  /tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/_pytest/cacheprovider.py:487: PytestCacheWarning: cache could not write path /home/tahv0/.codex/worktrees/c832/OpenScrub/.pytest_cache/v/cache/nodeids: [Errno 30] Read-only file system: '/home/tahv0/.codex/worktrees/c832/OpenScrub/.pytest_cache/v/cache/nodeids'
+    config.cache.set("cache/nodeids", sorted(str(n) for n in self.cached_nodeids))
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+21 passed, 1 warning in 0.08s

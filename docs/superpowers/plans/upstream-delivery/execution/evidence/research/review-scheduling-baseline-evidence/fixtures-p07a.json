@@ -1,0 +1,35 @@
+[
+  {
+    "job": "small",
+    "groups": 12,
+    "rows": 18,
+    "report_bytes": 8294,
+    "report_sha256": "35417c42e81cc618b073e1e080b50216c3ed381eb8d87e4ad739a16a03015261",
+    "mixed_group_members": [
+      1,
+      2
+    ]
+  },
+  {
+    "job": "beta",
+    "groups": 3,
+    "rows": 4,
+    "report_bytes": 3913,
+    "report_sha256": "d1fe64b557048ecd6a0e22fba6cae9f1739f4314ed588d242c4715f061b06e44",
+    "mixed_group_members": [
+      1,
+      2
+    ]
+  },
+  {
+    "job": "cold",
+    "groups": 3,
+    "rows": 4,
+    "report_bytes": 3913,
+    "report_sha256": "551c2b48afbce816bdb81c3a4907b9a435c5fc32848d47e67ba63a03337e400a",
+    "mixed_group_members": [
+      1,
+      2
+    ]
+  }
+]

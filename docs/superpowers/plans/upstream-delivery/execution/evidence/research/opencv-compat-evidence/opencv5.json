@@ -1,0 +1,156 @@
+{
+  "source_commit": "5d3a15ae683c08f368d6ba4bd0d2d77b4e7b8e2f",
+  "source_path": "/tmp/openscrub-opencv-compat-20261117/source/openscrub.py",
+  "source_sha256": "0e4f0f9a7846080f591038d021aaf3ca6f01201d83ac32bbdc273f53d5067ee7",
+  "python": "3.12.16",
+  "executable": "/tmp/openscrub-baseline-20261116/venv/bin/python",
+  "platform": "Linux-6.18.58.1-microsoft-standard-WSL2-x86_64-with-glibc2.43",
+  "cv2_version": "5.0.0",
+  "cv2_path": "/tmp/openscrub-baseline-20261116/venv/lib/python3.12/site-packages/cv2/__init__.py",
+  "packages": {
+    "opencv-python": {
+      "version": "5.0.0.93",
+      "requires_python": ">=3.6"
+    },
+    "numpy": {
+      "version": "2.5.5",
+      "requires_python": ">=3.12"
+    }
+  },
+  "api": {
+    "CascadeClassifier": false,
+    "FaceDetectorYN": true,
+    "FaceDetectorYN_create": true,
+    "FaceRecognizerSF": true,
+    "FaceRecognizerSF_create": true,
+    "QRCodeDetector": true,
+    "TrackerVit": true,
+    "TrackerVit_create": true,
+    "dnn": true
+  },
+  "cascade_names": [],
+  "namespaces": {
+    "objdetect": null,
+    "xobjdetect": null,
+    "legacy": null,
+    "dnn": []
+  },
+  "haar_xml": {
+    "path": "/tmp/openscrub-baseline-20261116/venv/lib/python3.12/site-packages/cv2/data/haarcascade_frontalface_default.xml",
+    "exists": false,
+    "bytes": null,
+    "sha256": null,
+    "data_directory_exists": true,
+    "data_directory_files": [
+      "__init__.py"
+    ]
+  },
+  "yunet_cache": {
+    "path": "/tmp/openscrub-baseline-20261116/synthetic-data/models-opencv4/face_detection_yunet_2023mar.onnx",
+    "bytes": 232589,
+    "sha256": "8f2383e4dd3cfbb4553ea8718107fc0423210dc964f9f4280604804ed2552fa4"
+  },
+  "cases": [
+    {
+      "model_availability": "unavailable",
+      "optional_missing_model": false,
+      "logs": [
+        "      downloading YuNet face model (~230 KB, one time)\u2026",
+        "      YuNet download failed (Probe policy: model downloads disabled) \u2014 using Haar cascade fallback"
+      ],
+      "constructor": "error",
+      "error": {
+        "type": "AttributeError",
+        "message": "module 'cv2' has no attribute 'CascadeClassifier'",
+        "traceback": "Traceback (most recent call last):\n  File \"/home/tahv0/src/OpenScrub/.superpowers/sdd/README/opencv-compat-evidence/probe.py\", line 94, in <module>\n    detector = app.FaceDetector(cb=callback, model_path=(\n               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/openscrub-opencv-compat-20261117/source/openscrub.py\", line 5833, in __init__\n    self.haar = cv2.CascadeClassifier(\n                ^^^^^^^^^^^^^^^^^^^^^\nAttributeError: module 'cv2' has no attribute 'CascadeClassifier'\n"
+      },
+      "fetch_attempts": [
+        {
+          "url": "https://media.githubusercontent.com/media/opencv/opencv_zoo/main/models/face_detection_yunet/face_detection_yunet_2023mar.onnx",
+          "dest": "/tmp/openscrub-opencv-compat-20261117/empty-models/face_detection_yunet_2023mar.onnx"
+        }
+      ]
+    },
+    {
+      "model_availability": "unavailable",
+      "optional_missing_model": true,
+      "logs": [
+        "      face model not found: /tmp/openscrub-opencv-compat-20261117/nonexistent-optional.onnx \u2014 falling back to built-in YuNet",
+        "      downloading YuNet face model (~230 KB, one time)\u2026",
+        "      YuNet download failed (Probe policy: model downloads disabled) \u2014 using Haar cascade fallback"
+      ],
+      "constructor": "error",
+      "error": {
+        "type": "AttributeError",
+        "message": "module 'cv2' has no attribute 'CascadeClassifier'",
+        "traceback": "Traceback (most recent call last):\n  File \"/home/tahv0/src/OpenScrub/.superpowers/sdd/README/opencv-compat-evidence/probe.py\", line 94, in <module>\n    detector = app.FaceDetector(cb=callback, model_path=(\n               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/openscrub-opencv-compat-20261117/source/openscrub.py\", line 5833, in __init__\n    self.haar = cv2.CascadeClassifier(\n                ^^^^^^^^^^^^^^^^^^^^^\nAttributeError: module 'cv2' has no attribute 'CascadeClassifier'\n"
+      },
+      "fetch_attempts": [
+        {
+          "url": "https://media.githubusercontent.com/media/opencv/opencv_zoo/main/models/face_detection_yunet/face_detection_yunet_2023mar.onnx",
+          "dest": "/tmp/openscrub-opencv-compat-20261117/empty-models/face_detection_yunet_2023mar.onnx"
+        }
+      ]
+    },
+    {
+      "model_availability": "verified",
+      "optional_missing_model": false,
+      "logs": [
+        "      face detector: YuNet (DNN)"
+      ],
+      "constructor": "ok",
+      "backend": "yunet",
+      "haar_empty": null,
+      "detections": {
+        "black_320x240_scale_1.0": {
+          "count": 0,
+          "boxes": []
+        },
+        "black_320x240_scale_0.4": {
+          "count": 0,
+          "boxes": []
+        },
+        "noise_320x240_scale_1.0": {
+          "count": 0,
+          "boxes": []
+        },
+        "noise_320x240_scale_0.4": {
+          "count": 0,
+          "boxes": []
+        }
+      },
+      "fetch_attempts": []
+    },
+    {
+      "model_availability": "verified",
+      "optional_missing_model": true,
+      "logs": [
+        "      face model not found: /tmp/openscrub-opencv-compat-20261117/nonexistent-optional.onnx \u2014 falling back to built-in YuNet",
+        "      face detector: YuNet (DNN)"
+      ],
+      "constructor": "ok",
+      "backend": "yunet",
+      "haar_empty": null,
+      "detections": {
+        "black_320x240_scale_1.0": {
+          "count": 0,
+          "boxes": []
+        },
+        "black_320x240_scale_0.4": {
+          "count": 0,
+          "boxes": []
+        },
+        "noise_320x240_scale_1.0": {
+          "count": 0,
+          "boxes": []
+        },
+        "noise_320x240_scale_0.4": {
+          "count": 0,
+          "boxes": []
+        }
+      },
+      "fetch_attempts": []
+    }
+  ],
+  "network_events": []
+}

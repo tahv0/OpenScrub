@@ -1,0 +1,2321 @@
+{
+  "source_sha": "e21ebdf6e3ee46e6c65050dc956a9a3459152269",
+  "imports": {
+    "web": "/tmp/openscrub-frame-identity-baseline-20261117/openscrub_web.py",
+    "engine": "/tmp/openscrub-frame-identity-baseline-20261117/openscrub.py"
+  },
+  "source_sha256": {
+    "openscrub.py": "0e4f0f9a7846080f591038d021aaf3ca6f01201d83ac32bbdc273f53d5067ee7",
+    "openscrub_web.py": "9835e1137abee62c0a78e2669ed8bae7059e36bf4bed9f5c7a44f0eb8b40ed3a"
+  },
+  "opencv": "4.14.0",
+  "python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]",
+  "commands": [
+    [
+      "ffmpeg",
+      "-y",
+      "-loglevel",
+      "error",
+      "-f",
+      "rawvideo",
+      "-pixel_format",
+      "bgr24",
+      "-video_size",
+      "320x180",
+      "-framerate",
+      "24",
+      "-i",
+      "/tmp/openscrub-frame-identity-baseline-20261117/runtime/cfr24.raw",
+      "-c:v",
+      "libx264",
+      "-g",
+      "24",
+      "-pix_fmt",
+      "yuv420p",
+      "/tmp/openscrub-frame-identity-baseline-20261117/runtime/cfr24.mp4"
+    ],
+    [
+      "ffmpeg",
+      "-y",
+      "-loglevel",
+      "error",
+      "-f",
+      "rawvideo",
+      "-pixel_format",
+      "bgr24",
+      "-video_size",
+      "320x180",
+      "-framerate",
+      "5",
+      "-i",
+      "/tmp/openscrub-frame-identity-baseline-20261117/runtime/cfr5.raw",
+      "-c:v",
+      "libx264",
+      "-g",
+      "5",
+      "-pix_fmt",
+      "yuv420p",
+      "/tmp/openscrub-frame-identity-baseline-20261117/runtime/cfr5.mp4"
+    ],
+    [
+      "ffmpeg",
+      "-y",
+      "-loglevel",
+      "error",
+      "-f",
+      "concat",
+      "-safe",
+      "0",
+      "-i",
+      "/tmp/openscrub-frame-identity-baseline-20261117/runtime/vfr-sequence/concat.txt",
+      "-fps_mode",
+      "vfr",
+      "-c:v",
+      "libx264",
+      "-pix_fmt",
+      "yuv420p",
+      "/tmp/openscrub-frame-identity-baseline-20261117/runtime/vfr.mp4"
+    ]
+  ],
+  "normalization": {
+    "input_probe": [
+      true,
+      13.0
+    ],
+    "args": {
+      "video": "/tmp/openscrub-frame-identity-baseline-20261117/runtime/vfr.cfr.mp4",
+      "output": "/tmp/openscrub-frame-identity-baseline-20261117/runtime/vfr-output.mp4",
+      "encoder": "x264",
+      "vfr": "auto",
+      "no_vfr_fix": false,
+      "original_video": "/tmp/openscrub-frame-identity-baseline-20261117/runtime/vfr.mp4",
+      "hdr_tonemapped": false
+    },
+    "logs": [
+      "      input is VFR (avg 13.00 fps) \u2014 normalizing to CFR 13 fps first"
+    ],
+    "fps": 13.0,
+    "n": 14
+  },
+  "sequential_reference": {
+    "cfr24": [
+      {
+        "index": 0,
+        "marker": 0,
+        "sha256_decoded": "9b5f9aac4bc731cfea4c8a6e7aa41d7c5baefd2ec3b7e7806720b661f1b422bc"
+      },
+      {
+        "index": 1,
+        "marker": 1,
+        "sha256_decoded": "d65543c3a9c026cf41e6586a4ac78d49a0a5ca6ccc63315a60e161d76d6cb069"
+      },
+      {
+        "index": 2,
+        "marker": 2,
+        "sha256_decoded": "281d64af32e3c3737affa9bc94eab2c434b846876ad1e66b9c5f3cebbdd9426f"
+      },
+      {
+        "index": 3,
+        "marker": 3,
+        "sha256_decoded": "639a60b83d6dfbfc39153eb9df897aa578e76f8811c102590861b84cde6a2aac"
+      },
+      {
+        "index": 4,
+        "marker": 4,
+        "sha256_decoded": "a138b076c6c72035d783a93e643fe030ca3ce76e39c57ea894f4720504eb707c"
+      },
+      {
+        "index": 5,
+        "marker": 5,
+        "sha256_decoded": "e25e99611285ed76c2c8934f0bb78c76b216f1310b5621edde0414a987a9f551"
+      },
+      {
+        "index": 6,
+        "marker": 6,
+        "sha256_decoded": "6dc12494f8d83d0ae76933a483fbf6f7393bc2e59192cce6685fc7f5a3caeb6c"
+      },
+      {
+        "index": 7,
+        "marker": 7,
+        "sha256_decoded": "205ffa8b17ffb5b4b0e41a96b8769b353ae994e7b53d74aeec23d4fa873d7af8"
+      },
+      {
+        "index": 8,
+        "marker": 8,
+        "sha256_decoded": "ffe16ed5f6ab2003a7fdf8429d1d3521845d05442ec71de67784cc66e92ac8c3"
+      },
+      {
+        "index": 9,
+        "marker": 9,
+        "sha256_decoded": "2d16845f8e6618ff02f51b8b99231ceb36f94e0f4b22b98f285e2f15d9a6affe"
+      },
+      {
+        "index": 10,
+        "marker": 10,
+        "sha256_decoded": "3a6a6ceca55ccca67ec2ea68b2beaa5ba77a3e5b36669acc8b7be2a42984dfce"
+      },
+      {
+        "index": 11,
+        "marker": 11,
+        "sha256_decoded": "60c29549440960813356282ed18fc686de71e487e363ff6d0a0456c07a8a30ba"
+      },
+      {
+        "index": 12,
+        "marker": 12,
+        "sha256_decoded": "dc2352fa60a12647edaa9ca99ad094f489a07717731b826ccb7ef60ebd5f1a13"
+      },
+      {
+        "index": 13,
+        "marker": 13,
+        "sha256_decoded": "e799876f0a4153d9d5673fd2d7ce52a2ecb29911e9862769573c539c447623c3"
+      },
+      {
+        "index": 14,
+        "marker": 14,
+        "sha256_decoded": "7060305c22c40f7cfa3281523f54ebac9b081d1b9bd9fd17c2f5b202dcd2dc4e"
+      },
+      {
+        "index": 15,
+        "marker": 15,
+        "sha256_decoded": "58b6ea7f1d299ed80ad97022a83c6b01ee7fb1d837c8ff44d05a5e6e372535e2"
+      },
+      {
+        "index": 16,
+        "marker": 16,
+        "sha256_decoded": "ff0afd3388ad8e3bfb32569d431e6a71fb3a4ce1924fdd49306cffc81cb9df92"
+      },
+      {
+        "index": 17,
+        "marker": 17,
+        "sha256_decoded": "b9762ffdc669a8f58756673f3c10e26860f4061dbfaa7503da80e63f77e15e2e"
+      },
+      {
+        "index": 18,
+        "marker": 18,
+        "sha256_decoded": "fe84d4bd0bf3bfb8cbe2e30ba10f20a29453a31fcf179bbac75957dfff75e17d"
+      },
+      {
+        "index": 19,
+        "marker": 19,
+        "sha256_decoded": "bf35f1c65d2e5405ef3e34c240fe0414c5a6b43c4fd2a04961a7aea7ecff8947"
+      },
+      {
+        "index": 20,
+        "marker": 20,
+        "sha256_decoded": "ac82df691f7cf27881e1976392653715e85a7d36ee71cf67acbbdf9322f1629e"
+      },
+      {
+        "index": 21,
+        "marker": 21,
+        "sha256_decoded": "cabec2a66b8622a76b97e69a1591809f50a56146506169fffacbd72622f6be90"
+      },
+      {
+        "index": 22,
+        "marker": 22,
+        "sha256_decoded": "b62d463c250228501f365dc426e9e6f84958bc0d56107b04e258f9e4458c90ea"
+      },
+      {
+        "index": 23,
+        "marker": 23,
+        "sha256_decoded": "e0bc31066f04d5ac27afe3ee739d0e94986c3b3b911c5e59f65fb3d5ffa55dc7"
+      },
+      {
+        "index": 24,
+        "marker": 24,
+        "sha256_decoded": "8d9ed4da79c16735eceb77ec7909f405a7ca6c08df9618edf289ba347d474f16"
+      },
+      {
+        "index": 25,
+        "marker": 25,
+        "sha256_decoded": "b8efc8cbc5af981a615f74bb975a4ef8cbd5e95e6f32862916d68f8a276352c4"
+      },
+      {
+        "index": 26,
+        "marker": 26,
+        "sha256_decoded": "b9d29671d97d498ec527b82dd9e4297fa21087bc4c07d337edd244eac287c332"
+      },
+      {
+        "index": 27,
+        "marker": 27,
+        "sha256_decoded": "21c1ad8fea285cc6e0da0020a2b4022419b9074c197be329e65cd040b476bc61"
+      },
+      {
+        "index": 28,
+        "marker": 28,
+        "sha256_decoded": "7d2bafe2071e34da20f51931d5a03ef7c9d28bcd0925146d23651c5146e124e0"
+      },
+      {
+        "index": 29,
+        "marker": 29,
+        "sha256_decoded": "67dec3a4148c119d8a9720611b3fa1b20a32eb1d99c939433670ad1fff9e2715"
+      },
+      {
+        "index": 30,
+        "marker": 30,
+        "sha256_decoded": "9f769435f94a44b218c04880db89d26b02b8cd8dfe5910fb458ff4ab27946fd0"
+      },
+      {
+        "index": 31,
+        "marker": 31,
+        "sha256_decoded": "5dfd92805fd4cfa0badb0c7a52e68e0d205c6361435aea6101387f8808cb5225"
+      },
+      {
+        "index": 32,
+        "marker": 32,
+        "sha256_decoded": "483163fee49e0ecfecc873eea8835c73378cb7959023cb01cfeaf21fe540d567"
+      },
+      {
+        "index": 33,
+        "marker": 33,
+        "sha256_decoded": "b0324a3e6cd49fc39ff5ebbd4b9362cdf4364afddd6689d59b8a43e8c548ff51"
+      },
+      {
+        "index": 34,
+        "marker": 34,
+        "sha256_decoded": "637875f297f79ef976cac98550561c35c457d3be57f8b1ae8b0f27616044bed5"
+      },
+      {
+        "index": 35,
+        "marker": 35,
+        "sha256_decoded": "21dfe2e848db90a3c0814ef6879066bfb10e44dd60d16440109ae180783b4156"
+      },
+      {
+        "index": 36,
+        "marker": 36,
+        "sha256_decoded": "3e75226f47be6d7efe0184f91700a3f61e95bc8c0413ab65a76b016d64c5bfa2"
+      },
+      {
+        "index": 37,
+        "marker": 37,
+        "sha256_decoded": "618f70baef1af13bc43f99ed38d833a9bedffc31643c83407e9da0cbe55dbc2b"
+      },
+      {
+        "index": 38,
+        "marker": 38,
+        "sha256_decoded": "a70a6a91ef1c0bc0ca95ae586438d631ec7042a14093fa09c691035b6cdf2525"
+      },
+      {
+        "index": 39,
+        "marker": 39,
+        "sha256_decoded": "4dcbe3b8193bd6d0193294cf697d2f1260d0fcca217927a11f4f49ad1813c89a"
+      },
+      {
+        "index": 40,
+        "marker": 40,
+        "sha256_decoded": "139bb01c4c182002f7c4b28e233bf116d161fed4167dd95a5f579a2f81cb6a7b"
+      },
+      {
+        "index": 41,
+        "marker": 41,
+        "sha256_decoded": "0355a1438c64e1c4737cdec82805ba061d5e645035d8e27bfea91f5d0d4d6554"
+      },
+      {
+        "index": 42,
+        "marker": 42,
+        "sha256_decoded": "6799ab5a53f32d42ebe89219543a1d6d672c999db4a38b43d664ee429b7458b4"
+      },
+      {
+        "index": 43,
+        "marker": 43,
+        "sha256_decoded": "a4fe7f4db0a078f5951409e1065a056ec71de83e0072e6238f5cc2e11cc0f30d"
+      },
+      {
+        "index": 44,
+        "marker": 44,
+        "sha256_decoded": "ea4a98f053efcc056ccc2abe69a32699ac0317fe22b841674373f095a8ff1e90"
+      },
+      {
+        "index": 45,
+        "marker": 45,
+        "sha256_decoded": "8338416687e02403217e5dfd30b92acc0f0dc6db033018154892a9ba6fd7a5ae"
+      },
+      {
+        "index": 46,
+        "marker": 46,
+        "sha256_decoded": "8a2b7d45553de99ebf2314fddd1082172dc9d0c02d5e15b270158275c7c46edd"
+      },
+      {
+        "index": 47,
+        "marker": 47,
+        "sha256_decoded": "ff9addfcbc0dd9d40a39c0bcbc5607c96eec9ddafa095b25d1d0f362dcf5c17f"
+      }
+    ],
+    "cfr5": [
+      {
+        "index": 0,
+        "marker": 0,
+        "sha256_decoded": "50bd373554e71a394facf47ace4a098193107df546fdee1c36c7b8f5667ecc54"
+      },
+      {
+        "index": 1,
+        "marker": 1,
+        "sha256_decoded": "f223a70995dbc9f286e9e4f6c79878bc9d0f5e13c714a31d093636447c7ec42d"
+      },
+      {
+        "index": 2,
+        "marker": 2,
+        "sha256_decoded": "7fe227cb55b54a287bcb1b54d5378ba2dad4a955ca78c14b378fb5793ad73636"
+      },
+      {
+        "index": 3,
+        "marker": 3,
+        "sha256_decoded": "2ea51cb66eff39ab6abb1b28923262b21cdafa2a3e9435978316003a36ee500d"
+      },
+      {
+        "index": 4,
+        "marker": 4,
+        "sha256_decoded": "4a165567ba62274fc8438c0281e3d160a72c3b5fcce9ce3d079fb2ff69ae7cac"
+      },
+      {
+        "index": 5,
+        "marker": 5,
+        "sha256_decoded": "c0718bda3c41403e53a67be212af2f972112de6d26472e5621ae991791cdba46"
+      },
+      {
+        "index": 6,
+        "marker": 6,
+        "sha256_decoded": "206218a7680c1e2d5bcf5e4ad9ca71a4a70bd143a6ca2dac1258ed8051d06c89"
+      },
+      {
+        "index": 7,
+        "marker": 7,
+        "sha256_decoded": "faa2e3efe73569f89ad3d86c9d5df135b3a54cf138c6cfed848140fba47567b1"
+      },
+      {
+        "index": 8,
+        "marker": 8,
+        "sha256_decoded": "ec1a72bf9a5c559b059ee8ef3e93713f2a49b243149146b6c789a61efeb8bb22"
+      },
+      {
+        "index": 9,
+        "marker": 9,
+        "sha256_decoded": "e7954dab019a0e6fd36ee388af1137a98b3992b4730f63df5f5bb2b822ce52b7"
+      }
+    ],
+    "normalized": [
+      {
+        "index": 0,
+        "marker": 0,
+        "sha256_decoded": "efc9f09b71db4281272d20603876616d746e559ba3899d1c89267de83ef0d66e"
+      },
+      {
+        "index": 1,
+        "marker": 1,
+        "sha256_decoded": "ef6a515968949c55cc5ad11557d488877f949eb52a1d855385556f0945104f24"
+      },
+      {
+        "index": 2,
+        "marker": 2,
+        "sha256_decoded": "945e115b38d6f47b7172a79b14bf45ee52947993e11ea50a33fe6792c9821464"
+      },
+      {
+        "index": 3,
+        "marker": 2,
+        "sha256_decoded": "945e115b38d6f47b7172a79b14bf45ee52947993e11ea50a33fe6792c9821464"
+      },
+      {
+        "index": 4,
+        "marker": 3,
+        "sha256_decoded": "0bc7b92ad0a7f46fadaf8d739f61ceb0eb3465dc2dd6eb27411c22accbb735e2"
+      },
+      {
+        "index": 5,
+        "marker": 4,
+        "sha256_decoded": "12fb80da2a65448e48705ffe7069fcd9396e6084423276b1a4e558661de84abe"
+      },
+      {
+        "index": 6,
+        "marker": 5,
+        "sha256_decoded": "270b7a835ade8d3d4dc6f0d63f347e04daa51fd01068cc62876d66a10c302584"
+      },
+      {
+        "index": 7,
+        "marker": 6,
+        "sha256_decoded": "598c72d27fab08bc5a7bc43e14f3e51a3fc1d3ebc6b500b15fd6b6553509a305"
+      },
+      {
+        "index": 8,
+        "marker": 7,
+        "sha256_decoded": "e79c302ca4788cd5d679e2b341f4abaf4d6261eb5b368439caac45e5369bc635"
+      },
+      {
+        "index": 9,
+        "marker": 8,
+        "sha256_decoded": "af8d788532670dd0989685aa91b2a318e18fdff1004b3080431c73099012998c"
+      },
+      {
+        "index": 10,
+        "marker": 9,
+        "sha256_decoded": "5446449ff3067db281a0b1ece8083f7662f4d2e35adda843dabf8324119e5134"
+      },
+      {
+        "index": 11,
+        "marker": 10,
+        "sha256_decoded": "1ea96b0d0f6569135fb555fef28b61de4ae3f4f8012edfb65fb99f1c2751c643"
+      },
+      {
+        "index": 12,
+        "marker": 11,
+        "sha256_decoded": "f91551bcdcc6937418c288cd8a48132c703ea0fcb2177fc28b13e585a47e92d0"
+      },
+      {
+        "index": 13,
+        "marker": 11,
+        "sha256_decoded": "b5dee4ed5aac7891a540d6b54ff4fbb639fb35f5a8d1cfc38f09ec6607523b17"
+      }
+    ]
+  },
+  "samples": [
+    {
+      "matching_sequential_source_indices": [
+        0
+      ],
+      "job": "cfr24",
+      "url": "/api/jobs/cfr24/frame_at?t=0",
+      "status": 200,
+      "content_type": "image/jpeg",
+      "headers": {
+        "Content-Type": "image/jpeg",
+        "Content-Length": "3867"
+      },
+      "marker": 0,
+      "requested_time": 0,
+      "geometry_frame": 0,
+      "boxes": {
+        "boxes": [
+          {
+            "box": [
+              50,
+              70,
+              90,
+              110
+            ],
+            "category": "name",
+            "enabled": true,
+            "i": 0,
+            "t_end": 2.0,
+            "t_start": 0,
+            "text": "Synthetic moving target"
+          }
+        ],
+        "ox": 0,
+        "oy": 0,
+        "t": 0.0
+      },
+      "capture_traces": [
+        {
+          "path": "/tmp/openscrub-frame-identity-baseline-20261117/runtime/cfr24.mp4",
+          "seeks": [
+            {
+              "property": 0,
+              "value": 0.0,
+              "read": {
+                "ok": true,
+                "marker": 0
+              }
+            }
+          ],
+          "released": true
+        }
+      ],
+      "schedule": "natural"
+    },
+    {
+      "matching_sequential_source_indices": [
+        5
+      ],
+      "job": "cfr24",
+      "url": "/api/jobs/cfr24/frame_at?t=0.2",
+      "status": 200,
+      "content_type": "image/jpeg",
+      "headers": {
+        "Content-Type": "image/jpeg",
+        "Content-Length": "3994"
+      },
+      "marker": 5,
+      "requested_time": 0.2,
+      "geometry_frame": 4,
+      "boxes": {
+        "boxes": [
+          {
+            "box": [
+              58,
+              70,
+              98,
+              110
+            ],
+            "category": "name",
+            "enabled": true,
+            "i": 0,
+            "t_end": 2.0,
+            "t_start": 0,
+            "text": "Synthetic moving target"
+          }
+        ],
+        "ox": 8,
+        "oy": 0,
+        "t": 0.2
+      },
+      "capture_traces": [
+        {
+          "path": "/tmp/openscrub-frame-identity-baseline-20261117/runtime/cfr24.mp4",
+          "seeks": [
+            {
+              "property": 0,
+              "value": 200.0,
+              "read": {
+                "ok": true,
+                "marker": 5
+              }
+            }
+          ],
+          "released": true
+        }
+      ],
+      "schedule": "natural"
+    },
+    {
+      "matching_sequential_source_indices": [
+        22
+      ],
+      "job": "cfr24",
+      "url": "/api/jobs/cfr24/frame_at?t=0.9",
+      "status": 200,
+      "content_type": "image/jpeg",
+      "headers": {
+        "Content-Type": "image/jpeg",
+        "Content-Length": "4050"
+      },
+      "marker": 22,
+      "requested_time": 0.9,
+      "geometry_frame": 21,
+      "boxes": {
+        "boxes": [
+          {
+            "box": [
+              92,
+              70,
+              132,
+              110
+            ],
+            "category": "name",
+            "enabled": true,
+            "i": 0,
+            "t_end": 2.0,
+            "t_start": 0,
+            "text": "Synthetic moving target"
+          }
+        ],
+        "ox": 42,
+        "oy": 0,
+        "t": 0.9
+      },
+      "capture_traces": [
+        {
+          "path": "/tmp/openscrub-frame-identity-baseline-20261117/runtime/cfr24.mp4",
+          "seeks": [
+            {
+              "property": 0,
+              "value": 900.0,
+              "read": {
+                "ok": true,
+                "marker": 22
+              }
+            }
+          ],
+          "released": true
+        }
+      ],
+      "schedule": "natural"
+    },
+    {
+      "matching_sequential_source_indices": [
+        46
+      ],
+      "job": "cfr24",
+      "url": "/api/jobs/cfr24/frame_at?t=1.9",
+      "status": 200,
+      "content_type": "image/jpeg",
+      "headers": {
+        "Content-Type": "image/jpeg",
+        "Content-Length": "3990"
+      },
+      "marker": 46,
+      "requested_time": 1.9,
+      "geometry_frame": 45,
+      "boxes": {
+        "boxes": [
+          {
+            "box": [
+              140,
+              70,
+              180,
+              110
+            ],
+            "category": "name",
+            "enabled": true,
+            "i": 0,
+            "t_end": 2.0,
+            "t_start": 0,
+            "text": "Synthetic moving target"
+          }
+        ],
+        "ox": 90,
+        "oy": 0,
+        "t": 1.9
+      },
+      "capture_traces": [
+        {
+          "path": "/tmp/openscrub-frame-identity-baseline-20261117/runtime/cfr24.mp4",
+          "seeks": [
+            {
+              "property": 0,
+              "value": 1900.0,
+              "read": {
+                "ok": true,
+                "marker": 46
+              }
+            }
+          ],
+          "released": true
+        }
+      ],
+      "schedule": "natural"
+    },
+    {
+      "matching_sequential_source_indices": [
+        40
+      ],
+      "job": "cfr24",
+      "url": "/api/jobs/cfr24/frame_at?t=2",
+      "status": 200,
+      "content_type": "image/jpeg",
+      "headers": {
+        "Content-Type": "image/jpeg",
+        "Content-Length": "3929"
+      },
+      "marker": 40,
+      "requested_time": 2,
+      "geometry_frame": 47,
+      "boxes": {
+        "boxes": [
+          {
+            "box": [
+              144,
+              70,
+              184,
+              110
+            ],
+            "category": "name",
+            "enabled": true,
+            "i": 0,
+            "t_end": 2.0,
+            "t_start": 0,
+            "text": "Synthetic moving target"
+          }
+        ],
+        "ox": 94,
+        "oy": 0,
+        "t": 2.0
+      },
+      "capture_traces": [
+        {
+          "path": "/tmp/openscrub-frame-identity-baseline-20261117/runtime/cfr24.mp4",
+          "seeks": [
+            {
+              "property": 0,
+              "value": 2000.0,
+              "read": {
+                "ok": false,
+                "marker": null
+              }
+            },
+            {
+              "property": 0,
+              "value": 1660.0,
+              "read": {
+                "ok": true,
+                "marker": 40
+              }
+            }
+          ],
+          "released": true
+        }
+      ],
+      "schedule": "natural"
+    },
+    {
+      "matching_sequential_source_indices": [
+        0
+      ],
+      "job": "cfr5",
+      "url": "/api/jobs/cfr5/frame_at?t=0",
+      "status": 200,
+      "content_type": "image/jpeg",
+      "headers": {
+        "Content-Type": "image/jpeg",
+        "Content-Length": "3838"
+      },
+      "marker": 0,
+      "requested_time": 0,
+      "geometry_frame": 0,
+      "boxes": {
+        "boxes": [
+          {
+            "box": [
+              50,
+              70,
+              90,
+              110
+            ],
+            "category": "name",
+            "enabled": true,
+            "i": 0,
+            "t_end": 2.0,
+            "t_start": 0,
+            "text": "Synthetic moving target"
+          }
+        ],
+        "ox": 0,
+        "oy": 0,
+        "t": 0.0
+      },
+      "capture_traces": [
+        {
+          "path": "/tmp/openscrub-frame-identity-baseline-20261117/runtime/cfr5.mp4",
+          "seeks": [
+            {
+              "property": 0,
+              "value": 0.0,
+              "read": {
+                "ok": true,
+                "marker": 0
+              }
+            }
+          ],
+          "released": true
+        }
+      ],
+      "schedule": "natural"
+    },
+    {
+      "matching_sequential_source_indices": [
+        1
+      ],
+      "job": "cfr5",
+      "url": "/api/jobs/cfr5/frame_at?t=0.2",
+      "status": 200,
+      "content_type": "image/jpeg",
+      "headers": {
+        "Content-Type": "image/jpeg",
+        "Content-Length": "3794"
+      },
+      "marker": 1,
+      "requested_time": 0.2,
+      "geometry_frame": 1,
+      "boxes": {
+        "boxes": [
+          {
+            "box": [
+              52,
+              70,
+              92,
+              110
+            ],
+            "category": "name",
+            "enabled": true,
+            "i": 0,
+            "t_end": 2.0,
+            "t_start": 0,
+            "text": "Synthetic moving target"
+          }
+        ],
+        "ox": 2,
+        "oy": 0,
+        "t": 0.2
+      },
+      "capture_traces": [
+        {
+          "path": "/tmp/openscrub-frame-identity-baseline-20261117/runtime/cfr5.mp4",
+          "seeks": [
+            {
+              "property": 0,
+              "value": 200.0,
+              "read": {
+                "ok": true,
+                "marker": 1
+              }
+            }
+          ],
+          "released": true
+        }
+      ],
+      "schedule": "natural"
+    },
+    {
+      "matching_sequential_source_indices": [
+        5
+      ],
+      "job": "cfr5",
+      "url": "/api/jobs/cfr5/frame_at?t=0.9",
+      "status": 200,
+      "content_type": "image/jpeg",
+      "headers": {
+        "Content-Type": "image/jpeg",
+        "Content-Length": "3972"
+      },
+      "marker": 5,
+      "requested_time": 0.9,
+      "geometry_frame": 4,
+      "boxes": {
+        "boxes": [
+          {
+            "box": [
+              58,
+              70,
+              98,
+              110
+            ],
+            "category": "name",
+            "enabled": true,
+            "i": 0,
+            "t_end": 2.0,
+            "t_start": 0,
+            "text": "Synthetic moving target"
+          }
+        ],
+        "ox": 8,
+        "oy": 0,
+        "t": 0.9
+      },
+      "capture_traces": [
+        {
+          "path": "/tmp/openscrub-frame-identity-baseline-20261117/runtime/cfr5.mp4",
+          "seeks": [
+            {
+              "property": 0,
+              "value": 900.0,
+              "read": {
+                "ok": true,
+                "marker": 5
+              }
+            }
+          ],
+          "released": true
+        }
+      ],
+      "schedule": "natural"
+    },
+    {
+      "matching_sequential_source_indices": [
+        9
+      ],
+      "job": "cfr5",
+      "url": "/api/jobs/cfr5/frame_at?t=1.8",
+      "status": 200,
+      "content_type": "image/jpeg",
+      "headers": {
+        "Content-Type": "image/jpeg",
+        "Content-Length": "3863"
+      },
+      "marker": 9,
+      "requested_time": 1.8,
+      "geometry_frame": 9,
+      "boxes": {
+        "boxes": [
+          {
+            "box": [
+              68,
+              70,
+              108,
+              110
+            ],
+            "category": "name",
+            "enabled": true,
+            "i": 0,
+            "t_end": 2.0,
+            "t_start": 0,
+            "text": "Synthetic moving target"
+          }
+        ],
+        "ox": 18,
+        "oy": 0,
+        "t": 1.8
+      },
+      "capture_traces": [
+        {
+          "path": "/tmp/openscrub-frame-identity-baseline-20261117/runtime/cfr5.mp4",
+          "seeks": [
+            {
+              "property": 0,
+              "value": 1800.0,
+              "read": {
+                "ok": true,
+                "marker": 9
+              }
+            }
+          ],
+          "released": true
+        }
+      ],
+      "schedule": "natural"
+    },
+    {
+      "matching_sequential_source_indices": [
+        8
+      ],
+      "job": "cfr5",
+      "url": "/api/jobs/cfr5/frame_at?t=1.9",
+      "status": 200,
+      "content_type": "image/jpeg",
+      "headers": {
+        "Content-Type": "image/jpeg",
+        "Content-Length": "3875"
+      },
+      "marker": 8,
+      "requested_time": 1.9,
+      "geometry_frame": 9,
+      "boxes": {
+        "boxes": [
+          {
+            "box": [
+              68,
+              70,
+              108,
+              110
+            ],
+            "category": "name",
+            "enabled": true,
+            "i": 0,
+            "t_end": 2.0,
+            "t_start": 0,
+            "text": "Synthetic moving target"
+          }
+        ],
+        "ox": 18,
+        "oy": 0,
+        "t": 1.9
+      },
+      "capture_traces": [
+        {
+          "path": "/tmp/openscrub-frame-identity-baseline-20261117/runtime/cfr5.mp4",
+          "seeks": [
+            {
+              "property": 0,
+              "value": 1900.0,
+              "read": {
+                "ok": false,
+                "marker": null
+              }
+            },
+            {
+              "property": 0,
+              "value": 1559.9999999999998,
+              "read": {
+                "ok": true,
+                "marker": 8
+              }
+            }
+          ],
+          "released": true
+        }
+      ],
+      "schedule": "natural"
+    },
+    {
+      "matching_sequential_source_indices": [
+        8
+      ],
+      "job": "cfr5",
+      "url": "/api/jobs/cfr5/frame_at?t=2",
+      "status": 200,
+      "content_type": "image/jpeg",
+      "headers": {
+        "Content-Type": "image/jpeg",
+        "Content-Length": "3875"
+      },
+      "marker": 8,
+      "requested_time": 2,
+      "geometry_frame": 9,
+      "boxes": {
+        "boxes": [
+          {
+            "box": [
+              68,
+              70,
+              108,
+              110
+            ],
+            "category": "name",
+            "enabled": true,
+            "i": 0,
+            "t_end": 2.0,
+            "t_start": 0,
+            "text": "Synthetic moving target"
+          }
+        ],
+        "ox": 18,
+        "oy": 0,
+        "t": 2.0
+      },
+      "capture_traces": [
+        {
+          "path": "/tmp/openscrub-frame-identity-baseline-20261117/runtime/cfr5.mp4",
+          "seeks": [
+            {
+              "property": 0,
+              "value": 2000.0,
+              "read": {
+                "ok": false,
+                "marker": null
+              }
+            },
+            {
+              "property": 0,
+              "value": 1660.0,
+              "read": {
+                "ok": true,
+                "marker": 8
+              }
+            }
+          ],
+          "released": true
+        }
+      ],
+      "schedule": "natural"
+    },
+    {
+      "matching_sequential_source_indices": [
+        0
+      ],
+      "job": "normalized",
+      "url": "/api/jobs/normalized/frame_at?t=0",
+      "status": 200,
+      "content_type": "image/jpeg",
+      "headers": {
+        "Content-Type": "image/jpeg",
+        "Content-Length": "3853"
+      },
+      "marker": 0,
+      "requested_time": 0,
+      "geometry_frame": 0,
+      "boxes": {
+        "boxes": [
+          {
+            "box": [
+              50,
+              70,
+              90,
+              110
+            ],
+            "category": "name",
+            "enabled": true,
+            "i": 0,
+            "t_end": 1.0769230769230769,
+            "t_start": 0,
+            "text": "Synthetic moving target"
+          }
+        ],
+        "ox": 0,
+        "oy": 0,
+        "t": 0.0
+      },
+      "capture_traces": [
+        {
+          "path": "/tmp/openscrub-frame-identity-baseline-20261117/runtime/vfr.cfr.mp4",
+          "seeks": [
+            {
+              "property": 0,
+              "value": 0.0,
+              "read": {
+                "ok": true,
+                "marker": 0
+              }
+            }
+          ],
+          "released": true
+        }
+      ],
+      "schedule": "natural"
+    },
+    {
+      "matching_sequential_source_indices": [
+        2,
+        3
+      ],
+      "job": "normalized",
+      "url": "/api/jobs/normalized/frame_at?t=0.2",
+      "status": 200,
+      "content_type": "image/jpeg",
+      "headers": {
+        "Content-Type": "image/jpeg",
+        "Content-Length": "3884"
+      },
+      "marker": 2,
+      "requested_time": 0.2,
+      "geometry_frame": 2,
+      "boxes": {
+        "boxes": [
+          {
+            "box": [
+              54,
+              70,
+              94,
+              110
+            ],
+            "category": "name",
+            "enabled": true,
+            "i": 0,
+            "t_end": 1.0769230769230769,
+            "t_start": 0,
+            "text": "Synthetic moving target"
+          }
+        ],
+        "ox": 4,
+        "oy": 0,
+        "t": 0.2
+      },
+      "capture_traces": [
+        {
+          "path": "/tmp/openscrub-frame-identity-baseline-20261117/runtime/vfr.cfr.mp4",
+          "seeks": [
+            {
+              "property": 0,
+              "value": 200.0,
+              "read": {
+                "ok": true,
+                "marker": 2
+              }
+            }
+          ],
+          "released": true
+        }
+      ],
+      "schedule": "natural"
+    },
+    {
+      "matching_sequential_source_indices": [
+        7
+      ],
+      "job": "normalized",
+      "url": "/api/jobs/normalized/frame_at?t=0.5",
+      "status": 200,
+      "content_type": "image/jpeg",
+      "headers": {
+        "Content-Type": "image/jpeg",
+        "Content-Length": "4011"
+      },
+      "marker": 6,
+      "requested_time": 0.5,
+      "geometry_frame": 6,
+      "boxes": {
+        "boxes": [
+          {
+            "box": [
+              60,
+              70,
+              100,
+              110
+            ],
+            "category": "name",
+            "enabled": true,
+            "i": 0,
+            "t_end": 1.0769230769230769,
+            "t_start": 0,
+            "text": "Synthetic moving target"
+          }
+        ],
+        "ox": 10,
+        "oy": 0,
+        "t": 0.5
+      },
+      "capture_traces": [
+        {
+          "path": "/tmp/openscrub-frame-identity-baseline-20261117/runtime/vfr.cfr.mp4",
+          "seeks": [
+            {
+              "property": 0,
+              "value": 500.0,
+              "read": {
+                "ok": true,
+                "marker": 6
+              }
+            }
+          ],
+          "released": true
+        }
+      ],
+      "schedule": "natural"
+    },
+    {
+      "matching_sequential_source_indices": [
+        13
+      ],
+      "job": "normalized",
+      "url": "/api/jobs/normalized/frame_at?t=1.0",
+      "status": 200,
+      "content_type": "image/jpeg",
+      "headers": {
+        "Content-Type": "image/jpeg",
+        "Content-Length": "3766"
+      },
+      "marker": 11,
+      "requested_time": 1.0,
+      "geometry_frame": 13,
+      "boxes": {
+        "boxes": [
+          {
+            "box": [
+              72,
+              70,
+              112,
+              110
+            ],
+            "category": "name",
+            "enabled": true,
+            "i": 0,
+            "t_end": 1.0769230769230769,
+            "t_start": 0,
+            "text": "Synthetic moving target"
+          }
+        ],
+        "ox": 22,
+        "oy": 0,
+        "t": 1.0
+      },
+      "capture_traces": [
+        {
+          "path": "/tmp/openscrub-frame-identity-baseline-20261117/runtime/vfr.cfr.mp4",
+          "seeks": [
+            {
+              "property": 0,
+              "value": 1000.0,
+              "read": {
+                "ok": true,
+                "marker": 11
+              }
+            }
+          ],
+          "released": true
+        }
+      ],
+      "schedule": "natural"
+    },
+    {
+      "matching_sequential_source_indices": [
+        10
+      ],
+      "job": "normalized",
+      "url": "/api/jobs/normalized/frame_at?t=1.0769230769230769",
+      "status": 200,
+      "content_type": "image/jpeg",
+      "headers": {
+        "Content-Type": "image/jpeg",
+        "Content-Length": "3873"
+      },
+      "marker": 9,
+      "requested_time": 1.0769230769230769,
+      "geometry_frame": 13,
+      "boxes": {
+        "boxes": [
+          {
+            "box": [
+              72,
+              70,
+              112,
+              110
+            ],
+            "category": "name",
+            "enabled": true,
+            "i": 0,
+            "t_end": 1.0769230769230769,
+            "t_start": 0,
+            "text": "Synthetic moving target"
+          }
+        ],
+        "ox": 22,
+        "oy": 0,
+        "t": 1.0769230769230769
+      },
+      "capture_traces": [
+        {
+          "path": "/tmp/openscrub-frame-identity-baseline-20261117/runtime/vfr.cfr.mp4",
+          "seeks": [
+            {
+              "property": 0,
+              "value": 1076.923076923077,
+              "read": {
+                "ok": false,
+                "marker": null
+              }
+            },
+            {
+              "property": 0,
+              "value": 736.9230769230768,
+              "read": {
+                "ok": true,
+                "marker": 9
+              }
+            }
+          ],
+          "released": true
+        }
+      ],
+      "schedule": "natural"
+    },
+    {
+      "matching_sequential_source_indices": [
+        5
+      ],
+      "job": "cfr24",
+      "url": "/api/jobs/cfr24/frame_at?t=0.2&src=output",
+      "status": 200,
+      "content_type": "image/jpeg",
+      "headers": {
+        "Content-Type": "image/jpeg",
+        "Content-Length": "3994"
+      },
+      "marker": 5,
+      "requested_time": 0.2,
+      "geometry_frame": 4,
+      "boxes": {
+        "boxes": [
+          {
+            "box": [
+              58,
+              70,
+              98,
+              110
+            ],
+            "category": "name",
+            "enabled": true,
+            "i": 0,
+            "t_end": 2.0,
+            "t_start": 0,
+            "text": "Synthetic moving target"
+          }
+        ],
+        "ox": 8,
+        "oy": 0,
+        "t": 0.2
+      },
+      "capture_traces": [
+        {
+          "path": "/tmp/openscrub-frame-identity-baseline-20261117/runtime/cfr24-preview-output.mp4",
+          "seeks": [
+            {
+              "property": 0,
+              "value": 200.0,
+              "read": {
+                "ok": true,
+                "marker": 5
+              }
+            }
+          ],
+          "released": true
+        }
+      ],
+      "schedule": "natural"
+    },
+    {
+      "matching_sequential_source_indices": [
+        40
+      ],
+      "job": "cfr24",
+      "url": "/api/jobs/cfr24/frame_at?t=2&src=output",
+      "status": 200,
+      "content_type": "image/jpeg",
+      "headers": {
+        "Content-Type": "image/jpeg",
+        "Content-Length": "3929"
+      },
+      "marker": 40,
+      "requested_time": 2,
+      "geometry_frame": 47,
+      "boxes": {
+        "boxes": [
+          {
+            "box": [
+              144,
+              70,
+              184,
+              110
+            ],
+            "category": "name",
+            "enabled": true,
+            "i": 0,
+            "t_end": 2.0,
+            "t_start": 0,
+            "text": "Synthetic moving target"
+          }
+        ],
+        "ox": 94,
+        "oy": 0,
+        "t": 2.0
+      },
+      "capture_traces": [
+        {
+          "path": "/tmp/openscrub-frame-identity-baseline-20261117/runtime/cfr24-preview-output.mp4",
+          "seeks": [
+            {
+              "property": 0,
+              "value": 2000.0,
+              "read": {
+                "ok": false,
+                "marker": null
+              }
+            },
+            {
+              "property": 0,
+              "value": 1660.0,
+              "read": {
+                "ok": true,
+                "marker": 40
+              }
+            }
+          ],
+          "released": true
+        }
+      ],
+      "schedule": "natural"
+    },
+    {
+      "matching_sequential_source_indices": [],
+      "job": "cfr24",
+      "url": "/api/jobs/cfr24/detframe/0",
+      "status": 200,
+      "content_type": "image/jpeg",
+      "headers": {
+        "Content-Type": "image/jpeg",
+        "Content-Length": "4422"
+      },
+      "marker": 4,
+      "requested_time": 0.2,
+      "geometry_frame": 4,
+      "boxes": {
+        "boxes": [
+          {
+            "box": [
+              58,
+              70,
+              98,
+              110
+            ],
+            "category": "name",
+            "enabled": true,
+            "i": 0,
+            "t_end": 2.0,
+            "t_start": 0,
+            "text": "Synthetic moving target"
+          }
+        ],
+        "ox": 8,
+        "oy": 0,
+        "t": 0.2
+      },
+      "capture_traces": [
+        {
+          "path": "/tmp/openscrub-frame-identity-baseline-20261117/runtime/cfr24.mp4",
+          "seeks": [
+            {
+              "property": 1,
+              "value": 4,
+              "read": {
+                "ok": true,
+                "marker": 4
+              }
+            }
+          ],
+          "released": true
+        }
+      ],
+      "schedule": "natural"
+    },
+    {
+      "matching_sequential_source_indices": [],
+      "job": "cfr24",
+      "url": "/api/jobs/cfr24/thumb/0",
+      "status": 200,
+      "content_type": "image/jpeg",
+      "headers": {
+        "Content-Disposition": "inline; filename=thumb2_0.jpg",
+        "Content-Type": "image/jpeg",
+        "Content-Length": "2059",
+        "Last-Modified": "Mon, 16 Nov 2026 23:36:50 GMT",
+        "Cache-Control": "public, max-age=3600",
+        "Expires": "Tue, 17 Nov 2026 00:36:50 GMT",
+        "ETag": "\"1794872210.8676693-2059-2494439884\"",
+        "Date": "Mon, 16 Nov 2026 23:36:50 GMT",
+        "Accept-Ranges": "bytes"
+      },
+      "marker": null,
+      "requested_time": 0.2,
+      "geometry_frame": 4,
+      "boxes": {
+        "boxes": [
+          {
+            "box": [
+              58,
+              70,
+              98,
+              110
+            ],
+            "category": "name",
+            "enabled": true,
+            "i": 0,
+            "t_end": 2.0,
+            "t_start": 0,
+            "text": "Synthetic moving target"
+          }
+        ],
+        "ox": 8,
+        "oy": 0,
+        "t": 0.2
+      },
+      "capture_traces": [
+        {
+          "path": "/tmp/openscrub-frame-identity-baseline-20261117/runtime/cfr24.mp4",
+          "seeks": [
+            {
+              "property": 1,
+              "value": 4,
+              "read": {
+                "ok": true,
+                "marker": 4
+              }
+            }
+          ],
+          "released": true
+        }
+      ],
+      "schedule": "natural",
+      "matching_sequential_source_crops": [
+        4
+      ]
+    },
+    {
+      "matching_sequential_source_indices": [
+        13
+      ],
+      "job": "cfr24",
+      "url": "/api/jobs/cfr24/frame_at?t=0.9",
+      "status": 200,
+      "content_type": "image/jpeg",
+      "headers": {
+        "Content-Type": "image/jpeg",
+        "Content-Length": "3867"
+      },
+      "marker": 13,
+      "requested_time": 0.9,
+      "geometry_frame": 21,
+      "boxes": {
+        "boxes": [
+          {
+            "box": [
+              92,
+              70,
+              132,
+              110
+            ],
+            "category": "name",
+            "enabled": true,
+            "i": 0,
+            "t_end": 2.0,
+            "t_start": 0,
+            "text": "Synthetic moving target"
+          }
+        ],
+        "ox": 42,
+        "oy": 0,
+        "t": 0.9
+      },
+      "capture_traces": [
+        {
+          "path": "/tmp/openscrub-frame-identity-baseline-20261117/runtime/cfr24.mp4",
+          "seeks": [
+            {
+              "property": 0,
+              "value": 900.0,
+              "read": {
+                "injected_failure": true
+              }
+            },
+            {
+              "property": 0,
+              "value": 560.0,
+              "read": {
+                "ok": true,
+                "marker": 13
+              }
+            }
+          ],
+          "released": true
+        }
+      ],
+      "schedule": [
+        true,
+        false
+      ]
+    },
+    {
+      "matching_sequential_source_indices": [],
+      "job": "cfr24",
+      "url": "/api/jobs/cfr24/frame_at?t=0.9",
+      "status": 404,
+      "content_type": "text/html; charset=utf-8",
+      "headers": {
+        "Content-Type": "text/html; charset=utf-8",
+        "Content-Length": "207",
+        "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+        "Pragma": "no-cache",
+        "Expires": "0"
+      },
+      "marker": null,
+      "requested_time": 0.9,
+      "geometry_frame": 21,
+      "boxes": {
+        "boxes": [
+          {
+            "box": [
+              92,
+              70,
+              132,
+              110
+            ],
+            "category": "name",
+            "enabled": true,
+            "i": 0,
+            "t_end": 2.0,
+            "t_start": 0,
+            "text": "Synthetic moving target"
+          }
+        ],
+        "ox": 42,
+        "oy": 0,
+        "t": 0.9
+      },
+      "capture_traces": [
+        {
+          "path": "/tmp/openscrub-frame-identity-baseline-20261117/runtime/cfr24.mp4",
+          "seeks": [
+            {
+              "property": 0,
+              "value": 900.0,
+              "read": {
+                "injected_failure": true
+              }
+            },
+            {
+              "property": 0,
+              "value": 560.0,
+              "read": {
+                "injected_failure": true
+              }
+            },
+            {
+              "property": 0,
+              "value": 0.0,
+              "read": {
+                "injected_failure": true
+              }
+            }
+          ],
+          "released": true
+        }
+      ],
+      "schedule": [
+        true,
+        true,
+        true,
+        true
+      ]
+    },
+    {
+      "matching_sequential_source_indices": [],
+      "job": "cfr24",
+      "url": "/api/jobs/cfr24/detframe/0",
+      "status": 404,
+      "content_type": "text/html; charset=utf-8",
+      "headers": {
+        "Content-Type": "text/html; charset=utf-8",
+        "Content-Length": "207",
+        "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+        "Pragma": "no-cache",
+        "Expires": "0"
+      },
+      "marker": null,
+      "requested_time": 0.2,
+      "geometry_frame": 4,
+      "boxes": {
+        "boxes": [
+          {
+            "box": [
+              58,
+              70,
+              98,
+              110
+            ],
+            "category": "name",
+            "enabled": true,
+            "i": 0,
+            "t_end": 2.0,
+            "t_start": 0,
+            "text": "Synthetic moving target"
+          }
+        ],
+        "ox": 8,
+        "oy": 0,
+        "t": 0.2
+      },
+      "capture_traces": [
+        {
+          "path": "/tmp/openscrub-frame-identity-baseline-20261117/runtime/cfr24.mp4",
+          "seeks": [
+            {
+              "property": 1,
+              "value": 4,
+              "read": {
+                "injected_failure": true
+              }
+            }
+          ],
+          "released": true
+        }
+      ],
+      "schedule": [
+        true,
+        false
+      ]
+    },
+    {
+      "matching_sequential_source_indices": [],
+      "job": "cfr24",
+      "url": "/api/jobs/cfr24/thumb/0",
+      "status": 200,
+      "content_type": "image/jpeg",
+      "headers": {
+        "Content-Disposition": "inline; filename=thumb2_0.jpg",
+        "Content-Type": "image/jpeg",
+        "Content-Length": "2070",
+        "Last-Modified": "Mon, 16 Nov 2026 23:36:50 GMT",
+        "Cache-Control": "public, max-age=3600",
+        "Expires": "Tue, 17 Nov 2026 00:36:50 GMT",
+        "ETag": "\"1794872210.9261906-2070-2494439884\"",
+        "Date": "Mon, 16 Nov 2026 23:36:50 GMT",
+        "Accept-Ranges": "bytes"
+      },
+      "marker": null,
+      "requested_time": 0.2,
+      "geometry_frame": 4,
+      "boxes": {
+        "boxes": [
+          {
+            "box": [
+              58,
+              70,
+              98,
+              110
+            ],
+            "category": "name",
+            "enabled": true,
+            "i": 0,
+            "t_end": 2.0,
+            "t_start": 0,
+            "text": "Synthetic moving target"
+          }
+        ],
+        "ox": 8,
+        "oy": 0,
+        "t": 0.2
+      },
+      "capture_traces": [
+        {
+          "path": "/tmp/openscrub-frame-identity-baseline-20261117/runtime/cfr24.mp4",
+          "seeks": [
+            {
+              "property": 1,
+              "value": 4,
+              "read": {
+                "injected_failure": true
+              }
+            }
+          ],
+          "released": true
+        },
+        {
+          "path": "/tmp/openscrub-frame-identity-baseline-20261117/runtime/cfr24.mp4",
+          "seeks": [
+            {
+              "property": 1,
+              "value": 24,
+              "read": {
+                "ok": true,
+                "marker": 24
+              }
+            }
+          ],
+          "released": true
+        }
+      ],
+      "schedule": [
+        true,
+        false
+      ],
+      "matching_sequential_source_crops": [
+        24
+      ]
+    }
+  ],
+  "media": {
+    "cfr24": {
+      "path": "/tmp/openscrub-frame-identity-baseline-20261117/runtime/cfr24.mp4",
+      "bytes": 11454,
+      "sha256": "3255faa79d819ad763cd1cc95c9d0f9aa5e49ade85019197220f6e5913f62c7c",
+      "probe": {
+        "programs": [],
+        "stream_groups": [],
+        "streams": [
+          {
+            "codec_name": "h264",
+            "width": 320,
+            "height": 180,
+            "r_frame_rate": "24/1",
+            "avg_frame_rate": "24/1",
+            "time_base": "1/12288",
+            "duration": "2.000000",
+            "nb_frames": "48"
+          }
+        ]
+      },
+      "frames": {
+        "frames": [
+          {
+            "pts_time": "0.000000",
+            "best_effort_timestamp_time": "0.000000",
+            "pict_type": "I",
+            "side_data_list": [
+              {
+                "side_data_type": "H.26[45] User Data Unregistered SEI message"
+              }
+            ]
+          },
+          {
+            "pts_time": "0.041667",
+            "best_effort_timestamp_time": "0.041667",
+            "pict_type": "B"
+          },
+          {
+            "pts_time": "0.083333",
+            "best_effort_timestamp_time": "0.083333",
+            "pict_type": "B"
+          },
+          {
+            "pts_time": "0.125000",
+            "best_effort_timestamp_time": "0.125000",
+            "pict_type": "P"
+          },
+          {
+            "pts_time": "0.166667",
+            "best_effort_timestamp_time": "0.166667",
+            "pict_type": "B"
+          },
+          {
+            "pts_time": "0.208333",
+            "best_effort_timestamp_time": "0.208333",
+            "pict_type": "P"
+          },
+          {
+            "pts_time": "0.250000",
+            "best_effort_timestamp_time": "0.250000",
+            "pict_type": "B"
+          },
+          {
+            "pts_time": "0.291667",
+            "best_effort_timestamp_time": "0.291667",
+            "pict_type": "B"
+          },
+          {
+            "pts_time": "0.333333",
+            "best_effort_timestamp_time": "0.333333",
+            "pict_type": "B"
+          },
+          {
+            "pts_time": "0.375000",
+            "best_effort_timestamp_time": "0.375000",
+            "pict_type": "P"
+          },
+          {
+            "pts_time": "0.416667",
+            "best_effort_timestamp_time": "0.416667",
+            "pict_type": "B"
+          },
+          {
+            "pts_time": "0.458333",
+            "best_effort_timestamp_time": "0.458333",
+            "pict_type": "P"
+          },
+          {
+            "pts_time": "0.500000",
+            "best_effort_timestamp_time": "0.500000",
+            "pict_type": "B"
+          },
+          {
+            "pts_time": "0.541667",
+            "best_effort_timestamp_time": "0.541667",
+            "pict_type": "B"
+          },
+          {
+            "pts_time": "0.583333",
+            "best_effort_timestamp_time": "0.583333",
+            "pict_type": "B"
+          },
+          {
+            "pts_time": "0.625000",
+            "best_effort_timestamp_time": "0.625000",
+            "pict_type": "P"
+          },
+          {
+            "pts_time": "0.666667",
+            "best_effort_timestamp_time": "0.666667",
+            "pict_type": "B"
+          },
+          {
+            "pts_time": "0.708333",
+            "best_effort_timestamp_time": "0.708333",
+            "pict_type": "B"
+          },
+          {
+            "pts_time": "0.750000",
+            "best_effort_timestamp_time": "0.750000",
+            "pict_type": "B"
+          },
+          {
+            "pts_time": "0.791667",
+            "best_effort_timestamp_time": "0.791667",
+            "pict_type": "P"
+          },
+          {
+            "pts_time": "0.833333",
+            "best_effort_timestamp_time": "0.833333",
+            "pict_type": "B"
+          },
+          {
+            "pts_time": "0.875000",
+            "best_effort_timestamp_time": "0.875000",
+            "pict_type": "B"
+          },
+          {
+            "pts_time": "0.916667",
+            "best_effort_timestamp_time": "0.916667",
+            "pict_type": "B"
+          },
+          {
+            "pts_time": "0.958333",
+            "best_effort_timestamp_time": "0.958333",
+            "pict_type": "P"
+          },
+          {
+            "pts_time": "1.000000",
+            "best_effort_timestamp_time": "1.000000",
+            "pict_type": "I"
+          },
+          {
+            "pts_time": "1.041667",
+            "best_effort_timestamp_time": "1.041667",
+            "pict_type": "B"
+          },
+          {
+            "pts_time": "1.083333",
+            "best_effort_timestamp_time": "1.083333",
+            "pict_type": "B"
+          },
+          {
+            "pts_time": "1.125000",
+            "best_effort_timestamp_time": "1.125000",
+            "pict_type": "B"
+          },
+          {
+            "pts_time": "1.166667",
+            "best_effort_timestamp_time": "1.166667",
+            "pict_type": "P"
+          },
+          {
+            "pts_time": "1.208333",
+            "best_effort_timestamp_time": "1.208333",
+            "pict_type": "B"
+          },
+          {
+            "pts_time": "1.250000",
+            "best_effort_timestamp_time": "1.250000",
+            "pict_type": "B"
+          },
+          {
+            "pts_time": "1.291667",
+            "best_effort_timestamp_time": "1.291667",
+            "pict_type": "B"
+          },
+          {
+            "pts_time": "1.333333",
+            "best_effort_timestamp_time": "1.333333",
+            "pict_type": "P"
+          },
+          {
+            "pts_time": "1.375000",
+            "best_effort_timestamp_time": "1.375000",
+            "pict_type": "B"
+          },
+          {
+            "pts_time": "1.416667",
+            "best_effort_timestamp_time": "1.416667",
+            "pict_type": "B"
+          },
+          {
+            "pts_time": "1.458333",
+            "best_effort_timestamp_time": "1.458333",
+            "pict_type": "P"
+          },
+          {
+            "pts_time": "1.500000",
+            "best_effort_timestamp_time": "1.500000",
+            "pict_type": "B"
+          },
+          {
+            "pts_time": "1.541667",
+            "best_effort_timestamp_time": "1.541667",
+            "pict_type": "B"
+          },
+          {
+            "pts_time": "1.583333",
+            "best_effort_timestamp_time": "1.583333",
+            "pict_type": "B"
+          },
+          {
+            "pts_time": "1.625000",
+            "best_effort_timestamp_time": "1.625000",
+            "pict_type": "P"
+          },
+          {
+            "pts_time": "1.666667",
+            "best_effort_timestamp_time": "1.666667",
+            "pict_type": "B"
+          },
+          {
+            "pts_time": "1.708333",
+            "best_effort_timestamp_time": "1.708333",
+            "pict_type": "P"
+          },
+          {
+            "pts_time": "1.750000",
+            "best_effort_timestamp_time": "1.750000",
+            "pict_type": "B"
+          },
+          {
+            "pts_time": "1.791667",
+            "best_effort_timestamp_time": "1.791667",
+            "pict_type": "B"
+          },
+          {
+            "pts_time": "1.833333",
+            "best_effort_timestamp_time": "1.833333",
+            "pict_type": "B"
+          },
+          {
+            "pts_time": "1.875000",
+            "best_effort_timestamp_time": "1.875000",
+            "pict_type": "P"
+          },
+          {
+            "pts_time": "1.916667",
+            "best_effort_timestamp_time": "1.916667",
+            "pict_type": "B"
+          },
+          {
+            "pts_time": "1.958333",
+            "best_effort_timestamp_time": "1.958333",
+            "pict_type": "P"
+          }
+        ]
+      }
+    },
+    "cfr5": {
+      "path": "/tmp/openscrub-frame-identity-baseline-20261117/runtime/cfr5.mp4",
+      "bytes": 6349,
+      "sha256": "ecc7cdc66751506e713c4dfce38fb096f5c1c0fcc8fbd73e8d5375cc94fe6bba",
+      "probe": {
+        "programs": [],
+        "stream_groups": [],
+        "streams": [
+          {
+            "codec_name": "h264",
+            "width": 320,
+            "height": 180,
+            "r_frame_rate": "5/1",
+            "avg_frame_rate": "5/1",
+            "time_base": "1/10240",
+            "duration": "2.000000",
+            "nb_frames": "10"
+          }
+        ]
+      },
+      "frames": {
+        "frames": [
+          {
+            "pts_time": "0.000000",
+            "best_effort_timestamp_time": "0.000000",
+            "pict_type": "I",
+            "side_data_list": [
+              {
+                "side_data_type": "H.26[45] User Data Unregistered SEI message"
+              }
+            ]
+          },
+          {
+            "pts_time": "0.200000",
+            "best_effort_timestamp_time": "0.200000",
+            "pict_type": "B"
+          },
+          {
+            "pts_time": "0.400000",
+            "best_effort_timestamp_time": "0.400000",
+            "pict_type": "B"
+          },
+          {
+            "pts_time": "0.600000",
+            "best_effort_timestamp_time": "0.600000",
+            "pict_type": "P"
+          },
+          {
+            "pts_time": "0.800000",
+            "best_effort_timestamp_time": "0.800000",
+            "pict_type": "P"
+          },
+          {
+            "pts_time": "1.000000",
+            "best_effort_timestamp_time": "1.000000",
+            "pict_type": "I"
+          },
+          {
+            "pts_time": "1.200000",
+            "best_effort_timestamp_time": "1.200000",
+            "pict_type": "B"
+          },
+          {
+            "pts_time": "1.400000",
+            "best_effort_timestamp_time": "1.400000",
+            "pict_type": "B"
+          },
+          {
+            "pts_time": "1.600000",
+            "best_effort_timestamp_time": "1.600000",
+            "pict_type": "B"
+          },
+          {
+            "pts_time": "1.800000",
+            "best_effort_timestamp_time": "1.800000",
+            "pict_type": "P"
+          }
+        ]
+      }
+    },
+    "normalized": {
+      "path": "/tmp/openscrub-frame-identity-baseline-20261117/runtime/vfr.cfr.mp4",
+      "bytes": 5577,
+      "sha256": "591cf2b749f17e12f7ae9d78d91dbf699ae5ebe28e3b89f085390dd631cb33f7",
+      "probe": {
+        "programs": [],
+        "stream_groups": [],
+        "streams": [
+          {
+            "codec_name": "h264",
+            "width": 320,
+            "height": 180,
+            "r_frame_rate": "13/1",
+            "avg_frame_rate": "13/1",
+            "time_base": "1/13312",
+            "duration": "1.076923",
+            "nb_frames": "14"
+          }
+        ]
+      },
+      "frames": {
+        "frames": [
+          {
+            "pts_time": "0.000000",
+            "best_effort_timestamp_time": "0.000000",
+            "pict_type": "I",
+            "side_data_list": [
+              {
+                "side_data_type": "H.26[45] User Data Unregistered SEI message"
+              }
+            ]
+          },
+          {
+            "pts_time": "0.076923",
+            "best_effort_timestamp_time": "0.076923",
+            "pict_type": "B"
+          },
+          {
+            "pts_time": "0.153846",
+            "best_effort_timestamp_time": "0.153846",
+            "pict_type": "B"
+          },
+          {
+            "pts_time": "0.230769",
+            "best_effort_timestamp_time": "0.230769",
+            "pict_type": "B"
+          },
+          {
+            "pts_time": "0.307692",
+            "best_effort_timestamp_time": "0.307692",
+            "pict_type": "P"
+          },
+          {
+            "pts_time": "0.384615",
+            "best_effort_timestamp_time": "0.384615",
+            "pict_type": "B"
+          },
+          {
+            "pts_time": "0.461538",
+            "best_effort_timestamp_time": "0.461538",
+            "pict_type": "P"
+          },
+          {
+            "pts_time": "0.538462",
+            "best_effort_timestamp_time": "0.538462",
+            "pict_type": "B"
+          },
+          {
+            "pts_time": "0.615385",
+            "best_effort_timestamp_time": "0.615385",
+            "pict_type": "B"
+          },
+          {
+            "pts_time": "0.692308",
+            "best_effort_timestamp_time": "0.692308",
+            "pict_type": "B"
+          },
+          {
+            "pts_time": "0.769231",
+            "best_effort_timestamp_time": "0.769231",
+            "pict_type": "P"
+          },
+          {
+            "pts_time": "0.846154",
+            "best_effort_timestamp_time": "0.846154",
+            "pict_type": "B"
+          },
+          {
+            "pts_time": "0.923077",
+            "best_effort_timestamp_time": "0.923077",
+            "pict_type": "P"
+          },
+          {
+            "pts_time": "1.000000",
+            "best_effort_timestamp_time": "1.000000",
+            "pict_type": "P"
+          }
+        ]
+      }
+    }
+  }
+}

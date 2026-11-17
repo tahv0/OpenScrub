@@ -1,0 +1,107 @@
+........................................................................ [ 30%]
+.....................................F.................................. [ 60%]
+........................................................................ [ 91%]
+.............F.......                                                    [100%]
+=================================== FAILURES ===================================
+________________ test_job_retry_reuses_upload_without_a_new_job ________________
+
+    def test_job_retry_reuses_upload_without_a_new_job():
+        """Issue #16, part two: after a failed scan the only path forward was
+        Start scan, which re-uploaded the same multi-GB file into a FRESH job
+        dir on every attempt until the disk filled. Retry re-queues the same
+        job on the file already on the server."""
+        import shutil
+        import openscrub_web as w
+        job = w.new_job("", {}, "clip.mp4")
+        client = w.app.test_client()
+        try:
+            path = os.path.join(job["dir"], "input.mp4")
+            with open(path, "wb") as f:
+                f.write(b"\x00" * 1024)
+            job["video"], job["size"] = path, 1024
+            job["phase"], job["error"] = "error", "boom"
+            n0 = len(w.JOBS)
+            r = client.post(f"/api/jobs/{job['id']}/retry")
+            assert r.status_code == 200
+            assert len(w.JOBS) == n0, "retry must reuse the job, not add one"
+            assert job["phase"] == "queued" and job["error"] is None
+            # guards: a running job can't be retried; a reaped file can't either
+            job["phase"] = "scanning"
+            assert client.post(f"/api/jobs/{job['id']}/retry").status_code == 409
+            job["phase"] = "error"
+            os.remove(path)
+>           assert client.post(f"/api/jobs/{job['id']}/retry").status_code == 410
+E           AssertionError: assert 409 == 410
+E            +  where 409 = <WrapperTestResponse streamed [409 CONFLICT]>.status_code
+E            +    where <WrapperTestResponse streamed [409 CONFLICT]> = post('/api/jobs/fbca1b875c52/retry')
+E            +      where post = <FlaskClient <Flask 'openscrub_web'>>.post
+
+test_openscrub.py:3400: AssertionError
+_________ test_successful_report_publication_does_not_abort_vault_lock _________
+
+tmp_path = PosixPath('/tmp/openscrub-task621/full1-tmp/test_successful_report_publica0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x756cae93c2c0>
+
+    def test_successful_report_publication_does_not_abort_vault_lock(tmp_path, monkeypatch):
+        report = tmp_path / 'report.json'
+        report.write_bytes(b'{"synthetic": "old"}')
+        video = tmp_path / 'input.avi'
+        video.write_bytes(b'synthetic input bytes')
+        key = os.urandom(32)
+        monkeypatch.setattr(web, 'JOBS_DIR', str(tmp_path))
+        monkeypatch.setattr(web, 'VAULT', {'key': key})
+        staged, snapshotted, published = (threading.Event() for _ in range(3))
+        errors, new_bytes = [], []
+        real_replace, real_walk = os.replace, vault._walk_files
+    
+        def gated_replace(source, destination):
+            if Path(source).name.startswith('.report-'):
+                staged.set()
+                assert snapshotted.wait(5), 'vault did not snapshot the active stage'
+            return real_replace(source, destination)
+    
+        def snapshot_before_publication(root):
+            paths = list(real_walk(root))
+            assert any(p.endswith('.tmp') for p in paths)
+            # os.walk may enumerate the stage first; freeze that permitted order.
+            paths.sort(key=lambda p: not p.endswith('.tmp'))
+            snapshotted.set()
+            assert published.wait(5), 'report publication did not finish'
+            yield from paths
+    
+        def publish():
+            try:
+                reports.atomic_report(report, {'synthetic': 'new'})
+                new_bytes.append(report.read_bytes())
+            except Exception as error:
+                errors.append(error)
+            finally:
+                published.set()
+    
+        with monkeypatch.context() as gate:
+            gate.setattr(reports.os, 'replace', gated_replace)
+            gate.setattr(vault, '_walk_files', snapshot_before_publication)
+            thread = threading.Thread(target=publish)
+            thread.start()
+            try:
+                assert staged.wait(5), 'report stage was not created'
+>               encrypted = web._vault_lock_now()
+                            ^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_vault_cleanup.py:56: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+openscrub_web.py:3543: in _vault_lock_now
+    return _vault_lock_locked()
+           ^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def _vault_lock_locked():
+        if _files_busy_locked():
+>           raise FilesBusy("job files are still in use")
+E           openscrub_web.FilesBusy: job files are still in use
+
+openscrub_web.py:3523: FilesBusy
+=========================== short test summary info ============================
+FAILED test_openscrub.py::test_job_retry_reuses_upload_without_a_new_job - As...
+FAILED tests/test_vault_cleanup.py::test_successful_report_publication_does_not_abort_vault_lock
+2 failed, 235 passed in 63.54s (0:01:03)

@@ -1,0 +1,13 @@
+# P10 / S04 exact-frame baseline research
+
+Read-only research, no product/Git/user-data/environment changes or subagents. Read P10/S04 in the performance plan and the exact-frame paragraphs of core-history-audit.md. Work from full pinned exports at e21ebdf6e3ee46e6c65050dc956a9a3459152269 under `/tmp/openscrub-frame-identity-baseline-20261117`, not the active native worktree.
+
+Inventory actual `_frame_at`, `job_frame_at`, detframe/thumb callers and ordinary box-editor/compare browser callers. Distinguish intentional tolerant preview fallback from geometry-editing requests that must correspond to the shown source time. Verify whether the editor currently receives an unlabelled fallback frame and under which concrete reachable condition; inspect boundary/end-of-video, failed-read and normalized-source behavior. Do not infer exactness from a successful seek setter or capture position metadata.
+
+Use short, small synthetic marked CFR clips and, if directly useful, a short VFR clip through the actual normalization path. Verify markers/pixels through actual production routes with full module imports and a task-local synthetic job/report. Source-coordinate/timestamp evidence should show the actual frame, requested frame/time and browser editor assumption. A deliberate out-of-range API call alone is not proof of a reachable UI defect; demonstrate the caller condition or state that limitation. Controlled failure injection at the real decoder boundary is allowed for failure semantics, but distinguish it from a natural-video failure.
+
+Choose only a few deterministic cases; no large 4K/long-duration generation, sustained benchmark, repeated stress, full suite/build or model download. Use existing isolated env-opencv4.sh and model-fetch blocking. If browser evidence is necessary, reuse existing isolated Playwright/Chromium without installation, record unavailable browser plugin fallback, and clean up processes. Local loopback is allowed.
+
+Report demonstrated correctness defects separately from absent evidence of performance cost. Recommend the smallest P10 implementation split and exact source/coordinate/cleanup tests, without implementing a new decoder worker or copying donor repair protocols. Any initial10s/explicit60s/two-worker budget remains a planned parameter until actual work justifies it. Keep P16 mask/resize work separate.
+
+Write `frame-identity-baseline-research.md` and compact `frame-identity-baseline-evidence/` scripts/results in this SDD workspace. Include exact source identities, commands, markers, real versus injected schedules, limitations and remaining long-GOP/4K/platform gates. Return concise status/findings/paths. No public research is required for this local source/runtime task.

@@ -1,0 +1,8 @@
+{
+  "baseline_sha": "5d3a15ae683c08f368d6ba4bd0d2d77b4e7b8e2f",
+  "python": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+  "opencv": "4.14.0",
+  "engine_path": "/tmp/openscrub-handoff-research-20261116/snapshot/openscrub.py",
+  "engine_sha256": "0e4f0f9a7846080f591038d021aaf3ca6f01201d83ac32bbdc273f53d5067ee7",
+  "test_sha256": "a3d7cba98e99ef2131608e5f0413a96cfc0945f8ce59e7de5ef78d0bac7e33a5"
+}

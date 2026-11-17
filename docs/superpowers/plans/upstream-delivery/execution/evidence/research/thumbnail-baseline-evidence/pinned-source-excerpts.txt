@@ -1,0 +1,576 @@
+
+e21ebdf6e3ee46e6c65050dc956a9a3459152269:openscrub_web.py:675-766
+675:     jid = job["id"]
+676:     cb = WebCallbacks(job)
+677:     try:
+678:         if action == "scan":
+679:             job["phase"] = "scanning"
+680:             job["log"].append("— scan started —")
+681:             args = build_args(job)
+682:             state = openscrub.run_scan(args, cb)
+683:             openscrub.write_report(os.path.join(job["dir"], "report.json"),
+684:                                   args, state)
+685:             job["stats"] = state["stats"]
+686:             def _pregen(jid=jid):
+687:                 """One pass through the video with a single decoder:
+688:                 thumbnails come out in seconds instead of minutes.
+689:                 Sorting by reference time keeps seeks short and forward-
+690:                 only, which is what codecs are fast at."""
+691:                 try:
+692:                     jb = JOBS.get(jid)
+693:                     doc = _load_job_report(jb)
+694:                     rs = doc["render_state"]
+695:                     todo = []
+696:                     for k, d in enumerate(doc["detections"]):
+697:                         cch = os.path.join(jb["dir"], f"thumb2_{k}.jpg")
+698:                         if os.path.exists(cch):
+699:                             continue
+700:                         tref = min(max(d.get("last_seen", d["t_start"]),
+701:                                        d["t_start"]), d["t_end"])
+702:                         todo.append((tref, k, d, cch))
+703:                     todo.sort()
+704:                     cap = cv2.VideoCapture(jb["video"])
+705:                     cur = -1
+706:                     frame = None
+707:                     for tref, k, d, cch in todo:
+708:                         fidx = min(int(tref * rs["fps"]),
+709:                                    len(rs["cum"]) - 1)
+710:                         if fidx != cur:
+711:                             if 0 <= fidx - cur <= 12:
+712:                                 while cur < fidx:   # cheap forward decode
+713:                                     ok, frame = cap.read()
+714:                                     if not ok:
+715:                                         frame = None
+716:                                         break
+717:                                     cur += 1
+718:                             else:
+719:                                 cap.set(cv2.CAP_PROP_POS_FRAMES, fidx)
+720:                                 ok, frame = cap.read()
+721:                                 cur = fidx if ok else cur
+722:                                 if not ok:
+723:                                     frame = None
+724:                         if frame is None:
+725:                             continue
+726:                         ox, oy = rs["cum"][fidx]
+727:                         h, wd = frame.shape[:2]
+728:                         pad = 24
+729:                         x1 = max(0, int(d["cbox"][0] + ox) - pad)
+730:                         y1 = max(0, int(d["cbox"][1] + oy) - pad)
+731:                         x2 = min(wd, int(d["cbox"][2] + ox) + pad)
+732:                         y2 = min(h, int(d["cbox"][3] + oy) + pad)
+733:                         crop = frame[y1:y2, x1:x2].copy()
+734:                         if crop.size == 0:
+735:                             continue
+736:                         inner = crop[pad:-pad or None, pad:-pad or None]
+737:                         if not inner.size or float(inner.std()) <= 8:
+738:                             continue   # blank: leave for the on-demand
+739:                                        # path, which tries other moments
+740:                         cv2.rectangle(crop, (pad, pad),
+741:                                       (crop.shape[1] - pad,
+742:                                        crop.shape[0] - pad),
+743:                                       (0, 0, 255), 2)
+744:                         cv2.imwrite(cch, crop,
+745:                                     [cv2.IMWRITE_JPEG_QUALITY, 80])
+746:                     cap.release()
+747:                     jb["log"].append("thumbnails pre-generated "
+748:                                      f"({len(todo)})")
+749:                 except Exception:
+750:                     pass
+751:             threading.Thread(target=_pregen, daemon=True).start()
+752:             try:
+753:                 prov = _load_job_report(job).get("provenance", {})
+754:                 if (prov.get("vfr_normalized")
+755:                         and os.path.exists(prov.get("input", ""))):
+756:                     job["video"] = prov["input"]
+757:                     job["log"].append(
+758:                         "using CFR-normalized file for previews/thumbnails")
+759:             except Exception:
+760:                 pass
+761:             if job["options"].get("skip_review"):
+762:                 job["log"].append("review skipped — rendering all detections")
+763:                 job["phase"] = "queued_render"
+764:                 enqueue(job, "render")
+765:             else:
+766:                 job["phase"] = "review"
+
+e21ebdf6e3ee46e6c65050dc956a9a3459152269:openscrub_web.py:850-865
+850: 
+851: @app.before_request
+852: def _touch_activity():
+853:     LAST_ACTIVITY["t"] = time.time()
+854: 
+855: 
+856: @app.before_request
+857: def enforce_vault_lock():
+858:     """While the vault is locked, every job operation is refused — the
+859:     files are ciphertext, so this fails closed rather than half-working."""
+860:     if request.path.startswith("/api/jobs") and vault_locked():
+861:         abort(423, "vault is locked — unlock it (Encryption panel) to "
+862:                    "access jobs")
+863: 
+864: 
+865: @app.before_request
+
+e21ebdf6e3ee46e6c65050dc956a9a3459152269:openscrub_web.py:985-1024
+985:     """Delete a job and every file it owns (upload, normalized video,
+986:     report, thumbnails, output). Running jobs must be cancelled first.
+987:     Deletion is GUARANTEED, not merely attempted: if a file is still
+988:     held open (Windows locks, a streaming handle, a busy network share),
+989:     a marker is written and background retries + the startup and
+990:     retention sweeps finish the removal — the old behavior popped the
+991:     job from the list FIRST and then failed, leaving an orphaned folder
+992:     the UI could no longer reach, which rose from the dead as a zombie
+993:     review job at the next restart."""
+994:     with JOBS_LOCK:
+995:         job = JOBS.get(jid)
+996:         if job is None:
+997:             abort(404)
+998:         if job.get("phase") in ("queued", "scanning", "rendering",
+999:                                 "queued_render"):
+1000:             abort(409, "job is queued or running — cancel it first")
+1001:     if _reap_job_dir(job["dir"], jid):
+1002:         with JOBS_LOCK:
+1003:             JOBS.pop(jid, None)
+1004:         return jsonify({"ok": True})
+1005:     # couldn't remove everything now: mark the dir so every future sweep
+1006:     # (background retries below, startup, retention) knows it is condemned,
+1007:     # take it out of the UI, and keep trying quietly
+1008:     try:
+1009:         with open(os.path.join(job["dir"], DELETE_MARKER), "w") as f:
+1010:             f.write(str(time.time()))
+1011:     except OSError:
+1012:         pass
+1013:     with JOBS_LOCK:
+1014:         JOBS.pop(jid, None)
+1015: 
+1016:     def _retry():
+1017:         for _ in range(10):
+1018:             time.sleep(30)
+1019:             if not os.path.isdir(job["dir"]):
+1020:                 return
+1021:             if _reap_job_dir(job["dir"], jid, retries=1):
+1022:                 print(f"[web] job {jid} delete completed on retry",
+1023:                       flush=True)
+1024:                 return
+
+e21ebdf6e3ee46e6c65050dc956a9a3459152269:openscrub_web.py:1103-1250
+1103: def _load_job_report(job):
+1104:     with open(os.path.join(job["dir"], "report.json"), encoding="utf-8") as f:
+1105:         return json.load(f)
+1106: 
+1107: 
+1108: def _frame_at(job, t, rstate):
+1109:     cap = cv2.VideoCapture(job["video"])
+1110:     fps = rstate["fps"]
+1111:     cap.set(cv2.CAP_PROP_POS_FRAMES, int(t * fps))
+1112:     ok, frame = cap.read()
+1113:     cap.release()
+1114:     return frame if ok else None
+1115: 
+1116: 
+1117: @app.route("/api/jobs/<jid>/mediainfo")
+1118: def job_mediainfo(jid):
+1119:     """Basic video properties straight from the file — available in every
+1120:     job phase, no scan report required."""
+1121:     job = JOBS.get(jid) or abort(404)
+1122:     cap = cv2.VideoCapture(job["video"])
+1123:     fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+1124:     n = cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0
+1125:     w_ = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+1126:     h_ = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+1127:     cap.release()
+1128:     return jsonify({"duration": n / fps if fps else 0, "fps": fps,
+1129:                     "width": w_, "height": h_})
+1130: 
+1131: 
+1132: @app.route("/api/jobs/<jid>/detections")
+1133: def job_detections(jid):
+1134:     job = JOBS.get(jid) or abort(404)
+1135:     doc = _load_job_report(job)
+1136:     items = []
+1137:     for i, d in enumerate(doc["detections"]):
+1138:         items.append({"i": i, "category": d["category"], "text": d["text"],
+1139:                       "t_start": d["t_start"], "t_end": round(d["t_end"], 2),
+1140:                       "enabled": d.get("enabled", True),
+1141:                       "track": d.get("track", -1),
+1142:                       "person": d.get("person", -1),
+1143:                       "confidence": d.get("confidence", 0),
+1144:                       "zone_dropped": bool(d.get("zone_dropped"))})
+1145:     return jsonify({"detections": items,
+1146:                     "fps": doc["render_state"]["fps"],
+1147:                     "duration": len(doc["render_state"]["cum"]) /
+1148:                                 doc["render_state"]["fps"]})
+1149: 
+1150: 
+1151: @app.route("/api/jobs/<jid>/detframe/<int:i>")
+1152: def job_detframe(jid, i):
+1153:     """Full video frame at a real sighting of detection i, with its box
+1154:     outlined — the review lightbox."""
+1155:     job = JOBS.get(jid) or abort(404)
+1156:     doc = _load_job_report(job)
+1157:     d = doc["detections"][i]
+1158:     rs = doc["render_state"]
+1159:     tref = min(max(d.get("last_seen", d["t_start"]), d["t_start"]), d["t_end"])
+1160:     fidx = min(int(tref * rs["fps"]), len(rs["cum"]) - 1)
+1161:     ox, oy = rs["cum"][fidx]
+1162:     frame = _frame_at(job, tref, rs)
+1163:     if frame is None:
+1164:         abort(404)
+1165:     x1, y1 = int(d["cbox"][0] + ox), int(d["cbox"][1] + oy)
+1166:     x2, y2 = int(d["cbox"][2] + ox), int(d["cbox"][3] + oy)
+1167:     cv2.rectangle(frame, (x1 - 4, y1 - 4), (x2 + 4, y2 + 4), (0, 0, 255), 3)
+1168:     ok, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 84])
+1169:     from flask import Response
+1170:     return Response(buf.tobytes(), mimetype="image/jpeg")
+1171: 
+1172: 
+1173: @app.route("/api/jobs/<jid>/boxes_at")
+1174: def job_boxes_at(jid):
+1175:     """Active blur boxes (screen coords) at time t, plus the scroll offset so
+1176:     the client can convert edited boxes back to content coordinates."""
+1177:     job = JOBS.get(jid) or abort(404)
+1178:     doc = _load_job_report(job)
+1179:     rs = doc["render_state"]
+1180:     t = float(request.args.get("t", 0))
+1181:     fidx = min(int(t * rs["fps"]), len(rs["cum"]) - 1)
+1182:     ox, oy = rs["cum"][fidx]
+1183:     boxes = []
+1184:     want_all = request.args.get("all") == "1"
+1185:     for i, d in enumerate(doc["detections"]):
+1186:         if not (d["t_start"] - 0.01 <= t <= d["t_end"] + 0.01):
+1187:             continue
+1188:         if not want_all and not d.get("enabled", True):
+1189:             continue
+1190:         if True:
+1191:             boxes.append({"i": i, "category": d["category"],
+1192:                           "enabled": d.get("enabled", True),
+1193:                           "text": d.get("text", ""),
+1194:                           "t_start": d["t_start"], "t_end": d["t_end"],
+1195:                           "box": [d["cbox"][0] + ox, d["cbox"][1] + oy,
+1196:                                   d["cbox"][2] + ox, d["cbox"][3] + oy]})
+1197:     return jsonify({"t": t, "ox": ox, "oy": oy, "boxes": boxes})
+1198: 
+1199: 
+1200: @app.route("/api/jobs/<jid>/thumb/<int:i>")
+1201: def job_thumb(jid, i):
+1202:     job = JOBS.get(jid) or abort(404)
+1203:     # i is already a Flask <int:> route var, but CodeQL doesn't trust the
+1204:     # converter — format it as an explicit non-negative integer so the
+1205:     # cache filename can never carry anything but digits.
+1206:     i = int(i)
+1207:     if i < 0:
+1208:         abort(404)
+1209:     cache = os.path.join(job["dir"], "thumb2_%d.jpg" % i)
+1210:     if not os.path.exists(cache):
+1211:         doc = _load_job_report(job)
+1212:         if i >= len(doc["detections"]):
+1213:             abort(404)
+1214:         d = doc["detections"][i]
+1215:         rs = doc["render_state"]
+1216:         # cut the thumbnail at a moment the detector actually SAW the object.
+1217:         # t_start can be earlier than the object's appearance (backtracking
+1218:         # deliberately moves it to just before onset) — a frame there shows
+1219:         # nothing and made review pictures mismatch their text.
+1220:         ls = min(max(d.get("last_seen", d["t_start"]), d["t_start"]),
+1221:                  d["t_end"])
+1222:         mid = (d["t_start"] + d["t_end"]) / 2
+1223:         crop = None
+1224:         pad = 24
+1225:         for tref in (ls, mid, min(d["t_start"] + 0.2, d["t_end"])):
+1226:             fidx = min(int(tref * rs["fps"]), len(rs["cum"]) - 1)
+1227:             ox, oy = rs["cum"][fidx]
+1228:             frame = _frame_at(job, tref, rs)
+1229:             if frame is None:
+1230:                 continue
+1231:             h, w = frame.shape[:2]
+1232:             x1 = max(0, int(d["cbox"][0] + ox) - pad)
+1233:             y1 = max(0, int(d["cbox"][1] + oy) - pad)
+1234:             x2 = min(w, int(d["cbox"][2] + ox) + pad)
+1235:             y2 = min(h, int(d["cbox"][3] + oy) + pad)
+1236:             c = frame[y1:y2, x1:x2]
+1237:             if c.size == 0:
+1238:                 continue
+1239:             crop = c
+1240:             inner = c[pad:-pad or None, pad:-pad or None]
+1241:             if inner.size and float(inner.std()) > 8:
+1242:                 break   # crop shows real content — use this moment
+1243:         if crop is None:
+1244:             abort(404)
+1245:         cv2.rectangle(crop, (pad, pad), (crop.shape[1] - pad,
+1246:                                          crop.shape[0] - pad), (0, 0, 255), 2)
+1247:         cv2.imwrite(cache, crop, [cv2.IMWRITE_JPEG_QUALITY, 80])
+1248:     return send_file(cache, mimetype="image/jpeg", max_age=3600)
+1249: 
+1250: 
+
+e21ebdf6e3ee46e6c65050dc956a9a3459152269:openscrub_web.py:1251-1335
+1251: @app.route("/api/jobs/<jid>/frame_at")
+1252: def job_frame_at(jid):
+1253:     job = JOBS.get(jid) or abort(404)
+1254:     t = max(0.0, float(request.args.get("t", 0)))
+1255:     path = (job["output"] if request.args.get("src") == "output"
+1256:             and job.get("output") else job["video"])
+1257:     cap = cv2.VideoCapture(path)
+1258:     # seek by TIMESTAMP, not frame index: the original upload is often VFR
+1259:     # (iPhone), where index = t*fps drifts out of sync with the CFR output
+1260:     # and can overshoot the file entirely (broken compare pane)
+1261:     frame = None
+1262:     for tt in (t, max(0.0, t - 0.34), max(0.0, t - 1.0), 0.0):
+1263:         cap.set(cv2.CAP_PROP_POS_MSEC, tt * 1000)
+1264:         ok, fr = cap.read()
+1265:         if ok:
+1266:             frame = fr
+1267:             break   # walk back instead of 404ing at the very end of the file
+1268:         if tt == 0.0:
+1269:             break
+1270:     cap.release()
+1271:     if frame is None:
+1272:         abort(404)
+1273:     ok, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 82])
+1274:     return Response(buf.tobytes(), mimetype="image/jpeg")
+1275: 
+1276: 
+1277: @app.route("/api/jobs/<jid>/video")
+1278: def job_video_stream(jid):
+1279:     """Range-aware stream of the job's scan video so review can PLAY the
+1280:     footage with live boxes (issue #17: the box editor was scrub-only,
+1281:     'you cannot play review and see hits'). Serves the same file frame_at
+1282:     reads — for HDR/VFR jobs that is the normalized SDR scan copy, which
+1283:     every browser can decode."""
+1284:     job = JOBS.get(jid) or abort(404)
+1285:     if not (job.get("video") and os.path.exists(job["video"])):
+1286:         abort(404)
+1287:     return send_file(job["video"], conditional=True)
+1288: 
+1289: 
+1290: @app.route("/api/jobs/<jid>/detections", methods=["POST"])
+1291: def job_save_edits(jid):
+1292:     job = JOBS.get(jid) or abort(404)
+1293:     edits = request.get_json(force=True)
+1294:     path = os.path.join(job["dir"], "report.json")
+1295:     doc = _load_job_report(job)
+1296:     enabled = edits.get("enabled", {})
+1297:     for i, d in enumerate(doc["detections"]):
+1298:         if str(i) in enabled:
+1299:             d["enabled"] = bool(enabled[str(i)])
+1300:     for i, box in (edits.get("box_overrides") or {}).items():
+1301:         i = int(i)
+1302:         if 0 <= i < len(doc["detections"]) and len(box) == 4:
+1303:             doc["detections"][i]["cbox"] = [float(v) for v in box]
+1304:     for i, span in (edits.get("time_overrides") or {}).items():
+1305:         i = int(i)
+1306:         if 0 <= i < len(doc["detections"]) and len(span) == 2:
+1307:             t0, t1 = float(span[0]), float(span[1])
+1308:             if t1 > t0 >= 0:
+1309:                 doc["detections"][i]["t_start"] = t0
+1310:                 doc["detections"][i]["t_end"] = t1
+1311:                 doc["detections"][i]["last_seen"] = min(
+1312:                     max(doc["detections"][i].get("last_seen", t0), t0), t1)
+1313:     rs = doc["render_state"]
+1314:     for m in edits.get("manual", []):
+1315:         t0 = float(m["t_start"]); t1 = float(m["t_end"])
+1316:         tref = float(m.get("t_ref", t0))
+1317:         fidx = min(int(tref * rs["fps"]), len(rs["cum"]) - 1)
+1318:         ox, oy = rs["cum"][fidx]
+1319:         b = m["screen_box"]
+1320:         doc["detections"].append({
+1321:             "t_start": t0, "t_end": t1,
+1322:             "cbox": [int(b[0] - ox), int(b[1] - oy),
+1323:                      int(b[2] - ox), int(b[3] - oy)],
+1324:             "category": "manual", "text": "user-drawn", "confidence": 1.0,
+1325:             "aoff": [ox, oy], "last_seen": t0, "enabled": True})
+1326:     if "audio" in edits:
+1327:         # audio redaction spans (mute/bleep): stored in the report so the
+1328:         # --from-report render applies them and re-renders keep them
+1329:         doc["audio_redactions"] = [
+1330:             {"t0": float(s["t0"]), "t1": float(s["t1"]),
+1331:              "mode": (s.get("mode") if s.get("mode") in ("mute", "bleep")
+1332:                       else "mute")}
+1333:             for s in (edits.get("audio") or [])
+1334:             if float(s.get("t1", 0)) > float(s.get("t0", 0)) >= 0]
+1335:     with open(path, "w", encoding="utf-8") as f:
+
+e21ebdf6e3ee46e6c65050dc956a9a3459152269:openscrub_web.py:1388-1430
+1388:                 job["video"], box, t_ref, t0, t1, cb=L(), person_det=det)
+1389:             if not samples:
+1390:                 st.update(state="done", added=0,
+1391:                           error="could not track that region — try a "
+1392:                                 "larger box or a frame where it's clearer")
+1393:                 return
+1394:             doc = _load_job_report(job)
+1395:             rs = doc["render_state"]
+1396:             fps = float(rs["fps"]) or 30.0
+1397:             step = 2.0 / fps
+1398:             tid = max([d.get("track", -1) for d in doc["detections"]]
+1399:                       + [-1]) + 1
+1400:             new = []
+1401:             tcls = samples[0][4] if len(samples[0]) > 4 else None
+1402:             label = ("tracked %s" % openscrub.COCO_NAMES[tcls]
+1403:                      if tcls is not None
+1404:                      and 0 <= tcls < len(openscrub.COCO_NAMES)
+1405:                      else "tracked object")
+1406:             for s in samples:
+1407:                 t, b, score = s[0], s[1], s[2]
+1408:                 poly = s[3] if len(s) > 3 and s[3] else ()
+1409:                 fidx = min(int(t * fps), len(rs["cum"]) - 1)
+1410:                 ox, oy = rs["cum"][fidx]
+1411:                 new.append({
+1412:                     "t_start": t, "t_end": t + step * 1.2,
+1413:                     "cbox": [int(b[0] - ox), int(b[1] - oy),
+1414:                              int(b[2] - ox), int(b[3] - oy)],
+1415:                     "category": "manual", "text": label,
+1416:                     "confidence": round(float(score), 3),
+1417:                     "aoff": [ox, oy], "last_seen": t,
+1418:                     "dense": True, "track": tid, "enabled": True,
+1419:                     "poly": [[[float(x), float(y)] for x, y in c]
+1420:                              for c in poly]})
+1421:             # grace pads: cover the sub-sample sliver at both ends
+1422:             new[0]["t_start"] = max(0.0, new[0]["t_start"] - 0.25)
+1423:             new[-1]["t_end"] += 0.25
+1424:             doc["detections"].extend(new)
+1425:             path = os.path.join(job["dir"], "report.json")
+1426:             with open(path, "w", encoding="utf-8") as f:
+1427:                 json.dump(doc, f, indent=1)
+1428:             job["log"].append(
+1429:                 "      tracked object: %d position(s), %.1f-%.1fs "
+1430:                 "(review card added)" % (len(new),
+
+e21ebdf6e3ee46e6c65050dc956a9a3459152269:openscrub_web.py:2808-2815
+2808: function thumbRetry(img){
+2809:  const n=+(img.dataset.r||0);
+2810:  if(n>=3)return;
+2811:  img.dataset.r=n+1;
+2812:  setTimeout(()=>{img.src=img.src.split("?r=")[0]+"?r="+Date.now();},
+2813:             600*(n+1));
+2814: }
+2815: function setAllZd(on){document.querySelectorAll(`.det[data-cat=zdrop]`)
+
+e21ebdf6e3ee46e6c65050dc956a9a3459152269:openscrub_web.py:3236-3250
+3236: def vault_locked():
+3237:     return vault_enabled() and VAULT["key"] is None
+3238: 
+3239: 
+3240: def _vault_lock_now():
+3241:     """Encrypt the job store and forget the key. Returns files encrypted."""
+3242:     with VAULT_LOCK:
+3243:         key = VAULT["key"]
+3244:         if key is None:
+3245:             return 0
+3246:         n = vault.encrypt_tree(key, JOBS_DIR)
+3247:         VAULT["key"] = None
+3248:         return n
+3249: 
+3250: 
+
+e21ebdf6e3ee46e6c65050dc956a9a3459152269:openscrub_web.py:3723-3738
+3723:     """Re-register jobs found on disk after a restart. A job with a report
+3724:     is a reviewable job; one with an output file is a finished one — either
+3725:     way the person's work survives the server going down."""
+3726:     n = 0
+3727:     for jid in sorted(os.listdir(JOBS_DIR)):
+3728:         jdir = os.path.join(JOBS_DIR, jid)
+3729:         rep = os.path.join(jdir, "report.json")
+3730:         if not os.path.isdir(jdir):
+3731:             continue
+3732:         if os.path.exists(os.path.join(jdir, DELETE_MARKER)):
+3733:             # the user deleted this job but a file was still held open at
+3734:             # the time — finish the removal instead of resurrecting the
+3735:             # job as a zombie (restarts release whatever held the lock)
+3736:             _reap_job_dir(jdir, jid, retries=1)
+3737:             continue
+3738:         if jid in JOBS:
+
+e21ebdf6e3ee46e6c65050dc956a9a3459152269:openscrub_web.py:3780-3796
+3780:             }
+3781:             with JOBS_LOCK:
+3782:                 JOBS[jid] = job
+3783:             n += 1
+3784:             continue
+3785:         try:
+3786:             with open(rep, encoding="utf-8") as f:
+3787:                 prov = json.load(f).get("provenance", {})
+3788:             video = prov.get("input")
+3789:             if not video or not os.path.exists(video):
+3790:                 continue
+3791:             out = os.path.join(jdir, "output.mp4")
+3792:             has_out = os.path.exists(out)
+3793:             job = {
+3794:                 "id": jid, "dir": jdir, "video": video,
+3795:                 "name": os.path.basename(prov.get("original_input")
+3796:                                           or video),
+
+e21ebdf6e3ee46e6c65050dc956a9a3459152269:openscrub.py:6287-6337
+6287: def write_report(path, args, state, output_path=None):
+6288:     prov = {
+6289:         "tool": "openscrub", "version": VERSION,
+6290:         "timestamp": datetime.datetime.now().astimezone().isoformat(),
+6291:         "input": os.path.abspath(args.video),
+6292:         "input_sha256": state.get("input_sha256"),
+6293:         "original_input": (os.path.abspath(args.original_video)
+6294:                            if getattr(args, "original_video", None) else None),
+6295:         "vfr_normalized": bool(getattr(args, "original_video", None)),
+6296:         "hdr_tonemapped": bool(getattr(args, "hdr_tonemapped", False)),
+6297:         "hdr_output": bool(getattr(args, "hdr_source", None)),
+6298:         "metadata_stripped": True,   # renders pass -map_metadata -1
+6299:         "zones": getattr(args, "zones_data", None),
+6300:         "windows": getattr(args, "windows_data", None),
+6301:         "settings": _settings_dict(args),
+6302:     }
+6303:     if output_path and os.path.exists(output_path):
+6304:         prov["output"] = os.path.abspath(output_path)
+6305:         prov["output_sha256"] = sha256_file(output_path)
+6306:     doc = {
+6307:         "provenance": prov,
+6308:         "render_state": {
+6309:             "fps": state["fps"],
+6310:             "cum": [[round(x, 1), round(y, 1)] for x, y in state["cum"]],
+6311:             "bands": [[round(x, 1), round(y, 1)] for x, y in state["bands"]],
+6312:         },
+6313:         "detections": ([dict(asdict(d), enabled=True)
+6314:                         for d in state["detections"]]
+6315:                        + [dict(asdict(d), enabled=False, zone_dropped=True)
+6316:                           for d in state.get("zdropped", [])]),
+6317:     }
+6318:     # additive field: audio redaction spans survive report round-trips (the
+6319:     # web review stores them here; the render-end rewrite must not drop them)
+6320:     aspans = getattr(args, "audio_spans", None)
+6321:     if aspans:
+6322:         doc["audio_redactions"] = [
+6323:             {"t0": a, "t1": b, "mode": m} for a, b, m in aspans]
+6324:     if state.get("audio_suggestions"):
+6325:         doc["audio_suggestions"] = state["audio_suggestions"]
+6326:     if state.get("audio_transcript"):
+6327:         doc["audio_transcript"] = state["audio_transcript"]
+6328:     with open(path, "w", encoding="utf-8") as f:
+6329:         json.dump(doc, f, indent=1)
+6330:     try:
+6331:         os.chmod(path, 0o600)
+6332:     except OSError:
+6333:         pass
+6334: 
+6335: 
+6336: def load_report(path):
+6337:     """-> (detections, render_state, provenance). Accepts v3 plain-list
+
+e21ebdf6e3ee46e6c65050dc956a9a3459152269:openscrub.py:6578-6586
+6578:             cb.log(f"      reusing existing {os.path.basename(fixed)}")
+6579:         else:
+6580:             _encode(src0, fixed, cfr=True, tonemap=False, vargs=sdr_vargs)
+6581:         args.original_video = src0
+6582:         args.hdr_tonemapped = False
+6583:         args.video = fixed
+6584:         return
+6585: 
+6586:     # ---- HDR input ----
+
+e21ebdf6e3ee46e6c65050dc956a9a3459152269:openscrub.py:6662-6671
+6662:                         f"timeline ({n_cp} vs {n_ref} frames) — refusing "
+6663:                         "to scan a desynced copy (blur would land at the "
+6664:                         "wrong times)")
+6665: 
+6666:     args.original_video = src0
+6667:     args.hdr_tonemapped = True
+6668:     args.video = sdr
+6669:     if want_hdr:
+6670:         args.hdr_source = hdr_src if hdr_src else src0
+6671:         args.hdr_encoder = henc

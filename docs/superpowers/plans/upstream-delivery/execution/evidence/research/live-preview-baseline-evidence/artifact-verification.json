@@ -1,0 +1,53 @@
+{
+  "artifact_verification": "PASS",
+  "requests_verified": 6,
+  "baseline_failures_confirmed": 3,
+  "exact_splice_confirmed": true,
+  "server_shutdown_recorded": true,
+  "probe_syntax_valid": true,
+  "source_hashes_match_export": true,
+  "cases": [
+    {
+      "case": "control-A-noise",
+      "declared": 96380,
+      "received": 96380,
+      "sha256": "3a39eb931613d2a538eaf3415816e6459aa0ba9bd3d94d4c8f0ca968467f5d43",
+      "length_matches": true
+    },
+    {
+      "case": "control-B-red",
+      "declared": 3329,
+      "received": 3329,
+      "sha256": "ac757845e84629b627e18faea306583ec7dfabd22925e05b481a066d5f0e0771",
+      "length_matches": true
+    },
+    {
+      "case": "control-C-green-texture",
+      "declared": 58060,
+      "received": 58060,
+      "sha256": "dd64fc72a11615f82f8e1319b7cfbea89e00923ec41d4fa207163a1a49387e27",
+      "length_matches": true
+    },
+    {
+      "case": "read-1",
+      "declared": 96380,
+      "received": 3329,
+      "sha256": "ac757845e84629b627e18faea306583ec7dfabd22925e05b481a066d5f0e0771",
+      "length_matches": false
+    },
+    {
+      "case": "read-2",
+      "declared": 96380,
+      "received": 58060,
+      "sha256": "adae3b9f26140d45138151d04415d4be92f1d36d07f4f04db55270cf84a796d7",
+      "length_matches": false
+    },
+    {
+      "case": "stat-open-atomic",
+      "declared": 96380,
+      "received": 3329,
+      "sha256": "ac757845e84629b627e18faea306583ec7dfabd22925e05b481a066d5f0e0771",
+      "length_matches": false
+    }
+  ]
+}

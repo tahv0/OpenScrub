@@ -1,0 +1,397 @@
+
+baseline/openscrub_web.py:680-755
+680:             job["log"].append("— scan started —")
+681:             args = build_args(job)
+682:             state = openscrub.run_scan(args, cb)
+683:             openscrub.write_report(os.path.join(job["dir"], "report.json"),
+684:                                   args, state)
+685:             job["stats"] = state["stats"]
+686:             def _pregen(jid=jid):
+687:                 """One pass through the video with a single decoder:
+688:                 thumbnails come out in seconds instead of minutes.
+689:                 Sorting by reference time keeps seeks short and forward-
+690:                 only, which is what codecs are fast at."""
+691:                 try:
+692:                     jb = JOBS.get(jid)
+693:                     doc = _load_job_report(jb)
+694:                     rs = doc["render_state"]
+695:                     todo = []
+696:                     for k, d in enumerate(doc["detections"]):
+697:                         cch = os.path.join(jb["dir"], f"thumb2_{k}.jpg")
+698:                         if os.path.exists(cch):
+699:                             continue
+700:                         tref = min(max(d.get("last_seen", d["t_start"]),
+701:                                        d["t_start"]), d["t_end"])
+702:                         todo.append((tref, k, d, cch))
+703:                     todo.sort()
+704:                     cap = cv2.VideoCapture(jb["video"])
+705:                     cur = -1
+706:                     frame = None
+707:                     for tref, k, d, cch in todo:
+708:                         fidx = min(int(tref * rs["fps"]),
+709:                                    len(rs["cum"]) - 1)
+710:                         if fidx != cur:
+711:                             if 0 <= fidx - cur <= 12:
+712:                                 while cur < fidx:   # cheap forward decode
+713:                                     ok, frame = cap.read()
+714:                                     if not ok:
+715:                                         frame = None
+716:                                         break
+717:                                     cur += 1
+718:                             else:
+719:                                 cap.set(cv2.CAP_PROP_POS_FRAMES, fidx)
+720:                                 ok, frame = cap.read()
+721:                                 cur = fidx if ok else cur
+722:                                 if not ok:
+723:                                     frame = None
+724:                         if frame is None:
+725:                             continue
+726:                         ox, oy = rs["cum"][fidx]
+727:                         h, wd = frame.shape[:2]
+728:                         pad = 24
+729:                         x1 = max(0, int(d["cbox"][0] + ox) - pad)
+730:                         y1 = max(0, int(d["cbox"][1] + oy) - pad)
+731:                         x2 = min(wd, int(d["cbox"][2] + ox) + pad)
+732:                         y2 = min(h, int(d["cbox"][3] + oy) + pad)
+733:                         crop = frame[y1:y2, x1:x2].copy()
+734:                         if crop.size == 0:
+735:                             continue
+736:                         inner = crop[pad:-pad or None, pad:-pad or None]
+737:                         if not inner.size or float(inner.std()) <= 8:
+738:                             continue   # blank: leave for the on-demand
+739:                                        # path, which tries other moments
+740:                         cv2.rectangle(crop, (pad, pad),
+741:                                       (crop.shape[1] - pad,
+742:                                        crop.shape[0] - pad),
+743:                                       (0, 0, 255), 2)
+744:                         cv2.imwrite(cch, crop,
+745:                                     [cv2.IMWRITE_JPEG_QUALITY, 80])
+746:                     cap.release()
+747:                     jb["log"].append("thumbnails pre-generated "
+748:                                      f"({len(todo)})")
+749:                 except Exception:
+750:                     pass
+751:             threading.Thread(target=_pregen, daemon=True).start()
+752:             try:
+753:                 prov = _load_job_report(job).get("provenance", {})
+754:                 if (prov.get("vfr_normalized")
+755:                         and os.path.exists(prov.get("input", ""))):
+
+baseline/openscrub_web.py:1136-1154
+1136:     items = []
+1137:     for i, d in enumerate(doc["detections"]):
+1138:         items.append({"i": i, "category": d["category"], "text": d["text"],
+1139:                       "t_start": d["t_start"], "t_end": round(d["t_end"], 2),
+1140:                       "enabled": d.get("enabled", True),
+1141:                       "track": d.get("track", -1),
+1142:                       "person": d.get("person", -1),
+1143:                       "confidence": d.get("confidence", 0),
+1144:                       "zone_dropped": bool(d.get("zone_dropped"))})
+1145:     return jsonify({"detections": items,
+1146:                     "fps": doc["render_state"]["fps"],
+1147:                     "duration": len(doc["render_state"]["cum"]) /
+1148:                                 doc["render_state"]["fps"]})
+1149: 
+1150: 
+1151: @app.route("/api/jobs/<jid>/detframe/<int:i>")
+1152: def job_detframe(jid, i):
+1153:     """Full video frame at a real sighting of detection i, with its box
+1154:     outlined — the review lightbox."""
+
+baseline/openscrub_web.py:1200-1258
+1200: @app.route("/api/jobs/<jid>/thumb/<int:i>")
+1201: def job_thumb(jid, i):
+1202:     job = JOBS.get(jid) or abort(404)
+1203:     # i is already a Flask <int:> route var, but CodeQL doesn't trust the
+1204:     # converter — format it as an explicit non-negative integer so the
+1205:     # cache filename can never carry anything but digits.
+1206:     i = int(i)
+1207:     if i < 0:
+1208:         abort(404)
+1209:     cache = os.path.join(job["dir"], "thumb2_%d.jpg" % i)
+1210:     if not os.path.exists(cache):
+1211:         doc = _load_job_report(job)
+1212:         if i >= len(doc["detections"]):
+1213:             abort(404)
+1214:         d = doc["detections"][i]
+1215:         rs = doc["render_state"]
+1216:         # cut the thumbnail at a moment the detector actually SAW the object.
+1217:         # t_start can be earlier than the object's appearance (backtracking
+1218:         # deliberately moves it to just before onset) — a frame there shows
+1219:         # nothing and made review pictures mismatch their text.
+1220:         ls = min(max(d.get("last_seen", d["t_start"]), d["t_start"]),
+1221:                  d["t_end"])
+1222:         mid = (d["t_start"] + d["t_end"]) / 2
+1223:         crop = None
+1224:         pad = 24
+1225:         for tref in (ls, mid, min(d["t_start"] + 0.2, d["t_end"])):
+1226:             fidx = min(int(tref * rs["fps"]), len(rs["cum"]) - 1)
+1227:             ox, oy = rs["cum"][fidx]
+1228:             frame = _frame_at(job, tref, rs)
+1229:             if frame is None:
+1230:                 continue
+1231:             h, w = frame.shape[:2]
+1232:             x1 = max(0, int(d["cbox"][0] + ox) - pad)
+1233:             y1 = max(0, int(d["cbox"][1] + oy) - pad)
+1234:             x2 = min(w, int(d["cbox"][2] + ox) + pad)
+1235:             y2 = min(h, int(d["cbox"][3] + oy) + pad)
+1236:             c = frame[y1:y2, x1:x2]
+1237:             if c.size == 0:
+1238:                 continue
+1239:             crop = c
+1240:             inner = c[pad:-pad or None, pad:-pad or None]
+1241:             if inner.size and float(inner.std()) > 8:
+1242:                 break   # crop shows real content — use this moment
+1243:         if crop is None:
+1244:             abort(404)
+1245:         cv2.rectangle(crop, (pad, pad), (crop.shape[1] - pad,
+1246:                                          crop.shape[0] - pad), (0, 0, 255), 2)
+1247:         cv2.imwrite(cache, crop, [cv2.IMWRITE_JPEG_QUALITY, 80])
+1248:     return send_file(cache, mimetype="image/jpeg", max_age=3600)
+1249: 
+1250: 
+1251: @app.route("/api/jobs/<jid>/frame_at")
+1252: def job_frame_at(jid):
+1253:     job = JOBS.get(jid) or abort(404)
+1254:     t = max(0.0, float(request.args.get("t", 0)))
+1255:     path = (job["output"] if request.args.get("src") == "output"
+1256:             and job.get("output") else job["video"])
+1257:     cap = cv2.VideoCapture(path)
+1258:     # seek by TIMESTAMP, not frame index: the original upload is often VFR
+
+baseline/openscrub_web.py:2080-2084
+2080: let CUR=null, EN={}, MAN=[], DUR=0, POLL=null, PHIST=[], PHPH="", LOGN=0, SHELLPH=null, JOBSJSON="";
+2081: 
+2082: async function loadJobs(){
+2083:  const r=await fetch("api/jobs");
+2084:  if(r.status===423){jobs.innerHTML='<span style="color:#f87171">&#128274; locked — unlock in the Encryption panel below</span>';JOBSJSON="";return;}
+
+baseline/openscrub_web.py:2114-2120
+2114: async function openJob(id){
+2115:  CUR=id; EN={}; MAN=[]; PHIST=[]; PHPH=""; LOGN=0; SHELLPH=null;
+2116:  detail.innerHTML="";
+2117:  if(POLL)clearInterval(POLL);
+2118:  POLL=setInterval(refresh,900); refresh();
+2119: }
+2120: 
+
+baseline/openscrub_web.py:2497-2504
+2497: function beFilter(){
+2498:  BE.boxes=(BE.raw||[]).filter(b=>{
+2499:   const on=(b.i in EN)?EN[b.i]:b.enabled;   // live: review toggles apply here
+2500:   return on;
+2501:  }).map(b=>{
+2502:   let bb=b;
+2503:   if(BE.ov[b.i]){const o=BE.ov[b.i];
+2504:    bb={...b,box:[o[0]+BE.ox,o[1]+BE.oy,o[2]+BE.ox,o[3]+BE.oy]};}
+
+baseline/openscrub_web.py:2709-2820
+2709: async function loadReview(){
+2710:  showPanel("review");
+2711:  const d=await (await fetch(`api/jobs/${CUR}/detections`)).json();
+2712:  DUR=d.duration;
+2713:  const groups={}; const zdrop=[]; TRKMEM={};
+2714:  d.detections.forEach(x=>{
+2715:   EN[x.i]=x.enabled;
+2716:   if(x.zone_dropped){zdrop.push(x);return;}
+2717:   (groups[x.category]=groups[x.category]||[]).push(x);});
+2718:  let html=`<div class="card" id="review"><h2>Review — red = will be blurred,
+2719:  green = kept visible. Drag a box around several to bulk-set.</h2>
+2720:  <div class="row" style="margin:0 0 8px">
+2721:   <button class="sec" onclick="loadBoxEdit(1)">▶ Preview video &amp; edit boxes
+2722:   (before rendering)</button></div>
+2723:  <div id="beslot"></div>
+2724:  <div id="detwrap" style="position:relative;user-select:none">`;
+2725:  if(zdrop.length){
+2726:   html+=`<details style="margin:4px 0 10px;border:1px dashed #f59e0b;border-radius:9px;padding:8px 10px;background:#26200a">
+2727:    <summary style="cursor:pointer;color:#fbbf24;font-weight:600">
+2728:     ⚠ ${zdrop.length} detection(s) outside your zones — NOT blurred
+2729:     (mostly logos/labels by design; open only if something real was zoned out)
+2730:    </summary>
+2731:    <div class="row" style="margin:8px 0 4px">
+2732:     <button class="sec" onclick="setAllZd(true)">blur all of these</button>
+2733:     <button class="sec" onclick="setAllZd(false)">keep all</button></div>
+2734:    <div class="grid3">`;
+2735:   for(const x of zdrop){
+2736:    html+=`<div class="det ${EN[x.i]?'':'off'}" id="det${x.i}" data-cat="zdrop">
+2737:     <img src="api/jobs/${CUR}/thumb/${x.i}" loading="lazy"
+2738:      style="cursor:zoom-in" onclick="zoomDet(${x.i})" onerror="thumbRetry(this)">
+2739:     <div>"${x.text}" <br>${x.t_start.toFixed(1)}–${x.t_end.toFixed(1)}s</div>
+2740:     <button class="blurbtn ${EN[x.i]?"blur":"keep"}" id="bb${x.i}"
+2741:      onclick="toggleDet(${x.i})">${EN[x.i]?"Blur":"Keep"}</button>
+2742:    </div>`;
+2743:   }
+2744:   html+=`</div></details>`;
+2745:  }
+2746:  for(const[cat,rawItems] of Object.entries(groups)){
+2747:   // collapse dense tracks: one card per physical object, not per frame
+2748:   const byGroup={},items=[];
+2749:   for(const x of rawItems){
+2750:    // identity first: one card per PERSON (all their tracks); then per
+2751:    // track; ungrouped detections stand alone
+2752:    const key=x.person>=0?("p"+x.person):(x.track>=0?("t"+x.track):null);
+2753:    if(key){(byGroup[key]=byGroup[key]||[]).push(x);}
+2754:    else{TRKMEM[x.i]=[x.i];items.push(x);}
+2755:   }
+2756:   for(const [key,members] of Object.entries(byGroup)){
+2757:    members.sort((a,b)=>a.t_start-b.t_start);
+2758:    let best=members[0];             // clearest thumbnail = highest-confidence
+2759:    for(const m of members)if((m.confidence||0)>(best.confidence||0))best=m;
+2760:    const rep={...best};
+2761:    rep.t_start=members[0].t_start;
+2762:    rep.t_end=members[members.length-1].t_end;
+2763:    rep.frames=members.length;
+2764:    rep.personcard=key[0]==="p";
+2765:    TRKMEM[rep.i]=members.map(m=>m.i);
+2766:    items.push(rep);
+2767:   }
+2768:   // person cards first, then everything else chronologically
+2769:   items.sort((a,b)=>((b.personcard?1:0)-(a.personcard?1:0))||a.t_start-b.t_start);
+2770:   html+=`<h3 style="margin:10px 0 6px">${CATDN[cat]||cat} <span class="badge">${items.length}</span>
+2771:   <button class="sec" style="padding:3px 8px;font-size:12px"
+2772:    onclick="setAll('${cat}',true)">all on</button>
+2773:   <button class="sec" style="padding:3px 8px;font-size:12px"
+2774:    onclick="setAll('${cat}',false)">all off</button></h3><div class="grid3">`;
+2775:   for(const x of items){
+2776:    html+=`<div class="det ${EN[x.i]?'':'off'}" id="det${x.i}" data-cat="${cat}">
+2777:     <img src="api/jobs/${CUR}/thumb/${x.i}"
+2778:      style="cursor:zoom-in" onclick="zoomDet(${x.i})"
+2779:      onerror="thumbRetry(this)">
+2780:     <div>${x.personcard?`<b>Person ${x.person+1}</b> — one decision for ALL their appearances`:`"${x.text}"`}${x.frames?` <span class="badge">×${x.frames} frames</span>`:""}${x.confidence?` <span class="badge" title="detector confidence — low values on a non-face thumbnail usually mean a false detection">${Math.round(x.confidence*100)}%</span>`:""} <br>${x.t_start.toFixed(1)}–${x.t_end.toFixed(1)}s</div>
+2781:     <button class="blurbtn ${EN[x.i]?"blur":"keep"}" id="bb${x.i}"
+2782:      onclick="toggleDet(${x.i})">${EN[x.i]?"Blur":"Keep"}</button>
+2783:    </div>`}
+2784:   html+=`</div>`}
+2785:  html+=`</div>
+2786:  <div class="row" style="margin-top:12px">
+2787:  <button onclick="saveAndRender()">Save edits &amp; render</button>
+2788:  <span style="font-size:12px;color:#94a3b8">missed something? use
+2789:   ▶ Preview video &amp; edit boxes above — its ＋ Add box replaces the old
+2790:   add-region tool</span></div></div>`;
+2791:  const old=document.getElementById("review"); if(old)old.remove();
+2792:  detail.insertAdjacentHTML("beforeend",html);
+2793:  initMarquee();
+2794: }
+2795: 
+2796: let TRKMEM={};
+2797: function applyDet(i,blur){
+2798:  for(const m of (TRKMEM[i]||[i]))EN[m]=blur;
+2799:  const b=document.getElementById("bb"+i),t=document.getElementById("det"+i);
+2800:  if(b){b.className="blurbtn "+(blur?"blur":"keep");
+2801:        b.textContent=blur?"Blur":"Keep";}
+2802:  if(t)t.classList.toggle("off",!blur);
+2803:  if(document.getElementById("beCv")){beFilter();beDraw();}   // live sync
+2804: }
+2805: function toggleDet(i){applyDet(i,!EN[i]);}
+2806: function setAll(cat,on){document.querySelectorAll(`.det[data-cat=${cat}]`)
+2807:  .forEach(el=>applyDet(+el.id.slice(3),on));}
+2808: function thumbRetry(img){
+2809:  const n=+(img.dataset.r||0);
+2810:  if(n>=3)return;
+2811:  img.dataset.r=n+1;
+2812:  setTimeout(()=>{img.src=img.src.split("?r=")[0]+"?r="+Date.now();},
+2813:             600*(n+1));
+2814: }
+2815: function setAllZd(on){document.querySelectorAll(`.det[data-cat=zdrop]`)
+2816:  .forEach(el=>applyDet(+el.id.slice(3),on));}
+2817: 
+2818: let selSet=new Set(),marqEl=null,menuEl=null,mStart=null;
+2819: function clearSel(){
+2820:  selSet.forEach(i=>{const t=document.getElementById("det"+i);
+
+p07a/openscrub_web.py:2085-2118
+2085: let VIEW_GEN=0, EDITS=null;
+2086: const REVIEW_DRAFTS=new Map();
+2087: function emptyEditor(){return {t:0,ox:0,oy:0,boxes:[],sel:-1,ov:{},dis:{},times:{},adds:[],
+2088:  add:false,addAnchor:null,drag:null,scale:1,dur:10,
+2089:  audio:[],audioSaved:[],audioLoaded:false};}
+2090: function sameEdit(a,b){return JSON.stringify(a)===JSON.stringify(b);}
+2091: function copyEdit(a){return JSON.parse(JSON.stringify(a));}
+2092: function ownsView(id,gen){return CUR===id&&VIEW_GEN===gen;}
+2093: function saveStatus(d,message){
+2094:  d.status=message;
+2095:  if(d!==EDITS)return;
+2096:  const el=document.getElementById("reviewSaveStatus");if(el)el.textContent=message;
+2097:  document.querySelectorAll("button[data-save-edits]").forEach(b=>{b.disabled=!!d.busy;});
+2098: }
+2099: function trimReviewDraft(d){
+2100:  const b=d.editor;
+2101:  // Clean audio is fetched display state even when other edit kinds are pending.
+2102:  // An in-flight audio submission may make a toggle-back a newer pending choice.
+2103:  if(!d.audioInFlight&&sameEdit(b.audio,b.audioSaved)){
+2104:   b.audio=[];b.audioSaved=[];b.audioLoaded=false;
+2105:  }
+2106:  if(!d.busy&&!hasReviewEdits(d)){
+2107:   d.en={};d.editor=emptyEditor();
+2108:  }
+2109: }
+2110: function hasReviewEdits(d){
+2111:  const b=d.editor;
+2112:  return Object.keys(d.enabled).length||d.manual.length||b.adds.length||
+2113:   Object.keys(b.ov).length||Object.keys(b.times).length||
+2114:   !sameEdit(b.audio,b.audioSaved);
+2115: }
+2116: 
+2117: async function loadJobs(){
+2118:  const r=await fetch("api/jobs");
+
+p07a/openscrub_web.py:2148-2172
+2148:  JOBSJSON="";loadJobs();
+2149: }
+2150: async function openJob(id){
+2151:  const video=document.getElementById("beVid");
+2152:  if(video){try{video.pause();}catch(e){}}
+2153:  if(EDITS){
+2154:   // Retain edit bookkeeping, not fetched box/report/transcript display data.
+2155:   EDITS.en={};
+2156:   const b=EDITS.editor;delete b.raw;b.boxes=[];
+2157:   delete b.tlspans;delete b.audioSugg;delete b.audioTx;b.playing=false;
+2158:   trimReviewDraft(EDITS);
+2159:  }
+2160:  VIEW_GEN++;CUR=id;
+2161:  EDITS=REVIEW_DRAFTS.get(id);
+2162:  if(!EDITS){EDITS={en:{},enabled:{},manual:[],editor:emptyEditor(),busy:false,status:""};
+2163:   REVIEW_DRAFTS.set(id,EDITS);}
+2164:  EN=EDITS.en;MAN=EDITS.manual;BE=EDITS.editor;
+2165:  PHIST=[];PHPH="";LOGN=0;SHELLPH=null;
+2166:  detail.innerHTML='<div id="reviewSaveStatus" role="status" aria-live="polite" style="margin:8px 0;color:#fbbf24"></div>';
+2167:  saveStatus(EDITS,EDITS.status);
+2168: 
+2169:  if(POLL)clearInterval(POLL);
+2170:  POLL=setInterval(refresh,900); refresh();
+2171: }
+2172: 
+
+p07a/openscrub_web.py:2777-2790
+2777: async function loadReview(){
+2778:  const id=CUR,gen=VIEW_GEN;
+2779:  showPanel("review");
+2780:  const d=await (await fetch(`api/jobs/${id}/detections`)).json();
+2781:  if(!ownsView(id,gen))return;
+2782:  DUR=d.duration;
+2783:  const groups={}; const zdrop=[]; TRKMEM={};
+2784:  d.detections.forEach(x=>{
+2785:   EN[x.i]=(x.i in EDITS.enabled)?EDITS.enabled[x.i]:x.enabled;
+2786:   if(x.zone_dropped){zdrop.push(x);return;}
+2787:   (groups[x.category]=groups[x.category]||[]).push(x);});
+2788:  let html=`<div class="card" id="review"><h2>Review — red = will be blurred,
+2789:  green = kept visible. Drag a box around several to bulk-set.</h2>
+2790:  <div class="row" style="margin:0 0 8px">
+
+p07a/openscrub_web.py:2865-2880
+2865: 
+2866: let TRKMEM={};
+2867: function applyDet(i,blur){
+2868:  for(const m of (TRKMEM[i]||[i])){EN[m]=blur;EDITS.enabled[m]=blur;}
+2869:  // A toggle back while a save is pending is still a deliberate next choice.
+2870:  if(!EDITS.busy)saveStatus(EDITS,"Unsaved edits — save to include them in the render.");
+2871:  const b=document.getElementById("bb"+i),t=document.getElementById("det"+i);
+2872:  if(b){b.className="blurbtn "+(blur?"blur":"keep");
+2873:        b.textContent=blur?"Blur":"Keep";}
+2874:  if(t)t.classList.toggle("off",!blur);
+2875:  if(document.getElementById("beCv")){beFilter();beDraw();}   // live sync
+2876: }
+2877: function toggleDet(i){applyDet(i,!EN[i]);}
+2878: function setAll(cat,on){document.querySelectorAll(`.det[data-cat=${cat}]`)
+2879:  .forEach(el=>applyDet(+el.id.slice(3),on));}
+2880: function thumbRetry(img){

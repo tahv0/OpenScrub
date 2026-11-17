@@ -1,0 +1,24 @@
+{
+  "before_rows": 10,
+  "after_rows": 10,
+  "enabled_render_rows": 7,
+  "decoded_frames_checked": 60,
+  "enabled_black_regions_per_frame": 7,
+  "disabled_visible_regions_per_frame": 3,
+  "fresh_process_route_status": 200,
+  "reopened_rows": 10,
+  "shifted_indices": [],
+  "audio_fields_equal": {
+    "audio_redactions": true,
+    "audio_suggestions": true,
+    "audio_transcript": true
+  },
+  "video": "/tmp/openscrub-task64-evidence/input.avi",
+  "output": "/tmp/openscrub-task64-evidence/rendered.mp4",
+  "output_sha256": "9ff928ab4cc4d52d92723a0b34a6ea01e3d784c88c82934ad272f017ce985193",
+  "limits": [
+    "Synthetic silent footage; no audible mute/bleep quality check",
+    "Actual Flask test client; no browser or socket",
+    "No concurrent-writer safety established"
+  ]
+}

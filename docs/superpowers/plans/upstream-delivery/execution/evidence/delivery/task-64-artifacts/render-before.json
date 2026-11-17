@@ -1,0 +1,885 @@
+{
+  "provenance": {
+    "input": "/tmp/openscrub-task64-evidence/input.avi",
+    "input_sha256": "929b6cc4595d29f8db89dcaa0e6661631bb066deaa5497e874dbb6838f8c3638",
+    "output": "/stale/output.mp4",
+    "output_sha256": "stale",
+    "timestamp": "old",
+    "version": "old",
+    "future_provenance": {
+      "retain": true
+    },
+    "settings": {
+      "mode": "blur",
+      "future_setting": {
+        "x": 1
+      }
+    }
+  },
+  "render_state": {
+    "fps": 30,
+    "cum": [
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ]
+    ],
+    "bands": [
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ]
+    ],
+    "future_state": {
+      "retain": true
+    }
+  },
+  "detections": [
+    {
+      "t_start": 0.0,
+      "t_end": 1.99,
+      "cbox": [
+        2,
+        20.25,
+        14,
+        60.75
+      ],
+      "category": "name",
+      "text": "synthetic-00",
+      "confidence": 0.85000000001,
+      "aoff": [
+        0.0,
+        0.0
+      ],
+      "last_seen": 0.5,
+      "enabled": false,
+      "dense": false,
+      "track": 100,
+      "person": 200,
+      "poly": [],
+      "future_row": {
+        "nested": [
+          0,
+          null,
+          false
+        ],
+        "note": "\u96ea"
+      }
+    },
+    {
+      "t_start": 0.0,
+      "t_end": 1.99,
+      "cbox": [
+        18,
+        20.25,
+        30,
+        60.75
+      ],
+      "category": "plate",
+      "text": "synthetic-01",
+      "confidence": 0.85000000001,
+      "aoff": [
+        0.0,
+        0.0
+      ],
+      "last_seen": 0.5,
+      "enabled": true,
+      "dense": false,
+      "track": 101,
+      "person": 201,
+      "poly": [],
+      "future_row": {
+        "nested": [
+          1,
+          null,
+          false
+        ],
+        "note": "\u96ea"
+      }
+    },
+    {
+      "t_start": 0.0,
+      "t_end": 1.99,
+      "cbox": [
+        34,
+        20.25,
+        46,
+        60.75
+      ],
+      "category": "face",
+      "text": "synthetic-02",
+      "confidence": 0.85000000001,
+      "aoff": [
+        0.0,
+        0.0
+      ],
+      "last_seen": 0.5,
+      "enabled": true,
+      "dense": true,
+      "track": 102,
+      "person": 202,
+      "poly": [],
+      "future_row": {
+        "nested": [
+          2,
+          null,
+          false
+        ],
+        "note": "\u96ea"
+      }
+    },
+    {
+      "t_start": 0.0,
+      "t_end": 1.99,
+      "cbox": [
+        50,
+        20.25,
+        62,
+        60.75
+      ],
+      "category": "manual",
+      "text": "synthetic-03",
+      "confidence": 0.85000000001,
+      "aoff": [
+        0.0,
+        0.0
+      ],
+      "last_seen": 0.5,
+      "enabled": true,
+      "dense": false,
+      "track": 103,
+      "person": 203,
+      "poly": [
+        [
+          [
+            0,
+            0
+          ],
+          [
+            1,
+            0
+          ],
+          [
+            0.5,
+            1
+          ]
+        ]
+      ],
+      "future_row": {
+        "nested": [
+          3,
+          null,
+          false
+        ],
+        "note": "\u96ea"
+      }
+    },
+    {
+      "t_start": 0.0,
+      "t_end": 1.99,
+      "cbox": [
+        66,
+        20.25,
+        78,
+        60.75
+      ],
+      "category": "person",
+      "text": "synthetic-04",
+      "confidence": 0.85000000001,
+      "aoff": [
+        0.0,
+        0.0
+      ],
+      "last_seen": 0.5,
+      "enabled": false,
+      "dense": true,
+      "track": 104,
+      "person": 204,
+      "poly": [],
+      "future_row": {
+        "nested": [
+          4,
+          null,
+          false
+        ],
+        "note": "\u96ea"
+      },
+      "zone_dropped": true
+    },
+    {
+      "t_start": 0.0,
+      "t_end": 1.99,
+      "cbox": [
+        82,
+        20.25,
+        94,
+        60.75
+      ],
+      "category": "name",
+      "text": "synthetic-05",
+      "confidence": 0.85000000001,
+      "aoff": [
+        0.0,
+        0.0
+      ],
+      "last_seen": 0.5,
+      "enabled": true,
+      "dense": false,
+      "track": 105,
+      "person": 205,
+      "poly": [],
+      "future_row": {
+        "nested": [
+          5,
+          null,
+          false
+        ],
+        "note": "\u96ea"
+      }
+    },
+    {
+      "t_start": 0.0,
+      "t_end": 1.99,
+      "cbox": [
+        98,
+        20.25,
+        110,
+        60.75
+      ],
+      "category": "person",
+      "text": "synthetic-06",
+      "confidence": 0.85000000001,
+      "aoff": [
+        0.0,
+        0.0
+      ],
+      "last_seen": 0.5,
+      "enabled": true,
+      "dense": true,
+      "track": 106,
+      "person": 206,
+      "poly": [],
+      "future_row": {
+        "nested": [
+          6,
+          null,
+          false
+        ],
+        "note": "\u96ea"
+      }
+    },
+    {
+      "t_start": 0.0,
+      "t_end": 1.99,
+      "cbox": [
+        114,
+        20.25,
+        126,
+        60.75
+      ],
+      "category": "face",
+      "text": "synthetic-07",
+      "confidence": 0.85000000001,
+      "aoff": [
+        0.0,
+        0.0
+      ],
+      "last_seen": 0.5,
+      "enabled": true,
+      "dense": true,
+      "track": 107,
+      "person": 207,
+      "poly": [],
+      "future_row": {
+        "nested": [
+          7,
+          null,
+          false
+        ],
+        "note": "\u96ea"
+      }
+    },
+    {
+      "t_start": 0.0,
+      "t_end": 1.99,
+      "cbox": [
+        130,
+        20.25,
+        142,
+        60.75
+      ],
+      "category": "manual",
+      "text": "synthetic-08",
+      "confidence": 0.85000000001,
+      "aoff": [
+        0.0,
+        0.0
+      ],
+      "last_seen": 0.5,
+      "enabled": false,
+      "dense": false,
+      "track": 108,
+      "person": 208,
+      "poly": [
+        [
+          [
+            0,
+            0
+          ],
+          [
+            1,
+            0
+          ],
+          [
+            0.5,
+            1
+          ]
+        ]
+      ],
+      "future_row": {
+        "nested": [
+          8,
+          null,
+          false
+        ],
+        "note": "\u96ea"
+      }
+    },
+    {
+      "t_start": 0.0,
+      "t_end": 1.99,
+      "cbox": [
+        146,
+        20.25,
+        158,
+        60.75
+      ],
+      "category": "manual",
+      "text": "synthetic-09",
+      "confidence": 0.85000000001,
+      "aoff": [
+        0.0,
+        0.0
+      ],
+      "last_seen": 0.5,
+      "enabled": true,
+      "dense": false,
+      "track": 109,
+      "person": 209,
+      "poly": [],
+      "future_row": {
+        "nested": [
+          9,
+          null,
+          false
+        ],
+        "note": "\u96ea"
+      }
+    }
+  ],
+  "audio_redactions": [
+    {
+      "t0": 0.2,
+      "t1": 0.4,
+      "mode": "mute",
+      "future_span": {
+        "retain": true
+      }
+    }
+  ],
+  "audio_suggestions": [
+    {
+      "t0": 0.5,
+      "t1": 0.7,
+      "text": "synthetic",
+      "category": "name",
+      "future_suggestion": []
+    }
+  ],
+  "audio_transcript": [
+    [
+      0.0,
+      0.9,
+      "synthetic audio"
+    ]
+  ],
+  "future_top": {
+    "nested": [
+      false,
+      null,
+      "\u96ea"
+    ]
+  }
+}

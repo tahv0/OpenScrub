@@ -1,0 +1,29 @@
+{
+  "wheel_package": [
+    "openscrub_internal/__init__.py",
+    "openscrub_internal/reports.py"
+  ],
+  "sdist_tests": true,
+  "startup": {
+    "wheel": [
+      "/tmp/openscrub-task61/installed/openscrub.py",
+      "/tmp/openscrub-task61/installed/openscrub_web.py",
+      "/tmp/openscrub-task61/installed/openscrub_internal/reports.py"
+    ],
+    "source": [
+      "/tmp/openscrub-task61/source/openscrub-1.0.96/openscrub.py",
+      "/tmp/openscrub-task61/source/openscrub-1.0.96/openscrub_web.py",
+      "/tmp/openscrub-task61/source/openscrub-1.0.96/openscrub_internal/reports.py"
+    ]
+  },
+  "updater": {
+    "nested_package_installed": true,
+    "preserved_synthetic_sentinels": [
+      "allowlist.txt",
+      "certs/key.pem",
+      "models/synthetic.onnx",
+      "openscrub_jobs/synthetic/report.json",
+      "zones.json"
+    ]
+  }
+}

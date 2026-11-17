@@ -1,0 +1,12 @@
+{
+  "verified": true,
+  "cases": 10,
+  "children_all_waited_and_absent": 40,
+  "baseline_missing_close_reproductions": [
+    "callback cancellation",
+    "real encoder write BrokenPipeError"
+  ],
+  "donor_closes_decoder_in_both": true,
+  "weak_observer_resources_released_after_exception_release": true,
+  "diagnostic_strong_reference_required_harness_close": true
+}

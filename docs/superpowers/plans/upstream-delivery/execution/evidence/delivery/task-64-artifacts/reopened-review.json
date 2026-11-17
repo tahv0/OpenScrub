@@ -1,0 +1,129 @@
+{
+  "status": 200,
+  "body": {
+    "detections": [
+      {
+        "category": "name",
+        "confidence": 0.85000000001,
+        "enabled": false,
+        "i": 0,
+        "person": 200,
+        "t_end": 1.99,
+        "t_start": 0.0,
+        "text": "synthetic-00",
+        "track": 100,
+        "zone_dropped": false
+      },
+      {
+        "category": "plate",
+        "confidence": 0.85000000001,
+        "enabled": true,
+        "i": 1,
+        "person": 201,
+        "t_end": 1.99,
+        "t_start": 0.0,
+        "text": "synthetic-01",
+        "track": 101,
+        "zone_dropped": false
+      },
+      {
+        "category": "face",
+        "confidence": 0.85000000001,
+        "enabled": true,
+        "i": 2,
+        "person": 202,
+        "t_end": 1.99,
+        "t_start": 0.0,
+        "text": "synthetic-02",
+        "track": 102,
+        "zone_dropped": false
+      },
+      {
+        "category": "manual",
+        "confidence": 0.85000000001,
+        "enabled": true,
+        "i": 3,
+        "person": 203,
+        "t_end": 1.99,
+        "t_start": 0.0,
+        "text": "synthetic-03",
+        "track": 103,
+        "zone_dropped": false
+      },
+      {
+        "category": "person",
+        "confidence": 0.85000000001,
+        "enabled": false,
+        "i": 4,
+        "person": 204,
+        "t_end": 1.99,
+        "t_start": 0.0,
+        "text": "synthetic-04",
+        "track": 104,
+        "zone_dropped": true
+      },
+      {
+        "category": "name",
+        "confidence": 0.85000000001,
+        "enabled": true,
+        "i": 5,
+        "person": 205,
+        "t_end": 1.99,
+        "t_start": 0.0,
+        "text": "synthetic-05",
+        "track": 105,
+        "zone_dropped": false
+      },
+      {
+        "category": "person",
+        "confidence": 0.85000000001,
+        "enabled": true,
+        "i": 6,
+        "person": 206,
+        "t_end": 1.99,
+        "t_start": 0.0,
+        "text": "synthetic-06",
+        "track": 106,
+        "zone_dropped": false
+      },
+      {
+        "category": "face",
+        "confidence": 0.85000000001,
+        "enabled": true,
+        "i": 7,
+        "person": 207,
+        "t_end": 1.99,
+        "t_start": 0.0,
+        "text": "synthetic-07",
+        "track": 107,
+        "zone_dropped": false
+      },
+      {
+        "category": "manual",
+        "confidence": 0.85000000001,
+        "enabled": false,
+        "i": 8,
+        "person": 208,
+        "t_end": 1.99,
+        "t_start": 0.0,
+        "text": "synthetic-08",
+        "track": 108,
+        "zone_dropped": false
+      },
+      {
+        "category": "manual",
+        "confidence": 0.85000000001,
+        "enabled": true,
+        "i": 9,
+        "person": 209,
+        "t_end": 1.99,
+        "t_start": 0.0,
+        "text": "synthetic-09",
+        "track": 109,
+        "zone_dropped": false
+      }
+    ],
+    "duration": 2.0,
+    "fps": 30
+  }
+}

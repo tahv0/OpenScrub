@@ -1,0 +1,270 @@
+PIN e21ebdf6e3ee46e6c65050dc956a9a3459152269 openscrub_web.py
+
+288: def server_path_error(p):
+289:     """Validate a user-supplied server-side media path. The path picker is a
+290:     deliberate feature (process a file already on this machine/NAS), but the
+291:     value is request data, so it is confined BEFORE any filesystem use:
+292:     canonicalized, restricted to a known video extension, and — when
+293:     $OPENSCRUB_MEDIA_ROOT is set — required to live inside that directory
+294:     tree. Returns an error string, or None if the path is acceptable."""
+295:     # canonicalize first, then apply the containment guard up front so the
+296:     # confinement precedes EVERY filesystem access (path-injection barrier).
+297:     # The guard is unconditional: with $OPENSCRUB_MEDIA_ROOT set, the path
+298:     # must live inside that tree (real confinement — set it in any deployment
+299:     # where the browser UI shouldn't reach the whole disk). Without it, the
+300:     # picker is deliberately unrestricted (process any video already on this
+301:     # machine/NAS is the feature), so the allowed prefix degrades to the
+302:     # path's own filesystem root — the canonicalize+check still runs on
+303:     # every request path rather than only on the configured branch.
+304:     # NOTE the guard is a SINGLE startswith with an early return — the one
+305:     # shape CodeQL's path-injection barrier analysis recognizes; compound
+306:     # conditions defeat its dominance check. (The media root itself is
+307:     # correctly rejected: a directory is never a valid video file.)
+308:     p = os.path.realpath(p)
+309:     root = os.environ.get("OPENSCRUB_MEDIA_ROOT")
+310:     r = os.path.realpath(root) if root else os.path.realpath(
+311:         os.path.splitdrive(p)[0] + os.sep)
+312:     if not p.startswith(r.rstrip(os.sep) + os.sep):
+313:         return "server path is outside OPENSCRUB_MEDIA_ROOT"
+314:     if os.path.splitext(p)[1].lower() not in MEDIA_EXTS:
+315:         return ("server path must be a video file ("
+316:                 + ", ".join(sorted(MEDIA_EXTS)) + ")")
+317:     if not os.path.isfile(p):
+318:         return "server path not found or not a file"
+319:     return None
+320: 
+
+322: OPTIONS_FILE = "options.json"
+323: 
+324: 
+325: def new_job(video_path, options, name):
+326:     jid = uuid.uuid4().hex[:12]
+327:     jdir = os.path.join(JOBS_DIR, jid)
+328:     os.makedirs(jdir, exist_ok=True)
+329:     job = {
+330:         "id": jid, "dir": jdir, "video": video_path, "name": name,
+331:         "options": options, "phase": "queued", "progress": 0.0,
+332:         "eta": None, "size": 0,
+333:         "log": [], "error": None, "output": None, "created": time.time(),
+334:         "cancel": threading.Event(), "stats": {}, "qgen": 0,
+335:     }
+336:     # keep the job's settings beside its upload: a scan that never finished
+337:     # has no report to recover them from, and a Retry after a restart then
+338:     # ran with DEFAULT settings (all categories) instead of the user's own
+339:     try:
+340:         with open(os.path.join(jdir, OPTIONS_FILE), "w",
+341:                   encoding="utf-8") as f:
+342:             json.dump(options, f)
+343:     except (OSError, TypeError, ValueError):
+344:         pass
+345:     with JOBS_LOCK:
+346:         JOBS[jid] = job
+347:     return job
+348: 
+
+429: def build_args(job, for_render=False):
+430:     o = job["options"]
+431:     jdir = job["dir"]
+432:     argv = [job["video"],
+433:             "--engine", o.get("engine", "auto"),
+434:             "--device", o.get("device", "auto"),
+435:             "--encoder", o.get("encoder", "auto"),
+436:             "--mode", o.get("mode", "blur"),
+437:             "--coverage", o.get("coverage", "tight"),
+438:             "--mode-map", o.get("mode_map", ""),
+
+621: # The single job worker. WORKER["current"] is the job it is running right
+622: # now (read by Cancel and the watchdog); WORKER["thread"] is the live thread.
+623: WORKER = {"current": None, "thread": None}
+624: _ACTIVE_PHASES = ("queued", "scanning", "rendering", "queued_render")
+625: 
+626: 
+627: def enqueue(job, action):
+628:     """Queue a job action. Each enqueue bumps the job's generation, and the
+629:     worker skips any queue entry whose generation is stale — so cancelling
+630:     a queued job (which bumps it too) really removes it from the line, and
+631:     a Retry after a Cancel can't run the scan twice."""
+632:     with JOBS_LOCK:
+633:         job["qgen"] = job.get("qgen", 0) + 1
+634:         gen = job["qgen"]
+635:     WORK_Q.put((job["id"], action, gen))
+636: 
+637: 
+
+674: def _run_job(job, action):
+675:     jid = job["id"]
+676:     cb = WebCallbacks(job)
+677:     try:
+678:         if action == "scan":
+679:             job["phase"] = "scanning"
+680:             job["log"].append("— scan started —")
+681:             args = build_args(job)
+682:             state = openscrub.run_scan(args, cb)
+683:             openscrub.write_report(os.path.join(job["dir"], "report.json"),
+684:                                   args, state)
+685:             job["stats"] = state["stats"]
+686:             def _pregen(jid=jid):
+
+775:             dets, rstate, prov = openscrub.load_report(
+776:                 os.path.join(job["dir"], "report.json"))
+777:             job["phase"] = "done"
+778:             job["progress"] = 1.0
+779:             job["eta"] = None
+780:     except openscrub.PipelineCancelled:
+781:         job["phase"] = "cancelled"
+782:         job["error"] = "cancelled by user"
+783:     except BaseException as e:
+784:         # BaseException, not Exception: a SystemExit (argparse) or any other
+785:         # non-Exception escaping here used to kill the worker thread silently
+786:         msg = str(e) or type(e).__name__
+787:         if isinstance(e, SystemExit):
+788:             msg = "the job stopped unexpectedly (exit %s)" % (e.code,)
+789:         job["phase"] = "error"
+790:         job["error"] = msg
+791:         job["log"].append(f"ERROR: {msg}")
+792:     finally:
+793:         job["eta"] = None       # a dead/paused job must not show "~N left"
+
+840: @app.before_request
+841: def check_token():
+842:     if TOKEN is None:          # open mode: anyone on the network is trusted
+843:         return
+844:     tok = (request.args.get("token") or request.cookies.get("phiblur_token")
+845:            or request.headers.get("X-Token"))
+846:     if tok != TOKEN:
+847:         abort(401, "missing or wrong access token — open the URL printed "
+848:                    "at server startup (includes ?token=...)")
+849: 
+850: 
+851: @app.before_request
+852: def _touch_activity():
+853:     LAST_ACTIVITY["t"] = time.time()
+854: 
+855: 
+856: @app.before_request
+857: def enforce_vault_lock():
+858:     """While the vault is locked, every job operation is refused — the
+859:     files are ciphertext, so this fails closed rather than half-working."""
+860:     if request.path.startswith("/api/jobs") and vault_locked():
+861:         abort(423, "vault is locked — unlock it (Encryption panel) to "
+862:                    "access jobs")
+863: 
+864: 
+865: @app.before_request
+866: def refuse_upload_without_disk_room():
+867:     """Registered after auth on purpose, but still BEFORE the view runs:
+868:     by the time create_job touches request.files, werkzeug has already
+869:     spooled the whole upload into the temp dir — too late to protect the
+870:     disk. Checking the Content-Length header here reads nothing."""
+871:     if request.method == "POST" and request.path == "/api/jobs":
+872:         err = _upload_disk_error(request.content_length)
+873:         if err:
+874:             return jsonify({"error": err}), 507
+875: 
+876: 
+
+901: 
+902: @app.route("/api/jobs", methods=["POST"])
+903: def create_job():
+904:     options = json.loads(request.form.get("options", "{}"))
+905:     jobs = []
+906:     files = request.files.getlist("video")
+907:     if files and files[0].filename:
+908:         for f in files:
+909:             name = os.path.basename(f.filename.replace("\\", "/"))
+910:             # extension comes from the client: keep it only if it's a plain
+911:             # known media suffix, never splice arbitrary text into the path
+912:             ext = os.path.splitext(name)[1].lower()
+913:             if ext not in MEDIA_EXTS:
+914:                 ext = ".mp4"
+915:             job = new_job("", options, name)
+916:             path = os.path.join(job["dir"], "input" + ext)
+917:             f.save(path)
+918:             job["video"] = path
+919:             try:
+920:                 job["size"] = os.path.getsize(path)
+921:             except OSError:
+922:                 pass
+923:             enqueue(job, "scan")
+924:             jobs.append(job["id"])
+925:     elif request.form.get("server_path"):
+926:         p = os.path.realpath(request.form["server_path"].strip())
+927:         err = server_path_error(p)
+928:         if err:
+929:             return jsonify({"error": err}), 400
+930:         # Containment guard REPEATED inline before the getsize() sink below:
+931:         # server_path_error already enforces it, but CodeQL's path-injection
+932:         # barrier analysis is function-local — without this single-startswith
+933:         # shape in THIS function the alert opens (code-scanning #21, the
+934:         # v1.0.83 duplicate-upload size lookup). Same as server_video.
+935:         root = os.environ.get("OPENSCRUB_MEDIA_ROOT")
+936:         r = os.path.realpath(root) if root else os.path.realpath(
+937:             os.path.splitdrive(p)[0] + os.sep)
+938:         if not p.startswith(r.rstrip(os.sep) + os.sep):
+939:             return jsonify({"error": "server path is outside "
+940:                                      "OPENSCRUB_MEDIA_ROOT"}), 400
+941:         job = new_job(p, options, os.path.basename(p))
+942:         try:
+943:             job["size"] = os.path.getsize(p)
+944:         except OSError:
+945:             pass
+946:         enqueue(job, "scan")
+947:         jobs.append(job["id"])
+948:     else:
+949:         return jsonify({"error": "no file uploaded and no server path"}), 400
+950:     return jsonify({"jobs": jobs})
+951: 
+
+984: def job_delete(jid):
+985:     """Delete a job and every file it owns (upload, normalized video,
+986:     report, thumbnails, output). Running jobs must be cancelled first.
+987:     Deletion is GUARANTEED, not merely attempted: if a file is still
+988:     held open (Windows locks, a streaming handle, a busy network share),
+989:     a marker is written and background retries + the startup and
+990:     retention sweeps finish the removal — the old behavior popped the
+991:     job from the list FIRST and then failed, leaving an orphaned folder
+992:     the UI could no longer reach, which rose from the dead as a zombie
+993:     review job at the next restart."""
+994:     with JOBS_LOCK:
+995:         job = JOBS.get(jid)
+996:         if job is None:
+997:             abort(404)
+998:         if job.get("phase") in ("queued", "scanning", "rendering",
+999:                                 "queued_render"):
+1000:             abort(409, "job is queued or running — cancel it first")
+1001:     if _reap_job_dir(job["dir"], jid):
+1002:         with JOBS_LOCK:
+1003:             JOBS.pop(jid, None)
+1004:         return jsonify({"ok": True})
+1005:     # couldn't remove everything now: mark the dir so every future sweep
+1006:     # (background retries below, startup, retention) knows it is condemned,
+1007:     # take it out of the UI, and keep trying quietly
+1008:     try:
+
+1087:     a worker that died) is cancelled on the spot — before, Cancel only set
+1088:     a flag the worker checks mid-scan, so a job the worker never picked up
+1089:     could never be cancelled (or deleted: delete refuses active jobs)."""
+1090:     job = JOBS.get(jid) or abort(404)
+1091:     job["cancel"].set()
+1092:     with JOBS_LOCK:
+1093:         if (WORKER.get("current") != jid
+1094:                 and job.get("phase") in _ACTIVE_PHASES):
+1095:             job["qgen"] = job.get("qgen", 0) + 1   # void its queue entry
+1096:             job["phase"] = "cancelled"
+1097:             job["error"] = "cancelled by user"
+1098:             job["eta"] = None
+1099:             job["log"].append("— cancelled —")
+1100:     return jsonify({"ok": True})
+1101: 
+1102: 
+
+DONOR cd1786880f602e479d5666bef0ba90c8b03697de openscrub_web.py (generic guard only)
+921: @app.route("/api/jobs", methods=["POST"])
+922: def create_job():
+923:     try:
+924:         options = json.loads(request.form.get("options", "{}"))
+925:         if not isinstance(options, dict):
+926:             raise ValueError()
+927:     except (ValueError, TypeError):
+928:         return jsonify({"error": "Scan options must be a JSON object."}), 400
+929:     try:

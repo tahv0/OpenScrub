@@ -124,7 +124,27 @@ Preserve upstream defaults, entry points, security refreshes, declared Python fl
 - [ ] **V:** Prove unsuccessful publication preserves prior reports/output and cleans decoder/encoder processes and partial files. Cover actual SDR/HDR, direct calls and ordinary report/worker paths. Separate existing process-cleanup defects if needed to keep the delivery reviewable.
 - [ ] **D/R/L:** Describe the exact corrupt-input trigger, failure behavior and preserved valid-input defaults; report any remaining output-lifecycle limits.
 
-**Additional P16 reproduction gate:** P07a browser validation observed image/overlay scaling diverge after resizing an already-open editor from desktop to mobile without reloading or scrubbing. Its baseline regression status is unverified. Preserve the recorded steps/screenshots, reproduce against pinned Austin, and scope a separate fix only if confirmed; it is not included in P07a.
+### P16D — keep editor overlays and pointer coordinates aligned on resize
+
+**What / why:** Recompute the ordinary editor's media-to-canvas transform when its displayed size changes. Paired full-browser probes of Austin's baseline and P07a show the same existing defect: the image shrinks from 640 to 326 CSS pixels while the canvas remains 640 pixels wide with scale 1. The painted edge is displaced by 158 pixels and clicking the visible target misses it. Scrubbing or reopening restores alignment. This is a display/edit-coordinate defect, not evidence of incorrect engine masks.
+
+**When:** Separate small W1/W3 UX fix; baseline provenance is confirmed. It does not block or belong inside P07a. Reuse P07a mount/view guards only with an explicit dependency, or keep equivalent minimal ownership local when targeting Austin independently.
+
+- [ ] **I:** Keep canvas CSS/backing size, drawing and inverse pointer mapping on one current transform derived from finite positive dimensions of the visible image/video. Observe the actual mounted media/container; viewport resizing must not require a frame reload, scrub or save. Do not merely CSS-scale an unchanged hit-test surface.
+- [ ] **I:** Preserve source-space boxes/manual additions, content-space overrides and their `ox/oy` conversion, time bounds and pending drafts. Resize alone must not create/move a saved box. Handle an active gesture coherently when the transform changes, and release/invalidate observers/callbacks when the editor, job or media is replaced.
+- [ ] **V/D:** Retain actual painted-pixel and target-hit regressions; test shrink/grow, pointer add/move/corners, nonzero offsets, unchanged save coordinates, playback/image switches, zero/hidden dimensions and close/job-switch cleanup. Run suite/build and browser checks. Record high-DPR/other-engine coverage honestly. Keep mask defaults, plate-quad features and broad responsive redesign out of this PR.
+
+## N09 — close decoder stdout during ordinary HDR cleanup
+
+**What:** Explicitly close the owned decoder stdout pipe in existing HDR cancellation/encoder-write cleanup, alongside the encoder stdin and child termination/wait steps.
+
+**Why:** Actual `run_render` → `render_hdr` cancellation and injected real encoder-write failure leave decoder stdout open while a caller retains the exception traceback; both children are already reaped. Releasing the exception and collecting its frame cycle closes the pipe, so the evidence is missing deterministic cleanup, not an unconditional permanent leak. The complete pinned donor closes it immediately without section arguments.
+
+**When:** A small separate W2/W3 reliability PR from the generic two-line part of `08f432b`, independent of section features, mask changes and P16C's broader output lifecycle. The [retained baseline](execution/evidence/research/hdr-decoder-cleanup-baseline-research.md) covers ten actual cases and terminal cleanup of all 40 children.
+
+- [ ] **I/V:** Add actual HDR cancellation and encoder-write error regressions with retained traceback/handle references, asserting decoder stdout and encoder stdin are closed and both children reaped. Keep successful frame/tag and unchanged before/after output controls, using a tiny synthetic clip. Preserve raised cancellation/error semantics and the existing ordinary cleanup boundary.
+- [ ] **V/D:** Run relevant render regressions, existing suite and build; record Python/platform/encoder coverage. Explicit close does not establish an interruptible native-call deadline or cancellation latency beyond existing checkpoints.
+- [ ] **D/R/L:** Explain the concrete retained-exception case and small source provenance. Keep final encoder-wait failures, retained temporary stderr handles, arbitrary compute exceptions and prior-output publication/preservation under P16C; the baseline did not create a prior output to test its preservation.
 
 ## P17 — manual whole-plate four-corner masks
 

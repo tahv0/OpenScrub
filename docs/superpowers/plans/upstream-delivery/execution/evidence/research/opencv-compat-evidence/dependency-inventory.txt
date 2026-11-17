@@ -1,0 +1,103 @@
+openscrub_update.py:10:* pip install (the module lives in site-packages): updates via
+openscrub_update.py:11:  `pip install --upgrade OpenScrub==<latest>`.
+openscrub_update.py:83:def pip_installed():
+openscrub_update.py:127:    cmd = [sys.executable, "-m", "pip", "install", "--upgrade",
+openscrub_update.py:196:    if pip_installed():
+openscrub_update.py:229:    if os.path.isdir(os.path.join(HERE, ".git")) and not pip_installed() \
+install.py:40:CORE_PKGS = ["opencv-python", "rapidfuzz", "pytesseract", "pillow",
+install.py:140:        r = pip("install", *missing)
+install.py:161:        r = pip("install", "spacy")
+install.py:197:            r = pip("install", "paddlepaddle-gpu", "-i",
+install.py:201:                r = pip("install", "paddlepaddle")
+install.py:203:                pip("install", "-U", "nvidia-cudnn-cu12")   # cuDNN pairing
+install.py:204:            r2 = pip("install", "paddleocr")
+install.py:208:        r = pip("install", "paddlepaddle")
+install.py:209:        r2 = pip("install", "paddleocr")
+install.py:238:    pip("uninstall", "-y", "onnxruntime", "onnxruntime-directml")
+install.py:239:    r = pip("install", "onnxruntime-directml")
+install.py:244:        pip("install", "onnxruntime")
+requirements.txt:1:opencv-python
+pyproject.toml:16:    "ocr", "opencv", "ffmpeg",
+pyproject.toml:37:    "opencv-python",
+Dockerfile.cuda:21:# image below is a CUDA-built OpenCV — see docker/Dockerfile.opencv-cuda),
+Dockerfile.cuda:28:# inherited from the opencv-cuda base image, which is rebuilt rarely
+Dockerfile.cuda:29:# (docker/Dockerfile.opencv-cuda) and keeps a stable digest across releases.
+Dockerfile.cuda:31:# CUDA-enabled OpenCV base (built by .github/workflows/opencv-cuda-base.yml).
+Dockerfile.cuda:33:FROM ghcr.io/austinmabry/opencv-cuda:4.10.0-cu126
+Dockerfile.cuda:48: && pip install --no-cache-dir --upgrade pip setuptools wheel
+Dockerfile.cuda:54:# requirement EXCEPT opencv (the CPU wheel would shadow the CUDA one) and
+Dockerfile.cuda:58:RUN grep -viE '^(opencv|numpy|onnxruntime)' requirements.txt > /tmp/req.nocv \
+Dockerfile.cuda:59: && pip install --no-cache-dir -r /tmp/req.nocv \
+Dockerfile.cuda:71: && pip install --no-cache-dir --no-deps onnxruntime-gpu \
+Dockerfile.cuda:72: && pip install --no-cache-dir coloredlogs flatbuffers sympy humanfriendly \
+Dockerfile.cuda:73: && pip install --no-cache-dir paddleocr \
+Dockerfile.cuda:82: && pip install --no-cache-dir faster-whisper \
+Dockerfile.cuda:83: && (pip uninstall -y onnxruntime || true) \
+Dockerfile.cuda:84: && pip install --no-cache-dir --force-reinstall --no-deps \
+Dockerfile.cuda:93: && pip install --no-cache-dir "numpy==1.26.4" \
+Dockerfile.cuda:94: # PaddleOCR installs opencv-contrib-python from pip, which SHADOWS the
+Dockerfile.cuda:98: # still lives at /opt/opencv in the base image.
+Dockerfile.cuda:99: && pip uninstall -y opencv-python opencv-contrib-python \
+Dockerfile.cuda:100:      opencv-python-headless opencv-contrib-python-headless || true \
+Dockerfile.cuda:101: && CVSRC="$(find /opt/opencv -type d -name cv2 | head -1)" \
+Dockerfile.cuda:136:RUN pip install --no-cache-dir --no-deps .
+Dockerfile.cuda:150: && pip install --no-cache-dir --upgrade pip setuptools wheel
+openscrub_setup.py:4:`pip install OpenScrub` covers every Python dependency, but two system
+openscrub_setup.py:141:    """Start Menu + Desktop shortcuts for the web app (Windows pip installs).
+openscrub_setup.py:209:        _ok("python dependencies (opencv, flask, ...)")
+openscrub_setup.py:211:        _miss(f"python dependency broken: {e} — try: pip install --force-reinstall OpenScrub")
+openscrub_setup.py:253:              'pip install "OpenScrub[ner]" then re-run openscrub-setup')
+Dockerfile.intel:36:FROM python:3.12-slim-bookworm
+Dockerfile.intel:50: && pip install --no-cache-dir --upgrade pip setuptools wheel
+Dockerfile.intel:62: && pip install --no-cache-dir -r /tmp/req.noort \
+Dockerfile.intel:65: && pip install --no-cache-dir faster-whisper \
+Dockerfile.intel:71: && (pip uninstall -y onnxruntime || true) \
+Dockerfile.intel:72: && pip install --no-cache-dir --force-reinstall --no-deps \
+Dockerfile.intel:98:RUN pip install --no-cache-dir --no-deps .
+Dockerfile.intel:112: && pip install --no-cache-dir --upgrade pip setuptools wheel
+Dockerfile:25:FROM python:3.12-slim
+Dockerfile:36: && pip install --no-cache-dir --upgrade pip setuptools wheel
+Dockerfile:42:RUN pip install --no-cache-dir -r requirements.txt \
+Dockerfile:45: && pip install --no-cache-dir faster-whisper \
+Dockerfile:64:RUN pip install --no-cache-dir --no-deps .
+Dockerfile:78: && pip install --no-cache-dir --upgrade pip setuptools wheel
+windows/openscrub.spec:15:#   detectors; NER can be added later via a full pip install instead.
+windows/build_installer.bat:21:python -m pip install --quiet --upgrade pyinstaller || exit /b 1
+windows/build_installer.bat:31:python -m pip uninstall -y onnxruntime onnxruntime-directml >nul 2>nul
+windows/build_installer.bat:32:python -m pip install --quiet onnxruntime-directml || exit /b 1
+docker/prefetch_models.py:30:        "https://media.githubusercontent.com/media/opencv/opencv_zoo/"
+docker/prefetch_models.py:35:        "https://media.githubusercontent.com/media/opencv/opencv_zoo/"
+docker/prefetch_models.py:41:        "https://media.githubusercontent.com/media/opencv/opencv_zoo/"
+docker/prefetch_models.py:76:    """Download + sha256-verify with retries (the opencv_zoo LFS media
+docker/Dockerfile.opencv-cuda:4:# published as ghcr.io/austinmabry/opencv-cuda:<tag>, and consumed by
+docker/Dockerfile.opencv-cuda:9:# Build (manually, via .github/workflows/opencv-cuda-base.yml or locally):
+docker/Dockerfile.opencv-cuda:10:#   docker build -f docker/Dockerfile.opencv-cuda \
+docker/Dockerfile.opencv-cuda:11:#     -t ghcr.io/austinmabry/opencv-cuda:4.10.0-cu126 .
+docker/Dockerfile.opencv-cuda:13:# Why a source build: the stock opencv-python wheel is CPU-only, so
+docker/Dockerfile.opencv-cuda:55: && pip3 install --no-cache-dir numpy==1.26.4
+docker/Dockerfile.opencv-cuda:59:# opencv_contrib — both repos must be the same version.
+docker/Dockerfile.opencv-cuda:61:      https://github.com/opencv/opencv.git \
+docker/Dockerfile.opencv-cuda:63:      https://github.com/opencv/opencv_contrib.git
+docker/Dockerfile.opencv-cuda:69:RUN cmake -S opencv -B build -G Ninja \
+docker/Dockerfile.opencv-cuda:71:      -D CMAKE_INSTALL_PREFIX=/opt/opencv \
+docker/Dockerfile.opencv-cuda:72:      -D OPENCV_EXTRA_MODULES_PATH=/src/opencv_contrib/modules \
+docker/Dockerfile.opencv-cuda:84:      -D BUILD_opencv_python3=ON \
+docker/Dockerfile.opencv-cuda:85:      -D BUILD_opencv_python2=OFF \
+docker/Dockerfile.opencv-cuda:91:      -D BUILD_opencv_apps=OFF \
+docker/Dockerfile.opencv-cuda:94: && find /opt/opencv -name "*.so*" -exec strip --strip-unneeded {} + || true
+docker/Dockerfile.opencv-cuda:110: && pip3 install --no-cache-dir numpy==1.26.4 \
+docker/Dockerfile.opencv-cuda:114:COPY --from=build /opt/opencv/lib /opt/opencv/lib
+docker/Dockerfile.opencv-cuda:116: && CVDIR=$(find /opt/opencv -type d -name cv2 | head -1) \
+docker/Dockerfile.opencv-cuda:118: && echo "/opt/opencv/lib" > /etc/ld.so.conf.d/opencv.conf \
+.github/workflows/opencv-cuda-base.yml:25:      - "docker/Dockerfile.opencv-cuda"
+.github/workflows/opencv-cuda-base.yml:26:      - ".github/workflows/opencv-cuda-base.yml"
+.github/workflows/opencv-cuda-base.yml:29:      opencv_version:
+.github/workflows/opencv-cuda-base.yml:67:          file: docker/Dockerfile.opencv-cuda
+.github/workflows/opencv-cuda-base.yml:70:            OPENCV_VERSION=${{ github.event.inputs.opencv_version || '4.10.0' }}
+.github/workflows/opencv-cuda-base.yml:73:            ghcr.io/austinmabry/opencv-cuda:${{ github.event.inputs.opencv_version || '4.10.0' }}-cu126
+.github/workflows/opencv-cuda-base.yml:74:            ghcr.io/austinmabry/opencv-cuda:latest
+.github/workflows/publish.yml:28:          python-version: "3.x"
+.github/workflows/publish.yml:30:        run: python -m pip install --upgrade build
+.github/workflows/windows-installer.yml:38:          python-version: "3.12"
+.github/workflows/windows-installer.yml:41:        run: python -m pip install .
+.github/ISSUE_TEMPLATE/bug_report.md:18:- Install type: pip / Windows installer / Docker CPU / Docker CUDA / source

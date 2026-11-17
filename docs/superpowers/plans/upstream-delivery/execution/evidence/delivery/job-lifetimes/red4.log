@@ -1,0 +1,262 @@
+FFFFF                                                                    [100%]
+=================================== FAILURES ===================================
+___ test_web_decoder_exception_closes_handle_before_owner_release[mediainfo] ___
+
+store = namespace(root=PosixPath('/tmp/openscrub-task621/red4-tmp/test_web_decoder_exception_clo0/data'), jobs=PosixPath('/tmp...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x78277b1ca0c0>, url='/api/jobs/6e590850fa6d')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7827b28da990>
+endpoint = 'mediainfo'
+
+    @pytest.mark.parametrize('endpoint', ['mediainfo', 'frame_at', 'detframe/0', 'thumb/0'])
+    def test_web_decoder_exception_closes_handle_before_owner_release(store, monkeypatch, endpoint):
+        handles = []
+        class Decoder:
+            def __init__(self):
+                self.closed = False
+                handles.append(self)
+            def get(self, *args):
+                raise OSError('synthetic property read failure')
+            def set(self, *args):
+                pass
+            def read(self):
+                raise OSError('synthetic decode failure')
+            def release(self):
+                assert web.FILES.count > 0
+                assert web.VAULT_LOCK.acquire(blocking=False), 'cleanup held global guard'
+                web.VAULT_LOCK.release()
+                self.closed = True
+        monkeypatch.setattr(web.cv2, 'VideoCapture', lambda *a: Decoder())
+        assert request('get', store.url + '/' + endpoint).status_code == 500
+>       assert handles and all(handle.closed for handle in handles)
+E       assert ([<test_job_lifecycle.test_web_decoder_exception_closes_handle_before_owner_release.<locals>.Decoder object at 0x7827b28d35c0>] and False)
+E        +  where False = all(<generator object test_web_decoder_exception_closes_handle_before_owner_release.<locals>.<genexpr> at 0x78277b107b80>)
+
+tests/test_job_lifecycle.py:575: AssertionError
+------------------------------ Captured log call -------------------------------
+ERROR    openscrub_web:app.py:875 Exception on /api/jobs/6e590850fa6d/mediainfo [GET]
+Traceback (most recent call last):
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", line 1273, in job_mediainfo
+    fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+          ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_job_lifecycle.py", line 563, in get
+    raise OSError('synthetic property read failure')
+OSError: synthetic property read failure
+___ test_web_decoder_exception_closes_handle_before_owner_release[frame_at] ____
+
+store = namespace(root=PosixPath('/tmp/openscrub-task621/red4-tmp/test_web_decoder_exception_clo1/data'), jobs=PosixPath('/tmp...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x78275fbc4fe0>, url='/api/jobs/8a0b0e34636e')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7827b28ccb60>
+endpoint = 'frame_at'
+
+    @pytest.mark.parametrize('endpoint', ['mediainfo', 'frame_at', 'detframe/0', 'thumb/0'])
+    def test_web_decoder_exception_closes_handle_before_owner_release(store, monkeypatch, endpoint):
+        handles = []
+        class Decoder:
+            def __init__(self):
+                self.closed = False
+                handles.append(self)
+            def get(self, *args):
+                raise OSError('synthetic property read failure')
+            def set(self, *args):
+                pass
+            def read(self):
+                raise OSError('synthetic decode failure')
+            def release(self):
+                assert web.FILES.count > 0
+                assert web.VAULT_LOCK.acquire(blocking=False), 'cleanup held global guard'
+                web.VAULT_LOCK.release()
+                self.closed = True
+        monkeypatch.setattr(web.cv2, 'VideoCapture', lambda *a: Decoder())
+        assert request('get', store.url + '/' + endpoint).status_code == 500
+>       assert handles and all(handle.closed for handle in handles)
+E       assert ([<test_job_lifecycle.test_web_decoder_exception_closes_handle_before_owner_release.<locals>.Decoder object at 0x7827b28cfd40>] and False)
+E        +  where False = all(<generator object test_web_decoder_exception_closes_handle_before_owner_release.<locals>.<genexpr> at 0x782768570580>)
+
+tests/test_job_lifecycle.py:575: AssertionError
+------------------------------ Captured log call -------------------------------
+ERROR    openscrub_web:app.py:875 Exception on /api/jobs/8a0b0e34636e/frame_at [GET]
+Traceback (most recent call last):
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", line 1414, in job_frame_at
+    ok, fr = cap.read()
+             ^^^^^^^^^^
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_job_lifecycle.py", line 567, in read
+    raise OSError('synthetic decode failure')
+OSError: synthetic decode failure
+__ test_web_decoder_exception_closes_handle_before_owner_release[detframe/0] ___
+
+store = namespace(root=PosixPath('/tmp/openscrub-task621/red4-tmp/test_web_decoder_exception_clo2/data'), jobs=PosixPath('/tmp...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x78275fbc5da0>, url='/api/jobs/28aee540648c')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7827b28cc320>
+endpoint = 'detframe/0'
+
+    @pytest.mark.parametrize('endpoint', ['mediainfo', 'frame_at', 'detframe/0', 'thumb/0'])
+    def test_web_decoder_exception_closes_handle_before_owner_release(store, monkeypatch, endpoint):
+        handles = []
+        class Decoder:
+            def __init__(self):
+                self.closed = False
+                handles.append(self)
+            def get(self, *args):
+                raise OSError('synthetic property read failure')
+            def set(self, *args):
+                pass
+            def read(self):
+                raise OSError('synthetic decode failure')
+            def release(self):
+                assert web.FILES.count > 0
+                assert web.VAULT_LOCK.acquire(blocking=False), 'cleanup held global guard'
+                web.VAULT_LOCK.release()
+                self.closed = True
+        monkeypatch.setattr(web.cv2, 'VideoCapture', lambda *a: Decoder())
+        assert request('get', store.url + '/' + endpoint).status_code == 500
+>       assert handles and all(handle.closed for handle in handles)
+E       assert ([<test_job_lifecycle.test_web_decoder_exception_closes_handle_before_owner_release.<locals>.Decoder object at 0x7827b28ce3f0>] and False)
+E        +  where False = all(<generator object test_web_decoder_exception_closes_handle_before_owner_release.<locals>.<genexpr> at 0x782768570280>)
+
+tests/test_job_lifecycle.py:575: AssertionError
+------------------------------ Captured log call -------------------------------
+ERROR    openscrub_web:app.py:875 Exception on /api/jobs/28aee540648c/detframe/0 [GET]
+Traceback (most recent call last):
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", line 1312, in job_detframe
+    frame = _frame_at(job, tref, rs)
+            ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", line 1262, in _frame_at
+    ok, frame = cap.read()
+                ^^^^^^^^^^
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_job_lifecycle.py", line 567, in read
+    raise OSError('synthetic decode failure')
+OSError: synthetic decode failure
+____ test_web_decoder_exception_closes_handle_before_owner_release[thumb/0] ____
+
+store = namespace(root=PosixPath('/tmp/openscrub-task621/red4-tmp/test_web_decoder_exception_clo3/data'), jobs=PosixPath('/tmp...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x78275fbc62a0>, url='/api/jobs/b95dad42bbb3')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7827b28cc950>
+endpoint = 'thumb/0'
+
+    @pytest.mark.parametrize('endpoint', ['mediainfo', 'frame_at', 'detframe/0', 'thumb/0'])
+    def test_web_decoder_exception_closes_handle_before_owner_release(store, monkeypatch, endpoint):
+        handles = []
+        class Decoder:
+            def __init__(self):
+                self.closed = False
+                handles.append(self)
+            def get(self, *args):
+                raise OSError('synthetic property read failure')
+            def set(self, *args):
+                pass
+            def read(self):
+                raise OSError('synthetic decode failure')
+            def release(self):
+                assert web.FILES.count > 0
+                assert web.VAULT_LOCK.acquire(blocking=False), 'cleanup held global guard'
+                web.VAULT_LOCK.release()
+                self.closed = True
+        monkeypatch.setattr(web.cv2, 'VideoCapture', lambda *a: Decoder())
+        assert request('get', store.url + '/' + endpoint).status_code == 500
+>       assert handles and all(handle.closed for handle in handles)
+E       assert ([<test_job_lifecycle.test_web_decoder_exception_closes_handle_before_owner_release.<locals>.Decoder object at 0x7827b3abb9b0>] and False)
+E        +  where False = all(<generator object test_web_decoder_exception_closes_handle_before_owner_release.<locals>.<genexpr> at 0x782768571540>)
+
+tests/test_job_lifecycle.py:575: AssertionError
+------------------------------ Captured log call -------------------------------
+ERROR    openscrub_web:app.py:875 Exception on /api/jobs/b95dad42bbb3/thumb/0 [GET]
+Traceback (most recent call last):
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", line 1378, in job_thumb
+    frame = _frame_at(job, tref, rs)
+            ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", line 1262, in _frame_at
+    ok, frame = cap.read()
+                ^^^^^^^^^^
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_job_lifecycle.py", line 567, in read
+    raise OSError('synthetic decode failure')
+OSError: synthetic decode failure
+____ test_tracking_receives_prompt_cancel_signal_through_existing_callback _____
+
+store = namespace(root=PosixPath('/tmp/openscrub-task621/red4-tmp/test_tracking_receives_prompt_0/data'), jobs=PosixPath('/tmp...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x78275fbc6480>, url='/api/jobs/92fd777ff9ad')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7827b28cc890>
+
+    def test_tracking_receives_prompt_cancel_signal_through_existing_callback(store, monkeypatch):
+        entered, checked = threading.Event(), threading.Event()
+        observed, threads = [], []
+        def compute(*args, **kwargs):
+            entered.set()
+            assert store.job['cancel'].wait(8)
+            observed.append(kwargs['cb'].cancelled())
+            checked.set()
+            return []
+        monkeypatch.setattr(openscrub, 'PersonDetector', lambda *a, **k: None)
+        monkeypatch.setattr(openscrub, 'track_manual_region', compute)
+        real_start = web._start_owned_thread
+        def start(*args):
+            thread = real_start(*args)
+            threads.append(thread)
+            return thread
+        monkeypatch.setattr(web, '_start_owned_thread', start)
+        try:
+            assert request('post', store.url + '/track_object', json={'box':[0,0,8,8], 't_ref':0, 't0':0, 't1':1}).status_code == 200
+            assert entered.wait(5)
+            assert request('post', store.url + '/cancel').status_code == 200
+            assert checked.wait(5)
+        finally:
+            store.job['cancel'].set()
+            for thread in threads:
+                thread.join(8)
+                assert not thread.is_alive()
+>       assert observed == [True]
+E       assert [False] == [True]
+E         
+E         At index 0 diff: False != True
+E         Use -v to get more diff
+
+tests/test_job_lifecycle.py:606: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_job_lifecycle.py::test_web_decoder_exception_closes_handle_before_owner_release[mediainfo]
+FAILED tests/test_job_lifecycle.py::test_web_decoder_exception_closes_handle_before_owner_release[frame_at]
+FAILED tests/test_job_lifecycle.py::test_web_decoder_exception_closes_handle_before_owner_release[detframe/0]
+FAILED tests/test_job_lifecycle.py::test_web_decoder_exception_closes_handle_before_owner_release[thumb/0]
+FAILED tests/test_job_lifecycle.py::test_tracking_receives_prompt_cancel_signal_through_existing_callback
+5 failed, 17 deselected in 0.14s

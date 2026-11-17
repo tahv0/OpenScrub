@@ -1,0 +1,46 @@
+{
+  "reviewed_base": "3795d49f6293baf7b8c35534862a4881447e1b16",
+  "fix_base": "4479b57612f4e5c463d31900f76277a5fcebb8a9",
+  "head": "c697d5a686d4dccbdf4f474567628d5d24e75a03",
+  "python39_grammar_all_packaged_python": true,
+  "exact_packaged_source_and_test_bytes": true,
+  "engine_only_private_input_pin_and_settings_exclusion": true,
+  "unchanged_default_engine_source_selection_branch": true,
+  "js_changed_functions": [
+    "persistFailure",
+    "loadPersist",
+    "clearPersist",
+    "rmPersist"
+  ],
+  "other_js_exactly_unchanged": true,
+  "web_python_changed_functions": [
+    "_reserve_files_locked",
+    "_reserve_queue_locked",
+    "_run_job",
+    "_select_render_input",
+    "_source_job_locked",
+    "allowlist",
+    "enforce_vault_lock",
+    "enqueue",
+    "job_render"
+  ],
+  "project_and_build_metadata_unchanged": true,
+  "actual_source_updater_inclusion": true,
+  "static_container_and_frozen_inclusion": true,
+  "source_sha256": {
+    "openscrub.py": "c500dfd91d2fd038c4792bd32900894745c5009fce839b10f8d747dc4dc30591",
+    "openscrub_web.py": "53385453acaaa1c15d57808c502775bfdfbcb5d778d08ac4217768674e1a60d8",
+    "openscrub_internal/__init__.py": "c35c063c010e329c5dad13782e7b67438ed4b2d1faf975d4f01be2773a18e022",
+    "openscrub_internal/lifetimes.py": "db2de8b7b38181909bebdf370dddd06a3b9b89a1b87292a72a72db4f0b1c927f",
+    "openscrub_internal/reports.py": "e8a7429c0b5430ee290f6635ca5d5a93445d3f0fe9bb0f58e57fec891ee01b7f"
+  },
+  "sdist_tests": [
+    "tests/test_job_lifecycle.py",
+    "tests/test_job_response_lifetime.py",
+    "tests/test_job_source_allowlist_lifecycle.py",
+    "tests/test_large_report_io.py",
+    "tests/test_report_roundtrip.py",
+    "tests/test_review_save_failures.py",
+    "tests/test_vault_cleanup.py"
+  ]
+}

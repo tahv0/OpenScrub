@@ -1,0 +1,20 @@
+installed 3.9.25 /tmp/openscrub-python39-20261117/venv/lib/python3.9/site-packages/openscrub.py
+synthetic OpenCV/NumPy PNG roundtrip: 32x24 exact
+GET / -> 200; UI present; no-store
+GET /api/jobs -> 200; list
+GET /api/models/face -> 200; dict
+GET /api/model_status -> 200; dict
+GET /api/vault -> 200; dict
+POST /api/jobs synthetic missing path -> 400
+GET /zones -> redirect /
+explicit outward model fetch blocked before networking
+Traceback (most recent call last):
+  File "/tmp/openscrub-python39-20261117/harness/smoke.py", line 56, in <module>
+    socket.create_connection(('192.0.2.1', 443), timeout=0.1)
+  File "/tmp/openscrub-python39-20261117/python/cpython-3.9-linux-x86_64-gnu/lib/python3.9/socket.py", line 856, in create_connection
+    raise err
+  File "/tmp/openscrub-python39-20261117/python/cpython-3.9-linux-x86_64-gnu/lib/python3.9/socket.py", line 839, in create_connection
+    sock = socket(af, socktype, proto)
+  File "/tmp/openscrub-python39-20261117/python/cpython-3.9-linux-x86_64-gnu/lib/python3.9/socket.py", line 232, in __init__
+    _socket.socket.__init__(self, family, type, proto, fileno)
+PermissionError: [Errno 1] Operation not permitted

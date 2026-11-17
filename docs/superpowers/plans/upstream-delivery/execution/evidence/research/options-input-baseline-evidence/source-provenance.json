@@ -1,0 +1,15 @@
+{
+  "commit": "e21ebdf6e3ee46e6c65050dc956a9a3459152269",
+  "tree": "795af785b672d397d2e287b5b963c10dcc4dbdf8",
+  "full_archive_sha256": "c44d383d99f4c3f9857331dfd8dda23ee5080abb6a57b5809dba9a586b2de17f",
+  "full_export_file_count": 113,
+  "all_export_files_match_git_archive_after_execution": true,
+  "active_native_worktree_imported": false,
+  "imports": {
+    "core": "/tmp/openscrub-options-input-20261117/source/openscrub.py",
+    "web": "/tmp/openscrub-options-input-20261117/source/openscrub_web.py"
+  },
+  "donor_guard_commit": "cd1786880f602e479d5666bef0ba90c8b03697de",
+  "product_or_git_changes": false,
+  "runtime_removed": true
+}

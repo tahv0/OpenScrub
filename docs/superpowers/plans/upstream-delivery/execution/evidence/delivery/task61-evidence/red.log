@@ -1,0 +1,97 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+_________ test_failed_report_write_preserves_previous_bytes[encoding] __________
+
+review = namespace(path=PosixPath('/tmp/openscrub-task61/red/test_failed_report_write_prese0/jobs/synthetic/report.json'), doc=...'t1': 0.2, 'mode': 'mute'}], 'custom_future_field': {'preserved': True}}, client=<FlaskClient <Flask 'openscrub_web'>>)
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x793441774bc0>
+failure = 'encoding'
+
+    @pytest.mark.parametrize('failure', ['encoding', 'write'])
+    def test_failed_report_write_preserves_previous_bytes(review, monkeypatch, failure):
+        """Opening/truncating the final destination before JSON completes loses work."""
+        previous = review.path.read_bytes()
+        def fail(doc, stream, **kwargs):
+            if failure == 'write':
+                stream.write('{"interrupted":')
+                raise OSError('injected write failure')
+            raise TypeError('injected encoding failure')
+        monkeypatch.setattr(_publisher(), 'json', SimpleNamespace(dump=fail, load=json.load))
+        response = review.client.post('/api/jobs/synthetic/detections',
+                                      json={'enabled': {'0': False}})
+        assert response.status_code == 500
+>       assert review.path.read_bytes() == previous
+E       assert b'' == b'{\n "proven...: true\n }\n}'
+E         
+E         Use -v to get more diff
+
+tests/test_large_report_io.py:63: AssertionError
+------------------------------ Captured log call -------------------------------
+ERROR    openscrub_web:app.py:875 Exception on /api/jobs/synthetic/detections [POST]
+Traceback (most recent call last):
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", line 1336, in job_save_edits
+    json.dump(doc, f, indent=1)
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py", line 58, in fail
+    raise TypeError('injected encoding failure')
+TypeError: injected encoding failure
+___________ test_failed_report_write_preserves_previous_bytes[write] ___________
+
+review = namespace(path=PosixPath('/tmp/openscrub-task61/red/test_failed_report_write_prese1/jobs/synthetic/report.json'), doc=...'t1': 0.2, 'mode': 'mute'}], 'custom_future_field': {'preserved': True}}, client=<FlaskClient <Flask 'openscrub_web'>>)
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x793441789fd0>
+failure = 'write'
+
+    @pytest.mark.parametrize('failure', ['encoding', 'write'])
+    def test_failed_report_write_preserves_previous_bytes(review, monkeypatch, failure):
+        """Opening/truncating the final destination before JSON completes loses work."""
+        previous = review.path.read_bytes()
+        def fail(doc, stream, **kwargs):
+            if failure == 'write':
+                stream.write('{"interrupted":')
+                raise OSError('injected write failure')
+            raise TypeError('injected encoding failure')
+        monkeypatch.setattr(_publisher(), 'json', SimpleNamespace(dump=fail, load=json.load))
+        response = review.client.post('/api/jobs/synthetic/detections',
+                                      json={'enabled': {'0': False}})
+        assert response.status_code == 500
+>       assert review.path.read_bytes() == previous
+E       assert b'{"interrupted":' == b'{\n "proven...: true\n }\n}'
+E         
+E         At index 1 diff: b'"' != b'\n'
+E         Use -v to get more diff
+
+tests/test_large_report_io.py:63: AssertionError
+------------------------------ Captured log call -------------------------------
+ERROR    openscrub_web:app.py:875 Exception on /api/jobs/synthetic/detections [POST]
+Traceback (most recent call last):
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", line 1336, in job_save_edits
+    json.dump(doc, f, indent=1)
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py", line 57, in fail
+    raise OSError('injected write failure')
+OSError: injected write failure
+=========================== short test summary info ============================
+FAILED tests/test_large_report_io.py::test_failed_report_write_preserves_previous_bytes[encoding]
+FAILED tests/test_large_report_io.py::test_failed_report_write_preserves_previous_bytes[write]
+2 failed in 0.04s

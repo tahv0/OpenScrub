@@ -1,0 +1,88 @@
+FE                                                                       [100%]
+==================================== ERRORS ====================================
+_ ERROR at teardown of test_intake_owns_new_job_after_cancel_and_before_upload_finishes _
+
+tmp_path = PosixPath('/tmp/openscrub-task621/red11-tmp/test_intake_owns_new_job_after0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7e5eba3f5940>
+
+    @pytest.fixture
+    def store(tmp_path, monkeypatch):
+        root = tmp_path / 'data'
+        root.mkdir()
+        jobs = root / 'jobs'
+        jobs.mkdir()
+        monkeypatch.setattr(web, '_data_root', lambda: str(root))
+        monkeypatch.setattr(web, 'JOBS_DIR', str(jobs))
+        monkeypatch.setattr(web, 'JOBS', {})
+        monkeypatch.setattr(web, 'WORK_Q', queue.Queue())
+        monkeypatch.setattr(web, 'WORKER', {'current': None, 'thread': None})
+        monkeypatch.setattr(web, 'VAULT', {'key': None})
+        # A fresh ownership domain isolates every route schedule, once implemented.
+        if hasattr(web, 'FILES'):
+            monkeypatch.setattr(web, 'FILES', type(web.FILES)(web.VAULT_LOCK))
+        monkeypatch.setattr(web, 'TOKEN', None)
+        monkeypatch.setitem(web.app.config, 'TESTING', False)
+        monkeypatch.setitem(web.app.config, 'PROPAGATE_EXCEPTIONS', False)
+        job = web.new_job('', {}, 'synthetic.avi')
+        video = Path(job['dir']) / 'input.avi'
+        video.write_bytes(b'synthetic video')
+        job.update(video=str(video), phase='review')
+        doc = {'provenance': {'input': str(video), 'settings': {}},
+               'render_state': {'fps': 30, 'cum': [[0, 0]] * 30},
+               'detections': [dict(t_start=0, t_end=1, cbox=[1, 2, 8, 9],
+                                  category='name', text='synthetic', confidence=.9,
+                                  aoff=[0, 0], last_seen=.5, enabled=True)],
+               'custom': {'preserved': True}}
+        path = Path(job['dir']) / 'report.json'
+        path.write_text(json.dumps(doc))
+        def enable():
+            key = vault.create_keystore(str(root), 'synthetic-password')
+            web.VAULT['key'] = key
+            return key
+        result = SimpleNamespace(root=root, jobs=jobs, job=job, path=path,
+                                 doc=doc, enable=enable,
+                                 url='/api/jobs/' + job['id'])
+        yield result
+        if hasattr(web, 'FILES'):
+>           assert web.FILES.count == 0, 'file ownership leaked'
+E           AssertionError: file ownership leaked
+E           assert 1 == 0
+E            +  where 1 = <openscrub_internal.lifetimes.FileOwners object at 0x7e5eba3f58b0>.count
+E            +    where <openscrub_internal.lifetimes.FileOwners object at 0x7e5eba3f58b0> = web.FILES
+
+tests/test_job_lifecycle.py:57: AssertionError
+=================================== FAILURES ===================================
+_______ test_intake_owns_new_job_after_cancel_and_before_upload_finishes _______
+
+store = namespace(root=PosixPath('/tmp/openscrub-task621/red11-tmp/test_intake_owns_new_job_after0/data'), jobs=PosixPath('/tm...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7e5e82b94540>, url='/api/jobs/0083e8aa5c03')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7e5eba3f5940>
+
+    def test_intake_owns_new_job_after_cancel_and_before_upload_finishes(store, monkeypatch):
+        import io
+        from werkzeug.datastructures import FileStorage
+        entered, release = threading.Event(), threading.Event()
+        real_save = FileStorage.save
+        created = []
+        def save(upload, destination, *args, **kwargs):
+            created.append(next(j for j in web.JOBS.values() if j is not store.job))
+            entered.set()
+            assert release.wait(8)
+            return real_save(upload, destination, *args, **kwargs)
+        monkeypatch.setattr(FileStorage, 'save', save)
+        call = start_call('post', '/api/jobs', data={'video': (io.BytesIO(b'synthetic intake'), 'intake.avi')})
+        try:
+            assert entered.wait(5)
+            job = created[0]
+            url = '/api/jobs/' + job['id']
+            assert request('post', url + '/cancel').status_code == 200
+            assert request('delete', url).status_code == 409
+>           assert request('post', url + '/retry').status_code == 409
+E           AssertionError: assert 410 == 409
+E            +  where 410 = <WrapperTestResponse 84 bytes [410 GONE]>.status_code
+E            +    where <WrapperTestResponse 84 bytes [410 GONE]> = request('post', ('/api/jobs/dbecbc1edc42' + '/retry'))
+
+tests/test_job_lifecycle.py:229: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_job_lifecycle.py::test_intake_owns_new_job_after_cancel_and_before_upload_finishes
+ERROR tests/test_job_lifecycle.py::test_intake_owns_new_job_after_cancel_and_before_upload_finishes
+1 failed, 37 deselected, 1 error in 0.16s

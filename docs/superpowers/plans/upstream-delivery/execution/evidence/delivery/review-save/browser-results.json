@@ -1,0 +1,149 @@
+{
+  "environment": {
+    "browser": "Chromium headless Linux",
+    "plugin": "Browser plugin not available",
+    "viewports": [
+      "1365x1000",
+      "390x844"
+    ]
+  },
+  "identity": {
+    "url": "http://127.0.0.1:18487/",
+    "title": "OpenScrub",
+    "nonblank": true,
+    "overlay": 0
+  },
+  "errors": [],
+  "warnings": [
+    "Failed to load resource: the server responded with a status of 409 (Conflict)",
+    "Failed to load resource: the server responded with a status of 423 (Locked)",
+    "Failed to load resource: the server responded with a status of 500 (Internal Server Error)",
+    "Failed to load resource: net::ERR_FAILED",
+    "Failed to load resource: the server responded with a status of 409 (Conflict)",
+    "Failed to load resource: the server responded with a status of 423 (Locked)",
+    "Failed to load resource: the server responded with a status of 500 (Internal Server Error)",
+    "Failed to load resource: net::ERR_FAILED",
+    "Failed to load resource: the server responded with a status of 423 (Locked)",
+    "Failed to load resource: the server responded with a status of 500 (Internal Server Error)"
+  ],
+  "results": [
+    {
+      "case": "review 409",
+      "passed": true
+    },
+    {
+      "case": "review 423",
+      "passed": true
+    },
+    {
+      "case": "review 500",
+      "passed": true
+    },
+    {
+      "case": "review network",
+      "passed": true
+    },
+    {
+      "case": "review json",
+      "passed": true
+    },
+    {
+      "case": "review body",
+      "passed": true
+    },
+    {
+      "case": "editor 409",
+      "passed": true
+    },
+    {
+      "case": "editor 423",
+      "passed": true
+    },
+    {
+      "case": "editor 500",
+      "passed": true
+    },
+    {
+      "case": "editor network",
+      "passed": true
+    },
+    {
+      "case": "editor json",
+      "passed": true
+    },
+    {
+      "case": "editor body",
+      "passed": true
+    },
+    {
+      "case": "deferred newer edits + cross-button duplicate submit",
+      "passed": true
+    },
+    {
+      "case": "A B A late ack",
+      "passed": true
+    },
+    {
+      "case": "A B A late rejection",
+      "passed": true
+    },
+    {
+      "case": "allowlist await preserves new choice",
+      "passed": true
+    },
+    {
+      "case": "render rejection retries without committed manual additions",
+      "passed": true
+    },
+    {
+      "case": "actual HTTP save + engine render",
+      "passed": true,
+      "payload": {
+        "enabled": {
+          "0": false
+        },
+        "manual": [
+          {
+            "t_start": 0,
+            "t_end": 2,
+            "t_ref": 0,
+            "screen_box": [
+              50,
+              60,
+              110,
+              120
+            ]
+          }
+        ],
+        "box_overrides": {
+          "1": [
+            160,
+            50,
+            250,
+            140
+          ]
+        },
+        "time_overrides": {
+          "1": [
+            0.2,
+            1.8
+          ]
+        },
+        "audio": [
+          {
+            "t0": 0,
+            "t1": 0.3,
+            "mode": "mute"
+          },
+          {
+            "t0": 0.800000037531226,
+            "t1": 1.400000018765613,
+            "mode": "mute"
+          }
+        ]
+      },
+      "phase": "done",
+      "outputBytes": 10167
+    }
+  ]
+}

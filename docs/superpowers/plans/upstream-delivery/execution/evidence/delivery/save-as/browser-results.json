@@ -1,0 +1,585 @@
+{
+  "url": "http://127.0.0.1:18484/",
+  "title": "OpenScrub",
+  "viewports": [
+    "1365x950",
+    "390x844"
+  ],
+  "facts": {
+    "accepted": 268435456,
+    "fileSize": 268435456,
+    "maxAhead": 2097152,
+    "maxChunk": 2097152,
+    "maxInflight": 1
+  },
+  "overflow": {
+    "width": 390,
+    "body": 390,
+    "exportWidth": 326
+  },
+  "errors": [],
+  "consoleWarnings": [
+    "Failed to load resource: net::ERR_FAILED"
+  ],
+  "exportRequests": [
+    "http://127.0.0.1:18484/api/jobs/alpha/download",
+    "http://127.0.0.1:18484/api/jobs/alpha/download",
+    "http://127.0.0.1:18484/api/jobs/alpha/download",
+    "http://127.0.0.1:18484/api/jobs/alpha/download",
+    "http://127.0.0.1:18484/api/jobs/alpha/report",
+    "http://127.0.0.1:18484/api/jobs/alpha/report",
+    "http://127.0.0.1:18484/api/jobs/alpha/report"
+  ],
+  "samples": [
+    {
+      "time": 1794864357252,
+      "usedSize": 4121700,
+      "totalSize": 8265728,
+      "embedderHeapUsedSize": 75425472,
+      "backingStorageSize": 7556010,
+      "ui": "Saving video — 4.9 MB / 268.4 MB (1%) · 1 s elapsed",
+      "accepted": 5158028,
+      "fetched": 5161028
+    },
+    {
+      "time": 1794864358252,
+      "usedSize": 7141828,
+      "totalSize": 10362880,
+      "embedderHeapUsedSize": 89152848,
+      "backingStorageSize": 10563921,
+      "ui": "Saving video — 7.9 MB / 268.4 MB (2%) · 2 s elapsed",
+      "accepted": 8162888,
+      "fetched": 8164388
+    },
+    {
+      "time": 1794864359252,
+      "usedSize": 7474316,
+      "totalSize": 13246464,
+      "embedderHeapUsedSize": 102995360,
+      "backingStorageSize": 13396332,
+      "ui": "Saving video — 10.1 MB / 268.4 MB (3%) · 2 s elapsed",
+      "accepted": 10992248,
+      "fetched": 10993748
+    },
+    {
+      "time": 1794864360252,
+      "usedSize": 6888580,
+      "totalSize": 14557184,
+      "embedderHeapUsedSize": 117657440,
+      "backingStorageSize": 14306559,
+      "ui": "Saving video — 11.9 MB / 268.4 MB (4%) · 4 s elapsed · 3.0 MB/s · about 1 min 26 s left",
+      "accepted": 11896328,
+      "fetched": 11899328
+    },
+    {
+      "time": 1794864361252,
+      "usedSize": 6944940,
+      "totalSize": 14557184,
+      "embedderHeapUsedSize": 126408016,
+      "backingStorageSize": 14306646,
+      "ui": "Saving video — 11.9 MB / 268.4 MB (4%) · 5 s elapsed · 2.4 MB/s · about 1 min 47 s left",
+      "accepted": 11896328,
+      "fetched": 11899328
+    },
+    {
+      "time": 1794864362252,
+      "usedSize": 6999536,
+      "totalSize": 14557184,
+      "embedderHeapUsedSize": 126371576,
+      "backingStorageSize": 14306733,
+      "ui": "Saving video — 11.9 MB / 268.4 MB (4%) · 6 s elapsed · 2.0 MB/s · about 2 min 9 s left",
+      "accepted": 11896328,
+      "fetched": 11899328
+    },
+    {
+      "time": 1794864363252,
+      "usedSize": 7054800,
+      "totalSize": 14557184,
+      "embedderHeapUsedSize": 126499168,
+      "backingStorageSize": 14306819,
+      "ui": "Saving video — 11.9 MB / 268.4 MB (4%) · 7 s elapsed · 1.7 MB/s · about 2 min 30 s left",
+      "accepted": 11896328,
+      "fetched": 11899328
+    },
+    {
+      "time": 1794864364252,
+      "usedSize": 7104620,
+      "totalSize": 14557184,
+      "embedderHeapUsedSize": 126576280,
+      "backingStorageSize": 14306906,
+      "ui": "Saving video — 11.9 MB / 268.4 MB (4%) · 8 s elapsed · 1.5 MB/s · about 2 min 52 s left",
+      "accepted": 11896328,
+      "fetched": 11899328
+    },
+    {
+      "time": 1794864365252,
+      "usedSize": 7383288,
+      "totalSize": 14557184,
+      "embedderHeapUsedSize": 128792920,
+      "backingStorageSize": 14352371,
+      "ui": "Waiting for data or disk… — 11.9 MB / 268.4 MB (4%) · 9 s elapsed",
+      "accepted": 11942828,
+      "fetched": 11944328
+    },
+    {
+      "time": 1794864366252,
+      "usedSize": 4527076,
+      "totalSize": 10625024,
+      "embedderHeapUsedSize": 62624600,
+      "backingStorageSize": 1773385,
+      "ui": "Saving video — 13.8 MB / 268.4 MB (5%) · 9 s elapsed · 1.4 MB/s · about 3 min 0 s left",
+      "accepted": 14755064,
+      "fetched": 14756564
+    },
+    {
+      "time": 1794864367253,
+      "usedSize": 5062064,
+      "totalSize": 10625024,
+      "embedderHeapUsedSize": 63638760,
+      "backingStorageSize": 4749049,
+      "ui": "Saving video — 16.7 MB / 268.4 MB (6%) · 10 s elapsed · 1.3 MB/s · about 3 min 15 s left",
+      "accepted": 17730548,
+      "fetched": 17735048
+    },
+    {
+      "time": 1794864368254,
+      "usedSize": 6626732,
+      "totalSize": 12197888,
+      "embedderHeapUsedSize": 66713728,
+      "backingStorageSize": 7813997,
+      "ui": "Saving video — 19.6 MB / 268.4 MB (7%) · 11 s elapsed · 1.3 MB/s · about 3 min 14 s left",
+      "accepted": 20792408,
+      "fetched": 20795408
+    },
+    {
+      "time": 1794864369255,
+      "usedSize": 7167416,
+      "totalSize": 14557184,
+      "embedderHeapUsedSize": 67839816,
+      "backingStorageSize": 10677945,
+      "ui": "Saving video — 22.7 MB / 268.4 MB (8%) · 12 s elapsed · 1.3 MB/s · about 3 min 9 s left",
+      "accepted": 23657768,
+      "fetched": 23659268
+    },
+    {
+      "time": 1794864370255,
+      "usedSize": 10081588,
+      "totalSize": 15081472,
+      "embedderHeapUsedSize": 70973648,
+      "backingStorageSize": 13630392,
+      "ui": "Saving video — 26.3 MB / 268.4 MB (9%) · 14 s elapsed · 1.4 MB/s · about 2 min 47 s left",
+      "accepted": 26608628,
+      "fetched": 26610128
+    },
+    {
+      "time": 1794864371255,
+      "usedSize": 4727296,
+      "totalSize": 15343616,
+      "embedderHeapUsedSize": 62191856,
+      "backingStorageSize": 1157810,
+      "ui": "Saving video — 29.2 MB / 268.4 MB (10%) · 15 s elapsed · 1.7 MB/s · about 2 min 18 s left",
+      "accepted": 29391628,
+      "fetched": 29393128
+    },
+    {
+      "time": 1794864372256,
+      "usedSize": 4483060,
+      "totalSize": 18751488,
+      "embedderHeapUsedSize": 63153624,
+      "backingStorageSize": 3988972,
+      "ui": "Saving video — 31.2 MB / 268.4 MB (11%) · 15 s elapsed · 1.9 MB/s · about 2 min 2 s left",
+      "accepted": 32221808,
+      "fetched": 32223308
+    },
+    {
+      "time": 1794864373256,
+      "usedSize": 9762612,
+      "totalSize": 21635072,
+      "embedderHeapUsedSize": 66266576,
+      "backingStorageSize": 6917420,
+      "ui": "Saving video — 34.9 MB / 268.4 MB (12%) · 17 s elapsed · 2.3 MB/s · about 1 min 41 s left",
+      "accepted": 35148668,
+      "fetched": 35150168
+    },
+    {
+      "time": 1794864374256,
+      "usedSize": 10406432,
+      "totalSize": 22159360,
+      "embedderHeapUsedSize": 67282144,
+      "backingStorageSize": 9848869,
+      "ui": "Saving video — 37.8 MB / 268.4 MB (14%) · 18 s elapsed · 2.6 MB/s · about 1 min 29 s left",
+      "accepted": 38074028,
+      "fetched": 38077028
+    },
+    {
+      "time": 1794864375256,
+      "usedSize": 10877092,
+      "totalSize": 22159360,
+      "embedderHeapUsedSize": 70532968,
+      "backingStorageSize": 12841818,
+      "ui": "Saving video — 40.0 MB / 268.4 MB (14%) · 18 s elapsed · 2.8 MB/s · about 1 min 21 s left",
+      "accepted": 41072888,
+      "fetched": 41078888
+    },
+    {
+      "time": 1794864376256,
+      "usedSize": 11642376,
+      "totalSize": 22421504,
+      "embedderHeapUsedSize": 71537688,
+      "backingStorageSize": 15902211,
+      "ui": "Saving video — 43.1 MB / 268.4 MB (16%) · 19 s elapsed · 3.0 MB/s · about 1 min 16 s left",
+      "accepted": 44133192,
+      "fetched": 44134692
+    },
+    {
+      "time": 1794864377257,
+      "usedSize": 12206608,
+      "totalSize": 23994368,
+      "embedderHeapUsedSize": 74587088,
+      "backingStorageSize": 18995716,
+      "ui": "Saving video — 46.9 MB / 268.4 MB (17%) · 21 s elapsed · 3.0 MB/s · about 1 min 14 s left",
+      "accepted": 47228108,
+      "fetched": 47231108
+    },
+    {
+      "time": 1794864378258,
+      "usedSize": 4967788,
+      "totalSize": 22945792,
+      "embedderHeapUsedSize": 62094720,
+      "backingStorageSize": 1343670,
+      "ui": "Saving video — 49.9 MB / 268.4 MB (18%) · 22 s elapsed · 3.0 MB/s · about 1 min 13 s left",
+      "accepted": 50196968,
+      "fetched": 50198468
+    },
+    {
+      "time": 1794864379258,
+      "usedSize": 10624488,
+      "totalSize": 23470080,
+      "embedderHeapUsedSize": 62990400,
+      "backingStorageSize": 4226512,
+      "ui": "Saving video — 52.8 MB / 268.4 MB (19%) · 23 s elapsed · 3.0 MB/s · about 1 min 12 s left",
+      "accepted": 53081828,
+      "fetched": 53083328
+    },
+    {
+      "time": 1794864380258,
+      "usedSize": 16150592,
+      "totalSize": 28712960,
+      "embedderHeapUsedSize": 66359848,
+      "backingStorageSize": 7172961,
+      "ui": "Saving video — 55.0 MB / 268.4 MB (20%) · 23 s elapsed · 3.0 MB/s · about 1 min 11 s left",
+      "accepted": 56028188,
+      "fetched": 56029688
+    },
+    {
+      "time": 1794864381259,
+      "usedSize": 10358980,
+      "totalSize": 29761536,
+      "embedderHeapUsedSize": 67362296,
+      "backingStorageSize": 10239410,
+      "ui": "Saving video — 58.8 MB / 268.4 MB (21%) · 25 s elapsed · 3.0 MB/s · about 1 min 10 s left",
+      "accepted": 59093048,
+      "fetched": 59094548
+    },
+    {
+      "time": 1794864382259,
+      "usedSize": 15851804,
+      "totalSize": 34480128,
+      "embedderHeapUsedSize": 70477072,
+      "backingStorageSize": 13194859,
+      "ui": "Saving video — 61.0 MB / 268.4 MB (22%) · 25 s elapsed · 3.0 MB/s · about 1 min 9 s left",
+      "accepted": 62049908,
+      "fetched": 62051408
+    },
+    {
+      "time": 1794864383260,
+      "usedSize": 11721732,
+      "totalSize": 36577280,
+      "embedderHeapUsedSize": 71465936,
+      "backingStorageSize": 16136807,
+      "ui": "Saving video — 64.8 MB / 268.4 MB (24%) · 27 s elapsed · 3.0 MB/s · about 1 min 7 s left",
+      "accepted": 64993268,
+      "fetched": 64994768
+    },
+    {
+      "time": 1794864384260,
+      "usedSize": 16952964,
+      "totalSize": 36577280,
+      "embedderHeapUsedSize": 72832576,
+      "backingStorageSize": 18966255,
+      "ui": "Saving video — 67.6 MB / 268.4 MB (25%) · 28 s elapsed · 3.0 MB/s · about 1 min 6 s left",
+      "accepted": 67819628,
+      "fetched": 67821128
+    },
+    {
+      "time": 1794864385260,
+      "usedSize": 20316020,
+      "totalSize": 36577280,
+      "embedderHeapUsedSize": 34474976,
+      "backingStorageSize": 68591727,
+      "ui": "Saving video — 88.1 MB / 268.4 MB (32%) · 28 s elapsed · 4.8 MB/s · about 37 s left",
+      "accepted": 115343360,
+      "fetched": 117440512
+    },
+    {
+      "time": 1794864386260,
+      "usedSize": 6337700,
+      "totalSize": 37101568,
+      "embedderHeapUsedSize": 21305336,
+      "backingStorageSize": 2128549,
+      "ui": "Saving video — 131.7 MB / 268.4 MB (49%) · 29 s elapsed · 8.9 MB/s · about 15 s left",
+      "accepted": 132704468,
+      "fetched": 132707468
+    },
+    {
+      "time": 1794864387259,
+      "usedSize": 11178064,
+      "totalSize": 37101568,
+      "embedderHeapUsedSize": 35077520,
+      "backingStorageSize": 4818047,
+      "ui": "Saving video — 135.1 MB / 268.4 MB (50%) · 31 s elapsed · 8.8 MB/s · about 15 s left",
+      "accepted": 135396788,
+      "fetched": 135399788
+    },
+    {
+      "time": 1794864388260,
+      "usedSize": 3721152,
+      "totalSize": 32120832,
+      "embedderHeapUsedSize": 43903816,
+      "backingStorageSize": 601590,
+      "ui": "Saving video — 137.3 MB / 268.4 MB (51%) · 31 s elapsed · 8.8 MB/s · about 14 s left",
+      "accepted": 138296648,
+      "fetched": 138298148
+    },
+    {
+      "time": 1794864389260,
+      "usedSize": 8884952,
+      "totalSize": 32120832,
+      "embedderHeapUsedSize": 57023968,
+      "backingStorageSize": 4153967,
+      "ui": "Saving video — 141.5 MB / 268.4 MB (52%) · 33 s elapsed · 8.9 MB/s · about 14 s left",
+      "accepted": 141846548,
+      "fetched": 141847088
+    },
+    {
+      "time": 1794864390261,
+      "usedSize": 14200152,
+      "totalSize": 32120832,
+      "embedderHeapUsedSize": 65036008,
+      "backingStorageSize": 7234451,
+      "ui": "Saving video — 143.8 MB / 268.4 MB (53%) · 33 s elapsed · 8.9 MB/s · about 13 s left",
+      "accepted": 144925448,
+      "fetched": 144926948
+    },
+    {
+      "time": 1794864391261,
+      "usedSize": 8300792,
+      "totalSize": 32120832,
+      "embedderHeapUsedSize": 68309640,
+      "backingStorageSize": 10410395,
+      "ui": "Saving video — 147.7 MB / 268.4 MB (55%) · 35 s elapsed · 8.9 MB/s · about 13 s left",
+      "accepted": 148105808,
+      "fetched": 148107308
+    },
+    {
+      "time": 1794864392261,
+      "usedSize": 13789044,
+      "totalSize": 32120832,
+      "embedderHeapUsedSize": 69176328,
+      "backingStorageSize": 13613879,
+      "ui": "Saving video — 150.9 MB / 268.4 MB (56%) · 36 s elapsed · 8.9 MB/s · about 13 s left",
+      "accepted": 151309208,
+      "fetched": 151319708
+    },
+    {
+      "time": 1794864393262,
+      "usedSize": 9625316,
+      "totalSize": 35528704,
+      "embedderHeapUsedSize": 72220944,
+      "backingStorageSize": 16681823,
+      "ui": "Saving video — 153.3 MB / 268.4 MB (57%) · 36 s elapsed · 9.0 MB/s · about 12 s left",
+      "accepted": 154371068,
+      "fetched": 154372568
+    },
+    {
+      "time": 1794864394263,
+      "usedSize": 6917404,
+      "totalSize": 33431552,
+      "embedderHeapUsedSize": 62774688,
+      "backingStorageSize": 2417089,
+      "ui": "Saving video — 156.7 MB / 268.4 MB (58%) · 37 s elapsed · 9.0 MB/s · about 12 s left",
+      "accepted": 157401968,
+      "fetched": 157403468
+    },
+    {
+      "time": 1794864395263,
+      "usedSize": 12404352,
+      "totalSize": 33431552,
+      "embedderHeapUsedSize": 63967360,
+      "backingStorageSize": 5199587,
+      "ui": "Saving video — 159.9 MB / 268.4 MB (59%) · 39 s elapsed · 6.8 MB/s · about 16 s left",
+      "accepted": 160185788,
+      "fetched": 160187288
+    },
+    {
+      "time": 1794864396263,
+      "usedSize": 6472576,
+      "totalSize": 33431552,
+      "embedderHeapUsedSize": 66994952,
+      "backingStorageSize": 8317031,
+      "ui": "Saving video — 163.0 MB / 268.4 MB (60%) · 40 s elapsed · 3.1 MB/s · about 34 s left",
+      "accepted": 163301648,
+      "fetched": 163303148
+    },
+    {
+      "time": 1794864397264,
+      "usedSize": 11886800,
+      "totalSize": 33431552,
+      "embedderHeapUsedSize": 67932240,
+      "backingStorageSize": 11445515,
+      "ui": "Saving video — 165.2 MB / 268.4 MB (61%) · 40 s elapsed · 3.1 MB/s · about 33 s left",
+      "accepted": 166431548,
+      "fetched": 166433048
+    },
+    {
+      "time": 1794864398264,
+      "usedSize": 17347688,
+      "totalSize": 33431552,
+      "embedderHeapUsedSize": 70722752,
+      "backingStorageSize": 14651999,
+      "ui": "Saving video — 169.3 MB / 268.4 MB (63%) · 42 s elapsed · 3.2 MB/s · about 31 s left",
+      "accepted": 169636448,
+      "fetched": 169637948
+    },
+    {
+      "time": 1794864399266,
+      "usedSize": 7664028,
+      "totalSize": 33169408,
+      "embedderHeapUsedSize": 62163992,
+      "backingStorageSize": 2972805,
+      "ui": "Saving video — 172.4 MB / 268.4 MB (64%) · 43 s elapsed · 3.1 MB/s · about 30 s left",
+      "accepted": 172773308,
+      "fetched": 172776308
+    },
+    {
+      "time": 1794864400266,
+      "usedSize": 13159260,
+      "totalSize": 33169408,
+      "embedderHeapUsedSize": 65027272,
+      "backingStorageSize": 6186883,
+      "ui": "Saving video — 175.7 MB / 268.4 MB (65%) · 44 s elapsed · 3.1 MB/s · about 29 s left",
+      "accepted": 175979708,
+      "fetched": 175981208
+    },
+    {
+      "time": 1794864401267,
+      "usedSize": 18727140,
+      "totalSize": 34742272,
+      "embedderHeapUsedSize": 67768968,
+      "backingStorageSize": 9528367,
+      "ui": "Saving video — 179.2 MB / 268.4 MB (66%) · 45 s elapsed · 3.2 MB/s · about 28 s left",
+      "accepted": 179328608,
+      "fetched": 179330108
+    },
+    {
+      "time": 1794864402267,
+      "usedSize": 24264800,
+      "totalSize": 39723008,
+      "embedderHeapUsedSize": 68925360,
+      "backingStorageSize": 12644311,
+      "ui": "Saving video — 182.1 MB / 268.4 MB (67%) · 46 s elapsed · 3.2 MB/s · about 27 s left",
+      "accepted": 182442968,
+      "fetched": 182445968
+    },
+    {
+      "time": 1794864403267,
+      "usedSize": 29785564,
+      "totalSize": 44965888,
+      "embedderHeapUsedSize": 71770976,
+      "backingStorageSize": 15822295,
+      "ui": "Saving video — 185.3 MB / 268.4 MB (69%) · 47 s elapsed · 3.1 MB/s · about 26 s left",
+      "accepted": 185619368,
+      "fetched": 185620868
+    },
+    {
+      "time": 1794864404268,
+      "usedSize": 12516148,
+      "totalSize": 46538752,
+      "embedderHeapUsedSize": 72887920,
+      "backingStorageSize": 18981191,
+      "ui": "Saving video — 187.6 MB / 268.4 MB (69%) · 47 s elapsed · 3.2 MB/s · about 25 s left",
+      "accepted": 188782680,
+      "fetched": 188783768
+    },
+    {
+      "time": 1794864405269,
+      "usedSize": 18055548,
+      "totalSize": 46538752,
+      "embedderHeapUsedSize": 73844176,
+      "backingStorageSize": 22084723,
+      "ui": "Saving video — 191.6 MB / 268.4 MB (71%) · 49 s elapsed · 3.2 MB/s · about 24 s left",
+      "accepted": 191881628,
+      "fetched": 191883128
+    },
+    {
+      "time": 1794864406270,
+      "usedSize": 23594276,
+      "totalSize": 51519488,
+      "embedderHeapUsedSize": 76840680,
+      "backingStorageSize": 25170667,
+      "ui": "Saving video — 193.9 MB / 268.4 MB (72%) · 49 s elapsed · 3.2 MB/s · about 23 s left",
+      "accepted": 194970488,
+      "fetched": 194971988
+    },
+    {
+      "time": 1794864407270,
+      "usedSize": 3033652,
+      "totalSize": 5120000,
+      "embedderHeapUsedSize": 60265952,
+      "backingStorageSize": 706590,
+      "ui": "Saving video — 197.7 MB / 268.4 MB (73%) · 51 s elapsed · 3.2 MB/s · about 22 s left",
+      "accepted": 198053888,
+      "fetched": 198056888
+    },
+    {
+      "time": 1794864408270,
+      "usedSize": 5022168,
+      "totalSize": 8265728,
+      "embedderHeapUsedSize": 57672552,
+      "backingStorageSize": 12371879,
+      "ui": "Saving video — 200.9 MB / 268.4 MB (74%) · 52 s elapsed · 3.2 MB/s · about 21 s left",
+      "accepted": 207618048,
+      "fetched": 209715200
+    },
+    {
+      "time": 1794864409270,
+      "usedSize": 4374928,
+      "totalSize": 8265728,
+      "embedderHeapUsedSize": 7436992,
+      "backingStorageSize": 14778310,
+      "ui": "Saving video — 263.1 MB / 268.4 MB (97%) · 52 s elapsed · 9.2 MB/s · about 0 s left",
+      "accepted": 264233888,
+      "fetched": 264235388
+    },
+    {
+      "time": 1794864410270,
+      "usedSize": 5230492,
+      "totalSize": 9052160,
+      "embedderHeapUsedSize": 6087480,
+      "backingStorageSize": 18032186,
+      "ui": "Saving video — 267.2 MB / 268.4 MB (99%) · 54 s elapsed · 9.2 MB/s · about 0 s left",
+      "accepted": 267491288,
+      "fetched": 267497288
+    },
+    {
+      "time": 1794864411270,
+      "usedSize": 6914216,
+      "totalSize": 9838592,
+      "embedderHeapUsedSize": 5677840,
+      "backingStorageSize": 18985622,
+      "ui": "Finalizing… — 268.4 MB / 268.4 MB (100%) · 55 s elapsed",
+      "accepted": 268435456,
+      "fetched": 268435456
+    }
+  ]
+}

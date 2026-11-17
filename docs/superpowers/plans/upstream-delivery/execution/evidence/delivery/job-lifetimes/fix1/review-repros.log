@@ -1,0 +1,4 @@
+{"route_status": 423, "vault_locked": true, "plaintext_created": false, "plaintext": null}
+.{"actual_render_source": ["/tmp/openscrub-task621/fix1/review-repros-tmp/test_render_original_source_is0/data/jobs/db27bb625d8a/input.avi"], "source_delete_status": 409, "source_exists": true, "destination_phase": "rendering"}
+.........
+10 passed in 0.21s

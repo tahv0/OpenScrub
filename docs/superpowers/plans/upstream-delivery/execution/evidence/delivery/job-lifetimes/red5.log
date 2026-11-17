@@ -1,0 +1,42 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+________ test_legacy_queue_entry_never_recursively_acquires_jobs_mutex _________
+
+store = namespace(root=PosixPath('/tmp/openscrub-task621/red5-tmp/test_legacy_queue_entry_never_0/data'), jobs=PosixPath('/tmp...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x73fdd8dcf240>, url='/api/jobs/dc335b200a5b')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x73fe1091d160>
+
+    def test_legacy_queue_entry_never_recursively_acquires_jobs_mutex(store, monkeypatch):
+        class StrictMutex:
+            def __init__(self):
+                self.lock = threading.Lock()
+                self.owner = None
+            def __enter__(self):
+                if self.owner == threading.get_ident():
+                    raise RuntimeError('recursive JOBS_LOCK acquire')
+                self.lock.acquire()
+                self.owner = threading.get_ident()
+                return self
+            def __exit__(self, *args):
+                self.owner = None
+                self.lock.release()
+        monkeypatch.setattr(web, 'JOBS_LOCK', StrictMutex())
+        reached = []
+        def build(*args, **kwargs):
+            reached.append(True)
+            raise RuntimeError('synthetic computation boundary')
+        monkeypatch.setattr(web, 'build_args', build)
+        web.WORK_Q.put((store.job['id'], 'scan'))
+        web.WORK_Q.put(None)
+        web.worker()
+>       assert reached == [True]
+E       assert [] == [True]
+E         
+E         Right contains one more item: True
+E         Use -v to get more diff
+
+tests/test_job_lifecycle.py:642: AssertionError
+----------------------------- Captured stdout call -----------------------------
+[web] worker: unexpected RuntimeError: recursive JOBS_LOCK acquire
+=========================== short test summary info ============================
+FAILED tests/test_job_lifecycle.py::test_legacy_queue_entry_never_recursively_acquires_jobs_mutex
+1 failed, 22 deselected in 0.10s

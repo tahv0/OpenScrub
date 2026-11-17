@@ -1,0 +1,90 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+___ test_real_tracker_cancellation_releases_capture_before_background_owner ____
+
+store = namespace(root=PosixPath('/tmp/openscrub-task621/red6-tmp/test_real_tracker_cancellation0/data'), jobs=PosixPath('/tmp...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7d6f1ffcb880>, url='/api/jobs/9f0f27b150cd')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7d6f577f1130>
+
+    def test_real_tracker_cancellation_releases_capture_before_background_owner(store, monkeypatch):
+        import cv2
+        import numpy as np
+        video = store.job['video']
+        writer = cv2.VideoWriter(video, cv2.VideoWriter_fourcc(*'MJPG'), 30, (48, 48))
+        assert writer.isOpened()
+        for i in range(15):
+            writer.write(np.random.default_rng(i).integers(0, 255, (48,48,3), dtype=np.uint8))
+        writer.release()
+        entered, release = threading.Event(), threading.Event()
+        real_capture, captures, threads = cv2.VideoCapture, [], []
+        class Capture:
+            def __init__(self, *args):
+                self.real = real_capture(*args)
+                self.releases = 0
+                captures.append(self)
+            def __getattr__(self, name):
+                return getattr(self.real, name)
+            def release(self):
+                assert web.FILES.count > 0, 'decoder closed after lifetime ended'
+                self.releases += 1
+                self.real.release()
+        class Vit:
+            def init(self, *args):
+                pass
+        def factory(log):
+            entered.set()
+            assert release.wait(8)
+            return Vit
+        monkeypatch.setattr(openscrub.cv2, 'VideoCapture', Capture)
+        monkeypatch.setattr(openscrub, '_vittrack_factory', factory)
+        monkeypatch.setattr(openscrub, 'PersonDetector', lambda *a, **k: None)
+        real_start = web._start_owned_thread
+        def start(*args):
+            thread = real_start(*args)
+            threads.append(thread)
+            return thread
+        monkeypatch.setattr(web, '_start_owned_thread', start)
+        try:
+            assert request('post', store.url + '/track_object', json={'box':[4,4,40,40], 't_ref':.1, 't0':0, 't1':.4}).status_code == 200
+            assert entered.wait(5)
+            assert request('post', store.url + '/cancel').status_code == 200
+        finally:
+            release.set()
+            for thread in threads:
+                thread.join(8)
+                assert not thread.is_alive()
+        try:
+>           assert captures and all(c.releases == 1 and not c.isOpened() for c in captures)
+E           assert ([<test_job_lifecycle.test_real_tracker_cancellation_releases_capture_before_background_owner.<locals>.Capture object at 0x7d6f577ed4c0>] and False)
+E            +  where False = all(<generator object test_real_tracker_cancellation_releases_capture_before_background_owner.<locals>.<genexpr> at 0x7d6f57eb9700>)
+
+tests/test_job_lifecycle.py:694: AssertionError
+_____________ test_tracker_failed_open_explicitly_releases_capture _____________
+
+store = namespace(root=PosixPath('/tmp/openscrub-task621/red6-tmp/test_tracker_failed_open_expli0/data'), jobs=PosixPath('/tmp...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7d6ef359d940>, url='/api/jobs/9f031b6b774b')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7d6f577f11f0>
+
+    def test_tracker_failed_open_explicitly_releases_capture(store, monkeypatch):
+        import cv2
+        real_capture, captures = cv2.VideoCapture, []
+        class Capture:
+            def __init__(self, *args):
+                self.real = real_capture(*args)
+                self.releases = 0
+                captures.append(self)
+            def __getattr__(self, name):
+                return getattr(self.real, name)
+            def release(self):
+                self.releases += 1
+                self.real.release()
+        monkeypatch.setattr(openscrub.cv2, 'VideoCapture', Capture)
+        assert openscrub.track_manual_region(store.job['video'], (4,4,40,40), 0, 0, 1) == []
+>       assert len(captures) == 1 and captures[0].releases == 1
+E       assert (1 == 1 and 0 == 1)
+E        +  where 1 = len([<test_job_lifecycle.test_tracker_failed_open_explicitly_releases_capture.<locals>.Capture object at 0x7d6f577ee7b0>])
+E        +  and   0 = <test_job_lifecycle.test_tracker_failed_open_explicitly_releases_capture.<locals>.Capture object at 0x7d6f577ee7b0>.releases
+
+tests/test_job_lifecycle.py:715: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_job_lifecycle.py::test_real_tracker_cancellation_releases_capture_before_background_owner
+FAILED tests/test_job_lifecycle.py::test_tracker_failed_open_explicitly_releases_capture
+2 failed, 23 deselected in 0.13s

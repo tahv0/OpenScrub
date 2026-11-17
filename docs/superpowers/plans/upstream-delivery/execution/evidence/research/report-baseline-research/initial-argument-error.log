@@ -1,0 +1,138 @@
+[2026-11-16 23:15:16,074] ERROR in app: Exception on /api/jobs/synthetic/detections [POST]
+Traceback (most recent call last):
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-report-research-20261116/source/openscrub_web.py", line 1336, in job_save_edits
+    json.dump(doc, f, indent=1)
+  File "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/report-baseline-research/run_report_baseline.py", line 122, in dump
+    raise TypeError('injected encoder failure after destination opened')
+TypeError: injected encoder failure after destination opened
+[2026-11-16 23:15:16,085] ERROR in app: Exception on /api/jobs/synthetic/detections [POST]
+Traceback (most recent call last):
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-report-research-20261116/source/openscrub_web.py", line 1336, in job_save_edits
+    json.dump(doc, f, indent=1)
+  File "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/report-baseline-research/run_report_baseline.py", line 125, in dump
+    raise OSError('injected interrupted write after 16 characters')
+OSError: injected interrupted write after 16 characters
+[2026-11-16 23:15:16,096] ERROR in app: Exception on /api/jobs/synthetic/detections [POST]
+Traceback (most recent call last):
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-report-research-20261116/source/openscrub_web.py", line 1336, in job_save_edits
+    json.dump(doc, f, indent=1)
+  File "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/report-baseline-research/run_report_baseline.py", line 122, in dump
+    raise TypeError('injected encoder failure after destination opened')
+TypeError: injected encoder failure after destination opened
+127.0.0.1 - - [16/Nov/2026 23:15:16] "[35m[1mPOST /api/jobs/synthetic/detections HTTP/1.1[0m" 500 -
+[2026-11-16 23:15:16,106] ERROR in app: Exception on /api/jobs/synthetic/detections [POST]
+Traceback (most recent call last):
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-report-research-20261116/source/openscrub_web.py", line 1336, in job_save_edits
+    json.dump(doc, f, indent=1)
+  File "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/report-baseline-research/run_report_baseline.py", line 125, in dump
+    raise OSError('injected interrupted write after 16 characters')
+OSError: injected interrupted write after 16 characters
+127.0.0.1 - - [16/Nov/2026 23:15:16] "[35m[1mPOST /api/jobs/synthetic/detections HTTP/1.1[0m" 500 -
+127.0.0.1 - - [16/Nov/2026 23:15:16] "POST /api/jobs/synthetic/detections HTTP/1.1" 200 -
+127.0.0.1 - - [16/Nov/2026 23:15:16] "POST /api/jobs/synthetic/detections HTTP/1.1" 200 -
+127.0.0.1 - - [16/Nov/2026 23:15:16] "POST /api/jobs/synthetic/detections HTTP/1.1" 200 -
+127.0.0.1 - - [16/Nov/2026 23:15:16] "POST /api/jobs/synthetic/detections HTTP/1.1" 200 -
+127.0.0.1 - - [16/Nov/2026 23:15:16] "POST /api/jobs/synthetic/detections HTTP/1.1" 200 -
+usage: run_report_baseline.py [-h] [-o OUTPUT] [--config CONFIG]
+                              [--allow-names ALLOW_NAMES]
+                              [--extra-names EXTRA_NAMES]
+                              [--engine {auto,paddle,onnx,tesseract}]
+                              [--device {auto,cpu,gpu}]
+                              [--encoder {auto,nvenc,qsv,x264}] [--no-ner]
+                              [--heuristic-names {auto,on,off}]
+                              [--sample-interval SAMPLE_INTERVAL]
+                              [--scan-trigger SCAN_TRIGGER] [--pad PAD]
+                              [--no-vfr-fix]
+                              [--out-quality {archival,balanced,share}]
+                              [--codec {h264,hevc}] [--hdr-output {match,sdr}]
+                              [--tile {auto,on,off}] [--face-heads]
+                              [--dense-faces]
+                              [--dense-face-stride DENSE_FACE_STRIDE]
+                              [--scan-speed {thorough,balanced,fast,fastest}]
+                              [--plate-model PLATE_MODEL]
+                              [--face-shape {ellipse,rect}]
+                              [--face-model FACE_MODEL]
+                              [--plate-threshold PLATE_THRESHOLD]
+                              [--person-model PERSON_MODEL]
+                              [--person-threshold PERSON_THRESHOLD]
+                              [--face-threshold FACE_THRESHOLD]
+                              [--draw-scores] [--detect-scale DETECT_SCALE]
+                              [--face-expand FACE_EXPAND]
+                              [--coverage {tight,box,concealed}]
+                              [--mode {blur,box,mosaic,inpaint}]
+                              [--mode-map MODE_MAP] [--mrn-regex MRN_REGEX]
+                              [--scroll-track {auto,on,off}]
+                              [--adaptive {on,off}] [--phrase TEXT]
+                              [--phrases FILE] [--custom-regex ID=PATTERN]
+                              [--bridge-gap BRIDGE_GAP] [--no-memory]
+                              [--preview] [--report REPORT]
+                              [--detect-windows DETECT_WINDOWS]
+                              [--detect-windows-frac DETECT_WINDOWS_FRAC]
+                              [--clip-frac CLIP_FRAC]
+                              [--mute-audio-tracks MUTE_AUDIO_TRACKS]
+                              [--audio-lane-count AUDIO_LANE_COUNT]
+                              [--clip-start CLIP_START] [--clip-end CLIP_END]
+                              [--audio-pii]
+                              [--audio-pii-model AUDIO_PII_MODEL]
+                              [--audio-pii-apply]
+                              [--audio-redact AUDIO_REDACT]
+                              [--audio-redact-mode {mute,bleep}]
+                              [--from-report FROM_REPORT] [--batch BATCH]
+                              [--overwrite]
+                              [--backtrack-window BACKTRACK_WINDOW]
+                              [--no-backtrack] [--skip-start SKIP_START]
+                              [--skip-end SKIP_END] [--zones ZONES]
+                              [--windows WINDOWS]
+                              [--ignore-region X1,Y1,X2,Y2]
+                              [--ocr-upscale {auto,on,off}] [--paranoid]
+                              [--vfr {auto,ignore}] [--categories CATEGORIES]
+                              [video]
+run_report_baseline.py: error: argument --encoder: invalid choice: 'cpu' (choose from auto, nvenc, qsv, x264)

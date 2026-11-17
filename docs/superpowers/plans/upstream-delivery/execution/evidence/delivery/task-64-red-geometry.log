@@ -1,0 +1,43 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+__________ test_render_objects_are_separate_from_retained_review_rows __________
+
+review = namespace(video=PosixPath('/tmp/pytest-of-tahv0/pytest-13/test_render_objects_are_separa0/input.avi'), path=PosixPath(... [False, None, '雪']}}, output=PosixPath('/tmp/pytest-of-tahv0/pytest-13/test_render_objects_are_separa0/rendered.mp4'))
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x78468980df40>
+
+    def test_render_objects_are_separate_from_retained_review_rows(review, monkeypatch):
+        original_render = openscrub.render
+        def mutate_then_render(src, dst, detections, *args, **kwargs):
+            # Coverage/render transformations may edit decoded objects. Such edits
+            # must never replace the exact saved review representation.
+            detections[0].text = 'render-only change'
+            detections[0].cbox = (30, 30, 35, 35)
+            detections[2].poly[0][0][0] = .25
+            return original_render(src, dst, detections, *args, **kwargs)
+        monkeypatch.setattr(openscrub, 'render', mutate_then_render)
+        openscrub.run_pipeline(render_args(review), Quiet())
+>       assert_review_preserved(review.doc, read(review.path))
+
+tests/test_report_roundtrip.py:227: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+before = {'provenance': {'input': '/tmp/pytest-of-tahv0/pytest-13/test_render_objects_are_separa0/input.avi', 'input_sha256': '...'name', ...}, ...], 'audio_redactions': [{'t0': 0.2, 't1': 0.4, 'mode': 'mute', 'future_span': {'retain': True}}], ...}
+after = {'provenance': {'tool': 'openscrub', 'version': '1.0.96', 'timestamp': '2026-11-17T00:08:20.951186+02:00', 'input': '/...[114, 20.25, 126, 60.75], 'category': 'face', ...}, ...], 'audio_redactions': [{'t0': 0.2, 't1': 0.4, 'mode': 'mute'}]}
+
+    def assert_review_preserved(before, after):
+        # Only provenance belongs to an ordinary render. This also checks empty,
+        # absent, additive, and high-precision values without normalizing them.
+>       assert {k: v for k, v in after.items() if k != 'provenance'} == {
+            k: v for k, v in before.items() if k != 'provenance'}
+E       AssertionError: assert {'render_stat...de': 'mute'}]} == {'render_stat...', ...}], ...}
+E         
+E         Differing items:
+E         {'detections': [{'t_start': 0.0, 't_end': 1.99, 'cbox': [30, 30, 35, 35], 'category': 'plate', ...}, {'t_start': 0.0, ...ory': 'person', ...}, {'t_start': 0.0, 't_end': 1.99, 'cbox': [114, 20.25, 126, 60.75], 'category': 'face', ...}, ...]} != {'detections': [{'t_start': 0.0, 't_end': 1.99, 'cbox': [2, 20.25, 14, 60.75], 'category': 'name', ...}, {'t_start': 0...egory': 'person', ...}, {'t_start': 0.0, 't_end': 1.99, 'cbox': [82, 20.25, 94, 60.75], 'category': 'name', ...}, ...]}
+E         {'audio_redactions': [{'t0': 0.2, 't1': 0.4, 'mode': 'mute'}]} != {'audio_re...
+E         
+E         ...Full output truncated, use '-vv' to show
+
+tests/test_report_roundtrip.py:83: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_report_roundtrip.py::test_render_objects_are_separate_from_retained_review_rows
+1 failed in 0.23s

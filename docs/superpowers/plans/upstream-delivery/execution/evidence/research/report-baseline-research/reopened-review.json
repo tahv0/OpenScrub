@@ -1,0 +1,168 @@
+{
+  "scope": "Fresh module imports; real Flask test-client GET, no browser/socket",
+  "status": 200,
+  "body": {
+    "detections": [
+      {
+        "category": "plate",
+        "confidence": 0.85,
+        "enabled": true,
+        "i": 0,
+        "person": -1,
+        "t_end": 0.25,
+        "t_start": 0.1,
+        "text": "synthetic-000001",
+        "track": -1,
+        "zone_dropped": false
+      },
+      {
+        "category": "face",
+        "confidence": 0.85,
+        "enabled": true,
+        "i": 1,
+        "person": 0,
+        "t_end": 0.35,
+        "t_start": 0.2,
+        "text": "synthetic-000002",
+        "track": 0,
+        "zone_dropped": false
+      },
+      {
+        "category": "manual",
+        "confidence": 0.85,
+        "enabled": true,
+        "i": 2,
+        "person": -1,
+        "t_end": 0.45,
+        "t_start": 0.3,
+        "text": "synthetic-000003",
+        "track": 0,
+        "zone_dropped": false
+      },
+      {
+        "category": "plate",
+        "confidence": 0.85,
+        "enabled": true,
+        "i": 3,
+        "person": -1,
+        "t_end": 0.75,
+        "t_start": 0.6,
+        "text": "synthetic-000006",
+        "track": -1,
+        "zone_dropped": false
+      },
+      {
+        "category": "face",
+        "confidence": 0.85,
+        "enabled": true,
+        "i": 4,
+        "person": 0,
+        "t_end": 0.85,
+        "t_start": 0.7,
+        "text": "synthetic-000007",
+        "track": 1,
+        "zone_dropped": false
+      },
+      {
+        "category": "manual",
+        "confidence": 0.85,
+        "enabled": true,
+        "i": 5,
+        "person": -1,
+        "t_end": 0.95,
+        "t_start": 0.8,
+        "text": "synthetic-000008",
+        "track": 1,
+        "zone_dropped": false
+      },
+      {
+        "category": "person",
+        "confidence": 0.85,
+        "enabled": true,
+        "i": 6,
+        "person": -1,
+        "t_end": 1.05,
+        "t_start": 0.9,
+        "text": "synthetic-000009",
+        "track": 1,
+        "zone_dropped": false
+      }
+    ],
+    "duration": 2.0,
+    "fps": 30
+  },
+  "original_index_by_text": {
+    "synthetic-recurring": 5,
+    "synthetic-000001": 1,
+    "synthetic-000002": 2,
+    "synthetic-000003": 3,
+    "synthetic-000004": 4,
+    "synthetic-000006": 6,
+    "synthetic-000007": 7,
+    "synthetic-000008": 8,
+    "synthetic-000009": 9
+  },
+  "shifted_rows": [
+    {
+      "text": "synthetic-000001",
+      "before_index": 1,
+      "after_index": 0
+    },
+    {
+      "text": "synthetic-000002",
+      "before_index": 2,
+      "after_index": 1
+    },
+    {
+      "text": "synthetic-000003",
+      "before_index": 3,
+      "after_index": 2
+    },
+    {
+      "text": "synthetic-000006",
+      "before_index": 6,
+      "after_index": 3
+    },
+    {
+      "text": "synthetic-000007",
+      "before_index": 7,
+      "after_index": 4
+    },
+    {
+      "text": "synthetic-000008",
+      "before_index": 8,
+      "after_index": 5
+    },
+    {
+      "text": "synthetic-000009",
+      "before_index": 9,
+      "after_index": 6
+    }
+  ],
+  "manual_rows_remaining": [
+    {
+      "category": "manual",
+      "confidence": 0.85,
+      "enabled": true,
+      "i": 2,
+      "person": -1,
+      "t_end": 0.45,
+      "t_start": 0.3,
+      "text": "synthetic-000003",
+      "track": 0,
+      "zone_dropped": false
+    },
+    {
+      "category": "manual",
+      "confidence": 0.85,
+      "enabled": true,
+      "i": 5,
+      "person": -1,
+      "t_end": 0.95,
+      "t_start": 0.8,
+      "text": "synthetic-000008",
+      "track": 1,
+      "zone_dropped": false
+    }
+  ]
+}

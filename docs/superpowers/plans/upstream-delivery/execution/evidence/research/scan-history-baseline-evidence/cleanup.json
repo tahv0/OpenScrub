@@ -1,0 +1,7 @@
+{
+  "synthetic_runtime": "/tmp/openscrub-scan-history-20261117/runtime",
+  "files_removed": 21,
+  "bytes_removed": 33597634,
+  "scope": "only this task synthetic runtime; existing environment and source export preserved",
+  "runtime_removed": true
+}

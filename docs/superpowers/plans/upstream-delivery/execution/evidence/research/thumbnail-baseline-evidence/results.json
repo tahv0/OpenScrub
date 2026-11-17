@@ -1,0 +1,1400 @@
+{
+  "source_sha": "e21ebdf6e3ee46e6c65050dc956a9a3459152269",
+  "modules": {
+    "web": "/tmp/openscrub-thumbnail-baseline-20261117/export/openscrub_web.py",
+    "engine": "/tmp/openscrub-thumbnail-baseline-20261117/export/openscrub.py"
+  },
+  "opencv": "4.14.0",
+  "jobs_dir": "/tmp/openscrub-thumbnail-baseline-20261117/synthetic-data/route-probe/openscrub_jobs",
+  "fixture": "4 MJPEG frames, 320x144 at 4 fps, visibly different colored thirds; four report rows",
+  "counts_scope": "builtins.open for exact report and JPEG; json.load exact report; _frame_at wraps actual pinned function",
+  "cases": [
+    {
+      "case": "cold_one",
+      "counts": {
+        "report_open_read": 1,
+        "report_open_write": 0,
+        "report_json_load": 1,
+        "frame_at_calls": 1,
+        "jpeg_open_read": 1
+      },
+      "report_identity": {
+        "path": "/tmp/openscrub-thumbnail-baseline-20261117/synthetic-data/route-probe/openscrub_jobs/synthetic/report.json",
+        "dev": 137,
+        "ino": 95690,
+        "size": 1868,
+        "mtime_ns": 1794870108857824333,
+        "ctime_ns": 1794870108857824333,
+        "sha256": "59eff8444ff660ea6b6e0b85967b21cc3987bfe284d16061cb3f4bfe530307fa"
+      },
+      "source_identity": {
+        "path": "/tmp/openscrub-thumbnail-baseline-20261117/synthetic-data/route-probe/openscrub_jobs/synthetic/input.avi",
+        "dev": 137,
+        "ino": 95688,
+        "size": 35592,
+        "mtime_ns": 1794870108855029318,
+        "ctime_ns": 1794870108855029318,
+        "sha256": "5d0b90fa5a49fa862540aa268dce207192d40a6725ab263d175aaa055e62d173"
+      },
+      "responses": [
+        {
+          "request": "GET /api/jobs/synthetic/thumb/0",
+          "status": 200,
+          "headers": {
+            "Content-Type": "image/jpeg",
+            "Content-Length": "2206",
+            "Last-Modified": "Mon, 16 Nov 2026 23:01:48 GMT",
+            "Cache-Control": "public, max-age=3600",
+            "Expires": "Tue, 17 Nov 2026 00:01:48 GMT",
+            "ETag": "\"1794870108.8809474-2206-1338058669\""
+          },
+          "sha256": "f6d95ce46b4969031a7025a4c98cee9b947c92062d46b1579e405b17f67fcbad",
+          "image": {
+            "shape": [
+              80,
+              80,
+              3
+            ],
+            "center_bgr_mean": [
+              240.2,
+              29.8,
+              30.2
+            ]
+          },
+          "image_path": "/tmp/openscrub-thumbnail-baseline-20261117/images/cold-left.jpg"
+        }
+      ]
+    },
+    {
+      "case": "warm_three",
+      "counts": {
+        "report_open_read": 0,
+        "report_open_write": 0,
+        "report_json_load": 0,
+        "frame_at_calls": 0,
+        "jpeg_open_read": 3
+      },
+      "report_identity": {
+        "path": "/tmp/openscrub-thumbnail-baseline-20261117/synthetic-data/route-probe/openscrub_jobs/synthetic/report.json",
+        "dev": 137,
+        "ino": 95690,
+        "size": 1868,
+        "mtime_ns": 1794870108857824333,
+        "ctime_ns": 1794870108857824333,
+        "sha256": "59eff8444ff660ea6b6e0b85967b21cc3987bfe284d16061cb3f4bfe530307fa"
+      },
+      "source_identity": {
+        "path": "/tmp/openscrub-thumbnail-baseline-20261117/synthetic-data/route-probe/openscrub_jobs/synthetic/input.avi",
+        "dev": 137,
+        "ino": 95688,
+        "size": 35592,
+        "mtime_ns": 1794870108855029318,
+        "ctime_ns": 1794870108855029318,
+        "sha256": "5d0b90fa5a49fa862540aa268dce207192d40a6725ab263d175aaa055e62d173"
+      },
+      "responses": [
+        {
+          "request": "GET /api/jobs/synthetic/thumb/0",
+          "status": 200,
+          "headers": {
+            "Content-Type": "image/jpeg",
+            "Content-Length": "2206",
+            "Last-Modified": "Mon, 16 Nov 2026 23:01:48 GMT",
+            "Cache-Control": "public, max-age=3600",
+            "Expires": "Tue, 17 Nov 2026 00:01:48 GMT",
+            "ETag": "\"1794870108.8809474-2206-1338058669\""
+          },
+          "sha256": "f6d95ce46b4969031a7025a4c98cee9b947c92062d46b1579e405b17f67fcbad",
+          "image": {
+            "shape": [
+              80,
+              80,
+              3
+            ],
+            "center_bgr_mean": [
+              240.2,
+              29.8,
+              30.2
+            ]
+          }
+        },
+        {
+          "request": "GET /api/jobs/synthetic/thumb/0",
+          "status": 200,
+          "headers": {
+            "Content-Type": "image/jpeg",
+            "Content-Length": "2206",
+            "Last-Modified": "Mon, 16 Nov 2026 23:01:48 GMT",
+            "Cache-Control": "public, max-age=3600",
+            "Expires": "Tue, 17 Nov 2026 00:01:48 GMT",
+            "ETag": "\"1794870108.8809474-2206-1338058669\""
+          },
+          "sha256": "f6d95ce46b4969031a7025a4c98cee9b947c92062d46b1579e405b17f67fcbad",
+          "image": {
+            "shape": [
+              80,
+              80,
+              3
+            ],
+            "center_bgr_mean": [
+              240.2,
+              29.8,
+              30.2
+            ]
+          }
+        },
+        {
+          "request": "GET /api/jobs/synthetic/thumb/0",
+          "status": 200,
+          "headers": {
+            "Content-Type": "image/jpeg",
+            "Content-Length": "2206",
+            "Last-Modified": "Mon, 16 Nov 2026 23:01:48 GMT",
+            "Cache-Control": "public, max-age=3600",
+            "Expires": "Tue, 17 Nov 2026 00:01:48 GMT",
+            "ETag": "\"1794870108.8809474-2206-1338058669\""
+          },
+          "sha256": "f6d95ce46b4969031a7025a4c98cee9b947c92062d46b1579e405b17f67fcbad",
+          "image": {
+            "shape": [
+              80,
+              80,
+              3
+            ],
+            "center_bgr_mean": [
+              240.2,
+              29.8,
+              30.2
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "case": "warm_conditional",
+      "counts": {
+        "report_open_read": 0,
+        "report_open_write": 0,
+        "report_json_load": 0,
+        "frame_at_calls": 0,
+        "jpeg_open_read": 1
+      },
+      "report_identity": {
+        "path": "/tmp/openscrub-thumbnail-baseline-20261117/synthetic-data/route-probe/openscrub_jobs/synthetic/report.json",
+        "dev": 137,
+        "ino": 95690,
+        "size": 1868,
+        "mtime_ns": 1794870108857824333,
+        "ctime_ns": 1794870108857824333,
+        "sha256": "59eff8444ff660ea6b6e0b85967b21cc3987bfe284d16061cb3f4bfe530307fa"
+      },
+      "source_identity": {
+        "path": "/tmp/openscrub-thumbnail-baseline-20261117/synthetic-data/route-probe/openscrub_jobs/synthetic/input.avi",
+        "dev": 137,
+        "ino": 95688,
+        "size": 35592,
+        "mtime_ns": 1794870108855029318,
+        "ctime_ns": 1794870108855029318,
+        "sha256": "5d0b90fa5a49fa862540aa268dce207192d40a6725ab263d175aaa055e62d173"
+      },
+      "responses": [
+        {
+          "request": "GET /api/jobs/synthetic/thumb/0",
+          "status": 304,
+          "headers": {
+            "Cache-Control": "public, max-age=3600",
+            "Expires": "Tue, 17 Nov 2026 00:01:48 GMT",
+            "ETag": "\"1794870108.8809474-2206-1338058669\""
+          },
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "case": "parallel_cold_four",
+      "counts": {
+        "report_open_read": 4,
+        "report_open_write": 0,
+        "report_json_load": 4,
+        "frame_at_calls": 4,
+        "jpeg_open_read": 4
+      },
+      "report_identity": {
+        "path": "/tmp/openscrub-thumbnail-baseline-20261117/synthetic-data/route-probe/openscrub_jobs/synthetic/report.json",
+        "dev": 137,
+        "ino": 95690,
+        "size": 1868,
+        "mtime_ns": 1794870108857824333,
+        "ctime_ns": 1794870108857824333,
+        "sha256": "59eff8444ff660ea6b6e0b85967b21cc3987bfe284d16061cb3f4bfe530307fa"
+      },
+      "source_identity": {
+        "path": "/tmp/openscrub-thumbnail-baseline-20261117/synthetic-data/route-probe/openscrub_jobs/synthetic/input.avi",
+        "dev": 137,
+        "ino": 95688,
+        "size": 35592,
+        "mtime_ns": 1794870108855029318,
+        "ctime_ns": 1794870108855029318,
+        "sha256": "5d0b90fa5a49fa862540aa268dce207192d40a6725ab263d175aaa055e62d173"
+      },
+      "responses": [
+        {
+          "request": "GET /api/jobs/synthetic/thumb/0",
+          "status": 200,
+          "headers": {
+            "Content-Type": "image/jpeg",
+            "Content-Length": "2206",
+            "Last-Modified": "Mon, 16 Nov 2026 23:01:48 GMT",
+            "Cache-Control": "public, max-age=3600",
+            "Expires": "Tue, 17 Nov 2026 00:01:48 GMT",
+            "ETag": "\"1794870108.894542-2206-1338058669\""
+          },
+          "sha256": "f6d95ce46b4969031a7025a4c98cee9b947c92062d46b1579e405b17f67fcbad",
+          "image": {
+            "shape": [
+              80,
+              80,
+              3
+            ],
+            "center_bgr_mean": [
+              240.2,
+              29.8,
+              30.2
+            ]
+          }
+        },
+        {
+          "request": "GET /api/jobs/synthetic/thumb/1",
+          "status": 200,
+          "headers": {
+            "Content-Type": "image/jpeg",
+            "Content-Length": "2206",
+            "Last-Modified": "Mon, 16 Nov 2026 23:01:48 GMT",
+            "Cache-Control": "public, max-age=3600",
+            "Expires": "Tue, 17 Nov 2026 00:01:48 GMT",
+            "ETag": "\"1794870108.8924394-2206-1338386350\""
+          },
+          "sha256": "f6d95ce46b4969031a7025a4c98cee9b947c92062d46b1579e405b17f67fcbad",
+          "image": {
+            "shape": [
+              80,
+              80,
+              3
+            ],
+            "center_bgr_mean": [
+              240.2,
+              29.8,
+              30.2
+            ]
+          }
+        },
+        {
+          "request": "GET /api/jobs/synthetic/thumb/2",
+          "status": 200,
+          "headers": {
+            "Content-Type": "image/jpeg",
+            "Content-Length": "2206",
+            "Last-Modified": "Mon, 16 Nov 2026 23:01:48 GMT",
+            "Cache-Control": "public, max-age=3600",
+            "Expires": "Tue, 17 Nov 2026 00:01:48 GMT",
+            "ETag": "\"1794870108.8933506-2206-1338714031\""
+          },
+          "sha256": "f6d95ce46b4969031a7025a4c98cee9b947c92062d46b1579e405b17f67fcbad",
+          "image": {
+            "shape": [
+              80,
+              80,
+              3
+            ],
+            "center_bgr_mean": [
+              240.2,
+              29.8,
+              30.2
+            ]
+          }
+        },
+        {
+          "request": "GET /api/jobs/synthetic/thumb/3",
+          "status": 200,
+          "headers": {
+            "Content-Type": "image/jpeg",
+            "Content-Length": "2206",
+            "Last-Modified": "Mon, 16 Nov 2026 23:01:48 GMT",
+            "Cache-Control": "public, max-age=3600",
+            "Expires": "Tue, 17 Nov 2026 00:01:48 GMT",
+            "ETag": "\"1794870108.8943896-2206-1339041712\""
+          },
+          "sha256": "f6d95ce46b4969031a7025a4c98cee9b947c92062d46b1579e405b17f67fcbad",
+          "image": {
+            "shape": [
+              80,
+              80,
+              3
+            ],
+            "center_bgr_mean": [
+              240.2,
+              29.8,
+              30.2
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "case": "parallel_readonly_consumers",
+      "counts": {
+        "report_open_read": 4,
+        "report_open_write": 0,
+        "report_json_load": 4,
+        "frame_at_calls": 0,
+        "jpeg_open_read": 0
+      },
+      "report_identity": {
+        "path": "/tmp/openscrub-thumbnail-baseline-20261117/synthetic-data/route-probe/openscrub_jobs/synthetic/report.json",
+        "dev": 137,
+        "ino": 95690,
+        "size": 1868,
+        "mtime_ns": 1794870108857824333,
+        "ctime_ns": 1794870108857824333,
+        "sha256": "59eff8444ff660ea6b6e0b85967b21cc3987bfe284d16061cb3f4bfe530307fa"
+      },
+      "source_identity": {
+        "path": "/tmp/openscrub-thumbnail-baseline-20261117/synthetic-data/route-probe/openscrub_jobs/synthetic/input.avi",
+        "dev": 137,
+        "ino": 95688,
+        "size": 35592,
+        "mtime_ns": 1794870108855029318,
+        "ctime_ns": 1794870108855029318,
+        "sha256": "5d0b90fa5a49fa862540aa268dce207192d40a6725ab263d175aaa055e62d173"
+      },
+      "responses": [
+        {
+          "request": "GET /api/jobs/synthetic/detections",
+          "status": 200,
+          "headers": {
+            "Content-Type": "application/json",
+            "Content-Length": "640",
+            "Cache-Control": "no-store"
+          },
+          "sha256": "b75d31329b850603611e3c49d14ba6fea9c06da59668b24ff24710afebff8e6e",
+          "body": {
+            "detections": [
+              {
+                "category": "manual",
+                "confidence": 1.0,
+                "enabled": true,
+                "i": 0,
+                "person": -1,
+                "t_end": 0.75,
+                "t_start": 0.0,
+                "text": "synthetic",
+                "track": -1,
+                "zone_dropped": false
+              },
+              {
+                "category": "manual",
+                "confidence": 1.0,
+                "enabled": true,
+                "i": 1,
+                "person": -1,
+                "t_end": 0.75,
+                "t_start": 0.0,
+                "text": "synthetic",
+                "track": -1,
+                "zone_dropped": false
+              },
+              {
+                "category": "manual",
+                "confidence": 1.0,
+                "enabled": true,
+                "i": 2,
+                "person": -1,
+                "t_end": 0.75,
+                "t_start": 0.0,
+                "text": "synthetic",
+                "track": -1,
+                "zone_dropped": false
+              },
+              {
+                "category": "manual",
+                "confidence": 1.0,
+                "enabled": true,
+                "i": 3,
+                "person": -1,
+                "t_end": 0.75,
+                "t_start": 0.0,
+                "text": "synthetic",
+                "track": -1,
+                "zone_dropped": false
+              }
+            ],
+            "duration": 1.0,
+            "fps": 4
+          }
+        },
+        {
+          "request": "GET /api/jobs/synthetic/boxes_at?t=0",
+          "status": 200,
+          "headers": {
+            "Content-Type": "application/json",
+            "Content-Length": "470",
+            "Cache-Control": "no-store"
+          },
+          "sha256": "c623c1a79d0136fe17e61e25b32cf4cf513ca39c913a01fc6a8fedddae42a4b5",
+          "body": {
+            "boxes": [
+              {
+                "box": [
+                  48,
+                  48,
+                  80,
+                  80
+                ],
+                "category": "manual",
+                "enabled": true,
+                "i": 0,
+                "t_end": 0.75,
+                "t_start": 0.0,
+                "text": "synthetic"
+              },
+              {
+                "box": [
+                  48,
+                  48,
+                  80,
+                  80
+                ],
+                "category": "manual",
+                "enabled": true,
+                "i": 1,
+                "t_end": 0.75,
+                "t_start": 0.0,
+                "text": "synthetic"
+              },
+              {
+                "box": [
+                  48,
+                  48,
+                  80,
+                  80
+                ],
+                "category": "manual",
+                "enabled": true,
+                "i": 2,
+                "t_end": 0.75,
+                "t_start": 0.0,
+                "text": "synthetic"
+              },
+              {
+                "box": [
+                  48,
+                  48,
+                  80,
+                  80
+                ],
+                "category": "manual",
+                "enabled": true,
+                "i": 3,
+                "t_end": 0.75,
+                "t_start": 0.0,
+                "text": "synthetic"
+              }
+            ],
+            "ox": 0,
+            "oy": 0,
+            "t": 0.0
+          }
+        },
+        {
+          "request": "GET /api/jobs/synthetic/detections",
+          "status": 200,
+          "headers": {
+            "Content-Type": "application/json",
+            "Content-Length": "640",
+            "Cache-Control": "no-store"
+          },
+          "sha256": "b75d31329b850603611e3c49d14ba6fea9c06da59668b24ff24710afebff8e6e",
+          "body": {
+            "detections": [
+              {
+                "category": "manual",
+                "confidence": 1.0,
+                "enabled": true,
+                "i": 0,
+                "person": -1,
+                "t_end": 0.75,
+                "t_start": 0.0,
+                "text": "synthetic",
+                "track": -1,
+                "zone_dropped": false
+              },
+              {
+                "category": "manual",
+                "confidence": 1.0,
+                "enabled": true,
+                "i": 1,
+                "person": -1,
+                "t_end": 0.75,
+                "t_start": 0.0,
+                "text": "synthetic",
+                "track": -1,
+                "zone_dropped": false
+              },
+              {
+                "category": "manual",
+                "confidence": 1.0,
+                "enabled": true,
+                "i": 2,
+                "person": -1,
+                "t_end": 0.75,
+                "t_start": 0.0,
+                "text": "synthetic",
+                "track": -1,
+                "zone_dropped": false
+              },
+              {
+                "category": "manual",
+                "confidence": 1.0,
+                "enabled": true,
+                "i": 3,
+                "person": -1,
+                "t_end": 0.75,
+                "t_start": 0.0,
+                "text": "synthetic",
+                "track": -1,
+                "zone_dropped": false
+              }
+            ],
+            "duration": 1.0,
+            "fps": 4
+          }
+        },
+        {
+          "request": "GET /api/jobs/synthetic/boxes_at?t=0",
+          "status": 200,
+          "headers": {
+            "Content-Type": "application/json",
+            "Content-Length": "470",
+            "Cache-Control": "no-store"
+          },
+          "sha256": "c623c1a79d0136fe17e61e25b32cf4cf513ca39c913a01fc6a8fedddae42a4b5",
+          "body": {
+            "boxes": [
+              {
+                "box": [
+                  48,
+                  48,
+                  80,
+                  80
+                ],
+                "category": "manual",
+                "enabled": true,
+                "i": 0,
+                "t_end": 0.75,
+                "t_start": 0.0,
+                "text": "synthetic"
+              },
+              {
+                "box": [
+                  48,
+                  48,
+                  80,
+                  80
+                ],
+                "category": "manual",
+                "enabled": true,
+                "i": 1,
+                "t_end": 0.75,
+                "t_start": 0.0,
+                "text": "synthetic"
+              },
+              {
+                "box": [
+                  48,
+                  48,
+                  80,
+                  80
+                ],
+                "category": "manual",
+                "enabled": true,
+                "i": 2,
+                "t_end": 0.75,
+                "t_start": 0.0,
+                "text": "synthetic"
+              },
+              {
+                "box": [
+                  48,
+                  48,
+                  80,
+                  80
+                ],
+                "category": "manual",
+                "enabled": true,
+                "i": 3,
+                "t_end": 0.75,
+                "t_start": 0.0,
+                "text": "synthetic"
+              }
+            ],
+            "ox": 0,
+            "oy": 0,
+            "t": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "case": "geometry_post_same_row",
+      "counts": {
+        "report_open_read": 3,
+        "report_open_write": 1,
+        "report_json_load": 3,
+        "frame_at_calls": 1,
+        "jpeg_open_read": 1
+      },
+      "report_identity": {
+        "path": "/tmp/openscrub-thumbnail-baseline-20261117/synthetic-data/route-probe/openscrub_jobs/synthetic/report.json",
+        "dev": 137,
+        "ino": 95690,
+        "size": 1878,
+        "mtime_ns": 1794870108900491485,
+        "ctime_ns": 1794870108900491485,
+        "sha256": "2d15bc6de520d7156338f120ad94f595d8d69ca547a78cd585863444afe50d3d"
+      },
+      "source_identity": {
+        "path": "/tmp/openscrub-thumbnail-baseline-20261117/synthetic-data/route-probe/openscrub_jobs/synthetic/input.avi",
+        "dev": 137,
+        "ino": 95688,
+        "size": 35592,
+        "mtime_ns": 1794870108855029318,
+        "ctime_ns": 1794870108855029318,
+        "sha256": "5d0b90fa5a49fa862540aa268dce207192d40a6725ab263d175aaa055e62d173"
+      },
+      "responses": [
+        {
+          "request": "POST /api/jobs/synthetic/detections",
+          "status": 200,
+          "headers": {
+            "Content-Type": "application/json",
+            "Content-Length": "45",
+            "Cache-Control": "no-store"
+          },
+          "sha256": "e98952372e033a0c637b9c15118e5166ba811f3684837f0db1f84c09ba9cc8bd",
+          "body": {
+            "ok": true,
+            "suggest_allowlist": [],
+            "total": 4
+          }
+        },
+        {
+          "request": "GET /api/jobs/synthetic/boxes_at?t=0",
+          "status": 200,
+          "headers": {
+            "Content-Type": "application/json",
+            "Content-Length": "480",
+            "Cache-Control": "no-store"
+          },
+          "sha256": "cece9d9c06c468a26b94c1fab65d45e8bfc33e370ed182ee351445f73cf73fdf",
+          "body": {
+            "boxes": [
+              {
+                "box": [
+                  208.0,
+                  48.0,
+                  240.0,
+                  80.0
+                ],
+                "category": "manual",
+                "enabled": true,
+                "i": 0,
+                "t_end": 0.75,
+                "t_start": 0.0,
+                "text": "synthetic"
+              },
+              {
+                "box": [
+                  48,
+                  48,
+                  80,
+                  80
+                ],
+                "category": "manual",
+                "enabled": true,
+                "i": 1,
+                "t_end": 0.75,
+                "t_start": 0.0,
+                "text": "synthetic"
+              },
+              {
+                "box": [
+                  48,
+                  48,
+                  80,
+                  80
+                ],
+                "category": "manual",
+                "enabled": true,
+                "i": 2,
+                "t_end": 0.75,
+                "t_start": 0.0,
+                "text": "synthetic"
+              },
+              {
+                "box": [
+                  48,
+                  48,
+                  80,
+                  80
+                ],
+                "category": "manual",
+                "enabled": true,
+                "i": 3,
+                "t_end": 0.75,
+                "t_start": 0.0,
+                "text": "synthetic"
+              }
+            ],
+            "ox": 0,
+            "oy": 0,
+            "t": 0.0
+          }
+        },
+        {
+          "request": "GET /api/jobs/synthetic/thumb/0",
+          "status": 200,
+          "headers": {
+            "Content-Type": "image/jpeg",
+            "Content-Length": "2206",
+            "Last-Modified": "Mon, 16 Nov 2026 23:01:48 GMT",
+            "Cache-Control": "public, max-age=3600",
+            "Expires": "Tue, 17 Nov 2026 00:01:48 GMT",
+            "ETag": "\"1794870108.894542-2206-1338058669\""
+          },
+          "sha256": "f6d95ce46b4969031a7025a4c98cee9b947c92062d46b1579e405b17f67fcbad",
+          "image": {
+            "shape": [
+              80,
+              80,
+              3
+            ],
+            "center_bgr_mean": [
+              240.2,
+              29.8,
+              30.2
+            ]
+          },
+          "image_path": "/tmp/openscrub-thumbnail-baseline-20261117/images/geometry-stale-left.jpg"
+        },
+        {
+          "request": "GET /api/jobs/synthetic/detframe/0",
+          "status": 200,
+          "headers": {
+            "Content-Type": "image/jpeg",
+            "Content-Length": "12970"
+          },
+          "sha256": "2735fe2420fc0dfd640cd90a5e243dcbe04be6c6fed91dc2e4e9150f8c941aa3",
+          "image": {
+            "shape": [
+              144,
+              320,
+              3
+            ],
+            "center_bgr_mean": [
+              31.3,
+              241.4,
+              33.1
+            ]
+          },
+          "image_path": "/tmp/openscrub-thumbnail-baseline-20261117/images/geometry-current-full.jpg"
+        }
+      ]
+    },
+    {
+      "case": "geometry_forced_cold_control",
+      "counts": {
+        "report_open_read": 1,
+        "report_open_write": 0,
+        "report_json_load": 1,
+        "frame_at_calls": 1,
+        "jpeg_open_read": 1
+      },
+      "report_identity": {
+        "path": "/tmp/openscrub-thumbnail-baseline-20261117/synthetic-data/route-probe/openscrub_jobs/synthetic/report.json",
+        "dev": 137,
+        "ino": 95690,
+        "size": 1878,
+        "mtime_ns": 1794870108900491485,
+        "ctime_ns": 1794870108900491485,
+        "sha256": "2d15bc6de520d7156338f120ad94f595d8d69ca547a78cd585863444afe50d3d"
+      },
+      "source_identity": {
+        "path": "/tmp/openscrub-thumbnail-baseline-20261117/synthetic-data/route-probe/openscrub_jobs/synthetic/input.avi",
+        "dev": 137,
+        "ino": 95688,
+        "size": 35592,
+        "mtime_ns": 1794870108855029318,
+        "ctime_ns": 1794870108855029318,
+        "sha256": "5d0b90fa5a49fa862540aa268dce207192d40a6725ab263d175aaa055e62d173"
+      },
+      "responses": [
+        null,
+        {
+          "request": "GET /api/jobs/synthetic/thumb/0",
+          "status": 200,
+          "headers": {
+            "Content-Type": "image/jpeg",
+            "Content-Length": "2749",
+            "Last-Modified": "Mon, 16 Nov 2026 23:01:48 GMT",
+            "Cache-Control": "public, max-age=3600",
+            "Expires": "Tue, 17 Nov 2026 00:01:48 GMT",
+            "ETag": "\"1794870108.9082181-2749-1338058669\""
+          },
+          "sha256": "df3f2b8315260c58e23e464325e24cd68fbd851756e6d5f8caaf1ab7bd859919",
+          "image": {
+            "shape": [
+              80,
+              80,
+              3
+            ],
+            "center_bgr_mean": [
+              37.7,
+              241.7,
+              242.6
+            ]
+          },
+          "image_path": "/tmp/openscrub-thumbnail-baseline-20261117/images/geometry-current-right.jpg"
+        }
+      ]
+    },
+    {
+      "case": "same_size_atomic_report_replace",
+      "counts": {
+        "report_open_read": 1,
+        "report_open_write": 0,
+        "report_json_load": 1,
+        "frame_at_calls": 0,
+        "jpeg_open_read": 1
+      },
+      "report_identity": {
+        "path": "/tmp/openscrub-thumbnail-baseline-20261117/synthetic-data/route-probe/openscrub_jobs/synthetic/report.json",
+        "dev": 137,
+        "ino": 95702,
+        "size": 1878,
+        "mtime_ns": 1794870108900491485,
+        "ctime_ns": 1794870108908914129,
+        "sha256": "08a7cd5aec2df74e067014141cd889844d760af78d8a378cbf73a3da04845c3b"
+      },
+      "source_identity": {
+        "path": "/tmp/openscrub-thumbnail-baseline-20261117/synthetic-data/route-probe/openscrub_jobs/synthetic/input.avi",
+        "dev": 137,
+        "ino": 95688,
+        "size": 35592,
+        "mtime_ns": 1794870108855029318,
+        "ctime_ns": 1794870108855029318,
+        "sha256": "5d0b90fa5a49fa862540aa268dce207192d40a6725ab263d175aaa055e62d173"
+      },
+      "responses": [
+        {
+          "request": "GET /api/jobs/synthetic/boxes_at?t=0",
+          "status": 200,
+          "headers": {
+            "Content-Type": "application/json",
+            "Content-Length": "480",
+            "Cache-Control": "no-store"
+          },
+          "sha256": "64f70b30b75e643c2eb4bc82c5a2b1589df22e8349624ee177483a938b04c0a3",
+          "body": {
+            "boxes": [
+              {
+                "box": [
+                  108.0,
+                  48.0,
+                  140.0,
+                  80.0
+                ],
+                "category": "manual",
+                "enabled": true,
+                "i": 0,
+                "t_end": 0.75,
+                "t_start": 0.0,
+                "text": "synthetic"
+              },
+              {
+                "box": [
+                  48,
+                  48,
+                  80,
+                  80
+                ],
+                "category": "manual",
+                "enabled": true,
+                "i": 1,
+                "t_end": 0.75,
+                "t_start": 0.0,
+                "text": "synthetic"
+              },
+              {
+                "box": [
+                  48,
+                  48,
+                  80,
+                  80
+                ],
+                "category": "manual",
+                "enabled": true,
+                "i": 2,
+                "t_end": 0.75,
+                "t_start": 0.0,
+                "text": "synthetic"
+              },
+              {
+                "box": [
+                  48,
+                  48,
+                  80,
+                  80
+                ],
+                "category": "manual",
+                "enabled": true,
+                "i": 3,
+                "t_end": 0.75,
+                "t_start": 0.0,
+                "text": "synthetic"
+              }
+            ],
+            "ox": 0,
+            "oy": 0,
+            "t": 0.0
+          }
+        },
+        {
+          "request": "GET /api/jobs/synthetic/thumb/0",
+          "status": 200,
+          "headers": {
+            "Content-Type": "image/jpeg",
+            "Content-Length": "2749",
+            "Last-Modified": "Mon, 16 Nov 2026 23:01:48 GMT",
+            "Cache-Control": "public, max-age=3600",
+            "Expires": "Tue, 17 Nov 2026 00:01:48 GMT",
+            "ETag": "\"1794870108.9082181-2749-1338058669\""
+          },
+          "sha256": "df3f2b8315260c58e23e464325e24cd68fbd851756e6d5f8caaf1ab7bd859919",
+          "image": {
+            "shape": [
+              80,
+              80,
+              3
+            ],
+            "center_bgr_mean": [
+              37.7,
+              241.7,
+              242.6
+            ]
+          },
+          "image_path": "/tmp/openscrub-thumbnail-baseline-20261117/images/atomic-stale-right.jpg"
+        }
+      ],
+      "previous_report_identity": {
+        "path": "/tmp/openscrub-thumbnail-baseline-20261117/synthetic-data/route-probe/openscrub_jobs/synthetic/report.json",
+        "dev": 137,
+        "ino": 95690,
+        "size": 1878,
+        "mtime_ns": 1794870108900491485,
+        "ctime_ns": 1794870108900491485,
+        "sha256": "2d15bc6de520d7156338f120ad94f595d8d69ca547a78cd585863444afe50d3d"
+      }
+    },
+    {
+      "case": "atomic_replace_forced_cold_control",
+      "counts": {
+        "report_open_read": 1,
+        "report_open_write": 0,
+        "report_json_load": 1,
+        "frame_at_calls": 1,
+        "jpeg_open_read": 1
+      },
+      "report_identity": {
+        "path": "/tmp/openscrub-thumbnail-baseline-20261117/synthetic-data/route-probe/openscrub_jobs/synthetic/report.json",
+        "dev": 137,
+        "ino": 95702,
+        "size": 1878,
+        "mtime_ns": 1794870108900491485,
+        "ctime_ns": 1794870108908914129,
+        "sha256": "08a7cd5aec2df74e067014141cd889844d760af78d8a378cbf73a3da04845c3b"
+      },
+      "source_identity": {
+        "path": "/tmp/openscrub-thumbnail-baseline-20261117/synthetic-data/route-probe/openscrub_jobs/synthetic/input.avi",
+        "dev": 137,
+        "ino": 95688,
+        "size": 35592,
+        "mtime_ns": 1794870108855029318,
+        "ctime_ns": 1794870108855029318,
+        "sha256": "5d0b90fa5a49fa862540aa268dce207192d40a6725ab263d175aaa055e62d173"
+      },
+      "responses": [
+        null,
+        {
+          "request": "GET /api/jobs/synthetic/thumb/0",
+          "status": 200,
+          "headers": {
+            "Content-Type": "image/jpeg",
+            "Content-Length": "2421",
+            "Last-Modified": "Mon, 16 Nov 2026 23:01:48 GMT",
+            "Cache-Control": "public, max-age=3600",
+            "Expires": "Tue, 17 Nov 2026 00:01:48 GMT",
+            "ETag": "\"1794870108.9129717-2421-1338058669\""
+          },
+          "sha256": "c7b0fd1a10e042259e82852060e3a64e5fcf3bfdc81e8c010c03ed4602ceefb1",
+          "image": {
+            "shape": [
+              80,
+              80,
+              3
+            ],
+            "center_bgr_mean": [
+              31.9,
+              240.7,
+              32.3
+            ]
+          },
+          "image_path": "/tmp/openscrub-thumbnail-baseline-20261117/images/atomic-current-middle.jpg"
+        }
+      ]
+    },
+    {
+      "case": "normalized_source_switch",
+      "counts": {
+        "report_open_read": 0,
+        "report_open_write": 0,
+        "report_json_load": 0,
+        "frame_at_calls": 0,
+        "jpeg_open_read": 1
+      },
+      "report_identity": {
+        "path": "/tmp/openscrub-thumbnail-baseline-20261117/synthetic-data/route-probe/openscrub_jobs/synthetic/report.json",
+        "dev": 137,
+        "ino": 95702,
+        "size": 1878,
+        "mtime_ns": 1794870108900491485,
+        "ctime_ns": 1794870108908914129,
+        "sha256": "08a7cd5aec2df74e067014141cd889844d760af78d8a378cbf73a3da04845c3b"
+      },
+      "source_identity": {
+        "path": "/tmp/openscrub-thumbnail-baseline-20261117/synthetic-data/route-probe/openscrub_jobs/synthetic/normalized.avi",
+        "dev": 137,
+        "ino": 95689,
+        "size": 35734,
+        "mtime_ns": 1794870108857563356,
+        "ctime_ns": 1794870108857563356,
+        "sha256": "4929fd33a977cbb4d0e7253b517b4812ceaa3bced9e8fadca540197ee86c1a17"
+      },
+      "responses": [
+        {
+          "request": "GET /api/jobs/synthetic/frame_at?t=0",
+          "status": 200,
+          "headers": {
+            "Content-Type": "image/jpeg",
+            "Content-Length": "11390"
+          },
+          "sha256": "c40385d4a5b31e039406def580c3fab817ff2e1618856bd42fb2582610945c55",
+          "image": {
+            "shape": [
+              144,
+              320,
+              3
+            ],
+            "center_bgr_mean": [
+              240.0,
+              31.25,
+              240.0
+            ]
+          },
+          "image_path": "/tmp/openscrub-thumbnail-baseline-20261117/images/normalized-current-full.jpg"
+        },
+        {
+          "request": "GET /api/jobs/synthetic/thumb/0",
+          "status": 200,
+          "headers": {
+            "Content-Type": "image/jpeg",
+            "Content-Length": "2421",
+            "Last-Modified": "Mon, 16 Nov 2026 23:01:48 GMT",
+            "Cache-Control": "public, max-age=3600",
+            "Expires": "Tue, 17 Nov 2026 00:01:48 GMT",
+            "ETag": "\"1794870108.9129717-2421-1338058669\""
+          },
+          "sha256": "c7b0fd1a10e042259e82852060e3a64e5fcf3bfdc81e8c010c03ed4602ceefb1",
+          "image": {
+            "shape": [
+              80,
+              80,
+              3
+            ],
+            "center_bgr_mean": [
+              31.9,
+              240.7,
+              32.3
+            ]
+          },
+          "image_path": "/tmp/openscrub-thumbnail-baseline-20261117/images/normalized-stale-middle.jpg"
+        }
+      ]
+    },
+    {
+      "case": "normalized_source_forced_cold_control",
+      "counts": {
+        "report_open_read": 1,
+        "report_open_write": 0,
+        "report_json_load": 1,
+        "frame_at_calls": 1,
+        "jpeg_open_read": 1
+      },
+      "report_identity": {
+        "path": "/tmp/openscrub-thumbnail-baseline-20261117/synthetic-data/route-probe/openscrub_jobs/synthetic/report.json",
+        "dev": 137,
+        "ino": 95702,
+        "size": 1878,
+        "mtime_ns": 1794870108900491485,
+        "ctime_ns": 1794870108908914129,
+        "sha256": "08a7cd5aec2df74e067014141cd889844d760af78d8a378cbf73a3da04845c3b"
+      },
+      "source_identity": {
+        "path": "/tmp/openscrub-thumbnail-baseline-20261117/synthetic-data/route-probe/openscrub_jobs/synthetic/normalized.avi",
+        "dev": 137,
+        "ino": 95689,
+        "size": 35734,
+        "mtime_ns": 1794870108857563356,
+        "ctime_ns": 1794870108857563356,
+        "sha256": "4929fd33a977cbb4d0e7253b517b4812ceaa3bced9e8fadca540197ee86c1a17"
+      },
+      "responses": [
+        null,
+        {
+          "request": "GET /api/jobs/synthetic/thumb/0",
+          "status": 200,
+          "headers": {
+            "Content-Type": "image/jpeg",
+            "Content-Length": "2218",
+            "Last-Modified": "Mon, 16 Nov 2026 23:01:48 GMT",
+            "Cache-Control": "public, max-age=3600",
+            "Expires": "Tue, 17 Nov 2026 00:01:48 GMT",
+            "ETag": "\"1794870108.9205334-2218-1338058669\""
+          },
+          "sha256": "9f9107a603792ccc331b9be09b948e90b9887cc4084769826aa96766159045d1",
+          "image": {
+            "shape": [
+              80,
+              80,
+              3
+            ],
+            "center_bgr_mean": [
+              239.85,
+              32.15,
+              239.0
+            ]
+          },
+          "image_path": "/tmp/openscrub-thumbnail-baseline-20261117/images/normalized-current-middle.jpg"
+        }
+      ]
+    },
+    {
+      "case": "source_atomic_replace_same_path",
+      "counts": {
+        "report_open_read": 0,
+        "report_open_write": 0,
+        "report_json_load": 0,
+        "frame_at_calls": 0,
+        "jpeg_open_read": 1
+      },
+      "report_identity": {
+        "path": "/tmp/openscrub-thumbnail-baseline-20261117/synthetic-data/route-probe/openscrub_jobs/synthetic/report.json",
+        "dev": 137,
+        "ino": 95702,
+        "size": 1878,
+        "mtime_ns": 1794870108900491485,
+        "ctime_ns": 1794870108908914129,
+        "sha256": "08a7cd5aec2df74e067014141cd889844d760af78d8a378cbf73a3da04845c3b"
+      },
+      "source_identity": {
+        "path": "/tmp/openscrub-thumbnail-baseline-20261117/synthetic-data/route-probe/openscrub_jobs/synthetic/normalized.avi",
+        "dev": 137,
+        "ino": 95710,
+        "size": 35592,
+        "mtime_ns": 1794870108922643856,
+        "ctime_ns": 1794870108922643856,
+        "sha256": "5d0b90fa5a49fa862540aa268dce207192d40a6725ab263d175aaa055e62d173"
+      },
+      "responses": [
+        {
+          "request": "GET /api/jobs/synthetic/frame_at?t=0",
+          "status": 200,
+          "headers": {
+            "Content-Type": "image/jpeg",
+            "Content-Length": "11908"
+          },
+          "sha256": "0b078b865b74d11fa068ed8175234e706f8a3cf550f8fca38d2ba27effe4e4ad",
+          "image": {
+            "shape": [
+              144,
+              320,
+              3
+            ],
+            "center_bgr_mean": [
+              32.7,
+              241.25,
+              32.95
+            ]
+          },
+          "image_path": "/tmp/openscrub-thumbnail-baseline-20261117/images/replaced-current-full.jpg"
+        },
+        {
+          "request": "GET /api/jobs/synthetic/thumb/0",
+          "status": 200,
+          "headers": {
+            "Content-Type": "image/jpeg",
+            "Content-Length": "2218",
+            "Last-Modified": "Mon, 16 Nov 2026 23:01:48 GMT",
+            "Cache-Control": "public, max-age=3600",
+            "Expires": "Tue, 17 Nov 2026 00:01:48 GMT",
+            "ETag": "\"1794870108.9205334-2218-1338058669\""
+          },
+          "sha256": "9f9107a603792ccc331b9be09b948e90b9887cc4084769826aa96766159045d1",
+          "image": {
+            "shape": [
+              80,
+              80,
+              3
+            ],
+            "center_bgr_mean": [
+              239.85,
+              32.15,
+              239.0
+            ]
+          },
+          "image_path": "/tmp/openscrub-thumbnail-baseline-20261117/images/replaced-stale-middle.jpg"
+        }
+      ],
+      "previous_source_identity": {
+        "path": "/tmp/openscrub-thumbnail-baseline-20261117/synthetic-data/route-probe/openscrub_jobs/synthetic/normalized.avi",
+        "dev": 137,
+        "ino": 95689,
+        "size": 35734,
+        "mtime_ns": 1794870108857563356,
+        "ctime_ns": 1794870108857563356,
+        "sha256": "4929fd33a977cbb4d0e7253b517b4812ceaa3bced9e8fadca540197ee86c1a17"
+      }
+    },
+    {
+      "case": "source_replace_forced_cold_control",
+      "counts": {
+        "report_open_read": 1,
+        "report_open_write": 0,
+        "report_json_load": 1,
+        "frame_at_calls": 1,
+        "jpeg_open_read": 1
+      },
+      "report_identity": {
+        "path": "/tmp/openscrub-thumbnail-baseline-20261117/synthetic-data/route-probe/openscrub_jobs/synthetic/report.json",
+        "dev": 137,
+        "ino": 95702,
+        "size": 1878,
+        "mtime_ns": 1794870108900491485,
+        "ctime_ns": 1794870108908914129,
+        "sha256": "08a7cd5aec2df74e067014141cd889844d760af78d8a378cbf73a3da04845c3b"
+      },
+      "source_identity": {
+        "path": "/tmp/openscrub-thumbnail-baseline-20261117/synthetic-data/route-probe/openscrub_jobs/synthetic/normalized.avi",
+        "dev": 137,
+        "ino": 95710,
+        "size": 35592,
+        "mtime_ns": 1794870108922643856,
+        "ctime_ns": 1794870108922643856,
+        "sha256": "5d0b90fa5a49fa862540aa268dce207192d40a6725ab263d175aaa055e62d173"
+      },
+      "responses": [
+        null,
+        {
+          "request": "GET /api/jobs/synthetic/thumb/0",
+          "status": 200,
+          "headers": {
+            "Content-Type": "image/jpeg",
+            "Content-Length": "2421",
+            "Last-Modified": "Mon, 16 Nov 2026 23:01:48 GMT",
+            "Cache-Control": "public, max-age=3600",
+            "Expires": "Tue, 17 Nov 2026 00:01:48 GMT",
+            "ETag": "\"1794870108.9296265-2421-1338058669\""
+          },
+          "sha256": "c7b0fd1a10e042259e82852060e3a64e5fcf3bfdc81e8c010c03ed4602ceefb1",
+          "image": {
+            "shape": [
+              80,
+              80,
+              3
+            ],
+            "center_bgr_mean": [
+              31.9,
+              240.7,
+              32.3
+            ]
+          },
+          "image_path": "/tmp/openscrub-thumbnail-baseline-20261117/images/replaced-current-middle.jpg"
+        }
+      ]
+    },
+    {
+      "case": "warm_with_corrupt_report",
+      "counts": {
+        "report_open_read": 0,
+        "report_open_write": 0,
+        "report_json_load": 0,
+        "frame_at_calls": 0,
+        "jpeg_open_read": 1
+      },
+      "report_identity": {
+        "path": "/tmp/openscrub-thumbnail-baseline-20261117/synthetic-data/route-probe/openscrub_jobs/synthetic/report.json",
+        "dev": 137,
+        "ino": 95702,
+        "size": 7,
+        "mtime_ns": 1794870108930164081,
+        "ctime_ns": 1794870108930164081,
+        "sha256": "be302461cda285db3ed2d45fb767b23e08ca8808b35a638009937df22b332d73"
+      },
+      "source_identity": {
+        "path": "/tmp/openscrub-thumbnail-baseline-20261117/synthetic-data/route-probe/openscrub_jobs/synthetic/normalized.avi",
+        "dev": 137,
+        "ino": 95710,
+        "size": 35592,
+        "mtime_ns": 1794870108922643856,
+        "ctime_ns": 1794870108922643856,
+        "sha256": "5d0b90fa5a49fa862540aa268dce207192d40a6725ab263d175aaa055e62d173"
+      },
+      "responses": [
+        {
+          "request": "GET /api/jobs/synthetic/thumb/0",
+          "status": 200,
+          "headers": {
+            "Content-Type": "image/jpeg",
+            "Content-Length": "2421",
+            "Last-Modified": "Mon, 16 Nov 2026 23:01:48 GMT",
+            "Cache-Control": "public, max-age=3600",
+            "Expires": "Tue, 17 Nov 2026 00:01:48 GMT",
+            "ETag": "\"1794870108.9296265-2421-1338058669\""
+          },
+          "sha256": "c7b0fd1a10e042259e82852060e3a64e5fcf3bfdc81e8c010c03ed4602ceefb1",
+          "image": {
+            "shape": [
+              80,
+              80,
+              3
+            ],
+            "center_bgr_mean": [
+              31.9,
+              240.7,
+              32.3
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

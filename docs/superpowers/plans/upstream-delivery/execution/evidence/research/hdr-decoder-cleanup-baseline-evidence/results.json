@@ -1,0 +1,6302 @@
+{
+  "baseline": "e21ebdf6e3ee46e6c65050dc956a9a3459152269",
+  "donor": "08f432b6160d2fc22e51456020df929de6717e16",
+  "source": {
+    "baseline": {
+      "path": "/tmp/openscrub-hdr-cleanup-20261117/baseline/openscrub.py",
+      "module_name": "hdr_cleanup_baseline",
+      "render_hdr_code_filename": "/tmp/openscrub-hdr-cleanup-20261117/baseline/openscrub.py",
+      "run_render_code_filename": "/tmp/openscrub-hdr-cleanup-20261117/baseline/openscrub.py",
+      "sha256": "0e4f0f9a7846080f591038d021aaf3ca6f01201d83ac32bbdc273f53d5067ee7",
+      "ranges": {
+        "PipelineCancelled": [
+          3432,
+          3433
+        ],
+        "Callbacks": [
+          3436,
+          3451
+        ],
+        "render_hdr": [
+          3887,
+          4059
+        ],
+        "run_render": [
+          8435,
+          8502
+        ]
+      }
+    },
+    "donor": {
+      "path": "/tmp/openscrub-hdr-cleanup-20261117/donor/openscrub.py",
+      "module_name": "hdr_cleanup_donor",
+      "render_hdr_code_filename": "/tmp/openscrub-hdr-cleanup-20261117/donor/openscrub.py",
+      "run_render_code_filename": "/tmp/openscrub-hdr-cleanup-20261117/donor/openscrub.py",
+      "sha256": "0dcf1686c4696fc2e8bc78b2853b2b145556ef81cad78c3a6ed34ff3f2d18f14",
+      "ranges": {
+        "PipelineCancelled": [
+          3372,
+          3373
+        ],
+        "Callbacks": [
+          3376,
+          3391
+        ],
+        "render_hdr": [
+          3827,
+          4035
+        ],
+        "run_render": [
+          8664,
+          8755
+        ]
+      }
+    }
+  },
+  "python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]",
+  "opencv": "4.14.0",
+  "numpy": "2.5.5",
+  "imports": {
+    "cv2": "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/cv2/__init__.py",
+    "numpy": "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/numpy/__init__.py",
+    "subprocess": "/tmp/openscrub-baseline-20261116/python/cpython-3.12.16-linux-x86_64-gnu/lib/python3.12/subprocess.py"
+  },
+  "tool_paths": {
+    "ffmpeg": "/tmp/openscrub-baseline-20261116/tools/usr/bin/ffmpeg",
+    "ffprobe": "/tmp/openscrub-baseline-20261116/tools/usr/bin/ffprobe"
+  },
+  "affinity": [
+    0
+  ],
+  "commands": [
+    {
+      "argv": [
+        "ffmpeg",
+        "-version"
+      ],
+      "returncode": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ffmpeg",
+        "-y",
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-f",
+        "rawvideo",
+        "-pix_fmt",
+        "yuv420p10le",
+        "-s",
+        "64x64",
+        "-r",
+        "3",
+        "-color_primaries",
+        "bt2020",
+        "-color_trc",
+        "smpte2084",
+        "-colorspace",
+        "bt2020nc",
+        "-i",
+        "/tmp/openscrub-hdr-cleanup-20261117/synthetic.yuv",
+        "-c:v",
+        "libx265",
+        "-x265-params",
+        "lossless=1:pools=1:colorprim=bt2020:transfer=smpte2084:colormatrix=bt2020nc",
+        "-color_primaries",
+        "bt2020",
+        "-color_trc",
+        "smpte2084",
+        "-colorspace",
+        "bt2020nc",
+        "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4"
+      ],
+      "returncode": 0,
+      "stderr": "x265 [info]: HEVC encoder version 4.1+1-1d117be\nx265 [info]: build info [Linux][GCC 15.2.0][64 bit] 10bit\nx265 [info]: using cpu capabilities: MMX2 SSE2Fast LZCNT SSSE3 SSE4.2 AVX FMA3 BMI2 AVX2\nx265 [info]: Main 10 profile, Level-8.5 (Main tier)\nx265 [warning]: Too few rows/columns, --wpp disabled\nx265 [info]: Thread pool created using 1 threads\nx265 [info]: Slices                              : 1\nx265 [info]: frame threads / pool features       : 1 / none\nx265 [warning]: Source height < 720p; disabling lookahead-slices\nx265 [info]: Coding QT: max CU size, min CU size : 64 / 8\nx265 [info]: Residual QT: max TU size, max depth : 32 / 1 inter / 1 intra\nx265 [info]: ME / range / subpel / merge         : hex / 57 / 2 / 3\nx265 [info]: Keyframe min / max / scenecut / bias  : 3 / 250 / 40 / 5.00 \nx265 [info]: Lookahead / bframes / badapt        : 20 / 4 / 2\nx265 [info]: b-pyramid / weightp / weightb       : 1 / 1 / 0\nx265 [info]: References / ref-limit  cu / depth  : 3 / off / on\nx265 [info]: Rate Control                        : Lossless\nx265 [info]: tools: rd=3 psy-rd=2.00 early-skip rskip mode=1 signhide tmvp\nx265 [info]: tools: b-intra strong-intra-smoothing deblock sao\nx265 [info]: frame I:      1, Avg QP:4.00  kb/s: 3.17    \nx265 [info]: frame P:      1, Avg QP:4.00  kb/s: 0.29    \nx265 [info]: frame B:      1, Avg QP:4.00  kb/s: 0.24    \nx265 [info]: Weighted P-Frames: Y:0.0% UV:0.0%\nx265 [info]: lossless compression ratio 99.74::1\n\nencoded 3 frames in 0.00s (654.45 fps), 1.23 kb/s, Avg QP:4.00\n"
+    },
+    {
+      "argv": [
+        "ffprobe",
+        "-v",
+        "error",
+        "-count_frames",
+        "-select_streams",
+        "v:0",
+        "-show_entries",
+        "stream=codec_name,pix_fmt,width,height,nb_frames,nb_read_frames,color_transfer,color_primaries,color_space",
+        "-of",
+        "json",
+        "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4"
+      ],
+      "returncode": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ffmpeg",
+        "-v",
+        "error",
+        "-i",
+        "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4",
+        "-f",
+        "rawvideo",
+        "-pix_fmt",
+        "yuv420p10le",
+        "pipe:1"
+      ],
+      "returncode": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ffprobe",
+        "-v",
+        "error",
+        "-count_frames",
+        "-select_streams",
+        "v:0",
+        "-show_entries",
+        "stream=codec_name,pix_fmt,width,height,nb_frames,nb_read_frames,color_transfer,color_primaries,color_space",
+        "-of",
+        "json",
+        "/tmp/openscrub-hdr-cleanup-20261117/baseline-success-weak-observer.mp4"
+      ],
+      "returncode": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ffmpeg",
+        "-v",
+        "error",
+        "-i",
+        "/tmp/openscrub-hdr-cleanup-20261117/baseline-success-weak-observer.mp4",
+        "-f",
+        "rawvideo",
+        "-pix_fmt",
+        "yuv420p10le",
+        "pipe:1"
+      ],
+      "returncode": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ffprobe",
+        "-v",
+        "error",
+        "-count_frames",
+        "-select_streams",
+        "v:0",
+        "-show_entries",
+        "stream=codec_name,pix_fmt,width,height,nb_frames,nb_read_frames,color_transfer,color_primaries,color_space",
+        "-of",
+        "json",
+        "/tmp/openscrub-hdr-cleanup-20261117/donor-success-weak-observer.mp4"
+      ],
+      "returncode": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ffmpeg",
+        "-v",
+        "error",
+        "-i",
+        "/tmp/openscrub-hdr-cleanup-20261117/donor-success-weak-observer.mp4",
+        "-f",
+        "rawvideo",
+        "-pix_fmt",
+        "yuv420p10le",
+        "pipe:1"
+      ],
+      "returncode": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ffprobe",
+        "-v",
+        "error",
+        "-count_frames",
+        "-select_streams",
+        "v:0",
+        "-show_entries",
+        "stream=codec_name,pix_fmt,width,height,nb_frames,nb_read_frames,color_transfer,color_primaries,color_space",
+        "-of",
+        "json",
+        "/tmp/openscrub-hdr-cleanup-20261117/baseline-success-diagnostic-strong.mp4"
+      ],
+      "returncode": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ffmpeg",
+        "-v",
+        "error",
+        "-i",
+        "/tmp/openscrub-hdr-cleanup-20261117/baseline-success-diagnostic-strong.mp4",
+        "-f",
+        "rawvideo",
+        "-pix_fmt",
+        "yuv420p10le",
+        "pipe:1"
+      ],
+      "returncode": 0,
+      "stderr": ""
+    }
+  ],
+  "cases": [
+    {
+      "name": "baseline-success-weak-observer",
+      "kind": "success",
+      "strong_diagnostic_popen_references": false,
+      "boundary": "actual run_render -> actual render_hdr",
+      "dst": "/tmp/openscrub-hdr-cleanup-20261117/baseline-success-weak-observer.mp4",
+      "return": {
+        "synthetic": true,
+        "output": "/tmp/openscrub-hdr-cleanup-20261117/baseline-success-weak-observer.mp4"
+      },
+      "status": "success",
+      "at_return_or_held_traceback": {
+        "children": [
+          {
+            "pid": 50,
+            "command": [
+              "ffmpeg",
+              "-loglevel",
+              "error",
+              "-i",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "yuv420p10le",
+              "pipe:1"
+            ],
+            "object_alive": false,
+            "returncode": null,
+            "wait_returns": [
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdout",
+                "fd": 3,
+                "target": "pipe:[1893473]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          },
+          {
+            "pid": 51,
+            "command": [
+              "ffprobe",
+              "-v",
+              "error",
+              "-select_streams",
+              "a",
+              "-show_entries",
+              "stream=codec_name,codec_tag_string",
+              "-of",
+              "json",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4"
+            ],
+            "object_alive": false,
+            "returncode": null,
+            "wait_returns": [
+              0,
+              0,
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdout",
+                "fd": 4,
+                "target": "pipe:[1893485]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              },
+              {
+                "name": "stderr",
+                "fd": 6,
+                "target": "pipe:[1893486]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          },
+          {
+            "pid": 57,
+            "command": [
+              "ffmpeg",
+              "-y",
+              "-loglevel",
+              "error",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "yuv420p10le",
+              "-s",
+              "64x64",
+              "-r",
+              "3.000000",
+              "-i",
+              "pipe:0",
+              "-i",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4",
+              "-map",
+              "0:v:0",
+              "-map",
+              "1:a?",
+              "-map_metadata",
+              "-1",
+              "-map_chapters",
+              "-1",
+              "-c:v",
+              "libx265",
+              "-crf",
+              "18",
+              "-preset",
+              "fast",
+              "-pix_fmt",
+              "yuv420p10le",
+              "-x265-params",
+              "colorprim=bt2020:transfer=smpte2084:colormatrix=bt2020nc",
+              "-color_primaries",
+              "bt2020",
+              "-color_trc",
+              "smpte2084",
+              "-colorspace",
+              "bt2020nc",
+              "-tag:v",
+              "hvc1",
+              "-c:a",
+              "copy",
+              "/tmp/openscrub-hdr-cleanup-20261117/baseline-success-weak-observer.mp4"
+            ],
+            "object_alive": false,
+            "returncode": null,
+            "wait_returns": [
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdin",
+                "fd": 6,
+                "target": "pipe:[1893504]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          }
+        ],
+        "temporary_files": [
+          {
+            "name": "encoder_error_file",
+            "fd": 4,
+            "target": "/tmp/#163494 (deleted)",
+            "object_alive": false,
+            "closed": null,
+            "fd_state": {
+              "open": false,
+              "same_target": false
+            }
+          }
+        ]
+      },
+      "after_releasing_exception_and_gc": {
+        "children": [
+          {
+            "pid": 50,
+            "command": [
+              "ffmpeg",
+              "-loglevel",
+              "error",
+              "-i",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "yuv420p10le",
+              "pipe:1"
+            ],
+            "object_alive": false,
+            "returncode": null,
+            "wait_returns": [
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdout",
+                "fd": 3,
+                "target": "pipe:[1893473]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          },
+          {
+            "pid": 51,
+            "command": [
+              "ffprobe",
+              "-v",
+              "error",
+              "-select_streams",
+              "a",
+              "-show_entries",
+              "stream=codec_name,codec_tag_string",
+              "-of",
+              "json",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4"
+            ],
+            "object_alive": false,
+            "returncode": null,
+            "wait_returns": [
+              0,
+              0,
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdout",
+                "fd": 4,
+                "target": "pipe:[1893485]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              },
+              {
+                "name": "stderr",
+                "fd": 6,
+                "target": "pipe:[1893486]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          },
+          {
+            "pid": 57,
+            "command": [
+              "ffmpeg",
+              "-y",
+              "-loglevel",
+              "error",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "yuv420p10le",
+              "-s",
+              "64x64",
+              "-r",
+              "3.000000",
+              "-i",
+              "pipe:0",
+              "-i",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4",
+              "-map",
+              "0:v:0",
+              "-map",
+              "1:a?",
+              "-map_metadata",
+              "-1",
+              "-map_chapters",
+              "-1",
+              "-c:v",
+              "libx265",
+              "-crf",
+              "18",
+              "-preset",
+              "fast",
+              "-pix_fmt",
+              "yuv420p10le",
+              "-x265-params",
+              "colorprim=bt2020:transfer=smpte2084:colormatrix=bt2020nc",
+              "-color_primaries",
+              "bt2020",
+              "-color_trc",
+              "smpte2084",
+              "-colorspace",
+              "bt2020nc",
+              "-tag:v",
+              "hvc1",
+              "-c:a",
+              "copy",
+              "/tmp/openscrub-hdr-cleanup-20261117/baseline-success-weak-observer.mp4"
+            ],
+            "object_alive": false,
+            "returncode": null,
+            "wait_returns": [
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdin",
+                "fd": 6,
+                "target": "pipe:[1893504]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          }
+        ],
+        "temporary_files": [
+          {
+            "name": "encoder_error_file",
+            "fd": 4,
+            "target": "/tmp/#163494 (deleted)",
+            "object_alive": false,
+            "closed": null,
+            "fd_state": {
+              "open": false,
+              "same_target": false
+            }
+          }
+        ]
+      },
+      "output_exists": true,
+      "output_bytes": 3366,
+      "encoder_write_attempt_frames": 3,
+      "preencode_all_3_frames_equal_source_raw": true,
+      "preencode_sha256": "174c242e9bd68fe5ee9512274b5d681a990b06737ad4ff1b74221753eecd725d",
+      "harness_cleanup_actions": [],
+      "terminal_after_harness_cleanup": {
+        "children": [
+          {
+            "pid": 50,
+            "command": [
+              "ffmpeg",
+              "-loglevel",
+              "error",
+              "-i",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "yuv420p10le",
+              "pipe:1"
+            ],
+            "object_alive": false,
+            "returncode": null,
+            "wait_returns": [
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdout",
+                "fd": 3,
+                "target": "pipe:[1893473]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          },
+          {
+            "pid": 51,
+            "command": [
+              "ffprobe",
+              "-v",
+              "error",
+              "-select_streams",
+              "a",
+              "-show_entries",
+              "stream=codec_name,codec_tag_string",
+              "-of",
+              "json",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4"
+            ],
+            "object_alive": false,
+            "returncode": null,
+            "wait_returns": [
+              0,
+              0,
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdout",
+                "fd": 4,
+                "target": "pipe:[1893485]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              },
+              {
+                "name": "stderr",
+                "fd": 6,
+                "target": "pipe:[1893486]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          },
+          {
+            "pid": 57,
+            "command": [
+              "ffmpeg",
+              "-y",
+              "-loglevel",
+              "error",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "yuv420p10le",
+              "-s",
+              "64x64",
+              "-r",
+              "3.000000",
+              "-i",
+              "pipe:0",
+              "-i",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4",
+              "-map",
+              "0:v:0",
+              "-map",
+              "1:a?",
+              "-map_metadata",
+              "-1",
+              "-map_chapters",
+              "-1",
+              "-c:v",
+              "libx265",
+              "-crf",
+              "18",
+              "-preset",
+              "fast",
+              "-pix_fmt",
+              "yuv420p10le",
+              "-x265-params",
+              "colorprim=bt2020:transfer=smpte2084:colormatrix=bt2020nc",
+              "-color_primaries",
+              "bt2020",
+              "-color_trc",
+              "smpte2084",
+              "-colorspace",
+              "bt2020nc",
+              "-tag:v",
+              "hvc1",
+              "-c:a",
+              "copy",
+              "/tmp/openscrub-hdr-cleanup-20261117/baseline-success-weak-observer.mp4"
+            ],
+            "object_alive": false,
+            "returncode": null,
+            "wait_returns": [
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdin",
+                "fd": 6,
+                "target": "pipe:[1893504]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          }
+        ],
+        "temporary_files": [
+          {
+            "name": "encoder_error_file",
+            "fd": 4,
+            "target": "/tmp/#163494 (deleted)",
+            "object_alive": false,
+            "closed": null,
+            "fd_state": {
+              "open": false,
+              "same_target": false
+            }
+          }
+        ]
+      },
+      "callbacks": [
+        [
+          "log",
+          "[4/4] Rendering -> /tmp/openscrub-hdr-cleanup-20261117/baseline-success-weak-observer.mp4"
+        ],
+        [
+          "log",
+          "      encoder: libx265 10-bit (CPU)"
+        ],
+        [
+          "cancelled",
+          false
+        ],
+        [
+          "progress",
+          "render",
+          3,
+          3
+        ],
+        [
+          "log",
+          "      HDR preserved: 10-bit HEVC, color tags color_primaries=bt2020, color_trc=smpte2084, colorspace=bt2020nc"
+        ],
+        [
+          "log",
+          "done."
+        ]
+      ],
+      "metadata": {
+        "programs": [],
+        "stream_groups": [],
+        "streams": [
+          {
+            "codec_name": "hevc",
+            "width": 64,
+            "height": 64,
+            "pix_fmt": "yuv420p10le",
+            "color_space": "bt2020nc",
+            "color_transfer": "smpte2084",
+            "color_primaries": "bt2020",
+            "nb_frames": "3",
+            "nb_read_frames": "3"
+          }
+        ]
+      },
+      "decoded_frame_count": 3,
+      "decoded_plane_ranges": [
+        [
+          856,
+          856
+        ],
+        [
+          560,
+          560
+        ],
+        [
+          341,
+          341
+        ]
+      ],
+      "decoded_plane_max_abs_vs_source": [
+        44,
+        240,
+        41
+      ]
+    },
+    {
+      "name": "baseline-cancel-weak-observer",
+      "kind": "cancel",
+      "strong_diagnostic_popen_references": false,
+      "boundary": "actual run_render -> actual render_hdr",
+      "dst": "/tmp/openscrub-hdr-cleanup-20261117/baseline-cancel-weak-observer.mp4",
+      "status": "PipelineCancelled",
+      "message": "",
+      "traceback": "Traceback (most recent call last):\n  File \"/home/tahv0/src/OpenScrub/.superpowers/sdd/README/hdr-decoder-cleanup-baseline-evidence/probe_cleanup.py\", line 233, in exercise\n    row['return'] = mod.run_render(args, state, CB())\n                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/openscrub-hdr-cleanup-20261117/baseline/openscrub.py\", line 8478, in run_render\n    render_hdr(args.hdr_source, dst, dets_r, state[\"cum\"],\n  File \"/tmp/openscrub-hdr-cleanup-20261117/baseline/openscrub.py\", line 3989, in render_hdr\n    raise PipelineCancelled()\nhdr_cleanup_baseline.PipelineCancelled\n",
+      "at_return_or_held_traceback": {
+        "children": [
+          {
+            "pid": 80,
+            "command": [
+              "ffmpeg",
+              "-loglevel",
+              "error",
+              "-i",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "yuv420p10le",
+              "pipe:1"
+            ],
+            "object_alive": true,
+            "returncode": 0,
+            "wait_returns": [
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdout",
+                "fd": 3,
+                "target": "pipe:[1893518]",
+                "object_alive": true,
+                "closed": false,
+                "fd_state": {
+                  "open": true,
+                  "same_target": true,
+                  "target": "pipe:[1893518]"
+                }
+              }
+            ]
+          },
+          {
+            "pid": 81,
+            "command": [
+              "ffprobe",
+              "-v",
+              "error",
+              "-select_streams",
+              "a",
+              "-show_entries",
+              "stream=codec_name,codec_tag_string",
+              "-of",
+              "json",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4"
+            ],
+            "object_alive": false,
+            "returncode": null,
+            "wait_returns": [
+              0,
+              0,
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdout",
+                "fd": 4,
+                "target": "pipe:[1893530]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": true,
+                  "same_target": false,
+                  "target": "/tmp/#163495 (deleted)"
+                }
+              },
+              {
+                "name": "stderr",
+                "fd": 6,
+                "target": "pipe:[1893531]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          },
+          {
+            "pid": 87,
+            "command": [
+              "ffmpeg",
+              "-y",
+              "-loglevel",
+              "error",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "yuv420p10le",
+              "-s",
+              "64x64",
+              "-r",
+              "3.000000",
+              "-i",
+              "pipe:0",
+              "-i",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4",
+              "-map",
+              "0:v:0",
+              "-map",
+              "1:a?",
+              "-map_metadata",
+              "-1",
+              "-map_chapters",
+              "-1",
+              "-c:v",
+              "libx265",
+              "-crf",
+              "18",
+              "-preset",
+              "fast",
+              "-pix_fmt",
+              "yuv420p10le",
+              "-x265-params",
+              "colorprim=bt2020:transfer=smpte2084:colormatrix=bt2020nc",
+              "-color_primaries",
+              "bt2020",
+              "-color_trc",
+              "smpte2084",
+              "-colorspace",
+              "bt2020nc",
+              "-tag:v",
+              "hvc1",
+              "-c:a",
+              "copy",
+              "/tmp/openscrub-hdr-cleanup-20261117/baseline-cancel-weak-observer.mp4"
+            ],
+            "object_alive": true,
+            "returncode": -15,
+            "wait_returns": [
+              -15
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdin",
+                "fd": 6,
+                "target": "pipe:[1893549]",
+                "object_alive": true,
+                "closed": true,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          }
+        ],
+        "temporary_files": [
+          {
+            "name": "encoder_error_file",
+            "fd": 4,
+            "target": "/tmp/#163495 (deleted)",
+            "object_alive": true,
+            "closed": false,
+            "fd_state": {
+              "open": true,
+              "same_target": true,
+              "target": "/tmp/#163495 (deleted)"
+            }
+          }
+        ]
+      },
+      "after_releasing_exception_and_gc": {
+        "children": [
+          {
+            "pid": 80,
+            "command": [
+              "ffmpeg",
+              "-loglevel",
+              "error",
+              "-i",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "yuv420p10le",
+              "pipe:1"
+            ],
+            "object_alive": false,
+            "returncode": null,
+            "wait_returns": [
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdout",
+                "fd": 3,
+                "target": "pipe:[1893518]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          },
+          {
+            "pid": 81,
+            "command": [
+              "ffprobe",
+              "-v",
+              "error",
+              "-select_streams",
+              "a",
+              "-show_entries",
+              "stream=codec_name,codec_tag_string",
+              "-of",
+              "json",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4"
+            ],
+            "object_alive": false,
+            "returncode": null,
+            "wait_returns": [
+              0,
+              0,
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdout",
+                "fd": 4,
+                "target": "pipe:[1893530]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              },
+              {
+                "name": "stderr",
+                "fd": 6,
+                "target": "pipe:[1893531]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          },
+          {
+            "pid": 87,
+            "command": [
+              "ffmpeg",
+              "-y",
+              "-loglevel",
+              "error",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "yuv420p10le",
+              "-s",
+              "64x64",
+              "-r",
+              "3.000000",
+              "-i",
+              "pipe:0",
+              "-i",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4",
+              "-map",
+              "0:v:0",
+              "-map",
+              "1:a?",
+              "-map_metadata",
+              "-1",
+              "-map_chapters",
+              "-1",
+              "-c:v",
+              "libx265",
+              "-crf",
+              "18",
+              "-preset",
+              "fast",
+              "-pix_fmt",
+              "yuv420p10le",
+              "-x265-params",
+              "colorprim=bt2020:transfer=smpte2084:colormatrix=bt2020nc",
+              "-color_primaries",
+              "bt2020",
+              "-color_trc",
+              "smpte2084",
+              "-colorspace",
+              "bt2020nc",
+              "-tag:v",
+              "hvc1",
+              "-c:a",
+              "copy",
+              "/tmp/openscrub-hdr-cleanup-20261117/baseline-cancel-weak-observer.mp4"
+            ],
+            "object_alive": false,
+            "returncode": null,
+            "wait_returns": [
+              -15
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdin",
+                "fd": 6,
+                "target": "pipe:[1893549]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          }
+        ],
+        "temporary_files": [
+          {
+            "name": "encoder_error_file",
+            "fd": 4,
+            "target": "/tmp/#163495 (deleted)",
+            "object_alive": false,
+            "closed": null,
+            "fd_state": {
+              "open": false,
+              "same_target": false
+            }
+          }
+        ]
+      },
+      "output_exists": false,
+      "output_bytes": null,
+      "encoder_write_attempt_frames": 0,
+      "harness_cleanup_actions": [],
+      "terminal_after_harness_cleanup": {
+        "children": [
+          {
+            "pid": 80,
+            "command": [
+              "ffmpeg",
+              "-loglevel",
+              "error",
+              "-i",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "yuv420p10le",
+              "pipe:1"
+            ],
+            "object_alive": false,
+            "returncode": null,
+            "wait_returns": [
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdout",
+                "fd": 3,
+                "target": "pipe:[1893518]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          },
+          {
+            "pid": 81,
+            "command": [
+              "ffprobe",
+              "-v",
+              "error",
+              "-select_streams",
+              "a",
+              "-show_entries",
+              "stream=codec_name,codec_tag_string",
+              "-of",
+              "json",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4"
+            ],
+            "object_alive": false,
+            "returncode": null,
+            "wait_returns": [
+              0,
+              0,
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdout",
+                "fd": 4,
+                "target": "pipe:[1893530]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              },
+              {
+                "name": "stderr",
+                "fd": 6,
+                "target": "pipe:[1893531]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          },
+          {
+            "pid": 87,
+            "command": [
+              "ffmpeg",
+              "-y",
+              "-loglevel",
+              "error",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "yuv420p10le",
+              "-s",
+              "64x64",
+              "-r",
+              "3.000000",
+              "-i",
+              "pipe:0",
+              "-i",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4",
+              "-map",
+              "0:v:0",
+              "-map",
+              "1:a?",
+              "-map_metadata",
+              "-1",
+              "-map_chapters",
+              "-1",
+              "-c:v",
+              "libx265",
+              "-crf",
+              "18",
+              "-preset",
+              "fast",
+              "-pix_fmt",
+              "yuv420p10le",
+              "-x265-params",
+              "colorprim=bt2020:transfer=smpte2084:colormatrix=bt2020nc",
+              "-color_primaries",
+              "bt2020",
+              "-color_trc",
+              "smpte2084",
+              "-colorspace",
+              "bt2020nc",
+              "-tag:v",
+              "hvc1",
+              "-c:a",
+              "copy",
+              "/tmp/openscrub-hdr-cleanup-20261117/baseline-cancel-weak-observer.mp4"
+            ],
+            "object_alive": false,
+            "returncode": null,
+            "wait_returns": [
+              -15
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdin",
+                "fd": 6,
+                "target": "pipe:[1893549]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          }
+        ],
+        "temporary_files": [
+          {
+            "name": "encoder_error_file",
+            "fd": 4,
+            "target": "/tmp/#163495 (deleted)",
+            "object_alive": false,
+            "closed": null,
+            "fd_state": {
+              "open": false,
+              "same_target": false
+            }
+          }
+        ]
+      },
+      "callbacks": [
+        [
+          "log",
+          "[4/4] Rendering -> /tmp/openscrub-hdr-cleanup-20261117/baseline-cancel-weak-observer.mp4"
+        ],
+        [
+          "log",
+          "      encoder: libx265 10-bit (CPU)"
+        ],
+        [
+          "cancelled",
+          true
+        ]
+      ]
+    },
+    {
+      "name": "baseline-io-error-weak-observer",
+      "kind": "io-error",
+      "strong_diagnostic_popen_references": false,
+      "boundary": "actual run_render -> actual render_hdr",
+      "dst": "/tmp/openscrub-hdr-cleanup-20261117/missing-parent/baseline-io-error-weak-observer.mp4",
+      "status": "RuntimeError",
+      "message": "HDR encode failed (ffmpeg exit 254): [out#0/mp4 @ 0x5e361ffd3880] Error opening output /tmp/openscrub-hdr-cleanup-20261117/missing-parent/baseline-io-error-weak-observer.mp4: No such file or directory | Error opening output file /tmp/openscrub-hdr-cleanup-20261117/missing-parent/baseline-io-error-weak-observer.mp4. | Error opening output files: No such file or directory",
+      "traceback": "Traceback (most recent call last):\n  File \"/home/tahv0/src/OpenScrub/.superpowers/sdd/README/hdr-decoder-cleanup-baseline-evidence/probe_cleanup.py\", line 233, in exercise\n    row['return'] = mod.run_render(args, state, CB())\n                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/openscrub-hdr-cleanup-20261117/baseline/openscrub.py\", line 8478, in run_render\n    render_hdr(args.hdr_source, dst, dets_r, state[\"cum\"],\n  File \"/tmp/openscrub-hdr-cleanup-20261117/baseline/openscrub.py\", line 4056, in render_hdr\n    raise _ffmpeg_failure(ff_err, \"HDR encode\", rc)\nRuntimeError: HDR encode failed (ffmpeg exit 254): [out#0/mp4 @ 0x5e361ffd3880] Error opening output /tmp/openscrub-hdr-cleanup-20261117/missing-parent/baseline-io-error-weak-observer.mp4: No such file or directory | Error opening output file /tmp/openscrub-hdr-cleanup-20261117/missing-parent/baseline-io-error-weak-observer.mp4. | Error opening output files: No such file or directory\n",
+      "at_return_or_held_traceback": {
+        "children": [
+          {
+            "pid": 88,
+            "command": [
+              "ffmpeg",
+              "-loglevel",
+              "error",
+              "-i",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "yuv420p10le",
+              "pipe:1"
+            ],
+            "object_alive": true,
+            "returncode": 0,
+            "wait_returns": [
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdout",
+                "fd": 3,
+                "target": "pipe:[1893561]",
+                "object_alive": true,
+                "closed": true,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          },
+          {
+            "pid": 89,
+            "command": [
+              "ffprobe",
+              "-v",
+              "error",
+              "-select_streams",
+              "a",
+              "-show_entries",
+              "stream=codec_name,codec_tag_string",
+              "-of",
+              "json",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4"
+            ],
+            "object_alive": false,
+            "returncode": null,
+            "wait_returns": [
+              0,
+              0,
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdout",
+                "fd": 4,
+                "target": "pipe:[1893573]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": true,
+                  "same_target": false,
+                  "target": "/tmp/#163496 (deleted)"
+                }
+              },
+              {
+                "name": "stderr",
+                "fd": 6,
+                "target": "pipe:[1893574]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          },
+          {
+            "pid": 95,
+            "command": [
+              "ffmpeg",
+              "-y",
+              "-loglevel",
+              "error",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "yuv420p10le",
+              "-s",
+              "64x64",
+              "-r",
+              "3.000000",
+              "-i",
+              "pipe:0",
+              "-i",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4",
+              "-map",
+              "0:v:0",
+              "-map",
+              "1:a?",
+              "-map_metadata",
+              "-1",
+              "-map_chapters",
+              "-1",
+              "-c:v",
+              "libx265",
+              "-crf",
+              "18",
+              "-preset",
+              "fast",
+              "-pix_fmt",
+              "yuv420p10le",
+              "-x265-params",
+              "colorprim=bt2020:transfer=smpte2084:colormatrix=bt2020nc",
+              "-color_primaries",
+              "bt2020",
+              "-color_trc",
+              "smpte2084",
+              "-colorspace",
+              "bt2020nc",
+              "-tag:v",
+              "hvc1",
+              "-c:a",
+              "copy",
+              "/tmp/openscrub-hdr-cleanup-20261117/missing-parent/baseline-io-error-weak-observer.mp4"
+            ],
+            "object_alive": true,
+            "returncode": 254,
+            "wait_returns": [
+              254
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdin",
+                "fd": 6,
+                "target": "pipe:[1893592]",
+                "object_alive": true,
+                "closed": true,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          }
+        ],
+        "temporary_files": [
+          {
+            "name": "encoder_error_file",
+            "fd": 4,
+            "target": "/tmp/#163496 (deleted)",
+            "object_alive": true,
+            "closed": false,
+            "fd_state": {
+              "open": true,
+              "same_target": true,
+              "target": "/tmp/#163496 (deleted)"
+            }
+          }
+        ]
+      },
+      "after_releasing_exception_and_gc": {
+        "children": [
+          {
+            "pid": 88,
+            "command": [
+              "ffmpeg",
+              "-loglevel",
+              "error",
+              "-i",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "yuv420p10le",
+              "pipe:1"
+            ],
+            "object_alive": false,
+            "returncode": null,
+            "wait_returns": [
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdout",
+                "fd": 3,
+                "target": "pipe:[1893561]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          },
+          {
+            "pid": 89,
+            "command": [
+              "ffprobe",
+              "-v",
+              "error",
+              "-select_streams",
+              "a",
+              "-show_entries",
+              "stream=codec_name,codec_tag_string",
+              "-of",
+              "json",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4"
+            ],
+            "object_alive": false,
+            "returncode": null,
+            "wait_returns": [
+              0,
+              0,
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdout",
+                "fd": 4,
+                "target": "pipe:[1893573]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              },
+              {
+                "name": "stderr",
+                "fd": 6,
+                "target": "pipe:[1893574]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          },
+          {
+            "pid": 95,
+            "command": [
+              "ffmpeg",
+              "-y",
+              "-loglevel",
+              "error",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "yuv420p10le",
+              "-s",
+              "64x64",
+              "-r",
+              "3.000000",
+              "-i",
+              "pipe:0",
+              "-i",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4",
+              "-map",
+              "0:v:0",
+              "-map",
+              "1:a?",
+              "-map_metadata",
+              "-1",
+              "-map_chapters",
+              "-1",
+              "-c:v",
+              "libx265",
+              "-crf",
+              "18",
+              "-preset",
+              "fast",
+              "-pix_fmt",
+              "yuv420p10le",
+              "-x265-params",
+              "colorprim=bt2020:transfer=smpte2084:colormatrix=bt2020nc",
+              "-color_primaries",
+              "bt2020",
+              "-color_trc",
+              "smpte2084",
+              "-colorspace",
+              "bt2020nc",
+              "-tag:v",
+              "hvc1",
+              "-c:a",
+              "copy",
+              "/tmp/openscrub-hdr-cleanup-20261117/missing-parent/baseline-io-error-weak-observer.mp4"
+            ],
+            "object_alive": false,
+            "returncode": null,
+            "wait_returns": [
+              254
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdin",
+                "fd": 6,
+                "target": "pipe:[1893592]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          }
+        ],
+        "temporary_files": [
+          {
+            "name": "encoder_error_file",
+            "fd": 4,
+            "target": "/tmp/#163496 (deleted)",
+            "object_alive": false,
+            "closed": null,
+            "fd_state": {
+              "open": false,
+              "same_target": false
+            }
+          }
+        ]
+      },
+      "output_exists": false,
+      "output_bytes": null,
+      "encoder_write_attempt_frames": 3,
+      "harness_cleanup_actions": [],
+      "terminal_after_harness_cleanup": {
+        "children": [
+          {
+            "pid": 88,
+            "command": [
+              "ffmpeg",
+              "-loglevel",
+              "error",
+              "-i",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "yuv420p10le",
+              "pipe:1"
+            ],
+            "object_alive": false,
+            "returncode": null,
+            "wait_returns": [
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdout",
+                "fd": 3,
+                "target": "pipe:[1893561]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          },
+          {
+            "pid": 89,
+            "command": [
+              "ffprobe",
+              "-v",
+              "error",
+              "-select_streams",
+              "a",
+              "-show_entries",
+              "stream=codec_name,codec_tag_string",
+              "-of",
+              "json",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4"
+            ],
+            "object_alive": false,
+            "returncode": null,
+            "wait_returns": [
+              0,
+              0,
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdout",
+                "fd": 4,
+                "target": "pipe:[1893573]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              },
+              {
+                "name": "stderr",
+                "fd": 6,
+                "target": "pipe:[1893574]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          },
+          {
+            "pid": 95,
+            "command": [
+              "ffmpeg",
+              "-y",
+              "-loglevel",
+              "error",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "yuv420p10le",
+              "-s",
+              "64x64",
+              "-r",
+              "3.000000",
+              "-i",
+              "pipe:0",
+              "-i",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4",
+              "-map",
+              "0:v:0",
+              "-map",
+              "1:a?",
+              "-map_metadata",
+              "-1",
+              "-map_chapters",
+              "-1",
+              "-c:v",
+              "libx265",
+              "-crf",
+              "18",
+              "-preset",
+              "fast",
+              "-pix_fmt",
+              "yuv420p10le",
+              "-x265-params",
+              "colorprim=bt2020:transfer=smpte2084:colormatrix=bt2020nc",
+              "-color_primaries",
+              "bt2020",
+              "-color_trc",
+              "smpte2084",
+              "-colorspace",
+              "bt2020nc",
+              "-tag:v",
+              "hvc1",
+              "-c:a",
+              "copy",
+              "/tmp/openscrub-hdr-cleanup-20261117/missing-parent/baseline-io-error-weak-observer.mp4"
+            ],
+            "object_alive": false,
+            "returncode": null,
+            "wait_returns": [
+              254
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdin",
+                "fd": 6,
+                "target": "pipe:[1893592]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          }
+        ],
+        "temporary_files": [
+          {
+            "name": "encoder_error_file",
+            "fd": 4,
+            "target": "/tmp/#163496 (deleted)",
+            "object_alive": false,
+            "closed": null,
+            "fd_state": {
+              "open": false,
+              "same_target": false
+            }
+          }
+        ]
+      },
+      "callbacks": [
+        [
+          "log",
+          "[4/4] Rendering -> /tmp/openscrub-hdr-cleanup-20261117/missing-parent/baseline-io-error-weak-observer.mp4"
+        ],
+        [
+          "log",
+          "      encoder: libx265 10-bit (CPU)"
+        ],
+        [
+          "cancelled",
+          false
+        ],
+        [
+          "progress",
+          "render",
+          3,
+          3
+        ]
+      ]
+    },
+    {
+      "name": "baseline-encoder-exit-weak-observer",
+      "kind": "encoder-exit",
+      "strong_diagnostic_popen_references": false,
+      "boundary": "actual run_render -> actual render_hdr",
+      "dst": "/tmp/openscrub-hdr-cleanup-20261117/baseline-encoder-exit-weak-observer.mp4",
+      "status": "RuntimeError",
+      "message": "HDR encode failed (ffmpeg exit -9) \u2014 ffmpeg gave no error message",
+      "traceback": "Traceback (most recent call last):\n  File \"/tmp/openscrub-hdr-cleanup-20261117/baseline/openscrub.py\", line 4035, in render_hdr\n    enc.stdin.write(buf.tobytes())\nBrokenPipeError: [Errno 32] Broken pipe\n\nDuring handling of the above exception, another exception occurred:\n\nTraceback (most recent call last):\n  File \"/home/tahv0/src/OpenScrub/.superpowers/sdd/README/hdr-decoder-cleanup-baseline-evidence/probe_cleanup.py\", line 233, in exercise\n    row['return'] = mod.run_render(args, state, CB())\n                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/openscrub-hdr-cleanup-20261117/baseline/openscrub.py\", line 8478, in run_render\n    render_hdr(args.hdr_source, dst, dets_r, state[\"cum\"],\n  File \"/tmp/openscrub-hdr-cleanup-20261117/baseline/openscrub.py\", line 4040, in render_hdr\n    raise err\nRuntimeError: HDR encode failed (ffmpeg exit -9) \u2014 ffmpeg gave no error message\n",
+      "at_return_or_held_traceback": {
+        "children": [
+          {
+            "pid": 96,
+            "command": [
+              "ffmpeg",
+              "-loglevel",
+              "error",
+              "-i",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "yuv420p10le",
+              "pipe:1"
+            ],
+            "object_alive": true,
+            "returncode": 0,
+            "wait_returns": [
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdout",
+                "fd": 3,
+                "target": "pipe:[1893606]",
+                "object_alive": true,
+                "closed": false,
+                "fd_state": {
+                  "open": true,
+                  "same_target": true,
+                  "target": "pipe:[1893606]"
+                }
+              }
+            ]
+          },
+          {
+            "pid": 97,
+            "command": [
+              "ffprobe",
+              "-v",
+              "error",
+              "-select_streams",
+              "a",
+              "-show_entries",
+              "stream=codec_name,codec_tag_string",
+              "-of",
+              "json",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4"
+            ],
+            "object_alive": false,
+            "returncode": null,
+            "wait_returns": [
+              0,
+              0,
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdout",
+                "fd": 4,
+                "target": "pipe:[1893618]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": true,
+                  "same_target": false,
+                  "target": "/tmp/#163497 (deleted)"
+                }
+              },
+              {
+                "name": "stderr",
+                "fd": 6,
+                "target": "pipe:[1893619]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          },
+          {
+            "pid": 103,
+            "command": [
+              "ffmpeg",
+              "-y",
+              "-loglevel",
+              "error",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "yuv420p10le",
+              "-s",
+              "64x64",
+              "-r",
+              "3.000000",
+              "-i",
+              "pipe:0",
+              "-i",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4",
+              "-map",
+              "0:v:0",
+              "-map",
+              "1:a?",
+              "-map_metadata",
+              "-1",
+              "-map_chapters",
+              "-1",
+              "-c:v",
+              "libx265",
+              "-crf",
+              "18",
+              "-preset",
+              "fast",
+              "-pix_fmt",
+              "yuv420p10le",
+              "-x265-params",
+              "colorprim=bt2020:transfer=smpte2084:colormatrix=bt2020nc",
+              "-color_primaries",
+              "bt2020",
+              "-color_trc",
+              "smpte2084",
+              "-colorspace",
+              "bt2020nc",
+              "-tag:v",
+              "hvc1",
+              "-c:a",
+              "copy",
+              "/tmp/openscrub-hdr-cleanup-20261117/baseline-encoder-exit-weak-observer.mp4"
+            ],
+            "object_alive": true,
+            "returncode": -9,
+            "wait_returns": [
+              -9,
+              -9
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdin",
+                "fd": 6,
+                "target": "pipe:[1893637]",
+                "object_alive": true,
+                "closed": true,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          }
+        ],
+        "temporary_files": [
+          {
+            "name": "encoder_error_file",
+            "fd": 4,
+            "target": "/tmp/#163497 (deleted)",
+            "object_alive": true,
+            "closed": false,
+            "fd_state": {
+              "open": true,
+              "same_target": true,
+              "target": "/tmp/#163497 (deleted)"
+            }
+          }
+        ]
+      },
+      "after_releasing_exception_and_gc": {
+        "children": [
+          {
+            "pid": 96,
+            "command": [
+              "ffmpeg",
+              "-loglevel",
+              "error",
+              "-i",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "yuv420p10le",
+              "pipe:1"
+            ],
+            "object_alive": false,
+            "returncode": null,
+            "wait_returns": [
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdout",
+                "fd": 3,
+                "target": "pipe:[1893606]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          },
+          {
+            "pid": 97,
+            "command": [
+              "ffprobe",
+              "-v",
+              "error",
+              "-select_streams",
+              "a",
+              "-show_entries",
+              "stream=codec_name,codec_tag_string",
+              "-of",
+              "json",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4"
+            ],
+            "object_alive": false,
+            "returncode": null,
+            "wait_returns": [
+              0,
+              0,
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdout",
+                "fd": 4,
+                "target": "pipe:[1893618]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              },
+              {
+                "name": "stderr",
+                "fd": 6,
+                "target": "pipe:[1893619]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          },
+          {
+            "pid": 103,
+            "command": [
+              "ffmpeg",
+              "-y",
+              "-loglevel",
+              "error",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "yuv420p10le",
+              "-s",
+              "64x64",
+              "-r",
+              "3.000000",
+              "-i",
+              "pipe:0",
+              "-i",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4",
+              "-map",
+              "0:v:0",
+              "-map",
+              "1:a?",
+              "-map_metadata",
+              "-1",
+              "-map_chapters",
+              "-1",
+              "-c:v",
+              "libx265",
+              "-crf",
+              "18",
+              "-preset",
+              "fast",
+              "-pix_fmt",
+              "yuv420p10le",
+              "-x265-params",
+              "colorprim=bt2020:transfer=smpte2084:colormatrix=bt2020nc",
+              "-color_primaries",
+              "bt2020",
+              "-color_trc",
+              "smpte2084",
+              "-colorspace",
+              "bt2020nc",
+              "-tag:v",
+              "hvc1",
+              "-c:a",
+              "copy",
+              "/tmp/openscrub-hdr-cleanup-20261117/baseline-encoder-exit-weak-observer.mp4"
+            ],
+            "object_alive": false,
+            "returncode": null,
+            "wait_returns": [
+              -9,
+              -9
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdin",
+                "fd": 6,
+                "target": "pipe:[1893637]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          }
+        ],
+        "temporary_files": [
+          {
+            "name": "encoder_error_file",
+            "fd": 4,
+            "target": "/tmp/#163497 (deleted)",
+            "object_alive": false,
+            "closed": null,
+            "fd_state": {
+              "open": false,
+              "same_target": false
+            }
+          }
+        ]
+      },
+      "output_exists": false,
+      "output_bytes": null,
+      "encoder_write_attempt_frames": 1,
+      "harness_cleanup_actions": [],
+      "terminal_after_harness_cleanup": {
+        "children": [
+          {
+            "pid": 96,
+            "command": [
+              "ffmpeg",
+              "-loglevel",
+              "error",
+              "-i",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "yuv420p10le",
+              "pipe:1"
+            ],
+            "object_alive": false,
+            "returncode": null,
+            "wait_returns": [
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdout",
+                "fd": 3,
+                "target": "pipe:[1893606]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          },
+          {
+            "pid": 97,
+            "command": [
+              "ffprobe",
+              "-v",
+              "error",
+              "-select_streams",
+              "a",
+              "-show_entries",
+              "stream=codec_name,codec_tag_string",
+              "-of",
+              "json",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4"
+            ],
+            "object_alive": false,
+            "returncode": null,
+            "wait_returns": [
+              0,
+              0,
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdout",
+                "fd": 4,
+                "target": "pipe:[1893618]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              },
+              {
+                "name": "stderr",
+                "fd": 6,
+                "target": "pipe:[1893619]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          },
+          {
+            "pid": 103,
+            "command": [
+              "ffmpeg",
+              "-y",
+              "-loglevel",
+              "error",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "yuv420p10le",
+              "-s",
+              "64x64",
+              "-r",
+              "3.000000",
+              "-i",
+              "pipe:0",
+              "-i",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4",
+              "-map",
+              "0:v:0",
+              "-map",
+              "1:a?",
+              "-map_metadata",
+              "-1",
+              "-map_chapters",
+              "-1",
+              "-c:v",
+              "libx265",
+              "-crf",
+              "18",
+              "-preset",
+              "fast",
+              "-pix_fmt",
+              "yuv420p10le",
+              "-x265-params",
+              "colorprim=bt2020:transfer=smpte2084:colormatrix=bt2020nc",
+              "-color_primaries",
+              "bt2020",
+              "-color_trc",
+              "smpte2084",
+              "-colorspace",
+              "bt2020nc",
+              "-tag:v",
+              "hvc1",
+              "-c:a",
+              "copy",
+              "/tmp/openscrub-hdr-cleanup-20261117/baseline-encoder-exit-weak-observer.mp4"
+            ],
+            "object_alive": false,
+            "returncode": null,
+            "wait_returns": [
+              -9,
+              -9
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdin",
+                "fd": 6,
+                "target": "pipe:[1893637]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          }
+        ],
+        "temporary_files": [
+          {
+            "name": "encoder_error_file",
+            "fd": 4,
+            "target": "/tmp/#163497 (deleted)",
+            "object_alive": false,
+            "closed": null,
+            "fd_state": {
+              "open": false,
+              "same_target": false
+            }
+          }
+        ]
+      },
+      "callbacks": [
+        [
+          "log",
+          "[4/4] Rendering -> /tmp/openscrub-hdr-cleanup-20261117/baseline-encoder-exit-weak-observer.mp4"
+        ],
+        [
+          "log",
+          "      encoder: libx265 10-bit (CPU)"
+        ],
+        [
+          "cancelled",
+          false
+        ],
+        [
+          "injection",
+          "SIGKILL actual encoder before first frame write",
+          103
+        ],
+        [
+          "injection confirmed",
+          "encoder exited, not reaped by harness"
+        ]
+      ]
+    },
+    {
+      "name": "donor-success-weak-observer",
+      "kind": "success",
+      "strong_diagnostic_popen_references": false,
+      "boundary": "actual run_render -> actual render_hdr",
+      "dst": "/tmp/openscrub-hdr-cleanup-20261117/donor-success-weak-observer.mp4",
+      "return": {
+        "synthetic": true,
+        "output": "/tmp/openscrub-hdr-cleanup-20261117/donor-success-weak-observer.mp4"
+      },
+      "status": "success",
+      "at_return_or_held_traceback": {
+        "children": [
+          {
+            "pid": 104,
+            "command": [
+              "ffmpeg",
+              "-loglevel",
+              "error",
+              "-i",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "yuv420p10le",
+              "pipe:1"
+            ],
+            "object_alive": false,
+            "returncode": null,
+            "wait_returns": [
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdout",
+                "fd": 3,
+                "target": "pipe:[1893649]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          },
+          {
+            "pid": 105,
+            "command": [
+              "ffprobe",
+              "-v",
+              "error",
+              "-select_streams",
+              "a",
+              "-show_entries",
+              "stream=codec_name,codec_tag_string",
+              "-of",
+              "json",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4"
+            ],
+            "object_alive": false,
+            "returncode": null,
+            "wait_returns": [
+              0,
+              0,
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdout",
+                "fd": 4,
+                "target": "pipe:[1893661]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              },
+              {
+                "name": "stderr",
+                "fd": 6,
+                "target": "pipe:[1893662]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          },
+          {
+            "pid": 111,
+            "command": [
+              "ffmpeg",
+              "-y",
+              "-loglevel",
+              "error",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "yuv420p10le",
+              "-s",
+              "64x64",
+              "-r",
+              "3.000000",
+              "-i",
+              "pipe:0",
+              "-i",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4",
+              "-map",
+              "0:v:0",
+              "-map",
+              "1:a?",
+              "-map_metadata",
+              "-1",
+              "-map_chapters",
+              "-1",
+              "-c:v",
+              "libx265",
+              "-crf",
+              "18",
+              "-preset",
+              "fast",
+              "-pix_fmt",
+              "yuv420p10le",
+              "-x265-params",
+              "colorprim=bt2020:transfer=smpte2084:colormatrix=bt2020nc",
+              "-color_primaries",
+              "bt2020",
+              "-color_trc",
+              "smpte2084",
+              "-colorspace",
+              "bt2020nc",
+              "-tag:v",
+              "hvc1",
+              "-c:a",
+              "copy",
+              "/tmp/openscrub-hdr-cleanup-20261117/donor-success-weak-observer.mp4"
+            ],
+            "object_alive": false,
+            "returncode": null,
+            "wait_returns": [
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdin",
+                "fd": 6,
+                "target": "pipe:[1893680]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          }
+        ],
+        "temporary_files": [
+          {
+            "name": "encoder_error_file",
+            "fd": 4,
+            "target": "/tmp/#163498 (deleted)",
+            "object_alive": false,
+            "closed": null,
+            "fd_state": {
+              "open": false,
+              "same_target": false
+            }
+          }
+        ]
+      },
+      "after_releasing_exception_and_gc": {
+        "children": [
+          {
+            "pid": 104,
+            "command": [
+              "ffmpeg",
+              "-loglevel",
+              "error",
+              "-i",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "yuv420p10le",
+              "pipe:1"
+            ],
+            "object_alive": false,
+            "returncode": null,
+            "wait_returns": [
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdout",
+                "fd": 3,
+                "target": "pipe:[1893649]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          },
+          {
+            "pid": 105,
+            "command": [
+              "ffprobe",
+              "-v",
+              "error",
+              "-select_streams",
+              "a",
+              "-show_entries",
+              "stream=codec_name,codec_tag_string",
+              "-of",
+              "json",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4"
+            ],
+            "object_alive": false,
+            "returncode": null,
+            "wait_returns": [
+              0,
+              0,
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdout",
+                "fd": 4,
+                "target": "pipe:[1893661]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              },
+              {
+                "name": "stderr",
+                "fd": 6,
+                "target": "pipe:[1893662]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          },
+          {
+            "pid": 111,
+            "command": [
+              "ffmpeg",
+              "-y",
+              "-loglevel",
+              "error",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "yuv420p10le",
+              "-s",
+              "64x64",
+              "-r",
+              "3.000000",
+              "-i",
+              "pipe:0",
+              "-i",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4",
+              "-map",
+              "0:v:0",
+              "-map",
+              "1:a?",
+              "-map_metadata",
+              "-1",
+              "-map_chapters",
+              "-1",
+              "-c:v",
+              "libx265",
+              "-crf",
+              "18",
+              "-preset",
+              "fast",
+              "-pix_fmt",
+              "yuv420p10le",
+              "-x265-params",
+              "colorprim=bt2020:transfer=smpte2084:colormatrix=bt2020nc",
+              "-color_primaries",
+              "bt2020",
+              "-color_trc",
+              "smpte2084",
+              "-colorspace",
+              "bt2020nc",
+              "-tag:v",
+              "hvc1",
+              "-c:a",
+              "copy",
+              "/tmp/openscrub-hdr-cleanup-20261117/donor-success-weak-observer.mp4"
+            ],
+            "object_alive": false,
+            "returncode": null,
+            "wait_returns": [
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdin",
+                "fd": 6,
+                "target": "pipe:[1893680]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          }
+        ],
+        "temporary_files": [
+          {
+            "name": "encoder_error_file",
+            "fd": 4,
+            "target": "/tmp/#163498 (deleted)",
+            "object_alive": false,
+            "closed": null,
+            "fd_state": {
+              "open": false,
+              "same_target": false
+            }
+          }
+        ]
+      },
+      "output_exists": true,
+      "output_bytes": 3366,
+      "encoder_write_attempt_frames": 3,
+      "preencode_all_3_frames_equal_source_raw": true,
+      "preencode_sha256": "174c242e9bd68fe5ee9512274b5d681a990b06737ad4ff1b74221753eecd725d",
+      "harness_cleanup_actions": [],
+      "terminal_after_harness_cleanup": {
+        "children": [
+          {
+            "pid": 104,
+            "command": [
+              "ffmpeg",
+              "-loglevel",
+              "error",
+              "-i",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "yuv420p10le",
+              "pipe:1"
+            ],
+            "object_alive": false,
+            "returncode": null,
+            "wait_returns": [
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdout",
+                "fd": 3,
+                "target": "pipe:[1893649]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          },
+          {
+            "pid": 105,
+            "command": [
+              "ffprobe",
+              "-v",
+              "error",
+              "-select_streams",
+              "a",
+              "-show_entries",
+              "stream=codec_name,codec_tag_string",
+              "-of",
+              "json",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4"
+            ],
+            "object_alive": false,
+            "returncode": null,
+            "wait_returns": [
+              0,
+              0,
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdout",
+                "fd": 4,
+                "target": "pipe:[1893661]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              },
+              {
+                "name": "stderr",
+                "fd": 6,
+                "target": "pipe:[1893662]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          },
+          {
+            "pid": 111,
+            "command": [
+              "ffmpeg",
+              "-y",
+              "-loglevel",
+              "error",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "yuv420p10le",
+              "-s",
+              "64x64",
+              "-r",
+              "3.000000",
+              "-i",
+              "pipe:0",
+              "-i",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4",
+              "-map",
+              "0:v:0",
+              "-map",
+              "1:a?",
+              "-map_metadata",
+              "-1",
+              "-map_chapters",
+              "-1",
+              "-c:v",
+              "libx265",
+              "-crf",
+              "18",
+              "-preset",
+              "fast",
+              "-pix_fmt",
+              "yuv420p10le",
+              "-x265-params",
+              "colorprim=bt2020:transfer=smpte2084:colormatrix=bt2020nc",
+              "-color_primaries",
+              "bt2020",
+              "-color_trc",
+              "smpte2084",
+              "-colorspace",
+              "bt2020nc",
+              "-tag:v",
+              "hvc1",
+              "-c:a",
+              "copy",
+              "/tmp/openscrub-hdr-cleanup-20261117/donor-success-weak-observer.mp4"
+            ],
+            "object_alive": false,
+            "returncode": null,
+            "wait_returns": [
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdin",
+                "fd": 6,
+                "target": "pipe:[1893680]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          }
+        ],
+        "temporary_files": [
+          {
+            "name": "encoder_error_file",
+            "fd": 4,
+            "target": "/tmp/#163498 (deleted)",
+            "object_alive": false,
+            "closed": null,
+            "fd_state": {
+              "open": false,
+              "same_target": false
+            }
+          }
+        ]
+      },
+      "callbacks": [
+        [
+          "log",
+          "[4/4] Rendering -> /tmp/openscrub-hdr-cleanup-20261117/donor-success-weak-observer.mp4"
+        ],
+        [
+          "log",
+          "      encoder: libx265 10-bit (CPU)"
+        ],
+        [
+          "cancelled",
+          false
+        ],
+        [
+          "progress",
+          "render",
+          3,
+          3
+        ],
+        [
+          "log",
+          "      HDR preserved: 10-bit HEVC, color tags color_primaries=bt2020, color_trc=smpte2084, colorspace=bt2020nc"
+        ],
+        [
+          "log",
+          "done."
+        ]
+      ],
+      "metadata": {
+        "programs": [],
+        "stream_groups": [],
+        "streams": [
+          {
+            "codec_name": "hevc",
+            "width": 64,
+            "height": 64,
+            "pix_fmt": "yuv420p10le",
+            "color_space": "bt2020nc",
+            "color_transfer": "smpte2084",
+            "color_primaries": "bt2020",
+            "nb_frames": "3",
+            "nb_read_frames": "3"
+          }
+        ]
+      },
+      "decoded_frame_count": 3,
+      "decoded_plane_ranges": [
+        [
+          856,
+          856
+        ],
+        [
+          560,
+          560
+        ],
+        [
+          341,
+          341
+        ]
+      ],
+      "decoded_plane_max_abs_vs_source": [
+        44,
+        240,
+        41
+      ]
+    },
+    {
+      "name": "donor-cancel-weak-observer",
+      "kind": "cancel",
+      "strong_diagnostic_popen_references": false,
+      "boundary": "actual run_render -> actual render_hdr",
+      "dst": "/tmp/openscrub-hdr-cleanup-20261117/donor-cancel-weak-observer.mp4",
+      "status": "PipelineCancelled",
+      "message": "",
+      "traceback": "Traceback (most recent call last):\n  File \"/home/tahv0/src/OpenScrub/.superpowers/sdd/README/hdr-decoder-cleanup-baseline-evidence/probe_cleanup.py\", line 233, in exercise\n    row['return'] = mod.run_render(args, state, CB())\n                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/openscrub-hdr-cleanup-20261117/donor/openscrub.py\", line 8729, in run_render\n    render_hdr(args.hdr_source, dst, dets_r, state[\"cum\"],\n  File \"/tmp/openscrub-hdr-cleanup-20261117/donor/openscrub.py\", line 3944, in render_hdr\n    raise PipelineCancelled()\nhdr_cleanup_donor.PipelineCancelled\n",
+      "at_return_or_held_traceback": {
+        "children": [
+          {
+            "pid": 134,
+            "command": [
+              "ffmpeg",
+              "-loglevel",
+              "error",
+              "-i",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "yuv420p10le",
+              "pipe:1"
+            ],
+            "object_alive": true,
+            "returncode": 0,
+            "wait_returns": [
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdout",
+                "fd": 3,
+                "target": "pipe:[1893694]",
+                "object_alive": true,
+                "closed": true,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          },
+          {
+            "pid": 135,
+            "command": [
+              "ffprobe",
+              "-v",
+              "error",
+              "-select_streams",
+              "a",
+              "-show_entries",
+              "stream=codec_name,codec_tag_string",
+              "-of",
+              "json",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4"
+            ],
+            "object_alive": false,
+            "returncode": null,
+            "wait_returns": [
+              0,
+              0,
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdout",
+                "fd": 4,
+                "target": "pipe:[1893706]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": true,
+                  "same_target": false,
+                  "target": "/tmp/#163499 (deleted)"
+                }
+              },
+              {
+                "name": "stderr",
+                "fd": 6,
+                "target": "pipe:[1893707]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          },
+          {
+            "pid": 141,
+            "command": [
+              "ffmpeg",
+              "-y",
+              "-loglevel",
+              "error",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "yuv420p10le",
+              "-s",
+              "64x64",
+              "-r",
+              "3.000000",
+              "-i",
+              "pipe:0",
+              "-i",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4",
+              "-map",
+              "0:v:0",
+              "-map",
+              "1:a?",
+              "-map_metadata",
+              "-1",
+              "-map_chapters",
+              "-1",
+              "-c:v",
+              "libx265",
+              "-crf",
+              "18",
+              "-preset",
+              "fast",
+              "-pix_fmt",
+              "yuv420p10le",
+              "-x265-params",
+              "colorprim=bt2020:transfer=smpte2084:colormatrix=bt2020nc",
+              "-color_primaries",
+              "bt2020",
+              "-color_trc",
+              "smpte2084",
+              "-colorspace",
+              "bt2020nc",
+              "-tag:v",
+              "hvc1",
+              "-c:a",
+              "copy",
+              "/tmp/openscrub-hdr-cleanup-20261117/donor-cancel-weak-observer.mp4"
+            ],
+            "object_alive": true,
+            "returncode": -15,
+            "wait_returns": [
+              -15
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdin",
+                "fd": 6,
+                "target": "pipe:[1893725]",
+                "object_alive": true,
+                "closed": true,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          }
+        ],
+        "temporary_files": [
+          {
+            "name": "encoder_error_file",
+            "fd": 4,
+            "target": "/tmp/#163499 (deleted)",
+            "object_alive": true,
+            "closed": false,
+            "fd_state": {
+              "open": true,
+              "same_target": true,
+              "target": "/tmp/#163499 (deleted)"
+            }
+          }
+        ]
+      },
+      "after_releasing_exception_and_gc": {
+        "children": [
+          {
+            "pid": 134,
+            "command": [
+              "ffmpeg",
+              "-loglevel",
+              "error",
+              "-i",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "yuv420p10le",
+              "pipe:1"
+            ],
+            "object_alive": false,
+            "returncode": null,
+            "wait_returns": [
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdout",
+                "fd": 3,
+                "target": "pipe:[1893694]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          },
+          {
+            "pid": 135,
+            "command": [
+              "ffprobe",
+              "-v",
+              "error",
+              "-select_streams",
+              "a",
+              "-show_entries",
+              "stream=codec_name,codec_tag_string",
+              "-of",
+              "json",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4"
+            ],
+            "object_alive": false,
+            "returncode": null,
+            "wait_returns": [
+              0,
+              0,
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdout",
+                "fd": 4,
+                "target": "pipe:[1893706]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              },
+              {
+                "name": "stderr",
+                "fd": 6,
+                "target": "pipe:[1893707]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          },
+          {
+            "pid": 141,
+            "command": [
+              "ffmpeg",
+              "-y",
+              "-loglevel",
+              "error",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "yuv420p10le",
+              "-s",
+              "64x64",
+              "-r",
+              "3.000000",
+              "-i",
+              "pipe:0",
+              "-i",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4",
+              "-map",
+              "0:v:0",
+              "-map",
+              "1:a?",
+              "-map_metadata",
+              "-1",
+              "-map_chapters",
+              "-1",
+              "-c:v",
+              "libx265",
+              "-crf",
+              "18",
+              "-preset",
+              "fast",
+              "-pix_fmt",
+              "yuv420p10le",
+              "-x265-params",
+              "colorprim=bt2020:transfer=smpte2084:colormatrix=bt2020nc",
+              "-color_primaries",
+              "bt2020",
+              "-color_trc",
+              "smpte2084",
+              "-colorspace",
+              "bt2020nc",
+              "-tag:v",
+              "hvc1",
+              "-c:a",
+              "copy",
+              "/tmp/openscrub-hdr-cleanup-20261117/donor-cancel-weak-observer.mp4"
+            ],
+            "object_alive": false,
+            "returncode": null,
+            "wait_returns": [
+              -15
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdin",
+                "fd": 6,
+                "target": "pipe:[1893725]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          }
+        ],
+        "temporary_files": [
+          {
+            "name": "encoder_error_file",
+            "fd": 4,
+            "target": "/tmp/#163499 (deleted)",
+            "object_alive": false,
+            "closed": null,
+            "fd_state": {
+              "open": false,
+              "same_target": false
+            }
+          }
+        ]
+      },
+      "output_exists": false,
+      "output_bytes": null,
+      "encoder_write_attempt_frames": 0,
+      "harness_cleanup_actions": [],
+      "terminal_after_harness_cleanup": {
+        "children": [
+          {
+            "pid": 134,
+            "command": [
+              "ffmpeg",
+              "-loglevel",
+              "error",
+              "-i",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "yuv420p10le",
+              "pipe:1"
+            ],
+            "object_alive": false,
+            "returncode": null,
+            "wait_returns": [
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdout",
+                "fd": 3,
+                "target": "pipe:[1893694]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          },
+          {
+            "pid": 135,
+            "command": [
+              "ffprobe",
+              "-v",
+              "error",
+              "-select_streams",
+              "a",
+              "-show_entries",
+              "stream=codec_name,codec_tag_string",
+              "-of",
+              "json",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4"
+            ],
+            "object_alive": false,
+            "returncode": null,
+            "wait_returns": [
+              0,
+              0,
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdout",
+                "fd": 4,
+                "target": "pipe:[1893706]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              },
+              {
+                "name": "stderr",
+                "fd": 6,
+                "target": "pipe:[1893707]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          },
+          {
+            "pid": 141,
+            "command": [
+              "ffmpeg",
+              "-y",
+              "-loglevel",
+              "error",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "yuv420p10le",
+              "-s",
+              "64x64",
+              "-r",
+              "3.000000",
+              "-i",
+              "pipe:0",
+              "-i",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4",
+              "-map",
+              "0:v:0",
+              "-map",
+              "1:a?",
+              "-map_metadata",
+              "-1",
+              "-map_chapters",
+              "-1",
+              "-c:v",
+              "libx265",
+              "-crf",
+              "18",
+              "-preset",
+              "fast",
+              "-pix_fmt",
+              "yuv420p10le",
+              "-x265-params",
+              "colorprim=bt2020:transfer=smpte2084:colormatrix=bt2020nc",
+              "-color_primaries",
+              "bt2020",
+              "-color_trc",
+              "smpte2084",
+              "-colorspace",
+              "bt2020nc",
+              "-tag:v",
+              "hvc1",
+              "-c:a",
+              "copy",
+              "/tmp/openscrub-hdr-cleanup-20261117/donor-cancel-weak-observer.mp4"
+            ],
+            "object_alive": false,
+            "returncode": null,
+            "wait_returns": [
+              -15
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdin",
+                "fd": 6,
+                "target": "pipe:[1893725]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          }
+        ],
+        "temporary_files": [
+          {
+            "name": "encoder_error_file",
+            "fd": 4,
+            "target": "/tmp/#163499 (deleted)",
+            "object_alive": false,
+            "closed": null,
+            "fd_state": {
+              "open": false,
+              "same_target": false
+            }
+          }
+        ]
+      },
+      "callbacks": [
+        [
+          "log",
+          "[4/4] Rendering -> /tmp/openscrub-hdr-cleanup-20261117/donor-cancel-weak-observer.mp4"
+        ],
+        [
+          "log",
+          "      encoder: libx265 10-bit (CPU)"
+        ],
+        [
+          "cancelled",
+          true
+        ]
+      ]
+    },
+    {
+      "name": "donor-io-error-weak-observer",
+      "kind": "io-error",
+      "strong_diagnostic_popen_references": false,
+      "boundary": "actual run_render -> actual render_hdr",
+      "dst": "/tmp/openscrub-hdr-cleanup-20261117/missing-parent/donor-io-error-weak-observer.mp4",
+      "status": "RuntimeError",
+      "message": "HDR encode failed (ffmpeg exit 254): [out#0/mp4 @ 0x629a04d73880] Error opening output /tmp/openscrub-hdr-cleanup-20261117/missing-parent/donor-io-error-weak-observer.mp4: No such file or directory | Error opening output file /tmp/openscrub-hdr-cleanup-20261117/missing-parent/donor-io-error-weak-observer.mp4. | Error opening output files: No such file or directory",
+      "traceback": "Traceback (most recent call last):\n  File \"/home/tahv0/src/OpenScrub/.superpowers/sdd/README/hdr-decoder-cleanup-baseline-evidence/probe_cleanup.py\", line 233, in exercise\n    row['return'] = mod.run_render(args, state, CB())\n                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/openscrub-hdr-cleanup-20261117/donor/openscrub.py\", line 8729, in run_render\n    render_hdr(args.hdr_source, dst, dets_r, state[\"cum\"],\n  File \"/tmp/openscrub-hdr-cleanup-20261117/donor/openscrub.py\", line 4032, in render_hdr\n    raise error\nRuntimeError: HDR encode failed (ffmpeg exit 254): [out#0/mp4 @ 0x629a04d73880] Error opening output /tmp/openscrub-hdr-cleanup-20261117/missing-parent/donor-io-error-weak-observer.mp4: No such file or directory | Error opening output file /tmp/openscrub-hdr-cleanup-20261117/missing-parent/donor-io-error-weak-observer.mp4. | Error opening output files: No such file or directory\n",
+      "at_return_or_held_traceback": {
+        "children": [
+          {
+            "pid": 142,
+            "command": [
+              "ffmpeg",
+              "-loglevel",
+              "error",
+              "-i",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "yuv420p10le",
+              "pipe:1"
+            ],
+            "object_alive": true,
+            "returncode": 0,
+            "wait_returns": [
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdout",
+                "fd": 3,
+                "target": "pipe:[1893737]",
+                "object_alive": true,
+                "closed": true,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          },
+          {
+            "pid": 143,
+            "command": [
+              "ffprobe",
+              "-v",
+              "error",
+              "-select_streams",
+              "a",
+              "-show_entries",
+              "stream=codec_name,codec_tag_string",
+              "-of",
+              "json",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4"
+            ],
+            "object_alive": false,
+            "returncode": null,
+            "wait_returns": [
+              0,
+              0,
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdout",
+                "fd": 4,
+                "target": "pipe:[1893749]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": true,
+                  "same_target": false,
+                  "target": "/tmp/#163500 (deleted)"
+                }
+              },
+              {
+                "name": "stderr",
+                "fd": 6,
+                "target": "pipe:[1893750]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          },
+          {
+            "pid": 149,
+            "command": [
+              "ffmpeg",
+              "-y",
+              "-loglevel",
+              "error",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "yuv420p10le",
+              "-s",
+              "64x64",
+              "-r",
+              "3.000000",
+              "-i",
+              "pipe:0",
+              "-i",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4",
+              "-map",
+              "0:v:0",
+              "-map",
+              "1:a?",
+              "-map_metadata",
+              "-1",
+              "-map_chapters",
+              "-1",
+              "-c:v",
+              "libx265",
+              "-crf",
+              "18",
+              "-preset",
+              "fast",
+              "-pix_fmt",
+              "yuv420p10le",
+              "-x265-params",
+              "colorprim=bt2020:transfer=smpte2084:colormatrix=bt2020nc",
+              "-color_primaries",
+              "bt2020",
+              "-color_trc",
+              "smpte2084",
+              "-colorspace",
+              "bt2020nc",
+              "-tag:v",
+              "hvc1",
+              "-c:a",
+              "copy",
+              "/tmp/openscrub-hdr-cleanup-20261117/missing-parent/donor-io-error-weak-observer.mp4"
+            ],
+            "object_alive": true,
+            "returncode": 254,
+            "wait_returns": [
+              254
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdin",
+                "fd": 6,
+                "target": "pipe:[1893768]",
+                "object_alive": true,
+                "closed": true,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          }
+        ],
+        "temporary_files": [
+          {
+            "name": "encoder_error_file",
+            "fd": 4,
+            "target": "/tmp/#163500 (deleted)",
+            "object_alive": true,
+            "closed": false,
+            "fd_state": {
+              "open": true,
+              "same_target": true,
+              "target": "/tmp/#163500 (deleted)"
+            }
+          }
+        ]
+      },
+      "after_releasing_exception_and_gc": {
+        "children": [
+          {
+            "pid": 142,
+            "command": [
+              "ffmpeg",
+              "-loglevel",
+              "error",
+              "-i",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "yuv420p10le",
+              "pipe:1"
+            ],
+            "object_alive": false,
+            "returncode": null,
+            "wait_returns": [
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdout",
+                "fd": 3,
+                "target": "pipe:[1893737]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          },
+          {
+            "pid": 143,
+            "command": [
+              "ffprobe",
+              "-v",
+              "error",
+              "-select_streams",
+              "a",
+              "-show_entries",
+              "stream=codec_name,codec_tag_string",
+              "-of",
+              "json",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4"
+            ],
+            "object_alive": false,
+            "returncode": null,
+            "wait_returns": [
+              0,
+              0,
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdout",
+                "fd": 4,
+                "target": "pipe:[1893749]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              },
+              {
+                "name": "stderr",
+                "fd": 6,
+                "target": "pipe:[1893750]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          },
+          {
+            "pid": 149,
+            "command": [
+              "ffmpeg",
+              "-y",
+              "-loglevel",
+              "error",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "yuv420p10le",
+              "-s",
+              "64x64",
+              "-r",
+              "3.000000",
+              "-i",
+              "pipe:0",
+              "-i",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4",
+              "-map",
+              "0:v:0",
+              "-map",
+              "1:a?",
+              "-map_metadata",
+              "-1",
+              "-map_chapters",
+              "-1",
+              "-c:v",
+              "libx265",
+              "-crf",
+              "18",
+              "-preset",
+              "fast",
+              "-pix_fmt",
+              "yuv420p10le",
+              "-x265-params",
+              "colorprim=bt2020:transfer=smpte2084:colormatrix=bt2020nc",
+              "-color_primaries",
+              "bt2020",
+              "-color_trc",
+              "smpte2084",
+              "-colorspace",
+              "bt2020nc",
+              "-tag:v",
+              "hvc1",
+              "-c:a",
+              "copy",
+              "/tmp/openscrub-hdr-cleanup-20261117/missing-parent/donor-io-error-weak-observer.mp4"
+            ],
+            "object_alive": false,
+            "returncode": null,
+            "wait_returns": [
+              254
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdin",
+                "fd": 6,
+                "target": "pipe:[1893768]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          }
+        ],
+        "temporary_files": [
+          {
+            "name": "encoder_error_file",
+            "fd": 4,
+            "target": "/tmp/#163500 (deleted)",
+            "object_alive": false,
+            "closed": null,
+            "fd_state": {
+              "open": false,
+              "same_target": false
+            }
+          }
+        ]
+      },
+      "output_exists": false,
+      "output_bytes": null,
+      "encoder_write_attempt_frames": 3,
+      "harness_cleanup_actions": [],
+      "terminal_after_harness_cleanup": {
+        "children": [
+          {
+            "pid": 142,
+            "command": [
+              "ffmpeg",
+              "-loglevel",
+              "error",
+              "-i",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "yuv420p10le",
+              "pipe:1"
+            ],
+            "object_alive": false,
+            "returncode": null,
+            "wait_returns": [
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdout",
+                "fd": 3,
+                "target": "pipe:[1893737]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          },
+          {
+            "pid": 143,
+            "command": [
+              "ffprobe",
+              "-v",
+              "error",
+              "-select_streams",
+              "a",
+              "-show_entries",
+              "stream=codec_name,codec_tag_string",
+              "-of",
+              "json",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4"
+            ],
+            "object_alive": false,
+            "returncode": null,
+            "wait_returns": [
+              0,
+              0,
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdout",
+                "fd": 4,
+                "target": "pipe:[1893749]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              },
+              {
+                "name": "stderr",
+                "fd": 6,
+                "target": "pipe:[1893750]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          },
+          {
+            "pid": 149,
+            "command": [
+              "ffmpeg",
+              "-y",
+              "-loglevel",
+              "error",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "yuv420p10le",
+              "-s",
+              "64x64",
+              "-r",
+              "3.000000",
+              "-i",
+              "pipe:0",
+              "-i",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4",
+              "-map",
+              "0:v:0",
+              "-map",
+              "1:a?",
+              "-map_metadata",
+              "-1",
+              "-map_chapters",
+              "-1",
+              "-c:v",
+              "libx265",
+              "-crf",
+              "18",
+              "-preset",
+              "fast",
+              "-pix_fmt",
+              "yuv420p10le",
+              "-x265-params",
+              "colorprim=bt2020:transfer=smpte2084:colormatrix=bt2020nc",
+              "-color_primaries",
+              "bt2020",
+              "-color_trc",
+              "smpte2084",
+              "-colorspace",
+              "bt2020nc",
+              "-tag:v",
+              "hvc1",
+              "-c:a",
+              "copy",
+              "/tmp/openscrub-hdr-cleanup-20261117/missing-parent/donor-io-error-weak-observer.mp4"
+            ],
+            "object_alive": false,
+            "returncode": null,
+            "wait_returns": [
+              254
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdin",
+                "fd": 6,
+                "target": "pipe:[1893768]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          }
+        ],
+        "temporary_files": [
+          {
+            "name": "encoder_error_file",
+            "fd": 4,
+            "target": "/tmp/#163500 (deleted)",
+            "object_alive": false,
+            "closed": null,
+            "fd_state": {
+              "open": false,
+              "same_target": false
+            }
+          }
+        ]
+      },
+      "callbacks": [
+        [
+          "log",
+          "[4/4] Rendering -> /tmp/openscrub-hdr-cleanup-20261117/missing-parent/donor-io-error-weak-observer.mp4"
+        ],
+        [
+          "log",
+          "      encoder: libx265 10-bit (CPU)"
+        ],
+        [
+          "cancelled",
+          false
+        ],
+        [
+          "progress",
+          "render",
+          3,
+          3
+        ]
+      ]
+    },
+    {
+      "name": "donor-encoder-exit-weak-observer",
+      "kind": "encoder-exit",
+      "strong_diagnostic_popen_references": false,
+      "boundary": "actual run_render -> actual render_hdr",
+      "dst": "/tmp/openscrub-hdr-cleanup-20261117/donor-encoder-exit-weak-observer.mp4",
+      "status": "RuntimeError",
+      "message": "HDR encode failed (ffmpeg exit -9) \u2014 ffmpeg gave no error message",
+      "traceback": "Traceback (most recent call last):\n  File \"/tmp/openscrub-hdr-cleanup-20261117/donor/openscrub.py\", line 4005, in render_hdr\n    enc.stdin.write(buf.tobytes())\nBrokenPipeError: [Errno 32] Broken pipe\n\nDuring handling of the above exception, another exception occurred:\n\nTraceback (most recent call last):\n  File \"/home/tahv0/src/OpenScrub/.superpowers/sdd/README/hdr-decoder-cleanup-baseline-evidence/probe_cleanup.py\", line 233, in exercise\n    row['return'] = mod.run_render(args, state, CB())\n                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/openscrub-hdr-cleanup-20261117/donor/openscrub.py\", line 8729, in run_render\n    render_hdr(args.hdr_source, dst, dets_r, state[\"cum\"],\n  File \"/tmp/openscrub-hdr-cleanup-20261117/donor/openscrub.py\", line 4010, in render_hdr\n    raise err\nRuntimeError: HDR encode failed (ffmpeg exit -9) \u2014 ffmpeg gave no error message\n",
+      "at_return_or_held_traceback": {
+        "children": [
+          {
+            "pid": 150,
+            "command": [
+              "ffmpeg",
+              "-loglevel",
+              "error",
+              "-i",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "yuv420p10le",
+              "pipe:1"
+            ],
+            "object_alive": true,
+            "returncode": 0,
+            "wait_returns": [
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdout",
+                "fd": 3,
+                "target": "pipe:[1893782]",
+                "object_alive": true,
+                "closed": true,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          },
+          {
+            "pid": 151,
+            "command": [
+              "ffprobe",
+              "-v",
+              "error",
+              "-select_streams",
+              "a",
+              "-show_entries",
+              "stream=codec_name,codec_tag_string",
+              "-of",
+              "json",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4"
+            ],
+            "object_alive": false,
+            "returncode": null,
+            "wait_returns": [
+              0,
+              0,
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdout",
+                "fd": 4,
+                "target": "pipe:[1893794]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": true,
+                  "same_target": false,
+                  "target": "/tmp/#163501 (deleted)"
+                }
+              },
+              {
+                "name": "stderr",
+                "fd": 6,
+                "target": "pipe:[1893795]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          },
+          {
+            "pid": 157,
+            "command": [
+              "ffmpeg",
+              "-y",
+              "-loglevel",
+              "error",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "yuv420p10le",
+              "-s",
+              "64x64",
+              "-r",
+              "3.000000",
+              "-i",
+              "pipe:0",
+              "-i",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4",
+              "-map",
+              "0:v:0",
+              "-map",
+              "1:a?",
+              "-map_metadata",
+              "-1",
+              "-map_chapters",
+              "-1",
+              "-c:v",
+              "libx265",
+              "-crf",
+              "18",
+              "-preset",
+              "fast",
+              "-pix_fmt",
+              "yuv420p10le",
+              "-x265-params",
+              "colorprim=bt2020:transfer=smpte2084:colormatrix=bt2020nc",
+              "-color_primaries",
+              "bt2020",
+              "-color_trc",
+              "smpte2084",
+              "-colorspace",
+              "bt2020nc",
+              "-tag:v",
+              "hvc1",
+              "-c:a",
+              "copy",
+              "/tmp/openscrub-hdr-cleanup-20261117/donor-encoder-exit-weak-observer.mp4"
+            ],
+            "object_alive": true,
+            "returncode": -9,
+            "wait_returns": [
+              -9,
+              -9
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdin",
+                "fd": 6,
+                "target": "pipe:[1893813]",
+                "object_alive": true,
+                "closed": true,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          }
+        ],
+        "temporary_files": [
+          {
+            "name": "encoder_error_file",
+            "fd": 4,
+            "target": "/tmp/#163501 (deleted)",
+            "object_alive": true,
+            "closed": false,
+            "fd_state": {
+              "open": true,
+              "same_target": true,
+              "target": "/tmp/#163501 (deleted)"
+            }
+          }
+        ]
+      },
+      "after_releasing_exception_and_gc": {
+        "children": [
+          {
+            "pid": 150,
+            "command": [
+              "ffmpeg",
+              "-loglevel",
+              "error",
+              "-i",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "yuv420p10le",
+              "pipe:1"
+            ],
+            "object_alive": false,
+            "returncode": null,
+            "wait_returns": [
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdout",
+                "fd": 3,
+                "target": "pipe:[1893782]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          },
+          {
+            "pid": 151,
+            "command": [
+              "ffprobe",
+              "-v",
+              "error",
+              "-select_streams",
+              "a",
+              "-show_entries",
+              "stream=codec_name,codec_tag_string",
+              "-of",
+              "json",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4"
+            ],
+            "object_alive": false,
+            "returncode": null,
+            "wait_returns": [
+              0,
+              0,
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdout",
+                "fd": 4,
+                "target": "pipe:[1893794]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              },
+              {
+                "name": "stderr",
+                "fd": 6,
+                "target": "pipe:[1893795]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          },
+          {
+            "pid": 157,
+            "command": [
+              "ffmpeg",
+              "-y",
+              "-loglevel",
+              "error",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "yuv420p10le",
+              "-s",
+              "64x64",
+              "-r",
+              "3.000000",
+              "-i",
+              "pipe:0",
+              "-i",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4",
+              "-map",
+              "0:v:0",
+              "-map",
+              "1:a?",
+              "-map_metadata",
+              "-1",
+              "-map_chapters",
+              "-1",
+              "-c:v",
+              "libx265",
+              "-crf",
+              "18",
+              "-preset",
+              "fast",
+              "-pix_fmt",
+              "yuv420p10le",
+              "-x265-params",
+              "colorprim=bt2020:transfer=smpte2084:colormatrix=bt2020nc",
+              "-color_primaries",
+              "bt2020",
+              "-color_trc",
+              "smpte2084",
+              "-colorspace",
+              "bt2020nc",
+              "-tag:v",
+              "hvc1",
+              "-c:a",
+              "copy",
+              "/tmp/openscrub-hdr-cleanup-20261117/donor-encoder-exit-weak-observer.mp4"
+            ],
+            "object_alive": false,
+            "returncode": null,
+            "wait_returns": [
+              -9,
+              -9
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdin",
+                "fd": 6,
+                "target": "pipe:[1893813]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          }
+        ],
+        "temporary_files": [
+          {
+            "name": "encoder_error_file",
+            "fd": 4,
+            "target": "/tmp/#163501 (deleted)",
+            "object_alive": false,
+            "closed": null,
+            "fd_state": {
+              "open": false,
+              "same_target": false
+            }
+          }
+        ]
+      },
+      "output_exists": false,
+      "output_bytes": null,
+      "encoder_write_attempt_frames": 1,
+      "harness_cleanup_actions": [],
+      "terminal_after_harness_cleanup": {
+        "children": [
+          {
+            "pid": 150,
+            "command": [
+              "ffmpeg",
+              "-loglevel",
+              "error",
+              "-i",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "yuv420p10le",
+              "pipe:1"
+            ],
+            "object_alive": false,
+            "returncode": null,
+            "wait_returns": [
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdout",
+                "fd": 3,
+                "target": "pipe:[1893782]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          },
+          {
+            "pid": 151,
+            "command": [
+              "ffprobe",
+              "-v",
+              "error",
+              "-select_streams",
+              "a",
+              "-show_entries",
+              "stream=codec_name,codec_tag_string",
+              "-of",
+              "json",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4"
+            ],
+            "object_alive": false,
+            "returncode": null,
+            "wait_returns": [
+              0,
+              0,
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdout",
+                "fd": 4,
+                "target": "pipe:[1893794]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              },
+              {
+                "name": "stderr",
+                "fd": 6,
+                "target": "pipe:[1893795]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          },
+          {
+            "pid": 157,
+            "command": [
+              "ffmpeg",
+              "-y",
+              "-loglevel",
+              "error",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "yuv420p10le",
+              "-s",
+              "64x64",
+              "-r",
+              "3.000000",
+              "-i",
+              "pipe:0",
+              "-i",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4",
+              "-map",
+              "0:v:0",
+              "-map",
+              "1:a?",
+              "-map_metadata",
+              "-1",
+              "-map_chapters",
+              "-1",
+              "-c:v",
+              "libx265",
+              "-crf",
+              "18",
+              "-preset",
+              "fast",
+              "-pix_fmt",
+              "yuv420p10le",
+              "-x265-params",
+              "colorprim=bt2020:transfer=smpte2084:colormatrix=bt2020nc",
+              "-color_primaries",
+              "bt2020",
+              "-color_trc",
+              "smpte2084",
+              "-colorspace",
+              "bt2020nc",
+              "-tag:v",
+              "hvc1",
+              "-c:a",
+              "copy",
+              "/tmp/openscrub-hdr-cleanup-20261117/donor-encoder-exit-weak-observer.mp4"
+            ],
+            "object_alive": false,
+            "returncode": null,
+            "wait_returns": [
+              -9,
+              -9
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdin",
+                "fd": 6,
+                "target": "pipe:[1893813]",
+                "object_alive": false,
+                "closed": null,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          }
+        ],
+        "temporary_files": [
+          {
+            "name": "encoder_error_file",
+            "fd": 4,
+            "target": "/tmp/#163501 (deleted)",
+            "object_alive": false,
+            "closed": null,
+            "fd_state": {
+              "open": false,
+              "same_target": false
+            }
+          }
+        ]
+      },
+      "callbacks": [
+        [
+          "log",
+          "[4/4] Rendering -> /tmp/openscrub-hdr-cleanup-20261117/donor-encoder-exit-weak-observer.mp4"
+        ],
+        [
+          "log",
+          "      encoder: libx265 10-bit (CPU)"
+        ],
+        [
+          "cancelled",
+          false
+        ],
+        [
+          "injection",
+          "SIGKILL actual encoder before first frame write",
+          157
+        ],
+        [
+          "injection confirmed",
+          "encoder exited, not reaped by harness"
+        ]
+      ]
+    },
+    {
+      "name": "baseline-success-diagnostic-strong",
+      "kind": "success",
+      "strong_diagnostic_popen_references": true,
+      "boundary": "actual run_render -> actual render_hdr",
+      "dst": "/tmp/openscrub-hdr-cleanup-20261117/baseline-success-diagnostic-strong.mp4",
+      "return": {
+        "synthetic": true,
+        "output": "/tmp/openscrub-hdr-cleanup-20261117/baseline-success-diagnostic-strong.mp4"
+      },
+      "status": "success",
+      "at_return_or_held_traceback": {
+        "children": [
+          {
+            "pid": 158,
+            "command": [
+              "ffmpeg",
+              "-loglevel",
+              "error",
+              "-i",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "yuv420p10le",
+              "pipe:1"
+            ],
+            "object_alive": true,
+            "returncode": 0,
+            "wait_returns": [
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdout",
+                "fd": 3,
+                "target": "pipe:[1893825]",
+                "object_alive": true,
+                "closed": true,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          },
+          {
+            "pid": 159,
+            "command": [
+              "ffprobe",
+              "-v",
+              "error",
+              "-select_streams",
+              "a",
+              "-show_entries",
+              "stream=codec_name,codec_tag_string",
+              "-of",
+              "json",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4"
+            ],
+            "object_alive": true,
+            "returncode": 0,
+            "wait_returns": [
+              0,
+              0,
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdout",
+                "fd": 4,
+                "target": "pipe:[1893837]",
+                "object_alive": true,
+                "closed": true,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              },
+              {
+                "name": "stderr",
+                "fd": 6,
+                "target": "pipe:[1893838]",
+                "object_alive": true,
+                "closed": true,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          },
+          {
+            "pid": 165,
+            "command": [
+              "ffmpeg",
+              "-y",
+              "-loglevel",
+              "error",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "yuv420p10le",
+              "-s",
+              "64x64",
+              "-r",
+              "3.000000",
+              "-i",
+              "pipe:0",
+              "-i",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4",
+              "-map",
+              "0:v:0",
+              "-map",
+              "1:a?",
+              "-map_metadata",
+              "-1",
+              "-map_chapters",
+              "-1",
+              "-c:v",
+              "libx265",
+              "-crf",
+              "18",
+              "-preset",
+              "fast",
+              "-pix_fmt",
+              "yuv420p10le",
+              "-x265-params",
+              "colorprim=bt2020:transfer=smpte2084:colormatrix=bt2020nc",
+              "-color_primaries",
+              "bt2020",
+              "-color_trc",
+              "smpte2084",
+              "-colorspace",
+              "bt2020nc",
+              "-tag:v",
+              "hvc1",
+              "-c:a",
+              "copy",
+              "/tmp/openscrub-hdr-cleanup-20261117/baseline-success-diagnostic-strong.mp4"
+            ],
+            "object_alive": true,
+            "returncode": 0,
+            "wait_returns": [
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdin",
+                "fd": 6,
+                "target": "pipe:[1893856]",
+                "object_alive": true,
+                "closed": true,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          }
+        ],
+        "temporary_files": [
+          {
+            "name": "encoder_error_file",
+            "fd": 4,
+            "target": "/tmp/#163502 (deleted)",
+            "object_alive": false,
+            "closed": null,
+            "fd_state": {
+              "open": false,
+              "same_target": false
+            }
+          }
+        ]
+      },
+      "after_releasing_exception_and_gc": {
+        "children": [
+          {
+            "pid": 158,
+            "command": [
+              "ffmpeg",
+              "-loglevel",
+              "error",
+              "-i",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "yuv420p10le",
+              "pipe:1"
+            ],
+            "object_alive": true,
+            "returncode": 0,
+            "wait_returns": [
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdout",
+                "fd": 3,
+                "target": "pipe:[1893825]",
+                "object_alive": true,
+                "closed": true,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          },
+          {
+            "pid": 159,
+            "command": [
+              "ffprobe",
+              "-v",
+              "error",
+              "-select_streams",
+              "a",
+              "-show_entries",
+              "stream=codec_name,codec_tag_string",
+              "-of",
+              "json",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4"
+            ],
+            "object_alive": true,
+            "returncode": 0,
+            "wait_returns": [
+              0,
+              0,
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdout",
+                "fd": 4,
+                "target": "pipe:[1893837]",
+                "object_alive": true,
+                "closed": true,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              },
+              {
+                "name": "stderr",
+                "fd": 6,
+                "target": "pipe:[1893838]",
+                "object_alive": true,
+                "closed": true,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          },
+          {
+            "pid": 165,
+            "command": [
+              "ffmpeg",
+              "-y",
+              "-loglevel",
+              "error",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "yuv420p10le",
+              "-s",
+              "64x64",
+              "-r",
+              "3.000000",
+              "-i",
+              "pipe:0",
+              "-i",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4",
+              "-map",
+              "0:v:0",
+              "-map",
+              "1:a?",
+              "-map_metadata",
+              "-1",
+              "-map_chapters",
+              "-1",
+              "-c:v",
+              "libx265",
+              "-crf",
+              "18",
+              "-preset",
+              "fast",
+              "-pix_fmt",
+              "yuv420p10le",
+              "-x265-params",
+              "colorprim=bt2020:transfer=smpte2084:colormatrix=bt2020nc",
+              "-color_primaries",
+              "bt2020",
+              "-color_trc",
+              "smpte2084",
+              "-colorspace",
+              "bt2020nc",
+              "-tag:v",
+              "hvc1",
+              "-c:a",
+              "copy",
+              "/tmp/openscrub-hdr-cleanup-20261117/baseline-success-diagnostic-strong.mp4"
+            ],
+            "object_alive": true,
+            "returncode": 0,
+            "wait_returns": [
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdin",
+                "fd": 6,
+                "target": "pipe:[1893856]",
+                "object_alive": true,
+                "closed": true,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          }
+        ],
+        "temporary_files": [
+          {
+            "name": "encoder_error_file",
+            "fd": 4,
+            "target": "/tmp/#163502 (deleted)",
+            "object_alive": false,
+            "closed": null,
+            "fd_state": {
+              "open": false,
+              "same_target": false
+            }
+          }
+        ]
+      },
+      "output_exists": true,
+      "output_bytes": 3366,
+      "encoder_write_attempt_frames": 3,
+      "preencode_all_3_frames_equal_source_raw": true,
+      "preencode_sha256": "174c242e9bd68fe5ee9512274b5d681a990b06737ad4ff1b74221753eecd725d",
+      "harness_cleanup_actions": [],
+      "terminal_after_harness_cleanup": {
+        "children": [
+          {
+            "pid": 158,
+            "command": [
+              "ffmpeg",
+              "-loglevel",
+              "error",
+              "-i",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "yuv420p10le",
+              "pipe:1"
+            ],
+            "object_alive": true,
+            "returncode": 0,
+            "wait_returns": [
+              0,
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdout",
+                "fd": 3,
+                "target": "pipe:[1893825]",
+                "object_alive": true,
+                "closed": true,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          },
+          {
+            "pid": 159,
+            "command": [
+              "ffprobe",
+              "-v",
+              "error",
+              "-select_streams",
+              "a",
+              "-show_entries",
+              "stream=codec_name,codec_tag_string",
+              "-of",
+              "json",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4"
+            ],
+            "object_alive": true,
+            "returncode": 0,
+            "wait_returns": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdout",
+                "fd": 4,
+                "target": "pipe:[1893837]",
+                "object_alive": true,
+                "closed": true,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              },
+              {
+                "name": "stderr",
+                "fd": 6,
+                "target": "pipe:[1893838]",
+                "object_alive": true,
+                "closed": true,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          },
+          {
+            "pid": 165,
+            "command": [
+              "ffmpeg",
+              "-y",
+              "-loglevel",
+              "error",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "yuv420p10le",
+              "-s",
+              "64x64",
+              "-r",
+              "3.000000",
+              "-i",
+              "pipe:0",
+              "-i",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4",
+              "-map",
+              "0:v:0",
+              "-map",
+              "1:a?",
+              "-map_metadata",
+              "-1",
+              "-map_chapters",
+              "-1",
+              "-c:v",
+              "libx265",
+              "-crf",
+              "18",
+              "-preset",
+              "fast",
+              "-pix_fmt",
+              "yuv420p10le",
+              "-x265-params",
+              "colorprim=bt2020:transfer=smpte2084:colormatrix=bt2020nc",
+              "-color_primaries",
+              "bt2020",
+              "-color_trc",
+              "smpte2084",
+              "-colorspace",
+              "bt2020nc",
+              "-tag:v",
+              "hvc1",
+              "-c:a",
+              "copy",
+              "/tmp/openscrub-hdr-cleanup-20261117/baseline-success-diagnostic-strong.mp4"
+            ],
+            "object_alive": true,
+            "returncode": 0,
+            "wait_returns": [
+              0,
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdin",
+                "fd": 6,
+                "target": "pipe:[1893856]",
+                "object_alive": true,
+                "closed": true,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          }
+        ],
+        "temporary_files": [
+          {
+            "name": "encoder_error_file",
+            "fd": 4,
+            "target": "/tmp/#163502 (deleted)",
+            "object_alive": false,
+            "closed": null,
+            "fd_state": {
+              "open": false,
+              "same_target": false
+            }
+          }
+        ]
+      },
+      "callbacks": [
+        [
+          "log",
+          "[4/4] Rendering -> /tmp/openscrub-hdr-cleanup-20261117/baseline-success-diagnostic-strong.mp4"
+        ],
+        [
+          "log",
+          "      encoder: libx265 10-bit (CPU)"
+        ],
+        [
+          "cancelled",
+          false
+        ],
+        [
+          "progress",
+          "render",
+          3,
+          3
+        ],
+        [
+          "log",
+          "      HDR preserved: 10-bit HEVC, color tags color_primaries=bt2020, color_trc=smpte2084, colorspace=bt2020nc"
+        ],
+        [
+          "log",
+          "done."
+        ]
+      ],
+      "metadata": {
+        "programs": [],
+        "stream_groups": [],
+        "streams": [
+          {
+            "codec_name": "hevc",
+            "width": 64,
+            "height": 64,
+            "pix_fmt": "yuv420p10le",
+            "color_space": "bt2020nc",
+            "color_transfer": "smpte2084",
+            "color_primaries": "bt2020",
+            "nb_frames": "3",
+            "nb_read_frames": "3"
+          }
+        ]
+      },
+      "decoded_frame_count": 3,
+      "decoded_plane_ranges": [
+        [
+          856,
+          856
+        ],
+        [
+          560,
+          560
+        ],
+        [
+          341,
+          341
+        ]
+      ],
+      "decoded_plane_max_abs_vs_source": [
+        44,
+        240,
+        41
+      ]
+    },
+    {
+      "name": "baseline-cancel-diagnostic-strong",
+      "kind": "cancel",
+      "strong_diagnostic_popen_references": true,
+      "boundary": "actual run_render -> actual render_hdr",
+      "dst": "/tmp/openscrub-hdr-cleanup-20261117/baseline-cancel-diagnostic-strong.mp4",
+      "status": "PipelineCancelled",
+      "message": "",
+      "traceback": "Traceback (most recent call last):\n  File \"/home/tahv0/src/OpenScrub/.superpowers/sdd/README/hdr-decoder-cleanup-baseline-evidence/probe_cleanup.py\", line 233, in exercise\n    row['return'] = mod.run_render(args, state, CB())\n                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/openscrub-hdr-cleanup-20261117/baseline/openscrub.py\", line 8478, in run_render\n    render_hdr(args.hdr_source, dst, dets_r, state[\"cum\"],\n  File \"/tmp/openscrub-hdr-cleanup-20261117/baseline/openscrub.py\", line 3989, in render_hdr\n    raise PipelineCancelled()\nhdr_cleanup_baseline.PipelineCancelled\n",
+      "at_return_or_held_traceback": {
+        "children": [
+          {
+            "pid": 188,
+            "command": [
+              "ffmpeg",
+              "-loglevel",
+              "error",
+              "-i",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "yuv420p10le",
+              "pipe:1"
+            ],
+            "object_alive": true,
+            "returncode": 0,
+            "wait_returns": [
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdout",
+                "fd": 3,
+                "target": "pipe:[1893870]",
+                "object_alive": true,
+                "closed": false,
+                "fd_state": {
+                  "open": true,
+                  "same_target": true,
+                  "target": "pipe:[1893870]"
+                }
+              }
+            ]
+          },
+          {
+            "pid": 189,
+            "command": [
+              "ffprobe",
+              "-v",
+              "error",
+              "-select_streams",
+              "a",
+              "-show_entries",
+              "stream=codec_name,codec_tag_string",
+              "-of",
+              "json",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4"
+            ],
+            "object_alive": true,
+            "returncode": 0,
+            "wait_returns": [
+              0,
+              0,
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdout",
+                "fd": 4,
+                "target": "pipe:[1893882]",
+                "object_alive": true,
+                "closed": true,
+                "fd_state": {
+                  "open": true,
+                  "same_target": false,
+                  "target": "/tmp/#163503 (deleted)"
+                }
+              },
+              {
+                "name": "stderr",
+                "fd": 6,
+                "target": "pipe:[1893883]",
+                "object_alive": true,
+                "closed": true,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          },
+          {
+            "pid": 195,
+            "command": [
+              "ffmpeg",
+              "-y",
+              "-loglevel",
+              "error",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "yuv420p10le",
+              "-s",
+              "64x64",
+              "-r",
+              "3.000000",
+              "-i",
+              "pipe:0",
+              "-i",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4",
+              "-map",
+              "0:v:0",
+              "-map",
+              "1:a?",
+              "-map_metadata",
+              "-1",
+              "-map_chapters",
+              "-1",
+              "-c:v",
+              "libx265",
+              "-crf",
+              "18",
+              "-preset",
+              "fast",
+              "-pix_fmt",
+              "yuv420p10le",
+              "-x265-params",
+              "colorprim=bt2020:transfer=smpte2084:colormatrix=bt2020nc",
+              "-color_primaries",
+              "bt2020",
+              "-color_trc",
+              "smpte2084",
+              "-colorspace",
+              "bt2020nc",
+              "-tag:v",
+              "hvc1",
+              "-c:a",
+              "copy",
+              "/tmp/openscrub-hdr-cleanup-20261117/baseline-cancel-diagnostic-strong.mp4"
+            ],
+            "object_alive": true,
+            "returncode": -15,
+            "wait_returns": [
+              -15
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdin",
+                "fd": 6,
+                "target": "pipe:[1893901]",
+                "object_alive": true,
+                "closed": true,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          }
+        ],
+        "temporary_files": [
+          {
+            "name": "encoder_error_file",
+            "fd": 4,
+            "target": "/tmp/#163503 (deleted)",
+            "object_alive": true,
+            "closed": false,
+            "fd_state": {
+              "open": true,
+              "same_target": true,
+              "target": "/tmp/#163503 (deleted)"
+            }
+          }
+        ]
+      },
+      "after_releasing_exception_and_gc": {
+        "children": [
+          {
+            "pid": 188,
+            "command": [
+              "ffmpeg",
+              "-loglevel",
+              "error",
+              "-i",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "yuv420p10le",
+              "pipe:1"
+            ],
+            "object_alive": true,
+            "returncode": 0,
+            "wait_returns": [
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdout",
+                "fd": 3,
+                "target": "pipe:[1893870]",
+                "object_alive": true,
+                "closed": false,
+                "fd_state": {
+                  "open": true,
+                  "same_target": true,
+                  "target": "pipe:[1893870]"
+                }
+              }
+            ]
+          },
+          {
+            "pid": 189,
+            "command": [
+              "ffprobe",
+              "-v",
+              "error",
+              "-select_streams",
+              "a",
+              "-show_entries",
+              "stream=codec_name,codec_tag_string",
+              "-of",
+              "json",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4"
+            ],
+            "object_alive": true,
+            "returncode": 0,
+            "wait_returns": [
+              0,
+              0,
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdout",
+                "fd": 4,
+                "target": "pipe:[1893882]",
+                "object_alive": true,
+                "closed": true,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              },
+              {
+                "name": "stderr",
+                "fd": 6,
+                "target": "pipe:[1893883]",
+                "object_alive": true,
+                "closed": true,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          },
+          {
+            "pid": 195,
+            "command": [
+              "ffmpeg",
+              "-y",
+              "-loglevel",
+              "error",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "yuv420p10le",
+              "-s",
+              "64x64",
+              "-r",
+              "3.000000",
+              "-i",
+              "pipe:0",
+              "-i",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4",
+              "-map",
+              "0:v:0",
+              "-map",
+              "1:a?",
+              "-map_metadata",
+              "-1",
+              "-map_chapters",
+              "-1",
+              "-c:v",
+              "libx265",
+              "-crf",
+              "18",
+              "-preset",
+              "fast",
+              "-pix_fmt",
+              "yuv420p10le",
+              "-x265-params",
+              "colorprim=bt2020:transfer=smpte2084:colormatrix=bt2020nc",
+              "-color_primaries",
+              "bt2020",
+              "-color_trc",
+              "smpte2084",
+              "-colorspace",
+              "bt2020nc",
+              "-tag:v",
+              "hvc1",
+              "-c:a",
+              "copy",
+              "/tmp/openscrub-hdr-cleanup-20261117/baseline-cancel-diagnostic-strong.mp4"
+            ],
+            "object_alive": true,
+            "returncode": -15,
+            "wait_returns": [
+              -15
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdin",
+                "fd": 6,
+                "target": "pipe:[1893901]",
+                "object_alive": true,
+                "closed": true,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          }
+        ],
+        "temporary_files": [
+          {
+            "name": "encoder_error_file",
+            "fd": 4,
+            "target": "/tmp/#163503 (deleted)",
+            "object_alive": false,
+            "closed": null,
+            "fd_state": {
+              "open": false,
+              "same_target": false
+            }
+          }
+        ]
+      },
+      "output_exists": false,
+      "output_bytes": null,
+      "encoder_write_attempt_frames": 0,
+      "harness_cleanup_actions": [
+        {
+          "pid": 188,
+          "action": "harness close stdout"
+        }
+      ],
+      "terminal_after_harness_cleanup": {
+        "children": [
+          {
+            "pid": 188,
+            "command": [
+              "ffmpeg",
+              "-loglevel",
+              "error",
+              "-i",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "yuv420p10le",
+              "pipe:1"
+            ],
+            "object_alive": true,
+            "returncode": 0,
+            "wait_returns": [
+              0,
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdout",
+                "fd": 3,
+                "target": "pipe:[1893870]",
+                "object_alive": true,
+                "closed": true,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          },
+          {
+            "pid": 189,
+            "command": [
+              "ffprobe",
+              "-v",
+              "error",
+              "-select_streams",
+              "a",
+              "-show_entries",
+              "stream=codec_name,codec_tag_string",
+              "-of",
+              "json",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4"
+            ],
+            "object_alive": true,
+            "returncode": 0,
+            "wait_returns": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdout",
+                "fd": 4,
+                "target": "pipe:[1893882]",
+                "object_alive": true,
+                "closed": true,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              },
+              {
+                "name": "stderr",
+                "fd": 6,
+                "target": "pipe:[1893883]",
+                "object_alive": true,
+                "closed": true,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          },
+          {
+            "pid": 195,
+            "command": [
+              "ffmpeg",
+              "-y",
+              "-loglevel",
+              "error",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "yuv420p10le",
+              "-s",
+              "64x64",
+              "-r",
+              "3.000000",
+              "-i",
+              "pipe:0",
+              "-i",
+              "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4",
+              "-map",
+              "0:v:0",
+              "-map",
+              "1:a?",
+              "-map_metadata",
+              "-1",
+              "-map_chapters",
+              "-1",
+              "-c:v",
+              "libx265",
+              "-crf",
+              "18",
+              "-preset",
+              "fast",
+              "-pix_fmt",
+              "yuv420p10le",
+              "-x265-params",
+              "colorprim=bt2020:transfer=smpte2084:colormatrix=bt2020nc",
+              "-color_primaries",
+              "bt2020",
+              "-color_trc",
+              "smpte2084",
+              "-colorspace",
+              "bt2020nc",
+              "-tag:v",
+              "hvc1",
+              "-c:a",
+              "copy",
+              "/tmp/openscrub-hdr-cleanup-20261117/baseline-cancel-diagnostic-strong.mp4"
+            ],
+            "object_alive": true,
+            "returncode": -15,
+            "wait_returns": [
+              -15,
+              -15
+            ],
+            "proc_state": "absent",
+            "streams": [
+              {
+                "name": "stdin",
+                "fd": 6,
+                "target": "pipe:[1893901]",
+                "object_alive": true,
+                "closed": true,
+                "fd_state": {
+                  "open": false,
+                  "same_target": false
+                }
+              }
+            ]
+          }
+        ],
+        "temporary_files": [
+          {
+            "name": "encoder_error_file",
+            "fd": 4,
+            "target": "/tmp/#163503 (deleted)",
+            "object_alive": false,
+            "closed": null,
+            "fd_state": {
+              "open": false,
+              "same_target": false
+            }
+          }
+        ]
+      },
+      "callbacks": [
+        [
+          "log",
+          "[4/4] Rendering -> /tmp/openscrub-hdr-cleanup-20261117/baseline-cancel-diagnostic-strong.mp4"
+        ],
+        [
+          "log",
+          "      encoder: libx265 10-bit (CPU)"
+        ],
+        [
+          "cancelled",
+          true
+        ]
+      ]
+    }
+  ],
+  "ffmpeg_version": "ffmpeg version 8.0.1-3ubuntu2 Copyright (c) 2000-2025 the FFmpeg developers",
+  "source_metadata": {
+    "programs": [],
+    "stream_groups": [],
+    "streams": [
+      {
+        "codec_name": "hevc",
+        "width": 64,
+        "height": 64,
+        "pix_fmt": "yuv420p10le",
+        "color_space": "bt2020nc",
+        "color_transfer": "smpte2084",
+        "color_primaries": "bt2020",
+        "nb_frames": "3",
+        "nb_read_frames": "3"
+      }
+    ]
+  },
+  "fixture_decoded_all_3_frames_exact": true,
+  "fixture_tools_cleanup": [],
+  "fixture_tools_terminal": {
+    "children": [
+      {
+        "pid": 34,
+        "command": [
+          "ffmpeg",
+          "-version"
+        ],
+        "object_alive": true,
+        "returncode": 0,
+        "wait_returns": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "proc_state": "absent",
+        "streams": [
+          {
+            "name": "stdout",
+            "fd": 3,
+            "target": "pipe:[1893414]",
+            "object_alive": true,
+            "closed": true,
+            "fd_state": {
+              "open": false,
+              "same_target": false
+            }
+          },
+          {
+            "name": "stderr",
+            "fd": 5,
+            "target": "pipe:[1893415]",
+            "object_alive": true,
+            "closed": true,
+            "fd_state": {
+              "open": false,
+              "same_target": false
+            }
+          }
+        ]
+      },
+      {
+        "pid": 35,
+        "command": [
+          "ffmpeg",
+          "-y",
+          "-hide_banner",
+          "-loglevel",
+          "error",
+          "-f",
+          "rawvideo",
+          "-pix_fmt",
+          "yuv420p10le",
+          "-s",
+          "64x64",
+          "-r",
+          "3",
+          "-color_primaries",
+          "bt2020",
+          "-color_trc",
+          "smpte2084",
+          "-colorspace",
+          "bt2020nc",
+          "-i",
+          "/tmp/openscrub-hdr-cleanup-20261117/synthetic.yuv",
+          "-c:v",
+          "libx265",
+          "-x265-params",
+          "lossless=1:pools=1:colorprim=bt2020:transfer=smpte2084:colormatrix=bt2020nc",
+          "-color_primaries",
+          "bt2020",
+          "-color_trc",
+          "smpte2084",
+          "-colorspace",
+          "bt2020nc",
+          "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4"
+        ],
+        "object_alive": true,
+        "returncode": 0,
+        "wait_returns": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "proc_state": "absent",
+        "streams": [
+          {
+            "name": "stdout",
+            "fd": 3,
+            "target": "pipe:[1893431]",
+            "object_alive": true,
+            "closed": true,
+            "fd_state": {
+              "open": false,
+              "same_target": false
+            }
+          },
+          {
+            "name": "stderr",
+            "fd": 5,
+            "target": "pipe:[1893432]",
+            "object_alive": true,
+            "closed": true,
+            "fd_state": {
+              "open": false,
+              "same_target": false
+            }
+          }
+        ]
+      },
+      {
+        "pid": 43,
+        "command": [
+          "ffprobe",
+          "-v",
+          "error",
+          "-count_frames",
+          "-select_streams",
+          "v:0",
+          "-show_entries",
+          "stream=codec_name,pix_fmt,width,height,nb_frames,nb_read_frames,color_transfer,color_primaries,color_space",
+          "-of",
+          "json",
+          "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4"
+        ],
+        "object_alive": true,
+        "returncode": 0,
+        "wait_returns": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "proc_state": "absent",
+        "streams": [
+          {
+            "name": "stdout",
+            "fd": 3,
+            "target": "pipe:[1893445]",
+            "object_alive": true,
+            "closed": true,
+            "fd_state": {
+              "open": false,
+              "same_target": false
+            }
+          },
+          {
+            "name": "stderr",
+            "fd": 5,
+            "target": "pipe:[1893446]",
+            "object_alive": true,
+            "closed": true,
+            "fd_state": {
+              "open": false,
+              "same_target": false
+            }
+          }
+        ]
+      },
+      {
+        "pid": 44,
+        "command": [
+          "ffmpeg",
+          "-v",
+          "error",
+          "-i",
+          "/tmp/openscrub-hdr-cleanup-20261117/synthetic-hdr.mp4",
+          "-f",
+          "rawvideo",
+          "-pix_fmt",
+          "yuv420p10le",
+          "pipe:1"
+        ],
+        "object_alive": true,
+        "returncode": 0,
+        "wait_returns": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "proc_state": "absent",
+        "streams": [
+          {
+            "name": "stdout",
+            "fd": 3,
+            "target": "pipe:[1893459]",
+            "object_alive": true,
+            "closed": true,
+            "fd_state": {
+              "open": false,
+              "same_target": false
+            }
+          },
+          {
+            "name": "stderr",
+            "fd": 5,
+            "target": "pipe:[1893460]",
+            "object_alive": true,
+            "closed": true,
+            "fd_state": {
+              "open": false,
+              "same_target": false
+            }
+          }
+        ]
+      }
+    ],
+    "temporary_files": []
+  },
+  "output_tools_cleanup": [],
+  "output_tools_terminal": {
+    "children": [
+      {
+        "pid": 196,
+        "command": [
+          "ffprobe",
+          "-v",
+          "error",
+          "-count_frames",
+          "-select_streams",
+          "v:0",
+          "-show_entries",
+          "stream=codec_name,pix_fmt,width,height,nb_frames,nb_read_frames,color_transfer,color_primaries,color_space",
+          "-of",
+          "json",
+          "/tmp/openscrub-hdr-cleanup-20261117/baseline-success-weak-observer.mp4"
+        ],
+        "object_alive": true,
+        "returncode": 0,
+        "wait_returns": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "proc_state": "absent",
+        "streams": [
+          {
+            "name": "stdout",
+            "fd": 3,
+            "target": "pipe:[1893913]",
+            "object_alive": true,
+            "closed": true,
+            "fd_state": {
+              "open": false,
+              "same_target": false
+            }
+          },
+          {
+            "name": "stderr",
+            "fd": 5,
+            "target": "pipe:[1893914]",
+            "object_alive": true,
+            "closed": true,
+            "fd_state": {
+              "open": false,
+              "same_target": false
+            }
+          }
+        ]
+      },
+      {
+        "pid": 197,
+        "command": [
+          "ffmpeg",
+          "-v",
+          "error",
+          "-i",
+          "/tmp/openscrub-hdr-cleanup-20261117/baseline-success-weak-observer.mp4",
+          "-f",
+          "rawvideo",
+          "-pix_fmt",
+          "yuv420p10le",
+          "pipe:1"
+        ],
+        "object_alive": true,
+        "returncode": 0,
+        "wait_returns": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "proc_state": "absent",
+        "streams": [
+          {
+            "name": "stdout",
+            "fd": 3,
+            "target": "pipe:[1893929]",
+            "object_alive": true,
+            "closed": true,
+            "fd_state": {
+              "open": false,
+              "same_target": false
+            }
+          },
+          {
+            "name": "stderr",
+            "fd": 5,
+            "target": "pipe:[1893930]",
+            "object_alive": true,
+            "closed": true,
+            "fd_state": {
+              "open": false,
+              "same_target": false
+            }
+          }
+        ]
+      },
+      {
+        "pid": 203,
+        "command": [
+          "ffprobe",
+          "-v",
+          "error",
+          "-count_frames",
+          "-select_streams",
+          "v:0",
+          "-show_entries",
+          "stream=codec_name,pix_fmt,width,height,nb_frames,nb_read_frames,color_transfer,color_primaries,color_space",
+          "-of",
+          "json",
+          "/tmp/openscrub-hdr-cleanup-20261117/donor-success-weak-observer.mp4"
+        ],
+        "object_alive": true,
+        "returncode": 0,
+        "wait_returns": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "proc_state": "absent",
+        "streams": [
+          {
+            "name": "stdout",
+            "fd": 3,
+            "target": "pipe:[1893943]",
+            "object_alive": true,
+            "closed": true,
+            "fd_state": {
+              "open": false,
+              "same_target": false
+            }
+          },
+          {
+            "name": "stderr",
+            "fd": 5,
+            "target": "pipe:[1893944]",
+            "object_alive": true,
+            "closed": true,
+            "fd_state": {
+              "open": false,
+              "same_target": false
+            }
+          }
+        ]
+      },
+      {
+        "pid": 204,
+        "command": [
+          "ffmpeg",
+          "-v",
+          "error",
+          "-i",
+          "/tmp/openscrub-hdr-cleanup-20261117/donor-success-weak-observer.mp4",
+          "-f",
+          "rawvideo",
+          "-pix_fmt",
+          "yuv420p10le",
+          "pipe:1"
+        ],
+        "object_alive": true,
+        "returncode": 0,
+        "wait_returns": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "proc_state": "absent",
+        "streams": [
+          {
+            "name": "stdout",
+            "fd": 3,
+            "target": "pipe:[1893957]",
+            "object_alive": true,
+            "closed": true,
+            "fd_state": {
+              "open": false,
+              "same_target": false
+            }
+          },
+          {
+            "name": "stderr",
+            "fd": 5,
+            "target": "pipe:[1893958]",
+            "object_alive": true,
+            "closed": true,
+            "fd_state": {
+              "open": false,
+              "same_target": false
+            }
+          }
+        ]
+      },
+      {
+        "pid": 210,
+        "command": [
+          "ffprobe",
+          "-v",
+          "error",
+          "-count_frames",
+          "-select_streams",
+          "v:0",
+          "-show_entries",
+          "stream=codec_name,pix_fmt,width,height,nb_frames,nb_read_frames,color_transfer,color_primaries,color_space",
+          "-of",
+          "json",
+          "/tmp/openscrub-hdr-cleanup-20261117/baseline-success-diagnostic-strong.mp4"
+        ],
+        "object_alive": true,
+        "returncode": 0,
+        "wait_returns": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "proc_state": "absent",
+        "streams": [
+          {
+            "name": "stdout",
+            "fd": 3,
+            "target": "pipe:[1893971]",
+            "object_alive": true,
+            "closed": true,
+            "fd_state": {
+              "open": false,
+              "same_target": false
+            }
+          },
+          {
+            "name": "stderr",
+            "fd": 5,
+            "target": "pipe:[1893972]",
+            "object_alive": true,
+            "closed": true,
+            "fd_state": {
+              "open": false,
+              "same_target": false
+            }
+          }
+        ]
+      },
+      {
+        "pid": 211,
+        "command": [
+          "ffmpeg",
+          "-v",
+          "error",
+          "-i",
+          "/tmp/openscrub-hdr-cleanup-20261117/baseline-success-diagnostic-strong.mp4",
+          "-f",
+          "rawvideo",
+          "-pix_fmt",
+          "yuv420p10le",
+          "pipe:1"
+        ],
+        "object_alive": true,
+        "returncode": 0,
+        "wait_returns": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "proc_state": "absent",
+        "streams": [
+          {
+            "name": "stdout",
+            "fd": 3,
+            "target": "pipe:[1893985]",
+            "object_alive": true,
+            "closed": true,
+            "fd_state": {
+              "open": false,
+              "same_target": false
+            }
+          },
+          {
+            "name": "stderr",
+            "fd": 5,
+            "target": "pipe:[1893986]",
+            "object_alive": true,
+            "closed": true,
+            "fd_state": {
+              "open": false,
+              "same_target": false
+            }
+          }
+        ]
+      }
+    ],
+    "temporary_files": []
+  }
+}

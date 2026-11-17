@@ -1,0 +1,379 @@
+........................................................................ [ 25%]
+........................................................................ [ 50%]
+..............................................FF........................ [ 76%]
+.....................................................FFFFFF........      [100%]
+=================================== FAILURES ===================================
+_________________ test_background_tracking_publication[False] __________________
+
+review = namespace(path=PosixPath('/tmp/openscrub-task621/full-final-tmp/test_background_tracking_publi0/jobs/synthetic/report....'t1': 0.2, 'mode': 'mute'}], 'custom_future_field': {'preserved': True}}, client=<FlaskClient <Flask 'openscrub_web'>>)
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x74a0fcbbf170>
+failed = False
+
+    @pytest.mark.parametrize('failed', [False, True])
+    def test_background_tracking_publication(review, monkeypatch, failed):
+        old = review.path.read_bytes()
+        # Model discovery/inference is outside publication; no model files/network.
+        monkeypatch.setattr(web, 'load_model_select', lambda: {})
+        monkeypatch.setattr(openscrub, 'PersonDetector', lambda *a, **kw: None)
+        monkeypatch.setattr(openscrub, 'track_manual_region',
+                            lambda *a, **kw: [(0.5, [2, 3, 9, 10], .9)])
+        if failed:
+            def fail(*args):
+                raise OSError('injected tracking replace failure')
+            monkeypatch.setattr(reports.os, 'replace', fail)
+        # Keep the actual background execution and await its completion deterministically.
+        real_thread = threading.Thread
+        threads = []
+        def thread_factory(*args, **kwargs):
+            thread = real_thread(*args, **kwargs)
+            threads.append(thread)
+            return thread
+        monkeypatch.setattr(web.threading, 'Thread', thread_factory)
+        response = review.client.post('/api/jobs/synthetic/track_object',
+                        json={'box': [2, 3, 9, 10], 't_ref': .5, 't0': 0, 't1': 1})
+>       assert response.status_code == 200  # existing asynchronous acceptance semantics
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       assert 500 == 200
+E        +  where 500 = <WrapperTestResponse streamed [500 INTERNAL SERVER ERROR]>.status_code
+
+tests/test_large_report_io.py:191: AssertionError
+------------------------------ Captured log call -------------------------------
+ERROR    openscrub_web:app.py:875 Exception on /api/jobs/synthetic/track_object [POST]
+Traceback (most recent call last):
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", line 1601, in job_track_object
+    if job["cancel"].is_set():
+       ~~~^^^^^^^^^^
+KeyError: 'cancel'
+__________________ test_background_tracking_publication[True] __________________
+
+review = namespace(path=PosixPath('/tmp/openscrub-task621/full-final-tmp/test_background_tracking_publi1/jobs/synthetic/report....'t1': 0.2, 'mode': 'mute'}], 'custom_future_field': {'preserved': True}}, client=<FlaskClient <Flask 'openscrub_web'>>)
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x74a0fcbd4e60>
+failed = True
+
+    @pytest.mark.parametrize('failed', [False, True])
+    def test_background_tracking_publication(review, monkeypatch, failed):
+        old = review.path.read_bytes()
+        # Model discovery/inference is outside publication; no model files/network.
+        monkeypatch.setattr(web, 'load_model_select', lambda: {})
+        monkeypatch.setattr(openscrub, 'PersonDetector', lambda *a, **kw: None)
+        monkeypatch.setattr(openscrub, 'track_manual_region',
+                            lambda *a, **kw: [(0.5, [2, 3, 9, 10], .9)])
+        if failed:
+            def fail(*args):
+                raise OSError('injected tracking replace failure')
+            monkeypatch.setattr(reports.os, 'replace', fail)
+        # Keep the actual background execution and await its completion deterministically.
+        real_thread = threading.Thread
+        threads = []
+        def thread_factory(*args, **kwargs):
+            thread = real_thread(*args, **kwargs)
+            threads.append(thread)
+            return thread
+        monkeypatch.setattr(web.threading, 'Thread', thread_factory)
+        response = review.client.post('/api/jobs/synthetic/track_object',
+                        json={'box': [2, 3, 9, 10], 't_ref': .5, 't0': 0, 't1': 1})
+>       assert response.status_code == 200  # existing asynchronous acceptance semantics
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       assert 500 == 200
+E        +  where 500 = <WrapperTestResponse streamed [500 INTERNAL SERVER ERROR]>.status_code
+
+tests/test_large_report_io.py:191: AssertionError
+------------------------------ Captured log call -------------------------------
+ERROR    openscrub_web:app.py:875 Exception on /api/jobs/synthetic/track_object [POST]
+Traceback (most recent call last):
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", line 1601, in job_track_object
+    if job["cancel"].is_set():
+       ~~~^^^^^^^^^^
+KeyError: 'cancel'
+__ test_lifecycle_rejections_keep_current_review_and_drafts[409-delJob('A')] ___
+
+action = "delJob('A')", status = 409
+
+    @pytest.mark.parametrize('action', ["delJob('A')", "retryJob('A')", 'vaultDoLock()'])
+    @pytest.mark.parametrize('status', [409, 423])
+    def test_lifecycle_rejections_keep_current_review_and_drafts(action, status):
+>       run_js("""setup();confirm=()=>true;
+        let alerts=[];alert=message=>alerts.push(String(message));vaultStatus=()=>{};
+        const draft=EDITS,view=VIEW_GEN,html=detail.innerHTML;
+        const p=ACTION;const pending=queue.shift();
+        pending.resolve({ok:false,status:STATUS,json:async()=>({error:'busy or locked'}),
+          text:async()=>'busy or locked'});
+        await tick();await p;
+        if(CUR!=='A'||VIEW_GEN!==view||EDITS!==draft||REVIEW_DRAFTS.get('A')!==draft)
+          throw Error('rejected lifecycle request cleared or switched review');
+        if(detail.innerHTML!==html||MAN.length!==1||BE.adds.length!==1||BE.audio.length!==2)
+          throw Error('rejected lifecycle request cleared draft/view');
+        if(alerts.length!==1||!alerts[0].includes('busy or locked')||alerts[0].startsWith('Locked'))
+          throw Error('lifecycle rejection claimed success or omitted failure');
+        if(calls.length!==1)throw Error('rejected lifecycle request started another action');
+        """.replace('ACTION', action).replace('STATUS', str(status)))
+
+tests/test_review_save_failures.py:333: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "setup();confirm=()=>true;\n    let alerts=[];alert=message=>alerts.push(String(message));vaultStatus=()=>{};\n    con...or omitted failure');\n    if(calls.length!==1)throw Error('rejected lifecycle request started another action');\n    "
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: Error: rejected lifecycle request cleared draft/view
+E             at evalmachine.<anonymous>:11:13
+E             at async [eval]:31:12
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...ror: rejected lifecycle request cleared draft/view\n    at evalmachine.<anonymous>:11:13\n    at async [eval]:31:12\n').returncode
+
+tests/test_review_save_failures.py:63: AssertionError
+_ test_lifecycle_rejections_keep_current_review_and_drafts[409-retryJob('A')] __
+
+action = "retryJob('A')", status = 409
+
+    @pytest.mark.parametrize('action', ["delJob('A')", "retryJob('A')", 'vaultDoLock()'])
+    @pytest.mark.parametrize('status', [409, 423])
+    def test_lifecycle_rejections_keep_current_review_and_drafts(action, status):
+>       run_js("""setup();confirm=()=>true;
+        let alerts=[];alert=message=>alerts.push(String(message));vaultStatus=()=>{};
+        const draft=EDITS,view=VIEW_GEN,html=detail.innerHTML;
+        const p=ACTION;const pending=queue.shift();
+        pending.resolve({ok:false,status:STATUS,json:async()=>({error:'busy or locked'}),
+          text:async()=>'busy or locked'});
+        await tick();await p;
+        if(CUR!=='A'||VIEW_GEN!==view||EDITS!==draft||REVIEW_DRAFTS.get('A')!==draft)
+          throw Error('rejected lifecycle request cleared or switched review');
+        if(detail.innerHTML!==html||MAN.length!==1||BE.adds.length!==1||BE.audio.length!==2)
+          throw Error('rejected lifecycle request cleared draft/view');
+        if(alerts.length!==1||!alerts[0].includes('busy or locked')||alerts[0].startsWith('Locked'))
+          throw Error('lifecycle rejection claimed success or omitted failure');
+        if(calls.length!==1)throw Error('rejected lifecycle request started another action');
+        """.replace('ACTION', action).replace('STATUS', str(status)))
+
+tests/test_review_save_failures.py:333: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "setup();confirm=()=>true;\n    let alerts=[];alert=message=>alerts.push(String(message));vaultStatus=()=>{};\n    con...or omitted failure');\n    if(calls.length!==1)throw Error('rejected lifecycle request started another action');\n    "
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: Error: rejected lifecycle request cleared draft/view
+E             at evalmachine.<anonymous>:11:13
+E             at async [eval]:31:12
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...ror: rejected lifecycle request cleared draft/view\n    at evalmachine.<anonymous>:11:13\n    at async [eval]:31:12\n').returncode
+
+tests/test_review_save_failures.py:63: AssertionError
+_ test_lifecycle_rejections_keep_current_review_and_drafts[409-vaultDoLock()] __
+
+action = 'vaultDoLock()', status = 409
+
+    @pytest.mark.parametrize('action', ["delJob('A')", "retryJob('A')", 'vaultDoLock()'])
+    @pytest.mark.parametrize('status', [409, 423])
+    def test_lifecycle_rejections_keep_current_review_and_drafts(action, status):
+>       run_js("""setup();confirm=()=>true;
+        let alerts=[];alert=message=>alerts.push(String(message));vaultStatus=()=>{};
+        const draft=EDITS,view=VIEW_GEN,html=detail.innerHTML;
+        const p=ACTION;const pending=queue.shift();
+        pending.resolve({ok:false,status:STATUS,json:async()=>({error:'busy or locked'}),
+          text:async()=>'busy or locked'});
+        await tick();await p;
+        if(CUR!=='A'||VIEW_GEN!==view||EDITS!==draft||REVIEW_DRAFTS.get('A')!==draft)
+          throw Error('rejected lifecycle request cleared or switched review');
+        if(detail.innerHTML!==html||MAN.length!==1||BE.adds.length!==1||BE.audio.length!==2)
+          throw Error('rejected lifecycle request cleared draft/view');
+        if(alerts.length!==1||!alerts[0].includes('busy or locked')||alerts[0].startsWith('Locked'))
+          throw Error('lifecycle rejection claimed success or omitted failure');
+        if(calls.length!==1)throw Error('rejected lifecycle request started another action');
+        """.replace('ACTION', action).replace('STATUS', str(status)))
+
+tests/test_review_save_failures.py:333: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "setup();confirm=()=>true;\n    let alerts=[];alert=message=>alerts.push(String(message));vaultStatus=()=>{};\n    con...or omitted failure');\n    if(calls.length!==1)throw Error('rejected lifecycle request started another action');\n    "
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: Error: rejected lifecycle request cleared draft/view
+E             at evalmachine.<anonymous>:11:13
+E             at async [eval]:31:12
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...ror: rejected lifecycle request cleared draft/view\n    at evalmachine.<anonymous>:11:13\n    at async [eval]:31:12\n').returncode
+
+tests/test_review_save_failures.py:63: AssertionError
+__ test_lifecycle_rejections_keep_current_review_and_drafts[423-delJob('A')] ___
+
+action = "delJob('A')", status = 423
+
+    @pytest.mark.parametrize('action', ["delJob('A')", "retryJob('A')", 'vaultDoLock()'])
+    @pytest.mark.parametrize('status', [409, 423])
+    def test_lifecycle_rejections_keep_current_review_and_drafts(action, status):
+>       run_js("""setup();confirm=()=>true;
+        let alerts=[];alert=message=>alerts.push(String(message));vaultStatus=()=>{};
+        const draft=EDITS,view=VIEW_GEN,html=detail.innerHTML;
+        const p=ACTION;const pending=queue.shift();
+        pending.resolve({ok:false,status:STATUS,json:async()=>({error:'busy or locked'}),
+          text:async()=>'busy or locked'});
+        await tick();await p;
+        if(CUR!=='A'||VIEW_GEN!==view||EDITS!==draft||REVIEW_DRAFTS.get('A')!==draft)
+          throw Error('rejected lifecycle request cleared or switched review');
+        if(detail.innerHTML!==html||MAN.length!==1||BE.adds.length!==1||BE.audio.length!==2)
+          throw Error('rejected lifecycle request cleared draft/view');
+        if(alerts.length!==1||!alerts[0].includes('busy or locked')||alerts[0].startsWith('Locked'))
+          throw Error('lifecycle rejection claimed success or omitted failure');
+        if(calls.length!==1)throw Error('rejected lifecycle request started another action');
+        """.replace('ACTION', action).replace('STATUS', str(status)))
+
+tests/test_review_save_failures.py:333: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "setup();confirm=()=>true;\n    let alerts=[];alert=message=>alerts.push(String(message));vaultStatus=()=>{};\n    con...or omitted failure');\n    if(calls.length!==1)throw Error('rejected lifecycle request started another action');\n    "
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: Error: rejected lifecycle request cleared draft/view
+E             at evalmachine.<anonymous>:11:13
+E             at async [eval]:31:12
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...ror: rejected lifecycle request cleared draft/view\n    at evalmachine.<anonymous>:11:13\n    at async [eval]:31:12\n').returncode
+
+tests/test_review_save_failures.py:63: AssertionError
+_ test_lifecycle_rejections_keep_current_review_and_drafts[423-retryJob('A')] __
+
+action = "retryJob('A')", status = 423
+
+    @pytest.mark.parametrize('action', ["delJob('A')", "retryJob('A')", 'vaultDoLock()'])
+    @pytest.mark.parametrize('status', [409, 423])
+    def test_lifecycle_rejections_keep_current_review_and_drafts(action, status):
+>       run_js("""setup();confirm=()=>true;
+        let alerts=[];alert=message=>alerts.push(String(message));vaultStatus=()=>{};
+        const draft=EDITS,view=VIEW_GEN,html=detail.innerHTML;
+        const p=ACTION;const pending=queue.shift();
+        pending.resolve({ok:false,status:STATUS,json:async()=>({error:'busy or locked'}),
+          text:async()=>'busy or locked'});
+        await tick();await p;
+        if(CUR!=='A'||VIEW_GEN!==view||EDITS!==draft||REVIEW_DRAFTS.get('A')!==draft)
+          throw Error('rejected lifecycle request cleared or switched review');
+        if(detail.innerHTML!==html||MAN.length!==1||BE.adds.length!==1||BE.audio.length!==2)
+          throw Error('rejected lifecycle request cleared draft/view');
+        if(alerts.length!==1||!alerts[0].includes('busy or locked')||alerts[0].startsWith('Locked'))
+          throw Error('lifecycle rejection claimed success or omitted failure');
+        if(calls.length!==1)throw Error('rejected lifecycle request started another action');
+        """.replace('ACTION', action).replace('STATUS', str(status)))
+
+tests/test_review_save_failures.py:333: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "setup();confirm=()=>true;\n    let alerts=[];alert=message=>alerts.push(String(message));vaultStatus=()=>{};\n    con...or omitted failure');\n    if(calls.length!==1)throw Error('rejected lifecycle request started another action');\n    "
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: Error: rejected lifecycle request cleared draft/view
+E             at evalmachine.<anonymous>:11:13
+E             at async [eval]:31:12
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...ror: rejected lifecycle request cleared draft/view\n    at evalmachine.<anonymous>:11:13\n    at async [eval]:31:12\n').returncode
+
+tests/test_review_save_failures.py:63: AssertionError
+_ test_lifecycle_rejections_keep_current_review_and_drafts[423-vaultDoLock()] __
+
+action = 'vaultDoLock()', status = 423
+
+    @pytest.mark.parametrize('action', ["delJob('A')", "retryJob('A')", 'vaultDoLock()'])
+    @pytest.mark.parametrize('status', [409, 423])
+    def test_lifecycle_rejections_keep_current_review_and_drafts(action, status):
+>       run_js("""setup();confirm=()=>true;
+        let alerts=[];alert=message=>alerts.push(String(message));vaultStatus=()=>{};
+        const draft=EDITS,view=VIEW_GEN,html=detail.innerHTML;
+        const p=ACTION;const pending=queue.shift();
+        pending.resolve({ok:false,status:STATUS,json:async()=>({error:'busy or locked'}),
+          text:async()=>'busy or locked'});
+        await tick();await p;
+        if(CUR!=='A'||VIEW_GEN!==view||EDITS!==draft||REVIEW_DRAFTS.get('A')!==draft)
+          throw Error('rejected lifecycle request cleared or switched review');
+        if(detail.innerHTML!==html||MAN.length!==1||BE.adds.length!==1||BE.audio.length!==2)
+          throw Error('rejected lifecycle request cleared draft/view');
+        if(alerts.length!==1||!alerts[0].includes('busy or locked')||alerts[0].startsWith('Locked'))
+          throw Error('lifecycle rejection claimed success or omitted failure');
+        if(calls.length!==1)throw Error('rejected lifecycle request started another action');
+        """.replace('ACTION', action).replace('STATUS', str(status)))
+
+tests/test_review_save_failures.py:333: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "setup();confirm=()=>true;\n    let alerts=[];alert=message=>alerts.push(String(message));vaultStatus=()=>{};\n    con...or omitted failure');\n    if(calls.length!==1)throw Error('rejected lifecycle request started another action');\n    "
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: Error: rejected lifecycle request cleared draft/view
+E             at evalmachine.<anonymous>:11:13
+E             at async [eval]:31:12
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...ror: rejected lifecycle request cleared draft/view\n    at evalmachine.<anonymous>:11:13\n    at async [eval]:31:12\n').returncode
+
+tests/test_review_save_failures.py:63: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_large_report_io.py::test_background_tracking_publication[False]
+FAILED tests/test_large_report_io.py::test_background_tracking_publication[True]
+FAILED tests/test_review_save_failures.py::test_lifecycle_rejections_keep_current_review_and_drafts[409-delJob('A')]
+FAILED tests/test_review_save_failures.py::test_lifecycle_rejections_keep_current_review_and_drafts[409-retryJob('A')]
+FAILED tests/test_review_save_failures.py::test_lifecycle_rejections_keep_current_review_and_drafts[409-vaultDoLock()]
+FAILED tests/test_review_save_failures.py::test_lifecycle_rejections_keep_current_review_and_drafts[423-delJob('A')]
+FAILED tests/test_review_save_failures.py::test_lifecycle_rejections_keep_current_review_and_drafts[423-retryJob('A')]
+FAILED tests/test_review_save_failures.py::test_lifecycle_rejections_keep_current_review_and_drafts[423-vaultDoLock()]
+8 failed, 275 passed in 94.41s (0:01:34)

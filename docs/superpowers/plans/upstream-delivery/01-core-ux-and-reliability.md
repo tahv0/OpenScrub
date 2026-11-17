@@ -57,6 +57,30 @@ For ordinary file responses, use the valid response `Content-Length` matching th
 - [ ] **V:** Run `python -m pytest test_openscrub.py tests/test_review_choices.py -q`, build and browser keyboard/bulk/save/reopen checks. Render a small synthetic case to confirm the chosen `enabled` values drive output.
 - [ ] **D/R/L:** Describe the concrete repeated-click/group example, screenshots using synthetic data if useful, and no report migration. Keep future filters in P15 rather than growing this PR.
 
+## N08 — reject malformed or non-object scan options
+
+**What:** Validate the shared multipart `options` boundary before creating a job, copying input, persisting options or enqueueing work.
+
+**Why:** Actual pinned upload/server-path routes return an HTML 500 response for malformed/empty JSON, while arrays, null, strings, numbers and booleans return HTTP 200 and are persisted/enqueued. Direct argument preparation then fails at `.get`. Missing options and valid objects work; accepted jobs remained cancellable/deletable in the probe, so no permanent-leak claim is justified.
+
+**When:** A separate small W1 reliability PR, independent of report saves/polling and the donor's learned-model features. Source provenance is the generic guard in `cd17868`; the [36-case route baseline](execution/evidence/research/options-input-baseline-research.md) supplies exact behavior and side-effect evidence.
+
+- [ ] **I:** Decode once and require a JSON object, returning HTTP 400 with a clear JSON error such as `Scan options must be a JSON object.` for malformed JSON or any non-object. Reject falsey non-objects too; `json.loads(...) or {}` would silently accept them.
+- [ ] **V:** Cover both upload and server-path forms, malformed/empty/whitespace input, arrays/null/scalars, omitted options, explicit `{}`, ordinary supported settings and the existing unknown-key policy. Rejected requests must create no durable job files, registration or queue work; ordinary framework form buffering is outside that promise. Preserve current accepted defaults and actual cancel/delete cleanup.
+- [ ] **D/R/L:** Run the owning regressions, existing suite and build. Keep the patch local to this input boundary, with no semantic validation framework or learned/narrow-specific settings. Describe clear rejection and avoided unusable jobs; do not claim a worker execution or permanent leak was reproduced.
+
+## N11 — display filenames as literal text
+
+**What:** Preserve uploaded/server-source display names literally in the ordinary job list and job title, using the existing text/escaping boundary where appropriate.
+
+**Why:** The source preservation audit found raw `j.name` interpolation in `loadJobs` and `shellHtml`, while accepted basenames are not escaped during intake. The useful donor correction is independent of Findings and section UI. This is a source-backed display-correctness candidate; no executed exploit is established.
+
+**When:** A small separate W1 correctness PR after its accepted-input and display contract is checked. It can accompany the early UX delivery sequence but does not belong in the P02 output-choice patch. The earlier browser research was blocked by a platform filter and produced no runtime report; do not retry that probe or claim its validation.
+
+- [ ] **E/S:** Recheck the ordinary basename-to-list/title path and existing escaping/text helpers against the selected upstream base. Keep filename normalization and download naming behavior intact; limit scope to the actual display sinks.
+- [ ] **I/V:** Verify ordinary punctuation, ampersands, quotation marks and Unicode names display unchanged as text without altering surrounding element structure or job-selection behavior. Use benign fixture names and actual emitted UI functions; no executable filename probes or broad security audit. Preserve accessible title/list text and exercise normal job switching.
+- [ ] **D/R/L:** Explain the literal-name display correction with concrete benign examples, source provenance and exact validation. No external security report or publication is authorized by this card.
+
 ## P03 — resilient progress polling
 
 **What:** Bound metadata/log requests and reject stale responses after job/view changes.
@@ -98,8 +122,10 @@ For ordinary file responses, use the valid response `Content-Length` matching th
 
 **Files / contract:** `WebCallbacks.scan_frame`, `job_preview`, a small `_publish_preview_jpeg(path, image, quality) -> bool` in `openscrub_web.py`, `tests/test_live_preview.py`. Retain the preview's existing scale/rate limits and serve a stable response snapshot.
 
-- [ ] **E/I:** Add a controlled writer/reader regression through the production WSGI path. Assert each response decodes as one complete JPEG and its declared length equals its bytes. Add failed-encode/publication cases that retain the prior complete preview.
-- [ ] **I:** Encode before publication, write a same-directory temporary snapshot and replace or use another verified bounded snapshot method. Never publish an empty/partial encoding. Keep the change local unless P06 provides an actually useful byte-publication helper; do not create a generic storage framework.
+**Confirmed baseline:** Actual pinned callback/routes through Cheroot returned HTTP 200 with 96,380 declared bytes but 3,329 received after publication between headers and first read. Publication between normal 8,192-byte reads returned exactly an old-image prefix plus a new-image suffix; a tolerant decoder still returned pixels with a corruption warning. A separate atomic-replacement control demonstrated the path-stat/open race in `send_file(path)`. The producer and consumer therefore need complementary fixes; an atomic rename alone is insufficient. Current preview behavior is width720 (including upscaling), aspect-derived height, JPEG quality70 and a 0.4-second callback throttle. Preserve those defaults.
+
+- [ ] **E/I:** Add a controlled writer/reader regression through the production WSGI path. Assert each response equals one complete expected JPEG generation and its declared length equals its bytes; successful tolerant decoding alone does not rule out torn bytes. Cover metadata/first-read, between-read and stat/open replacement schedules. Add failed-encode/publication and missing-preview cases that retain the prior complete preview where one exists.
+- [ ] **I:** Encode before publication, write a same-directory temporary snapshot and replace or use another verified snapshot method. Never publish an empty/partial encoding. Derive response bytes and headers from the same generation, using a small immutable response snapshot or a verified descriptor-based alternative. Keep no unbounded generation cache; width720 alone is not a fixed byte/RSS ceiling for every aspect ratio. Keep the change local unless P06 provides an actually useful byte-publication helper; do not create a generic storage framework.
 - [ ] **V:** Run `python -m pytest test_openscrub.py tests/test_live_preview.py -q`, build and concurrent real HTTP requests. Check Windows replacement/read behavior on Windows before claiming it; record unavailable platform coverage.
 - [ ] **D/R/L:** Include the observed race/reproduction, publication mechanism, memory bound and failure behavior. Do not bundle corner-save state fixes into this preview PR.
 
@@ -141,7 +167,9 @@ For ordinary file responses, use the valid response `Content-Length` matching th
 
 - [ ] **E/S:** Inventory actual request/background ownership and choose one documented lock order. Keep a lifecycle guard for short admission/transition decisions; do not hold it or the report lock throughout inference, decoding, output hashing or network transfer. A small private helper is justified only if it gives these repeated owners one clear interface.
 - [ ] **I:** Close admissions during vault transitions and condemned-job cleanup; recheck identity/state after acquiring the guard. Track work until cleanup actually finishes. Initialize internal state consistently for new and rehydrated jobs. Unlock must not advertise readiness during partial decryption; transition failures must not admit file mutations into a partially transformed store.
+- [ ] **I:** Cover generic server-video/waveform paths that resolve into a live job directory, including symlink aliases, while preserving existing path permissions and allowed external paths. If another job retains that file as its source, hold a secondary source-job lease during its active operation. Keep I/O within validated protected targets; idle references are not permanent retention pins, and no global path registry is introduced.
 - [ ] **I:** Make manual lock, auto-lock and shutdown share the same busy decision. Preserve existing retention age and deletion-marker/retry behavior while skipping active work. Cancellation signals computation promptly while ownership remains active until cleanup finishes; never join a worker while holding a shared lock. P06B.2 owns the stronger cancellation/publication ordering and per-job generation check.
+- [ ] **I:** Preserve immediate retry of genuinely queued cancelled work through guarded ticket handoff; a running owner keeps its lease through cleanup. Wire the existing web tracker cancellation callback and fix the demonstrated manual-decoder exception path with release-only `finally`, preserving tracking output. Broader fallback-loop cancellation remains a separate P10C candidate.
 - [ ] **V/D:** Use deterministic actual-route staging/lock, delete/restart, retention, tracker/thumbnail and failed-transition cases. If streamed-file protection is included, verify exactly-once release on normal completion/disconnect through actual WSGI, preserving Range and Content-Length. Record in-process scope and unavailable Windows behavior. PR lead: background work must finish before its files can be encrypted or removed.
 
 #### P06B.2 — latest-document edit and tracking transactions

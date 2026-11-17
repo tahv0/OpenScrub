@@ -1,0 +1,13 @@
+{
+  "installed_module_probe": [
+    "/tmp/openscrub-task621/installed/site-packages/openscrub.py",
+    "/tmp/openscrub-task621/installed-profile/run-np9inqf4/.local/share/OpenScrub/openscrub_jobs"
+  ],
+  "actual_cli_help": true,
+  "actual_web_entrypoint_cheroot": true,
+  "homepage_and_job_api": true,
+  "real_vault_setup_lock_unlock": true,
+  "idle_sigterm_exit": 0,
+  "runtime_data_root": "/tmp/openscrub-task621/installed-profile/run-np9inqf4",
+  "no_model_fetches": true
+}

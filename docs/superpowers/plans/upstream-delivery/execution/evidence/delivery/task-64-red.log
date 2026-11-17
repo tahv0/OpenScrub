@@ -1,0 +1,342 @@
+FFFFFFFFFF...                                                            [100%]
+=================================== FAILURES ===================================
+__________ test_real_render_and_fresh_route_reopen_keep_all_ten_rows ___________
+
+review = namespace(video=PosixPath('/tmp/pytest-of-tahv0/pytest-11/test_real_render_and_fresh_rou0/input.avi'), path=PosixPath(... [False, None, '雪']}}, output=PosixPath('/tmp/pytest-of-tahv0/pytest-11/test_real_render_and_fresh_rou0/rendered.mp4'))
+
+    def test_real_render_and_fresh_route_reopen_keep_all_ten_rows(review):
+        """Reconstructing a report from enabled detections loses Keep rows/indices."""
+        summary = openscrub.run_pipeline(render_args(review), Quiet())
+        assert summary['regions'] == 7
+        saved = read(review.path)
+>       assert len(saved['detections']) == 10
+E       AssertionError: assert 7 == 10
+E        +  where 7 = len([{'t_start': 0.0, 't_end': 1.99, 'cbox': [18, 20.25, 30, 60.75], 'category': 'plate', ...}, {'t_start': 0.0, 't_end': ...gory': 'person', ...}, {'t_start': 0.0, 't_end': 1.99, 'cbox': [114, 20.25, 126, 60.75], 'category': 'face', ...}, ...])
+
+tests/test_report_roundtrip.py:93: AssertionError
+______ test_empty_or_absent_audio_and_additive_metadata_stay_exact[empty] ______
+
+review = namespace(video=PosixPath('/tmp/pytest-of-tahv0/pytest-11/test_empty_or_absent_audio_and0/input.avi'), path=PosixPath(...[], 'future_top': {}}, output=PosixPath('/tmp/pytest-of-tahv0/pytest-11/test_empty_or_absent_audio_and0/rendered.mp4'))
+metadata = 'empty'
+
+    @pytest.mark.parametrize('metadata', ['empty', 'absent'])
+    def test_empty_or_absent_audio_and_additive_metadata_stay_exact(review, metadata):
+        for key in ('audio_redactions', 'audio_suggestions', 'audio_transcript'):
+            if metadata == 'empty':
+                review.doc[key] = []
+            else:
+                del review.doc[key]
+        review.doc['future_top'] = {}
+        review.doc['provenance'] = {}
+        review.path.write_text(json.dumps(review.doc), encoding='utf-8')
+        openscrub.run_pipeline(render_args(review), Quiet())
+>       assert_review_preserved(review.doc, read(review.path))
+
+tests/test_report_roundtrip.py:162: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+before = {'provenance': {}, 'render_state': {'fps': 30, 'cum': [[0.0, 0.0], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0], [0....tart': 0.0, 't_end': 1.99, 'cbox': [82, 20.25, 94, 60.75], 'category': 'name', ...}, ...], 'audio_redactions': [], ...}
+after = {'provenance': {'tool': 'openscrub', 'version': '1.0.96', 'timestamp': '2026-11-17T00:07:24.252562+02:00', 'input': '/...ory': 'person', ...}, {'t_start': 0.0, 't_end': 1.99, 'cbox': [114, 20.25, 126, 60.75], 'category': 'face', ...}, ...]}
+
+    def assert_review_preserved(before, after):
+        # Only provenance belongs to an ordinary render. This also checks empty,
+        # absent, additive, and high-precision values without normalizing them.
+>       assert {k: v for k, v in after.items() if k != 'provenance'} == {
+            k: v for k, v in before.items() if k != 'provenance'}
+E       AssertionError: assert {'render_stat...', ...}, ...]} == {'render_stat...ons': [], ...}
+E         
+E         Differing items:
+E         {'detections': [{'t_start': 0.0, 't_end': 1.99, 'cbox': [18, 20.25, 30, 60.75], 'category': 'plate', ...}, {'t_start':...ory': 'person', ...}, {'t_start': 0.0, 't_end': 1.99, 'cbox': [114, 20.25, 126, 60.75], 'category': 'face', ...}, ...]} != {'detections': [{'t_start': 0.0, 't_end': 1.99, 'cbox': [2, 20.25, 14, 60.75], 'category': 'name', ...}, {'t_start': 0...egory': 'person', ...}, {'t_start': 0.0, 't_end': 1.99, 'cbox': [82, 20.25, 94, 60.75], 'category': 'name', ...}, ...]}
+E         {'render_state': {'fps': 30, 'cum': [[0.0, 0.0], [0.0, 0.0], [0.0, 0.0], [0....
+E         
+E         ...Full output truncated, use '-vv' to show
+
+tests/test_report_roundtrip.py:84: AssertionError
+_____ test_empty_or_absent_audio_and_additive_metadata_stay_exact[absent] ______
+
+review = namespace(video=PosixPath('/tmp/pytest-of-tahv0/pytest-11/test_empty_or_absent_audio_and1/input.avi'), path=PosixPath(...}], 'future_top': {}}, output=PosixPath('/tmp/pytest-of-tahv0/pytest-11/test_empty_or_absent_audio_and1/rendered.mp4'))
+metadata = 'absent'
+
+    @pytest.mark.parametrize('metadata', ['empty', 'absent'])
+    def test_empty_or_absent_audio_and_additive_metadata_stay_exact(review, metadata):
+        for key in ('audio_redactions', 'audio_suggestions', 'audio_transcript'):
+            if metadata == 'empty':
+                review.doc[key] = []
+            else:
+                del review.doc[key]
+        review.doc['future_top'] = {}
+        review.doc['provenance'] = {}
+        review.path.write_text(json.dumps(review.doc), encoding='utf-8')
+        openscrub.run_pipeline(render_args(review), Quiet())
+>       assert_review_preserved(review.doc, read(review.path))
+
+tests/test_report_roundtrip.py:162: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+before = {'provenance': {}, 'render_state': {'fps': 30, 'cum': [[0.0, 0.0], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0], [0.......}, {'t_start': 0.0, 't_end': 1.99, 'cbox': [82, 20.25, 94, 60.75], 'category': 'name', ...}, ...], 'future_top': {}}
+after = {'provenance': {'tool': 'openscrub', 'version': '1.0.96', 'timestamp': '2026-11-17T00:07:24.426164+02:00', 'input': '/...ory': 'person', ...}, {'t_start': 0.0, 't_end': 1.99, 'cbox': [114, 20.25, 126, 60.75], 'category': 'face', ...}, ...]}
+
+    def assert_review_preserved(before, after):
+        # Only provenance belongs to an ordinary render. This also checks empty,
+        # absent, additive, and high-precision values without normalizing them.
+>       assert {k: v for k, v in after.items() if k != 'provenance'} == {
+            k: v for k, v in before.items() if k != 'provenance'}
+E       AssertionError: assert {'render_stat...', ...}, ...]} == {'render_stat...ture_top': {}}
+E         
+E         Differing items:
+E         {'detections': [{'t_start': 0.0, 't_end': 1.99, 'cbox': [18, 20.25, 30, 60.75], 'category': 'plate', ...}, {'t_start':...ory': 'person', ...}, {'t_start': 0.0, 't_end': 1.99, 'cbox': [114, 20.25, 126, 60.75], 'category': 'face', ...}, ...]} != {'detections': [{'t_start': 0.0, 't_end': 1.99, 'cbox': [2, 20.25, 14, 60.75], 'category': 'name', ...}, {'t_start': 0...egory': 'person', ...}, {'t_start': 0.0, 't_end': 1.99, 'cbox': [82, 20.25, 94, 60.75], 'category': 'name', ...}, ...]}
+E         {'render_state': {'fps': 30, 'cum': [[0.0, 0.0], [0.0, 0.0], [0.0, 0.0], [0....
+E         
+E         ...Full output truncated, use '-vv' to show
+
+tests/test_report_roundtrip.py:84: AssertionError
+_____ test_explicit_audio_changes_win_without_losing_review_metadata[cli] ______
+
+review = namespace(video=PosixPath('/tmp/pytest-of-tahv0/pytest-11/test_explicit_audio_changes_wi0/input.avi'), path=PosixPath(... [False, None, '雪']}}, output=PosixPath('/tmp/pytest-of-tahv0/pytest-11/test_explicit_audio_changes_wi0/rendered.mp4'))
+override = 'cli'
+
+    @pytest.mark.parametrize('override', ['cli', 'programmatic', 'clear', 'apply'])
+    def test_explicit_audio_changes_win_without_losing_review_metadata(review, override):
+        extra = ['--audio-redact', '.8-1.2', '--audio-redact-mode', 'bleep'] \
+            if override == 'cli' else ['--audio-pii-apply'] if override == 'apply' else []
+        args = render_args(review, *extra)
+        if override == 'programmatic':
+            args.audio_spans = [(1.1, 1.3, 'mute')]
+        elif override == 'clear':
+            args.audio_spans = []
+        openscrub.run_pipeline(args, Quiet())
+        saved = read(review.path)
+        expected = {'cli': [{'t0': .8, 't1': 1.2, 'mode': 'bleep'}],
+                    'programmatic': [{'t0': 1.1, 't1': 1.3, 'mode': 'mute'}],
+                    'clear': [],
+                    'apply': [{'t0': .2, 't1': .4, 'mode': 'mute'},
+                              {'t0': .5, 't1': .7, 'mode': 'mute'}]}[override]
+        assert saved['audio_redactions'] == expected
+        before = copy.deepcopy(review.doc)
+        before['audio_redactions'] = expected
+>       assert_review_preserved(before, saved)
+
+tests/test_report_roundtrip.py:184: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+before = {'provenance': {'input': '/tmp/pytest-of-tahv0/pytest-11/test_explicit_audio_changes_wi0/input.avi', 'input_sha256': '... 20.25, 94, 60.75], 'category': 'name', ...}, ...], 'audio_redactions': [{'t0': 0.8, 't1': 1.2, 'mode': 'bleep'}], ...}
+after = {'provenance': {'tool': 'openscrub', 'version': '1.0.96', 'timestamp': '2026-11-17T00:07:24.600043+02:00', 'input': '/...114, 20.25, 126, 60.75], 'category': 'face', ...}, ...], 'audio_redactions': [{'t0': 0.8, 't1': 1.2, 'mode': 'bleep'}]}
+
+    def assert_review_preserved(before, after):
+        # Only provenance belongs to an ordinary render. This also checks empty,
+        # absent, additive, and high-precision values without normalizing them.
+>       assert {k: v for k, v in after.items() if k != 'provenance'} == {
+            k: v for k, v in before.items() if k != 'provenance'}
+E       AssertionError: assert {'render_stat...e': 'bleep'}]} == {'render_stat...', ...}], ...}
+E         
+E         Omitting 1 identical items, use -vv to show
+E         Differing items:
+E         {'detections': [{'t_start': 0.0, 't_end': 1.99, 'cbox': [18, 20.25, 30, 60.75], 'category': 'plate', ...}, {'t_start':...ory': 'person', ...}, {'t_start': 0.0, 't_end': 1.99, 'cbox': [114, 20.25, 126, 60.75], 'category': 'face', ...}, ...]} != {'detections': [{'t_start': 0.0, 't_end': 1.99, 'cbox': [2, 20.25, 14, 60.75], 'category': 'name', ...}, {'t_start': 0...egory': 'person', ...}, {'t_start': 0.0, 't_end': 1.99, 'cbox': [82, 20.25, 94, 60.75], 'category': 'name', ...}, ...]}
+E         {'render_state': {'fps': 30, 'cum...
+E         
+E         ...Full output truncated, use '-vv' to show
+
+tests/test_report_roundtrip.py:84: AssertionError
+_ test_explicit_audio_changes_win_without_losing_review_metadata[programmatic] _
+
+review = namespace(video=PosixPath('/tmp/pytest-of-tahv0/pytest-11/test_explicit_audio_changes_wi1/input.avi'), path=PosixPath(... [False, None, '雪']}}, output=PosixPath('/tmp/pytest-of-tahv0/pytest-11/test_explicit_audio_changes_wi1/rendered.mp4'))
+override = 'programmatic'
+
+    @pytest.mark.parametrize('override', ['cli', 'programmatic', 'clear', 'apply'])
+    def test_explicit_audio_changes_win_without_losing_review_metadata(review, override):
+        extra = ['--audio-redact', '.8-1.2', '--audio-redact-mode', 'bleep'] \
+            if override == 'cli' else ['--audio-pii-apply'] if override == 'apply' else []
+        args = render_args(review, *extra)
+        if override == 'programmatic':
+            args.audio_spans = [(1.1, 1.3, 'mute')]
+        elif override == 'clear':
+            args.audio_spans = []
+        openscrub.run_pipeline(args, Quiet())
+        saved = read(review.path)
+        expected = {'cli': [{'t0': .8, 't1': 1.2, 'mode': 'bleep'}],
+                    'programmatic': [{'t0': 1.1, 't1': 1.3, 'mode': 'mute'}],
+                    'clear': [],
+                    'apply': [{'t0': .2, 't1': .4, 'mode': 'mute'},
+                              {'t0': .5, 't1': .7, 'mode': 'mute'}]}[override]
+        assert saved['audio_redactions'] == expected
+        before = copy.deepcopy(review.doc)
+        before['audio_redactions'] = expected
+>       assert_review_preserved(before, saved)
+
+tests/test_report_roundtrip.py:184: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+before = {'provenance': {'input': '/tmp/pytest-of-tahv0/pytest-11/test_explicit_audio_changes_wi1/input.avi', 'input_sha256': '..., 20.25, 94, 60.75], 'category': 'name', ...}, ...], 'audio_redactions': [{'t0': 1.1, 't1': 1.3, 'mode': 'mute'}], ...}
+after = {'provenance': {'tool': 'openscrub', 'version': '1.0.96', 'timestamp': '2026-11-17T00:07:24.772328+02:00', 'input': '/...[114, 20.25, 126, 60.75], 'category': 'face', ...}, ...], 'audio_redactions': [{'t0': 1.1, 't1': 1.3, 'mode': 'mute'}]}
+
+    def assert_review_preserved(before, after):
+        # Only provenance belongs to an ordinary render. This also checks empty,
+        # absent, additive, and high-precision values without normalizing them.
+>       assert {k: v for k, v in after.items() if k != 'provenance'} == {
+            k: v for k, v in before.items() if k != 'provenance'}
+E       AssertionError: assert {'render_stat...de': 'mute'}]} == {'render_stat...', ...}], ...}
+E         
+E         Omitting 1 identical items, use -vv to show
+E         Differing items:
+E         {'detections': [{'t_start': 0.0, 't_end': 1.99, 'cbox': [18, 20.25, 30, 60.75], 'category': 'plate', ...}, {'t_start':...ory': 'person', ...}, {'t_start': 0.0, 't_end': 1.99, 'cbox': [114, 20.25, 126, 60.75], 'category': 'face', ...}, ...]} != {'detections': [{'t_start': 0.0, 't_end': 1.99, 'cbox': [2, 20.25, 14, 60.75], 'category': 'name', ...}, {'t_start': 0...egory': 'person', ...}, {'t_start': 0.0, 't_end': 1.99, 'cbox': [82, 20.25, 94, 60.75], 'category': 'name', ...}, ...]}
+E         {'render_state': {'fps': 30, 'cum...
+E         
+E         ...Full output truncated, use '-vv' to show
+
+tests/test_report_roundtrip.py:84: AssertionError
+____ test_explicit_audio_changes_win_without_losing_review_metadata[clear] _____
+
+review = namespace(video=PosixPath('/tmp/pytest-of-tahv0/pytest-11/test_explicit_audio_changes_wi2/input.avi'), path=PosixPath(... [False, None, '雪']}}, output=PosixPath('/tmp/pytest-of-tahv0/pytest-11/test_explicit_audio_changes_wi2/rendered.mp4'))
+override = 'clear'
+
+    @pytest.mark.parametrize('override', ['cli', 'programmatic', 'clear', 'apply'])
+    def test_explicit_audio_changes_win_without_losing_review_metadata(review, override):
+        extra = ['--audio-redact', '.8-1.2', '--audio-redact-mode', 'bleep'] \
+            if override == 'cli' else ['--audio-pii-apply'] if override == 'apply' else []
+        args = render_args(review, *extra)
+        if override == 'programmatic':
+            args.audio_spans = [(1.1, 1.3, 'mute')]
+        elif override == 'clear':
+            args.audio_spans = []
+        openscrub.run_pipeline(args, Quiet())
+        saved = read(review.path)
+        expected = {'cli': [{'t0': .8, 't1': 1.2, 'mode': 'bleep'}],
+                    'programmatic': [{'t0': 1.1, 't1': 1.3, 'mode': 'mute'}],
+                    'clear': [],
+                    'apply': [{'t0': .2, 't1': .4, 'mode': 'mute'},
+                              {'t0': .5, 't1': .7, 'mode': 'mute'}]}[override]
+>       assert saved['audio_redactions'] == expected
+E       AssertionError: assert [{'t0': 0.2, ...ode': 'mute'}] == []
+E         
+E         Left contains one more item: {'t0': 0.2, 't1': 0.4, 'mode': 'mute'}
+E         Use -v to get more diff
+
+tests/test_report_roundtrip.py:181: AssertionError
+____ test_explicit_audio_changes_win_without_losing_review_metadata[apply] _____
+
+review = namespace(video=PosixPath('/tmp/pytest-of-tahv0/pytest-11/test_explicit_audio_changes_wi3/input.avi'), path=PosixPath(... [False, None, '雪']}}, output=PosixPath('/tmp/pytest-of-tahv0/pytest-11/test_explicit_audio_changes_wi3/rendered.mp4'))
+override = 'apply'
+
+    @pytest.mark.parametrize('override', ['cli', 'programmatic', 'clear', 'apply'])
+    def test_explicit_audio_changes_win_without_losing_review_metadata(review, override):
+        extra = ['--audio-redact', '.8-1.2', '--audio-redact-mode', 'bleep'] \
+            if override == 'cli' else ['--audio-pii-apply'] if override == 'apply' else []
+        args = render_args(review, *extra)
+        if override == 'programmatic':
+            args.audio_spans = [(1.1, 1.3, 'mute')]
+        elif override == 'clear':
+            args.audio_spans = []
+        openscrub.run_pipeline(args, Quiet())
+        saved = read(review.path)
+        expected = {'cli': [{'t0': .8, 't1': 1.2, 'mode': 'bleep'}],
+                    'programmatic': [{'t0': 1.1, 't1': 1.3, 'mode': 'mute'}],
+                    'clear': [],
+                    'apply': [{'t0': .2, 't1': .4, 'mode': 'mute'},
+                              {'t0': .5, 't1': .7, 'mode': 'mute'}]}[override]
+>       assert saved['audio_redactions'] == expected
+E       AssertionError: assert [{'t0': 0.2, ...ode': 'mute'}] == [{'t0': 0.2, ...ode': 'mute'}]
+E         
+E         Right contains one more item: {'t0': 0.5, 't1': 0.7, 'mode': 'mute'}
+E         Use -v to get more diff
+
+tests/test_report_roundtrip.py:181: AssertionError
+_______ test_distinct_destination_and_successive_renders_preserve_source _______
+
+review = namespace(video=PosixPath('/tmp/pytest-of-tahv0/pytest-11/test_distinct_destination_and_0/input.avi'), path=PosixPath(... [False, None, '雪']}}, output=PosixPath('/tmp/pytest-of-tahv0/pytest-11/test_distinct_destination_and_0/rendered.mp4'))
+
+    def test_distinct_destination_and_successive_renders_preserve_source(review):
+        original_bytes = review.path.read_bytes()
+        destination = review.path.with_name('copy.json')
+        openscrub.run_pipeline(render_args(review, destination=destination), Quiet())
+        first = read(destination)
+        assert review.path.read_bytes() == original_bytes
+>       assert_review_preserved(review.doc, first)
+
+tests/test_report_roundtrip.py:193: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+before = {'provenance': {'input': '/tmp/pytest-of-tahv0/pytest-11/test_distinct_destination_and_0/input.avi', 'input_sha256': '...'name', ...}, ...], 'audio_redactions': [{'t0': 0.2, 't1': 0.4, 'mode': 'mute', 'future_span': {'retain': True}}], ...}
+after = {'provenance': {'tool': 'openscrub', 'version': '1.0.96', 'timestamp': '2026-11-17T00:07:25.288535+02:00', 'input': '/...[114, 20.25, 126, 60.75], 'category': 'face', ...}, ...], 'audio_redactions': [{'t0': 0.2, 't1': 0.4, 'mode': 'mute'}]}
+
+    def assert_review_preserved(before, after):
+        # Only provenance belongs to an ordinary render. This also checks empty,
+        # absent, additive, and high-precision values without normalizing them.
+>       assert {k: v for k, v in after.items() if k != 'provenance'} == {
+            k: v for k, v in before.items() if k != 'provenance'}
+E       AssertionError: assert {'render_stat...de': 'mute'}]} == {'render_stat...', ...}], ...}
+E         
+E         Differing items:
+E         {'detections': [{'t_start': 0.0, 't_end': 1.99, 'cbox': [18, 20.25, 30, 60.75], 'category': 'plate', ...}, {'t_start':...ory': 'person', ...}, {'t_start': 0.0, 't_end': 1.99, 'cbox': [114, 20.25, 126, 60.75], 'category': 'face', ...}, ...]} != {'detections': [{'t_start': 0.0, 't_end': 1.99, 'cbox': [2, 20.25, 14, 60.75], 'category': 'name', ...}, {'t_start': 0...egory': 'person', ...}, {'t_start': 0.0, 't_end': 1.99, 'cbox': [82, 20.25, 94, 60.75], 'category': 'name', ...}, ...]}
+E         {'audio_redactions': [{'t0': 0.2, 't1': 0.4, 'mode': 'mute'}]} != {'audio_re...
+E         
+E         ...Full output truncated, use '-vv' to show
+
+tests/test_report_roundtrip.py:84: AssertionError
+_________________ test_from_report_reads_one_coherent_snapshot _________________
+
+review = namespace(video=PosixPath('/tmp/pytest-of-tahv0/pytest-11/test_from_report_reads_one_coh0/input.avi'), path=PosixPath(... [False, None, '雪']}}, output=PosixPath('/tmp/pytest-of-tahv0/pytest-11/test_from_report_reads_one_coh0/rendered.mp4'))
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7d8f559849e0>
+
+    def test_from_report_reads_one_coherent_snapshot(review, monkeypatch):
+        original_open = builtins.open
+        reads = []
+        def counted_open(path, mode='r', *args, **kwargs):
+            if Path(path) == review.path and 'r' in mode:
+                reads.append(path)
+            return original_open(path, mode, *args, **kwargs)
+        monkeypatch.setattr(builtins, 'open', counted_open)
+        openscrub.run_pipeline(render_args(review), Quiet())
+>       assert len(reads) == 1
+E       AssertionError: assert 3 == 1
+E        +  where 3 = len(['/tmp/pytest-of-tahv0/pytest-11/test_from_report_reads_one_coh0/report.json', '/tmp/pytest-of-tahv0/pytest-11/test_from_report_reads_one_coh0/report.json', '/tmp/pytest-of-tahv0/pytest-11/test_from_report_reads_one_coh0/report.json'])
+
+tests/test_report_roundtrip.py:213: AssertionError
+__________ test_render_objects_are_separate_from_retained_review_rows __________
+
+review = namespace(video=PosixPath('/tmp/pytest-of-tahv0/pytest-11/test_render_objects_are_separa0/input.avi'), path=PosixPath(... [False, None, '雪']}}, output=PosixPath('/tmp/pytest-of-tahv0/pytest-11/test_render_objects_are_separa0/rendered.mp4'))
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7d8f55ae6180>
+
+    def test_render_objects_are_separate_from_retained_review_rows(review, monkeypatch):
+        original_render = openscrub.render
+        def mutate_then_render(src, dst, detections, *args, **kwargs):
+            # Coverage/render transformations may edit decoded objects. Such edits
+            # must never replace the exact saved review representation.
+            detections[0].text = 'render-only change'
+            detections[0].cbox = (30, 30, 35, 35)
+            return original_render(src, dst, detections, *args, **kwargs)
+        monkeypatch.setattr(openscrub, 'render', mutate_then_render)
+        openscrub.run_pipeline(render_args(review), Quiet())
+>       assert_review_preserved(review.doc, read(review.path))
+
+tests/test_report_roundtrip.py:227: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+before = {'provenance': {'input': '/tmp/pytest-of-tahv0/pytest-11/test_render_objects_are_separa0/input.avi', 'input_sha256': '...'name', ...}, ...], 'audio_redactions': [{'t0': 0.2, 't1': 0.4, 'mode': 'mute', 'future_span': {'retain': True}}], ...}
+after = {'provenance': {'tool': 'openscrub', 'version': '1.0.96', 'timestamp': '2026-11-17T00:07:25.633814+02:00', 'input': '/...[114, 20.25, 126, 60.75], 'category': 'face', ...}, ...], 'audio_redactions': [{'t0': 0.2, 't1': 0.4, 'mode': 'mute'}]}
+
+    def assert_review_preserved(before, after):
+        # Only provenance belongs to an ordinary render. This also checks empty,
+        # absent, additive, and high-precision values without normalizing them.
+>       assert {k: v for k, v in after.items() if k != 'provenance'} == {
+            k: v for k, v in before.items() if k != 'provenance'}
+E       AssertionError: assert {'render_stat...de': 'mute'}]} == {'render_stat...', ...}], ...}
+E         
+E         Differing items:
+E         {'detections': [{'t_start': 0.0, 't_end': 1.99, 'cbox': [30, 30, 35, 35], 'category': 'plate', ...}, {'t_start': 0.0, ...ory': 'person', ...}, {'t_start': 0.0, 't_end': 1.99, 'cbox': [114, 20.25, 126, 60.75], 'category': 'face', ...}, ...]} != {'detections': [{'t_start': 0.0, 't_end': 1.99, 'cbox': [2, 20.25, 14, 60.75], 'category': 'name', ...}, {'t_start': 0...egory': 'person', ...}, {'t_start': 0.0, 't_end': 1.99, 'cbox': [82, 20.25, 94, 60.75], 'category': 'name', ...}, ...]}
+E         {'audio_redactions': [{'t0': 0.2, 't1': 0.4, 'mode': 'mute'}]} != {'audio_re...
+E         
+E         ...Full output truncated, use '-vv' to show
+
+tests/test_report_roundtrip.py:84: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_report_roundtrip.py::test_real_render_and_fresh_route_reopen_keep_all_ten_rows
+FAILED tests/test_report_roundtrip.py::test_empty_or_absent_audio_and_additive_metadata_stay_exact[empty]
+FAILED tests/test_report_roundtrip.py::test_empty_or_absent_audio_and_additive_metadata_stay_exact[absent]
+FAILED tests/test_report_roundtrip.py::test_explicit_audio_changes_win_without_losing_review_metadata[cli]
+FAILED tests/test_report_roundtrip.py::test_explicit_audio_changes_win_without_losing_review_metadata[programmatic]
+FAILED tests/test_report_roundtrip.py::test_explicit_audio_changes_win_without_losing_review_metadata[clear]
+FAILED tests/test_report_roundtrip.py::test_explicit_audio_changes_win_without_losing_review_metadata[apply]
+FAILED tests/test_report_roundtrip.py::test_distinct_destination_and_successive_renders_preserve_source
+FAILED tests/test_report_roundtrip.py::test_from_report_reads_one_coherent_snapshot
+FAILED tests/test_report_roundtrip.py::test_render_objects_are_separate_from_retained_review_rows
+10 failed, 3 passed in 2.10s

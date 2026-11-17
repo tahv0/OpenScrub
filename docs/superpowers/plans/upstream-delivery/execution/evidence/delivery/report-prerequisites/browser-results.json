@@ -1,0 +1,24 @@
+{
+  "browser": "Chromium headless Linux",
+  "plugin": "Browser plugin not available",
+  "viewport": "1365x1000",
+  "identity": {
+    "url": "http://127.0.0.1:18488/",
+    "title": "OpenScrub",
+    "nonblank": true,
+    "overlay": 0
+  },
+  "errors": [],
+  "warnings": [],
+  "submitted": {
+    "enabled": {
+      "0": false
+    },
+    "manual": [],
+    "box_overrides": {},
+    "time_overrides": {}
+  },
+  "phase": "done",
+  "savedRows": 10,
+  "renderedRows": 10
+}

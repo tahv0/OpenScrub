@@ -1,0 +1,206 @@
+......FF.F....FFF...............                                         [100%]
+=================================== FAILURES ===================================
+_ test_render_original_source_owned_from_queue_through_normalization_cleanup[False] _
+
+store = namespace(root=PosixPath('/tmp/openscrub-task621/fix1/allowlist-green-tmp/test_render_original_source_ow0/data'), jobs...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7e90a4faf240>, url='/api/jobs/34a63b163cbf')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7e90dc652e70>
+alias = False
+
+    @pytest.mark.parametrize('alias', [False, True])
+    def test_render_original_source_owned_from_queue_through_normalization_cleanup(store, monkeypatch, alias):
+        store.enable()
+        original = Path(store.job['video'])
+        if alias:
+            original = store.root / 'original-alias.avi'
+            original.symlink_to(store.job['video'])
+        job, report, doc = destination(store, original)
+        entered, release, sources, probes = threading.Event(), threading.Event(), [], []
+        real_exists = os.path.exists
+        def exists(path):
+            if str(path) == store.job['video']:
+                probes.append(store.job['_files'].count)
+            return real_exists(path)
+        monkeypatch.setattr(web.os.path, 'exists', exists)
+        def normalize(args, cb):
+            sources.append(args.video)
+            entered.set()
+            assert release.wait(8)
+            raise RuntimeError('stop at real pipeline normalization boundary')
+        monkeypatch.setattr(openscrub, 'normalize_vfr', normalize)
+        thread = None
+        try:
+            assert request('post', '/api/jobs/' + job['id'] + '/render').status_code == 200
+>           assert store.job['_files'].count == 1, 'queued render did not own actual original source'
+E           AssertionError: queued render did not own actual original source
+E           assert 0 == 1
+E            +  where 0 = <openscrub_internal.lifetimes._JobFiles object at 0x7e90dc652de0>.count
+
+tests/test_job_source_allowlist_lifecycle.py:167: AssertionError
+_ test_render_original_source_owned_from_queue_through_normalization_cleanup[True] _
+
+store = namespace(root=PosixPath('/tmp/openscrub-task621/fix1/allowlist-green-tmp/test_render_original_source_ow1/data'), jobs...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7e90a4faf1a0>, url='/api/jobs/bb3bc5e1a464')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7e90dc652d50>
+alias = True
+
+    @pytest.mark.parametrize('alias', [False, True])
+    def test_render_original_source_owned_from_queue_through_normalization_cleanup(store, monkeypatch, alias):
+        store.enable()
+        original = Path(store.job['video'])
+        if alias:
+            original = store.root / 'original-alias.avi'
+            original.symlink_to(store.job['video'])
+        job, report, doc = destination(store, original)
+        entered, release, sources, probes = threading.Event(), threading.Event(), [], []
+        real_exists = os.path.exists
+        def exists(path):
+            if str(path) == store.job['video']:
+                probes.append(store.job['_files'].count)
+            return real_exists(path)
+        monkeypatch.setattr(web.os.path, 'exists', exists)
+        def normalize(args, cb):
+            sources.append(args.video)
+            entered.set()
+            assert release.wait(8)
+            raise RuntimeError('stop at real pipeline normalization boundary')
+        monkeypatch.setattr(openscrub, 'normalize_vfr', normalize)
+        thread = None
+        try:
+            assert request('post', '/api/jobs/' + job['id'] + '/render').status_code == 200
+>           assert store.job['_files'].count == 1, 'queued render did not own actual original source'
+E           AssertionError: queued render did not own actual original source
+E           assert 0 == 1
+E            +  where 0 = <openscrub_internal.lifetimes._JobFiles object at 0x7e90dc652090>.count
+
+tests/test_job_source_allowlist_lifecycle.py:167: AssertionError
+_ test_render_source_selection_preserves_self_alias_and_missing_fallback[self_alias] _
+
+store = namespace(root=PosixPath('/tmp/openscrub-task621/fix1/allowlist-green-tmp/test_render_source_selection_p1/data'), jobs...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7e90a4faf740>, url='/api/jobs/2e866da818e0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7e90dc664bc0>
+original = 'self_alias'
+
+    @pytest.mark.parametrize('original', ['self', 'self_alias', 'missing_live', 'missing_unregistered', 'external', 'external_missing'])
+    def test_render_source_selection_preserves_self_alias_and_missing_fallback(store, monkeypatch, original):
+        job, report, doc = destination(store, store.job['video'])
+        expected = job['video']
+        if original == 'self':
+            source = job['video']
+        elif original == 'self_alias':
+            source = store.root / 'self-alias.avi'
+            source.symlink_to(job['video'])
+        elif original == 'missing_live':
+            source = Path(store.job['dir']) / 'missing-original.avi'
+        elif original == 'missing_unregistered':
+            source = store.jobs / 'removed-source' / 'input.avi'
+        else:
+            source = store.root / 'external.avi'
+            if original == 'external':
+                source.write_bytes(b'synthetic external original')
+                expected = str(source)
+        doc['provenance']['original_input'] = str(source)
+        report.write_text(json.dumps(doc))
+        sources = []
+        def normalize(args, cb):
+            sources.append(args.video)
+            raise RuntimeError('selected source verified')
+        monkeypatch.setattr(openscrub, 'normalize_vfr', normalize)
+        assert request('post', '/api/jobs/' + job['id'] + '/render').status_code == 200
+        assert job['_files'].count == 1 and not job['_files'].queued[job['qgen']].related
+        assert store.job['_files'].count == 0
+        join(run_queued())
+>       assert sources == [expected]
+E       AssertionError: assert ['/tmp/opensc...lf-alias.avi'] == ['/tmp/opensc...nput.cfr.mp4']
+E         
+E         At index 0 diff: '/tmp/openscrub-task621/fix1/allowlist-green-tmp/test_render_source_selection_p1/data/self-alias.avi' != '/tmp/openscrub-task621/fix1/allowlist-green-tmp/test_render_source_selection_p1/data/jobs/846fdfff8d96/input.cfr.mp4'
+E         Use -v to get more diff
+
+tests/test_job_source_allowlist_lifecycle.py:223: AssertionError
+_ test_render_rejects_extant_unregistered_or_deleting_original_without_read[unregistered-404] _
+
+store = namespace(root=PosixPath('/tmp/openscrub-task621/fix1/allowlist-green-tmp/test_render_rejects_extant_unr0/data'), jobs...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7e90dcd2c540>, url='/api/jobs/eb6697c36b2b')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7e90dc643ef0>
+state = 'unregistered', code = 404
+
+    @pytest.mark.parametrize('state,code', [('unregistered', 404), ('deleting', 409)])
+    def test_render_rejects_extant_unregistered_or_deleting_original_without_read(store, monkeypatch, state, code):
+        job, report, doc = destination(store, store.job['video'])
+        if state == 'unregistered':
+            web.JOBS.pop(store.job['id'])
+        else:
+            store.job['_files'].closed = True
+        opened = []
+        real_open = builtins.open
+        def opening(path, *args, **kwargs):
+            if str(path) == store.job['video']:
+                opened.append(str(path))
+            return real_open(path, *args, **kwargs)
+        monkeypatch.setattr(builtins, 'open', opening)
+        response = request('post', '/api/jobs/' + job['id'] + '/render')
+        try:
+>           assert response.status_code == code
+E           assert 200 == 404
+E            +  where 200 = <WrapperTestResponse 12 bytes [200 OK]>.status_code
+
+tests/test_job_source_allowlist_lifecycle.py:243: AssertionError
+_ test_render_rejects_extant_unregistered_or_deleting_original_without_read[deleting-409] _
+
+store = namespace(root=PosixPath('/tmp/openscrub-task621/fix1/allowlist-green-tmp/test_render_rejects_extant_unr1/data'), jobs...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7e905e7a3ec0>, url='/api/jobs/45afdeae7b32')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7e90dc6482c0>
+state = 'deleting', code = 409
+
+    @pytest.mark.parametrize('state,code', [('unregistered', 404), ('deleting', 409)])
+    def test_render_rejects_extant_unregistered_or_deleting_original_without_read(store, monkeypatch, state, code):
+        job, report, doc = destination(store, store.job['video'])
+        if state == 'unregistered':
+            web.JOBS.pop(store.job['id'])
+        else:
+            store.job['_files'].closed = True
+        opened = []
+        real_open = builtins.open
+        def opening(path, *args, **kwargs):
+            if str(path) == store.job['video']:
+                opened.append(str(path))
+            return real_open(path, *args, **kwargs)
+        monkeypatch.setattr(builtins, 'open', opening)
+        response = request('post', '/api/jobs/' + job['id'] + '/render')
+        try:
+>           assert response.status_code == code
+E           assert 200 == 409
+E            +  where 200 = <WrapperTestResponse 12 bytes [200 OK]>.status_code
+
+tests/test_job_source_allowlist_lifecycle.py:243: AssertionError
+___ test_render_pins_selected_original_when_report_provenance_later_changes ____
+
+store = namespace(root=PosixPath('/tmp/openscrub-task621/fix1/allowlist-green-tmp/test_render_pins_selected_orig0/data'), jobs...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7e905e7a2a20>, url='/api/jobs/e371f7a81526')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7e90dc64b980>
+
+    def test_render_pins_selected_original_when_report_provenance_later_changes(store, monkeypatch):
+        job, report, doc = destination(store, store.job['video'])
+        other = web.new_job('', {}, 'later-original.avi')
+        other_video = Path(other['dir']) / 'input.avi'
+        other_video.write_bytes(b'synthetic later source')
+        other.update(video=str(other_video), phase='review')
+        sources = []
+        def normalize(args, cb):
+            sources.append(args.video)
+            raise RuntimeError('selected source verified')
+        monkeypatch.setattr(openscrub, 'normalize_vfr', normalize)
+        assert request('post', '/api/jobs/' + job['id'] + '/render').status_code == 200
+        doc['provenance']['original_input'] = str(other_video)
+        report.write_text(json.dumps(doc))
+        join(run_queued())
+>       assert sources == [store.job['video']], 'engine followed later unowned provenance'
+E       AssertionError: engine followed later unowned provenance
+E       assert ['/tmp/opensc...05/input.avi'] == ['/tmp/opensc...26/input.avi']
+E         
+E         At index 0 diff: '/tmp/openscrub-task621/fix1/allowlist-green-tmp/test_render_pins_selected_orig0/data/jobs/b8f1ec4cbb05/input.avi' != '/tmp/openscrub-task621/fix1/allowlist-green-tmp/test_render_pins_selected_orig0/data/jobs/e371f7a81526/input.avi'
+E         Use -v to get more diff
+
+tests/test_job_source_allowlist_lifecycle.py:267: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_job_source_allowlist_lifecycle.py::test_render_original_source_owned_from_queue_through_normalization_cleanup[False]
+FAILED tests/test_job_source_allowlist_lifecycle.py::test_render_original_source_owned_from_queue_through_normalization_cleanup[True]
+FAILED tests/test_job_source_allowlist_lifecycle.py::test_render_source_selection_preserves_self_alias_and_missing_fallback[self_alias]
+FAILED tests/test_job_source_allowlist_lifecycle.py::test_render_rejects_extant_unregistered_or_deleting_original_without_read[unregistered-404]
+FAILED tests/test_job_source_allowlist_lifecycle.py::test_render_rejects_extant_unregistered_or_deleting_original_without_read[deleting-409]
+FAILED tests/test_job_source_allowlist_lifecycle.py::test_render_pins_selected_original_when_report_provenance_later_changes
+6 failed, 26 passed, 66 deselected in 2.82s

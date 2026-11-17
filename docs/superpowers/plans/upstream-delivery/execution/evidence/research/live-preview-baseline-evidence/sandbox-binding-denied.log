@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/live-preview-baseline-evidence/probe.py", line 194, in <module>
+    assert not server_errors, server_errors
+           ^^^^^^^^^^^^^^^^^
+AssertionError: ['Traceback (most recent call last):\n  File "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/live-preview-baseline-evidence/probe.py", line 186, in serve\n    web._serve(\'127.0.0.1\', 0, None)\n  File "/tmp/openscrub-live-preview-baseline-20261117/export/openscrub_web.py", line 4065, in _serve\n    server.start()\n  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/cheroot/server.py", line 1934, in start\n    self.prepare()\n  File "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/live-preview-baseline-evidence/probe.py", line 179, in observed_prepare\n    real_prepare(self)\n  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/cheroot/server.py", line 1858, in prepare\n    raise socket.error(msg)\nOSError: No socket could be created -- ((\'127.0.0.1\', 0): [Errno 1] Operation not permitted)\n']

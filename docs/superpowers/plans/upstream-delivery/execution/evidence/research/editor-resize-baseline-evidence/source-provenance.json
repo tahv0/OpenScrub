@@ -1,0 +1,24 @@
+[
+  {
+    "label": "baseline",
+    "sha": "e21ebdf6e3ee46e6c65050dc956a9a3459152269",
+    "tree": "795af785b672d397d2e287b5b963c10dcc4dbdf8",
+    "export": "/tmp/openscrub-editor-resize-baseline-20261117/baseline",
+    "export_method": "git archive SHA | tar -x -C EXPORT",
+    "full_archive_file_count": 113,
+    "verified_all_archive_files": true,
+    "ordered_export_digest": "924ce3fd032278f1f63e21ebe16a11ccc77961b2670f173d53b282059dc9abe9",
+    "web_sha256": "9835e1137abee62c0a78e2669ed8bae7059e36bf4bed9f5c7a44f0eb8b40ed3a"
+  },
+  {
+    "label": "p07a",
+    "sha": "92124753736e287ac800af91f0ac96f3e96c01be",
+    "tree": "4a06d7219f9aa07fec5a6e6a495fdbe86235bcdf",
+    "export": "/tmp/openscrub-editor-resize-baseline-20261117/p07a",
+    "export_method": "git archive SHA | tar -x -C EXPORT",
+    "full_archive_file_count": 114,
+    "verified_all_archive_files": true,
+    "ordered_export_digest": "858cfc08fd9ba0fb2d23dc8bb36ef774d598a524c9e7c3f367c6edba5a236295",
+    "web_sha256": "cb3b5fccffb2105982a914c2002d419519bceacf2c8bf3c2bb33ea13eb43b038"
+  }
+]

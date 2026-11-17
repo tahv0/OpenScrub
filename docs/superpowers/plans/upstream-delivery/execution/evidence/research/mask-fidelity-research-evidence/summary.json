@@ -1,0 +1,11 @@
+{
+  "verified": true,
+  "chroma_cases": 48,
+  "baseline_missing_coverage_cases": 26,
+  "baseline_extra_coverage_cases": 1,
+  "donor_chroma_failures": 0,
+  "geometry_cases_each_in_sdr_and_hdr": 19,
+  "real_hdr_render_cases": 9,
+  "n02_disposition": "confirmed; minimal chroma coverage contract",
+  "n03_disposition": "confirmed valid-box reliability/degeneracy candidate; existing empty-mask fallbacks retained; invalid boxes require explicit render failure"
+}

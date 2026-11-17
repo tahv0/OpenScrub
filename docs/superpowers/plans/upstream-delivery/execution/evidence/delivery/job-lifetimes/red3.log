@@ -1,0 +1,47 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+___ test_cancel_between_render_admission_and_queue_put_cannot_replace_retry ____
+
+store = namespace(root=PosixPath('/tmp/openscrub-task621/red3-tmp/test_cancel_between_render_adm0/data'), jobs=PosixPath('/tmp...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x73f234590680>, url='/api/jobs/a2eaa1909305')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x73f26bb62d20>
+
+    def test_cancel_between_render_admission_and_queue_put_cannot_replace_retry(store, monkeypatch):
+        store.enable()
+        before_put, release = threading.Event(), threading.Event()
+        real_put = web.WORK_Q.put
+        real_enqueue = web.enqueue
+        def enqueue(job, action, *args, **kwargs):
+            if action == 'render':
+                before_put.set()
+                assert release.wait(8)
+            return real_enqueue(job, action, *args, **kwargs)
+        monkeypatch.setattr(web, 'enqueue', enqueue)
+        call = start_call('post', store.url + '/render')
+        try:
+            assert before_put.wait(5)
+            assert request('post', store.url + '/cancel').status_code == 200
+            assert request('post', store.url + '/retry').status_code == 200
+        finally:
+            release.set()
+            assert finish(call).status_code == 200
+        ran = []
+        def build(job, for_render=False):
+            ran.append(for_render)
+            raise RuntimeError('stop at computation boundary')
+        monkeypatch.setattr(web, 'build_args', build)
+        real_put(None)
+        thread = threading.Thread(target=web.worker)
+        thread.start()
+        thread.join(8)
+        assert not thread.is_alive()
+>       assert ran == [False], 'obsolete render ticket replaced/executed instead of the retry scan'
+E       AssertionError: obsolete render ticket replaced/executed instead of the retry scan
+E       assert [True] == [False]
+E         
+E         At index 0 diff: True != False
+E         Use -v to get more diff
+
+tests/test_job_lifecycle.py:271: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_job_lifecycle.py::test_cancel_between_render_admission_and_queue_put_cannot_replace_retry
+1 failed, 6 deselected in 0.14s

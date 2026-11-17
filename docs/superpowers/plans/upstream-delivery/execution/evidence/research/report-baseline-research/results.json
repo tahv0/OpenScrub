@@ -1,0 +1,780 @@
+{
+  "upstream_sha": "5d3a15ae683c08f368d6ba4bd0d2d77b4e7b8e2f",
+  "date": "2026-11-16",
+  "source_snapshot": "/tmp/openscrub-report-research-20261116/source",
+  "source_sha256": {
+    "openscrub.py": "0e4f0f9a7846080f591038d021aaf3ca6f01201d83ac32bbdc273f53d5067ee7",
+    "openscrub_web.py": "9835e1137abee62c0a78e2669ed8bae7059e36bf4bed9f5c7a44f0eb8b40ed3a"
+  },
+  "python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]",
+  "platform": "Linux-6.18.58.1-microsoft-standard-WSL2-x86_64-with-glibc2.43",
+  "opencv": "4.14.0",
+  "cpu": "",
+  "logical_cpus": 16,
+  "scope": "Unmodified full baseline imports; real Flask routes with test-client and loopback threaded Werkzeug HTTP; no browser, no TLS, no production deployment.",
+  "fixture_seed": "deterministic formulas; no RNG",
+  "limits": [
+    "Single host Linux/Python 3.12/OpenCV4",
+    "No filesystem-cache drops",
+    "Socket client and server share process; RSS includes fixture/client/instrumentation",
+    "JSON stream proxy adds per-write Python accounting overhead; timings are instrumented baseline only",
+    "No model inference or real footage; synthetic motion/groups/audio; no performance speedup claim",
+    "Overlap schedule explicitly controlled at report load; not an estimate of random race frequency"
+  ],
+  "regressions": {
+    "test-client-encoding": {
+      "status": 500,
+      "payload_bytes": 23,
+      "before_bytes": 107533,
+      "after_bytes": 0,
+      "previous_bytes_preserved": false,
+      "valid_json_after_failure": false,
+      "counts": {
+        "parses": 1,
+        "serializations": 1,
+        "report_write_opens": 1,
+        "stream_write_calls": 0,
+        "output_characters": 0
+      }
+    },
+    "test-client-write": {
+      "status": 500,
+      "payload_bytes": 23,
+      "before_bytes": 107533,
+      "after_bytes": 16,
+      "previous_bytes_preserved": false,
+      "valid_json_after_failure": false,
+      "counts": {
+        "parses": 1,
+        "serializations": 1,
+        "report_write_opens": 1,
+        "stream_write_calls": 0,
+        "output_characters": 0
+      }
+    },
+    "socket-encoding": {
+      "status": 500,
+      "payload_bytes": 23,
+      "before_bytes": 107533,
+      "after_bytes": 0,
+      "previous_bytes_preserved": false,
+      "valid_json_after_failure": false,
+      "counts": {
+        "parses": 1,
+        "serializations": 1,
+        "report_write_opens": 1,
+        "stream_write_calls": 0,
+        "output_characters": 0
+      }
+    },
+    "socket-write": {
+      "status": 500,
+      "payload_bytes": 23,
+      "before_bytes": 107533,
+      "after_bytes": 16,
+      "previous_bytes_preserved": false,
+      "valid_json_after_failure": false,
+      "counts": {
+        "parses": 1,
+        "serializations": 1,
+        "report_write_opens": 1,
+        "stream_write_calls": 0,
+        "output_characters": 0
+      }
+    },
+    "socket-identical-manual-replay": {
+      "statuses": [
+        200,
+        200
+      ],
+      "request_bytes": 79,
+      "row_counts": [
+        10,
+        11,
+        12
+      ],
+      "duplicate_added_rows_equal": true,
+      "existing_rows_preserved": true,
+      "other_fields_preserved": true
+    },
+    "socket-overlapping-sparse-saves": {
+      "schedule": "Both real threaded socket requests read old report; request disabling row 1 completes; request disabling row 2 writes stale snapshot.",
+      "statuses": {
+        "1": 200,
+        "2": 200
+      },
+      "errors": [],
+      "expected_enabled": [
+        false,
+        false
+      ],
+      "actual_enabled": [
+        true,
+        false
+      ],
+      "other_field_preservation": {
+        "all_other_fields_equal": true,
+        "rows": 10,
+        "audio_redactions_equal": true,
+        "audio_suggestions_equal": true,
+        "audio_transcript_equal": true,
+        "render_state_equal": true
+      }
+    },
+    "socket-ordinary-combined-edit": {
+      "status": 200,
+      "response": {
+        "ok": true,
+        "suggest_allowlist": [
+          "synthetic-recurring"
+        ],
+        "total": 10
+      },
+      "counts": {
+        "parses": 1,
+        "serializations": 1,
+        "report_write_opens": 1,
+        "stream_write_calls": 18815,
+        "output_characters": 107471
+      },
+      "rows": 10,
+      "enabled_applied": true,
+      "box_applied": true,
+      "time_applied": true,
+      "audio_applied": true,
+      "suggest_allowlist_preserved": true
+    }
+  },
+  "render_preservation": {
+    "before_rows": 10,
+    "before_enabled_rows": 7,
+    "before_disabled_texts": [
+      "synthetic-recurring",
+      "synthetic-000004",
+      "synthetic-recurring"
+    ],
+    "load_report_rows": 7,
+    "loaded_track_person": [
+      [
+        "synthetic-000001",
+        -1,
+        -1
+      ],
+      [
+        "synthetic-000002",
+        0,
+        0
+      ],
+      [
+        "synthetic-000003",
+        0,
+        -1
+      ],
+      [
+        "synthetic-000006",
+        -1,
+        -1
+      ],
+      [
+        "synthetic-000007",
+        1,
+        0
+      ],
+      [
+        "synthetic-000008",
+        1,
+        -1
+      ],
+      [
+        "synthetic-000009",
+        1,
+        -1
+      ]
+    ],
+    "render_summary": {
+      "scans": 0,
+      "raw_hits": 0,
+      "regions": 7,
+      "recalls": 0,
+      "remembered": 0,
+      "output": "/tmp/openscrub-report-research-20261116/data/jobs/synthetic/rendered.mp4"
+    },
+    "actual_render_completed": true,
+    "seconds": 0.184919790001004,
+    "output_frames": 60,
+    "after_rows": 7,
+    "after_texts": [
+      "synthetic-000001",
+      "synthetic-000002",
+      "synthetic-000003",
+      "synthetic-000006",
+      "synthetic-000007",
+      "synthetic-000008",
+      "synthetic-000009"
+    ],
+    "after_row_indices_by_original_text": {
+      "synthetic-000001": 0,
+      "synthetic-000002": 1,
+      "synthetic-000003": 2,
+      "synthetic-000006": 3,
+      "synthetic-000007": 4,
+      "synthetic-000008": 5,
+      "synthetic-000009": 6
+    },
+    "disabled_rows_lost": [
+      "synthetic-recurring",
+      "synthetic-000004",
+      "synthetic-recurring"
+    ],
+    "enabled_track_person_preserved": true,
+    "audio_redactions": {
+      "present_before": true,
+      "present_after": true,
+      "equal": true
+    },
+    "audio_suggestions": {
+      "present_before": true,
+      "present_after": false,
+      "equal": false
+    },
+    "audio_transcript": {
+      "present_before": true,
+      "present_after": false,
+      "equal": false
+    },
+    "render_before_artifact": "/tmp/openscrub-report-research-20261116/data/render-before.json",
+    "render_after_artifact": "/tmp/openscrub-report-research-20261116/data/render-after.json",
+    "video_bytes": 36660,
+    "output_bytes": 7811
+  },
+  "measurements": [
+    {
+      "rows": 1000,
+      "initial_report_bytes": 535273,
+      "fps": 30,
+      "frame_count": 3000,
+      "duration_seconds": 100.0,
+      "motion_history_pairs": 3000,
+      "motion_history_json_bytes": 34201,
+      "band_history_pairs": 3000,
+      "dense_rows": 600,
+      "manual_rows": 200,
+      "distinct_tracks": 200,
+      "disabled_rows": 92,
+      "payload_bytes": {
+        "sparse": 23,
+        "no_op": 14,
+        "bulk": 11903
+      },
+      "cache_state": "Application has no report cache. Three warm-up route operations per scenario; filesystem cache remains OS managed and is not dropped.",
+      "scenarios": {
+        "sparse": {
+          "warmups": 3,
+          "measured_repetitions": 5,
+          "samples": [
+            {
+              "seconds": 0.04779386399968644,
+              "status": 200,
+              "counts": {
+                "parses": 1,
+                "serializations": 1,
+                "report_write_opens": 1,
+                "stream_write_calls": 98943,
+                "output_characters": 535273
+              },
+              "payload_bytes": 22
+            },
+            {
+              "seconds": 0.04740803399909055,
+              "status": 200,
+              "counts": {
+                "parses": 1,
+                "serializations": 1,
+                "report_write_opens": 1,
+                "stream_write_calls": 98943,
+                "output_characters": 535274
+              },
+              "payload_bytes": 23
+            },
+            {
+              "seconds": 0.047131631999945967,
+              "status": 200,
+              "counts": {
+                "parses": 1,
+                "serializations": 1,
+                "report_write_opens": 1,
+                "stream_write_calls": 98943,
+                "output_characters": 535273
+              },
+              "payload_bytes": 22
+            },
+            {
+              "seconds": 0.04628114200022537,
+              "status": 200,
+              "counts": {
+                "parses": 1,
+                "serializations": 1,
+                "report_write_opens": 1,
+                "stream_write_calls": 98943,
+                "output_characters": 535274
+              },
+              "payload_bytes": 23
+            },
+            {
+              "seconds": 0.04706890700254007,
+              "status": 200,
+              "counts": {
+                "parses": 1,
+                "serializations": 1,
+                "report_write_opens": 1,
+                "stream_write_calls": 98943,
+                "output_characters": 535273
+              },
+              "payload_bytes": 22
+            }
+          ],
+          "median_seconds": 0.047131631999945967,
+          "rss_before_bytes": 114184192,
+          "sampled_peak_rss_bytes": 115367936,
+          "process_peak_rss_bytes": 114155520,
+          "report_bytes": 535273,
+          "identical_report_bytes": true,
+          "after_sha256": "cb67a8841add9265f4d455ba8dd995974e10d99fbf54c0ce842d787a5e03bb62"
+        },
+        "no_op": {
+          "warmups": 3,
+          "measured_repetitions": 5,
+          "samples": [
+            {
+              "seconds": 0.046482180998282274,
+              "status": 200,
+              "counts": {
+                "parses": 1,
+                "serializations": 1,
+                "report_write_opens": 1,
+                "stream_write_calls": 98943,
+                "output_characters": 535273
+              },
+              "payload_bytes": 14
+            },
+            {
+              "seconds": 0.046294015999592375,
+              "status": 200,
+              "counts": {
+                "parses": 1,
+                "serializations": 1,
+                "report_write_opens": 1,
+                "stream_write_calls": 98943,
+                "output_characters": 535273
+              },
+              "payload_bytes": 14
+            },
+            {
+              "seconds": 0.045276732998900115,
+              "status": 200,
+              "counts": {
+                "parses": 1,
+                "serializations": 1,
+                "report_write_opens": 1,
+                "stream_write_calls": 98943,
+                "output_characters": 535273
+              },
+              "payload_bytes": 14
+            },
+            {
+              "seconds": 0.044639520998316584,
+              "status": 200,
+              "counts": {
+                "parses": 1,
+                "serializations": 1,
+                "report_write_opens": 1,
+                "stream_write_calls": 98943,
+                "output_characters": 535273
+              },
+              "payload_bytes": 14
+            },
+            {
+              "seconds": 0.04855591300292872,
+              "status": 200,
+              "counts": {
+                "parses": 1,
+                "serializations": 1,
+                "report_write_opens": 1,
+                "stream_write_calls": 98943,
+                "output_characters": 535273
+              },
+              "payload_bytes": 14
+            }
+          ],
+          "median_seconds": 0.046294015999592375,
+          "rss_before_bytes": 115355648,
+          "sampled_peak_rss_bytes": 116457472,
+          "process_peak_rss_bytes": 115204096,
+          "report_bytes": 535273,
+          "identical_report_bytes": true,
+          "after_sha256": "cb67a8841add9265f4d455ba8dd995974e10d99fbf54c0ce842d787a5e03bb62"
+        }
+      },
+      "preservation": {
+        "all_other_fields_equal": true,
+        "rows": 1000,
+        "audio_redactions_equal": true,
+        "audio_suggestions_equal": true,
+        "audio_transcript_equal": true,
+        "render_state_equal": true
+      }
+    },
+    {
+      "rows": 10000,
+      "initial_report_bytes": 5368380,
+      "fps": 30,
+      "frame_count": 30000,
+      "duration_seconds": 1000.0,
+      "motion_history_pairs": 30000,
+      "motion_history_json_bytes": 342501,
+      "band_history_pairs": 30000,
+      "dense_rows": 6000,
+      "manual_rows": 2000,
+      "distinct_tracks": 2000,
+      "disabled_rows": 911,
+      "payload_bytes": {
+        "sparse": 23,
+        "no_op": 14,
+        "bulk": 128903
+      },
+      "cache_state": "Application has no report cache. Three warm-up route operations per scenario; filesystem cache remains OS managed and is not dropped.",
+      "scenarios": {
+        "sparse": {
+          "warmups": 3,
+          "measured_repetitions": 5,
+          "samples": [
+            {
+              "seconds": 0.46703935299956356,
+              "status": 200,
+              "counts": {
+                "parses": 1,
+                "serializations": 1,
+                "report_write_opens": 1,
+                "stream_write_calls": 988143,
+                "output_characters": 5368380
+              },
+              "payload_bytes": 22
+            },
+            {
+              "seconds": 0.46219458599807695,
+              "status": 200,
+              "counts": {
+                "parses": 1,
+                "serializations": 1,
+                "report_write_opens": 1,
+                "stream_write_calls": 988143,
+                "output_characters": 5368381
+              },
+              "payload_bytes": 23
+            },
+            {
+              "seconds": 0.4572828610034776,
+              "status": 200,
+              "counts": {
+                "parses": 1,
+                "serializations": 1,
+                "report_write_opens": 1,
+                "stream_write_calls": 988143,
+                "output_characters": 5368380
+              },
+              "payload_bytes": 22
+            },
+            {
+              "seconds": 0.4511255559991696,
+              "status": 200,
+              "counts": {
+                "parses": 1,
+                "serializations": 1,
+                "report_write_opens": 1,
+                "stream_write_calls": 988143,
+                "output_characters": 5368381
+              },
+              "payload_bytes": 23
+            },
+            {
+              "seconds": 0.44907345100000384,
+              "status": 200,
+              "counts": {
+                "parses": 1,
+                "serializations": 1,
+                "report_write_opens": 1,
+                "stream_write_calls": 988143,
+                "output_characters": 5368380
+              },
+              "payload_bytes": 22
+            }
+          ],
+          "median_seconds": 0.4572828610034776,
+          "rss_before_bytes": 133066752,
+          "sampled_peak_rss_bytes": 156598272,
+          "process_peak_rss_bytes": 171565056,
+          "report_bytes": 5368380,
+          "identical_report_bytes": true,
+          "after_sha256": "be6cf8e4994920582b611565f230387665b68a618d0adcb23bd8a3b249b167f0"
+        },
+        "no_op": {
+          "warmups": 3,
+          "measured_repetitions": 5,
+          "samples": [
+            {
+              "seconds": 0.45283457299956353,
+              "status": 200,
+              "counts": {
+                "parses": 1,
+                "serializations": 1,
+                "report_write_opens": 1,
+                "stream_write_calls": 988143,
+                "output_characters": 5368380
+              },
+              "payload_bytes": 14
+            },
+            {
+              "seconds": 0.44361574599679443,
+              "status": 200,
+              "counts": {
+                "parses": 1,
+                "serializations": 1,
+                "report_write_opens": 1,
+                "stream_write_calls": 988143,
+                "output_characters": 5368380
+              },
+              "payload_bytes": 14
+            },
+            {
+              "seconds": 0.4434029419971921,
+              "status": 200,
+              "counts": {
+                "parses": 1,
+                "serializations": 1,
+                "report_write_opens": 1,
+                "stream_write_calls": 988143,
+                "output_characters": 5368380
+              },
+              "payload_bytes": 14
+            },
+            {
+              "seconds": 0.4474785569982487,
+              "status": 200,
+              "counts": {
+                "parses": 1,
+                "serializations": 1,
+                "report_write_opens": 1,
+                "stream_write_calls": 988143,
+                "output_characters": 5368380
+              },
+              "payload_bytes": 14
+            },
+            {
+              "seconds": 0.4431095309992088,
+              "status": 200,
+              "counts": {
+                "parses": 1,
+                "serializations": 1,
+                "report_write_opens": 1,
+                "stream_write_calls": 988143,
+                "output_characters": 5368380
+              },
+              "payload_bytes": 14
+            }
+          ],
+          "median_seconds": 0.44361574599679443,
+          "rss_before_bytes": 157126656,
+          "sampled_peak_rss_bytes": 167575552,
+          "process_peak_rss_bytes": 171565056,
+          "report_bytes": 5368380,
+          "identical_report_bytes": true,
+          "after_sha256": "be6cf8e4994920582b611565f230387665b68a618d0adcb23bd8a3b249b167f0"
+        }
+      },
+      "preservation": {
+        "all_other_fields_equal": true,
+        "rows": 10000,
+        "audio_redactions_equal": true,
+        "audio_suggestions_equal": true,
+        "audio_transcript_equal": true,
+        "render_state_equal": true
+      }
+    },
+    {
+      "rows": 100000,
+      "initial_report_bytes": 54078012,
+      "fps": 30,
+      "frame_count": 300000,
+      "duration_seconds": 10000.0,
+      "motion_history_pairs": 300000,
+      "motion_history_json_bytes": 3425001,
+      "band_history_pairs": 300000,
+      "dense_rows": 60000,
+      "manual_rows": 20000,
+      "distinct_tracks": 20000,
+      "disabled_rows": 9092,
+      "payload_bytes": {
+        "sparse": 23,
+        "no_op": 14,
+        "bulk": 1388903
+      },
+      "cache_state": "Application has no report cache. Three warm-up route operations per scenario; filesystem cache remains OS managed and is not dropped.",
+      "scenarios": {
+        "sparse": {
+          "warmups": 3,
+          "measured_repetitions": 5,
+          "samples": [
+            {
+              "seconds": 5.592045158999099,
+              "status": 200,
+              "counts": {
+                "parses": 1,
+                "serializations": 1,
+                "report_write_opens": 1,
+                "stream_write_calls": 9880143,
+                "output_characters": 54078012
+              },
+              "payload_bytes": 22
+            },
+            {
+              "seconds": 5.257598340998811,
+              "status": 200,
+              "counts": {
+                "parses": 1,
+                "serializations": 1,
+                "report_write_opens": 1,
+                "stream_write_calls": 9880143,
+                "output_characters": 54078013
+              },
+              "payload_bytes": 23
+            },
+            {
+              "seconds": 4.8763455690022965,
+              "status": 200,
+              "counts": {
+                "parses": 1,
+                "serializations": 1,
+                "report_write_opens": 1,
+                "stream_write_calls": 9880143,
+                "output_characters": 54078012
+              },
+              "payload_bytes": 22
+            },
+            {
+              "seconds": 4.849301982001634,
+              "status": 200,
+              "counts": {
+                "parses": 1,
+                "serializations": 1,
+                "report_write_opens": 1,
+                "stream_write_calls": 9880143,
+                "output_characters": 54078013
+              },
+              "payload_bytes": 23
+            },
+            {
+              "seconds": 5.074376578999363,
+              "status": 200,
+              "counts": {
+                "parses": 1,
+                "serializations": 1,
+                "report_write_opens": 1,
+                "stream_write_calls": 9880143,
+                "output_characters": 54078012
+              },
+              "payload_bytes": 22
+            }
+          ],
+          "median_seconds": 5.074376578999363,
+          "rss_before_bytes": 175685632,
+          "sampled_peak_rss_bytes": 471764992,
+          "process_peak_rss_bytes": 756768768,
+          "report_bytes": 54078012,
+          "identical_report_bytes": true,
+          "after_sha256": "2b1a683d406e9b40b21117166b62f249e1820762e908f6d6bc8171d4ba464cbf"
+        },
+        "no_op": {
+          "warmups": 3,
+          "measured_repetitions": 5,
+          "samples": [
+            {
+              "seconds": 4.839741849998973,
+              "status": 200,
+              "counts": {
+                "parses": 1,
+                "serializations": 1,
+                "report_write_opens": 1,
+                "stream_write_calls": 9880143,
+                "output_characters": 54078012
+              },
+              "payload_bytes": 14
+            },
+            {
+              "seconds": 4.711304473003111,
+              "status": 200,
+              "counts": {
+                "parses": 1,
+                "serializations": 1,
+                "report_write_opens": 1,
+                "stream_write_calls": 9880143,
+                "output_characters": 54078012
+              },
+              "payload_bytes": 14
+            },
+            {
+              "seconds": 4.80443856599959,
+              "status": 200,
+              "counts": {
+                "parses": 1,
+                "serializations": 1,
+                "report_write_opens": 1,
+                "stream_write_calls": 9880143,
+                "output_characters": 54078012
+              },
+              "payload_bytes": 14
+            },
+            {
+              "seconds": 4.710151352999674,
+              "status": 200,
+              "counts": {
+                "parses": 1,
+                "serializations": 1,
+                "report_write_opens": 1,
+                "stream_write_calls": 9880143,
+                "output_characters": 54078012
+              },
+              "payload_bytes": 14
+            },
+            {
+              "seconds": 4.7366208670027845,
+              "status": 200,
+              "counts": {
+                "parses": 1,
+                "serializations": 1,
+                "report_write_opens": 1,
+                "stream_write_calls": 9880143,
+                "output_characters": 54078012
+              },
+              "payload_bytes": 14
+            }
+          ],
+          "median_seconds": 4.7366208670027845,
+          "rss_before_bytes": 188882944,
+          "sampled_peak_rss_bytes": 471764992,
+          "process_peak_rss_bytes": 756768768,
+          "report_bytes": 54078012,
+          "identical_report_bytes": true,
+          "after_sha256": "2b1a683d406e9b40b21117166b62f249e1820762e908f6d6bc8171d4ba464cbf"
+        }
+      },
+      "preservation": {
+        "all_other_fields_equal": true,
+        "rows": 100000,
+        "audio_redactions_equal": true,
+        "audio_suggestions_equal": true,
+        "audio_transcript_equal": true,
+        "render_state_equal": true
+      }
+    }
+  ]
+}

@@ -1,0 +1,1 @@
+PASS: pinned source, route failures/race/replay, actual render + fresh reopen, and 30 measured socket samples verified.

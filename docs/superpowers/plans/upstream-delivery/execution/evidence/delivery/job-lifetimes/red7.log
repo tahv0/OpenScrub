@@ -1,0 +1,38 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+____ test_single_tracker_reservation_outlives_terminal_status_until_cleanup ____
+
+store = namespace(root=PosixPath('/tmp/openscrub-task621/red7-tmp/test_single_tracker_reservatio0/data'), jobs=PosixPath('/tmp...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7e4fdb1cfb00>, url='/api/jobs/f9ba91ba58d4')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7e5012d39280>
+
+    def test_single_tracker_reservation_outlives_terminal_status_until_cleanup(store, monkeypatch):
+        cleaning, release, threads = threading.Event(), threading.Event(), []
+        monkeypatch.setattr(openscrub, 'PersonDetector', lambda *a, **k: None)
+        monkeypatch.setattr(openscrub, 'track_manual_region', lambda *a, **k: [])
+        real_start = web._start_owned_thread
+        def start(target, lease):
+            real_release = lease.release
+            def cleanup():
+                cleaning.set()
+                assert release.wait(8)
+                real_release()
+            lease.release = cleanup
+            thread = real_start(target, lease)
+            threads.append(thread)
+            return thread
+        monkeypatch.setattr(web, '_start_owned_thread', start)
+        payload = {'box':[0,0,8,8], 't_ref':0, 't0':0, 't1':1}
+        try:
+            assert request('post', store.url + '/track_object', json=payload).status_code == 200
+            assert cleaning.wait(5)
+            assert request('get', store.url + '/track_status').get_json()['state'] == 'done'
+>           assert request('post', store.url + '/track_object', json=payload).status_code == 409
+E           AssertionError: assert 200 == 409
+E            +  where 200 = <WrapperTestResponse 12 bytes [200 OK]>.status_code
+E            +    where <WrapperTestResponse 12 bytes [200 OK]> = request('post', ('/api/jobs/f9ba91ba58d4' + '/track_object'), json={'box': [0, 0, 8, 8], 't_ref': 0, 't0': 0, 't1': 1})
+E            +      where '/api/jobs/f9ba91ba58d4' = namespace(root=PosixPath('/tmp/openscrub-task621/red7-tmp/test_single_tracker_reservatio0/data'), jobs=PosixPath('/tmp...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7e4fdb1cfb00>, url='/api/jobs/f9ba91ba58d4').url
+
+tests/test_job_lifecycle.py:739: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_job_lifecycle.py::test_single_tracker_reservation_outlives_terminal_status_until_cleanup
+1 failed, 25 deselected in 0.12s

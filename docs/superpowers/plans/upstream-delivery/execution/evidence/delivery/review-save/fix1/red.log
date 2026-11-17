@@ -1,0 +1,241 @@
+......................................FFFFF...............F.             [100%]
+=================================== FAILURES ===================================
+___ test_revisit_refreshes_clean_audio_with_non_audio_draft_pending[enabled] ___
+
+kind = 'enabled'
+
+    @pytest.mark.parametrize("kind", ["enabled", "manual", "box", "time", "editor_manual"])
+    def test_revisit_refreshes_clean_audio_with_non_audio_draft_pending(kind):
+>       run_js(PENDING_AUDIO_SETUP.replace("KIND", json.dumps(kind)) + """
+        openJob('B');openJob('A');const load=tlInit();
+        await reply({detections:[],audio_redactions:[{t0:5,t1:6,mode:'mute'}]});await load;
+        BE.audio.push({t0:7,t1:8,mode:'bleep'});const save=saveAndRender();
+        if(JSON.stringify(calls.at(-1).body.audio)!==JSON.stringify([
+          {t0:5,t1:6,mode:'mute'},{t0:7,t1:8,mode:'bleep'}]))throw Error('revisited audio used stale clean cache');
+        const sent=calls.at(-1).body;
+        if(kind==='enabled'&&sent.enabled[1]!==false)throw Error('pending enabled choice lost');
+        if((kind==='manual'||kind==='editor_manual')&&sent.manual.length!==1)throw Error('pending manual lost');
+        if(kind==='box'&&!sent.box_overrides[1])throw Error('pending box lost');
+        if(kind==='time'&&!sent.time_overrides[1])throw Error('pending time lost');
+        await reply();await reply();await save;
+        """)
+
+tests/test_review_save_failures.py:261: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "\nsetup();EDITS.enabled={};MAN.length=0;BE.adds=[];BE.ov={};BE.times={};\nBE.audioSaved=copyEdit(BE.audio);beTLDraw=(...=='time'&&!sent.time_overrides[1])throw Error('pending time lost');\n    await reply();await reply();await save;\n    "
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: Error: revisited audio used stale clean cache
+E             at evalmachine.<anonymous>:15:64
+E             at async [eval]:31:12
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...err='Error: revisited audio used stale clean cache\n    at evalmachine.<anonymous>:15:64\n    at async [eval]:31:12\n').returncode
+
+tests/test_review_save_failures.py:63: AssertionError
+___ test_revisit_refreshes_clean_audio_with_non_audio_draft_pending[manual] ____
+
+kind = 'manual'
+
+    @pytest.mark.parametrize("kind", ["enabled", "manual", "box", "time", "editor_manual"])
+    def test_revisit_refreshes_clean_audio_with_non_audio_draft_pending(kind):
+>       run_js(PENDING_AUDIO_SETUP.replace("KIND", json.dumps(kind)) + """
+        openJob('B');openJob('A');const load=tlInit();
+        await reply({detections:[],audio_redactions:[{t0:5,t1:6,mode:'mute'}]});await load;
+        BE.audio.push({t0:7,t1:8,mode:'bleep'});const save=saveAndRender();
+        if(JSON.stringify(calls.at(-1).body.audio)!==JSON.stringify([
+          {t0:5,t1:6,mode:'mute'},{t0:7,t1:8,mode:'bleep'}]))throw Error('revisited audio used stale clean cache');
+        const sent=calls.at(-1).body;
+        if(kind==='enabled'&&sent.enabled[1]!==false)throw Error('pending enabled choice lost');
+        if((kind==='manual'||kind==='editor_manual')&&sent.manual.length!==1)throw Error('pending manual lost');
+        if(kind==='box'&&!sent.box_overrides[1])throw Error('pending box lost');
+        if(kind==='time'&&!sent.time_overrides[1])throw Error('pending time lost');
+        await reply();await reply();await save;
+        """)
+
+tests/test_review_save_failures.py:261: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "\nsetup();EDITS.enabled={};MAN.length=0;BE.adds=[];BE.ov={};BE.times={};\nBE.audioSaved=copyEdit(BE.audio);beTLDraw=(...=='time'&&!sent.time_overrides[1])throw Error('pending time lost');\n    await reply();await reply();await save;\n    "
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: Error: revisited audio used stale clean cache
+E             at evalmachine.<anonymous>:15:64
+E             at async [eval]:31:12
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...err='Error: revisited audio used stale clean cache\n    at evalmachine.<anonymous>:15:64\n    at async [eval]:31:12\n').returncode
+
+tests/test_review_save_failures.py:63: AssertionError
+_____ test_revisit_refreshes_clean_audio_with_non_audio_draft_pending[box] _____
+
+kind = 'box'
+
+    @pytest.mark.parametrize("kind", ["enabled", "manual", "box", "time", "editor_manual"])
+    def test_revisit_refreshes_clean_audio_with_non_audio_draft_pending(kind):
+>       run_js(PENDING_AUDIO_SETUP.replace("KIND", json.dumps(kind)) + """
+        openJob('B');openJob('A');const load=tlInit();
+        await reply({detections:[],audio_redactions:[{t0:5,t1:6,mode:'mute'}]});await load;
+        BE.audio.push({t0:7,t1:8,mode:'bleep'});const save=saveAndRender();
+        if(JSON.stringify(calls.at(-1).body.audio)!==JSON.stringify([
+          {t0:5,t1:6,mode:'mute'},{t0:7,t1:8,mode:'bleep'}]))throw Error('revisited audio used stale clean cache');
+        const sent=calls.at(-1).body;
+        if(kind==='enabled'&&sent.enabled[1]!==false)throw Error('pending enabled choice lost');
+        if((kind==='manual'||kind==='editor_manual')&&sent.manual.length!==1)throw Error('pending manual lost');
+        if(kind==='box'&&!sent.box_overrides[1])throw Error('pending box lost');
+        if(kind==='time'&&!sent.time_overrides[1])throw Error('pending time lost');
+        await reply();await reply();await save;
+        """)
+
+tests/test_review_save_failures.py:261: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "\nsetup();EDITS.enabled={};MAN.length=0;BE.adds=[];BE.ov={};BE.times={};\nBE.audioSaved=copyEdit(BE.audio);beTLDraw=(...=='time'&&!sent.time_overrides[1])throw Error('pending time lost');\n    await reply();await reply();await save;\n    "
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: Error: revisited audio used stale clean cache
+E             at evalmachine.<anonymous>:15:64
+E             at async [eval]:31:12
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...err='Error: revisited audio used stale clean cache\n    at evalmachine.<anonymous>:15:64\n    at async [eval]:31:12\n').returncode
+
+tests/test_review_save_failures.py:63: AssertionError
+____ test_revisit_refreshes_clean_audio_with_non_audio_draft_pending[time] _____
+
+kind = 'time'
+
+    @pytest.mark.parametrize("kind", ["enabled", "manual", "box", "time", "editor_manual"])
+    def test_revisit_refreshes_clean_audio_with_non_audio_draft_pending(kind):
+>       run_js(PENDING_AUDIO_SETUP.replace("KIND", json.dumps(kind)) + """
+        openJob('B');openJob('A');const load=tlInit();
+        await reply({detections:[],audio_redactions:[{t0:5,t1:6,mode:'mute'}]});await load;
+        BE.audio.push({t0:7,t1:8,mode:'bleep'});const save=saveAndRender();
+        if(JSON.stringify(calls.at(-1).body.audio)!==JSON.stringify([
+          {t0:5,t1:6,mode:'mute'},{t0:7,t1:8,mode:'bleep'}]))throw Error('revisited audio used stale clean cache');
+        const sent=calls.at(-1).body;
+        if(kind==='enabled'&&sent.enabled[1]!==false)throw Error('pending enabled choice lost');
+        if((kind==='manual'||kind==='editor_manual')&&sent.manual.length!==1)throw Error('pending manual lost');
+        if(kind==='box'&&!sent.box_overrides[1])throw Error('pending box lost');
+        if(kind==='time'&&!sent.time_overrides[1])throw Error('pending time lost');
+        await reply();await reply();await save;
+        """)
+
+tests/test_review_save_failures.py:261: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "\nsetup();EDITS.enabled={};MAN.length=0;BE.adds=[];BE.ov={};BE.times={};\nBE.audioSaved=copyEdit(BE.audio);beTLDraw=(...=='time'&&!sent.time_overrides[1])throw Error('pending time lost');\n    await reply();await reply();await save;\n    "
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: Error: revisited audio used stale clean cache
+E             at evalmachine.<anonymous>:15:64
+E             at async [eval]:31:12
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...err='Error: revisited audio used stale clean cache\n    at evalmachine.<anonymous>:15:64\n    at async [eval]:31:12\n').returncode
+
+tests/test_review_save_failures.py:63: AssertionError
+_ test_revisit_refreshes_clean_audio_with_non_audio_draft_pending[editor_manual] _
+
+kind = 'editor_manual'
+
+    @pytest.mark.parametrize("kind", ["enabled", "manual", "box", "time", "editor_manual"])
+    def test_revisit_refreshes_clean_audio_with_non_audio_draft_pending(kind):
+>       run_js(PENDING_AUDIO_SETUP.replace("KIND", json.dumps(kind)) + """
+        openJob('B');openJob('A');const load=tlInit();
+        await reply({detections:[],audio_redactions:[{t0:5,t1:6,mode:'mute'}]});await load;
+        BE.audio.push({t0:7,t1:8,mode:'bleep'});const save=saveAndRender();
+        if(JSON.stringify(calls.at(-1).body.audio)!==JSON.stringify([
+          {t0:5,t1:6,mode:'mute'},{t0:7,t1:8,mode:'bleep'}]))throw Error('revisited audio used stale clean cache');
+        const sent=calls.at(-1).body;
+        if(kind==='enabled'&&sent.enabled[1]!==false)throw Error('pending enabled choice lost');
+        if((kind==='manual'||kind==='editor_manual')&&sent.manual.length!==1)throw Error('pending manual lost');
+        if(kind==='box'&&!sent.box_overrides[1])throw Error('pending box lost');
+        if(kind==='time'&&!sent.time_overrides[1])throw Error('pending time lost');
+        await reply();await reply();await save;
+        """)
+
+tests/test_review_save_failures.py:261: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "\nsetup();EDITS.enabled={};MAN.length=0;BE.adds=[];BE.ov={};BE.times={};\nBE.audioSaved=copyEdit(BE.audio);beTLDraw=(...=='time'&&!sent.time_overrides[1])throw Error('pending time lost');\n    await reply();await reply();await save;\n    "
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: Error: revisited audio used stale clean cache
+E             at evalmachine.<anonymous>:15:64
+E             at async [eval]:31:12
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...err='Error: revisited audio used stale clean cache\n    at evalmachine.<anonymous>:15:64\n    at async [eval]:31:12\n').returncode
+
+tests/test_review_save_failures.py:63: AssertionError
+___________ test_revisit_refreshes_clean_audio_during_non_audio_save ___________
+
+    def test_revisit_refreshes_clean_audio_during_non_audio_save():
+>       run_js(PENDING_AUDIO_SETUP.replace("KIND", json.dumps("enabled")) + """
+        const save=saveAndRender();openJob('B');openJob('A');const load=tlInit();
+        const saving=queue.shift();await reply({detections:[],audio_redactions:[{t0:5,t1:6,mode:'mute'}]});await load;
+        if(BE.audio[0].t0!==5)throw Error('non-audio save retained stale clean audio');
+        saving.resolve(response());await tick();await save;
+        if(calls.some(c=>c.url.endsWith('/render')))throw Error('revisited view rendered');
+        """)
+
+tests/test_review_save_failures.py:293: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "\nsetup();EDITS.enabled={};MAN.length=0;BE.adds=[];BE.ov={};BE.times={};\nBE.audioSaved=copyEdit(BE.audio);beTLDraw=(...wait tick();await save;\n    if(calls.some(c=>c.url.endsWith('/render')))throw Error('revisited view rendered');\n    "
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: Error: non-audio save retained stale clean audio
+E             at evalmachine.<anonymous>:13:33
+E             at async [eval]:31:12
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...='Error: non-audio save retained stale clean audio\n    at evalmachine.<anonymous>:13:33\n    at async [eval]:31:12\n').returncode
+
+tests/test_review_save_failures.py:63: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_review_save_failures.py::test_revisit_refreshes_clean_audio_with_non_audio_draft_pending[enabled]
+FAILED tests/test_review_save_failures.py::test_revisit_refreshes_clean_audio_with_non_audio_draft_pending[manual]
+FAILED tests/test_review_save_failures.py::test_revisit_refreshes_clean_audio_with_non_audio_draft_pending[box]
+FAILED tests/test_review_save_failures.py::test_revisit_refreshes_clean_audio_with_non_audio_draft_pending[time]
+FAILED tests/test_review_save_failures.py::test_revisit_refreshes_clean_audio_with_non_audio_draft_pending[editor_manual]
+FAILED tests/test_review_save_failures.py::test_revisit_refreshes_clean_audio_during_non_audio_save
+6 failed, 54 passed in 6.69s

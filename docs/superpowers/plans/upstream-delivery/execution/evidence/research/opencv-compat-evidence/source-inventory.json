@@ -1,0 +1,89 @@
+{
+  "source_commit": "5d3a15ae683c08f368d6ba4bd0d2d77b4e7b8e2f",
+  "files": {
+    "pyproject.toml": {
+      "sha256": "7692271c613956392066f2fbc5329ea4eab8a656614d6e127710ba8b112fdbe3",
+      "current_matches_pin": true
+    },
+    "requirements.txt": {
+      "sha256": "9fccdf6ad2d0ea484f40906ba224881fb4f5b16ff44fdbf14819865c0d8fa6ee",
+      "current_matches_pin": true
+    },
+    "install.py": {
+      "sha256": "bdb1cfb39368d212c9a65384264533cbf7c825b5c261f7c2f2b42cfb8e02cbeb",
+      "current_matches_pin": true
+    },
+    "openscrub_setup.py": {
+      "sha256": "d0362a038f8182e8fae510100085bb087f09f7e5cf7e11a780a24390b3037eaf",
+      "current_matches_pin": true
+    },
+    "openscrub_update.py": {
+      "sha256": "4d6a20f75d985a119f8421227c3bd88b17fd1b8eed44e353b127b5b49e733d55",
+      "current_matches_pin": true
+    },
+    "Dockerfile": {
+      "sha256": "cb7148141b842eea809d33b05c389522124963739ef992c95c769f6d700c800c",
+      "current_matches_pin": true
+    },
+    "Dockerfile.intel": {
+      "sha256": "d3ff7ec60107bcb2cdb1e1f72ca3ea7aadcd5b49f29da1a19402fce028aa3e6d",
+      "current_matches_pin": true
+    },
+    "Dockerfile.cuda": {
+      "sha256": "c434b90d62c605520b456ff450bebec2ee9229932c0e7a71e3a54ae83d208466",
+      "current_matches_pin": true
+    },
+    "docker/Dockerfile.opencv-cuda": {
+      "sha256": "11d0f50cbb500ccde78464bdc9983131f4057493159b287fd9bcdc740d33fae7",
+      "current_matches_pin": true
+    },
+    ".github/workflows/windows-installer.yml": {
+      "sha256": "db741efaadb4e3a146c3b55dcca0fbb4a972b6d938ee754a84a0fd38daa76027",
+      "current_matches_pin": true
+    },
+    ".github/workflows/opencv-cuda-base.yml": {
+      "sha256": "51c2e928dc4b59367a7f9a08fc4a1d47e82219afdc0500bca070e9ac99c98e88",
+      "current_matches_pin": true
+    },
+    ".github/workflows/docker-image.yml": {
+      "sha256": "f6c0c0e236c4b9b1c5e7b686014ab737893a03ea5304ff67457f497bf93e6460",
+      "current_matches_pin": true
+    },
+    ".github/workflows/publish.yml": {
+      "sha256": "6d5f7c2b3261f5fddf4df0b3bf9983f0bc3c55d9ca6d96757d33802eca5a7a02",
+      "current_matches_pin": true
+    },
+    "windows/build_installer.bat": {
+      "sha256": "fc5f6934832afa5f756c95c53322724f1ef82680486c0bd4834f99f007161a89",
+      "current_matches_pin": true
+    },
+    "windows/openscrub.spec": {
+      "sha256": "49d35c42ee505aae5c6d72113790aeeaa34c9d434fbe68c834d7e5c09af33221",
+      "current_matches_pin": true
+    },
+    "README.md": {
+      "sha256": "71ab78cbda68642ffd36ac810427818261e15003eb79e8c802286935b62aa2a2",
+      "current_matches_pin": true
+    },
+    "CONTRIBUTING.md": {
+      "sha256": "ce0ab04a15a6373018800d24e7ee553dddc92a156eac45ecfb1c8c4c1d9824a3",
+      "current_matches_pin": true
+    },
+    "CLAUDE.md": {
+      "sha256": "f19a360826e9ea084f7a8fad9f67e8f12869f25a5f00393e5be1ed0a2b545d55",
+      "current_matches_pin": true
+    },
+    "openscrub_gui.py": {
+      "sha256": "2fee837398620f351e6770a19c1016d5af3104350a1bec744ba42a611e2c9965",
+      "current_matches_pin": true
+    },
+    "openscrub_web.py": {
+      "sha256": "9835e1137abee62c0a78e2669ed8bae7059e36bf4bed9f5c7a44f0eb8b40ed3a",
+      "current_matches_pin": true
+    },
+    "fetch_plate_models.py": {
+      "sha256": "da0a63c3ff96d9bd2f67fad513c880d973b27a09c23080eb53f0be5fe9974ef2",
+      "current_matches_pin": true
+    }
+  }
+}

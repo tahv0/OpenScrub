@@ -1,0 +1,52 @@
+{
+  "cold_firstpass": {
+    "events": [
+      {
+        "cache_before": false,
+        "entered": 31165.332926161,
+        "gate_released": true,
+        "i": 0,
+        "job": "cold",
+        "production_done": 31165.340963608,
+        "returned": 31165.340966308,
+        "token": 3001
+      },
+      {
+        "cache_before": false,
+        "entered": 31165.333538005,
+        "gate_released": true,
+        "i": 2,
+        "job": "cold",
+        "production_done": 31165.344946695,
+        "returned": 31165.344948935,
+        "token": 3002
+      },
+      {
+        "cache_before": false,
+        "entered": 31165.333860356,
+        "gate_released": true,
+        "i": 3,
+        "job": "cold",
+        "production_done": 31165.34180566,
+        "returned": 31165.34180868,
+        "token": 3003
+      }
+    ],
+    "images": 3
+  },
+  "exploratory_errors": [
+    {
+      "job": "tenK",
+      "errors": [
+        "Cannot read properties of null (reading 'style')"
+      ]
+    }
+  ],
+  "notes": [
+    "Initial server bind denied by sandbox; loopback-only execution was approved via escalation.",
+    "Initial harness certificate paths were incompletely redirected, causing certinfo FileNotFoundError; fixed in harness, final browser runs have no warnings or errors.",
+    "Initial switch harness waited for beta cards before releasing held connections; 20s safety gate expired. Refined final cases capture pending beta then release; no final gate timeout.",
+    "Initial tenK reopening logged a null-style page error without stack. Not attributed to scheduling and not reproduced in final flow; larger reopen behavior remains unqualified.",
+    "Final tenK Playwright requestfinished notifications lagged direct Chromium Network.loadingFinished. Summary retains both; CDP counters support outstanding-count conclusions."
+  ]
+}

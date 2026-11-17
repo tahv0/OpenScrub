@@ -1,0 +1,22 @@
+{
+  "python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]",
+  "packages": {
+    "opencv-python": "4.14.0.94",
+    "numpy": "2.5.5",
+    "pytest": "9.2.0",
+    "build": "1.6.1"
+  },
+  "isolated_build_backend": "hatchling==1.33.0",
+  "distribution_byte_checks": {
+    "openscrub.py": true,
+    "openscrub_internal/reports.py": true,
+    "openscrub_web.py": true,
+    "sdist/tests/test_report_roundtrip.py": true,
+    "sdist/tests/test_large_report_io.py": true,
+    "sdist/tests/test_vault_cleanup.py": true
+  },
+  "artifacts": {
+    "/tmp/openscrub-task64-dist/openscrub-1.0.96-py3-none-any.whl": "5e2b33ea83f5da1dbce140f65a86e8d71ec896ae6035676da7f479b7b0bb369d",
+    "/tmp/openscrub-task64-dist/openscrub-1.0.96.tar.gz": "135ddfc7fc1e9cc06c339a436b414f047b7f32041a9b4398608367e1aededcc2"
+  }
+}

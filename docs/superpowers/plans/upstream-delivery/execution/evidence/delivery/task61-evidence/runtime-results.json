@@ -1,0 +1,31 @@
+{
+  "scan": "manual-only synthetic scan completed",
+  "http_failures": {
+    "encoding": {
+      "status": 500,
+      "bytes_preserved": true,
+      "restart": {
+        "restart_phase": "review",
+        "restart_get_status": 200
+      }
+    },
+    "write": {
+      "status": 500,
+      "bytes_preserved": true,
+      "restart": {
+        "restart_phase": "review",
+        "restart_get_status": 200
+      }
+    }
+  },
+  "http_success": {
+    "ok": true,
+    "suggest_allowlist": [],
+    "total": 1
+  },
+  "render": {
+    "frames": 60,
+    "report_rows": 1,
+    "output_bytes": 7811
+  }
+}

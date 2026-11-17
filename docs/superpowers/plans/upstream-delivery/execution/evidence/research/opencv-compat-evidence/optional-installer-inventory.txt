@@ -1,0 +1,67 @@
+./openscrub_update.py:10:* pip install (the module lives in site-packages): updates via
+./openscrub_update.py:11:  `pip install --upgrade OpenScrub==<latest>`.
+./openscrub_update.py:83:def pip_installed():
+./openscrub_update.py:127:    cmd = [sys.executable, "-m", "pip", "install", "--upgrade",
+./openscrub_update.py:196:    if pip_installed():
+./openscrub_update.py:229:    if os.path.isdir(os.path.join(HERE, ".git")) and not pip_installed() \
+./requirements.txt:1:opencv-python
+./openscrub_web.py:57:    folder (unchanged behavior). When pip-installed (module lives inside
+./openscrub_web.py:114:    per-user data dir (pip / frozen installs download there)."""
+./openscrub_web.py:124:# pip installs meant site-packages (lost on upgrade) and for frozen installs
+./openscrub_web.py:3047:  if(d.frozen){el.innerHTML='This standalone install has no pip, so optional engines cannot be added here. Use the pip install of OpenScrub (<code>pip install "OpenScrub[ner]"</code>) if you need spaCy NER or PaddleOCR.';return;}
+./openscrub_web.py:3311:# Optional engines (spaCy NER, PaddleOCR) — installable from the web UI on
+./openscrub_web.py:3312:# pip/folder installs. Frozen (Program Files) builds have no pip, so the
+./openscrub_web.py:3415:        "pip": ["spacy"],
+./openscrub_web.py:3423:        "pip": ["paddleocr", "paddlepaddle"],
+./openscrub_web.py:3432:        "pip": ["paddleocr", "paddlepaddle-gpu==3.2.2", "-i",
+./openscrub_web.py:3434:        "post": [["-m", "pip", "install", "-U", "nvidia-cudnn-cu12"]],
+./openscrub_web.py:3456:                   "pip — optional engines need the pip install of "
+./openscrub_web.py:3466:            cmds = [[sys.executable, "-m", "pip", "install"] + spec["pip"]]
+./openscrub_web.py:3913:            print("    pip install cryptography      (recommended)")
+./openscrub_web.py:3975:        print("    (running on Flask's built-in server — `pip install cheroot`")
+./openscrub_gui.py:7:installers for the optional OCR/NER engines, and a cancel button.
+./openscrub_gui.py:14:(pip install pillow). tkinter ships with the python.org Windows installer.
+./openscrub_gui.py:81:    "PaddleOCR (CPU)": [[sys.executable, "-m", "pip", "install", "paddleocr", "paddlepaddle"]],
+./openscrub_gui.py:83:        [sys.executable, "-m", "pip", "install", "paddleocr"],
+./openscrub_gui.py:84:        [sys.executable, "-m", "pip", "uninstall", "-y", "paddlepaddle"],
+./openscrub_gui.py:85:        [sys.executable, "-m", "pip", "install", "paddlepaddle-gpu==3.2.2",
+./openscrub_gui.py:88:        [sys.executable, "-m", "pip", "install", "spacy"],
+./openscrub_gui.py:306:                      "Pillow not installed — run: pip install pillow"),
+./openscrub_setup.py:4:`pip install OpenScrub` covers every Python dependency, but two system
+./openscrub_setup.py:41:    """Same search the engine performs: PATH, then known Windows installs."""
+./openscrub_setup.py:141:    """Start Menu + Desktop shortcuts for the web app (Windows pip installs).
+./openscrub_setup.py:209:        _ok("python dependencies (opencv, flask, ...)")
+./openscrub_setup.py:211:        _miss(f"python dependency broken: {e} — try: pip install --force-reinstall OpenScrub")
+./openscrub_setup.py:253:              'pip install "OpenScrub[ner]" then re-run openscrub-setup')
+./docker/prefetch_models.py:30:        "https://media.githubusercontent.com/media/opencv/opencv_zoo/"
+./docker/prefetch_models.py:35:        "https://media.githubusercontent.com/media/opencv/opencv_zoo/"
+./docker/prefetch_models.py:41:        "https://media.githubusercontent.com/media/opencv/opencv_zoo/"
+./docker/prefetch_models.py:76:    """Download + sha256-verify with retries (the opencv_zoo LFS media
+./install.py:40:CORE_PKGS = ["opencv-python", "rapidfuzz", "pytesseract", "pillow",
+./install.py:100:    return run([PYTHON, "-m", "pip", *args])
+./install.py:140:        r = pip("install", *missing)
+./install.py:161:        r = pip("install", "spacy")
+./install.py:197:            r = pip("install", "paddlepaddle-gpu", "-i",
+./install.py:201:                r = pip("install", "paddlepaddle")
+./install.py:203:                pip("install", "-U", "nvidia-cudnn-cu12")   # cuDNN pairing
+./install.py:204:            r2 = pip("install", "paddleocr")
+./install.py:208:        r = pip("install", "paddlepaddle")
+./install.py:209:        r2 = pip("install", "paddleocr")
+./install.py:238:    pip("uninstall", "-y", "onnxruntime", "onnxruntime-directml")
+./install.py:239:    r = pip("install", "onnxruntime-directml")
+./install.py:244:        pip("install", "onnxruntime")
+./zones_ui.py:161:  <div><label>OCR engine <span class="qm" data-tip="Which text reader finds names, numbers and other text on screen. Auto (recommended) picks the best one installed: PaddleOCR on the NVIDIA image, the same PP-OCR models via ONNX elsewhere, Tesseract as a last resort. Paddle and ONNX read equally well; Tesseract is slower and misses more. If a choice isn't installed, OpenScrub falls back automatically and says so in the log. Only matters for text categories.">?</span></label><select id="engine"><option>auto</option>
+./fetch_plate_models.py:7:    pip install open-image-models
+./fetch_plate_models.py:66:                 "    pip install open-image-models\nthen re-run.")
+./pyproject.toml:16:    "ocr", "opencv", "ffmpeg",
+./pyproject.toml:37:    "opencv-python",
+./openscrub.py:607:                      "detection only.\n  For better accuracy: pip install "
+./openscrub.py:1617:VITTRACK_URL = ("https://media.githubusercontent.com/media/opencv/opencv_zoo/"
+./openscrub.py:1625:    """cv2.TrackerVit (OpenCV >= 4.9) + the opencv_zoo vittrack model:
+./openscrub.py:4306:YUNET_URL = ("https://media.githubusercontent.com/media/opencv/opencv_zoo/"
+./openscrub.py:4308:SFACE_URL = ("https://media.githubusercontent.com/media/opencv/opencv_zoo/"
+./openscrub.py:4419:# The stock opencv-python wheel is CPU-only, so face detection (YuNet/SCRFD/
+./openscrub.py:4483:    pip's site-packages, or a frozen (PyInstaller) install under Program
+./openscrub.py:4852:                     "Install onnxruntime (pip install onnxruntime) to "
+./openscrub.py:6234:               "`pip install faster-whisper` enables local speech "
+./openscrub.py:7244:    # bake it in, so this normally fires only on pip/source installs.)

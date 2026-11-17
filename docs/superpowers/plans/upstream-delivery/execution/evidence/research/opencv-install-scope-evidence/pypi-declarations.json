@@ -1,0 +1,284 @@
+[
+  {
+    "retrieved_at_utc": "2026-11-16T23:25:25.405181+00:00",
+    "url": "https://pypi.org/pypi/paddleocr/json",
+    "headers": {
+      "Date": "Mon, 16 Nov 2026 23:25:25 GMT",
+      "ETag": "\"tOqAp30DFoWWL31wjjid4A\""
+    },
+    "name": "paddleocr",
+    "version": "3.7.0",
+    "requires_python": ">=3.8",
+    "provides_extra": [
+      "all",
+      "doc-parser",
+      "doc2md",
+      "ie",
+      "trans"
+    ],
+    "files": [
+      {
+        "filename": "paddleocr-3.7.0-py3-none-any.whl",
+        "packagetype": "bdist_wheel",
+        "upload_time_iso_8601": "2026-06-11T12:09:51.204074Z",
+        "requires_python": ">=3.8",
+        "yanked": false
+      },
+      {
+        "filename": "paddleocr-3.7.0.tar.gz",
+        "packagetype": "sdist",
+        "upload_time_iso_8601": "2026-06-11T12:09:52.545653Z",
+        "requires_python": ">=3.8",
+        "yanked": false
+      }
+    ],
+    "requires_dist_relevant": [
+      "paddlex[ocr-core]<3.8.0,>=3.7.0",
+      "paddlex[genai-client,ie,ocr,trans]<3.8.0,>=3.7.0; extra == \"all\"",
+      "paddlex[genai-client,ocr]<3.8.0,>=3.7.0; extra == \"doc-parser\"",
+      "paddlex[ie]<3.8.0,>=3.7.0; extra == \"ie\"",
+      "paddlex[trans]<3.8.0,>=3.7.0; extra == \"trans\""
+    ],
+    "scope": "Filtered from PyPI JSON: complete OpenCV/PaddleX/NumPy declarations; other dependencies intentionally omitted. File rows are registry metadata only; no artifact fetched."
+  },
+  {
+    "retrieved_at_utc": "2026-11-16T23:25:25.555946+00:00",
+    "url": "https://pypi.org/pypi/paddlex/json",
+    "headers": {
+      "Date": "Mon, 16 Nov 2026 23:25:25 GMT",
+      "ETag": "\"3sc6+H2mNWi1SkA6jqvn3g\""
+    },
+    "name": "paddlex",
+    "version": "3.7.2",
+    "requires_python": ">=3.8",
+    "provides_extra": [
+      "cv",
+      "multimodal",
+      "ie",
+      "trans",
+      "ocr-core",
+      "ocr",
+      "speech",
+      "ts",
+      "video",
+      "base",
+      "genai-client",
+      "genai-sglang-server",
+      "genai-vllm-server",
+      "paddle2onnx",
+      "serving"
+    ],
+    "files": [
+      {
+        "filename": "paddlex-3.7.2-py3-none-any.whl",
+        "packagetype": "bdist_wheel",
+        "upload_time_iso_8601": "2026-06-25T05:50:51.196355Z",
+        "requires_python": ">=3.8",
+        "yanked": false
+      },
+      {
+        "filename": "paddlex-3.7.2.tar.gz",
+        "packagetype": "sdist",
+        "upload_time_iso_8601": "2026-06-25T05:50:53.340189Z",
+        "requires_python": ">=3.8",
+        "yanked": false
+      }
+    ],
+    "requires_dist_relevant": [
+      "numpy<2.4,>=1.24",
+      "opencv-contrib-python==4.10.0.84; extra == \"cv\"",
+      "opencv-contrib-python==4.10.0.84; extra == \"multimodal\"",
+      "opencv-contrib-python==4.10.0.84; extra == \"ie\"",
+      "opencv-contrib-python==4.10.0.84; extra == \"trans\"",
+      "opencv-contrib-python==4.10.0.84; extra == \"ocr-core\"",
+      "opencv-contrib-python==4.10.0.84; extra == \"ocr\"",
+      "opencv-contrib-python==4.10.0.84; extra == \"video\"",
+      "opencv-contrib-python==4.10.0.84; extra == \"base\"",
+      "opencv-contrib-python==4.10.0.84; extra == \"serving\""
+    ],
+    "scope": "Filtered from PyPI JSON: complete OpenCV/PaddleX/NumPy declarations; other dependencies intentionally omitted. File rows are registry metadata only; no artifact fetched."
+  },
+  {
+    "retrieved_at_utc": "2026-11-16T23:26:01.277322+00:00",
+    "url": "https://pypi.org/pypi/paddlex/3.7.0/json",
+    "name": "paddlex",
+    "version": "3.7.0",
+    "requires_python": ">=3.8",
+    "files": [
+      {
+        "filename": "paddlex-3.7.0-py3-none-any.whl",
+        "upload_time_iso_8601": "2026-06-11T09:01:58.814753Z"
+      },
+      {
+        "filename": "paddlex-3.7.0.tar.gz",
+        "upload_time_iso_8601": "2026-06-11T09:02:01.671307Z"
+      }
+    ],
+    "requires_dist_relevant": [
+      "numpy<2.4,>=1.24",
+      "opencv-contrib-python==4.10.0.84; extra == \"cv\"",
+      "opencv-contrib-python==4.10.0.84; extra == \"multimodal\"",
+      "opencv-contrib-python==4.10.0.84; extra == \"ie\"",
+      "opencv-contrib-python==4.10.0.84; extra == \"trans\"",
+      "opencv-contrib-python==4.10.0.84; extra == \"ocr-core\"",
+      "opencv-contrib-python==4.10.0.84; extra == \"ocr\"",
+      "opencv-contrib-python==4.10.0.84; extra == \"video\"",
+      "opencv-contrib-python==4.10.0.84; extra == \"base\"",
+      "opencv-contrib-python==4.10.0.84; extra == \"serving\""
+    ],
+    "scope": "Filtered from PyPI JSON: complete OpenCV/PaddleX/NumPy declarations; other dependencies intentionally omitted. File rows are registry metadata only; no artifact fetched."
+  },
+  {
+    "retrieved_at_utc": "2026-11-16T23:26:01.425167+00:00",
+    "url": "https://pypi.org/pypi/paddlex/3.7.1/json",
+    "name": "paddlex",
+    "version": "3.7.1",
+    "requires_python": ">=3.8",
+    "files": [
+      {
+        "filename": "paddlex-3.7.1-py3-none-any.whl",
+        "upload_time_iso_8601": "2026-06-11T10:41:43.921994Z"
+      },
+      {
+        "filename": "paddlex-3.7.1.tar.gz",
+        "upload_time_iso_8601": "2026-06-11T10:41:46.042452Z"
+      }
+    ],
+    "requires_dist_relevant": [
+      "numpy<2.4,>=1.24",
+      "opencv-contrib-python==4.10.0.84; extra == \"cv\"",
+      "opencv-contrib-python==4.10.0.84; extra == \"multimodal\"",
+      "opencv-contrib-python==4.10.0.84; extra == \"ie\"",
+      "opencv-contrib-python==4.10.0.84; extra == \"trans\"",
+      "opencv-contrib-python==4.10.0.84; extra == \"ocr-core\"",
+      "opencv-contrib-python==4.10.0.84; extra == \"ocr\"",
+      "opencv-contrib-python==4.10.0.84; extra == \"video\"",
+      "opencv-contrib-python==4.10.0.84; extra == \"base\"",
+      "opencv-contrib-python==4.10.0.84; extra == \"serving\""
+    ],
+    "scope": "Filtered from PyPI JSON: complete OpenCV/PaddleX/NumPy declarations; other dependencies intentionally omitted. File rows are registry metadata only; no artifact fetched."
+  },
+  {
+    "retrieved_at_utc": "2026-11-16T23:25:25.611514+00:00",
+    "url": "https://pypi.org/pypi/paddlepaddle/json",
+    "headers": {
+      "Date": "Mon, 16 Nov 2026 23:25:25 GMT",
+      "ETag": "\"ciQzVqSawC5HnwdOLxMwSw\""
+    },
+    "name": "paddlepaddle",
+    "version": "3.3.1",
+    "requires_python": null,
+    "provides_extra": null,
+    "files": [
+      {
+        "filename": "paddlepaddle-3.3.1-cp310-cp310-macosx_11_0_arm64.whl",
+        "packagetype": "bdist_wheel",
+        "upload_time_iso_8601": "2026-03-26T11:17:55.180936Z",
+        "requires_python": null,
+        "yanked": false
+      },
+      {
+        "filename": "paddlepaddle-3.3.1-cp310-cp310-manylinux1_x86_64.whl",
+        "packagetype": "bdist_wheel",
+        "upload_time_iso_8601": "2026-03-24T08:01:41.657531Z",
+        "requires_python": null,
+        "yanked": false
+      },
+      {
+        "filename": "paddlepaddle-3.3.1-cp310-cp310-win_amd64.whl",
+        "packagetype": "bdist_wheel",
+        "upload_time_iso_8601": "2026-03-24T08:05:37.962526Z",
+        "requires_python": null,
+        "yanked": false
+      },
+      {
+        "filename": "paddlepaddle-3.3.1-cp311-cp311-macosx_11_0_arm64.whl",
+        "packagetype": "bdist_wheel",
+        "upload_time_iso_8601": "2026-03-26T11:18:09.265542Z",
+        "requires_python": null,
+        "yanked": false
+      },
+      {
+        "filename": "paddlepaddle-3.3.1-cp311-cp311-manylinux1_x86_64.whl",
+        "packagetype": "bdist_wheel",
+        "upload_time_iso_8601": "2026-03-24T08:01:59.868986Z",
+        "requires_python": null,
+        "yanked": false
+      },
+      {
+        "filename": "paddlepaddle-3.3.1-cp311-cp311-win_amd64.whl",
+        "packagetype": "bdist_wheel",
+        "upload_time_iso_8601": "2026-03-26T11:11:23.176971Z",
+        "requires_python": null,
+        "yanked": false
+      },
+      {
+        "filename": "paddlepaddle-3.3.1-cp312-cp312-macosx_11_0_arm64.whl",
+        "packagetype": "bdist_wheel",
+        "upload_time_iso_8601": "2026-03-26T11:18:20.499901Z",
+        "requires_python": null,
+        "yanked": false
+      },
+      {
+        "filename": "paddlepaddle-3.3.1-cp312-cp312-manylinux1_x86_64.whl",
+        "packagetype": "bdist_wheel",
+        "upload_time_iso_8601": "2026-03-24T08:02:17.755398Z",
+        "requires_python": null,
+        "yanked": false
+      },
+      {
+        "filename": "paddlepaddle-3.3.1-cp312-cp312-win_amd64.whl",
+        "packagetype": "bdist_wheel",
+        "upload_time_iso_8601": "2026-03-26T11:11:37.180856Z",
+        "requires_python": null,
+        "yanked": false
+      },
+      {
+        "filename": "paddlepaddle-3.3.1-cp313-cp313-macosx_11_0_arm64.whl",
+        "packagetype": "bdist_wheel",
+        "upload_time_iso_8601": "2026-03-26T11:18:41.158258Z",
+        "requires_python": null,
+        "yanked": false
+      },
+      {
+        "filename": "paddlepaddle-3.3.1-cp313-cp313-manylinux1_x86_64.whl",
+        "packagetype": "bdist_wheel",
+        "upload_time_iso_8601": "2026-03-24T08:02:36.024524Z",
+        "requires_python": null,
+        "yanked": false
+      },
+      {
+        "filename": "paddlepaddle-3.3.1-cp313-cp313-win_amd64.whl",
+        "packagetype": "bdist_wheel",
+        "upload_time_iso_8601": "2026-03-26T11:11:52.214495Z",
+        "requires_python": null,
+        "yanked": false
+      },
+      {
+        "filename": "paddlepaddle-3.3.1-cp39-cp39-macosx_11_0_arm64.whl",
+        "packagetype": "bdist_wheel",
+        "upload_time_iso_8601": "2026-03-26T11:18:52.670408Z",
+        "requires_python": null,
+        "yanked": false
+      },
+      {
+        "filename": "paddlepaddle-3.3.1-cp39-cp39-manylinux1_x86_64.whl",
+        "packagetype": "bdist_wheel",
+        "upload_time_iso_8601": "2026-03-24T08:02:56.388252Z",
+        "requires_python": null,
+        "yanked": false
+      },
+      {
+        "filename": "paddlepaddle-3.3.1-cp39-cp39-win_amd64.whl",
+        "packagetype": "bdist_wheel",
+        "upload_time_iso_8601": "2026-03-26T11:12:06.620546Z",
+        "requires_python": null,
+        "yanked": false
+      }
+    ],
+    "requires_dist_relevant": [
+      "numpy>=1.21"
+    ],
+    "scope": "Filtered from PyPI JSON: complete OpenCV/PaddleX/NumPy declarations; other dependencies intentionally omitted. File rows are registry metadata only; no artifact fetched."
+  }
+]

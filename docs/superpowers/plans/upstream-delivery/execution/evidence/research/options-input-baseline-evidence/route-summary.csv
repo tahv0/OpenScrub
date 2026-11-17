@@ -1,0 +1,37 @@
+intake,case,options_present,options_field,http_status,registered_jobs,queue_entries,job_files,options_type,argument_preparation,cancel_delete_status,remaining_jobs_or_files,server_fixture_unchanged
+upload,missing,False,,200,1,1,2,dict,success,200/200,0,True
+upload,empty,True,,500,0,0,0,,not reached,,0,True
+upload,whitespace,True,   ,500,0,0,0,,not reached,,0,True
+upload,malformed-object,True,{,500,0,0,0,,not reached,,0,True
+upload,malformed-token,True,not-json,500,0,0,0,,not reached,,0,True
+upload,array-empty,True,[],200,1,1,2,list,'list' object has no attribute 'get',200/200,0,True
+upload,array-nonempty,True,[1],200,1,1,2,list,'list' object has no attribute 'get',200/200,0,True
+upload,null,True,null,200,1,1,2,NoneType,'NoneType' object has no attribute 'get',200/200,0,True
+upload,string,True,"""ordinary""",200,1,1,2,str,'str' object has no attribute 'get',200/200,0,True
+upload,string-empty,True,"""""",200,1,1,2,str,'str' object has no attribute 'get',200/200,0,True
+upload,integer,True,7,200,1,1,2,int,'int' object has no attribute 'get',200/200,0,True
+upload,zero,True,0,200,1,1,2,int,'int' object has no attribute 'get',200/200,0,True
+upload,decimal,True,1.5,200,1,1,2,float,'float' object has no attribute 'get',200/200,0,True
+upload,boolean-true,True,true,200,1,1,2,bool,'bool' object has no attribute 'get',200/200,0,True
+upload,boolean-false,True,false,200,1,1,2,bool,'bool' object has no attribute 'get',200/200,0,True
+upload,object-empty,True,{},200,1,1,2,dict,success,200/200,0,True
+upload,object-supported,True,"{""categories"": ""email"", ""mode"": ""box"", ""sample_interval"": 0.75, ""pad"": 3, ""no_ner"": true, ""use_zones"": false}",200,1,1,2,dict,success,200/200,0,True
+upload,object-unknown-key,True,"{""categories"": ""email"", ""mode"": ""box"", ""sample_interval"": 0.75, ""pad"": 3, ""no_ner"": true, ""use_zones"": false, ""ordinary_unknown_key"": {""value"": 7}}",200,1,1,2,dict,success,200/200,0,True
+server-path,missing,False,,200,1,1,1,dict,success,200/200,0,True
+server-path,empty,True,,500,0,0,0,,not reached,,0,True
+server-path,whitespace,True,   ,500,0,0,0,,not reached,,0,True
+server-path,malformed-object,True,{,500,0,0,0,,not reached,,0,True
+server-path,malformed-token,True,not-json,500,0,0,0,,not reached,,0,True
+server-path,array-empty,True,[],200,1,1,1,list,'list' object has no attribute 'get',200/200,0,True
+server-path,array-nonempty,True,[1],200,1,1,1,list,'list' object has no attribute 'get',200/200,0,True
+server-path,null,True,null,200,1,1,1,NoneType,'NoneType' object has no attribute 'get',200/200,0,True
+server-path,string,True,"""ordinary""",200,1,1,1,str,'str' object has no attribute 'get',200/200,0,True
+server-path,string-empty,True,"""""",200,1,1,1,str,'str' object has no attribute 'get',200/200,0,True
+server-path,integer,True,7,200,1,1,1,int,'int' object has no attribute 'get',200/200,0,True
+server-path,zero,True,0,200,1,1,1,int,'int' object has no attribute 'get',200/200,0,True
+server-path,decimal,True,1.5,200,1,1,1,float,'float' object has no attribute 'get',200/200,0,True
+server-path,boolean-true,True,true,200,1,1,1,bool,'bool' object has no attribute 'get',200/200,0,True
+server-path,boolean-false,True,false,200,1,1,1,bool,'bool' object has no attribute 'get',200/200,0,True
+server-path,object-empty,True,{},200,1,1,1,dict,success,200/200,0,True
+server-path,object-supported,True,"{""categories"": ""email"", ""mode"": ""box"", ""sample_interval"": 0.75, ""pad"": 3, ""no_ner"": true, ""use_zones"": false}",200,1,1,1,dict,success,200/200,0,True
+server-path,object-unknown-key,True,"{""categories"": ""email"", ""mode"": ""box"", ""sample_interval"": 0.75, ""pad"": 3, ""no_ner"": true, ""use_zones"": false, ""ordinary_unknown_key"": {""value"": 7}}",200,1,1,1,dict,success,200/200,0,True

@@ -1,0 +1,497 @@
+{
+  "environment": {
+    "browserPlugin": "Browser plugin not available; task permits existing isolated Playwright fallback",
+    "playwright": "1.65.1",
+    "node": "v22.22.1",
+    "viewport": {
+      "width": 1100,
+      "height": 900
+    },
+    "browser": "159.0.8154.6"
+  },
+  "states": [
+    {
+      "url": "http://127.0.0.1:18571/",
+      "title": "OpenScrub",
+      "nonblank": true,
+      "overlays": 0,
+      "slider": {
+        "min": "0",
+        "max": "1.9",
+        "step": "0.1",
+        "value": "0.2"
+      },
+      "label": "0.2s",
+      "BE": {
+        "t": 0.2,
+        "dur": 2,
+        "ox": 8,
+        "oy": 0,
+        "boxes": [
+          {
+            "box": [
+              58,
+              70,
+              98,
+              110
+            ],
+            "category": "name",
+            "enabled": true,
+            "i": 0,
+            "t_end": 2,
+            "t_start": 0,
+            "text": "Synthetic moving target"
+          }
+        ],
+        "scale": 1
+      },
+      "image": {
+        "src": "http://127.0.0.1:18571/api/jobs/cfr24/frame_at?t=0.2",
+        "width": 320,
+        "height": 180,
+        "marker": 5
+      },
+      "pointerEvents": "auto",
+      "job": "cfr24",
+      "selected": 0,
+      "localDraft": {
+        "ov": {
+          "0": [
+            55,
+            70,
+            95,
+            110
+          ]
+        },
+        "t": 0.2,
+        "ox": 8
+      }
+    },
+    {
+      "url": "http://127.0.0.1:18571/",
+      "title": "OpenScrub",
+      "nonblank": true,
+      "overlays": 0,
+      "slider": {
+        "min": "0",
+        "max": "1.9",
+        "step": "0.1",
+        "value": "1.9"
+      },
+      "label": "1.9s",
+      "BE": {
+        "t": 1.9,
+        "dur": 2,
+        "ox": 18,
+        "oy": 0,
+        "boxes": [
+          {
+            "box": [
+              68,
+              70,
+              108,
+              110
+            ],
+            "category": "name",
+            "enabled": true,
+            "i": 0,
+            "t_end": 2,
+            "t_start": 0,
+            "text": "Synthetic moving target"
+          }
+        ],
+        "scale": 1
+      },
+      "image": {
+        "src": "http://127.0.0.1:18571/api/jobs/cfr5/frame_at?t=1.9",
+        "width": 320,
+        "height": 180,
+        "marker": 8
+      },
+      "pointerEvents": "auto",
+      "job": "cfr5",
+      "selected": 0,
+      "localDraft": {
+        "ov": {
+          "0": [
+            55,
+            70,
+            95,
+            110
+          ]
+        },
+        "t": 1.9,
+        "ox": 18
+      }
+    },
+    {
+      "url": "http://127.0.0.1:18571/",
+      "title": "OpenScrub",
+      "nonblank": true,
+      "overlays": 0,
+      "slider": {
+        "min": "0",
+        "max": "1.0",
+        "step": "0.1",
+        "value": "0.5"
+      },
+      "label": "0.5s",
+      "BE": {
+        "t": 0.5,
+        "dur": 1.0769230769230769,
+        "ox": 10,
+        "oy": 0,
+        "boxes": [
+          {
+            "box": [
+              60,
+              70,
+              100,
+              110
+            ],
+            "category": "name",
+            "enabled": true,
+            "i": 0,
+            "t_end": 1.0769230769230769,
+            "t_start": 0,
+            "text": "Synthetic moving target"
+          }
+        ],
+        "scale": 1
+      },
+      "image": {
+        "src": "http://127.0.0.1:18571/api/jobs/normalized/frame_at?t=0.5",
+        "width": 320,
+        "height": 180,
+        "marker": 6
+      },
+      "pointerEvents": "auto",
+      "job": "normalized",
+      "selected": 0,
+      "localDraft": {
+        "ov": {
+          "0": [
+            55,
+            70,
+            95,
+            110
+          ]
+        },
+        "t": 0.5,
+        "ox": 10
+      }
+    }
+  ],
+  "compare": {
+    "entry": "source route/caller inspection only; review-phase synthetic job has no compare container or rendered output"
+  },
+  "errors": [],
+  "warnings": [
+    "Canvas2D: Multiple readback operations using getImageData are faster with the willReadFrequently attribute set to true. See: https://html.spec.whatwg.org/multipage/canvas.html#concept-canvas-will-read-frequently",
+    "Canvas2D: Multiple readback operations using getImageData are faster with the willReadFrequently attribute set to true. See: https://html.spec.whatwg.org/multipage/canvas.html#concept-canvas-will-read-frequently",
+    "Canvas2D: Multiple readback operations using getImageData are faster with the willReadFrequently attribute set to true. See: https://html.spec.whatwg.org/multipage/canvas.html#concept-canvas-will-read-frequently"
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/model_status"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/custom_cats"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/models/face"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/quality_tier"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/allowlist"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/certinfo"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/jobs"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/update_check"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/vault"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/extras"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/models/plate"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/models/person"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/jobs/cfr24"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/jobs/cfr24/log?from=0"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/jobs/cfr24/detections"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/jobs"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/jobs/cfr24/thumb/0"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/jobs/cfr24/mediainfo"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/jobs/cfr24/report"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/jobs/cfr24/boxes_at?t=0&all=1"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/jobs/cfr24/frame_at?t=0"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/jobs/cfr24/boxes_at?t=0.2&all=1"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/jobs/cfr24/frame_at?t=0.2"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/jobs/cfr24/boxes_at?t=0.2&all=1"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/model_status"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/custom_cats"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/models/face"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/quality_tier"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/allowlist"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/certinfo"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/jobs"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/update_check"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/vault"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/extras"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/models/plate"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/models/person"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/jobs/cfr5"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/jobs/cfr5/log?from=0"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/jobs/cfr5/detections"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/jobs"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/jobs/cfr5/thumb/0"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/jobs/cfr5/mediainfo"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/jobs/cfr5/report"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/jobs/cfr5/boxes_at?t=0&all=1"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/jobs/cfr5/frame_at?t=0"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/jobs/cfr5/boxes_at?t=1.9&all=1"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/jobs/cfr5/frame_at?t=1.9"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/jobs/cfr5/boxes_at?t=1.9&all=1"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/model_status"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/custom_cats"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/models/face"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/quality_tier"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/allowlist"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/certinfo"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/jobs"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/update_check"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/vault"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/extras"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/models/plate"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/models/person"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/jobs/normalized"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/jobs/normalized/log?from=0"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/jobs/normalized/detections"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/jobs"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/jobs/normalized/thumb/0"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/jobs/normalized/mediainfo"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/jobs/normalized/report"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/jobs/normalized/boxes_at?t=0&all=1"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/jobs/normalized/frame_at?t=0"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/jobs/normalized/boxes_at?t=0.5&all=1"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/jobs/normalized/frame_at?t=0.5"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:18571/api/jobs/normalized/boxes_at?t=0.5&all=1"
+    }
+  ],
+  "mutations": []
+}

@@ -1,0 +1,82 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+___ test_audio_toggle_back_survives_unacknowledged_save_and_revisit[network] ___
+
+failure = 'network'
+
+    @pytest.mark.parametrize("failure", ["network", "423"])
+    def test_audio_toggle_back_survives_unacknowledged_save_and_revisit(failure):
+>       run_js(PENDING_AUDIO_SETUP.replace("KIND", json.dumps("enabled")) + """
+        const baseline=copyEdit(BE.audio);BE.audio.push({t0:2,t1:3,mode:'bleep'});
+        const save=saveAndRender();BE.audio=copyEdit(baseline);openJob('B');
+        if(FAILURE==='network')queue.shift().reject(Error('offline'));
+        else await reply({error:'busy'},423);
+        await tick();await save;openJob('A');
+        const load=tlInit();await reply({detections:[],audio_redactions:[{t0:5,t1:6,mode:'mute'}]});await load;
+        if(!sameEdit(BE.audio,baseline))throw Error('unacknowledged audio toggle-back lost');
+        const retry=saveAndRender();if(!sameEdit(calls.at(-1).body.audio,baseline))throw Error('unacknowledged audio toggle-back omitted');
+        await reply();await reply();await retry;
+        """.replace("FAILURE", json.dumps(failure)))
+
+tests/test_review_save_failures.py:317: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "\nsetup();EDITS.enabled={};MAN.length=0;BE.adds=[];BE.ov={};BE.times={};\nBE.audioSaved=copyEdit(BE.audio);beTLDraw=(...baseline))throw Error('unacknowledged audio toggle-back omitted');\n    await reply();await reply();await retry;\n    "
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: Error: unacknowledged audio toggle-back omitted
+E             at evalmachine.<anonymous>:18:86
+E             at async [eval]:31:12
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...r='Error: unacknowledged audio toggle-back omitted\n    at evalmachine.<anonymous>:18:86\n    at async [eval]:31:12\n').returncode
+
+tests/test_review_save_failures.py:63: AssertionError
+_____ test_audio_toggle_back_survives_unacknowledged_save_and_revisit[423] _____
+
+failure = '423'
+
+    @pytest.mark.parametrize("failure", ["network", "423"])
+    def test_audio_toggle_back_survives_unacknowledged_save_and_revisit(failure):
+>       run_js(PENDING_AUDIO_SETUP.replace("KIND", json.dumps("enabled")) + """
+        const baseline=copyEdit(BE.audio);BE.audio.push({t0:2,t1:3,mode:'bleep'});
+        const save=saveAndRender();BE.audio=copyEdit(baseline);openJob('B');
+        if(FAILURE==='network')queue.shift().reject(Error('offline'));
+        else await reply({error:'busy'},423);
+        await tick();await save;openJob('A');
+        const load=tlInit();await reply({detections:[],audio_redactions:[{t0:5,t1:6,mode:'mute'}]});await load;
+        if(!sameEdit(BE.audio,baseline))throw Error('unacknowledged audio toggle-back lost');
+        const retry=saveAndRender();if(!sameEdit(calls.at(-1).body.audio,baseline))throw Error('unacknowledged audio toggle-back omitted');
+        await reply();await reply();await retry;
+        """.replace("FAILURE", json.dumps(failure)))
+
+tests/test_review_save_failures.py:317: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "\nsetup();EDITS.enabled={};MAN.length=0;BE.adds=[];BE.ov={};BE.times={};\nBE.audioSaved=copyEdit(BE.audio);beTLDraw=(...baseline))throw Error('unacknowledged audio toggle-back omitted');\n    await reply();await reply();await retry;\n    "
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: Error: unacknowledged audio toggle-back omitted
+E             at evalmachine.<anonymous>:18:86
+E             at async [eval]:31:12
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...r='Error: unacknowledged audio toggle-back omitted\n    at evalmachine.<anonymous>:18:86\n    at async [eval]:31:12\n').returncode
+
+tests/test_review_save_failures.py:63: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_review_save_failures.py::test_audio_toggle_back_survives_unacknowledged_save_and_revisit[network]
+FAILED tests/test_review_save_failures.py::test_audio_toggle_back_survives_unacknowledged_save_and_revisit[423]
+2 failed, 60 deselected in 0.27s

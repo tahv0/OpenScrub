@@ -1,0 +1,202 @@
+{
+  "identity": {
+    "url": "http://127.0.0.1:18487/",
+    "title": "OpenScrub",
+    "nonblank": true,
+    "overlays": 0
+  },
+  "environment": "Browser plugin unavailable; isolated Playwright Chromium Linux1365x1000",
+  "results": [
+    {
+      "case": "fresh audio with pending enabled",
+      "payload": {
+        "enabled": {
+          "0": false
+        },
+        "manual": [],
+        "box_overrides": {},
+        "time_overrides": {},
+        "audio": [
+          {
+            "t0": 0.5,
+            "t1": 0.6,
+            "mode": "mute"
+          },
+          {
+            "t0": 1.400000018765613,
+            "t1": 1.600000075062452,
+            "mode": "mute"
+          }
+        ]
+      },
+      "passed": true
+    },
+    {
+      "case": "fresh audio with pending manual",
+      "payload": {
+        "enabled": {},
+        "manual": [
+          {
+            "t_start": 0,
+            "t_end": 1,
+            "screen_box": [
+              10,
+              10,
+              40,
+              40
+            ]
+          }
+        ],
+        "box_overrides": {},
+        "time_overrides": {},
+        "audio": [
+          {
+            "t0": 0.5,
+            "t1": 0.6,
+            "mode": "mute"
+          },
+          {
+            "t0": 1.400000018765613,
+            "t1": 1.600000075062452,
+            "mode": "mute"
+          }
+        ]
+      },
+      "passed": true
+    },
+    {
+      "case": "fresh audio with pending box",
+      "payload": {
+        "enabled": {},
+        "manual": [],
+        "box_overrides": {
+          "0": [
+            10,
+            10,
+            40,
+            40
+          ]
+        },
+        "time_overrides": {},
+        "audio": [
+          {
+            "t0": 0.5,
+            "t1": 0.6,
+            "mode": "mute"
+          },
+          {
+            "t0": 1.400000018765613,
+            "t1": 1.600000075062452,
+            "mode": "mute"
+          }
+        ]
+      },
+      "passed": true
+    },
+    {
+      "case": "fresh audio with pending time",
+      "payload": {
+        "enabled": {},
+        "manual": [],
+        "box_overrides": {},
+        "time_overrides": {
+          "0": [
+            0.2,
+            1
+          ]
+        },
+        "audio": [
+          {
+            "t0": 0.5,
+            "t1": 0.6,
+            "mode": "mute"
+          },
+          {
+            "t0": 1.400000018765613,
+            "t1": 1.600000075062452,
+            "mode": "mute"
+          }
+        ]
+      },
+      "passed": true
+    },
+    {
+      "case": "fresh audio with pending editor_manual",
+      "payload": {
+        "enabled": {},
+        "manual": [
+          {
+            "t_start": 0,
+            "t_end": 1,
+            "t_ref": 0,
+            "screen_box": [
+              10,
+              10,
+              40,
+              40
+            ]
+          }
+        ],
+        "box_overrides": {},
+        "time_overrides": {},
+        "audio": [
+          {
+            "t0": 0.5,
+            "t1": 0.6,
+            "mode": "mute"
+          },
+          {
+            "t0": 1.400000018765613,
+            "t1": 1.600000075062452,
+            "mode": "mute"
+          }
+        ]
+      },
+      "passed": true
+    },
+    {
+      "case": "dirty audio add survives revisit",
+      "passed": true
+    },
+    {
+      "case": "dirty audio remove survives revisit",
+      "passed": true
+    },
+    {
+      "case": "dirty audio modify survives revisit",
+      "passed": true
+    },
+    {
+      "case": "in-flight non-audio save refreshes clean audio",
+      "passed": true
+    },
+    {
+      "case": "audio toggle-back retry after ok",
+      "passed": true
+    },
+    {
+      "case": "audio toggle-back retry after 423",
+      "passed": true
+    },
+    {
+      "case": "audio toggle-back retry after network",
+      "passed": true
+    }
+  ],
+  "errors": [],
+  "warnings": [
+    "Failed to load resource: the server responded with a status of 423 (Locked)",
+    "Failed to load resource: the server responded with a status of 423 (Locked)",
+    "Failed to load resource: the server responded with a status of 423 (Locked)",
+    "Failed to load resource: the server responded with a status of 423 (Locked)",
+    "Failed to load resource: the server responded with a status of 423 (Locked)",
+    "Failed to load resource: the server responded with a status of 423 (Locked)",
+    "Failed to load resource: the server responded with a status of 423 (Locked)",
+    "Failed to load resource: the server responded with a status of 423 (Locked)",
+    "Failed to load resource: the server responded with a status of 423 (Locked)",
+    "Failed to load resource: the server responded with a status of 423 (Locked)",
+    "Failed to load resource: the server responded with a status of 423 (Locked)",
+    "Failed to load resource: net::ERR_FAILED",
+    "Failed to load resource: the server responded with a status of 423 (Locked)"
+  ]
+}

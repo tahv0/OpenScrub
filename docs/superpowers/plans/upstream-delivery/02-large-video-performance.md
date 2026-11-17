@@ -140,8 +140,11 @@ Proposed contract: `get_snapshot(job_id, report_path, source_identity) -> (docum
 
 **Files / contract:** `loadReview`, existing group metadata and thumbnail UI in `openscrub_web.py`; `tests/test_thumbnail_scheduling.py`. One queue per active review view, tagged with job/view generation. Proposed initial limits: mount pages of 64 groups, up to four browser thumbnail requests in flight, and prefetch one viewport ahead. Tune only with recorded evidence; these are internal starting values, not new user-facing controls.
 
+**Confirmed baseline:** Actual pinned UI/routes mount and request all 1k/10k ordinary groups. Ten thousand groups comprise 15,000 rows and a 2,460,605-byte metadata response; bounding cards does not paginate that response. Six warm Flask responses held at a controlled boundary occupy the observed browser connections. After a bottom jump, the next flight in the 10k case contains zero visible groups; after switching jobs, 9,994 old thumbnail requests remain outstanding and new metadata waits for connections. Chromium sometimes reprioritizes visible images, so this is not a strict FIFO claim. Old images did not repopulate the new job's DOM. P07a already preserves the tested pending mixed-group choice across a revisit; reuse that ownership. These are ordering/count findings, not measured speedups.
+
 - [ ] **E/I:** Add browser tests `test_scroll_jump_prioritizes_current_view`, `test_paging_preserves_hidden_group_choices`, `test_switch_job_discards_old_thumbnail_results` and a request-count bound. Include empty/grouped/zone-dropped states.
 - [ ] **I:** Store choices independently of mounted cards; use metadata to count/filter all groups. Cancel obsolete fetches or ignore their results, and remove them from the active queue. Retry transient failures with a bounded budget; failed images must not prevent editing other cards.
+- [ ] **I:** Preserve whole-category output actions using complete group metadata: current category all-on/off walks mounted cards, so virtualization must not silently narrow its scope. Retain person-before-track grouping, all member choices and existing zone-dropped behavior. An aborted browser request does not prove an already-started server decode stopped; server pre-generation remains a separate owner.
 - [ ] **I:** Prefer local view changes over save/refetch cycles. Integrate P15 filters only through a small documented queue-refresh hook if that feature is present; do not copy the learning sampler or similarity UI.
 - [ ] **V:** Run `python -m pytest test_openscrub.py tests/test_thumbnail_scheduling.py -q`, build and S03/S06 browser measurements. Validate both warm and cold server responses; report the remaining full-metadata cost honestly.
 - [ ] **D/R/L:** Include large-group counts, mounted/request bounds, visible-latency results and preservation of hidden choices. No new review database or inference semantics.
@@ -162,6 +165,32 @@ Proposed contract: `get_snapshot(job_id, report_path, source_identity) -> (docum
 - [ ] **I:** Bound active decoder work (initial proposal: two shared workers) and queued obsolete work. Crop/resize before unnecessary large image transport when the source coordinates are known. Return actual frame evidence; refuse exact-mode success on an unverified fallback.
 - [ ] **V:** Run `python -m pytest test_openscrub.py tests/test_thumbnail_decode.py -q`, build, planned `benchmark/review_io.py --scenario decode --video <synthetic-clip>`, and S04/S06. Verify cleanup on supported Windows/Linux paths; do not assert a universal 4K latency target from one machine.
 - [ ] **D/R/L:** Describe the exact cold-seek trigger, resource bounds, source-frame contract and measured tradeoffs. Keep 409/503 corner-confirmation leases out; any ordinary timeout response must have a corresponding small upstream UI handling change.
+
+### P10A — bind editable pixels and geometry to the same source sample
+
+**What / why:** Separate exact geometry requests from tolerant representative/compare previews. Actual upstream editor interactions show three concrete mismatches: at 24 fps, 0.2s displays frame 5 while geometry uses frame 4; the valid 5 fps slider endpoint 1.9s naturally falls back to frame 8 while geometry uses frame 9; an actually normalized VFR source has the same timestamp/index disagreement. The editor permits pointer edits in each case. These are correctness findings, not decode-cost measurements.
+
+**When:** A focused prerequisite before new plate/shape editing relies on source coordinates. It can precede P10B's worker/resource optimization, with necessary lifecycle interfaces declared. P16 resize and mask rasterization stay separate.
+
+- [ ] **E/S:** Specify one source/timeline resolver and a coherent final-frame boundary policy for image selection, offsets and geometry. Exact samples carry actual source identity, frame/time, dimensions and requested time; choose a decoder method whose output identity can be verified. A successful seek setter or a capture-position value alone is not verification.
+- [ ] **I:** Bind the editor's image and boxes to that same sample before enabling geometry gestures. Handle late/out-of-order image and boxes responses, missing/changed sources and failed exact reads without making an older visible frame editable under a new timestamp. Keep ordinary pending edits and report coordinates intact.
+- [ ] **I:** Preserve intentional compare walk-back and thumbnail representative search. Where a time is displayed, distinguish the actual sample/fallback from the requested time; do not silently redefine a thumbnail's representative cache index as exact frame provenance.
+- [ ] **V/D:** Retain the three natural browser cases, independent sequential frame markers/PTS, normalized duplicate-frame limits, start/middle/end and odd-coordinate crop comparisons. Verify source/content/crop coordinate round trips and blocked edits while the sample is unverified. Run relevant suite/build/browser paths; make no general 4K or decoder-latency claim from short clips.
+
+### P10B — bound demonstrated expensive decoding work
+
+**What / why / when:** Implement the parent P10 resource/deadline/queue contract only after actual cold long-GOP/4K workloads justify the mechanism. Keep exact-frame correctness from P10A. The proposed 10-second normal budget, explicit retry up to 60 seconds and two shared workers remain starting proposals, not measured optimal settings or already-implemented behavior.
+
+- [ ] **E/I/V:** Measure source/frame correctness and cost separately; use an interruptible existing FFmpeg/subprocess path if justified. Prove deadline/cancel terminates and reaps real decoder work, releases slots, rejects obsolete source results and leaves unrelated saves responsive. A stopped HTTP waiter with a live native thread does not pass. Report memory/concurrency and platform limits, preserving all parent P10 gates.
+
+### P10C — cancellation polling in ordinary manual tracking
+
+**What / why:** Investigate source-observed missing cancellation checks in the existing manual tracker's NCC fallback and hold-rest loops. Long tracking may retain active work after the user cancels. This is a generic tracking concern; optional O02 can reuse its eventual fix.
+
+**When:** Separate small upstream reliability follow-up after an actual cancellation schedule is reproduced. P06B.1 already owns wiring the web callback and the manual decoder's release-only cleanup; do not duplicate those changes or alter default matching/padding to make a cancellation test pass.
+
+- [ ] **E/I:** Reproduce cancellation in the real fallback/hold-rest paths using marked synthetic media and bounded compute-boundary controls. If confirmed, add the minimum cooperative checks with clear cancelled exit semantics; preserve complete-run detections and resource cleanup.
+- [ ] **V/D:** Verify prompt observation at the chosen Python checkpoints, unchanged uncancelled output and no leaked decoder/worker owner. Record that a single native decode call may still block; do not claim an interruptible native deadline from loop polling.
 
 ## P11 — remaining scan overhead investigation
 
@@ -192,6 +221,36 @@ Proposed contract: `get_snapshot(job_id, report_path, source_identity) -> (docum
 - [ ] **I:** Preserve cancellation checkpoints through skipped frames and release the capture in `finally` on success, EOF, cancellation and exceptions. Do not add seek state, a decoder subprocess, new dependency or a background thread to this focused change.
 - [ ] **V/D:** Run the owning tests, existing suite, full build and marked real-video comparisons. Include a small repeatable recipe/measurement tool under `benchmark/` only as needed for this scenario. Report operation counts separately from wall time and codec work, with resolution/GOP/frame identity, three warm-ups/five samples and memory/cleanup limits. Keep generated video outside Git.
 - [ ] **R/L:** PR lead: late dense-track smoothing should avoid retrieving frames it never uses. Cite measured results at exact before/after commits and retain cancellation/frame-correctness evidence. Keep broader scan-history, ETA and stop/review changes separate.
+
+### P11B — skip irrelevant early OCR history during tail extension
+
+**What / why:** `merge_detections` currently restarts at the first OCR scan for each merged text region, even when earlier timestamps cannot support its tail. Actual full-module controlled histories of 10/50/100 unique ordinary email detections cause 64/1,324/5,149 timestamp visits. Repeated content is linear. This is final aggregation work, not a per-frame inference or preview slowdown.
+
+**When:** A separate W2 performance PR after representative cost measurement, independent of P11A and optional modes. It is the smallest finalization candidate identified by S05; no removed preview cache is required.
+
+- [ ] **E/S:** Retain the full-module work-count recipe and measure representative history sizes on identical inputs before/after. Separate controlled OCR-history input from real pretrained inference throughput; account for index construction and memory.
+- [ ] **I:** Build one chronological timestamp index and begin each tail walk strictly after the existing `last_seen + .01` boundary without copying a full-history slice per region. Preserve duplicate timestamps, ordered support/stopping rules, confidence/box/fuzzy thresholds, bridge gaps and every Detection field. Nonchronological or unsupported timestamp input needs a semantics-preserving fallback.
+- [ ] **V/D:** Verify complete before/after output equality, deterministic work bounds, chronological/repeated/duplicate/unordered inputs and relevant merge/scan regressions, full suite/build and a real synthetic report roundtrip. Describe measured finalization savings only. Contradiction-window indexing is a separate extension, unexercised by this baseline.
+
+### P11C — index eligible reverse-recall candidates
+
+**What / why:** Forward PhiMemory is already indexed/batched, but `reverse_pass` still walks remembered keys for historical words. The controlled 10/50/100 unique-history probe records 155/3,775/15,050 visits; a benign unmatched token accounts for a quadratic component. This is post-scan reverse recall.
+
+**When:** Separate W2 investigation/PR after P11B or independently when a safe equivalence contract and representative benefit are demonstrated. Do not bundle it with a timestamp-only optimization.
+
+- [ ] **E/S/I:** Preserve reverse pass's lower lenient thresholds, numeric same-length/two-digit tolerance, name-sighting gates, category/allowlist filtering and first eligible insertion-order match. Reusing forward recall unchanged is not equivalent. Identify a bounded candidate index that preserves those semantics before implementation.
+- [ ] **V/D:** Compare every resulting detection and order, including unmatched words, ambiguous eligible keys, numeric/name cases and filtering. Measure index construction plus lookup work on fixed histories, run relevant/full tests and build. Leave the candidate open or close without code if meaningful benefit cannot be established safely.
+
+### P11D — reduce irrelevant merge candidate visits
+
+**What / why:** Distinct text regions leave a growing `mergeable` list. The same controlled 10/50/100 unique histories visit 55/1,275/5,050 prior candidates, separate from the tail-history and reverse-pass work.
+
+**When:** A later separate W2 candidate because candidate ordering and geometric verification make this riskier than skipping timestamps. Source/work-count evidence alone is not a shipped improvement.
+
+- [ ] **E/S:** Measure realistic distinct-region workloads and identify an index that retains reverse candidate priority, overlapping-box/union behavior and visual long-gap verification. An arbitrary age cutoff would drop intentionally mergeable verified gaps and is not acceptable.
+- [ ] **I/V/D:** Implement only after the equivalence boundary is explicit. Preserve all output fields/order and source-frame verification; include difficult overlap/gap/duplicate cases, actual scan/merge invocation, measured before/after costs, relevant/full tests and build. Keep this candidate's acceptance or no-adoption reasoning separate from P11B/C.
+
+The S05 probe also confirms the `a11a3926` preview-cache donor is removed-system-only. Actual tested callbacks append logs/update scalar progress/publish the current frame without walking growing history; sampled scan-loop calls stay fixed. This scoped result does not establish constant cost for every fuzzy-memory bucket or default inference workload. The [retained research](execution/evidence/research/scan-history-baseline-research.md) records the exact source, computational OCR stub, operation counts, output checks and untested cases.
 
 ## Review focus
 

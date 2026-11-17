@@ -1,0 +1,3 @@
+Server/module AST outside APP_JS equals P06D base.
+APP_JS equals reviewed P07a head.
+P06A and baseline prerequisites remain ancestors.

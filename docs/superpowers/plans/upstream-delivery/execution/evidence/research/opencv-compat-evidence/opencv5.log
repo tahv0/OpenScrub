@@ -1,0 +1,2 @@
+[ WARN:0@0.043] global net_impl_backend.cpp:345 setPreferableTarget Targets are not supported by the new graph engine for now
+[ WARN:0@0.056] global net_impl_backend.cpp:345 setPreferableTarget Targets are not supported by the new graph engine for now

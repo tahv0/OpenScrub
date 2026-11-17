@@ -1,0 +1,483 @@
+/tmp/openscrub-live-preview-baseline-20261117/export/openscrub_web.py:361-374
+361:     }
+362: 
+363: 
+364: class WebCallbacks(openscrub.Callbacks):
+365:     wants_frames = True
+366: 
+367:     def __init__(self, job):
+368:         self.job = job
+369:         self._last_frame = 0.0
+370:         self._stage = None          # ETA state: current stage,
+371:         self._t0 = 0.0              # when it started,
+372:         self._cur0 = 0             # its first cur value,
+373:         self._eta = None            # and the smoothed estimate
+374: 
+/tmp/openscrub-live-preview-baseline-20261117/export/openscrub_web.py:414-424
+414:     def scan_frame(self, frame, t, found):
+415:         now = time.time()
+416:         if now - self._last_frame < 0.4:   # throttle disk writes
+417:             return
+418:         self._last_frame = now
+419:         h, w = frame.shape[:2]
+420:         scale = 720 / w
+421:         small = cv2.resize(frame, (720, int(h * scale)))
+422:         cv2.imwrite(os.path.join(self.job["dir"], "preview.jpg"), small,
+423:                     [cv2.IMWRITE_JPEG_QUALITY, 70])
+424: 
+/tmp/openscrub-live-preview-baseline-20261117/export/openscrub_web.py:778-794
+778:             job["progress"] = 1.0
+779:             job["eta"] = None
+780:     except openscrub.PipelineCancelled:
+781:         job["phase"] = "cancelled"
+782:         job["error"] = "cancelled by user"
+783:     except BaseException as e:
+784:         # BaseException, not Exception: a SystemExit (argparse) or any other
+785:         # non-Exception escaping here used to kill the worker thread silently
+786:         msg = str(e) or type(e).__name__
+787:         if isinstance(e, SystemExit):
+788:             msg = "the job stopped unexpectedly (exit %s)" % (e.code,)
+789:         job["phase"] = "error"
+790:         job["error"] = msg
+791:         job["log"].append(f"ERROR: {msg}")
+792:     finally:
+793:         job["eta"] = None       # a dead/paused job must not show "~N left"
+794: 
+/tmp/openscrub-live-preview-baseline-20261117/export/openscrub_web.py:1074-1081
+1074: @app.route("/api/jobs/<jid>/preview.jpg")
+1075: def job_preview(jid):
+1076:     job = JOBS.get(jid) or abort(404)
+1077:     p = os.path.join(job["dir"], "preview.jpg")
+1078:     if not os.path.exists(p):
+1079:         abort(404)
+1080:     return send_file(p, mimetype="image/jpeg", max_age=0)
+1081: 
+/tmp/openscrub-live-preview-baseline-20261117/export/openscrub_web.py:2112-2119
+2112:  JOBSJSON="";loadJobs();
+2113: }
+2114: async function openJob(id){
+2115:  CUR=id; EN={}; MAN=[]; PHIST=[]; PHPH=""; LOGN=0; SHELLPH=null;
+2116:  detail.innerHTML="";
+2117:  if(POLL)clearInterval(POLL);
+2118:  POLL=setInterval(refresh,900); refresh();
+2119: }
+/tmp/openscrub-live-preview-baseline-20261117/export/openscrub_web.py:2173-2179
+2173: 
+2174:  // live preview: swap src in place (browser keeps old frame until new loads)
+2175:  const img=document.getElementById("pimg");
+2176:  if(j.phase=="scanning"){
+2177:   img.src=`api/jobs/${CUR}/preview.jpg?x=${Date.now()}`;
+2178:  }
+2179: 
+/tmp/openscrub-live-preview-baseline-20261117/export/openscrub_web.py:3968-4001
+3968: def _serve(host, port, ssl_ctx):
+3969:     """Run under cheroot (a production WSGI server that supports TLS and
+3970:     Windows) when available; otherwise fall back to Flask's built-in dev
+3971:     server, which works fine for a small LAN but prints a warning."""
+3972:     try:
+3973:         from cheroot.wsgi import Server
+3974:     except ImportError:
+3975:         print("    (running on Flask's built-in server — `pip install cheroot`")
+3976:         print("     to switch to a production server and silence its warning)")
+3977:         app.run(host=host, port=port, threaded=True, ssl_context=ssl_ctx)
+3978:         return
+3979:     # A browser opens several connections per host (Safari preconnects up to
+3980:     # ~6), and each idle keep-alive connection holds a cheroot worker until
+3981:     # it times out — so the pool needs headroom well past one browser's
+3982:     # connection count or real requests queue behind idle sockets. 16 was
+3983:     # tight enough that a phone plus a laptop could stall; 64 is ample and
+3984:     # cheroot worker threads are cheap.
+3985:     server = Server((host, port), app, server_name="openscrub",
+3986:                     numthreads=64)
+3987:     # Browsers probing/rejecting the self-signed certificate abort mid-
+3988:     # handshake on every new socket, and cheroot logs each one. Harmless
+3989:     # noise (install a trusted cert to stop the aborts themselves) —
+3990:     # filter just that class of message, pass everything else through.
+3991:     _orig_log = server.error_log
+3992:     _TLS_NOISE = ("during handshake", "certificate unknown", "unknown ca",
+3993:                   "peer dropped the tls connection", "http request")
+3994: 
+3995:     def _quiet_log(msg="", level=20, traceback=False):
+3996:         if any(s in str(msg).lower() for s in _TLS_NOISE):
+3997:             return
+3998:         _orig_log(msg, level, traceback)
+3999: 
+4000:     server.error_log = _quiet_log
+4001:     if ssl_ctx:
+/tmp/openscrub-live-preview-baseline-20261117/export/openscrub_web.py:4062-4068
+4062: 
+4063:         server.ssl_adapter = RedirectingTLS(ssl_ctx[0], ssl_ctx[1])
+4064:     try:
+4065:         server.start()
+4066:     except KeyboardInterrupt:
+4067:         server.stop()
+4068: 
+/tmp/openscrub-live-preview-baseline-20261117/export/openscrub.py:8047-8062
+8047:             if cb.wants_frames:
+8048:                 shown = frame.copy()
+8049:                 for d in found:
+8050:                     cv2.rectangle(shown,
+8051:                                   (int(d.cbox[0] + cx), int(d.cbox[1] + cy)),
+8052:                                   (int(d.cbox[2] + cx), int(d.cbox[3] + cy)),
+8053:                                   (0, 0, 255), 2)
+8054:                 # dense faces/plates bypass `found`, so camera footage lost
+8055:                 # its red boxes on the live preview — draw the current
+8056:                 # frame's dense detections too (display only)
+8057:                 for (dx1, dy1, dx2, dy2) in dense_now:
+8058:                     cv2.rectangle(shown, (int(dx1), int(dy1)),
+8059:                                   (int(dx2), int(dy2)), (0, 0, 255), 2)
+8060:                 cb.scan_frame(shown, t, len(found) + len(dense_now))
+8061:             cb.progress("scan", idx, total)
+8062:         bands.append((cx - scan_cx, cy - scan_cy) if track_on
+/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/werkzeug/utils.py:312
+312: def send_file(
+313:     path_or_file: os.PathLike[str] | str | t.IO[bytes],
+314:     environ: WSGIEnvironment,
+315:     mimetype: str | None = None,
+316:     as_attachment: bool = False,
+317:     download_name: str | None = None,
+318:     conditional: bool = True,
+319:     etag: bool | str = True,
+320:     last_modified: datetime | int | float | None = None,
+321:     max_age: None | (int | t.Callable[[str | None], int | None]) = None,
+322:     use_x_sendfile: bool = False,
+323:     response_class: type[Response] | None = None,
+324:     _root_path: os.PathLike[str] | str | None = None,
+325: ) -> Response:
+326:     """Send the contents of a file to the client.
+327: 
+328:     The first argument can be a file path or a file-like object. Paths
+329:     are preferred in most cases because Werkzeug can manage the file and
+330:     get extra information from the path. Passing a file-like object
+331:     requires that the file is opened in binary mode, and is mostly
+332:     useful when building a file in memory with :class:`io.BytesIO`.
+333: 
+334:     Never pass file paths provided by a user. The path is assumed to be
+335:     trusted, so a user could craft a path to access a file you didn't
+336:     intend. Use :func:`send_from_directory` to safely serve user-provided paths.
+337: 
+338:     If the WSGI server sets a ``file_wrapper`` in ``environ``, it is
+339:     used, otherwise Werkzeug's built-in wrapper is used. Alternatively,
+340:     if the HTTP server supports ``X-Sendfile``, ``use_x_sendfile=True``
+341:     will tell the server to send the given path, which is much more
+342:     efficient than reading it in Python.
+343: 
+344:     :param path_or_file: The path to the file to send, relative to the
+345:         current working directory if a relative path is given.
+346:         Alternatively, a file-like object opened in binary mode. Make
+347:         sure the file pointer is seeked to the start of the data.
+348:     :param environ: The WSGI environ for the current request.
+349:     :param mimetype: The MIME type to send for the file. If not
+350:         provided, it will try to detect it from the file name.
+351:     :param as_attachment: Indicate to a browser that it should offer to
+352:         save the file instead of displaying it.
+353:     :param download_name: The default name browsers will use when saving
+354:         the file. Defaults to the passed file name.
+355:     :param conditional: Enable conditional and range responses based on
+356:         request headers. Requires passing a file path and ``environ``.
+357:     :param etag: Calculate an ETag for the file, which requires passing
+358:         a file path. Can also be a string to use instead.
+359:     :param last_modified: The last modified time to send for the file,
+360:         in seconds. If not provided, it will try to detect it from the
+361:         file path.
+362:     :param max_age: How long the client should cache the file, in
+363:         seconds. If set, ``Cache-Control`` will be ``public``, otherwise
+364:         it will be ``no-cache`` to prefer conditional caching.
+365:     :param use_x_sendfile: Set the ``X-Sendfile`` header to let the
+366:         server to efficiently send the file. Requires support from the
+367:         HTTP server. Requires passing a file path.
+368:     :param response_class: Build the response using this class. Defaults
+369:         to :class:`~werkzeug.wrappers.Response`.
+370:     :param _root_path: Do not use. For internal use only. Use
+371:         :func:`send_from_directory` to safely send files under a path.
+372: 
+373:     .. versionchanged:: 2.0.2
+374:         ``send_file`` only sets a detected ``Content-Encoding`` if
+375:         ``as_attachment`` is disabled.
+376: 
+377:     .. versionadded:: 2.0
+378:         Adapted from Flask's implementation.
+379: 
+380:     .. versionchanged:: 2.0
+381:         ``download_name`` replaces Flask's ``attachment_filename``
+382:          parameter. If ``as_attachment=False``, it is passed with
+383:          ``Content-Disposition: inline`` instead.
+384: 
+385:     .. versionchanged:: 2.0
+386:         ``max_age`` replaces Flask's ``cache_timeout`` parameter.
+387:         ``conditional`` is enabled and ``max_age`` is not set by
+388:         default.
+389: 
+390:     .. versionchanged:: 2.0
+391:         ``etag`` replaces Flask's ``add_etags`` parameter. It can be a
+392:         string to use instead of generating one.
+393: 
+394:     .. versionchanged:: 2.0
+395:         If an encoding is returned when guessing ``mimetype`` from
+396:         ``download_name``, set the ``Content-Encoding`` header.
+397:     """
+398:     if response_class is None:
+399:         from .wrappers import Response
+400: 
+401:         response_class = Response
+402: 
+403:     path: str | None = None
+404:     file: t.IO[bytes] | None = None
+405:     size: int | None = None
+406:     mtime: float | None = None
+407:     headers = Headers()
+408: 
+409:     if isinstance(path_or_file, (os.PathLike, str)) or hasattr(
+410:         path_or_file, "__fspath__"
+411:     ):
+412:         path_or_file = t.cast("os.PathLike[str] | str", path_or_file)
+413: 
+414:         # Flask will pass app.root_path, allowing its send_file wrapper
+415:         # to not have to deal with paths.
+416:         if _root_path is not None:
+417:             path = os.path.join(_root_path, path_or_file)
+418:         else:
+419:             path = os.path.abspath(path_or_file)
+420: 
+421:         stat = os.stat(path)
+422:         size = stat.st_size
+423:         mtime = stat.st_mtime
+424:     else:
+425:         file = path_or_file
+426: 
+427:     if download_name is None and path is not None:
+428:         download_name = os.path.basename(path)
+429: 
+430:     if mimetype is None:
+431:         if download_name is None:
+432:             raise TypeError(
+433:                 "Unable to detect the MIME type because a file name is"
+434:                 " not available. Either set 'download_name', pass a"
+435:                 " path instead of a file, or set 'mimetype'."
+436:             )
+437: 
+438:         mimetype, encoding = mimetypes.guess_type(download_name)
+439: 
+440:         if mimetype is None:
+441:             mimetype = "application/octet-stream"
+442: 
+443:         # Don't send encoding for attachments, it causes browsers to
+444:         # save decompress tar.gz files.
+445:         if encoding is not None and not as_attachment:
+446:             headers.set("Content-Encoding", encoding)
+447: 
+448:     if download_name is not None:
+449:         try:
+450:             download_name.encode("ascii")
+451:         except UnicodeEncodeError:
+452:             simple = unicodedata.normalize("NFKD", download_name)
+453:             simple = simple.encode("ascii", "ignore").decode("ascii")
+454:             # safe = RFC 5987 attr-char
+455:             quoted = quote(download_name, safe="!#$&+-.^_`|~")
+456:             names = {"filename": simple, "filename*": f"UTF-8''{quoted}"}
+457:         else:
+458:             names = {"filename": download_name}
+459: 
+460:         value = "attachment" if as_attachment else "inline"
+461:         headers.set("Content-Disposition", value, **names)
+462:     elif as_attachment:
+463:         raise TypeError(
+464:             "No name provided for attachment. Either set"
+465:             " 'download_name' or pass a path instead of a file."
+466:         )
+467: 
+468:     if use_x_sendfile and path is not None:
+469:         headers["X-Sendfile"] = path
+470:         data = None
+471:     else:
+472:         if file is None:
+473:             file = open(path, "rb")  # type: ignore
+474:         elif isinstance(file, io.BytesIO):
+475:             size = file.getbuffer().nbytes
+476:         elif isinstance(file, io.TextIOBase):
+477:             raise ValueError("Files must be opened in binary mode or use BytesIO.")
+478: 
+479:         data = wrap_file(environ, file)
+480: 
+481:     rv = response_class(
+482:         data, mimetype=mimetype, headers=headers, direct_passthrough=True
+483:     )
+484: 
+485:     if size is not None:
+486:         rv.content_length = size
+487: 
+488:     if last_modified is not None:
+489:         rv.last_modified = last_modified  # type: ignore
+490:     elif mtime is not None:
+491:         rv.last_modified = mtime  # type: ignore
+492: 
+493:     rv.cache_control.no_cache = True
+494: 
+495:     # Flask will pass app.get_send_file_max_age, allowing its send_file
+496:     # wrapper to not have to deal with paths.
+497:     if callable(max_age):
+498:         max_age = max_age(path)
+499: 
+500:     if max_age is not None:
+501:         if max_age > 0:
+502:             rv.cache_control.no_cache = None
+503:             rv.cache_control.public = True
+504: 
+505:         rv.cache_control.max_age = max_age
+506:         rv.expires = int(time() + max_age)  # type: ignore
+507: 
+508:     if isinstance(etag, str):
+509:         rv.set_etag(etag)
+510:     elif etag and path is not None:
+511:         check = adler32(path.encode()) & 0xFFFFFFFF
+512:         rv.set_etag(f"{mtime}-{size}-{check}")
+513: 
+514:     if conditional:
+515:         try:
+516:             rv = rv.make_conditional(environ, accept_ranges=True, complete_length=size)
+517:         except RequestedRangeNotSatisfiable:
+518:             if file is not None:
+519:                 file.close()
+520: 
+521:             raise
+522: 
+523:         # Some x-sendfile implementations incorrectly ignore the 304
+524:         # status code and send the file anyway.
+525:         if rv.status_code == 304:
+526:             rv.headers.pop("x-sendfile", None)
+527: 
+528:     return rv
+/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/werkzeug/wsgi.py:279
+279: def wrap_file(
+280:     environ: WSGIEnvironment, file: t.IO[bytes], buffer_size: int = 8192
+281: ) -> t.Iterable[bytes]:
+282:     """Wraps a file.  This uses the WSGI server's file wrapper if available
+283:     or otherwise the generic :class:`FileWrapper`.
+284: 
+285:     .. versionadded:: 0.5
+286: 
+287:     If the file wrapper from the WSGI server is used it's important to not
+288:     iterate over it from inside the application but to pass it through
+289:     unchanged.  If you want to pass out a file wrapper inside a response
+290:     object you have to set :attr:`Response.direct_passthrough` to `True`.
+291: 
+292:     More information about file wrappers are available in :pep:`333`.
+293: 
+294:     :param file: a :class:`file`-like object with a :meth:`~file.read` method.
+295:     :param buffer_size: number of bytes for one iteration.
+296:     """
+297:     return environ.get("wsgi.file_wrapper", FileWrapper)(  # type: ignore
+298:         file, buffer_size
+299:     )
+/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/werkzeug/wsgi.py:347
+347:     def __next__(self) -> bytes:
+348:         data = self.file.read(self.buffer_size)
+349:         if data:
+350:             return data
+351:         raise StopIteration()
+/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/cheroot/wsgi.py:136
+136:     def respond(self):
+137:         """Process the current request.
+138: 
+139:         From :pep:`333`:
+140: 
+141:             The start_response callable must not actually transmit
+142:             the response headers. Instead, it must store them for the
+143:             server or gateway to transmit only after the first
+144:             iteration of the application return value that yields
+145:             a NON-EMPTY string, or upon the application's first
+146:             invocation of the write() callable.
+147:         """
+148:         response = self.req.server.wsgi_app(self.env, self.start_response)
+149:         try:
+150:             for chunk in filter(None, response):
+151:                 if not isinstance(chunk, bytes):
+152:                     raise ValueError('WSGI Applications must yield bytes')
+153:                 self.write(chunk)
+154:         finally:
+155:             # Send headers if not already sent
+156:             self.req.ensure_headers_sent()
+157:             if hasattr(response, 'close'):
+158:                 response.close()
+/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/cheroot/wsgi.py:160
+160:     def start_response(self, status, headers, exc_info=None):  # noqa: WPS238
+161:         """WSGI callable to begin the HTTP response."""
+162:         # "The application may call start_response more than once,
+163:         # if and only if the exc_info argument is provided."
+164:         if self.started_response and not exc_info:
+165:             raise RuntimeError(
+166:                 'WSGI start_response called a second time with no exc_info.',
+167:             )
+168:         self.started_response = True
+169: 
+170:         # "if exc_info is provided, and the HTTP headers have already been
+171:         # sent, start_response must raise an error, and should raise the
+172:         # exc_info tuple."
+173:         if self.req.sent_headers:
+174:             value = exc_info[1]
+175:             raise value
+176: 
+177:         self.req.status = self._encode_status(status)
+178: 
+179:         for k, v in headers:
+180:             if not isinstance(k, str):
+181:                 raise TypeError(
+182:                     'WSGI response header key %r is not of type str.' % k,
+183:                 )
+184:             if not isinstance(v, str):
+185:                 raise TypeError(
+186:                     'WSGI response header value %r is not of type str.' % v,
+187:                 )
+188:             if k.lower() == 'content-length':
+189:                 self.remaining_bytes_out = int(v)
+190:             out_header = ntob(k), ntob(v)
+191:             self.req.outheaders.append(out_header)
+192: 
+193:         return self.write
+/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/cheroot/wsgi.py:208
+208:     def write(self, chunk):
+209:         """WSGI callable to write unbuffered data to the client.
+210: 
+211:         This method is also used internally by start_response (to write
+212:         data from the iterable returned by the WSGI application).
+213:         """
+214:         if not self.started_response:
+215:             raise RuntimeError('WSGI write called before start_response.')
+216: 
+217:         chunklen = len(chunk)
+218:         rbo = self.remaining_bytes_out
+219:         if rbo is not None and chunklen > rbo:
+220:             if not self.req.sent_headers:
+221:                 # Whew. We can send a 500 to the client.
+222:                 self.req.simple_response(
+223:                     '500 Internal Server Error',
+224:                     'The requested resource returned more bytes than the '
+225:                     'declared Content-Length.',
+226:                 )
+227:             else:
+228:                 # Dang. We have probably already sent data. Truncate the chunk
+229:                 # to fit (so the client doesn't hang) and raise an error later.
+230:                 chunk = chunk[:rbo]
+231: 
+232:         self.req.ensure_headers_sent()
+233: 
+234:         self.req.write(chunk)
+235: 
+236:         if rbo is not None:
+237:             rbo -= chunklen
+238:             if rbo < 0:
+239:                 raise ValueError(
+240:                     'Response body exceeds the declared Content-Length.',
+241:                 )
+/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/cheroot/server.py:1925
+1925:     def start(self):
+1926:         """Run the server forever.
+1927: 
+1928:         It is shortcut for invoking :func:`prepare()` then :func:`serve()`.
+1929:         """
+1930:         # We don't have to trap KeyboardInterrupt or SystemExit here,
+1931:         # because cherrypy.server already does so, calling self.stop() for us.
+1932:         # If you're using this server with another framework, you should
+1933:         # trap those exceptions in whatever code block calls start().
+1934:         self.prepare()
+1935:         self.serve()

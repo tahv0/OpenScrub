@@ -1,0 +1,40 @@
+[
+  {
+    "url": "https://www.paddlepaddle.org.cn/packages/stable/cu126/paddleocr/",
+    "retrieved_at_utc": "2026-11-16T23:26:03.597422+00:00",
+    "status": 200,
+    "response_body_characters": 0,
+    "response_body_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "pinned_3_2_2_links": [],
+    "scope": "Index listing only; empty bodies mean no candidates observed, not a platform resolver execution. No wheels or wheel metadata downloaded."
+  },
+  {
+    "url": "https://www.paddlepaddle.org.cn/packages/stable/cu126/paddlex/",
+    "retrieved_at_utc": "2026-11-16T23:26:05.350396+00:00",
+    "status": 200,
+    "response_body_characters": 0,
+    "response_body_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "pinned_3_2_2_links": [],
+    "scope": "Index listing only; empty bodies mean no candidates observed, not a platform resolver execution. No wheels or wheel metadata downloaded."
+  },
+  {
+    "url": "https://www.paddlepaddle.org.cn/packages/stable/cu126/paddlepaddle-gpu/",
+    "retrieved_at_utc": "2026-11-16T23:26:06.228976+00:00",
+    "status": 200,
+    "response_body_characters": 16052,
+    "response_body_sha256": "ca535d5c70fa45d2634e785b45daef76d10e175dc3bfb02f198b293b5a089371",
+    "pinned_3_2_2_links": [
+      "<a href=https://paddle-whl.cdn.bcebos.com/stable/cu126/paddlepaddle-gpu/paddlepaddle_gpu-3.2.2-cp310-cp310-linux_x86_64.whl>paddlepaddle_gpu-3.2.2-cp310-cp310-linux_x86_64.whl</a>",
+      "<a href=https://paddle-whl.cdn.bcebos.com/stable/cu126/paddlepaddle-gpu/paddlepaddle_gpu-3.2.2-cp310-cp310-win_amd64.whl>paddlepaddle_gpu-3.2.2-cp310-cp310-win_amd64.whl</a>",
+      "<a href=https://paddle-whl.cdn.bcebos.com/stable/cu126/paddlepaddle-gpu/paddlepaddle_gpu-3.2.2-cp311-cp311-linux_x86_64.whl>paddlepaddle_gpu-3.2.2-cp311-cp311-linux_x86_64.whl</a>",
+      "<a href=https://paddle-whl.cdn.bcebos.com/stable/cu126/paddlepaddle-gpu/paddlepaddle_gpu-3.2.2-cp311-cp311-win_amd64.whl>paddlepaddle_gpu-3.2.2-cp311-cp311-win_amd64.whl</a>",
+      "<a href=https://paddle-whl.cdn.bcebos.com/stable/cu126/paddlepaddle-gpu/paddlepaddle_gpu-3.2.2-cp312-cp312-linux_x86_64.whl>paddlepaddle_gpu-3.2.2-cp312-cp312-linux_x86_64.whl</a>",
+      "<a href=https://paddle-whl.cdn.bcebos.com/stable/cu126/paddlepaddle-gpu/paddlepaddle_gpu-3.2.2-cp312-cp312-win_amd64.whl>paddlepaddle_gpu-3.2.2-cp312-cp312-win_amd64.whl</a>",
+      "<a href=https://paddle-whl.cdn.bcebos.com/stable/cu126/paddlepaddle-gpu/paddlepaddle_gpu-3.2.2-cp313-cp313-linux_x86_64.whl>paddlepaddle_gpu-3.2.2-cp313-cp313-linux_x86_64.whl</a>",
+      "<a href=https://paddle-whl.cdn.bcebos.com/stable/cu126/paddlepaddle-gpu/paddlepaddle_gpu-3.2.2-cp313-cp313-win_amd64.whl>paddlepaddle_gpu-3.2.2-cp313-cp313-win_amd64.whl</a>",
+      "<a href=https://paddle-whl.cdn.bcebos.com/stable/cu126/paddlepaddle-gpu/paddlepaddle_gpu-3.2.2-cp39-cp39-linux_x86_64.whl>paddlepaddle_gpu-3.2.2-cp39-cp39-linux_x86_64.whl</a>",
+      "<a href=https://paddle-whl.cdn.bcebos.com/stable/cu126/paddlepaddle-gpu/paddlepaddle_gpu-3.2.2-cp39-cp39-win_amd64.whl>paddlepaddle_gpu-3.2.2-cp39-cp39-win_amd64.whl</a>"
+    ],
+    "scope": "Index listing only; empty bodies mean no candidates observed, not a platform resolver execution. No wheels or wheel metadata downloaded."
+  }
+]

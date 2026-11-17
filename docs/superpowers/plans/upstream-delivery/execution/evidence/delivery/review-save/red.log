@@ -1,0 +1,731 @@
+FFFFFFFFFFFFFFFFFFF.F...                                                 [100%]
+=================================== FAILURES ===================================
+______________ test_job_switch_during_save_never_renders_new_job _______________
+
+    def test_job_switch_during_save_never_renders_new_job():
+>       run_js("""setup();const p=saveAndRender();openJob('B');MAN.push({newJob:true});
+        await reply();await p;
+        if(calls.some(c=>c.url.endsWith('/render')))throw Error('stale save rendered a job');
+        if(MAN.length!==1||!MAN[0].newJob)throw Error('new job draft cleared');""")
+
+tests/test_review_save_failures.py:67: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "setup();const p=saveAndRender();openJob('B');MAN.push({newJob:true});\n    await reply();await p;\n    if(calls.some(...throw Error('stale save rendered a job');\n    if(MAN.length!==1||!MAN[0].newJob)throw Error('new job draft cleared');"
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: scenario left a pending request
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...catch(e=>{console.error(e);process.exit(1)});\n'], returncode=1, stdout='', stderr='scenario left a pending request\n').returncode
+
+tests/test_review_save_failures.py:63: AssertionError
+______________________ test_newer_edits_survive_save_ack _______________________
+
+    def test_newer_edits_survive_save_ack():
+>       run_js("""setup();const p=saveAndRender();
+        applyDet(0,true);BE.ov[0]=[9,8,7,6];BE.times[0]=[0,2];
+        BE.adds.push({t0:1,t1:2,box:[2,3,40,50]});MAN.push({newer:true});
+        BE.audio.push({t0:1,t1:2,mode:'bleep'});await reply();await p;
+        if(!EN[0]||BE.ov[0][0]!==9||BE.times[0][1]!==2||BE.adds.length!==1||MAN.length!==1||BE.audio.length!==2)
+          throw Error('newer draft lost');
+        if(calls.length!==1)throw Error('render omits newer edits');""")
+
+tests/test_review_save_failures.py:74: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "setup();const p=saveAndRender();\n    applyDet(0,true);BE.ov[0]=[9,8,7,6];BE.times[0]=[0,2];\n    BE.adds.push({t0:1,....length!==2)\n      throw Error('newer draft lost');\n    if(calls.length!==1)throw Error('render omits newer edits');"
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: scenario left a pending request
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...catch(e=>{console.error(e);process.exit(1)});\n'], returncode=1, stdout='', stderr='scenario left a pending request\n').returncode
+
+tests/test_review_save_failures.py:63: AssertionError
+______ test_failed_save_keeps_manual_and_audio_drafts[saveAndRender-409] _______
+
+failure = '409', entry = 'saveAndRender'
+
+    @pytest.mark.parametrize("failure", ["409", "423", "500", "network", "json", "body"])
+    @pytest.mark.parametrize("entry", ["saveAndRender", "beSave"])
+    def test_failed_save_keeps_manual_and_audio_drafts(failure, entry):
+>       run_js("""setup();const p=ENTRY();
+        const request=queue.shift();
+        if(FAILURE==='network')request.reject(Error('offline'));
+        else if(FAILURE==='json')request.resolve({ok:true,status:200,json:async()=>{throw Error('invalid JSON')}});
+        else request.resolve(response({error:'busy'},FAILURE==='body'?200:+FAILURE));
+        await tick();await p;
+        if(MAN.length!==1||BE.adds.length!==1||BE.audio.length!==1||!BE.ov[0]||!BE.times[0])throw Error('failed save cleared drafts');
+        if(calls.length!==1)throw Error('render after failed save');
+        if(document.getElementById('beslot').innerHTML.includes('rendering with'))throw Error('editor replaced after failure');
+        if(!document.getElementById('reviewSaveStatus')?.textContent)throw Error('missing actionable error');
+        """.replace("ENTRY", entry).replace("FAILURE", json.dumps(failure)))
+
+tests/test_review_save_failures.py:86: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = 'setup();const p=saveAndRender();\n    const request=queue.shift();\n    if("409"===\'network\')request.reject(Error(\...;\n    if(!document.getElementById(\'reviewSaveStatus\')?.textContent)throw Error(\'missing actionable error\');\n    '
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: scenario left a pending request
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...catch(e=>{console.error(e);process.exit(1)});\n'], returncode=1, stdout='', stderr='scenario left a pending request\n').returncode
+
+tests/test_review_save_failures.py:63: AssertionError
+______ test_failed_save_keeps_manual_and_audio_drafts[saveAndRender-423] _______
+
+failure = '423', entry = 'saveAndRender'
+
+    @pytest.mark.parametrize("failure", ["409", "423", "500", "network", "json", "body"])
+    @pytest.mark.parametrize("entry", ["saveAndRender", "beSave"])
+    def test_failed_save_keeps_manual_and_audio_drafts(failure, entry):
+>       run_js("""setup();const p=ENTRY();
+        const request=queue.shift();
+        if(FAILURE==='network')request.reject(Error('offline'));
+        else if(FAILURE==='json')request.resolve({ok:true,status:200,json:async()=>{throw Error('invalid JSON')}});
+        else request.resolve(response({error:'busy'},FAILURE==='body'?200:+FAILURE));
+        await tick();await p;
+        if(MAN.length!==1||BE.adds.length!==1||BE.audio.length!==1||!BE.ov[0]||!BE.times[0])throw Error('failed save cleared drafts');
+        if(calls.length!==1)throw Error('render after failed save');
+        if(document.getElementById('beslot').innerHTML.includes('rendering with'))throw Error('editor replaced after failure');
+        if(!document.getElementById('reviewSaveStatus')?.textContent)throw Error('missing actionable error');
+        """.replace("ENTRY", entry).replace("FAILURE", json.dumps(failure)))
+
+tests/test_review_save_failures.py:86: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = 'setup();const p=saveAndRender();\n    const request=queue.shift();\n    if("423"===\'network\')request.reject(Error(\...;\n    if(!document.getElementById(\'reviewSaveStatus\')?.textContent)throw Error(\'missing actionable error\');\n    '
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: scenario left a pending request
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...catch(e=>{console.error(e);process.exit(1)});\n'], returncode=1, stdout='', stderr='scenario left a pending request\n').returncode
+
+tests/test_review_save_failures.py:63: AssertionError
+______ test_failed_save_keeps_manual_and_audio_drafts[saveAndRender-500] _______
+
+failure = '500', entry = 'saveAndRender'
+
+    @pytest.mark.parametrize("failure", ["409", "423", "500", "network", "json", "body"])
+    @pytest.mark.parametrize("entry", ["saveAndRender", "beSave"])
+    def test_failed_save_keeps_manual_and_audio_drafts(failure, entry):
+>       run_js("""setup();const p=ENTRY();
+        const request=queue.shift();
+        if(FAILURE==='network')request.reject(Error('offline'));
+        else if(FAILURE==='json')request.resolve({ok:true,status:200,json:async()=>{throw Error('invalid JSON')}});
+        else request.resolve(response({error:'busy'},FAILURE==='body'?200:+FAILURE));
+        await tick();await p;
+        if(MAN.length!==1||BE.adds.length!==1||BE.audio.length!==1||!BE.ov[0]||!BE.times[0])throw Error('failed save cleared drafts');
+        if(calls.length!==1)throw Error('render after failed save');
+        if(document.getElementById('beslot').innerHTML.includes('rendering with'))throw Error('editor replaced after failure');
+        if(!document.getElementById('reviewSaveStatus')?.textContent)throw Error('missing actionable error');
+        """.replace("ENTRY", entry).replace("FAILURE", json.dumps(failure)))
+
+tests/test_review_save_failures.py:86: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = 'setup();const p=saveAndRender();\n    const request=queue.shift();\n    if("500"===\'network\')request.reject(Error(\...;\n    if(!document.getElementById(\'reviewSaveStatus\')?.textContent)throw Error(\'missing actionable error\');\n    '
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: scenario left a pending request
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...catch(e=>{console.error(e);process.exit(1)});\n'], returncode=1, stdout='', stderr='scenario left a pending request\n').returncode
+
+tests/test_review_save_failures.py:63: AssertionError
+____ test_failed_save_keeps_manual_and_audio_drafts[saveAndRender-network] _____
+
+failure = 'network', entry = 'saveAndRender'
+
+    @pytest.mark.parametrize("failure", ["409", "423", "500", "network", "json", "body"])
+    @pytest.mark.parametrize("entry", ["saveAndRender", "beSave"])
+    def test_failed_save_keeps_manual_and_audio_drafts(failure, entry):
+>       run_js("""setup();const p=ENTRY();
+        const request=queue.shift();
+        if(FAILURE==='network')request.reject(Error('offline'));
+        else if(FAILURE==='json')request.resolve({ok:true,status:200,json:async()=>{throw Error('invalid JSON')}});
+        else request.resolve(response({error:'busy'},FAILURE==='body'?200:+FAILURE));
+        await tick();await p;
+        if(MAN.length!==1||BE.adds.length!==1||BE.audio.length!==1||!BE.ov[0]||!BE.times[0])throw Error('failed save cleared drafts');
+        if(calls.length!==1)throw Error('render after failed save');
+        if(document.getElementById('beslot').innerHTML.includes('rendering with'))throw Error('editor replaced after failure');
+        if(!document.getElementById('reviewSaveStatus')?.textContent)throw Error('missing actionable error');
+        """.replace("ENTRY", entry).replace("FAILURE", json.dumps(failure)))
+
+tests/test_review_save_failures.py:86: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = 'setup();const p=saveAndRender();\n    const request=queue.shift();\n    if("network"===\'network\')request.reject(Err...;\n    if(!document.getElementById(\'reviewSaveStatus\')?.textContent)throw Error(\'missing actionable error\');\n    '
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: Error: offline
+E             at evalmachine.<anonymous>:3:45
+E             at evalmachine.<anonymous>:11:7
+E             at Script.runInContext (node:vm:149:12)
+E             at Object.runInContext (node:vm:301:6)
+E             at run ([eval]:29:38)
+E             at [eval]:31:18
+E             at [eval]:31:56
+E             at [eval]:32:4
+E             at runScriptInThisContext (node:internal/vm:209:10)
+E             at node:internal/process/execution:446:12
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...[eval]:32:4\n    at runScriptInThisContext (node:internal/vm:209:10)\n    at node:internal/process/execution:446:12\n').returncode
+
+tests/test_review_save_failures.py:63: AssertionError
+______ test_failed_save_keeps_manual_and_audio_drafts[saveAndRender-json] ______
+
+failure = 'json', entry = 'saveAndRender'
+
+    @pytest.mark.parametrize("failure", ["409", "423", "500", "network", "json", "body"])
+    @pytest.mark.parametrize("entry", ["saveAndRender", "beSave"])
+    def test_failed_save_keeps_manual_and_audio_drafts(failure, entry):
+>       run_js("""setup();const p=ENTRY();
+        const request=queue.shift();
+        if(FAILURE==='network')request.reject(Error('offline'));
+        else if(FAILURE==='json')request.resolve({ok:true,status:200,json:async()=>{throw Error('invalid JSON')}});
+        else request.resolve(response({error:'busy'},FAILURE==='body'?200:+FAILURE));
+        await tick();await p;
+        if(MAN.length!==1||BE.adds.length!==1||BE.audio.length!==1||!BE.ov[0]||!BE.times[0])throw Error('failed save cleared drafts');
+        if(calls.length!==1)throw Error('render after failed save');
+        if(document.getElementById('beslot').innerHTML.includes('rendering with'))throw Error('editor replaced after failure');
+        if(!document.getElementById('reviewSaveStatus')?.textContent)throw Error('missing actionable error');
+        """.replace("ENTRY", entry).replace("FAILURE", json.dumps(failure)))
+
+tests/test_review_save_failures.py:86: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = 'setup();const p=saveAndRender();\n    const request=queue.shift();\n    if("json"===\'network\')request.reject(Error(...;\n    if(!document.getElementById(\'reviewSaveStatus\')?.textContent)throw Error(\'missing actionable error\');\n    '
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: Error: invalid JSON
+E             at Object.json (evalmachine.<anonymous>:4:86)
+E             at saveAndRender (evalmachine.<anonymous>:1000:35)
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...lid JSON\n    at Object.json (evalmachine.<anonymous>:4:86)\n    at saveAndRender (evalmachine.<anonymous>:1000:35)\n').returncode
+
+tests/test_review_save_failures.py:63: AssertionError
+______ test_failed_save_keeps_manual_and_audio_drafts[saveAndRender-body] ______
+
+failure = 'body', entry = 'saveAndRender'
+
+    @pytest.mark.parametrize("failure", ["409", "423", "500", "network", "json", "body"])
+    @pytest.mark.parametrize("entry", ["saveAndRender", "beSave"])
+    def test_failed_save_keeps_manual_and_audio_drafts(failure, entry):
+>       run_js("""setup();const p=ENTRY();
+        const request=queue.shift();
+        if(FAILURE==='network')request.reject(Error('offline'));
+        else if(FAILURE==='json')request.resolve({ok:true,status:200,json:async()=>{throw Error('invalid JSON')}});
+        else request.resolve(response({error:'busy'},FAILURE==='body'?200:+FAILURE));
+        await tick();await p;
+        if(MAN.length!==1||BE.adds.length!==1||BE.audio.length!==1||!BE.ov[0]||!BE.times[0])throw Error('failed save cleared drafts');
+        if(calls.length!==1)throw Error('render after failed save');
+        if(document.getElementById('beslot').innerHTML.includes('rendering with'))throw Error('editor replaced after failure');
+        if(!document.getElementById('reviewSaveStatus')?.textContent)throw Error('missing actionable error');
+        """.replace("ENTRY", entry).replace("FAILURE", json.dumps(failure)))
+
+tests/test_review_save_failures.py:86: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = 'setup();const p=saveAndRender();\n    const request=queue.shift();\n    if("body"===\'network\')request.reject(Error(...;\n    if(!document.getElementById(\'reviewSaveStatus\')?.textContent)throw Error(\'missing actionable error\');\n    '
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: scenario left a pending request
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...catch(e=>{console.error(e);process.exit(1)});\n'], returncode=1, stdout='', stderr='scenario left a pending request\n').returncode
+
+tests/test_review_save_failures.py:63: AssertionError
+__________ test_failed_save_keeps_manual_and_audio_drafts[beSave-409] __________
+
+failure = '409', entry = 'beSave'
+
+    @pytest.mark.parametrize("failure", ["409", "423", "500", "network", "json", "body"])
+    @pytest.mark.parametrize("entry", ["saveAndRender", "beSave"])
+    def test_failed_save_keeps_manual_and_audio_drafts(failure, entry):
+>       run_js("""setup();const p=ENTRY();
+        const request=queue.shift();
+        if(FAILURE==='network')request.reject(Error('offline'));
+        else if(FAILURE==='json')request.resolve({ok:true,status:200,json:async()=>{throw Error('invalid JSON')}});
+        else request.resolve(response({error:'busy'},FAILURE==='body'?200:+FAILURE));
+        await tick();await p;
+        if(MAN.length!==1||BE.adds.length!==1||BE.audio.length!==1||!BE.ov[0]||!BE.times[0])throw Error('failed save cleared drafts');
+        if(calls.length!==1)throw Error('render after failed save');
+        if(document.getElementById('beslot').innerHTML.includes('rendering with'))throw Error('editor replaced after failure');
+        if(!document.getElementById('reviewSaveStatus')?.textContent)throw Error('missing actionable error');
+        """.replace("ENTRY", entry).replace("FAILURE", json.dumps(failure)))
+
+tests/test_review_save_failures.py:86: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = 'setup();const p=beSave();\n    const request=queue.shift();\n    if("409"===\'network\')request.reject(Error(\'offlin...;\n    if(!document.getElementById(\'reviewSaveStatus\')?.textContent)throw Error(\'missing actionable error\');\n    '
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: scenario left a pending request
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...catch(e=>{console.error(e);process.exit(1)});\n'], returncode=1, stdout='', stderr='scenario left a pending request\n').returncode
+
+tests/test_review_save_failures.py:63: AssertionError
+__________ test_failed_save_keeps_manual_and_audio_drafts[beSave-423] __________
+
+failure = '423', entry = 'beSave'
+
+    @pytest.mark.parametrize("failure", ["409", "423", "500", "network", "json", "body"])
+    @pytest.mark.parametrize("entry", ["saveAndRender", "beSave"])
+    def test_failed_save_keeps_manual_and_audio_drafts(failure, entry):
+>       run_js("""setup();const p=ENTRY();
+        const request=queue.shift();
+        if(FAILURE==='network')request.reject(Error('offline'));
+        else if(FAILURE==='json')request.resolve({ok:true,status:200,json:async()=>{throw Error('invalid JSON')}});
+        else request.resolve(response({error:'busy'},FAILURE==='body'?200:+FAILURE));
+        await tick();await p;
+        if(MAN.length!==1||BE.adds.length!==1||BE.audio.length!==1||!BE.ov[0]||!BE.times[0])throw Error('failed save cleared drafts');
+        if(calls.length!==1)throw Error('render after failed save');
+        if(document.getElementById('beslot').innerHTML.includes('rendering with'))throw Error('editor replaced after failure');
+        if(!document.getElementById('reviewSaveStatus')?.textContent)throw Error('missing actionable error');
+        """.replace("ENTRY", entry).replace("FAILURE", json.dumps(failure)))
+
+tests/test_review_save_failures.py:86: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = 'setup();const p=beSave();\n    const request=queue.shift();\n    if("423"===\'network\')request.reject(Error(\'offlin...;\n    if(!document.getElementById(\'reviewSaveStatus\')?.textContent)throw Error(\'missing actionable error\');\n    '
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: scenario left a pending request
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...catch(e=>{console.error(e);process.exit(1)});\n'], returncode=1, stdout='', stderr='scenario left a pending request\n').returncode
+
+tests/test_review_save_failures.py:63: AssertionError
+__________ test_failed_save_keeps_manual_and_audio_drafts[beSave-500] __________
+
+failure = '500', entry = 'beSave'
+
+    @pytest.mark.parametrize("failure", ["409", "423", "500", "network", "json", "body"])
+    @pytest.mark.parametrize("entry", ["saveAndRender", "beSave"])
+    def test_failed_save_keeps_manual_and_audio_drafts(failure, entry):
+>       run_js("""setup();const p=ENTRY();
+        const request=queue.shift();
+        if(FAILURE==='network')request.reject(Error('offline'));
+        else if(FAILURE==='json')request.resolve({ok:true,status:200,json:async()=>{throw Error('invalid JSON')}});
+        else request.resolve(response({error:'busy'},FAILURE==='body'?200:+FAILURE));
+        await tick();await p;
+        if(MAN.length!==1||BE.adds.length!==1||BE.audio.length!==1||!BE.ov[0]||!BE.times[0])throw Error('failed save cleared drafts');
+        if(calls.length!==1)throw Error('render after failed save');
+        if(document.getElementById('beslot').innerHTML.includes('rendering with'))throw Error('editor replaced after failure');
+        if(!document.getElementById('reviewSaveStatus')?.textContent)throw Error('missing actionable error');
+        """.replace("ENTRY", entry).replace("FAILURE", json.dumps(failure)))
+
+tests/test_review_save_failures.py:86: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = 'setup();const p=beSave();\n    const request=queue.shift();\n    if("500"===\'network\')request.reject(Error(\'offlin...;\n    if(!document.getElementById(\'reviewSaveStatus\')?.textContent)throw Error(\'missing actionable error\');\n    '
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: scenario left a pending request
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...catch(e=>{console.error(e);process.exit(1)});\n'], returncode=1, stdout='', stderr='scenario left a pending request\n').returncode
+
+tests/test_review_save_failures.py:63: AssertionError
+________ test_failed_save_keeps_manual_and_audio_drafts[beSave-network] ________
+
+failure = 'network', entry = 'beSave'
+
+    @pytest.mark.parametrize("failure", ["409", "423", "500", "network", "json", "body"])
+    @pytest.mark.parametrize("entry", ["saveAndRender", "beSave"])
+    def test_failed_save_keeps_manual_and_audio_drafts(failure, entry):
+>       run_js("""setup();const p=ENTRY();
+        const request=queue.shift();
+        if(FAILURE==='network')request.reject(Error('offline'));
+        else if(FAILURE==='json')request.resolve({ok:true,status:200,json:async()=>{throw Error('invalid JSON')}});
+        else request.resolve(response({error:'busy'},FAILURE==='body'?200:+FAILURE));
+        await tick();await p;
+        if(MAN.length!==1||BE.adds.length!==1||BE.audio.length!==1||!BE.ov[0]||!BE.times[0])throw Error('failed save cleared drafts');
+        if(calls.length!==1)throw Error('render after failed save');
+        if(document.getElementById('beslot').innerHTML.includes('rendering with'))throw Error('editor replaced after failure');
+        if(!document.getElementById('reviewSaveStatus')?.textContent)throw Error('missing actionable error');
+        """.replace("ENTRY", entry).replace("FAILURE", json.dumps(failure)))
+
+tests/test_review_save_failures.py:86: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = 'setup();const p=beSave();\n    const request=queue.shift();\n    if("network"===\'network\')request.reject(Error(\'of...;\n    if(!document.getElementById(\'reviewSaveStatus\')?.textContent)throw Error(\'missing actionable error\');\n    '
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: Error: offline
+E             at evalmachine.<anonymous>:3:45
+E             at evalmachine.<anonymous>:11:7
+E             at Script.runInContext (node:vm:149:12)
+E             at Object.runInContext (node:vm:301:6)
+E             at run ([eval]:29:38)
+E             at [eval]:31:18
+E             at [eval]:31:56
+E             at [eval]:32:4
+E             at runScriptInThisContext (node:internal/vm:209:10)
+E             at node:internal/process/execution:446:12
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...[eval]:32:4\n    at runScriptInThisContext (node:internal/vm:209:10)\n    at node:internal/process/execution:446:12\n').returncode
+
+tests/test_review_save_failures.py:63: AssertionError
+_________ test_failed_save_keeps_manual_and_audio_drafts[beSave-json] __________
+
+failure = 'json', entry = 'beSave'
+
+    @pytest.mark.parametrize("failure", ["409", "423", "500", "network", "json", "body"])
+    @pytest.mark.parametrize("entry", ["saveAndRender", "beSave"])
+    def test_failed_save_keeps_manual_and_audio_drafts(failure, entry):
+>       run_js("""setup();const p=ENTRY();
+        const request=queue.shift();
+        if(FAILURE==='network')request.reject(Error('offline'));
+        else if(FAILURE==='json')request.resolve({ok:true,status:200,json:async()=>{throw Error('invalid JSON')}});
+        else request.resolve(response({error:'busy'},FAILURE==='body'?200:+FAILURE));
+        await tick();await p;
+        if(MAN.length!==1||BE.adds.length!==1||BE.audio.length!==1||!BE.ov[0]||!BE.times[0])throw Error('failed save cleared drafts');
+        if(calls.length!==1)throw Error('render after failed save');
+        if(document.getElementById('beslot').innerHTML.includes('rendering with'))throw Error('editor replaced after failure');
+        if(!document.getElementById('reviewSaveStatus')?.textContent)throw Error('missing actionable error');
+        """.replace("ENTRY", entry).replace("FAILURE", json.dumps(failure)))
+
+tests/test_review_save_failures.py:86: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = 'setup();const p=beSave();\n    const request=queue.shift();\n    if("json"===\'network\')request.reject(Error(\'offli...;\n    if(!document.getElementById(\'reviewSaveStatus\')?.textContent)throw Error(\'missing actionable error\');\n    '
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: Error: invalid JSON
+E             at Object.json (evalmachine.<anonymous>:4:86)
+E             at saveAndRender (evalmachine.<anonymous>:1000:35)
+E             at async beSave (evalmachine.<anonymous>:759:2)
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...:4:86)\n    at saveAndRender (evalmachine.<anonymous>:1000:35)\n    at async beSave (evalmachine.<anonymous>:759:2)\n').returncode
+
+tests/test_review_save_failures.py:63: AssertionError
+_________ test_failed_save_keeps_manual_and_audio_drafts[beSave-body] __________
+
+failure = 'body', entry = 'beSave'
+
+    @pytest.mark.parametrize("failure", ["409", "423", "500", "network", "json", "body"])
+    @pytest.mark.parametrize("entry", ["saveAndRender", "beSave"])
+    def test_failed_save_keeps_manual_and_audio_drafts(failure, entry):
+>       run_js("""setup();const p=ENTRY();
+        const request=queue.shift();
+        if(FAILURE==='network')request.reject(Error('offline'));
+        else if(FAILURE==='json')request.resolve({ok:true,status:200,json:async()=>{throw Error('invalid JSON')}});
+        else request.resolve(response({error:'busy'},FAILURE==='body'?200:+FAILURE));
+        await tick();await p;
+        if(MAN.length!==1||BE.adds.length!==1||BE.audio.length!==1||!BE.ov[0]||!BE.times[0])throw Error('failed save cleared drafts');
+        if(calls.length!==1)throw Error('render after failed save');
+        if(document.getElementById('beslot').innerHTML.includes('rendering with'))throw Error('editor replaced after failure');
+        if(!document.getElementById('reviewSaveStatus')?.textContent)throw Error('missing actionable error');
+        """.replace("ENTRY", entry).replace("FAILURE", json.dumps(failure)))
+
+tests/test_review_save_failures.py:86: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = 'setup();const p=beSave();\n    const request=queue.shift();\n    if("body"===\'network\')request.reject(Error(\'offli...;\n    if(!document.getElementById(\'reviewSaveStatus\')?.textContent)throw Error(\'missing actionable error\');\n    '
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: scenario left a pending request
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...catch(e=>{console.error(e);process.exit(1)});\n'], returncode=1, stdout='', stderr='scenario left a pending request\n').returncode
+
+tests/test_review_save_failures.py:63: AssertionError
+____________ test_enabled_payload_contains_only_deliberate_changes _____________
+
+    def test_enabled_payload_contains_only_deliberate_changes():
+>       run_js("""setup();const p=saveAndRender();
+        if(JSON.stringify(calls[0].body.enabled)!=='{"0":false}')throw Error('stale loaded enabled values submitted');
+        await reply();await reply();await p;""")
+
+tests/test_review_save_failures.py:100: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = 'setup();const p=saveAndRender();\n    if(JSON.stringify(calls[0].body.enabled)!==\'{"0":false}\')throw Error(\'stale loaded enabled values submitted\');\n    await reply();await reply();await p;'
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: Error: stale loaded enabled values submitted
+E             at evalmachine.<anonymous>:2:68
+E             at evalmachine.<anonymous>:3:43
+E             at Script.runInContext (node:vm:149:12)
+E             at Object.runInContext (node:vm:301:6)
+E             at run ([eval]:29:38)
+E             at [eval]:31:18
+E             at [eval]:31:56
+E             at [eval]:32:4
+E             at runScriptInThisContext (node:internal/vm:209:10)
+E             at node:internal/process/execution:446:12
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...[eval]:32:4\n    at runScriptInThisContext (node:internal/vm:209:10)\n    at node:internal/process/execution:446:12\n').returncode
+
+tests/test_review_save_failures.py:63: AssertionError
+__________ test_duplicate_submit_is_guarded_across_both_entry_points ___________
+
+    def test_duplicate_submit_is_guarded_across_both_entry_points():
+>       run_js("""setup();const p=saveAndRender();const q=beSave();
+        if(calls.length!==1)throw Error('duplicate save');await reply();await reply();await p;await q;
+        if(calls.length!==2)throw Error('duplicate render');""")
+
+tests/test_review_save_failures.py:106: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "setup();const p=saveAndRender();const q=beSave();\n    if(calls.length!==1)throw Error('duplicate save');await reply();await reply();await p;await q;\n    if(calls.length!==2)throw Error('duplicate render');"
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: Error: duplicate save
+E             at evalmachine.<anonymous>:2:31
+E             at evalmachine.<anonymous>:3:59
+E             at Script.runInContext (node:vm:149:12)
+E             at Object.runInContext (node:vm:301:6)
+E             at run ([eval]:29:38)
+E             at [eval]:31:18
+E             at [eval]:31:56
+E             at [eval]:32:4
+E             at runScriptInThisContext (node:internal/vm:209:10)
+E             at node:internal/process/execution:446:12
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...[eval]:32:4\n    at runScriptInThisContext (node:internal/vm:209:10)\n    at node:internal/process/execution:446:12\n').returncode
+
+tests/test_review_save_failures.py:63: AssertionError
+________________ test_allowlist_await_keeps_job_and_newer_edits ________________
+
+    def test_allowlist_await_keeps_job_and_newer_edits():
+>       run_js("""setup();confirm=()=>true;const p=saveAndRender();await reply({ok:true,suggest_allowlist:['synthetic']});
+        if(calls[1].url!=='api/allowlist')throw Error('allowlist behavior lost');
+        openJob('B');await reply();await p;
+        if(calls.some(c=>c.url.endsWith('/render')))throw Error('render after allowlist job switch');""")
+
+tests/test_review_save_failures.py:112: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "setup();confirm=()=>true;const p=saveAndRender();await reply({ok:true,suggest_allowlist:['synthetic']});\n    if(call...it reply();await p;\n    if(calls.some(c=>c.url.endsWith('/render')))throw Error('render after allowlist job switch');"
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: scenario left a pending request
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...catch(e=>{console.error(e);process.exit(1)});\n'], returncode=1, stdout='', stderr='scenario left a pending request\n').returncode
+
+tests/test_review_save_failures.py:63: AssertionError
+_________________ test_job_switch_away_and_back_is_a_new_view __________________
+
+    def test_job_switch_away_and_back_is_a_new_view():
+>       run_js("""setup();const p=saveAndRender();openJob('B');openJob('A');
+        await reply();await p;
+        if(calls.length!==1)throw Error('old view rendered on revisit');
+        if(MAN.length||BE.adds.length)throw Error('acknowledged old draft not reconciled');""")
+
+tests/test_review_save_failures.py:119: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "setup();const p=saveAndRender();openJob('B');openJob('A');\n    await reply();await p;\n    if(calls.length!==1)throw...d view rendered on revisit');\n    if(MAN.length||BE.adds.length)throw Error('acknowledged old draft not reconciled');"
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: scenario left a pending request
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...catch(e=>{console.error(e);process.exit(1)});\n'], returncode=1, stdout='', stderr='scenario left a pending request\n').returncode
+
+tests/test_review_save_failures.py:63: AssertionError
+_____________ test_failed_old_job_draft_is_recoverable_on_revisit ______________
+
+    def test_failed_old_job_draft_is_recoverable_on_revisit():
+>       run_js("""setup();const p=saveAndRender();openJob('B');await reply({error:'busy'},409);await p;openJob('A');
+        if(MAN.length!==1||BE.adds.length!==1||BE.audio.length!==1)throw Error('old job drafts lost');""")
+
+tests/test_review_save_failures.py:126: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "setup();const p=saveAndRender();openJob('B');await reply({error:'busy'},409);await p;openJob('A');\n    if(MAN.length!==1||BE.adds.length!==1||BE.audio.length!==1)throw Error('old job drafts lost');"
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: scenario left a pending request
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...catch(e=>{console.error(e);process.exit(1)});\n'], returncode=1, stdout='', stderr='scenario left a pending request\n').returncode
+
+tests/test_review_save_failures.py:63: AssertionError
+____ test_render_failure_retry_does_not_reappend_committed_manual[network] _____
+
+failure = 'network'
+
+    @pytest.mark.parametrize("failure", ["500", "network", "json", "body"])
+    def test_render_failure_retry_does_not_reappend_committed_manual(failure):
+>       run_js("""setup();const p=saveAndRender();await reply();const req=queue.shift();
+        if(FAILURE==='network')req.reject(Error('offline'));
+        else if(FAILURE==='json')req.resolve({ok:true,status:200,json:async()=>{throw Error('invalid JSON')}});
+        else req.resolve(response({error:'render failed'},FAILURE==='body'?200:+FAILURE));
+        await tick();await p;
+        if(MAN.length||BE.adds.length)throw Error('committed manual retained for replay');
+        const retry=saveAndRender();
+        if(calls.at(-1).body.manual.length)throw Error('retry appends committed manual');
+        await reply();await reply();await retry;
+        """.replace("FAILURE", json.dumps(failure)))
+
+tests/test_review_save_failures.py:132: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = 'setup();const p=saveAndRender();await reply();const req=queue.shift();\n    if("network"===\'network\')req.reject(Err...ody.manual.length)throw Error(\'retry appends committed manual\');\n    await reply();await reply();await retry;\n    '
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: Error: offline
+E             at evalmachine.<anonymous>:2:41
+E             at async [eval]:31:12
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...'], returncode=1, stdout='', stderr='Error: offline\n    at evalmachine.<anonymous>:2:41\n    at async [eval]:31:12\n').returncode
+
+tests/test_review_save_failures.py:63: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_review_save_failures.py::test_job_switch_during_save_never_renders_new_job
+FAILED tests/test_review_save_failures.py::test_newer_edits_survive_save_ack
+FAILED tests/test_review_save_failures.py::test_failed_save_keeps_manual_and_audio_drafts[saveAndRender-409]
+FAILED tests/test_review_save_failures.py::test_failed_save_keeps_manual_and_audio_drafts[saveAndRender-423]
+FAILED tests/test_review_save_failures.py::test_failed_save_keeps_manual_and_audio_drafts[saveAndRender-500]
+FAILED tests/test_review_save_failures.py::test_failed_save_keeps_manual_and_audio_drafts[saveAndRender-network]
+FAILED tests/test_review_save_failures.py::test_failed_save_keeps_manual_and_audio_drafts[saveAndRender-json]
+FAILED tests/test_review_save_failures.py::test_failed_save_keeps_manual_and_audio_drafts[saveAndRender-body]
+FAILED tests/test_review_save_failures.py::test_failed_save_keeps_manual_and_audio_drafts[beSave-409]
+FAILED tests/test_review_save_failures.py::test_failed_save_keeps_manual_and_audio_drafts[beSave-423]
+FAILED tests/test_review_save_failures.py::test_failed_save_keeps_manual_and_audio_drafts[beSave-500]
+FAILED tests/test_review_save_failures.py::test_failed_save_keeps_manual_and_audio_drafts[beSave-network]
+FAILED tests/test_review_save_failures.py::test_failed_save_keeps_manual_and_audio_drafts[beSave-json]
+FAILED tests/test_review_save_failures.py::test_failed_save_keeps_manual_and_audio_drafts[beSave-body]
+FAILED tests/test_review_save_failures.py::test_enabled_payload_contains_only_deliberate_changes
+FAILED tests/test_review_save_failures.py::test_duplicate_submit_is_guarded_across_both_entry_points
+FAILED tests/test_review_save_failures.py::test_allowlist_await_keeps_job_and_newer_edits
+FAILED tests/test_review_save_failures.py::test_job_switch_away_and_back_is_a_new_view
+FAILED tests/test_review_save_failures.py::test_failed_old_job_draft_is_recoverable_on_revisit
+FAILED tests/test_review_save_failures.py::test_render_failure_retry_does_not_reappend_committed_manual[network]
+20 failed, 4 passed in 28.86s

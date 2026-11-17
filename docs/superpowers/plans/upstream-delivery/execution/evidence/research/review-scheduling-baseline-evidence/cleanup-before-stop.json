@@ -1,0 +1,14 @@
+{
+  "baseline": {
+    "total_production_thumb_entries_all_harness_passes": 3818,
+    "pending_tokens": [],
+    "held_jobs": [],
+    "all_entered_work_returned": true
+  },
+  "p07a": {
+    "total_production_thumb_entries_all_harness_passes": 30,
+    "pending_tokens": [],
+    "held_jobs": [],
+    "all_entered_work_returned": true
+  }
+}

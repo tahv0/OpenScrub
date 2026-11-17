@@ -1,0 +1,83 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+_________ test_worker_pickup_cancel_and_cleanup_share_ticket_lifetime __________
+
+store = namespace(root=PosixPath('/tmp/openscrub-task621/red8-tmp/test_worker_pickup_cancel_and_0/data'), jobs=PosixPath('/tmp...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x725ef1b980e0>, url='/api/jobs/46f8965859db')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x725f295a2c00>
+
+    def test_worker_pickup_cancel_and_cleanup_share_ticket_lifetime(store, monkeypatch):
+        store.enable()
+        entered, release = threading.Event(), threading.Event()
+        def compute(args, cb):
+            entered.set()
+            assert release.wait(8)
+            raise openscrub.PipelineCancelled()
+        monkeypatch.setattr(openscrub, 'run_scan', compute)
+        monkeypatch.setattr(openscrub, 'PersonDetector', lambda *a, **k: None)
+        monkeypatch.setattr(openscrub, 'track_manual_region', lambda *a, **k: [])
+        store.job['phase'] = 'error'
+        assert request('post', store.url + '/retry').status_code == 200
+        assert request('post', '/api/vault/lock').status_code == 409
+        web.WORK_Q.put(None)
+        thread = threading.Thread(target=web.worker)
+        thread.start()
+        try:
+            assert entered.wait(5)
+            assert request('post', store.url + '/cancel').status_code == 200
+            assert store.job['cancel'].is_set()
+            # Even a prematurely terminal public phase cannot release resources.
+            store.job['phase'] = 'cancelled'
+            assert request('post', store.url + '/retry').status_code == 409
+            assert request('post', store.url + '/render').status_code == 409
+>           assert request('post', store.url + '/track_object', json={'box':[0,0,8,8], 't_ref':0, 't0':0, 't1':1}).status_code == 409
+E           AssertionError: assert 200 == 409
+E            +  where 200 = <WrapperTestResponse 12 bytes [200 OK]>.status_code
+E            +    where <WrapperTestResponse 12 bytes [200 OK]> = request('post', ('/api/jobs/46f8965859db' + '/track_object'), json={'box': [0, 0, 8, 8], 't_ref': 0, 't0': 0, 't1': 1})
+E            +      where '/api/jobs/46f8965859db' = namespace(root=PosixPath('/tmp/openscrub-task621/red8-tmp/test_worker_pickup_cancel_and_0/data'), jobs=PosixPath('/tmp...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x725ef1b980e0>, url='/api/jobs/46f8965859db').url
+
+tests/test_job_lifecycle.py:426: AssertionError
+____ test_next_tracker_gets_fresh_event_only_after_cancelled_owner_cleanup _____
+
+store = namespace(root=PosixPath('/tmp/openscrub-task621/red8-tmp/test_next_tracker_gets_fresh_e0/data'), jobs=PosixPath('/tmp...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x725ef1bba980>, url='/api/jobs/0e526f0af216')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x725f295a2630>
+
+    def test_next_tracker_gets_fresh_event_only_after_cancelled_owner_cleanup(store, monkeypatch):
+        entered, observed, threads = threading.Event(), [], []
+        def compute(*args, **kwargs):
+            if not observed:
+                entered.set()
+                assert store.job['cancel'].wait(8)
+            observed.append(kwargs['cb'].cancelled())
+            return []
+        monkeypatch.setattr(openscrub, 'PersonDetector', lambda *a, **k: None)
+        monkeypatch.setattr(openscrub, 'track_manual_region', compute)
+        real_start = web._start_owned_thread
+        def start(*args):
+            thread = real_start(*args)
+            threads.append(thread)
+            return thread
+        monkeypatch.setattr(web, '_start_owned_thread', start)
+        payload = {'box':[0,0,8,8], 't_ref':0, 't0':0, 't1':1}
+        try:
+            assert request('post', store.url + '/track_object', json=payload).status_code == 200
+            assert entered.wait(5)
+            assert request('post', store.url + '/cancel').status_code == 200
+            threads[0].join(8)
+            assert not threads[0].is_alive()
+            assert request('post', store.url + '/track_object', json=payload).status_code == 200
+        finally:
+            store.job['cancel'].set()
+            for thread in threads:
+                thread.join(8)
+                assert not thread.is_alive()
+>       assert observed == [True, False]
+E       assert [True, True] == [True, False]
+E         
+E         At index 1 diff: True != False
+E         Use -v to get more diff
+
+tests/test_job_lifecycle.py:781: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_job_lifecycle.py::test_worker_pickup_cancel_and_cleanup_share_ticket_lifetime
+FAILED tests/test_job_lifecycle.py::test_next_tracker_gets_fresh_event_only_after_cancelled_owner_cleanup
+2 failed, 25 deselected in 0.22s

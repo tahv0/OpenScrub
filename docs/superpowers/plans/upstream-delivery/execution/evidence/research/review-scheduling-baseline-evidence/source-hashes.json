@@ -1,0 +1,16 @@
+[
+  {
+    "source": "baseline",
+    "sha": "e21ebdf6e3ee46e6c65050dc956a9a3459152269",
+    "openscrub_web_sha256": "9835e1137abee62c0a78e2669ed8bae7059e36bf4bed9f5c7a44f0eb8b40ed3a",
+    "APP_JS_sha256": "9c20f2bcd754eac832cfbe6bab802f7b202d41fdf0608203ded89b8d74caf7ce",
+    "openscrub_py_sha256": "0e4f0f9a7846080f591038d021aaf3ca6f01201d83ac32bbdc273f53d5067ee7"
+  },
+  {
+    "source": "p07a",
+    "sha": "92124753736e287ac800af91f0ac96f3e96c01be",
+    "openscrub_web_sha256": "cb3b5fccffb2105982a914c2002d419519bceacf2c8bf3c2bb33ea13eb43b038",
+    "APP_JS_sha256": "1430b0f69074524a2af5ba052b467746d17b79703870e67a5524078571c7ce33",
+    "openscrub_py_sha256": "0e4f0f9a7846080f591038d021aaf3ca6f01201d83ac32bbdc273f53d5067ee7"
+  }
+]

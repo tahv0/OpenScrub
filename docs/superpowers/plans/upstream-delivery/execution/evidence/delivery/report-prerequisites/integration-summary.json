@@ -1,0 +1,30 @@
+{
+  "before_rows": 10,
+  "saved_rows": 10,
+  "rendered_rows": 10,
+  "fresh_reopened_rows": 10,
+  "fresh_status": 200,
+  "full_review_document_equal_except_provenance": true,
+  "original_order_preserved": true,
+  "disabled_rows": [
+    0,
+    4,
+    8
+  ],
+  "manual_rows": [
+    3,
+    8,
+    9
+  ],
+  "frames_checked": 60,
+  "enabled_black_regions_per_frame": 7,
+  "disabled_visible_regions_per_frame": 3,
+  "audio_fields_equal": {
+    "audio_redactions": true,
+    "audio_suggestions": true,
+    "audio_transcript": true
+  },
+  "fresh_full_report_equal": true,
+  "source": "/home/tahv0/.codex/worktrees/c832/OpenScrub",
+  "output": "/tmp/openscrub-task620/synthetic-data/browser-runtime/openscrub_jobs/53e03f5fa455/output.mp4"
+}

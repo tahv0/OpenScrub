@@ -1,0 +1,25 @@
+{
+  "sha": "5d3a15ae683c08f368d6ba4bd0d2d77b4e7b8e2f",
+  "files": {
+    "openscrub.py": {
+      "matches_git_object": true,
+      "sha256": "0e4f0f9a7846080f591038d021aaf3ca6f01201d83ac32bbdc273f53d5067ee7",
+      "bytes": 413860
+    },
+    "openscrub_web.py": {
+      "matches_git_object": true,
+      "sha256": "9835e1137abee62c0a78e2669ed8bae7059e36bf4bed9f5c7a44f0eb8b40ed3a",
+      "bytes": 256131
+    },
+    "zones_ui.py": {
+      "matches_git_object": true,
+      "sha256": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7",
+      "bytes": 65948
+    },
+    "openscrub_vault.py": {
+      "matches_git_object": true,
+      "sha256": "cc2db6a35d0b934502f1400b0d3a5b1f23ff8f63e6d24f9fc6fc4ab7baaebf82",
+      "bytes": 6695
+    }
+  }
+}

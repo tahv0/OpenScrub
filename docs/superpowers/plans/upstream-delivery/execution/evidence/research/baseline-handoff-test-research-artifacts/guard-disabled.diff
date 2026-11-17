@@ -1,0 +1,11 @@
+--- a/openscrub.py
++++ b/openscrub.py
+@@ -2233,7 +2233,7 @@
+                     # earlier, so pa/ref_a fell under 1.8 even as pa/current
+                     # hit 2.67. Use both.
+                     par = max(pa / ca, pa / ref_a)
+-                    if par > 1.8:
++                    if False and par > 1.8:
+                         # For a PERSON, appearance is the AUTHORITY: the
+                         # VitTrack anchor drifts onto a larger look-alike
+                         # during the handoff and would rubber-stamp it

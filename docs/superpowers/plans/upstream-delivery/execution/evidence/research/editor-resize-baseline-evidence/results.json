@@ -1,0 +1,1403 @@
+{
+  "environment": {
+    "plugin": "Browser plugin not available in skills/tool catalog; authorized regular Playwright fallback",
+    "playwright": "1.65.1",
+    "node": "v22.22.1",
+    "platform": "linux",
+    "dpr": 1,
+    "browser": "159.0.8154.6"
+  },
+  "versions": [
+    {
+      "label": "baseline",
+      "identity": {
+        "url": "http://127.0.0.1:18561/",
+        "title": "OpenScrub",
+        "nonblank": true,
+        "frameworkOverlays": 0
+      },
+      "states": [
+        {
+          "viewport": {
+            "width": 1365,
+            "height": 1000
+          },
+          "scroll": {
+            "x": 0,
+            "y": 532
+          },
+          "image": {
+            "x": 32,
+            "y": 639,
+            "width": 640,
+            "height": 360,
+            "clientWidth": 640,
+            "clientHeight": 360,
+            "naturalWidth": 640,
+            "naturalHeight": 360,
+            "src": "http://127.0.0.1:18561/api/jobs/resize/frame_at?t=0"
+          },
+          "canvas": {
+            "x": 32,
+            "y": 639,
+            "width": 640,
+            "height": 360,
+            "clientWidth": 640,
+            "clientHeight": 360
+          },
+          "BE": {
+            "scale": 1,
+            "t": 0,
+            "ox": 0,
+            "oy": 0,
+            "sel": -1,
+            "box": [
+              120,
+              80,
+              320,
+              220
+            ],
+            "overrides": {}
+          },
+          "paint": {
+            "redStroke": {
+              "x0": 119,
+              "y0": 79,
+              "x1": 320,
+              "y1": 220,
+              "count": 1360
+            },
+            "allPixels": {
+              "x0": 119,
+              "y0": 79,
+              "x1": 320,
+              "y1": 220,
+              "count": 28684
+            },
+            "renderedCssOuterEdges": [
+              151,
+              718,
+              353,
+              860
+            ],
+            "expectedCssBoxEdges": [
+              152,
+              719,
+              352,
+              859
+            ],
+            "edgeDelta": [
+              -1,
+              -1,
+              1,
+              1
+            ],
+            "expectedCenter": [
+              252,
+              789
+            ],
+            "expectedCenterPixel": [
+              219,
+              36,
+              36,
+              56
+            ]
+          },
+          "sourceToImage": {
+            "x": 1,
+            "y": 1
+          },
+          "name": "desktop"
+        },
+        {
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "scroll": {
+            "x": 0,
+            "y": 504
+          },
+          "image": {
+            "x": 32,
+            "y": 882,
+            "width": 326,
+            "height": 183.375,
+            "clientWidth": 326,
+            "clientHeight": 183,
+            "naturalWidth": 640,
+            "naturalHeight": 360,
+            "src": "http://127.0.0.1:18561/api/jobs/resize/frame_at?t=0"
+          },
+          "canvas": {
+            "x": 32,
+            "y": 882,
+            "width": 640,
+            "height": 360,
+            "clientWidth": 640,
+            "clientHeight": 360
+          },
+          "BE": {
+            "scale": 1,
+            "t": 0,
+            "ox": 0,
+            "oy": 0,
+            "sel": -1,
+            "box": [
+              120,
+              80,
+              320,
+              220
+            ],
+            "overrides": {}
+          },
+          "paint": {
+            "redStroke": {
+              "x0": 119,
+              "y0": 79,
+              "x1": 320,
+              "y1": 220,
+              "count": 1360
+            },
+            "allPixels": {
+              "x0": 119,
+              "y0": 79,
+              "x1": 320,
+              "y1": 220,
+              "count": 28684
+            },
+            "renderedCssOuterEdges": [
+              151,
+              961,
+              353,
+              1103
+            ],
+            "expectedCssBoxEdges": [
+              93.125,
+              922.75,
+              195,
+              994.0625
+            ],
+            "edgeDelta": [
+              57.875,
+              38.25,
+              158,
+              108.9375
+            ],
+            "expectedCenter": [
+              144.0625,
+              958.40625
+            ],
+            "expectedCenterPixel": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "sourceToImage": {
+            "x": 0.509375,
+            "y": 0.509375
+          },
+          "name": "mobile-live"
+        },
+        {
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "scroll": {
+            "x": 0,
+            "y": 1144
+          },
+          "image": {
+            "x": 32,
+            "y": 242,
+            "width": 326,
+            "height": 183.375,
+            "clientWidth": 326,
+            "clientHeight": 183,
+            "naturalWidth": 640,
+            "naturalHeight": 360,
+            "src": "http://127.0.0.1:18561/api/jobs/resize/frame_at?t=0"
+          },
+          "canvas": {
+            "x": 32,
+            "y": 242,
+            "width": 640,
+            "height": 360,
+            "clientWidth": 640,
+            "clientHeight": 360
+          },
+          "BE": {
+            "scale": 1,
+            "t": 0,
+            "ox": 0,
+            "oy": 0,
+            "sel": -1,
+            "box": [
+              120,
+              80,
+              320,
+              220
+            ],
+            "overrides": {}
+          },
+          "paint": {
+            "redStroke": {
+              "x0": 119,
+              "y0": 79,
+              "x1": 320,
+              "y1": 220,
+              "count": 1360
+            },
+            "allPixels": {
+              "x0": 119,
+              "y0": 79,
+              "x1": 320,
+              "y1": 220,
+              "count": 28684
+            },
+            "renderedCssOuterEdges": [
+              151,
+              321,
+              353,
+              463
+            ],
+            "expectedCssBoxEdges": [
+              93.125,
+              282.75,
+              195,
+              354.0625
+            ],
+            "edgeDelta": [
+              57.875,
+              38.25,
+              158,
+              108.9375
+            ],
+            "expectedCenter": [
+              144.0625,
+              318.40625
+            ],
+            "expectedCenterPixel": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "sourceToImage": {
+            "x": 0.509375,
+            "y": 0.509375
+          },
+          "name": "mobile-redraw"
+        },
+        {
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "scroll": {
+            "x": 0,
+            "y": 1144
+          },
+          "image": {
+            "x": 32,
+            "y": 242,
+            "width": 326,
+            "height": 183.375,
+            "clientWidth": 326,
+            "clientHeight": 183,
+            "naturalWidth": 640,
+            "naturalHeight": 360,
+            "src": "http://127.0.0.1:18561/api/jobs/resize/frame_at?t=0.5"
+          },
+          "canvas": {
+            "x": 32,
+            "y": 242,
+            "width": 326,
+            "height": 183,
+            "clientWidth": 326,
+            "clientHeight": 183
+          },
+          "BE": {
+            "scale": 0.509375,
+            "t": 0.5,
+            "ox": 0,
+            "oy": 0,
+            "sel": -1,
+            "box": [
+              120,
+              80,
+              320,
+              220
+            ],
+            "overrides": {}
+          },
+          "paint": {
+            "redStroke": {
+              "x0": 61,
+              "y0": 40,
+              "x1": 163,
+              "y1": 112,
+              "count": 519
+            },
+            "allPixels": {
+              "x0": 60,
+              "y0": 39,
+              "x1": 163,
+              "y1": 113,
+              "count": 7800
+            },
+            "renderedCssOuterEdges": [
+              93,
+              282,
+              196,
+              355
+            ],
+            "expectedCssBoxEdges": [
+              93.125,
+              282.75,
+              195,
+              354.0625
+            ],
+            "edgeDelta": [
+              -0.125,
+              -0.75,
+              1,
+              0.9375
+            ],
+            "expectedCenter": [
+              144.0625,
+              318.40625
+            ],
+            "expectedCenterPixel": [
+              219,
+              36,
+              36,
+              56
+            ]
+          },
+          "sourceToImage": {
+            "x": 0.509375,
+            "y": 0.509375
+          },
+          "name": "mobile-scrub"
+        },
+        {
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "scroll": {
+            "x": 0,
+            "y": 1017
+          },
+          "image": {
+            "x": 32,
+            "y": 369,
+            "width": 326,
+            "height": 183.375,
+            "clientWidth": 326,
+            "clientHeight": 183,
+            "naturalWidth": 640,
+            "naturalHeight": 360,
+            "src": "http://127.0.0.1:18561/api/jobs/resize/frame_at?t=0"
+          },
+          "canvas": {
+            "x": 32,
+            "y": 369,
+            "width": 326,
+            "height": 183,
+            "clientWidth": 326,
+            "clientHeight": 183
+          },
+          "BE": {
+            "scale": 0.509375,
+            "t": 0,
+            "ox": 0,
+            "oy": 0,
+            "sel": -1,
+            "box": [
+              120,
+              80,
+              320,
+              220
+            ],
+            "overrides": {}
+          },
+          "paint": {
+            "redStroke": {
+              "x0": 61,
+              "y0": 40,
+              "x1": 163,
+              "y1": 112,
+              "count": 519
+            },
+            "allPixels": {
+              "x0": 60,
+              "y0": 39,
+              "x1": 163,
+              "y1": 113,
+              "count": 7800
+            },
+            "renderedCssOuterEdges": [
+              93,
+              409,
+              196,
+              482
+            ],
+            "expectedCssBoxEdges": [
+              93.125,
+              409.75,
+              195,
+              481.0625
+            ],
+            "edgeDelta": [
+              -0.125,
+              -0.75,
+              1,
+              0.9375
+            ],
+            "expectedCenter": [
+              144.0625,
+              445.40625
+            ],
+            "expectedCenterPixel": [
+              219,
+              36,
+              36,
+              56
+            ]
+          },
+          "sourceToImage": {
+            "x": 0.509375,
+            "y": 0.509375
+          },
+          "name": "mobile-reopen"
+        }
+      ],
+      "livePointerHit": {
+        "imageRelativeCssPoint": {
+          "x": 112.0625,
+          "y": 76.40625
+        },
+        "selected": -1
+      },
+      "liveResize": {
+        "sameElements": true,
+        "imageLoadEvents": 0,
+        "frameRequests": []
+      },
+      "scrubPointerHit": {
+        "imageRelativeCssPoint": {
+          "x": 112.0625,
+          "y": 76.40625
+        },
+        "selected": 0
+      },
+      "editorClosed": true,
+      "reopenNewElements": true,
+      "report": {
+        "provenance": {
+          "input": "/tmp/openscrub-editor-resize-baseline-20261117/runtime/baseline/source.mp4",
+          "settings": {
+            "pad": 0,
+            "mode": "box"
+          }
+        },
+        "render_state": {
+          "fps": 10,
+          "cum": [
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ]
+          ],
+          "bands": [
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ]
+          ]
+        },
+        "detections": [
+          {
+            "t_start": 0,
+            "t_end": 2,
+            "last_seen": 0,
+            "cbox": [
+              120,
+              80,
+              320,
+              220
+            ],
+            "aoff": [
+              0,
+              0
+            ],
+            "category": "name",
+            "text": "Synthetic rectangular target",
+            "confidence": 1,
+            "enabled": true
+          }
+        ],
+        "audio_redactions": []
+      },
+      "errors": [],
+      "warnings": [
+        "Canvas2D: Multiple readback operations using getImageData are faster with the willReadFrequently attribute set to true. See: https://html.spec.whatwg.org/multipage/canvas.html#concept-canvas-will-read-frequently"
+      ],
+      "mutations": []
+    },
+    {
+      "label": "p07a",
+      "identity": {
+        "url": "http://127.0.0.1:18562/",
+        "title": "OpenScrub",
+        "nonblank": true,
+        "frameworkOverlays": 0
+      },
+      "states": [
+        {
+          "viewport": {
+            "width": 1365,
+            "height": 1000
+          },
+          "scroll": {
+            "x": 0,
+            "y": 532
+          },
+          "image": {
+            "x": 32,
+            "y": 639,
+            "width": 640,
+            "height": 360,
+            "clientWidth": 640,
+            "clientHeight": 360,
+            "naturalWidth": 640,
+            "naturalHeight": 360,
+            "src": "http://127.0.0.1:18562/api/jobs/resize/frame_at?t=0"
+          },
+          "canvas": {
+            "x": 32,
+            "y": 639,
+            "width": 640,
+            "height": 360,
+            "clientWidth": 640,
+            "clientHeight": 360
+          },
+          "BE": {
+            "scale": 1,
+            "t": 0,
+            "ox": 0,
+            "oy": 0,
+            "sel": -1,
+            "box": [
+              120,
+              80,
+              320,
+              220
+            ],
+            "overrides": {}
+          },
+          "paint": {
+            "redStroke": {
+              "x0": 119,
+              "y0": 79,
+              "x1": 320,
+              "y1": 220,
+              "count": 1360
+            },
+            "allPixels": {
+              "x0": 119,
+              "y0": 79,
+              "x1": 320,
+              "y1": 220,
+              "count": 28684
+            },
+            "renderedCssOuterEdges": [
+              151,
+              718,
+              353,
+              860
+            ],
+            "expectedCssBoxEdges": [
+              152,
+              719,
+              352,
+              859
+            ],
+            "edgeDelta": [
+              -1,
+              -1,
+              1,
+              1
+            ],
+            "expectedCenter": [
+              252,
+              789
+            ],
+            "expectedCenterPixel": [
+              219,
+              36,
+              36,
+              56
+            ]
+          },
+          "sourceToImage": {
+            "x": 1,
+            "y": 1
+          },
+          "name": "desktop"
+        },
+        {
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "scroll": {
+            "x": 0,
+            "y": 504
+          },
+          "image": {
+            "x": 32,
+            "y": 882,
+            "width": 326,
+            "height": 183.375,
+            "clientWidth": 326,
+            "clientHeight": 183,
+            "naturalWidth": 640,
+            "naturalHeight": 360,
+            "src": "http://127.0.0.1:18562/api/jobs/resize/frame_at?t=0"
+          },
+          "canvas": {
+            "x": 32,
+            "y": 882,
+            "width": 640,
+            "height": 360,
+            "clientWidth": 640,
+            "clientHeight": 360
+          },
+          "BE": {
+            "scale": 1,
+            "t": 0,
+            "ox": 0,
+            "oy": 0,
+            "sel": -1,
+            "box": [
+              120,
+              80,
+              320,
+              220
+            ],
+            "overrides": {}
+          },
+          "paint": {
+            "redStroke": {
+              "x0": 119,
+              "y0": 79,
+              "x1": 320,
+              "y1": 220,
+              "count": 1360
+            },
+            "allPixels": {
+              "x0": 119,
+              "y0": 79,
+              "x1": 320,
+              "y1": 220,
+              "count": 28684
+            },
+            "renderedCssOuterEdges": [
+              151,
+              961,
+              353,
+              1103
+            ],
+            "expectedCssBoxEdges": [
+              93.125,
+              922.75,
+              195,
+              994.0625
+            ],
+            "edgeDelta": [
+              57.875,
+              38.25,
+              158,
+              108.9375
+            ],
+            "expectedCenter": [
+              144.0625,
+              958.40625
+            ],
+            "expectedCenterPixel": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "sourceToImage": {
+            "x": 0.509375,
+            "y": 0.509375
+          },
+          "name": "mobile-live"
+        },
+        {
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "scroll": {
+            "x": 0,
+            "y": 1144
+          },
+          "image": {
+            "x": 32,
+            "y": 242,
+            "width": 326,
+            "height": 183.375,
+            "clientWidth": 326,
+            "clientHeight": 183,
+            "naturalWidth": 640,
+            "naturalHeight": 360,
+            "src": "http://127.0.0.1:18562/api/jobs/resize/frame_at?t=0"
+          },
+          "canvas": {
+            "x": 32,
+            "y": 242,
+            "width": 640,
+            "height": 360,
+            "clientWidth": 640,
+            "clientHeight": 360
+          },
+          "BE": {
+            "scale": 1,
+            "t": 0,
+            "ox": 0,
+            "oy": 0,
+            "sel": -1,
+            "box": [
+              120,
+              80,
+              320,
+              220
+            ],
+            "overrides": {}
+          },
+          "paint": {
+            "redStroke": {
+              "x0": 119,
+              "y0": 79,
+              "x1": 320,
+              "y1": 220,
+              "count": 1360
+            },
+            "allPixels": {
+              "x0": 119,
+              "y0": 79,
+              "x1": 320,
+              "y1": 220,
+              "count": 28684
+            },
+            "renderedCssOuterEdges": [
+              151,
+              321,
+              353,
+              463
+            ],
+            "expectedCssBoxEdges": [
+              93.125,
+              282.75,
+              195,
+              354.0625
+            ],
+            "edgeDelta": [
+              57.875,
+              38.25,
+              158,
+              108.9375
+            ],
+            "expectedCenter": [
+              144.0625,
+              318.40625
+            ],
+            "expectedCenterPixel": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "sourceToImage": {
+            "x": 0.509375,
+            "y": 0.509375
+          },
+          "name": "mobile-redraw"
+        },
+        {
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "scroll": {
+            "x": 0,
+            "y": 1144
+          },
+          "image": {
+            "x": 32,
+            "y": 242,
+            "width": 326,
+            "height": 183.375,
+            "clientWidth": 326,
+            "clientHeight": 183,
+            "naturalWidth": 640,
+            "naturalHeight": 360,
+            "src": "http://127.0.0.1:18562/api/jobs/resize/frame_at?t=0.5"
+          },
+          "canvas": {
+            "x": 32,
+            "y": 242,
+            "width": 326,
+            "height": 183,
+            "clientWidth": 326,
+            "clientHeight": 183
+          },
+          "BE": {
+            "scale": 0.509375,
+            "t": 0.5,
+            "ox": 0,
+            "oy": 0,
+            "sel": -1,
+            "box": [
+              120,
+              80,
+              320,
+              220
+            ],
+            "overrides": {}
+          },
+          "paint": {
+            "redStroke": {
+              "x0": 61,
+              "y0": 40,
+              "x1": 163,
+              "y1": 112,
+              "count": 519
+            },
+            "allPixels": {
+              "x0": 60,
+              "y0": 39,
+              "x1": 163,
+              "y1": 113,
+              "count": 7800
+            },
+            "renderedCssOuterEdges": [
+              93,
+              282,
+              196,
+              355
+            ],
+            "expectedCssBoxEdges": [
+              93.125,
+              282.75,
+              195,
+              354.0625
+            ],
+            "edgeDelta": [
+              -0.125,
+              -0.75,
+              1,
+              0.9375
+            ],
+            "expectedCenter": [
+              144.0625,
+              318.40625
+            ],
+            "expectedCenterPixel": [
+              219,
+              36,
+              36,
+              56
+            ]
+          },
+          "sourceToImage": {
+            "x": 0.509375,
+            "y": 0.509375
+          },
+          "name": "mobile-scrub"
+        },
+        {
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "scroll": {
+            "x": 0,
+            "y": 1017
+          },
+          "image": {
+            "x": 32,
+            "y": 369,
+            "width": 326,
+            "height": 183.375,
+            "clientWidth": 326,
+            "clientHeight": 183,
+            "naturalWidth": 640,
+            "naturalHeight": 360,
+            "src": "http://127.0.0.1:18562/api/jobs/resize/frame_at?t=0"
+          },
+          "canvas": {
+            "x": 32,
+            "y": 369,
+            "width": 326,
+            "height": 183,
+            "clientWidth": 326,
+            "clientHeight": 183
+          },
+          "BE": {
+            "scale": 0.509375,
+            "t": 0,
+            "ox": 0,
+            "oy": 0,
+            "sel": -1,
+            "box": [
+              120,
+              80,
+              320,
+              220
+            ],
+            "overrides": {}
+          },
+          "paint": {
+            "redStroke": {
+              "x0": 61,
+              "y0": 40,
+              "x1": 163,
+              "y1": 112,
+              "count": 519
+            },
+            "allPixels": {
+              "x0": 60,
+              "y0": 39,
+              "x1": 163,
+              "y1": 113,
+              "count": 7800
+            },
+            "renderedCssOuterEdges": [
+              93,
+              409,
+              196,
+              482
+            ],
+            "expectedCssBoxEdges": [
+              93.125,
+              409.75,
+              195,
+              481.0625
+            ],
+            "edgeDelta": [
+              -0.125,
+              -0.75,
+              1,
+              0.9375
+            ],
+            "expectedCenter": [
+              144.0625,
+              445.40625
+            ],
+            "expectedCenterPixel": [
+              219,
+              36,
+              36,
+              56
+            ]
+          },
+          "sourceToImage": {
+            "x": 0.509375,
+            "y": 0.509375
+          },
+          "name": "mobile-reopen"
+        }
+      ],
+      "livePointerHit": {
+        "imageRelativeCssPoint": {
+          "x": 112.0625,
+          "y": 76.40625
+        },
+        "selected": -1
+      },
+      "liveResize": {
+        "sameElements": true,
+        "imageLoadEvents": 0,
+        "frameRequests": []
+      },
+      "scrubPointerHit": {
+        "imageRelativeCssPoint": {
+          "x": 112.0625,
+          "y": 76.40625
+        },
+        "selected": 0
+      },
+      "editorClosed": true,
+      "reopenNewElements": true,
+      "report": {
+        "provenance": {
+          "input": "/tmp/openscrub-editor-resize-baseline-20261117/runtime/p07a/source.mp4",
+          "settings": {
+            "pad": 0,
+            "mode": "box"
+          }
+        },
+        "render_state": {
+          "fps": 10,
+          "cum": [
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ]
+          ],
+          "bands": [
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ]
+          ]
+        },
+        "detections": [
+          {
+            "t_start": 0,
+            "t_end": 2,
+            "last_seen": 0,
+            "cbox": [
+              120,
+              80,
+              320,
+              220
+            ],
+            "aoff": [
+              0,
+              0
+            ],
+            "category": "name",
+            "text": "Synthetic rectangular target",
+            "confidence": 1,
+            "enabled": true
+          }
+        ],
+        "audio_redactions": []
+      },
+      "errors": [],
+      "warnings": [
+        "Canvas2D: Multiple readback operations using getImageData are faster with the willReadFrequently attribute set to true. See: https://html.spec.whatwg.org/multipage/canvas.html#concept-canvas-will-read-frequently"
+      ],
+      "mutations": []
+    }
+  ],
+  "browserClosed": true
+}

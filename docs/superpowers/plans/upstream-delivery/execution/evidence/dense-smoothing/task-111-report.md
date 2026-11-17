@@ -61,7 +61,7 @@ blur, pad=8 and ellipse face shape, x264 encoding. **All 130 decoded BGR frames
 are equal**, aggregate decoded-frame hash
 `99047cfa56bb1b128e3477a60d00003ee48b9377dea2c644a6140351e699c1d2`.
 A separate real Tesseract `run_pipeline` scan/report/default render on a
-synthetic SSN video produced one report row and 20 decoded output frames.
+synthetic SSN video produced one report row; output capture metadata reports 20 frames.
 This checks engine integration without representing the OCR scan as a dense
 face-detector benchmark. [Runtime results](task111-evidence/runtime-results.json).
 

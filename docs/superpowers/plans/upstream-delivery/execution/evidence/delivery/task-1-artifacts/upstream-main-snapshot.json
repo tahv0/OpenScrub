@@ -1,0 +1,10 @@
+{
+  "fetched_at": "2026-11-16 21:10:01 UTC",
+  "source_url": "https://api.github.com/repos/austinmabry/OpenScrub/branches/main",
+  "tool": "connected GitHub fetch",
+  "branch": "main",
+  "sha": "5d3a15ae683c08f368d6ba4bd0d2d77b4e7b8e2f",
+  "commit_url": "https://github.com/austinmabry/OpenScrub/commit/5d3a15ae683c08f368d6ba4bd0d2d77b4e7b8e2f",
+  "commit_date": "2026-11-16T15:44:24Z",
+  "subject": "Benchmark: publish the v1.0.96 re-measurement"
+}

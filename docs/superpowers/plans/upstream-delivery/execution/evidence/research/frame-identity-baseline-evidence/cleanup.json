@@ -1,0 +1,9 @@
+{
+  "server_pid": 485764,
+  "server_running": false,
+  "loopback_port": 18571,
+  "connect_errno": 111,
+  "server_session_exit": 143,
+  "browser": "Closed by browser.cjs finally; browser command exited 0",
+  "product_changes": false
+}

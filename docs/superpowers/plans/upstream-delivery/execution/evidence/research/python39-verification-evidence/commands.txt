@@ -1,0 +1,27 @@
+All paths below are task-local unless explicitly described as read-only or report destinations.
+
+# Pin a full export; never use moving worktree source for runtime checks.
+git archive --format=tar --output=/tmp/openscrub-python39-20261117/source-3795d49.tar 3795d49f6293baf7b8c35534862a4881447e1b16
+tar -xf /tmp/openscrub-python39-20261117/source-3795d49.tar -C /tmp/openscrub-python39-20261117/source
+
+# setup.sh records all UV/cache/tmp/index settings and exact underlying commands.
+bash /tmp/openscrub-python39-20261117/setup.sh python
+# First sandboxed attempt failed DNS; identical authorized network execution succeeded.
+bash /tmp/openscrub-python39-20261117/setup.sh venv
+bash /tmp/openscrub-python39-20261117/setup.sh install
+# Actual install: uv pip install --python TASK_ROOT/venv/bin/python -c TASK_ROOT/validation-constraints.txt TASK_ROOT/source pytest build hatchling
+
+source /tmp/openscrub-python39-20261117/env.sh
+cd /tmp/openscrub-python39-20261117/runtime
+# Import smoke included every declared core requirement plus pytest/build/Hatchling.
+python -c 'import sys, platform, cv2, numpy, onnxruntime, rapidfuzz, pytesseract, PIL, flask, yaml, cryptography, cheroot, pytest, build, hatchling, openscrub; import python39_isolation; web = python39_isolation.configure("installed"); print(sys.version); print(platform.platform()); print("OpenCV", cv2.__version__, "NumPy", numpy.__version__, "ONNXRuntime", onnxruntime.__version__); print("installed engine", openscrub.__file__); print("web", web.__file__); print("isolated profile", __import__("os").path.expanduser("~")); print("all core/test/build imports passed")'
+# First platform diagnostic hit an over-strict harness /dev/null write guard; allow /dev/null and rerun passed.
+# verify.sh records exact installed/source CLI, API smoke, build and native tool commands.
+bash /tmp/openscrub-python39-20261117/verify.sh
+# Initial socket-blocker assertion hit sandbox socket-creation denial. Preserved initial log;
+# changed only harness assertion to direct sys.audit event, reran verify.sh, all passed.
+python /tmp/openscrub-python39-20261117/manifest.py
+/tmp/openscrub-baseline-20261116/bootstrap/bin/uv --version
+
+# Copies of logs, manifests, harness/scripts and constraint are placed in the SDD evidence directory.
+# No pytest suite, feature-branch reruns, models or optional/training dependencies were invoked.

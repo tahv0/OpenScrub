@@ -1,0 +1,93 @@
+[1/4] OCR engine   (openscrub v1.0.96)
+      PaddleOCR unavailable: ModuleNotFoundError: No module named 'paddleocr'
+      downloading OCR detection model (~4.8 MB, one time)…
+      ONNX PP-OCR unavailable: RuntimeError: Baseline policy: model network downloads disabled
+      falling back to Tesseract — the job continues on CPU OCR.
+      using TesseractBackend
+[2/4] Detectors
+      names: skipped (name category not selected)
+[3/4] Scanning (every 0.5s or 60px of scroll, self-tuning to screen activity and scroll speed)
+      9 OCR scans | 0 raw hits -> 0 merged regions | 0 memory recalls, 0 strings remembered
+      safety bands: suppressed — the scan found no text anywhere, so edge bands (which exist to cover unscanned text) could only be camera-motion artifacts
+[2026-11-16 23:48:47,808] ERROR in app: Exception on /api/jobs/synthetic/detections [POST]
+Traceback (most recent call last):
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", line 1336, in job_save_edits
+    atomic_report(path, doc)
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_internal/reports.py", line 28, in atomic_report
+    json.dump(report, stream, indent=1)
+  File "/tmp/openscrub-task61/verify_runtime.py", line 66, in fail
+    raise TypeError('injected HTTP encoding failure')
+TypeError: injected HTTP encoding failure
+127.0.0.1 - - [16/Nov/2026 23:48:47] "[35m[1mPOST /api/jobs/synthetic/detections HTTP/1.1[0m" 500 -
+[2026-11-16 23:48:48,410] ERROR in app: Exception on /api/jobs/synthetic/detections [POST]
+Traceback (most recent call last):
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", line 1336, in job_save_edits
+    atomic_report(path, doc)
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_internal/reports.py", line 28, in atomic_report
+    json.dump(report, stream, indent=1)
+  File "/tmp/openscrub-task61/verify_runtime.py", line 65, in fail
+    raise OSError('injected HTTP write failure')
+OSError: injected HTTP write failure
+127.0.0.1 - - [16/Nov/2026 23:48:48] "[35m[1mPOST /api/jobs/synthetic/detections HTTP/1.1[0m" 500 -
+127.0.0.1 - - [16/Nov/2026 23:48:49] "POST /api/jobs/synthetic/detections HTTP/1.1" 200 -
+[1/2] Loading detections from /tmp/openscrub-task61/runtime/jobs/synthetic/report.json
+      1 enabled detections
+[4/4] Rendering -> /tmp/openscrub-task61/runtime/jobs/synthetic/rendered.mp4
+      encoder: libx264 (CPU)
+      audit report: /tmp/openscrub-task61/runtime/jobs/synthetic/report.json (contains PII text — protect it)
+done.
+{
+  "scan": "manual-only synthetic scan completed",
+  "http_failures": {
+    "encoding": {
+      "status": 500,
+      "bytes_preserved": true,
+      "restart": {
+        "restart_phase": "review",
+        "restart_get_status": 200
+      }
+    },
+    "write": {
+      "status": 500,
+      "bytes_preserved": true,
+      "restart": {
+        "restart_phase": "review",
+        "restart_get_status": 200
+      }
+    }
+  },
+  "http_success": {
+    "ok": true,
+    "suggest_allowlist": [],
+    "total": 1
+  },
+  "render": {
+    "frames": 60,
+    "report_rows": 1,
+    "output_bytes": 7811
+  }
+}

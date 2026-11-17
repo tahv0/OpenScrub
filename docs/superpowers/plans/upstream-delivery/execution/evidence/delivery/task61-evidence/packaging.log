@@ -1,0 +1,39 @@
+/tmp/openscrub-task61/verify_packaging.py:23: DeprecationWarning: Python 3.14 will, by default, filter extracted tar archives and reject files or modify their metadata. Use the filter argument to control this behavior.
+  archive.extractall(ROOT / 'source')
+Processing ./openscrub-task61/dist/openscrub-1.0.96-py3-none-any.whl
+Installing collected packages: openscrub
+Successfully installed openscrub-1.0.96
+updating folder install at /tmp/openscrub-task61/update-target …
+  downloading local-synthetic
+  sha256 verified (8e0016330897fb0d…)
+  26 file(s) updated; previous versions saved to backups/pre-update-1.0.96-20261116-234938
+folder update complete.
+{
+  "wheel_package": [
+    "openscrub_internal/__init__.py",
+    "openscrub_internal/reports.py"
+  ],
+  "sdist_tests": true,
+  "startup": {
+    "wheel": [
+      "/tmp/openscrub-task61/installed/openscrub.py",
+      "/tmp/openscrub-task61/installed/openscrub_web.py",
+      "/tmp/openscrub-task61/installed/openscrub_internal/reports.py"
+    ],
+    "source": [
+      "/tmp/openscrub-task61/source/openscrub-1.0.96/openscrub.py",
+      "/tmp/openscrub-task61/source/openscrub-1.0.96/openscrub_web.py",
+      "/tmp/openscrub-task61/source/openscrub-1.0.96/openscrub_internal/reports.py"
+    ]
+  },
+  "updater": {
+    "nested_package_installed": true,
+    "preserved_synthetic_sentinels": [
+      "allowlist.txt",
+      "certs/key.pem",
+      "models/synthetic.onnx",
+      "openscrub_jobs/synthetic/report.json",
+      "zones.json"
+    ]
+  }
+}

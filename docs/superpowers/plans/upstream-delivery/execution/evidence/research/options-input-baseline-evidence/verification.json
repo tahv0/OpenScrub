@@ -1,0 +1,11 @@
+{
+  "verification": "passed",
+  "actual_route_cases": 36,
+  "malformed_500_cases": 8,
+  "accepted_nonobject_cases": 20,
+  "accepted_object_default_controls": 8,
+  "cancel_delete_successes": 28,
+  "pinned_files_unchanged": 113,
+  "runtime_removed": true,
+  "no_worker_or_inference_calls": true
+}

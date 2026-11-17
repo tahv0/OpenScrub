@@ -1,0 +1,13 @@
+{
+  "passed": true,
+  "checks": [
+    "small card/request/count, switch, choice, no final error/gate-timeout assertions passed",
+    "oneK card/request/count, switch, choice, no final error/gate-timeout assertions passed",
+    "tenK card/request/count, switch, choice, no final error/gate-timeout assertions passed",
+    "P07a small pending draft and reopen preservation passed",
+    "Pinned exported product source hashes unchanged",
+    "All entered production work drained and both listeners closed",
+    "All report evidence links resolve"
+  ],
+  "scope": "Research artifact consistency; not product tests or a performance comparison"
+}

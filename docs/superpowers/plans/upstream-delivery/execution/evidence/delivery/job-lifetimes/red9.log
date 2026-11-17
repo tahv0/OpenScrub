@@ -1,0 +1,182 @@
+FFFFFF                                                                   [100%]
+=================================== FAILURES ===================================
+____ test_server_preview_job_path_and_symlink_hold_stream_ownership[False] _____
+
+store = namespace(root=PosixPath('/tmp/openscrub-task621/red9-tmp/test_server_preview_job_path_a0/data'), jobs=PosixPath('/tmp...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x70a2483bf9c0>, url='/api/jobs/ce3b8cd057aa')
+alias = False
+
+    @pytest.mark.parametrize('alias', [False, True])
+    def test_server_preview_job_path_and_symlink_hold_stream_ownership(store, alias):
+        store.enable()
+        path = Path(store.job['video'])
+        if alias:
+            path = store.root / 'source-alias.avi'
+            path.symlink_to(store.job['video'])
+        client = web.app.test_client()
+        response = client.get('/api/server_video', query_string={'path': str(path)}, buffered=False)
+        try:
+            assert response.status_code == 200
+>           assert request('delete', store.url).status_code == 409
+E           AssertionError: assert 200 == 409
+E            +  where 200 = <WrapperTestResponse 12 bytes [200 OK]>.status_code
+E            +    where <WrapperTestResponse 12 bytes [200 OK]> = request('delete', '/api/jobs/ce3b8cd057aa')
+E            +      where '/api/jobs/ce3b8cd057aa' = namespace(root=PosixPath('/tmp/openscrub-task621/red9-tmp/test_server_preview_job_path_a0/data'), jobs=PosixPath('/tmp...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x70a2483bf9c0>, url='/api/jobs/ce3b8cd057aa').url
+
+tests/test_job_lifecycle.py:797: AssertionError
+_____ test_server_preview_job_path_and_symlink_hold_stream_ownership[True] _____
+
+store = namespace(root=PosixPath('/tmp/openscrub-task621/red9-tmp/test_server_preview_job_path_a1/data'), jobs=PosixPath('/tmp...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x70a20a599120>, url='/api/jobs/f7987b945b22')
+alias = True
+
+    @pytest.mark.parametrize('alias', [False, True])
+    def test_server_preview_job_path_and_symlink_hold_stream_ownership(store, alias):
+        store.enable()
+        path = Path(store.job['video'])
+        if alias:
+            path = store.root / 'source-alias.avi'
+            path.symlink_to(store.job['video'])
+        client = web.app.test_client()
+        response = client.get('/api/server_video', query_string={'path': str(path)}, buffered=False)
+        try:
+            assert response.status_code == 200
+>           assert request('delete', store.url).status_code == 409
+E           AssertionError: assert 200 == 409
+E            +  where 200 = <WrapperTestResponse 12 bytes [200 OK]>.status_code
+E            +    where <WrapperTestResponse 12 bytes [200 OK]> = request('delete', '/api/jobs/f7987b945b22')
+E            +      where '/api/jobs/f7987b945b22' = namespace(root=PosixPath('/tmp/openscrub-task621/red9-tmp/test_server_preview_job_path_a1/data'), jobs=PosixPath('/tmp...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x70a20a599120>, url='/api/jobs/f7987b945b22').url
+
+tests/test_job_lifecycle.py:797: AssertionError
+__ test_waveform_job_path_owns_canonical_source_until_compute_finishes[False] __
+
+store = namespace(root=PosixPath('/tmp/openscrub-task621/red9-tmp/test_waveform_job_path_owns_ca0/data'), jobs=PosixPath('/tmp...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x70a20a599e40>, url='/api/jobs/22e772402cc7')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x70a27faa6ed0>
+alias = False
+
+    @pytest.mark.parametrize('alias', [False, True])
+    def test_waveform_job_path_owns_canonical_source_until_compute_finishes(store, monkeypatch, alias):
+        import subprocess
+        store.enable()
+        path = Path(store.job['video'])
+        if alias:
+            path = store.root / 'audio-source-alias.avi'
+            path.symlink_to(store.job['video'])
+        entered, release, sources = threading.Event(), threading.Event(), []
+        def compute(argv, **kwargs):
+            sources.append(argv[argv.index('-i') + 1])
+            entered.set()
+            assert release.wait(8)
+            return SimpleNamespace(stdout=b'\x00\x00\x01\x00')
+        monkeypatch.setattr(subprocess, 'run', compute)
+        call = start_call('get', '/api/waveform', query_string={'path': str(path)})
+        try:
+            assert entered.wait(5)
+>           assert request('delete', store.url).status_code == 409
+E           AssertionError: assert 200 == 409
+E            +  where 200 = <WrapperTestResponse 12 bytes [200 OK]>.status_code
+E            +    where <WrapperTestResponse 12 bytes [200 OK]> = request('delete', '/api/jobs/22e772402cc7')
+E            +      where '/api/jobs/22e772402cc7' = namespace(root=PosixPath('/tmp/openscrub-task621/red9-tmp/test_waveform_job_path_owns_ca0/data'), jobs=PosixPath('/tmp...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x70a20a599e40>, url='/api/jobs/22e772402cc7').url
+
+tests/test_job_lifecycle.py:824: AssertionError
+__ test_waveform_job_path_owns_canonical_source_until_compute_finishes[True] ___
+
+store = namespace(root=PosixPath('/tmp/openscrub-task621/red9-tmp/test_waveform_job_path_owns_ca1/data'), jobs=PosixPath('/tmp...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x70a20a59a020>, url='/api/jobs/5e341e9b4ba8')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x70a27faa6f60>
+alias = True
+
+    @pytest.mark.parametrize('alias', [False, True])
+    def test_waveform_job_path_owns_canonical_source_until_compute_finishes(store, monkeypatch, alias):
+        import subprocess
+        store.enable()
+        path = Path(store.job['video'])
+        if alias:
+            path = store.root / 'audio-source-alias.avi'
+            path.symlink_to(store.job['video'])
+        entered, release, sources = threading.Event(), threading.Event(), []
+        def compute(argv, **kwargs):
+            sources.append(argv[argv.index('-i') + 1])
+            entered.set()
+            assert release.wait(8)
+            return SimpleNamespace(stdout=b'\x00\x00\x01\x00')
+        monkeypatch.setattr(subprocess, 'run', compute)
+        call = start_call('get', '/api/waveform', query_string={'path': str(path)})
+        try:
+            assert entered.wait(5)
+>           assert request('delete', store.url).status_code == 409
+E           AssertionError: assert 200 == 409
+E            +  where 200 = <WrapperTestResponse 12 bytes [200 OK]>.status_code
+E            +    where <WrapperTestResponse 12 bytes [200 OK]> = request('delete', '/api/jobs/5e341e9b4ba8')
+E            +      where '/api/jobs/5e341e9b4ba8' = namespace(root=PosixPath('/tmp/openscrub-task621/red9-tmp/test_waveform_job_path_owns_ca1/data'), jobs=PosixPath('/tmp...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x70a20a59a020>, url='/api/jobs/5e341e9b4ba8').url
+
+tests/test_job_lifecycle.py:824: AssertionError
+_ test_intake_source_job_remains_owned_through_queue_and_cancelled_worker[False] _
+
+store = namespace(root=PosixPath('/tmp/openscrub-task621/red9-tmp/test_intake_source_job_remains0/data'), jobs=PosixPath('/tmp...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x70a20a59a7a0>, url='/api/jobs/9f8082bc0329')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x70a27faabb90>
+alias = False
+
+    @pytest.mark.parametrize('alias', [False, True])
+    def test_intake_source_job_remains_owned_through_queue_and_cancelled_worker(store, monkeypatch, alias):
+        source = Path(store.job['video'])
+        if alias:
+            source = store.root / 'intake-alias.avi'
+            source.symlink_to(store.job['video'])
+        response = request('post', '/api/jobs', data={'server_path': str(source)})
+        assert response.status_code == 200
+        jid = response.get_json()['jobs'][0]
+        url = '/api/jobs/' + jid
+        entered, release = threading.Event(), threading.Event()
+        def compute(args, cb):
+            assert args.video == store.job['video']
+            entered.set()
+            assert release.wait(8)
+            raise openscrub.PipelineCancelled()
+        monkeypatch.setattr(openscrub, 'run_scan', compute)
+        thread = None
+        try:
+>           assert request('delete', store.url).status_code == 409
+E           AssertionError: assert 200 == 409
+E            +  where 200 = <WrapperTestResponse 12 bytes [200 OK]>.status_code
+E            +    where <WrapperTestResponse 12 bytes [200 OK]> = request('delete', '/api/jobs/9f8082bc0329')
+E            +      where '/api/jobs/9f8082bc0329' = namespace(root=PosixPath('/tmp/openscrub-task621/red9-tmp/test_intake_source_job_remains0/data'), jobs=PosixPath('/tmp...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x70a20a59a7a0>, url='/api/jobs/9f8082bc0329').url
+
+tests/test_job_lifecycle.py:853: AssertionError
+_ test_intake_source_job_remains_owned_through_queue_and_cancelled_worker[True] _
+
+store = namespace(root=PosixPath('/tmp/openscrub-task621/red9-tmp/test_intake_source_job_remains1/data'), jobs=PosixPath('/tmp...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x70a20a59ad40>, url='/api/jobs/ffec9d0abed3')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x70a27faab050>
+alias = True
+
+    @pytest.mark.parametrize('alias', [False, True])
+    def test_intake_source_job_remains_owned_through_queue_and_cancelled_worker(store, monkeypatch, alias):
+        source = Path(store.job['video'])
+        if alias:
+            source = store.root / 'intake-alias.avi'
+            source.symlink_to(store.job['video'])
+        response = request('post', '/api/jobs', data={'server_path': str(source)})
+        assert response.status_code == 200
+        jid = response.get_json()['jobs'][0]
+        url = '/api/jobs/' + jid
+        entered, release = threading.Event(), threading.Event()
+        def compute(args, cb):
+            assert args.video == store.job['video']
+            entered.set()
+            assert release.wait(8)
+            raise openscrub.PipelineCancelled()
+        monkeypatch.setattr(openscrub, 'run_scan', compute)
+        thread = None
+        try:
+>           assert request('delete', store.url).status_code == 409
+E           AssertionError: assert 200 == 409
+E            +  where 200 = <WrapperTestResponse 12 bytes [200 OK]>.status_code
+E            +    where <WrapperTestResponse 12 bytes [200 OK]> = request('delete', '/api/jobs/ffec9d0abed3')
+E            +      where '/api/jobs/ffec9d0abed3' = namespace(root=PosixPath('/tmp/openscrub-task621/red9-tmp/test_intake_source_job_remains1/data'), jobs=PosixPath('/tmp...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x70a20a59ad40>, url='/api/jobs/ffec9d0abed3').url
+
+tests/test_job_lifecycle.py:853: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_job_lifecycle.py::test_server_preview_job_path_and_symlink_hold_stream_ownership[False]
+FAILED tests/test_job_lifecycle.py::test_server_preview_job_path_and_symlink_hold_stream_ownership[True]
+FAILED tests/test_job_lifecycle.py::test_waveform_job_path_owns_canonical_source_until_compute_finishes[False]
+FAILED tests/test_job_lifecycle.py::test_waveform_job_path_owns_canonical_source_until_compute_finishes[True]
+FAILED tests/test_job_lifecycle.py::test_intake_source_job_remains_owned_through_queue_and_cancelled_worker[False]
+FAILED tests/test_job_lifecycle.py::test_intake_source_job_remains_owned_through_queue_and_cancelled_worker[True]
+6 failed, 30 deselected in 0.47s

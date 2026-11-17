@@ -1,0 +1,1885 @@
+FFFFFFFFF                                                                [100%]
+=================================== FAILURES ===================================
+___ test_configured_wsgi_closes_stream_owner_exactly_once[complete-download] ___
+
+store = namespace(root=PosixPath('/tmp/openscrub-task621/socket-tmp/test_configured_wsgi_closes_st0/data'), jobs=PosixPath('/t...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7c41c0373ec0>, url='/api/jobs/0c90ff9149d7')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7c41f7d8b710>
+endpoint = 'download', ending = 'complete'
+
+    @pytest.mark.parametrize('endpoint', ['download', 'report', 'video'])
+    @pytest.mark.parametrize('ending', ['complete', 'iterator_error', 'disconnect'])
+    def test_configured_wsgi_closes_stream_owner_exactly_once(store, monkeypatch, endpoint, ending):
+        store.enable()
+        payload = bytes(range(256)) * 16384
+        if endpoint == 'report':
+            doc = dict(store.doc, synthetic_padding='x' * len(payload))
+            store.path.write_text(json.dumps(doc))
+            payload = store.path.read_bytes()
+        else:
+            output = Path(store.job['dir']) / 'output.mp4'
+            output.write_bytes(payload)
+            Path(store.job['video']).write_bytes(payload)
+            store.job.update(output=str(output), phase='done')
+        ready, entered, release, closed = (threading.Event() for _ in range(4))
+        servers, errors, releases, logs = [], [], [], []
+        real_server = wsgi.Server
+        class Server(real_server):
+            def prepare(self):
+                super().prepare()
+                servers.append(self)
+                ready.set()
+            def error_log(self, message='', level=20, traceback=False):
+                logs.append(str(message))
+        monkeypatch.setattr(wsgi, 'Server', Server)
+        real_send, real_close = web.send_file, web.OwnedIterable.close
+        class Gate:
+            def __init__(self, source):
+                self.source, self.iterator, self.calls = source, iter(source), 0
+            def __iter__(self):
+                return self
+            def __next__(self):
+                self.calls += 1
+                if self.calls == 2:
+                    entered.set()
+                    assert release.wait(8), 'socket schedule did not release file read'
+                    if ending == 'iterator_error':
+                        raise OSError('synthetic streaming read failure')
+                return next(self.iterator)
+            def close(self):
+                self.source.close()
+        def send(*args, **kwargs):
+            response = real_send(*args, **kwargs)
+            response.response = Gate(response.response)
+            return response
+        def close(owner):
+            was_released = owner.lease.released
+            try:
+                return real_close(owner)
+            finally:
+                if not was_released and owner.lease.released:
+                    releases.append(1)
+                closed.set()
+        monkeypatch.setattr(web, 'send_file', send)
+        monkeypatch.setattr(web.OwnedIterable, 'close', close)
+        def serve():
+            try:
+                web._serve('127.0.0.1', 0, None)
+            except BaseException as error:
+                errors.append(error)
+                ready.set()
+        thread = threading.Thread(target=serve, name='task621-cheroot')
+        thread.start()
+        connection = response = None
+        try:
+>           assert ready.wait(8) and not errors, errors
+E           AssertionError: [TypeError("Server.__init__() got an unexpected keyword argument 'gateway'")]
+E           assert (True and not [TypeError("Server.__init__() got an unexpected keyword argument 'gateway'")])
+E            +  where True = wait(8)
+E            +    where wait = <threading.Event at 0x7c41f7d8a690: set>.wait
+
+tests/test_job_response_lifetime.py:80: AssertionError
+
+During handling of the above exception, another exception occurred:
+
+store = namespace(root=PosixPath('/tmp/openscrub-task621/socket-tmp/test_configured_wsgi_closes_st0/data'), jobs=PosixPath('/t...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7c41c0373ec0>, url='/api/jobs/0c90ff9149d7')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7c41f7d8b710>
+endpoint = 'download', ending = 'complete'
+
+    @pytest.mark.parametrize('endpoint', ['download', 'report', 'video'])
+    @pytest.mark.parametrize('ending', ['complete', 'iterator_error', 'disconnect'])
+    def test_configured_wsgi_closes_stream_owner_exactly_once(store, monkeypatch, endpoint, ending):
+        store.enable()
+        payload = bytes(range(256)) * 16384
+        if endpoint == 'report':
+            doc = dict(store.doc, synthetic_padding='x' * len(payload))
+            store.path.write_text(json.dumps(doc))
+            payload = store.path.read_bytes()
+        else:
+            output = Path(store.job['dir']) / 'output.mp4'
+            output.write_bytes(payload)
+            Path(store.job['video']).write_bytes(payload)
+            store.job.update(output=str(output), phase='done')
+        ready, entered, release, closed = (threading.Event() for _ in range(4))
+        servers, errors, releases, logs = [], [], [], []
+        real_server = wsgi.Server
+        class Server(real_server):
+            def prepare(self):
+                super().prepare()
+                servers.append(self)
+                ready.set()
+            def error_log(self, message='', level=20, traceback=False):
+                logs.append(str(message))
+        monkeypatch.setattr(wsgi, 'Server', Server)
+        real_send, real_close = web.send_file, web.OwnedIterable.close
+        class Gate:
+            def __init__(self, source):
+                self.source, self.iterator, self.calls = source, iter(source), 0
+            def __iter__(self):
+                return self
+            def __next__(self):
+                self.calls += 1
+                if self.calls == 2:
+                    entered.set()
+                    assert release.wait(8), 'socket schedule did not release file read'
+                    if ending == 'iterator_error':
+                        raise OSError('synthetic streaming read failure')
+                return next(self.iterator)
+            def close(self):
+                self.source.close()
+        def send(*args, **kwargs):
+            response = real_send(*args, **kwargs)
+            response.response = Gate(response.response)
+            return response
+        def close(owner):
+            was_released = owner.lease.released
+            try:
+                return real_close(owner)
+            finally:
+                if not was_released and owner.lease.released:
+                    releases.append(1)
+                closed.set()
+        monkeypatch.setattr(web, 'send_file', send)
+        monkeypatch.setattr(web.OwnedIterable, 'close', close)
+        def serve():
+            try:
+                web._serve('127.0.0.1', 0, None)
+            except BaseException as error:
+                errors.append(error)
+                ready.set()
+        thread = threading.Thread(target=serve, name='task621-cheroot')
+        thread.start()
+        connection = response = None
+        try:
+            assert ready.wait(8) and not errors, errors
+            server = servers[0]
+            port = server.socket.getsockname()[1]
+            assert server.requests.min == 64  # exercise actual _serve configuration
+            def api(method, path):
+                conn = http.client.HTTPConnection('127.0.0.1', port, timeout=5)
+                try:
+                    conn.request(method, path, headers={'Connection': 'close'})
+                    result = conn.getresponse()
+                    result.read()
+                    return result.status
+                finally:
+                    conn.close()
+            connection = http.client.HTTPConnection('127.0.0.1', port, timeout=5)
+            connection.request('GET', store.url + '/' + endpoint,
+                               headers={'Range': 'bytes=3-1048578', 'Connection': 'close'})
+            response = connection.getresponse()
+            assert response.status == 206
+            assert response.getheader('Content-Length') == '1048576'
+            assert response.getheader('Content-Range') == 'bytes 3-1048578/%d' % len(payload)
+            if endpoint == 'download':
+                assert 'synthetic_redacted.mp4' in response.getheader('Content-Disposition')
+            if endpoint == 'report':
+                assert 'synthetic_audit.json' in response.getheader('Content-Disposition')
+            assert entered.wait(5), 'iterator was never genuinely active'
+            assert web.FILES.count == 1, 'request teardown released the stream too early'
+            assert api('DELETE', store.url) == 409
+            assert api('POST', '/api/vault/lock') == 409
+            if ending == 'disconnect':
+                connection.sock.shutdown(socket.SHUT_RDWR)
+                response.close()
+                connection.close()
+            release.set()
+            if ending == 'complete':
+                body = response.read()
+                assert len(body) == 1048576 and body == payload[3:1048579]
+            elif ending == 'iterator_error':
+                with pytest.raises(http.client.IncompleteRead):
+                    response.read()
+            assert closed.wait(8), 'Cheroot did not close the WSGI iterable'
+            assert web.FILES.count == 0 and releases == [1]
+            assert api('POST', '/api/vault/lock') == 200
+        finally:
+            release.set()
+            if response is not None:
+                response.close()
+            if connection is not None:
+                connection.close()
+            for server in servers:
+                server.stop()
+            thread.join(8)
+>           assert not thread.is_alive() and not errors, errors
+E           AssertionError: [TypeError("Server.__init__() got an unexpected keyword argument 'gateway'")]
+E           assert (not False and not [TypeError("Server.__init__() got an unexpected keyword argument 'gateway'")])
+E            +  where False = is_alive()
+E            +    where is_alive = <Thread(task621-cheroot, stopped 136619655890624)>.is_alive
+
+tests/test_job_response_lifetime.py:131: AssertionError
+____ test_configured_wsgi_closes_stream_owner_exactly_once[complete-report] ____
+
+store = namespace(root=PosixPath('/tmp/openscrub-task621/socket-tmp/test_configured_wsgi_closes_st1/data'), jobs=PosixPath('/t...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7c419c7e98a0>, url='/api/jobs/ffb055a469cf')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7c41f7d8a300>
+endpoint = 'report', ending = 'complete'
+
+    @pytest.mark.parametrize('endpoint', ['download', 'report', 'video'])
+    @pytest.mark.parametrize('ending', ['complete', 'iterator_error', 'disconnect'])
+    def test_configured_wsgi_closes_stream_owner_exactly_once(store, monkeypatch, endpoint, ending):
+        store.enable()
+        payload = bytes(range(256)) * 16384
+        if endpoint == 'report':
+            doc = dict(store.doc, synthetic_padding='x' * len(payload))
+            store.path.write_text(json.dumps(doc))
+            payload = store.path.read_bytes()
+        else:
+            output = Path(store.job['dir']) / 'output.mp4'
+            output.write_bytes(payload)
+            Path(store.job['video']).write_bytes(payload)
+            store.job.update(output=str(output), phase='done')
+        ready, entered, release, closed = (threading.Event() for _ in range(4))
+        servers, errors, releases, logs = [], [], [], []
+        real_server = wsgi.Server
+        class Server(real_server):
+            def prepare(self):
+                super().prepare()
+                servers.append(self)
+                ready.set()
+            def error_log(self, message='', level=20, traceback=False):
+                logs.append(str(message))
+        monkeypatch.setattr(wsgi, 'Server', Server)
+        real_send, real_close = web.send_file, web.OwnedIterable.close
+        class Gate:
+            def __init__(self, source):
+                self.source, self.iterator, self.calls = source, iter(source), 0
+            def __iter__(self):
+                return self
+            def __next__(self):
+                self.calls += 1
+                if self.calls == 2:
+                    entered.set()
+                    assert release.wait(8), 'socket schedule did not release file read'
+                    if ending == 'iterator_error':
+                        raise OSError('synthetic streaming read failure')
+                return next(self.iterator)
+            def close(self):
+                self.source.close()
+        def send(*args, **kwargs):
+            response = real_send(*args, **kwargs)
+            response.response = Gate(response.response)
+            return response
+        def close(owner):
+            was_released = owner.lease.released
+            try:
+                return real_close(owner)
+            finally:
+                if not was_released and owner.lease.released:
+                    releases.append(1)
+                closed.set()
+        monkeypatch.setattr(web, 'send_file', send)
+        monkeypatch.setattr(web.OwnedIterable, 'close', close)
+        def serve():
+            try:
+                web._serve('127.0.0.1', 0, None)
+            except BaseException as error:
+                errors.append(error)
+                ready.set()
+        thread = threading.Thread(target=serve, name='task621-cheroot')
+        thread.start()
+        connection = response = None
+        try:
+>           assert ready.wait(8) and not errors, errors
+E           AssertionError: [TypeError("Server.__init__() got an unexpected keyword argument 'gateway'")]
+E           assert (True and not [TypeError("Server.__init__() got an unexpected keyword argument 'gateway'")])
+E            +  where True = wait(8)
+E            +    where wait = <threading.Event at 0x7c41f7d851f0: set>.wait
+
+tests/test_job_response_lifetime.py:80: AssertionError
+
+During handling of the above exception, another exception occurred:
+
+store = namespace(root=PosixPath('/tmp/openscrub-task621/socket-tmp/test_configured_wsgi_closes_st1/data'), jobs=PosixPath('/t...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7c419c7e98a0>, url='/api/jobs/ffb055a469cf')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7c41f7d8a300>
+endpoint = 'report', ending = 'complete'
+
+    @pytest.mark.parametrize('endpoint', ['download', 'report', 'video'])
+    @pytest.mark.parametrize('ending', ['complete', 'iterator_error', 'disconnect'])
+    def test_configured_wsgi_closes_stream_owner_exactly_once(store, monkeypatch, endpoint, ending):
+        store.enable()
+        payload = bytes(range(256)) * 16384
+        if endpoint == 'report':
+            doc = dict(store.doc, synthetic_padding='x' * len(payload))
+            store.path.write_text(json.dumps(doc))
+            payload = store.path.read_bytes()
+        else:
+            output = Path(store.job['dir']) / 'output.mp4'
+            output.write_bytes(payload)
+            Path(store.job['video']).write_bytes(payload)
+            store.job.update(output=str(output), phase='done')
+        ready, entered, release, closed = (threading.Event() for _ in range(4))
+        servers, errors, releases, logs = [], [], [], []
+        real_server = wsgi.Server
+        class Server(real_server):
+            def prepare(self):
+                super().prepare()
+                servers.append(self)
+                ready.set()
+            def error_log(self, message='', level=20, traceback=False):
+                logs.append(str(message))
+        monkeypatch.setattr(wsgi, 'Server', Server)
+        real_send, real_close = web.send_file, web.OwnedIterable.close
+        class Gate:
+            def __init__(self, source):
+                self.source, self.iterator, self.calls = source, iter(source), 0
+            def __iter__(self):
+                return self
+            def __next__(self):
+                self.calls += 1
+                if self.calls == 2:
+                    entered.set()
+                    assert release.wait(8), 'socket schedule did not release file read'
+                    if ending == 'iterator_error':
+                        raise OSError('synthetic streaming read failure')
+                return next(self.iterator)
+            def close(self):
+                self.source.close()
+        def send(*args, **kwargs):
+            response = real_send(*args, **kwargs)
+            response.response = Gate(response.response)
+            return response
+        def close(owner):
+            was_released = owner.lease.released
+            try:
+                return real_close(owner)
+            finally:
+                if not was_released and owner.lease.released:
+                    releases.append(1)
+                closed.set()
+        monkeypatch.setattr(web, 'send_file', send)
+        monkeypatch.setattr(web.OwnedIterable, 'close', close)
+        def serve():
+            try:
+                web._serve('127.0.0.1', 0, None)
+            except BaseException as error:
+                errors.append(error)
+                ready.set()
+        thread = threading.Thread(target=serve, name='task621-cheroot')
+        thread.start()
+        connection = response = None
+        try:
+            assert ready.wait(8) and not errors, errors
+            server = servers[0]
+            port = server.socket.getsockname()[1]
+            assert server.requests.min == 64  # exercise actual _serve configuration
+            def api(method, path):
+                conn = http.client.HTTPConnection('127.0.0.1', port, timeout=5)
+                try:
+                    conn.request(method, path, headers={'Connection': 'close'})
+                    result = conn.getresponse()
+                    result.read()
+                    return result.status
+                finally:
+                    conn.close()
+            connection = http.client.HTTPConnection('127.0.0.1', port, timeout=5)
+            connection.request('GET', store.url + '/' + endpoint,
+                               headers={'Range': 'bytes=3-1048578', 'Connection': 'close'})
+            response = connection.getresponse()
+            assert response.status == 206
+            assert response.getheader('Content-Length') == '1048576'
+            assert response.getheader('Content-Range') == 'bytes 3-1048578/%d' % len(payload)
+            if endpoint == 'download':
+                assert 'synthetic_redacted.mp4' in response.getheader('Content-Disposition')
+            if endpoint == 'report':
+                assert 'synthetic_audit.json' in response.getheader('Content-Disposition')
+            assert entered.wait(5), 'iterator was never genuinely active'
+            assert web.FILES.count == 1, 'request teardown released the stream too early'
+            assert api('DELETE', store.url) == 409
+            assert api('POST', '/api/vault/lock') == 409
+            if ending == 'disconnect':
+                connection.sock.shutdown(socket.SHUT_RDWR)
+                response.close()
+                connection.close()
+            release.set()
+            if ending == 'complete':
+                body = response.read()
+                assert len(body) == 1048576 and body == payload[3:1048579]
+            elif ending == 'iterator_error':
+                with pytest.raises(http.client.IncompleteRead):
+                    response.read()
+            assert closed.wait(8), 'Cheroot did not close the WSGI iterable'
+            assert web.FILES.count == 0 and releases == [1]
+            assert api('POST', '/api/vault/lock') == 200
+        finally:
+            release.set()
+            if response is not None:
+                response.close()
+            if connection is not None:
+                connection.close()
+            for server in servers:
+                server.stop()
+            thread.join(8)
+>           assert not thread.is_alive() and not errors, errors
+E           AssertionError: [TypeError("Server.__init__() got an unexpected keyword argument 'gateway'")]
+E           assert (not False and not [TypeError("Server.__init__() got an unexpected keyword argument 'gateway'")])
+E            +  where False = is_alive()
+E            +    where is_alive = <Thread(task621-cheroot, stopped 136619655890624)>.is_alive
+
+tests/test_job_response_lifetime.py:131: AssertionError
+____ test_configured_wsgi_closes_stream_owner_exactly_once[complete-video] _____
+
+store = namespace(root=PosixPath('/tmp/openscrub-task621/socket-tmp/test_configured_wsgi_closes_st2/data'), jobs=PosixPath('/t...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7c419c7e9d00>, url='/api/jobs/6ef9b30c4410')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7c41f7d8a990>
+endpoint = 'video', ending = 'complete'
+
+    @pytest.mark.parametrize('endpoint', ['download', 'report', 'video'])
+    @pytest.mark.parametrize('ending', ['complete', 'iterator_error', 'disconnect'])
+    def test_configured_wsgi_closes_stream_owner_exactly_once(store, monkeypatch, endpoint, ending):
+        store.enable()
+        payload = bytes(range(256)) * 16384
+        if endpoint == 'report':
+            doc = dict(store.doc, synthetic_padding='x' * len(payload))
+            store.path.write_text(json.dumps(doc))
+            payload = store.path.read_bytes()
+        else:
+            output = Path(store.job['dir']) / 'output.mp4'
+            output.write_bytes(payload)
+            Path(store.job['video']).write_bytes(payload)
+            store.job.update(output=str(output), phase='done')
+        ready, entered, release, closed = (threading.Event() for _ in range(4))
+        servers, errors, releases, logs = [], [], [], []
+        real_server = wsgi.Server
+        class Server(real_server):
+            def prepare(self):
+                super().prepare()
+                servers.append(self)
+                ready.set()
+            def error_log(self, message='', level=20, traceback=False):
+                logs.append(str(message))
+        monkeypatch.setattr(wsgi, 'Server', Server)
+        real_send, real_close = web.send_file, web.OwnedIterable.close
+        class Gate:
+            def __init__(self, source):
+                self.source, self.iterator, self.calls = source, iter(source), 0
+            def __iter__(self):
+                return self
+            def __next__(self):
+                self.calls += 1
+                if self.calls == 2:
+                    entered.set()
+                    assert release.wait(8), 'socket schedule did not release file read'
+                    if ending == 'iterator_error':
+                        raise OSError('synthetic streaming read failure')
+                return next(self.iterator)
+            def close(self):
+                self.source.close()
+        def send(*args, **kwargs):
+            response = real_send(*args, **kwargs)
+            response.response = Gate(response.response)
+            return response
+        def close(owner):
+            was_released = owner.lease.released
+            try:
+                return real_close(owner)
+            finally:
+                if not was_released and owner.lease.released:
+                    releases.append(1)
+                closed.set()
+        monkeypatch.setattr(web, 'send_file', send)
+        monkeypatch.setattr(web.OwnedIterable, 'close', close)
+        def serve():
+            try:
+                web._serve('127.0.0.1', 0, None)
+            except BaseException as error:
+                errors.append(error)
+                ready.set()
+        thread = threading.Thread(target=serve, name='task621-cheroot')
+        thread.start()
+        connection = response = None
+        try:
+>           assert ready.wait(8) and not errors, errors
+E           AssertionError: [TypeError("Server.__init__() got an unexpected keyword argument 'gateway'")]
+E           assert (True and not [TypeError("Server.__init__() got an unexpected keyword argument 'gateway'")])
+E            +  where True = wait(8)
+E            +    where wait = <threading.Event at 0x7c41f7d835f0: set>.wait
+
+tests/test_job_response_lifetime.py:80: AssertionError
+
+During handling of the above exception, another exception occurred:
+
+store = namespace(root=PosixPath('/tmp/openscrub-task621/socket-tmp/test_configured_wsgi_closes_st2/data'), jobs=PosixPath('/t...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7c419c7e9d00>, url='/api/jobs/6ef9b30c4410')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7c41f7d8a990>
+endpoint = 'video', ending = 'complete'
+
+    @pytest.mark.parametrize('endpoint', ['download', 'report', 'video'])
+    @pytest.mark.parametrize('ending', ['complete', 'iterator_error', 'disconnect'])
+    def test_configured_wsgi_closes_stream_owner_exactly_once(store, monkeypatch, endpoint, ending):
+        store.enable()
+        payload = bytes(range(256)) * 16384
+        if endpoint == 'report':
+            doc = dict(store.doc, synthetic_padding='x' * len(payload))
+            store.path.write_text(json.dumps(doc))
+            payload = store.path.read_bytes()
+        else:
+            output = Path(store.job['dir']) / 'output.mp4'
+            output.write_bytes(payload)
+            Path(store.job['video']).write_bytes(payload)
+            store.job.update(output=str(output), phase='done')
+        ready, entered, release, closed = (threading.Event() for _ in range(4))
+        servers, errors, releases, logs = [], [], [], []
+        real_server = wsgi.Server
+        class Server(real_server):
+            def prepare(self):
+                super().prepare()
+                servers.append(self)
+                ready.set()
+            def error_log(self, message='', level=20, traceback=False):
+                logs.append(str(message))
+        monkeypatch.setattr(wsgi, 'Server', Server)
+        real_send, real_close = web.send_file, web.OwnedIterable.close
+        class Gate:
+            def __init__(self, source):
+                self.source, self.iterator, self.calls = source, iter(source), 0
+            def __iter__(self):
+                return self
+            def __next__(self):
+                self.calls += 1
+                if self.calls == 2:
+                    entered.set()
+                    assert release.wait(8), 'socket schedule did not release file read'
+                    if ending == 'iterator_error':
+                        raise OSError('synthetic streaming read failure')
+                return next(self.iterator)
+            def close(self):
+                self.source.close()
+        def send(*args, **kwargs):
+            response = real_send(*args, **kwargs)
+            response.response = Gate(response.response)
+            return response
+        def close(owner):
+            was_released = owner.lease.released
+            try:
+                return real_close(owner)
+            finally:
+                if not was_released and owner.lease.released:
+                    releases.append(1)
+                closed.set()
+        monkeypatch.setattr(web, 'send_file', send)
+        monkeypatch.setattr(web.OwnedIterable, 'close', close)
+        def serve():
+            try:
+                web._serve('127.0.0.1', 0, None)
+            except BaseException as error:
+                errors.append(error)
+                ready.set()
+        thread = threading.Thread(target=serve, name='task621-cheroot')
+        thread.start()
+        connection = response = None
+        try:
+            assert ready.wait(8) and not errors, errors
+            server = servers[0]
+            port = server.socket.getsockname()[1]
+            assert server.requests.min == 64  # exercise actual _serve configuration
+            def api(method, path):
+                conn = http.client.HTTPConnection('127.0.0.1', port, timeout=5)
+                try:
+                    conn.request(method, path, headers={'Connection': 'close'})
+                    result = conn.getresponse()
+                    result.read()
+                    return result.status
+                finally:
+                    conn.close()
+            connection = http.client.HTTPConnection('127.0.0.1', port, timeout=5)
+            connection.request('GET', store.url + '/' + endpoint,
+                               headers={'Range': 'bytes=3-1048578', 'Connection': 'close'})
+            response = connection.getresponse()
+            assert response.status == 206
+            assert response.getheader('Content-Length') == '1048576'
+            assert response.getheader('Content-Range') == 'bytes 3-1048578/%d' % len(payload)
+            if endpoint == 'download':
+                assert 'synthetic_redacted.mp4' in response.getheader('Content-Disposition')
+            if endpoint == 'report':
+                assert 'synthetic_audit.json' in response.getheader('Content-Disposition')
+            assert entered.wait(5), 'iterator was never genuinely active'
+            assert web.FILES.count == 1, 'request teardown released the stream too early'
+            assert api('DELETE', store.url) == 409
+            assert api('POST', '/api/vault/lock') == 409
+            if ending == 'disconnect':
+                connection.sock.shutdown(socket.SHUT_RDWR)
+                response.close()
+                connection.close()
+            release.set()
+            if ending == 'complete':
+                body = response.read()
+                assert len(body) == 1048576 and body == payload[3:1048579]
+            elif ending == 'iterator_error':
+                with pytest.raises(http.client.IncompleteRead):
+                    response.read()
+            assert closed.wait(8), 'Cheroot did not close the WSGI iterable'
+            assert web.FILES.count == 0 and releases == [1]
+            assert api('POST', '/api/vault/lock') == 200
+        finally:
+            release.set()
+            if response is not None:
+                response.close()
+            if connection is not None:
+                connection.close()
+            for server in servers:
+                server.stop()
+            thread.join(8)
+>           assert not thread.is_alive() and not errors, errors
+E           AssertionError: [TypeError("Server.__init__() got an unexpected keyword argument 'gateway'")]
+E           assert (not False and not [TypeError("Server.__init__() got an unexpected keyword argument 'gateway'")])
+E            +  where False = is_alive()
+E            +    where is_alive = <Thread(task621-cheroot, stopped 136619655890624)>.is_alive
+
+tests/test_job_response_lifetime.py:131: AssertionError
+_ test_configured_wsgi_closes_stream_owner_exactly_once[iterator_error-download] _
+
+store = namespace(root=PosixPath('/tmp/openscrub-task621/socket-tmp/test_configured_wsgi_closes_st3/data'), jobs=PosixPath('/t...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7c419c7ea480>, url='/api/jobs/e0e232ef10f2')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7c41f7d81f40>
+endpoint = 'download', ending = 'iterator_error'
+
+    @pytest.mark.parametrize('endpoint', ['download', 'report', 'video'])
+    @pytest.mark.parametrize('ending', ['complete', 'iterator_error', 'disconnect'])
+    def test_configured_wsgi_closes_stream_owner_exactly_once(store, monkeypatch, endpoint, ending):
+        store.enable()
+        payload = bytes(range(256)) * 16384
+        if endpoint == 'report':
+            doc = dict(store.doc, synthetic_padding='x' * len(payload))
+            store.path.write_text(json.dumps(doc))
+            payload = store.path.read_bytes()
+        else:
+            output = Path(store.job['dir']) / 'output.mp4'
+            output.write_bytes(payload)
+            Path(store.job['video']).write_bytes(payload)
+            store.job.update(output=str(output), phase='done')
+        ready, entered, release, closed = (threading.Event() for _ in range(4))
+        servers, errors, releases, logs = [], [], [], []
+        real_server = wsgi.Server
+        class Server(real_server):
+            def prepare(self):
+                super().prepare()
+                servers.append(self)
+                ready.set()
+            def error_log(self, message='', level=20, traceback=False):
+                logs.append(str(message))
+        monkeypatch.setattr(wsgi, 'Server', Server)
+        real_send, real_close = web.send_file, web.OwnedIterable.close
+        class Gate:
+            def __init__(self, source):
+                self.source, self.iterator, self.calls = source, iter(source), 0
+            def __iter__(self):
+                return self
+            def __next__(self):
+                self.calls += 1
+                if self.calls == 2:
+                    entered.set()
+                    assert release.wait(8), 'socket schedule did not release file read'
+                    if ending == 'iterator_error':
+                        raise OSError('synthetic streaming read failure')
+                return next(self.iterator)
+            def close(self):
+                self.source.close()
+        def send(*args, **kwargs):
+            response = real_send(*args, **kwargs)
+            response.response = Gate(response.response)
+            return response
+        def close(owner):
+            was_released = owner.lease.released
+            try:
+                return real_close(owner)
+            finally:
+                if not was_released and owner.lease.released:
+                    releases.append(1)
+                closed.set()
+        monkeypatch.setattr(web, 'send_file', send)
+        monkeypatch.setattr(web.OwnedIterable, 'close', close)
+        def serve():
+            try:
+                web._serve('127.0.0.1', 0, None)
+            except BaseException as error:
+                errors.append(error)
+                ready.set()
+        thread = threading.Thread(target=serve, name='task621-cheroot')
+        thread.start()
+        connection = response = None
+        try:
+>           assert ready.wait(8) and not errors, errors
+E           AssertionError: [TypeError("Server.__init__() got an unexpected keyword argument 'gateway'")]
+E           assert (True and not [TypeError("Server.__init__() got an unexpected keyword argument 'gateway'")])
+E            +  where True = wait(8)
+E            +    where wait = <threading.Event at 0x7c41f7d81670: set>.wait
+
+tests/test_job_response_lifetime.py:80: AssertionError
+
+During handling of the above exception, another exception occurred:
+
+store = namespace(root=PosixPath('/tmp/openscrub-task621/socket-tmp/test_configured_wsgi_closes_st3/data'), jobs=PosixPath('/t...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7c419c7ea480>, url='/api/jobs/e0e232ef10f2')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7c41f7d81f40>
+endpoint = 'download', ending = 'iterator_error'
+
+    @pytest.mark.parametrize('endpoint', ['download', 'report', 'video'])
+    @pytest.mark.parametrize('ending', ['complete', 'iterator_error', 'disconnect'])
+    def test_configured_wsgi_closes_stream_owner_exactly_once(store, monkeypatch, endpoint, ending):
+        store.enable()
+        payload = bytes(range(256)) * 16384
+        if endpoint == 'report':
+            doc = dict(store.doc, synthetic_padding='x' * len(payload))
+            store.path.write_text(json.dumps(doc))
+            payload = store.path.read_bytes()
+        else:
+            output = Path(store.job['dir']) / 'output.mp4'
+            output.write_bytes(payload)
+            Path(store.job['video']).write_bytes(payload)
+            store.job.update(output=str(output), phase='done')
+        ready, entered, release, closed = (threading.Event() for _ in range(4))
+        servers, errors, releases, logs = [], [], [], []
+        real_server = wsgi.Server
+        class Server(real_server):
+            def prepare(self):
+                super().prepare()
+                servers.append(self)
+                ready.set()
+            def error_log(self, message='', level=20, traceback=False):
+                logs.append(str(message))
+        monkeypatch.setattr(wsgi, 'Server', Server)
+        real_send, real_close = web.send_file, web.OwnedIterable.close
+        class Gate:
+            def __init__(self, source):
+                self.source, self.iterator, self.calls = source, iter(source), 0
+            def __iter__(self):
+                return self
+            def __next__(self):
+                self.calls += 1
+                if self.calls == 2:
+                    entered.set()
+                    assert release.wait(8), 'socket schedule did not release file read'
+                    if ending == 'iterator_error':
+                        raise OSError('synthetic streaming read failure')
+                return next(self.iterator)
+            def close(self):
+                self.source.close()
+        def send(*args, **kwargs):
+            response = real_send(*args, **kwargs)
+            response.response = Gate(response.response)
+            return response
+        def close(owner):
+            was_released = owner.lease.released
+            try:
+                return real_close(owner)
+            finally:
+                if not was_released and owner.lease.released:
+                    releases.append(1)
+                closed.set()
+        monkeypatch.setattr(web, 'send_file', send)
+        monkeypatch.setattr(web.OwnedIterable, 'close', close)
+        def serve():
+            try:
+                web._serve('127.0.0.1', 0, None)
+            except BaseException as error:
+                errors.append(error)
+                ready.set()
+        thread = threading.Thread(target=serve, name='task621-cheroot')
+        thread.start()
+        connection = response = None
+        try:
+            assert ready.wait(8) and not errors, errors
+            server = servers[0]
+            port = server.socket.getsockname()[1]
+            assert server.requests.min == 64  # exercise actual _serve configuration
+            def api(method, path):
+                conn = http.client.HTTPConnection('127.0.0.1', port, timeout=5)
+                try:
+                    conn.request(method, path, headers={'Connection': 'close'})
+                    result = conn.getresponse()
+                    result.read()
+                    return result.status
+                finally:
+                    conn.close()
+            connection = http.client.HTTPConnection('127.0.0.1', port, timeout=5)
+            connection.request('GET', store.url + '/' + endpoint,
+                               headers={'Range': 'bytes=3-1048578', 'Connection': 'close'})
+            response = connection.getresponse()
+            assert response.status == 206
+            assert response.getheader('Content-Length') == '1048576'
+            assert response.getheader('Content-Range') == 'bytes 3-1048578/%d' % len(payload)
+            if endpoint == 'download':
+                assert 'synthetic_redacted.mp4' in response.getheader('Content-Disposition')
+            if endpoint == 'report':
+                assert 'synthetic_audit.json' in response.getheader('Content-Disposition')
+            assert entered.wait(5), 'iterator was never genuinely active'
+            assert web.FILES.count == 1, 'request teardown released the stream too early'
+            assert api('DELETE', store.url) == 409
+            assert api('POST', '/api/vault/lock') == 409
+            if ending == 'disconnect':
+                connection.sock.shutdown(socket.SHUT_RDWR)
+                response.close()
+                connection.close()
+            release.set()
+            if ending == 'complete':
+                body = response.read()
+                assert len(body) == 1048576 and body == payload[3:1048579]
+            elif ending == 'iterator_error':
+                with pytest.raises(http.client.IncompleteRead):
+                    response.read()
+            assert closed.wait(8), 'Cheroot did not close the WSGI iterable'
+            assert web.FILES.count == 0 and releases == [1]
+            assert api('POST', '/api/vault/lock') == 200
+        finally:
+            release.set()
+            if response is not None:
+                response.close()
+            if connection is not None:
+                connection.close()
+            for server in servers:
+                server.stop()
+            thread.join(8)
+>           assert not thread.is_alive() and not errors, errors
+E           AssertionError: [TypeError("Server.__init__() got an unexpected keyword argument 'gateway'")]
+E           assert (not False and not [TypeError("Server.__init__() got an unexpected keyword argument 'gateway'")])
+E            +  where False = is_alive()
+E            +    where is_alive = <Thread(task621-cheroot, stopped 136619655890624)>.is_alive
+
+tests/test_job_response_lifetime.py:131: AssertionError
+_ test_configured_wsgi_closes_stream_owner_exactly_once[iterator_error-report] _
+
+store = namespace(root=PosixPath('/tmp/openscrub-task621/socket-tmp/test_configured_wsgi_closes_st4/data'), jobs=PosixPath('/t...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7c419c7e9d00>, url='/api/jobs/f45c185e652a')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7c41f7d82bd0>
+endpoint = 'report', ending = 'iterator_error'
+
+    @pytest.mark.parametrize('endpoint', ['download', 'report', 'video'])
+    @pytest.mark.parametrize('ending', ['complete', 'iterator_error', 'disconnect'])
+    def test_configured_wsgi_closes_stream_owner_exactly_once(store, monkeypatch, endpoint, ending):
+        store.enable()
+        payload = bytes(range(256)) * 16384
+        if endpoint == 'report':
+            doc = dict(store.doc, synthetic_padding='x' * len(payload))
+            store.path.write_text(json.dumps(doc))
+            payload = store.path.read_bytes()
+        else:
+            output = Path(store.job['dir']) / 'output.mp4'
+            output.write_bytes(payload)
+            Path(store.job['video']).write_bytes(payload)
+            store.job.update(output=str(output), phase='done')
+        ready, entered, release, closed = (threading.Event() for _ in range(4))
+        servers, errors, releases, logs = [], [], [], []
+        real_server = wsgi.Server
+        class Server(real_server):
+            def prepare(self):
+                super().prepare()
+                servers.append(self)
+                ready.set()
+            def error_log(self, message='', level=20, traceback=False):
+                logs.append(str(message))
+        monkeypatch.setattr(wsgi, 'Server', Server)
+        real_send, real_close = web.send_file, web.OwnedIterable.close
+        class Gate:
+            def __init__(self, source):
+                self.source, self.iterator, self.calls = source, iter(source), 0
+            def __iter__(self):
+                return self
+            def __next__(self):
+                self.calls += 1
+                if self.calls == 2:
+                    entered.set()
+                    assert release.wait(8), 'socket schedule did not release file read'
+                    if ending == 'iterator_error':
+                        raise OSError('synthetic streaming read failure')
+                return next(self.iterator)
+            def close(self):
+                self.source.close()
+        def send(*args, **kwargs):
+            response = real_send(*args, **kwargs)
+            response.response = Gate(response.response)
+            return response
+        def close(owner):
+            was_released = owner.lease.released
+            try:
+                return real_close(owner)
+            finally:
+                if not was_released and owner.lease.released:
+                    releases.append(1)
+                closed.set()
+        monkeypatch.setattr(web, 'send_file', send)
+        monkeypatch.setattr(web.OwnedIterable, 'close', close)
+        def serve():
+            try:
+                web._serve('127.0.0.1', 0, None)
+            except BaseException as error:
+                errors.append(error)
+                ready.set()
+        thread = threading.Thread(target=serve, name='task621-cheroot')
+        thread.start()
+        connection = response = None
+        try:
+>           assert ready.wait(8) and not errors, errors
+E           AssertionError: [TypeError("Server.__init__() got an unexpected keyword argument 'gateway'")]
+E           assert (True and not [TypeError("Server.__init__() got an unexpected keyword argument 'gateway'")])
+E            +  where True = wait(8)
+E            +    where wait = <threading.Event at 0x7c41f7d81880: set>.wait
+
+tests/test_job_response_lifetime.py:80: AssertionError
+
+During handling of the above exception, another exception occurred:
+
+store = namespace(root=PosixPath('/tmp/openscrub-task621/socket-tmp/test_configured_wsgi_closes_st4/data'), jobs=PosixPath('/t...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7c419c7e9d00>, url='/api/jobs/f45c185e652a')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7c41f7d82bd0>
+endpoint = 'report', ending = 'iterator_error'
+
+    @pytest.mark.parametrize('endpoint', ['download', 'report', 'video'])
+    @pytest.mark.parametrize('ending', ['complete', 'iterator_error', 'disconnect'])
+    def test_configured_wsgi_closes_stream_owner_exactly_once(store, monkeypatch, endpoint, ending):
+        store.enable()
+        payload = bytes(range(256)) * 16384
+        if endpoint == 'report':
+            doc = dict(store.doc, synthetic_padding='x' * len(payload))
+            store.path.write_text(json.dumps(doc))
+            payload = store.path.read_bytes()
+        else:
+            output = Path(store.job['dir']) / 'output.mp4'
+            output.write_bytes(payload)
+            Path(store.job['video']).write_bytes(payload)
+            store.job.update(output=str(output), phase='done')
+        ready, entered, release, closed = (threading.Event() for _ in range(4))
+        servers, errors, releases, logs = [], [], [], []
+        real_server = wsgi.Server
+        class Server(real_server):
+            def prepare(self):
+                super().prepare()
+                servers.append(self)
+                ready.set()
+            def error_log(self, message='', level=20, traceback=False):
+                logs.append(str(message))
+        monkeypatch.setattr(wsgi, 'Server', Server)
+        real_send, real_close = web.send_file, web.OwnedIterable.close
+        class Gate:
+            def __init__(self, source):
+                self.source, self.iterator, self.calls = source, iter(source), 0
+            def __iter__(self):
+                return self
+            def __next__(self):
+                self.calls += 1
+                if self.calls == 2:
+                    entered.set()
+                    assert release.wait(8), 'socket schedule did not release file read'
+                    if ending == 'iterator_error':
+                        raise OSError('synthetic streaming read failure')
+                return next(self.iterator)
+            def close(self):
+                self.source.close()
+        def send(*args, **kwargs):
+            response = real_send(*args, **kwargs)
+            response.response = Gate(response.response)
+            return response
+        def close(owner):
+            was_released = owner.lease.released
+            try:
+                return real_close(owner)
+            finally:
+                if not was_released and owner.lease.released:
+                    releases.append(1)
+                closed.set()
+        monkeypatch.setattr(web, 'send_file', send)
+        monkeypatch.setattr(web.OwnedIterable, 'close', close)
+        def serve():
+            try:
+                web._serve('127.0.0.1', 0, None)
+            except BaseException as error:
+                errors.append(error)
+                ready.set()
+        thread = threading.Thread(target=serve, name='task621-cheroot')
+        thread.start()
+        connection = response = None
+        try:
+            assert ready.wait(8) and not errors, errors
+            server = servers[0]
+            port = server.socket.getsockname()[1]
+            assert server.requests.min == 64  # exercise actual _serve configuration
+            def api(method, path):
+                conn = http.client.HTTPConnection('127.0.0.1', port, timeout=5)
+                try:
+                    conn.request(method, path, headers={'Connection': 'close'})
+                    result = conn.getresponse()
+                    result.read()
+                    return result.status
+                finally:
+                    conn.close()
+            connection = http.client.HTTPConnection('127.0.0.1', port, timeout=5)
+            connection.request('GET', store.url + '/' + endpoint,
+                               headers={'Range': 'bytes=3-1048578', 'Connection': 'close'})
+            response = connection.getresponse()
+            assert response.status == 206
+            assert response.getheader('Content-Length') == '1048576'
+            assert response.getheader('Content-Range') == 'bytes 3-1048578/%d' % len(payload)
+            if endpoint == 'download':
+                assert 'synthetic_redacted.mp4' in response.getheader('Content-Disposition')
+            if endpoint == 'report':
+                assert 'synthetic_audit.json' in response.getheader('Content-Disposition')
+            assert entered.wait(5), 'iterator was never genuinely active'
+            assert web.FILES.count == 1, 'request teardown released the stream too early'
+            assert api('DELETE', store.url) == 409
+            assert api('POST', '/api/vault/lock') == 409
+            if ending == 'disconnect':
+                connection.sock.shutdown(socket.SHUT_RDWR)
+                response.close()
+                connection.close()
+            release.set()
+            if ending == 'complete':
+                body = response.read()
+                assert len(body) == 1048576 and body == payload[3:1048579]
+            elif ending == 'iterator_error':
+                with pytest.raises(http.client.IncompleteRead):
+                    response.read()
+            assert closed.wait(8), 'Cheroot did not close the WSGI iterable'
+            assert web.FILES.count == 0 and releases == [1]
+            assert api('POST', '/api/vault/lock') == 200
+        finally:
+            release.set()
+            if response is not None:
+                response.close()
+            if connection is not None:
+                connection.close()
+            for server in servers:
+                server.stop()
+            thread.join(8)
+>           assert not thread.is_alive() and not errors, errors
+E           AssertionError: [TypeError("Server.__init__() got an unexpected keyword argument 'gateway'")]
+E           assert (not False and not [TypeError("Server.__init__() got an unexpected keyword argument 'gateway'")])
+E            +  where False = is_alive()
+E            +    where is_alive = <Thread(task621-cheroot, stopped 136619655890624)>.is_alive
+
+tests/test_job_response_lifetime.py:131: AssertionError
+_ test_configured_wsgi_closes_stream_owner_exactly_once[iterator_error-video] __
+
+store = namespace(root=PosixPath('/tmp/openscrub-task621/socket-tmp/test_configured_wsgi_closes_st5/data'), jobs=PosixPath('/t...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7c419c7e96c0>, url='/api/jobs/c86d7db32e5f')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7c41f7d83f50>
+endpoint = 'video', ending = 'iterator_error'
+
+    @pytest.mark.parametrize('endpoint', ['download', 'report', 'video'])
+    @pytest.mark.parametrize('ending', ['complete', 'iterator_error', 'disconnect'])
+    def test_configured_wsgi_closes_stream_owner_exactly_once(store, monkeypatch, endpoint, ending):
+        store.enable()
+        payload = bytes(range(256)) * 16384
+        if endpoint == 'report':
+            doc = dict(store.doc, synthetic_padding='x' * len(payload))
+            store.path.write_text(json.dumps(doc))
+            payload = store.path.read_bytes()
+        else:
+            output = Path(store.job['dir']) / 'output.mp4'
+            output.write_bytes(payload)
+            Path(store.job['video']).write_bytes(payload)
+            store.job.update(output=str(output), phase='done')
+        ready, entered, release, closed = (threading.Event() for _ in range(4))
+        servers, errors, releases, logs = [], [], [], []
+        real_server = wsgi.Server
+        class Server(real_server):
+            def prepare(self):
+                super().prepare()
+                servers.append(self)
+                ready.set()
+            def error_log(self, message='', level=20, traceback=False):
+                logs.append(str(message))
+        monkeypatch.setattr(wsgi, 'Server', Server)
+        real_send, real_close = web.send_file, web.OwnedIterable.close
+        class Gate:
+            def __init__(self, source):
+                self.source, self.iterator, self.calls = source, iter(source), 0
+            def __iter__(self):
+                return self
+            def __next__(self):
+                self.calls += 1
+                if self.calls == 2:
+                    entered.set()
+                    assert release.wait(8), 'socket schedule did not release file read'
+                    if ending == 'iterator_error':
+                        raise OSError('synthetic streaming read failure')
+                return next(self.iterator)
+            def close(self):
+                self.source.close()
+        def send(*args, **kwargs):
+            response = real_send(*args, **kwargs)
+            response.response = Gate(response.response)
+            return response
+        def close(owner):
+            was_released = owner.lease.released
+            try:
+                return real_close(owner)
+            finally:
+                if not was_released and owner.lease.released:
+                    releases.append(1)
+                closed.set()
+        monkeypatch.setattr(web, 'send_file', send)
+        monkeypatch.setattr(web.OwnedIterable, 'close', close)
+        def serve():
+            try:
+                web._serve('127.0.0.1', 0, None)
+            except BaseException as error:
+                errors.append(error)
+                ready.set()
+        thread = threading.Thread(target=serve, name='task621-cheroot')
+        thread.start()
+        connection = response = None
+        try:
+>           assert ready.wait(8) and not errors, errors
+E           AssertionError: [TypeError("Server.__init__() got an unexpected keyword argument 'gateway'")]
+E           assert (True and not [TypeError("Server.__init__() got an unexpected keyword argument 'gateway'")])
+E            +  where True = wait(8)
+E            +    where wait = <threading.Event at 0x7c41f7d81640: set>.wait
+
+tests/test_job_response_lifetime.py:80: AssertionError
+
+During handling of the above exception, another exception occurred:
+
+store = namespace(root=PosixPath('/tmp/openscrub-task621/socket-tmp/test_configured_wsgi_closes_st5/data'), jobs=PosixPath('/t...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7c419c7e96c0>, url='/api/jobs/c86d7db32e5f')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7c41f7d83f50>
+endpoint = 'video', ending = 'iterator_error'
+
+    @pytest.mark.parametrize('endpoint', ['download', 'report', 'video'])
+    @pytest.mark.parametrize('ending', ['complete', 'iterator_error', 'disconnect'])
+    def test_configured_wsgi_closes_stream_owner_exactly_once(store, monkeypatch, endpoint, ending):
+        store.enable()
+        payload = bytes(range(256)) * 16384
+        if endpoint == 'report':
+            doc = dict(store.doc, synthetic_padding='x' * len(payload))
+            store.path.write_text(json.dumps(doc))
+            payload = store.path.read_bytes()
+        else:
+            output = Path(store.job['dir']) / 'output.mp4'
+            output.write_bytes(payload)
+            Path(store.job['video']).write_bytes(payload)
+            store.job.update(output=str(output), phase='done')
+        ready, entered, release, closed = (threading.Event() for _ in range(4))
+        servers, errors, releases, logs = [], [], [], []
+        real_server = wsgi.Server
+        class Server(real_server):
+            def prepare(self):
+                super().prepare()
+                servers.append(self)
+                ready.set()
+            def error_log(self, message='', level=20, traceback=False):
+                logs.append(str(message))
+        monkeypatch.setattr(wsgi, 'Server', Server)
+        real_send, real_close = web.send_file, web.OwnedIterable.close
+        class Gate:
+            def __init__(self, source):
+                self.source, self.iterator, self.calls = source, iter(source), 0
+            def __iter__(self):
+                return self
+            def __next__(self):
+                self.calls += 1
+                if self.calls == 2:
+                    entered.set()
+                    assert release.wait(8), 'socket schedule did not release file read'
+                    if ending == 'iterator_error':
+                        raise OSError('synthetic streaming read failure')
+                return next(self.iterator)
+            def close(self):
+                self.source.close()
+        def send(*args, **kwargs):
+            response = real_send(*args, **kwargs)
+            response.response = Gate(response.response)
+            return response
+        def close(owner):
+            was_released = owner.lease.released
+            try:
+                return real_close(owner)
+            finally:
+                if not was_released and owner.lease.released:
+                    releases.append(1)
+                closed.set()
+        monkeypatch.setattr(web, 'send_file', send)
+        monkeypatch.setattr(web.OwnedIterable, 'close', close)
+        def serve():
+            try:
+                web._serve('127.0.0.1', 0, None)
+            except BaseException as error:
+                errors.append(error)
+                ready.set()
+        thread = threading.Thread(target=serve, name='task621-cheroot')
+        thread.start()
+        connection = response = None
+        try:
+            assert ready.wait(8) and not errors, errors
+            server = servers[0]
+            port = server.socket.getsockname()[1]
+            assert server.requests.min == 64  # exercise actual _serve configuration
+            def api(method, path):
+                conn = http.client.HTTPConnection('127.0.0.1', port, timeout=5)
+                try:
+                    conn.request(method, path, headers={'Connection': 'close'})
+                    result = conn.getresponse()
+                    result.read()
+                    return result.status
+                finally:
+                    conn.close()
+            connection = http.client.HTTPConnection('127.0.0.1', port, timeout=5)
+            connection.request('GET', store.url + '/' + endpoint,
+                               headers={'Range': 'bytes=3-1048578', 'Connection': 'close'})
+            response = connection.getresponse()
+            assert response.status == 206
+            assert response.getheader('Content-Length') == '1048576'
+            assert response.getheader('Content-Range') == 'bytes 3-1048578/%d' % len(payload)
+            if endpoint == 'download':
+                assert 'synthetic_redacted.mp4' in response.getheader('Content-Disposition')
+            if endpoint == 'report':
+                assert 'synthetic_audit.json' in response.getheader('Content-Disposition')
+            assert entered.wait(5), 'iterator was never genuinely active'
+            assert web.FILES.count == 1, 'request teardown released the stream too early'
+            assert api('DELETE', store.url) == 409
+            assert api('POST', '/api/vault/lock') == 409
+            if ending == 'disconnect':
+                connection.sock.shutdown(socket.SHUT_RDWR)
+                response.close()
+                connection.close()
+            release.set()
+            if ending == 'complete':
+                body = response.read()
+                assert len(body) == 1048576 and body == payload[3:1048579]
+            elif ending == 'iterator_error':
+                with pytest.raises(http.client.IncompleteRead):
+                    response.read()
+            assert closed.wait(8), 'Cheroot did not close the WSGI iterable'
+            assert web.FILES.count == 0 and releases == [1]
+            assert api('POST', '/api/vault/lock') == 200
+        finally:
+            release.set()
+            if response is not None:
+                response.close()
+            if connection is not None:
+                connection.close()
+            for server in servers:
+                server.stop()
+            thread.join(8)
+>           assert not thread.is_alive() and not errors, errors
+E           AssertionError: [TypeError("Server.__init__() got an unexpected keyword argument 'gateway'")]
+E           assert (not False and not [TypeError("Server.__init__() got an unexpected keyword argument 'gateway'")])
+E            +  where False = is_alive()
+E            +    where is_alive = <Thread(task621-cheroot, stopped 136619655890624)>.is_alive
+
+tests/test_job_response_lifetime.py:131: AssertionError
+__ test_configured_wsgi_closes_stream_owner_exactly_once[disconnect-download] __
+
+store = namespace(root=PosixPath('/tmp/openscrub-task621/socket-tmp/test_configured_wsgi_closes_st6/data'), jobs=PosixPath('/t...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7c41c03c8360>, url='/api/jobs/db745f65aab9')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7c41f7d82e40>
+endpoint = 'download', ending = 'disconnect'
+
+    @pytest.mark.parametrize('endpoint', ['download', 'report', 'video'])
+    @pytest.mark.parametrize('ending', ['complete', 'iterator_error', 'disconnect'])
+    def test_configured_wsgi_closes_stream_owner_exactly_once(store, monkeypatch, endpoint, ending):
+        store.enable()
+        payload = bytes(range(256)) * 16384
+        if endpoint == 'report':
+            doc = dict(store.doc, synthetic_padding='x' * len(payload))
+            store.path.write_text(json.dumps(doc))
+            payload = store.path.read_bytes()
+        else:
+            output = Path(store.job['dir']) / 'output.mp4'
+            output.write_bytes(payload)
+            Path(store.job['video']).write_bytes(payload)
+            store.job.update(output=str(output), phase='done')
+        ready, entered, release, closed = (threading.Event() for _ in range(4))
+        servers, errors, releases, logs = [], [], [], []
+        real_server = wsgi.Server
+        class Server(real_server):
+            def prepare(self):
+                super().prepare()
+                servers.append(self)
+                ready.set()
+            def error_log(self, message='', level=20, traceback=False):
+                logs.append(str(message))
+        monkeypatch.setattr(wsgi, 'Server', Server)
+        real_send, real_close = web.send_file, web.OwnedIterable.close
+        class Gate:
+            def __init__(self, source):
+                self.source, self.iterator, self.calls = source, iter(source), 0
+            def __iter__(self):
+                return self
+            def __next__(self):
+                self.calls += 1
+                if self.calls == 2:
+                    entered.set()
+                    assert release.wait(8), 'socket schedule did not release file read'
+                    if ending == 'iterator_error':
+                        raise OSError('synthetic streaming read failure')
+                return next(self.iterator)
+            def close(self):
+                self.source.close()
+        def send(*args, **kwargs):
+            response = real_send(*args, **kwargs)
+            response.response = Gate(response.response)
+            return response
+        def close(owner):
+            was_released = owner.lease.released
+            try:
+                return real_close(owner)
+            finally:
+                if not was_released and owner.lease.released:
+                    releases.append(1)
+                closed.set()
+        monkeypatch.setattr(web, 'send_file', send)
+        monkeypatch.setattr(web.OwnedIterable, 'close', close)
+        def serve():
+            try:
+                web._serve('127.0.0.1', 0, None)
+            except BaseException as error:
+                errors.append(error)
+                ready.set()
+        thread = threading.Thread(target=serve, name='task621-cheroot')
+        thread.start()
+        connection = response = None
+        try:
+>           assert ready.wait(8) and not errors, errors
+E           AssertionError: [TypeError("Server.__init__() got an unexpected keyword argument 'gateway'")]
+E           assert (True and not [TypeError("Server.__init__() got an unexpected keyword argument 'gateway'")])
+E            +  where True = wait(8)
+E            +    where wait = <threading.Event at 0x7c41f7d8a420: set>.wait
+
+tests/test_job_response_lifetime.py:80: AssertionError
+
+During handling of the above exception, another exception occurred:
+
+store = namespace(root=PosixPath('/tmp/openscrub-task621/socket-tmp/test_configured_wsgi_closes_st6/data'), jobs=PosixPath('/t...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7c41c03c8360>, url='/api/jobs/db745f65aab9')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7c41f7d82e40>
+endpoint = 'download', ending = 'disconnect'
+
+    @pytest.mark.parametrize('endpoint', ['download', 'report', 'video'])
+    @pytest.mark.parametrize('ending', ['complete', 'iterator_error', 'disconnect'])
+    def test_configured_wsgi_closes_stream_owner_exactly_once(store, monkeypatch, endpoint, ending):
+        store.enable()
+        payload = bytes(range(256)) * 16384
+        if endpoint == 'report':
+            doc = dict(store.doc, synthetic_padding='x' * len(payload))
+            store.path.write_text(json.dumps(doc))
+            payload = store.path.read_bytes()
+        else:
+            output = Path(store.job['dir']) / 'output.mp4'
+            output.write_bytes(payload)
+            Path(store.job['video']).write_bytes(payload)
+            store.job.update(output=str(output), phase='done')
+        ready, entered, release, closed = (threading.Event() for _ in range(4))
+        servers, errors, releases, logs = [], [], [], []
+        real_server = wsgi.Server
+        class Server(real_server):
+            def prepare(self):
+                super().prepare()
+                servers.append(self)
+                ready.set()
+            def error_log(self, message='', level=20, traceback=False):
+                logs.append(str(message))
+        monkeypatch.setattr(wsgi, 'Server', Server)
+        real_send, real_close = web.send_file, web.OwnedIterable.close
+        class Gate:
+            def __init__(self, source):
+                self.source, self.iterator, self.calls = source, iter(source), 0
+            def __iter__(self):
+                return self
+            def __next__(self):
+                self.calls += 1
+                if self.calls == 2:
+                    entered.set()
+                    assert release.wait(8), 'socket schedule did not release file read'
+                    if ending == 'iterator_error':
+                        raise OSError('synthetic streaming read failure')
+                return next(self.iterator)
+            def close(self):
+                self.source.close()
+        def send(*args, **kwargs):
+            response = real_send(*args, **kwargs)
+            response.response = Gate(response.response)
+            return response
+        def close(owner):
+            was_released = owner.lease.released
+            try:
+                return real_close(owner)
+            finally:
+                if not was_released and owner.lease.released:
+                    releases.append(1)
+                closed.set()
+        monkeypatch.setattr(web, 'send_file', send)
+        monkeypatch.setattr(web.OwnedIterable, 'close', close)
+        def serve():
+            try:
+                web._serve('127.0.0.1', 0, None)
+            except BaseException as error:
+                errors.append(error)
+                ready.set()
+        thread = threading.Thread(target=serve, name='task621-cheroot')
+        thread.start()
+        connection = response = None
+        try:
+            assert ready.wait(8) and not errors, errors
+            server = servers[0]
+            port = server.socket.getsockname()[1]
+            assert server.requests.min == 64  # exercise actual _serve configuration
+            def api(method, path):
+                conn = http.client.HTTPConnection('127.0.0.1', port, timeout=5)
+                try:
+                    conn.request(method, path, headers={'Connection': 'close'})
+                    result = conn.getresponse()
+                    result.read()
+                    return result.status
+                finally:
+                    conn.close()
+            connection = http.client.HTTPConnection('127.0.0.1', port, timeout=5)
+            connection.request('GET', store.url + '/' + endpoint,
+                               headers={'Range': 'bytes=3-1048578', 'Connection': 'close'})
+            response = connection.getresponse()
+            assert response.status == 206
+            assert response.getheader('Content-Length') == '1048576'
+            assert response.getheader('Content-Range') == 'bytes 3-1048578/%d' % len(payload)
+            if endpoint == 'download':
+                assert 'synthetic_redacted.mp4' in response.getheader('Content-Disposition')
+            if endpoint == 'report':
+                assert 'synthetic_audit.json' in response.getheader('Content-Disposition')
+            assert entered.wait(5), 'iterator was never genuinely active'
+            assert web.FILES.count == 1, 'request teardown released the stream too early'
+            assert api('DELETE', store.url) == 409
+            assert api('POST', '/api/vault/lock') == 409
+            if ending == 'disconnect':
+                connection.sock.shutdown(socket.SHUT_RDWR)
+                response.close()
+                connection.close()
+            release.set()
+            if ending == 'complete':
+                body = response.read()
+                assert len(body) == 1048576 and body == payload[3:1048579]
+            elif ending == 'iterator_error':
+                with pytest.raises(http.client.IncompleteRead):
+                    response.read()
+            assert closed.wait(8), 'Cheroot did not close the WSGI iterable'
+            assert web.FILES.count == 0 and releases == [1]
+            assert api('POST', '/api/vault/lock') == 200
+        finally:
+            release.set()
+            if response is not None:
+                response.close()
+            if connection is not None:
+                connection.close()
+            for server in servers:
+                server.stop()
+            thread.join(8)
+>           assert not thread.is_alive() and not errors, errors
+E           AssertionError: [TypeError("Server.__init__() got an unexpected keyword argument 'gateway'")]
+E           assert (not False and not [TypeError("Server.__init__() got an unexpected keyword argument 'gateway'")])
+E            +  where False = is_alive()
+E            +    where is_alive = <Thread(task621-cheroot, stopped 136619655890624)>.is_alive
+
+tests/test_job_response_lifetime.py:131: AssertionError
+___ test_configured_wsgi_closes_stream_owner_exactly_once[disconnect-report] ___
+
+store = namespace(root=PosixPath('/tmp/openscrub-task621/socket-tmp/test_configured_wsgi_closes_st7/data'), jobs=PosixPath('/t...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7c419c788c20>, url='/api/jobs/11593e9330c4')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7c41f7d8be90>
+endpoint = 'report', ending = 'disconnect'
+
+    @pytest.mark.parametrize('endpoint', ['download', 'report', 'video'])
+    @pytest.mark.parametrize('ending', ['complete', 'iterator_error', 'disconnect'])
+    def test_configured_wsgi_closes_stream_owner_exactly_once(store, monkeypatch, endpoint, ending):
+        store.enable()
+        payload = bytes(range(256)) * 16384
+        if endpoint == 'report':
+            doc = dict(store.doc, synthetic_padding='x' * len(payload))
+            store.path.write_text(json.dumps(doc))
+            payload = store.path.read_bytes()
+        else:
+            output = Path(store.job['dir']) / 'output.mp4'
+            output.write_bytes(payload)
+            Path(store.job['video']).write_bytes(payload)
+            store.job.update(output=str(output), phase='done')
+        ready, entered, release, closed = (threading.Event() for _ in range(4))
+        servers, errors, releases, logs = [], [], [], []
+        real_server = wsgi.Server
+        class Server(real_server):
+            def prepare(self):
+                super().prepare()
+                servers.append(self)
+                ready.set()
+            def error_log(self, message='', level=20, traceback=False):
+                logs.append(str(message))
+        monkeypatch.setattr(wsgi, 'Server', Server)
+        real_send, real_close = web.send_file, web.OwnedIterable.close
+        class Gate:
+            def __init__(self, source):
+                self.source, self.iterator, self.calls = source, iter(source), 0
+            def __iter__(self):
+                return self
+            def __next__(self):
+                self.calls += 1
+                if self.calls == 2:
+                    entered.set()
+                    assert release.wait(8), 'socket schedule did not release file read'
+                    if ending == 'iterator_error':
+                        raise OSError('synthetic streaming read failure')
+                return next(self.iterator)
+            def close(self):
+                self.source.close()
+        def send(*args, **kwargs):
+            response = real_send(*args, **kwargs)
+            response.response = Gate(response.response)
+            return response
+        def close(owner):
+            was_released = owner.lease.released
+            try:
+                return real_close(owner)
+            finally:
+                if not was_released and owner.lease.released:
+                    releases.append(1)
+                closed.set()
+        monkeypatch.setattr(web, 'send_file', send)
+        monkeypatch.setattr(web.OwnedIterable, 'close', close)
+        def serve():
+            try:
+                web._serve('127.0.0.1', 0, None)
+            except BaseException as error:
+                errors.append(error)
+                ready.set()
+        thread = threading.Thread(target=serve, name='task621-cheroot')
+        thread.start()
+        connection = response = None
+        try:
+>           assert ready.wait(8) and not errors, errors
+E           AssertionError: [TypeError("Server.__init__() got an unexpected keyword argument 'gateway'")]
+E           assert (True and not [TypeError("Server.__init__() got an unexpected keyword argument 'gateway'")])
+E            +  where True = wait(8)
+E            +    where wait = <threading.Event at 0x7c41f7d786e0: set>.wait
+
+tests/test_job_response_lifetime.py:80: AssertionError
+
+During handling of the above exception, another exception occurred:
+
+store = namespace(root=PosixPath('/tmp/openscrub-task621/socket-tmp/test_configured_wsgi_closes_st7/data'), jobs=PosixPath('/t...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7c419c788c20>, url='/api/jobs/11593e9330c4')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7c41f7d8be90>
+endpoint = 'report', ending = 'disconnect'
+
+    @pytest.mark.parametrize('endpoint', ['download', 'report', 'video'])
+    @pytest.mark.parametrize('ending', ['complete', 'iterator_error', 'disconnect'])
+    def test_configured_wsgi_closes_stream_owner_exactly_once(store, monkeypatch, endpoint, ending):
+        store.enable()
+        payload = bytes(range(256)) * 16384
+        if endpoint == 'report':
+            doc = dict(store.doc, synthetic_padding='x' * len(payload))
+            store.path.write_text(json.dumps(doc))
+            payload = store.path.read_bytes()
+        else:
+            output = Path(store.job['dir']) / 'output.mp4'
+            output.write_bytes(payload)
+            Path(store.job['video']).write_bytes(payload)
+            store.job.update(output=str(output), phase='done')
+        ready, entered, release, closed = (threading.Event() for _ in range(4))
+        servers, errors, releases, logs = [], [], [], []
+        real_server = wsgi.Server
+        class Server(real_server):
+            def prepare(self):
+                super().prepare()
+                servers.append(self)
+                ready.set()
+            def error_log(self, message='', level=20, traceback=False):
+                logs.append(str(message))
+        monkeypatch.setattr(wsgi, 'Server', Server)
+        real_send, real_close = web.send_file, web.OwnedIterable.close
+        class Gate:
+            def __init__(self, source):
+                self.source, self.iterator, self.calls = source, iter(source), 0
+            def __iter__(self):
+                return self
+            def __next__(self):
+                self.calls += 1
+                if self.calls == 2:
+                    entered.set()
+                    assert release.wait(8), 'socket schedule did not release file read'
+                    if ending == 'iterator_error':
+                        raise OSError('synthetic streaming read failure')
+                return next(self.iterator)
+            def close(self):
+                self.source.close()
+        def send(*args, **kwargs):
+            response = real_send(*args, **kwargs)
+            response.response = Gate(response.response)
+            return response
+        def close(owner):
+            was_released = owner.lease.released
+            try:
+                return real_close(owner)
+            finally:
+                if not was_released and owner.lease.released:
+                    releases.append(1)
+                closed.set()
+        monkeypatch.setattr(web, 'send_file', send)
+        monkeypatch.setattr(web.OwnedIterable, 'close', close)
+        def serve():
+            try:
+                web._serve('127.0.0.1', 0, None)
+            except BaseException as error:
+                errors.append(error)
+                ready.set()
+        thread = threading.Thread(target=serve, name='task621-cheroot')
+        thread.start()
+        connection = response = None
+        try:
+            assert ready.wait(8) and not errors, errors
+            server = servers[0]
+            port = server.socket.getsockname()[1]
+            assert server.requests.min == 64  # exercise actual _serve configuration
+            def api(method, path):
+                conn = http.client.HTTPConnection('127.0.0.1', port, timeout=5)
+                try:
+                    conn.request(method, path, headers={'Connection': 'close'})
+                    result = conn.getresponse()
+                    result.read()
+                    return result.status
+                finally:
+                    conn.close()
+            connection = http.client.HTTPConnection('127.0.0.1', port, timeout=5)
+            connection.request('GET', store.url + '/' + endpoint,
+                               headers={'Range': 'bytes=3-1048578', 'Connection': 'close'})
+            response = connection.getresponse()
+            assert response.status == 206
+            assert response.getheader('Content-Length') == '1048576'
+            assert response.getheader('Content-Range') == 'bytes 3-1048578/%d' % len(payload)
+            if endpoint == 'download':
+                assert 'synthetic_redacted.mp4' in response.getheader('Content-Disposition')
+            if endpoint == 'report':
+                assert 'synthetic_audit.json' in response.getheader('Content-Disposition')
+            assert entered.wait(5), 'iterator was never genuinely active'
+            assert web.FILES.count == 1, 'request teardown released the stream too early'
+            assert api('DELETE', store.url) == 409
+            assert api('POST', '/api/vault/lock') == 409
+            if ending == 'disconnect':
+                connection.sock.shutdown(socket.SHUT_RDWR)
+                response.close()
+                connection.close()
+            release.set()
+            if ending == 'complete':
+                body = response.read()
+                assert len(body) == 1048576 and body == payload[3:1048579]
+            elif ending == 'iterator_error':
+                with pytest.raises(http.client.IncompleteRead):
+                    response.read()
+            assert closed.wait(8), 'Cheroot did not close the WSGI iterable'
+            assert web.FILES.count == 0 and releases == [1]
+            assert api('POST', '/api/vault/lock') == 200
+        finally:
+            release.set()
+            if response is not None:
+                response.close()
+            if connection is not None:
+                connection.close()
+            for server in servers:
+                server.stop()
+            thread.join(8)
+>           assert not thread.is_alive() and not errors, errors
+E           AssertionError: [TypeError("Server.__init__() got an unexpected keyword argument 'gateway'")]
+E           assert (not False and not [TypeError("Server.__init__() got an unexpected keyword argument 'gateway'")])
+E            +  where False = is_alive()
+E            +    where is_alive = <Thread(task621-cheroot, stopped 136619655890624)>.is_alive
+
+tests/test_job_response_lifetime.py:131: AssertionError
+___ test_configured_wsgi_closes_stream_owner_exactly_once[disconnect-video] ____
+
+store = namespace(root=PosixPath('/tmp/openscrub-task621/socket-tmp/test_configured_wsgi_closes_st8/data'), jobs=PosixPath('/t...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7c419c788a40>, url='/api/jobs/db48061f6503')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7c41f7d79c40>
+endpoint = 'video', ending = 'disconnect'
+
+    @pytest.mark.parametrize('endpoint', ['download', 'report', 'video'])
+    @pytest.mark.parametrize('ending', ['complete', 'iterator_error', 'disconnect'])
+    def test_configured_wsgi_closes_stream_owner_exactly_once(store, monkeypatch, endpoint, ending):
+        store.enable()
+        payload = bytes(range(256)) * 16384
+        if endpoint == 'report':
+            doc = dict(store.doc, synthetic_padding='x' * len(payload))
+            store.path.write_text(json.dumps(doc))
+            payload = store.path.read_bytes()
+        else:
+            output = Path(store.job['dir']) / 'output.mp4'
+            output.write_bytes(payload)
+            Path(store.job['video']).write_bytes(payload)
+            store.job.update(output=str(output), phase='done')
+        ready, entered, release, closed = (threading.Event() for _ in range(4))
+        servers, errors, releases, logs = [], [], [], []
+        real_server = wsgi.Server
+        class Server(real_server):
+            def prepare(self):
+                super().prepare()
+                servers.append(self)
+                ready.set()
+            def error_log(self, message='', level=20, traceback=False):
+                logs.append(str(message))
+        monkeypatch.setattr(wsgi, 'Server', Server)
+        real_send, real_close = web.send_file, web.OwnedIterable.close
+        class Gate:
+            def __init__(self, source):
+                self.source, self.iterator, self.calls = source, iter(source), 0
+            def __iter__(self):
+                return self
+            def __next__(self):
+                self.calls += 1
+                if self.calls == 2:
+                    entered.set()
+                    assert release.wait(8), 'socket schedule did not release file read'
+                    if ending == 'iterator_error':
+                        raise OSError('synthetic streaming read failure')
+                return next(self.iterator)
+            def close(self):
+                self.source.close()
+        def send(*args, **kwargs):
+            response = real_send(*args, **kwargs)
+            response.response = Gate(response.response)
+            return response
+        def close(owner):
+            was_released = owner.lease.released
+            try:
+                return real_close(owner)
+            finally:
+                if not was_released and owner.lease.released:
+                    releases.append(1)
+                closed.set()
+        monkeypatch.setattr(web, 'send_file', send)
+        monkeypatch.setattr(web.OwnedIterable, 'close', close)
+        def serve():
+            try:
+                web._serve('127.0.0.1', 0, None)
+            except BaseException as error:
+                errors.append(error)
+                ready.set()
+        thread = threading.Thread(target=serve, name='task621-cheroot')
+        thread.start()
+        connection = response = None
+        try:
+>           assert ready.wait(8) and not errors, errors
+E           AssertionError: [TypeError("Server.__init__() got an unexpected keyword argument 'gateway'")]
+E           assert (True and not [TypeError("Server.__init__() got an unexpected keyword argument 'gateway'")])
+E            +  where True = wait(8)
+E            +    where wait = <threading.Event at 0x7c41f7d7a3f0: set>.wait
+
+tests/test_job_response_lifetime.py:80: AssertionError
+
+During handling of the above exception, another exception occurred:
+
+store = namespace(root=PosixPath('/tmp/openscrub-task621/socket-tmp/test_configured_wsgi_closes_st8/data'), jobs=PosixPath('/t...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7c419c788a40>, url='/api/jobs/db48061f6503')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7c41f7d79c40>
+endpoint = 'video', ending = 'disconnect'
+
+    @pytest.mark.parametrize('endpoint', ['download', 'report', 'video'])
+    @pytest.mark.parametrize('ending', ['complete', 'iterator_error', 'disconnect'])
+    def test_configured_wsgi_closes_stream_owner_exactly_once(store, monkeypatch, endpoint, ending):
+        store.enable()
+        payload = bytes(range(256)) * 16384
+        if endpoint == 'report':
+            doc = dict(store.doc, synthetic_padding='x' * len(payload))
+            store.path.write_text(json.dumps(doc))
+            payload = store.path.read_bytes()
+        else:
+            output = Path(store.job['dir']) / 'output.mp4'
+            output.write_bytes(payload)
+            Path(store.job['video']).write_bytes(payload)
+            store.job.update(output=str(output), phase='done')
+        ready, entered, release, closed = (threading.Event() for _ in range(4))
+        servers, errors, releases, logs = [], [], [], []
+        real_server = wsgi.Server
+        class Server(real_server):
+            def prepare(self):
+                super().prepare()
+                servers.append(self)
+                ready.set()
+            def error_log(self, message='', level=20, traceback=False):
+                logs.append(str(message))
+        monkeypatch.setattr(wsgi, 'Server', Server)
+        real_send, real_close = web.send_file, web.OwnedIterable.close
+        class Gate:
+            def __init__(self, source):
+                self.source, self.iterator, self.calls = source, iter(source), 0
+            def __iter__(self):
+                return self
+            def __next__(self):
+                self.calls += 1
+                if self.calls == 2:
+                    entered.set()
+                    assert release.wait(8), 'socket schedule did not release file read'
+                    if ending == 'iterator_error':
+                        raise OSError('synthetic streaming read failure')
+                return next(self.iterator)
+            def close(self):
+                self.source.close()
+        def send(*args, **kwargs):
+            response = real_send(*args, **kwargs)
+            response.response = Gate(response.response)
+            return response
+        def close(owner):
+            was_released = owner.lease.released
+            try:
+                return real_close(owner)
+            finally:
+                if not was_released and owner.lease.released:
+                    releases.append(1)
+                closed.set()
+        monkeypatch.setattr(web, 'send_file', send)
+        monkeypatch.setattr(web.OwnedIterable, 'close', close)
+        def serve():
+            try:
+                web._serve('127.0.0.1', 0, None)
+            except BaseException as error:
+                errors.append(error)
+                ready.set()
+        thread = threading.Thread(target=serve, name='task621-cheroot')
+        thread.start()
+        connection = response = None
+        try:
+            assert ready.wait(8) and not errors, errors
+            server = servers[0]
+            port = server.socket.getsockname()[1]
+            assert server.requests.min == 64  # exercise actual _serve configuration
+            def api(method, path):
+                conn = http.client.HTTPConnection('127.0.0.1', port, timeout=5)
+                try:
+                    conn.request(method, path, headers={'Connection': 'close'})
+                    result = conn.getresponse()
+                    result.read()
+                    return result.status
+                finally:
+                    conn.close()
+            connection = http.client.HTTPConnection('127.0.0.1', port, timeout=5)
+            connection.request('GET', store.url + '/' + endpoint,
+                               headers={'Range': 'bytes=3-1048578', 'Connection': 'close'})
+            response = connection.getresponse()
+            assert response.status == 206
+            assert response.getheader('Content-Length') == '1048576'
+            assert response.getheader('Content-Range') == 'bytes 3-1048578/%d' % len(payload)
+            if endpoint == 'download':
+                assert 'synthetic_redacted.mp4' in response.getheader('Content-Disposition')
+            if endpoint == 'report':
+                assert 'synthetic_audit.json' in response.getheader('Content-Disposition')
+            assert entered.wait(5), 'iterator was never genuinely active'
+            assert web.FILES.count == 1, 'request teardown released the stream too early'
+            assert api('DELETE', store.url) == 409
+            assert api('POST', '/api/vault/lock') == 409
+            if ending == 'disconnect':
+                connection.sock.shutdown(socket.SHUT_RDWR)
+                response.close()
+                connection.close()
+            release.set()
+            if ending == 'complete':
+                body = response.read()
+                assert len(body) == 1048576 and body == payload[3:1048579]
+            elif ending == 'iterator_error':
+                with pytest.raises(http.client.IncompleteRead):
+                    response.read()
+            assert closed.wait(8), 'Cheroot did not close the WSGI iterable'
+            assert web.FILES.count == 0 and releases == [1]
+            assert api('POST', '/api/vault/lock') == 200
+        finally:
+            release.set()
+            if response is not None:
+                response.close()
+            if connection is not None:
+                connection.close()
+            for server in servers:
+                server.stop()
+            thread.join(8)
+>           assert not thread.is_alive() and not errors, errors
+E           AssertionError: [TypeError("Server.__init__() got an unexpected keyword argument 'gateway'")]
+E           assert (not False and not [TypeError("Server.__init__() got an unexpected keyword argument 'gateway'")])
+E            +  where False = is_alive()
+E            +    where is_alive = <Thread(task621-cheroot, stopped 136619655890624)>.is_alive
+
+tests/test_job_response_lifetime.py:131: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_job_response_lifetime.py::test_configured_wsgi_closes_stream_owner_exactly_once[complete-download]
+FAILED tests/test_job_response_lifetime.py::test_configured_wsgi_closes_stream_owner_exactly_once[complete-report]
+FAILED tests/test_job_response_lifetime.py::test_configured_wsgi_closes_stream_owner_exactly_once[complete-video]
+FAILED tests/test_job_response_lifetime.py::test_configured_wsgi_closes_stream_owner_exactly_once[iterator_error-download]
+FAILED tests/test_job_response_lifetime.py::test_configured_wsgi_closes_stream_owner_exactly_once[iterator_error-report]
+FAILED tests/test_job_response_lifetime.py::test_configured_wsgi_closes_stream_owner_exactly_once[iterator_error-video]
+FAILED tests/test_job_response_lifetime.py::test_configured_wsgi_closes_stream_owner_exactly_once[disconnect-download]
+FAILED tests/test_job_response_lifetime.py::test_configured_wsgi_closes_stream_owner_exactly_once[disconnect-report]
+FAILED tests/test_job_response_lifetime.py::test_configured_wsgi_closes_stream_owner_exactly_once[disconnect-video]
+9 failed in 0.86s

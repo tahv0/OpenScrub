@@ -1,0 +1,5 @@
+Downloading cpython-3.9.25-linux-x86_64-gnu (download) (27.0MiB)
+ Downloaded cpython-3.9.25-linux-x86_64-gnu (download)
+Installed Python 3.9.25 in 2.92s
+ + cpython-3.9.25-linux-x86_64-gnu (python3.9)
+warning: `/tmp/openscrub-python39-20261117/python-bin` is not on your PATH. To use installed Python executables, run `export PATH="/tmp/openscrub-python39-20261117/python-bin:$PATH"` or `uv python update-shell`.

@@ -1,0 +1,10 @@
+Processing ./openscrub-task61/fix1-dist/openscrub-1.0.96-py3-none-any.whl
+Installing collected packages: openscrub
+Successfully installed openscrub-1.0.96
+{
+  "wheel_vault_matches_source": true,
+  "wheel_report_helper_unchanged": true,
+  "sdist_vault_and_focused_tests_match_source": true,
+  "installed_vault": "/tmp/openscrub-task61/fix1-installed/openscrub_vault.py",
+  "installed_report_helper": "/tmp/openscrub-task61/fix1-installed/openscrub_internal/reports.py"
+}

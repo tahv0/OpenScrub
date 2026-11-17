@@ -1,0 +1,92 @@
+F.                                                                       [100%]
+=================================== FAILURES ===================================
+_______ test_intake_owns_new_job_after_cancel_and_before_upload_finishes _______
+
+store = namespace(root=PosixPath('/tmp/openscrub-task621/red2-tmp/test_intake_owns_new_job_after0/data'), jobs=PosixPath('/tmp...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x712953d905e0>, url='/api/jobs/bfe19fadac6a')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x71298b362a20>
+
+    def test_intake_owns_new_job_after_cancel_and_before_upload_finishes(store, monkeypatch):
+        import io
+        from werkzeug.datastructures import FileStorage
+        entered, release = threading.Event(), threading.Event()
+        real_save = FileStorage.save
+        created = []
+        def save(upload, destination, *args, **kwargs):
+            created.append(next(j for j in web.JOBS.values() if j is not store.job))
+            entered.set()
+            assert release.wait(8)
+            return real_save(upload, destination, *args, **kwargs)
+        monkeypatch.setattr(FileStorage, 'save', save)
+        call = start_call('post', '/api/jobs', data={'video': (io.BytesIO(b'synthetic intake'), 'intake.avi')})
+        try:
+            assert entered.wait(5)
+            job = created[0]
+            url = '/api/jobs/' + job['id']
+            assert request('post', url + '/cancel').status_code == 200
+>           assert request('delete', url).status_code == 409
+E           AssertionError: assert 200 == 409
+E            +  where 200 = <WrapperTestResponse 12 bytes [200 OK]>.status_code
+E            +    where <WrapperTestResponse 12 bytes [200 OK]> = request('delete', '/api/jobs/cdc5a272ba19')
+
+tests/test_job_lifecycle.py:228: AssertionError
+
+During handling of the above exception, another exception occurred:
+
+store = namespace(root=PosixPath('/tmp/openscrub-task621/red2-tmp/test_intake_owns_new_job_after0/data'), jobs=PosixPath('/tmp...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x712953d905e0>, url='/api/jobs/bfe19fadac6a')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x71298b362a20>
+
+    def test_intake_owns_new_job_after_cancel_and_before_upload_finishes(store, monkeypatch):
+        import io
+        from werkzeug.datastructures import FileStorage
+        entered, release = threading.Event(), threading.Event()
+        real_save = FileStorage.save
+        created = []
+        def save(upload, destination, *args, **kwargs):
+            created.append(next(j for j in web.JOBS.values() if j is not store.job))
+            entered.set()
+            assert release.wait(8)
+            return real_save(upload, destination, *args, **kwargs)
+        monkeypatch.setattr(FileStorage, 'save', save)
+        call = start_call('post', '/api/jobs', data={'video': (io.BytesIO(b'synthetic intake'), 'intake.avi')})
+        try:
+            assert entered.wait(5)
+            job = created[0]
+            url = '/api/jobs/' + job['id']
+            assert request('post', url + '/cancel').status_code == 200
+            assert request('delete', url).status_code == 409
+            assert request('post', '/api/vault/setup', json={'password': 'synthetic-password'}).status_code == 409
+        finally:
+            release.set()
+>           assert finish(call).status_code == 200
+E           assert 500 == 200
+E            +  where 500 = <WrapperTestResponse 265 bytes [500 INTERNAL SERVER ERROR]>.status_code
+E            +    where <WrapperTestResponse 265 bytes [500 INTERNAL SERVER ERROR]> = finish((<Thread(Thread-1 (run), stopped 124420126344896)>, <threading.Event at 0x71298b362030: set>, [], [<WrapperTestResponse 265 bytes [500 INTERNAL SERVER ERROR]>]))
+
+tests/test_job_lifecycle.py:232: AssertionError
+------------------------------ Captured log call -------------------------------
+ERROR    openscrub_web:app.py:875 Exception on /api/jobs [POST]
+Traceback (most recent call last):
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", line 1022, in create_job
+    f.save(path)
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_job_lifecycle.py", line 220, in save
+    return real_save(upload, destination, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/werkzeug/datastructures/file_storage.py", line 129, in save
+    dst = open(dst, "wb")
+          ^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/tmp/openscrub-task621/red2-tmp/test_intake_owns_new_job_after0/data/jobs/cdc5a272ba19/input.avi'
+=========================== short test summary info ============================
+FAILED tests/test_job_lifecycle.py::test_intake_owns_new_job_after_cancel_and_before_upload_finishes
+1 failed, 1 passed, 5 deselected in 0.15s

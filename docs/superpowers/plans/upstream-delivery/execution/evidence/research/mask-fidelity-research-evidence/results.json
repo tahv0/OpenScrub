@@ -1,0 +1,2913 @@
+{
+  "baseline": "5d3a15ae683c08f368d6ba4bd0d2d77b4e7b8e2f",
+  "donor": "8697c2811db6cfda644f730284e037f7294b47cc",
+  "opencv": "4.14.0",
+  "numpy": "2.5.5",
+  "source_ranges": {
+    "baseline": {
+      "Detection": [
+        731,
+        748
+      ],
+      "blur_silhouette": [
+        3181,
+        3229
+      ],
+      "_blur_silhouette_yuv10": [
+        3684,
+        3746
+      ],
+      "render_hdr": [
+        3887,
+        4059
+      ],
+      "render": [
+        4062,
+        4299
+      ],
+      "load_report": [
+        6336,
+        6364
+      ]
+    },
+    "donor": {
+      "Detection": [
+        705,
+        727
+      ],
+      "rasterize_mask": [
+        3023,
+        3067
+      ],
+      "blur_silhouette": [
+        3070,
+        3091
+      ],
+      "_blur_silhouette_yuv10": [
+        3429,
+        3471
+      ],
+      "render_hdr": [
+        3614,
+        3775
+      ],
+      "render": [
+        3778,
+        3992
+      ],
+      "load_report": [
+        5978,
+        6010
+      ]
+    }
+  },
+  "chroma": {
+    "donor_tip_full_square_fixture_pass": {
+      "baseline": true,
+      "donor": true
+    },
+    "cases": [
+      {
+        "case": "full_square_control",
+        "origin": [
+          4,
+          4
+        ],
+        "pad": 0,
+        "implementations": {
+          "baseline": {
+            "luma_pixels": 144,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 36,
+            "actual_chroma_cells": 36,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          },
+          "donor": {
+            "luma_pixels": 144,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 36,
+            "actual_chroma_cells": 36,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          }
+        }
+      },
+      {
+        "case": "full_square_control",
+        "origin": [
+          4,
+          4
+        ],
+        "pad": 1,
+        "implementations": {
+          "baseline": {
+            "luma_pixels": 144,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 36,
+            "actual_chroma_cells": 36,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          },
+          "donor": {
+            "luma_pixels": 144,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 36,
+            "actual_chroma_cells": 36,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          }
+        }
+      },
+      {
+        "case": "full_square_control",
+        "origin": [
+          4,
+          4
+        ],
+        "pad": 3,
+        "implementations": {
+          "baseline": {
+            "luma_pixels": 144,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 36,
+            "actual_chroma_cells": 36,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          },
+          "donor": {
+            "luma_pixels": 144,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 36,
+            "actual_chroma_cells": 36,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          }
+        }
+      },
+      {
+        "case": "sparse_triangle",
+        "origin": [
+          4,
+          4
+        ],
+        "pad": 0,
+        "implementations": {
+          "baseline": {
+            "luma_pixels": 3,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 3,
+            "actual_chroma_cells": 0,
+            "missing_cells_yx": [
+              [
+                2,
+                2
+              ],
+              [
+                2,
+                3
+              ],
+              [
+                3,
+                2
+              ]
+            ],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          },
+          "donor": {
+            "luma_pixels": 3,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 3,
+            "actual_chroma_cells": 3,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          }
+        }
+      },
+      {
+        "case": "sparse_triangle",
+        "origin": [
+          4,
+          4
+        ],
+        "pad": 1,
+        "implementations": {
+          "baseline": {
+            "luma_pixels": 15,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 4,
+            "actual_chroma_cells": 4,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          },
+          "donor": {
+            "luma_pixels": 15,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 4,
+            "actual_chroma_cells": 4,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          }
+        }
+      },
+      {
+        "case": "sparse_triangle",
+        "origin": [
+          4,
+          4
+        ],
+        "pad": 3,
+        "implementations": {
+          "baseline": {
+            "luma_pixels": 35,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 9,
+            "actual_chroma_cells": 9,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          },
+          "donor": {
+            "luma_pixels": 35,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 9,
+            "actual_chroma_cells": 9,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          }
+        }
+      },
+      {
+        "case": "right_edge_triangle",
+        "origin": [
+          4,
+          4
+        ],
+        "pad": 0,
+        "implementations": {
+          "baseline": {
+            "luma_pixels": 3,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 1,
+            "actual_chroma_cells": 1,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          },
+          "donor": {
+            "luma_pixels": 3,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 1,
+            "actual_chroma_cells": 1,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          }
+        }
+      },
+      {
+        "case": "right_edge_triangle",
+        "origin": [
+          4,
+          4
+        ],
+        "pad": 1,
+        "implementations": {
+          "baseline": {
+            "luma_pixels": 8,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 3,
+            "actual_chroma_cells": 2,
+            "missing_cells_yx": [
+              [
+                2,
+                6
+              ]
+            ],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          },
+          "donor": {
+            "luma_pixels": 8,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 3,
+            "actual_chroma_cells": 3,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          }
+        }
+      },
+      {
+        "case": "right_edge_triangle",
+        "origin": [
+          4,
+          4
+        ],
+        "pad": 3,
+        "implementations": {
+          "baseline": {
+            "luma_pixels": 24,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 8,
+            "actual_chroma_cells": 6,
+            "missing_cells_yx": [
+              [
+                2,
+                5
+              ],
+              [
+                3,
+                5
+              ]
+            ],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          },
+          "donor": {
+            "luma_pixels": 24,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 8,
+            "actual_chroma_cells": 8,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          }
+        }
+      },
+      {
+        "case": "diagonal_triangle",
+        "origin": [
+          4,
+          4
+        ],
+        "pad": 0,
+        "implementations": {
+          "baseline": {
+            "luma_pixels": 18,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 9,
+            "actual_chroma_cells": 6,
+            "missing_cells_yx": [
+              [
+                5,
+                4
+              ],
+              [
+                6,
+                5
+              ],
+              [
+                7,
+                6
+              ]
+            ],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          },
+          "donor": {
+            "luma_pixels": 18,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 9,
+            "actual_chroma_cells": 9,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          }
+        }
+      },
+      {
+        "case": "diagonal_triangle",
+        "origin": [
+          4,
+          4
+        ],
+        "pad": 1,
+        "implementations": {
+          "baseline": {
+            "luma_pixels": 59,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 18,
+            "actual_chroma_cells": 16,
+            "missing_cells_yx": [
+              [
+                6,
+                4
+              ],
+              [
+                7,
+                5
+              ]
+            ],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          },
+          "donor": {
+            "luma_pixels": 59,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 18,
+            "actual_chroma_cells": 18,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          }
+        }
+      },
+      {
+        "case": "diagonal_triangle",
+        "origin": [
+          4,
+          4
+        ],
+        "pad": 3,
+        "implementations": {
+          "baseline": {
+            "luma_pixels": 117,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 31,
+            "actual_chroma_cells": 30,
+            "missing_cells_yx": [
+              [
+                7,
+                3
+              ]
+            ],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          },
+          "donor": {
+            "luma_pixels": 117,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 31,
+            "actual_chroma_cells": 31,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          }
+        }
+      },
+      {
+        "case": "full_square_control",
+        "origin": [
+          5,
+          4
+        ],
+        "pad": 0,
+        "implementations": {
+          "baseline": {
+            "luma_pixels": 144,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 42,
+            "actual_chroma_cells": 42,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          },
+          "donor": {
+            "luma_pixels": 144,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 42,
+            "actual_chroma_cells": 42,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          }
+        }
+      },
+      {
+        "case": "full_square_control",
+        "origin": [
+          5,
+          4
+        ],
+        "pad": 1,
+        "implementations": {
+          "baseline": {
+            "luma_pixels": 144,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 42,
+            "actual_chroma_cells": 42,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          },
+          "donor": {
+            "luma_pixels": 144,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 42,
+            "actual_chroma_cells": 42,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          }
+        }
+      },
+      {
+        "case": "full_square_control",
+        "origin": [
+          5,
+          4
+        ],
+        "pad": 3,
+        "implementations": {
+          "baseline": {
+            "luma_pixels": 144,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 42,
+            "actual_chroma_cells": 42,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          },
+          "donor": {
+            "luma_pixels": 144,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 42,
+            "actual_chroma_cells": 42,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          }
+        }
+      },
+      {
+        "case": "sparse_triangle",
+        "origin": [
+          5,
+          4
+        ],
+        "pad": 0,
+        "implementations": {
+          "baseline": {
+            "luma_pixels": 3,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 2,
+            "actual_chroma_cells": 1,
+            "missing_cells_yx": [
+              [
+                2,
+                3
+              ]
+            ],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          },
+          "donor": {
+            "luma_pixels": 3,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 2,
+            "actual_chroma_cells": 2,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          }
+        }
+      },
+      {
+        "case": "sparse_triangle",
+        "origin": [
+          5,
+          4
+        ],
+        "pad": 1,
+        "implementations": {
+          "baseline": {
+            "luma_pixels": 15,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 6,
+            "actual_chroma_cells": 6,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          },
+          "donor": {
+            "luma_pixels": 15,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 6,
+            "actual_chroma_cells": 6,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          }
+        }
+      },
+      {
+        "case": "sparse_triangle",
+        "origin": [
+          5,
+          4
+        ],
+        "pad": 3,
+        "implementations": {
+          "baseline": {
+            "luma_pixels": 35,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 12,
+            "actual_chroma_cells": 12,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          },
+          "donor": {
+            "luma_pixels": 35,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 12,
+            "actual_chroma_cells": 12,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          }
+        }
+      },
+      {
+        "case": "right_edge_triangle",
+        "origin": [
+          5,
+          4
+        ],
+        "pad": 0,
+        "implementations": {
+          "baseline": {
+            "luma_pixels": 3,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 2,
+            "actual_chroma_cells": 1,
+            "missing_cells_yx": [
+              [
+                2,
+                7
+              ]
+            ],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          },
+          "donor": {
+            "luma_pixels": 3,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 2,
+            "actual_chroma_cells": 2,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          }
+        }
+      },
+      {
+        "case": "right_edge_triangle",
+        "origin": [
+          5,
+          4
+        ],
+        "pad": 1,
+        "implementations": {
+          "baseline": {
+            "luma_pixels": 8,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 4,
+            "actual_chroma_cells": 2,
+            "missing_cells_yx": [
+              [
+                2,
+                7
+              ],
+              [
+                3,
+                7
+              ]
+            ],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          },
+          "donor": {
+            "luma_pixels": 8,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 4,
+            "actual_chroma_cells": 4,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          }
+        }
+      },
+      {
+        "case": "right_edge_triangle",
+        "origin": [
+          5,
+          4
+        ],
+        "pad": 3,
+        "implementations": {
+          "baseline": {
+            "luma_pixels": 24,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 9,
+            "actual_chroma_cells": 6,
+            "missing_cells_yx": [
+              [
+                2,
+                6
+              ],
+              [
+                3,
+                6
+              ],
+              [
+                4,
+                6
+              ]
+            ],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          },
+          "donor": {
+            "luma_pixels": 24,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 9,
+            "actual_chroma_cells": 9,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          }
+        }
+      },
+      {
+        "case": "diagonal_triangle",
+        "origin": [
+          5,
+          4
+        ],
+        "pad": 0,
+        "implementations": {
+          "baseline": {
+            "luma_pixels": 18,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 12,
+            "actual_chroma_cells": 5,
+            "missing_cells_yx": [
+              [
+                2,
+                3
+              ],
+              [
+                3,
+                3
+              ],
+              [
+                3,
+                4
+              ],
+              [
+                4,
+                4
+              ],
+              [
+                4,
+                5
+              ],
+              [
+                6,
+                6
+              ],
+              [
+                7,
+                7
+              ]
+            ],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          },
+          "donor": {
+            "luma_pixels": 18,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 12,
+            "actual_chroma_cells": 12,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          }
+        }
+      },
+      {
+        "case": "diagonal_triangle",
+        "origin": [
+          5,
+          4
+        ],
+        "pad": 1,
+        "implementations": {
+          "baseline": {
+            "luma_pixels": 59,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 22,
+            "actual_chroma_cells": 17,
+            "missing_cells_yx": [
+              [
+                2,
+                4
+              ],
+              [
+                3,
+                5
+              ],
+              [
+                4,
+                3
+              ],
+              [
+                5,
+                4
+              ],
+              [
+                7,
+                6
+              ]
+            ],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          },
+          "donor": {
+            "luma_pixels": 59,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 22,
+            "actual_chroma_cells": 22,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          }
+        }
+      },
+      {
+        "case": "diagonal_triangle",
+        "origin": [
+          5,
+          4
+        ],
+        "pad": 3,
+        "implementations": {
+          "baseline": {
+            "luma_pixels": 117,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 36,
+            "actual_chroma_cells": 35,
+            "missing_cells_yx": [
+              [
+                6,
+                3
+              ]
+            ],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          },
+          "donor": {
+            "luma_pixels": 117,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 36,
+            "actual_chroma_cells": 36,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          }
+        }
+      },
+      {
+        "case": "full_square_control",
+        "origin": [
+          4,
+          5
+        ],
+        "pad": 0,
+        "implementations": {
+          "baseline": {
+            "luma_pixels": 144,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 42,
+            "actual_chroma_cells": 42,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          },
+          "donor": {
+            "luma_pixels": 144,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 42,
+            "actual_chroma_cells": 42,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          }
+        }
+      },
+      {
+        "case": "full_square_control",
+        "origin": [
+          4,
+          5
+        ],
+        "pad": 1,
+        "implementations": {
+          "baseline": {
+            "luma_pixels": 144,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 42,
+            "actual_chroma_cells": 42,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          },
+          "donor": {
+            "luma_pixels": 144,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 42,
+            "actual_chroma_cells": 42,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          }
+        }
+      },
+      {
+        "case": "full_square_control",
+        "origin": [
+          4,
+          5
+        ],
+        "pad": 3,
+        "implementations": {
+          "baseline": {
+            "luma_pixels": 144,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 42,
+            "actual_chroma_cells": 42,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          },
+          "donor": {
+            "luma_pixels": 144,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 42,
+            "actual_chroma_cells": 42,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          }
+        }
+      },
+      {
+        "case": "sparse_triangle",
+        "origin": [
+          4,
+          5
+        ],
+        "pad": 0,
+        "implementations": {
+          "baseline": {
+            "luma_pixels": 3,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 2,
+            "actual_chroma_cells": 1,
+            "missing_cells_yx": [
+              [
+                3,
+                2
+              ]
+            ],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          },
+          "donor": {
+            "luma_pixels": 3,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 2,
+            "actual_chroma_cells": 2,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          }
+        }
+      },
+      {
+        "case": "sparse_triangle",
+        "origin": [
+          4,
+          5
+        ],
+        "pad": 1,
+        "implementations": {
+          "baseline": {
+            "luma_pixels": 15,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 6,
+            "actual_chroma_cells": 6,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          },
+          "donor": {
+            "luma_pixels": 15,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 6,
+            "actual_chroma_cells": 6,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          }
+        }
+      },
+      {
+        "case": "sparse_triangle",
+        "origin": [
+          4,
+          5
+        ],
+        "pad": 3,
+        "implementations": {
+          "baseline": {
+            "luma_pixels": 35,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 12,
+            "actual_chroma_cells": 12,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          },
+          "donor": {
+            "luma_pixels": 35,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 12,
+            "actual_chroma_cells": 12,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          }
+        }
+      },
+      {
+        "case": "right_edge_triangle",
+        "origin": [
+          4,
+          5
+        ],
+        "pad": 0,
+        "implementations": {
+          "baseline": {
+            "luma_pixels": 3,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 2,
+            "actual_chroma_cells": 1,
+            "missing_cells_yx": [
+              [
+                3,
+                7
+              ]
+            ],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          },
+          "donor": {
+            "luma_pixels": 3,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 2,
+            "actual_chroma_cells": 2,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          }
+        }
+      },
+      {
+        "case": "right_edge_triangle",
+        "origin": [
+          4,
+          5
+        ],
+        "pad": 1,
+        "implementations": {
+          "baseline": {
+            "luma_pixels": 8,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 4,
+            "actual_chroma_cells": 2,
+            "missing_cells_yx": [
+              [
+                2,
+                6
+              ],
+              [
+                3,
+                6
+              ]
+            ],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          },
+          "donor": {
+            "luma_pixels": 8,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 4,
+            "actual_chroma_cells": 4,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          }
+        }
+      },
+      {
+        "case": "right_edge_triangle",
+        "origin": [
+          4,
+          5
+        ],
+        "pad": 3,
+        "implementations": {
+          "baseline": {
+            "luma_pixels": 24,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 9,
+            "actual_chroma_cells": 6,
+            "missing_cells_yx": [
+              [
+                2,
+                5
+              ],
+              [
+                3,
+                5
+              ],
+              [
+                4,
+                5
+              ]
+            ],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          },
+          "donor": {
+            "luma_pixels": 24,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 9,
+            "actual_chroma_cells": 9,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          }
+        }
+      },
+      {
+        "case": "diagonal_triangle",
+        "origin": [
+          4,
+          5
+        ],
+        "pad": 0,
+        "implementations": {
+          "baseline": {
+            "luma_pixels": 18,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 12,
+            "actual_chroma_cells": 4,
+            "missing_cells_yx": [
+              [
+                3,
+                2
+              ],
+              [
+                3,
+                3
+              ],
+              [
+                4,
+                3
+              ],
+              [
+                4,
+                4
+              ],
+              [
+                5,
+                4
+              ],
+              [
+                5,
+                5
+              ],
+              [
+                6,
+                6
+              ],
+              [
+                7,
+                7
+              ]
+            ],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          },
+          "donor": {
+            "luma_pixels": 18,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 12,
+            "actual_chroma_cells": 12,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          }
+        }
+      },
+      {
+        "case": "diagonal_triangle",
+        "origin": [
+          4,
+          5
+        ],
+        "pad": 1,
+        "implementations": {
+          "baseline": {
+            "luma_pixels": 59,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 22,
+            "actual_chroma_cells": 16,
+            "missing_cells_yx": [
+              [
+                3,
+                4
+              ],
+              [
+                4,
+                2
+              ],
+              [
+                4,
+                5
+              ],
+              [
+                5,
+                3
+              ],
+              [
+                5,
+                6
+              ],
+              [
+                6,
+                7
+              ]
+            ],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          },
+          "donor": {
+            "luma_pixels": 59,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 22,
+            "actual_chroma_cells": 22,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          }
+        }
+      },
+      {
+        "case": "diagonal_triangle",
+        "origin": [
+          4,
+          5
+        ],
+        "pad": 3,
+        "implementations": {
+          "baseline": {
+            "luma_pixels": 117,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 36,
+            "actual_chroma_cells": 34,
+            "missing_cells_yx": [
+              [
+                3,
+                6
+              ],
+              [
+                4,
+                7
+              ]
+            ],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          },
+          "donor": {
+            "luma_pixels": 117,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 36,
+            "actual_chroma_cells": 36,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          }
+        }
+      },
+      {
+        "case": "full_square_control",
+        "origin": [
+          5,
+          5
+        ],
+        "pad": 0,
+        "implementations": {
+          "baseline": {
+            "luma_pixels": 144,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 49,
+            "actual_chroma_cells": 49,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          },
+          "donor": {
+            "luma_pixels": 144,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 49,
+            "actual_chroma_cells": 49,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          }
+        }
+      },
+      {
+        "case": "full_square_control",
+        "origin": [
+          5,
+          5
+        ],
+        "pad": 1,
+        "implementations": {
+          "baseline": {
+            "luma_pixels": 144,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 49,
+            "actual_chroma_cells": 49,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          },
+          "donor": {
+            "luma_pixels": 144,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 49,
+            "actual_chroma_cells": 49,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          }
+        }
+      },
+      {
+        "case": "full_square_control",
+        "origin": [
+          5,
+          5
+        ],
+        "pad": 3,
+        "implementations": {
+          "baseline": {
+            "luma_pixels": 144,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 49,
+            "actual_chroma_cells": 49,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          },
+          "donor": {
+            "luma_pixels": 144,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 49,
+            "actual_chroma_cells": 49,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          }
+        }
+      },
+      {
+        "case": "sparse_triangle",
+        "origin": [
+          5,
+          5
+        ],
+        "pad": 0,
+        "implementations": {
+          "baseline": {
+            "luma_pixels": 3,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 1,
+            "actual_chroma_cells": 1,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          },
+          "donor": {
+            "luma_pixels": 3,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 1,
+            "actual_chroma_cells": 1,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          }
+        }
+      },
+      {
+        "case": "sparse_triangle",
+        "origin": [
+          5,
+          5
+        ],
+        "pad": 1,
+        "implementations": {
+          "baseline": {
+            "luma_pixels": 15,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 8,
+            "actual_chroma_cells": 8,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          },
+          "donor": {
+            "luma_pixels": 15,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 8,
+            "actual_chroma_cells": 8,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          }
+        }
+      },
+      {
+        "case": "sparse_triangle",
+        "origin": [
+          5,
+          5
+        ],
+        "pad": 3,
+        "implementations": {
+          "baseline": {
+            "luma_pixels": 35,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 15,
+            "actual_chroma_cells": 15,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          },
+          "donor": {
+            "luma_pixels": 35,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 15,
+            "actual_chroma_cells": 15,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          }
+        }
+      },
+      {
+        "case": "right_edge_triangle",
+        "origin": [
+          5,
+          5
+        ],
+        "pad": 0,
+        "implementations": {
+          "baseline": {
+            "luma_pixels": 3,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 3,
+            "actual_chroma_cells": 1,
+            "missing_cells_yx": [
+              [
+                2,
+                7
+              ],
+              [
+                3,
+                8
+              ]
+            ],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          },
+          "donor": {
+            "luma_pixels": 3,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 3,
+            "actual_chroma_cells": 3,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          }
+        }
+      },
+      {
+        "case": "right_edge_triangle",
+        "origin": [
+          5,
+          5
+        ],
+        "pad": 1,
+        "implementations": {
+          "baseline": {
+            "luma_pixels": 8,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 4,
+            "actual_chroma_cells": 2,
+            "missing_cells_yx": [
+              [
+                2,
+                7
+              ],
+              [
+                3,
+                7
+              ]
+            ],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          },
+          "donor": {
+            "luma_pixels": 8,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 4,
+            "actual_chroma_cells": 4,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          }
+        }
+      },
+      {
+        "case": "right_edge_triangle",
+        "origin": [
+          5,
+          5
+        ],
+        "pad": 3,
+        "implementations": {
+          "baseline": {
+            "luma_pixels": 24,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 9,
+            "actual_chroma_cells": 6,
+            "missing_cells_yx": [
+              [
+                2,
+                6
+              ],
+              [
+                3,
+                6
+              ],
+              [
+                4,
+                6
+              ]
+            ],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          },
+          "donor": {
+            "luma_pixels": 24,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 9,
+            "actual_chroma_cells": 9,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          }
+        }
+      },
+      {
+        "case": "diagonal_triangle",
+        "origin": [
+          5,
+          5
+        ],
+        "pad": 0,
+        "implementations": {
+          "baseline": {
+            "luma_pixels": 18,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 10,
+            "actual_chroma_cells": 8,
+            "missing_cells_yx": [
+              [
+                7,
+                6
+              ],
+              [
+                8,
+                7
+              ]
+            ],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          },
+          "donor": {
+            "luma_pixels": 18,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 10,
+            "actual_chroma_cells": 10,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          }
+        }
+      },
+      {
+        "case": "diagonal_triangle",
+        "origin": [
+          5,
+          5
+        ],
+        "pad": 1,
+        "implementations": {
+          "baseline": {
+            "luma_pixels": 59,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 22,
+            "actual_chroma_cells": 20,
+            "missing_cells_yx": [
+              [
+                6,
+                4
+              ],
+              [
+                8,
+                6
+              ]
+            ],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          },
+          "donor": {
+            "luma_pixels": 59,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 22,
+            "actual_chroma_cells": 22,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          }
+        }
+      },
+      {
+        "case": "diagonal_triangle",
+        "origin": [
+          5,
+          5
+        ],
+        "pad": 3,
+        "implementations": {
+          "baseline": {
+            "luma_pixels": 117,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 39,
+            "actual_chroma_cells": 40,
+            "missing_cells_yx": [
+              [
+                7,
+                3
+              ]
+            ],
+            "extra_cells_yx": [
+              [
+                2,
+                6
+              ],
+              [
+                6,
+                2
+              ]
+            ],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": false
+          },
+          "donor": {
+            "luma_pixels": 117,
+            "luma_same_as_baseline": true,
+            "required_chroma_cells": 39,
+            "actual_chroma_cells": 39,
+            "missing_cells_yx": [],
+            "extra_cells_yx": [],
+            "uv_same_coverage": true,
+            "unrelated_chroma_unchanged": true
+          }
+        }
+      }
+    ]
+  },
+  "geometry": {
+    "valid_square": {
+      "baseline": {
+        "sdr": {
+          "status": "ok",
+          "changed": [
+            432
+          ],
+          "full_box": true
+        },
+        "hdr": {
+          "status": "ok",
+          "changed": [
+            144,
+            36,
+            36
+          ],
+          "full_box": true
+        }
+      },
+      "donor": {
+        "sdr": {
+          "status": "ok",
+          "changed": [
+            432
+          ],
+          "full_box": true
+        },
+        "hdr": {
+          "status": "ok",
+          "changed": [
+            144,
+            36,
+            36
+          ],
+          "full_box": true
+        }
+      }
+    },
+    "nan_point": {
+      "baseline": {
+        "sdr": {
+          "status": "ValueError",
+          "message": "cannot convert float NaN to integer",
+          "source_trace": [
+            "    module.blur_silhouette(planes[0], *region, 'box', polys,",
+            "  File \"/tmp/openscrub-mask-fidelity-research/mask_baseline.py\", line 3205, in blur_silhouette",
+            "    arr = np.array([[int(round(float(qx) * pbw + pbx1)) - x1i,",
+            "                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^",
+            "ValueError: cannot convert float NaN to integer"
+          ]
+        },
+        "hdr": {
+          "status": "ValueError",
+          "message": "cannot convert float NaN to integer",
+          "source_trace": [
+            "    module._blur_silhouette_yuv10(*planes, *region, 'box', polys,",
+            "  File \"/tmp/openscrub-mask-fidelity-research/mask_baseline.py\", line 3704, in _blur_silhouette_yuv10",
+            "    arr = np.array([[int(round(float(qx) * pbw + pbx1)) - x1i,",
+            "                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^",
+            "ValueError: cannot convert float NaN to integer"
+          ]
+        }
+      },
+      "donor": {
+        "sdr": {
+          "status": "ok",
+          "changed": [
+            432
+          ],
+          "full_box": true
+        },
+        "hdr": {
+          "status": "ok",
+          "changed": [
+            144,
+            36,
+            36
+          ],
+          "full_box": true
+        }
+      }
+    },
+    "infinite_point": {
+      "baseline": {
+        "sdr": {
+          "status": "OverflowError",
+          "message": "cannot convert float infinity to integer",
+          "source_trace": [
+            "    module.blur_silhouette(planes[0], *region, 'box', polys,",
+            "  File \"/tmp/openscrub-mask-fidelity-research/mask_baseline.py\", line 3205, in blur_silhouette",
+            "    arr = np.array([[int(round(float(qx) * pbw + pbx1)) - x1i,",
+            "                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^",
+            "OverflowError: cannot convert float infinity to integer"
+          ]
+        },
+        "hdr": {
+          "status": "OverflowError",
+          "message": "cannot convert float infinity to integer",
+          "source_trace": [
+            "    module._blur_silhouette_yuv10(*planes, *region, 'box', polys,",
+            "  File \"/tmp/openscrub-mask-fidelity-research/mask_baseline.py\", line 3704, in _blur_silhouette_yuv10",
+            "    arr = np.array([[int(round(float(qx) * pbw + pbx1)) - x1i,",
+            "                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^",
+            "OverflowError: cannot convert float infinity to integer"
+          ]
+        }
+      },
+      "donor": {
+        "sdr": {
+          "status": "ok",
+          "changed": [
+            432
+          ],
+          "full_box": true
+        },
+        "hdr": {
+          "status": "ok",
+          "changed": [
+            144,
+            36,
+            36
+          ],
+          "full_box": true
+        }
+      }
+    },
+    "missing_coordinate": {
+      "baseline": {
+        "sdr": {
+          "status": "ValueError",
+          "message": "not enough values to unpack (expected 2, got 1)",
+          "source_trace": [
+            "    module.blur_silhouette(planes[0], *region, 'box', polys,",
+            "  File \"/tmp/openscrub-mask-fidelity-research/mask_baseline.py\", line 3207, in blur_silhouette",
+            "    for qx, qy in pts], np.int32)",
+            "        ^^^^^^",
+            "ValueError: not enough values to unpack (expected 2, got 1)"
+          ]
+        },
+        "hdr": {
+          "status": "ValueError",
+          "message": "not enough values to unpack (expected 2, got 1)",
+          "source_trace": [
+            "    module._blur_silhouette_yuv10(*planes, *region, 'box', polys,",
+            "  File \"/tmp/openscrub-mask-fidelity-research/mask_baseline.py\", line 3706, in _blur_silhouette_yuv10",
+            "    for qx, qy in pts], np.int32)",
+            "        ^^^^^^",
+            "ValueError: not enough values to unpack (expected 2, got 1)"
+          ]
+        }
+      },
+      "donor": {
+        "sdr": {
+          "status": "ok",
+          "changed": [
+            432
+          ],
+          "full_box": true
+        },
+        "hdr": {
+          "status": "ok",
+          "changed": [
+            144,
+            36,
+            36
+          ],
+          "full_box": true
+        }
+      }
+    },
+    "extra_coordinate": {
+      "baseline": {
+        "sdr": {
+          "status": "ValueError",
+          "message": "too many values to unpack (expected 2)",
+          "source_trace": [
+            "    module.blur_silhouette(planes[0], *region, 'box', polys,",
+            "  File \"/tmp/openscrub-mask-fidelity-research/mask_baseline.py\", line 3207, in blur_silhouette",
+            "    for qx, qy in pts], np.int32)",
+            "        ^^^^^^",
+            "ValueError: too many values to unpack (expected 2)"
+          ]
+        },
+        "hdr": {
+          "status": "ValueError",
+          "message": "too many values to unpack (expected 2)",
+          "source_trace": [
+            "    module._blur_silhouette_yuv10(*planes, *region, 'box', polys,",
+            "  File \"/tmp/openscrub-mask-fidelity-research/mask_baseline.py\", line 3706, in _blur_silhouette_yuv10",
+            "    for qx, qy in pts], np.int32)",
+            "        ^^^^^^",
+            "ValueError: too many values to unpack (expected 2)"
+          ]
+        }
+      },
+      "donor": {
+        "sdr": {
+          "status": "ok",
+          "changed": [
+            432
+          ],
+          "full_box": true
+        },
+        "hdr": {
+          "status": "ok",
+          "changed": [
+            144,
+            36,
+            36
+          ],
+          "full_box": true
+        }
+      }
+    },
+    "nonnumeric_coordinate": {
+      "baseline": {
+        "sdr": {
+          "status": "ValueError",
+          "message": "could not convert string to float: 'bad'",
+          "source_trace": [
+            "    module.blur_silhouette(planes[0], *region, 'box', polys,",
+            "  File \"/tmp/openscrub-mask-fidelity-research/mask_baseline.py\", line 3205, in blur_silhouette",
+            "    arr = np.array([[int(round(float(qx) * pbw + pbx1)) - x1i,",
+            "                               ^^^^^^^^^",
+            "ValueError: could not convert string to float: 'bad'"
+          ]
+        },
+        "hdr": {
+          "status": "ValueError",
+          "message": "could not convert string to float: 'bad'",
+          "source_trace": [
+            "    module._blur_silhouette_yuv10(*planes, *region, 'box', polys,",
+            "  File \"/tmp/openscrub-mask-fidelity-research/mask_baseline.py\", line 3704, in _blur_silhouette_yuv10",
+            "    arr = np.array([[int(round(float(qx) * pbw + pbx1)) - x1i,",
+            "                               ^^^^^^^^^",
+            "ValueError: could not convert string to float: 'bad'"
+          ]
+        }
+      },
+      "donor": {
+        "sdr": {
+          "status": "ok",
+          "changed": [
+            432
+          ],
+          "full_box": true
+        },
+        "hdr": {
+          "status": "ok",
+          "changed": [
+            144,
+            36,
+            36
+          ],
+          "full_box": true
+        }
+      }
+    },
+    "two_points": {
+      "baseline": {
+        "sdr": {
+          "status": "ok",
+          "changed": [
+            432
+          ],
+          "full_box": true
+        },
+        "hdr": {
+          "status": "ok",
+          "changed": [
+            144,
+            36,
+            36
+          ],
+          "full_box": true
+        }
+      },
+      "donor": {
+        "sdr": {
+          "status": "ok",
+          "changed": [
+            432
+          ],
+          "full_box": true
+        },
+        "hdr": {
+          "status": "ok",
+          "changed": [
+            144,
+            36,
+            36
+          ],
+          "full_box": true
+        }
+      }
+    },
+    "collinear": {
+      "baseline": {
+        "sdr": {
+          "status": "ok",
+          "changed": [
+            36
+          ],
+          "full_box": false
+        },
+        "hdr": {
+          "status": "ok",
+          "changed": [
+            12,
+            6,
+            6
+          ],
+          "full_box": false
+        }
+      },
+      "donor": {
+        "sdr": {
+          "status": "ok",
+          "changed": [
+            432
+          ],
+          "full_box": true
+        },
+        "hdr": {
+          "status": "ok",
+          "changed": [
+            144,
+            36,
+            36
+          ],
+          "full_box": true
+        }
+      }
+    },
+    "repeated_point": {
+      "baseline": {
+        "sdr": {
+          "status": "ok",
+          "changed": [
+            3
+          ],
+          "full_box": false
+        },
+        "hdr": {
+          "status": "ok",
+          "changed": [
+            1,
+            1,
+            1
+          ],
+          "full_box": false
+        }
+      },
+      "donor": {
+        "sdr": {
+          "status": "ok",
+          "changed": [
+            432
+          ],
+          "full_box": true
+        },
+        "hdr": {
+          "status": "ok",
+          "changed": [
+            144,
+            36,
+            36
+          ],
+          "full_box": true
+        }
+      }
+    },
+    "empty_polygon": {
+      "baseline": {
+        "sdr": {
+          "status": "ok",
+          "changed": [
+            432
+          ],
+          "full_box": true
+        },
+        "hdr": {
+          "status": "ok",
+          "changed": [
+            144,
+            36,
+            36
+          ],
+          "full_box": true
+        }
+      },
+      "donor": {
+        "sdr": {
+          "status": "ok",
+          "changed": [
+            432
+          ],
+          "full_box": true
+        },
+        "hdr": {
+          "status": "ok",
+          "changed": [
+            144,
+            36,
+            36
+          ],
+          "full_box": true
+        }
+      }
+    },
+    "outside_empty": {
+      "baseline": {
+        "sdr": {
+          "status": "ok",
+          "changed": [
+            432
+          ],
+          "full_box": true
+        },
+        "hdr": {
+          "status": "ok",
+          "changed": [
+            144,
+            36,
+            36
+          ],
+          "full_box": true
+        }
+      },
+      "donor": {
+        "sdr": {
+          "status": "ok",
+          "changed": [
+            432
+          ],
+          "full_box": true
+        },
+        "hdr": {
+          "status": "ok",
+          "changed": [
+            144,
+            36,
+            36
+          ],
+          "full_box": true
+        }
+      }
+    },
+    "empty_component_plus_valid": {
+      "baseline": {
+        "sdr": {
+          "status": "ok",
+          "changed": [
+            432
+          ],
+          "full_box": true
+        },
+        "hdr": {
+          "status": "ok",
+          "changed": [
+            144,
+            36,
+            36
+          ],
+          "full_box": true
+        }
+      },
+      "donor": {
+        "sdr": {
+          "status": "ok",
+          "changed": [
+            432
+          ],
+          "full_box": true
+        },
+        "hdr": {
+          "status": "ok",
+          "changed": [
+            144,
+            36,
+            36
+          ],
+          "full_box": true
+        }
+      }
+    },
+    "invalid_poly_box_only": {
+      "baseline": {
+        "sdr": {
+          "status": "ValueError",
+          "message": "cannot convert float NaN to integer",
+          "source_trace": [
+            "    module.blur_silhouette(planes[0], *region, 'box', polys,",
+            "  File \"/tmp/openscrub-mask-fidelity-research/mask_baseline.py\", line 3205, in blur_silhouette",
+            "    arr = np.array([[int(round(float(qx) * pbw + pbx1)) - x1i,",
+            "                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^",
+            "ValueError: cannot convert float NaN to integer"
+          ]
+        },
+        "hdr": {
+          "status": "ValueError",
+          "message": "cannot convert float NaN to integer",
+          "source_trace": [
+            "    module._blur_silhouette_yuv10(*planes, *region, 'box', polys,",
+            "  File \"/tmp/openscrub-mask-fidelity-research/mask_baseline.py\", line 3704, in _blur_silhouette_yuv10",
+            "    arr = np.array([[int(round(float(qx) * pbw + pbx1)) - x1i,",
+            "                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^",
+            "ValueError: cannot convert float NaN to integer"
+          ]
+        }
+      },
+      "donor": {
+        "sdr": {
+          "status": "ok",
+          "changed": [
+            432
+          ],
+          "full_box": true
+        },
+        "hdr": {
+          "status": "ok",
+          "changed": [
+            144,
+            36,
+            36
+          ],
+          "full_box": true
+        }
+      }
+    },
+    "reversed_poly_box_only": {
+      "baseline": {
+        "sdr": {
+          "status": "ok",
+          "changed": [
+            432
+          ],
+          "full_box": true
+        },
+        "hdr": {
+          "status": "ok",
+          "changed": [
+            144,
+            36,
+            36
+          ],
+          "full_box": true
+        }
+      },
+      "donor": {
+        "sdr": {
+          "status": "ok",
+          "changed": [
+            432
+          ],
+          "full_box": true
+        },
+        "hdr": {
+          "status": "ok",
+          "changed": [
+            144,
+            36,
+            36
+          ],
+          "full_box": true
+        }
+      }
+    },
+    "nan_region": {
+      "baseline": {
+        "sdr": {
+          "status": "ValueError",
+          "message": "cannot convert float NaN to integer",
+          "source_trace": [
+            "    module.blur_silhouette(planes[0], *region, 'box', polys,",
+            "  File \"/tmp/openscrub-mask-fidelity-research/mask_baseline.py\", line 3193, in blur_silhouette",
+            "    x1i, y1i = max(0, int(x1)), max(0, int(y1))",
+            "                      ^^^^^^^",
+            "ValueError: cannot convert float NaN to integer"
+          ]
+        },
+        "hdr": {
+          "status": "ValueError",
+          "message": "cannot convert float NaN to integer",
+          "source_trace": [
+            "    module._blur_silhouette_yuv10(*planes, *region, 'box', polys,",
+            "  File \"/tmp/openscrub-mask-fidelity-research/mask_baseline.py\", line 3692, in _blur_silhouette_yuv10",
+            "    x1i, y1i = max(0, int(x1)), max(0, int(y1))",
+            "                      ^^^^^^^",
+            "ValueError: cannot convert float NaN to integer"
+          ]
+        }
+      },
+      "donor": {
+        "sdr": {
+          "status": "ValueError",
+          "message": "cannot convert float NaN to integer",
+          "source_trace": [
+            "                                 ^^^^^^^^^^^^^^^",
+            "  File \"/tmp/openscrub-mask-fidelity-research/mask_donor.py\", line 3027, in rasterize_mask",
+            "    x1i, y1i = max(0, int(x1)), max(0, int(y1))",
+            "                      ^^^^^^^",
+            "ValueError: cannot convert float NaN to integer"
+          ]
+        },
+        "hdr": {
+          "status": "ValueError",
+          "message": "cannot convert float NaN to integer",
+          "source_trace": [
+            "                                 ^^^^^^^^^^^^^^^",
+            "  File \"/tmp/openscrub-mask-fidelity-research/mask_donor.py\", line 3027, in rasterize_mask",
+            "    x1i, y1i = max(0, int(x1)), max(0, int(y1))",
+            "                      ^^^^^^^",
+            "ValueError: cannot convert float NaN to integer"
+          ]
+        }
+      }
+    },
+    "infinite_region": {
+      "baseline": {
+        "sdr": {
+          "status": "OverflowError",
+          "message": "cannot convert float infinity to integer",
+          "source_trace": [
+            "    module.blur_silhouette(planes[0], *region, 'box', polys,",
+            "  File \"/tmp/openscrub-mask-fidelity-research/mask_baseline.py\", line 3194, in blur_silhouette",
+            "    x2i, y2i = min(w, int(x2)), min(h, int(y2))",
+            "                      ^^^^^^^",
+            "OverflowError: cannot convert float infinity to integer"
+          ]
+        },
+        "hdr": {
+          "status": "OverflowError",
+          "message": "cannot convert float infinity to integer",
+          "source_trace": [
+            "    module._blur_silhouette_yuv10(*planes, *region, 'box', polys,",
+            "  File \"/tmp/openscrub-mask-fidelity-research/mask_baseline.py\", line 3693, in _blur_silhouette_yuv10",
+            "    x2i, y2i = min(w, int(x2)), min(h, int(y2))",
+            "                      ^^^^^^^",
+            "OverflowError: cannot convert float infinity to integer"
+          ]
+        }
+      },
+      "donor": {
+        "sdr": {
+          "status": "OverflowError",
+          "message": "cannot convert float infinity to integer",
+          "source_trace": [
+            "                                 ^^^^^^^^^^^^^^^",
+            "  File \"/tmp/openscrub-mask-fidelity-research/mask_donor.py\", line 3028, in rasterize_mask",
+            "    x2i, y2i = min(w, int(x2)), min(h, int(y2))",
+            "                      ^^^^^^^",
+            "OverflowError: cannot convert float infinity to integer"
+          ]
+        },
+        "hdr": {
+          "status": "OverflowError",
+          "message": "cannot convert float infinity to integer",
+          "source_trace": [
+            "                                 ^^^^^^^^^^^^^^^",
+            "  File \"/tmp/openscrub-mask-fidelity-research/mask_donor.py\", line 3028, in rasterize_mask",
+            "    x2i, y2i = min(w, int(x2)), min(h, int(y2))",
+            "                      ^^^^^^^",
+            "OverflowError: cannot convert float infinity to integer"
+          ]
+        }
+      }
+    },
+    "nonnumeric_region": {
+      "baseline": {
+        "sdr": {
+          "status": "ValueError",
+          "message": "invalid literal for int() with base 10: 'bad'",
+          "source_trace": [
+            "    module.blur_silhouette(planes[0], *region, 'box', polys,",
+            "  File \"/tmp/openscrub-mask-fidelity-research/mask_baseline.py\", line 3193, in blur_silhouette",
+            "    x1i, y1i = max(0, int(x1)), max(0, int(y1))",
+            "                      ^^^^^^^",
+            "ValueError: invalid literal for int() with base 10: 'bad'"
+          ]
+        },
+        "hdr": {
+          "status": "ValueError",
+          "message": "invalid literal for int() with base 10: 'bad'",
+          "source_trace": [
+            "    module._blur_silhouette_yuv10(*planes, *region, 'box', polys,",
+            "  File \"/tmp/openscrub-mask-fidelity-research/mask_baseline.py\", line 3692, in _blur_silhouette_yuv10",
+            "    x1i, y1i = max(0, int(x1)), max(0, int(y1))",
+            "                      ^^^^^^^",
+            "ValueError: invalid literal for int() with base 10: 'bad'"
+          ]
+        }
+      },
+      "donor": {
+        "sdr": {
+          "status": "ValueError",
+          "message": "invalid literal for int() with base 10: 'bad'",
+          "source_trace": [
+            "                                 ^^^^^^^^^^^^^^^",
+            "  File \"/tmp/openscrub-mask-fidelity-research/mask_donor.py\", line 3027, in rasterize_mask",
+            "    x1i, y1i = max(0, int(x1)), max(0, int(y1))",
+            "                      ^^^^^^^",
+            "ValueError: invalid literal for int() with base 10: 'bad'"
+          ]
+        },
+        "hdr": {
+          "status": "ValueError",
+          "message": "invalid literal for int() with base 10: 'bad'",
+          "source_trace": [
+            "                                 ^^^^^^^^^^^^^^^",
+            "  File \"/tmp/openscrub-mask-fidelity-research/mask_donor.py\", line 3027, in rasterize_mask",
+            "    x1i, y1i = max(0, int(x1)), max(0, int(y1))",
+            "                      ^^^^^^^",
+            "ValueError: invalid literal for int() with base 10: 'bad'"
+          ]
+        }
+      }
+    },
+    "reversed_region": {
+      "baseline": {
+        "sdr": {
+          "status": "ok",
+          "changed": [
+            0
+          ],
+          "full_box": false
+        },
+        "hdr": {
+          "status": "ok",
+          "changed": [
+            0,
+            0,
+            0
+          ],
+          "full_box": false
+        }
+      },
+      "donor": {
+        "sdr": {
+          "status": "ok",
+          "changed": [
+            0
+          ],
+          "full_box": false
+        },
+        "hdr": {
+          "status": "ok",
+          "changed": [
+            0,
+            0,
+            0
+          ],
+          "full_box": false
+        }
+      }
+    },
+    "zero_region": {
+      "baseline": {
+        "sdr": {
+          "status": "ok",
+          "changed": [
+            0
+          ],
+          "full_box": false
+        },
+        "hdr": {
+          "status": "ok",
+          "changed": [
+            0,
+            0,
+            0
+          ],
+          "full_box": false
+        }
+      },
+      "donor": {
+        "sdr": {
+          "status": "ok",
+          "changed": [
+            0
+          ],
+          "full_box": false
+        },
+        "hdr": {
+          "status": "ok",
+          "changed": [
+            0,
+            0,
+            0
+          ],
+          "full_box": false
+        }
+      }
+    }
+  },
+  "media": {
+    "source_metadata": {
+      "programs": [],
+      "stream_groups": [],
+      "streams": [
+        {
+          "codec_name": "hevc",
+          "width": 64,
+          "height": 64,
+          "pix_fmt": "yuv420p10le",
+          "color_space": "bt2020nc",
+          "color_transfer": "smpte2084",
+          "color_primaries": "bt2020",
+          "nb_frames": "3"
+        }
+      ]
+    },
+    "source_plane_exact": [
+      true,
+      true,
+      true
+    ],
+    "cases": {
+      "sparse_baseline": {
+        "status": "ok",
+        "output_metadata": {
+          "programs": [],
+          "stream_groups": [],
+          "streams": [
+            {
+              "codec_name": "hevc",
+              "width": 64,
+              "height": 64,
+              "pix_fmt": "yuv420p10le",
+              "color_space": "bt2020nc",
+              "color_transfer": "smpte2084",
+              "color_primaries": "bt2020",
+              "nb_frames": "3"
+            }
+          ]
+        },
+        "preencode_changed_pixels": [
+          3,
+          1,
+          1
+        ],
+        "required_chroma_cells_yx": [
+          [
+            2,
+            3
+          ],
+          [
+            3,
+            3
+          ]
+        ],
+        "preencode_u_at_required": [
+          800,
+          512
+        ],
+        "preencode_v_at_required": [
+          300,
+          512
+        ],
+        "preencode_exact_leaf_match": [
+          true,
+          true,
+          true
+        ],
+        "preencode_luma_pixels_yx": [
+          [
+            5,
+            6
+          ],
+          [
+            5,
+            7
+          ],
+          [
+            6,
+            6
+          ]
+        ],
+        "preencode_unrelated_chroma_unchanged": true,
+        "decoded_u_at_required": [
+          614,
+          556
+        ],
+        "decoded_v_at_required": [
+          402,
+          489
+        ],
+        "decoded_plane_max_abs_vs_exact": [
+          52,
+          245,
+          102
+        ]
+      },
+      "sparse_donor_leaf": {
+        "status": "ok",
+        "output_metadata": {
+          "programs": [],
+          "stream_groups": [],
+          "streams": [
+            {
+              "codec_name": "hevc",
+              "width": 64,
+              "height": 64,
+              "pix_fmt": "yuv420p10le",
+              "color_space": "bt2020nc",
+              "color_transfer": "smpte2084",
+              "color_primaries": "bt2020",
+              "nb_frames": "3"
+            }
+          ]
+        },
+        "preencode_changed_pixels": [
+          3,
+          2,
+          2
+        ],
+        "required_chroma_cells_yx": [
+          [
+            2,
+            3
+          ],
+          [
+            3,
+            3
+          ]
+        ],
+        "preencode_u_at_required": [
+          512,
+          512
+        ],
+        "preencode_v_at_required": [
+          512,
+          512
+        ],
+        "preencode_exact_leaf_match": [
+          true,
+          true,
+          true
+        ],
+        "preencode_luma_pixels_yx": [
+          [
+            5,
+            6
+          ],
+          [
+            5,
+            7
+          ],
+          [
+            6,
+            6
+          ]
+        ],
+        "preencode_unrelated_chroma_unchanged": true,
+        "decoded_u_at_required": [
+          520,
+          518
+        ],
+        "decoded_v_at_required": [
+          499,
+          498
+        ],
+        "decoded_plane_max_abs_vs_exact": [
+          50,
+          244,
+          58
+        ]
+      },
+      "nan_point": {
+        "status": "ValueError",
+        "message": "cannot convert float NaN to integer",
+        "source_trace": [
+          "    base.render_hdr(str(src), str(dst), detections, state['cum'], state['bands'], 3, 0, 'box', 'libx265', tags, cb=Quiet())",
+          "  File \"/tmp/openscrub-mask-fidelity-research/mask_baseline.py\", line 4006, in render_hdr",
+          "    _blur_silhouette_yuv10(",
+          "  File \"/tmp/openscrub-mask-fidelity-research/mask_baseline.py\", line 3704, in _blur_silhouette_yuv10",
+          "    arr = np.array([[int(round(float(qx) * pbw + pbx1)) - x1i,",
+          "                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^",
+          "ValueError: cannot convert float NaN to integer"
+        ]
+      },
+      "infinite_point": {
+        "status": "OverflowError",
+        "message": "cannot convert float infinity to integer",
+        "source_trace": [
+          "    base.render_hdr(str(src), str(dst), detections, state['cum'], state['bands'], 3, 0, 'box', 'libx265', tags, cb=Quiet())",
+          "  File \"/tmp/openscrub-mask-fidelity-research/mask_baseline.py\", line 4006, in render_hdr",
+          "    _blur_silhouette_yuv10(",
+          "  File \"/tmp/openscrub-mask-fidelity-research/mask_baseline.py\", line 3704, in _blur_silhouette_yuv10",
+          "    arr = np.array([[int(round(float(qx) * pbw + pbx1)) - x1i,",
+          "                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^",
+          "OverflowError: cannot convert float infinity to integer"
+        ]
+      },
+      "malformed_point": {
+        "status": "ValueError",
+        "message": "not enough values to unpack (expected 2, got 1)",
+        "source_trace": [
+          "    base.render_hdr(str(src), str(dst), detections, state['cum'], state['bands'], 3, 0, 'box', 'libx265', tags, cb=Quiet())",
+          "  File \"/tmp/openscrub-mask-fidelity-research/mask_baseline.py\", line 4006, in render_hdr",
+          "    _blur_silhouette_yuv10(",
+          "  File \"/tmp/openscrub-mask-fidelity-research/mask_baseline.py\", line 3706, in _blur_silhouette_yuv10",
+          "    for qx, qy in pts], np.int32)",
+          "        ^^^^^^",
+          "ValueError: not enough values to unpack (expected 2, got 1)"
+        ]
+      },
+      "two_points": {
+        "status": "ok",
+        "output_metadata": {
+          "programs": [],
+          "stream_groups": [],
+          "streams": [
+            {
+              "codec_name": "hevc",
+              "width": 64,
+              "height": 64,
+              "pix_fmt": "yuv420p10le",
+              "color_space": "bt2020nc",
+              "color_transfer": "smpte2084",
+              "color_primaries": "bt2020",
+              "nb_frames": "3"
+            }
+          ]
+        },
+        "preencode_changed_pixels": [
+          144,
+          36,
+          36
+        ],
+        "decoded_luma_changed_pixels": 4096
+      },
+      "collinear": {
+        "status": "ok",
+        "output_metadata": {
+          "programs": [],
+          "stream_groups": [],
+          "streams": [
+            {
+              "codec_name": "hevc",
+              "width": 64,
+              "height": 64,
+              "pix_fmt": "yuv420p10le",
+              "color_space": "bt2020nc",
+              "color_transfer": "smpte2084",
+              "color_primaries": "bt2020",
+              "nb_frames": "3"
+            }
+          ]
+        },
+        "preencode_changed_pixels": [
+          12,
+          6,
+          6
+        ],
+        "decoded_luma_changed_pixels": 4096
+      },
+      "nan_box": {
+        "status": "ValueError",
+        "message": "cannot convert float NaN to integer",
+        "source_trace": [
+          "    base.render_hdr(str(src), str(dst), detections, state['cum'], state['bands'], 3, 0, 'box', 'libx265', tags, cb=Quiet())",
+          "  File \"/tmp/openscrub-mask-fidelity-research/mask_baseline.py\", line 4006, in render_hdr",
+          "    _blur_silhouette_yuv10(",
+          "  File \"/tmp/openscrub-mask-fidelity-research/mask_baseline.py\", line 3692, in _blur_silhouette_yuv10",
+          "    x1i, y1i = max(0, int(x1)), max(0, int(y1))",
+          "                      ^^^^^^^",
+          "ValueError: cannot convert float NaN to integer"
+        ]
+      },
+      "reversed_box": {
+        "status": "ok",
+        "output_metadata": {
+          "programs": [],
+          "stream_groups": [],
+          "streams": [
+            {
+              "codec_name": "hevc",
+              "width": 64,
+              "height": 64,
+              "pix_fmt": "yuv420p10le",
+              "color_space": "bt2020nc",
+              "color_transfer": "smpte2084",
+              "color_primaries": "bt2020",
+              "nb_frames": "3"
+            }
+          ]
+        },
+        "preencode_changed_pixels": [
+          0,
+          0,
+          0
+        ],
+        "decoded_luma_changed_pixels": 4096
+      }
+    }
+  }
+}

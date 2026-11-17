@@ -1,0 +1,25 @@
+{
+  "passed": 12,
+  "identity": {
+    "url": "http://127.0.0.1:18487/",
+    "title": "OpenScrub",
+    "nonblank": true,
+    "overlays": 0
+  },
+  "errors": [],
+  "warnings": [
+    "Failed to load resource: the server responded with a status of 423 (Locked)",
+    "Failed to load resource: the server responded with a status of 423 (Locked)",
+    "Failed to load resource: the server responded with a status of 423 (Locked)",
+    "Failed to load resource: the server responded with a status of 423 (Locked)",
+    "Failed to load resource: the server responded with a status of 423 (Locked)",
+    "Failed to load resource: the server responded with a status of 423 (Locked)",
+    "Failed to load resource: the server responded with a status of 423 (Locked)",
+    "Failed to load resource: the server responded with a status of 423 (Locked)",
+    "Failed to load resource: the server responded with a status of 423 (Locked)",
+    "Failed to load resource: the server responded with a status of 423 (Locked)",
+    "Failed to load resource: the server responded with a status of 423 (Locked)",
+    "Failed to load resource: net::ERR_FAILED",
+    "Failed to load resource: the server responded with a status of 423 (Locked)"
+  ]
+}

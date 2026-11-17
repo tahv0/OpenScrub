@@ -1,0 +1,57 @@
+[
+  {
+    "job": "small",
+    "groups": 12,
+    "rows": 18,
+    "report_bytes": 8298,
+    "report_sha256": "826e548732d41de20e109878cc0f414d11393b5b79e2778bc5129a7a48fea34b",
+    "mixed_group_members": [
+      1,
+      2
+    ]
+  },
+  {
+    "job": "beta",
+    "groups": 3,
+    "rows": 4,
+    "report_bytes": 3917,
+    "report_sha256": "01185df88277148321ef44973e75aea0123987e97e32c34490a711bf0c593411",
+    "mixed_group_members": [
+      1,
+      2
+    ]
+  },
+  {
+    "job": "cold",
+    "groups": 3,
+    "rows": 4,
+    "report_bytes": 3917,
+    "report_sha256": "fb5d705877500361c1247d649065d4a4a43ded40407621c31b6554a6bdd5d31d",
+    "mixed_group_members": [
+      1,
+      2
+    ]
+  },
+  {
+    "job": "oneK",
+    "groups": 1000,
+    "rows": 1500,
+    "report_bytes": 476840,
+    "report_sha256": "0bc03de03e29ac2586b5f02adbc81be67618909fc4e790b40693b1edaa64e056",
+    "mixed_group_members": [
+      1,
+      2
+    ]
+  },
+  {
+    "job": "tenK",
+    "groups": 10000,
+    "rows": 15000,
+    "report_bytes": 4774340,
+    "report_sha256": "88678ed9c903e8c3afbd2aa7de51b090f6e38911cca7da54544b5e0257f1f84d",
+    "mixed_group_members": [
+      1,
+      2
+    ]
+  }
+]

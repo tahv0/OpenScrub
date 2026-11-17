@@ -1,0 +1,175 @@
+FFFF                                                                     [100%]
+=================================== FAILURES ===================================
+__________ test_save_stage_owns_files_until_publish_and_vault_reopen ___________
+
+store = namespace(root=PosixPath('/tmp/openscrub-task621/red-tmp/test_save_stage_owns_files_unt0/data'), jobs=PosixPath('/tmp/...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7f6efa5b7060>, url='/api/jobs/d92bc6bdb9f7')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f6f31b51160>
+
+    def test_save_stage_owns_files_until_publish_and_vault_reopen(store, monkeypatch):
+        store.enable()
+        staged, release = threading.Event(), threading.Event()
+        real_replace = reports.os.replace
+        def replace(source, target):
+            if Path(source).name.startswith('.report-'):
+                staged.set()
+                assert release.wait(8)
+            return real_replace(source, target)
+        monkeypatch.setattr(reports.os, 'replace', replace)
+        call = start_call('post', store.url + '/detections', json={'enabled': {'0': False}})
+        try:
+            assert staged.wait(5)
+>           assert request('post', '/api/vault/lock').status_code == 409
+E           AssertionError: assert 200 == 409
+E            +  where 200 = <WrapperTestResponse 26 bytes [200 OK]>.status_code
+E            +    where <WrapperTestResponse 26 bytes [200 OK]> = request('post', '/api/vault/lock')
+
+tests/test_job_lifecycle.py:103: AssertionError
+------------------------------ Captured log call -------------------------------
+ERROR    openscrub_web:app.py:875 Exception on /api/jobs/d92bc6bdb9f7/detections [POST]
+Traceback (most recent call last):
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", line 1336, in job_save_edits
+    atomic_report(path, doc)
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_internal/reports.py", line 32, in atomic_report
+    os.replace(staged, path)
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_job_lifecycle.py", line 98, in replace
+    return real_replace(source, target)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/tmp/openscrub-task621/red-tmp/test_save_stage_owns_files_unt0/data/jobs/d92bc6bdb9f7/.report-nuixy3q3.tmp' -> '/tmp/openscrub-task621/red-tmp/test_save_stage_owns_files_unt0/data/jobs/d92bc6bdb9f7/report.json'
+___________ test_tracking_owner_outlives_cancelled_phase_and_cleanup ___________
+
+store = namespace(root=PosixPath('/tmp/openscrub-task621/red-tmp/test_tracking_owner_outlives_c0/data'), jobs=PosixPath('/tmp/...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7f6efa134d60>, url='/api/jobs/ff8b082697b3')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f6f31b674d0>
+
+    def test_tracking_owner_outlives_cancelled_phase_and_cleanup(store, monkeypatch):
+        store.enable()
+        entered, release, exited = threading.Event(), threading.Event(), threading.Event()
+        def compute(*args, **kwargs):
+            entered.set()
+            assert release.wait(8)
+            raise RuntimeError('synthetic compute failure')
+        monkeypatch.setattr(openscrub, 'PersonDetector', lambda *a, **k: None)
+        monkeypatch.setattr(openscrub, 'track_manual_region', compute)
+        real_thread = threading.Thread
+        threads = []
+        def thread(*args, **kwargs):
+            t = real_thread(*args, **kwargs)
+            threads.append(t)
+            return t
+        monkeypatch.setattr(web.threading, 'Thread', thread)
+        try:
+            assert request('post', store.url + '/track_object', json={'box': [0,0,8,8], 't_ref': 0, 't0': 0, 't1': 1}).status_code == 200
+            assert entered.wait(5)
+            store.job['phase'] = 'cancelled'
+>           assert request('post', '/api/vault/lock').status_code == 409
+E           AssertionError: assert 200 == 409
+E            +  where 200 = <WrapperTestResponse 26 bytes [200 OK]>.status_code
+E            +    where <WrapperTestResponse 26 bytes [200 OK]> = request('post', '/api/vault/lock')
+
+tests/test_job_lifecycle.py:141: AssertionError
+______________ test_streamed_response_keeps_delete_and_lock_busy _______________
+
+store = namespace(root=PosixPath('/tmp/openscrub-task621/red-tmp/test_streamed_response_keeps_d0/data'), jobs=PosixPath('/tmp/...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7f6efa134a40>, url='/api/jobs/0845abf49ae1')
+
+    def test_streamed_response_keeps_delete_and_lock_busy(store):
+        store.enable()
+        payload = bytes(range(256)) * 1024
+        output = Path(store.job['dir']) / 'output.mp4'
+        output.write_bytes(payload)
+        store.job.update(output=str(output), phase='done')
+        client = web.app.test_client()
+        response = client.get(store.url + '/download', headers={'Range': 'bytes=3-65538'}, buffered=False)
+        try:
+            assert response.status_code == 206
+            assert response.headers['Content-Length'] == '65536'
+            assert response.headers['Content-Range'] == 'bytes 3-65538/262144'
+>           assert request('delete', store.url).status_code == 409
+E           AssertionError: assert 200 == 409
+E            +  where 200 = <WrapperTestResponse 12 bytes [200 OK]>.status_code
+E            +    where <WrapperTestResponse 12 bytes [200 OK]> = request('delete', '/api/jobs/0845abf49ae1')
+E            +      where '/api/jobs/0845abf49ae1' = namespace(root=PosixPath('/tmp/openscrub-task621/red-tmp/test_streamed_response_keeps_d0/data'), jobs=PosixPath('/tmp/...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7f6efa134a40>, url='/api/jobs/0845abf49ae1').url
+
+tests/test_job_lifecycle.py:169: AssertionError
+_____ test_failed_encrypt_keeps_admissions_closed_until_explicit_recovery ______
+
+store = namespace(root=PosixPath('/tmp/openscrub-task621/red-tmp/test_failed_encrypt_keeps_admi0/data'), jobs=PosixPath('/tmp/...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7f6efa134900>, url='/api/jobs/dfb9fe9ae621')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f6f31b7fb30>
+
+    def test_failed_encrypt_keeps_admissions_closed_until_explicit_recovery(store, monkeypatch):
+        store.enable()
+        real_encrypt = vault.encrypt_tree
+        def fail(key, root):
+            # Real partial transform before the injected failure.
+            vault.encrypt_file(key, str(store.path))
+            raise OSError('synthetic failure with sensitive path')
+        monkeypatch.setattr(vault, 'encrypt_tree', fail)
+        assert request('post', '/api/vault/lock').status_code == 500
+>       assert request('post', store.url + '/detections', json={}).status_code == 423
+E       AssertionError: assert 500 == 423
+E        +  where 500 = <WrapperTestResponse 265 bytes [500 INTERNAL SERVER ERROR]>.status_code
+E        +    where <WrapperTestResponse 265 bytes [500 INTERNAL SERVER ERROR]> = request('post', ('/api/jobs/dfb9fe9ae621' + '/detections'), json={})
+E        +      where '/api/jobs/dfb9fe9ae621' = namespace(root=PosixPath('/tmp/openscrub-task621/red-tmp/test_failed_encrypt_keeps_admi0/data'), jobs=PosixPath('/tmp/...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7f6efa134900>, url='/api/jobs/dfb9fe9ae621').url
+
+tests/test_job_lifecycle.py:187: AssertionError
+------------------------------ Captured log call -------------------------------
+ERROR    openscrub_web:app.py:875 Exception on /api/vault/lock [POST]
+Traceback (most recent call last):
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", line 3629, in vault_lock_route
+    n = _vault_lock_now()
+        ^^^^^^^^^^^^^^^^^
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", line 3371, in _vault_lock_now
+    n = vault.encrypt_tree(key, JOBS_DIR)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_job_lifecycle.py", line 184, in fail
+    raise OSError('synthetic failure with sensitive path')
+OSError: synthetic failure with sensitive path
+ERROR    openscrub_web:app.py:875 Exception on /api/jobs/dfb9fe9ae621/detections [POST]
+Traceback (most recent call last):
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", line 1296, in job_save_edits
+    doc = _load_job_report(job)
+          ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", line 1105, in _load_job_report
+    with open(os.path.join(job["dir"], "report.json"), encoding="utf-8") as f:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/tmp/openscrub-task621/red-tmp/test_failed_encrypt_keeps_admi0/data/jobs/dfb9fe9ae621/report.json'
+=========================== short test summary info ============================
+FAILED tests/test_job_lifecycle.py::test_save_stage_owns_files_until_publish_and_vault_reopen
+FAILED tests/test_job_lifecycle.py::test_tracking_owner_outlives_cancelled_phase_and_cleanup
+FAILED tests/test_job_lifecycle.py::test_streamed_response_keeps_delete_and_lock_busy
+FAILED tests/test_job_lifecycle.py::test_failed_encrypt_keeps_admissions_closed_until_explicit_recovery
+4 failed, 1 deselected in 0.35s

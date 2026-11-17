@@ -1,0 +1,145 @@
+[2026-11-16 23:15:33,359] ERROR in app: Exception on /api/jobs/synthetic/detections [POST]
+Traceback (most recent call last):
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-report-research-20261116/source/openscrub_web.py", line 1336, in job_save_edits
+    json.dump(doc, f, indent=1)
+  File "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/report-baseline-research/run_report_baseline.py", line 122, in dump
+    raise TypeError('injected encoder failure after destination opened')
+TypeError: injected encoder failure after destination opened
+[2026-11-16 23:15:33,368] ERROR in app: Exception on /api/jobs/synthetic/detections [POST]
+Traceback (most recent call last):
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-report-research-20261116/source/openscrub_web.py", line 1336, in job_save_edits
+    json.dump(doc, f, indent=1)
+  File "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/report-baseline-research/run_report_baseline.py", line 125, in dump
+    raise OSError('injected interrupted write after 16 characters')
+OSError: injected interrupted write after 16 characters
+[2026-11-16 23:15:33,378] ERROR in app: Exception on /api/jobs/synthetic/detections [POST]
+Traceback (most recent call last):
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-report-research-20261116/source/openscrub_web.py", line 1336, in job_save_edits
+    json.dump(doc, f, indent=1)
+  File "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/report-baseline-research/run_report_baseline.py", line 122, in dump
+    raise TypeError('injected encoder failure after destination opened')
+TypeError: injected encoder failure after destination opened
+127.0.0.1 - - [16/Nov/2026 23:15:33] "[35m[1mPOST /api/jobs/synthetic/detections HTTP/1.1[0m" 500 -
+[2026-11-16 23:15:33,387] ERROR in app: Exception on /api/jobs/synthetic/detections [POST]
+Traceback (most recent call last):
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-report-research-20261116/source/openscrub_web.py", line 1336, in job_save_edits
+    json.dump(doc, f, indent=1)
+  File "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/report-baseline-research/run_report_baseline.py", line 125, in dump
+    raise OSError('injected interrupted write after 16 characters')
+OSError: injected interrupted write after 16 characters
+127.0.0.1 - - [16/Nov/2026 23:15:33] "[35m[1mPOST /api/jobs/synthetic/detections HTTP/1.1[0m" 500 -
+127.0.0.1 - - [16/Nov/2026 23:15:33] "POST /api/jobs/synthetic/detections HTTP/1.1" 200 -
+127.0.0.1 - - [16/Nov/2026 23:15:33] "POST /api/jobs/synthetic/detections HTTP/1.1" 200 -
+127.0.0.1 - - [16/Nov/2026 23:15:33] "POST /api/jobs/synthetic/detections HTTP/1.1" 200 -
+127.0.0.1 - - [16/Nov/2026 23:15:33] "POST /api/jobs/synthetic/detections HTTP/1.1" 200 -
+127.0.0.1 - - [16/Nov/2026 23:15:33] "POST /api/jobs/synthetic/detections HTTP/1.1" 200 -
+[1/2] Loading detections from /tmp/openscrub-report-research-20261116/data/jobs/synthetic/report.json
+      7 enabled detections
+[4/4] Rendering -> /tmp/openscrub-report-research-20261116/data/jobs/synthetic/rendered.mp4
+      encoder: libx264 (CPU)
+      audio: 2 span(s) redacted (bleep, mute)
+      audit report: /tmp/openscrub-report-research-20261116/data/jobs/synthetic/report.json (contains PII text — protect it)
+done.
+127.0.0.1 - - [16/Nov/2026 23:15:33] "POST /api/jobs/synthetic/detections HTTP/1.1" 200 -
+127.0.0.1 - - [16/Nov/2026 23:15:33] "POST /api/jobs/synthetic/detections HTTP/1.1" 200 -
+127.0.0.1 - - [16/Nov/2026 23:15:33] "POST /api/jobs/synthetic/detections HTTP/1.1" 200 -
+127.0.0.1 - - [16/Nov/2026 23:15:33] "POST /api/jobs/synthetic/detections HTTP/1.1" 200 -
+127.0.0.1 - - [16/Nov/2026 23:15:33] "POST /api/jobs/synthetic/detections HTTP/1.1" 200 -
+127.0.0.1 - - [16/Nov/2026 23:15:33] "POST /api/jobs/synthetic/detections HTTP/1.1" 200 -
+127.0.0.1 - - [16/Nov/2026 23:15:34] "POST /api/jobs/synthetic/detections HTTP/1.1" 200 -
+127.0.0.1 - - [16/Nov/2026 23:15:34] "POST /api/jobs/synthetic/detections HTTP/1.1" 200 -
+{"progress_rows": 1000, "scenario": "sparse", "median_seconds": 0.047131631999945967}
+127.0.0.1 - - [16/Nov/2026 23:15:34] "POST /api/jobs/synthetic/detections HTTP/1.1" 200 -
+127.0.0.1 - - [16/Nov/2026 23:15:34] "POST /api/jobs/synthetic/detections HTTP/1.1" 200 -
+127.0.0.1 - - [16/Nov/2026 23:15:34] "POST /api/jobs/synthetic/detections HTTP/1.1" 200 -
+127.0.0.1 - - [16/Nov/2026 23:15:34] "POST /api/jobs/synthetic/detections HTTP/1.1" 200 -
+127.0.0.1 - - [16/Nov/2026 23:15:34] "POST /api/jobs/synthetic/detections HTTP/1.1" 200 -
+127.0.0.1 - - [16/Nov/2026 23:15:34] "POST /api/jobs/synthetic/detections HTTP/1.1" 200 -
+127.0.0.1 - - [16/Nov/2026 23:15:34] "POST /api/jobs/synthetic/detections HTTP/1.1" 200 -
+127.0.0.1 - - [16/Nov/2026 23:15:34] "POST /api/jobs/synthetic/detections HTTP/1.1" 200 -
+{"progress_rows": 1000, "scenario": "no_op", "median_seconds": 0.046294015999592375}
+127.0.0.1 - - [16/Nov/2026 23:15:35] "POST /api/jobs/synthetic/detections HTTP/1.1" 200 -
+127.0.0.1 - - [16/Nov/2026 23:15:35] "POST /api/jobs/synthetic/detections HTTP/1.1" 200 -
+127.0.0.1 - - [16/Nov/2026 23:15:36] "POST /api/jobs/synthetic/detections HTTP/1.1" 200 -
+127.0.0.1 - - [16/Nov/2026 23:15:36] "POST /api/jobs/synthetic/detections HTTP/1.1" 200 -
+127.0.0.1 - - [16/Nov/2026 23:15:37] "POST /api/jobs/synthetic/detections HTTP/1.1" 200 -
+127.0.0.1 - - [16/Nov/2026 23:15:37] "POST /api/jobs/synthetic/detections HTTP/1.1" 200 -
+127.0.0.1 - - [16/Nov/2026 23:15:38] "POST /api/jobs/synthetic/detections HTTP/1.1" 200 -
+127.0.0.1 - - [16/Nov/2026 23:15:38] "POST /api/jobs/synthetic/detections HTTP/1.1" 200 -
+{"progress_rows": 10000, "scenario": "sparse", "median_seconds": 0.4572828610034776}
+127.0.0.1 - - [16/Nov/2026 23:15:38] "POST /api/jobs/synthetic/detections HTTP/1.1" 200 -
+127.0.0.1 - - [16/Nov/2026 23:15:39] "POST /api/jobs/synthetic/detections HTTP/1.1" 200 -
+127.0.0.1 - - [16/Nov/2026 23:15:39] "POST /api/jobs/synthetic/detections HTTP/1.1" 200 -
+127.0.0.1 - - [16/Nov/2026 23:15:40] "POST /api/jobs/synthetic/detections HTTP/1.1" 200 -
+127.0.0.1 - - [16/Nov/2026 23:15:40] "POST /api/jobs/synthetic/detections HTTP/1.1" 200 -
+127.0.0.1 - - [16/Nov/2026 23:15:41] "POST /api/jobs/synthetic/detections HTTP/1.1" 200 -
+127.0.0.1 - - [16/Nov/2026 23:15:41] "POST /api/jobs/synthetic/detections HTTP/1.1" 200 -
+127.0.0.1 - - [16/Nov/2026 23:15:42] "POST /api/jobs/synthetic/detections HTTP/1.1" 200 -
+{"progress_rows": 10000, "scenario": "no_op", "median_seconds": 0.44361574599679443}
+127.0.0.1 - - [16/Nov/2026 23:15:53] "POST /api/jobs/synthetic/detections HTTP/1.1" 200 -
+127.0.0.1 - - [16/Nov/2026 23:15:58] "POST /api/jobs/synthetic/detections HTTP/1.1" 200 -
+127.0.0.1 - - [16/Nov/2026 23:16:03] "POST /api/jobs/synthetic/detections HTTP/1.1" 200 -
+127.0.0.1 - - [16/Nov/2026 23:16:09] "POST /api/jobs/synthetic/detections HTTP/1.1" 200 -
+127.0.0.1 - - [16/Nov/2026 23:16:14] "POST /api/jobs/synthetic/detections HTTP/1.1" 200 -
+127.0.0.1 - - [16/Nov/2026 23:16:19] "POST /api/jobs/synthetic/detections HTTP/1.1" 200 -
+127.0.0.1 - - [16/Nov/2026 23:16:24] "POST /api/jobs/synthetic/detections HTTP/1.1" 200 -
+127.0.0.1 - - [16/Nov/2026 23:16:29] "POST /api/jobs/synthetic/detections HTTP/1.1" 200 -
+{"progress_rows": 100000, "scenario": "sparse", "median_seconds": 5.074376578999363}
+127.0.0.1 - - [16/Nov/2026 23:16:34] "POST /api/jobs/synthetic/detections HTTP/1.1" 200 -
+127.0.0.1 - - [16/Nov/2026 23:16:39] "POST /api/jobs/synthetic/detections HTTP/1.1" 200 -
+127.0.0.1 - - [16/Nov/2026 23:16:44] "POST /api/jobs/synthetic/detections HTTP/1.1" 200 -
+127.0.0.1 - - [16/Nov/2026 23:16:49] "POST /api/jobs/synthetic/detections HTTP/1.1" 200 -
+127.0.0.1 - - [16/Nov/2026 23:16:54] "POST /api/jobs/synthetic/detections HTTP/1.1" 200 -
+127.0.0.1 - - [16/Nov/2026 23:16:59] "POST /api/jobs/synthetic/detections HTTP/1.1" 200 -
+127.0.0.1 - - [16/Nov/2026 23:17:03] "POST /api/jobs/synthetic/detections HTTP/1.1" 200 -
+127.0.0.1 - - [16/Nov/2026 23:17:08] "POST /api/jobs/synthetic/detections HTTP/1.1" 200 -
+{"progress_rows": 100000, "scenario": "no_op", "median_seconds": 4.7366208670027845}
+Evidence: /home/tahv0/src/OpenScrub/.superpowers/sdd/README/report-baseline-research/results.json

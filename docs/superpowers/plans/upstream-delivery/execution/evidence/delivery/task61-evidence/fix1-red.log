@@ -1,0 +1,118 @@
+FF......                                                                 [100%]
+=================================== FAILURES ===================================
+_________ test_successful_report_publication_does_not_abort_vault_lock _________
+
+tmp_path = PosixPath('/tmp/openscrub-task61/fix1-red/test_successful_report_publica0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7eee868de090>
+
+    def test_successful_report_publication_does_not_abort_vault_lock(tmp_path, monkeypatch):
+        report = tmp_path / 'report.json'
+        report.write_bytes(b'{"synthetic": "old"}')
+        video = tmp_path / 'input.avi'
+        video.write_bytes(b'synthetic input bytes')
+        key = os.urandom(32)
+        monkeypatch.setattr(web, 'JOBS_DIR', str(tmp_path))
+        monkeypatch.setattr(web, 'VAULT', {'key': key})
+        staged, snapshotted, published = (threading.Event() for _ in range(3))
+        errors, new_bytes = [], []
+        real_replace, real_walk = os.replace, vault._walk_files
+    
+        def gated_replace(source, destination):
+            if Path(source).name.startswith('.report-'):
+                staged.set()
+                assert snapshotted.wait(5), 'vault did not snapshot the active stage'
+            return real_replace(source, destination)
+    
+        def snapshot_before_publication(root):
+            paths = list(real_walk(root))
+            assert any(p.endswith('.tmp') for p in paths)
+            # os.walk may enumerate the stage first; freeze that permitted order.
+            paths.sort(key=lambda p: not p.endswith('.tmp'))
+            snapshotted.set()
+            assert published.wait(5), 'report publication did not finish'
+            yield from paths
+    
+        def publish():
+            try:
+                reports.atomic_report(report, {'synthetic': 'new'})
+                new_bytes.append(report.read_bytes())
+            except Exception as error:
+                errors.append(error)
+            finally:
+                published.set()
+    
+        with monkeypatch.context() as gate:
+            gate.setattr(reports.os, 'replace', gated_replace)
+            gate.setattr(vault, '_walk_files', snapshot_before_publication)
+            thread = threading.Thread(target=publish)
+            thread.start()
+            try:
+                assert staged.wait(5), 'report stage was not created'
+>               encrypted = web._vault_lock_now()
+                            ^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_vault_cleanup.py:56: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+openscrub_web.py:3245: in _vault_lock_now
+    n = vault.encrypt_tree(key, JOBS_DIR)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+key = b'\xe0\x96\x0bx\x14G\xbc\xc3\x84\x17\xb1\x9e\x05\x9e\x8c\x8d\x85\xa9\xa9\\DA\xc4\x1e \xc4\x01\xe3\x93\xd93\xa0'
+root = '/tmp/openscrub-task61/fix1-red/test_successful_report_publica0'
+
+    def encrypt_tree(key, root):
+        """Encrypt every not-yet-encrypted file under root. Returns count."""
+        n = 0
+        for p in list(_walk_files(root)):
+            if p.endswith(".tmp"):
+>               os.remove(p)                       # leftover from a crash
+                ^^^^^^^^^^^^
+E               FileNotFoundError: [Errno 2] No such file or directory: '/tmp/openscrub-task61/fix1-red/test_successful_report_publica0/.report-cayvxki1.tmp'
+
+openscrub_vault.py:169: FileNotFoundError
+______ test_decrypt_continues_after_snapshotted_temporary_file_disappears ______
+
+tmp_path = PosixPath('/tmp/openscrub-task61/fix1-red/test_decrypt_continues_after_s0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7eee868eeb70>
+
+    def test_decrypt_continues_after_snapshotted_temporary_file_disappears(tmp_path, monkeypatch):
+        key = os.urandom(32)
+        report = tmp_path / 'report.json'
+        report.write_bytes(b'{"synthetic": true}')
+        video = tmp_path / 'input.avi'
+        video.write_bytes(b'synthetic input')
+        assert vault.encrypt_tree(key, str(tmp_path)) == 2
+        vanished = tmp_path / '.report-vanished.tmp'
+        leftover = tmp_path / 'crash-leftover.tmp'
+        vanished.write_bytes(b'synthetic stage')
+        leftover.write_bytes(b'synthetic crash leftover')
+        real_walk = vault._walk_files
+        def snapshot_then_remove(root):
+            paths = list(real_walk(root))
+            paths.sort(key=lambda p: not p.endswith('.tmp'))
+            vanished.unlink()
+            return iter(paths)
+        monkeypatch.setattr(vault, '_walk_files', snapshot_then_remove)
+>       assert vault.decrypt_tree(key, str(tmp_path)) == 2
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_vault_cleanup.py:90: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+key = b'\x8c\xa8\xfc\xe6V\xd8\xf4\xe1K\xffl&\x16\xbd\xb0\xdf\xa1\xf1\xfb\xd2\xc5*\xfa\x96\xf00\xe0\xe6\x19\x85\x8a#'
+root = '/tmp/openscrub-task61/fix1-red/test_decrypt_continues_after_s0'
+
+    def decrypt_tree(key, root):
+        """Decrypt every encrypted file under root. Returns count."""
+        n = 0
+        for p in list(_walk_files(root)):
+            if p.endswith(".tmp"):
+>               os.remove(p)
+E               FileNotFoundError: [Errno 2] No such file or directory: '/tmp/openscrub-task61/fix1-red/test_decrypt_continues_after_s0/.report-vanished.tmp'
+
+openscrub_vault.py:181: FileNotFoundError
+=========================== short test summary info ============================
+FAILED tests/test_vault_cleanup.py::test_successful_report_publication_does_not_abort_vault_lock
+FAILED tests/test_vault_cleanup.py::test_decrypt_continues_after_snapshotted_temporary_file_disappears
+2 failed, 6 passed in 0.09s

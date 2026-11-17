@@ -1,0 +1,40 @@
+{
+  "evidence": "source-isolated synthetic decoder; not real video",
+  "fps": 30,
+  "first_detection_seconds": 600,
+  "window_start_seconds": 590,
+  "results": [
+    {
+      "sha": "5d3a15ae683c08f368d6ba4bd0d2d77b4e7b8e2f",
+      "seek_success": true,
+      "decoder_reads_until_first_useful_gray": 17873,
+      "simulated_seek_targets": [],
+      "decoder_next_frame": 17873
+    },
+    {
+      "sha": "5d3a15ae683c08f368d6ba4bd0d2d77b4e7b8e2f",
+      "seek_success": false,
+      "decoder_reads_until_first_useful_gray": 17873,
+      "simulated_seek_targets": [],
+      "decoder_next_frame": 17873
+    },
+    {
+      "sha": "b4d0c75f25d91510fe1692f901d11853dc7db005",
+      "seek_success": true,
+      "decoder_reads_until_first_useful_gray": 1,
+      "simulated_seek_targets": [
+        17872
+      ],
+      "decoder_next_frame": 17873
+    },
+    {
+      "sha": "b4d0c75f25d91510fe1692f901d11853dc7db005",
+      "seek_success": false,
+      "decoder_reads_until_first_useful_gray": 17873,
+      "simulated_seek_targets": [
+        17872
+      ],
+      "decoder_next_frame": 17873
+    }
+  ]
+}

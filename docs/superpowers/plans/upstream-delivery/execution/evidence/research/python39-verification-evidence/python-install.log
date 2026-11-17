@@ -1,0 +1,8 @@
+error: Failed to install cpython-3.9.25-linux-x86_64-gnu
+  cause: Request failed after 3 retries in 7.8s
+  cause: Failed to download `https://github.com/astral-sh/python-build-standalone/releases/download/20251031/cpython-3.9.25%2B20251031-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz`
+  cause: error sending request for url (https://github.com/astral-sh/python-build-standalone/releases/download/20251031/cpython-3.9.25%2B20251031-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz)
+  cause: client error (Connect)
+  cause: dns error
+  cause: error resolving DNS
+  cause: failed to lookup address information: Temporary failure in name resolution

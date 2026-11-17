@@ -1,0 +1,13 @@
+{
+  "servers": [
+    {
+      "pid": 470018,
+      "returncode": -2
+    },
+    {
+      "pid": 470058,
+      "returncode": -2
+    }
+  ],
+  "all_reaped": true
+}
