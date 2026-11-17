@@ -1,0 +1,21 @@
+TASK161_ACTIVE_SOURCE {"python": "3.9.25 (main, Oct 31 2025, 23:00:23) \n[Clang 21.1.4 ]", "sources": {"openscrub": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py", "sha256": "d69d965a83d0e1544e772839e72778e9cf653495fbe1819c22613e510b3aa3f8"}, "openscrub_web": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", "sha256": "9835e1137abee62c0a78e2669ed8bae7059e36bf4bed9f5c7a44f0eb8b40ed3a"}, "zones_ui": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/zones_ui.py", "sha256": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7"}}}
+.............................................................................................................................................................................................................................................................................................................................................................[4/4] Rendering -> /tmp/openscrub-task161/floor-tmp/test_report_run_render_hdr_exa0/hdr.mp4
+      encoder: libx265 10-bit (CPU)
+      HDR preserved: 10-bit HEVC, color tags color_primaries=bt2020, color_trc=smpte2084, colorspace=bt2020nc
+done.
+ENCODER_CHILDREN [{"pid": 1337294, "returncode": 0}, {"pid": 1337308, "returncode": 0}]
+.[4/4] Rendering -> /tmp/openscrub-task161/floor-tmp/test_report_run_render_hdr_exa1/hdr.mp4
+      encoder: libx265 10-bit (CPU)
+      HDR preserved: 10-bit HEVC, color tags color_primaries=bt2020, color_trc=smpte2084, colorspace=bt2020nc
+done.
+ENCODER_CHILDREN [{"pid": 1337549, "returncode": 0}, {"pid": 1337563, "returncode": 0}]
+.[4/4] Rendering -> /tmp/openscrub-task161/floor-tmp/test_report_run_render_sdr_con0/sdr.mp4
+      encoder: libx264 (CPU)
+done.
+ENCODER_CHILDREN [{"pid": 1337921, "returncode": 0}]
+.      input is HDR10/PQ HDR — tone-mapping a copy to SDR (BT.709) for detection
+      HDR output: preserving HDR10/PQ — 10-bit HEVC via hevc_nvenc
+....      person detector: no model installed — person category INACTIVE this scan. Download one in Settings → Detection models (one click, hash-verified), or place a YOLO ONNX at models/person_yolov8.onnx or set $OPENSCRUB_PERSON_MODEL.
+..      encoder: libx264 (CPU)
+..
+360 passed, 126 deselected in 16.79s

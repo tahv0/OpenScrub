@@ -1,0 +1,9 @@
+============================================================
+openscrub web — open from any device on your LAN:
+    http://172.25.211.236:58839/
+    (open access: no token — everyone on this network can use it;
+     add --token <secret> if you ever want a gate back)
+Jobs folder (contains PII): /tmp/openscrub-task161/installed-profile-s2zx557z/.local/share/OpenScrub/openscrub_jobs — kept forever
+Do NOT expose this port to the internet.
+============================================================
+    WARNING: plain HTTP — PII crosses the network unencrypted.

@@ -1,0 +1,8 @@
+{
+  "sdist_source_tests_guidance_bytes": true,
+  "wheel_source_bytes": true,
+  "python39_grammar": true,
+  "frozen_files": 114,
+  "engine_sha256": "d69d965a83d0e1544e772839e72778e9cf653495fbe1819c22613e510b3aa3f8",
+  "test_sha256": "a911fe2f3987be1385a2794f92ddf4e6836ff83e587c28c0246f350bab8851cd"
+}

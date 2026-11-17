@@ -1,0 +1,446 @@
+  1746	#appzone,#settingsview{max-width:1560px;margin:0 auto;padding:0 16px 8px}
+  1747	#appzone .card,#settingsview .card{padding:14px 16px}
+  1748	#appzone .card h2,#settingsview .card h2{font-size:15px;text-transform:none;
+  1749	 letter-spacing:0;color:#e2e8f0;font-weight:700;margin:0 0 10px}
+  1750	#appzone h3,#settingsview h3{color:#e2e8f0}
+  1751	#appzone label,#settingsview label{display:block;margin:6px 0 2px;
+  1752	 font-size:13px;color:#94a3b8}
+  1753	#appzone input[type=text],#appzone input[type=number],
+  1754	#appzone input[type=password],#appzone select,#appzone textarea,
+  1755	#settingsview input[type=text],#settingsview input[type=number],
+  1756	#settingsview input[type=password],#settingsview select,
+  1757	#settingsview textarea{width:100%;padding:7px}
+  1758	input[type=password]{background:var(--panel);border:1px solid #334155;
+  1759	 color:var(--txt);border-radius:6px;padding:5px 8px;font-size:12.5px;
+  1760	 font-family:inherit}
+  1761	textarea{height:64px}
+  1762	.grid2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}
+  1763	.grid3{display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:9px}
+  1764	.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  1765	#appzone button,#settingsview button{background:var(--acc);color:#fff;
+  1766	 padding:8px 14px;font-size:13px}
+  1767	#appzone button.sec,#settingsview button.sec{background:#475569}
+  1768	#appzone button.danger,#settingsview button.danger{background:#dc2626}
+  1769	button:disabled{opacity:.5}
+  1770	progress{width:100%;height:12px;accent-color:var(--acc)}
+  1771	.det{background:var(--panel);border:1px solid #334155;border-radius:8px;
+  1772	 padding:6px;text-align:center;font-size:12px;color:#cbd5e1}
+  1773	.det img{max-width:100%;border-radius:5px}
+  1774	.det.off img{opacity:.55}
+  1775	.det.selected{outline:2px dashed #60a5fa;outline-offset:2px}
+  1776	.detchoices{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:4px}
+  1777	.detstate{margin-top:6px;font-weight:600;min-height:2.5em}
+  1778	.detscope{margin-top:4px;font-size:11px;color:#94a3b8}
+  1779	#appzone .blurbtn{width:100%;padding:8px 3px;font-weight:700;
+  1780	 font-size:13px;border-radius:8px;letter-spacing:.3px;
+  1781	 transition:background .15s,transform .05s}
+  1782	.blurbtn:active{transform:scale(.97)}
+  1783	#appzone .blurbtn.blur{background:#dc2626}
+  1784	#appzone .blurbtn.keep{background:#15803d}
+  1785	#appzone .blurbtn[aria-pressed="false"]{background:#334155}
+  1786	#appzone .detchoices button:focus-visible{outline:3px solid #fbbf24;outline-offset:2px}
+  2085	let CUR=null, EN={}, MAN=[], DUR=0, POLL=null, PHIST=[], PHPH="", LOGN=0, SHELLPH=null, JOBSJSON="";
+  2086	
+  2087	// VIEW_GEN advances on every openJob (including A -> B -> A) and removal.
+  2088	// Drafts live only in this page; late acknowledgements reconcile their owner,
+  2089	// but may never publish into, or start rendering from, a different view.
+  2090	let VIEW_GEN=0, EDITS=null;
+  2091	const REVIEW_DRAFTS=new Map();
+  2092	function emptyEditor(){return {t:0,ox:0,oy:0,boxes:[],sel:-1,ov:{},dis:{},times:{},adds:[],
+  2093	 add:false,addAnchor:null,drag:null,scale:1,dur:10,
+  2094	 audio:[],audioSaved:[],audioLoaded:false};}
+  2095	function sameEdit(a,b){return JSON.stringify(a)===JSON.stringify(b);}
+  2096	function copyEdit(a){return JSON.parse(JSON.stringify(a));}
+  2097	function ownsView(id,gen){return CUR===id&&VIEW_GEN===gen;}
+  2098	function saveStatus(d,message){
+  2099	 d.status=message;
+  2100	 if(d!==EDITS)return;
+  2101	 const el=document.getElementById("reviewSaveStatus");if(el)el.textContent=message;
+  2102	 document.querySelectorAll("button[data-save-edits]").forEach(b=>{b.disabled=!!d.busy;});
+  2103	}
+  2104	function trimReviewDraft(d){
+  2105	 const b=d.editor;
+  2106	 // Clean audio is fetched display state even when other edit kinds are pending.
+  2107	 // An in-flight audio submission may make a toggle-back a newer pending choice.
+  2108	 if(!d.audioInFlight&&sameEdit(b.audio,b.audioSaved)){
+  2109	  b.audio=[];b.audioSaved=[];b.audioLoaded=false;
+  2110	 }
+  2111	 if(!d.busy&&!hasReviewEdits(d)){
+  2112	  d.en={};d.editor=emptyEditor();
+  2113	 }
+  2114	}
+  2115	function hasReviewEdits(d){
+  2116	 const b=d.editor;
+  2117	 return Object.keys(d.enabled).length||d.manual.length||b.adds.length||
+  2118	  Object.keys(b.ov).length||Object.keys(b.times).length||
+  2119	  !sameEdit(b.audio,b.audioSaved);
+  2120	}
+  2143	async function delJob(id){
+  2144	 if(!confirm("Delete this job and ALL of its files — upload, report, and rendered output?\\n\\nThis cannot be undone."))return;
+  2145	 const r=await fetch("api/jobs/"+id,{method:"DELETE"});
+  2146	 if(!r.ok){
+  2147	  let m="could not delete the job";
+  2148	  try{const e=await r.json();m=e.error||e.description||m;}catch(_){}
+  2149	  alert(m);return;
+  2150	 }
+  2151	 REVIEW_DRAFTS.delete(id);
+  2152	 if(CUR===id){VIEW_GEN++;CUR=null;EDITS=null;if(POLL)clearInterval(POLL);detail.innerHTML="";}
+  2153	 JOBSJSON="";loadJobs();
+  2154	}
+  2155	async function openJob(id){
+  2156	 const video=document.getElementById("beVid");
+  2157	 if(video){try{video.pause();}catch(e){}}
+  2158	 if(EDITS){
+  2159	  // Retain edit bookkeeping, not fetched box/report/transcript display data.
+  2160	  EDITS.en={};
+  2161	  const b=EDITS.editor;delete b.raw;b.boxes=[];
+  2162	  delete b.tlspans;delete b.audioSugg;delete b.audioTx;b.playing=false;
+  2163	  trimReviewDraft(EDITS);
+  2164	 }
+  2165	 VIEW_GEN++;CUR=id;
+  2166	 EDITS=REVIEW_DRAFTS.get(id);
+  2167	 if(!EDITS){EDITS={en:{},enabled:{},manual:[],editor:emptyEditor(),busy:false,status:""};
+  2168	  REVIEW_DRAFTS.set(id,EDITS);}
+  2169	 EN=EDITS.en;MAN=EDITS.manual;BE=EDITS.editor;
+  2170	 PHIST=[];PHPH="";LOGN=0;SHELLPH=null;
+  2171	 detail.innerHTML='<div id="reviewSaveStatus" role="status" aria-live="polite" style="margin:8px 0;color:#fbbf24"></div>';
+  2172	 saveStatus(EDITS,EDITS.status);
+  2173	
+  2174	 if(POLL)clearInterval(POLL);
+  2175	 POLL=setInterval(refresh,900); refresh();
+  2176	}
+  2244	 // action buttons rebuilt ONLY when the phase changes
+  2245	 if(SHELLPH!==j.phase){
+  2246	  SHELLPH=j.phase;
+  2247	  let a="";
+  2248	  if(j.phase=="scanning"||j.phase=="rendering")
+  2249	   a=`<button class="danger" onclick="cancelJob()">Cancel</button>`;
+  2250	  if(j.phase=="error"||j.phase=="cancelled")
+  2251	   a=`<button onclick="retryJob(CUR)">Retry scan (no re-upload)</button>
+  2252	    <div style="width:100%;font-size:12px;color:#9ca3af">The uploaded file
+  2253	    is still on the server — Retry re-runs the scan without uploading it
+  2254	    again. Delete the job (&#128465;&#65039; in the list) to free its disk
+  2255	    space.</div>`;
+  2256	  if(j.phase=="review"){
+  2257	   // no interstitial button: review is the ONLY next step after a scan,
+  2258	   // so open it directly — both on a live scan finishing and on
+  2259	   // selecting a job that is already waiting in review
+  2260	   a="";
+  2261	   loadReview();
+  2262	  }
+  2263	  if(j.phase=="done"&&j.has_output)
+  2264	   a=`<a href="api/jobs/${CUR}/download"><button>Download redacted video</button></a>
+  2265	    <a href="api/jobs/${CUR}/report"><button class="sec">Download audit report</button></a>
+  2266	    <button class="sec" onclick="loadReview()">Re-open review</button>
+  2267	    <button class="sec" onclick="loadCompare()">Compare before/after</button>
+  2268	    <button class="sec" onclick="loadBoxEdit()">Preview &amp; edit blur boxes</button>
+  2269	    <div class="warn" style="width:100%">Reminder: scrub the result before
+  2270	    sharing. This tool is best-effort, not a compliance guarantee.</div>
+  2271	    <div id="compare" style="width:100%"></div>
+  2272	    <div id="beslot_done" style="width:100%"></div>`;
+  2273	  document.getElementById("actions").innerHTML=a;
+  2274	  if(j.phase!="scanning")img.style.display="none";
+  2275	 }
+  2276	 loadJobs();
+  2277	}
+  2278	
+  2279	let BE=emptyEditor();
+  2280	async function loadBoxEdit(fromReview){
+  2281	 const id=CUR,gen=VIEW_GEN,editor=BE;
+  2282	 showPanel(fromReview?"boxedit_rev":"boxedit");
+  2283	 const mi=await (await fetch(`api/jobs/${id}/mediainfo`)).json();
+  2284	 if(!ownsView(id,gen)||BE!==editor)return;
+  2285	 // in review: the slot right under the Preview button; on done: the actions slot
+  2286	 let c=document.getElementById("beslot")||document.getElementById("beslot_done");
+  2287	 if(!c){c=document.createElement("div");c.id="beslot";c.style.width="100%";
+  2716	function zoomDet(i){
+  2717	 let ov=document.getElementById("lb");
+  2718	 if(!ov){
+  2719	  ov=document.createElement("div");ov.id="lb";
+  2720	  ov.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.82);"+
+  2721	   "z-index:100;display:flex;align-items:center;justify-content:center;"+
+  2722	   "cursor:zoom-out;padding:18px";
+  2723	  ov.onclick=()=>ov.remove();
+  2724	  document.body.appendChild(ov);
+  2725	 }
+  2726	 ov.innerHTML=`<img src="api/jobs/${CUR}/detframe/${i}"
+  2727	  style="max-width:96%;max-height:96%;border-radius:8px;
+  2728	  box-shadow:0 12px 50px rgba(0,0,0,.6)">`;
+  2729	}
+  2730	function beRemove(){
+  2731	 if(BE.sel<0)return;
+  2732	 applyDet(BE.sel,false);   // syncs thumbnail + refilters editor
+  2733	 BE.sel=-1;
+  2734	 document.getElementById("beRm").style.display="none";
+  2735	 document.getElementById("beTimes").style.display="none";
+  2736	}
+  2740	// the three post-render views (compare, review, box editor) are mutually
+  2741	// exclusive: opening one closes the others instead of stacking them
+  2742	function showPanel(which){
+  2743	 // a playing box-editor video must be PAUSED before its DOM is wiped —
+  2744	 // an element removed via innerHTML can keep its audio running
+  2745	 try{const v=document.getElementById("beVid");
+  2746	  if(v&&!v.paused){BE.playing=false;v.pause();}}catch(e){}
+  2747	 // "boxedit_rev" = the editor button INSIDE the review card: the editor
+  2748	 // mounts in the review's own slot, so the review stays. Everything else
+  2749	 // is standalone and closes the other panels.
+  2750	 if(which!=="compare"){
+  2751	  const c=document.getElementById("compare");if(c)c.innerHTML="";}
+  2752	 const b=document.getElementById("beslot_done");
+  2753	 const b2=document.getElementById("beslot");
+  2754	 if(which==="boxedit_rev"){if(b)b.innerHTML=""}
+  2755	 else{
+  2756	  if(which!=="boxedit"){if(b)b.innerHTML=""}
+  2757	  if(b2)b2.innerHTML="";
+  2758	  if(which!=="review"){
+  2759	   const rev=document.getElementById("review");if(rev)rev.remove();}
+  2760	 }
+  2761	}
+  2782	async function loadReview(){
+  2783	 const id=CUR,gen=VIEW_GEN;
+  2784	 showPanel("review");
+  2785	 const d=await (await fetch(`api/jobs/${id}/detections`)).json();
+  2786	 if(!ownsView(id,gen))return;
+  2787	 DUR=d.duration;
+  2788	 const groups={}; const zdrop=[]; TRKMEM={}; ROWCARD={};
+  2789	 d.detections.forEach(x=>{
+  2790	  EN[x.i]=(x.i in EDITS.enabled)?EDITS.enabled[x.i]:x.enabled;
+  2791	  if(x.zone_dropped){zdrop.push(x);return;}
+  2792	  (groups[x.category]=groups[x.category]||[]).push(x);});
+  2793	 let html=`<div class="card" id="review"><h2>Review — choose Blur or Keep visible.
+  2794	 Drag a box around several to bulk-set.</h2>
+  2795	 <div class="row" style="margin:0 0 8px">
+  2796	  <button class="sec" onclick="loadBoxEdit(1)">▶ Preview video &amp; edit boxes
+  2797	  (before rendering)</button></div>
+  2798	 <div id="beslot"></div>
+  2799	 <div id="detwrap" style="position:relative;user-select:none">`;
+  2800	 if(zdrop.length){
+  2801	  html+=`<details style="margin:4px 0 10px;border:1px dashed #f59e0b;border-radius:9px;padding:8px 10px;background:#26200a">
+  2802	   <summary style="cursor:pointer;color:#fbbf24;font-weight:600">
+  2803	    ⚠ ${zdrop.length} detection(s) outside your zones — choose output below
+  2804	    (mostly logos/labels by design; open only if something real was zoned out)
+  2805	   </summary>
+  2806	   <div class="row" style="margin:8px 0 4px">
+  2807	    <button class="sec" onclick="setAllZd(true)">Blur all</button>
+  2808	    <button class="sec" onclick="setAllZd(false)">Keep all visible</button></div>
+  2809	   <div class="grid3">`;
+  2810	  for(const x of zdrop){
+  2811	   html+=`<div class="det" id="det${x.i}" data-cat="zdrop">
+  2812	    <img src="api/jobs/${CUR}/thumb/${x.i}" loading="lazy"
+  2813	     style="cursor:zoom-in" onclick="zoomDet(${x.i})" onerror="thumbRetry(this)">
+  2814	    <div>"${x.text}" <br>${x.t_start.toFixed(1)}–${x.t_end.toFixed(1)}s</div>
+  2815	    ${detChoices(x.i,"Outside-zone detection")}
+  2816	   </div>`;
+  2817	  }
+  2818	  html+=`</div></details>`;
+  2819	 }
+  2820	 for(const[cat,rawItems] of Object.entries(groups)){
+  2821	  // collapse dense tracks: one card per physical object, not per frame
+  2822	  const byGroup={},items=[];
+  2823	  for(const x of rawItems){
+  2824	   // identity first: one card per PERSON (all their tracks); then per
+  2825	   // track; ungrouped detections stand alone
+  2826	   const key=x.person>=0?("p"+x.person):(x.track>=0?("t"+x.track):null);
+  2827	   if(key){(byGroup[key]=byGroup[key]||[]).push(x);}
+  2828	   else{TRKMEM[x.i]=[x.i];items.push(x);}
+  2829	  }
+  2830	  for(const [key,members] of Object.entries(byGroup)){
+  2831	   members.sort((a,b)=>a.t_start-b.t_start);
+  2832	   let best=members[0];             // clearest thumbnail = highest-confidence
+  2833	   for(const m of members)if((m.confidence||0)>(best.confidence||0))best=m;
+  2834	   const rep={...best};
+  2835	   rep.t_start=members[0].t_start;
+  2836	   rep.t_end=members[members.length-1].t_end;
+  2837	   rep.frames=members.length;
+  2838	   rep.personcard=key[0]==="p";
+  2839	   TRKMEM[rep.i]=members.map(m=>m.i);
+  2840	   items.push(rep);
+  2841	  }
+  2842	  // person cards first, then everything else chronologically
+  2843	  items.sort((a,b)=>((b.personcard?1:0)-(a.personcard?1:0))||a.t_start-b.t_start);
+  2844	  html+=`<h3 style="margin:10px 0 6px">${CATDN[cat]||cat} <span class="badge">${items.length}</span>
+  2845	  <button class="sec" style="padding:3px 8px;font-size:12px"
+  2846	   onclick="setAll('${cat}',true)">Blur all</button>
+  2847	  <button class="sec" style="padding:3px 8px;font-size:12px"
+  2848	   onclick="setAll('${cat}',false)">Keep all visible</button></h3><div class="grid3">`;
+  2849	  for(const x of items){
+  2850	   html+=`<div class="det" id="det${x.i}" data-cat="${cat}">
+  2851	    <img src="api/jobs/${CUR}/thumb/${x.i}"
+  2852	     style="cursor:zoom-in" onclick="zoomDet(${x.i})"
+  2853	     onerror="thumbRetry(this)">
+  2854	    <div>${x.personcard?`<b>Person ${x.person+1}</b>`:`"${x.text}"`}${x.frames?` <span class="badge">×${x.frames} frames</span>`:""}${x.confidence?` <span class="badge" title="detector confidence — low values on a non-face thumbnail usually mean a false detection">${Math.round(x.confidence*100)}%</span>`:""} <br>${x.t_start.toFixed(1)}–${x.t_end.toFixed(1)}s</div>
+  2855	    ${x.frames>1?`<div class="detscope">Applies to all ${x.frames} appearances in this ${detLabel(CATDN[cat]||cat)} group</div>`:""}
+  2856	    ${detChoices(x.i,CATDN[cat]||cat)}
+  2857	   </div>`}
+  2858	  html+=`</div>`}
+  2859	 html+=`</div>
+  2860	 <div class="row" style="margin-top:12px">
+  2861	 <button data-save-edits onclick="saveAndRender()">Save edits &amp; render</button>
+  2862	 <span style="font-size:12px;color:#94a3b8">missed something? use
+  2863	  ▶ Preview video &amp; edit boxes above — its ＋ Add box replaces the old
+  2864	  add-region tool</span></div></div>`;
+  2865	 const old=document.getElementById("review"); if(old)old.remove();
+  2866	 detail.insertAdjacentHTML("beforeend",html);
+  2867	 // Derived membership belongs to this mounted view, never to the saved draft.
+  2868	 for(const [rep,members] of Object.entries(TRKMEM))for(const m of members)ROWCARD[m]=+rep;
+  2869	 for(const x of zdrop)ROWCARD[x.i]=x.i;
+  2870	 for(const i of new Set(Object.values(ROWCARD)))refreshDet(i);
+  2871	 initMarquee();saveStatus(EDITS,EDITS.status);
+  2872	}
+  2873	
+  2874	let TRKMEM={},ROWCARD={};
+  2875	function detLabel(s){return String(s).replace(/[&<>"\']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","\'":"&#39;"}[c]));}
+  2876	function detChoices(i,category){
+  2877	 const count=(TRKMEM[i]||[i]).length;
+  2878	 return `<div class="detstate" id="ds${i}"></div>
+  2879	 <div class="detchoices" id="dc${i}" role="group"
+  2880	  aria-label="${detLabel(category)} output, appearance ${i+1}, ${count} appearance${count===1?"":"s"}"
+  2881	  aria-describedby="ds${i}">
+  2882	  <button class="blurbtn blur" id="bb${i}" aria-pressed="false"
+  2883	   onclick="applyDet(${i},true)">Blur</button>
+  2884	  <button class="blurbtn keep" id="kb${i}" aria-pressed="false"
+  2885	   onclick="applyDet(${i},false)">Keep visible</button></div>`;
+  2886	}
+  2887	function refreshDet(i){
+  2888	 const members=TRKMEM[i]||[i],blurred=members.reduce((n,m)=>n+(EN[m]?1:0),0);
+  2889	 const kept=members.length-blurred;
+  2890	 const state=document.getElementById("ds"+i),card=document.getElementById("det"+i);
+  2891	 if(state)state.textContent=kept===0?"Will be blurred":blurred===0?"Will stay visible":
+  2892	  `Mixed — ${blurred} will be blurred; ${kept} will stay visible`;
+  2893	 const blur=document.getElementById("bb"+i),keep=document.getElementById("kb"+i);
+  2894	 if(blur)blur.setAttribute("aria-pressed",String(kept===0));
+  2895	 if(keep)keep.setAttribute("aria-pressed",String(blurred===0));
+  2896	 if(card)card.classList.toggle("off",blurred===0);
+  2897	}
+  2898	function applyDet(i,blur){
+  2899	 const cards=new Set();
+  2900	 for(const m of (TRKMEM[i]||[i])){
+  2901	  EN[m]=blur;EDITS.enabled[m]=blur;
+  2902	  cards.add(ROWCARD[m]??m);
+  2903	 }
+  2904	 // Record explicit intent, including a choice equal to the loaded value.
+  2905	 if(!EDITS.busy)saveStatus(EDITS,"Unsaved edits — save to include them in the render.");
+  2906	 cards.forEach(refreshDet);
+  2907	 if(document.getElementById("beCv")){beFilter();beDraw();}   // live sync
+  2908	}
+  2909	function setAll(cat,on){document.querySelectorAll(`.det[data-cat=${cat}]`)
+  2910	 .forEach(el=>applyDet(+el.id.slice(3),on));}
+  2911	function thumbRetry(img){
+  2912	 const n=+(img.dataset.r||0);
+  2913	 if(n>=3)return;
+  2914	 img.dataset.r=n+1;
+  2915	 setTimeout(()=>{img.src=img.src.split("?r=")[0]+"?r="+Date.now();},
+  2916	            600*(n+1));
+  2917	}
+  2918	function setAllZd(on){document.querySelectorAll(`.det[data-cat=zdrop]`)
+  2919	 .forEach(el=>applyDet(+el.id.slice(3),on));}
+  2920	
+  2921	let selSet=new Set(),marqEl=null,menuEl=null,mStart=null;
+  2922	function clearSel(){
+  2923	 selSet.forEach(i=>{const t=document.getElementById("det"+i);
+  2924	  if(t)t.classList.remove("selected");});
+  2925	 selSet.clear();
+  2926	 if(menuEl){menuEl.remove();menuEl=null;}
+  2927	}
+  2928	function initMarquee(){
+  2929	 const wrap=document.getElementById("detwrap");
+  2930	 if(!wrap||wrap.dataset.mq)return;
+  2931	 wrap.dataset.mq=1;
+  2932	 wrap.addEventListener("pointerdown",e=>{
+  2933	  if(e.pointerType==="touch")return;         // touch keeps normal scrolling
+  2934	  if(e.target.closest("button"))return;      // button clicks stay clicks
+  2935	  clearSel();
+  2936	  mStart=[e.pageX,e.pageY];
+  2937	  marqEl=document.createElement("div");marqEl.className="marq";
+  2938	  document.body.appendChild(marqEl);
+  2939	  const move=ev=>{
+  2940	   const x1=Math.min(mStart[0],ev.pageX),y1=Math.min(mStart[1],ev.pageY),
+  2941	         x2=Math.max(mStart[0],ev.pageX),y2=Math.max(mStart[1],ev.pageY);
+  2942	   Object.assign(marqEl.style,{left:x1+"px",top:y1+"px",
+  2943	    width:(x2-x1)+"px",height:(y2-y1)+"px"});
+  2944	  };
+  2945	  const up=ev=>{
+  2946	   document.removeEventListener("pointermove",move);
+  2947	   document.removeEventListener("pointerup",up);
+  2948	   const r=marqEl.getBoundingClientRect();
+  2949	   marqEl.remove();marqEl=null;
+  2950	   if(r.width<8&&r.height<8)return;          // just a click — not a drag
+  2951	   document.querySelectorAll("#detwrap .det").forEach(t=>{
+  2952	    const b=t.getBoundingClientRect();
+  2953	    if(b.left<r.right&&b.right>r.left&&b.top<r.bottom&&b.bottom>r.top){
+  2954	     selSet.add(+t.id.slice(3));t.classList.add("selected");}});
+  2955	   if(selSet.size)showSelMenu(ev.pageX,ev.pageY);
+  2956	  };
+  2957	  document.addEventListener("pointermove",move);
+  2958	  document.addEventListener("pointerup",up);
+  2959	  e.preventDefault();
+  2960	 });
+  2961	}
+  2962	function showSelMenu(x,y){
+  2963	 menuEl=document.createElement("div");menuEl.className="selmenu";
+  2964	 menuEl.innerHTML=`<span>${selSet.size} selected</span>
+  2965	  <button class="mkeep" onclick="bulkSet(false)">Keep visible</button>
+  2966	  <button class="mblur" onclick="bulkSet(true)">Blur</button>`;
+  2967	 Object.assign(menuEl.style,{left:x+"px",top:(y+10)+"px"});
+  2968	 document.body.appendChild(menuEl);
+  2969	}
+  2970	function bulkSet(blur){selSet.forEach(i=>applyDet(i,blur));clearSel();}
+  2971	document.addEventListener("pointerdown",e=>{
+  2972	 if(menuEl&&!e.target.closest(".selmenu")
+  2973	    &&!e.target.closest("#detwrap"))clearSel();});
+  3014	async function saveAndRender(){
+  3015	 const id=CUR,gen=VIEW_GEN,d=EDITS;
+  3016	 if(!id||!d||d.busy)return false;
+  3017	 const b=d.editor,manRefs=[...d.manual],addRefs=[...b.adds];
+  3018	 const man=copyEdit(d.manual),adds=copyEdit(b.adds);
+  3019	 const payload=copyEdit({enabled:d.enabled,manual:[...man,...adds.map(a=>({
+  3020	  t_start:a.t0,t_end:a.t1,t_ref:a.tref,screen_box:a.box}))],
+  3021	  box_overrides:b.ov,time_overrides:b.times});
+  3022	 // Plain review must never wipe audio that the editor has not loaded.
+  3023	 if(b.audioLoaded&&!sameEdit(b.audio,b.audioSaved)){payload.audio=copyEdit(b.audio);}
+  3024	 d.audioInFlight=payload.audio!==undefined;
+  3025	 d.busy=true;saveStatus(d,"Saving edits… You can keep editing; newer edits stay pending.");
+  3026	 let saved=false;
+  3027	 try{
+  3028	  const result=await reviewPost(`api/jobs/${id}/detections`,payload);
+  3029	  saved=true;d.audioInFlight=false;
+  3030	  acknowledgeMap(d.enabled,payload.enabled);
+  3031	  acknowledgeMap(b.ov,payload.box_overrides);acknowledgeMap(b.times,payload.time_overrides);
+  3032	  acknowledgeAdds(d.manual,manRefs,man);acknowledgeAdds(b.adds,addRefs,adds);
+  3033	  if(payload.audio!==undefined)b.audioSaved=copyEdit(payload.audio);
+  3034	  // A switched-away view never opens a confirmation or changes current UI.
+  3035	  if(!ownsView(id,gen)){
+  3036	   saveStatus(d,"Edits saved. Review pending edits, then save to render this job.");return false;
+  3037	  }
+  3038	  let allowError="";
+  3039	  if(result.suggest_allowlist&&result.suggest_allowlist.length&&
+  3040	     confirm("You disabled every instance of: "+result.suggest_allowlist.join(", ")+". Add these to the permanent allow-list so future scans skip them?")){
+  3041	   try{await reviewPost("api/allowlist",{words:result.suggest_allowlist});loadPersist();}
+  3042	   catch(e){allowError=" Allow-list update failed: "+e.message;}
+  3043	  }
+  3044	  if(!ownsView(id,gen)){
+  3045	   saveStatus(d,"Edits saved. Review pending edits, then save to render this job."+allowError);return false;
+  3046	  }
+  3047	  if(hasReviewEdits(d)){
+  3048	   saveStatus(d,"Submitted edits saved. Newer edits are still pending — save again to include them before rendering."+allowError);return false;
+  3049	  }
+  3050	  saveStatus(d,"Edits saved; requesting render…");
+  3051	  await reviewPost(`api/jobs/${id}/render`);
+  3052	  // Edits can also arrive while the render request is pending.
+  3053	  if(hasReviewEdits(d)){
+  3054	   saveStatus(d,"Render started with submitted edits. Newer edits are pending — save again to render them."+allowError);return true;
+  3055	  }
+  3056	  saveStatus(d,"Rendering with saved edits…"+allowError);
+  3057	  if(ownsView(id,gen)){
+  3058	   const rv=document.getElementById("review");if(rv)rv.remove();
+  3059	   const c=document.getElementById("beslot_done");if(c)c.innerHTML="rendering with your edits…";
+  3060	  }
+  3061	  return true;
+  3062	 }catch(e){
+  3063	  // A failed response leaves the audio baseline uncertain. Retain even a
+  3064	  // newer toggle-back to the old baseline and deliberately send it on retry.
+  3065	  if(!saved&&payload.audio!==undefined)b.audioSaved=null;
+  3066	  saveStatus(d,(saved?"Edits saved; render was not confirmed. Retry with Save to render. ":
+  3067	   "Save was not confirmed; drafts retained. Retry with Save. ")+e.message);
+  3068	  return false;
+  3069	 }finally{d.audioInFlight=false;d.busy=false;saveStatus(d,d.status);if(d!==EDITS)trimReviewDraft(d);}

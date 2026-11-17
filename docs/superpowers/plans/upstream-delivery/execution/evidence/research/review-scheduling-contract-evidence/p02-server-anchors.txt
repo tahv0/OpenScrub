@@ -1,0 +1,147 @@
+   678	        if action == "scan":
+   679	            job["phase"] = "scanning"
+   680	            job["log"].append("— scan started —")
+   681	            args = build_args(job)
+   682	            state = openscrub.run_scan(args, cb)
+   683	            openscrub.write_report(os.path.join(job["dir"], "report.json"),
+   684	                                  args, state)
+   685	            job["stats"] = state["stats"]
+   686	            def _pregen(jid=jid):
+   687	                """One pass through the video with a single decoder:
+   688	                thumbnails come out in seconds instead of minutes.
+   689	                Sorting by reference time keeps seeks short and forward-
+   690	                only, which is what codecs are fast at."""
+   691	                try:
+   692	                    jb = JOBS.get(jid)
+   693	                    doc = _load_job_report(jb)
+   694	                    rs = doc["render_state"]
+   695	                    todo = []
+   696	                    for k, d in enumerate(doc["detections"]):
+   697	                        cch = os.path.join(jb["dir"], f"thumb2_{k}.jpg")
+   698	                        if os.path.exists(cch):
+   699	                            continue
+   700	                        tref = min(max(d.get("last_seen", d["t_start"]),
+   701	                                       d["t_start"]), d["t_end"])
+   702	                        todo.append((tref, k, d, cch))
+   703	                    todo.sort()
+   704	                    cap = cv2.VideoCapture(jb["video"])
+   705	                    cur = -1
+   706	                    frame = None
+   707	                    for tref, k, d, cch in todo:
+   708	                        fidx = min(int(tref * rs["fps"]),
+   709	                                   len(rs["cum"]) - 1)
+   710	                        if fidx != cur:
+   711	                            if 0 <= fidx - cur <= 12:
+   712	                                while cur < fidx:   # cheap forward decode
+   713	                                    ok, frame = cap.read()
+   714	                                    if not ok:
+   715	                                        frame = None
+   716	                                        break
+   717	                                    cur += 1
+   718	                            else:
+   719	                                cap.set(cv2.CAP_PROP_POS_FRAMES, fidx)
+   720	                                ok, frame = cap.read()
+   721	                                cur = fidx if ok else cur
+   722	                                if not ok:
+   723	                                    frame = None
+   724	                        if frame is None:
+   725	                            continue
+   726	                        ox, oy = rs["cum"][fidx]
+   727	                        h, wd = frame.shape[:2]
+   728	                        pad = 24
+   729	                        x1 = max(0, int(d["cbox"][0] + ox) - pad)
+   730	                        y1 = max(0, int(d["cbox"][1] + oy) - pad)
+   731	                        x2 = min(wd, int(d["cbox"][2] + ox) + pad)
+   732	                        y2 = min(h, int(d["cbox"][3] + oy) + pad)
+   733	                        crop = frame[y1:y2, x1:x2].copy()
+   734	                        if crop.size == 0:
+   735	                            continue
+   736	                        inner = crop[pad:-pad or None, pad:-pad or None]
+   737	                        if not inner.size or float(inner.std()) <= 8:
+   738	                            continue   # blank: leave for the on-demand
+   739	                                       # path, which tries other moments
+   740	                        cv2.rectangle(crop, (pad, pad),
+   741	                                      (crop.shape[1] - pad,
+   742	                                       crop.shape[0] - pad),
+   743	                                      (0, 0, 255), 2)
+   744	                        cv2.imwrite(cch, crop,
+   745	                                    [cv2.IMWRITE_JPEG_QUALITY, 80])
+   746	                    cap.release()
+   747	                    jb["log"].append("thumbnails pre-generated "
+   748	                                     f"({len(todo)})")
+   749	                except Exception:
+   750	                    pass
+   751	            threading.Thread(target=_pregen, daemon=True).start()
+   752	            try:
+   753	                prov = _load_job_report(job).get("provenance", {})
+   754	                if (prov.get("vfr_normalized")
+   755	                        and os.path.exists(prov.get("input", ""))):
+   756	                    job["video"] = prov["input"]
+   757	                    job["log"].append(
+   758	                        "using CFR-normalized file for previews/thumbnails")
+  1132	@app.route("/api/jobs/<jid>/detections")
+  1133	def job_detections(jid):
+  1134	    job = JOBS.get(jid) or abort(404)
+  1135	    doc = _load_job_report(job)
+  1136	    items = []
+  1137	    for i, d in enumerate(doc["detections"]):
+  1138	        items.append({"i": i, "category": d["category"], "text": d["text"],
+  1139	                      "t_start": d["t_start"], "t_end": round(d["t_end"], 2),
+  1140	                      "enabled": d.get("enabled", True),
+  1141	                      "track": d.get("track", -1),
+  1142	                      "person": d.get("person", -1),
+  1143	                      "confidence": d.get("confidence", 0),
+  1144	                      "zone_dropped": bool(d.get("zone_dropped"))})
+  1145	    return jsonify({"detections": items,
+  1146	                    "fps": doc["render_state"]["fps"],
+  1147	                    "duration": len(doc["render_state"]["cum"]) /
+  1148	                                doc["render_state"]["fps"]})
+  1200	@app.route("/api/jobs/<jid>/thumb/<int:i>")
+  1201	def job_thumb(jid, i):
+  1202	    job = JOBS.get(jid) or abort(404)
+  1203	    # i is already a Flask <int:> route var, but CodeQL doesn't trust the
+  1204	    # converter — format it as an explicit non-negative integer so the
+  1205	    # cache filename can never carry anything but digits.
+  1206	    i = int(i)
+  1207	    if i < 0:
+  1208	        abort(404)
+  1209	    cache = os.path.join(job["dir"], "thumb2_%d.jpg" % i)
+  1210	    if not os.path.exists(cache):
+  1211	        doc = _load_job_report(job)
+  1212	        if i >= len(doc["detections"]):
+  1213	            abort(404)
+  1214	        d = doc["detections"][i]
+  1215	        rs = doc["render_state"]
+  1216	        # cut the thumbnail at a moment the detector actually SAW the object.
+  1217	        # t_start can be earlier than the object's appearance (backtracking
+  1218	        # deliberately moves it to just before onset) — a frame there shows
+  1219	        # nothing and made review pictures mismatch their text.
+  1220	        ls = min(max(d.get("last_seen", d["t_start"]), d["t_start"]),
+  1221	                 d["t_end"])
+  1222	        mid = (d["t_start"] + d["t_end"]) / 2
+  1223	        crop = None
+  1224	        pad = 24
+  1225	        for tref in (ls, mid, min(d["t_start"] + 0.2, d["t_end"])):
+  1226	            fidx = min(int(tref * rs["fps"]), len(rs["cum"]) - 1)
+  1227	            ox, oy = rs["cum"][fidx]
+  1228	            frame = _frame_at(job, tref, rs)
+  1229	            if frame is None:
+  1230	                continue
+  1231	            h, w = frame.shape[:2]
+  1232	            x1 = max(0, int(d["cbox"][0] + ox) - pad)
+  1233	            y1 = max(0, int(d["cbox"][1] + oy) - pad)
+  1234	            x2 = min(w, int(d["cbox"][2] + ox) + pad)
+  1235	            y2 = min(h, int(d["cbox"][3] + oy) + pad)
+  1236	            c = frame[y1:y2, x1:x2]
+  1237	            if c.size == 0:
+  1238	                continue
+  1239	            crop = c
+  1240	            inner = c[pad:-pad or None, pad:-pad or None]
+  1241	            if inner.size and float(inner.std()) > 8:
+  1242	                break   # crop shows real content — use this moment
+  1243	        if crop is None:
+  1244	            abort(404)
+  1245	        cv2.rectangle(crop, (pad, pad), (crop.shape[1] - pad,
+  1246	                                         crop.shape[0] - pad), (0, 0, 255), 2)
+  1247	        cv2.imwrite(cache, crop, [cv2.IMWRITE_JPEG_QUALITY, 80])
+  1248	    return send_file(cache, mimetype="image/jpeg", max_age=3600)
