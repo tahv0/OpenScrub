@@ -3205,7 +3205,7 @@ def _geometry_metadata(cap, stage):
                   cap.get(cv2.CAP_PROP_FRAME_COUNT))
         _geometry_finite(values, 3, stage, "video dimensions/count")
         w, h, total = (int(value) for value in values)
-        if w <= 0 or h <= 0 or total < 0:
+        if w <= 0 or h <= 0:
             raise ValueError(f"render geometry {stage}: invalid video dimensions/count")
     except Exception:
         cap.release()
