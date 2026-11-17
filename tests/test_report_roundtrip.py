@@ -202,14 +202,18 @@ def test_distinct_destination_and_successive_renders_preserve_source(review):
 
 def test_from_report_reads_one_coherent_snapshot(review, monkeypatch):
     original_open = builtins.open
-    reads = []
+    reads, backups = [], []
     def counted_open(path, mode='r', *args, **kwargs):
-        if Path(path) == review.path and 'r' in mode:
-            reads.append(path)
+        if Path(path) == review.path:
+            if mode == 'r':
+                reads.append(path)
+            elif mode == 'rb':
+                backups.append(path)
         return original_open(path, mode, *args, **kwargs)
     monkeypatch.setattr(builtins, 'open', counted_open)
     openscrub.run_pipeline(render_args(review), Quiet())
     assert len(reads) == 1
+    assert len(backups) == 1  # byte backup does not construct a second review snapshot
     assert_review_preserved(review.doc, read(review.path))
 
 
