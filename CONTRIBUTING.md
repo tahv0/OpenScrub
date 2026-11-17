@@ -22,7 +22,7 @@ Thanks for helping! A few rules keep this privacy tool trustworthy.
 
 ## Before you open a PR
 
-    python -m pytest test_openscrub.py -q      # must be green
+    python -m pytest -q                       # engine and standalone web tests
     python -m build                            # full sdist->wheel build
 
 For web UI changes, also boot `python openscrub_web.py` and click through
