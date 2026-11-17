@@ -322,3 +322,24 @@ unassisted one.
   second is a claim about footage nobody has run yet.
 - Publish the failures next to the successes. A tool that says where it
   struggles is the one worth believing.
+
+
+Report save I/O can be compared independently of inference:
+
+```sh
+python benchmark/review_io.py --scenario saves --rows 1000 10000 100000 \
+  --before-ref BASE_SHA --after-ref HEAD_SHA --repository . \
+  --evidence-dir /tmp/openscrub-review-io --output /tmp/openscrub-review-io/results.json
+```
+
+Use a fresh evidence directory and a runtime with the project dependencies.
+Both revisions are exported and checked against their pinned Git blobs; workers
+assert imported module paths and hashes. The benchmark warms both versions and
+alternates uninstrumented loopback HTTP requests (three warmups and five samples
+per version/scenario by default). Sparse and bulk values alternate on every
+request. Fresh workers count report parse/dump/staging/fsync/replacement and Python
+stream writes separately from request/response JSON. Results retain all samples,
+status codes, report/payload sizes, content hashes and Linux RSS observations.
+Keep other sustained workloads idle while measuring. High-water memory includes
+imports and fixture construction; sampled RSS can miss transient peaks. These
+measurements characterize a local warm-cache workload, not production capacity.

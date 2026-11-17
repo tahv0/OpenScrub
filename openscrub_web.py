@@ -1780,6 +1780,29 @@ def job_video_stream(jid):
     return send_file(video, conditional=True)
 
 
+def _same_json_value(left, right):
+    """Compare touched JSON values without losing encoder-visible distinctions.
+
+    Nonfinite or unusual values conservatively require publication. Assignment
+    replaces touched containers; their originals need no copy or normalization.
+    """
+    if type(left) is not type(right):
+        return False
+    if type(left) is float:
+        return (math.isfinite(left) and math.isfinite(right) and left == right
+                and (left != 0 or math.copysign(1, left) == math.copysign(1, right)))
+    if type(left) in (str, int, bool, type(None)):
+        return left == right
+    if type(left) is list:
+        return (len(left) == len(right)
+                and all(_same_json_value(a, b) for a, b in zip(left, right)))
+    if type(left) is dict:
+        return (left.keys() == right.keys()
+                and all(_same_json_value(value, right[key])
+                        for key, value in left.items()))
+    return False
+
+
 def _valid_manual_creation(value):
     """Only immutable, finite creation records can establish replay equality."""
     def numbers(items, size):
@@ -1808,23 +1831,34 @@ def job_save_edits(jid):
             doc = _load_job_report(job)
         except FileNotFoundError:
             abort(404, "job report not found")
+        # Remember only effective assignment destinations, before their first
+        # assignment. Aliased indices may change then restore the same field.
+        missing = object()
+        touched = {}
+        def assign(target, key, value):
+            destination = (id(target), key)
+            if destination not in touched:
+                touched[destination] = (target, key, target.get(key, missing))
+            target[key] = value
+
+        original_count = len(doc["detections"])
         enabled = edits.get("enabled", {})
         for i, d in enumerate(doc["detections"]):
             if str(i) in enabled:
-                d["enabled"] = bool(enabled[str(i)])
+                assign(d, "enabled", bool(enabled[str(i)]))
         for i, box in (edits.get("box_overrides") or {}).items():
             i = int(i)
             if 0 <= i < len(doc["detections"]) and len(box) == 4:
-                doc["detections"][i]["cbox"] = [float(v) for v in box]
+                assign(doc["detections"][i], "cbox", [float(v) for v in box])
         for i, span in (edits.get("time_overrides") or {}).items():
             i = int(i)
             if 0 <= i < len(doc["detections"]) and len(span) == 2:
                 t0, t1 = float(span[0]), float(span[1])
                 if t1 > t0 >= 0:
-                    doc["detections"][i]["t_start"] = t0
-                    doc["detections"][i]["t_end"] = t1
-                    doc["detections"][i]["last_seen"] = min(
-                        max(doc["detections"][i].get("last_seen", t0), t0), t1)
+                    assign(doc["detections"][i], "t_start", t0)
+                    assign(doc["detections"][i], "t_end", t1)
+                    assign(doc["detections"][i], "last_seen", min(
+                        max(doc["detections"][i].get("last_seen", t0), t0), t1))
         rs = doc["render_state"]
         # Read identities from this transaction's latest raw document. Never
         # reconstruct creation from a row's mutable current geometry/choices.
@@ -1874,13 +1908,16 @@ def job_save_edits(jid):
         if "audio" in edits:
             # audio redaction spans (mute/bleep): stored in the report so the
             # --from-report render applies them and re-renders keep them
-            doc["audio_redactions"] = [
+            assign(doc, "audio_redactions", [
                 {"t0": float(s["t0"]), "t1": float(s["t1"]),
                  "mode": (s.get("mode") if s.get("mode") in ("mute", "bleep")
                           else "mute")}
                 for s in (edits.get("audio") or [])
-                if float(s.get("t1", 0)) > float(s.get("t0", 0)) >= 0]
-        atomic_report(path, doc)
+                if float(s.get("t1", 0)) > float(s.get("t0", 0)) >= 0])
+        if (len(doc["detections"]) != original_count
+                or any(original is missing or not _same_json_value(original, target[key])
+                       for target, key, original in touched.values())):
+            atomic_report(path, doc)
         # suggest allowlisting any string whose EVERY instance was disabled —
         # the review just taught us it's a recurring false positive
         per = {}

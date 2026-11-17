@@ -120,6 +120,7 @@ include = [
     "test_openscrub.py",
     "tests",
     "CONTRIBUTING.md",
+    "benchmark",
 ]
 
 [tool.pytest.ini_options]
