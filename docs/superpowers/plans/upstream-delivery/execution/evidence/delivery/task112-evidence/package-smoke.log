@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "/tmp/openscrub-task112/package-smoke.py", line 9, in <module>
+    assert not any(str(native)==p for p in sys.path)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError

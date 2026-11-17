@@ -1,0 +1,106 @@
+   128	    return ok
+   129	
+   130	
+   131	def step_opencv(check=True, yes=False, final=False):
+   132	    snapshot = probe_opencv(PYTHON)
+   133	    if not check and assess_opencv(snapshot)["state"] == "missing":
+   134	        if ask("Install Python package: opencv-python<5?", yes):
+   135	            pip("install", "opencv-python<5")
+   136	            snapshot = probe_opencv(PYTHON)
+   137	    assessment = assess_opencv(snapshot)
+   138	    record("OpenCV face fallback" + (" (final)" if final else ""),
+   139	           assessment["healthy"], assessment["state"] + "; " + assessment["evidence"])
+   140	    hint = opencv_repair_hint(snapshot, PYTHON)
+   141	    if hint:
+   142	        log("  " + hint)
+   143	    return assessment
+   144	
+   145	
+   146	def step_core(check, yes):
+   147	    step_opencv(check, yes)
+   148	    missing = [p for p, m in zip(
+   149	        CORE_PKGS[1:], ["rapidfuzz", "pytesseract", "PIL",
+   150	                    "flask", "yaml", "cryptography"]) if not have(m)]
+   151	    if not missing:
+   152	        record("Core Python packages", True, "all present")
+   153	        return
+   154	    if check:
+   155	        record("Core Python packages", False, "missing: " + ", ".join(missing))
+   156	        return
+   157	    if ask(f"Install Python packages: {', '.join(missing)}?", yes):
+   158	        r = pip("install", *missing)
+   159	        record("Core Python packages", r.returncode == 0,
+   160	               "" if r.returncode == 0 else (r.stderr or "")[-200:])
+   161	
+   162	
+   163	def step_spacy(check, yes):
+   164	    if have("spacy"):
+   165	        r = run([PYTHON, "-c", "import spacy; spacy.load('en_core_web_sm')"])
+   166	        if r.returncode == 0:
+   185	def detect_nvidia():
+   186	    smi = shutil.which("nvidia-smi")
+   187	    if not smi:
+   188	        return None
+   189	    r = run([smi, "--query-gpu=name,driver_version", "--format=csv,noheader"],
+   190	            timeout=20)
+   191	    if r.returncode == 0 and r.stdout.strip():
+   192	        return r.stdout.strip().splitlines()[0]
+   193	    return None
+   194	
+   195	
+   196	def step_paddle(check, yes, cpu_only):
+   197	    gpu = None if cpu_only else detect_nvidia()
+   198	    if have("paddleocr") and have("paddle"):
+   199	        r = run([PYTHON, "-c",
+   200	                 "import paddle; print(paddle.device.is_compiled_with_cuda())"])
+   201	        cuda = "True" in (r.stdout or "")
+   202	        record("PaddleOCR", True,
+   203	               f"GPU build{' (CUDA active)' if cuda else ''}" if cuda
+   204	               else "CPU build" + (f" — NVIDIA GPU present ({gpu}); rerun "
+   205	                                   "installer to upgrade" if gpu else ""))
+   206	        if not (gpu and not cuda):
+   207	            return
+   208	    if check:
+   209	        record("PaddleOCR (recommended engine)", have("paddleocr"),
+   210	               f"NVIDIA GPU detected: {gpu}" if gpu else "no NVIDIA GPU — CPU build")
+   211	        return
+   212	    if gpu:
+   213	        log(f"  NVIDIA GPU detected: {gpu}")
+   214	        if ask("Install GPU-accelerated PaddleOCR (large download)?", yes):
+   215	            r = pip("install", "paddlepaddle-gpu", "-i",
+   216	                    "https://www.paddlepaddle.org.cn/packages/stable/cu126/")
+   217	            if r.returncode != 0:
+   218	                log("  GPU wheel failed — falling back to CPU build")
+   219	                r = pip("install", "paddlepaddle")
+   220	            else:
+   221	                pip("install", "-U", "nvidia-cudnn-cu12")   # cuDNN pairing
+   222	            r2 = pip("install", "paddleocr")
+   223	            record("PaddleOCR (GPU)", r.returncode == 0 and r2.returncode == 0)
+   224	            return
+   225	    if ask("Install CPU PaddleOCR (recommended engine)?", yes):
+   226	        r = pip("install", "paddlepaddle")
+   227	        r2 = pip("install", "paddleocr")
+   228	        record("PaddleOCR (CPU)", r.returncode == 0 and r2.returncode == 0)
+   413	    step_spacy(a.check, a.yes)
+   414	    step_system_tools(a.check, a.yes)
+   415	    step_paddle(a.check, a.yes, a.cpu_only)
+   416	    final_opencv = step_opencv(final=True)
+   417	    step_directml(a.check, a.yes, a.cpu_only)
+   418	    step_nvenc()
+   419	    if not a.no_shortcut:
+   420	        step_shortcut(a.check)
+   421	
+   422	    log("=" * 62)
+   423	    bad = [s for s, ok, _ in RESULTS if not ok]
+   424	    if a.check:
+   425	        log(f" Check complete — {len(RESULTS) - len(bad)}/{len(RESULTS)} ready."
+   426	            + ("" if not bad else " See diagnostics above for remaining items."))
+   427	    elif bad:
+   428	        log(" Finished with warnings: " + "; ".join(bad))
+   429	        if final_opencv["healthy"]:
+   430	            log(" Everything else works — Tesseract/x264 fallbacks cover gaps.")
+   431	        else:
+   432	            log(" OpenCV needs attention; unavailable-model face fallback is not certified.")
+   433	    else:
+   434	        log(" Install complete.")
+   435	        log(f" Start OpenScrub: the '{'OpenScrub' if not a.no_shortcut else 'launcher'}'"

@@ -1,0 +1,11 @@
+     1	opencv-python<5
+     2	numpy
+     3	onnxruntime
+     4	rapidfuzz
+     5	pytesseract
+     6	pillow
+     7	spacy
+     8	flask
+     9	pyyaml
+    10	cryptography
+    11	cheroot>=10.0

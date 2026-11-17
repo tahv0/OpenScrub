@@ -1,0 +1,123 @@
+     1	# CUDA-enabled OpenCV base image for OpenScrub's GPU build.
+     2	#
+     3	# This image is built RARELY (only when the OpenCV or CUDA version changes),
+     4	# published as ghcr.io/austinmabry/opencv-cuda:<tag>, and consumed by
+     5	# Dockerfile.cuda via `FROM`. Isolating the ~1 GB CUDA-OpenCV layer here
+     6	# means normal OpenScrub releases never rebuild or re-ship it — a version
+     7	# bump only re-downloads the small app layers.
+     8	#
+     9	# Build (manually, via .github/workflows/opencv-cuda-base.yml or locally):
+    10	#   docker build -f docker/Dockerfile.opencv-cuda \
+    11	#     -t ghcr.io/austinmabry/opencv-cuda:4.10.0-cu126 .
+    12	#
+    13	# Why a source build: the stock opencv-python wheel is CPU-only, so
+    14	# YuNet / SCRFD / CenterFace / SFace all run on the CPU. Built WITH_CUDA +
+    15	# OPENCV_DNN_CUDA, the same nets run on the GPU (the engine sets
+    16	# DNN_TARGET_CUDA when a GPU is present).
+    17	#
+    18	# Works on ALL NVIDIA GPUs (Maxwell 5.2 and newer), NOT just specific
+    19	# cards. Two mechanisms:
+    20	#   - CUDA_ARCH_BIN: native machine code (SASS) is compiled for the common
+    21	#     consumer arches — Pascal (GTX 10 / P2000), Turing (RTX 20), Ampere
+    22	#     (RTX 30 / 3060), Ada (RTX 40) — so those run at full speed with no
+    23	#     first-run delay.
+    24	#   - CUDA_ARCH_PTX=5.2: forward-compatible PTX is also embedded, which the
+    25	#     driver JIT-compiles for ANY other GPU — Maxwell, Volta, Hopper,
+    26	#     Blackwell (RTX 50), and future cards. Those pay a one-time JIT cost
+    27	#     on first use (cached by the driver afterward), then run on the GPU.
+    28	# Net: universal GPU support, like the base CUDA image — not a per-card
+    29	# build. Add an arch to CUDA_ARCH_BIN only to give that card native SASS
+    30	# (skip its JIT); it already WORKS via PTX regardless.
+    31	#
+    32	# Only the OpenCV modules OpenScrub actually uses are built (BUILD_LIST) —
+    33	# this keeps the image small and the compile within a free CI runner.
+    34	
+    35	ARG OPENCV_VERSION=4.10.0
+    36	ARG CUDA_ARCH_BIN="6.1;7.5;8.6;8.9"
+    37	ARG CUDA_ARCH_PTX="5.2"
+    38	
+    39	# ---------- build stage: full CUDA toolkit (nvcc), thrown away after ----------
+    40	FROM nvidia/cuda:12.6.3-cudnn-devel-ubuntu22.04 AS build
+    41	ARG OPENCV_VERSION
+    42	ARG CUDA_ARCH_BIN
+    43	ARG CUDA_ARCH_PTX
+    44	ENV DEBIAN_FRONTEND=noninteractive
+    45	
+    46	RUN apt-get update && apt-get install -y --no-install-recommends \
+    47	      build-essential cmake ninja-build git pkg-config \
+    48	      python3-dev python3-pip \
+    49	      libavcodec-dev libavformat-dev libavutil-dev libswscale-dev \
+    50	      libjpeg-dev libpng-dev libtiff-dev \
+    51	 && rm -rf /var/lib/apt/lists/* \
+    52	 # build the python bindings against a PINNED numpy (not apt's), so the
+    53	 # cv2 that ships is compiled against the EXACT numpy the runtime uses —
+    54	 # a version skew here left cv2 "partially initialized" at import.
+    55	 && pip3 install --no-cache-dir numpy==1.26.4
+    56	
+    57	WORKDIR /src
+    58	# the CUDA DNN backend requires the 'cudev' module, which lives in
+    59	# opencv_contrib — both repos must be the same version.
+    60	RUN git clone --depth 1 --branch ${OPENCV_VERSION} \
+    61	      https://github.com/opencv/opencv.git \
+    62	 && git clone --depth 1 --branch ${OPENCV_VERSION} \
+    63	      https://github.com/opencv/opencv_contrib.git
+    64	
+    65	# BUILD_LIST limits the build to what OpenScrub calls (core/imgproc/
+    66	# imgcodecs/videoio/dnn/objdetect/python3) plus cudev for the CUDA
+    67	# backend; cmake pulls in their dependencies automatically. FaceDetectorYN
+    68	# and FaceRecognizerSF live in objdetect; readNet in dnn.
+    69	RUN cmake -S opencv -B build -G Ninja \
+    70	      -D CMAKE_BUILD_TYPE=Release \
+    71	      -D CMAKE_INSTALL_PREFIX=/opt/opencv \
+    72	      -D OPENCV_EXTRA_MODULES_PATH=/src/opencv_contrib/modules \
+    73	      -D BUILD_LIST=core,imgproc,imgcodecs,videoio,dnn,objdetect,python3,cudev \
+    74	      -D WITH_CUDA=ON \
+    75	      -D OPENCV_DNN_CUDA=ON \
+    76	      -D WITH_CUDNN=ON \
+    77	      -D WITH_NVCUVID=OFF \
+    78	      -D WITH_NVCUVENC=OFF \
+    79	      -D CUDA_ARCH_BIN=${CUDA_ARCH_BIN} \
+    80	      -D CUDA_ARCH_PTX=${CUDA_ARCH_PTX} \
+    81	      -D WITH_CUBLAS=ON \
+    82	      -D ENABLE_FAST_MATH=ON \
+    83	      -D CUDA_FAST_MATH=ON \
+    84	      -D BUILD_opencv_python3=ON \
+    85	      -D BUILD_opencv_python2=OFF \
+    86	      -D PYTHON3_EXECUTABLE=/usr/bin/python3 \
+    87	      -D WITH_FFMPEG=ON \
+    88	      -D WITH_GTK=OFF \
+    89	      -D BUILD_TESTS=OFF -D BUILD_PERF_TESTS=OFF \
+    90	      -D BUILD_EXAMPLES=OFF -D BUILD_DOCS=OFF \
+    91	      -D BUILD_opencv_apps=OFF \
+    92	      -D OPENCV_GENERATE_PKGCONFIG=ON \
+    93	 && cmake --build build --target install \
+    94	 && find /opt/opencv -name "*.so*" -exec strip --strip-unneeded {} + || true
+    95	
+    96	# ---------- runtime stage: cudnn-runtime (cuDNN + CUDA rt already present) ----
+    97	FROM nvidia/cuda:12.6.3-cudnn-runtime-ubuntu22.04
+    98	ENV DEBIAN_FRONTEND=noninteractive \
+    99	    NVIDIA_VISIBLE_DEVICES=all \
+   100	    NVIDIA_DRIVER_CAPABILITIES=compute,utility,video
+   101	
+   102	# runtime libs for the modules we built: ffmpeg (videoio) + image codecs.
+   103	# numpy is the SAME pinned version cv2 was compiled against (via pip, not
+   104	# apt) — anything layered on top (Paddle) must keep this exact version.
+   105	RUN apt-get update && apt-get install -y --no-install-recommends \
+   106	      python3 python3-pip \
+   107	      libavcodec58 libavformat58 libavutil56 libswscale5 \
+   108	      libjpeg-turbo8 libpng16-16 libtiff5 \
+   109	 && rm -rf /var/lib/apt/lists/* \
+   110	 && pip3 install --no-cache-dir numpy==1.26.4 \
+   111	 && ln -sf /usr/bin/python3 /usr/local/bin/python
+   112	
+   113	# the compiled OpenCV: shared libs + the python cv2 module
+   114	COPY --from=build /opt/opencv/lib /opt/opencv/lib
+   115	RUN SITE=$(python3 -c "import site;print(site.getsitepackages()[0])") \
+   116	 && CVDIR=$(find /opt/opencv -type d -name cv2 | head -1) \
+   117	 && cp -r "$CVDIR" "$SITE"/ \
+   118	 && echo "/opt/opencv/lib" > /etc/ld.so.conf.d/opencv.conf \
+   119	 && ldconfig \
+   120	 && python3 -c "import numpy, cv2; \
+   121	print('OpenCV', cv2.__version__, '| numpy', numpy.__version__, \
+   122	'| FaceDetectorYN:', hasattr(cv2, 'FaceDetectorYN_create'), \
+   123	'| CUDA devices:', cv2.cuda.getCudaEnabledDeviceCount())"

@@ -1,0 +1,11 @@
+     1	.git
+     2	.github
+     3	windows
+     4	dist
+     5	build
+     6	assets/*
+     7	!assets/openscrub.ico
+     8	openscrub_jobs
+     9	*.onnx
+    10	*.mp4
+    11	__pycache__

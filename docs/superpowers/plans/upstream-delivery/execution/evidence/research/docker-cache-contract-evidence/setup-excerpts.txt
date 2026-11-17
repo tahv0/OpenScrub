@@ -1,0 +1,81 @@
+   165	    except Exception:
+   166	        pass
+   167	    if not _confirm("Create Start Menu + Desktop shortcuts for "
+   168	                    "'OpenScrub Web'?", assume_yes):
+   169	        _note("Skipped. The server exe is: " + web)
+   170	        return
+   171	    icon_line = f'$s.IconLocation="{ico}";' if ico else ""
+   172	    ps = (
+   173	        '$W=New-Object -ComObject WScript.Shell;'
+   174	        'foreach($d in @([Environment]::GetFolderPath("Programs"),'
+   175	        '[Environment]::GetFolderPath("Desktop"))){'
+   176	        '$s=$W.CreateShortcut((Join-Path $d "OpenScrub Web.lnk"));'
+   177	        f'$s.TargetPath="{web}";'
+   178	        '$s.WorkingDirectory=[Environment]::GetFolderPath("UserProfile");'
+   179	        f'{icon_line}'
+   180	        '$s.Save()}'
+   181	    )
+   182	    r = subprocess.run(["powershell", "-NoProfile", "-Command", ps],
+   183	                       capture_output=True, text=True)
+   184	    if r.returncode == 0:
+   185	        _ok("shortcuts created: Start Menu + Desktop -> OpenScrub Web")
+   186	    else:
+   187	        _note("shortcut creation failed: " + (r.stderr or "").strip()[:200])
+   188	
+   189	
+   190	def main(argv=None):
+   191	    ap = argparse.ArgumentParser(
+   192	        prog="openscrub-setup",
+   193	        description="Detect and install OpenScrub's system prerequisites "
+   194	                    "(Tesseract OCR, FFmpeg).")
+   195	    ap.add_argument("--check", action="store_true",
+   196	                    help="report status only; install nothing")
+   197	    ap.add_argument("--yes", "-y", action="store_true",
+   198	                    help="install anything missing without prompting")
+   199	    ap.add_argument("--with-plates", action="store_true",
+   200	                    help="also offer the optional license-plate model")
+   201	    args = ap.parse_args(argv)
+   202	
+   203	    print("OpenScrub setup — system prerequisites")
+   204	    print("=" * 46)
+   205	
+   206	    changed = False
+   207	
+   208	    # Probe OpenCV separately: importing it alone does not establish fallback health.
+   209	    snapshot = probe_opencv(sys.executable)
+   210	    assessment = assess_opencv(snapshot)
+   211	    report = (_ok if assessment["healthy"] else
+   212	              _note if assessment["state"] in {"alternate", "unmanaged"} else _miss)
+   213	    report(
+   214	        "OpenCV face fallback: " + assessment["state"] + "; " + assessment["evidence"])
+   215	    hint = opencv_repair_hint(snapshot, sys.executable)
+   216	    if hint:
+   217	        _note(hint)
+   218	    try:
+   219	        import flask  # noqa: F401
+   220	        _ok("Flask Python dependency")
+   221	    except ImportError as e:
+   222	        _miss(f"Flask Python dependency broken: {e}")
+   223	
+   224	    # Tesseract
+   225	    t = find_tesseract()
+   226	    if t:
+   227	        _ok(f"Tesseract OCR: {t}")
+   228	    else:
+   229	        _miss("Tesseract OCR — required for ALL text categories "
+   230	              "(names, SSNs, addresses, ...)")
+   231	        if not args.check:
+   232	            if os.name == "nt":
+   233	                changed |= install_windows("UB-Mannheim.TesseractOCR", args.yes)
+   234	            else:
+   235	                changed |= install_apt(["tesseract-ocr"], args.yes)
+   236	
+   237	    # FFmpeg
+   238	    f = find_ffmpeg()
+   239	    if f:
+   240	        _ok(f"FFmpeg: {f}")
+   241	    else:
+   242	        _miss("FFmpeg — needed for audio passthrough, H.264 output, and "
+   243	              "screen-recording (VFR) normalization")
+   244	        if not args.check:
+   245	            if os.name == "nt":

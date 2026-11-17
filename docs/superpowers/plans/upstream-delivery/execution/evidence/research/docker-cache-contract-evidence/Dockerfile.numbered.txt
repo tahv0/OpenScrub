@@ -1,0 +1,101 @@
+     1	# OpenScrub server image (CPU). Built and pushed to GitHub Container
+     2	# Registry and Docker Hub automatically on every release
+     3	# (.github/workflows/docker-image.yml):
+     4	#
+     5	#     docker run -d -p 8384:8384 \
+     6	#       -v openscrub_data:/root/.local/share/OpenScrub \
+     7	#       ghcr.io/austinmabry/openscrub:latest        # or pharmhero/openscrub
+     8	#
+     9	# then open https://<host>:8384/ (self-signed cert; add --token via the
+    10	# command below for access control):
+    11	#     docker run ... ghcr.io/austinmabry/openscrub:latest \
+    12	#       openscrub-web --host 0.0.0.0 --token mysecret
+    13	#
+    14	# Data (jobs, certs, zones, models, vault) lives in the mounted volume —
+    15	# the container itself is disposable. To update: pull the new tag and
+    16	# recreate the container (the in-app updater is disabled in Docker).
+    17	# Notes: CPU OCR/encode only (no CUDA/NVENC). spaCy NER is included.
+    18	#
+    19	# LAYER ORDER MATTERS: heavy dependencies install BEFORE the app code is
+    20	# copied, so a release that only changes code rebuilds (and users only
+    21	# re-download) the small app layers at the bottom. Combined with the
+    22	# workflow's registry build cache, unchanged dependency layers keep the
+    23	# same digest across releases.
+    24	
+    25	FROM python:3.12-slim
+    26	
+    27	# dist-upgrade pulls the latest Debian security patches even when the base
+    28	# image tag lags behind. This layer is cached across builds; the weekly
+    29	# security refresh re-runs a SEPARATE small layer at the top of the image
+    30	# (see the end of this file) so published tags keep absorbing fixes
+    31	# without invalidating the heavy layers below.
+    32	RUN apt-get update \
+    33	 && apt-get dist-upgrade -y \
+    34	 && apt-get install -y --no-install-recommends tesseract-ocr ffmpeg \
+    35	 && rm -rf /var/lib/apt/lists/* \
+    36	 && pip install --no-cache-dir --upgrade pip setuptools wheel
+    37	
+    38	WORKDIR /src
+    39	
+    40	# ---- heavy dependency layer: rebuilds ONLY when requirements.txt changes
+    41	COPY requirements.txt ./
+    42	RUN pip install --no-cache-dir -r requirements.txt \
+    43	 # faster-whisper: local speech transcription for spoken-PII
+    44	 # suggestions (fully offline)
+    45	 && pip install --no-cache-dir faster-whisper \
+    46	 # spaCy NER for name detection, baked in with its model
+    47	 && python -m spacy download en_core_web_sm
+    48	
+    49	# ---- model layer: pre-fetched detection models so first run works
+    50	# offline. In its OWN cached layer ABOVE the app code (standalone script,
+    51	# no openscrub import — retries the flaky LFS media host and verifies
+    52	# every pinned sha256): a release that only changes code no longer
+    53	# re-downloads ~60MB of unchanged models. Rebuilds only when
+    54	# docker/prefetch_models.py itself changes; a sync test pins its table
+    55	# to the engine's constants.
+    56	COPY docker/prefetch_models.py ./
+    57	RUN python prefetch_models.py yunet sface vittrack ppdet pprec pprec_yml plate_t640
+    58	
+    59	# ---- app layers: tiny, change every release
+    60	COPY pyproject.toml README.md LICENSE NOTICE THIRD_PARTY_NOTICES.md plate_models.json face_models.json person_models.json ./
+    61	COPY openscrub.py openscrub_web.py openscrub_setup.py openscrub_update.py \
+    62	     openscrub_vault.py zones_ui.py install.py test_openscrub.py ./
+    63	COPY openscrub_internal/ openscrub_internal/
+    64	COPY assets/openscrub.ico assets/
+    65	RUN pip install --no-cache-dir --no-deps .
+    66	
+    67	# ---- security refresh layer: the ONLY layer the weekly scheduled rebuild
+    68	# (docker-image.yml) invalidates. SECURITY_REFRESH is a cache-buster (the
+    69	# workflow passes the run id); everything below it stays cached, so a
+    70	# refresh republishes tags whose multi-GB dependency layers keep their
+    71	# exact digests — users re-download only this small patch layer. The
+    72	# earlier --no-cache refresh rebuilt every layer with new digests and
+    73	# forced a near-full image re-pull on every user, every week.
+    74	ARG SECURITY_REFRESH=0
+    75	RUN echo "security refresh ${SECURITY_REFRESH}" \
+    76	 && apt-get update \
+    77	 && apt-get dist-upgrade -y \
+    78	 && rm -rf /var/lib/apt/lists/* \
+    79	 && pip install --no-cache-dir --upgrade pip setuptools wheel
+    80	
+    81	# tells the web UI it runs in a container: the update notice becomes
+    82	# inform-only ("pull the new image") instead of offering the in-place
+    83	# updater, whose writes would vanish on the next container recreate
+    84	ENV OPENSCRUB_IN_DOCKER=1
+    85	# Unbuffered stdout: without this, Python block-buffers prints in a non-TTY
+    86	# container and `docker logs` stays EMPTY for minutes — a real Mac user
+    87	# debugged a perfectly healthy server because the startup banner (and any
+    88	# crash traceback stuck behind it) never appeared.
+    89	ENV PYTHONUNBUFFERED=1
+    90	
+    91	EXPOSE 8384
+    92	# Lets `docker ps`/Docker Desktop show whether the server actually answers
+    93	# (the reported failure looked identical whether the server was up or not).
+    94	# Scheme-agnostic: tries the default self-signed HTTPS, then --http.
+    95	HEALTHCHECK --interval=60s --timeout=10s --start-period=90s --retries=3 \
+    96	  CMD python -c "import urllib.request,ssl;\
+    97	ctx=ssl._create_unverified_context();\
+    98	exec('try:\n urllib.request.urlopen(\"https://127.0.0.1:8384/\",context=ctx,timeout=8)\nexcept Exception:\n urllib.request.urlopen(\"http://127.0.0.1:8384/\",timeout=8)')"
+    99	
+   100	VOLUME ["/root/.local/share/OpenScrub"]
+   101	CMD ["openscrub-web", "--host", "0.0.0.0"]

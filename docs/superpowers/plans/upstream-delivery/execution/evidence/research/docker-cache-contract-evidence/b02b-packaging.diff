@@ -1,0 +1,81 @@
+diff --git a/Dockerfile b/Dockerfile
+index fa72409..4fa7c30 100644
+--- a/Dockerfile
++++ b/Dockerfile
+@@ -60,6 +60,7 @@ RUN python prefetch_models.py yunet sface vittrack ppdet pprec pprec_yml plate_t
+ COPY pyproject.toml README.md LICENSE NOTICE THIRD_PARTY_NOTICES.md plate_models.json face_models.json person_models.json ./
+ COPY openscrub.py openscrub_web.py openscrub_setup.py openscrub_update.py \
+      openscrub_vault.py zones_ui.py install.py test_openscrub.py ./
++COPY openscrub_internal/ openscrub_internal/
+ COPY assets/openscrub.ico assets/
+ RUN pip install --no-cache-dir --no-deps .
+ 
+diff --git a/Dockerfile.cuda b/Dockerfile.cuda
+index b872a49..3098e9e 100644
+--- a/Dockerfile.cuda
++++ b/Dockerfile.cuda
+@@ -132,6 +132,7 @@ RUN python prefetch_models.py yunet sface vittrack ppdet plate_t640
+ COPY pyproject.toml README.md LICENSE NOTICE THIRD_PARTY_NOTICES.md plate_models.json face_models.json person_models.json ./
+ COPY openscrub.py openscrub_web.py openscrub_setup.py openscrub_update.py \
+      openscrub_vault.py zones_ui.py install.py test_openscrub.py ./
++COPY openscrub_internal/ openscrub_internal/
+ COPY assets/openscrub.ico assets/
+ RUN pip install --no-cache-dir --no-deps .
+ 
+diff --git a/Dockerfile.intel b/Dockerfile.intel
+index c0ddc15..b8527e2 100644
+--- a/Dockerfile.intel
++++ b/Dockerfile.intel
+@@ -94,6 +94,7 @@ RUN python prefetch_models.py yunet sface vittrack ppdet pprec pprec_yml plate_t
+ COPY pyproject.toml README.md LICENSE NOTICE THIRD_PARTY_NOTICES.md plate_models.json face_models.json person_models.json ./
+ COPY openscrub.py openscrub_web.py openscrub_setup.py openscrub_update.py \
+      openscrub_vault.py zones_ui.py install.py test_openscrub.py ./
++COPY openscrub_internal/ openscrub_internal/
+ COPY assets/openscrub.ico assets/
+ RUN pip install --no-cache-dir --no-deps .
+ 
+diff --git a/pyproject.toml b/pyproject.toml
+index 2a60019..cf6b765 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -34,7 +34,7 @@ classifiers = [
+     "Topic :: Scientific/Engineering :: Image Processing",
+ ]
+ dependencies = [
+-    "opencv-python",
++    "opencv-python<5",
+     "numpy",
+     # License-plate models (open-image-models YOLOv9) are "end2end" ONNX
+     # exports with a baked-in NonMaxSuppression node that OpenCV's DNN module
+@@ -89,6 +89,7 @@ pattern = "VERSION = \"(?P<version>[^\"]+)\""
+ 
+ [tool.hatch.build.targets.wheel]
+ include = [
++    "openscrub_internal/",
+     "openscrub.py",
+     "openscrub_web.py",
+     "zones_ui.py",
+@@ -99,6 +100,7 @@ include = [
+ 
+ [tool.hatch.build.targets.sdist]
+ include = [
++    "openscrub_internal/",
+     "plate_models.json",
+     "face_models.json",
+     "person_models.json",
+@@ -116,4 +118,5 @@ include = [
+     "NOTICE",
+     "THIRD_PARTY_NOTICES.md",
+     "test_openscrub.py",
++    "tests/",
+ ]
+diff --git a/requirements.txt b/requirements.txt
+index 2bca460..149e830 100644
+--- a/requirements.txt
++++ b/requirements.txt
+@@ -1,4 +1,4 @@
+-opencv-python
++opencv-python<5
+ numpy
+ onnxruntime
+ rapidfuzz

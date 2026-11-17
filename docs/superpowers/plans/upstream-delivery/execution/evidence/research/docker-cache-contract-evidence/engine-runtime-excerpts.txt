@@ -1,0 +1,60 @@
+  3454	def _ort_session(path):
+  3455	    """onnxruntime session on the best available hardware: CUDA (the
+  3456	    :cuda image) > OpenVINO (the :intel image — AUTO targets the
+  3457	    iGPU/Arc and falls back to CPU) > DirectML (the Windows installer —
+  3458	    any DirectX 12 GPU: NVIDIA, AMD or Intel) > CPU. OPENSCRUB_CPU_DNN=1
+  3459	    forces CPU. CPU is always listed last so onnxruntime can fall back
+  3460	    per-node if GPU init fails at runtime — a driver mismatch degrades
+  3461	    to CPU instead of killing the job."""
+  3462	    import onnxruntime as ort
+  3463	    avail = ort.get_available_providers()
+  3464	    force_cpu = os.environ.get("OPENSCRUB_CPU_DNN") == "1"
+  3465	    gpu = ([] if force_cpu else
+  3466	           [p for p in ("CUDAExecutionProvider", "OpenVINOExecutionProvider",
+  3467	                        "DmlExecutionProvider")
+  3468	            if p in avail])
+  3469	    if "OpenVINOExecutionProvider" in gpu:
+  3470	        withopts = [("OpenVINOExecutionProvider",
+  3471	                     {"device_type": "AUTO:GPU,CPU"})
+  3472	                    if p == "OpenVINOExecutionProvider" else p
+  3473	                    for p in gpu] + ["CPUExecutionProvider"]
+  3474	        try:
+  3475	            return ort.InferenceSession(path, providers=withopts)
+  3476	        except Exception:
+  3477	            pass    # device-option drift across ORT versions: retry plain
+  3478	    sess_opts = None
+  3479	    if gpu and gpu[0] == "DmlExecutionProvider":
+  3480	        # DirectML requires memory-pattern optimization off and sequential
+  3481	        # execution — onnxruntime raises at inference otherwise. (No effect
+  3482	        # on the other providers; only set when DirectML leads.)
+  3483	        sess_opts = ort.SessionOptions()
+  3484	        sess_opts.enable_mem_pattern = False
+  3485	        sess_opts.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
+  3486	    return ort.InferenceSession(path, sess_options=sess_opts,
+  3487	                                providers=gpu + ["CPUExecutionProvider"])
+  5810	                    log(f"      face model failed to load ({e}) — "
+  5811	                        "falling back to built-in YuNet")
+  5812	            else:
+  5813	                log(f"      face model not found: {path} — "
+  5814	                    "falling back to built-in YuNet")
+  5815	        model = os.path.join(_model_dir(), "face_detection_yunet_2023mar.onnx")
+  5816	        if not os.path.exists(model) or os.path.getsize(model) < 10000:
+  5817	            try:
+  5818	                log("      downloading YuNet face model (~230 KB, one time)…")
+  5819	                _fetch_model(YUNET_URL, model, sha256=YUNET_SHA256, log_fn=log)
+  5820	            except Exception as e:
+  5821	                log(f"      YuNet download failed ({e}) — using Haar cascade fallback")
+  5822	        if (os.path.exists(model) and os.path.getsize(model) > 10000
+  5823	                and hasattr(cv2, "FaceDetectorYN_create")):
+  5824	            try:
+  5825	                self.yunet = _make_yunet(model, (320, 320), self.thresh)
+  5826	                self.size = None
+  5827	                if self.net is None and self.ort is None:
+  5828	                    log("      face detector: YuNet (DNN)"
+  5829	                        + ("  [GPU]" if cuda_dnn_available() else ""))
+  5830	                return
+  5831	            except Exception as e:
+  5832	                log(f"      YuNet init failed ({e}) — using Haar cascade fallback")
+  5833	        self.haar = cv2.CascadeClassifier(
+  5834	            cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
+  5835	        log("      face detector: Haar cascade (install note: YuNet is more accurate)")

@@ -1,0 +1,7 @@
+3c672b062700136b70b4481e8c5daf160edd525de912633bef36b0ee22c8417d  docs/superpowers/plans/upstream-delivery/README.md
+d451539df4fa70f5e17c649790ee5c1c90517a166a044607091eedf46195c569  docs/superpowers/plans/upstream-delivery/03-packaging-and-review-features.md
+ec68b344523d0d26cc709b3ac4028bdd5aa8c6c6d31a097fbe8ae2abe6156cc3  .superpowers/sdd/README/platform-readiness-research.md
+77626a4ce042b02cdefa7de1ff4c84ccd81cd555cfdaf255915a3f94fd553be3  .superpowers/sdd/README/opencv-compat-research.md
+5cd2540053317a4161551a8cee97006a230c4b3f9fc79c4cbf91f5725cd3d100  .superpowers/sdd/README/opencv-install-scope-research.md
+b916a9f6e8b9b86ccdc1cfc2438fd0ea0e159f75623ef6b6fb9756d44340439b  .superpowers/sdd/README/task-91-report.md
+88f3a2e2ff80817548c48e10fb5ea88823863ad3a42426bdb3004d3cce022e89  .superpowers/sdd/README/task-91-fix1-review.md

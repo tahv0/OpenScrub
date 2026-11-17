@@ -1,0 +1,1 @@
+Verified report/evidence presence and 11 full numbered snapshots against exact a10 Git blobs. No product runtime checks run.

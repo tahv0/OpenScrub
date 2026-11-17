@@ -1,0 +1,135 @@
+     1	# OpenScrub server image for INTEL GPUs — Quick Sync iGPUs (Gen 9+) and
+     2	# Arc discrete cards. Hardware H.264/HEVC encoding via QSV/VAAPI (fast
+     3	# HDR renders and scan copies) + ONNX inference through the OpenVINO
+     4	# execution provider (plates, person/seg, AND OCR — PP-OCRv5 det+rec via
+     5	# OnnxOcrBackend — all on the iGPU; better-than-Tesseract, GPU OCR).
+     6	#
+     7	#     docker run -d -p 8384:8384 \
+     8	#       --device /dev/dri:/dev/dri \
+     9	#       -v openscrub_data:/root/.local/share/OpenScrub \
+    10	#       ghcr.io/austinmabry/openscrub:intel        # or pharmhero/openscrub:intel
+    11	#
+    12	# --device /dev/dri is REQUIRED for GPU use — without it the container
+    13	# still works but everything runs on the CPU (the engine pre-flight
+    14	# tests every encoder with a real test encode and falls back loudly,
+    15	# never silently). On Unraid/CasaOS add the device in the template.
+    16	#
+    17	# Notes:
+    18	# - The iHD media driver covers Gen 9 (Skylake) through Arc. Very new
+    19	#   Arc cards may want a newer compute runtime than Debian ships for
+    20	#   OpenVINO GPU inference; encoding works regardless, and inference
+    21	#   falls back to OpenVINO-on-CPU (still faster than stock CPU ORT).
+    22	# - Same layout as the CPU image otherwise: data lives in the mounted
+    23	#   volume, the container is disposable, in-app updater disabled.
+    24	#
+    25	# LAYER ORDER MATTERS: heavy dependencies install BEFORE the app code is
+    26	# copied, so a release that only changes code rebuilds (and users only
+    27	# re-download) the small app layers at the bottom.
+    28	
+    29	# PINNED to bookworm (not the floating python:3.12-slim, which moved to
+    30	# trixie and broke the first build): trixie DROPPED libmfx1 (the legacy
+    31	# QSV runtime for Gen 9-11 iGPUs — most of the home-server fleet) and
+    32	# intel-opencl-icd (the compute runtime OpenVINO needs for iGPU
+    33	# inference). Bookworm ships both, and its ffmpeg is built against
+    34	# libmfx (verified: libavcodec59 depends on it), so the QSV encoders
+    35	# are present. Revisit when trixie regains an Intel compute runtime.
+    36	FROM python:3.12-slim-bookworm
+    37	
+    38	# Debian's non-free component carries the Intel iHD media driver; the
+    39	# QSV stack is libva -> iHD driver, dispatched from ffmpeg through
+    40	# libmfx (Gen 9-11) / libmfx-gen + libvpl (Gen 12+/Arc). intel-opencl-icd
+    41	# is the compute runtime OpenVINO uses to run inference on the iGPU.
+    42	RUN sed -i 's/Components: main/Components: main contrib non-free non-free-firmware/' \
+    43	      /etc/apt/sources.list.d/debian.sources \
+    44	 && apt-get update \
+    45	 && apt-get dist-upgrade -y \
+    46	 && apt-get install -y --no-install-recommends tesseract-ocr ffmpeg \
+    47	      intel-media-va-driver-non-free libmfx1 libmfx-gen1.2 libvpl2 \
+    48	      libva-drm2 intel-opencl-icd vainfo \
+    49	 && rm -rf /var/lib/apt/lists/* \
+    50	 && pip install --no-cache-dir --upgrade pip setuptools wheel
+    51	
+    52	ENV LIBVA_DRIVER_NAME=iHD
+    53	
+    54	WORKDIR /src
+    55	
+    56	# ---- heavy dependency layer: rebuilds ONLY when requirements.txt changes.
+    57	# onnxruntime-openvino REPLACES the stock onnxruntime wheel: same API,
+    58	# adds the OpenVINOExecutionProvider the engine prefers when present
+    59	# (AUTO device: iGPU/Arc when available, CPU otherwise).
+    60	COPY requirements.txt ./
+    61	RUN grep -viE '^onnxruntime' requirements.txt > /tmp/req.noort \
+    62	 && pip install --no-cache-dir -r /tmp/req.noort \
+    63	 # faster-whisper: local speech transcription for spoken-PII
+    64	 # suggestions (fully offline)
+    65	 && pip install --no-cache-dir faster-whisper \
+    66	 # faster-whisper depends on STOCK onnxruntime, whose files land in the
+    67	 # same onnxruntime/ package dir and CLOBBER the OpenVINO provider (it
+    68	 # broke the v1.0.65 build the day stock 1.27 released). Evict any
+    69	 # stock wheel and install onnxruntime-openvino LAST so its files win
+    70	 # unconditionally — the assert below is the backstop.
+    71	 && (pip uninstall -y onnxruntime || true) \
+    72	 && pip install --no-cache-dir --force-reinstall --no-deps \
+    73	      onnxruntime-openvino \
+    74	 # spaCy NER for name detection, baked in with its model
+    75	 && python -m spacy download en_core_web_sm \
+    76	 # fail the build if the OpenVINO provider didn't register — an image
+    77	 # tagged :intel that silently ran plain CPU would defeat its purpose
+    78	 && python -c "import onnxruntime as ort; \
+    79	provs = ort.get_available_providers(); \
+    80	assert 'OpenVINOExecutionProvider' in provs, \
+    81	('onnxruntime OpenVINO provider missing: %r' % provs); \
+    82	print('onnxruntime', ort.__version__, '| providers', provs)"
+    83	
+    84	# ---- model layer: pre-fetched detection models so first run works
+    85	# offline. In its OWN cached layer ABOVE the app code (standalone script,
+    86	# no openscrub import): a release that only changes code no longer
+    87	# re-downloads ~60MB of unchanged models. Rebuilds only when
+    88	# docker/prefetch_models.py itself changes; a sync test pins its table
+    89	# to the engine's constants.
+    90	COPY docker/prefetch_models.py ./
+    91	RUN python prefetch_models.py yunet sface vittrack ppdet pprec pprec_yml plate_t640
+    92	
+    93	# ---- app layers: tiny, change every release
+    94	COPY pyproject.toml README.md LICENSE NOTICE THIRD_PARTY_NOTICES.md plate_models.json face_models.json person_models.json ./
+    95	COPY openscrub.py openscrub_web.py openscrub_setup.py openscrub_update.py \
+    96	     openscrub_vault.py zones_ui.py install.py test_openscrub.py ./
+    97	COPY openscrub_internal/ openscrub_internal/
+    98	COPY assets/openscrub.ico assets/
+    99	RUN pip install --no-cache-dir --no-deps .
+   100	
+   101	# ---- security refresh layer: the ONLY layer the weekly scheduled rebuild
+   102	# (docker-image.yml) invalidates. SECURITY_REFRESH is a cache-buster (the
+   103	# workflow passes the run id); everything below it stays cached, so a
+   104	# refresh republishes tags whose multi-GB dependency layers keep their
+   105	# exact digests — users re-download only this small patch layer. The
+   106	# earlier --no-cache refresh rebuilt every layer with new digests and
+   107	# forced a near-full image re-pull on every user, every week.
+   108	ARG SECURITY_REFRESH=0
+   109	RUN echo "security refresh ${SECURITY_REFRESH}" \
+   110	 && apt-get update \
+   111	 && apt-get dist-upgrade -y \
+   112	 && rm -rf /var/lib/apt/lists/* \
+   113	 && pip install --no-cache-dir --upgrade pip setuptools wheel
+   114	
+   115	# tells the web UI it runs in a container: the update notice becomes
+   116	# inform-only ("pull the new image") instead of offering the in-place
+   117	# updater, whose writes would vanish on the next container recreate
+   118	ENV OPENSCRUB_IN_DOCKER=1
+   119	# Unbuffered stdout: without this, Python block-buffers prints in a non-TTY
+   120	# container and `docker logs` stays EMPTY for minutes — a real Mac user
+   121	# debugged a perfectly healthy server because the startup banner (and any
+   122	# crash traceback stuck behind it) never appeared.
+   123	ENV PYTHONUNBUFFERED=1
+   124	
+   125	EXPOSE 8384
+   126	# Lets `docker ps`/Docker Desktop show whether the server actually answers
+   127	# (the reported failure looked identical whether the server was up or not).
+   128	# Scheme-agnostic: tries the default self-signed HTTPS, then --http.
+   129	HEALTHCHECK --interval=60s --timeout=10s --start-period=90s --retries=3 \
+   130	  CMD python -c "import urllib.request,ssl;\
+   131	ctx=ssl._create_unverified_context();\
+   132	exec('try:\n urllib.request.urlopen(\"https://127.0.0.1:8384/\",context=ctx,timeout=8)\nexcept Exception:\n urllib.request.urlopen(\"http://127.0.0.1:8384/\",timeout=8)')"
+   133	
+   134	VOLUME ["/root/.local/share/OpenScrub"]
+   135	CMD ["openscrub-web", "--host", "0.0.0.0"]

@@ -1,0 +1,74 @@
+     1	# Builds the CUDA-enabled OpenCV BASE image that Dockerfile.cuda builds FROM.
+     2	#
+     3	# Run this MANUALLY and RARELY — only when the OpenCV or CUDA version
+     4	# changes. It is intentionally NOT tied to releases: the whole point is
+     5	# that this ~1 GB layer keeps a stable digest so normal OpenScrub releases
+     6	# never rebuild or re-ship it, and users never re-download it on a version
+     7	# bump.
+     8	#
+     9	# Compiling OpenCV with CUDA for several GPU architectures takes ~1-2 hours.
+    10	# After it publishes, bump the FROM tag in Dockerfile.cuda to match, then
+    11	# cut a normal release as usual.
+    12	
+    13	name: OpenCV CUDA base image
+    14	
+    15	on:
+    16	  # rebuild ONLY when the base recipe itself changes — NOT on every
+    17	  # release. Rebuilding per-release would give the ~1 GB CUDA-OpenCV layer
+    18	  # a new digest each time and force users to re-download it on every
+    19	  # version bump (the exact slow-pull problem the base image exists to
+    20	  # avoid). The CUDA app image FROMs a fixed base tag, so every release
+    21	  # already ships the latest app code on top of this stable base.
+    22	  push:
+    23	    branches: [main]
+    24	    paths:
+    25	      - "docker/Dockerfile.opencv-cuda"
+    26	      - ".github/workflows/opencv-cuda-base.yml"
+    27	  workflow_dispatch:
+    28	    inputs:
+    29	      opencv_version:
+    30	        description: "OpenCV git tag to build (e.g. 4.10.0)"
+    31	        required: true
+    32	        default: "4.10.0"
+    33	      arches:
+    34	        description: "CUDA_ARCH_BIN — arches to compile NATIVE SASS for
+    35	          (all other NVIDIA GPUs still work via the embedded PTX 5.2 JIT)"
+    36	        required: true
+    37	        default: "6.1;7.5;8.6;8.9"
+    38	
+    39	jobs:
+    40	  build:
+    41	    runs-on: ubuntu-latest
+    42	    timeout-minutes: 350
+    43	    permissions:
+    44	      contents: read
+    45	      packages: write
+    46	    steps:
+    47	      - uses: actions/checkout@v7
+    48	
+    49	      - name: Free runner disk (source build needs space)
+    50	        run: |
+    51	          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc \
+    52	                      /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
+    53	          df -h /
+    54	
+    55	      - uses: docker/setup-buildx-action@v4
+    56	
+    57	      - uses: docker/login-action@v4
+    58	        with:
+    59	          registry: ghcr.io
+    60	          username: ${{ github.actor }}
+    61	          password: ${{ secrets.GITHUB_TOKEN }}
+    62	
+    63	      - name: Build and push
+    64	        uses: docker/build-push-action@v7
+    65	        with:
+    66	          context: .
+    67	          file: docker/Dockerfile.opencv-cuda
+    68	          push: true
+    69	          build-args: |
+    70	            OPENCV_VERSION=${{ github.event.inputs.opencv_version || '4.10.0' }}
+    71	            CUDA_ARCH_BIN=${{ github.event.inputs.arches || '6.1;7.5;8.6;8.9' }}
+    72	          tags: |
+    73	            ghcr.io/austinmabry/opencv-cuda:${{ github.event.inputs.opencv_version || '4.10.0' }}-cu126
+    74	            ghcr.io/austinmabry/opencv-cuda:latest

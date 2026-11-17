@@ -1,0 +1,1095 @@
+........F......F                                                         [100%]
+=================================== FAILURES ===================================
+_ test_tail_records_preserve_support_boundaries_and_caller_order[history8-0.5-0.0] _
+
+history = [(Decimal('0.5'), (0.0, 0.0), [])], end = 0.5, seen = 0.0
+
+    @pytest.mark.parametrize("history,end,seen", [
+        ([scan(0), scan(.5), scan(1)], 1.5, 1),
+        ([scan(.01, "different"), scan(.5)], 1., .5),
+        ([scan(.5), scan(.5, "different"), scan(1)], 1.5, 1),
+        ([scan(.5), scan(1, "different"), scan(1.5)], 1., .5),
+        ([scan(.5, confidence=.49), scan(1)], .5, 0.),
+        ([scan(.5, confidence=.5), scan(1, box=(500, 500, 550, 520))], 1., .5),
+        ([scan(4.), scan(8.), scan(12.01)], 8.5, 8.),
+        # Caller order is meaningful: the earlier contradictory row is skipped
+        # after support at 2 advances last_seen, so sorting would lose coverage.
+        ([scan(2), scan(1, "different"), scan(3)], 3.5, 3),
+        ([(Decimal(".5"), (0., 0.), [])], .5, 0.),
+        ([(float("nan"), (0., 0.), []), scan(.5)], .5, 0.),
+    ])
+    def test_tail_records_preserve_support_boundaries_and_caller_order(history, end, seen):
+        # The second independent region makes this exercise shared history too.
+        other = core.Detection(0., 99., (500, 500, 550, 520), "phone", "5551234567", .8)
+>       assert merge([detection(), other], history) == [
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+            record(end=end, seen=seen),
+            dict(t_start=0., t_end=.5, cbox=(500, 500, 550, 520),
+                 category="phone", text="5551234567", confidence=.8,
+                 aoff=(0., 0.), last_seen=0., dense=False, track=-1, person=-1, poly=()),
+        ]
+
+tests/test_tail_history_index.py:56: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_tail_history_index.py:35: in merge
+    return [asdict(d) for d in core.merge_detections(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+dets = [Detection(t_start=0.0, t_end=0.5, cbox=(8, 8, 150, 28), category='email', text='alice@example.invalid', confidence=0....'phone', text='5551234567', confidence=0.8, aoff=(0.0, 0.0), last_seen=0.0, dense=False, track=-1, person=-1, poly=())]
+hold = 0.5, scans = [(Decimal('0.5'), (0.0, 0.0), [])], bridge_gap = 4.0
+fuzz = <module 'rapidfuzz.fuzz' from '/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/rapidfuzz/fuzz.py'>
+gap_check = None
+
+    def merge_detections(dets, hold, scans=None, bridge_gap=4.0, fuzz=None,
+                         gap_check=None):
+        """Chain detections of the same category whose content boxes overlap.
+    
+        Short gaps (within `hold`) chain unconditionally, as before. Longer gaps
+        up to `bridge_gap` seconds are BRIDGED — kept blurred straight through —
+        unless an intermediate scan positively saw different, readable text in
+        that region (i.e. the content genuinely changed). An empty or unreadable
+        region during the gap is treated as an OCR miss and stays covered:
+        fail closed, never flash PII."""
+        dets = sorted(dets, key=lambda d: d.t_start)
+        merged = []
+        mergeable = []  # Non-dense detections only
+    
+        def contradicted(m, t_from, t_to):
+            """True only if the gap contains STABLE different text — the same
+            different string read on two or more scans. A single divergent read
+            is far more likely to be the mouse cursor sitting over the word (or
+            another transient occlusion) garbling OCR than genuinely new content:
+            real replacement text reads consistently, cursor garble varies every
+            scan. Fail closed — an unstable read keeps the region blurred."""
+            if not scans:
+                return False
+            mx1, my1, mx2, my2 = m.cbox
+            seen = {}
+            for st, _cum, words in scans:
+                if not (t_from + 0.01 < st < t_to - 0.01):
+                    continue
+                for txt, (x1, y1, x2, y2), conf in words:
+                    if conf < 0.6:
+                        continue
+                    cxm = (x1 + x2) / 2
+                    cym = (y1 + y2) / 2
+                    if mx1 - 6 <= cxm <= mx2 + 6 and my1 - 4 <= cym <= my2 + 4:
+                        n = PhiMemory.norm(txt)
+                        if fuzz:
+                            mt = PhiMemory.norm(m.text)
+                            # partial_ratio catches cursor-occluded reads of the
+                            # SAME word ("errin" ~ "herrin"): those are evidence
+                            # the word is still there, never evidence it changed
+                            same = (fuzz.ratio(n, mt) >= 70
+                                    or fuzz.partial_ratio(n, mt) >= 85)
+                        else:
+                            same = False
+                        if not same and len(n) >= 3:
+                            seen[n] = seen.get(n, 0) + 1
+                            if seen[n] >= 2:
+                                return True
+            return False
+    
+        for d in dets:
+            d.last_seen = d.t_start
+            if getattr(d, 'dense', False):
+                merged.append(d)
+                continue
+            if not getattr(d, "dense", False):
+                # dense samples keep their sub-frame hold: stamping them with the
+                # multi-second OCR hold leaves every PAST position blurred for
+                # `hold` seconds — a trail of stale boxes marching away from a
+                # moving face. Their continuity across detector flicker and the
+                # onset gap is handled per-track by smooth_dense_tracks().
+                d.t_end = d.t_start + hold
+            for m in reversed(mergeable):
+                if m.category != d.category or not boxes_overlap(m.cbox, d.cbox):
+                    continue
+                if getattr(d, "dense", False) or getattr(m, "dense", False):
+                    # dense face boxes are per-frame position samples of a possibly
+                    # moving face — never merge them, or the bounding box balloons
+                    # to cover the whole path. Each stands alone with its short
+                    # hold, so the blur rides the face frame by frame.
+                    continue
+                # different readable text in the same spot is a DIFFERENT object
+                # (e.g. names sliding through one row of an inner-scrolling list)
+                # — never fuse them, or the region's text and its frames diverge
+                if fuzz and m.text and d.text:
+                    _mn = PhiMemory.norm(m.text)
+                    _dn = PhiMemory.norm(d.text)
+                    if (fuzz.ratio(_mn, _dn) < 70
+                            and fuzz.partial_ratio(_mn, _dn) < 85):
+                        continue
+                gap = d.t_start - m.last_seen
+                ok = gap <= hold
+                if not ok and not contradicted(m, m.last_seen, d.t_start):
+                    if gap <= bridge_gap:
+                        ok = True
+                    elif gap_check is not None:
+                        # beyond the configured bridge: ask the pixels. The file
+                        # is checked at points inside the gap — bridge any length
+                        # of gap the content verifiably persisted through, refuse
+                        # if it visibly changed. The knob stops mattering.
+                        ok = gap_check(m, m.last_seen, d.t_start)
+                if ok:
+                    m.last_seen = max(m.last_seen, d.t_start)
+                    m.t_end = max(m.t_end, d.t_end)
+                    m.cbox = (min(m.cbox[0], d.cbox[0]), min(m.cbox[1], d.cbox[1]),
+                              max(m.cbox[2], d.cbox[2]), max(m.cbox[3], d.cbox[3]))
+                    break
+            else:
+                merged.append(d)
+                mergeable.append(d)
+    
+        # Tail extension: a span ends `hold` after its LAST positive detection,
+        # but the text often outlives that detection — under heavy compression
+        # the final scans read only fragments ('4111.' '1111-1111' '1111'),
+        # which fail the full pattern yet are strong evidence the string is
+        # still on screen (the benchmark's compressed card leaked exactly this
+        # tail). Walk the scans PAST each span's last sighting: while a scan's
+        # words in the region fuzzy-match the span text (the same same-word
+        # test contradicted() uses), the content verifiably persisted — extend
+        # coverage through that scan. A scan with no matching read stops the
+        # walk, so a real scene change never accretes stale blur.
+        if scans and fuzz:
+            for m in merged:
+                if getattr(m, "dense", False) or not m.text:
+                    continue
+                mx1, my1, mx2, my2 = m.cbox
+                mt = PhiMemory.norm(m.text)
+                for st, _cum, words in scans:
+                    if st <= m.last_seen + 0.01:
+                        continue
+>                   if st - m.last_seen > bridge_gap:
+                       ^^^^^^^^^^^^^^^^
+E                   TypeError: unsupported operand type(s) for -: 'decimal.Decimal' and 'float'
+
+openscrub.py:3035: TypeError
+__________ test_run_scan_finalization_and_report_with_controlled_ocr ___________
+
+tmp_path = PosixPath('/tmp/pytest-of-tahv0/pytest-42/test_run_scan_finalization_and0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7b6948c5b320>
+
+    def test_run_scan_finalization_and_report_with_controlled_ocr(tmp_path, monkeypatch):
+        """Real decoding, forward/reverse recall, merge, and report; OCR is controlled."""
+        clip = tmp_path / "fixed.avi"
+        writer = cv2.VideoWriter(str(clip), cv2.VideoWriter_fourcc(*"FFV1"), 6., (160, 96))
+        assert writer.isOpened()
+        frame = np.random.default_rng(1411).integers(0, 256, (96, 160, 3), dtype=np.uint8)
+        for _ in range(8):
+            writer.write(frame)
+        writer.release()
+    
+        class OCR:
+            calls = 0
+            def read(self, image):
+                self.calls += 1
+                return [(TEXT, BOX, .99)]
+    
+        ocr = OCR()
+        monkeypatch.setattr(core, "make_ocr", lambda *args, **kwargs: ocr)
+        parser = core.build_parser()
+        args = core._prep_args(parser.parse_args([
+            str(clip), "--categories", "email", "--engine", "tesseract",
+            "--sample-interval", "0.3333333333333333", "--scroll-track", "off",
+            "--adaptive", "off", "--ocr-upscale", "off", "--no-vfr-fix", "--no-backtrack",
+        ]), parser)
+>       state = core.run_scan(args, core.Callbacks())
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_tail_history_index.py:111: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+args = Namespace(video='/tmp/pytest-of-tahv0/pytest-42/test_run_scan_finalization_and0/fixed.avi', output=None, config=None, ...r_upscale='off', paranoid=False, vfr='auto', categories='email', ignore_regions=[], zones_data=None, windows_data=None)
+cb = <openscrub.Callbacks object at 0x7b6948bf5940>
+
+    def run_scan(args, cb=None):
+        """Scan pass only: OCR + face detection + tracking. Returns a state dict
+        consumed by run_render (and serialized into --report files)."""
+        cb = cb or Callbacks()
+        if not args.video or not os.path.exists(args.video):
+            raise RuntimeError(f"input not found: {args.video}")
+        # normalize attributes that may be absent when args come from an older
+        # embedder (GUI/web) rather than _prep_args
+        for attr, default in (("ignore_regions", []), ("config", None),
+                              ("from_report", None), ("face_expand", 0.15),
+                              ("no_vfr_fix", False)):
+            if not hasattr(args, attr):
+                setattr(args, attr, default)
+        normalize_vfr(args, cb)
+        cats = {c.strip() for c in args.categories.split(",")
+                if c.strip() and c.strip() != "none"}
+        # per-window categories (unified editor) extend the load set: a category
+        # any window asks for must have its engines loaded, whatever --categories
+        # says. Union only ever ADDS detection — fail closed.
+        for _w in (getattr(args, "windows_data", None) or []):
+            for _c in (_w.get("cats") or []):
+                if _c and _c.strip():
+                    cats.add(_c.strip())
+        if not cats:
+            # manual-only job: no automatic detection at all. The scan still
+            # runs (it produces the render_state/report the review needs) but
+            # loads no engines; the user adds tracked objects / boxes in review.
+            cb.log("      no detection categories selected — manual-only job: "
+                   "add tracked objects and boxes in review")
+        # everything except the pixel detectors is text: it exists only to feed
+        # OCR output into detect_phi. Load ONLY what the selected categories
+        # actually need — a faces-only job must not pay for PaddleOCR (seconds
+        # of startup + 2-3 GB of RAM) or spaCy.
+        text_cats = cats - {"face", "plate", "person", "qrcode", "screen",
+                            "anytext"}
+    
+        cb.log(f"[1/4] OCR engine   (openscrub v{VERSION})")
+        if text_cats:
+            ocr = make_ocr(args.engine, device=args.device)
+            cb.log(f"      using {type(ocr).__name__}")
+        else:
+            ocr = None
+            cb.log("      skipped — no text categories selected "
+                   f"({', '.join(sorted(cats))} only): detector-only scan")
+    
+        cb.log("[2/4] Detectors")
+        if cuda_dnn_available():
+            cb.log("      OpenCV DNN: CUDA (GPU-accelerated face detection "
+                   "+ identity grouping)")
+        if "name" in cats:
+            namer = NameDetector(allow_names=args.allow_names,
+                                 extra_names=args.extra_names,
+                                 use_ner=not args.no_ner,
+                                 heuristic=args.heuristic_names)
+            modes = []
+            if namer.nlp is not None:
+                modes.append("spaCy NER")
+            modes.append("label heuristic")
+            if namer.heuristic:
+                modes.append("capitalized-pair heuristic")
+            cb.log(f"      names: {', '.join(modes)}"
+                   + (f" | allowlist: {len(namer.allow)} tokens" if namer.allow
+                      else ""))
+        else:
+            namer = None
+            cb.log("      names: skipped (name category not selected)")
+        facer = (FaceDetector(cb, expand=args.face_expand,
+                              thresh=getattr(args, "face_threshold", 0.6),
+                              model_path=getattr(args, "face_model", None))
+                 if "face" in cats else None)
+        plater = (PlateDetector(cb, model_path=getattr(args, "plate_model", None),
+                                thresh=getattr(args, "plate_threshold", 0.35))
+                  if "plate" in cats else None)
+        if plater is not None and getattr(args, "plate_threshold", 0.35) > 0.35:
+            # raising the cutoff trades false plates (hands, labels, signs)
+            # for missed ones — and a missed plate is never blurred. Say so.
+            cb.log("      plate threshold %.2f (default 0.35): fewer false "
+                   "plates, but real plates the detector is less sure of are "
+                   "NOT blurred — check the output carefully"
+                   % args.plate_threshold)
+        # Issue #18: a plate-only job on a fresh install ran with NO plate
+        # model — the category was silently inert and the job "succeeded"
+        # having looked for nothing. The recommended registry model is MIT
+        # and sha256-pinned, so a missing plate model now self-heals exactly
+        # like YuNet: fetched unattended on first use. (The Docker images
+        # bake it in, so this normally fires only on pip/source installs.)
+        # An explicitly chosen --plate-model is never substituted.
+        if (plater is not None and not plater.available()
+                and not getattr(args, "plate_model", None)
+                and autofetch_plate_model(cb)):
+            plater = PlateDetector(cb,
+                                   thresh=getattr(args, "plate_threshold", 0.35))
+        personer = (PersonDetector(cb,
+                                   model_path=getattr(args, "person_model", None),
+                                   thresh=getattr(args, "person_threshold", 0.5))
+                    if ("person" in cats or "screen" in cats
+                        or (getattr(args, "face_heads", False)
+                            and "face" in cats)) else None)
+        qrer = QRDetector(cb) if "qrcode" in cats else None
+        texter = TextRegionDetector(cb) if "anytext" in cats else None
+        detect_scale = float(getattr(args, "detect_scale", 1.0) or 1.0)
+        if args.ignore_regions:
+            cb.log(f"      ignore regions: {len(args.ignore_regions)}")
+    
+        # Empty --mrn-regex means the user brought no ID pattern: the category
+        # is INACTIVE, and must be — re.compile("") matches every word, which
+        # would blur everything. Log it loudly so nobody thinks IDs are covered.
+        mrn_pat = getattr(args, "mrn_regex", "") or ""
+        mrn_re = re.compile(mrn_pat) if mrn_pat.strip() else None
+        if mrn_re is None and "mrn" in cats:
+            cb.log("      mrn (ID numbers): no regex configured — category "
+                   "inactive. Set one in the Regex field (web) or --mrn-regex.")
+        # user-defined categories: only those enabled in --categories run, and a
+        # bad pattern fails the run loudly rather than silently detecting nothing
+        custom_res = []
+        for spec in getattr(args, "custom_regex", []) or []:
+            cid, _, pat = spec.partition("=")
+            cid = cid.strip().lower()
+            if not cid or not pat:
+                raise ValueError("--custom-regex needs ID=PATTERN, got %r" % spec)
+            if cid in cats:
+                custom_res.append((cid, re.compile(pat)))
+        if custom_res:
+            cb.log("      custom categories: "
+                   + ", ".join(c for c, _ in custom_res))
+        # "specific text" — the user's own list of words/phrases to blur
+        phrases = []
+        if "phrase" in cats:
+            phrases = load_phrases(getattr(args, "phrase", None) or (),
+                                   getattr(args, "phrases", None))
+            if phrases:
+                cb.log("      specific text: %d term(s) to find" % len(phrases))
+            else:
+                cb.log("      specific text: no text entered — category "
+                       "inactive. Type the text to find (web) or pass "
+                       "--phrase / --phrases.")
+    
+        # FAIL-CLOSED GUARD (issue #18): a selected category whose detector
+        # has no model detects NOTHING. Say so LOUDLY per category — and when
+        # EVERY selected category is in that state and no manual track boxes
+        # exist, refuse the scan outright: a job that cannot possibly find
+        # what it was asked for must not complete as if it had.
+        inert = []
+        if plater is not None and not plater.available():
+            inert.append("plate")
+        if personer is not None and not personer.available():
+            inert += [c for c in ("person", "screen") if c in cats]
+        if "mrn" in cats and mrn_re is None:
+            inert.append("mrn")          # its own log line already fired above
+        if "phrase" in cats and not phrases:
+            inert.append("phrase")       # its own log line already fired above
+        for c in inert:
+            if c not in ("mrn", "phrase"):
+                cb.log("      WARNING: the '%s' category is selected but has "
+                       "no model — it will detect NOTHING this scan. Download "
+                       "one in Settings → Detection models (one click)." % c)
+        has_tracks = any(w.get("track")
+                         for w in (getattr(args, "windows_data", None) or []))
+        if cats and not [c for c in cats if c not in inert] and not has_tracks:
+            raise RuntimeError(
+                "nothing to detect: every selected category (%s) is inactive "
+                "— each needs a detection model (or, for regex categories, a "
+                "pattern; for specific text, the text to find) that is not "
+                "installed or entered. Download a model in Settings "
+                "→ Detection models (a quality tier installs one too), then "
+                "Retry this job — the uploaded file is kept."
+                % ", ".join(sorted(inert)))
+    
+        cb.log(f"[3/4] Scanning (every {args.sample_interval}s or {args.scan_trigger}px of scroll"
+               + (", self-tuning to screen activity and scroll speed)"
+                  if getattr(args, "adaptive", "on") != "off" else ")"))
+        cap = cv2.VideoCapture(args.video)
+        fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+        total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        vw = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        vh = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        step = max(1, int(round(fps * args.sample_interval)))
+        # ignore zones ride in the zones file under the "ignore" class:
+        # normalized rects where NOTHING is ever detected or blurred. They are
+        # not a detection category — pop before zone filtering. Normalized
+        # --ignore-region values (all <= 1.0) scale to this video too.
+        if getattr(args, "zones_data", None) and "ignore" in args.zones_data:
+            args.ignore_regions = list(args.ignore_regions or []) + list(
+                args.zones_data.pop("ignore"))
+        if args.ignore_regions:
+            args.ignore_regions = [
+                (r[0] * vw, r[1] * vh, r[2] * vw, r[3] * vh)
+                if max(r) <= 1.0 else tuple(r)
+                for r in args.ignore_regions]
+        global_zones_px = (zones_to_pixels(args.zones_data, vw, vh)
+                           if getattr(args, "zones_data", None) else None)
+        duration = total / fps if fps else 0
+        win_start = max(0.0, float(getattr(args, "skip_start", 0) or 0))
+        win_end = duration - max(0.0, float(getattr(args, "skip_end", 0) or 0))
+        # Multiple detection windows ("a-b,c-d"): scan ONLY those ranges. The
+        # web timeline's detection track sends these; --skip-start/--skip-end
+        # remain the single-window form. Overlapping/touching ranges merge.
+        dwin = []
+        dwf = (getattr(args, "detect_windows_frac", "") or "").strip()
+        if dwf:
+            # fractions of duration (web UI) — resolved against the SERVER's
+            # measured duration, immune to any client/server length mismatch
+            for part in dwf.split(","):
+                part = part.strip()
+                if not part:
+                    continue
+                a, _, b = part.partition("-")
+                w0 = max(0.0, min(1.0, float(a))) * duration
+                w1 = max(0.0, min(1.0, float(b))) * duration
+                if w1 > w0:
+                    dwin.append((w0, w1))
+        else:
+            for part in (getattr(args, "detect_windows", "") or "").split(","):
+                part = part.strip()
+                if not part:
+                    continue
+                a, _, b = part.partition("-")
+                w0, w1 = max(0.0, float(a)), min(duration, float(b))
+                if w1 > w0:
+                    dwin.append((w0, w1))
+        dwin.sort()
+        merged = []
+        for w in dwin:
+            if merged and w[0] <= merged[-1][1] + 0.05:
+                merged[-1] = (merged[-1][0], max(merged[-1][1], w[1]))
+            else:
+                merged.append(w)
+        dwin = merged
+    
+        # Unified windows model: each detection window carries its own TIME
+        # RANGE, its own CATEGORIES, and its own ZONES. Windows may OVERLAP
+        # (stack): "blur faces 1.2-19.5s" and "also blur names 5-7s" are two
+        # stacked windows. At any time t the effective scope is the UNION of
+        # everything the covering windows ask for. windows_px = [(t0, t1,
+        # cats_set_or_None, zones_px_or_None)]; cats None = all scan cats,
+        # zones None = whole frame. Sources, in priority order:
+        #   1. args.windows_data (editor): explicit windows with cats + zones.
+        #   2. legacy detect_windows time ranges: global cats + global zones.
+        #   3. no windows: one whole-clip window (today's exact behavior).
+        windows_px = []
+        track_jobs = []          # (t0, t1, box_px, t_ref) from the editor
+        uwin = getattr(args, "windows_data", None)
+        if uwin:
+            for w in uwin:
+                t0 = max(0.0, min(1.0, float(w.get("t0", 0.0)))) * duration
+                t1 = max(0.0, min(1.0, float(w.get("t1", 1.0)))) * duration
+                if t1 <= t0:
+                    continue
+                wc = w.get("cats")
+                wc = {c.strip() for c in wc if c and c.strip()} if wc else None
+                wz = w.get("zones") or {}
+                wz = {c: rs for c, rs in wz.items() if c != "ignore" and rs}
+                zp = zones_to_pixels(wz, vw, vh) if wz else None
+                windows_px.append((t0, t1, wc, zp))
+                # pre-scan tracked objects: [nx1,ny1,nx2,ny2,tref_frac] boxes
+                # drawn ON an object in the editor — template-tracked through
+                # this window after the scan pass and blurred wherever they go
+                for tb in (w.get("track") or []):
+                    try:
+                        # clamp to the frame: the editor once let a drag run
+                        # past the video's edge (ny2 of 1.82 on a real job) and
+                        # the oversized seed box degraded tracking
+                        bx = [min(vw, max(0.0, float(tb[0]) * vw)),
+                              min(vh, max(0.0, float(tb[1]) * vh)),
+                              min(vw, max(0.0, float(tb[2]) * vw)),
+                              min(vh, max(0.0, float(tb[3]) * vh))]
+                        tref = (float(tb[4]) * duration if len(tb) > 4
+                                else (t0 + t1) / 2)
+                        track_jobs.append((t0, t1, bx,
+                                           min(max(tref, t0), t1)))
+                    except (TypeError, ValueError, IndexError):
+                        continue
+            windows_px.sort(key=lambda w: (w[0], w[1]))
+        if windows_px:
+            ivals = sorted((t0, t1) for t0, t1, _, _ in windows_px)
+        elif dwin:
+            windows_px = [(t0, t1, None, global_zones_px) for t0, t1 in dwin]
+            ivals = list(dwin)
+        else:
+            windows_px = [(win_start, win_end, None, global_zones_px)]
+            ivals = [(win_start, win_end)]
+        # dwin = merged COVERAGE intervals (decode/scan gating + fast-skip);
+        # windows_px stays unmerged so overlapping windows keep their identity
+        dwin = []
+        for w in ivals:
+            if dwin and w[0] <= dwin[-1][1] + 0.05:
+                dwin[-1] = (dwin[-1][0], max(dwin[-1][1], w[1]))
+            else:
+                dwin.append(tuple(w))
+        win_start, win_end = dwin[0][0], dwin[-1][1]
+        if len(windows_px) > 1 or win_start > 0 or win_end < duration:
+            cb.log("      detection windows: "
+                   + ", ".join(
+                       f"{a:.1f}-{b:.1f}s"
+                       + (f" [{','.join(sorted(wc))}]" if wc else "")
+                       for a, b, wc, _ in windows_px)
+                   + f" (of {duration:.1f}s) — nothing outside them is "
+                     "detected or blurred")
+    
+        def _scope_at(t):
+            """Effective detection scope at time t: {category: rects_or_None},
+            the UNION across every window covering t. A category absent from
+            the dict is not detected at t; rects None = unrestricted (any
+            covering window that leaves the category unzoned wins)."""
+            scope = {}
+            for t0, t1, wc, zp in windows_px:
+                if not (t0 <= t <= t1):
+                    continue
+                for c in (wc if wc is not None else cats):
+                    rects = (zp or {}).get(c)
+                    if rects is None:
+                        scope[c] = None
+                    elif c in scope:
+                        if scope[c] is not None:
+                            scope[c] = scope[c] + rects
+                    else:
+                        scope[c] = list(rects)
+            return scope
+    
+        any_zones = any(zp for _, _, _, zp in windows_px)
+        scoped = bool(uwin) or any_zones
+        zone_dropped = {}
+        win_inactive = {}
+        zdrop_raw = []
+        if any_zones:
+            per_win = [f"[{a:.0f}-{b:.0f}s: " + ", ".join(
+                f"{c}({len(r)})" for c, r in zp.items()) + "]"
+                for a, b, _, zp in windows_px if zp]
+            cb.log("      detection zones active: " + " ".join(per_win))
+    
+        scroll_mode = getattr(args, "scroll_track", "auto")
+        track_on = scroll_mode != "off"
+        if track_on and not text_cats:
+            # scroll tracking and safety bands exist to keep unscanned TEXT
+            # covered as it scrolls into view. With no text categories they can
+            # only hurt: on real-world video the tracker reads camera/subject
+            # motion as scrolling — drifting boxes and smearing blur bands
+            # along the frame edges (the boat-video failure).
+            track_on = False
+            cb.log("      scroll tracking + safety bands off (no text "
+                   "categories selected — they only protect text content)")
+        elif scroll_mode == "auto":
+            _cam, _movf, _mixf = probe_camera_motion(args.video)
+            if _cam:
+                track_on = False
+                cb.log("      camera footage detected (continuous 2-axis "
+                       "motion) — scroll tracking and safety bands off; "
+                       "detections are screen-anchored. Force with "
+                       "--scroll-track on if this is actually a screen "
+                       "recording.")
+        tracker = ScrollTracker()
+        memory = None if (args.no_memory or not text_cats) else PhiMemory(
+            threshold=78 if getattr(args, "paranoid", False) else 82)
+        cum = []
+        bands = []
+        raw = []
+        scans = []
+        cx = cy = 0.0
+        last_scan_idx = -10**9
+        scan_cx = scan_cy = 0.0
+        n_scans = 0
+        n_recalled = 0
+        recall_counts = {}
+        from collections import deque
+        BT_SCALE = 0.5
+        bt_on = not getattr(args, "no_backtrack", False)
+        bt_win = max(args.sample_interval + 0.6,
+                     float(getattr(args, "backtrack_window", 2.5) or 2.5))
+        bt_buf = deque(maxlen=max(3, int(round(fps * bt_win))))
+        prev_keys = {}
+        adapt = getattr(args, "adaptive", "on") != "off"
+        scan_small = None            # gray half-res frame at the last OCR scan
+        prev_fcx = prev_fcy = 0.0    # last frame's scroll offset (velocity)
+        bt_count, bt_gain, bt_capped = 0, 0.0, 0
+        bt_deep = []   # regions still visible at the buffer's oldest frame:
+                       # their true onset is found after the scan by seeking
+                       # the file itself (RAM buffer can stay small)
+        face_tracks = []   # forward face tracking: detect once, hold every frame
+        # faces are ALWAYS detected per-frame (dense): scan-cadence face adds
+        # merged with the OCR hold union a moving person's positions into one
+        # body-sized box (the boat-video failure). Per-frame re-detection +
+        # track smoothing is strictly better on every kind of footage; the
+        # --dense-faces flag remains for compatibility, --dense-face-stride
+        # still tunes the cost.
+        dense_faces = "face" in cats or bool(getattr(args, "dense_faces", False))
+        args.dense_faces = dense_faces   # keep camera-mode/report paths in sync
+        dense_stride = max(1, int(getattr(args, "dense_face_stride", 1) or 1))
+        tile_mode = getattr(args, "tile", "auto") or "auto"
+        if tile_mode != "off" and (plater or personer):
+            _insz = max((det.INPUT for det in (plater, personer) if det),
+                        default=640)
+            if vw and max(vw, vh) / _insz >= 2.6 or tile_mode == "on":
+                cb.log("      tiled detection: frame %dpx vs model input %d — "
+                       "plates/person/screens also scan an overlapping tile "
+                       "grid (small objects; full-frame pass still runs)"
+                       % (max(vw, vh), _insz))
+        # per-window zones: face/plate gating rects are looked up by time in the
+        # frame loop via _zones_at(t_now), not fixed once here.
+        any_face_zone = any(zp and zp.get("face") for _, _, _, zp in windows_px)
+        if dense_faces:
+            cb.log("      dense faces: detecting "
+                   + (f"every {dense_stride} frames" if dense_stride > 1
+                      else "every frame")
+                   + (" inside face zone(s)" if any_face_zone
+                      else " (whole frame — set a face zone to speed this up)"))
+        _speed = getattr(args, "scan_speed", None) or "thorough"
+        if _speed != "thorough" or dense_stride > 1 or detect_scale < 1.0:
+            # anything short of thorough trades coverage for time — say so in
+            # the log the reviewer reads, not just in a help tooltip
+            cb.log(f"      scan speed: {_speed} — per-frame detectors run every "
+                   f"{dense_stride} frame(s), gaps interpolated"
+                   + (f"; faces detected at {detect_scale:.2f}x resolution "
+                      "(small/distant faces can be missed)"
+                      if detect_scale < 1.0 else "")
+                   + (". Brief or fast-moving subjects can be missed — "
+                      "review the output carefully." if dense_stride > 2
+                      or detect_scale < 1.0 else "."))
+        idx = 0
+        dense_now = []
+        # Fast-skip: when scroll tracking is off (camera footage, face/plate/
+        # manual jobs — exactly the "one person 16 minutes in" case), frames
+        # before the detection window carry no information we need, so SEEK past
+        # them instead of decoding them. cum/bands get zero rows for the skipped
+        # indices (render min-guards its lookups). With tracking ON the frames
+        # must be decoded sequentially — offsets accumulate — so no skip there.
+        if win_start > 1.0 and not track_on:
+            skip_n = max(0, int(win_start * fps) - 1)
+            if _seek_cap(cap, skip_n, fps):
+                cum.extend([(0.0, 0.0)] * skip_n)
+                bands.extend([(0.0, 0.0)] * skip_n)
+                idx = skip_n
+                cb.log(f"      fast-skip: jumped straight to {win_start:.1f}s — "
+                       f"{skip_n} frame(s) before the window are not decoded")
+            else:
+                cap.release()
+                cap = cv2.VideoCapture(args.video)  # unseekable: decode it all
+                cb.log("      fast-skip unavailable on this file — decoding "
+                       "from the start")
+        while True:
+            if idx % 30 == 0 and cb.cancelled():
+                cap.release()
+                raise PipelineCancelled()
+            ok, frame = cap.read()
+            if not ok:
+                break
+            cx, cy = tracker.step(frame) if track_on else (0.0, 0.0)
+            cum.append((cx, cy))
+    
+            t_now = idx / fps
+            if not any(w0 <= t_now <= w1 for w0, w1 in dwin):
+                # outside every detection window: no scans, no safety bands
+                # (the user has declared these spans PII-free)
+                if not track_on:
+                    nxt = next((w0 for w0, w1 in dwin if w0 > t_now), None)
+                    if nxt is None:
+                        # past the last window: stop decoding the tail entirely
+                        cb.log(f"      fast-stop: last window ended at "
+                               f"{win_end:.1f}s — the rest of the video is "
+                               "not decoded")
+                        break
+                    if nxt - t_now > 1.5:
+                        # gap between windows: seek instead of decoding it
+                        # (verified — a lying seek would mislabel every
+                        # detection after the jump; unseekable → keep
+                        # decoding sequentially, just without scanning)
+                        tgt = max(idx + 1, int(nxt * fps) - 1)
+                        if _seek_cap(cap, tgt, fps):
+                            bands.append((0.0, 0.0))
+                            cum.extend([(0.0, 0.0)] * (tgt - len(cum)))
+                            bands.extend([(0.0, 0.0)] * (tgt - len(bands)))
+                            idx = tgt
+                            cb.log(f"      fast-skip: jumped {t_now:.1f}s → "
+                                   f"{nxt:.1f}s (gap between windows not "
+                                   "decoded)")
+                            continue
+                        # jump failed and may have consumed frames: reopen at
+                        # a KNOWN position and keep decoding sequentially
+                        cap.release()
+                        cap = cv2.VideoCapture(args.video)
+                        if not _seek_cap(cap, idx + 1, fps):
+                            break
+                scan_cx, scan_cy = cx, cy
+                bands.append((0.0, 0.0))
+                idx += 1
+                continue
+            small = (cv2.resize(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY), None,
+                                fx=BT_SCALE, fy=BT_SCALE) if bt_on else None)
+            if idx % max(1, dense_stride) == 0:
+                dense_now = []      # latest dense boxes, drawn on the preview
+            face_now = []           # this frame's face boxes (head dedupe)
+            person_rows = None      # person inference shared with head-blur
+            # dense face detection: find faces on THIS frame at their true screen
+            # position, independent of the OCR scan cadence — per-frame
+            # re-detection (not tracking), so a face moving fast across the frame
+            # stays covered because the detector re-finds it wherever it is.
+            if (dense_faces and facer is not None and "face" in cats
+                    and idx % dense_stride == 0):
+                dense_hold = 0.3 * dense_stride / fps
+                _fsc = _scope_at(t_now)
+                if "face" not in _fsc:
+                    _fzr = ()       # no covering window wants faces at this time
+                else:
+                    _fzr = _fsc["face"]
+                for (fx1, fy1, fx2, fy2, conf) in (
+                        facer.find(frame, detect_scale) if "face" in _fsc else []):
+                    # zone-filter by the face's screen center, exactly like every
+                    # other category (robust; no cropped-background detector quirks)
+                    if _fzr and not in_any_zone((fx1, fy1, fx2, fy2), _fzr):
+                        continue
+                    if in_ignore_region((fx1, fy1, fx2, fy2),
+                                        args.ignore_regions):
+                        continue
+                    raw.append(Detection(
+                        t_now, t_now + dense_hold,
+                        (int(fx1 - cx), int(fy1 - cy),
+                         int(fx2 - cx), int(fy2 - cy)),
+                        "face", "face", round(conf, 3), (cx, cy),
+                        dense=True))
+                    dense_now.append((fx1, fy1, fx2, fy2))
+                    face_now.append((fx1, fy1, fx2, fy2))
+            # per-frame license-plate detection: plates on dashcam/CCTV footage move
+            # fast, so (like dense faces) we re-detect every frame at the true
+            # position rather than tracking. Only runs if a plate model is loaded.
+            if (plater is not None and plater.available() and "plate" in cats
+                    and idx % max(1, dense_stride) == 0):
+                phold = 0.3 * max(1, dense_stride) / fps
+                _psc = _scope_at(t_now)
+                _pzr = _psc.get("plate")
+                for (px1, py1, px2, py2, pconf) in (
+                        _maybe_tiled(lambda f: plater.find(f, detect_scale),
+                                     frame, plater.INPUT, tile_mode)
+                        if "plate" in _psc else []):
+                    if _pzr and not in_any_zone((px1, py1, px2, py2), _pzr):
+                        continue
+                    if in_ignore_region((px1, py1, px2, py2),
+                                        args.ignore_regions):
+                        continue
+                    raw.append(Detection(
+                        t_now, t_now + phold,
+                        (int(px1 - cx), int(py1 - cy),
+                         int(px2 - cx), int(py2 - cy)),
+                        "plate", "plate", round(pconf, 3), (cx, cy),
+                        dense=True))
+                    dense_now.append((px1, py1, px2, py2))
+            # per-frame full-body person detection: bodies move like faces do, so
+            # (like dense faces/plates) re-detect every frame at the true
+            # position. Only runs if a person model is loaded — INERT otherwise.
+            if (personer is not None and personer.available()
+                    and "person" in cats and idx % max(1, dense_stride) == 0):
+                bhold = 0.3 * max(1, dense_stride) / fps
+                _bsc = _scope_at(t_now)
+                _bzr = _bsc.get("person")
+                person_rows = (_maybe_tiled(
+                    lambda fr_: personer.find(fr_, detect_scale),
+                    frame, personer.INPUT, tile_mode)
+                    if "person" in _bsc else [])
+                for det_row in person_rows:
+                    bx1, by1, bx2, by2, bconf = det_row[:5]
+                    bpoly = det_row[5] if len(det_row) > 5 else ()
+                    if _bzr and not in_any_zone((bx1, by1, bx2, by2), _bzr):
+                        continue
+                    if in_ignore_region((bx1, by1, bx2, by2),
+                                        args.ignore_regions):
+                        continue
+                    raw.append(Detection(
+                        t_now, t_now + bhold,
+                        (int(bx1 - cx), int(by1 - cy),
+                         int(bx2 - cx), int(by2 - cy)),
+                        "person", "person", round(bconf, 3), (cx, cy),
+                        dense=True, poly=bpoly))
+                    dense_now.append((bx1, by1, bx2, by2))
+            # per-frame QR/barcode detection: the code region is blurred, the
+            # payload is never decoded. Built into OpenCV — always available.
+            if (qrer is not None and "qrcode" in cats
+                    and idx % max(1, dense_stride) == 0):
+                qhold = 0.3 * max(1, dense_stride) / fps
+                _qsc = _scope_at(t_now)
+                _qzr = _qsc.get("qrcode")
+                for (qx1, qy1, qx2, qy2, qconf) in (
+                        qrer.find(frame, detect_scale) if "qrcode" in _qsc
+                        else []):
+                    if _qzr and not in_any_zone((qx1, qy1, qx2, qy2), _qzr):
+                        continue
+                    if in_ignore_region((qx1, qy1, qx2, qy2),
+                                        args.ignore_regions):
+                        continue
+                    raw.append(Detection(
+                        t_now, t_now + qhold,
+                        (int(qx1 - cx), int(qy1 - cy),
+                         int(qx2 - cx), int(qy2 - cy)),
+                        "qrcode", "qr/barcode", round(qconf, 3), (cx, cy),
+                        dense=True))
+                    dense_now.append((qx1, qy1, qx2, qy2))
+            # per-frame screen detection (tv/laptop/phone from the same COCO
+            # person model): a filmed display leaks everything shown on it.
+            # INERT without a person model, exactly like person/plates.
+            if (personer is not None and personer.available()
+                    and "screen" in cats and idx % max(1, dense_stride) == 0):
+                shold = 0.3 * max(1, dense_stride) / fps
+                _ssc = _scope_at(t_now)
+                _szr = _ssc.get("screen")
+                for det_row in (
+                        _maybe_tiled(
+                            lambda fr_: personer.find_classes(fr_, detect_scale),
+                            frame, personer.INPUT, tile_mode)
+                        if "screen" in _ssc else []):
+                    sx1, sy1, sx2, sy2, sconf = det_row[:5]
+                    spoly = det_row[5] if len(det_row) > 5 else ()
+                    if _szr and not in_any_zone((sx1, sy1, sx2, sy2), _szr):
+                        continue
+                    if in_ignore_region((sx1, sy1, sx2, sy2),
+                                        args.ignore_regions):
+                        continue
+                    raw.append(Detection(
+                        t_now, t_now + shold,
+                        (int(sx1 - cx), int(sy1 - cy),
+                         int(sx2 - cx), int(sy2 - cy)),
+                        "screen", "screen", round(sconf, 3), (cx, cy),
+                        dense=True, poly=spoly))
+                    dense_now.append((sx1, sy1, sx2, sy2))
+            # per-frame ALL-TEXT detection: any readable text region in the
+            # wild (signs, badges, papers, whiteboards, handwriting) is
+            # blurred without being read. Dense like plates — scene text
+            # moves with the camera.
+            if (texter is not None and texter.available()
+                    and "anytext" in cats
+                    and idx % max(1, dense_stride) == 0):
+                thold = 0.3 * max(1, dense_stride) / fps
+                _tsc = _scope_at(t_now)
+                _tzr = _tsc.get("anytext")
+                for (tx1, ty1, tx2, ty2, tconf) in (
+                        texter.find(frame, detect_scale)
+                        if "anytext" in _tsc else []):
+                    if _tzr and not in_any_zone((tx1, ty1, tx2, ty2), _tzr):
+                        continue
+                    if in_ignore_region((tx1, ty1, tx2, ty2),
+                                        args.ignore_regions):
+                        continue
+                    raw.append(Detection(
+                        t_now, t_now + thold,
+                        (int(tx1 - cx), int(ty1 - cy),
+                         int(tx2 - cx), int(ty2 - cy)),
+                        "anytext", "text region", round(tconf, 3),
+                        (cx, cy), dense=True))
+                    dense_now.append((tx1, ty1, tx2, ty2))
+            # head blur: face detectors can't see the BACK of a turned head,
+            # but hair/ears/head-shape identify people anyway. With
+            # --face-heads on and a person model loaded, derive a head
+            # region from every person detection and add it to the face
+            # category — skipping heads that already contain a live face
+            # detection (no doubled cards). Union-only: can never LOSE a
+            # face the detector found.
+            if (getattr(args, "face_heads", False) and "face" in cats
+                    and personer is not None and personer.available()
+                    and idx % max(1, dense_stride) == 0):
+                _hsc = _scope_at(t_now)
+                if "face" in _hsc:
+                    _hzr = _hsc.get("face")
+                    if person_rows is None:
+                        person_rows = _maybe_tiled(
+                            lambda fr_: personer.find(fr_, detect_scale),
+                            frame, personer.INPUT, tile_mode)
+                    hhold = 0.3 * max(1, dense_stride) / fps
+                    for row in person_rows:
+                        hb = _head_box(row)
+                        if hb is None:
+                            continue
+                        hx1, hy1, hx2, hy2 = hb
+                        if any(hx1 <= (f0 + f2) / 2 <= hx2
+                               and hy1 <= (f1 + f3) / 2 <= hy2
+                               for f0, f1, f2, f3 in face_now):
+                            continue        # a real face already covers this
+                        if _hzr and not in_any_zone((hx1, hy1, hx2, hy2),
+                                                    _hzr):
+                            continue
+                        if in_ignore_region((hx1, hy1, hx2, hy2),
+                                            args.ignore_regions):
+                            continue
+                        raw.append(Detection(
+                            t_now, t_now + hhold,
+                            (int(hx1 - cx), int(hy1 - cy),
+                             int(hx2 - cx), int(hy2 - cy)),
+                            "face", "head", round(float(row[4]), 3),
+                            (cx, cy), dense=True))
+                        dense_now.append((hx1, hy1, hx2, hy2))
+            moved = abs(cx - scan_cx) + abs(cy - scan_cy)
+            step_eff, trig_eff = step, args.scan_trigger
+            if adapt:
+                # Self-tuning pace: when the screen has barely changed since the
+                # last scan, stretch the interval (2x) — nothing new to read, and
+                # memory/safety bands still backstop. Under heavy change, tighten
+                # it (0.5x) so new content is read sooner. Fast scrolling lowers
+                # the scroll trigger so scans fire earlier in the movement.
+                if scan_small is not None and scan_small.shape == small.shape:
+                    step_eff = text_scan_stride(small, scan_small, step)
+                speed = (abs(cx - prev_fcx) + abs(cy - prev_fcy)) * fps
+                if speed > 300:
+                    trig_eff = max(20.0, args.scan_trigger * 0.5)
+            prev_fcx, prev_fcy = cx, cy
+            due = (idx - last_scan_idx >= step_eff) or (moved >= trig_eff)
+            if due and idx - last_scan_idx >= 2:
+                t = idx / fps
+                scan_small = small
+                if ocr is not None:
+                    words = read_adaptive(ocr, frame,
+                                          getattr(args, "ocr_upscale", "auto"))
+                    lines = group_lines(words)
+                    found = detect_phi(words, lines, t, (cx, cy), namer, mrn_re,
+                                       custom_res, phrases)
+                    found = [d for d in found if d.category in cats]
+                else:
+                    words, found = [], []   # detector-only scan: no text pass
+    
+                # in dense mode the frame loop already detects faces on EVERY
+                # frame — adding scan-time copies only feeds merge_detections
+                # unions that balloon across a moving face's path
+                if facer is not None and not dense_faces:
+                    for (fx1, fy1, fx2, fy2, conf) in facer.find(frame, detect_scale):
+                        found.append(Detection(t, t,
+                                               (int(fx1 - cx), int(fy1 - cy),
+                                                int(fx2 - cx), int(fy2 - cy)),
+                                               "face", "face", round(conf, 3),
+                                               (cx, cy)))
+    
+                if memory is not None:
+                    primary_found = list(found)
+                    flagged = {tuple(b) for _, b, _ in
+                               ((d.text, (d.cbox[0] + cx, d.cbox[1] + cy,
+                                          d.cbox[2] + cx, d.cbox[3] + cy), 0)
+                                for d in found)}
+                    for w, box, conf in words:
+                        if tuple(box) in flagged:
+                            continue
+                        cat = memory.recall(w)
+                        if cat and cat in cats and not (namer and namer._allowed(w)):
+                            cbox = (int(box[0] - cx), int(box[1] - cy),
+                                    int(box[2] - cx), int(box[3] - cy))
+                            found.append(Detection(t, t, cbox, cat, w,
+                                                   round(float(conf), 3), (cx, cy)))
+                            n_recalled += 1
+                            k = PhiMemory.norm(w)
+                            recall_counts[k] = recall_counts.get(k, 0) + 1
+                    # only primary detections build memory (recalls must not
+                    # self-reinforce a false positive)
+                    for d in primary_found:
+                        memory.add(d.text, d.category, primary=True)
+    
+                if args.ignore_regions:
+                    found = [d for d in found if not in_ignore_region(
+                        (d.cbox[0] + cx, d.cbox[1] + cy,
+                         d.cbox[2] + cx, d.cbox[3] + cy), args.ignore_regions)]
+    
+                if scoped:
+                    _st = _scope_at(t)
+                    kept = []
+                    for d in found:
+                        if getattr(d, "dense", False):
+                            kept.append(d)          # dense dets pre-filtered
+                            continue
+                        if d.category not in _st:
+                            # no covering window asks for this category at t —
+                            # deliberate time-scoping, dropped without warning
+                            win_inactive[d.category] = \
+                                win_inactive.get(d.category, 0) + 1
+                            continue
+                        rects = _st[d.category]
+                        sb = (d.cbox[0] + cx, d.cbox[1] + cy,
+                              d.cbox[2] + cx, d.cbox[3] + cy)
+                        if rects and not in_any_zone(sb, rects):
+                            zone_dropped[d.category] = zone_dropped.get(d.category, 0) + 1
+                            zdrop_raw.append(d)
+                        else:
+                            kept.append(d)
+                    found = kept
+    
+                if bt_on:
+                    # "New" must be POSITIONAL: the same person's name can already
+                    # be on screen in a list row when it also appears in a chart
+                    # banner after a click — that banner is a new appearance and
+                    # needs backtracking even though the text isn't new.
+                    def _bt_key(d):
+                        return (d.category,
+                                PhiMemory.norm(d.text) if d.text else "")
+    
+                    def _center(d):
+                        return ((d.cbox[0] + d.cbox[2]) / 2,
+                                (d.cbox[1] + d.cbox[3]) / 2)
+                    cur_keys = {}
+                    for d in found:
+                        cur_keys.setdefault(_bt_key(d), []).append(_center(d))
+                    for d in found:
+                        cx0, cy0 = _center(d)
+                        seen_near = any(
+                            abs(cx0 - px) < 120 and abs(cy0 - py) < 120
+                            for px, py in prev_keys.get(_bt_key(d), []))
+                        if seen_near:
+                            continue
+                        onset = backtrack_onset(d, bt_buf, cx, cy, small, BT_SCALE)
+                        if onset is not None:
+                            if bt_buf and onset == bt_buf[0][0]:
+                                bt_capped += 1   # visible beyond the buffer —
+                                # queue for the post-scan deep backtrack
+                                tx1 = int((d.cbox[0] + cx) * BT_SCALE)
+                                ty1 = int((d.cbox[1] + cy) * BT_SCALE)
+                                tx2 = int((d.cbox[2] + cx) * BT_SCALE)
+                                ty2 = int((d.cbox[3] + cy) * BT_SCALE)
+                                sh_, sw_ = small.shape[:2]
+                                tx1, ty1 = max(0, tx1), max(0, ty1)
+                                tx2, ty2 = min(sw_, tx2), min(sh_, ty2)
+                                if tx2 - tx1 >= 6 and ty2 - ty1 >= 4:
+                                    bt_deep.append(
+                                        (d, cx, cy,
+                                         small[ty1:ty2, tx1:tx2].copy()))
+                            new_start = max(win_start, onset / fps - 0.12)
+                            if new_start < d.t_start - 0.01:
+                                bt_count += 1
+                                bt_gain += d.t_start - new_start
+                                d.t_start = new_start
+                    prev_keys = cur_keys
+                if bt_on:
+                    for d in found:
+                        if d.category == "face" and dense_faces:
+                            continue   # dense mode re-detects faces every frame
+                        if d.category != "face" and not (
+                                d.text and len(PhiMemory.norm(d.text)) >= 3):
+                            continue
+                        sx1 = int((d.cbox[0] + cx) * BT_SCALE)
+                        sy1 = int((d.cbox[1] + cy) * BT_SCALE)
+                        sx2 = int((d.cbox[2] + cx) * BT_SCALE)
+                        sy2 = int((d.cbox[3] + cy) * BT_SCALE)
+                        hh, ww = small.shape[:2]
+                        sx1, sy1 = max(0, sx1), max(0, sy1)
+                        sx2, sy2 = min(ww, sx2), min(hh, sy2)
+                        if sx2 - sx1 < 8 or sy2 - sy1 < 8:
+                            continue
+                        tmpl = small[sy1:sy2, sx1:sx2].copy()
+    
+                        dn = PhiMemory.norm(d.text) if d.text else ""
+                        dcx = (d.cbox[0] + d.cbox[2]) / 2
+                        dcy = (d.cbox[1] + d.cbox[3]) / 2
+                        for tr in face_tracks:
+                            if tr["cat"] != d.category:
+                                continue
+                            if tr["norm"] == dn:
+                                same_text = True
+                            elif dn and tr["norm"]:
+                                from rapidfuzz import fuzz as _f
+                                same_text = _f.ratio(dn, tr["norm"]) >= 85
+                            else:
+                                same_text = (not dn and not tr["norm"])
+                            near = (abs(dcx - tr["c"][0]) < 100
+                                    and abs(dcy - tr["c"][1]) < 100)
+                            if same_text and near:
+                                tr.update(tmpl=tmpl, cbox=d.cbox, last_ok=t,
+                                          conf=d.confidence, c=(dcx, dcy),
+                                          text=d.text)
+                                break
+                        else:
+                            if len(face_tracks) < 500:
+                                face_tracks.append({
+                                    "tmpl": tmpl, "cbox": d.cbox, "cat": d.category,
+                                    "text": d.text, "norm": dn, "c": (dcx, dcy),
+                                    "last_ok": t, "last_emit": t,
+                                    "conf": d.confidence})
+                raw.extend(found)
+                if ocr is not None:
+                    scans.append((t, (cx, cy),
+                                  [(w, (b[0] - cx, b[1] - cy,
+                                        b[2] - cx, b[3] - cy), c)
+                                   for w, b, c in words]))
+                if ocr is not None and n_scans == 0 and len(words) < 3:
+                    # First-scan sanity: a text-dense frame that OCR read nothing
+                    # from means a broken OCR setup — say so in minute one, not
+                    # after a 40-minute render.
+                    _edges = cv2.Canny(small, 60, 180)
+>                   if float((_edges > 0).mean()) > 0.02:
+                              ^^^^^^^^^^
+E                   TypeError: '>' not supported between instances of 'NoneType' and 'int'
+
+openscrub.py:8034: TypeError
+----------------------------- Captured stdout call -----------------------------
+[1/4] OCR engine   (openscrub v1.0.96)
+      using OCR
+[2/4] Detectors
+      names: skipped (name category not selected)
+[3/4] Scanning (every 0.3333333333333333s or 60px of scroll)
+=========================== short test summary info ============================
+FAILED tests/test_tail_history_index.py::test_tail_records_preserve_support_boundaries_and_caller_order[history8-0.5-0.0]
+FAILED tests/test_tail_history_index.py::test_run_scan_finalization_and_report_with_controlled_ocr
+2 failed, 14 passed in 0.33s

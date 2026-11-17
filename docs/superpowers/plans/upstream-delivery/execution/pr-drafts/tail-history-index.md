@@ -1,0 +1,9 @@
+# Skip irrelevant OCR history when extending detection tails
+
+`merge_detections` restarted OCR history for each text span, repeatedly visiting timestamps before its last sighting. Reused chronological histories now get one local timestamp index. Each tail walk starts at the existing time boundary and retains the original support and stopping rules. Unordered, malformed and unsupported histories retain their original traversal; a single merged region avoids index construction.
+
+In the detector-consistent fixture with 10,000 history entries and 30 detections, the complete merge call, including index construction, fell from median 12.272 to 3.384 ms (72.42%). The index uses 85,176 bytes of timestamp references. This measures merge and tail work, excluding inference and other finalization stages. Small control differences are not claimed as gains; the original repeated-content control's 27-microsecond regression and both complete comparisons remain recorded.
+
+Validation includes complete output equality, a real scan-to-report path with controlled OCR, 153 full-suite passes before test-only strengthening, final 27 focused checks on each Python 3.12/3.9 and 20 controls on the exact base. Offline packages, installed CLI/Flask smoke and complete parser-default equality pass. Runtime bytes stayed unchanged through those checks.
+
+Local candidate: `pr/tail-history-index`, `e21ebdf6e3ee46e6c65050dc956a9a3459152269` → `952af20da205133886ba69799e134b86d1654137`, with a separate benchmark-fixture correction commit. Independent review approved without findings; no publication. [Report](../evidence/delivery/task-112-report.md) and [review](../evidence/delivery/task-112-review.md) retain source identities, original/corrected fixtures, every sample and limitations. Additional index storage grows with history length; these Linux fixture results do not establish end-to-end or cross-platform scan performance.

@@ -1,0 +1,122 @@
+     1	[build-system]
+     2	requires = ["hatchling"]
+     3	build-backend = "hatchling.build"
+     4	
+     5	[project]
+     6	name = "OpenScrub"
+     7	dynamic = ["version"]
+     8	description = "Local, GPU-accelerated redaction for video and screen recordings — blur, black-box, or mosaic faces, names, and any regex-matchable PII, with human review."
+     9	readme = "README.md"
+    10	requires-python = ">=3.9"
+    11	license = { file = "LICENSE" }
+    12	authors = [{ name = "Austin Mabry" }]
+    13	keywords = [
+    14	    "redaction", "video-redaction", "face-blur", "anonymization",
+    15	    "screen-recording", "pii", "phi", "privacy", "hipaa", "gdpr",
+    16	    "ocr", "opencv", "ffmpeg",
+    17	]
+    18	classifiers = [
+    19	    "Development Status :: 4 - Beta",
+    20	    "Environment :: Console",
+    21	    "Environment :: Web Environment",
+    22	    "Intended Audience :: Healthcare Industry",
+    23	    "Intended Audience :: Developers",
+    24	    "Intended Audience :: Information Technology",
+    25	    "License :: OSI Approved :: Apache Software License",
+    26	    "Operating System :: OS Independent",
+    27	    "Programming Language :: Python :: 3",
+    28	    "Programming Language :: Python :: 3.9",
+    29	    "Programming Language :: Python :: 3.10",
+    30	    "Programming Language :: Python :: 3.11",
+    31	    "Programming Language :: Python :: 3.12",
+    32	    "Topic :: Multimedia :: Video",
+    33	    "Topic :: Security",
+    34	    "Topic :: Scientific/Engineering :: Image Processing",
+    35	]
+    36	dependencies = [
+    37	    "opencv-python<5",
+    38	    "numpy",
+    39	    # License-plate models (open-image-models YOLOv9) are "end2end" ONNX
+    40	    # exports with a baked-in NonMaxSuppression node that OpenCV's DNN module
+    41	    # cannot build. onnxruntime runs them; without it the plate category would
+    42	    # silently do nothing (a fail-open hole in a fail-closed privacy tool).
+    43	    "onnxruntime",
+    44	    "rapidfuzz",
+    45	    "pytesseract",
+    46	    "pillow",
+    47	    "flask",
+    48	    "pyyaml",
+    49	    "cryptography",
+    50	    # Production WSGI server with TLS for the web UI (Flask dev-server
+    51	    # fallback exists, but ships with the package so pip users get it).
+    52	    "cheroot>=10.0",
+    53	]
+    54	
+    55	[project.optional-dependencies]
+    56	# Named-entity name detection extra. spaCy is heavy, so it's opt-in; the core
+    57	# detectors (regex categories + face detection) work fine without it.
+    58	ner = ["spacy>=3.7"]
+    59	all = ["spacy>=3.7"]
+    60	
+    61	[project.urls]
+    62	Homepage = "https://github.com/austinmabry/OpenScrub"
+    63	Repository = "https://github.com/austinmabry/OpenScrub"
+    64	Issues = "https://github.com/austinmabry/OpenScrub/issues"
+    65	
+    66	[project.scripts]
+    67	# `openscrub` runs the CLI engine; `openscrub-web` starts the web UI.
+    68	openscrub = "openscrub:main"
+    69	openscrub-web = "openscrub_web:main"
+    70	openscrub-setup = "openscrub_setup:main"
+    71	openscrub-update = "openscrub_update:main"
+    72	
+    73	[tool.hatch.version]
+    74	# Single source of truth: the VERSION = "x.y.z" line in openscrub.py. A release
+    75	# just needs that line bumped (matches your standing version-bump delivery rule).
+    76	path = "openscrub.py"
+    77	pattern = "VERSION = \"(?P<version>[^\"]+)\""
+    78	
+    79	[tool.hatch.build.targets.wheel.force-include]
+    80	"plate_models.json" = "plate_models.json"
+    81	"face_models.json" = "face_models.json"
+    82	"person_models.json" = "person_models.json"
+    83	# third-party model licenses + copyright notices. Lands at the top of
+    84	# site-packages beside the registries, so it gets a project-prefixed name
+    85	# that can't collide with another package's notices file.
+    86	"THIRD_PARTY_NOTICES.md" = "openscrub_THIRD_PARTY_NOTICES.md"
+    87	# branded icon for the Start Menu shortcut openscrub-setup creates
+    88	"assets/openscrub.ico" = "openscrub.ico"
+    89	
+    90	[tool.hatch.build.targets.wheel]
+    91	include = [
+    92	    "openscrub_internal/",
+    93	    "openscrub.py",
+    94	    "openscrub_web.py",
+    95	    "zones_ui.py",
+    96	    "openscrub_setup.py",
+    97	    "openscrub_update.py",
+    98	    "openscrub_vault.py",
+    99	]
+   100	
+   101	[tool.hatch.build.targets.sdist]
+   102	include = [
+   103	    "openscrub_internal/",
+   104	    "plate_models.json",
+   105	    "face_models.json",
+   106	    "person_models.json",
+   107	    "assets/openscrub.ico",
+   108	    "openscrub.py",
+   109	    "openscrub_setup.py",
+   110	    "openscrub_update.py",
+   111	    "openscrub_vault.py",
+   112	    "openscrub_web.py",
+   113	    "zones_ui.py",
+   114	    "install.py",
+   115	    "requirements.txt",
+   116	    "README.md",
+   117	    "LICENSE",
+   118	    "NOTICE",
+   119	    "THIRD_PARTY_NOTICES.md",
+   120	    "test_openscrub.py",
+   121	    "tests/",
+   122	]

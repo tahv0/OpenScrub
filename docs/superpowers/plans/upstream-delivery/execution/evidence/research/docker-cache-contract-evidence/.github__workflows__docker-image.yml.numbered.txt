@@ -1,0 +1,236 @@
+     1	# Builds the server Docker images on every published release and pushes
+     2	# them to BOTH registries, fully automatically — publish the release and
+     3	# walk away:
+     4	#   ghcr.io/austinmabry/openscrub:<version>, :latest   (+ -cuda, :cuda)
+     5	#   docker.io/pharmhero/openscrub:<version>, :latest   (+ -cuda, :cuda)
+     6	#
+     7	# GHCR auth is the built-in GITHUB_TOKEN. Docker Hub auth needs ONE repo
+     8	# secret: DOCKERHUB_TOKEN (a Docker Hub personal access token with
+     9	# Read & Write scope, created at hub.docker.com -> Account settings ->
+    10	# Personal access tokens). Until that secret exists, the workflow simply
+    11	# pushes GHCR-only — it never fails on a missing token.
+    12	# Free on both sides: Actions is free for public repos, Docker Hub's free
+    13	# plan hosts unlimited public repositories.
+    14	
+    15	name: Docker image
+    16	
+    17	on:
+    18	  release:
+    19	    types: [published]
+    20	  # Weekly security refresh: rebuild the LATEST RELEASE so published tags
+    21	  # absorb the Debian/Ubuntu security patches that shipped since the release
+    22	  # was cut. Same code, fresher packages — this is what keeps Docker Scout
+    23	  # counts down between releases. The refresh must NOT use --no-cache: that
+    24	  # rebuilt every layer with a new digest, so every user re-downloaded the
+    25	  # near-complete image (~10 GB for :cuda) every Monday, and Unraid's
+    26	  # auto-update recreated their container for a "new" image with the same
+    27	  # code. Instead the Dockerfiles end with a small `apt-get dist-upgrade`
+    28	  # layer keyed on the SECURITY_REFRESH build-arg (the run id): only that
+    29	  # layer rebuilds, the heavy layers keep their digests and the pull is
+    30	  # just the patch delta.
+    31	  schedule:
+    32	    - cron: "17 8 * * 1"
+    33	  workflow_dispatch:
+    34	    inputs:
+    35	      tag:
+    36	        description: "Version label for the images (e.g. v1.0.17). Manual
+    37	          runs build with the Dockerfiles of the branch you dispatch on."
+    38	        required: true
+    39	
+    40	env:
+    41	  DOCKERHUB_USER: pharmhero
+    42	
+    43	jobs:
+    44	  build-image:
+    45	    runs-on: ubuntu-latest
+    46	    permissions:
+    47	      contents: read
+    48	      packages: write
+    49	    env:
+    50	      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+    51	    steps:
+    52	      - uses: actions/checkout@v7
+    53	        with:
+    54	          fetch-depth: 0    # scheduled refresh needs tags to find the release
+    55	
+    56	      - name: Compute tags
+    57	        id: meta
+    58	        run: |
+    59	          RAW="${{ github.event.inputs.tag || github.event.release.tag_name }}"
+    60	          if [ -z "$RAW" ]; then
+    61	            # scheduled refresh: build the latest release's code, not main
+    62	            RAW="$(git describe --tags --abbrev=0)"
+    63	            git checkout "$RAW"
+    64	            echo "::notice::scheduled refresh of $RAW"
+    65	          fi
+    66	          V="${RAW#v}"
+    67	          TAGS="ghcr.io/austinmabry/openscrub:${V}"
+    68	          TAGS="$TAGS,ghcr.io/austinmabry/openscrub:latest"
+    69	          if [ -n "$DOCKERHUB_TOKEN" ]; then
+    70	            TAGS="$TAGS,docker.io/${DOCKERHUB_USER}/openscrub:${V}"
+    71	            TAGS="$TAGS,docker.io/${DOCKERHUB_USER}/openscrub:latest"
+    72	          else
+    73	            echo "::notice::DOCKERHUB_TOKEN secret not set — pushing to GHCR only"
+    74	          fi
+    75	          echo "tags=$TAGS" >> "$GITHUB_OUTPUT"
+    76	
+    77	      # arm64: Apple Silicon Docker Desktop + ARM servers/NAS (Umbrel,
+    78	      # CasaOS on Pi). Scans are CPU-bound — slow on a Pi, fine on M-series.
+    79	      - uses: docker/setup-qemu-action@v4
+    80	
+    81	      - uses: docker/setup-buildx-action@v4
+    82	
+    83	      - uses: docker/login-action@v4
+    84	        with:
+    85	          registry: ghcr.io
+    86	          username: ${{ github.actor }}
+    87	          password: ${{ secrets.GITHUB_TOKEN }}
+    88	
+    89	      - name: Log in to Docker Hub
+    90	        if: env.DOCKERHUB_TOKEN != ''
+    91	        uses: docker/login-action@v4
+    92	        with:
+    93	          username: ${{ env.DOCKERHUB_USER }}
+    94	          password: ${{ secrets.DOCKERHUB_TOKEN }}
+    95	
+    96	      - uses: docker/build-push-action@v7
+    97	        with:
+    98	          context: .
+    99	          platforms: linux/amd64,linux/arm64
+   100	          build-args: |
+   101	            SECURITY_REFRESH=${{ github.run_id }}
+   102	          push: true
+   103	          tags: ${{ steps.meta.outputs.tags }}
+   104	          # registry build cache: unchanged layers (base, apt, the pip
+   105	          # dependency stack) keep their exact digests across releases, so
+   106	          # users pulling a new version only download the small app layers
+   107	          cache-from: type=registry,ref=ghcr.io/austinmabry/openscrub:buildcache
+   108	          cache-to: type=registry,ref=ghcr.io/austinmabry/openscrub:buildcache,mode=max
+   109	
+   110	  build-image-cuda:
+   111	    runs-on: ubuntu-latest
+   112	    permissions:
+   113	      contents: read
+   114	      packages: write
+   115	    env:
+   116	      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+   117	    steps:
+   118	      - uses: actions/checkout@v7
+   119	        with:
+   120	          fetch-depth: 0    # scheduled refresh needs tags to find the release
+   121	
+   122	      - name: Free runner disk (CUDA image is large)
+   123	        run: |
+   124	          sudo rm -rf /usr/local/lib/android /usr/share/dotnet                       /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
+   125	          df -h /
+   126	
+   127	      - name: Compute tags
+   128	        id: meta
+   129	        run: |
+   130	          RAW="${{ github.event.inputs.tag || github.event.release.tag_name }}"
+   131	          if [ -z "$RAW" ]; then
+   132	            # scheduled refresh: build the latest release's code, not main
+   133	            RAW="$(git describe --tags --abbrev=0)"
+   134	            git checkout "$RAW"
+   135	            echo "::notice::scheduled refresh of $RAW"
+   136	          fi
+   137	          V="${RAW#v}"
+   138	          TAGS="ghcr.io/austinmabry/openscrub:${V}-cuda"
+   139	          TAGS="$TAGS,ghcr.io/austinmabry/openscrub:cuda"
+   140	          if [ -n "$DOCKERHUB_TOKEN" ]; then
+   141	            TAGS="$TAGS,docker.io/${DOCKERHUB_USER}/openscrub:${V}-cuda"
+   142	            TAGS="$TAGS,docker.io/${DOCKERHUB_USER}/openscrub:cuda"
+   143	          else
+   144	            echo "::notice::DOCKERHUB_TOKEN secret not set — pushing to GHCR only"
+   145	          fi
+   146	          echo "tags=$TAGS" >> "$GITHUB_OUTPUT"
+   147	
+   148	      - uses: docker/setup-buildx-action@v4
+   149	
+   150	      - uses: docker/login-action@v4
+   151	        with:
+   152	          registry: ghcr.io
+   153	          username: ${{ github.actor }}
+   154	          password: ${{ secrets.GITHUB_TOKEN }}
+   155	
+   156	      - name: Log in to Docker Hub
+   157	        if: env.DOCKERHUB_TOKEN != ''
+   158	        uses: docker/login-action@v4
+   159	        with:
+   160	          username: ${{ env.DOCKERHUB_USER }}
+   161	          password: ${{ secrets.DOCKERHUB_TOKEN }}
+   162	
+   163	      - uses: docker/build-push-action@v7
+   164	        with:
+   165	          context: .
+   166	          file: Dockerfile.cuda
+   167	          build-args: |
+   168	            SECURITY_REFRESH=${{ github.run_id }}
+   169	          push: true
+   170	          tags: ${{ steps.meta.outputs.tags }}
+   171	          # registry build cache: the multi-GB CUDA/Paddle layers keep their
+   172	          # exact digests across releases — version-to-version pulls only
+   173	          # download the small app layers
+   174	          cache-from: type=registry,ref=ghcr.io/austinmabry/openscrub:buildcache-cuda
+   175	          cache-to: type=registry,ref=ghcr.io/austinmabry/openscrub:buildcache-cuda,mode=max
+   176	
+   177	  build-image-intel:
+   178	    runs-on: ubuntu-latest
+   179	    permissions:
+   180	      contents: read
+   181	      packages: write
+   182	    env:
+   183	      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+   184	    steps:
+   185	      - uses: actions/checkout@v7
+   186	        with:
+   187	          fetch-depth: 0    # scheduled refresh needs tags to find the release
+   188	
+   189	      - name: Compute tags
+   190	        id: meta
+   191	        run: |
+   192	          RAW="${{ github.event.inputs.tag || github.event.release.tag_name }}"
+   193	          if [ -z "$RAW" ]; then
+   194	            # scheduled refresh: build the latest release's code, not main
+   195	            RAW="$(git describe --tags --abbrev=0)"
+   196	            git checkout "$RAW"
+   197	            echo "::notice::scheduled refresh of $RAW"
+   198	          fi
+   199	          V="${RAW#v}"
+   200	          TAGS="ghcr.io/austinmabry/openscrub:${V}-intel"
+   201	          TAGS="$TAGS,ghcr.io/austinmabry/openscrub:intel"
+   202	          if [ -n "$DOCKERHUB_TOKEN" ]; then
+   203	            TAGS="$TAGS,docker.io/${DOCKERHUB_USER}/openscrub:${V}-intel"
+   204	            TAGS="$TAGS,docker.io/${DOCKERHUB_USER}/openscrub:intel"
+   205	          else
+   206	            echo "::notice::DOCKERHUB_TOKEN secret not set — pushing to GHCR only"
+   207	          fi
+   208	          echo "tags=$TAGS" >> "$GITHUB_OUTPUT"
+   209	
+   210	      - uses: docker/setup-buildx-action@v4
+   211	
+   212	      - uses: docker/login-action@v4
+   213	        with:
+   214	          registry: ghcr.io
+   215	          username: ${{ github.actor }}
+   216	          password: ${{ secrets.GITHUB_TOKEN }}
+   217	
+   218	      - name: Log in to Docker Hub
+   219	        if: env.DOCKERHUB_TOKEN != ''
+   220	        uses: docker/login-action@v4
+   221	        with:
+   222	          username: ${{ env.DOCKERHUB_USER }}
+   223	          password: ${{ secrets.DOCKERHUB_TOKEN }}
+   224	
+   225	      # amd64 only: QSV/OpenVINO are x86 Intel technologies
+   226	      - uses: docker/build-push-action@v7
+   227	        with:
+   228	          context: .
+   229	          file: Dockerfile.intel
+   230	          platforms: linux/amd64
+   231	          build-args: |
+   232	            SECURITY_REFRESH=${{ github.run_id }}
+   233	          push: true
+   234	          tags: ${{ steps.meta.outputs.tags }}
+   235	          cache-from: type=registry,ref=ghcr.io/austinmabry/openscrub:buildcache-intel
+   236	          cache-to: type=registry,ref=ghcr.io/austinmabry/openscrub:buildcache-intel,mode=max

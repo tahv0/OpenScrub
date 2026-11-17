@@ -1,0 +1,35 @@
+# P13 conditional pip download reuse in existing images
+
+## Task 1301: measure heavy dependency download reuse while preserving final refresh
+
+### Global constraints and prerequisite
+
+Preserve Austin image/provider/base/platform/model choices, Python floor, no-deps app installation, SECURITY_REFRESH and final apt/pip refresh, release/tag/schedule/registry ownership and compiled CUDA OpenCV. No training/workbench, new model choice, provider upgrade, global dependency pin, generated Dockerfile, cache-workaround CI action, shared-builder pruning or remote publication. No original-checkout/user-data changes or nested agents.
+
+Supervisor creates `pr/docker-pip-download-cache` from exact reviewed B02b `a10e485962571a566f99225541735ab1ada1f4c0`. Read `docker-cache-contract-research.md` and compact exact-source evidence, plus retained platform readiness and B02b checks. Earlier Docker/RTX metadata is capability context only; do not repeat that probe for its own sake. Source-only cache mechanics can use e21, but this candidate's runtime acceptance uses the coherent B02b prerequisite. No combined umbrella base.
+
+### What, why and conditional scope
+
+Upstream already caches dependency/model layers and imports/exports registry result caches. The remaining candidate is builder-local reuse of pip downloads when a heavy dependency RUN must execute again. First validate the actual target workload and resource budget; a no-benefit closure is acceptable. Do not claim source-only rebuild gains from mounts on an already-cached heavy RUN.
+
+1. Candidate A touches only heavy dependency RUNs in Dockerfile, Dockerfile.intel and Dockerfile.cuda. Use one BuildKit pip cache mount per RUN with separate CPU/Intel/CUDA IDs and appropriate sharing; remove --no-cache-dir only from pip commands inside those mounted RUNs. Preserve filters, install/index arguments, order, uninstall/restore steps, versions and capability assertions. Verify actual pip configuration uses the mount. Add the syntax directive only as required. Keep bootstrap, app no-deps install, final refresh and the separate CUDA-base Dockerfile unchanged.
+2. Preserve the documented source OpenCV/contrib4.10, NumPy1.26.4, CUDA12.6.3/cuDNN, ORT/Paddle provider order and cv2 wheel removal/restoration. CPU/Intel retain their existing bounded normal OpenCV path. CUDA Haar XML/data is an unverified capability gate, not a source-proven broken image; inspect the final image. Never replace its compiled cv2 with pip as a cache experiment repair. Actual GPU inference belongs to P14.
+3. Refresh relocation, bootstrap/app mounts and recursive context exclusions are outside the first candidate. If measurements reveal a concrete remaining cost, report it with its smallest separate scope; do not silently add it. Preserve executable workflow values, per-run refresh argument, model lists/hash verification, cache refs/platforms and release ownership. Cache mounts are builder-local mutable state, not dependency locks or guaranteed cross-run CI storage.
+
+### Actual measurement and adoption gate
+
+Request one exclusive heavy-workload slot from root before any build/pull/measurement. First check available disk/build capability without modifying host configuration, agree a bounded artifact/network budget and materiality criterion with root, and use task-owned disposable builders/containers/tags only. No prune of shared caches, host driver/runtime installation, upstream pushes or concurrent unrelated suites/inference/benchmarks. Start CPU amd64; execute affected Intel/CUDA cases sequentially before claiming those variants accepted. An unavailable platform remains explicit.
+
+Freeze exact source/patch/context manifests, resolved base/platform image digests, Docker/Buildx/BuildKit/frontend identity, builder/cache IDs, selected dependency/package inventories and declared model hashes. Hold these inputs equal within each comparison. Floating indices or base content changes invalidate attribution and require an explicit disposition, not a convenient new label. Cold result cache and cold mount are separate from warm base/network content; --no-cache with a populated mount is not a cold-mount run.
+
+Use the handoff's bounded actual cases: independent cold before/after builds; unchanged warm control; identical source-only edit with fixed refresh; dependency rerun with a genuine small compatible scratch constraint change plus a separately labelled comment-only negative control; and refresh-only ARG change. Record per-stage times, CACHED/download/reuse work, context transfer, exact image/layer/package identities and complete outcomes. Preserve all regressions and final patched package inventories. Candidate A should retain the original invalidation shape; do not attribute ordinary layer hits or model urllib downloads to pip mounts. A no-update refresh run proves execution, not newly available patches. Repeat only for a specific variance/input concern, not until a favorable run appears.
+
+A fresh disposable builder importing permitted read-only registry result cache may establish the separate layer-versus-mount boundary. Never write upstream cache refs. Local cache export/import is valid local evidence but not cross-run CI persistence. Explain cold network/allocator/host variance rather than presenting a single total as a universal build speedup.
+
+For accepted variants, start the actual final-image web entrypoint with isolated data and runtime networking disabled; verify an in-container response/health and clean owned shutdown. Record final OpenCV path/version/ownership/Haar constructor/XML/classifier, NumPy and ORT/provider registration, spaCy/baked model presence/hashes and absence of cache payload in final layers. Provider registration is packaging evidence, not model GPU execution. No Windows/arm64/Intel-GPU success follows from Linux amd64 or host NVIDIA metadata. A real pre-existing compatibility failure needs its own declared disposition rather than an incidental cache patch.
+
+### Tests, documentation and delivery
+
+If measurements justify adoption, add meaningful Docker contract regressions under tests/test_docker_build_cache.py and concise docs/DOCKER_BUILD_CACHE.md. Assert actual instruction scope, provider restore, no-deps, refresh commands/order/ARG and required COPY invariants, not a verbatim donor string. Static tests do not replace image builds. Run focused checks, one full stable ordinary suite, offline sdist→wheel/source/test inclusion and applicable Python3.9 checks in the prepared environment. No unrelated browser matrix or new model evaluation is required.
+
+Self-review and commit only a justified variation; otherwise retain a source/measurement-backed no-adoption closure. Write task-1301-report.md/task-1301-pr.md with exact sources, actual workload/materiality choice, measured work/times/costs, builder-cache lifetime, security/provider preservation, commands/results and outstanding variants/platforms. Artifacts /tmp/openscrub-task1301. Existing tools/native/Git escalation is authorized; any actual host configuration change is outside this task. No publication or nested agents.

@@ -1,0 +1,59 @@
+................F                                                        [100%]
+=================================== FAILURES ===================================
+__________ test_run_scan_finalization_and_report_with_controlled_ocr ___________
+
+tmp_path = PosixPath('/tmp/pytest-of-tahv0/pytest-43/test_run_scan_finalization_and0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x76c8224ec200>
+
+    def test_run_scan_finalization_and_report_with_controlled_ocr(tmp_path, monkeypatch):
+        """Real decoding, forward/reverse recall, merge, and report; OCR is controlled."""
+        clip = tmp_path / "fixed.avi"
+        writer = cv2.VideoWriter(str(clip), cv2.VideoWriter_fourcc(*"FFV1"), 6., (160, 96))
+        assert writer.isOpened()
+        frame = np.random.default_rng(1411).integers(0, 256, (96, 160, 3), dtype=np.uint8)
+        for _ in range(8):
+            writer.write(frame)
+        writer.release()
+    
+        class OCR:
+            calls = 0
+            def read(self, image):
+                self.calls += 1
+                return [(TEXT, BOX, .99), ("pending", (8, 40, 70, 60), .99),
+                        ("ready", (85, 40, 150, 60), .99)]
+    
+        ocr = OCR()
+        monkeypatch.setattr(core, "make_ocr", lambda *args, **kwargs: ocr)
+        parser = core.build_parser()
+        args = core._prep_args(parser.parse_args([
+            str(clip), "--categories", "email", "--engine", "tesseract",
+            "--sample-interval", "0.3333333333333333", "--scroll-track", "off",
+            "--adaptive", "off", "--ocr-upscale", "off", "--no-vfr-fix", "--no-backtrack",
+        ]), parser)
+        state = core.run_scan(args, core.Callbacks())
+        assert ocr.calls == state["stats"]["scans"] == 4
+        expected = dict(t_start=0., t_end=1.5, cbox=BOX, category="email", text=TEXT,
+                        confidence=.99, aoff=(0., 0.), last_seen=1., dense=False,
+                        track=-1, person=-1, poly=())
+>       assert [asdict(d) for d in state["detections"]] == [expected]
+E       AssertionError: assert [{'t_start': ...'email', ...}] == [{'t_start': ...'email', ...}]
+E         
+E         At index 0 diff: {'t_start': 0.0, 't_end': 1.6333333333333333, 'cbox': (8, 8, 150, 28), 'category': 'email', 'text': 'alice@example.invalid', 'confidence': 0.99, 'aoff': (0.0, 0.0), 'last_seen': 1.0, 'dense': False, 'track': -1, 'person': -1, 'poly': ()} != {'t_start': 0.0, 't_end': 1.5, 'cbox': (8, 8, 150, 28), 'category': 'email', 'text': 'alice@example.invalid', 'confidence': 0.99, 'aoff': (0.0, 0.0), 'last_seen': 1.0, 'dense': False, 'track': -1, 'person': -1, 'poly': ()}
+E         Use -v to get more diff
+
+tests/test_tail_history_index.py:117: AssertionError
+----------------------------- Captured stdout call -----------------------------
+[1/4] OCR engine   (openscrub v1.0.96)
+      using OCR
+[2/4] Detectors
+      names: skipped (name category not selected)
+[3/4] Scanning (every 0.3333333333333333s or 60px of scroll)
+  t=   0.00s  1 PII region(s): email
+  t=   0.33s  1 PII region(s): email
+  t=   0.67s  1 PII region(s): email
+  t=   1.00s  1 PII region(s): email
+      reverse pass: 4 additional near-miss region(s) from remembered PII
+      4 OCR scans | 8 raw hits -> 1 merged regions | 0 memory recalls, 1 strings remembered
+=========================== short test summary info ============================
+FAILED tests/test_tail_history_index.py::test_run_scan_finalization_and_report_with_controlled_ocr
+1 failed, 16 passed in 0.11s

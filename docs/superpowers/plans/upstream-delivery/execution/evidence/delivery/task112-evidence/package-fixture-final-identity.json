@@ -1,0 +1,13 @@
+{
+  "openscrub.py": "2ea608fa18eaa197d356e50e52abff67938f4d53416a9af4c0ebfbe915898b6a",
+  "tests/test_tail_history_index.py": "581578199f2441cbea0edc3bdcab4ff02ecab92b1028ebce467b050e6b60fa32",
+  "benchmark/tail_history.py": "027f588469c6c5159dbcccf581fa4c1731c94c1b5dec4e66dbf03e99ba28f475",
+  "benchmark/README.md": "6119e975a0948c2bd9e9f97ecc976fa1651dd45298ff4f9bf155aacb42f466d4",
+  "test_openscrub.py": "feef977385df4f689317a73c6ff913cba22a0260d0afaf8a0a03d02b32de2636",
+  "pyproject.toml": "2aa96ca9573fd650a510f9a08674b95c9c0e4ec91daa8a53b8f6a776380079cd",
+  "artifacts": {
+    "openscrub-1.0.96-py3-none-any.whl": "4981a41cf9b22bcb79e9ab4d8dddc58054f267c250c827fef013f0dfe4f1a4af",
+    "openscrub-1.0.96.tar.gz": "e44802a25d5d368438c3ee975254b19ba2cb1930d45c4bb864de09ded61a71c6"
+  },
+  "wheel_identical_to_installed_smoke": true
+}

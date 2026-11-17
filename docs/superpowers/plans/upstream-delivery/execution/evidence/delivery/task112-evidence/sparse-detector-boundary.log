@@ -1,0 +1,165 @@
+{
+  "boundary": "actual group_lines \u2192 detect_phi \u2192 email category filter",
+  "checked": [
+    {
+      "timestamp": 0.0,
+      "ocr": "pending",
+      "email_detections": 0
+    },
+    {
+      "timestamp": 3323.0,
+      "ocr": "pending",
+      "email_detections": 0
+    },
+    {
+      "timestamp": 3323.3333333333335,
+      "ocr": "zumuzqyvgsedcuazyejljiwl@sample.invalid",
+      "email_detections": 1
+    },
+    {
+      "timestamp": 3323.6666666666665,
+      "ocr": "cmjibuhvmcvfxxpdnxjhmtiz@sample.invalid",
+      "email_detections": 1
+    },
+    {
+      "timestamp": 3324.0,
+      "ocr": "tuzndhadeduustuwfjbwsvkn@sample.invalid",
+      "email_detections": 1
+    },
+    {
+      "timestamp": 3324.3333333333335,
+      "ocr": "pzcxfchvojzixhrdiajachpx@sample.invalid",
+      "email_detections": 1
+    },
+    {
+      "timestamp": 3324.6666666666665,
+      "ocr": "ehfcfokopxuioswkbbgkzbhy@sample.invalid",
+      "email_detections": 1
+    },
+    {
+      "timestamp": 3325.0,
+      "ocr": "qtqikjrmyolpfedgskbjqliw@sample.invalid",
+      "email_detections": 1
+    },
+    {
+      "timestamp": 3325.3333333333335,
+      "ocr": "uasfinlsbzmosyqnoshewide@sample.invalid",
+      "email_detections": 1
+    },
+    {
+      "timestamp": 3325.6666666666665,
+      "ocr": "bazvxxibmhmwcqoopjusqpxl@sample.invalid",
+      "email_detections": 1
+    },
+    {
+      "timestamp": 3326.0,
+      "ocr": "crmhbvpthiqqkafcwbzyyijf@sample.invalid",
+      "email_detections": 1
+    },
+    {
+      "timestamp": 3326.3333333333335,
+      "ocr": "mykzmrreynsjkfpytwsicgyu@sample.invalid",
+      "email_detections": 1
+    },
+    {
+      "timestamp": 3326.6666666666665,
+      "ocr": "rceiljcajqbeqlcyyrqfmuui@sample.invalid",
+      "email_detections": 1
+    },
+    {
+      "timestamp": 3327.0,
+      "ocr": "qlcfmcetfmqjrrgvcaxgxugi@sample.invalid",
+      "email_detections": 1
+    },
+    {
+      "timestamp": 3327.3333333333335,
+      "ocr": "ketsibqapqwjguuvlspysncf@sample.invalid",
+      "email_detections": 1
+    },
+    {
+      "timestamp": 3327.6666666666665,
+      "ocr": "pgmghipxqpmdcvkhogmgaarf@sample.invalid",
+      "email_detections": 1
+    },
+    {
+      "timestamp": 3328.0,
+      "ocr": "jkkluxsmcivddznezwatkage@sample.invalid",
+      "email_detections": 1
+    },
+    {
+      "timestamp": 3328.3333333333335,
+      "ocr": "kyfoenzbwtpfvqqzegvzjcga@sample.invalid",
+      "email_detections": 1
+    },
+    {
+      "timestamp": 3328.6666666666665,
+      "ocr": "cladzugwzjfqglxozdqisilf@sample.invalid",
+      "email_detections": 1
+    },
+    {
+      "timestamp": 3329.0,
+      "ocr": "jbhzgkyepgynhkcaldfgnxwe@sample.invalid",
+      "email_detections": 1
+    },
+    {
+      "timestamp": 3329.3333333333335,
+      "ocr": "hqsnjgqwxdvdvyzasfjiygze@sample.invalid",
+      "email_detections": 1
+    },
+    {
+      "timestamp": 3329.6666666666665,
+      "ocr": "eoqkfebbjhedrybtjrgiuhxf@sample.invalid",
+      "email_detections": 1
+    },
+    {
+      "timestamp": 3330.0,
+      "ocr": "ufgyvlmuxlpwknzwrtszfusz@sample.invalid",
+      "email_detections": 1
+    },
+    {
+      "timestamp": 3330.3333333333335,
+      "ocr": "hhpespkmhjqirgydhdhvaylm@sample.invalid",
+      "email_detections": 1
+    },
+    {
+      "timestamp": 3330.6666666666665,
+      "ocr": "ceyhvsqguiifovsvjrzfyfxe@sample.invalid",
+      "email_detections": 1
+    },
+    {
+      "timestamp": 3331.0,
+      "ocr": "hgyazepryysnfkhkzqnoxdup@sample.invalid",
+      "email_detections": 1
+    },
+    {
+      "timestamp": 3331.3333333333335,
+      "ocr": "vmqhzqwizlnzfqteytjocahg@sample.invalid",
+      "email_detections": 1
+    },
+    {
+      "timestamp": 3331.6666666666665,
+      "ocr": "tkzniacxwdnmbyyberttdcrm@sample.invalid",
+      "email_detections": 1
+    },
+    {
+      "timestamp": 3332.0,
+      "ocr": "hbjzqhsfcplbvzpprdbpcjyt@sample.invalid",
+      "email_detections": 1
+    },
+    {
+      "timestamp": 3332.3333333333335,
+      "ocr": "szfpqxhieljeilgcamesjvbw@sample.invalid",
+      "email_detections": 1
+    },
+    {
+      "timestamp": 3332.6666666666665,
+      "ocr": "utdqdkpscvpaiwzslbgznsyt@sample.invalid",
+      "email_detections": 1
+    },
+    {
+      "timestamp": 3333.0,
+      "ocr": "oydyjysqegtwbekfvpnogqbb@sample.invalid",
+      "email_detections": 1
+    }
+  ]
+}

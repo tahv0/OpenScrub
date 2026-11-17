@@ -1,0 +1,19 @@
+{
+  "final-comparison.json": {
+    "cases": 4,
+    "all_full_records_and_eight_call_pair_digests_equal": true,
+    "benchmark_sha256": "299dbe5aed1a45a0a765e7ece1901b9dc4ecde6e0b6384dcdf45cf59ba198efa"
+  },
+  "final-comparison-detector-consistent.json": {
+    "cases": 4,
+    "all_full_records_and_eight_call_pair_digests_equal": true,
+    "benchmark_sha256": "027f588469c6c5159dbcccf581fa4c1731c94c1b5dec4e66dbf03e99ba28f475"
+  },
+  "head": "952af20da205133886ba69799e134b86d1654137",
+  "clean_worktree": true,
+  "source_blobs_verified": true,
+  "report_links_resolve": true,
+  "full_suite": "153 passed; pre-strengthening test hash ecfae9cb",
+  "final_focused": "27 passed on 3.12 and 3.9",
+  "final_base_semantics": "20 passed"
+}
