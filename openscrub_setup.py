@@ -26,6 +26,8 @@ import shutil
 import subprocess
 import sys
 
+from openscrub_internal.opencv_compat import assess_opencv, opencv_repair_hint, probe_opencv
+
 
 GREEN, YELLOW, RED, END = "\033[92m", "\033[93m", "\033[91m", "\033[0m"
 if os.name == "nt":
@@ -203,12 +205,21 @@ def main(argv=None):
 
     changed = False
 
-    # Python-side sanity (pip already handled these; verify imports work)
+    # Probe OpenCV separately: importing it alone does not establish fallback health.
+    snapshot = probe_opencv(sys.executable)
+    assessment = assess_opencv(snapshot)
+    report = (_ok if assessment["healthy"] else
+              _note if assessment["state"] in {"alternate", "unmanaged"} else _miss)
+    report(
+        "OpenCV face fallback: " + assessment["state"] + "; " + assessment["evidence"])
+    hint = opencv_repair_hint(snapshot, sys.executable)
+    if hint:
+        _note(hint)
     try:
-        import cv2, flask  # noqa: F401
-        _ok("python dependencies (opencv, flask, ...)")
+        import flask  # noqa: F401
+        _ok("Flask Python dependency")
     except ImportError as e:
-        _miss(f"python dependency broken: {e} — try: pip install --force-reinstall OpenScrub")
+        _miss(f"Flask Python dependency broken: {e}")
 
     # Tesseract
     t = find_tesseract()

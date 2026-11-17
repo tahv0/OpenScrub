@@ -822,3 +822,41 @@ those are aggregated alongside OpenScrub, not relicensed by it. The
 detection model files OpenScrub uses — and the ones pre-installed in the
 Docker images — are listed with their licenses, copyright notices, and
 full license texts in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+### OpenCV face fallback compatibility
+
+The normal core dependency is `opencv-python<5`. OpenCV 5's normal wheel lacks
+OpenScrub's existing Haar constructor/data, so an unavailable YuNet model can
+prevent face detection. Check this separately from whether `cv2` imports:
+
+```bash
+python -m openscrub_setup --check
+# From a source checkout (also after a source update):
+python install.py --check
+```
+
+These checks report the imported runtime/path, all four cv2 wheel distributions,
+and whether the frontal-face Haar cascade constructs successfully. They do not
+fetch models or change dependencies. For an existing **sole normal wheel** that
+is incompatible or broken, deliberately restore the bounded wheel using the
+interpreter reported by the check, then rerun the check in a fresh process:
+
+```bash
+python -m pip install --force-reinstall "opencv-python<5"
+python -m openscrub_setup --check
+```
+
+Source updates copy release files but do not reconcile dependencies. `--yes`
+does not repair an existing OpenCV installation automatically. Mixed wheel
+flavors need deliberate ownership reconciliation or a clean environment;
+reinstalling the normal wheel alone does not cure coexistence. Alternate wheels
+and source/distro/frozen builds are identified separately even when Haar works.
+For source-built CUDA OpenCV, retain the intended source build and verify its
+constructor and Haar XML rather than replacing it with a CPU wheel.
+
+Optional Paddle installation remains a separate cv2 flavor-policy follow-up.
+PaddleOCR/PaddleX can request `opencv-contrib-python` alongside the normal core
+wheel; the core `<5` bound cannot prevent that conflict. The standalone installer
+checks OpenCV again after Paddle, while desktop/web provider install commands
+retain their existing choices. Recheck after optional installs; neither the bound
+nor a successful import certifies mixed flavors, GPU execution, or model accuracy.

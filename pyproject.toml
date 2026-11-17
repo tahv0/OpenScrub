@@ -34,7 +34,7 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Image Processing",
 ]
 dependencies = [
-    "opencv-python",
+    "opencv-python<5",
     "numpy",
     # License-plate models (open-image-models YOLOv9) are "end2end" ONNX
     # exports with a baked-in NonMaxSuppression node that OpenCV's DNN module
@@ -89,6 +89,7 @@ pattern = "VERSION = \"(?P<version>[^\"]+)\""
 
 [tool.hatch.build.targets.wheel]
 include = [
+    "openscrub_internal/",
     "openscrub.py",
     "openscrub_web.py",
     "zones_ui.py",
@@ -99,6 +100,7 @@ include = [
 
 [tool.hatch.build.targets.sdist]
 include = [
+    "openscrub_internal/",
     "plate_models.json",
     "face_models.json",
     "person_models.json",
@@ -116,4 +118,5 @@ include = [
     "NOTICE",
     "THIRD_PARTY_NOTICES.md",
     "test_openscrub.py",
+    "tests/",
 ]
