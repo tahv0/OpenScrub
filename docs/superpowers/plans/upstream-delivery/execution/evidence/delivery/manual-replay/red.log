@@ -1,0 +1,96 @@
+E                                                                        [100%]
+==================================== ERRORS ====================================
+___ ERROR at setup of test_committed_http_response_lost_then_identical_retry ___
+
+store = namespace(root=PosixPath('/tmp/openscrub-task72/red-tmp/test_committed_http_response_l0/data'), jobs=PosixPath('/tmp/o...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7bf45097dda0>, url='/api/jobs/e26dfef38ace')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7bf488389220>
+
+    @pytest.fixture
+    def socket_api(store, monkeypatch):
+        import http.client
+        from cheroot import wsgi
+        ready = threading.Event()
+        servers, errors = [], []
+        real = wsgi.Server.prepare
+        def prepare(server):
+            real(server)
+            servers.append(server)
+            ready.set()
+        monkeypatch.setattr(wsgi.Server, 'prepare', prepare)
+        def serve():
+            try:
+                web._serve('127.0.0.1', 0, None)
+            except BaseException as error:
+                errors.append(error)
+                ready.set()
+        thread = threading.Thread(target=serve)
+        thread.start()
+        try:
+>           assert ready.wait(8) and not errors, errors
+E           AssertionError: [OSError("No socket could be created -- (('127.0.0.1', 0): [Errno 1] Operation not permitted)")]
+E           assert (True and not [OSError("No socket could be created -- (('127.0.0.1', 0): [Errno 1] Operation not permitted)")])
+E            +  where True = wait(8)
+E            +    where wait = <threading.Event at 0x7bf488358c50: set>.wait
+
+tests/test_report_transactions.py:543: AssertionError
+
+During handling of the above exception, another exception occurred:
+
+store = namespace(root=PosixPath('/tmp/openscrub-task72/red-tmp/test_committed_http_response_l0/data'), jobs=PosixPath('/tmp/o...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7bf45097dda0>, url='/api/jobs/e26dfef38ace')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7bf488389220>
+
+    @pytest.fixture
+    def socket_api(store, monkeypatch):
+        import http.client
+        from cheroot import wsgi
+        ready = threading.Event()
+        servers, errors = [], []
+        real = wsgi.Server.prepare
+        def prepare(server):
+            real(server)
+            servers.append(server)
+            ready.set()
+        monkeypatch.setattr(wsgi.Server, 'prepare', prepare)
+        def serve():
+            try:
+                web._serve('127.0.0.1', 0, None)
+            except BaseException as error:
+                errors.append(error)
+                ready.set()
+        thread = threading.Thread(target=serve)
+        thread.start()
+        try:
+            assert ready.wait(8) and not errors, errors
+            port = servers[0].socket.getsockname()[1]
+            def api(method, path, payload=None):
+                connection = http.client.HTTPConnection('127.0.0.1', port, timeout=8)
+                try:
+                    body = json.dumps(payload) if payload is not None else None
+                    connection.request(method, path, body=body, headers={
+                        'Content-Type': 'application/json', 'Connection': 'close'})
+                    result = connection.getresponse()
+                    return result.status, dict(result.getheaders()), result.read()
+                finally:
+                    connection.close()
+            yield api
+        finally:
+            for server in servers:
+                server.stop()
+            join(thread)
+>           assert not errors
+E           assert not [OSError("No socket could be created -- (('127.0.0.1', 0): [Errno 1] Operation not permitted)")]
+
+tests/test_report_transactions.py:560: AssertionError
+=============================== warnings summary ===============================
+../../../../../../tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/_pytest/cacheprovider.py:487
+  /tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/_pytest/cacheprovider.py:487: PytestCacheWarning: cache could not write path /home/tahv0/.codex/worktrees/c832/OpenScrub/.pytest_cache/v/cache/nodeids: [Errno 30] Read-only file system: '/home/tahv0/.codex/worktrees/c832/OpenScrub/.pytest_cache/v/cache/nodeids'
+    config.cache.set("cache/nodeids", sorted(str(n) for n in self.cached_nodeids))
+
+../../../../../../tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/_pytest/cacheprovider.py:439
+  /tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/_pytest/cacheprovider.py:439: PytestCacheWarning: cache could not write path /home/tahv0/.codex/worktrees/c832/OpenScrub/.pytest_cache/v/cache/lastfailed: [Errno 30] Read-only file system: '/home/tahv0/.codex/worktrees/c832/OpenScrub/.pytest_cache/v/cache/lastfailed'
+    config.cache.set("cache/lastfailed", current_lastfailed)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+ERROR tests/test_manual_addition_replay.py::test_committed_http_response_lost_then_identical_retry
+2 warnings, 1 error in 0.28s

@@ -1,0 +1,1766 @@
+{
+  "environment": {
+    "browser": "Playwright Chromium, existing install",
+    "browserPlugin": "not available",
+    "viewport": "1365x1000",
+    "origin": "http://127.0.0.1:18507",
+    "application": "full unmodified emitted PAGE; synthetic HTTP intercepted by Playwright",
+    "inference": false,
+    "realPersistence": false,
+    "realRender": false
+  },
+  "scenarios": [
+    {
+      "name": "mixed/person-track/category construction",
+      "before": {
+        "enabled": {
+          "0": true,
+          "1": false,
+          "2": true,
+          "3": false,
+          "4": true,
+          "5": false,
+          "6": true,
+          "7": true,
+          "8": false,
+          "9": false,
+          "10": true,
+          "11": true,
+          "12": true
+        },
+        "members": {
+          "1": [
+            0,
+            1,
+            11
+          ],
+          "2": [
+            2
+          ],
+          "3": [
+            3
+          ],
+          "4": [
+            4,
+            5
+          ],
+          "6": [
+            6
+          ],
+          "7": [
+            7
+          ],
+          "10": [
+            10
+          ],
+          "12": [
+            12
+          ]
+        },
+        "cards": [
+          {
+            "id": "det8",
+            "category": "zdrop",
+            "text": "Keep",
+            "pressed": null,
+            "off": true
+          },
+          {
+            "id": "det9",
+            "category": "zdrop",
+            "text": "Keep",
+            "pressed": null,
+            "off": true
+          },
+          {
+            "id": "det1",
+            "category": "face",
+            "text": "Keep",
+            "pressed": null,
+            "off": true
+          },
+          {
+            "id": "det2",
+            "category": "face",
+            "text": "Blur",
+            "pressed": null,
+            "off": false
+          },
+          {
+            "id": "det3",
+            "category": "face",
+            "text": "Keep",
+            "pressed": null,
+            "off": true
+          },
+          {
+            "id": "det4",
+            "category": "face",
+            "text": "Blur",
+            "pressed": null,
+            "off": false
+          },
+          {
+            "id": "det10",
+            "category": "face",
+            "text": "Blur",
+            "pressed": null,
+            "off": false
+          },
+          {
+            "id": "det6",
+            "category": "plate",
+            "text": "Blur",
+            "pressed": null,
+            "off": false
+          },
+          {
+            "id": "det7",
+            "category": "email",
+            "text": "Blur",
+            "pressed": null,
+            "off": false
+          },
+          {
+            "id": "det12",
+            "category": "person",
+            "text": "Blur",
+            "pressed": null,
+            "off": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "repeated click toggles and isolates group",
+      "once": {
+        "enabled": {
+          "0": true,
+          "1": true,
+          "2": true,
+          "3": false,
+          "4": true,
+          "5": false,
+          "6": true,
+          "7": true,
+          "8": false,
+          "9": false,
+          "10": true,
+          "11": true,
+          "12": true
+        },
+        "members": {
+          "1": [
+            0,
+            1,
+            11
+          ],
+          "2": [
+            2
+          ],
+          "3": [
+            3
+          ],
+          "4": [
+            4,
+            5
+          ],
+          "6": [
+            6
+          ],
+          "7": [
+            7
+          ],
+          "10": [
+            10
+          ],
+          "12": [
+            12
+          ]
+        },
+        "cards": [
+          {
+            "id": "det8",
+            "category": "zdrop",
+            "text": "Keep",
+            "pressed": null,
+            "off": true
+          },
+          {
+            "id": "det9",
+            "category": "zdrop",
+            "text": "Keep",
+            "pressed": null,
+            "off": true
+          },
+          {
+            "id": "det1",
+            "category": "face",
+            "text": "Blur",
+            "pressed": null,
+            "off": false
+          },
+          {
+            "id": "det2",
+            "category": "face",
+            "text": "Blur",
+            "pressed": null,
+            "off": false
+          },
+          {
+            "id": "det3",
+            "category": "face",
+            "text": "Keep",
+            "pressed": null,
+            "off": true
+          },
+          {
+            "id": "det4",
+            "category": "face",
+            "text": "Blur",
+            "pressed": null,
+            "off": false
+          },
+          {
+            "id": "det10",
+            "category": "face",
+            "text": "Blur",
+            "pressed": null,
+            "off": false
+          },
+          {
+            "id": "det6",
+            "category": "plate",
+            "text": "Blur",
+            "pressed": null,
+            "off": false
+          },
+          {
+            "id": "det7",
+            "category": "email",
+            "text": "Blur",
+            "pressed": null,
+            "off": false
+          },
+          {
+            "id": "det12",
+            "category": "person",
+            "text": "Blur",
+            "pressed": null,
+            "off": false
+          }
+        ]
+      },
+      "twice": {
+        "enabled": {
+          "0": false,
+          "1": false,
+          "2": true,
+          "3": false,
+          "4": true,
+          "5": false,
+          "6": true,
+          "7": true,
+          "8": false,
+          "9": false,
+          "10": true,
+          "11": false,
+          "12": true
+        },
+        "members": {
+          "1": [
+            0,
+            1,
+            11
+          ],
+          "2": [
+            2
+          ],
+          "3": [
+            3
+          ],
+          "4": [
+            4,
+            5
+          ],
+          "6": [
+            6
+          ],
+          "7": [
+            7
+          ],
+          "10": [
+            10
+          ],
+          "12": [
+            12
+          ]
+        },
+        "cards": [
+          {
+            "id": "det8",
+            "category": "zdrop",
+            "text": "Keep",
+            "pressed": null,
+            "off": true
+          },
+          {
+            "id": "det9",
+            "category": "zdrop",
+            "text": "Keep",
+            "pressed": null,
+            "off": true
+          },
+          {
+            "id": "det1",
+            "category": "face",
+            "text": "Keep",
+            "pressed": null,
+            "off": true
+          },
+          {
+            "id": "det2",
+            "category": "face",
+            "text": "Blur",
+            "pressed": null,
+            "off": false
+          },
+          {
+            "id": "det3",
+            "category": "face",
+            "text": "Keep",
+            "pressed": null,
+            "off": true
+          },
+          {
+            "id": "det4",
+            "category": "face",
+            "text": "Blur",
+            "pressed": null,
+            "off": false
+          },
+          {
+            "id": "det10",
+            "category": "face",
+            "text": "Blur",
+            "pressed": null,
+            "off": false
+          },
+          {
+            "id": "det6",
+            "category": "plate",
+            "text": "Blur",
+            "pressed": null,
+            "off": false
+          },
+          {
+            "id": "det7",
+            "category": "email",
+            "text": "Blur",
+            "pressed": null,
+            "off": false
+          },
+          {
+            "id": "det12",
+            "category": "person",
+            "text": "Blur",
+            "pressed": null,
+            "off": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "Tab reaches first card action after category controls",
+      "focused": "bb1"
+    },
+    {
+      "name": "native keyboard Enter and Space toggle",
+      "focus": "bb4",
+      "enter": {
+        "enabled": {
+          "0": false,
+          "1": false,
+          "2": true,
+          "3": false,
+          "4": false,
+          "5": false,
+          "6": true,
+          "7": true,
+          "8": false,
+          "9": false,
+          "10": true,
+          "11": false,
+          "12": true
+        },
+        "members": {
+          "1": [
+            0,
+            1,
+            11
+          ],
+          "2": [
+            2
+          ],
+          "3": [
+            3
+          ],
+          "4": [
+            4,
+            5
+          ],
+          "6": [
+            6
+          ],
+          "7": [
+            7
+          ],
+          "10": [
+            10
+          ],
+          "12": [
+            12
+          ]
+        },
+        "cards": [
+          {
+            "id": "det8",
+            "category": "zdrop",
+            "text": "Keep",
+            "pressed": null,
+            "off": true
+          },
+          {
+            "id": "det9",
+            "category": "zdrop",
+            "text": "Keep",
+            "pressed": null,
+            "off": true
+          },
+          {
+            "id": "det1",
+            "category": "face",
+            "text": "Keep",
+            "pressed": null,
+            "off": true
+          },
+          {
+            "id": "det2",
+            "category": "face",
+            "text": "Blur",
+            "pressed": null,
+            "off": false
+          },
+          {
+            "id": "det3",
+            "category": "face",
+            "text": "Keep",
+            "pressed": null,
+            "off": true
+          },
+          {
+            "id": "det4",
+            "category": "face",
+            "text": "Keep",
+            "pressed": null,
+            "off": true
+          },
+          {
+            "id": "det10",
+            "category": "face",
+            "text": "Blur",
+            "pressed": null,
+            "off": false
+          },
+          {
+            "id": "det6",
+            "category": "plate",
+            "text": "Blur",
+            "pressed": null,
+            "off": false
+          },
+          {
+            "id": "det7",
+            "category": "email",
+            "text": "Blur",
+            "pressed": null,
+            "off": false
+          },
+          {
+            "id": "det12",
+            "category": "person",
+            "text": "Blur",
+            "pressed": null,
+            "off": false
+          }
+        ]
+      },
+      "space": {
+        "enabled": {
+          "0": false,
+          "1": false,
+          "2": true,
+          "3": false,
+          "4": true,
+          "5": true,
+          "6": true,
+          "7": true,
+          "8": false,
+          "9": false,
+          "10": true,
+          "11": false,
+          "12": true
+        },
+        "members": {
+          "1": [
+            0,
+            1,
+            11
+          ],
+          "2": [
+            2
+          ],
+          "3": [
+            3
+          ],
+          "4": [
+            4,
+            5
+          ],
+          "6": [
+            6
+          ],
+          "7": [
+            7
+          ],
+          "10": [
+            10
+          ],
+          "12": [
+            12
+          ]
+        },
+        "cards": [
+          {
+            "id": "det8",
+            "category": "zdrop",
+            "text": "Keep",
+            "pressed": null,
+            "off": true
+          },
+          {
+            "id": "det9",
+            "category": "zdrop",
+            "text": "Keep",
+            "pressed": null,
+            "off": true
+          },
+          {
+            "id": "det1",
+            "category": "face",
+            "text": "Keep",
+            "pressed": null,
+            "off": true
+          },
+          {
+            "id": "det2",
+            "category": "face",
+            "text": "Blur",
+            "pressed": null,
+            "off": false
+          },
+          {
+            "id": "det3",
+            "category": "face",
+            "text": "Keep",
+            "pressed": null,
+            "off": true
+          },
+          {
+            "id": "det4",
+            "category": "face",
+            "text": "Blur",
+            "pressed": null,
+            "off": false
+          },
+          {
+            "id": "det10",
+            "category": "face",
+            "text": "Blur",
+            "pressed": null,
+            "off": false
+          },
+          {
+            "id": "det6",
+            "category": "plate",
+            "text": "Blur",
+            "pressed": null,
+            "off": false
+          },
+          {
+            "id": "det7",
+            "category": "email",
+            "text": "Blur",
+            "pressed": null,
+            "off": false
+          },
+          {
+            "id": "det12",
+            "category": "person",
+            "text": "Blur",
+            "pressed": null,
+            "off": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "category explicit setter is idempotent, excludes zones and other categories",
+      "category": {
+        "enabled": {
+          "0": false,
+          "1": false,
+          "2": false,
+          "3": false,
+          "4": false,
+          "5": false,
+          "6": true,
+          "7": true,
+          "8": false,
+          "9": false,
+          "10": false,
+          "11": false,
+          "12": true
+        },
+        "members": {
+          "1": [
+            0,
+            1,
+            11
+          ],
+          "2": [
+            2
+          ],
+          "3": [
+            3
+          ],
+          "4": [
+            4,
+            5
+          ],
+          "6": [
+            6
+          ],
+          "7": [
+            7
+          ],
+          "10": [
+            10
+          ],
+          "12": [
+            12
+          ]
+        },
+        "cards": [
+          {
+            "id": "det8",
+            "category": "zdrop",
+            "text": "Keep",
+            "pressed": null,
+            "off": true
+          },
+          {
+            "id": "det9",
+            "category": "zdrop",
+            "text": "Keep",
+            "pressed": null,
+            "off": true
+          },
+          {
+            "id": "det1",
+            "category": "face",
+            "text": "Keep",
+            "pressed": null,
+            "off": true
+          },
+          {
+            "id": "det2",
+            "category": "face",
+            "text": "Keep",
+            "pressed": null,
+            "off": true
+          },
+          {
+            "id": "det3",
+            "category": "face",
+            "text": "Keep",
+            "pressed": null,
+            "off": true
+          },
+          {
+            "id": "det4",
+            "category": "face",
+            "text": "Keep",
+            "pressed": null,
+            "off": true
+          },
+          {
+            "id": "det10",
+            "category": "face",
+            "text": "Keep",
+            "pressed": null,
+            "off": true
+          },
+          {
+            "id": "det6",
+            "category": "plate",
+            "text": "Blur",
+            "pressed": null,
+            "off": false
+          },
+          {
+            "id": "det7",
+            "category": "email",
+            "text": "Blur",
+            "pressed": null,
+            "off": false
+          },
+          {
+            "id": "det12",
+            "category": "person",
+            "text": "Blur",
+            "pressed": null,
+            "off": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "desktop marquee bulk explicit choice",
+      "selected": [
+        4
+      ],
+      "bulk": {
+        "enabled": {
+          "0": false,
+          "1": false,
+          "2": false,
+          "3": false,
+          "4": true,
+          "5": true,
+          "6": true,
+          "7": true,
+          "8": false,
+          "9": false,
+          "10": false,
+          "11": false,
+          "12": true
+        },
+        "members": {
+          "1": [
+            0,
+            1,
+            11
+          ],
+          "2": [
+            2
+          ],
+          "3": [
+            3
+          ],
+          "4": [
+            4,
+            5
+          ],
+          "6": [
+            6
+          ],
+          "7": [
+            7
+          ],
+          "10": [
+            10
+          ],
+          "12": [
+            12
+          ]
+        },
+        "cards": [
+          {
+            "id": "det8",
+            "category": "zdrop",
+            "text": "Keep",
+            "pressed": null,
+            "off": true
+          },
+          {
+            "id": "det9",
+            "category": "zdrop",
+            "text": "Keep",
+            "pressed": null,
+            "off": true
+          },
+          {
+            "id": "det1",
+            "category": "face",
+            "text": "Keep",
+            "pressed": null,
+            "off": true
+          },
+          {
+            "id": "det2",
+            "category": "face",
+            "text": "Keep",
+            "pressed": null,
+            "off": true
+          },
+          {
+            "id": "det3",
+            "category": "face",
+            "text": "Keep",
+            "pressed": null,
+            "off": true
+          },
+          {
+            "id": "det4",
+            "category": "face",
+            "text": "Blur",
+            "pressed": null,
+            "off": false
+          },
+          {
+            "id": "det10",
+            "category": "face",
+            "text": "Keep",
+            "pressed": null,
+            "off": true
+          },
+          {
+            "id": "det6",
+            "category": "plate",
+            "text": "Blur",
+            "pressed": null,
+            "off": false
+          },
+          {
+            "id": "det7",
+            "category": "email",
+            "text": "Blur",
+            "pressed": null,
+            "off": false
+          },
+          {
+            "id": "det12",
+            "category": "person",
+            "text": "Blur",
+            "pressed": null,
+            "off": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "Escape clears marquee selection",
+      "selection": []
+    },
+    {
+      "name": "zone rows stay independent; summary is static even after enabling",
+      "zone": {
+        "enabled": {
+          "0": false,
+          "1": false,
+          "2": false,
+          "3": false,
+          "4": true,
+          "5": true,
+          "6": true,
+          "7": true,
+          "8": true,
+          "9": true,
+          "10": false,
+          "11": false,
+          "12": true
+        },
+        "members": {
+          "1": [
+            0,
+            1,
+            11
+          ],
+          "2": [
+            2
+          ],
+          "3": [
+            3
+          ],
+          "4": [
+            4,
+            5
+          ],
+          "6": [
+            6
+          ],
+          "7": [
+            7
+          ],
+          "10": [
+            10
+          ],
+          "12": [
+            12
+          ]
+        },
+        "cards": [
+          {
+            "id": "det8",
+            "category": "zdrop",
+            "text": "Blur",
+            "pressed": null,
+            "off": false
+          },
+          {
+            "id": "det9",
+            "category": "zdrop",
+            "text": "Blur",
+            "pressed": null,
+            "off": false
+          },
+          {
+            "id": "det1",
+            "category": "face",
+            "text": "Keep",
+            "pressed": null,
+            "off": true
+          },
+          {
+            "id": "det2",
+            "category": "face",
+            "text": "Keep",
+            "pressed": null,
+            "off": true
+          },
+          {
+            "id": "det3",
+            "category": "face",
+            "text": "Keep",
+            "pressed": null,
+            "off": true
+          },
+          {
+            "id": "det4",
+            "category": "face",
+            "text": "Blur",
+            "pressed": null,
+            "off": false
+          },
+          {
+            "id": "det10",
+            "category": "face",
+            "text": "Keep",
+            "pressed": null,
+            "off": true
+          },
+          {
+            "id": "det6",
+            "category": "plate",
+            "text": "Blur",
+            "pressed": null,
+            "off": false
+          },
+          {
+            "id": "det7",
+            "category": "email",
+            "text": "Blur",
+            "pressed": null,
+            "off": false
+          },
+          {
+            "id": "det12",
+            "category": "person",
+            "text": "Blur",
+            "pressed": null,
+            "off": false
+          }
+        ]
+      },
+      "summary": "⚠ 2 detection(s) outside your zones — NOT blurred (mostly logos/labels by design; open only if something real was zoned out)"
+    },
+    {
+      "name": "enlarged original preview and Escape",
+      "zoom": "api/jobs/qa/detframe/8"
+    },
+    {
+      "name": "editor non-representative Remove blur is row-local",
+      "editor": {
+        "enabled": {
+          "0": false,
+          "1": false,
+          "2": true,
+          "3": false,
+          "4": true,
+          "5": false,
+          "6": true,
+          "7": true,
+          "8": false,
+          "9": false,
+          "10": true,
+          "11": true,
+          "12": true
+        },
+        "members": {
+          "1": [
+            0,
+            1,
+            11
+          ],
+          "2": [
+            2
+          ],
+          "3": [
+            3
+          ],
+          "4": [
+            4,
+            5
+          ],
+          "6": [
+            6
+          ],
+          "7": [
+            7
+          ],
+          "10": [
+            10
+          ],
+          "12": [
+            12
+          ]
+        },
+        "cards": [
+          {
+            "id": "det8",
+            "category": "zdrop",
+            "text": "Keep",
+            "pressed": null,
+            "off": true
+          },
+          {
+            "id": "det9",
+            "category": "zdrop",
+            "text": "Keep",
+            "pressed": null,
+            "off": true
+          },
+          {
+            "id": "det1",
+            "category": "face",
+            "text": "Keep",
+            "pressed": null,
+            "off": true
+          },
+          {
+            "id": "det2",
+            "category": "face",
+            "text": "Blur",
+            "pressed": null,
+            "off": false
+          },
+          {
+            "id": "det3",
+            "category": "face",
+            "text": "Keep",
+            "pressed": null,
+            "off": true
+          },
+          {
+            "id": "det4",
+            "category": "face",
+            "text": "Blur",
+            "pressed": null,
+            "off": false
+          },
+          {
+            "id": "det10",
+            "category": "face",
+            "text": "Blur",
+            "pressed": null,
+            "off": false
+          },
+          {
+            "id": "det6",
+            "category": "plate",
+            "text": "Blur",
+            "pressed": null,
+            "off": false
+          },
+          {
+            "id": "det7",
+            "category": "email",
+            "text": "Blur",
+            "pressed": null,
+            "off": false
+          },
+          {
+            "id": "det12",
+            "category": "person",
+            "text": "Blur",
+            "pressed": null,
+            "off": false
+          }
+        ]
+      },
+      "remainingEditorRows": [
+        2,
+        4,
+        6,
+        7,
+        10,
+        11,
+        12
+      ]
+    },
+    {
+      "name": "editor representative Remove blur propagates to card group",
+      "editor": {
+        "enabled": {
+          "0": false,
+          "1": false,
+          "2": true,
+          "3": true,
+          "4": true,
+          "5": true,
+          "6": true,
+          "7": true,
+          "8": false,
+          "9": false,
+          "10": true,
+          "11": false,
+          "12": true
+        },
+        "members": {
+          "1": [
+            0,
+            1,
+            11
+          ],
+          "2": [
+            2
+          ],
+          "3": [
+            3
+          ],
+          "4": [
+            4,
+            5
+          ],
+          "6": [
+            6
+          ],
+          "7": [
+            7
+          ],
+          "10": [
+            10
+          ],
+          "12": [
+            12
+          ]
+        },
+        "cards": [
+          {
+            "id": "det8",
+            "category": "zdrop",
+            "text": "Keep",
+            "pressed": null,
+            "off": true
+          },
+          {
+            "id": "det9",
+            "category": "zdrop",
+            "text": "Keep",
+            "pressed": null,
+            "off": true
+          },
+          {
+            "id": "det1",
+            "category": "face",
+            "text": "Keep",
+            "pressed": null,
+            "off": true
+          },
+          {
+            "id": "det2",
+            "category": "face",
+            "text": "Blur",
+            "pressed": null,
+            "off": false
+          },
+          {
+            "id": "det3",
+            "category": "face",
+            "text": "Blur",
+            "pressed": null,
+            "off": false
+          },
+          {
+            "id": "det4",
+            "category": "face",
+            "text": "Blur",
+            "pressed": null,
+            "off": false
+          },
+          {
+            "id": "det10",
+            "category": "face",
+            "text": "Blur",
+            "pressed": null,
+            "off": false
+          },
+          {
+            "id": "det6",
+            "category": "plate",
+            "text": "Blur",
+            "pressed": null,
+            "off": false
+          },
+          {
+            "id": "det7",
+            "category": "email",
+            "text": "Blur",
+            "pressed": null,
+            "off": false
+          },
+          {
+            "id": "det12",
+            "category": "person",
+            "text": "Blur",
+            "pressed": null,
+            "off": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "controlled HTTP save and reopen; render acknowledged only",
+      "post": {
+        "enabled": {
+          "0": false,
+          "1": false,
+          "2": false,
+          "3": false,
+          "4": false,
+          "5": false,
+          "6": true,
+          "7": true,
+          "8": false,
+          "9": false,
+          "10": false,
+          "11": false,
+          "12": true
+        },
+        "manual": [],
+        "box_overrides": {},
+        "time_overrides": {},
+        "audio": []
+      },
+      "renders": 1,
+      "reopened": {
+        "enabled": {
+          "0": false,
+          "1": false,
+          "2": false,
+          "3": false,
+          "4": false,
+          "5": false,
+          "6": true,
+          "7": true,
+          "8": false,
+          "9": false,
+          "10": false,
+          "11": false,
+          "12": true
+        },
+        "members": {
+          "1": [
+            0,
+            1,
+            11
+          ],
+          "2": [
+            2
+          ],
+          "3": [
+            3
+          ],
+          "4": [
+            4,
+            5
+          ],
+          "6": [
+            6
+          ],
+          "7": [
+            7
+          ],
+          "10": [
+            10
+          ],
+          "12": [
+            12
+          ]
+        },
+        "cards": [
+          {
+            "id": "det8",
+            "category": "zdrop",
+            "text": "Keep",
+            "pressed": null,
+            "off": true
+          },
+          {
+            "id": "det9",
+            "category": "zdrop",
+            "text": "Keep",
+            "pressed": null,
+            "off": true
+          },
+          {
+            "id": "det1",
+            "category": "face",
+            "text": "Keep",
+            "pressed": null,
+            "off": true
+          },
+          {
+            "id": "det2",
+            "category": "face",
+            "text": "Keep",
+            "pressed": null,
+            "off": true
+          },
+          {
+            "id": "det3",
+            "category": "face",
+            "text": "Keep",
+            "pressed": null,
+            "off": true
+          },
+          {
+            "id": "det4",
+            "category": "face",
+            "text": "Keep",
+            "pressed": null,
+            "off": true
+          },
+          {
+            "id": "det10",
+            "category": "face",
+            "text": "Keep",
+            "pressed": null,
+            "off": true
+          },
+          {
+            "id": "det6",
+            "category": "plate",
+            "text": "Blur",
+            "pressed": null,
+            "off": false
+          },
+          {
+            "id": "det7",
+            "category": "email",
+            "text": "Blur",
+            "pressed": null,
+            "off": false
+          },
+          {
+            "id": "det12",
+            "category": "person",
+            "text": "Blur",
+            "pressed": null,
+            "off": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "mobile tooltip guard and placement",
+      "checkedBefore": false,
+      "help": {
+        "open": true,
+        "below": false,
+        "width": "250px",
+        "offset": "0px",
+        "checked": false
+      }
+    },
+    {
+      "name": "draft same-value explicit setter and newer opposite choice survives ACK",
+      "untouched": {},
+      "sameValue": {
+        "4": true,
+        "5": true
+      },
+      "pending": {
+        "4": false,
+        "5": false
+      },
+      "afterAck": {
+        "enabled": {
+          "4": false,
+          "5": false
+        },
+        "status": "Submitted edits saved. Newer edits are still pending — save again to include them before rendering."
+      },
+      "post": {
+        "enabled": {
+          "4": true,
+          "5": true
+        },
+        "manual": [],
+        "box_overrides": {},
+        "time_overrides": {}
+      },
+      "renders": 0
+    }
+  ],
+  "errors": [],
+  "console": [],
+  "requests": [
+    {
+      "pin": "austin",
+      "method": "GET",
+      "path": "/api/model_status"
+    },
+    {
+      "pin": "austin",
+      "method": "GET",
+      "path": "/api/custom_cats"
+    },
+    {
+      "pin": "austin",
+      "method": "GET",
+      "path": "/api/models/face"
+    },
+    {
+      "pin": "austin",
+      "method": "GET",
+      "path": "/api/quality_tier"
+    },
+    {
+      "pin": "austin",
+      "method": "GET",
+      "path": "/api/allowlist"
+    },
+    {
+      "pin": "austin",
+      "method": "GET",
+      "path": "/api/certinfo"
+    },
+    {
+      "pin": "austin",
+      "method": "GET",
+      "path": "/api/jobs"
+    },
+    {
+      "pin": "austin",
+      "method": "GET",
+      "path": "/api/update_check"
+    },
+    {
+      "pin": "austin",
+      "method": "GET",
+      "path": "/api/vault"
+    },
+    {
+      "pin": "austin",
+      "method": "GET",
+      "path": "/api/extras"
+    },
+    {
+      "pin": "austin",
+      "method": "GET",
+      "path": "/api/models/plate"
+    },
+    {
+      "pin": "austin",
+      "method": "GET",
+      "path": "/api/models/person"
+    },
+    {
+      "pin": "austin",
+      "method": "GET",
+      "path": "/api/jobs/qa"
+    },
+    {
+      "pin": "austin",
+      "method": "GET",
+      "path": "/api/jobs/qa/log"
+    },
+    {
+      "pin": "austin",
+      "method": "GET",
+      "path": "/api/jobs/qa/detections"
+    },
+    {
+      "pin": "austin",
+      "method": "GET",
+      "path": "/api/jobs"
+    },
+    {
+      "pin": "austin",
+      "method": "GET",
+      "path": "/api/jobs/qa/thumb/1"
+    },
+    {
+      "pin": "austin",
+      "method": "GET",
+      "path": "/api/jobs/qa/thumb/2"
+    },
+    {
+      "pin": "austin",
+      "method": "GET",
+      "path": "/api/jobs/qa/thumb/3"
+    },
+    {
+      "pin": "austin",
+      "method": "GET",
+      "path": "/api/jobs/qa/thumb/4"
+    },
+    {
+      "pin": "austin",
+      "method": "GET",
+      "path": "/api/jobs/qa/thumb/10"
+    },
+    {
+      "pin": "austin",
+      "method": "GET",
+      "path": "/api/jobs/qa/thumb/6"
+    },
+    {
+      "pin": "austin",
+      "method": "GET",
+      "path": "/api/jobs/qa/thumb/7"
+    },
+    {
+      "pin": "austin",
+      "method": "GET",
+      "path": "/api/jobs/qa/thumb/12"
+    },
+    {
+      "pin": "austin",
+      "method": "GET",
+      "path": "/api/jobs/qa/thumb/8"
+    },
+    {
+      "pin": "austin",
+      "method": "GET",
+      "path": "/api/jobs/qa/thumb/9"
+    },
+    {
+      "pin": "austin",
+      "method": "GET",
+      "path": "/api/jobs/qa/detframe/8"
+    },
+    {
+      "pin": "austin",
+      "method": "GET",
+      "path": "/api/jobs/qa/detections"
+    },
+    {
+      "pin": "austin",
+      "method": "GET",
+      "path": "/api/jobs/qa/mediainfo"
+    },
+    {
+      "pin": "austin",
+      "method": "GET",
+      "path": "/api/jobs/qa/report"
+    },
+    {
+      "pin": "austin",
+      "method": "GET",
+      "path": "/api/jobs/qa/boxes_at"
+    },
+    {
+      "pin": "austin",
+      "method": "GET",
+      "path": "/api/jobs/qa/frame_at"
+    },
+    {
+      "pin": "austin",
+      "method": "GET",
+      "path": "/api/jobs/qa/detections"
+    },
+    {
+      "pin": "austin",
+      "method": "GET",
+      "path": "/api/jobs/qa"
+    },
+    {
+      "pin": "austin",
+      "method": "GET",
+      "path": "/api/jobs/qa/log"
+    },
+    {
+      "pin": "austin",
+      "method": "GET",
+      "path": "/api/jobs"
+    },
+    {
+      "pin": "austin",
+      "method": "GET",
+      "path": "/api/jobs/qa/mediainfo"
+    },
+    {
+      "pin": "austin",
+      "method": "GET",
+      "path": "/api/jobs/qa/report"
+    },
+    {
+      "pin": "austin",
+      "method": "GET",
+      "path": "/api/jobs/qa/boxes_at"
+    },
+    {
+      "pin": "austin",
+      "method": "POST",
+      "path": "/api/jobs/qa/detections"
+    },
+    {
+      "pin": "austin",
+      "method": "POST",
+      "path": "/api/jobs/qa/render"
+    },
+    {
+      "pin": "austin",
+      "method": "GET",
+      "path": "/api/jobs/qa/detections"
+    },
+    {
+      "pin": "draft",
+      "method": "GET",
+      "path": "/api/model_status"
+    },
+    {
+      "pin": "draft",
+      "method": "GET",
+      "path": "/api/custom_cats"
+    },
+    {
+      "pin": "draft",
+      "method": "GET",
+      "path": "/api/models/face"
+    },
+    {
+      "pin": "draft",
+      "method": "GET",
+      "path": "/api/quality_tier"
+    },
+    {
+      "pin": "draft",
+      "method": "GET",
+      "path": "/api/allowlist"
+    },
+    {
+      "pin": "draft",
+      "method": "GET",
+      "path": "/api/certinfo"
+    },
+    {
+      "pin": "draft",
+      "method": "GET",
+      "path": "/api/jobs"
+    },
+    {
+      "pin": "draft",
+      "method": "GET",
+      "path": "/api/update_check"
+    },
+    {
+      "pin": "draft",
+      "method": "GET",
+      "path": "/api/vault"
+    },
+    {
+      "pin": "draft",
+      "method": "GET",
+      "path": "/api/extras"
+    },
+    {
+      "pin": "draft",
+      "method": "GET",
+      "path": "/api/models/plate"
+    },
+    {
+      "pin": "draft",
+      "method": "GET",
+      "path": "/api/models/person"
+    },
+    {
+      "pin": "draft",
+      "method": "GET",
+      "path": "/api/jobs/qa"
+    },
+    {
+      "pin": "draft",
+      "method": "GET",
+      "path": "/api/jobs/qa/log"
+    },
+    {
+      "pin": "draft",
+      "method": "GET",
+      "path": "/api/jobs/qa/detections"
+    },
+    {
+      "pin": "draft",
+      "method": "GET",
+      "path": "/api/jobs"
+    },
+    {
+      "pin": "draft",
+      "method": "GET",
+      "path": "/api/jobs/qa/thumb/1"
+    },
+    {
+      "pin": "draft",
+      "method": "GET",
+      "path": "/api/jobs/qa/thumb/2"
+    },
+    {
+      "pin": "draft",
+      "method": "GET",
+      "path": "/api/jobs/qa/thumb/3"
+    },
+    {
+      "pin": "draft",
+      "method": "GET",
+      "path": "/api/jobs/qa/thumb/4"
+    },
+    {
+      "pin": "draft",
+      "method": "GET",
+      "path": "/api/jobs/qa/thumb/10"
+    },
+    {
+      "pin": "draft",
+      "method": "GET",
+      "path": "/api/jobs/qa/thumb/6"
+    },
+    {
+      "pin": "draft",
+      "method": "GET",
+      "path": "/api/jobs/qa/thumb/7"
+    },
+    {
+      "pin": "draft",
+      "method": "GET",
+      "path": "/api/jobs/qa/thumb/12"
+    },
+    {
+      "pin": "draft",
+      "method": "POST",
+      "path": "/api/jobs/qa/detections"
+    }
+  ]
+}

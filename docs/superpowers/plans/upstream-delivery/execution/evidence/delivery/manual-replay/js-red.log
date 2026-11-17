@@ -1,0 +1,137 @@
+FFF                                                                      [100%]
+=================================== FAILURES ===================================
+___ test_manual_id_is_generated_once_retained_and_serialized_on_retry[False] ___
+
+fallback = False
+
+    @pytest.mark.parametrize("fallback", [False, True])
+    def test_manual_id_is_generated_once_retained_and_serialized_on_retry(fallback):
+>       run_js("""setup();if(FALLBACK)crypto={getRandomValues:crypto.getRandomValues.bind(crypto)};
+        const p=saveAndRender();const ids=calls[0].body.manual.map(m=>m.manual_id);
+        assert(ids.every(id=>/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(id)));
+        assert.notEqual(ids[0],ids[1]);await reply({error:'lost response'},500);await p;
+        openJob('B');openJob('A');const q=saveAndRender();
+        assert.deepEqual(calls[1].body.manual.map(m=>m.manual_id),ids);
+        await reply();await reply();await q;""".replace('FALLBACK', str(fallback).lower()))
+
+tests/test_review_save_failures.py:389: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = 'setup();if(false)crypto={getRandomValues:crypto.getRandomValues.bind(crypto)};\n    const p=saveAndRender();const ids...nder();\n    assert.deepEqual(calls[1].body.manual.map(m=>m.manual_id),ids);\n    await reply();await reply();await q;'
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+E         
+E           assert(ids.every(id=>/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(id)))
+E         
+E             at evalmachine.<anonymous>:3:5
+E             at evalmachine.<anonymous>:7:43
+E             at Script.runInContext (node:vm:149:12)
+E             at Object.runInContext (node:vm:301:6)
+E             at run ([eval]:30:38)
+E             at [eval]:32:18
+E             at [eval]:32:56
+E             at [eval]:33:4
+E             at runScriptInThisContext (node:internal/vm:209:10)
+E             at node:internal/process/execution:446:12 {
+E           generatedMessage: true,
+E           code: 'ERR_ASSERTION',
+E           actual: false,
+E           expected: true,
+E           operator: '==',
+E           diff: 'simple'
+E         }
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...ssage: true,\n  code: 'ERR_ASSERTION',\n  actual: false,\n  expected: true,\n  operator: '==',\n  diff: 'simple'\n}\n").returncode
+
+tests/test_review_save_failures.py:64: AssertionError
+___ test_manual_id_is_generated_once_retained_and_serialized_on_retry[True] ____
+
+fallback = True
+
+    @pytest.mark.parametrize("fallback", [False, True])
+    def test_manual_id_is_generated_once_retained_and_serialized_on_retry(fallback):
+>       run_js("""setup();if(FALLBACK)crypto={getRandomValues:crypto.getRandomValues.bind(crypto)};
+        const p=saveAndRender();const ids=calls[0].body.manual.map(m=>m.manual_id);
+        assert(ids.every(id=>/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(id)));
+        assert.notEqual(ids[0],ids[1]);await reply({error:'lost response'},500);await p;
+        openJob('B');openJob('A');const q=saveAndRender();
+        assert.deepEqual(calls[1].body.manual.map(m=>m.manual_id),ids);
+        await reply();await reply();await q;""".replace('FALLBACK', str(fallback).lower()))
+
+tests/test_review_save_failures.py:389: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = 'setup();if(true)crypto={getRandomValues:crypto.getRandomValues.bind(crypto)};\n    const p=saveAndRender();const ids=...nder();\n    assert.deepEqual(calls[1].body.manual.map(m=>m.manual_id),ids);\n    await reply();await reply();await q;'
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+E         
+E           assert(ids.every(id=>/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(id)))
+E         
+E             at evalmachine.<anonymous>:3:5
+E             at evalmachine.<anonymous>:7:43
+E             at Script.runInContext (node:vm:149:12)
+E             at Object.runInContext (node:vm:301:6)
+E             at run ([eval]:30:38)
+E             at [eval]:32:18
+E             at [eval]:32:56
+E             at [eval]:33:4
+E             at runScriptInThisContext (node:internal/vm:209:10)
+E             at node:internal/process/execution:446:12 {
+E           generatedMessage: true,
+E           code: 'ERR_ASSERTION',
+E           actual: false,
+E           expected: true,
+E           operator: '==',
+E           diff: 'simple'
+E         }
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...ssage: true,\n  code: 'ERR_ASSERTION',\n  actual: false,\n  expected: true,\n  operator: '==',\n  diff: 'simple'\n}\n").returncode
+
+tests/test_review_save_failures.py:64: AssertionError
+_______ test_missing_secure_randomness_retains_drafts_and_reports_error ________
+
+    def test_missing_secure_randomness_retains_drafts_and_reports_error():
+>       run_js("""setup();crypto={};const p=saveAndRender();await p;
+        assert.equal(calls.length,0);assert.equal(BE.adds.length,1);assert.equal(MAN.length,1);
+        assert(document.getElementById('reviewSaveStatus').textContent.includes('random'));
+        assert(!EDITS.busy);""")
+
+tests/test_review_save_failures.py:399: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "setup();crypto={};const p=saveAndRender();await p;\n    assert.equal(calls.length,0);assert.equal(BE.adds.length,1);a...1);\n    assert(document.getElementById('reviewSaveStatus').textContent.includes('random'));\n    assert(!EDITS.busy);"
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: scenario left a pending request
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...catch(e=>{console.error(e);process.exit(1)});\n'], returncode=1, stdout='', stderr='scenario left a pending request\n').returncode
+
+tests/test_review_save_failures.py:64: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_review_save_failures.py::test_manual_id_is_generated_once_retained_and_serialized_on_retry[False]
+FAILED tests/test_review_save_failures.py::test_manual_id_is_generated_once_retained_and_serialized_on_retry[True]
+FAILED tests/test_review_save_failures.py::test_missing_secure_randomness_retains_drafts_and_reports_error
+3 failed, 80 deselected in 2.42s

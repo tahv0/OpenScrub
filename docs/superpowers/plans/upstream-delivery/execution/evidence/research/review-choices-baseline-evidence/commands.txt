@@ -1,0 +1,53 @@
+Working directory: /home/tahv0/src/OpenScrub
+Research root: /tmp/openscrub-review-choices-20261117
+
+Full pinned exports (executed once; no changes made inside exports):
+mkdir -p /tmp/openscrub-review-choices-20261117/austin /tmp/openscrub-review-choices-20261117/draft
+git archive e21ebdf6e3ee46e6c65050dc956a9a3459152269 | tar -x -C /tmp/openscrub-review-choices-20261117/austin
+git archive 92124753736e287ac800af91f0ac96f3e96c01be | tar -x -C /tmp/openscrub-review-choices-20261117/draft
+
+Pin identity:
+git rev-parse e21ebdf6e3ee46e6c65050dc956a9a3459152269 92124753736e287ac800af91f0ac96f3e96c01be 39b4ed83
+git ls-tree e21ebdf6e3ee46e6c65050dc956a9a3459152269 openscrub_web.py zones_ui.py openscrub.py
+git ls-tree 92124753736e287ac800af91f0ac96f3e96c01be openscrub_web.py zones_ui.py openscrub.py
+
+Ordinary baseline blobs:
+openscrub.py f02b4d018fb0de9f906ad16d5b8b9b172dfde293
+openscrub_web.py 61589a6ebe0950ea5b0364e6d27dec01e3346e3b
+zones_ui.py b26c0a810f6c985b53e4ca0d0b1ef0190a731ae5
+Draft-interface pin differs in openscrub_web.py: ddffb01d906341bbeaf878e2defb8019561d499f
+Full donor pin: 39b4ed830b4cbc60c50876c4a6c3a12645a7090f
+
+Bounded source reads:
+P02 plan: docs/superpowers/plans/upstream-delivery/01-core-ux-and-reliability.md:44-58
+Relevant audit rows: execution/preservation/core-semantic-audit.md:100-102,128,131;
+preservation-audit.md:P15; history-disposition-audit.md:176-199,309-316.
+git show 39b4ed83 -- openscrub_web.py
+Pinned source excerpts: loadReview/applyDet/category/marquee/help/keyboard/save,
+editor beFilter/beHook/beRemove/zoomDet, index/PAGE composition,
+draft owner/applyDet/save/ack handling, and ordinary report enabled projection.
+
+Emit the full unmodified application without imports:
+. /tmp/openscrub-baseline-20261116/env-opencv4.sh
+python /tmp/openscrub-review-choices-20261117/emit.py
+
+Browser fallback (Browser plugin not available):
+. /tmp/openscrub-baseline-20261116/env-opencv4.sh
+PLAYWRIGHT_BROWSERS_PATH=/tmp/openscrub-save-as-20261116/browsers LD_LIBRARY_PATH=/tmp/openscrub-save-as-20261116/tools/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH node /tmp/openscrub-review-choices-20261117/browser.cjs > /tmp/openscrub-review-choices-20261117/browser.log 2>&1
+
+Initial Chromium launch inside sandbox failed at sandbox_host_linux.cc:41
+(Operation not permitted); authorized escalated launch succeeded.
+An initial harness-only locator chose a help tip in closed Advanced settings;
+the harness now opens that panel and chooses the checkbox-label help tip.
+Final run: {"status":"passed","scenarios":14,"errors":[],"console":[]}
+All application HTTP fulfilled in Playwright at http://127.0.0.1:18507.
+No backend execution, disk persistence, real render, inference, model download,
+dependency installation, full suite/build, or performance test.
+
+Versions:
+/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python --version
+Python 3.12.16
+node --version
+v22.22.1
+/tmp/openscrub-save-as-20261116/node_modules/.bin/playwright --version
+Version 1.65.1

@@ -1,0 +1,374 @@
+[
+  {
+    "mode": "ack",
+    "creation": {
+      "manual_id": "2d7cd0cd-a2a5-4738-9573-ef51adcb1f52",
+      "box": [
+        20,
+        20,
+        60,
+        60
+      ],
+      "t0": 0,
+      "t1": 4,
+      "tref": 0
+    },
+    "second": "c72697e8-3835-44f1-aeba-9ec9a0a27c42",
+    "requests": [
+      {
+        "enabled": {},
+        "manual": [
+          {
+            "manual_id": "2d7cd0cd-a2a5-4738-9573-ef51adcb1f52",
+            "t_start": 0,
+            "t_end": 4,
+            "t_ref": 0,
+            "screen_box": [
+              20,
+              20,
+              60,
+              60
+            ]
+          }
+        ],
+        "box_overrides": {},
+        "time_overrides": {}
+      },
+      {
+        "enabled": {
+          "0": false
+        },
+        "manual": [
+          {
+            "manual_id": "c72697e8-3835-44f1-aeba-9ec9a0a27c42",
+            "t_start": 0,
+            "t_end": 4,
+            "t_ref": 1,
+            "screen_box": [
+              20,
+              20,
+              60,
+              60
+            ]
+          }
+        ],
+        "box_overrides": {
+          "0": [
+            30,
+            30,
+            80,
+            90
+          ]
+        },
+        "time_overrides": {
+          "0": [
+            0.5,
+            5
+          ]
+        }
+      },
+      {
+        "enabled": {
+          "0": false
+        },
+        "manual": [
+          {
+            "manual_id": "c72697e8-3835-44f1-aeba-9ec9a0a27c42",
+            "t_start": 0,
+            "t_end": 4,
+            "t_ref": 1,
+            "screen_box": [
+              20,
+              20,
+              60,
+              60
+            ]
+          }
+        ],
+        "box_overrides": {
+          "0": [
+            30,
+            30,
+            80,
+            90
+          ]
+        },
+        "time_overrides": {
+          "0": [
+            0.5,
+            5
+          ]
+        }
+      }
+    ],
+    "current": [
+      {
+        "t_start": 0.5,
+        "t_end": 5,
+        "cbox": [
+          30,
+          30,
+          80,
+          90
+        ],
+        "aoff": [
+          0,
+          0
+        ],
+        "category": "manual",
+        "text": "user-drawn",
+        "confidence": 1,
+        "last_seen": 0.5,
+        "enabled": false,
+        "manual_id": "2d7cd0cd-a2a5-4738-9573-ef51adcb1f52",
+        "manual_creation": {
+          "t_start": 0,
+          "t_end": 4,
+          "cbox": [
+            20,
+            20,
+            60,
+            60
+          ],
+          "aoff": [
+            0,
+            0
+          ]
+        }
+      },
+      {
+        "t_start": 0,
+        "t_end": 4,
+        "cbox": [
+          20,
+          20,
+          60,
+          60
+        ],
+        "aoff": [
+          0,
+          0
+        ],
+        "category": "manual",
+        "text": "user-drawn",
+        "confidence": 1,
+        "last_seen": 0,
+        "enabled": true,
+        "manual_id": "c72697e8-3835-44f1-aeba-9ec9a0a27c42",
+        "manual_creation": {
+          "t_start": 0,
+          "t_end": 4,
+          "cbox": [
+            20,
+            20,
+            60,
+            60
+          ],
+          "aoff": [
+            0,
+            0
+          ]
+        }
+      }
+    ],
+    "errors": []
+  },
+  {
+    "mode": "lost",
+    "creation": {
+      "manual_id": "9f3d0c75-8c00-423a-9795-7272493d8da7",
+      "box": [
+        20,
+        20,
+        60,
+        60
+      ],
+      "t0": 0,
+      "t1": 4,
+      "tref": 0
+    },
+    "second": "2ca09efa-390c-440f-a8eb-213bcc88f6f5",
+    "requests": [
+      {
+        "enabled": {},
+        "manual": [
+          {
+            "manual_id": "9f3d0c75-8c00-423a-9795-7272493d8da7",
+            "t_start": 0,
+            "t_end": 4,
+            "t_ref": 0,
+            "screen_box": [
+              20,
+              20,
+              60,
+              60
+            ]
+          }
+        ],
+        "box_overrides": {},
+        "time_overrides": {}
+      },
+      {
+        "enabled": {
+          "0": false
+        },
+        "manual": [
+          {
+            "manual_id": "9f3d0c75-8c00-423a-9795-7272493d8da7",
+            "t_start": 0,
+            "t_end": 4,
+            "t_ref": 0,
+            "screen_box": [
+              20,
+              20,
+              60,
+              60
+            ]
+          },
+          {
+            "manual_id": "2ca09efa-390c-440f-a8eb-213bcc88f6f5",
+            "t_start": 0,
+            "t_end": 4,
+            "t_ref": 1,
+            "screen_box": [
+              20,
+              20,
+              60,
+              60
+            ]
+          }
+        ],
+        "box_overrides": {
+          "0": [
+            30,
+            30,
+            80,
+            90
+          ]
+        },
+        "time_overrides": {
+          "0": [
+            0.5,
+            5
+          ]
+        }
+      },
+      {
+        "enabled": {
+          "0": false
+        },
+        "manual": [
+          {
+            "manual_id": "9f3d0c75-8c00-423a-9795-7272493d8da7",
+            "t_start": 0,
+            "t_end": 4,
+            "t_ref": 0,
+            "screen_box": [
+              20,
+              20,
+              60,
+              60
+            ]
+          },
+          {
+            "manual_id": "2ca09efa-390c-440f-a8eb-213bcc88f6f5",
+            "t_start": 0,
+            "t_end": 4,
+            "t_ref": 1,
+            "screen_box": [
+              20,
+              20,
+              60,
+              60
+            ]
+          }
+        ],
+        "box_overrides": {
+          "0": [
+            30,
+            30,
+            80,
+            90
+          ]
+        },
+        "time_overrides": {
+          "0": [
+            0.5,
+            5
+          ]
+        }
+      }
+    ],
+    "current": [
+      {
+        "t_start": 0.5,
+        "t_end": 5,
+        "cbox": [
+          30,
+          30,
+          80,
+          90
+        ],
+        "aoff": [
+          0,
+          0
+        ],
+        "category": "manual",
+        "text": "user-drawn",
+        "confidence": 1,
+        "last_seen": 0.5,
+        "enabled": false,
+        "manual_id": "9f3d0c75-8c00-423a-9795-7272493d8da7",
+        "manual_creation": {
+          "t_start": 0,
+          "t_end": 4,
+          "cbox": [
+            20,
+            20,
+            60,
+            60
+          ],
+          "aoff": [
+            0,
+            0
+          ]
+        }
+      },
+      {
+        "t_start": 0,
+        "t_end": 4,
+        "cbox": [
+          20,
+          20,
+          60,
+          60
+        ],
+        "aoff": [
+          0,
+          0
+        ],
+        "category": "manual",
+        "text": "user-drawn",
+        "confidence": 1,
+        "last_seen": 0,
+        "enabled": true,
+        "manual_id": "2ca09efa-390c-440f-a8eb-213bcc88f6f5",
+        "manual_creation": {
+          "t_start": 0,
+          "t_end": 4,
+          "cbox": [
+            20,
+            20,
+            60,
+            60
+          ],
+          "aoff": [
+            0,
+            0
+          ]
+        }
+      }
+    ],
+    "errors": []
+  }
+]

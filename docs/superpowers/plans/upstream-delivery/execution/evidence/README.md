@@ -5,8 +5,10 @@ These local planning records preserve synthetic research, completed-task reports
 | Evidence | What it establishes |
 | --- | --- |
 | [Report baseline](research/report-baseline-research/README.md) / [transaction inventory](research/report-transaction-research.md) | Actual-route interrupted writes, lost sparse edits, replay and roundtrip loss; proposed ownership boundaries remain distinct from passing implementation evidence. |
+| [No-op save scope](research/report-noop-scope-research.md) | Actual transaction-head work counts and normalization/metadata semantics; separate unchanged-publication and conditional serializer candidates, without latency claims. |
 | [Thumbnail baseline](research/thumbnail-baseline-research.md) | Warm-hit parse avoidance, repeated cold work and visibly stale crops after report/source changes. |
 | [Review scheduling](research/review-scheduling-baseline-research.md) | Actual 1k/10k eager cards/requests, scroll and job-switch ordering, and reuse of P07a draft ownership. |
+| [Output-choice baseline](research/review-choices-baseline-research.md) | Repeated toggle/mixed-state behavior, existing group/editor scope and native keyboard/help controls; full emitted UI with controlled HTTP. |
 | [Scan history](research/scan-history-baseline-research.md) | Removed preview-cache donor closure and three distinct final-aggregation work-count candidates; controlled OCR input, no inference-throughput claim. |
 | [Scan-option input](research/options-input-baseline-research.md) | Malformed/non-object options across actual upload/server-path routes, accepted controls and complete synthetic cleanup. |
 | [HDR decoder cleanup](research/hdr-decoder-cleanup-baseline-research.md) | Actual cancellation/write-error pipe lifetime with retained exceptions, reaped children and successful HDR frame/tag controls. |
@@ -20,6 +22,7 @@ These local planning records preserve synthetic research, completed-task reports
 | [Atomic reports](delivery/task-61-report.md) / [complete roundtrip](delivery/task-64-report.md) | Complete report publication and preservation; independent concurrency work follows. |
 | [Browser save snapshots](delivery/task-71-report.md) / [audio fix review](delivery/task-71-fix1-review.md) | Pending/current draft ownership and the narrow reviewed audio correction. |
 | [Manual replay contract](research/manual-replay-contract-research.md) | Existing committed-before-ack indexed-edit flow and the need for immutable creation data; actual JS plus explicitly isolated server-function checks, not full HTTP/render/restart acceptance. |
+| [Manual replay implementation](delivery/task-72-report.md) / [review](delivery/task-72-review.md) | Stable addition identity and immutable creation through retries/later edits, actual browser schedules and render/fresh-process replay; injected response-loss boundary stated explicitly. |
 | [Combined report prerequisites](delivery/task-620-report.md) | Reviewed prerequisite assembly, full combined suite and actual save/render/reopen scenario. |
 | [Job file lifetimes](delivery/task-621-report.md) / [fix review](delivery/task-621-fix1-review.md) | Store/job/selected-source ownership, actual WSGI close and allowlist refusal behavior, with initial and amended-head verification distinguished. |
 | [Report transactions](delivery/task-622-report.md) / [review](delivery/task-622-review.md) | Latest-document updates, current tracker IDs, captured cancellation and final report/status publication, with stabilized-source runtime/build evidence. |

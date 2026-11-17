@@ -1,0 +1,36 @@
+469661d9212e2a7423af85d13bfa38a0567a5f3912882cabb25f27becb36b875  docs/superpowers/plans/upstream-delivery/01-core-ux-and-reliability.md
+c7661717ee64db708ce4c53c0b3f37a673829746d704608751eb15ba7a927a00  .superpowers/sdd/README/report-baseline-research/README.md
+09af163f8d88dc23941c1cb35b12661330c585f669da194b81d63e334588afd8  .superpowers/sdd/README/task-622-report.md
+dfc4a4e6c6fd2d2496fb971e8308629e31fcfab609bac848ba65935006c0a854  .superpowers/sdd/README/task-72-brief.md
+13b318b6519719faebf3483fc71403219d4cc799187ebacef731511b894f6ce1  .superpowers/sdd/README/report-noop-scope-evidence/probe.py
+
+Exact reviewed product pin:
+f2cdf4813c86296644911f3f0b09bfc56d3e03c5
+
+Executed once, from the supervisor repository:
+mkdir -p /tmp/openscrub-report-noop-20261117/export
+git archive f2cdf4813c86296644911f3f0b09bfc56d3e03c5 | tar -x -C /tmp/openscrub-report-noop-20261117/export
+
+Executed once from the export, with absolute output path in the actual invocation:
+. /tmp/openscrub-baseline-20261116/env-opencv4.sh
+python /tmp/openscrub-report-noop-20261117/probe.py > /home/tahv0/src/OpenScrub/.superpowers/sdd/README/report-noop-scope-evidence/run.log 2>&1
+
+Python3.9 API/source inspection only (no product imports or route run):
+. /tmp/openscrub-python39-20261117/env.sh
+python - <<'PY'
+import inspect,json,sys
+print(sys.version)
+print('stdlib:',json.__file__)
+print('dump:',inspect.signature(json.dump))
+print('dumps:',inspect.signature(json.dumps))
+print('dump-source-tail:')
+print('\n'.join(inspect.getsource(json.dump).splitlines()[-16:]))
+print('dumps-source-tail:')
+print('\n'.join(inspect.getsource(json.dumps).splitlines()[-13:]))
+print('iterencode-source-tail:')
+print('\n'.join(inspect.getsource(json.JSONEncoder.iterencode).splitlines()[-14:]))
+PY
+Output: python39-json.txt
+
+No latency timings, repeated large-report measurements, full tests/builds,
+dependency/model installs, native-worktree imports or product modifications.

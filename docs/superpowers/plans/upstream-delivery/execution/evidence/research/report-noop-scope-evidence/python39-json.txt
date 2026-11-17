@@ -1,0 +1,51 @@
+3.9.25 (main, Oct 31 2025, 23:00:23) 
+[Clang 21.1.4 ]
+stdlib: /tmp/openscrub-python39-20261117/python/cpython-3.9-linux-x86_64-gnu/lib/python3.9/json/__init__.py
+dump: (obj, fp, *, skipkeys=False, ensure_ascii=True, check_circular=True, allow_nan=True, cls=None, indent=None, separators=None, default=None, sort_keys=False, **kw)
+dumps: (obj, *, skipkeys=False, ensure_ascii=True, check_circular=True, allow_nan=True, cls=None, indent=None, separators=None, default=None, sort_keys=False, **kw)
+dump-source-tail:
+    if (not skipkeys and ensure_ascii and
+        check_circular and allow_nan and
+        cls is None and indent is None and separators is None and
+        default is None and not sort_keys and not kw):
+        iterable = _default_encoder.iterencode(obj)
+    else:
+        if cls is None:
+            cls = JSONEncoder
+        iterable = cls(skipkeys=skipkeys, ensure_ascii=ensure_ascii,
+            check_circular=check_circular, allow_nan=allow_nan, indent=indent,
+            separators=separators,
+            default=default, sort_keys=sort_keys, **kw).iterencode(obj)
+    # could accelerate with writelines in some versions of Python, at
+    # a debuggability cost
+    for chunk in iterable:
+        fp.write(chunk)
+dumps-source-tail:
+    # cached encoder
+    if (not skipkeys and ensure_ascii and
+        check_circular and allow_nan and
+        cls is None and indent is None and separators is None and
+        default is None and not sort_keys and not kw):
+        return _default_encoder.encode(obj)
+    if cls is None:
+        cls = JSONEncoder
+    return cls(
+        skipkeys=skipkeys, ensure_ascii=ensure_ascii,
+        check_circular=check_circular, allow_nan=allow_nan, indent=indent,
+        separators=separators, default=default, sort_keys=sort_keys,
+        **kw).encode(obj)
+iterencode-source-tail:
+
+
+        if (_one_shot and c_make_encoder is not None
+                and self.indent is None):
+            _iterencode = c_make_encoder(
+                markers, self.default, _encoder, self.indent,
+                self.key_separator, self.item_separator, self.sort_keys,
+                self.skipkeys, self.allow_nan)
+        else:
+            _iterencode = _make_iterencode(
+                markers, self.default, _encoder, self.indent, floatstr,
+                self.key_separator, self.item_separator, self.sort_keys,
+                self.skipkeys, _one_shot)
+        return _iterencode(o, 0)

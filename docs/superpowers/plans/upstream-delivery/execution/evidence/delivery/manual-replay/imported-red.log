@@ -1,0 +1,58 @@
+....F....                                                                [100%]
+=================================== FAILURES ===================================
+_ test_imported_identified_row_without_trustworthy_creation_conflicts_only_on_replay[creation4] _
+
+store = namespace(root=PosixPath('/tmp/openscrub-task72/imported-red-tmp/test_imported_identified_row_w4/data'), jobs=PosixPat...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x75746cd88360>, url='/api/jobs/dde4681df131')
+creation = {'t_start': 0, 't_end': 1, 'cbox': [2, 3, 20, 30], 'aoff': [100000000000000000...0000000000000000000, 0]}
+
+    @pytest.mark.parametrize('creation', [None, {}, {'t_start': 0, 't_end': 1, 'cbox': [1,2,3], 'aoff': [0,0]},
+        {'t_start': 0, 't_end': 1, 'cbox': [2,3,20,30], 'aoff': [float('nan'),0]},
+        {'t_start': 0, 't_end': 1, 'cbox': [2,3,20,30], 'aoff': [10**400,0]},
+        {'t_start': 0, 't_end': 1, 'cbox': [2.5,3,20,30], 'aoff': [0,0]},
+        {'t_start': True, 't_end': 1, 'cbox': [2,3,20,30], 'aoff': [0,0]},
+        {'t_start': 0, 't_end': 1, 'cbox': [2,3,20,30], 'aoff': [0,0], 'extra': 1}])
+    def test_imported_identified_row_without_trustworthy_creation_conflicts_only_on_replay(store, creation):
+        doc = saved(store)
+        doc['detections'][0]['manual_id'] = 'draw:one'
+        if creation is not None:
+            doc['detections'][0]['manual_creation'] = creation
+        store.path.write_text(json.dumps(doc))
+        assert post(store, [], enabled={'0': False}).status_code == 200
+        before = store.path.read_bytes()
+        response = post(store, [addition()], enabled={'0': True})
+>       assert response.status_code == 409 and response.json['error']
+E       assert (500 == 409)
+E        +  where 500 = <WrapperTestResponse 265 bytes [500 INTERNAL SERVER ERROR]>.status_code
+
+tests/test_manual_addition_replay.py:132: AssertionError
+------------------------------ Captured log call -------------------------------
+ERROR    openscrub_web:app.py:875 Exception on /api/jobs/dde4681df131/detections [POST]
+Traceback (most recent call last):
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", line 1778, in job_save_edits
+    if (len(rows) != 1 or not _valid_manual_creation(rows[0].get("manual_creation"))
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", line 1713, in _valid_manual_creation
+    and numbers(value["aoff"], 2))
+        ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", line 1706, in numbers
+    and all(type(v) in (int, float) and math.isfinite(v)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", line 1706, in <genexpr>
+    and all(type(v) in (int, float) and math.isfinite(v)
+                                        ^^^^^^^^^^^^^^^^
+OverflowError: int too large to convert to float
+=========================== short test summary info ============================
+FAILED tests/test_manual_addition_replay.py::test_imported_identified_row_without_trustworthy_creation_conflicts_only_on_replay[creation4]
+1 failed, 8 passed, 28 deselected in 0.24s

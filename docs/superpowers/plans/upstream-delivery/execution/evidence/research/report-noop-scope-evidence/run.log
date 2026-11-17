@@ -1,0 +1,16 @@
+{
+  "cases": 31,
+  "statuses": {
+    "200": 25,
+    "400": 1,
+    "404": 1,
+    "409": 1,
+    "500": 3
+  },
+  "tracked_files_verified": 124,
+  "imports": {
+    "openscrub": "/tmp/openscrub-report-noop-20261117/export/openscrub.py",
+    "openscrub_web": "/tmp/openscrub-report-noop-20261117/export/openscrub_web.py",
+    "openscrub_internal.reports": "/tmp/openscrub-report-noop-20261117/export/openscrub_internal/reports.py"
+  }
+}

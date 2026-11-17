@@ -1,0 +1,2083 @@
+{
+  "pin": "f2cdf4813c86296644911f3f0b09bfc56d3e03c5",
+  "source": "/tmp/openscrub-report-noop-20261117/export",
+  "imports": {
+    "openscrub": "/tmp/openscrub-report-noop-20261117/export/openscrub.py",
+    "openscrub_web": "/tmp/openscrub-report-noop-20261117/export/openscrub_web.py",
+    "openscrub_internal.reports": "/tmp/openscrub-report-noop-20261117/export/openscrub_internal/reports.py"
+  },
+  "tracked_files_verified": 124,
+  "tracked_path_and_sha256_manifest_sha256": "d4d94e91cb50abc56b368803c7f4ea8729adcafea4edc9446e94d2113190cf40",
+  "source_files_sha256": {
+    "openscrub.py": "275de34766d3d64592222be5633906a3dcd2557ce78e2dd7b7d6fb8075fd0355",
+    "openscrub_web.py": "8621413a6bb4d1e940c9313c06479be1b5627e566eff3c76f7760bf85227e4ca",
+    "openscrub_internal/reports.py": "e8a7429c0b5430ee290f6635ca5d5a93445d3f0fe9bb0f58e57fec891ee01b7f",
+    "openscrub_internal/lifetimes.py": "dbfc317c1c878b8e8a599391578504c44a8964199f2cdae6e2ed60a6336d6743"
+  },
+  "python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]",
+  "platform": "Linux-6.18.58.1-microsoft-standard-WSL2-x86_64-with-glibc2.43",
+  "transport": "Flask test client; full registered routes and hooks; no socket timing",
+  "results": [
+    {
+      "case": "empty-noncanonical",
+      "payload": {},
+      "status": 200,
+      "response": {
+        "ok": true,
+        "suggest_allowlist": [
+          "synthetic-recurring"
+        ],
+        "total": 2
+      },
+      "response_mimetype": "application/json",
+      "cache_control": "no-store",
+      "before": {
+        "bytes": 907,
+        "sha256": "02dcc328621e151a6716a51d5d219ef5d1f6a2030abacbf989bd24d4d2e096fa",
+        "dev": 137,
+        "inode": 193476,
+        "mtime_ns": 1700000000000000000,
+        "ctime_ns": 1794879711441291236,
+        "mode": "0o640"
+      },
+      "after": {
+        "bytes": 1601,
+        "sha256": "4a7967647470fbaf3b136503215bee25b90b7062a614da5f3208d2f7ba987e1c",
+        "dev": 137,
+        "inode": 193477,
+        "mtime_ns": 1794879711457631529,
+        "ctime_ns": 1794879711457631529,
+        "mode": "0o600"
+      },
+      "bytes_equal": false,
+      "same_file_identity": false,
+      "counts": {
+        "http_json_parses": 1,
+        "http_json_serializations": 1,
+        "report_parse_attempts": 1,
+        "report_parse_successes": 1,
+        "publication_attempts": 1,
+        "publication_successes": 1,
+        "report_serializations": 1,
+        "staging_file_creations": 1,
+        "stream_write_calls": 358,
+        "output_characters": 1601,
+        "fsync_calls": 1,
+        "replace_attempts": 1,
+        "replace_successes": 1
+      },
+      "public_job_unchanged": true,
+      "activity_touched": true,
+      "outstanding_file_owners": 0,
+      "unknown_top_and_rows_preserved": true,
+      "type_sensitive_differences": [],
+      "staging_files_remaining": []
+    },
+    {
+      "case": "empty-canonical",
+      "payload": {},
+      "status": 200,
+      "response": {
+        "ok": true,
+        "suggest_allowlist": [
+          "synthetic-recurring"
+        ],
+        "total": 2
+      },
+      "response_mimetype": "application/json",
+      "cache_control": "no-store",
+      "before": {
+        "bytes": 1601,
+        "sha256": "4a7967647470fbaf3b136503215bee25b90b7062a614da5f3208d2f7ba987e1c",
+        "dev": 137,
+        "inode": 193477,
+        "mtime_ns": 1700000000000000000,
+        "ctime_ns": 1794879711460742906,
+        "mode": "0o640"
+      },
+      "after": {
+        "bytes": 1601,
+        "sha256": "4a7967647470fbaf3b136503215bee25b90b7062a614da5f3208d2f7ba987e1c",
+        "dev": 137,
+        "inode": 193478,
+        "mtime_ns": 1794879711461404399,
+        "ctime_ns": 1794879711461404399,
+        "mode": "0o600"
+      },
+      "bytes_equal": true,
+      "same_file_identity": false,
+      "counts": {
+        "http_json_parses": 1,
+        "http_json_serializations": 1,
+        "report_parse_attempts": 1,
+        "report_parse_successes": 1,
+        "publication_attempts": 1,
+        "publication_successes": 1,
+        "report_serializations": 1,
+        "staging_file_creations": 1,
+        "stream_write_calls": 358,
+        "output_characters": 1601,
+        "fsync_calls": 1,
+        "replace_attempts": 1,
+        "replace_successes": 1
+      },
+      "public_job_unchanged": true,
+      "activity_touched": true,
+      "outstanding_file_owners": 0,
+      "unknown_top_and_rows_preserved": true,
+      "type_sensitive_differences": [],
+      "staging_files_remaining": []
+    },
+    {
+      "case": "same-enabled",
+      "payload": {
+        "enabled": {
+          "0": false
+        }
+      },
+      "status": 200,
+      "response": {
+        "ok": true,
+        "suggest_allowlist": [
+          "synthetic-recurring"
+        ],
+        "total": 2
+      },
+      "response_mimetype": "application/json",
+      "cache_control": "no-store",
+      "before": {
+        "bytes": 1601,
+        "sha256": "4a7967647470fbaf3b136503215bee25b90b7062a614da5f3208d2f7ba987e1c",
+        "dev": 137,
+        "inode": 193478,
+        "mtime_ns": 1700000000000000000,
+        "ctime_ns": 1794879711461921553,
+        "mode": "0o640"
+      },
+      "after": {
+        "bytes": 1601,
+        "sha256": "4a7967647470fbaf3b136503215bee25b90b7062a614da5f3208d2f7ba987e1c",
+        "dev": 137,
+        "inode": 193479,
+        "mtime_ns": 1794879711462548337,
+        "ctime_ns": 1794879711462548337,
+        "mode": "0o600"
+      },
+      "bytes_equal": true,
+      "same_file_identity": false,
+      "counts": {
+        "http_json_parses": 1,
+        "http_json_serializations": 1,
+        "report_parse_attempts": 1,
+        "report_parse_successes": 1,
+        "publication_attempts": 1,
+        "publication_successes": 1,
+        "report_serializations": 1,
+        "staging_file_creations": 1,
+        "stream_write_calls": 358,
+        "output_characters": 1601,
+        "fsync_calls": 1,
+        "replace_attempts": 1,
+        "replace_successes": 1
+      },
+      "public_job_unchanged": true,
+      "activity_touched": true,
+      "outstanding_file_owners": 0,
+      "unknown_top_and_rows_preserved": true,
+      "type_sensitive_differences": [],
+      "staging_files_remaining": []
+    },
+    {
+      "case": "same-box",
+      "payload": {
+        "box_overrides": {
+          "0": [
+            1,
+            2,
+            8,
+            9
+          ]
+        }
+      },
+      "status": 200,
+      "response": {
+        "ok": true,
+        "suggest_allowlist": [
+          "synthetic-recurring"
+        ],
+        "total": 2
+      },
+      "response_mimetype": "application/json",
+      "cache_control": "no-store",
+      "before": {
+        "bytes": 1601,
+        "sha256": "4a7967647470fbaf3b136503215bee25b90b7062a614da5f3208d2f7ba987e1c",
+        "dev": 137,
+        "inode": 193479,
+        "mtime_ns": 1700000000000000000,
+        "ctime_ns": 1794879711463123581,
+        "mode": "0o640"
+      },
+      "after": {
+        "bytes": 1601,
+        "sha256": "4a7967647470fbaf3b136503215bee25b90b7062a614da5f3208d2f7ba987e1c",
+        "dev": 137,
+        "inode": 193480,
+        "mtime_ns": 1794879711463741094,
+        "ctime_ns": 1794879711463741094,
+        "mode": "0o600"
+      },
+      "bytes_equal": true,
+      "same_file_identity": false,
+      "counts": {
+        "http_json_parses": 1,
+        "http_json_serializations": 1,
+        "report_parse_attempts": 1,
+        "report_parse_successes": 1,
+        "publication_attempts": 1,
+        "publication_successes": 1,
+        "report_serializations": 1,
+        "staging_file_creations": 1,
+        "stream_write_calls": 358,
+        "output_characters": 1601,
+        "fsync_calls": 1,
+        "replace_attempts": 1,
+        "replace_successes": 1
+      },
+      "public_job_unchanged": true,
+      "activity_touched": true,
+      "outstanding_file_owners": 0,
+      "unknown_top_and_rows_preserved": true,
+      "type_sensitive_differences": [],
+      "staging_files_remaining": []
+    },
+    {
+      "case": "same-time",
+      "payload": {
+        "time_overrides": {
+          "0": [
+            0,
+            1
+          ]
+        }
+      },
+      "status": 200,
+      "response": {
+        "ok": true,
+        "suggest_allowlist": [
+          "synthetic-recurring"
+        ],
+        "total": 2
+      },
+      "response_mimetype": "application/json",
+      "cache_control": "no-store",
+      "before": {
+        "bytes": 1601,
+        "sha256": "4a7967647470fbaf3b136503215bee25b90b7062a614da5f3208d2f7ba987e1c",
+        "dev": 137,
+        "inode": 193480,
+        "mtime_ns": 1700000000000000000,
+        "ctime_ns": 1794879711464291759,
+        "mode": "0o640"
+      },
+      "after": {
+        "bytes": 1601,
+        "sha256": "4a7967647470fbaf3b136503215bee25b90b7062a614da5f3208d2f7ba987e1c",
+        "dev": 137,
+        "inode": 193481,
+        "mtime_ns": 1794879711464894252,
+        "ctime_ns": 1794879711464894252,
+        "mode": "0o600"
+      },
+      "bytes_equal": true,
+      "same_file_identity": false,
+      "counts": {
+        "http_json_parses": 1,
+        "http_json_serializations": 1,
+        "report_parse_attempts": 1,
+        "report_parse_successes": 1,
+        "publication_attempts": 1,
+        "publication_successes": 1,
+        "report_serializations": 1,
+        "staging_file_creations": 1,
+        "stream_write_calls": 358,
+        "output_characters": 1601,
+        "fsync_calls": 1,
+        "replace_attempts": 1,
+        "replace_successes": 1
+      },
+      "public_job_unchanged": true,
+      "activity_touched": true,
+      "outstanding_file_owners": 0,
+      "unknown_top_and_rows_preserved": true,
+      "type_sensitive_differences": [],
+      "staging_files_remaining": []
+    },
+    {
+      "case": "same-audio",
+      "payload": {
+        "audio": [
+          {
+            "t0": 0.2,
+            "t1": 0.4,
+            "mode": "mute"
+          }
+        ]
+      },
+      "status": 200,
+      "response": {
+        "ok": true,
+        "suggest_allowlist": [
+          "synthetic-recurring"
+        ],
+        "total": 2
+      },
+      "response_mimetype": "application/json",
+      "cache_control": "no-store",
+      "before": {
+        "bytes": 1601,
+        "sha256": "4a7967647470fbaf3b136503215bee25b90b7062a614da5f3208d2f7ba987e1c",
+        "dev": 137,
+        "inode": 193481,
+        "mtime_ns": 1700000000000000000,
+        "ctime_ns": 1794879711465409917,
+        "mode": "0o640"
+      },
+      "after": {
+        "bytes": 1601,
+        "sha256": "4a7967647470fbaf3b136503215bee25b90b7062a614da5f3208d2f7ba987e1c",
+        "dev": 137,
+        "inode": 193482,
+        "mtime_ns": 1794879711465996061,
+        "ctime_ns": 1794879711465996061,
+        "mode": "0o600"
+      },
+      "bytes_equal": true,
+      "same_file_identity": false,
+      "counts": {
+        "http_json_parses": 1,
+        "http_json_serializations": 1,
+        "report_parse_attempts": 1,
+        "report_parse_successes": 1,
+        "publication_attempts": 1,
+        "publication_successes": 1,
+        "report_serializations": 1,
+        "staging_file_creations": 1,
+        "stream_write_calls": 358,
+        "output_characters": 1601,
+        "fsync_calls": 1,
+        "replace_attempts": 1,
+        "replace_successes": 1
+      },
+      "public_job_unchanged": true,
+      "activity_touched": true,
+      "outstanding_file_owners": 0,
+      "unknown_top_and_rows_preserved": true,
+      "type_sensitive_differences": [],
+      "staging_files_remaining": []
+    },
+    {
+      "case": "sparse-change-unknown-preserved",
+      "payload": {
+        "enabled": {
+          "0": true
+        }
+      },
+      "status": 200,
+      "response": {
+        "ok": true,
+        "suggest_allowlist": [],
+        "total": 2
+      },
+      "response_mimetype": "application/json",
+      "cache_control": "no-store",
+      "before": {
+        "bytes": 1601,
+        "sha256": "4a7967647470fbaf3b136503215bee25b90b7062a614da5f3208d2f7ba987e1c",
+        "dev": 137,
+        "inode": 193482,
+        "mtime_ns": 1700000000000000000,
+        "ctime_ns": 1794879711466481416,
+        "mode": "0o640"
+      },
+      "after": {
+        "bytes": 1600,
+        "sha256": "47949b5d1d9879e9fcd0d94f5850c76aa38d0ed0d4d1411cc1e9182304a9ee65",
+        "dev": 137,
+        "inode": 193483,
+        "mtime_ns": 1794879711467054090,
+        "ctime_ns": 1794879711467054090,
+        "mode": "0o600"
+      },
+      "bytes_equal": false,
+      "same_file_identity": false,
+      "counts": {
+        "http_json_parses": 1,
+        "http_json_serializations": 1,
+        "report_parse_attempts": 1,
+        "report_parse_successes": 1,
+        "publication_attempts": 1,
+        "publication_successes": 1,
+        "report_serializations": 1,
+        "staging_file_creations": 1,
+        "stream_write_calls": 358,
+        "output_characters": 1600,
+        "fsync_calls": 1,
+        "replace_attempts": 1,
+        "replace_successes": 1
+      },
+      "public_job_unchanged": true,
+      "activity_touched": true,
+      "outstanding_file_owners": 0,
+      "unknown_top_and_rows_preserved": true,
+      "type_sensitive_differences": [
+        {
+          "path": "$.detections[0].enabled",
+          "before": false,
+          "after": true,
+          "before_type": "bool",
+          "after_type": "bool"
+        }
+      ],
+      "staging_files_remaining": []
+    },
+    {
+      "case": "audio-omitted",
+      "payload": {
+        "enabled": {}
+      },
+      "status": 200,
+      "response": {
+        "ok": true,
+        "suggest_allowlist": [
+          "synthetic-recurring"
+        ],
+        "total": 2
+      },
+      "response_mimetype": "application/json",
+      "cache_control": "no-store",
+      "before": {
+        "bytes": 1601,
+        "sha256": "4a7967647470fbaf3b136503215bee25b90b7062a614da5f3208d2f7ba987e1c",
+        "dev": 137,
+        "inode": 193483,
+        "mtime_ns": 1700000000000000000,
+        "ctime_ns": 1794879711467560865,
+        "mode": "0o640"
+      },
+      "after": {
+        "bytes": 1601,
+        "sha256": "4a7967647470fbaf3b136503215bee25b90b7062a614da5f3208d2f7ba987e1c",
+        "dev": 137,
+        "inode": 193484,
+        "mtime_ns": 1794879711468180598,
+        "ctime_ns": 1794879711468180598,
+        "mode": "0o600"
+      },
+      "bytes_equal": true,
+      "same_file_identity": false,
+      "counts": {
+        "http_json_parses": 1,
+        "http_json_serializations": 1,
+        "report_parse_attempts": 1,
+        "report_parse_successes": 1,
+        "publication_attempts": 1,
+        "publication_successes": 1,
+        "report_serializations": 1,
+        "staging_file_creations": 1,
+        "stream_write_calls": 358,
+        "output_characters": 1601,
+        "fsync_calls": 1,
+        "replace_attempts": 1,
+        "replace_successes": 1
+      },
+      "public_job_unchanged": true,
+      "activity_touched": true,
+      "outstanding_file_owners": 0,
+      "unknown_top_and_rows_preserved": true,
+      "type_sensitive_differences": [],
+      "staging_files_remaining": []
+    },
+    {
+      "case": "audio-explicit-empty-clears",
+      "payload": {
+        "audio": []
+      },
+      "status": 200,
+      "response": {
+        "ok": true,
+        "suggest_allowlist": [
+          "synthetic-recurring"
+        ],
+        "total": 2
+      },
+      "response_mimetype": "application/json",
+      "cache_control": "no-store",
+      "before": {
+        "bytes": 1601,
+        "sha256": "4a7967647470fbaf3b136503215bee25b90b7062a614da5f3208d2f7ba987e1c",
+        "dev": 137,
+        "inode": 193484,
+        "mtime_ns": 1700000000000000000,
+        "ctime_ns": 1794879711468663383,
+        "mode": "0o640"
+      },
+      "after": {
+        "bytes": 1545,
+        "sha256": "9a04988a3a532c05ca9bb752f805b8072dfdbfadb7989bfdf1fb6d91a18f0243",
+        "dev": 137,
+        "inode": 193485,
+        "mtime_ns": 1794879711469334696,
+        "ctime_ns": 1794879711469334696,
+        "mode": "0o600"
+      },
+      "bytes_equal": false,
+      "same_file_identity": false,
+      "counts": {
+        "http_json_parses": 1,
+        "http_json_serializations": 1,
+        "report_parse_attempts": 1,
+        "report_parse_successes": 1,
+        "publication_attempts": 1,
+        "publication_successes": 1,
+        "report_serializations": 1,
+        "staging_file_creations": 1,
+        "stream_write_calls": 341,
+        "output_characters": 1545,
+        "fsync_calls": 1,
+        "replace_attempts": 1,
+        "replace_successes": 1
+      },
+      "public_job_unchanged": true,
+      "activity_touched": true,
+      "outstanding_file_owners": 0,
+      "unknown_top_and_rows_preserved": true,
+      "type_sensitive_differences": [
+        {
+          "path": "$.audio_redactions",
+          "before": [
+            {
+              "t0": 0.2,
+              "t1": 0.4,
+              "mode": "mute"
+            }
+          ],
+          "after": [],
+          "before_type": "list",
+          "after_type": "list"
+        }
+      ],
+      "staging_files_remaining": []
+    },
+    {
+      "case": "audio-explicit-empty-already-empty",
+      "payload": {
+        "audio": []
+      },
+      "status": 200,
+      "response": {
+        "ok": true,
+        "suggest_allowlist": [
+          "synthetic-recurring"
+        ],
+        "total": 2
+      },
+      "response_mimetype": "application/json",
+      "cache_control": "no-store",
+      "before": {
+        "bytes": 1545,
+        "sha256": "9a04988a3a532c05ca9bb752f805b8072dfdbfadb7989bfdf1fb6d91a18f0243",
+        "dev": 137,
+        "inode": 193485,
+        "mtime_ns": 1700000000000000000,
+        "ctime_ns": 1794879711469840641,
+        "mode": "0o640"
+      },
+      "after": {
+        "bytes": 1545,
+        "sha256": "9a04988a3a532c05ca9bb752f805b8072dfdbfadb7989bfdf1fb6d91a18f0243",
+        "dev": 137,
+        "inode": 193486,
+        "mtime_ns": 1794879711470463865,
+        "ctime_ns": 1794879711470463865,
+        "mode": "0o600"
+      },
+      "bytes_equal": true,
+      "same_file_identity": false,
+      "counts": {
+        "http_json_parses": 1,
+        "http_json_serializations": 1,
+        "report_parse_attempts": 1,
+        "report_parse_successes": 1,
+        "publication_attempts": 1,
+        "publication_successes": 1,
+        "report_serializations": 1,
+        "staging_file_creations": 1,
+        "stream_write_calls": 341,
+        "output_characters": 1545,
+        "fsync_calls": 1,
+        "replace_attempts": 1,
+        "replace_successes": 1
+      },
+      "public_job_unchanged": true,
+      "activity_touched": true,
+      "outstanding_file_owners": 0,
+      "unknown_top_and_rows_preserved": true,
+      "type_sensitive_differences": [],
+      "staging_files_remaining": []
+    },
+    {
+      "case": "audio-omitted-absent",
+      "payload": {},
+      "status": 200,
+      "response": {
+        "ok": true,
+        "suggest_allowlist": [
+          "synthetic-recurring"
+        ],
+        "total": 2
+      },
+      "response_mimetype": "application/json",
+      "cache_control": "no-store",
+      "before": {
+        "bytes": 1520,
+        "sha256": "ac5617f83baa217eab2a0acccba56661a95ac49094f5207d366bbe006acd4b63",
+        "dev": 137,
+        "inode": 193486,
+        "mtime_ns": 1700000000000000000,
+        "ctime_ns": 1794879711470949380,
+        "mode": "0o640"
+      },
+      "after": {
+        "bytes": 1520,
+        "sha256": "ac5617f83baa217eab2a0acccba56661a95ac49094f5207d366bbe006acd4b63",
+        "dev": 137,
+        "inode": 193487,
+        "mtime_ns": 1794879711471545904,
+        "ctime_ns": 1794879711471545904,
+        "mode": "0o600"
+      },
+      "bytes_equal": true,
+      "same_file_identity": false,
+      "counts": {
+        "http_json_parses": 1,
+        "http_json_serializations": 1,
+        "report_parse_attempts": 1,
+        "report_parse_successes": 1,
+        "publication_attempts": 1,
+        "publication_successes": 1,
+        "report_serializations": 1,
+        "staging_file_creations": 1,
+        "stream_write_calls": 337,
+        "output_characters": 1520,
+        "fsync_calls": 1,
+        "replace_attempts": 1,
+        "replace_successes": 1
+      },
+      "public_job_unchanged": true,
+      "activity_touched": true,
+      "outstanding_file_owners": 0,
+      "unknown_top_and_rows_preserved": true,
+      "type_sensitive_differences": [],
+      "staging_files_remaining": []
+    },
+    {
+      "case": "audio-explicit-empty-absent",
+      "payload": {
+        "audio": []
+      },
+      "status": 200,
+      "response": {
+        "ok": true,
+        "suggest_allowlist": [
+          "synthetic-recurring"
+        ],
+        "total": 2
+      },
+      "response_mimetype": "application/json",
+      "cache_control": "no-store",
+      "before": {
+        "bytes": 1520,
+        "sha256": "ac5617f83baa217eab2a0acccba56661a95ac49094f5207d366bbe006acd4b63",
+        "dev": 137,
+        "inode": 193487,
+        "mtime_ns": 1700000000000000000,
+        "ctime_ns": 1794879711472068019,
+        "mode": "0o640"
+      },
+      "after": {
+        "bytes": 1545,
+        "sha256": "aa7d1f9ce5b56ca5b19942f65c04fb3615709c13be955e56cebae93822eaa3ce",
+        "dev": 137,
+        "inode": 193488,
+        "mtime_ns": 1794879711472644923,
+        "ctime_ns": 1794879711472644923,
+        "mode": "0o600"
+      },
+      "bytes_equal": false,
+      "same_file_identity": false,
+      "counts": {
+        "http_json_parses": 1,
+        "http_json_serializations": 1,
+        "report_parse_attempts": 1,
+        "report_parse_successes": 1,
+        "publication_attempts": 1,
+        "publication_successes": 1,
+        "report_serializations": 1,
+        "staging_file_creations": 1,
+        "stream_write_calls": 341,
+        "output_characters": 1545,
+        "fsync_calls": 1,
+        "replace_attempts": 1,
+        "replace_successes": 1
+      },
+      "public_job_unchanged": true,
+      "activity_touched": true,
+      "outstanding_file_owners": 0,
+      "unknown_top_and_rows_preserved": true,
+      "type_sensitive_differences": [
+        "$.audio_redactions: key inserted/removed"
+      ],
+      "staging_files_remaining": []
+    },
+    {
+      "case": "audio-null-clears",
+      "payload": {
+        "audio": null
+      },
+      "status": 200,
+      "response": {
+        "ok": true,
+        "suggest_allowlist": [
+          "synthetic-recurring"
+        ],
+        "total": 2
+      },
+      "response_mimetype": "application/json",
+      "cache_control": "no-store",
+      "before": {
+        "bytes": 1601,
+        "sha256": "4a7967647470fbaf3b136503215bee25b90b7062a614da5f3208d2f7ba987e1c",
+        "dev": 137,
+        "inode": 193488,
+        "mtime_ns": 1700000000000000000,
+        "ctime_ns": 1794879711473123488,
+        "mode": "0o640"
+      },
+      "after": {
+        "bytes": 1545,
+        "sha256": "9a04988a3a532c05ca9bb752f805b8072dfdbfadb7989bfdf1fb6d91a18f0243",
+        "dev": 137,
+        "inode": 193489,
+        "mtime_ns": 1794879711473718972,
+        "ctime_ns": 1794879711473718972,
+        "mode": "0o600"
+      },
+      "bytes_equal": false,
+      "same_file_identity": false,
+      "counts": {
+        "http_json_parses": 1,
+        "http_json_serializations": 1,
+        "report_parse_attempts": 1,
+        "report_parse_successes": 1,
+        "publication_attempts": 1,
+        "publication_successes": 1,
+        "report_serializations": 1,
+        "staging_file_creations": 1,
+        "stream_write_calls": 341,
+        "output_characters": 1545,
+        "fsync_calls": 1,
+        "replace_attempts": 1,
+        "replace_successes": 1
+      },
+      "public_job_unchanged": true,
+      "activity_touched": true,
+      "outstanding_file_owners": 0,
+      "unknown_top_and_rows_preserved": true,
+      "type_sensitive_differences": [
+        {
+          "path": "$.audio_redactions",
+          "before": [
+            {
+              "t0": 0.2,
+              "t1": 0.4,
+              "mode": "mute"
+            }
+          ],
+          "after": [],
+          "before_type": "list",
+          "after_type": "list"
+        }
+      ],
+      "staging_files_remaining": []
+    },
+    {
+      "case": "enabled-absent-omitted",
+      "payload": {},
+      "status": 200,
+      "response": {
+        "ok": true,
+        "suggest_allowlist": [],
+        "total": 2
+      },
+      "response_mimetype": "application/json",
+      "cache_control": "no-store",
+      "before": {
+        "bytes": 1580,
+        "sha256": "2e50d4a7d1c6ff7494610e265cccd22d3c28f8ee54dac6f3ad249668d2a01df2",
+        "dev": 137,
+        "inode": 193489,
+        "mtime_ns": 1700000000000000000,
+        "ctime_ns": 1794879711474198737,
+        "mode": "0o640"
+      },
+      "after": {
+        "bytes": 1580,
+        "sha256": "2e50d4a7d1c6ff7494610e265cccd22d3c28f8ee54dac6f3ad249668d2a01df2",
+        "dev": 137,
+        "inode": 193490,
+        "mtime_ns": 1794879711474768481,
+        "ctime_ns": 1794879711474768481,
+        "mode": "0o600"
+      },
+      "bytes_equal": true,
+      "same_file_identity": false,
+      "counts": {
+        "http_json_parses": 1,
+        "http_json_serializations": 1,
+        "report_parse_attempts": 1,
+        "report_parse_successes": 1,
+        "publication_attempts": 1,
+        "publication_successes": 1,
+        "report_serializations": 1,
+        "staging_file_creations": 1,
+        "stream_write_calls": 354,
+        "output_characters": 1580,
+        "fsync_calls": 1,
+        "replace_attempts": 1,
+        "replace_successes": 1
+      },
+      "public_job_unchanged": true,
+      "activity_touched": true,
+      "outstanding_file_owners": 0,
+      "unknown_top_and_rows_preserved": true,
+      "type_sensitive_differences": [],
+      "staging_files_remaining": []
+    },
+    {
+      "case": "enabled-absent-explicit-default",
+      "payload": {
+        "enabled": {
+          "0": true
+        }
+      },
+      "status": 200,
+      "response": {
+        "ok": true,
+        "suggest_allowlist": [],
+        "total": 2
+      },
+      "response_mimetype": "application/json",
+      "cache_control": "no-store",
+      "before": {
+        "bytes": 1580,
+        "sha256": "2e50d4a7d1c6ff7494610e265cccd22d3c28f8ee54dac6f3ad249668d2a01df2",
+        "dev": 137,
+        "inode": 193490,
+        "mtime_ns": 1700000000000000000,
+        "ctime_ns": 1794879711475243966,
+        "mode": "0o640"
+      },
+      "after": {
+        "bytes": 1600,
+        "sha256": "7d59a2302485ed2f2e89bc5d4c7d4c53a569efb7a3ece5f6f084e857c53a6bba",
+        "dev": 137,
+        "inode": 193491,
+        "mtime_ns": 1794879711476015338,
+        "ctime_ns": 1794879711476015338,
+        "mode": "0o600"
+      },
+      "bytes_equal": false,
+      "same_file_identity": false,
+      "counts": {
+        "http_json_parses": 1,
+        "http_json_serializations": 1,
+        "report_parse_attempts": 1,
+        "report_parse_successes": 1,
+        "publication_attempts": 1,
+        "publication_successes": 1,
+        "report_serializations": 1,
+        "staging_file_creations": 1,
+        "stream_write_calls": 358,
+        "output_characters": 1600,
+        "fsync_calls": 1,
+        "replace_attempts": 1,
+        "replace_successes": 1
+      },
+      "public_job_unchanged": true,
+      "activity_touched": true,
+      "outstanding_file_owners": 0,
+      "unknown_top_and_rows_preserved": true,
+      "type_sensitive_differences": [
+        "$.detections[0].enabled: key inserted/removed"
+      ],
+      "staging_files_remaining": []
+    },
+    {
+      "case": "enabled-equal-number-bool",
+      "payload": {
+        "enabled": {
+          "0": true
+        }
+      },
+      "status": 200,
+      "response": {
+        "ok": true,
+        "suggest_allowlist": [],
+        "total": 2
+      },
+      "response_mimetype": "application/json",
+      "cache_control": "no-store",
+      "before": {
+        "bytes": 1597,
+        "sha256": "3a1dd90335bb5d0c761eca6879219df84a175501f20c71d56ebac3ab6840f834",
+        "dev": 137,
+        "inode": 193491,
+        "mtime_ns": 1700000000000000000,
+        "ctime_ns": 1794879711476504513,
+        "mode": "0o640"
+      },
+      "after": {
+        "bytes": 1600,
+        "sha256": "47949b5d1d9879e9fcd0d94f5850c76aa38d0ed0d4d1411cc1e9182304a9ee65",
+        "dev": 137,
+        "inode": 193492,
+        "mtime_ns": 1794879711477079787,
+        "ctime_ns": 1794879711477079787,
+        "mode": "0o600"
+      },
+      "bytes_equal": false,
+      "same_file_identity": false,
+      "counts": {
+        "http_json_parses": 1,
+        "http_json_serializations": 1,
+        "report_parse_attempts": 1,
+        "report_parse_successes": 1,
+        "publication_attempts": 1,
+        "publication_successes": 1,
+        "report_serializations": 1,
+        "staging_file_creations": 1,
+        "stream_write_calls": 358,
+        "output_characters": 1600,
+        "fsync_calls": 1,
+        "replace_attempts": 1,
+        "replace_successes": 1
+      },
+      "public_job_unchanged": true,
+      "activity_touched": true,
+      "outstanding_file_owners": 0,
+      "unknown_top_and_rows_preserved": true,
+      "type_sensitive_differences": [
+        {
+          "path": "$.detections[0].enabled",
+          "before": 1,
+          "after": true,
+          "before_type": "int",
+          "after_type": "bool"
+        }
+      ],
+      "staging_files_remaining": []
+    },
+    {
+      "case": "enabled-string-false-truthy",
+      "payload": {
+        "enabled": {
+          "0": "false"
+        }
+      },
+      "status": 200,
+      "response": {
+        "ok": true,
+        "suggest_allowlist": [],
+        "total": 2
+      },
+      "response_mimetype": "application/json",
+      "cache_control": "no-store",
+      "before": {
+        "bytes": 1601,
+        "sha256": "4a7967647470fbaf3b136503215bee25b90b7062a614da5f3208d2f7ba987e1c",
+        "dev": 137,
+        "inode": 193492,
+        "mtime_ns": 1700000000000000000,
+        "ctime_ns": 1794879711477613872,
+        "mode": "0o640"
+      },
+      "after": {
+        "bytes": 1600,
+        "sha256": "47949b5d1d9879e9fcd0d94f5850c76aa38d0ed0d4d1411cc1e9182304a9ee65",
+        "dev": 137,
+        "inode": 193493,
+        "mtime_ns": 1794879711478202336,
+        "ctime_ns": 1794879711478202336,
+        "mode": "0o600"
+      },
+      "bytes_equal": false,
+      "same_file_identity": false,
+      "counts": {
+        "http_json_parses": 1,
+        "http_json_serializations": 1,
+        "report_parse_attempts": 1,
+        "report_parse_successes": 1,
+        "publication_attempts": 1,
+        "publication_successes": 1,
+        "report_serializations": 1,
+        "staging_file_creations": 1,
+        "stream_write_calls": 358,
+        "output_characters": 1600,
+        "fsync_calls": 1,
+        "replace_attempts": 1,
+        "replace_successes": 1
+      },
+      "public_job_unchanged": true,
+      "activity_touched": true,
+      "outstanding_file_owners": 0,
+      "unknown_top_and_rows_preserved": true,
+      "type_sensitive_differences": [
+        {
+          "path": "$.detections[0].enabled",
+          "before": false,
+          "after": true,
+          "before_type": "bool",
+          "after_type": "bool"
+        }
+      ],
+      "staging_files_remaining": []
+    },
+    {
+      "case": "box-equal-int-float",
+      "payload": {
+        "box_overrides": {
+          "0": [
+            1,
+            2,
+            8,
+            9
+          ]
+        }
+      },
+      "status": 200,
+      "response": {
+        "ok": true,
+        "suggest_allowlist": [
+          "synthetic-recurring"
+        ],
+        "total": 2
+      },
+      "response_mimetype": "application/json",
+      "cache_control": "no-store",
+      "before": {
+        "bytes": 1593,
+        "sha256": "24d6274a68eaf3588c90179e93f988e988260ed55585b4ef1033391a18038bd3",
+        "dev": 137,
+        "inode": 193493,
+        "mtime_ns": 1700000000000000000,
+        "ctime_ns": 1794879711478674371,
+        "mode": "0o640"
+      },
+      "after": {
+        "bytes": 1601,
+        "sha256": "4a7967647470fbaf3b136503215bee25b90b7062a614da5f3208d2f7ba987e1c",
+        "dev": 137,
+        "inode": 193494,
+        "mtime_ns": 1794879711479248455,
+        "ctime_ns": 1794879711479248455,
+        "mode": "0o600"
+      },
+      "bytes_equal": false,
+      "same_file_identity": false,
+      "counts": {
+        "http_json_parses": 1,
+        "http_json_serializations": 1,
+        "report_parse_attempts": 1,
+        "report_parse_successes": 1,
+        "publication_attempts": 1,
+        "publication_successes": 1,
+        "report_serializations": 1,
+        "staging_file_creations": 1,
+        "stream_write_calls": 358,
+        "output_characters": 1601,
+        "fsync_calls": 1,
+        "replace_attempts": 1,
+        "replace_successes": 1
+      },
+      "public_job_unchanged": true,
+      "activity_touched": true,
+      "outstanding_file_owners": 0,
+      "unknown_top_and_rows_preserved": true,
+      "type_sensitive_differences": [
+        {
+          "path": "$.detections[0].cbox[0]",
+          "before": 1,
+          "after": 1.0,
+          "before_type": "int",
+          "after_type": "float"
+        },
+        {
+          "path": "$.detections[0].cbox[1]",
+          "before": 2,
+          "after": 2.0,
+          "before_type": "int",
+          "after_type": "float"
+        },
+        {
+          "path": "$.detections[0].cbox[2]",
+          "before": 8,
+          "after": 8.0,
+          "before_type": "int",
+          "after_type": "float"
+        },
+        {
+          "path": "$.detections[0].cbox[3]",
+          "before": 9,
+          "after": 9.0,
+          "before_type": "int",
+          "after_type": "float"
+        }
+      ],
+      "staging_files_remaining": []
+    },
+    {
+      "case": "time-equal-int-float",
+      "payload": {
+        "time_overrides": {
+          "0": [
+            0,
+            1
+          ]
+        }
+      },
+      "status": 200,
+      "response": {
+        "ok": true,
+        "suggest_allowlist": [
+          "synthetic-recurring"
+        ],
+        "total": 2
+      },
+      "response_mimetype": "application/json",
+      "cache_control": "no-store",
+      "before": {
+        "bytes": 1595,
+        "sha256": "68dde6c04200453aeaa1a6b02d76ea9876f5854f3e6075af9b566836c223d999",
+        "dev": 137,
+        "inode": 193494,
+        "mtime_ns": 1700000000000000000,
+        "ctime_ns": 1794879711479757199,
+        "mode": "0o640"
+      },
+      "after": {
+        "bytes": 1599,
+        "sha256": "e0c05f8a79c68c808eb1b57d19c3d7b921addd3b8772f7dacd83016c6043afa6",
+        "dev": 137,
+        "inode": 193495,
+        "mtime_ns": 1794879711480384853,
+        "ctime_ns": 1794879711480384853,
+        "mode": "0o600"
+      },
+      "bytes_equal": false,
+      "same_file_identity": false,
+      "counts": {
+        "http_json_parses": 1,
+        "http_json_serializations": 1,
+        "report_parse_attempts": 1,
+        "report_parse_successes": 1,
+        "publication_attempts": 1,
+        "publication_successes": 1,
+        "report_serializations": 1,
+        "staging_file_creations": 1,
+        "stream_write_calls": 358,
+        "output_characters": 1599,
+        "fsync_calls": 1,
+        "replace_attempts": 1,
+        "replace_successes": 1
+      },
+      "public_job_unchanged": true,
+      "activity_touched": true,
+      "outstanding_file_owners": 0,
+      "unknown_top_and_rows_preserved": true,
+      "type_sensitive_differences": [
+        {
+          "path": "$.detections[0].t_end",
+          "before": 1,
+          "after": 1.0,
+          "before_type": "int",
+          "after_type": "float"
+        },
+        {
+          "path": "$.detections[0].t_start",
+          "before": 0,
+          "after": 0.0,
+          "before_type": "int",
+          "after_type": "float"
+        }
+      ],
+      "staging_files_remaining": []
+    },
+    {
+      "case": "same-time-clamps-last-seen",
+      "payload": {
+        "time_overrides": {
+          "0": [
+            0,
+            1
+          ]
+        }
+      },
+      "status": 200,
+      "response": {
+        "ok": true,
+        "suggest_allowlist": [
+          "synthetic-recurring"
+        ],
+        "total": 2
+      },
+      "response_mimetype": "application/json",
+      "cache_control": "no-store",
+      "before": {
+        "bytes": 1601,
+        "sha256": "0aac98d2897d908018bfc74049e7bec848e416859ad8541be624f1f8b99542d1",
+        "dev": 137,
+        "inode": 193495,
+        "mtime_ns": 1700000000000000000,
+        "ctime_ns": 1794879711480869408,
+        "mode": "0o640"
+      },
+      "after": {
+        "bytes": 1601,
+        "sha256": "a2910e53a055d0ecbec45798d324371a0f57f8382a1315496dfaf37a3d3516db",
+        "dev": 137,
+        "inode": 193496,
+        "mtime_ns": 1794879711481491021,
+        "ctime_ns": 1794879711481491021,
+        "mode": "0o600"
+      },
+      "bytes_equal": false,
+      "same_file_identity": false,
+      "counts": {
+        "http_json_parses": 1,
+        "http_json_serializations": 1,
+        "report_parse_attempts": 1,
+        "report_parse_successes": 1,
+        "publication_attempts": 1,
+        "publication_successes": 1,
+        "report_serializations": 1,
+        "staging_file_creations": 1,
+        "stream_write_calls": 358,
+        "output_characters": 1601,
+        "fsync_calls": 1,
+        "replace_attempts": 1,
+        "replace_successes": 1
+      },
+      "public_job_unchanged": true,
+      "activity_touched": true,
+      "outstanding_file_owners": 0,
+      "unknown_top_and_rows_preserved": true,
+      "type_sensitive_differences": [
+        {
+          "path": "$.detections[0].last_seen",
+          "before": 2.0,
+          "after": 1.0,
+          "before_type": "float",
+          "after_type": "float"
+        }
+      ],
+      "staging_files_remaining": []
+    },
+    {
+      "case": "same-time-adds-last-seen",
+      "payload": {
+        "time_overrides": {
+          "0": [
+            0,
+            1
+          ]
+        }
+      },
+      "status": 200,
+      "response": {
+        "ok": true,
+        "suggest_allowlist": [
+          "synthetic-recurring"
+        ],
+        "total": 2
+      },
+      "response_mimetype": "application/json",
+      "cache_control": "no-store",
+      "before": {
+        "bytes": 1580,
+        "sha256": "5c90b04a45f9566ff39cac5f1907b5a044b9779515f653fdfd7b48ff0c4e1759",
+        "dev": 137,
+        "inode": 193496,
+        "mtime_ns": 1700000000000000000,
+        "ctime_ns": 1794879711481978376,
+        "mode": "0o640"
+      },
+      "after": {
+        "bytes": 1601,
+        "sha256": "85771853088e783de06b3b4c39f2f922b9a7d4e9a9aa0b551a14d979de3e5e15",
+        "dev": 137,
+        "inode": 193497,
+        "mtime_ns": 1794879711482653919,
+        "ctime_ns": 1794879711482653919,
+        "mode": "0o600"
+      },
+      "bytes_equal": false,
+      "same_file_identity": false,
+      "counts": {
+        "http_json_parses": 1,
+        "http_json_serializations": 1,
+        "report_parse_attempts": 1,
+        "report_parse_successes": 1,
+        "publication_attempts": 1,
+        "publication_successes": 1,
+        "report_serializations": 1,
+        "staging_file_creations": 1,
+        "stream_write_calls": 358,
+        "output_characters": 1601,
+        "fsync_calls": 1,
+        "replace_attempts": 1,
+        "replace_successes": 1
+      },
+      "public_job_unchanged": true,
+      "activity_touched": true,
+      "outstanding_file_owners": 0,
+      "unknown_top_and_rows_preserved": true,
+      "type_sensitive_differences": [
+        "$.detections[0].last_seen: key inserted/removed"
+      ],
+      "staging_files_remaining": []
+    },
+    {
+      "case": "audio-equal-number-bool",
+      "payload": {
+        "audio": [
+          {
+            "t0": 0,
+            "t1": 1,
+            "mode": "mute"
+          }
+        ]
+      },
+      "status": 200,
+      "response": {
+        "ok": true,
+        "suggest_allowlist": [
+          "synthetic-recurring"
+        ],
+        "total": 2
+      },
+      "response_mimetype": "application/json",
+      "cache_control": "no-store",
+      "before": {
+        "bytes": 1604,
+        "sha256": "c182d3ac2de4aac7d17588969a6bb638d05ad65bdcc13a7c2c6a6918b75e4c98",
+        "dev": 137,
+        "inode": 193497,
+        "mtime_ns": 1700000000000000000,
+        "ctime_ns": 1794879711483133994,
+        "mode": "0o640"
+      },
+      "after": {
+        "bytes": 1601,
+        "sha256": "ac5f83b4b860def4e9df667356b02ef814d6490508cd99db1009a77f2103d66a",
+        "dev": 137,
+        "inode": 193498,
+        "mtime_ns": 1794879711483739998,
+        "ctime_ns": 1794879711483739998,
+        "mode": "0o600"
+      },
+      "bytes_equal": false,
+      "same_file_identity": false,
+      "counts": {
+        "http_json_parses": 1,
+        "http_json_serializations": 1,
+        "report_parse_attempts": 1,
+        "report_parse_successes": 1,
+        "publication_attempts": 1,
+        "publication_successes": 1,
+        "report_serializations": 1,
+        "staging_file_creations": 1,
+        "stream_write_calls": 358,
+        "output_characters": 1601,
+        "fsync_calls": 1,
+        "replace_attempts": 1,
+        "replace_successes": 1
+      },
+      "public_job_unchanged": true,
+      "activity_touched": true,
+      "outstanding_file_owners": 0,
+      "unknown_top_and_rows_preserved": true,
+      "type_sensitive_differences": [
+        {
+          "path": "$.audio_redactions[0].t1",
+          "before": true,
+          "after": 1.0,
+          "before_type": "bool",
+          "after_type": "float"
+        },
+        {
+          "path": "$.audio_redactions[0].t0",
+          "before": false,
+          "after": 0.0,
+          "before_type": "bool",
+          "after_type": "float"
+        }
+      ],
+      "staging_files_remaining": []
+    },
+    {
+      "case": "audio-explicit-drops-unknown",
+      "payload": {
+        "audio": [
+          {
+            "t0": 0.2,
+            "t1": 0.4,
+            "mode": "mute"
+          }
+        ]
+      },
+      "status": 200,
+      "response": {
+        "ok": true,
+        "suggest_allowlist": [
+          "synthetic-recurring"
+        ],
+        "total": 2
+      },
+      "response_mimetype": "application/json",
+      "cache_control": "no-store",
+      "before": {
+        "bytes": 1639,
+        "sha256": "0210c4acb95557f344f70fc1306209f22597944376b809f893a284138f02b8dd",
+        "dev": 137,
+        "inode": 193498,
+        "mtime_ns": 1700000000000000000,
+        "ctime_ns": 1794879711484268913,
+        "mode": "0o640"
+      },
+      "after": {
+        "bytes": 1601,
+        "sha256": "4a7967647470fbaf3b136503215bee25b90b7062a614da5f3208d2f7ba987e1c",
+        "dev": 137,
+        "inode": 193499,
+        "mtime_ns": 1794879711484849787,
+        "ctime_ns": 1794879711484849787,
+        "mode": "0o600"
+      },
+      "bytes_equal": false,
+      "same_file_identity": false,
+      "counts": {
+        "http_json_parses": 1,
+        "http_json_serializations": 1,
+        "report_parse_attempts": 1,
+        "report_parse_successes": 1,
+        "publication_attempts": 1,
+        "publication_successes": 1,
+        "report_serializations": 1,
+        "staging_file_creations": 1,
+        "stream_write_calls": 358,
+        "output_characters": 1601,
+        "fsync_calls": 1,
+        "replace_attempts": 1,
+        "replace_successes": 1
+      },
+      "public_job_unchanged": true,
+      "activity_touched": true,
+      "outstanding_file_owners": 0,
+      "unknown_top_and_rows_preserved": true,
+      "type_sensitive_differences": [
+        "$.audio_redactions[0].future: key inserted/removed"
+      ],
+      "staging_files_remaining": []
+    },
+    {
+      "case": "ignored-indices-and-invalid-ranges",
+      "payload": {
+        "enabled": {
+          "-1": true,
+          "999": true,
+          "bogus": true
+        },
+        "box_overrides": {
+          "-1": null,
+          "999": null,
+          "0": [
+            1,
+            2,
+            3
+          ]
+        },
+        "time_overrides": {
+          "999": null,
+          "0": [
+            1,
+            0
+          ]
+        }
+      },
+      "status": 200,
+      "response": {
+        "ok": true,
+        "suggest_allowlist": [
+          "synthetic-recurring"
+        ],
+        "total": 2
+      },
+      "response_mimetype": "application/json",
+      "cache_control": "no-store",
+      "before": {
+        "bytes": 1601,
+        "sha256": "4a7967647470fbaf3b136503215bee25b90b7062a614da5f3208d2f7ba987e1c",
+        "dev": 137,
+        "inode": 193499,
+        "mtime_ns": 1700000000000000000,
+        "ctime_ns": 1794879711485372742,
+        "mode": "0o640"
+      },
+      "after": {
+        "bytes": 1601,
+        "sha256": "4a7967647470fbaf3b136503215bee25b90b7062a614da5f3208d2f7ba987e1c",
+        "dev": 137,
+        "inode": 193500,
+        "mtime_ns": 1794879711485997606,
+        "ctime_ns": 1794879711485997606,
+        "mode": "0o600"
+      },
+      "bytes_equal": true,
+      "same_file_identity": false,
+      "counts": {
+        "http_json_parses": 1,
+        "http_json_serializations": 1,
+        "report_parse_attempts": 1,
+        "report_parse_successes": 1,
+        "publication_attempts": 1,
+        "publication_successes": 1,
+        "report_serializations": 1,
+        "staging_file_creations": 1,
+        "stream_write_calls": 358,
+        "output_characters": 1601,
+        "fsync_calls": 1,
+        "replace_attempts": 1,
+        "replace_successes": 1
+      },
+      "public_job_unchanged": true,
+      "activity_touched": true,
+      "outstanding_file_owners": 0,
+      "unknown_top_and_rows_preserved": true,
+      "type_sensitive_differences": [],
+      "staging_files_remaining": []
+    },
+    {
+      "case": "malformed-box-index-errors",
+      "payload": {
+        "box_overrides": {
+          "bogus": [
+            1,
+            2,
+            8,
+            9
+          ]
+        }
+      },
+      "status": 500,
+      "response": null,
+      "response_mimetype": "text/html",
+      "cache_control": "no-store, no-cache, must-revalidate, max-age=0",
+      "before": {
+        "bytes": 1601,
+        "sha256": "4a7967647470fbaf3b136503215bee25b90b7062a614da5f3208d2f7ba987e1c",
+        "dev": 137,
+        "inode": 193500,
+        "mtime_ns": 1700000000000000000,
+        "ctime_ns": 1794879711486497791,
+        "mode": "0o640"
+      },
+      "after": {
+        "bytes": 1601,
+        "sha256": "4a7967647470fbaf3b136503215bee25b90b7062a614da5f3208d2f7ba987e1c",
+        "dev": 137,
+        "inode": 193500,
+        "mtime_ns": 1700000000000000000,
+        "ctime_ns": 1794879711486497791,
+        "mode": "0o640"
+      },
+      "bytes_equal": true,
+      "same_file_identity": true,
+      "counts": {
+        "http_json_parses": 1,
+        "http_json_serializations": 0,
+        "report_parse_attempts": 1,
+        "report_parse_successes": 1,
+        "publication_attempts": 0,
+        "publication_successes": 0,
+        "report_serializations": 0,
+        "staging_file_creations": 0,
+        "stream_write_calls": 0,
+        "output_characters": 0,
+        "fsync_calls": 0,
+        "replace_attempts": 0,
+        "replace_successes": 0
+      },
+      "public_job_unchanged": true,
+      "activity_touched": true,
+      "outstanding_file_owners": 0,
+      "unknown_top_and_rows_preserved": true,
+      "type_sensitive_differences": [],
+      "staging_files_remaining": []
+    },
+    {
+      "case": "malformed-enabled-null-errors",
+      "payload": {
+        "enabled": null
+      },
+      "status": 500,
+      "response": null,
+      "response_mimetype": "text/html",
+      "cache_control": "no-store, no-cache, must-revalidate, max-age=0",
+      "before": {
+        "bytes": 1601,
+        "sha256": "4a7967647470fbaf3b136503215bee25b90b7062a614da5f3208d2f7ba987e1c",
+        "dev": 137,
+        "inode": 193500,
+        "mtime_ns": 1700000000000000000,
+        "ctime_ns": 1794879711487404642,
+        "mode": "0o640"
+      },
+      "after": {
+        "bytes": 1601,
+        "sha256": "4a7967647470fbaf3b136503215bee25b90b7062a614da5f3208d2f7ba987e1c",
+        "dev": 137,
+        "inode": 193500,
+        "mtime_ns": 1700000000000000000,
+        "ctime_ns": 1794879711487404642,
+        "mode": "0o640"
+      },
+      "bytes_equal": true,
+      "same_file_identity": true,
+      "counts": {
+        "http_json_parses": 1,
+        "http_json_serializations": 0,
+        "report_parse_attempts": 1,
+        "report_parse_successes": 1,
+        "publication_attempts": 0,
+        "publication_successes": 0,
+        "report_serializations": 0,
+        "staging_file_creations": 0,
+        "stream_write_calls": 0,
+        "output_characters": 0,
+        "fsync_calls": 0,
+        "replace_attempts": 0,
+        "replace_successes": 0
+      },
+      "public_job_unchanged": true,
+      "activity_touched": true,
+      "outstanding_file_owners": 0,
+      "unknown_top_and_rows_preserved": true,
+      "type_sensitive_differences": [],
+      "staging_files_remaining": []
+    },
+    {
+      "case": "manual-legacy-appends",
+      "payload": {
+        "manual": [
+          {
+            "t_start": 0,
+            "t_end": 1,
+            "screen_box": [
+              1,
+              2,
+              8,
+              9
+            ]
+          }
+        ]
+      },
+      "status": 200,
+      "response": {
+        "ok": true,
+        "suggest_allowlist": [
+          "synthetic-recurring"
+        ],
+        "total": 3
+      },
+      "response_mimetype": "application/json",
+      "cache_control": "no-store",
+      "before": {
+        "bytes": 1601,
+        "sha256": "4a7967647470fbaf3b136503215bee25b90b7062a614da5f3208d2f7ba987e1c",
+        "dev": 137,
+        "inode": 193500,
+        "mtime_ns": 1700000000000000000,
+        "ctime_ns": 1794879711488268853,
+        "mode": "0o640"
+      },
+      "after": {
+        "bytes": 1836,
+        "sha256": "f7ce53c2b6fc39fccfac091c07aedbb3a82f7763331fbf2691a6f10ef6055e3b",
+        "dev": 137,
+        "inode": 193501,
+        "mtime_ns": 1794879711489045115,
+        "ctime_ns": 1794879711489045115,
+        "mode": "0o600"
+      },
+      "bytes_equal": false,
+      "same_file_identity": false,
+      "counts": {
+        "http_json_parses": 1,
+        "http_json_serializations": 1,
+        "report_parse_attempts": 1,
+        "report_parse_successes": 1,
+        "publication_attempts": 1,
+        "publication_successes": 1,
+        "report_serializations": 1,
+        "staging_file_creations": 1,
+        "stream_write_calls": 406,
+        "output_characters": 1836,
+        "fsync_calls": 1,
+        "replace_attempts": 1,
+        "replace_successes": 1
+      },
+      "public_job_unchanged": true,
+      "activity_touched": true,
+      "outstanding_file_owners": 0,
+      "unknown_top_and_rows_preserved": true,
+      "type_sensitive_differences": [
+        {
+          "path": "$.detections",
+          "before": [
+            {
+              "t_start": 0.0,
+              "t_end": 1.0,
+              "cbox": [
+                1.0,
+                2.0,
+                8.0,
+                9.0
+              ],
+              "category": "name",
+              "text": "synthetic-recurring",
+              "confidence": 0.9,
+              "aoff": [
+                0,
+                0
+              ],
+              "last_seen": 0.5,
+              "enabled": false,
+              "extra": {
+                "bool": true,
+                "number": 1,
+                "nested": [
+                  null,
+                  {
+                    "label": "雪"
+                  }
+                ]
+              }
+            },
+            {
+              "t_start": 0.0,
+              "t_end": 1.0,
+              "cbox": [
+                1.0,
+                2.0,
+                8.0,
+                9.0
+              ],
+              "category": "name",
+              "text": "synthetic-recurring",
+              "confidence": 0.9,
+              "aoff": [
+                0,
+                0
+              ],
+              "last_seen": 0.5,
+              "enabled": false,
+              "extra": {
+                "bool": true,
+                "number": 1,
+                "nested": [
+                  null,
+                  {
+                    "label": "雪"
+                  }
+                ]
+              }
+            }
+          ],
+          "after": [
+            {
+              "t_start": 0.0,
+              "t_end": 1.0,
+              "cbox": [
+                1.0,
+                2.0,
+                8.0,
+                9.0
+              ],
+              "category": "name",
+              "text": "synthetic-recurring",
+              "confidence": 0.9,
+              "aoff": [
+                0,
+                0
+              ],
+              "last_seen": 0.5,
+              "enabled": false,
+              "extra": {
+                "bool": true,
+                "number": 1,
+                "nested": [
+                  null,
+                  {
+                    "label": "雪"
+                  }
+                ]
+              }
+            },
+            {
+              "t_start": 0.0,
+              "t_end": 1.0,
+              "cbox": [
+                1.0,
+                2.0,
+                8.0,
+                9.0
+              ],
+              "category": "name",
+              "text": "synthetic-recurring",
+              "confidence": 0.9,
+              "aoff": [
+                0,
+                0
+              ],
+              "last_seen": 0.5,
+              "enabled": false,
+              "extra": {
+                "bool": true,
+                "number": 1,
+                "nested": [
+                  null,
+                  {
+                    "label": "雪"
+                  }
+                ]
+              }
+            },
+            {
+              "t_start": 0.0,
+              "t_end": 1.0,
+              "cbox": [
+                1,
+                2,
+                8,
+                9
+              ],
+              "category": "manual",
+              "text": "user-drawn",
+              "confidence": 1.0,
+              "aoff": [
+                0,
+                0
+              ],
+              "last_seen": 0.0,
+              "enabled": true
+            }
+          ],
+          "before_type": "list",
+          "after_type": "list"
+        }
+      ],
+      "staging_files_remaining": []
+    },
+    {
+      "case": "queued-empty-refused",
+      "payload": {},
+      "status": 409,
+      "response": null,
+      "response_mimetype": "text/html",
+      "cache_control": "no-store, no-cache, must-revalidate, max-age=0",
+      "before": {
+        "bytes": 1601,
+        "sha256": "4a7967647470fbaf3b136503215bee25b90b7062a614da5f3208d2f7ba987e1c",
+        "dev": 137,
+        "inode": 193501,
+        "mtime_ns": 1700000000000000000,
+        "ctime_ns": 1794879711489532810,
+        "mode": "0o640"
+      },
+      "after": {
+        "bytes": 1601,
+        "sha256": "4a7967647470fbaf3b136503215bee25b90b7062a614da5f3208d2f7ba987e1c",
+        "dev": 137,
+        "inode": 193501,
+        "mtime_ns": 1700000000000000000,
+        "ctime_ns": 1794879711489532810,
+        "mode": "0o640"
+      },
+      "bytes_equal": true,
+      "same_file_identity": true,
+      "counts": {
+        "http_json_parses": 1,
+        "http_json_serializations": 0,
+        "report_parse_attempts": 0,
+        "report_parse_successes": 0,
+        "publication_attempts": 0,
+        "publication_successes": 0,
+        "report_serializations": 0,
+        "staging_file_creations": 0,
+        "stream_write_calls": 0,
+        "output_characters": 0,
+        "fsync_calls": 0,
+        "replace_attempts": 0,
+        "replace_successes": 0
+      },
+      "public_job_unchanged": true,
+      "activity_touched": true,
+      "outstanding_file_owners": 0,
+      "unknown_top_and_rows_preserved": true,
+      "type_sensitive_differences": [],
+      "staging_files_remaining": []
+    },
+    {
+      "case": "malformed-request-json",
+      "payload": null,
+      "status": 400,
+      "response": null,
+      "response_mimetype": "text/html",
+      "cache_control": "no-store, no-cache, must-revalidate, max-age=0",
+      "before": {
+        "bytes": 1601,
+        "sha256": "4a7967647470fbaf3b136503215bee25b90b7062a614da5f3208d2f7ba987e1c",
+        "dev": 137,
+        "inode": 193501,
+        "mtime_ns": 1700000000000000000,
+        "ctime_ns": 1794879711490277032,
+        "mode": "0o640"
+      },
+      "after": {
+        "bytes": 1601,
+        "sha256": "4a7967647470fbaf3b136503215bee25b90b7062a614da5f3208d2f7ba987e1c",
+        "dev": 137,
+        "inode": 193501,
+        "mtime_ns": 1700000000000000000,
+        "ctime_ns": 1794879711490277032,
+        "mode": "0o640"
+      },
+      "bytes_equal": true,
+      "same_file_identity": true,
+      "counts": {
+        "http_json_parses": 1,
+        "http_json_serializations": 0,
+        "report_parse_attempts": 0,
+        "report_parse_successes": 0,
+        "publication_attempts": 0,
+        "publication_successes": 0,
+        "report_serializations": 0,
+        "staging_file_creations": 0,
+        "stream_write_calls": 0,
+        "output_characters": 0,
+        "fsync_calls": 0,
+        "replace_attempts": 0,
+        "replace_successes": 0
+      },
+      "public_job_unchanged": true,
+      "activity_touched": true,
+      "outstanding_file_owners": 0,
+      "unknown_top_and_rows_preserved": true,
+      "type_sensitive_differences": [],
+      "staging_files_remaining": []
+    },
+    {
+      "case": "malformed-report-json",
+      "payload": {},
+      "status": 500,
+      "response": null,
+      "response_mimetype": "text/html",
+      "cache_control": "no-store, no-cache, must-revalidate, max-age=0",
+      "before": {
+        "bytes": 1,
+        "sha256": "021fb596db81e6d02bf3d2586ee3981fe519f275c0ac9ca76bbcf2ebb4097d96",
+        "dev": 137,
+        "inode": 193501,
+        "mtime_ns": 1794879711491074694,
+        "ctime_ns": 1794879711491074694,
+        "mode": "0o640"
+      },
+      "after": {
+        "bytes": 1,
+        "sha256": "021fb596db81e6d02bf3d2586ee3981fe519f275c0ac9ca76bbcf2ebb4097d96",
+        "dev": 137,
+        "inode": 193501,
+        "mtime_ns": 1794879711491074694,
+        "ctime_ns": 1794879711491074694,
+        "mode": "0o640"
+      },
+      "bytes_equal": true,
+      "same_file_identity": true,
+      "counts": {
+        "http_json_parses": 1,
+        "http_json_serializations": 0,
+        "report_parse_attempts": 1,
+        "report_parse_successes": 0,
+        "publication_attempts": 0,
+        "publication_successes": 0,
+        "report_serializations": 0,
+        "staging_file_creations": 0,
+        "stream_write_calls": 0,
+        "output_characters": 0,
+        "fsync_calls": 0,
+        "replace_attempts": 0,
+        "replace_successes": 0
+      },
+      "public_job_unchanged": true,
+      "activity_touched": true,
+      "outstanding_file_owners": 0,
+      "unknown_top_and_rows_preserved": false,
+      "type_sensitive_differences": null,
+      "staging_files_remaining": []
+    },
+    {
+      "case": "missing-report",
+      "payload": {},
+      "status": 404,
+      "response": null,
+      "response_mimetype": "text/html",
+      "cache_control": "no-store, no-cache, must-revalidate, max-age=0",
+      "before": null,
+      "after": null,
+      "bytes_equal": null,
+      "same_file_identity": null,
+      "counts": {
+        "http_json_parses": 1,
+        "http_json_serializations": 0,
+        "report_parse_attempts": 0,
+        "report_parse_successes": 0,
+        "publication_attempts": 0,
+        "publication_successes": 0,
+        "report_serializations": 0,
+        "staging_file_creations": 0,
+        "stream_write_calls": 0,
+        "output_characters": 0,
+        "fsync_calls": 0,
+        "replace_attempts": 0,
+        "replace_successes": 0
+      },
+      "public_job_unchanged": true,
+      "activity_touched": true,
+      "outstanding_file_owners": 0,
+      "unknown_top_and_rows_preserved": false,
+      "type_sensitive_differences": null,
+      "staging_files_remaining": []
+    }
+  ]
+}

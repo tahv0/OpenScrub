@@ -1,0 +1,578 @@
+FFFFFFFFFFFFFFFFFFFFFFFFFFF                                              [100%]
+=================================== FAILURES ===================================
+____________ test_committed_http_response_lost_then_identical_retry ____________
+
+store = namespace(root=PosixPath('/tmp/openscrub-task72/red2-tmp/test_committed_http_response_l0/data'), jobs=PosixPath('/tmp/...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x796ac4785bc0>, url='/api/jobs/a77930be59d0')
+socket_api = <function socket_api.<locals>.api at 0x796aa07dda80>
+
+    def test_committed_http_response_lost_then_identical_retry(store, socket_api):
+        payload = {'manual': [addition()]}
+        # Deliberately discard a completed HTTP response, as an injected browser
+        # response failure would. This is not a real transport-disconnect test.
+        assert socket_api('POST', store.url + '/detections', payload)[0] == 200
+        assert len(saved(store)['detections']) == 2
+        assert socket_api('POST', store.url + '/detections', payload)[0] == 200
+>       assert len(saved(store)['detections']) == 2
+E       AssertionError: assert 3 == 2
+E        +  where 3 = len([{'t_start': 0, 't_end': 1, 'cbox': [1, 2, 8, 9], 'category': 'name', ...}, {'t_start': 0.0, 't_end': 1.0, 'cbox': [2,...20, 30], 'category': 'manual', ...}, {'t_start': 0.0, 't_end': 1.0, 'cbox': [2, 3, 20, 30], 'category': 'manual', ...}])
+
+tests/test_manual_addition_replay.py:33: AssertionError
+__________ test_replay_preserves_previously_committed_indexed_changes __________
+
+store = namespace(root=PosixPath('/tmp/openscrub-task72/red2-tmp/test_replay_preserves_previous0/data'), jobs=PosixPath('/tmp/...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x796aa07df6a0>, url='/api/jobs/0795a9094f44')
+
+    def test_replay_preserves_previously_committed_indexed_changes(store):
+        assert post(store, [addition()]).status_code == 200
+        changes = dict(enabled={'1': False}, box_overrides={'1': [9, 8, 35, 45]},
+                       time_overrides={'1': [.2, 2]}, audio=[{'t0': 0, 't1': .5}])
+        assert post(store, [], **changes).status_code == 200
+        row = copy.deepcopy(saved(store)['detections'][1])
+        for _ in range(2):
+            assert post(store, [addition()], **changes).status_code == 200
+            assert saved(store)['detections'][1] == row
+>           assert len(saved(store)['detections']) == 2
+E           AssertionError: assert 3 == 2
+E            +  where 3 = len([{'t_start': 0, 't_end': 1, 'cbox': [1, 2, 8, 9], 'category': 'name', ...}, {'t_start': 0.2, 't_end': 2.0, 'cbox': [9...., 45.0], 'category': 'manual', ...}, {'t_start': 0.0, 't_end': 1.0, 'cbox': [2, 3, 20, 30], 'category': 'manual', ...}])
+
+tests/test_manual_addition_replay.py:47: AssertionError
+_________________ test_same_id_concurrent_requests_append_once _________________
+
+store = namespace(root=PosixPath('/tmp/openscrub-task72/red2-tmp/test_same_id_concurrent_reques0/data'), jobs=PosixPath('/tmp/...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x796aa07eb880>, url='/api/jobs/7d797bf5f501')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x796afbff7440>
+
+    def test_same_id_concurrent_requests_append_once(store, monkeypatch):
+        lock = ObservedLock()
+        web.FILES.initialize(store.job).report_lock = lock
+        entered, release = threading.Event(), threading.Event()
+        real = web.atomic_report
+        def publish(path, doc):
+            if not entered.is_set():
+                entered.set()
+                assert release.wait(8)
+            real(path, doc)
+        monkeypatch.setattr(web, 'atomic_report', publish)
+        first = start_call('post', store.url + '/detections', json={'manual': [addition()]})
+        second = None
+        try:
+            assert entered.wait(5)
+            second = start_call('post', store.url + '/detections', json={'manual': [addition()]})
+            assert lock.waiting.wait(5)
+        finally:
+            release.set()
+            assert finish(first).status_code == 200
+            if second:
+                assert finish(second).status_code == 200
+>       assert len(saved(store)['detections']) == 2
+E       AssertionError: assert 3 == 2
+E        +  where 3 = len([{'t_start': 0, 't_end': 1, 'cbox': [1, 2, 8, 9], 'category': 'name', ...}, {'t_start': 0.0, 't_end': 1.0, 'cbox': [2,...20, 30], 'category': 'manual', ...}, {'t_start': 0.0, 't_end': 1.0, 'cbox': [2, 3, 20, 30], 'category': 'manual', ...}])
+
+tests/test_manual_addition_replay.py:72: AssertionError
+__________ test_duplicate_ids_and_distinct_equal_geometry_and_legacy ___________
+
+store = namespace(root=PosixPath('/tmp/openscrub-task72/red2-tmp/test_duplicate_ids_and_distinc0/data'), jobs=PosixPath('/tmp/...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x796aa07eb240>, url='/api/jobs/9a30ac50209a')
+
+    def test_duplicate_ids_and_distinct_equal_geometry_and_legacy(store):
+        assert post(store, [addition(), addition(), addition('draw:two'), addition('DRAW:ONE')]).status_code == 200
+>       assert [d.get('manual_id') for d in saved(store)['detections']] == [None, 'draw:one', 'draw:two', 'DRAW:ONE']
+E       AssertionError: assert [None, None, None, None, None] == [None, 'draw:...', 'DRAW:ONE']
+E         
+E         At index 1 diff: None != 'draw:one'
+E         Left contains one more item: None
+E         Use -v to get more diff
+
+tests/test_manual_addition_replay.py:77: AssertionError
+_______ test_incompatible_id_reuse_atomically_rejects_other_edits[False] _______
+
+store = namespace(root=PosixPath('/tmp/openscrub-task72/red2-tmp/test_incompatible_id_reuse_ato0/data'), jobs=PosixPath('/tmp/...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x796aa07dfa60>, url='/api/jobs/851fe927f0bc')
+existing = False
+
+    @pytest.mark.parametrize('existing', [False, True])
+    def test_incompatible_id_reuse_atomically_rejects_other_edits(store, existing):
+        if existing:
+            assert post(store, [addition()]).status_code == 200
+        before = store.path.read_bytes()
+        response = post(store, [addition(), addition(t_end=3)], enabled={'0': False},
+                        audio=[{'t0': 0, 't1': .8}])
+>       assert response.status_code == 409 and response.json['error']
+E       assert (200 == 409)
+E        +  where 200 = <WrapperTestResponse 45 bytes [200 OK]>.status_code
+
+tests/test_manual_addition_replay.py:90: AssertionError
+_______ test_incompatible_id_reuse_atomically_rejects_other_edits[True] ________
+
+store = namespace(root=PosixPath('/tmp/openscrub-task72/red2-tmp/test_incompatible_id_reuse_ato1/data'), jobs=PosixPath('/tmp/...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x796aa07ebba0>, url='/api/jobs/7e313eecbbf3')
+existing = True
+
+    @pytest.mark.parametrize('existing', [False, True])
+    def test_incompatible_id_reuse_atomically_rejects_other_edits(store, existing):
+        if existing:
+            assert post(store, [addition()]).status_code == 200
+        before = store.path.read_bytes()
+        response = post(store, [addition(), addition(t_end=3)], enabled={'0': False},
+                        audio=[{'t0': 0, 't1': .8}])
+>       assert response.status_code == 409 and response.json['error']
+E       assert (200 == 409)
+E        +  where 200 = <WrapperTestResponse 45 bytes [200 OK]>.status_code
+
+tests/test_manual_addition_replay.py:90: AssertionError
+____________ test_explicit_invalid_id_is_json_400_and_atomic[None] _____________
+
+store = namespace(root=PosixPath('/tmp/openscrub-task72/red2-tmp/test_explicit_invalid_id_is_js0/data'), jobs=PosixPath('/tmp/...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x796aa07ebec0>, url='/api/jobs/51cde6e8d015')
+identity = None
+
+    @pytest.mark.parametrize('identity', [None, '', 1, [], {}, 'a b', 'å', 'x'*129, 'line\n'])
+    def test_explicit_invalid_id_is_json_400_and_atomic(store, identity):
+        before = store.path.read_bytes()
+        response = post(store, [addition(identity)], enabled={'0': False})
+>       assert response.status_code == 400 and response.json['error']
+E       assert (200 == 400)
+E        +  where 200 = <WrapperTestResponse 45 bytes [200 OK]>.status_code
+
+tests/test_manual_addition_replay.py:99: AssertionError
+______________ test_explicit_invalid_id_is_json_400_and_atomic[] _______________
+
+store = namespace(root=PosixPath('/tmp/openscrub-task72/red2-tmp/test_explicit_invalid_id_is_js1/data'), jobs=PosixPath('/tmp/...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x796aa07eb420>, url='/api/jobs/c4e55b779b91')
+identity = ''
+
+    @pytest.mark.parametrize('identity', [None, '', 1, [], {}, 'a b', 'å', 'x'*129, 'line\n'])
+    def test_explicit_invalid_id_is_json_400_and_atomic(store, identity):
+        before = store.path.read_bytes()
+        response = post(store, [addition(identity)], enabled={'0': False})
+>       assert response.status_code == 400 and response.json['error']
+E       assert (200 == 400)
+E        +  where 200 = <WrapperTestResponse 45 bytes [200 OK]>.status_code
+
+tests/test_manual_addition_replay.py:99: AssertionError
+______________ test_explicit_invalid_id_is_json_400_and_atomic[1] ______________
+
+store = namespace(root=PosixPath('/tmp/openscrub-task72/red2-tmp/test_explicit_invalid_id_is_js2/data'), jobs=PosixPath('/tmp/...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x796aa07eb880>, url='/api/jobs/d80f519bdb52')
+identity = 1
+
+    @pytest.mark.parametrize('identity', [None, '', 1, [], {}, 'a b', 'å', 'x'*129, 'line\n'])
+    def test_explicit_invalid_id_is_json_400_and_atomic(store, identity):
+        before = store.path.read_bytes()
+        response = post(store, [addition(identity)], enabled={'0': False})
+>       assert response.status_code == 400 and response.json['error']
+E       assert (200 == 400)
+E        +  where 200 = <WrapperTestResponse 45 bytes [200 OK]>.status_code
+
+tests/test_manual_addition_replay.py:99: AssertionError
+__________ test_explicit_invalid_id_is_json_400_and_atomic[identity3] __________
+
+store = namespace(root=PosixPath('/tmp/openscrub-task72/red2-tmp/test_explicit_invalid_id_is_js3/data'), jobs=PosixPath('/tmp/...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x796aa07eb740>, url='/api/jobs/ebf18ecfc0d8')
+identity = []
+
+    @pytest.mark.parametrize('identity', [None, '', 1, [], {}, 'a b', 'å', 'x'*129, 'line\n'])
+    def test_explicit_invalid_id_is_json_400_and_atomic(store, identity):
+        before = store.path.read_bytes()
+        response = post(store, [addition(identity)], enabled={'0': False})
+>       assert response.status_code == 400 and response.json['error']
+E       assert (200 == 400)
+E        +  where 200 = <WrapperTestResponse 45 bytes [200 OK]>.status_code
+
+tests/test_manual_addition_replay.py:99: AssertionError
+__________ test_explicit_invalid_id_is_json_400_and_atomic[identity4] __________
+
+store = namespace(root=PosixPath('/tmp/openscrub-task72/red2-tmp/test_explicit_invalid_id_is_js4/data'), jobs=PosixPath('/tmp/...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x796aa07ebba0>, url='/api/jobs/0ff5fe9750ee')
+identity = {}
+
+    @pytest.mark.parametrize('identity', [None, '', 1, [], {}, 'a b', 'å', 'x'*129, 'line\n'])
+    def test_explicit_invalid_id_is_json_400_and_atomic(store, identity):
+        before = store.path.read_bytes()
+        response = post(store, [addition(identity)], enabled={'0': False})
+>       assert response.status_code == 400 and response.json['error']
+E       assert (200 == 400)
+E        +  where 200 = <WrapperTestResponse 45 bytes [200 OK]>.status_code
+
+tests/test_manual_addition_replay.py:99: AssertionError
+_____________ test_explicit_invalid_id_is_json_400_and_atomic[a b] _____________
+
+store = namespace(root=PosixPath('/tmp/openscrub-task72/red2-tmp/test_explicit_invalid_id_is_js5/data'), jobs=PosixPath('/tmp/...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x796aa07ded40>, url='/api/jobs/7f957156d2ff')
+identity = 'a b'
+
+    @pytest.mark.parametrize('identity', [None, '', 1, [], {}, 'a b', 'å', 'x'*129, 'line\n'])
+    def test_explicit_invalid_id_is_json_400_and_atomic(store, identity):
+        before = store.path.read_bytes()
+        response = post(store, [addition(identity)], enabled={'0': False})
+>       assert response.status_code == 400 and response.json['error']
+E       assert (200 == 400)
+E        +  where 200 = <WrapperTestResponse 45 bytes [200 OK]>.status_code
+
+tests/test_manual_addition_replay.py:99: AssertionError
+____________ test_explicit_invalid_id_is_json_400_and_atomic[\xe5] _____________
+
+store = namespace(root=PosixPath('/tmp/openscrub-task72/red2-tmp/test_explicit_invalid_id_is_js6/data'), jobs=PosixPath('/tmp/...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x796a7df880e0>, url='/api/jobs/c438e4087547')
+identity = 'å'
+
+    @pytest.mark.parametrize('identity', [None, '', 1, [], {}, 'a b', 'å', 'x'*129, 'line\n'])
+    def test_explicit_invalid_id_is_json_400_and_atomic(store, identity):
+        before = store.path.read_bytes()
+        response = post(store, [addition(identity)], enabled={'0': False})
+>       assert response.status_code == 400 and response.json['error']
+E       assert (200 == 400)
+E        +  where 200 = <WrapperTestResponse 45 bytes [200 OK]>.status_code
+
+tests/test_manual_addition_replay.py:99: AssertionError
+__________ test_explicit_invalid_id_is_json_400_and_atomic[identity7] __________
+
+store = namespace(root=PosixPath('/tmp/openscrub-task72/red2-tmp/test_explicit_invalid_id_is_js7/data'), jobs=PosixPath('/tmp/...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x796a7df88c20>, url='/api/jobs/20a63aa68454')
+identity = 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
+
+    @pytest.mark.parametrize('identity', [None, '', 1, [], {}, 'a b', 'å', 'x'*129, 'line\n'])
+    def test_explicit_invalid_id_is_json_400_and_atomic(store, identity):
+        before = store.path.read_bytes()
+        response = post(store, [addition(identity)], enabled={'0': False})
+>       assert response.status_code == 400 and response.json['error']
+E       assert (200 == 400)
+E        +  where 200 = <WrapperTestResponse 45 bytes [200 OK]>.status_code
+
+tests/test_manual_addition_replay.py:99: AssertionError
+___________ test_explicit_invalid_id_is_json_400_and_atomic[line\n] ____________
+
+store = namespace(root=PosixPath('/tmp/openscrub-task72/red2-tmp/test_explicit_invalid_id_is_js8/data'), jobs=PosixPath('/tmp/...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x796a7df88720>, url='/api/jobs/972bb201f5df')
+identity = 'line\n'
+
+    @pytest.mark.parametrize('identity', [None, '', 1, [], {}, 'a b', 'å', 'x'*129, 'line\n'])
+    def test_explicit_invalid_id_is_json_400_and_atomic(store, identity):
+        before = store.path.read_bytes()
+        response = post(store, [addition(identity)], enabled={'0': False})
+>       assert response.status_code == 400 and response.json['error']
+E       assert (200 == 400)
+E        +  where 200 = <WrapperTestResponse 45 bytes [200 OK]>.status_code
+
+tests/test_manual_addition_replay.py:99: AssertionError
+_____ test_identified_creation_requires_finite_effective_numbers[changes0] _____
+
+store = namespace(root=PosixPath('/tmp/openscrub-task72/red2-tmp/test_identified_creation_requi0/data'), jobs=PosixPath('/tmp/...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x796a7df89440>, url='/api/jobs/e2d5ce2081d6')
+changes = {'t_start': nan}
+
+    @pytest.mark.parametrize('changes', [dict(t_start=float('nan')), dict(t_end=float('inf')),
+        dict(t_ref=float('inf')), dict(screen_box=[1,2,3]),
+        dict(screen_box=[1,2,3,float('nan')]), dict(screen_box=[1,2,3,'bad'])])
+    def test_identified_creation_requires_finite_effective_numbers(store, changes):
+        before = store.path.read_bytes()
+        response = post(store, [addition(**changes)], enabled={'0': False})
+>       assert response.status_code == 400 and response.json['error']
+E       assert (500 == 400)
+E        +  where 500 = <WrapperTestResponse 265 bytes [500 INTERNAL SERVER ERROR]>.status_code
+
+tests/test_manual_addition_replay.py:109: AssertionError
+------------------------------ Captured log call -------------------------------
+ERROR    openscrub_web:app.py:875 Exception on /api/jobs/e2d5ce2081d6/detections [POST]
+Traceback (most recent call last):
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", line 1733, in job_save_edits
+    fidx = min(int(tref * rs["fps"]), len(rs["cum"]) - 1)
+               ^^^^^^^^^^^^^^^^^^^^^
+ValueError: cannot convert float NaN to integer
+_____ test_identified_creation_requires_finite_effective_numbers[changes1] _____
+
+store = namespace(root=PosixPath('/tmp/openscrub-task72/red2-tmp/test_identified_creation_requi1/data'), jobs=PosixPath('/tmp/...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x796a7df89300>, url='/api/jobs/90c7c3b6300c')
+changes = {'t_end': inf}
+
+    @pytest.mark.parametrize('changes', [dict(t_start=float('nan')), dict(t_end=float('inf')),
+        dict(t_ref=float('inf')), dict(screen_box=[1,2,3]),
+        dict(screen_box=[1,2,3,float('nan')]), dict(screen_box=[1,2,3,'bad'])])
+    def test_identified_creation_requires_finite_effective_numbers(store, changes):
+        before = store.path.read_bytes()
+        response = post(store, [addition(**changes)], enabled={'0': False})
+>       assert response.status_code == 400 and response.json['error']
+E       assert (200 == 400)
+E        +  where 200 = <WrapperTestResponse 45 bytes [200 OK]>.status_code
+
+tests/test_manual_addition_replay.py:109: AssertionError
+_____ test_identified_creation_requires_finite_effective_numbers[changes2] _____
+
+store = namespace(root=PosixPath('/tmp/openscrub-task72/red2-tmp/test_identified_creation_requi2/data'), jobs=PosixPath('/tmp/...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x796a7df8b2e0>, url='/api/jobs/ad80dfd599d8')
+changes = {'t_ref': inf}
+
+    @pytest.mark.parametrize('changes', [dict(t_start=float('nan')), dict(t_end=float('inf')),
+        dict(t_ref=float('inf')), dict(screen_box=[1,2,3]),
+        dict(screen_box=[1,2,3,float('nan')]), dict(screen_box=[1,2,3,'bad'])])
+    def test_identified_creation_requires_finite_effective_numbers(store, changes):
+        before = store.path.read_bytes()
+        response = post(store, [addition(**changes)], enabled={'0': False})
+>       assert response.status_code == 400 and response.json['error']
+E       assert (500 == 400)
+E        +  where 500 = <WrapperTestResponse 265 bytes [500 INTERNAL SERVER ERROR]>.status_code
+
+tests/test_manual_addition_replay.py:109: AssertionError
+------------------------------ Captured log call -------------------------------
+ERROR    openscrub_web:app.py:875 Exception on /api/jobs/ad80dfd599d8/detections [POST]
+Traceback (most recent call last):
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", line 1733, in job_save_edits
+    fidx = min(int(tref * rs["fps"]), len(rs["cum"]) - 1)
+               ^^^^^^^^^^^^^^^^^^^^^
+OverflowError: cannot convert float infinity to integer
+_____ test_identified_creation_requires_finite_effective_numbers[changes3] _____
+
+store = namespace(root=PosixPath('/tmp/openscrub-task72/red2-tmp/test_identified_creation_requi3/data'), jobs=PosixPath('/tmp/...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x796a7df89760>, url='/api/jobs/4178ea1d1410')
+changes = {'screen_box': [1, 2, 3]}
+
+    @pytest.mark.parametrize('changes', [dict(t_start=float('nan')), dict(t_end=float('inf')),
+        dict(t_ref=float('inf')), dict(screen_box=[1,2,3]),
+        dict(screen_box=[1,2,3,float('nan')]), dict(screen_box=[1,2,3,'bad'])])
+    def test_identified_creation_requires_finite_effective_numbers(store, changes):
+        before = store.path.read_bytes()
+        response = post(store, [addition(**changes)], enabled={'0': False})
+>       assert response.status_code == 400 and response.json['error']
+E       assert (500 == 400)
+E        +  where 500 = <WrapperTestResponse 265 bytes [500 INTERNAL SERVER ERROR]>.status_code
+
+tests/test_manual_addition_replay.py:109: AssertionError
+------------------------------ Captured log call -------------------------------
+ERROR    openscrub_web:app.py:875 Exception on /api/jobs/4178ea1d1410/detections [POST]
+Traceback (most recent call last):
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", line 1739, in job_save_edits
+    int(b[2] - ox), int(b[3] - oy)],
+                        ~^^^
+IndexError: list index out of range
+_____ test_identified_creation_requires_finite_effective_numbers[changes4] _____
+
+store = namespace(root=PosixPath('/tmp/openscrub-task72/red2-tmp/test_identified_creation_requi4/data'), jobs=PosixPath('/tmp/...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x796aa07eb740>, url='/api/jobs/44b6be7af748')
+changes = {'screen_box': [1, 2, 3, nan]}
+
+    @pytest.mark.parametrize('changes', [dict(t_start=float('nan')), dict(t_end=float('inf')),
+        dict(t_ref=float('inf')), dict(screen_box=[1,2,3]),
+        dict(screen_box=[1,2,3,float('nan')]), dict(screen_box=[1,2,3,'bad'])])
+    def test_identified_creation_requires_finite_effective_numbers(store, changes):
+        before = store.path.read_bytes()
+        response = post(store, [addition(**changes)], enabled={'0': False})
+>       assert response.status_code == 400 and response.json['error']
+E       assert (500 == 400)
+E        +  where 500 = <WrapperTestResponse 265 bytes [500 INTERNAL SERVER ERROR]>.status_code
+
+tests/test_manual_addition_replay.py:109: AssertionError
+------------------------------ Captured log call -------------------------------
+ERROR    openscrub_web:app.py:875 Exception on /api/jobs/44b6be7af748/detections [POST]
+Traceback (most recent call last):
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", line 1739, in job_save_edits
+    int(b[2] - ox), int(b[3] - oy)],
+                    ^^^^^^^^^^^^^^
+ValueError: cannot convert float NaN to integer
+_____ test_identified_creation_requires_finite_effective_numbers[changes5] _____
+
+store = namespace(root=PosixPath('/tmp/openscrub-task72/red2-tmp/test_identified_creation_requi5/data'), jobs=PosixPath('/tmp/...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x796ac4785c60>, url='/api/jobs/b2a7f0ac2d7c')
+changes = {'screen_box': [1, 2, 3, 'bad']}
+
+    @pytest.mark.parametrize('changes', [dict(t_start=float('nan')), dict(t_end=float('inf')),
+        dict(t_ref=float('inf')), dict(screen_box=[1,2,3]),
+        dict(screen_box=[1,2,3,float('nan')]), dict(screen_box=[1,2,3,'bad'])])
+    def test_identified_creation_requires_finite_effective_numbers(store, changes):
+        before = store.path.read_bytes()
+        response = post(store, [addition(**changes)], enabled={'0': False})
+>       assert response.status_code == 400 and response.json['error']
+E       assert (500 == 400)
+E        +  where 500 = <WrapperTestResponse 265 bytes [500 INTERNAL SERVER ERROR]>.status_code
+
+tests/test_manual_addition_replay.py:109: AssertionError
+------------------------------ Captured log call -------------------------------
+ERROR    openscrub_web:app.py:875 Exception on /api/jobs/b2a7f0ac2d7c/detections [POST]
+Traceback (most recent call last):
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", line 1739, in job_save_edits
+    int(b[2] - ox), int(b[3] - oy)],
+                        ~~~~~^~~~
+TypeError: unsupported operand type(s) for -: 'str' and 'int'
+_ test_imported_identified_row_without_trustworthy_creation_conflicts_only_on_replay[None] _
+
+store = namespace(root=PosixPath('/tmp/openscrub-task72/red2-tmp/test_imported_identified_row_w0/data'), jobs=PosixPath('/tmp/...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x796a7df8b9c0>, url='/api/jobs/94576fcf62c3')
+creation = None
+
+    @pytest.mark.parametrize('creation', [None, {}, {'t_start': 0, 't_end': 1, 'cbox': [1,2,3], 'aoff': [0,0]},
+        {'t_start': 0, 't_end': 1, 'cbox': [2,3,20,30], 'aoff': [float('nan'),0]}])
+    def test_imported_identified_row_without_trustworthy_creation_conflicts_only_on_replay(store, creation):
+        doc = saved(store)
+        doc['detections'][0]['manual_id'] = 'draw:one'
+        if creation is not None:
+            doc['detections'][0]['manual_creation'] = creation
+        store.path.write_text(json.dumps(doc))
+        assert post(store, [], enabled={'0': False}).status_code == 200
+        before = store.path.read_bytes()
+        response = post(store, [addition()], enabled={'0': True})
+>       assert response.status_code == 409 and response.json['error']
+E       assert (200 == 409)
+E        +  where 200 = <WrapperTestResponse 45 bytes [200 OK]>.status_code
+
+tests/test_manual_addition_replay.py:124: AssertionError
+_ test_imported_identified_row_without_trustworthy_creation_conflicts_only_on_replay[creation1] _
+
+store = namespace(root=PosixPath('/tmp/openscrub-task72/red2-tmp/test_imported_identified_row_w1/data'), jobs=PosixPath('/tmp/...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x796a7df8ad40>, url='/api/jobs/334e7784a181')
+creation = {}
+
+    @pytest.mark.parametrize('creation', [None, {}, {'t_start': 0, 't_end': 1, 'cbox': [1,2,3], 'aoff': [0,0]},
+        {'t_start': 0, 't_end': 1, 'cbox': [2,3,20,30], 'aoff': [float('nan'),0]}])
+    def test_imported_identified_row_without_trustworthy_creation_conflicts_only_on_replay(store, creation):
+        doc = saved(store)
+        doc['detections'][0]['manual_id'] = 'draw:one'
+        if creation is not None:
+            doc['detections'][0]['manual_creation'] = creation
+        store.path.write_text(json.dumps(doc))
+        assert post(store, [], enabled={'0': False}).status_code == 200
+        before = store.path.read_bytes()
+        response = post(store, [addition()], enabled={'0': True})
+>       assert response.status_code == 409 and response.json['error']
+E       assert (200 == 409)
+E        +  where 200 = <WrapperTestResponse 45 bytes [200 OK]>.status_code
+
+tests/test_manual_addition_replay.py:124: AssertionError
+_ test_imported_identified_row_without_trustworthy_creation_conflicts_only_on_replay[creation2] _
+
+store = namespace(root=PosixPath('/tmp/openscrub-task72/red2-tmp/test_imported_identified_row_w2/data'), jobs=PosixPath('/tmp/...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x796a7df8aac0>, url='/api/jobs/275135c2ef73')
+creation = {'t_start': 0, 't_end': 1, 'cbox': [1, 2, 3], 'aoff': [0, 0]}
+
+    @pytest.mark.parametrize('creation', [None, {}, {'t_start': 0, 't_end': 1, 'cbox': [1,2,3], 'aoff': [0,0]},
+        {'t_start': 0, 't_end': 1, 'cbox': [2,3,20,30], 'aoff': [float('nan'),0]}])
+    def test_imported_identified_row_without_trustworthy_creation_conflicts_only_on_replay(store, creation):
+        doc = saved(store)
+        doc['detections'][0]['manual_id'] = 'draw:one'
+        if creation is not None:
+            doc['detections'][0]['manual_creation'] = creation
+        store.path.write_text(json.dumps(doc))
+        assert post(store, [], enabled={'0': False}).status_code == 200
+        before = store.path.read_bytes()
+        response = post(store, [addition()], enabled={'0': True})
+>       assert response.status_code == 409 and response.json['error']
+E       assert (200 == 409)
+E        +  where 200 = <WrapperTestResponse 45 bytes [200 OK]>.status_code
+
+tests/test_manual_addition_replay.py:124: AssertionError
+_ test_imported_identified_row_without_trustworthy_creation_conflicts_only_on_replay[creation3] _
+
+store = namespace(root=PosixPath('/tmp/openscrub-task72/red2-tmp/test_imported_identified_row_w3/data'), jobs=PosixPath('/tmp/...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x796a7df8bb00>, url='/api/jobs/0122727f4baa')
+creation = {'t_start': 0, 't_end': 1, 'cbox': [2, 3, 20, 30], 'aoff': [nan, 0]}
+
+    @pytest.mark.parametrize('creation', [None, {}, {'t_start': 0, 't_end': 1, 'cbox': [1,2,3], 'aoff': [0,0]},
+        {'t_start': 0, 't_end': 1, 'cbox': [2,3,20,30], 'aoff': [float('nan'),0]}])
+    def test_imported_identified_row_without_trustworthy_creation_conflicts_only_on_replay(store, creation):
+        doc = saved(store)
+        doc['detections'][0]['manual_id'] = 'draw:one'
+        if creation is not None:
+            doc['detections'][0]['manual_creation'] = creation
+        store.path.write_text(json.dumps(doc))
+        assert post(store, [], enabled={'0': False}).status_code == 200
+        before = store.path.read_bytes()
+        response = post(store, [addition()], enabled={'0': True})
+>       assert response.status_code == 409 and response.json['error']
+E       assert (200 == 409)
+E        +  where 200 = <WrapperTestResponse 45 bytes [200 OK]>.status_code
+
+tests/test_manual_addition_replay.py:124: AssertionError
+____________ test_multiple_imported_rows_with_same_id_are_conflict _____________
+
+store = namespace(root=PosixPath('/tmp/openscrub-task72/red2-tmp/test_multiple_imported_rows_wi0/data'), jobs=PosixPath('/tmp/...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x796a7df8afc0>, url='/api/jobs/bc660526670f')
+
+    def test_multiple_imported_rows_with_same_id_are_conflict(store):
+        assert post(store, [addition()]).status_code == 200
+        doc = saved(store); doc['detections'].append(copy.deepcopy(doc['detections'][1]))
+        store.path.write_text(json.dumps(doc)); before = store.path.read_bytes()
+        response = post(store, [addition()])
+>       assert response.status_code == 409 and response.json['error']
+E       assert (200 == 409)
+E        +  where 200 = <WrapperTestResponse 45 bytes [200 OK]>.status_code
+
+tests/test_manual_addition_replay.py:133: AssertionError
+____ test_effective_normalization_reference_default_and_untrusted_creation _____
+
+store = namespace(root=PosixPath('/tmp/openscrub-task72/red2-tmp/test_effective_normalization_r0/data'), jobs=PosixPath('/tmp/...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x796a7df8a5c0>, url='/api/jobs/596eeb94aa6c')
+
+    def test_effective_normalization_reference_default_and_untrusted_creation(store):
+        doc = saved(store)
+        doc['render_state'] = {'fps': 2, 'cum': [[0,0],[10,20],[10,20]]}
+        store.path.write_text(json.dumps(doc))
+        first = addition(t_start='.5', t_end='2', screen_box=[12.9,23.8,30.2,50.7], manual_creation={'fake': True})
+        assert post(store, [first]).status_code == 200
+        assert post(store, [addition(t_start=.5, t_end=2., t_ref=.9, screen_box=[12.1,23.1,30.9,50.1])]).status_code == 200
+        row = saved(store)['detections'][1]
+>       assert row['manual_creation'] == {'t_start': .5, 't_end': 2., 'cbox': [2,3,20,30], 'aoff': [10,20]}
+               ^^^^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'manual_creation'
+
+tests/test_manual_addition_replay.py:145: KeyError
+=========================== short test summary info ============================
+FAILED tests/test_manual_addition_replay.py::test_committed_http_response_lost_then_identical_retry
+FAILED tests/test_manual_addition_replay.py::test_replay_preserves_previously_committed_indexed_changes
+FAILED tests/test_manual_addition_replay.py::test_same_id_concurrent_requests_append_once
+FAILED tests/test_manual_addition_replay.py::test_duplicate_ids_and_distinct_equal_geometry_and_legacy
+FAILED tests/test_manual_addition_replay.py::test_incompatible_id_reuse_atomically_rejects_other_edits[False]
+FAILED tests/test_manual_addition_replay.py::test_incompatible_id_reuse_atomically_rejects_other_edits[True]
+FAILED tests/test_manual_addition_replay.py::test_explicit_invalid_id_is_json_400_and_atomic[None]
+FAILED tests/test_manual_addition_replay.py::test_explicit_invalid_id_is_json_400_and_atomic[]
+FAILED tests/test_manual_addition_replay.py::test_explicit_invalid_id_is_json_400_and_atomic[1]
+FAILED tests/test_manual_addition_replay.py::test_explicit_invalid_id_is_json_400_and_atomic[identity3]
+FAILED tests/test_manual_addition_replay.py::test_explicit_invalid_id_is_json_400_and_atomic[identity4]
+FAILED tests/test_manual_addition_replay.py::test_explicit_invalid_id_is_json_400_and_atomic[a b]
+FAILED tests/test_manual_addition_replay.py::test_explicit_invalid_id_is_json_400_and_atomic[\xe5]
+FAILED tests/test_manual_addition_replay.py::test_explicit_invalid_id_is_json_400_and_atomic[identity7]
+FAILED tests/test_manual_addition_replay.py::test_explicit_invalid_id_is_json_400_and_atomic[line\n]
+FAILED tests/test_manual_addition_replay.py::test_identified_creation_requires_finite_effective_numbers[changes0]
+FAILED tests/test_manual_addition_replay.py::test_identified_creation_requires_finite_effective_numbers[changes1]
+FAILED tests/test_manual_addition_replay.py::test_identified_creation_requires_finite_effective_numbers[changes2]
+FAILED tests/test_manual_addition_replay.py::test_identified_creation_requires_finite_effective_numbers[changes3]
+FAILED tests/test_manual_addition_replay.py::test_identified_creation_requires_finite_effective_numbers[changes4]
+FAILED tests/test_manual_addition_replay.py::test_identified_creation_requires_finite_effective_numbers[changes5]
+FAILED tests/test_manual_addition_replay.py::test_imported_identified_row_without_trustworthy_creation_conflicts_only_on_replay[None]
+FAILED tests/test_manual_addition_replay.py::test_imported_identified_row_without_trustworthy_creation_conflicts_only_on_replay[creation1]
+FAILED tests/test_manual_addition_replay.py::test_imported_identified_row_without_trustworthy_creation_conflicts_only_on_replay[creation2]
+FAILED tests/test_manual_addition_replay.py::test_imported_identified_row_without_trustworthy_creation_conflicts_only_on_replay[creation3]
+FAILED tests/test_manual_addition_replay.py::test_multiple_imported_rows_with_same_id_are_conflict
+FAILED tests/test_manual_addition_replay.py::test_effective_normalization_reference_default_and_untrusted_creation
+27 failed in 0.95s

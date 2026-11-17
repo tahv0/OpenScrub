@@ -1,0 +1,2 @@
+PASS: 31 records; success/error counts, exact metadata/response behavior, typed normalization, unknown preservation, zero remaining owners/staging files, source/import pin and probe SHA verified.
+Artifact verification only; route, benchmark and suite not rerun.

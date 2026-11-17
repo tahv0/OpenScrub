@@ -1,0 +1,14 @@
+# P02 ordinary output-choice baseline research
+
+You are a read-only research worker. Use full pinned Git exports at `e21ebdf6e3ee46e6c65050dc956a9a3459152269` and, only for the existing draft interface comparison, `92124753736e287ac800af91f0ac96f3e96c01be`. Never import or modify the moving native product worktree. No subagents, product changes, commits, dependency/model installation, user data or external messages. Write only this plan's SDD report/evidence and synthetic `/tmp/openscrub-review-choices-20261117` files.
+
+Read only P02 in `docs/superpowers/plans/upstream-delivery/01-core-ux-and-reliability.md`, relevant P02/N12/P15 audit rows, and donor `39b4ed83` when useful. Source audit is already complete; do not repeat it. The future change is separate explicit Blur / Keep output actions with visible current state, not an identity/training/classification system or new handled state.
+
+1. Inventory actual ordinary review controls, group construction/propagation, person versus track precedence, mixed enabled state, category/bulk actions, zone-dropped handling, editor selection and keyboard semantics. Identify all supported ambiguous toggles that belong to the small P02 patch versus separate features. Preserve Austin's tooltip positioning/tap behavior and enlarged previews.
+2. Establish bounded actual emitted-UI/browser baseline scenarios with synthetic ordinary reports: repeated click; mixed group; person/track overlaps; unrelated groups; category/bulk controls; zone-dropped; keyboard focus/action. Use the full unmodified emitted application where practical, not a miniature state machine. State clearly where callbacks or HTTP are controlled. No inference or repeated performance tests.
+3. Propose the smallest coherent explicit-setter UI contract, retaining existing `enabled` semantics and accessibility. Explain current-state text for mixed groups and what a group action affects. Avoid global frontend/module changes and new report metadata. Account for P07a deliberate same-value intent and pending snapshot/ack ownership as the integration point; do not regress its draft handling.
+4. Record exact source hashes/commands, screenshots only if informative, before behavior and concrete future acceptance tests including save/reopen/render. This research need not implement or claim full output validation. Do not run the full suite/build or repeat prior research. Raise ambiguity to supervisor; make no product changes.
+
+Use existing Python3.12 environment `/tmp/openscrub-baseline-20261116/env-opencv4.sh`, task-local jobs and no model downloads. Browser plugin is unavailable; existing Playwright/Chromium under `/tmp/openscrub-save-as-20261116/{node_modules,browsers,tools}` is the recorded fallback. No new tools required.
+
+Write `review-choices-baseline-research.md` and compact `review-choices-baseline-evidence/` in `/home/tahv0/src/OpenScrub/.superpowers/sdd/README/`. Return status, one-line findings and paths only.
