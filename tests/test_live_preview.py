@@ -145,7 +145,7 @@ def test_http_replacement_before_open_uses_same_generation_for_length(preview, h
     publish(job, frames[0])
     stage = path.parent / "staged"
     stage.mkdir()
-    publish({"dir": str(stage)}, frames[1])
+    publish({"dir": str(stage), "cancel": threading.Event()}, frames[1])
     reached, resume = threading.Event(), threading.Event()
     original_open = builtins.open
 

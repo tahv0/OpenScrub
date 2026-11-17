@@ -46,6 +46,8 @@ def intake(tmp_path, monkeypatch):
     jobs_dir = Path(web.JOBS_DIR)
     jobs_dir.mkdir()
     monkeypatch.setattr(web, "JOBS", {})
+    monkeypatch.setattr(web, "FILES", type(web.FILES)(web.VAULT_LOCK))
+    monkeypatch.setattr(web, "VAULT", {"key": None})
     monkeypatch.setattr(web, "WORK_Q", queue.Queue())
     monkeypatch.setattr(web, "WORKER", {"thread": None, "current": None})
     monkeypatch.setattr(web, "TOKEN", None)
@@ -87,7 +89,9 @@ def intake(tmp_path, monkeypatch):
     # RED failures may leave queued work. This fixture owns the temporary
     # storage and explicitly drains the queue without starting a worker.
     while not web.WORK_Q.empty():
-        web.WORK_Q.get_nowait()
+        ticket = web.WORK_Q.get_nowait()
+        if len(ticket) > 3:
+            ticket[3].release()
         web.WORK_Q.task_done()
 
 
@@ -137,7 +141,9 @@ def test_object_options_preserve_input_settings_and_cleanup(intake, kind, option
     assert web.WORK_Q.qsize() == 1
     queued = web.WORK_Q.get_nowait()
     web.WORK_Q.task_done()
-    assert queued == (jid, "scan", 1)
+    assert queued[:3] == (jid, "scan", 1)
+    assert len(queued) == 4 and not queued[3].released
+    assert queued[3] is web.FILES.initialize(job).queued[1]
 
     args = web.build_args(job)
     assert (args.engine, args.device) == ("auto", "auto")

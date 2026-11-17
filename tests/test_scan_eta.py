@@ -1,10 +1,12 @@
 """Stage ETA behavior using the actual web callback and a controlled clock."""
 import math
+import threading
 from types import SimpleNamespace
 
 import pytest
 
 import openscrub_web as web
+from test_job_lifecycle import store
 
 
 @pytest.fixture
@@ -17,7 +19,7 @@ def clock(monkeypatch):
 
 
 def test_sustained_slow_tail_replaces_fast_prefix(clock):
-    job = {}
+    job = {"cancel": threading.Event()}
     cb = web.WebCallbacks(job)
     # 600 s at 10 units/s, then 180 s at 1 unit/s; 3820 units remain.
     for t in range(0, 601, 5):
@@ -39,7 +41,7 @@ def observe(cb, clock, t, cur, total=100, stage="scan"):
 
 
 def test_startup_waits_three_seconds_and_smooths_new_estimates(clock):
-    cb = web.WebCallbacks({})
+    cb = web.WebCallbacks({"cancel": threading.Event()})
     assert observe(cb, clock, 0, 10) is None
     assert observe(cb, clock, 2, 12) is None
     assert observe(cb, clock, 3, 13) == 87
@@ -49,7 +51,7 @@ def test_startup_waits_three_seconds_and_smooths_new_estimates(clock):
 
 
 def test_steady_rate_tracks_remaining_time(clock):
-    cb = web.WebCallbacks({})
+    cb = web.WebCallbacks({"cancel": threading.Event()})
     for t in range(0, 101, 5):
         eta = observe(cb, clock, t, t, 200)
         if t >= 20:
@@ -57,10 +59,10 @@ def test_steady_rate_tracks_remaining_time(clock):
 
 
 def test_zero_progress_and_mature_stall_have_no_useful_rate(clock):
-    cb = web.WebCallbacks({})
+    cb = web.WebCallbacks({"cancel": threading.Event()})
     for t in range(0, 151, 5):
         assert observe(cb, clock, t, 0) is None
-    cb = web.WebCallbacks({})
+    cb = web.WebCallbacks({"cancel": threading.Event()})
     observe(cb, clock, 0, 0)
     assert observe(cb, clock, 20, 20) == 80
     for t in range(25, 151, 5):
@@ -69,7 +71,7 @@ def test_zero_progress_and_mature_stall_have_no_useful_rate(clock):
 
 
 def test_recent_window_retains_one_predecessor_for_interval_rate(clock):
-    cb = web.WebCallbacks({})
+    cb = web.WebCallbacks({"cancel": threading.Event()})
     observe(cb, clock, 0, 0, 1000)
     assert observe(cb, clock, 100, 100, 1000) == 900
     assert observe(cb, clock, 230, 230, 1000) == 816
@@ -79,7 +81,7 @@ def test_recent_window_retains_one_predecessor_for_interval_rate(clock):
 
 
 def test_recent_rate_is_mature_at_twenty_seconds(clock):
-    cb = web.WebCallbacks({})
+    cb = web.WebCallbacks({"cancel": threading.Event()})
     observe(cb, clock, 0, 0)
     assert observe(cb, clock, 20, 20) == 80
     # The last sampled rate is 1/s over 20 s. Before the next sample,
@@ -88,7 +90,7 @@ def test_recent_rate_is_mature_at_twenty_seconds(clock):
 
 
 def test_subsample_and_repeated_calls_do_not_grow_sample_storage(clock):
-    cb = web.WebCallbacks({})
+    cb = web.WebCallbacks({"cancel": threading.Event()})
     observe(cb, clock, 0, 0)
     for t in range(1, 5):
         observe(cb, clock, t, t)
@@ -99,7 +101,7 @@ def test_subsample_and_repeated_calls_do_not_grow_sample_storage(clock):
 
 
 def test_wall_clock_jump_does_not_change_eta(clock):
-    cb = web.WebCallbacks({})
+    cb = web.WebCallbacks({"cancel": threading.Event()})
     observe(cb, clock, 0, 0)
     assert observe(cb, clock, 5, 5) == 95
     clock.now, clock.wall = 10, -10000
@@ -108,7 +110,7 @@ def test_wall_clock_jump_does_not_change_eta(clock):
 
 
 def test_counter_regression_between_samples_starts_fresh(clock):
-    cb = web.WebCallbacks({})
+    cb = web.WebCallbacks({"cancel": threading.Event()})
     observe(cb, clock, 0, 10)
     observe(cb, clock, 1, 15)
     assert observe(cb, clock, 2, 14) is None
@@ -120,7 +122,7 @@ def test_counter_regression_between_samples_starts_fresh(clock):
     ("render", 0.56173), ("other", 0.56173),
 ])
 def test_progress_mapping_and_stage_reset(clock, stage, progress):
-    cb = web.WebCallbacks({})
+    cb = web.WebCallbacks({"cancel": threading.Event()})
     observe(cb, clock, 0, 0, stage="old")
     observe(cb, clock, 5, 5, stage="old")
     assert observe(cb, clock, 10, 1, 8.1, stage) is None
@@ -129,7 +131,7 @@ def test_progress_mapping_and_stage_reset(clock, stage, progress):
 
 
 def test_completion_resets_estimator_for_same_stage_next_attempt(clock):
-    cb = web.WebCallbacks({})
+    cb = web.WebCallbacks({"cancel": threading.Event()})
     observe(cb, clock, 0, 0)
     observe(cb, clock, 5, 5)
     assert observe(cb, clock, 6, 100) is None
@@ -137,7 +139,7 @@ def test_completion_resets_estimator_for_same_stage_next_attempt(clock):
     # A following call at the same counter must still begin fresh.
     assert observe(cb, clock, 20, 100, 200) is None
     assert observe(cb, clock, 23, 103, 200) == 97
-    assert observe(web.WebCallbacks({}), clock, 30, 103, 200) is None
+    assert observe(web.WebCallbacks({"cancel": threading.Event()}), clock, 30, 103, 200) is None
 
 
 @pytest.mark.parametrize("cur,total", [
@@ -146,14 +148,14 @@ def test_completion_resets_estimator_for_same_stage_next_attempt(clock):
     (1e-308, 1e308),
 ])
 def test_unusable_numeric_observations_never_publish_invalid_eta(clock, cur, total):
-    cb = web.WebCallbacks({})
+    cb = web.WebCallbacks({"cancel": threading.Event()})
     observe(cb, clock, 0, 0)
     observe(cb, clock, 5, cur, total)
     assert cb.job["eta"] is None
 
 
 def test_storage_stays_bounded_over_a_long_stage(clock):
-    cb = web.WebCallbacks({})
+    cb = web.WebCallbacks({"cancel": threading.Event()})
     for t in range(0, 10001, 5):
         observe(cb, clock, t, t, 20000)
         assert len(cb._rate_points) <= 26
@@ -163,11 +165,10 @@ def test_storage_stays_bounded_over_a_long_stage(clock):
 
 @pytest.mark.parametrize("result", ["done", "cancelled", "error"])
 def test_worker_clears_published_eta_and_uses_fresh_callback(
-        clock, monkeypatch, tmp_path, result):
-    job = {"id": "eta-test", "name": "synthetic.mp4", "dir": str(tmp_path), "options": {},
-           "log": [], "error": None, "stats": {}, "output": None}
+        clock, monkeypatch, store, result):
+    job = store.job
     callbacks = []
-    monkeypatch.setattr(web, "build_args", lambda *a, **kw: object())
+    monkeypatch.setattr(web, "build_args", lambda *a, **kw: SimpleNamespace())
     monkeypatch.setattr(web.openscrub, "load_report", lambda *a: ([], {}, {}))
 
     def pipeline(args, cb):
@@ -178,7 +179,7 @@ def test_worker_clears_published_eta_and_uses_fresh_callback(
             raise web.openscrub.PipelineCancelled()
         if result == "error":
             raise RuntimeError("synthetic stage error")
-        return {"output": str(tmp_path / "result.mp4")}
+        return {"output": str(store.root / "result.mp4")}
 
     monkeypatch.setattr(web.openscrub, "run_pipeline", pipeline)
     for _ in range(2):
