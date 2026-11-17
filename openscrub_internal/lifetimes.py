@@ -1,8 +1,10 @@
 """In-process web file ownership. Reserve/inspect only under the web guard.
 
-This coordinates lifetime, not report transactions or other processes. A token
-may move to a queued task, thread, or WSGI iterable; release is idempotent.
+Per-job state also owns the report transaction lock and operation identity.
+This does not coordinate other processes. A lifetime token may move to a queued task, thread, or WSGI iterable; release is idempotent.
 """
+
+import threading
 
 
 class _JobFiles:
@@ -12,6 +14,11 @@ class _JobFiles:
         self.closed = False
         self.queued = {}
         self.tracker = None
+        # Initialized before a new/rehydrated job enters the registry. Never
+        # persisted: one stable transaction boundary per live job identity.
+        self.report_lock = threading.Lock()
+        self.operation = None
+        self.active = None
 
 
 class FileOwners:
@@ -39,6 +46,7 @@ class _Lease:
         self.related = []
         self.source = None
         self.report_input = False
+        self.operation = None
 
     def release_locked(self):
         if self.released:

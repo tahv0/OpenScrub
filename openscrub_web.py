@@ -537,8 +537,9 @@ def job_public(job):
 class WebCallbacks(openscrub.Callbacks):
     wants_frames = True
 
-    def __init__(self, job):
+    def __init__(self, job, cancel_event=None):
         self.job = job
+        self.cancel_event = cancel_event if cancel_event is not None else job["cancel"]
         self._last_frame = 0.0
         self._stage = None          # ETA state: current stage,
         self._t0 = 0.0              # when it started,
@@ -596,7 +597,7 @@ class WebCallbacks(openscrub.Callbacks):
                     [cv2.IMWRITE_JPEG_QUALITY, 70])
 
     def cancelled(self):
-        return self.job["cancel"].is_set()
+        return self.cancel_event.is_set()
 
 
 def build_args(job, for_render=False):
@@ -797,43 +798,103 @@ WORKER = {"current": None, "thread": None}
 _ACTIVE_PHASES = ("queued", "scanning", "rendering", "queued_render")
 
 
-def _reserve_queue_locked(job, action, render_owner=None):
-    _validate_files_locked(job)
-    lease = _reserve_files_locked(job, work=True,
-                source=render_owner.source if render_owner is not None else None)
-    lease.report_input = bool(render_owner is not None and render_owner.report_input)
+def _report_current(job):
+    """Identity lookup only; caller owns report_lock and a file lifetime.
+
+    Admission takes VAULT_LOCK -> JOBS_LOCK and releases both before this
+    boundary. Never acquire VAULT_LOCK (including lease release) inside it.
+    """
+    with JOBS_LOCK:
+        if not any(current is job for current in JOBS.values()):
+            abort(404)
+        if FILES.initialize(job).closed:
+            abort(409, "job is being deleted")
+
+
+def _edit_gate(job):
+    _report_current(job)
+    if FILES.initialize(job).active is not None or job.get("phase") in _ACTIVE_PHASES:
+        abort(409, "job work is queued, running or still cleaning up")
+
+
+def _operation_valid(job, owner):
+    files = FILES.initialize(job)
+    with JOBS_LOCK:
+        return (any(current is job for current in JOBS.values()) and not files.closed
+                and owner.operation is not None
+                and files.operation is owner.operation)
+
+
+def _begin_operation(job, owner):
+    files = FILES.initialize(job)
+    owner.operation = threading.Event()
+    files.operation = owner.operation
+    job["cancel"] = owner.operation
+    files.active = owner
+
+
+def _finish_operation(job, owner):
+    # Release lifecycle ownership outside the report transaction. Keep the
+    # mutation gate closed until actual worker cleanup/release has completed.
+    owner.release()
+    if job is None:  # a cancelled ticket's job may already have been deleted
+        return
+    files = FILES.initialize(job)
+    with files.report_lock:
+        if files.active is owner:
+            files.active = None
+
+
+def _reserve_queue_locked(job, action, prepared):
+    """Transfer a PREPARED lifetime under report_lock, without vault nesting."""
+    _report_current(job)
+    _begin_operation(job, prepared)
     with JOBS_LOCK:
         job["qgen"] = job.get("qgen", 0) + 1
         gen = job["qgen"]
-        FILES.initialize(job).queued[gen] = lease
-    return job["id"], action, gen, lease
+        FILES.initialize(job).queued[gen] = prepared
+    job["phase"] = "queued_render" if action == "render" else "queued"
+    return job["id"], action, gen, prepared
+
+
+def _prepare_work(job, action):
+    # Source selection can reserve related jobs and release provisional leases;
+    # all of that must finish before taking report_lock.
+    prepared = _own_files(job, work=True)
+    try:
+        if action == "render":
+            _select_render_input(job, prepared)
+        return prepared
+    except BaseException:
+        prepared.release()
+        raise
 
 
 def enqueue(job, action, ticket=None):
-    """Reserve before queue submission. Cancel and pickup share ticket identity.
-
-    A caller changing phase under VAULT_LOCK supplies its reserved ticket after
-    releasing the guard. A cancelled ticket can still reach the queue, but its
-    idempotently released lease and old generation prevent it running a retry.
-    """
     if ticket is None:
-        if action == "render":
-            with _own_files(job) as admission:
-                _select_render_input(job, admission)
-                with VAULT_LOCK:
-                    ticket = _reserve_queue_locked(job, action, admission)
-        else:
-            with VAULT_LOCK:
-                ticket = _reserve_queue_locked(job, action)
+        prepared = _prepare_work(job, action)
+        try:
+            with FILES.initialize(job).report_lock:
+                # Intake may have been cancelled while upload was writing.
+                # Queueing its eventual completed upload must not revive it.
+                if not job["cancel"].is_set():
+                    ticket = _reserve_queue_locked(job, action, prepared)
+        finally:
+            if ticket is None:
+                prepared.release()
+        if ticket is None:
+            return
     try:
         WORK_Q.put(ticket)
     except BaseException:
-        with VAULT_LOCK:
-            FILES.initialize(job).queued.pop(ticket[2], None)
-            ticket[3].release_locked()
-            if job.get("qgen") == ticket[2]:
+        files = FILES.initialize(job)
+        with files.report_lock:
+            with JOBS_LOCK:
+                files.queued.pop(ticket[2], None)
+            if _operation_valid(job, ticket[3]):
                 job["phase"] = "error"
                 job["error"] = "could not queue job work"
+        _finish_operation(job, ticket[3])
         raise
 
 
@@ -884,27 +945,47 @@ def worker():
                   flush=True)
         finally:
             if lease is not None:
-                lease.release()
+                _finish_operation(job, lease)
             WORKER["current"] = None
             WORK_Q.task_done()
 
 
 def _run_job(job, action, owner=None):
     if owner is None:
-        with _own_files(job, work=True) as owner:
+        owner = _prepare_work(job, action)
+        try:
+            with FILES.initialize(job).report_lock:
+                _begin_operation(job, owner)
             return _run_job(job, action, owner)
+        finally:
+            _finish_operation(job, owner)
     jid = job["id"]
-    cb = WebCallbacks(job)
+    files = FILES.initialize(job)
+    with files.report_lock:
+        if owner.operation is None:  # compatibility with old queue entries
+            _begin_operation(job, owner)
+        if not _operation_valid(job, owner):
+            return
+        job["phase"] = "scanning" if action == "scan" else "rendering"
+    cb = WebCallbacks(job, owner.operation)
+    def publish_report(path, doc):
+        with files.report_lock:
+            if not _operation_valid(job, owner) or owner.operation.is_set():
+                raise openscrub.PipelineCancelled()
+            atomic_report(path, doc)
+    cb.publish_report = publish_report
     source = owner.source if owner is not None else job["video"]
     try:
         if action == "scan":
-            job["phase"] = "scanning"
             job["log"].append("— scan started —")
             args = build_args(dict(job, video=source))
             state = openscrub.run_scan(args, cb)
             openscrub.write_report(os.path.join(job["dir"], "report.json"),
-                                  args, state)
-            job["stats"] = state["stats"]
+                                  args, state, publisher=cb.publish_report)
+            with files.report_lock:
+                if not _operation_valid(job, owner):
+                    return
+                job["stats"] = state["stats"]
             try:
                 prov = _load_job_report(job).get("provenance", {})
                 if (prov.get("vfr_normalized")
@@ -983,42 +1064,56 @@ def _run_job(job, action, owner=None):
                     if cap is not None:
                         cap.release()
             _start_owned_thread(_pregen, thumbnail_owner)
-            if job["options"].get("skip_review"):
-                job["log"].append("review skipped — rendering all detections")
-                job["phase"] = "queued_render"
-                enqueue(job, "render")
-            else:
-                job["phase"] = "review"
-            job["progress"] = 0.5
-            job["eta"] = None
+            next_owner = (_prepare_work(job, "render")
+                          if job["options"].get("skip_review") else None)
+            ticket = None
+            try:
+                with files.report_lock:
+                    if not _operation_valid(job, owner):
+                        return
+                    if next_owner is not None:
+                        job["log"].append("review skipped — rendering all detections")
+                        ticket = _reserve_queue_locked(job, "render", next_owner)
+                    else:
+                        job["phase"] = "review"
+                    job["progress"] = 0.5
+                    job["eta"] = None
+            finally:
+                if next_owner is not None and ticket is None:
+                    next_owner.release()
+            if ticket is not None:
+                enqueue(job, "render", ticket)
         elif action == "render":
-            job["phase"] = "rendering"
             if not owner.report_input:  # compatibility with older queue entries
                 _select_render_input(job, owner)
             args = build_args(dict(job, video=owner.source), for_render=True)
             args._report_input = owner.source
             res = openscrub.run_pipeline(args, cb)
-            job["output"] = res["output"]
-            # refresh report with output hash
-            dets, rstate, prov = openscrub.load_report(
-                os.path.join(job["dir"], "report.json"))
-            job["phase"] = "done"
-            job["progress"] = 1.0
-            job["eta"] = None
+            with files.report_lock:
+                if not _operation_valid(job, owner):
+                    return
+                job["output"] = res["output"]
+                job["phase"] = "done"
+                job["progress"] = 1.0
+                job["eta"] = None
     except openscrub.PipelineCancelled:
-        job["phase"] = "cancelled"
-        job["error"] = "cancelled by user"
+        with files.report_lock:
+            if _operation_valid(job, owner):
+                job["phase"] = "cancelled"
+                job["error"] = "cancelled by user"
     except BaseException as e:
-        # BaseException, not Exception: a SystemExit (argparse) or any other
-        # non-Exception escaping here used to kill the worker thread silently
         msg = str(e) or type(e).__name__
         if isinstance(e, SystemExit):
             msg = "the job stopped unexpectedly (exit %s)" % (e.code,)
-        job["phase"] = "error"
-        job["error"] = msg
-        job["log"].append(f"ERROR: {msg}")
+        with files.report_lock:
+            if _operation_valid(job, owner):
+                job["phase"] = "error"
+                job["error"] = msg
+                job["log"].append(f"ERROR: {msg}")
     finally:
-        job["eta"] = None       # a dead/paused job must not show "~N left"
+        with files.report_lock:
+            if _operation_valid(job, owner):
+                job["eta"] = None
 
 
 def start_worker():
@@ -1280,6 +1375,8 @@ def _delete_job(job):
         state.closed = True
         lease = FILES.reserve()  # deletion owns the tree, not an admitted job
     with lease:
+        with state.report_lock:
+            state.operation = None
         if _reap_job_dir(job["dir"], jid):
             with JOBS_LOCK:
                 JOBS.pop(jid, None)
@@ -1319,30 +1416,27 @@ def job_retry(jid):
     already on the server. Before this existed, the only path after an
     error was Start scan — which uploaded the same multi-GB file into a
     fresh job dir on every attempt until the disk filled (issue #16)."""
-    with VAULT_LOCK:
-        job = JOBS.get(jid)
-        if job is None:
-            abort(404)
-        _validate_files_locked(job)
-        if FILES.initialize(job).work:
-            return jsonify({"error": "job work is still cleaning up"}), 409
-        if job["phase"] not in ("error", "cancelled"):
-            return jsonify({"error": "only a failed or cancelled job can "
-                                     "be retried"}), 409
-        video = _job_video(job)
-        if not (video and os.path.exists(video)):
-            return jsonify({"error": "the job's video file is no longer "
-                                     "on the server — start a new "
-                                     "scan"}), 410
-        job["cancel"].clear()
-        job["error"] = None
-        job["output"] = None
-        job["progress"] = 0.0
-        job["eta"] = None
-        job["phase"] = "queued"
-        job["log"].append("— retrying scan (reusing the file already on "
-                          "the server — nothing is re-uploaded) —")
-        ticket = _reserve_queue_locked(job, "scan")
+    job = JOBS.get(jid) or abort(404)
+    prepared = _prepare_work(job, "scan")
+    ticket = None
+    try:
+        video = prepared.source
+        exists = bool(video and os.path.exists(video))
+        with FILES.initialize(job).report_lock:
+            _report_current(job)
+            if (FILES.initialize(job).active is not None
+                    or FILES.initialize(job).work > 1):
+                return jsonify({"error": "job work is still cleaning up"}), 409
+            if job["phase"] not in ("error", "cancelled"):
+                return jsonify({"error": "only a failed or cancelled job can be retried"}), 409
+            if not exists:
+                return jsonify({"error": "the job's video file is no longer on the server — start a new scan"}), 410
+            job.update(error=None, output=None, progress=0.0, eta=None)
+            job["log"].append("— retrying scan (reusing the file already on the server — nothing is re-uploaded) —")
+            ticket = _reserve_queue_locked(job, "scan", prepared)
+    finally:
+        if ticket is None:
+            prepared.release()
     enqueue(job, "scan", ticket)
     return jsonify({"ok": True})
 
@@ -1378,19 +1472,34 @@ def job_cancel(jid):
     a flag the worker checks mid-scan, so a job the worker never picked up
     could never be cancelled (or deleted: delete refuses active jobs)."""
     job = JOBS.get(jid) or abort(404)
-    job["cancel"].set()
-    with VAULT_LOCK:
-        _validate_files_locked(job)
-        if (WORKER.get("current") != jid
-                and job.get("phase") in _ACTIVE_PHASES):
-            for lease in FILES.initialize(job).queued.values():
-                lease.release_locked()
-            FILES.initialize(job).queued.clear()
-            job["qgen"] = job.get("qgen", 0) + 1   # void its queue entry
-            job["phase"] = "cancelled"
-            job["error"] = "cancelled by user"
-            job["eta"] = None
+    files = FILES.initialize(job)
+    operation = files.operation  # capture the operation this request cancels
+    if operation is not None:
+        operation.set()  # promptly signal compute, before waiting for report I/O
+    released = []
+    with files.report_lock:
+        _report_current(job)
+        if files.operation is not operation:
+            # That attempt finished/replaced while this request waited. Do not
+            # signal, invalidate or release a newer attempt's queue ownership.
+            return jsonify({"ok": True})
+        if operation is None:
+            job["cancel"].set()  # idle/intake: no running compute to interrupt
+        files.operation = None  # Event.clear cannot revive the captured attempt
+        with JOBS_LOCK:
+            released = list(files.queued.values())
+            files.queued.clear()
+            job["qgen"] = job.get("qgen", 0) + 1
+        if files.active in released:
+            files.active = None
+        if job.get("phase") in _ACTIVE_PHASES:
+            job.update(phase="cancelled", error="cancelled by user", eta=None)
             job["log"].append("— cancelled —")
+        if job.get("trackbg", {}).get("state") == "running":
+            job["trackbg"] = {"state": "done", "added": 0,
+                              "error": "cancelled by user"}
+    for lease in released:
+        lease.release()
     return jsonify({"ok": True})
 
 
@@ -1594,57 +1703,62 @@ def job_save_edits(jid):
     job = JOBS.get(jid) or abort(404)
     edits = request.get_json(force=True)
     path = os.path.join(job["dir"], "report.json")
-    doc = _load_job_report(job)
-    enabled = edits.get("enabled", {})
-    for i, d in enumerate(doc["detections"]):
-        if str(i) in enabled:
-            d["enabled"] = bool(enabled[str(i)])
-    for i, box in (edits.get("box_overrides") or {}).items():
-        i = int(i)
-        if 0 <= i < len(doc["detections"]) and len(box) == 4:
-            doc["detections"][i]["cbox"] = [float(v) for v in box]
-    for i, span in (edits.get("time_overrides") or {}).items():
-        i = int(i)
-        if 0 <= i < len(doc["detections"]) and len(span) == 2:
-            t0, t1 = float(span[0]), float(span[1])
-            if t1 > t0 >= 0:
-                doc["detections"][i]["t_start"] = t0
-                doc["detections"][i]["t_end"] = t1
-                doc["detections"][i]["last_seen"] = min(
-                    max(doc["detections"][i].get("last_seen", t0), t0), t1)
-    rs = doc["render_state"]
-    for m in edits.get("manual", []):
-        t0 = float(m["t_start"]); t1 = float(m["t_end"])
-        tref = float(m.get("t_ref", t0))
-        fidx = min(int(tref * rs["fps"]), len(rs["cum"]) - 1)
-        ox, oy = rs["cum"][fidx]
-        b = m["screen_box"]
-        doc["detections"].append({
-            "t_start": t0, "t_end": t1,
-            "cbox": [int(b[0] - ox), int(b[1] - oy),
-                     int(b[2] - ox), int(b[3] - oy)],
-            "category": "manual", "text": "user-drawn", "confidence": 1.0,
-            "aoff": [ox, oy], "last_seen": t0, "enabled": True})
-    if "audio" in edits:
-        # audio redaction spans (mute/bleep): stored in the report so the
-        # --from-report render applies them and re-renders keep them
-        doc["audio_redactions"] = [
-            {"t0": float(s["t0"]), "t1": float(s["t1"]),
-             "mode": (s.get("mode") if s.get("mode") in ("mute", "bleep")
-                      else "mute")}
-            for s in (edits.get("audio") or [])
-            if float(s.get("t1", 0)) > float(s.get("t0", 0)) >= 0]
-    atomic_report(path, doc)
-    # suggest allowlisting any string whose EVERY instance was disabled —
-    # the review just taught us it's a recurring false positive
-    per = {}
-    for d in doc["detections"]:
-        if d["category"] in ("name",):
-            per.setdefault(d["text"], []).append(d.get("enabled", True))
-    suggest = sorted(t for t, states in per.items()
-                     if len(states) >= 2 and not any(states))
-    return jsonify({"ok": True, "total": len(doc["detections"]),
-                    "suggest_allowlist": suggest})
+    with FILES.initialize(job).report_lock:
+        _edit_gate(job)
+        try:
+            doc = _load_job_report(job)
+        except FileNotFoundError:
+            abort(404, "job report not found")
+        enabled = edits.get("enabled", {})
+        for i, d in enumerate(doc["detections"]):
+            if str(i) in enabled:
+                d["enabled"] = bool(enabled[str(i)])
+        for i, box in (edits.get("box_overrides") or {}).items():
+            i = int(i)
+            if 0 <= i < len(doc["detections"]) and len(box) == 4:
+                doc["detections"][i]["cbox"] = [float(v) for v in box]
+        for i, span in (edits.get("time_overrides") or {}).items():
+            i = int(i)
+            if 0 <= i < len(doc["detections"]) and len(span) == 2:
+                t0, t1 = float(span[0]), float(span[1])
+                if t1 > t0 >= 0:
+                    doc["detections"][i]["t_start"] = t0
+                    doc["detections"][i]["t_end"] = t1
+                    doc["detections"][i]["last_seen"] = min(
+                        max(doc["detections"][i].get("last_seen", t0), t0), t1)
+        rs = doc["render_state"]
+        for m in edits.get("manual", []):
+            t0 = float(m["t_start"]); t1 = float(m["t_end"])
+            tref = float(m.get("t_ref", t0))
+            fidx = min(int(tref * rs["fps"]), len(rs["cum"]) - 1)
+            ox, oy = rs["cum"][fidx]
+            b = m["screen_box"]
+            doc["detections"].append({
+                "t_start": t0, "t_end": t1,
+                "cbox": [int(b[0] - ox), int(b[1] - oy),
+                         int(b[2] - ox), int(b[3] - oy)],
+                "category": "manual", "text": "user-drawn", "confidence": 1.0,
+                "aoff": [ox, oy], "last_seen": t0, "enabled": True})
+        if "audio" in edits:
+            # audio redaction spans (mute/bleep): stored in the report so the
+            # --from-report render applies them and re-renders keep them
+            doc["audio_redactions"] = [
+                {"t0": float(s["t0"]), "t1": float(s["t1"]),
+                 "mode": (s.get("mode") if s.get("mode") in ("mute", "bleep")
+                          else "mute")}
+                for s in (edits.get("audio") or [])
+                if float(s.get("t1", 0)) > float(s.get("t0", 0)) >= 0]
+        atomic_report(path, doc)
+        # suggest allowlisting any string whose EVERY instance was disabled —
+        # the review just taught us it's a recurring false positive
+        per = {}
+        for d in doc["detections"]:
+            if d["category"] in ("name",):
+                per.setdefault(d["text"], []).append(d.get("enabled", True))
+        suggest = sorted(t for t, states in per.items()
+                         if len(states) >= 2 and not any(states))
+        return jsonify({"ok": True, "total": len(doc["detections"]),
+                        "suggest_allowlist": suggest})
 
 
 @app.route("/api/jobs/<jid>/track_object", methods=["POST"])
@@ -1664,19 +1778,29 @@ def job_track_object(jid):
     if len(box) != 4 or not (t1 > t0 >= 0) or not (t0 <= t_ref <= t1):
         abort(400)
     st = {"state": "running", "added": 0, "error": None}
-    with VAULT_LOCK:
-        _validate_files_locked(job)
-        files = FILES.initialize(job)
-        if ((files.tracker is not None and not files.tracker.released)
-                or job.get("trackbg", {}).get("state") == "running"):
-            return jsonify({"error": "tracking already in progress"}), 409
-        if job["cancel"].is_set():
-            if files.work:
-                return jsonify({"error": "cancelled job work is still cleaning up"}), 409
-            job["cancel"].clear()
-        lease = _reserve_files_locked(job, work=True)
-        files.tracker = lease
-        job["trackbg"] = st
+    files = FILES.initialize(job)
+    current, operation = job.get("video"), files.operation
+    lease = _own_files(job, work=True)
+    try:
+        with files.report_lock:
+            _edit_gate(job)
+            if job.get("video") != current or files.operation is not operation:
+                abort(409, "job operation or source changed — retry tracking")
+            if ((files.tracker is not None and not files.tracker.released)
+                    or job.get("trackbg", {}).get("state") == "running"):
+                abort(409, "tracking already in progress")
+            if job["cancel"].is_set():
+                if files.work > 1:
+                    abort(409, "cancelled job work is still cleaning up")
+                job["cancel"].clear()
+            lease.operation = threading.Event()
+            files.operation = lease.operation
+            job["cancel"] = lease.operation
+            files.tracker = lease
+            job["trackbg"] = st
+    except BaseException:
+        lease.release()
+        raise
 
     def _run():
         try:
@@ -1684,7 +1808,7 @@ def job_track_object(jid):
                 def log(self, m):
                     job["log"].append(m)
                 def cancelled(self):
-                    return job["cancel"].is_set()
+                    return lease.operation.is_set()
             det = None
             try:
                 # same person-model resolution the scan uses: the panel
@@ -1699,51 +1823,57 @@ def job_track_object(jid):
                 det = None
             samples = openscrub.track_manual_region(
                 lease.source, box, t_ref, t0, t1, cb=L(), person_det=det)
-            if not samples:
-                st.update(state="done", added=0,
-                          error="could not track that region — try a "
-                                "larger box or a frame where it's clearer")
-                return
-            doc = _load_job_report(job)
-            rs = doc["render_state"]
-            fps = float(rs["fps"]) or 30.0
-            step = 2.0 / fps
-            tid = max([d.get("track", -1) for d in doc["detections"]]
-                      + [-1]) + 1
-            new = []
-            tcls = samples[0][4] if len(samples[0]) > 4 else None
-            label = ("tracked %s" % openscrub.COCO_NAMES[tcls]
-                     if tcls is not None
-                     and 0 <= tcls < len(openscrub.COCO_NAMES)
-                     else "tracked object")
-            for s in samples:
-                t, b, score = s[0], s[1], s[2]
-                poly = s[3] if len(s) > 3 and s[3] else ()
-                fidx = min(int(t * fps), len(rs["cum"]) - 1)
-                ox, oy = rs["cum"][fidx]
-                new.append({
-                    "t_start": t, "t_end": t + step * 1.2,
-                    "cbox": [int(b[0] - ox), int(b[1] - oy),
-                             int(b[2] - ox), int(b[3] - oy)],
-                    "category": "manual", "text": label,
-                    "confidence": round(float(score), 3),
-                    "aoff": [ox, oy], "last_seen": t,
-                    "dense": True, "track": tid, "enabled": True,
-                    "poly": [[[float(x), float(y)] for x, y in c]
-                             for c in poly]})
-            # grace pads: cover the sub-sample sliver at both ends
-            new[0]["t_start"] = max(0.0, new[0]["t_start"] - 0.25)
-            new[-1]["t_end"] += 0.25
-            doc["detections"].extend(new)
-            path = os.path.join(job["dir"], "report.json")
-            atomic_report(path, doc)
-            job["log"].append(
-                "      tracked object: %d position(s), %.1f-%.1fs "
-                "(review card added)" % (len(new),
-                                         new[0]["t_start"], new[-1]["t_end"]))
-            st.update(state="done", added=len(new))
+            with files.report_lock:
+                if (not _operation_valid(job, lease)
+                        or job.get("trackbg") is not st or lease.operation.is_set()):
+                    return
+                if not samples:
+                    st.update(state="done", added=0,
+                              error="could not track that region — try a "
+                                    "larger box or a frame where it's clearer")
+                    return
+                doc = _load_job_report(job)
+                rs = doc["render_state"]
+                fps = float(rs["fps"]) or 30.0
+                step = 2.0 / fps
+                tid = max([d.get("track", -1) for d in doc["detections"]
+                           if isinstance(d.get("track", -1), int)] + [-1]) + 1
+                new = []
+                tcls = samples[0][4] if len(samples[0]) > 4 else None
+                label = ("tracked %s" % openscrub.COCO_NAMES[tcls]
+                         if tcls is not None
+                         and 0 <= tcls < len(openscrub.COCO_NAMES)
+                         else "tracked object")
+                for s in samples:
+                    t, b, score = s[0], s[1], s[2]
+                    poly = s[3] if len(s) > 3 and s[3] else ()
+                    fidx = min(int(t * fps), len(rs["cum"]) - 1)
+                    ox, oy = rs["cum"][fidx]
+                    new.append({
+                        "t_start": t, "t_end": t + step * 1.2,
+                        "cbox": [int(b[0] - ox), int(b[1] - oy),
+                                 int(b[2] - ox), int(b[3] - oy)],
+                        "category": "manual", "text": label,
+                        "confidence": round(float(score), 3),
+                        "aoff": [ox, oy], "last_seen": t,
+                        "dense": True, "track": tid, "enabled": True,
+                        "poly": [[[float(x), float(y)] for x, y in c]
+                                 for c in poly]})
+                # grace pads: cover the sub-sample sliver at both ends
+                new[0]["t_start"] = max(0.0, new[0]["t_start"] - 0.25)
+                new[-1]["t_end"] += 0.25
+                doc["detections"].extend(new)
+                path = os.path.join(job["dir"], "report.json")
+                atomic_report(path, doc)
+                job["log"].append(
+                    "      tracked object: %d position(s), %.1f-%.1fs "
+                    "(review card added)" % (len(new),
+                                             new[0]["t_start"], new[-1]["t_end"]))
+                st.update(state="done", added=len(new))
         except Exception as e:
-            st.update(state="done", added=0, error=str(e))
+            with files.report_lock:
+                if _operation_valid(job, lease) and job.get("trackbg") is st:
+                    st.update(state="done", added=0, error=str(e))
 
     try:
         _start_owned_thread(_run, lease)
@@ -2007,31 +2137,38 @@ def allowlist():
 @app.route("/api/jobs/<jid>/render", methods=["POST"])
 def job_render(jid):
     job = JOBS.get(jid) or abort(404)
-    def refusal():
+    files = FILES.initialize(job)
+    def refusal(prepared_work=0):
+        _report_current(job)
         if job["phase"] in ("rendering", "queued_render"):
             return jsonify({"ok": True, "note": "render already in progress"})
-        if FILES.initialize(job).work:
+        if files.active is not None or files.work > prepared_work:
             return jsonify({"error": "job work is still cleaning up"}), 409
+        if files.tracker is not None and not files.tracker.released:
+            return jsonify({"error": "tracking already in progress"}), 409
         if job["phase"] not in ("review", "done", "error", "cancelled"):
             return jsonify({"error": f"cannot render from phase {job['phase']}"}), 400
-    with VAULT_LOCK:
-        _validate_files_locked(job)
+    with files.report_lock:
         rejected = refusal()
         if rejected is not None:
             return rejected
-    # JSON I/O and source existence checks run outside the transition mutex,
-    # under the request lease. Reserve the selected source before queueing.
-    admission = g.file_owner
-    _select_render_input(job, admission)
-    with VAULT_LOCK:
-        _validate_files_locked(job)
-        rejected = refusal()
-        if rejected is not None:
-            return rejected
-        ticket = _reserve_queue_locked(job, "render", admission)
-        job["phase"] = "queued_render"
-        job["cancel"].clear()
-        job["error"] = None
+        current, operation = job.get("video"), files.operation
+    # Preparation can reserve/release sources under VAULT_LOCK. Revalidate its
+    # operation/source snapshot at admission, after releasing that shared guard.
+    prepared = _prepare_work(job, "render")
+    ticket = None
+    try:
+        with files.report_lock:
+            rejected = refusal(prepared_work=1)
+            if rejected is not None:
+                return rejected
+            if job.get("video") != current or files.operation is not operation:
+                return jsonify({"error": "job operation or source changed — retry render"}), 409
+            ticket = _reserve_queue_locked(job, "render", prepared)
+            job["error"] = None
+    finally:
+        if ticket is None:
+            prepared.release()
     enqueue(job, "render", ticket)
     return jsonify({"ok": True})
 
@@ -2053,10 +2190,11 @@ def job_download(jid):
 @app.route("/api/jobs/<jid>/report")
 def job_report(jid):
     job = JOBS.get(jid) or abort(404)
-    return send_file(os.path.join(job["dir"], "report.json"),
-                     as_attachment=True,
-                     download_name=os.path.splitext(job["name"])[0]
-                     + "_audit.json")
+    with FILES.initialize(job).report_lock:
+        return send_file(os.path.join(job["dir"], "report.json"),
+                         as_attachment=True,
+                         download_name=os.path.splitext(job["name"])[0]
+                         + "_audit.json")
 
 
 # ----------------------------------------------------------------------------

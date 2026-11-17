@@ -6283,7 +6283,7 @@ def transcribe_audio_pii(video, cats, cb, model_size="base", nlp=None,
             pass
 
 
-def write_report(path, args, state, output_path=None):
+def write_report(path, args, state, output_path=None, publisher=None):
     prov = {
         "tool": "openscrub", "version": VERSION,
         "timestamp": datetime.datetime.now().astimezone().isoformat(),
@@ -6341,7 +6341,9 @@ def write_report(path, args, state, output_path=None):
         # saved representation, including additive fields on individual spans.
         doc["audio_redactions"] = [
             {"t0": a, "t1": b, "mode": m} for a, b, m in (aspans or [])]
-    atomic_report(path, doc)
+    # Construction and output hashing precede an optional caller-owned final
+    # publication boundary. CLI/GUI and old callback callers keep atomic bytes.
+    (publisher or atomic_report)(path, doc)
 
 
 def load_report(path):
@@ -8511,7 +8513,8 @@ def run_render(args, state, cb=None):
                mute_tracks=mute_tracks, cb=cb, out_quality=out_q,
                audio_lanes=getattr(args, "audio_lane_count", None))
     if args.report:
-        write_report(args.report, args, state, output_path=dst)
+        write_report(args.report, args, state, output_path=dst,
+                     publisher=getattr(cb, "publish_report", None))
         cb.log(f"      audit report: {args.report} (contains PII text — protect it)")
     cb.log("done.")
     return dict(state["stats"], output=dst)
