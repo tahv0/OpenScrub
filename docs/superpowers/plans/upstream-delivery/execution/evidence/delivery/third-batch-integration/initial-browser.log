@@ -1,0 +1,19 @@
+AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
++ actual - expected
+
+  [
+    {
++     text: 'Failed to load resource: the server responded with a status of 500 (INTERNAL SERVER ERROR)',
+-     text: 'Failed to load resource: the server responded with a status of 500 (Internal Server Error)',
+      url: 'http://127.0.0.1:18652/api/jobs/406831068426/detections'
+    }
+  ]
+
+    at /tmp/openscrub-task652/browser.cjs:68:36 {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: [Array],
+  expected: [Array],
+  operator: 'deepStrictEqual',
+  diff: 'simple'
+}

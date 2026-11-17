@@ -1,0 +1,16 @@
+{
+  "before": "ac6496810b03d8b062ab9da150aeea1e62285fed",
+  "after": "4b9bd7e576a8ae30369672b4b4722fc9752e233f",
+  "measured_after_equals_final_head": true,
+  "driver_sha256": "a439f6a886757bb249f046d57610997ece80c22dae8bf9d9eedd51db53f203ef",
+  "measurement_log_sha256": "eb467f2ea5ae49600b8bf0f76b4fd5e07db96182dae53f101c73ed2e5534c1cc",
+  "measurement_results_sha256": "c5870027daf58fbe33c892a8d03f6e6637688b7729953eb630bff21a98488494",
+  "source_manifests": {
+    "before": 139,
+    "after": 144
+  },
+  "timing_and_counts_completed_exit0": true,
+  "complete_reports_verified": true,
+  "no_selective_rerun": true,
+  "no_after_measurement_source_changes": true
+}

@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "/tmp/openscrub-task652/installed_compat.py", line 18, in <module>
+    assert Path(module.__file__).is_relative_to(root), module.__file__
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: /home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py

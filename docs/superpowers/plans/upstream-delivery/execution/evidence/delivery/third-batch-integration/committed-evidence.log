@@ -1,0 +1,20 @@
+{
+  "base": "ac6496810b03d8b062ab9da150aeea1e62285fed",
+  "head": "4b9bd7e576a8ae30369672b4b4722fc9752e233f",
+  "expected_final_reports": {
+    "100000": {
+      "path": "/tmp/openscrub-task652/expected-final-100000.json",
+      "bytes": 69956372,
+      "sha256": "74f6909e2997cc763ecdbd8601986a5ae784217a4a7270e2863b3ffb7b814681"
+    }
+  },
+  "main_http200": 54,
+  "timed_http200": 48,
+  "counted_http200": 6,
+  "every_noop_identity_and_mtime_retained": true,
+  "every_changed_request_replaces_inode": true,
+  "all_complete_final_reports_byte_equal": true,
+  "all_pinned_exports_unchanged": true,
+  "frozen_committed_blobs": 144,
+  "clean_head": true
+}

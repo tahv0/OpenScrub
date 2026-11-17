@@ -1,0 +1,8 @@
+{
+  "frozen_files": 144,
+  "wheel_installed_native_exact": true,
+  "unchanged_engine_owners_except_reviewed_functions": true,
+  "web_exact_ast": true,
+  "candidate_refs_preserved": true,
+  "no_runtime_integration_correction": true
+}

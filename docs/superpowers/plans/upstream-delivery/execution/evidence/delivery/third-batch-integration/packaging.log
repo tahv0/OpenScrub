@@ -1,0 +1,16 @@
+{
+  "base": "ac6496810b03d8b062ab9da150aeea1e62285fed",
+  "exact_sdist_sources_tests_docs_metadata": true,
+  "exact_wheel_sources": true,
+  "packaged_python39_grammar": true,
+  "metadata_python_floor": ">=3.9",
+  "opencv_bound": "opencv-python<5",
+  "unchanged_project_dependencies_entrypoints_and_defaults": true,
+  "unchanged_web_routes_internal_modules": true,
+  "no_removed_system_in_wheel": true,
+  "node_syntax": true,
+  "supported_archive_filter": "data",
+  "frozen_manifest_matched": true,
+  "source_count": 10,
+  "focused_test_files": 25
+}

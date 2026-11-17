@@ -1,0 +1,41 @@
+{
+  "runtime_source_count": 8,
+  "imports": {
+    "openscrub.py": {
+      "removed": [],
+      "added": [
+        "Import(names=[alias(name='math')])"
+      ]
+    },
+    "openscrub_web.py": {
+      "removed": [],
+      "added": []
+    },
+    "openscrub_setup.py": {
+      "removed": [],
+      "added": []
+    },
+    "zones_ui.py": {
+      "removed": [],
+      "added": []
+    },
+    "openscrub_internal/reports.py": {
+      "removed": [],
+      "added": []
+    },
+    "openscrub_internal/lifetimes.py": {
+      "removed": [],
+      "added": []
+    },
+    "openscrub_internal/opencv_compat.py": {
+      "removed": [],
+      "added": []
+    },
+    "openscrub_internal/__init__.py": {
+      "removed": [],
+      "added": []
+    }
+  },
+  "only_reviewed_polygon_stdlib_math_addition": true,
+  "no_removed_system_imports_added": true
+}

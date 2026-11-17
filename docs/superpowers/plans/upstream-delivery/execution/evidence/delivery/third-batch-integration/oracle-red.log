@@ -1,0 +1,767 @@
+TASK652_ACTIVE_SOURCE {"python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]", "sources": {"openscrub": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py", "sha256": "89b3e84e28ba7065489cc1355cfeadaa4f04f0adf3bcbc19503ff01957e3f7e8"}, "openscrub_web": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", "sha256": "0fc4669a086265bc3c0dd05e895a3abfed18eda7544124f8408dfeade450a330"}, "zones_ui": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/zones_ui.py", "sha256": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7"}}}
+........................................................................ [  8%]
+........................................................................ [ 16%]
+........................................................................ [ 24%]
+........................................................................ [ 32%]
+........................................................................ [ 40%]
+........................................................................ [ 48%]
+.........F.F.F.F.F.F.F.F.................................F.F.F.F.F.F.F.F [ 56%]
+........................................................................ [ 64%]
+........................................................................ [ 72%]
+........................................................................ [ 80%]
+........................................................................ [ 88%]
+........................................................................ [ 96%]
+....................................                                     [100%]
+=================================== FAILURES ===================================
+_____ test_usable_contours_keep_baseline_pixels[0-polys2-pixels2-box-hdr] ______
+
+path = 'hdr', mode = 'box', polys = [[(0, 0), (1, 1), (0, 1), (1, 0)]]
+pixels = [(0, 0), (12, 12), (0, 12), (12, 0)], pad = 0
+
+    @pytest.mark.parametrize("path", ["sdr", "hdr"])
+    @pytest.mark.parametrize("mode", MODES)
+    @pytest.mark.parametrize("polys,pixels", VALID)
+    @pytest.mark.parametrize("pad", [0, 2])
+    def test_usable_contours_keep_baseline_pixels(path, mode, polys, pixels, pad):
+        before = source_planes(path)
+        filled = [p.copy() for p in before]
+        full_box(path, filled, (4, 4, 16, 16), mode)
+        mask = np.zeros((12, 12), np.uint8)
+        cv2.fillPoly(mask, [np.array(pixels, np.int32)], 255)
+        if pad:
+            mask = cv2.dilate(mask, np.ones((5, 5), np.uint8))
+        expected = [p.copy() for p in before]
+        for index, plane in enumerate(expected):
+            if index:
+                m = cv2.resize(mask, (6, 6), interpolation=cv2.INTER_NEAREST)
+                roi = plane[2:8, 2:8]
+                cv2.copyTo(filled[index][2:8, 2:8], m, roi)
+            else:
+                cv2.copyTo(filled[index][4:16, 4:16], mask, plane[4:16, 4:16])
+        actual = [p.copy() for p in before]
+        apply(path, actual, (4, 4, 16, 16), mode, polys, (4, 4, 16, 16), pad)
+        for a, e in zip(actual, expected):
+>           np.testing.assert_array_equal(a, e)
+E           AssertionError: 
+E           Arrays are not equal
+E           
+E           Mismatched elements: 3 / 256 (1.17%)
+E           Mismatch at indices:
+E            [5, 4]: 512 (ACTUAL), 838 (DESIRED)
+E            [6, 3]: 512 (ACTUAL), 875 (DESIRED)
+E            [7, 2]: 512 (ACTUAL), 400 (DESIRED)
+E           Max absolute difference among violations: 363
+E           Max relative difference among violations: 0.41485714
+E            ACTUAL: array([[919, 353, 578, 297, 648, 568, 906, 703, 935, 227, 312, 291, 150,
+E                   760, 213, 113],
+E                  [131, 395, 650, 270, 404, 912, 220, 291, 221, 812, 381, 795, 271,...
+E            DESIRED: array([[919, 353, 578, 297, 648, 568, 906, 703, 935, 227, 312, 291, 150,
+E                   760, 213, 113],
+E                  [131, 395, 650, 270, 404, 912, 220, 291, 221, 812, 381, 795, 271,...
+
+tests/test_polygon_fallback.py:133: AssertionError
+_____ test_usable_contours_keep_baseline_pixels[0-polys2-pixels2-blur-hdr] _____
+
+path = 'hdr', mode = 'blur', polys = [[(0, 0), (1, 1), (0, 1), (1, 0)]]
+pixels = [(0, 0), (12, 12), (0, 12), (12, 0)], pad = 0
+
+    @pytest.mark.parametrize("path", ["sdr", "hdr"])
+    @pytest.mark.parametrize("mode", MODES)
+    @pytest.mark.parametrize("polys,pixels", VALID)
+    @pytest.mark.parametrize("pad", [0, 2])
+    def test_usable_contours_keep_baseline_pixels(path, mode, polys, pixels, pad):
+        before = source_planes(path)
+        filled = [p.copy() for p in before]
+        full_box(path, filled, (4, 4, 16, 16), mode)
+        mask = np.zeros((12, 12), np.uint8)
+        cv2.fillPoly(mask, [np.array(pixels, np.int32)], 255)
+        if pad:
+            mask = cv2.dilate(mask, np.ones((5, 5), np.uint8))
+        expected = [p.copy() for p in before]
+        for index, plane in enumerate(expected):
+            if index:
+                m = cv2.resize(mask, (6, 6), interpolation=cv2.INTER_NEAREST)
+                roi = plane[2:8, 2:8]
+                cv2.copyTo(filled[index][2:8, 2:8], m, roi)
+            else:
+                cv2.copyTo(filled[index][4:16, 4:16], mask, plane[4:16, 4:16])
+        actual = [p.copy() for p in before]
+        apply(path, actual, (4, 4, 16, 16), mode, polys, (4, 4, 16, 16), pad)
+        for a, e in zip(actual, expected):
+>           np.testing.assert_array_equal(a, e)
+E           AssertionError: 
+E           Arrays are not equal
+E           
+E           Mismatched elements: 3 / 256 (1.17%)
+E           Mismatch at indices:
+E            [5, 4]: 568 (ACTUAL), 838 (DESIRED)
+E            [6, 3]: 579 (ACTUAL), 875 (DESIRED)
+E            [7, 2]: 581 (ACTUAL), 400 (DESIRED)
+E           Max absolute difference among violations: 296
+E           Max relative difference among violations: 0.4525
+E            ACTUAL: array([[919, 353, 578, 297, 648, 568, 906, 703, 935, 227, 312, 291, 150,
+E                   760, 213, 113],
+E                  [131, 395, 650, 270, 404, 912, 220, 291, 221, 812, 381, 795, 271,...
+E            DESIRED: array([[919, 353, 578, 297, 648, 568, 906, 703, 935, 227, 312, 291, 150,
+E                   760, 213, 113],
+E                  [131, 395, 650, 270, 404, 912, 220, 291, 221, 812, 381, 795, 271,...
+
+tests/test_polygon_fallback.py:133: AssertionError
+____ test_usable_contours_keep_baseline_pixels[0-polys2-pixels2-mosaic-hdr] ____
+
+path = 'hdr', mode = 'mosaic', polys = [[(0, 0), (1, 1), (0, 1), (1, 0)]]
+pixels = [(0, 0), (12, 12), (0, 12), (12, 0)], pad = 0
+
+    @pytest.mark.parametrize("path", ["sdr", "hdr"])
+    @pytest.mark.parametrize("mode", MODES)
+    @pytest.mark.parametrize("polys,pixels", VALID)
+    @pytest.mark.parametrize("pad", [0, 2])
+    def test_usable_contours_keep_baseline_pixels(path, mode, polys, pixels, pad):
+        before = source_planes(path)
+        filled = [p.copy() for p in before]
+        full_box(path, filled, (4, 4, 16, 16), mode)
+        mask = np.zeros((12, 12), np.uint8)
+        cv2.fillPoly(mask, [np.array(pixels, np.int32)], 255)
+        if pad:
+            mask = cv2.dilate(mask, np.ones((5, 5), np.uint8))
+        expected = [p.copy() for p in before]
+        for index, plane in enumerate(expected):
+            if index:
+                m = cv2.resize(mask, (6, 6), interpolation=cv2.INTER_NEAREST)
+                roi = plane[2:8, 2:8]
+                cv2.copyTo(filled[index][2:8, 2:8], m, roi)
+            else:
+                cv2.copyTo(filled[index][4:16, 4:16], mask, plane[4:16, 4:16])
+        actual = [p.copy() for p in before]
+        apply(path, actual, (4, 4, 16, 16), mode, polys, (4, 4, 16, 16), pad)
+        for a, e in zip(actual, expected):
+>           np.testing.assert_array_equal(a, e)
+E           AssertionError: 
+E           Arrays are not equal
+E           
+E           Mismatched elements: 3 / 256 (1.17%)
+E           Mismatch at indices:
+E            [5, 4]: 569 (ACTUAL), 838 (DESIRED)
+E            [6, 3]: 569 (ACTUAL), 875 (DESIRED)
+E            [7, 2]: 569 (ACTUAL), 400 (DESIRED)
+E           Max absolute difference among violations: 306
+E           Max relative difference among violations: 0.4225
+E            ACTUAL: array([[919, 353, 578, 297, 648, 568, 906, 703, 935, 227, 312, 291, 150,
+E                   760, 213, 113],
+E                  [131, 395, 650, 270, 404, 912, 220, 291, 221, 812, 381, 795, 271,...
+E            DESIRED: array([[919, 353, 578, 297, 648, 568, 906, 703, 935, 227, 312, 291, 150,
+E                   760, 213, 113],
+E                  [131, 395, 650, 270, 404, 912, 220, 291, 221, 812, 381, 795, 271,...
+
+tests/test_polygon_fallback.py:133: AssertionError
+___ test_usable_contours_keep_baseline_pixels[0-polys2-pixels2-inpaint-hdr] ____
+
+path = 'hdr', mode = 'inpaint', polys = [[(0, 0), (1, 1), (0, 1), (1, 0)]]
+pixels = [(0, 0), (12, 12), (0, 12), (12, 0)], pad = 0
+
+    @pytest.mark.parametrize("path", ["sdr", "hdr"])
+    @pytest.mark.parametrize("mode", MODES)
+    @pytest.mark.parametrize("polys,pixels", VALID)
+    @pytest.mark.parametrize("pad", [0, 2])
+    def test_usable_contours_keep_baseline_pixels(path, mode, polys, pixels, pad):
+        before = source_planes(path)
+        filled = [p.copy() for p in before]
+        full_box(path, filled, (4, 4, 16, 16), mode)
+        mask = np.zeros((12, 12), np.uint8)
+        cv2.fillPoly(mask, [np.array(pixels, np.int32)], 255)
+        if pad:
+            mask = cv2.dilate(mask, np.ones((5, 5), np.uint8))
+        expected = [p.copy() for p in before]
+        for index, plane in enumerate(expected):
+            if index:
+                m = cv2.resize(mask, (6, 6), interpolation=cv2.INTER_NEAREST)
+                roi = plane[2:8, 2:8]
+                cv2.copyTo(filled[index][2:8, 2:8], m, roi)
+            else:
+                cv2.copyTo(filled[index][4:16, 4:16], mask, plane[4:16, 4:16])
+        actual = [p.copy() for p in before]
+        apply(path, actual, (4, 4, 16, 16), mode, polys, (4, 4, 16, 16), pad)
+        for a, e in zip(actual, expected):
+>           np.testing.assert_array_equal(a, e)
+E           AssertionError: 
+E           Arrays are not equal
+E           
+E           Mismatched elements: 3 / 256 (1.17%)
+E           Mismatch at indices:
+E            [5, 4]: 436 (ACTUAL), 838 (DESIRED)
+E            [6, 3]: 424 (ACTUAL), 875 (DESIRED)
+E            [7, 2]: 424 (ACTUAL), 400 (DESIRED)
+E           Max absolute difference among violations: 451
+E           Max relative difference among violations: 0.51542857
+E            ACTUAL: array([[919, 353, 578, 297, 648, 568, 906, 703, 935, 227, 312, 291, 150,
+E                   760, 213, 113],
+E                  [131, 395, 650, 270, 404, 912, 220, 291, 221, 812, 381, 795, 271,...
+E            DESIRED: array([[919, 353, 578, 297, 648, 568, 906, 703, 935, 227, 312, 291, 150,
+E                   760, 213, 113],
+E                  [131, 395, 650, 270, 404, 912, 220, 291, 221, 812, 381, 795, 271,...
+
+tests/test_polygon_fallback.py:133: AssertionError
+_____ test_usable_contours_keep_baseline_pixels[0-polys3-pixels3-box-hdr] ______
+
+path = 'hdr', mode = 'box', polys = [[(-0.5, 0.25), (0.5, -0.5), (1.5, 1.5)]]
+pixels = [(-6, 3), (6, -6), (18, 18)], pad = 0
+
+    @pytest.mark.parametrize("path", ["sdr", "hdr"])
+    @pytest.mark.parametrize("mode", MODES)
+    @pytest.mark.parametrize("polys,pixels", VALID)
+    @pytest.mark.parametrize("pad", [0, 2])
+    def test_usable_contours_keep_baseline_pixels(path, mode, polys, pixels, pad):
+        before = source_planes(path)
+        filled = [p.copy() for p in before]
+        full_box(path, filled, (4, 4, 16, 16), mode)
+        mask = np.zeros((12, 12), np.uint8)
+        cv2.fillPoly(mask, [np.array(pixels, np.int32)], 255)
+        if pad:
+            mask = cv2.dilate(mask, np.ones((5, 5), np.uint8))
+        expected = [p.copy() for p in before]
+        for index, plane in enumerate(expected):
+            if index:
+                m = cv2.resize(mask, (6, 6), interpolation=cv2.INTER_NEAREST)
+                roi = plane[2:8, 2:8]
+                cv2.copyTo(filled[index][2:8, 2:8], m, roi)
+            else:
+                cv2.copyTo(filled[index][4:16, 4:16], mask, plane[4:16, 4:16])
+        actual = [p.copy() for p in before]
+        apply(path, actual, (4, 4, 16, 16), mode, polys, (4, 4, 16, 16), pad)
+        for a, e in zip(actual, expected):
+>           np.testing.assert_array_equal(a, e)
+E           AssertionError: 
+E           Arrays are not equal
+E           
+E           Mismatched elements: 2 / 256 (0.781%)
+E           Mismatch at indices:
+E            [6, 3]: 512 (ACTUAL), 875 (DESIRED)
+E            [7, 4]: 512 (ACTUAL), 918 (DESIRED)
+E           Max absolute difference among violations: 406
+E           Max relative difference among violations: 0.4422658
+E            ACTUAL: array([[919, 353, 578, 297, 648, 568, 906, 703, 935, 227, 312, 291, 150,
+E                   760, 213, 113],
+E                  [131, 395, 650, 270, 404, 912, 220, 291, 221, 812, 381, 795, 271,...
+E            DESIRED: array([[919, 353, 578, 297, 648, 568, 906, 703, 935, 227, 312, 291, 150,
+E                   760, 213, 113],
+E                  [131, 395, 650, 270, 404, 912, 220, 291, 221, 812, 381, 795, 271,...
+
+tests/test_polygon_fallback.py:133: AssertionError
+_____ test_usable_contours_keep_baseline_pixels[0-polys3-pixels3-blur-hdr] _____
+
+path = 'hdr', mode = 'blur', polys = [[(-0.5, 0.25), (0.5, -0.5), (1.5, 1.5)]]
+pixels = [(-6, 3), (6, -6), (18, 18)], pad = 0
+
+    @pytest.mark.parametrize("path", ["sdr", "hdr"])
+    @pytest.mark.parametrize("mode", MODES)
+    @pytest.mark.parametrize("polys,pixels", VALID)
+    @pytest.mark.parametrize("pad", [0, 2])
+    def test_usable_contours_keep_baseline_pixels(path, mode, polys, pixels, pad):
+        before = source_planes(path)
+        filled = [p.copy() for p in before]
+        full_box(path, filled, (4, 4, 16, 16), mode)
+        mask = np.zeros((12, 12), np.uint8)
+        cv2.fillPoly(mask, [np.array(pixels, np.int32)], 255)
+        if pad:
+            mask = cv2.dilate(mask, np.ones((5, 5), np.uint8))
+        expected = [p.copy() for p in before]
+        for index, plane in enumerate(expected):
+            if index:
+                m = cv2.resize(mask, (6, 6), interpolation=cv2.INTER_NEAREST)
+                roi = plane[2:8, 2:8]
+                cv2.copyTo(filled[index][2:8, 2:8], m, roi)
+            else:
+                cv2.copyTo(filled[index][4:16, 4:16], mask, plane[4:16, 4:16])
+        actual = [p.copy() for p in before]
+        apply(path, actual, (4, 4, 16, 16), mode, polys, (4, 4, 16, 16), pad)
+        for a, e in zip(actual, expected):
+>           np.testing.assert_array_equal(a, e)
+E           AssertionError: 
+E           Arrays are not equal
+E           
+E           Mismatched elements: 2 / 256 (0.781%)
+E           Mismatch at indices:
+E            [6, 3]: 579 (ACTUAL), 875 (DESIRED)
+E            [7, 4]: 579 (ACTUAL), 918 (DESIRED)
+E           Max absolute difference among violations: 339
+E           Max relative difference among violations: 0.36928105
+E            ACTUAL: array([[919, 353, 578, 297, 648, 568, 906, 703, 935, 227, 312, 291, 150,
+E                   760, 213, 113],
+E                  [131, 395, 650, 270, 404, 912, 220, 291, 221, 812, 381, 795, 271,...
+E            DESIRED: array([[919, 353, 578, 297, 648, 568, 906, 703, 935, 227, 312, 291, 150,
+E                   760, 213, 113],
+E                  [131, 395, 650, 270, 404, 912, 220, 291, 221, 812, 381, 795, 271,...
+
+tests/test_polygon_fallback.py:133: AssertionError
+____ test_usable_contours_keep_baseline_pixels[0-polys3-pixels3-mosaic-hdr] ____
+
+path = 'hdr', mode = 'mosaic', polys = [[(-0.5, 0.25), (0.5, -0.5), (1.5, 1.5)]]
+pixels = [(-6, 3), (6, -6), (18, 18)], pad = 0
+
+    @pytest.mark.parametrize("path", ["sdr", "hdr"])
+    @pytest.mark.parametrize("mode", MODES)
+    @pytest.mark.parametrize("polys,pixels", VALID)
+    @pytest.mark.parametrize("pad", [0, 2])
+    def test_usable_contours_keep_baseline_pixels(path, mode, polys, pixels, pad):
+        before = source_planes(path)
+        filled = [p.copy() for p in before]
+        full_box(path, filled, (4, 4, 16, 16), mode)
+        mask = np.zeros((12, 12), np.uint8)
+        cv2.fillPoly(mask, [np.array(pixels, np.int32)], 255)
+        if pad:
+            mask = cv2.dilate(mask, np.ones((5, 5), np.uint8))
+        expected = [p.copy() for p in before]
+        for index, plane in enumerate(expected):
+            if index:
+                m = cv2.resize(mask, (6, 6), interpolation=cv2.INTER_NEAREST)
+                roi = plane[2:8, 2:8]
+                cv2.copyTo(filled[index][2:8, 2:8], m, roi)
+            else:
+                cv2.copyTo(filled[index][4:16, 4:16], mask, plane[4:16, 4:16])
+        actual = [p.copy() for p in before]
+        apply(path, actual, (4, 4, 16, 16), mode, polys, (4, 4, 16, 16), pad)
+        for a, e in zip(actual, expected):
+>           np.testing.assert_array_equal(a, e)
+E           AssertionError: 
+E           Arrays are not equal
+E           
+E           Mismatched elements: 2 / 256 (0.781%)
+E           Mismatch at indices:
+E            [6, 3]: 569 (ACTUAL), 875 (DESIRED)
+E            [7, 4]: 569 (ACTUAL), 918 (DESIRED)
+E           Max absolute difference among violations: 349
+E           Max relative difference among violations: 0.38017429
+E            ACTUAL: array([[919, 353, 578, 297, 648, 568, 906, 703, 935, 227, 312, 291, 150,
+E                   760, 213, 113],
+E                  [131, 395, 650, 270, 404, 912, 220, 291, 221, 812, 381, 795, 271,...
+E            DESIRED: array([[919, 353, 578, 297, 648, 568, 906, 703, 935, 227, 312, 291, 150,
+E                   760, 213, 113],
+E                  [131, 395, 650, 270, 404, 912, 220, 291, 221, 812, 381, 795, 271,...
+
+tests/test_polygon_fallback.py:133: AssertionError
+___ test_usable_contours_keep_baseline_pixels[0-polys3-pixels3-inpaint-hdr] ____
+
+path = 'hdr', mode = 'inpaint'
+polys = [[(-0.5, 0.25), (0.5, -0.5), (1.5, 1.5)]]
+pixels = [(-6, 3), (6, -6), (18, 18)], pad = 0
+
+    @pytest.mark.parametrize("path", ["sdr", "hdr"])
+    @pytest.mark.parametrize("mode", MODES)
+    @pytest.mark.parametrize("polys,pixels", VALID)
+    @pytest.mark.parametrize("pad", [0, 2])
+    def test_usable_contours_keep_baseline_pixels(path, mode, polys, pixels, pad):
+        before = source_planes(path)
+        filled = [p.copy() for p in before]
+        full_box(path, filled, (4, 4, 16, 16), mode)
+        mask = np.zeros((12, 12), np.uint8)
+        cv2.fillPoly(mask, [np.array(pixels, np.int32)], 255)
+        if pad:
+            mask = cv2.dilate(mask, np.ones((5, 5), np.uint8))
+        expected = [p.copy() for p in before]
+        for index, plane in enumerate(expected):
+            if index:
+                m = cv2.resize(mask, (6, 6), interpolation=cv2.INTER_NEAREST)
+                roi = plane[2:8, 2:8]
+                cv2.copyTo(filled[index][2:8, 2:8], m, roi)
+            else:
+                cv2.copyTo(filled[index][4:16, 4:16], mask, plane[4:16, 4:16])
+        actual = [p.copy() for p in before]
+        apply(path, actual, (4, 4, 16, 16), mode, polys, (4, 4, 16, 16), pad)
+        for a, e in zip(actual, expected):
+>           np.testing.assert_array_equal(a, e)
+E           AssertionError: 
+E           Arrays are not equal
+E           
+E           Mismatched elements: 2 / 256 (0.781%)
+E           Mismatch at indices:
+E            [6, 3]: 424 (ACTUAL), 875 (DESIRED)
+E            [7, 4]: 452 (ACTUAL), 918 (DESIRED)
+E           Max absolute difference among violations: 466
+E           Max relative difference among violations: 0.51542857
+E            ACTUAL: array([[919, 353, 578, 297, 648, 568, 906, 703, 935, 227, 312, 291, 150,
+E                   760, 213, 113],
+E                  [131, 395, 650, 270, 404, 912, 220, 291, 221, 812, 381, 795, 271,...
+E            DESIRED: array([[919, 353, 578, 297, 648, 568, 906, 703, 935, 227, 312, 291, 150,
+E                   760, 213, 113],
+E                  [131, 395, 650, 270, 404, 912, 220, 291, 221, 812, 381, 795, 271,...
+
+tests/test_polygon_fallback.py:133: AssertionError
+_____ test_usable_contours_keep_baseline_pixels[2-polys2-pixels2-box-hdr] ______
+
+path = 'hdr', mode = 'box', polys = [[(0, 0), (1, 1), (0, 1), (1, 0)]]
+pixels = [(0, 0), (12, 12), (0, 12), (12, 0)], pad = 2
+
+    @pytest.mark.parametrize("path", ["sdr", "hdr"])
+    @pytest.mark.parametrize("mode", MODES)
+    @pytest.mark.parametrize("polys,pixels", VALID)
+    @pytest.mark.parametrize("pad", [0, 2])
+    def test_usable_contours_keep_baseline_pixels(path, mode, polys, pixels, pad):
+        before = source_planes(path)
+        filled = [p.copy() for p in before]
+        full_box(path, filled, (4, 4, 16, 16), mode)
+        mask = np.zeros((12, 12), np.uint8)
+        cv2.fillPoly(mask, [np.array(pixels, np.int32)], 255)
+        if pad:
+            mask = cv2.dilate(mask, np.ones((5, 5), np.uint8))
+        expected = [p.copy() for p in before]
+        for index, plane in enumerate(expected):
+            if index:
+                m = cv2.resize(mask, (6, 6), interpolation=cv2.INTER_NEAREST)
+                roi = plane[2:8, 2:8]
+                cv2.copyTo(filled[index][2:8, 2:8], m, roi)
+            else:
+                cv2.copyTo(filled[index][4:16, 4:16], mask, plane[4:16, 4:16])
+        actual = [p.copy() for p in before]
+        apply(path, actual, (4, 4, 16, 16), mode, polys, (4, 4, 16, 16), pad)
+        for a, e in zip(actual, expected):
+>           np.testing.assert_array_equal(a, e)
+E           AssertionError: 
+E           Arrays are not equal
+E           
+E           Mismatched elements: 1 / 256 (0.391%)
+E           Mismatch at index:
+E            [5, 2]: 512 (ACTUAL), 162 (DESIRED)
+E           Max absolute difference among violations: 350
+E           Max relative difference among violations: 2.16049383
+E            ACTUAL: array([[919, 353, 578, 297, 648, 568, 906, 703, 935, 227, 312, 291, 150,
+E                   760, 213, 113],
+E                  [131, 395, 650, 270, 404, 912, 220, 291, 221, 812, 381, 795, 271,...
+E            DESIRED: array([[919, 353, 578, 297, 648, 568, 906, 703, 935, 227, 312, 291, 150,
+E                   760, 213, 113],
+E                  [131, 395, 650, 270, 404, 912, 220, 291, 221, 812, 381, 795, 271,...
+
+tests/test_polygon_fallback.py:133: AssertionError
+_____ test_usable_contours_keep_baseline_pixels[2-polys2-pixels2-blur-hdr] _____
+
+path = 'hdr', mode = 'blur', polys = [[(0, 0), (1, 1), (0, 1), (1, 0)]]
+pixels = [(0, 0), (12, 12), (0, 12), (12, 0)], pad = 2
+
+    @pytest.mark.parametrize("path", ["sdr", "hdr"])
+    @pytest.mark.parametrize("mode", MODES)
+    @pytest.mark.parametrize("polys,pixels", VALID)
+    @pytest.mark.parametrize("pad", [0, 2])
+    def test_usable_contours_keep_baseline_pixels(path, mode, polys, pixels, pad):
+        before = source_planes(path)
+        filled = [p.copy() for p in before]
+        full_box(path, filled, (4, 4, 16, 16), mode)
+        mask = np.zeros((12, 12), np.uint8)
+        cv2.fillPoly(mask, [np.array(pixels, np.int32)], 255)
+        if pad:
+            mask = cv2.dilate(mask, np.ones((5, 5), np.uint8))
+        expected = [p.copy() for p in before]
+        for index, plane in enumerate(expected):
+            if index:
+                m = cv2.resize(mask, (6, 6), interpolation=cv2.INTER_NEAREST)
+                roi = plane[2:8, 2:8]
+                cv2.copyTo(filled[index][2:8, 2:8], m, roi)
+            else:
+                cv2.copyTo(filled[index][4:16, 4:16], mask, plane[4:16, 4:16])
+        actual = [p.copy() for p in before]
+        apply(path, actual, (4, 4, 16, 16), mode, polys, (4, 4, 16, 16), pad)
+        for a, e in zip(actual, expected):
+>           np.testing.assert_array_equal(a, e)
+E           AssertionError: 
+E           Arrays are not equal
+E           
+E           Mismatched elements: 1 / 256 (0.391%)
+E           Mismatch at index:
+E            [5, 2]: 574 (ACTUAL), 162 (DESIRED)
+E           Max absolute difference among violations: 412
+E           Max relative difference among violations: 2.54320988
+E            ACTUAL: array([[919, 353, 578, 297, 648, 568, 906, 703, 935, 227, 312, 291, 150,
+E                   760, 213, 113],
+E                  [131, 395, 650, 270, 404, 912, 220, 291, 221, 812, 381, 795, 271,...
+E            DESIRED: array([[919, 353, 578, 297, 648, 568, 906, 703, 935, 227, 312, 291, 150,
+E                   760, 213, 113],
+E                  [131, 395, 650, 270, 404, 912, 220, 291, 221, 812, 381, 795, 271,...
+
+tests/test_polygon_fallback.py:133: AssertionError
+____ test_usable_contours_keep_baseline_pixels[2-polys2-pixels2-mosaic-hdr] ____
+
+path = 'hdr', mode = 'mosaic', polys = [[(0, 0), (1, 1), (0, 1), (1, 0)]]
+pixels = [(0, 0), (12, 12), (0, 12), (12, 0)], pad = 2
+
+    @pytest.mark.parametrize("path", ["sdr", "hdr"])
+    @pytest.mark.parametrize("mode", MODES)
+    @pytest.mark.parametrize("polys,pixels", VALID)
+    @pytest.mark.parametrize("pad", [0, 2])
+    def test_usable_contours_keep_baseline_pixels(path, mode, polys, pixels, pad):
+        before = source_planes(path)
+        filled = [p.copy() for p in before]
+        full_box(path, filled, (4, 4, 16, 16), mode)
+        mask = np.zeros((12, 12), np.uint8)
+        cv2.fillPoly(mask, [np.array(pixels, np.int32)], 255)
+        if pad:
+            mask = cv2.dilate(mask, np.ones((5, 5), np.uint8))
+        expected = [p.copy() for p in before]
+        for index, plane in enumerate(expected):
+            if index:
+                m = cv2.resize(mask, (6, 6), interpolation=cv2.INTER_NEAREST)
+                roi = plane[2:8, 2:8]
+                cv2.copyTo(filled[index][2:8, 2:8], m, roi)
+            else:
+                cv2.copyTo(filled[index][4:16, 4:16], mask, plane[4:16, 4:16])
+        actual = [p.copy() for p in before]
+        apply(path, actual, (4, 4, 16, 16), mode, polys, (4, 4, 16, 16), pad)
+        for a, e in zip(actual, expected):
+>           np.testing.assert_array_equal(a, e)
+E           AssertionError: 
+E           Arrays are not equal
+E           
+E           Mismatched elements: 1 / 256 (0.391%)
+E           Mismatch at index:
+E            [5, 2]: 569 (ACTUAL), 162 (DESIRED)
+E           Max absolute difference among violations: 407
+E           Max relative difference among violations: 2.51234568
+E            ACTUAL: array([[919, 353, 578, 297, 648, 568, 906, 703, 935, 227, 312, 291, 150,
+E                   760, 213, 113],
+E                  [131, 395, 650, 270, 404, 912, 220, 291, 221, 812, 381, 795, 271,...
+E            DESIRED: array([[919, 353, 578, 297, 648, 568, 906, 703, 935, 227, 312, 291, 150,
+E                   760, 213, 113],
+E                  [131, 395, 650, 270, 404, 912, 220, 291, 221, 812, 381, 795, 271,...
+
+tests/test_polygon_fallback.py:133: AssertionError
+___ test_usable_contours_keep_baseline_pixels[2-polys2-pixels2-inpaint-hdr] ____
+
+path = 'hdr', mode = 'inpaint', polys = [[(0, 0), (1, 1), (0, 1), (1, 0)]]
+pixels = [(0, 0), (12, 12), (0, 12), (12, 0)], pad = 2
+
+    @pytest.mark.parametrize("path", ["sdr", "hdr"])
+    @pytest.mark.parametrize("mode", MODES)
+    @pytest.mark.parametrize("polys,pixels", VALID)
+    @pytest.mark.parametrize("pad", [0, 2])
+    def test_usable_contours_keep_baseline_pixels(path, mode, polys, pixels, pad):
+        before = source_planes(path)
+        filled = [p.copy() for p in before]
+        full_box(path, filled, (4, 4, 16, 16), mode)
+        mask = np.zeros((12, 12), np.uint8)
+        cv2.fillPoly(mask, [np.array(pixels, np.int32)], 255)
+        if pad:
+            mask = cv2.dilate(mask, np.ones((5, 5), np.uint8))
+        expected = [p.copy() for p in before]
+        for index, plane in enumerate(expected):
+            if index:
+                m = cv2.resize(mask, (6, 6), interpolation=cv2.INTER_NEAREST)
+                roi = plane[2:8, 2:8]
+                cv2.copyTo(filled[index][2:8, 2:8], m, roi)
+            else:
+                cv2.copyTo(filled[index][4:16, 4:16], mask, plane[4:16, 4:16])
+        actual = [p.copy() for p in before]
+        apply(path, actual, (4, 4, 16, 16), mode, polys, (4, 4, 16, 16), pad)
+        for a, e in zip(actual, expected):
+>           np.testing.assert_array_equal(a, e)
+E           AssertionError: 
+E           Arrays are not equal
+E           
+E           Mismatched elements: 1 / 256 (0.391%)
+E           Mismatch at index:
+E            [5, 2]: 348 (ACTUAL), 162 (DESIRED)
+E           Max absolute difference among violations: 186
+E           Max relative difference among violations: 1.14814815
+E            ACTUAL: array([[919, 353, 578, 297, 648, 568, 906, 703, 935, 227, 312, 291, 150,
+E                   760, 213, 113],
+E                  [131, 395, 650, 270, 404, 912, 220, 291, 221, 812, 381, 795, 271,...
+E            DESIRED: array([[919, 353, 578, 297, 648, 568, 906, 703, 935, 227, 312, 291, 150,
+E                   760, 213, 113],
+E                  [131, 395, 650, 270, 404, 912, 220, 291, 221, 812, 381, 795, 271,...
+
+tests/test_polygon_fallback.py:133: AssertionError
+_____ test_usable_contours_keep_baseline_pixels[2-polys3-pixels3-box-hdr] ______
+
+path = 'hdr', mode = 'box', polys = [[(-0.5, 0.25), (0.5, -0.5), (1.5, 1.5)]]
+pixels = [(-6, 3), (6, -6), (18, 18)], pad = 2
+
+    @pytest.mark.parametrize("path", ["sdr", "hdr"])
+    @pytest.mark.parametrize("mode", MODES)
+    @pytest.mark.parametrize("polys,pixels", VALID)
+    @pytest.mark.parametrize("pad", [0, 2])
+    def test_usable_contours_keep_baseline_pixels(path, mode, polys, pixels, pad):
+        before = source_planes(path)
+        filled = [p.copy() for p in before]
+        full_box(path, filled, (4, 4, 16, 16), mode)
+        mask = np.zeros((12, 12), np.uint8)
+        cv2.fillPoly(mask, [np.array(pixels, np.int32)], 255)
+        if pad:
+            mask = cv2.dilate(mask, np.ones((5, 5), np.uint8))
+        expected = [p.copy() for p in before]
+        for index, plane in enumerate(expected):
+            if index:
+                m = cv2.resize(mask, (6, 6), interpolation=cv2.INTER_NEAREST)
+                roi = plane[2:8, 2:8]
+                cv2.copyTo(filled[index][2:8, 2:8], m, roi)
+            else:
+                cv2.copyTo(filled[index][4:16, 4:16], mask, plane[4:16, 4:16])
+        actual = [p.copy() for p in before]
+        apply(path, actual, (4, 4, 16, 16), mode, polys, (4, 4, 16, 16), pad)
+        for a, e in zip(actual, expected):
+>           np.testing.assert_array_equal(a, e)
+E           AssertionError: 
+E           Arrays are not equal
+E           
+E           Mismatched elements: 1 / 256 (0.391%)
+E           Mismatch at index:
+E            [7, 2]: 512 (ACTUAL), 400 (DESIRED)
+E           Max absolute difference among violations: 112
+E           Max relative difference among violations: 0.28
+E            ACTUAL: array([[919, 353, 578, 297, 648, 568, 906, 703, 935, 227, 312, 291, 150,
+E                   760, 213, 113],
+E                  [131, 395, 650, 270, 404, 912, 220, 291, 221, 812, 381, 795, 271,...
+E            DESIRED: array([[919, 353, 578, 297, 648, 568, 906, 703, 935, 227, 312, 291, 150,
+E                   760, 213, 113],
+E                  [131, 395, 650, 270, 404, 912, 220, 291, 221, 812, 381, 795, 271,...
+
+tests/test_polygon_fallback.py:133: AssertionError
+_____ test_usable_contours_keep_baseline_pixels[2-polys3-pixels3-blur-hdr] _____
+
+path = 'hdr', mode = 'blur', polys = [[(-0.5, 0.25), (0.5, -0.5), (1.5, 1.5)]]
+pixels = [(-6, 3), (6, -6), (18, 18)], pad = 2
+
+    @pytest.mark.parametrize("path", ["sdr", "hdr"])
+    @pytest.mark.parametrize("mode", MODES)
+    @pytest.mark.parametrize("polys,pixels", VALID)
+    @pytest.mark.parametrize("pad", [0, 2])
+    def test_usable_contours_keep_baseline_pixels(path, mode, polys, pixels, pad):
+        before = source_planes(path)
+        filled = [p.copy() for p in before]
+        full_box(path, filled, (4, 4, 16, 16), mode)
+        mask = np.zeros((12, 12), np.uint8)
+        cv2.fillPoly(mask, [np.array(pixels, np.int32)], 255)
+        if pad:
+            mask = cv2.dilate(mask, np.ones((5, 5), np.uint8))
+        expected = [p.copy() for p in before]
+        for index, plane in enumerate(expected):
+            if index:
+                m = cv2.resize(mask, (6, 6), interpolation=cv2.INTER_NEAREST)
+                roi = plane[2:8, 2:8]
+                cv2.copyTo(filled[index][2:8, 2:8], m, roi)
+            else:
+                cv2.copyTo(filled[index][4:16, 4:16], mask, plane[4:16, 4:16])
+        actual = [p.copy() for p in before]
+        apply(path, actual, (4, 4, 16, 16), mode, polys, (4, 4, 16, 16), pad)
+        for a, e in zip(actual, expected):
+>           np.testing.assert_array_equal(a, e)
+E           AssertionError: 
+E           Arrays are not equal
+E           
+E           Mismatched elements: 1 / 256 (0.391%)
+E           Mismatch at index:
+E            [7, 2]: 581 (ACTUAL), 400 (DESIRED)
+E           Max absolute difference among violations: 181
+E           Max relative difference among violations: 0.4525
+E            ACTUAL: array([[919, 353, 578, 297, 648, 568, 906, 703, 935, 227, 312, 291, 150,
+E                   760, 213, 113],
+E                  [131, 395, 650, 270, 404, 912, 220, 291, 221, 812, 381, 795, 271,...
+E            DESIRED: array([[919, 353, 578, 297, 648, 568, 906, 703, 935, 227, 312, 291, 150,
+E                   760, 213, 113],
+E                  [131, 395, 650, 270, 404, 912, 220, 291, 221, 812, 381, 795, 271,...
+
+tests/test_polygon_fallback.py:133: AssertionError
+____ test_usable_contours_keep_baseline_pixels[2-polys3-pixels3-mosaic-hdr] ____
+
+path = 'hdr', mode = 'mosaic', polys = [[(-0.5, 0.25), (0.5, -0.5), (1.5, 1.5)]]
+pixels = [(-6, 3), (6, -6), (18, 18)], pad = 2
+
+    @pytest.mark.parametrize("path", ["sdr", "hdr"])
+    @pytest.mark.parametrize("mode", MODES)
+    @pytest.mark.parametrize("polys,pixels", VALID)
+    @pytest.mark.parametrize("pad", [0, 2])
+    def test_usable_contours_keep_baseline_pixels(path, mode, polys, pixels, pad):
+        before = source_planes(path)
+        filled = [p.copy() for p in before]
+        full_box(path, filled, (4, 4, 16, 16), mode)
+        mask = np.zeros((12, 12), np.uint8)
+        cv2.fillPoly(mask, [np.array(pixels, np.int32)], 255)
+        if pad:
+            mask = cv2.dilate(mask, np.ones((5, 5), np.uint8))
+        expected = [p.copy() for p in before]
+        for index, plane in enumerate(expected):
+            if index:
+                m = cv2.resize(mask, (6, 6), interpolation=cv2.INTER_NEAREST)
+                roi = plane[2:8, 2:8]
+                cv2.copyTo(filled[index][2:8, 2:8], m, roi)
+            else:
+                cv2.copyTo(filled[index][4:16, 4:16], mask, plane[4:16, 4:16])
+        actual = [p.copy() for p in before]
+        apply(path, actual, (4, 4, 16, 16), mode, polys, (4, 4, 16, 16), pad)
+        for a, e in zip(actual, expected):
+>           np.testing.assert_array_equal(a, e)
+E           AssertionError: 
+E           Arrays are not equal
+E           
+E           Mismatched elements: 1 / 256 (0.391%)
+E           Mismatch at index:
+E            [7, 2]: 569 (ACTUAL), 400 (DESIRED)
+E           Max absolute difference among violations: 169
+E           Max relative difference among violations: 0.4225
+E            ACTUAL: array([[919, 353, 578, 297, 648, 568, 906, 703, 935, 227, 312, 291, 150,
+E                   760, 213, 113],
+E                  [131, 395, 650, 270, 404, 912, 220, 291, 221, 812, 381, 795, 271,...
+E            DESIRED: array([[919, 353, 578, 297, 648, 568, 906, 703, 935, 227, 312, 291, 150,
+E                   760, 213, 113],
+E                  [131, 395, 650, 270, 404, 912, 220, 291, 221, 812, 381, 795, 271,...
+
+tests/test_polygon_fallback.py:133: AssertionError
+___ test_usable_contours_keep_baseline_pixels[2-polys3-pixels3-inpaint-hdr] ____
+
+path = 'hdr', mode = 'inpaint'
+polys = [[(-0.5, 0.25), (0.5, -0.5), (1.5, 1.5)]]
+pixels = [(-6, 3), (6, -6), (18, 18)], pad = 2
+
+    @pytest.mark.parametrize("path", ["sdr", "hdr"])
+    @pytest.mark.parametrize("mode", MODES)
+    @pytest.mark.parametrize("polys,pixels", VALID)
+    @pytest.mark.parametrize("pad", [0, 2])
+    def test_usable_contours_keep_baseline_pixels(path, mode, polys, pixels, pad):
+        before = source_planes(path)
+        filled = [p.copy() for p in before]
+        full_box(path, filled, (4, 4, 16, 16), mode)
+        mask = np.zeros((12, 12), np.uint8)
+        cv2.fillPoly(mask, [np.array(pixels, np.int32)], 255)
+        if pad:
+            mask = cv2.dilate(mask, np.ones((5, 5), np.uint8))
+        expected = [p.copy() for p in before]
+        for index, plane in enumerate(expected):
+            if index:
+                m = cv2.resize(mask, (6, 6), interpolation=cv2.INTER_NEAREST)
+                roi = plane[2:8, 2:8]
+                cv2.copyTo(filled[index][2:8, 2:8], m, roi)
+            else:
+                cv2.copyTo(filled[index][4:16, 4:16], mask, plane[4:16, 4:16])
+        actual = [p.copy() for p in before]
+        apply(path, actual, (4, 4, 16, 16), mode, polys, (4, 4, 16, 16), pad)
+        for a, e in zip(actual, expected):
+>           np.testing.assert_array_equal(a, e)
+E           AssertionError: 
+E           Arrays are not equal
+E           
+E           Mismatched elements: 1 / 256 (0.391%)
+E           Mismatch at index:
+E            [7, 2]: 424 (ACTUAL), 400 (DESIRED)
+E           Max absolute difference among violations: 24
+E           Max relative difference among violations: 0.06
+E            ACTUAL: array([[919, 353, 578, 297, 648, 568, 906, 703, 935, 227, 312, 291, 150,
+E                   760, 213, 113],
+E                  [131, 395, 650, 270, 404, 912, 220, 291, 221, 812, 381, 795, 271,...
+E            DESIRED: array([[919, 353, 578, 297, 648, 568, 906, 703, 935, 227, 312, 291, 150,
+E                   760, 213, 113],
+E                  [131, 395, 650, 270, 404, 912, 220, 291, 221, 812, 381, 795, 271,...
+
+tests/test_polygon_fallback.py:133: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_polygon_fallback.py::test_usable_contours_keep_baseline_pixels[0-polys2-pixels2-box-hdr]
+FAILED tests/test_polygon_fallback.py::test_usable_contours_keep_baseline_pixels[0-polys2-pixels2-blur-hdr]
+FAILED tests/test_polygon_fallback.py::test_usable_contours_keep_baseline_pixels[0-polys2-pixels2-mosaic-hdr]
+FAILED tests/test_polygon_fallback.py::test_usable_contours_keep_baseline_pixels[0-polys2-pixels2-inpaint-hdr]
+FAILED tests/test_polygon_fallback.py::test_usable_contours_keep_baseline_pixels[0-polys3-pixels3-box-hdr]
+FAILED tests/test_polygon_fallback.py::test_usable_contours_keep_baseline_pixels[0-polys3-pixels3-blur-hdr]
+FAILED tests/test_polygon_fallback.py::test_usable_contours_keep_baseline_pixels[0-polys3-pixels3-mosaic-hdr]
+FAILED tests/test_polygon_fallback.py::test_usable_contours_keep_baseline_pixels[0-polys3-pixels3-inpaint-hdr]
+FAILED tests/test_polygon_fallback.py::test_usable_contours_keep_baseline_pixels[2-polys2-pixels2-box-hdr]
+FAILED tests/test_polygon_fallback.py::test_usable_contours_keep_baseline_pixels[2-polys2-pixels2-blur-hdr]
+FAILED tests/test_polygon_fallback.py::test_usable_contours_keep_baseline_pixels[2-polys2-pixels2-mosaic-hdr]
+FAILED tests/test_polygon_fallback.py::test_usable_contours_keep_baseline_pixels[2-polys2-pixels2-inpaint-hdr]
+FAILED tests/test_polygon_fallback.py::test_usable_contours_keep_baseline_pixels[2-polys3-pixels3-box-hdr]
+FAILED tests/test_polygon_fallback.py::test_usable_contours_keep_baseline_pixels[2-polys3-pixels3-blur-hdr]
+FAILED tests/test_polygon_fallback.py::test_usable_contours_keep_baseline_pixels[2-polys3-pixels3-mosaic-hdr]
+FAILED tests/test_polygon_fallback.py::test_usable_contours_keep_baseline_pixels[2-polys3-pixels3-inpaint-hdr]
+16 failed, 884 passed in 6.90s

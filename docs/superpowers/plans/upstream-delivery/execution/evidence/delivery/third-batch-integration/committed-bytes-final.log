@@ -1,0 +1,19 @@
+{
+  "base": "ac6496810b03d8b062ab9da150aeea1e62285fed",
+  "head": "4b9bd7e576a8ae30369672b4b4722fc9752e233f",
+  "clean": true,
+  "frozen_committed_files": 144,
+  "wheel_installed_source_exact_commit": true,
+  "candidate_refs": {
+    "pr/readable-report-serialization": "4a62e49d2f0896b737081cc92e1f92e9bcaee93f",
+    "pr/hdr-decoder-cleanup": "ded411cbec308333d1416ae3d58b4f6e918d7849",
+    "pr/hdr-chroma-coverage": "0c648c2e7d3e40304dce9ae878d14709966b1fe1",
+    "pr/invalid-polygon-fallback": "a3c3193e8dff41ec0588e66443398048a5c15ece",
+    "pr/manual-tracker-cancellation": "2004b22002b8317c26ea508ff8187acbcd0cfab2"
+  },
+  "all_x_provenance_present": true,
+  "artifacts": {
+    "openscrub-1.0.96-py3-none-any.whl": "bc13cab502da52977ffaa657a3896f8f341f9ae2ee9056c3c301842c20daece0",
+    "openscrub-1.0.96.tar.gz": "61179e0ffb94fba541a1e304c9d8d547e424497fea3a617ed2ce006fcd58f914"
+  }
+}

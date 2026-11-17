@@ -1,0 +1,30 @@
+# P11B tail-history traversal
+
+## Task 112: skip OCR history that cannot extend a detection tail
+
+### Global constraints
+
+Preserve Python>=3.9, all ordinary matching/box/confidence/fuzzy/bridge/tail-stop rules, duplicate/insertion-order semantics, every Detection field and scan defaults. No custom training/workbench/removed preview cache, new dependency/version, public diagnostic fields or general indexing framework. New tests in tests/, justified measurement script in benchmark/. Synthetic inputs/existing tools only; no original-checkout/user-data changes, publication or subagents.
+
+### What, why and when
+
+The completed `scan-history-baseline-research.md` identifies three independent finalization costs. P11B alone is the chronological tail walk in merge_detections: repeated restart at the beginning visits64/1324/5149 timestamps for10/50/100 unique ordinary detections. Those are work counts, not speed measurements or per-frame inference overhead. Read that report/actual full-module recipe; do not repeat P11A smoothing or implement P11C reverse recall/P11D merge candidates here.
+
+Supervisor creates `pr/tail-history-index` from exact Austin-plus-test-only e21ebdf6e3ee46e6c65050dc956a9a3459152269 before dispatch. First establish representative baseline tail-cost evidence with the actual full module and deterministic ordinary OCR histories. Coordinate all timed measurement with supervisor as the sole timed workload. Do not run browser/suites/builds/container work or other benchmarks concurrently. If cost/reuse does not justify an index, report evidence and a precise no-adoption disposition rather than forcing production machinery.
+
+### Implementation contract if justified
+
+1. Build one chronological timestamp index per merge call, including its construction/memory cost. Begin each tail walk strictly after the exact existing last_seen + .01 boundary; use an index/range rather than copying a full history slice per detection. Use a small local helper/stdlib bisect only where it clarifies the owner; no new module for this one index.
+2. Preserve duplicate timestamps/order, later supporting observations, stopping at contradictory/missing support as the current implementation specifies, all confidence/box/fuzzy thresholds/bridge gaps and full returned Detection values. Do not replace the detector/matcher or loosen thresholds to obtain apparent equivalence.
+3. Nonchronological or unsupported timestamp input must follow a semantics-preserving fallback. No silent sorting/reordering, dropping malformed input that previously failed, or new arbitrary history-age limit. Empty/no-tail inputs retain their behavior; finite boundary/equality and duplicates need meaningful controls.
+4. Do not index reverse recall, rewrite merge candidate priority, change global PhiMemory or import donor preview caching. No inference acceleration claim. Prefix transport optimization remains the separately reviewed P11A branch.
+
+### Evidence and delivery
+
+Add tests/test_tail_history_index.py with owning RED (bounded timestamp work) and concrete full-output equality/expected detections for chronological, repeated, duplicate, boundary-equal, unordered and unsupported inputs. Include actual run_scan/finalization/report path on a tiny synthetic clip with controlled OCR at existing interface; identify that boundary rather than claim real-model throughput. Unit tests must not require a Git repository/old checkout or mirror a miniature implementation.
+
+For measurements use an actual base/head full-module comparison with deterministic fixtures, fresh mutable inputs prepared outside timing, same settings and pinned source. Select a few representative pairs of scan-history size and detection count, not a large Cartesian/stress matrix. Consider sparse detections over long timestamp history as well as unique short histories, so unrelated quadratic merge work is reported rather than hidden. Record baseline attribution, three warmups/five alternating recorded samples per selected case, complete output equality, separate instrumented timestamp/index counts, index construction/retention and honest process-memory limits. Publish finalization/tail savings only; retain any workload that regresses. Do not call microfixture timing a general long/4K speedup.
+
+After source stabilizes run focused checks, relevant merge/scan regressions, one full discovered suite, sdist→wheel/source/test/benchmark inclusion and installed CLI/web smoke, plus focused active-source Python3.9. No UI change means no unrelated browser run; no new models. Artifacts/tmp/openscrub-task112. Reuse prepared env-opencv4.sh, Python3.9 env and offline build tooling. Native/Git writes may use already-authorized require_escalated.
+
+Self-review and commit a justified candidate, or report the evidence-backed closure if adoption is not justified. Report/draft task-112-report.md/task-112-pr.md here must name exact base/head, measured trigger and costs, equivalence/results, defaults preserved, changed files and limits. No publication or nested agents.

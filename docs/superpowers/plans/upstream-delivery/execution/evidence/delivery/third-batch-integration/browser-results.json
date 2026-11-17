@@ -1,0 +1,203 @@
+{
+  "origin": "http://127.0.0.1:18652",
+  "title": "OpenScrub",
+  "ids": {
+    "alpha": "8221de25bb01",
+    "beta": "6b23b29f1d6e"
+  },
+  "errors": [],
+  "controlledDiagnostics": [
+    {
+      "text": "Failed to load resource: the server responded with a status of 500 (INTERNAL SERVER ERROR)",
+      "url": "http://127.0.0.1:18652/api/jobs/8221de25bb01/detections"
+    }
+  ],
+  "requests": [
+    {
+      "url": "http://127.0.0.1:18652/",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18652/api/model_status",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18652/api/custom_cats",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18652/api/models/face",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18652/api/quality_tier",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18652/api/allowlist",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18652/api/certinfo",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18652/api/jobs",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18652/api/update_check",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18652/api/vault",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18652/api/extras",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18652/api/models/plate",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18652/api/models/person",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18652/api/jobs/8221de25bb01",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18652/api/jobs/8221de25bb01/log?from=0",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18652/api/jobs",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18652/api/jobs/8221de25bb01/detections",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18652/api/jobs/8221de25bb01/thumb/1",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18652/api/jobs/8221de25bb01/thumb/2",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18652/api/jobs/8221de25bb01/thumb/10",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18652/api/jobs/8221de25bb01/thumb/3",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18652/api/jobs/8221de25bb01/thumb/4",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18652/api/jobs/8221de25bb01/thumb/6",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18652/api/jobs/8221de25bb01/thumb/7",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18652/api/jobs/8221de25bb01/thumb/12",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18652/api/jobs/8221de25bb01/detections",
+      "method": "POST"
+    },
+    {
+      "url": "http://127.0.0.1:18652/api/jobs/8221de25bb01/detections",
+      "method": "POST"
+    },
+    {
+      "url": "http://127.0.0.1:18652/api/jobs/8221de25bb01/detections",
+      "method": "POST"
+    },
+    {
+      "url": "http://127.0.0.1:18652/api/jobs/8221de25bb01/render",
+      "method": "POST"
+    },
+    {
+      "url": "http://127.0.0.1:18652/api/jobs/8221de25bb01",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18652/api/jobs/8221de25bb01/log?from=0",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18652/api/jobs",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18652/api/jobs/8221de25bb01",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18652/api/jobs/8221de25bb01/log?from=0",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18652/api/jobs",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18652/api/jobs/8221de25bb01/detections",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18652/api/jobs/8221de25bb01/thumb/8",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18652/api/jobs/8221de25bb01/thumb/9",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18652/api/jobs/8221de25bb01/detections",
+      "method": "POST"
+    },
+    {
+      "url": "http://127.0.0.1:18652/api/jobs/8221de25bb01/render",
+      "method": "POST"
+    }
+  ],
+  "expected": [
+    false,
+    false,
+    true,
+    false,
+    true,
+    true,
+    true,
+    true,
+    true,
+    false,
+    true,
+    false,
+    true
+  ],
+  "rows": 14,
+  "output": "/tmp/openscrub-task652/synthetic-data/browser-runtime-final/openscrub_jobs/8221de25bb01/output.mp4",
+  "reportPath": "/tmp/openscrub-task652/synthetic-data/browser-runtime-final/openscrub_jobs/8221de25bb01/report.json",
+  "checks": [
+    "same-value no-op skips publisher and still renders",
+    "newer different draft retained through held acknowledgement and failed save; no unintended render",
+    "repeated explicit group/independent zone controls",
+    "manual replay ID",
+    "actual accepted render plus real report publisher completion",
+    "all raw rows/indices/audio/additive data after render and fresh browser"
+  ]
+}

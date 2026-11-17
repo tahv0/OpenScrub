@@ -1,0 +1,6 @@
+{
+  "document": "task-652-report.md",
+  "original_sha256": "ef25799fdd1d468abfd048245051a5f328da920fbd60c7b7b6bcd28e00bf4eb2",
+  "current_sha256": "9d9e98407744e77c259661958d7cddbcc4eed6993373de483d6552a3f2abf275",
+  "change": "Supervisor labels five-sample maxima directly; raw benchmark values, source, tests and measurements unchanged."
+}

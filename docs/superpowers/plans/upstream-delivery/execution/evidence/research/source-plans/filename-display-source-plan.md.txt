@@ -1,0 +1,22 @@
+# N11 literal filenames in ordinary views
+
+## Task 119: preserve filenames as text in the job list and title
+
+### Global constraints
+
+Preserve Austin defaults, Python>=3.9, accepted basename normalization, download naming and ordinary selection/job behavior. No training/workbench, unrelated security audit, dependency/framework, broad UI rewrite or root helper. Tests under `tests/`; synthetic data only. No original-checkout/user-data changes, publication or subagents.
+
+### What, why and when
+
+The preservation audit found raw `j.name` interpolation in the ordinary job list and detail title. Preserve literal text using the existing escaping/text boundary, independently of removed Findings/sections code. This is a small separate N11 correctness PR. An earlier browser research probe was stopped by a platform filter and produced no runtime report; do not retry that probe, execute filename payloads or claim its validation. Use only benign text-display cases here.
+
+The supervisor will create `pr/literal-job-filenames` in `/home/tahv0/.codex/worktrees/c832/OpenScrub` from exact Austin-plus-test-only base `e21ebdf6e3ee46e6c65050dc956a9a3459152269` before dispatch. Inspect the ordinary basename→metadata→`loadJobs`/`shellHtml` path and existing escaping helper. Do not reopen the full preservation audit.
+
+1. Make the actual job list and job title display exactly the accepted name, using existing escaped interpolation or DOM text APIs as appropriate. Do not change filename normalization, stored metadata, extension handling, download headers, job IDs/selection, tooltips or layouts. Keep the production diff small and local.
+2. Use harmless fixtures with spaces, apostrophes, quotation marks, ampersands, Unicode and literal entity-looking text such as `Family &amp; friends — café.mp4`. This can demonstrate entity decoding changing the old visible name without executable markup. Assert exact text content and unchanged surrounding element/selection structure through the actual emitted UI functions. No executable filename or script/event-handler tests, scanner, external exploit report or workaround of the stopped probe.
+3. Verify both upload/server-source accepted basenames and actual ordinary list/detail job switching. Use task-local synthetic input/jobs and existing browser tools. Distinguish any controlled HTTP responses from actual routes. Preserve accessible list/title text, and confirm ordinary downloads retain their existing names; do not add P01 Save As to this branch.
+4. Add owning regressions under `tests/test_job_filename_display.py`, establish the benign RED→GREEN, then run the full discovered suite once at stabilized source, evaluated-JS parse, sdist→wheel/source/test inclusion, installed CLI/web smoke and applicable Python3.9 active-source checks. Only necessary branch-local discovery/contributor instructions change. No new tools/models or heavy performance measurement; artifacts under `/tmp/openscrub-task119`.
+
+Self-review and commit. Write `task-119-report.md` / `task-119-pr.md` in this SDD workspace with exact base/head, concrete harmless text example, source provenance, commands/results, changed files and limits. Describe literal display correctness; do not claim an executed exploit, broad security certification or upstream acceptance. No publication or nested agents.
+
+Tooling: `/tmp/openscrub-baseline-20261116/env-opencv4.sh`, `/tmp/openscrub-python39-20261117/env.sh`, existing Playwright/Chromium fallback under `/tmp/openscrub-save-as-20261116`. Native local edits/Git commits may require already-authorized `require_escalated`.

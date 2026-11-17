@@ -1,0 +1,28 @@
+# P11C reverse-recall candidate work
+
+## Task 113: avoid reverse-recall comparisons that cannot match
+
+### Global constraints
+
+Preserve Python>=3.9, normalization, reverse matching/gating/allowlist/category thresholds, first eligible insertion-order winner, scan/word order, duplicate observations, every Detection field and defaults. No training/workbench, forward PhiMemory rewrite, persistent cache, new dependency, general indexing or hook-purity framework. Tests under tests/, justified measurement under benchmark/. Synthetic inputs and prepared tools only; no original-checkout/user-data changes, publication or subagents.
+
+### What, why and when
+
+S05 records155/3775/15050 remembered-key visits for10/50/100 unique ordinary histories, including unmatched words. This is post-scan reverse recall, not inference or preview throughput. Read scan-index-contract-research.md P11C and its final scope/instrumentation clarification, plus retained scan-history-baseline-research.md. Root creates pr/reverse-recall-index from exacte21ebdf6e3ee46e6c65050dc956a9a3459152269. P11A/B/D remain independent; do not copy their changes or repeat their benchmark programs.
+
+First measure actual supported reverse/finalization cost with a few deterministic ordinary histories; coordinate timed work with root as the sole timed workload. A necessary-condition index is a candidate, not an obligation to land code. Close with retained evidence if dispatch/construction costs erase the benefit or semantics cannot be preserved simply.
+
+1. Keep the existing reverse predicate authoritative. Normalized query length below4/STOPWORDS and original-word allowlist filtering remain before lookup. Category and existing _gated checks retain their meaning. Digit strings require both str.isdigit(), equal length and at most two mismatches; other pairs require lengths within2 and the existing fuzz.ratio/lenient threshold. Do not use partial_ratio, forward recall, an exact shortcut, highest-score selection or Unicode/digit normalization.
+2. If justified, lazily build one local length/type index from the actual current memory.items insertion order per invocation. Numeric keys use same-length buckets; nondigit queries discover nondigit lengths query±2. Merge at most five ordered buckets into original global insertion order, then run the original predicate. First eligible fuzzy match must still beat a later exact key. Pre-call mapping changes must be visible; no reuse of forward caches or persistent index. No unnecessary construction for empty/no-eligible input.
+3. Support ordinary stable PhiMemory mappings/string keys/categories and actual ordinary callers. Use cheap data/order fallback where needed for malformed mappings/keys, preserving old failures rather than silently producing no matches. Do not eagerly reorder/consume a one-shot scans iterator or build a classifier for arbitrary Python hook side effects. The research's final clarification supersedes broader speculative callback-purity wording.
+4. Preserve one Detection per matched word, original OCR text, int box conversion, rounded confidence, tuple offset, default other fields, duplicates and input order. Keep merge/tail/contradiction behavior untouched. No category/threshold change to manufacture speed.
+
+### Evidence and adoption
+
+Add tests/test_reverse_recall_index.py with actual full-module behavior and literal expected records: earlier fuzzy versus later exact winner; gate/category rejection followed by later winner; two numeric mismatches and Unicode digits; alpha±2/threshold boundaries; query4 versus remembered3; duplicate/unordered scans/words; original-word allowlist; pre-call memory mutation; actual metadata/defaults and malformed-input compatibility. Ordinary tests must not require Git/old checkout or copy a miniature matcher. Performance RED may be the retained exact-base work/latency evidence; do not add a method-dispatch test merely to force a failing unit test. Any operation-count regression must measure a stable meaningful work bound, with instrumentation outside production and separate from timing.
+
+Use actual base/head modules, fresh mutable fixtures outside timing, a heterogeneous-length/unmatched case, same-length worst case and repeated/early-winner control. Include index construction, bucket merge/order cost and memory retention in total reverse and total finalization results. Coordinate3warmups/5alternating recorded samples per selected case; preserve all samples/regressions and complete output equality, report median without five-sample p95. O(M) references/serials and worst-case full candidate scans remain explicit. No general long-video/4K or model throughput claim.
+
+If adopted, verify one tiny actual run_scan/report path with controlled OCR at the existing interface, including accepted and zone-dropped output. Report that controlled boundary honestly. Run focused/relevant reverse/scan tests, one stable full suite, actual active-source Python3.9, offline sdist→wheel/exact source/tests/benchmark and installed CLI/web smoke. Use prepared isolated environments and /tmp/openscrub-task113, native cwd/import assertions and correct3.12 install recipe. No browser change/model download/new dependency needed.
+
+Self-review and commit a justified candidate, or document the evidence-backed no-adoption closure. Write task-113-report.md/task-113-pr.md here with exact base/head, actual trigger/benefit/cost, preserved priority/output, commands/results, failed attempts and remaining limits. Native/Git edits may use already-authorized escalation. No publication/nested agents.

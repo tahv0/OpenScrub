@@ -1,0 +1,39 @@
+# Third intermediate C01 acceptance
+
+## Task 652: combine readable saves, renderer corrections and cooperative tracking cancellation
+
+### Global constraints
+
+Preserve Austin defaults, Python>=3.9, complete raw reports, reviewed file/source/operation ownership, manual replay and browser draft/acknowledgement behavior. No training/workbench, optional uncertainty/plate policy, extra features, dependency migration, original-checkout/user-data changes, publication or subagents. This is an intermediate local C01 assembly, not an umbrella upstream PR, final C01 approval or C02 adoption. Preserve every independent candidate branch.
+
+### Handoff gate and why this batch
+
+Do not extract/dispatch until Task110 is independently reviewed and its exact final provenance commits below are filled. Supervisor selects integration/upstream-focused at the second reviewed batch head ac6496810b03d8b062ab9da150aeea1e62285fed in the native worktree. Read task-651-report.md/task-651-review.md and relevant candidate reports/reviews; no rebuilding their standalone branches or copying documentation checkpoints into product history.
+
+This batch proves that the serializer optimization still publishes complete reports, HDR chroma and invalid-polygon fallback coexist in the real pipeline, deterministic decoder closure remains intact, and cancellation actually stops repeated tracker work before existing lifetime/transaction cleanup. It is the next usable clean-app checkpoint; broad P16C geometry/resource/staged-video publication remains separate.
+
+### Exact provenance picks — fill the last item before dispatch
+
+1. P06C.2 readable serialization:4a62e49d2f0896b737081cc92e1f92e9bcaee93f from pr/readable-report-serialization, base3457efa.
+2. N09 HDR decoder cleanup:ded411cbec308333d1416ae3d58b4f6e918d7849 from pr/hdr-decoder-cleanup, basee21ebdf.
+3. P16A HDR chroma coverage:0c648c2e7d3e40304dce9ae878d14709966b1fe1 from pr/hdr-chroma-coverage, basee21ebdf.
+4. P16B known-box polygon fallback:a3c3193e8dff41ec0588e66443398048a5c15ece from pr/invalid-polygon-fallback, basee21ebdf.
+5. P10C manual tracker cancellation: 2004b22002b8317c26ea508ff8187acbcd0cfab2 from pr/manual-tracker-cancellation, base12919c9.
+
+Use -x for each actual pick, including any declared review fixes. No squashing distinct candidates, merges or unreviewed whole-file transplantation. Resolve only real intersections; keep independent contracts and metadata/source inclusion. Put any integration correction in a separate described commit. Do not weaken error/lifetime/geometry assertions to make old fixtures pass.
+
+### Required combined behavior
+
+1. P16B's standalone valid-HDR controls intentionally retain its base's old nearest-neighbor chroma mapping. In this combination P16A correctly changes that expectation. Update affected combined test oracles to independent global touched-luma→chroma cells, preserving B's usable-contour/fallback decisions and exact SDR/luma/full-box controls. Keep all parity/odd/clipped/mode tests. Do not revert A, loosen comparisons or relabel standalone B evidence. Distinguish test compatibility from product corrections.
+2. Exercise ordinary report→actual run_render/worker→SDR and HDR with tiny synthetic sources. Include a sparse valid silhouette reaching extra chroma cells and a malformed/degenerate polygon inside a valid box, requested fill mode/padding, independent unmasked/kept/face-or-rectangle controls and output frame/format/colour tags. Observe exact real encoder-input bytes; lossy decoded pixels remain separate. Use actual default pipeline orchestration, not only report→leaf rendering. If a coverage transform bypasses the reviewed fallback, retain the concrete failure and escalate its smallest owner fix; do not silently switch to a nondefault path to pass.
+3. Save mixed groups, independent zone/manual replay IDs and audio/additive raw data through actual HTTP, run a bounded real render and reopen in a fresh browser/interpreter. Verify all raw rows/indices/geometry/times/choice/audio/additive values and selected/kept/unrelated output. Reuse the second-batch fixture, not its entire old browser/polling matrix. Actual PAGE must retain a newer different draft through one held/failed save while the new serializer is active; no unintended render or acknowledgement of newer edits. Include a no-op save followed by render.
+4. On the combined source exercise actual manual tracking cancellation at a completed native match and actual Flask cancellation/deletion boundaries: no further outer work after observation, no partial publication, deletion409 while cleanup/lifetime owns the source, closed capture before release, eventual deletion200 and zero owned work. Retain full uncancelled sample equality. Existing N09 tests must still prove real retained-exception pipe closure/reaped children. No claim of native-call interruption or comprehensive P16C cleanup/output restoration.
+5. Preserve atomic report failure behavior and all P06 busy/deleting/vault/latest-document/manual-replay gates. Use relevant focused regressions and one bounded actual lifecycle overlap; no repeat of the entire historical stream matrix. Maintain serializer bytes/errors and no-op publication semantics, and distinguish its readable JSON output from Python dispatch counts. No new cross-process/crash/Windows durability claim.
+
+### Validation, performance and delivery
+
+After actual conflicts and fixes stabilize, run relevant combined tests, one full discovered suite, applicable active-source Python3.9 checks, evaluated-JS parse if browser/test extraction changed, offline sdist→wheel and installed CLI/web/HTTP smoke. Verify exact packaged/runtime/test/private-helper bytes, default options and absence of removed-system imports. Existing reviewed OpenCV declarations and installed compatibility remain intact; no repeat resolver/network/model work. Browser helpers classify expected errors by exact injected scenario/URL, with zero unexplained errors in healthy controls. Harness polling awaits accepted render request and actual publisher completion, not stale pre-request done state.
+
+One largest-report interaction check compares exact second-batchac64968 to the stabilized assembled head at100000rows for existing no-op/sparse/bulk saves. Use the adopted reusable benchmark, three warmups/five alternating measured requests per case, exclusive timed slot and separate instrumented counts. Before and after both skip no-op publication: explicitly use before-noop-publications=0. Before uses old serializer; after uses the reviewed public iterator/writelines route, so common report_encode counts must work on both. Run a tiny counted smoke before timing to catch harness assumptions. Preserve all timed values, whole expected output/unchanged metadata checks, source manifests, memory observations and any regressions. No repeat1k/10k attribution or large-token matrix, no untouched-feature speed claim. Do not relabel measured SHAs after amendments; runtime-identity proof or new relevant measurement is required if source changes.
+
+Reuse prepared task-local3.12/3.9/browser/offline environments and /tmp/openscrub-task652, native cwd/import gates and correct3.12 pip entrypoints. No model/dependency downloads. Coordinate timing with root; no other runtime workload alongside. Self-review/commit and write task-652-report.md, task-652-pr.md and task-652-acceptance.md with exact base/head, original→picked map, real conflicts/corrections, actual output/ownership/performance results and limits. Root reviews then transfers the acceptance record to execution/batches. Native/Git writes may use already-authorized escalation. No publication/nested agents or final C01/C02 claim.
