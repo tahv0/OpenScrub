@@ -153,3 +153,39 @@ def test_online_wake_replaces_pending_work_once():
     run_js("""openJob('A');const old=queue.shift();emit('online');emit('focus');emit('pageshow');
     await advance(0);assert.equal(old.options.signal.aborted,true);assert.equal(calls.length,2);
     old.reject(Error('late failure'));await tick();await cycle();assert.equal(timers.size,1);""")
+
+
+def test_new_contract_stale_clamp_replaces_and_advances():
+    run_js("""openJob('A');await reply(job());
+    await reply({from:5,base:5,len:7,epoch:'E1',reset:'stale',dropped:5,truncated:0,lines:['six','seven']});
+    assert.equal(elements.get('log').textContent,'six\\nseven');
+    assert.equal(LOGN,7);assert.equal(LOGE,'E1');
+    assert.match(elements.get('logStatus').textContent,/omitted/);
+    await advance(900);await reply(job());assert.ok(queue[0].url.includes('epoch=E1'));
+    await reply({from:7,base:5,len:8,epoch:'E1',reset:null,dropped:5,truncated:0,lines:['eight']});
+    assert.equal(elements.get('log').textContent,'six\\nseven\\neight');""")
+
+
+@pytest.mark.parametrize('change', [
+    "delete bad.base", "bad.len=9", "bad.from=0", "bad.base=3", "bad.reset='future'",
+    "bad.epoch='E2'", "bad.dropped=-1", "bad.truncated=1.5", "bad.epoch='x'.repeat(129)",
+    "bad.lines=[3]", "bad.len=Number.MAX_SAFE_INTEGER+1",
+])
+def test_invalid_new_snapshot_cannot_publish_or_advance(change):
+    run_js("""openJob('A');await reply(job());
+    await reply({from:0,base:0,len:1,epoch:'E1',reset:null,dropped:0,truncated:0,lines:['kept']});
+    await advance(900);await reply({...job(),log_epoch:'ADVISORY',log_len:999});
+    const bad={from:1,base:0,len:2,epoch:'E1',reset:null,dropped:0,truncated:0,lines:['bad']};CHANGE;
+    await reply(bad);assert.equal(LOGN,1);assert.equal(LOGE,'E1');assert.equal(elements.get('log').textContent,'kept');
+    assert.match(elements.get('pollStatus').textContent,/retrying/);""".replace('CHANGE', change))
+
+
+def test_epoch_replacement_future_and_authoritative_empty():
+    run_js("""openJob('A');await reply(job());
+    await reply({from:0,base:0,len:1,epoch:'E1',reset:null,dropped:0,truncated:0,lines:['old']});
+    await advance(900);await reply(job());
+    await reply({from:0,base:0,len:2,epoch:'E2',reset:'epoch',dropped:0,truncated:0,lines:['fresh','history']});
+    assert.equal(elements.get('log').textContent,'fresh\\nhistory');assert.equal(LOGN,2);assert.equal(LOGE,'E2');
+    await advance(900);await reply(job());
+    await reply({from:0,base:0,len:0,epoch:'E3',reset:'epoch',dropped:0,truncated:0,lines:[]});
+    assert.equal(elements.get('log').textContent,'');assert.equal(LOGN,0);assert.equal(LOGE,'E3');""")

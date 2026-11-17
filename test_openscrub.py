@@ -485,7 +485,7 @@ def test_plate_threshold_exposed_in_editor_and_clamped(tmp_path):
     page = zones_ui.ZONES_PAGE
     assert 'id="pthr"' in page and 'value="0.35"' in page
     assert 'plate_threshold:$("pthr").value.trim()===""?null' in page
-    job = {"video": str(tmp_path / "x.mp4"), "dir": str(tmp_path), "log": [],
+    job = {"video": str(tmp_path / "x.mp4"), "dir": str(tmp_path), "log": w.JobLog(),
            "options": {}}
     for given, want in ((0.5, 0.5), (5, 0.95), (-1, 0.05), (None, 0.35),
                         ("abc", 0.35), (float("nan"), 0.35), ("0.6", 0.6)):
@@ -662,7 +662,7 @@ def test_phrase_category_wired_through_web(tmp_path):
     assert 'Specific text is checked but no text is entered' in page
     assert 'phrase:"specific text"' in w.PAGE          # review heading
     assert "phrase" in w.BUILTIN_CATS
-    job = {"video": str(tmp_path / "x.mp4"), "dir": str(tmp_path), "log": [],
+    job = {"video": str(tmp_path / "x.mp4"), "dir": str(tmp_path), "log": w.JobLog(),
            "options": {"categories": "phrase",
                        "phrases": "Acme Corp\nProject Bluebird\n"}}
     a = w.build_args(job)
@@ -3618,7 +3618,7 @@ def test_bad_web_settings_fall_back_and_never_exit(tmp_path, monkeypatch):
     defaults with a log NOTE, and any remaining parser error is a normal
     exception (fails the job) — never a SystemExit."""
     import openscrub_web as w
-    job = {"video": str(tmp_path / "x.mp4"), "dir": str(tmp_path), "log": [],
+    job = {"video": str(tmp_path / "x.mp4"), "dir": str(tmp_path), "log": w.JobLog(),
            "options": {"engine": "", "device": None, "mode": "smudge",
                        "pad": None, "detect_scale": "nan",
                        "face_threshold": "", "scan_speed": "fastest"}}
@@ -3626,7 +3626,7 @@ def test_bad_web_settings_fall_back_and_never_exit(tmp_path, monkeypatch):
     assert (a.engine, a.device, a.mode) == ("auto", "auto", "blur")
     assert a.pad == 8 and a.detect_scale == 0.5     # fastest still applies
     assert a.face_threshold == 0.6
-    assert any("--engine" in l and "not valid" in l for l in job["log"])
+    assert any("--engine" in l and "not valid" in l for l in job["log"].snapshot()["lines"])
     # good values pass through untouched
     job["options"] = {"engine": "tesseract", "pad": 3, "mode": "box"}
     a = w.build_args(job)
@@ -3684,7 +3684,7 @@ def test_web_worker_survives_a_dying_job_and_cancel_clears_the_queue(
         t.join(10)
         assert not t.is_alive()
         assert a["phase"] == "error" and "stopped unexpectedly" in a["error"]
-        assert any(l.startswith("ERROR:") for l in a["log"])
+        assert any(l.startswith("ERROR:") for l in a["log"].snapshot()["lines"])
         assert b["phase"] == "error" and b["error"] == "second job ran", \
             "the worker must survive job A and run job B"
         assert ran.count(c["id"]) == 1, "retried job must run exactly once"

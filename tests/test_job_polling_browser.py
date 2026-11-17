@@ -24,8 +24,11 @@ def polling_http(monkeypatch, tmp_path):
     for jid in ('A', 'B'):
         job = web.new_job('', {}, 'synthetic job ' + jid)
         web.JOBS.pop(job['id'])
-        job.update(id=jid, phase='queued', progress=.2, log=['log-' + jid])
+        folder = tmp_path / jid
+        folder.mkdir()
+        job.update(id=jid, dir=str(folder), phase='queued', progress=.2, log=web.JobLog(['log-' + jid]))
         web.JOBS[jid] = job
+    monkeypatch.setattr(web, 'enqueue', lambda *_: None)
     gate = threading.Event()
     state = {'kind': None, 'entered': 0, 'released': 0}
 
@@ -35,6 +38,40 @@ def polling_http(monkeypatch, tmp_path):
 
         def do_POST(self):
             data = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
+            action = data.get('action')
+            jid = data.get('id', 'A')
+            if action in ('seed', 'replace', 'recover'):
+                old = web.JOBS[jid]
+                if action == 'recover':
+                    folder = Path(old['dir'])
+                    (folder / 'input.mp4').write_bytes(b'')
+                    web.JOBS.pop(jid)
+                    web.rehydrate_jobs()
+                    job = web.JOBS[jid]
+                else:
+                    job = web.new_job('', {}, 'synthetic job ' + jid)
+                    web.JOBS.pop(job['id'])
+                    folder = tmp_path / jid
+                    folder.mkdir(exist_ok=True)
+                    job.update(id=jid, dir=str(folder), phase='queued', name='synthetic job ' + jid)
+                    web.JOBS[jid] = job
+                if action == 'replace':
+                    web.WebCallbacks(old).log('obsolete callback must stay old')
+                # Recovery starts with its real recovery message.
+                count = data.get('count', 0)
+                for i in range(count):
+                    web.WebCallbacks(job).log(data.get('prefix', 'L') + str(i))
+            elif action == 'append':
+                callback = web.WebCallbacks(web.JOBS[jid])
+                for message in data['lines']:
+                    callback.log(message)
+            elif action == 'retry':
+                job = web.JOBS[jid]
+                video = Path(job['dir']) / 'input.mp4'
+                video.write_bytes(b'')
+                job.update(video=str(video), phase='error')
+                with web.app.test_client() as client:
+                    assert client.post('/api/jobs/' + jid + '/retry').status_code == 200
             if data.get('release'):
                 gate.set()
             if data.get('kind'):
@@ -116,7 +153,7 @@ async function setup(name){
    if(u.pathname==='/api/persist')body={enabled:false,count:0};
    return route.fulfill({json:body})}
   const [,id,tail]=m,kind=tail||'meta';q.events.push({id,kind,query:u.search,method:req.method()});
-  if(q.pass===kind&&req.method()==='GET')return route.continue();
+  if((q.pass===kind||q.pass==='both'&&['meta','log'].includes(kind))&&req.method()==='GET')return route.continue();
   if(/thumb|detframe|frame_at|preview.jpg/.test(kind))return route.fulfill({contentType:'image/png',body:tiny});
   let body=kind==='meta'?meta(id,q.phase,q.progress):kind==='log'?{from:+u.searchParams.get('from'),lines:q.logs[id].slice(+u.searchParams.get('from')),len:q.logs[id].length}:
    kind==='detections'?{duration:10,detections:[{i:0,category:'mrn',text:'review-'+id,enabled:true,t_start:0,t_end:1,track:-1,person:-1}]}:
@@ -235,3 +272,97 @@ def test_emitted_page_polling_acceptance(polling_http):
     assert result.returncode == 0, result.stdout + result.stderr
     if os.environ.get('POLLING_ARTIFACTS'):
         Path(os.environ['POLLING_ARTIFACTS'], 'browser-summary.log').write_text(result.stdout)
+
+
+BOUNDED_BROWSER = r"""
+const {chromium}=require('playwright'),assert=require('node:assert/strict'),fs=require('node:fs');
+const base=process.env.POLLING_BASE,results=[];
+const pause=ms=>new Promise(r=>setTimeout(r,ms));
+async function wait(fn){for(let i=0;i<200;i++){if(await fn())return;await pause(20)}throw Error('bounded condition expired')}
+(async()=>{
+ const browser=await chromium.launch({headless:true,args:['--no-sandbox']});
+ const page=await browser.newPage({viewport:{width:1280,height:950}}),errors=[],consoleErrors=[],requests=[];
+ page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(['error','warning'].includes(m.type()))consoleErrors.push(m.text())});
+ await page.clock.install();
+ await page.route('**/api/**',async route=>{
+  const u=new URL(route.request().url());
+  if(/^\/api\/jobs\/[AB](\/log)?$/.test(u.pathname)){requests.push(u.pathname+u.search);return route.continue()}
+  let body={};if(u.pathname==='/api/jobs')body=[];
+  if(u.pathname==='/api/quality_tier')body={tiers:[],current:'fast'};
+  if(u.pathname==='/api/persist')body={enabled:false,count:0};
+  return route.fulfill({json:body});
+ });
+ const control=async data=>{const r=await page.request.post(base+'/__qa__/control',{data});assert.equal(r.status(),200)};
+ const cursor=()=>page.evaluate(()=>LOGN);
+ const text=()=>page.locator('#log').textContent();
+ const note=()=>page.locator('#logStatus').textContent();
+ const epoch=()=>page.evaluate(()=>LOGE);
+ async function poll(){const n=requests.length;await page.clock.runFor(900);await wait(()=>requests.length>=n+2);await wait(async()=>await page.evaluate(()=>POLL_CYCLE===null))}
+ try{
+  await control({action:'seed',count:2100});
+  await page.goto(base);await page.clock.pauseAt(await page.evaluate(()=>Date.now()+100));
+  assert.equal(await page.title(),'OpenScrub');assert.match(await page.locator('body').innerText(),/OpenScrub/);
+  await page.evaluate(()=>openJob('A'));await wait(async()=>await cursor()===2100);
+  assert.equal(await text(),Array.from({length:400},(_,i)=>'L'+(1700+i)).join('\n'));
+  assert.match(await note(),/omitted/);const firstEpoch=await epoch();
+  results.push('overflow initial400 through both production routes');
+  await control({action:'append',lines:['normal-one','normal-two']});await poll();
+  assert.equal(await cursor(),2102);assert.ok((await text()).endsWith('L2099\nnormal-one\nnormal-two'));
+  const before=await text();await poll();assert.equal(await text(),before);results.push('normal increments exactly once');
+  // A stale cursor must replay retained history; reset display still uses400.
+  await control({action:'append',lines:Array.from({length:2100},(_,i)=>'gap-'+i)});await poll();
+  assert.equal(await cursor(),4202);assert.equal(await text(),Array.from({length:400},(_,i)=>'gap-'+(1700+i)).join('\n'));
+  assert.match(await note(),/omitted/);results.push('stale recovery replaces transcript');
+  await page.evaluate(()=>LOGN=999999);await poll();assert.equal(await cursor(),4202);assert.match(await note(),/replaced/);
+  results.push('future recovery');
+  await control({action:'append',lines:['😀'.repeat(10000)]});await poll();assert.match(await note(),/truncated/);
+  assert.ok((await text()).endsWith('... [message truncated]'));results.push('fixed truncation status');
+  await control({action:'retry'});await page.evaluate(()=>openJob('A'));await wait(async()=>await cursor()===4204);
+  assert.equal(await epoch(),firstEpoch);assert.match(await text(),/retrying scan/);results.push('append-only retry same epoch');
+  await control({action:'replace',count:4500,prefix:'replacement-'});await poll();
+  assert.equal(await cursor(),4500);assert.notEqual(await epoch(),firstEpoch);
+  assert.equal(await text(),Array.from({length:400},(_,i)=>'replacement-'+(4100+i)).join('\n'));
+  assert.match(await note(),/replaced/);results.push('actual server job replacement larger than old cursor');
+  const replacedEpoch=await epoch();await control({action:'recover',count:4600,prefix:'recovered-'});await poll();
+  assert.equal(await cursor(),4601);assert.notEqual(await epoch(),replacedEpoch);
+  assert.equal(await text(),Array.from({length:400},(_,i)=>'recovered-'+(4200+i)).join('\n'));
+  results.push('actual incomplete recovery replacement larger than old cursor');
+  // Hold real old bodies across A→B→A and recovery, then release them late.
+  for(const kind of ['meta','log']){
+   await control({kind});let headers=0;const listener=r=>{if(r.headers()['x-qa-body-gate']===kind)headers++};page.on('response',listener);
+   await page.clock.runFor(900);await wait(()=>headers===1);
+   await page.evaluate(()=>openJob('B'));await wait(async()=>await cursor()===1);
+   assert.equal(await text(),'log-B');
+   await control({action:'replace',count:4700,prefix:'fresh-'+kind+'-'});
+   await page.evaluate(()=>openJob('A'));await wait(async()=>await cursor()===4700);
+   const accepted=await epoch();await control({release:true});await pause(80);
+   assert.equal(await epoch(),accepted);assert.equal(await cursor(),4700);
+   assert.ok((await text()).startsWith('fresh-'+kind+'-4300\n'));
+   page.off('response',listener);results.push('held '+kind+' body across A→B→A and job replacement');
+  }
+  // A real pending body from before Retry cannot overwrite the reopened view.
+  await control({kind:'log'});let held=0;page.on('response',r=>{if(r.headers()['x-qa-body-gate']==='log')held++});
+  await page.clock.runFor(900);await wait(()=>held===1);const retryEpoch=await epoch();
+  await control({action:'retry'});await page.evaluate(()=>openJob('A'));await wait(async()=>await cursor()===4701);
+  await control({release:true});await pause(80);assert.equal(await cursor(),4701);assert.equal(await epoch(),retryEpoch);
+  assert.match(await text(),/retrying scan/);results.push('held body across append-only retry');
+  assert.deepEqual(errors,[]);assert.deepEqual(consoleErrors,[]);
+  await page.screenshot({path:process.env.POLLING_ARTIFACTS+'/bounded-logs-desktop.png'});
+  await page.setViewportSize({width:390,height:844});await page.screenshot({path:process.env.POLLING_ARTIFACTS+'/bounded-logs-mobile.png'});
+  fs.writeFileSync(process.env.POLLING_ARTIFACTS+'/bounded-browser.json',JSON.stringify({results,requests,errors,consoleErrors,url:page.url(),title:await page.title()},null,2));
+  console.log(JSON.stringify({results,requests:requests.length,errors,consoleErrors}));
+ }finally{await browser.close()}
+})().catch(e=>{console.error(e);process.exit(1)});
+"""
+
+
+def test_bounded_history_through_actual_page_and_backend(polling_http):
+    node = shutil.which('node')
+    if not node:
+        pytest.skip('Node needed for optional Playwright acceptance')
+    available = subprocess.run([node, '-e', "require('playwright')"], capture_output=True)
+    if available.returncode:
+        pytest.skip('Existing Playwright required; no dependencies installed')
+    env = dict(os.environ, POLLING_BASE=polling_http)
+    result = subprocess.run([node, '-e', BOUNDED_BROWSER], capture_output=True, text=True, env=env, timeout=120)
+    assert result.returncode == 0, result.stdout + result.stderr
