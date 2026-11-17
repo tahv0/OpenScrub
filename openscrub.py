@@ -4036,6 +4036,7 @@ def render_hdr(src, dst, detections, cum, bands, fps, pad, mode,
     meta = dec = enc = ff_err = None
     remove_partial = False
     cleanup_errors = []
+    primary = None
     try:
         meta = cv2.VideoCapture(src)
         w = int(meta.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -4176,16 +4177,31 @@ def render_hdr(src, dst, detections, cum, bands, fps, pad, mode,
         cb.progress("render", max(total, idx), max(total, idx))
         try:
             enc.stdin.close()
-        except (BrokenPipeError, OSError):
-            pass                        # exit code + stderr say why below
-        rc = enc.wait()
+        except OSError as close_error:
+            # A failed close may not have delivered EOF. Bound only this
+            # exceptional status wait; healthy finalization has no timeout.
+            try:
+                rc = enc.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                cleanup_errors.extend(_stop_render_children((dec, enc)))
+                raise close_error  # forced termination is not an encoder cause
+            except Exception as wait_error:
+                cleanup_errors.append(wait_error)
+                raise close_error
+            if rc == 0:
+                raise  # retain a close error even after successful encoding
+            cleanup_errors.append(close_error)  # encoder diagnostics stay primary
+        else:
+            rc = enc.wait()
         if rc != 0:
             raise _ffmpeg_failure(ff_err, "HDR encode", rc)
         cb.log(f"      HDR preserved: 10-bit HEVC, color tags "
                + (", ".join(f"{k.lstrip('-')}={v}" for k, v in (tags or {}).items())
                   or "(none in source)"))
+    except BaseException as error:
+        primary = error
+        raise
     finally:
-        primary = sys.exc_info()[1]
         cleanup_errors.extend(_stop_render_children((dec, enc)))
         for resource, action in ((meta, "release"), (ff_err, "close")):
             if resource is not None:
@@ -4230,6 +4246,7 @@ def render(src, dst, detections, cum, bands, fps, pad, mode, preview,
     cap = proc = out = ff_err = tmp_video = None
     remove_partial = False
     cleanup_errors = []
+    primary = None
     try:
         cap = cv2.VideoCapture(src)
         w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -4430,9 +4447,22 @@ def render(src, dst, detections, cum, bands, fps, pad, mode, preview,
         if proc is not None:
             try:
                 proc.stdin.close()
-            except (BrokenPipeError, OSError):
-                pass                        # exit code + stderr say why below
-            rc = proc.wait()
+            except OSError as close_error:
+                # A failed close may not have delivered EOF. Bound only this
+                # exceptional status wait; healthy finalization has no timeout.
+                try:
+                    rc = proc.wait(timeout=2)
+                except subprocess.TimeoutExpired:
+                    cleanup_errors.extend(_stop_render_children((proc,)))
+                    raise close_error  # forced termination is not an encoder cause
+                except Exception as wait_error:
+                    cleanup_errors.append(wait_error)
+                    raise close_error
+                if rc == 0:
+                    raise  # retain a close error even after successful encoding
+                cleanup_errors.append(close_error)  # encoder diagnostics stay primary
+            else:
+                rc = proc.wait()
             if rc != 0:
                 raise _ffmpeg_failure(ff_err, "video encode", rc,
                                       hint=gpu_hint)
@@ -4440,8 +4470,10 @@ def render(src, dst, detections, cum, bands, fps, pad, mode, preview,
             out.release()
             out = None
             os.replace(tmp_video, dst)
+    except BaseException as error:
+        primary = error
+        raise
     finally:
-        primary = sys.exc_info()[1]
         cleanup_errors.extend(_stop_render_children((proc,)))
         for resource, action in ((cap, "release"), (out, "release"), (ff_err, "close")):
             if resource is not None:
