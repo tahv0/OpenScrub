@@ -200,3 +200,15 @@ def test_epoch_replacement_future_and_authoritative_empty():
     await advance(900);await reply(job());
     await reply({from:0,base:0,len:0,epoch:'E3',reset:'epoch',dropped:0,truncated:0,lines:[]});
     assert.equal(elements.get('log').textContent,'');assert.equal(LOGN,0);assert.equal(LOGE,'E3');""")
+
+
+def test_phase_actions_replacement_releases_only_removed_editor_owner():
+    run_js("""openJob('A');await cycle('done');
+    const actions=elements.get('actions'),cv=document.createElement('canvas');actions.appendChild(cv);
+    let disconnected=0,paused=0;BE.drag={kind:'move'};
+    const video={paused:false,pause(){paused++;this.paused=true}};
+    BE_VIEW={cv,vid:video,editor:BE,observer:{disconnect(){disconnected++}}};
+    await advance(900);await cycle('rendering');
+    assert.equal(BE_VIEW,null);assert.equal(BE.drag,null);
+    assert.equal(disconnected,1);assert.equal(paused,1);
+    """)
