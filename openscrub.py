@@ -4007,11 +4007,28 @@ def render_hdr(src, dst, detections, cum, bands, fps, pad, mode,
     source's color tags (PQ/HLG + BT.2020) carried over. `hvc1` tagging
     keeps QuickTime/Apple players happy. No preview mode — previews use
     the SDR copy."""
+    _geometry_preflight(detections, cum, bands, fps, pad, band_margin, "HDR")
+    return _render_hdr(
+        src, dst, detections, cum, bands, fps, pad, mode, encoder, tags,
+        band_margin, progress_every, cb, mode_map, face_shape, audio_spans,
+        mute_tracks, out_quality, audio_lanes)
+
+
+def _render_hdr(src, dst, detections, cum, bands, fps, pad, mode,
+               encoder, tags, band_margin=25, progress_every=60, cb=None,
+               mode_map=None, face_shape="ellipse", audio_spans=None,
+               mute_tracks=(), out_quality="archival", audio_lanes=None):
+    """render(), but 10-bit end to end: decode the HDR source to raw
+    yuv420p10le, blur the planes in place, encode 10-bit HEVC with the
+    source's color tags (PQ/HLG + BT.2020) carried over. `hvc1` tagging
+    keeps QuickTime/Apple players happy. No preview mode — previews use
+    the SDR copy."""
+    # render_hdr() checks source extents; run_render() checks them before coverage.
+    # Coverage may legally round a positive source box to an empty integer box.
     mode_map = mode_map or {}
     def _mode_for(cat):
         return mode_map.get(cat, mode)
     cb = cb or Callbacks()
-    _geometry_preflight(detections, cum, bands, fps, pad, band_margin, "HDR")
     meta = cv2.VideoCapture(src)
     w, h, total = _geometry_metadata(meta, "HDR")
     meta.release()
@@ -4169,6 +4186,20 @@ def render(src, dst, detections, cum, bands, fps, pad, mode, preview,
            mode_map=None, draw_scores=False, vcodec="h264",
            face_shape="ellipse", audio_spans=None, clip=None,
            mute_tracks=(), out_quality="archival", audio_lanes=None):
+    _geometry_preflight(detections, cum, bands, fps, pad, band_margin, "SDR")
+    return _render(
+        src, dst, detections, cum, bands, fps, pad, mode, preview, encoder,
+        band_margin, progress_every, cb, mode_map, draw_scores, vcodec,
+        face_shape, audio_spans, clip, mute_tracks, out_quality, audio_lanes)
+
+
+def _render(src, dst, detections, cum, bands, fps, pad, mode, preview,
+           encoder="auto", band_margin=25, progress_every=60, cb=None,
+           mode_map=None, draw_scores=False, vcodec="h264",
+           face_shape="ellipse", audio_spans=None, clip=None,
+           mute_tracks=(), out_quality="archival", audio_lanes=None):
+    # render() checks source extents; run_render() checks them before coverage.
+    # Coverage may legally round a positive source box to an empty integer box.
     # mode_map: {category: "blur"|"box"} overrides the global `mode` per
     # category. Lets you black-box the reversible-blur-vulnerable categories
     # (SSN, MRN, account numbers) while blurring faces, in one render.
@@ -4176,7 +4207,6 @@ def render(src, dst, detections, cum, bands, fps, pad, mode, preview,
     def _mode_for(cat):
         return mode_map.get(cat, mode)
     cb = cb or Callbacks()
-    _geometry_preflight(detections, cum, bands, fps, pad, band_margin, "SDR")
     cap = cv2.VideoCapture(src)
     w, h, total = _geometry_metadata(cap, "SDR")
 
@@ -8571,7 +8601,7 @@ def run_render(args, state, cb=None):
         cb.log(f"      output quality: {out_q} (smaller file; archival is "
                "the visually-lossless default)")
     if getattr(args, "hdr_source", None) and not args.preview:
-        render_hdr(args.hdr_source, dst, dets_r, state["cum"],
+        _render_hdr(args.hdr_source, dst, dets_r, state["cum"],
                    state["bands"], state["fps"], pad=args.pad, mode=args.mode,
                    encoder=args.hdr_encoder,
                    tags=getattr(args, "hdr_tags", {}),
@@ -8581,7 +8611,7 @@ def run_render(args, state, cb=None):
                    out_quality=out_q,
                    audio_lanes=getattr(args, "audio_lane_count", None))
     else:
-        render(args.video, dst, dets_r, state["cum"],
+        _render(args.video, dst, dets_r, state["cum"],
                state["bands"],
                state["fps"], pad=args.pad, mode=args.mode, preview=args.preview,
                mode_map=getattr(args, "mode_map", None),

@@ -239,7 +239,7 @@ def test_polygon_fallback_not_preempted_by_primary_guard(hdr):
                                                 (2, -1, (2, None))])
 def test_existing_clip_policy(monkeypatch, start, end, expected):
     observed = []
-    monkeypatch.setattr(o, "render", lambda *a, **kw: observed.append(kw["clip"]))
+    monkeypatch.setattr(o, "_render", lambda *a, **kw: observed.append(kw["clip"]))
     args = SimpleNamespace(output="out", video="in", preview=False, report=None,
                            pad=0, mode="box", encoder="cpu", clip_start=start,
                            clip_end=end)
@@ -259,3 +259,18 @@ def test_band_derived_overflow():
     with pytest.raises(ValueError, match=r"geometry.*test.*band box"):
         o._geometry_bands(1e308, 0, 16, 16, 1e308, "test")
     assert o._geometry_bands(0, -4, 16, 16, -5, "test") == [(0, 17, 16, 16)]
+
+
+@pytest.mark.parametrize("hdr", [False, True])
+@pytest.mark.parametrize("pad", [0, 1])
+def test_run_coverage_rounding_keeps_legal_empty_box(monkeypatch, hdr, pad):
+    observed = []
+    name = "_render_hdr" if hdr else "_render"
+    monkeypatch.setattr(o, name, lambda *a, **kw: observed.append(a[2][0].cbox),
+                        raising=False)
+    d = detection((.1, .1, .2, .2), dense=True, track=1)
+    args = SimpleNamespace(output="out", video="in", preview=False, report=None,
+                           pad=pad, mode="box", encoder="cpu", coverage="concealed",
+                           hdr_source="in" if hdr else None, hdr_encoder="libx265")
+    o.run_render(args, dict(detections=[d], cum=[(0, 0)], bands=[(0, 0)], fps=1, stats={}))
+    assert observed == [(0, 0, 0, 0)]
