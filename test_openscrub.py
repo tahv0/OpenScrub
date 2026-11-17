@@ -3395,6 +3395,8 @@ def test_job_retry_reuses_upload_without_a_new_job():
         # guards: a running job can't be retried; a reaped file can't either
         job["phase"] = "scanning"
         assert client.post(f"/api/jobs/{job['id']}/retry").status_code == 409
+        # A terminal phase alone no longer releases the queued file owner.
+        assert client.post(f"/api/jobs/{job['id']}/cancel").status_code == 200
         job["phase"] = "error"
         os.remove(path)
         assert client.post(f"/api/jobs/{job['id']}/retry").status_code == 410
@@ -3405,12 +3407,15 @@ def test_job_retry_reuses_upload_without_a_new_job():
         assert mine["size"] == 1024
     finally:
         try:
-            w.WORK_Q.get_nowait()
+            ticket = w.WORK_Q.get_nowait()
+            if ticket is not None and len(ticket) > 3:
+                ticket[3].release()
             w.WORK_Q.task_done()
         except Exception:
             pass
         shutil.rmtree(job["dir"], ignore_errors=True)
         w.JOBS.pop(job["id"], None)
+    assert w.FILES.count == 0, "test cleanup leaked job file ownership"
 
 
 def test_upload_refused_when_disk_cannot_fit_it(monkeypatch):
@@ -3600,6 +3605,7 @@ def test_job_video_stream_supports_range():
         r = client.get(f"/api/jobs/{job['id']}/video")
         assert r.status_code == 200
         assert r.headers.get("Accept-Ranges") == "bytes"
+        r.close()  # the unconsumed streaming response still owns its job files
         r2 = client.get(f"/api/jobs/{job['id']}/video",
                         headers={"Range": "bytes=0-99"})
         assert r2.status_code == 206 and len(r2.data) == 100
@@ -3608,6 +3614,7 @@ def test_job_video_stream_supports_range():
     finally:
         shutil.rmtree(job["dir"], ignore_errors=True)
         w.JOBS.pop(job["id"], None)
+    assert w.FILES.count == 0, "test cleanup leaked job file ownership"
 
 
 def test_bad_web_settings_fall_back_and_never_exit(tmp_path, monkeypatch):
@@ -3649,7 +3656,9 @@ def test_web_worker_survives_a_dying_job_and_cancel_clears_the_queue(
     import openscrub_web as w
     while True:                        # start from an empty queue
         try:
-            w.WORK_Q.get_nowait()
+            ticket = w.WORK_Q.get_nowait()
+            if ticket is not None and len(ticket) > 3:
+                ticket[3].release()
             w.WORK_Q.task_done()
         except Exception:
             break
@@ -3694,6 +3703,7 @@ def test_web_worker_survives_a_dying_job_and_cancel_clears_the_queue(
         for j in (a, b, c):
             shutil.rmtree(j["dir"], ignore_errors=True)
             w.JOBS.pop(j["id"], None)
+    assert w.FILES.count == 0, "test cleanup leaked job file ownership"
 
 
 def test_worker_watchdog_fails_orphan_and_restarts(monkeypatch):
@@ -3951,13 +3961,16 @@ def test_server_path_intake_guard_precedes_size_lookup(monkeypatch, tmp_path):
         assert w.JOBS[jid]["size"] == 512
     finally:
         try:
-            w.WORK_Q.get_nowait()
+            ticket = w.WORK_Q.get_nowait()
+            if ticket is not None and len(ticket) > 3:
+                ticket[3].release()
             w.WORK_Q.task_done()
         except Exception:
             pass
         job = w.JOBS.pop(jid, None)
         if job:
             shutil.rmtree(job["dir"], ignore_errors=True)
+    assert w.FILES.count == 0, "test cleanup leaked job file ownership"
 
 
 def _apac_clip(path, apac_first=False):

@@ -31,7 +31,8 @@ def review(tmp_path, monkeypatch):
     path = folder / 'report.json'
     path.write_text(json.dumps(doc, indent=1), encoding='utf-8')
     monkeypatch.setattr(web, 'JOBS', {'synthetic': {'dir': str(folder),
-                        'video': str(video), 'log': []}})
+                        'video': str(video), 'log': [],
+                        'cancel': threading.Event()}})
     monkeypatch.setattr(web, 'JOBS_DIR', str(jobs))
     monkeypatch.setattr(web, 'TOKEN', None)
     monkeypatch.setattr(web, 'vault_locked', lambda: False)

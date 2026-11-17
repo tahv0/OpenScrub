@@ -325,3 +325,23 @@ def test_audio_toggle_back_survives_unacknowledged_save_and_revisit(failure):
     const retry=saveAndRender();if(!sameEdit(calls.at(-1).body.audio,baseline))throw Error('unacknowledged audio toggle-back omitted');
     await reply();await reply();await retry;
     """.replace("FAILURE", json.dumps(failure)))
+
+
+@pytest.mark.parametrize('action', ["delJob('A')", "retryJob('A')", 'vaultDoLock()'])
+@pytest.mark.parametrize('status', [409, 423])
+def test_lifecycle_rejections_keep_current_review_and_drafts(action, status):
+    run_js("""setup();confirm=()=>true;
+    let alerts=[];alert=message=>alerts.push(String(message));vaultStatus=()=>{};
+    const draft=EDITS,view=VIEW_GEN,html=detail.innerHTML;
+    const p=ACTION;const pending=queue.shift();
+    pending.resolve({ok:false,status:STATUS,json:async()=>({error:'busy or locked'}),
+      text:async()=>'busy or locked'});
+    await tick();await p;
+    if(CUR!=='A'||VIEW_GEN!==view||EDITS!==draft||REVIEW_DRAFTS.get('A')!==draft)
+      throw Error('rejected lifecycle request cleared or switched review');
+    if(detail.innerHTML!==html||MAN.length!==1||BE.adds.length!==1||BE.audio.length!==1)
+      throw Error('rejected lifecycle request cleared draft/view');
+    if(alerts.length!==1||!alerts[0].includes('busy or locked')||alerts[0].startsWith('Locked'))
+      throw Error('lifecycle rejection claimed success or omitted failure');
+    if(calls.length!==1)throw Error('rejected lifecycle request started another action');
+    """.replace('ACTION', action).replace('STATUS', str(status)))

@@ -36,11 +36,12 @@ import time
 import uuid
 
 import cv2
-from flask import (Flask, Response, abort, jsonify, redirect, request,
-                   send_file)
+from flask import (Flask, Response, abort, jsonify, redirect, request, g,
+                   send_file, has_request_context)
 
 import openscrub
 from openscrub_internal.reports import atomic_report
+from openscrub_internal.lifetimes import FileOwners, OwnedIterable
 import zones_ui
 
 
@@ -323,7 +324,124 @@ def server_path_error(p):
 OPTIONS_FILE = "options.json"
 
 
+class FilesBusy(RuntimeError):
+    pass
+
+
+def _validate_files_locked(job=None):
+    # Admission always rechecks after waiting for the transition guard.
+    if vault_locked():
+        abort(423, "vault is locked or needs recovery — unlock it to access jobs")
+    if job is not None:
+        with JOBS_LOCK:
+            if not any(current is job for current in JOBS.values()):
+                abort(404)
+        if FILES.initialize(job).closed:
+            abort(409, "job is being deleted")
+
+
+def _source_job_locked(canonical):
+    root = os.path.realpath(JOBS_DIR).rstrip(os.sep) + os.sep
+    if not canonical.startswith(root):
+        return None
+    jid = canonical[len(root):].split(os.sep, 1)[0]
+    with JOBS_LOCK:
+        source_job = JOBS.get(jid)
+    if source_job is None:
+        abort(404, "source job is no longer available")
+    _validate_files_locked(source_job)
+    return source_job
+
+
+def _reserve_files_locked(job=None, work=False, read_source=True):
+    source = (os.path.realpath(job["video"])
+              if read_source and job and job.get("video") else None)
+    source_job = _source_job_locked(source) if source else None
+    lease = FILES.reserve(job, work)
+    lease.source = source
+    if source_job is not None and source_job is not job:
+        lease.related.append(FILES.reserve(source_job))
+    return lease
+
+
+def _request_source_path(path):
+    """Canonical path used for both admission and actual server-path I/O."""
+    canonical = os.path.realpath(path)
+    with VAULT_LOCK:
+        source_job = _source_job_locked(canonical)
+        if source_job is not None:
+            lease = FILES.reserve(source_job)
+            lease.source = canonical
+            if g.get("file_owner") is None:
+                g.file_owner = lease
+            else:
+                g.setdefault("file_children", []).append(lease)
+    return canonical
+
+
+def _job_video(job):
+    # Requests use their admitted source even if scan normalization updates
+    # the live job while a decoder is waiting. Worker/thread callers snapshot
+    # their own lease's source before starting work.
+    if has_request_context():
+        lease = g.get("file_owner")
+        if lease is not None and lease.state is FILES.initialize(job):
+            return lease.source or job.get("video")
+    return job.get("video")
+
+
+def _update_job_source(job, path, owner):
+    canonical = os.path.realpath(path)
+    with VAULT_LOCK:
+        _validate_files_locked(job)
+        source_job = _source_job_locked(canonical)
+        if source_job is not None and source_job is not job:
+            # Reserve before following a changed normalized input. This stays
+            # with the worker through its final report/provenance access.
+            if owner is not None and all(
+                    token.state is not FILES.initialize(source_job)
+                    for token in [owner] + owner.related):
+                owner.related.append(FILES.reserve(source_job))
+        job["video"] = canonical
+
+
+def _own_files(job=None, work=False):
+    with VAULT_LOCK:
+        _validate_files_locked(job)
+        return _reserve_files_locked(job, work)
+
+
+def _files_busy_locked(blocking=True):
+    if not JOBS_LOCK.acquire(blocking=blocking):
+        return True  # shutdown cannot safely inspect the registry now
+    try:
+        return bool(FILES.count or any(j.get("phase") in _ACTIVE_PHASES
+                                       for j in JOBS.values()))
+    finally:
+        JOBS_LOCK.release()
+
+
+def _start_owned_thread(target, lease):
+    def run():
+        try:
+            target()
+        finally:
+            lease.release()
+    try:
+        thread = threading.Thread(target=run, daemon=True)
+        thread.start()
+        return thread
+    except BaseException:
+        lease.release()
+        raise
+
+
 def new_job(video_path, options, name):
+    with _own_files():
+        return _new_job(video_path, options, name)
+
+
+def _new_job(video_path, options, name):
     jid = uuid.uuid4().hex[:12]
     jdir = os.path.join(JOBS_DIR, jid)
     os.makedirs(jdir, exist_ok=True)
@@ -334,6 +452,7 @@ def new_job(video_path, options, name):
         "log": [], "error": None, "output": None, "created": time.time(),
         "cancel": threading.Event(), "stats": {}, "qgen": 0,
     }
+    FILES.initialize(job)
     # keep the job's settings beside its upload: a scan that never finished
     # has no report to recover them from, and a Retry after a restart then
     # ran with DEFAULT settings (all categories) instead of the user's own
@@ -343,8 +462,11 @@ def new_job(video_path, options, name):
             json.dump(options, f)
     except (OSError, TypeError, ValueError):
         pass
-    with JOBS_LOCK:
-        JOBS[jid] = job
+    with VAULT_LOCK:
+        with JOBS_LOCK:
+            JOBS[jid] = job
+        if has_request_context() and g.get("file_owner") is not None:
+            g.setdefault("file_children", []).append(FILES.reserve(job, work=True))
     return job
 
 
@@ -625,15 +747,37 @@ WORKER = {"current": None, "thread": None}
 _ACTIVE_PHASES = ("queued", "scanning", "rendering", "queued_render")
 
 
-def enqueue(job, action):
-    """Queue a job action. Each enqueue bumps the job's generation, and the
-    worker skips any queue entry whose generation is stale — so cancelling
-    a queued job (which bumps it too) really removes it from the line, and
-    a Retry after a Cancel can't run the scan twice."""
+def _reserve_queue_locked(job, action):
+    _validate_files_locked(job)
+    lease = _reserve_files_locked(job, work=True)
     with JOBS_LOCK:
         job["qgen"] = job.get("qgen", 0) + 1
         gen = job["qgen"]
-    WORK_Q.put((job["id"], action, gen))
+        FILES.initialize(job).queued[gen] = lease
+    return job["id"], action, gen, lease
+
+
+def enqueue(job, action, ticket=None):
+    """Reserve before queue submission. Cancel and pickup share ticket identity.
+
+    A caller changing phase under VAULT_LOCK supplies its reserved ticket after
+    releasing the guard. A cancelled ticket can still reach the queue, but its
+    idempotently released lease and old generation prevent it running a retry.
+    """
+    if ticket is None:
+        with VAULT_LOCK:
+            ticket = _reserve_queue_locked(job, action)
+    try:
+        WORK_Q.put(ticket)
+    except BaseException:
+        with VAULT_LOCK:
+            FILES.initialize(job).queued.pop(ticket[2], None)
+            ticket[3].release_locked()
+            if job.get("qgen") == ticket[2]:
+                job["phase"] = "error"
+                job["error"] = "could not queue job work"
+        raise
+
 
 
 def worker():
@@ -652,45 +796,71 @@ def worker():
         if item is None:               # explicit stop (tests); the watchdog
             WORK_Q.task_done()         # starts a fresh worker in production
             return
+        lease = None
         try:
             jid, action = item[0], item[1]
             gen = item[2] if len(item) > 2 else None
-            with JOBS_LOCK:
-                job = JOBS.get(jid)
-                stale = (job is None
-                         or (gen is not None and gen != job.get("qgen", 0))
-                         or job.get("phase") == "cancelled")
-                if not stale:
-                    WORKER["current"] = jid
+            lease = item[3] if len(item) > 3 else None
+            with VAULT_LOCK:
+                with JOBS_LOCK:
+                    job = JOBS.get(jid)
+                    stale = (job is None
+                             or (gen is not None and gen != job.get("qgen", 0))
+                             or job.get("phase") == "cancelled"
+                             or (lease is not None and (lease.released
+                                 or FILES.initialize(job) is not lease.state))
+                             or FILES.initialize(job).closed)
+                    if job is not None:
+                        FILES.initialize(job).queued.pop(gen, None)
+                    if not stale:
+                        # Cancel and this handoff share the same guard. Once
+                        # removed from queued, only the worker releases it.
+                        WORKER["current"] = jid
+                if not stale and lease is None:  # old queue entries
+                    _validate_files_locked(job)
+                    lease = _reserve_files_locked(job, work=True)
             if not stale:
-                _run_job(job, action)
+                _run_job(job, action, lease)
         except BaseException as e:     # belt and braces: never die
             print(f"[web] worker: unexpected {type(e).__name__}: {e}",
                   flush=True)
         finally:
+            if lease is not None:
+                lease.release()
             WORKER["current"] = None
             WORK_Q.task_done()
 
 
-def _run_job(job, action):
+def _run_job(job, action, owner=None):
     jid = job["id"]
     cb = WebCallbacks(job)
+    source = owner.source if owner is not None else job["video"]
     try:
         if action == "scan":
             job["phase"] = "scanning"
             job["log"].append("— scan started —")
-            args = build_args(job)
+            args = build_args(dict(job, video=source))
             state = openscrub.run_scan(args, cb)
             openscrub.write_report(os.path.join(job["dir"], "report.json"),
                                   args, state)
             job["stats"] = state["stats"]
-            def _pregen(jid=jid):
+            try:
+                prov = _load_job_report(job).get("provenance", {})
+                if (prov.get("vfr_normalized")
+                        and os.path.exists(prov.get("input", ""))):
+                    _update_job_source(job, prov["input"], owner)
+                    job["log"].append(
+                        "using CFR-normalized file for previews/thumbnails")
+            except Exception:
+                pass
+            thumbnail_owner = _own_files(job, work=True)
+            def _pregen(jb=job, video=thumbnail_owner.source):
                 """One pass through the video with a single decoder:
                 thumbnails come out in seconds instead of minutes.
                 Sorting by reference time keeps seeks short and forward-
                 only, which is what codecs are fast at."""
+                cap = None
                 try:
-                    jb = JOBS.get(jid)
                     doc = _load_job_report(jb)
                     rs = doc["render_state"]
                     todo = []
@@ -702,7 +872,7 @@ def _run_job(job, action):
                                        d["t_start"]), d["t_end"])
                         todo.append((tref, k, d, cch))
                     todo.sort()
-                    cap = cv2.VideoCapture(jb["video"])
+                    cap = cv2.VideoCapture(video)
                     cur = -1
                     frame = None
                     for tref, k, d, cch in todo:
@@ -744,21 +914,14 @@ def _run_job(job, action):
                                       (0, 0, 255), 2)
                         cv2.imwrite(cch, crop,
                                     [cv2.IMWRITE_JPEG_QUALITY, 80])
-                    cap.release()
                     jb["log"].append("thumbnails pre-generated "
                                      f"({len(todo)})")
                 except Exception:
                     pass
-            threading.Thread(target=_pregen, daemon=True).start()
-            try:
-                prov = _load_job_report(job).get("provenance", {})
-                if (prov.get("vfr_normalized")
-                        and os.path.exists(prov.get("input", ""))):
-                    job["video"] = prov["input"]
-                    job["log"].append(
-                        "using CFR-normalized file for previews/thumbnails")
-            except Exception:
-                pass
+                finally:
+                    if cap is not None:
+                        cap.release()
+            _start_owned_thread(_pregen, thumbnail_owner)
             if job["options"].get("skip_review"):
                 job["log"].append("review skipped — rendering all detections")
                 job["phase"] = "queued_render"
@@ -769,7 +932,7 @@ def _run_job(job, action):
             job["eta"] = None
         elif action == "render":
             job["phase"] = "rendering"
-            args = build_args(job, for_render=True)
+            args = build_args(dict(job, video=source), for_render=True)
             res = openscrub.run_pipeline(args, cb)
             job["output"] = res["output"]
             # refresh report with output hash
@@ -856,11 +1019,46 @@ def _touch_activity():
 
 @app.before_request
 def enforce_vault_lock():
-    """While the vault is locked, every job operation is refused — the
-    files are ciphertext, so this fails closed rather than half-working."""
-    if request.path.startswith("/api/jobs") and vault_locked():
-        abort(423, "vault is locked — unlock it (Encryption panel) to "
-                   "access jobs")
+    """Admit file work before intake parsing or a view captures a job."""
+    if request.path.startswith("/api/jobs"):
+        # Deletion closes admissions itself, without becoming its own busy owner.
+        if request.endpoint == "job_delete":
+            with VAULT_LOCK:
+                _validate_files_locked()
+            return
+        with VAULT_LOCK:
+            jid = (request.view_args or {}).get("jid")
+            job = JOBS.get(jid) if jid is not None else None
+            if jid is not None and job is None:
+                abort(404)
+            _validate_files_locked(job)
+            read_source = request.endpoint in {
+                "job_retry", "job_render", "job_track_object", "job_mediainfo",
+                "job_detframe", "job_thumb", "job_frame_at", "job_video_stream"}
+            g.file_owner = _reserve_files_locked(job, read_source=read_source)
+
+
+@app.after_request
+def _finish_file_response(response):
+    for child in g.pop("file_children", []):
+        child.release()
+    lease = g.pop("file_owner", None)
+    if lease is not None:
+        if response.direct_passthrough:
+            response.response = OwnedIterable(response.response, lease)
+        else:
+            lease.release()  # detached JSON/JPEG bytes no longer read job files
+    return response
+
+
+@app.teardown_request
+def _release_failed_request(error):
+    for child in g.pop("file_children", []):
+        child.release()
+    lease = g.pop("file_owner", None)
+    if lease is not None:
+        lease.release()
+
 
 
 @app.before_request
@@ -924,7 +1122,7 @@ def create_job():
             enqueue(job, "scan")
             jobs.append(job["id"])
     elif request.form.get("server_path"):
-        p = os.path.realpath(request.form["server_path"].strip())
+        p = _request_source_path(request.form["server_path"].strip())
         err = server_path_error(p)
         if err:
             return jsonify({"error": err}), 400
@@ -953,9 +1151,18 @@ def create_job():
 
 @app.route("/api/jobs")
 def list_jobs():
-    with JOBS_LOCK:
-        js = sorted(JOBS.values(), key=lambda j: -j["created"])
-    return jsonify([job_public(j) for j in js])
+    with VAULT_LOCK:
+        _validate_files_locked()
+        with JOBS_LOCK:
+            js = sorted(JOBS.values(), key=lambda j: -j["created"])
+        leases = [FILES.reserve(j) for j in js if not FILES.initialize(j).closed]
+        js = [j for j in js if not FILES.initialize(j).closed]
+    try:
+        return jsonify([job_public(j) for j in js])
+    finally:
+        for lease in leases:
+            lease.release()
+
 
 
 DELETE_MARKER = ".delete_pending"
@@ -992,41 +1199,51 @@ def job_delete(jid):
     job from the list FIRST and then failed, leaving an orphaned folder
     the UI could no longer reach, which rose from the dead as a zombie
     review job at the next restart."""
-    with JOBS_LOCK:
-        job = JOBS.get(jid)
-        if job is None:
-            abort(404)
-        if job.get("phase") in ("queued", "scanning", "rendering",
-                                "queued_render"):
-            abort(409, "job is queued or running — cancel it first")
-    if _reap_job_dir(job["dir"], jid):
+    job = JOBS.get(jid) or abort(404)
+    return jsonify(_delete_job(job))
+
+
+def _delete_job(job):
+    jid = job["id"]
+    with VAULT_LOCK:
+        _validate_files_locked(job)
+        state = FILES.initialize(job)
+        if state.count or job.get("phase") in _ACTIVE_PHASES:
+            abort(409, "job files are still in use — wait for cleanup")
+        state.closed = True
+        lease = FILES.reserve()  # deletion owns the tree, not an admitted job
+    with lease:
+        if _reap_job_dir(job["dir"], jid):
+            with JOBS_LOCK:
+                JOBS.pop(jid, None)
+            return {"ok": True}
+        try:
+            with open(os.path.join(job["dir"], DELETE_MARKER), "w") as f:
+                f.write(str(time.time()))
+        except OSError:
+            pass
         with JOBS_LOCK:
             JOBS.pop(jid, None)
-        return jsonify({"ok": True})
-    # couldn't remove everything now: mark the dir so every future sweep
-    # (background retries below, startup, retention) knows it is condemned,
-    # take it out of the UI, and keep trying quietly
-    try:
-        with open(os.path.join(job["dir"], DELETE_MARKER), "w") as f:
-            f.write(str(time.time()))
-    except OSError:
-        pass
-    with JOBS_LOCK:
-        JOBS.pop(jid, None)
 
     def _retry():
         for _ in range(10):
             time.sleep(30)
-            if not os.path.isdir(job["dir"]):
-                return
-            if _reap_job_dir(job["dir"], jid, retries=1):
-                print(f"[web] job {jid} delete completed on retry",
-                      flush=True)
-                return
+            try:
+                # A retry does not keep the store busy during its sleep. If
+                # locked, leave the marker for unlock/startup/retention.
+                retry_lease = _own_files()
+            except Exception:
+                continue
+            with retry_lease:
+                if not os.path.isdir(job["dir"]):
+                    return
+                if _reap_job_dir(job["dir"], jid, retries=1):
+                    print(f"[web] job {jid} delete completed on retry", flush=True)
+                    return
     threading.Thread(target=_retry, daemon=True).start()
-    return jsonify({"ok": True, "pending": True,
-                    "note": "some files were still in use; removal will "
-                            "complete automatically"})
+    return {"ok": True, "pending": True,
+            "note": "some files were still in use; removal will complete automatically"}
+
 
 
 @app.route("/api/jobs/<jid>/retry", methods=["POST"])
@@ -1035,14 +1252,18 @@ def job_retry(jid):
     already on the server. Before this existed, the only path after an
     error was Start scan — which uploaded the same multi-GB file into a
     fresh job dir on every attempt until the disk filled (issue #16)."""
-    with JOBS_LOCK:
+    with VAULT_LOCK:
         job = JOBS.get(jid)
         if job is None:
             abort(404)
+        _validate_files_locked(job)
+        if FILES.initialize(job).work:
+            return jsonify({"error": "job work is still cleaning up"}), 409
         if job["phase"] not in ("error", "cancelled"):
             return jsonify({"error": "only a failed or cancelled job can "
                                      "be retried"}), 409
-        if not (job.get("video") and os.path.exists(job["video"])):
+        video = _job_video(job)
+        if not (video and os.path.exists(video)):
             return jsonify({"error": "the job's video file is no longer "
                                      "on the server — start a new "
                                      "scan"}), 410
@@ -1054,7 +1275,8 @@ def job_retry(jid):
         job["phase"] = "queued"
         job["log"].append("— retrying scan (reusing the file already on "
                           "the server — nothing is re-uploaded) —")
-    enqueue(job, "scan")
+        ticket = _reserve_queue_locked(job, "scan")
+    enqueue(job, "scan", ticket)
     return jsonify({"ok": True})
 
 
@@ -1090,9 +1312,13 @@ def job_cancel(jid):
     could never be cancelled (or deleted: delete refuses active jobs)."""
     job = JOBS.get(jid) or abort(404)
     job["cancel"].set()
-    with JOBS_LOCK:
+    with VAULT_LOCK:
+        _validate_files_locked(job)
         if (WORKER.get("current") != jid
                 and job.get("phase") in _ACTIVE_PHASES):
+            for lease in FILES.initialize(job).queued.values():
+                lease.release_locked()
+            FILES.initialize(job).queued.clear()
             job["qgen"] = job.get("qgen", 0) + 1   # void its queue entry
             job["phase"] = "cancelled"
             job["error"] = "cancelled by user"
@@ -1107,12 +1333,15 @@ def _load_job_report(job):
 
 
 def _frame_at(job, t, rstate):
-    cap = cv2.VideoCapture(job["video"])
-    fps = rstate["fps"]
-    cap.set(cv2.CAP_PROP_POS_FRAMES, int(t * fps))
-    ok, frame = cap.read()
-    cap.release()
-    return frame if ok else None
+    cap = cv2.VideoCapture(_job_video(job))
+    try:
+        fps = rstate["fps"]
+        cap.set(cv2.CAP_PROP_POS_FRAMES, int(t * fps))
+        ok, frame = cap.read()
+        return frame if ok else None
+    finally:
+        cap.release()
+
 
 
 @app.route("/api/jobs/<jid>/mediainfo")
@@ -1120,12 +1349,14 @@ def job_mediainfo(jid):
     """Basic video properties straight from the file — available in every
     job phase, no scan report required."""
     job = JOBS.get(jid) or abort(404)
-    cap = cv2.VideoCapture(job["video"])
-    fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
-    n = cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0
-    w_ = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    h_ = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    cap.release()
+    cap = cv2.VideoCapture(_job_video(job))
+    try:
+        fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+        n = cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0
+        w_ = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        h_ = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    finally:
+        cap.release()
     return jsonify({"duration": n / fps if fps else 0, "fps": fps,
                     "width": w_, "height": h_})
 
@@ -1254,21 +1485,23 @@ def job_frame_at(jid):
     job = JOBS.get(jid) or abort(404)
     t = max(0.0, float(request.args.get("t", 0)))
     path = (job["output"] if request.args.get("src") == "output"
-            and job.get("output") else job["video"])
+            and job.get("output") else _job_video(job))
     cap = cv2.VideoCapture(path)
     # seek by TIMESTAMP, not frame index: the original upload is often VFR
     # (iPhone), where index = t*fps drifts out of sync with the CFR output
     # and can overshoot the file entirely (broken compare pane)
-    frame = None
-    for tt in (t, max(0.0, t - 0.34), max(0.0, t - 1.0), 0.0):
-        cap.set(cv2.CAP_PROP_POS_MSEC, tt * 1000)
-        ok, fr = cap.read()
-        if ok:
-            frame = fr
-            break   # walk back instead of 404ing at the very end of the file
-        if tt == 0.0:
-            break
-    cap.release()
+    try:
+        frame = None
+        for tt in (t, max(0.0, t - 0.34), max(0.0, t - 1.0), 0.0):
+            cap.set(cv2.CAP_PROP_POS_MSEC, tt * 1000)
+            ok, fr = cap.read()
+            if ok:
+                frame = fr
+                break   # walk back instead of 404ing at the very end of the file
+            if tt == 0.0:
+                break
+    finally:
+        cap.release()
     if frame is None:
         abort(404)
     ok, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 82])
@@ -1283,9 +1516,10 @@ def job_video_stream(jid):
     reads — for HDR/VFR jobs that is the normalized SDR scan copy, which
     every browser can decode."""
     job = JOBS.get(jid) or abort(404)
-    if not (job.get("video") and os.path.exists(job["video"])):
+    video = _job_video(job)
+    if not (video and os.path.exists(video)):
         abort(404)
-    return send_file(job["video"], conditional=True)
+    return send_file(video, conditional=True)
 
 
 @app.route("/api/jobs/<jid>/detections", methods=["POST"])
@@ -1354,8 +1588,6 @@ def job_track_object(jid):
     review shows one card (with fan-out) and the render blurs it wherever
     it went. Runs in a background thread; poll /track_status."""
     job = JOBS.get(jid) or abort(404)
-    if job.get("trackbg", {}).get("state") == "running":
-        return jsonify({"error": "tracking already in progress"}), 409
     p = request.get_json(force=True)
     try:
         box = [float(v) for v in p["box"]]
@@ -1365,13 +1597,27 @@ def job_track_object(jid):
     if len(box) != 4 or not (t1 > t0 >= 0) or not (t0 <= t_ref <= t1):
         abort(400)
     st = {"state": "running", "added": 0, "error": None}
-    job["trackbg"] = st
+    with VAULT_LOCK:
+        _validate_files_locked(job)
+        files = FILES.initialize(job)
+        if ((files.tracker is not None and not files.tracker.released)
+                or job.get("trackbg", {}).get("state") == "running"):
+            return jsonify({"error": "tracking already in progress"}), 409
+        if job["cancel"].is_set():
+            if files.work:
+                return jsonify({"error": "cancelled job work is still cleaning up"}), 409
+            job["cancel"].clear()
+        lease = _reserve_files_locked(job, work=True)
+        files.tracker = lease
+        job["trackbg"] = st
 
     def _run():
         try:
             class L(openscrub.Callbacks):
                 def log(self, m):
                     job["log"].append(m)
+                def cancelled(self):
+                    return job["cancel"].is_set()
             det = None
             try:
                 # same person-model resolution the scan uses: the panel
@@ -1385,7 +1631,7 @@ def job_track_object(jid):
             except Exception:
                 det = None
             samples = openscrub.track_manual_region(
-                job["video"], box, t_ref, t0, t1, cb=L(), person_det=det)
+                lease.source, box, t_ref, t0, t1, cb=L(), person_det=det)
             if not samples:
                 st.update(state="done", added=0,
                           error="could not track that region — try a "
@@ -1432,7 +1678,11 @@ def job_track_object(jid):
         except Exception as e:
             st.update(state="done", added=0, error=str(e))
 
-    threading.Thread(target=_run, daemon=True).start()
+    try:
+        _start_owned_thread(_run, lease)
+    except BaseException:
+        st.update(state="done", added=0, error="tracking could not start")
+        raise
     return jsonify({"ok": True})
 
 
@@ -1689,14 +1939,19 @@ def allowlist():
 @app.route("/api/jobs/<jid>/render", methods=["POST"])
 def job_render(jid):
     job = JOBS.get(jid) or abort(404)
-    if job["phase"] in ("rendering", "queued_render"):
-        return jsonify({"ok": True, "note": "render already in progress"})
-    if job["phase"] not in ("review", "done", "error", "cancelled"):
-        return jsonify({"error": f"cannot render from phase {job['phase']}"}), 400
-    job["phase"] = "queued_render"
-    job["cancel"].clear()
-    job["error"] = None
-    enqueue(job, "render")
+    with VAULT_LOCK:
+        _validate_files_locked(job)
+        if job["phase"] in ("rendering", "queued_render"):
+            return jsonify({"ok": True, "note": "render already in progress"})
+        if FILES.initialize(job).work:
+            return jsonify({"error": "job work is still cleaning up"}), 409
+        if job["phase"] not in ("review", "done", "error", "cancelled"):
+            return jsonify({"error": f"cannot render from phase {job['phase']}"}), 400
+        job["phase"] = "queued_render"
+        job["cancel"].clear()
+        job["error"] = None
+        ticket = _reserve_queue_locked(job, "render")
+    enqueue(job, "render", ticket)
     return jsonify({"ok": True})
 
 
@@ -3312,6 +3567,7 @@ import openscrub_vault as vault
 
 VAULT = {"key": None}          # data key while unlocked; None = locked
 VAULT_LOCK = threading.Lock()
+FILES = FileOwners(VAULT_LOCK)
 WEB_SETTINGS_PATH = os.path.join(_data_root(), "web_settings.json")
 LAST_ACTIVITY = {"t": time.time()}
 
@@ -3341,12 +3597,6 @@ def _autolock_watcher():
                 continue
             if time.time() - LAST_ACTIVITY["t"] < mins * 60:
                 continue
-            with JOBS_LOCK:
-                busy = any(j.get("phase") in ("queued", "scanning",
-                                              "rendering", "queued_render")
-                           for j in JOBS.values())
-            if busy:
-                continue
             n = _vault_lock_now()
             print("vault: auto-locked after %d idle minute(s) — "
                   "%d file(s) encrypted" % (mins, n))
@@ -3359,35 +3609,55 @@ def vault_enabled():
 
 
 def vault_locked():
-    return vault_enabled() and VAULT["key"] is None
+    return VAULT.get("closed", False) or (vault_enabled() and VAULT["key"] is None)
 
 
-def _vault_lock_now():
-    """Encrypt the job store and forget the key. Returns files encrypted."""
-    with VAULT_LOCK:
-        key = VAULT["key"]
-        if key is None:
-            return 0
+def _vault_lock_locked(blocking_jobs=True):
+    if _files_busy_locked(blocking=blocking_jobs):
+        raise FilesBusy("job files are still in use")
+    key = VAULT["key"]
+    if key is None:
+        return 0
+    VAULT["closed"] = True
+    try:
         n = vault.encrypt_tree(key, JOBS_DIR)
-        VAULT["key"] = None
-        return n
+    except BaseException:
+        VAULT["error"] = "Encryption failed; unlock to recover before accessing jobs."
+        raise
+    VAULT["key"] = None
+    VAULT["error"] = None
+    return n
+
+
+def _vault_lock_now(blocking=True):
+    """One guarded busy/admission decision, also used by auto-lock/shutdown."""
+    if not VAULT_LOCK.acquire(blocking=blocking):
+        raise FilesBusy("a lifecycle transition is in progress")
+    try:
+        return _vault_lock_locked(blocking_jobs=blocking)
+    finally:
+        VAULT_LOCK.release()
 
 
 def _vault_lock_atexit():
     try:
         if vault_enabled() and VAULT["key"] is not None:
-            busy = any(j.get("phase") in ("queued", "scanning", "rendering",
-                                          "queued_render") for j in JOBS.values())
-            if busy:
-                print("vault: NOT locking on exit — a job was still running; "
-                      "job files remain in plaintext. Restart and lock.")
-                return
-            n = _vault_lock_now()
+            # A Python signal can run while this very thread owns VAULT_LOCK.
+            # Never join or wait for it; timeout is not permission to encrypt.
+            # If the signal interrupted JOBS_LOCK itself, do not even
+            # attempt VAULT_LOCK in the inverse order. Release this probe
+            # before taking the normal VAULT_LOCK -> JOBS_LOCK path.
+            if not JOBS_LOCK.acquire(blocking=False):
+                raise FilesBusy("job registry is in use")
+            JOBS_LOCK.release()
+            n = _vault_lock_now(blocking=False)
             print("vault: locked on shutdown (%d file(s) encrypted)" % n)
-    except Exception as e:
-        # never die silently here: a swallowed error means plaintext on disk
-        print("vault: LOCK ON SHUTDOWN FAILED (%s) — job files may remain "
-              "in plaintext. Restart the server and use the Lock button." % e)
+    except FilesBusy:
+        print("vault: NOT locking on exit — job files or a lifecycle transition "
+              "are still active; files may remain in plaintext. Restart and lock.")
+    except Exception:
+        print("vault: LOCK ON SHUTDOWN FAILED — job files may remain in plaintext. "
+              "Restart the server and use the Lock button.")
 
 
 @app.route("/api/vault")
@@ -3397,6 +3667,7 @@ def vault_status():
         enc, plain = vault.tree_locked_state(JOBS_DIR)
     return jsonify({"enabled": vault_enabled(), "locked": vault_locked(),
                     "encrypted_files": enc, "plaintext_files": plain,
+                    "error": VAULT.get("error"),
                     "autolock_min": int(_web_settings().get(
                         "vault_autolock_min", 0) or 0)})
 
@@ -3409,7 +3680,19 @@ def vault_setup():
     if len(pw) < 8:
         abort(400, "password must be at least 8 characters")
     with VAULT_LOCK:
-        VAULT["key"] = vault.create_keystore(_data_root(), pw)
+        if vault_enabled():
+            abort(409, "vault already set up")
+        if _files_busy_locked():
+            abort(409, "job files are still in use")
+        VAULT["closed"] = True
+        try:
+            key = vault.create_keystore(_data_root(), pw)
+        except BaseException:
+            VAULT["error"] = "Vault setup failed; retry setup or unlock to recover."
+            raise
+        VAULT["key"] = key
+        VAULT["closed"] = False
+        VAULT["error"] = None
     return jsonify({"ok": True, "note":
                     "Encryption enabled. Jobs encrypt when you lock or "
                     "shut down. LOSING THIS PASSWORD MAKES THE ENCRYPTED "
@@ -3426,9 +3709,18 @@ def vault_unlock():
     except ValueError:
         abort(403, "wrong password")
     with VAULT_LOCK:
+        if _files_busy_locked():
+            abort(409, "job files are still in use")
+        VAULT["closed"] = True
+        try:
+            n = vault.decrypt_tree(key, JOBS_DIR)
+            _rehydrate_jobs()  # registration is part of the closed transition
+        except BaseException:
+            VAULT["error"] = "Decryption or recovery failed; unlock again to recover."
+            raise
         VAULT["key"] = key
-        n = vault.decrypt_tree(key, JOBS_DIR)
-    rehydrate_jobs()               # pick up jobs that were locked at startup
+        VAULT["closed"] = False
+        VAULT["error"] = None
     return jsonify({"ok": True, "decrypted": n})
 
 
@@ -3620,13 +3912,10 @@ def vault_autolock():
 
 @app.route("/api/vault/lock", methods=["POST"])
 def vault_lock_route():
-    with JOBS_LOCK:
-        busy = any(j.get("phase") in ("queued", "scanning", "rendering",
-                                      "queued_render")
-                   for j in JOBS.values())
-    if busy:
-        abort(409, "a job is queued or running — lock after it finishes")
-    n = _vault_lock_now()
+    try:
+        n = _vault_lock_now()
+    except FilesBusy:
+        abort(409, "job files are still in use — lock after cleanup finishes")
     return jsonify({"ok": True, "encrypted": n})
 
 
@@ -3705,7 +3994,7 @@ def server_video():
     request data: the same server_path_error confinement that gates job
     intake runs BEFORE any filesystem access. conditional=True gives Range
     support so the <video> element can seek/scrub."""
-    p = os.path.realpath(request.args.get("path", ""))
+    p = _request_source_path(request.args.get("path", ""))
     err = server_path_error(p)
     if err:
         return jsonify({"error": err}), 400
@@ -3727,7 +4016,7 @@ def waveform():
     editor's waveform lanes. Same confinement as every server-path route:
     server_path_error runs first, and the containment guard is repeated
     inline in the CodeQL-recognized shape before any use."""
-    p = os.path.realpath(request.args.get("path", ""))
+    p = _request_source_path(request.args.get("path", ""))
     err = server_path_error(p)
     if err:
         return jsonify({"error": err}), 400
@@ -3845,6 +4134,13 @@ def lan_ip():
 
 
 def rehydrate_jobs():
+    if vault_locked():
+        return
+    with _own_files():
+        return _rehydrate_jobs()
+
+
+def _rehydrate_jobs():
     """Re-register jobs found on disk after a restart. A job with a report
     is a reviewable job; one with an output file is a finished one — either
     way the person's work survives the server going down."""
@@ -3903,6 +4199,7 @@ def rehydrate_jobs():
                 "output": None, "created": os.path.getmtime(jdir),
                 "cancel": threading.Event(), "stats": {},
             }
+            FILES.initialize(job)
             with JOBS_LOCK:
                 JOBS[jid] = job
             n += 1
@@ -3937,6 +4234,7 @@ def rehydrate_jobs():
                 job["size"] = os.path.getsize(orig)
             except OSError:
                 pass
+            FILES.initialize(job)
             with JOBS_LOCK:
                 JOBS[jid] = job
             n += 1
@@ -3947,19 +4245,28 @@ def rehydrate_jobs():
 
 
 def retention_sweep(days):
-    import shutil as _sh
-    cutoff = time.time() - days * 86400
-    for jid in os.listdir(JOBS_DIR):
-        p = os.path.join(JOBS_DIR, jid)
-        if not os.path.isdir(p):
-            continue
-        if os.path.exists(os.path.join(p, DELETE_MARKER)):
-            _reap_job_dir(p, jid, retries=1)     # condemned: age-independent
-            continue
-        if os.path.getmtime(p) < cutoff:
-            _sh.rmtree(p, ignore_errors=True)
-            with JOBS_LOCK:
-                JOBS.pop(jid, None)
+    try:
+        lease = _own_files()
+    except Exception:  # locked/failed transition: defer until access is ready
+        return
+    with lease:
+        cutoff = time.time() - days * 86400
+        for jid in os.listdir(JOBS_DIR):
+            p = os.path.join(JOBS_DIR, jid)
+            if not os.path.isdir(p):
+                continue
+            if os.path.exists(os.path.join(p, DELETE_MARKER)):
+                _reap_job_dir(p, jid, retries=1)
+                continue
+            if os.path.getmtime(p) < cutoff:
+                job = JOBS.get(jid)
+                if job is not None:
+                    try:
+                        _delete_job(job)
+                    except Exception:  # owned jobs stay registered for next sweep
+                        continue
+                else:
+                    _reap_job_dir(p, jid, retries=1)
 
 
 def retention_loop(days):

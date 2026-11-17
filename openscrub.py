@@ -2465,259 +2465,255 @@ def track_manual_region(video, box, t_ref, t0, t1, cb=None,
     boxes, one per step_frames. Empty if the video/box is unusable."""
     log = (cb.log if cb else print)
     cap = cv2.VideoCapture(video)
-    if not cap.isOpened():
-        return []
-    fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
-    step = max(1, int(step_frames)) / fps
-    t_ref = min(max(t_ref, t0), t1)
-    W = cap.get(cv2.CAP_PROP_FRAME_WIDTH) or 0
-    H = cap.get(cv2.CAP_PROP_FRAME_HEIGHT) or 0
-
-    def _frame(t):
-        return _grab_frame(cap, t, fps)
-
-    def _left_frame(b):
-        # the object is gone only when the box CENTER walks off-screen —
-        # a box mid-dip can balloon to touch every edge while the object
-        # is still dead centre (seen on real footage)
-        cx, cy = (b[0] + b[2]) / 2, (b[1] + b[3]) / 2
-        return not (0.02 * W < cx < 0.98 * W and 0.02 * H < cy < 0.98 * H)
-
-    if (box[2] - box[0]) * scale < 8 or (box[3] - box[1]) * scale < 8:
-        cap.release()
-        log("      track: region too small to track reliably")
-        return []
-
-    if person_det is not None:
-        # a drawn box that CONTAINS A PERSON gets detector-driven
-        # tracking: body-tight boxes + silhouettes every frame, immune
-        # to the scale/appearance drift that plagues generic trackers
-        try:
-            # detector masks are repainted at every sample; at the default
-            # 2-frame cadence the outline visibly STEPS/flickers at half
-            # the frame rate (real footage) — detect EVERY frame instead
-            ps = _track_person_dense(video, box, t_ref, t0, t1,
-                                     person_det, log, step_frames=1,
-                                     cancelled=(cb.cancelled if cb else None))
-        except Exception as e:
-            log("      track: person-detector path failed (%s) — using "
-                "the generic tracker" % e)
-            ps = []
-        if ps:
-            live = sum(1 for x in ps if x[2] > 0.0) / float(len(ps))
-            if live >= 0.5:
-                cap.release()
-                return ps
-            # the detector barely sees this object (marginal class, odd
-            # angle) — frozen coverage would win over live tracking.
-            # The generic tracker follows pixels and will do better.
-            log("      track: the detector only saw the object in %d%% "
-                "of frames — using the generic tracker instead"
-                % round(live * 100))
-        else:
-            log("      track: nothing recognizable under the drawn box — "
-                "tracking the region as a generic object")
-
-    samples = [(t_ref, (float(box[0]), float(box[1]),
-                        float(box[2]), float(box[3])), 1.0)]
-    _last_log = time.time()
-
-    def _hold_rest(t, cur, direction, out):
-        """Fail-closed coverage: freeze the box and emit it to the window
-        edge (unless the object left the frame — nothing to protect)."""
-        if _left_frame(cur):
-            log("      track: object left the frame at t=%.1fs — "
-                "coverage ends there" % t)
-            return
-        log("      track: LOST the object at t=%.1fs — holding the last "
-            "box to the window edge (review and trim if needed)" % t)
-        t2 = t + direction * step
-        while t0 - 1e-6 <= t2 <= t1 + 1e-6:
-            out.append((t2, (cur[0], cur[1], cur[2], cur[3]), 0.0))
-            t2 += direction * step
-
-    vit = _vittrack_factory(log)
-    if vit is not None:
-        fr0 = None
-        for dt in (0.0, 0.066, -0.066, 0.33, -0.33, 1.0):
-            ts = t_ref + dt
-            if ts < t0 - 1e-6 or ts > t1 + 1e-6:
-                continue
-            fr0 = _frame(ts)
-            if fr0 is not None:
-                t_ref = ts
-                break
-        if fr0 is None:
-            log("      track: could not READ the video near t=%.1fs — "
-                "cannot start tracking there (is the clip shorter than "
-                "expected?)" % t_ref)
-            cap.release()
+    try:
+        if not cap.isOpened():
             return []
-        sm0 = cv2.resize(fr0, None, fx=scale, fy=scale)
-        for direction in (1, -1):
-            trk = vit()
-            trk.init(sm0, (int(box[0] * scale), int(box[1] * scale),
-                           max(8, int((box[2] - box[0]) * scale)),
-                           max(8, int((box[3] - box[1]) * scale))))
-            cur = [float(v) for v in box]
-            held = False
-            t = t_ref
-            if direction == 1:  # forward: sequential reads, no re-seeking
-                # robust prime: positions the decoder just past t_ref's
-                # frame even when random POS_MSEC seek fails on this file
-                _grab_frame(cap, t_ref, fps)
-                rev = None
+        fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+        step = max(1, int(step_frames)) / fps
+        t_ref = min(max(t_ref, t0), t1)
+        W = cap.get(cv2.CAP_PROP_FRAME_WIDTH) or 0
+        H = cap.get(cv2.CAP_PROP_FRAME_HEIGHT) or 0
+
+        def _frame(t):
+            return _grab_frame(cap, t, fps)
+
+        def _left_frame(b):
+            # the object is gone only when the box CENTER walks off-screen —
+            # a box mid-dip can balloon to touch every edge while the object
+            # is still dead centre (seen on real footage)
+            cx, cy = (b[0] + b[2]) / 2, (b[1] + b[3]) / 2
+            return not (0.02 * W < cx < 0.98 * W and 0.02 * H < cy < 0.98 * H)
+
+        if (box[2] - box[0]) * scale < 8 or (box[3] - box[1]) * scale < 8:
+            log("      track: region too small to track reliably")
+            return []
+
+        if person_det is not None:
+            # a drawn box that CONTAINS A PERSON gets detector-driven
+            # tracking: body-tight boxes + silhouettes every frame, immune
+            # to the scale/appearance drift that plagues generic trackers
+            try:
+                # detector masks are repainted at every sample; at the default
+                # 2-frame cadence the outline visibly STEPS/flickers at half
+                # the frame rate (real footage) — detect EVERY frame instead
+                ps = _track_person_dense(video, box, t_ref, t0, t1,
+                                         person_det, log, step_frames=1,
+                                         cancelled=(cb.cancelled if cb else None))
+            except Exception as e:
+                log("      track: person-detector path failed (%s) — using "
+                    "the generic tracker" % e)
+                ps = []
+            if ps:
+                live = sum(1 for x in ps if x[2] > 0.0) / float(len(ps))
+                if live >= 0.5:
+                    return ps
+                # the detector barely sees this object (marginal class, odd
+                # angle) — frozen coverage would win over live tracking.
+                # The generic tracker follows pixels and will do better.
+                log("      track: the detector only saw the object in %d%% "
+                    "of frames — using the generic tracker instead"
+                    % round(live * 100))
             else:
-                # backward: chunked forward reads served in reverse — a
-                # per-step backward seek decodes keyframe-to-target every
-                # step (from frame ZERO on a single-keyframe export)
-                rev = _RevReader(cap, fps)
+                log("      track: nothing recognizable under the drawn box — "
+                    "tracking the region as a generic object")
+
+        samples = [(t_ref, (float(box[0]), float(box[1]),
+                            float(box[2]), float(box[3])), 1.0)]
+        _last_log = time.time()
+
+        def _hold_rest(t, cur, direction, out):
+            """Fail-closed coverage: freeze the box and emit it to the window
+        edge (unless the object left the frame — nothing to protect)."""
+            if _left_frame(cur):
+                log("      track: object left the frame at t=%.1fs — "
+                    "coverage ends there" % t)
+                return
+            log("      track: LOST the object at t=%.1fs — holding the last "
+                "box to the window edge (review and trim if needed)" % t)
+            t2 = t + direction * step
+            while t0 - 1e-6 <= t2 <= t1 + 1e-6:
+                out.append((t2, (cur[0], cur[1], cur[2], cur[3]), 0.0))
+                t2 += direction * step
+
+        vit = _vittrack_factory(log)
+        if vit is not None:
+            fr0 = None
+            for dt in (0.0, 0.066, -0.066, 0.33, -0.33, 1.0):
+                ts = t_ref + dt
+                if ts < t0 - 1e-6 or ts > t1 + 1e-6:
+                    continue
+                fr0 = _frame(ts)
+                if fr0 is not None:
+                    t_ref = ts
+                    break
+            if fr0 is None:
+                log("      track: could not READ the video near t=%.1fs — "
+                    "cannot start tracking there (is the clip shorter than "
+                    "expected?)" % t_ref)
+                return []
+            sm0 = cv2.resize(fr0, None, fx=scale, fy=scale)
+            for direction in (1, -1):
+                trk = vit()
+                trk.init(sm0, (int(box[0] * scale), int(box[1] * scale),
+                               max(8, int((box[2] - box[0]) * scale)),
+                               max(8, int((box[3] - box[1]) * scale))))
+                cur = [float(v) for v in box]
+                held = False
+                t = t_ref
+                if direction == 1:  # forward: sequential reads, no re-seeking
+                    # robust prime: positions the decoder just past t_ref's
+                    # frame even when random POS_MSEC seek fails on this file
+                    _grab_frame(cap, t_ref, fps)
+                    rev = None
+                else:
+                    # backward: chunked forward reads served in reverse — a
+                    # per-step backward seek decodes keyframe-to-target every
+                    # step (from frame ZERO on a single-keyframe export)
+                    rev = _RevReader(cap, fps)
+                while True:
+                    if cb is not None and cb.cancelled():
+                        raise PipelineCancelled()
+                    t2 = t + direction * step
+                    if t2 < t0 - 1e-6 or t2 > t1 + 1e-6:
+                        break
+                    if direction == 1:
+                        fr = None
+                        for _ in range(max(1, int(step_frames))):
+                            ok0, fr0_ = cap.read()
+                            if not ok0:
+                                fr = None
+                                break
+                            fr = fr0_
+                    else:
+                        fr = rev.get(t2)
+                    if fr is None:
+                        break
+                    ok, bb = trk.update(cv2.resize(fr, None,
+                                                   fx=scale, fy=scale))
+                    score = float(trk.getTrackingScore())
+                    nb = None
+                    if ok:
+                        x, y, w, h = bb
+                        nb = [x / scale, y / scale,
+                              (x + w) / scale, (y + h) / scale]
+                    if nb is not None and score >= 0.30:
+                        cur = nb
+                        held = False
+                        if _left_frame(cur):
+                            log("      track: object left the frame at "
+                                "t=%.1fs — coverage ends there" % t2)
+                            break
+                        samples.append((t2, tuple(cur), score))
+                    elif nb is not None and score >= 0.15:
+                        # uncertain: the box may be loose OR drifting. Blur
+                        # the UNION of it and the last confident box — covers
+                        # either way (over-blur beats under-blur) — and keep
+                        # following so a re-lock resumes cleanly.
+                        if not held:
+                            held = True
+                            log("      track: weak lock at t=%.1fs — blur "
+                                "widens to cover the uncertainty until the "
+                                "tracker re-locks" % t2)
+                        u = (min(cur[0], nb[0]), min(cur[1], nb[1]),
+                             max(cur[2], nb[2]), max(cur[3], nb[3]))
+                        samples.append((t2, u, 0.0))
+                    else:
+                        # truly lost: do NOT move the blur on a guess —
+                        # freeze it; the tracker keeps looking each frame and
+                        # resumes the moment it re-locks (score recovers)
+                        if not held:
+                            held = True
+                            log("      track: LOST the object at t=%.1fs — "
+                                "blur holds its last position until the "
+                                "tracker re-acquires" % t2)
+                        samples.append((t2, tuple(cur), 0.0))
+                    if time.time() - _last_log >= 3.0:
+                        _last_log = time.time()
+                        log("        …tracking %s to t=%.1fs (%d samples)"
+                            % ("forward" if direction > 0 else "backward",
+                               t2, len(samples)))
+                    t = t2
+            samples.sort(key=lambda s: s[0])
+            return samples
+
+        # ---- template fallback (no TrackerVit / no model) ----------------
+        def _gray(t):
+            fr = _frame(t)
+            if fr is None:
+                return None
+            g = cv2.resize(cv2.cvtColor(fr, cv2.COLOR_BGR2GRAY), None,
+                           fx=scale, fy=scale)
+            return cv2.GaussianBlur(g, (3, 3), 0)
+
+        g0 = _gray(t_ref)
+        if g0 is None:
+            return []
+        gh, gw = g0.shape[:2]
+        x1 = max(0, int(box[0] * scale)); y1 = max(0, int(box[1] * scale))
+        x2 = min(gw, int(box[2] * scale)); y2 = min(gh, int(box[3] * scale))
+        if x2 - x1 < 8 or y2 - y1 < 8:
+            log("      track: region too small to track reliably")
+            return []
+        tmpl0 = g0[y1:y2, x1:x2]
+        if float(tmpl0.std()) < 4:
+            log("      track: NOTE — region has very little texture; the match "
+                "may lose it quickly. Consider a slightly larger box.")
+
+        for direction in (1, -1):
+            cur = list(box)
+            tmpl = tmpl0.copy()
+            s_cum = 1.0                 # cumulative scale vs the drawn box
+            t = t_ref
             while True:
-                if cb is not None and cb.cancelled():
-                    raise PipelineCancelled()
                 t2 = t + direction * step
                 if t2 < t0 - 1e-6 or t2 > t1 + 1e-6:
                     break
-                if direction == 1:
-                    fr = None
-                    for _ in range(max(1, int(step_frames))):
-                        ok0, fr0_ = cap.read()
-                        if not ok0:
-                            fr = None
-                            break
-                        fr = fr0_
-                else:
-                    fr = rev.get(t2)
-                if fr is None:
+                g = _gray(t2)
+                if g is None:
                     break
-                ok, bb = trk.update(cv2.resize(fr, None,
-                                               fx=scale, fy=scale))
-                score = float(trk.getTrackingScore())
-                nb = None
-                if ok:
-                    x, y, w, h = bb
-                    nb = [x / scale, y / scale,
-                          (x + w) / scale, (y + h) / scale]
-                if nb is not None and score >= 0.30:
-                    cur = nb
-                    held = False
-                    if _left_frame(cur):
-                        log("      track: object left the frame at "
-                            "t=%.1fs — coverage ends there" % t2)
-                        break
-                    samples.append((t2, tuple(cur), score))
-                elif nb is not None and score >= 0.15:
-                    # uncertain: the box may be loose OR drifting. Blur
-                    # the UNION of it and the last confident box — covers
-                    # either way (over-blur beats under-blur) — and keep
-                    # following so a re-lock resumes cleanly.
-                    if not held:
-                        held = True
-                        log("      track: weak lock at t=%.1fs — blur "
-                            "widens to cover the uncertainty until the "
-                            "tracker re-locks" % t2)
-                    u = (min(cur[0], nb[0]), min(cur[1], nb[1]),
-                         max(cur[2], nb[2]), max(cur[3], nb[3]))
-                    samples.append((t2, u, 0.0))
-                else:
-                    # truly lost: do NOT move the blur on a guess —
-                    # freeze it; the tracker keeps looking each frame and
-                    # resumes the moment it re-locks (score recovers)
-                    if not held:
-                        held = True
-                        log("      track: LOST the object at t=%.1fs — "
-                            "blur holds its last position until the "
-                            "tracker re-acquires" % t2)
-                    samples.append((t2, tuple(cur), 0.0))
+                th_, tw_ = tmpl.shape
+                m = int(max(16, 1.5 * max(tw_, th_)))
+                rx1 = max(0, int(cur[0] * scale) - m)
+                ry1 = max(0, int(cur[1] * scale) - m)
+                rx2 = min(g.shape[1], int(cur[2] * scale) + m)
+                ry2 = min(g.shape[0], int(cur[3] * scale) + m)
+                best = None             # (score, gx, gy, f, tw2, th2)
+                for f in (0.93, 1.0, 1.075):
+                    if not 0.4 <= s_cum * f <= 3.0:
+                        continue        # runaway scale = drift, not zoom
+                    tw2, th2 = int(tw_ * f), int(th_ * f)
+                    if (tw2 < 8 or th2 < 8 or rx2 - rx1 < tw2
+                            or ry2 - ry1 < th2):
+                        continue
+                    tm = tmpl if f == 1.0 else cv2.resize(tmpl, (tw2, th2))
+                    res = cv2.matchTemplate(g[ry1:ry2, rx1:rx2], tm,
+                                            cv2.TM_CCOEFF_NORMED)
+                    _, mx, _, loc = cv2.minMaxLoc(res)
+                    if best is None or mx > best[0]:
+                        best = (mx, rx1 + loc[0], ry1 + loc[1], f, tw2, th2)
+                if best is None or best[0] < thr:
+                    _hold_rest(t, cur, direction, samples)
+                    break
+                mx, gx, gy, f, tw2, th2 = best
+                s_cum *= f
+                nx, ny = gx / scale, gy / scale
+                cur = [nx, ny, nx + tw2 / scale, ny + th2 / scale]
+                samples.append((t2, (cur[0], cur[1], cur[2], cur[3]),
+                                float(mx)))
+                if mx > 0.80:           # confident: adopt current appearance
+                    cand = g[gy:gy + th2, gx:gx + tw2]
+                    if cand.shape == (th2, tw2):
+                        tmpl = cand.copy()
                 if time.time() - _last_log >= 3.0:
                     _last_log = time.time()
                     log("        …tracking %s to t=%.1fs (%d samples)"
                         % ("forward" if direction > 0 else "backward",
                            t2, len(samples)))
                 t = t2
-        cap.release()
         samples.sort(key=lambda s: s[0])
         return samples
-
-    # ---- template fallback (no TrackerVit / no model) ----------------
-    def _gray(t):
-        fr = _frame(t)
-        if fr is None:
-            return None
-        g = cv2.resize(cv2.cvtColor(fr, cv2.COLOR_BGR2GRAY), None,
-                       fx=scale, fy=scale)
-        return cv2.GaussianBlur(g, (3, 3), 0)
-
-    g0 = _gray(t_ref)
-    if g0 is None:
+    finally:
         cap.release()
-        return []
-    gh, gw = g0.shape[:2]
-    x1 = max(0, int(box[0] * scale)); y1 = max(0, int(box[1] * scale))
-    x2 = min(gw, int(box[2] * scale)); y2 = min(gh, int(box[3] * scale))
-    if x2 - x1 < 8 or y2 - y1 < 8:
-        cap.release()
-        log("      track: region too small to track reliably")
-        return []
-    tmpl0 = g0[y1:y2, x1:x2]
-    if float(tmpl0.std()) < 4:
-        log("      track: NOTE — region has very little texture; the match "
-            "may lose it quickly. Consider a slightly larger box.")
-
-    for direction in (1, -1):
-        cur = list(box)
-        tmpl = tmpl0.copy()
-        s_cum = 1.0                 # cumulative scale vs the drawn box
-        t = t_ref
-        while True:
-            t2 = t + direction * step
-            if t2 < t0 - 1e-6 or t2 > t1 + 1e-6:
-                break
-            g = _gray(t2)
-            if g is None:
-                break
-            th_, tw_ = tmpl.shape
-            m = int(max(16, 1.5 * max(tw_, th_)))
-            rx1 = max(0, int(cur[0] * scale) - m)
-            ry1 = max(0, int(cur[1] * scale) - m)
-            rx2 = min(g.shape[1], int(cur[2] * scale) + m)
-            ry2 = min(g.shape[0], int(cur[3] * scale) + m)
-            best = None             # (score, gx, gy, f, tw2, th2)
-            for f in (0.93, 1.0, 1.075):
-                if not 0.4 <= s_cum * f <= 3.0:
-                    continue        # runaway scale = drift, not zoom
-                tw2, th2 = int(tw_ * f), int(th_ * f)
-                if (tw2 < 8 or th2 < 8 or rx2 - rx1 < tw2
-                        or ry2 - ry1 < th2):
-                    continue
-                tm = tmpl if f == 1.0 else cv2.resize(tmpl, (tw2, th2))
-                res = cv2.matchTemplate(g[ry1:ry2, rx1:rx2], tm,
-                                        cv2.TM_CCOEFF_NORMED)
-                _, mx, _, loc = cv2.minMaxLoc(res)
-                if best is None or mx > best[0]:
-                    best = (mx, rx1 + loc[0], ry1 + loc[1], f, tw2, th2)
-            if best is None or best[0] < thr:
-                _hold_rest(t, cur, direction, samples)
-                break
-            mx, gx, gy, f, tw2, th2 = best
-            s_cum *= f
-            nx, ny = gx / scale, gy / scale
-            cur = [nx, ny, nx + tw2 / scale, ny + th2 / scale]
-            samples.append((t2, (cur[0], cur[1], cur[2], cur[3]),
-                            float(mx)))
-            if mx > 0.80:           # confident: adopt current appearance
-                cand = g[gy:gy + th2, gx:gx + tw2]
-                if cand.shape == (th2, tw2):
-                    tmpl = cand.copy()
-            if time.time() - _last_log >= 3.0:
-                _last_log = time.time()
-                log("        …tracking %s to t=%.1fs (%d samples)"
-                    % ("forward" if direction > 0 else "backward",
-                       t2, len(samples)))
-            t = t2
-    cap.release()
-    samples.sort(key=lambda s: s[0])
-    return samples
 
 
 def group_persons(dets, video, cb=None):
