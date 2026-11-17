@@ -119,6 +119,9 @@ include = [
     "THIRD_PARTY_NOTICES.md",
     "test_openscrub.py",
     "tests/",
+    "benchmark/browser_logs*.py",
+    "benchmark/browser_logs.js",
+    "benchmark/README.md",
 ]
 
 [tool.pytest.ini_options]

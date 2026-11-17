@@ -827,10 +827,26 @@ full license texts in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 Job messages are kept in memory as a recent history: at most 2,000 entries
 and 512 KiB of UTF-8 payload per job, with each callback entry capped at 8 KiB
 including `... [message truncated]`. Embedded newlines remain one entry;
-lone surrogates become `?`. The browser shows fixed omission/truncation notes,
-starts with the latest 400 entries, and continues appending while open.
-This does not bound browser history or total process memory, and creates no
-persistent callback log. Retry appends to the same history.
+lone surrogates become `?`. Retry appends to the same server history; callback
+messages are not persisted.
+
+Each open browser job starts with the latest 400 entries and then retains at
+most 800 entries and 2,097,152 represented bytes (twice the UTF-16 code-unit
+count, including separators). A defensive 8,192-code-unit display limit keeps
+a bounded prefix and `... [display entry truncated]` for oversized entries
+from older servers. Empty and multiline callbacks remain single entries.
+One fixed note explains omitted/truncated history. Polling still advances the
+server cursor over every accepted entry; older display history is not fetched
+back. These limits describe retained text, not browser or process memory.
+
+New entries follow the bottom when the reader is within 40 CSS pixels of it,
+sampled when the response is ready. Reading farther up preserves the first
+visible retained entry and its pixel offset, including through width changes.
+If that entry is evicted, the view shows the oldest retained entry and a fixed
+lost-position notice. A new view, reopen or accepted server history reset goes
+to the recent bottom without moving keyboard focus. The log supports keyboard
+scrolling and native selection/copy; surviving content nodes remain stable.
+Closing/replacing the view discards its display state and resize callbacks.
 
 `GET /api/jobs/<id>/log?from=N&epoch=E` returns absolute `from`/`len` cursors,
 `lines`, `base`, `epoch`, `reset`, `dropped` and `truncated` in one snapshot.

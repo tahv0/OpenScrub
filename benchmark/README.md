@@ -322,3 +322,86 @@ unassisted one.
   second is a claim about footage nobody has run yet.
 - Publish the failures next to the successes. A tool that says where it
   struggles is the one worth believing.
+
+## Optional synthetic browser-log comparison
+
+`browser_logs.py` compares the P12B-only client with the bounded P12C client
+through actual callbacks, production metadata/log routes and the emitted PAGE.
+It uses existing OpenScrub Python dependencies, pytest, Node and an existing
+Playwright/Chromium installation. It installs nothing and runs no media/model
+workload. It needs loopback sockets and permission to launch the browser.
+
+Use two immutable source checkouts and a fresh, short scratch path with enough
+free space. Keep the existing Python/browser/tool installations read-only. The
+helper redirects profile, models, cache, jobs and temporary files into scratch,
+blocks Python writes outside it and outward Python network connections, and
+asserts exact selected imports before creating synthetic jobs. This is a scoped
+recipe guard, not an OS sandbox for Node/Chromium or arbitrary extensions.
+Do not point scratch at user data or run other workloads during comparison.
+
+The following names are examples; supply paths to your existing installations:
+
+```bash
+BASE_SOURCE=/absolute/path/to/P12B-checkout
+CANDIDATE_SOURCE=/absolute/path/to/P12C-checkout
+BENCH_ROOT=/tmp/openscrub-browser-log-bench
+PYTHON_BIN=/absolute/path/to/python
+NODE_BINARY=/absolute/path/to/node
+CHROMIUM_BINARY=/absolute/path/to/chrome-headless-shell
+export NODE_PATH=/absolute/path/to/existing/node_modules
+export PYTHONDONTWRITEBYTECODE=1
+
+"$PYTHON_BIN" "$CANDIDATE_SOURCE/benchmark/browser_logs_env.py" \
+  --source "$BASE_SOURCE" --source "$CANDIDATE_SOURCE" \
+  --tool "$PYTHON_BIN" --tool "$NODE_BINARY" --tool "$CHROMIUM_BINARY" \
+  --tool "$NODE_PATH/playwright/package.json" \
+  --tool "$NODE_PATH/playwright-core/package.json" \
+  --output "$BENCH_ROOT/frozen.json"
+```
+
+Copy the printed manifest SHA-256 into `GRANTED_SHA` below after checking the
+inputs and reserving an exclusive measurement slot. The runner verifies the
+manifest itself and every frozen file before imports and after each phase. A
+source/tool/path/hash mismatch aborts. Sources must contain the precise P12B/P12C
+publication markers; this is not a general benchmark for arbitrary revisions.
+
+```bash
+GRANTED_SHA=copy_the_printed_manifest_sha256
+"$PYTHON_BIN" "$CANDIDATE_SOURCE/benchmark/browser_logs.py" \
+  --root "$BENCH_ROOT" --source "$CANDIDATE_SOURCE" \
+  --node "$NODE_BINARY" --chromium "$CHROMIUM_BINARY" \
+  --manifest "$BENCH_ROOT/frozen.json" --granted-sha "$GRANTED_SHA" \
+  --phase timing --label candidate --check-setup
+```
+
+`--check-setup` only checks isolated imports/guards; it runs no browser, job
+fixture or timing. For the full comparison, run the same command without that
+flag in this order: `--source "$BASE_SOURCE" --label base --phase timing`,
+then candidate timing, then base instrumentation, then candidate
+instrumentation. Keep the same root, tools and manifest. Preserve every result
+and failure; do not selectively repeat favorable cases. The runner saves raw
+JSON and process logs under scratch, including partial records on failure.
+
+Each timing case starts at 400 emissions, uses five accepted 20-entry warmups,
+then 125 observed batches through 3,000 emissions. The four fixtures are short
+progress, eight-row tool output, 8,192-unit unbroken text, and 8,192-unit dense
+multiline text with 255 LFs. Native HTTP headers/body parsing, synchronous DOM
+publication plus forced layout, and the metadata→log cycle are separate
+boundaries. Healthy 900ms scheduling gaps are excluded. Correctness checks and
+async DOM hashing occur between observations. Frame/long-task timestamps allow
+overlap classification; idle post-batch wheel checks do not measure input
+latency during publication. Instrumentation runs only after all timing and
+counts represented UTF-16 publication inputs/nodes, not engine copies or RSS.
+
+```bash
+"$PYTHON_BIN" "$CANDIDATE_SOURCE/benchmark/browser_logs_summary.py" "$BENCH_ROOT"
+```
+
+The summary checks complete records and identical fixture hashes and reports
+median and empirical nearest-rank p95 (`sorted[118]` of 125 observations).
+Initial population has one observation per case/source. The 16ms median/50ms
+p95 publication budgets are local escalation thresholds: retain and discuss
+exceedances, especially dense multiline layouts. Different retained histories
+and fixed source order do not establish equal-work or universal speed claims.
+The final portable recipe is a delivery revision; historical task measurements
+remain bound to their archived original recipes and hashes.

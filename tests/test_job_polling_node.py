@@ -10,9 +10,17 @@ from test_review_save_failures import app_js
 HARNESS = r"""
 const vm=require('node:vm'),assert=require('node:assert/strict');
 const elements=new Map(), events={};
-function el(){return {textContent:'',style:{},scrollTop:0,clientHeight:100,scrollHeight:100,
- classList:{toggle(){},remove(){}},addEventListener(){},querySelector(){return null},
- remove(){for(const [k,v] of elements)if(v===this)elements.delete(k)},
+// Tree/text semantics only: geometry remains a fixed schedule-test stub.
+function el(type=1,data=''){return {nodeType:type,data,dataset:{},childNodes:[],style:{},scrollTop:0,clientTop:0,clientWidth:800,clientHeight:100,scrollHeight:100,
+ get textContent(){return this.nodeType===3?this.data:this.childNodes.map(n=>n.textContent).join('')},
+ set textContent(value){if(this.nodeType===3)this.data=value;else{this.childNodes=[];if(value)this.appendChild(el(3,value))}},
+ get firstChild(){return this.childNodes[0]||null},
+ appendChild(node){if(node.nodeType===11){for(const child of [...node.childNodes])this.appendChild(child);node.childNodes=[];return node}
+ node.parentNode=this;this.childNodes.push(node);return node},
+ contains(node){return node===this||this.childNodes.some(n=>n.contains(node))},
+ getBoundingClientRect(){return {top:0,bottom:100,height:100}},
+ classList:{toggle(){},remove(){}},addEventListener(){},removeEventListener(){},querySelector(){return null},
+ remove(){if(this.parentNode)this.parentNode.childNodes=this.parentNode.childNodes.filter(n=>n!==this);for(const [k,v] of elements)if(v===this)elements.delete(k)},
  insertAdjacentHTML(pos,html){for(const m of html.matchAll(/id="([^"]+)"/g))elements.set(m[1],el());},
  set innerHTML(html){this._html=html;if(this===elements.get('detail')){
  for(const k of [...elements.keys()])if(k!=='detail')elements.delete(k);}
@@ -22,7 +30,7 @@ let now=0,seq=0;const timers=new Map();
 const listen=(type,fn)=>(events[type]??=[]).push(fn);
 const ctx=vm.createContext({console,AbortController,Set,Map,Promise,JSON,Math,Date,
  document:{hidden:false,getElementById:id=>elements.get(id)||null,querySelectorAll:()=>[],
- addEventListener:listen,createElement:el},window:{addEventListener:listen},detail:elements.get('detail'),
+ addEventListener:listen,createElement:()=>el(),createTextNode:text=>el(3,text),createDocumentFragment:()=>el(11)},window:{addEventListener:listen},detail:elements.get('detail'),
  setTimeout:(fn,ms)=>{const id=++seq;timers.set(id,{fn,at:now+ms});return id},clearTimeout:id=>timers.delete(id),
  setInterval:(fn,ms)=>{const id=++seq;timers.set(id,{fn,at:now+ms,repeat:ms});return id},clearInterval:id=>timers.delete(id),
  confirm:()=>true,alert(){},fetch(){throw Error('unexpected startup fetch')}});
@@ -121,8 +129,8 @@ def test_authoritative_empty_shrunk_cursor_initial_tail_and_scroll():
     const lg=elements.get('log');assert.equal(lg.textContent.split('\\n').length,400);assert.ok(lg.textContent.startsWith('L5\\n'));
     assert.equal(LOGN,405);assert.equal(lg.scrollTop,100);lg.scrollTop=0;lg.scrollHeight=1000;
     await advance(900);await reply(job());await reply(log([],1,405));
-    assert.equal(lg.textContent,'');assert.equal(LOGN,0);assert.ok(queue[0].url.endsWith('from=0'));
-    await reply(log(['new'],1,0));assert.equal(lg.textContent,'new');assert.equal(LOGN,1);assert.equal(lg.scrollTop,0);
+    assert.ok(lg.textContent.startsWith('L5\\n'));assert.equal(LOGN,405);assert.ok(queue[0].url.endsWith('from=0'));
+    await reply(log(['new'],1,0));assert.equal(lg.textContent,'new');assert.equal(LOGN,1);assert.equal(lg.scrollTop,1000,'accepted reset goes to recent bottom');
     await advance(900);await cycle();assert.equal(LOGN,0,'empty len=0 is authoritative');""")
 
 

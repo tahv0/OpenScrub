@@ -65,6 +65,9 @@ def polling_http(monkeypatch, tmp_path):
                 callback = web.WebCallbacks(web.JOBS[jid])
                 for message in data['lines']:
                     callback.log(message)
+            elif action == 'cancel':
+                with web.app.test_client() as client:
+                    assert client.post('/api/jobs/' + jid + '/cancel').status_code == 200
             elif action == 'retry':
                 job = web.JOBS[jid]
                 video = Path(job['dir']) / 'input.mp4'
@@ -82,6 +85,15 @@ def polling_http(monkeypatch, tmp_path):
             self.send_header('Content-Length', str(len(payload)))
             self.end_headers()
             self.wfile.write(payload)
+
+        def do_DELETE(self):
+            with web.app.test_client() as client:
+                result = client.delete(self.path)
+            self.send_response(result.status_code)
+            self.send_header('Content-Type', result.content_type)
+            self.send_header('Content-Length', str(len(result.data)))
+            self.end_headers()
+            self.wfile.write(result.data)
 
         def do_GET(self):
             path = urlsplit(self.path).path
@@ -347,9 +359,11 @@ async function wait(fn){for(let i=0;i<200;i++){if(await fn())return;await pause(
   await control({release:true});await pause(80);assert.equal(await cursor(),4701);assert.equal(await epoch(),retryEpoch);
   assert.match(await text(),/retrying scan/);results.push('held body across append-only retry');
   assert.deepEqual(errors,[]);assert.deepEqual(consoleErrors,[]);
+  if(process.env.POLLING_ARTIFACTS){
   await page.screenshot({path:process.env.POLLING_ARTIFACTS+'/bounded-logs-desktop.png'});
   await page.setViewportSize({width:390,height:844});await page.screenshot({path:process.env.POLLING_ARTIFACTS+'/bounded-logs-mobile.png'});
   fs.writeFileSync(process.env.POLLING_ARTIFACTS+'/bounded-browser.json',JSON.stringify({results,requests,errors,consoleErrors,url:page.url(),title:await page.title()},null,2));
+  }
   console.log(JSON.stringify({results,requests:requests.length,errors,consoleErrors}));
  }finally{await browser.close()}
 })().catch(e=>{console.error(e);process.exit(1)});
