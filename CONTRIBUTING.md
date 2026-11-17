@@ -23,6 +23,7 @@ Thanks for helping! A few rules keep this privacy tool trustworthy.
 ## Before you open a PR
 
     python -m pytest -q                        # all discovered tests must be green
+
     python -m build                            # full sdist->wheel build
 
 The discovered suite includes `test_openscrub.py` and `tests/`. The HDR
