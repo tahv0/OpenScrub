@@ -4162,6 +4162,8 @@ def _render_hdr_into(src, dst, detections, cum, bands, fps, pad, mode,
     source's color tags (PQ/HLG + BT.2020) carried over. `hvc1` tagging
     keeps QuickTime/Apple players happy. No preview mode — previews use
     the SDR copy."""
+    # Public entry checks source extents before the single delivery stage.
+    # Coverage may legally round a positive source box to an empty integer box.
     mode_map = mode_map or {}
     def _mode_for(cat):
         return mode_map.get(cat, mode)
@@ -4362,6 +4364,8 @@ def _render_into(src, dst, detections, cum, bands, fps, pad, mode, preview,
     # mode_map: {category: "blur"|"box"} overrides the global `mode` per
     # category. Lets you black-box the reversible-blur-vulnerable categories
     # (SSN, MRN, account numbers) while blurring faces, in one render.
+    # Public entry checks source extents before the single delivery stage.
+    # Coverage may legally round a positive source box to an empty integer box.
     mode_map = mode_map or {}
     def _mode_for(cat):
         return mode_map.get(cat, mode)
