@@ -221,3 +221,246 @@ def test_real_encoding_failure_cleans_staging_file(tmp_path, exists):
     else:
         assert not path.exists()
     assert not list(tmp_path.glob('*.tmp'))
+
+
+@pytest.fixture
+def report_work(monkeypatch):
+    """Count report operations only, leaving request/response JSON untouched."""
+    counts = dict(parse=0, dump=0, stage=0, fsync=0, replace=0, stream_writes=0)
+    load, dump = web._load_job_report, json.dump
+    def parse(job):
+        counts['parse'] += 1
+        return load(job)
+    def encode(doc, stream, **kwargs):
+        counts['dump'] += 1
+        class Stream:
+            def write(self, value):
+                counts['stream_writes'] += 1
+                return stream.write(value)
+        return dump(doc, Stream(), **kwargs)
+    monkeypatch.setattr(web, '_load_job_report', parse)
+    monkeypatch.setattr(reports, 'json', SimpleNamespace(dump=encode))
+    for owner, name, key in [(reports.tempfile, 'NamedTemporaryFile', 'stage'),
+                             (reports.os, 'fsync', 'fsync'),
+                             (reports.os, 'replace', 'replace')]:
+        original = getattr(owner, name)
+        def count(*args, _original=original, _key=key, **kwargs):
+            counts[_key] += 1
+            return _original(*args, **kwargs)
+        monkeypatch.setattr(owner, name, count)
+    return counts
+
+
+def file_snapshot(path):
+    stat = path.stat()
+    return (path.read_bytes(), stat.st_dev, stat.st_ino, stat.st_mtime_ns,
+            stat.st_ctime_ns, stat.st_mode)
+
+
+def finite_review(review):
+    doc = json.loads(review.path.read_bytes())
+    for row in doc['detections']:
+        row.update(t_start=0., t_end=1., cbox=[1., 2., 8., 9.])
+    return doc
+
+
+@pytest.mark.parametrize('canonical', [False, True])
+@pytest.mark.parametrize('edits', [
+    {}, {'enabled': {'0': 'false', '1': True}},
+    {'box_overrides': {'0': ['1', 2, 8., 9]}},
+    {'time_overrides': {'0': ['0', 1]}},
+    {'audio': [{'t0': '.1', 't1': '.2', 'mode': 'unsupported', 'ignored': True}]},
+    {'enabled': {'00': False, '-1': False, '999': False},
+     'box_overrides': {'999': None, '0': [1]},
+     'time_overrides': {'-1': None, '0': [1, 0]}},
+    {'box_overrides': {'0': [4, 5, 6, 7], '00': [1, 2, 8, 9]},
+     'time_overrides': {'0': [.1, .9], '00': [0, 1]}},
+])
+def test_unchanged_save_preserves_exact_file_and_skips_publication(review, report_work, canonical, edits):
+    # Unconditional publication loses metadata even for byte-identical JSON.
+    doc = finite_review(review)
+    review.path.write_text(json.dumps(doc, indent=1 if canonical else None))
+    if os.name != 'nt':
+        review.path.chmod(0o640)
+    os.utime(review.path, ns=(1000000000, 2000000000))
+    before = file_snapshot(review.path)
+    response = review.client.post('/api/jobs/synthetic/detections', json=edits)
+    assert response.status_code == 200
+    assert response.json == {'ok': True, 'total': 2, 'suggest_allowlist': []}
+    assert file_snapshot(review.path) == before
+    assert report_work == dict(parse=1, dump=0, stage=0, fsync=0, replace=0, stream_writes=0)
+    assert web.FILES.count == 0
+
+
+@pytest.mark.parametrize('case', [
+    'missing_enabled', 'numeric_enabled', 'integer_box', 'integer_time',
+    'negative_zero_box', 'negative_zero_time', 'missing_last_seen', 'clamped_last_seen',
+    'missing_audio', 'audio_extra', 'audio_bool', 'audio_int', 'audio_negative_zero',
+    'nonfinite_box', 'nonfinite_audio', 'sparse', 'combined', 'legacy_manual',
+])
+def test_effective_changes_publish_once_with_raw_fields_preserved(review, report_work, case):
+    doc = finite_review(review)
+    row = doc['detections'][0]
+    edits = {}
+    if case == 'missing_enabled':
+        del row['enabled']; edits = {'enabled': {'0': True}}
+    elif case == 'numeric_enabled':
+        row['enabled'] = 1; edits = {'enabled': {'0': True}}
+    elif case == 'integer_box':
+        row['cbox'] = [1, 2, 8, 9]; edits = {'box_overrides': {'0': [1, 2, 8, 9]}}
+    elif case == 'integer_time':
+        row.update(t_start=0, t_end=1); edits = {'time_overrides': {'0': [0, 1]}}
+    elif case == 'negative_zero_box':
+        row['cbox'][0] = -0.; edits = {'box_overrides': {'0': [0., 2., 8., 9.]}}
+    elif case == 'negative_zero_time':
+        row['t_start'] = -0.; edits = {'time_overrides': {'0': [0., 1.]}}
+    elif case in ('missing_last_seen', 'clamped_last_seen'):
+        if case == 'missing_last_seen': del row['last_seen']
+        else: row['last_seen'] = 2.
+        edits = {'time_overrides': {'0': [0., 1.]}}
+    elif case == 'missing_audio':
+        del doc['audio_redactions']; edits = {'audio': []}
+    elif case == 'audio_extra':
+        doc['audio_redactions'][0]['future'] = {'nested': [True, 1, 1.]}
+        edits = {'audio': [{'t0': .1, 't1': .2}]}
+    elif case in ('audio_bool', 'audio_int', 'audio_negative_zero'):
+        value = {'audio_bool': False, 'audio_int': 0, 'audio_negative_zero': -0.}[case]
+        doc['audio_redactions'] = [{'t0': value, 't1': 1., 'mode': 'mute'}]
+        edits = {'audio': [{'t0': 0., 't1': 1.}]}
+    elif case == 'nonfinite_box':
+        row['cbox'][0] = float('inf'); edits = {'box_overrides': {'0': [float('inf'), 2, 8, 9]}}
+    elif case == 'nonfinite_audio':
+        doc['audio_redactions'][0]['t1'] = float('inf')
+        edits = {'audio': doc['audio_redactions']}
+    elif case == 'sparse': edits = {'enabled': {'0': False}}
+    elif case == 'combined':
+        edits = {'enabled': {'0': False, '1': False}, 'box_overrides': {'0': [2,3,9,10]},
+                 'time_overrides': {'0': [.2, 2]}, 'audio': []}
+    elif case == 'legacy_manual':
+        edits = {'manual': [{'t_start': 0, 't_end': 1, 'screen_box': [1,2,8,9]}]}
+    doc['unknown'] = {'ordered': [None, True, 1, 1., {'motion': [[1,2],[3,4]]}]}
+    doc['audio_transcript'] = [{'text': 'raw synthetic', 'future': [0,False]}]
+    review.path.write_text(json.dumps(doc, indent=1))
+    before = review.path.read_bytes()
+    response = review.client.post('/api/jobs/synthetic/detections', json=edits)
+    assert response.status_code == 200
+    after = json.loads(review.path.read_bytes())
+    assert report_work['parse'] == report_work['dump'] == report_work['stage'] == report_work['fsync'] == report_work['replace'] == 1
+    assert report_work['stream_writes'] > 0  # Python writes, not syscalls.
+    assert after['unknown'] == doc['unknown']
+    assert after['audio_transcript'] == doc['audio_transcript']
+    assert after['render_state'] == doc['render_state']
+    assert review.path.read_bytes() == json.dumps(after, indent=1).encode()
+    if not case.startswith('nonfinite'):
+        assert review.path.read_bytes() != before
+    if case == 'combined':
+        assert after['detections'][0]['cbox'] == [2.,3.,9.,10.]
+        assert after['detections'][0]['last_seen'] == .5
+        assert after['audio_redactions'] == []
+        assert response.json['suggest_allowlist'] == ['synthetic']
+    if case == 'audio_extra': assert set(after['audio_redactions'][0]) == {'t0','t1','mode'}
+    assert web.FILES.count == 0
+
+
+def test_replay_only_skips_but_replay_edit_publishes_and_conflict_rejects(review, report_work):
+    manual = {'manual_id': 'draw:one', 't_start': 0, 't_end': 1, 'screen_box': [2,3,8,9]}
+    url = '/api/jobs/synthetic/detections'
+    assert review.client.post(url, json={'manual': [manual]}).status_code == 200
+    before = file_snapshot(review.path)
+    for key in report_work: report_work[key] = 0
+    assert review.client.post(url, json={'manual': [manual, manual]}).json['total'] == 3
+    assert file_snapshot(review.path) == before
+    assert report_work['parse'] == 1 and report_work['replace'] == report_work['dump'] == 0
+    assert review.client.post(url, json={'manual': [manual], 'enabled': {'2': False}}).status_code == 200
+    assert report_work['replace'] == 1
+    current = file_snapshot(review.path)
+    assert review.client.post(url, json={'manual': [dict(manual, t_end=2)], 'enabled': {'0': False}}).status_code == 409
+    assert file_snapshot(review.path) == current
+    assert report_work['replace'] == 1
+    assert review.client.post(url, json={'manual': [dict(manual, manual_id='draw:two')]}).json['total'] == 4
+    assert report_work['replace'] == 2
+
+
+@pytest.mark.parametrize('broken,edits,status', [
+    ('missing', {}, 404), ('malformed', {}, 500), ('no_render_state', {}, 500),
+    ('no_detections', {}, 500), (None, {'enabled': None}, 500),
+    (None, {'box_overrides': {'bad': [1,2,8,9]}}, 500),
+    (None, {'time_overrides': {'0': ['bad',1]}}, 500),
+    (None, {'manual': [{'manual_id': None}]}, 400),
+])
+def test_noop_candidates_still_parse_and_validate(review, report_work, broken, edits, status):
+    if broken == 'missing': review.path.unlink()
+    elif broken == 'malformed': review.path.write_bytes(b'{')
+    elif broken:
+        doc = finite_review(review); del doc[broken[3:]]
+        review.path.write_text(json.dumps(doc))
+    before = review.path.read_bytes() if review.path.exists() else None
+    assert review.client.post('/api/jobs/synthetic/detections', json=edits).status_code == status
+    assert report_work['parse'] == 1 and report_work['replace'] == report_work['dump'] == 0
+    assert (review.path.read_bytes() if review.path.exists() else None) == before
+    assert web.FILES.count == 0
+
+
+def test_failed_change_releases_waiting_noop_to_fresh_snapshot(review, monkeypatch, report_work):
+    from test_report_transactions import ObservedLock
+    from test_job_lifecycle import start_call, finish
+    lock = ObservedLock()
+    web.FILES.initialize(web.JOBS['synthetic']).report_lock = lock
+    entered, release = threading.Event(), threading.Event()
+    def fail(*args):
+        entered.set()
+        assert release.wait(5)
+        raise OSError('injected replacement failure')
+    monkeypatch.setattr(reports.os, 'replace', fail)
+    before = file_snapshot(review.path)
+    first = start_call('post', '/api/jobs/synthetic/detections', json={'enabled': {'0': False}})
+    second = None
+    try:
+        assert entered.wait(5)
+        second = start_call('post', '/api/jobs/synthetic/detections', json={})
+        assert lock.waiting.wait(5)
+    finally:
+        release.set()
+        assert finish(first).status_code == 500
+        if second: assert finish(second).status_code == 200
+    assert report_work['parse'] == 2 and report_work['dump'] == 1
+    assert file_snapshot(review.path) == before
+    assert web.FILES.count == 0
+
+
+@pytest.mark.parametrize('present', [False, True])
+def test_omitted_audio_stays_absent_or_empty_and_explicit_empty_is_acknowledged(review, report_work, present):
+    doc = finite_review(review)
+    if present: doc['audio_redactions'] = []
+    else: del doc['audio_redactions']
+    review.path.write_text(json.dumps(doc))
+    before = file_snapshot(review.path)
+    assert review.client.post('/api/jobs/synthetic/detections', json={}).status_code == 200
+    assert file_snapshot(review.path) == before
+    if present:
+        assert review.client.post('/api/jobs/synthetic/detections', json={'audio': [{'t0': 1, 't1': 0}]}).status_code == 200
+        assert file_snapshot(review.path) == before
+    assert report_work['dump'] == 0
+
+
+def test_alias_time_restoration_still_publishes_effective_last_seen_clamp(review, report_work):
+    doc = finite_review(review)
+    review.path.write_text(json.dumps(doc))
+    response = review.client.post('/api/jobs/synthetic/detections', json={
+        'time_overrides': {'0': [.7,.9], '00': [0.,1.]}})
+    assert response.status_code == 200
+    assert json.loads(review.path.read_bytes())['detections'][0]['last_seen'] == .7
+    assert report_work['replace'] == 1
+
+
+def test_noop_response_uses_each_fresh_report(review, report_work):
+    url = '/api/jobs/synthetic/detections'
+    assert review.client.post(url, json={}).json['suggest_allowlist'] == []
+    doc = finite_review(review)
+    for row in doc['detections']: row['enabled'] = False
+    doc['future'] = {'unusual_but_untouched': float('nan')}
+    review.path.write_text(json.dumps(doc, separators=(',', ':')))
+    before = file_snapshot(review.path)
+    assert review.client.post(url, json={}).json['suggest_allowlist'] == ['synthetic']
+    assert file_snapshot(review.path) == before
+    assert report_work['parse'] == 2 and report_work['dump'] == 0
