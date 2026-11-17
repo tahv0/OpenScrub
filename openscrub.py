@@ -4111,7 +4111,7 @@ def render_hdr(src, dst, detections, cum, bands, fps, pad, mode,
         # are separate: arbitrary setup/frame errors must not unlink dst.
         if remove_partial:
             for path in (dst,):
-                if path:
+                if path and os.path.exists(path):
                     try:
                         os.remove(path)
                     except OSError:
@@ -4367,7 +4367,7 @@ def render(src, dst, detections, cum, bands, fps, pad, mode, preview,
         # are separate: arbitrary setup/frame errors must not unlink dst.
         if remove_partial:
             for path in (dst, tmp_video):
-                if path:
+                if path and os.path.exists(path):
                     try:
                         os.remove(path)
                     except OSError:
