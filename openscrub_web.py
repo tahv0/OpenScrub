@@ -1275,7 +1275,7 @@ def set_cookie(resp):
 def create_job():
     try:
         options = json.loads(request.form.get("options", "{}"))
-    except json.JSONDecodeError:
+    except ValueError:
         return jsonify({"error": "Scan options must be a JSON object."}), 400
     if not isinstance(options, dict):
         return jsonify({"error": "Scan options must be a JSON object."}), 400
