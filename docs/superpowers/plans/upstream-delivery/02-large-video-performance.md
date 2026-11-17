@@ -185,12 +185,13 @@ Proposed contract: `get_snapshot(job_id, report_path, source_identity) -> (docum
 
 ### P10C — cancellation polling in ordinary manual tracking
 
-**What / why:** Investigate source-observed missing cancellation checks in the existing manual tracker's NCC fallback and hold-rest loops. Long tracking may retain active work after the user cancels. This is a generic tracking concern; optional O02 can reuse its eventual fix.
+**What / why:** Stop repeated NCC matching and held-coverage work once cancellation is observed. The [actual full-module baseline](execution/evidence/research/tracker-cancel-baseline-research.md) on reviewed12919c9 shows41 additional native matches,13 frame grabs and19 reads after cancellation at match1; natural target-loss coverage also keeps appending. The existing web route correctly suppresses publication and holds ownership until cleanup, so this is a separate compute-cancellation defect. The adjacent person-helper catch also swallows PipelineCancelled in a controlled handoff test.
 
-**When:** Separate small upstream reliability follow-up after an actual cancellation schedule is reproduced. P06B.1 already owns wiring the web callback and the manual decoder's release-only cleanup; do not duplicate those changes or alter default matching/padding to make a cancellation test pass.
+**When:** Small upstream reliability follow-up on the reviewed capture-finally/operation contract. No new tracker, optional model or O02 feature is needed. Native decoding/model/match interruption remains P10B, not a claim from Python polling.
 
-- [ ] **E/I:** Reproduce cancellation in the real fallback/hold-rest paths using marked synthetic media and bounded compute-boundary controls. If confirmed, add the minimum cooperative checks with clear cancelled exit semantics; preserve complete-run detections and resource cleanup.
-- [ ] **V/D:** Verify prompt observation at the chosen Python checkpoints, unchanged uncancelled output and no leaked decoder/worker owner. Record that a single native decode call may still block; do not claim an interruptible native deadline from loop polling.
+- [ ] **I:** Poll before acquisition, NCC sampling-loop work, each held append and successful return; propagate person-helper cancellation without generic fallback, and observe cancellation after helper/model resolution. Keep ordinary failure fallback, existing Vit checks and uncancelled defaults. Entry cancellation deliberately takes precedence over invalid/unreadable input, raising PipelineCancelled rather than returning an empty successful result.
+- [ ] **V:** Reuse complete steady/loss sample arrays, real match/log/append cancellation gates and controlled helper boundaries. Preserve all uncancelled samples and exactly-once capture cleanup. A fixed three-scale sweep can finish its current sample before the next outer checkpoint; no further frame work follows observation.
+- [ ] **V/D:** Actual Flask cancellation must preserve cancelled status/no publication, deletion refusal through cleanup, capture release before lease release and zero remaining owners/threads. Run relevant/full/build/floor checks. Report deterministic work avoided and exact checkpoints, with no general latency/native interrupt or inference-throughput claim.
 
 ## P11 — remaining scan overhead investigation
 

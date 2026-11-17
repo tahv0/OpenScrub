@@ -1,0 +1,251 @@
+{
+  "steady_complete": {
+    "counts": {
+      "grabs": 15,
+      "reads": 22,
+      "matches": 42,
+      "hold_appends": 0,
+      "callback_polls": 0
+    },
+    "after": {
+      "grabs": 0,
+      "reads": 0,
+      "matches": 0,
+      "hold_appends": 0
+    },
+    "samples": 15,
+    "exception": null
+  },
+  "steady_cancel_after_match1": {
+    "counts": {
+      "grabs": 15,
+      "reads": 22,
+      "matches": 42,
+      "hold_appends": 0,
+      "callback_polls": 0
+    },
+    "after": {
+      "grabs": 13,
+      "reads": 19,
+      "matches": 41,
+      "hold_appends": 0
+    },
+    "samples": 15,
+    "exception": null
+  },
+  "steady_precancelled": {
+    "counts": {
+      "grabs": 15,
+      "reads": 22,
+      "matches": 42,
+      "hold_appends": 0,
+      "callback_polls": 0
+    },
+    "after": {
+      "grabs": 15,
+      "reads": 22,
+      "matches": 42,
+      "hold_appends": 0
+    },
+    "samples": 15,
+    "exception": null
+  },
+  "lost_complete": {
+    "counts": {
+      "grabs": 3,
+      "reads": 4,
+      "matches": 6,
+      "hold_appends": 14,
+      "callback_polls": 0
+    },
+    "after": {
+      "grabs": 0,
+      "reads": 0,
+      "matches": 0,
+      "hold_appends": 0
+    },
+    "samples": 15,
+    "exception": null
+  },
+  "lost_cancel_at_hold_log": {
+    "counts": {
+      "grabs": 3,
+      "reads": 4,
+      "matches": 6,
+      "hold_appends": 14,
+      "callback_polls": 0
+    },
+    "after": {
+      "grabs": 1,
+      "reads": 1,
+      "matches": 3,
+      "hold_appends": 14
+    },
+    "samples": 15,
+    "exception": null
+  },
+  "lost_cancel_inside_hold": {
+    "counts": {
+      "grabs": 3,
+      "reads": 4,
+      "matches": 6,
+      "hold_appends": 14,
+      "callback_polls": 0
+    },
+    "after": {
+      "grabs": 1,
+      "reads": 1,
+      "matches": 3,
+      "hold_appends": 13
+    },
+    "samples": 15,
+    "exception": null
+  },
+  "small_complete": {
+    "counts": {
+      "grabs": 0,
+      "reads": 0,
+      "matches": 0,
+      "hold_appends": 0,
+      "callback_polls": 0
+    },
+    "after": {
+      "grabs": 0,
+      "reads": 0,
+      "matches": 0,
+      "hold_appends": 0
+    },
+    "samples": 0,
+    "exception": null
+  },
+  "small_precancelled": {
+    "counts": {
+      "grabs": 0,
+      "reads": 0,
+      "matches": 0,
+      "hold_appends": 0,
+      "callback_polls": 0
+    },
+    "after": {
+      "grabs": 0,
+      "reads": 0,
+      "matches": 0,
+      "hold_appends": 0
+    },
+    "samples": 0,
+    "exception": null
+  },
+  "missing_complete": {
+    "counts": {
+      "grabs": 0,
+      "reads": 0,
+      "matches": 0,
+      "hold_appends": 0,
+      "callback_polls": 0
+    },
+    "after": {
+      "grabs": 0,
+      "reads": 0,
+      "matches": 0,
+      "hold_appends": 0
+    },
+    "samples": 0,
+    "exception": null
+  },
+  "missing_precancelled": {
+    "counts": {
+      "grabs": 0,
+      "reads": 0,
+      "matches": 0,
+      "hold_appends": 0,
+      "callback_polls": 0
+    },
+    "after": {
+      "grabs": 0,
+      "reads": 0,
+      "matches": 0,
+      "hold_appends": 0
+    },
+    "samples": 0,
+    "exception": null
+  },
+  "person_cancel_exception_controlled": {
+    "counts": {
+      "grabs": 15,
+      "reads": 22,
+      "matches": 42,
+      "hold_appends": 0,
+      "callback_polls": 0
+    },
+    "after": {
+      "grabs": 15,
+      "reads": 22,
+      "matches": 42,
+      "hold_appends": 0
+    },
+    "samples": 15,
+    "exception": null
+  },
+  "vit_precancelled_controlled_factory": {
+    "counts": {
+      "grabs": 2,
+      "reads": 2,
+      "matches": 0,
+      "hold_appends": 0,
+      "callback_polls": 1
+    },
+    "after": {
+      "grabs": 2,
+      "reads": 2,
+      "matches": 0,
+      "hold_appends": 0
+    },
+    "samples": 0,
+    "exception": "PipelineCancelled: "
+  }
+}
+{
+  "web": {
+    "start": [
+      200,
+      {
+        "ok": true
+      }
+    ],
+    "cancel": [
+      200,
+      {
+        "ok": true
+      }
+    ],
+    "owners_while_cancelled": 1,
+    "status_while_cancelled": [
+      200,
+      {
+        "added": 0,
+        "error": "cancelled by user",
+        "state": "done"
+      }
+    ],
+    "delete_while_cancelled": 409,
+    "report_unchanged": true,
+    "owners_after": 0,
+    "work_after": 0,
+    "tracker_lease_released": true,
+    "worker_threads_alive": 0,
+    "delete_after": 200
+  },
+  "web_counts": {
+    "grabs": 15,
+    "reads": 22,
+    "matches": 42,
+    "hold_appends": 0,
+    "callback_polls": 0
+  },
+  "web_after_cancel": {
+    "grabs": 13,
+    "reads": 19,
+    "matches": 41,
+    "hold_appends": 0
+  }
+}

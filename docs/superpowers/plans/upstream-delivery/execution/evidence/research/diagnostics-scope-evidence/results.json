@@ -1,0 +1,68 @@
+{
+  "worker": {
+    "id": "ca2503d72e1f",
+    "phase": "error",
+    "error": "input not found: /tmp/openscrub-diagnostics-scope-20261117/runtime/worker/missing-PATH_SENTINEL_OCR_PLATE_PROVIDER.mp4",
+    "log_len": 1208,
+    "sentinel_in_log": true,
+    "status_log_len": 1208,
+    "status_tail_len": 30,
+    "cursor_payload": {
+      "from": 1200,
+      "len": 1208,
+      "lines": [
+        "synthetic line 1197",
+        "synthetic line 1198",
+        "synthetic line 1199",
+        "synthetic line 1200",
+        "synthetic line 1201",
+        "synthetic line 1202",
+        "synthetic line 1203",
+        "synthetic line 1204"
+      ]
+    },
+    "worker_alive_after_job_error": true,
+    "watchdog_restarted_worker": true,
+    "owners_after_stop": 0,
+    "job_files": [
+      "input.mp4",
+      "options.json"
+    ]
+  },
+  "restart": {
+    "id": "ca2503d72e1f",
+    "phase": "error",
+    "error": "recovered after a server restart before the scan finished \u2014 Retry re-runs it with its original settings (the uploaded file was kept), or Delete frees its disk space",
+    "log": [
+      "(recovered after server restart \u2014 the scan had not completed)"
+    ],
+    "files": [
+      "input.mp4",
+      "options.json"
+    ],
+    "diagnostics_files": []
+  },
+  "startup_failure": {
+    "source": "/tmp/openscrub-diagnostics-scope-20261117/12919c96c6f7558136b50d7b4d85e5e6b62f1971/openscrub_web.py",
+    "jobs_dir": "/tmp/openscrub-diagnostics-scope-20261117/runtime/startup_failure/jobs",
+    "listener_opened": false,
+    "worker_alive": true,
+    "diagnostic_files_before_exit": []
+  },
+  "sigterm": {
+    "source": "/tmp/openscrub-diagnostics-scope-20261117/12919c96c6f7558136b50d7b4d85e5e6b62f1971/openscrub_web.py",
+    "jobs_dir": "/tmp/openscrub-diagnostics-scope-20261117/runtime/sigterm/jobs",
+    "listener_opened": false,
+    "worker_alive": true,
+    "diagnostic_files_before_exit": []
+  },
+  "validation": {
+    "passed": true,
+    "no_http_listener": true,
+    "donor_executed": false,
+    "real_worker_thread_joined": true,
+    "task_owned_runtime_removed_after_capture": true,
+    "python": "existing venv-opencv4/bin/python; no install",
+    "scope": "Three tiny cases: worker failure plus restart, main serve-boundary exception, main SIGTERM boundary. No actual WSGI server or TLS exercise."
+  }
+}

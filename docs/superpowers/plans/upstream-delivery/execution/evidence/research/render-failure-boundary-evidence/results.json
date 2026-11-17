@@ -1,0 +1,1694 @@
+{
+  "pin": "12919c96c6f7558136b50d7b4d85e5e6b62f1971",
+  "modules": {
+    "openscrub.py": "275de34766d3d64592222be5633906a3dcd2557ce78e2dd7b7d6fb8075fd0355",
+    "openscrub_web.py": "7762f0314df5e11e46a570af54cd20e928953e7bf92d55da7d648dad36e0fce2",
+    "openscrub_internal/reports.py": "e8a7429c0b5430ee290f6635ca5d5a93445d3f0fe9bb0f58e57fec891ee01b7f"
+  },
+  "cases": [
+    {
+      "name": "pre_encoder_concealed_source_nan",
+      "entry": "actual run_render",
+      "before": {
+        "video": {
+          "exists": true,
+          "size": 1150,
+          "sha256": "0f9aa6ec687d422526c67976a472eaa8971626d63fbc7f097c8f50cc521c02f2"
+        },
+        "report": {
+          "exists": true,
+          "size": 749,
+          "sha256": "eaf223b47b133adfdcd5bd3c4578fbd7798bff15f884ae7ae3d1bf1ef4f6cb48"
+        }
+      },
+      "job": null,
+      "operation": null,
+      "exception": {
+        "type": "OverflowError",
+        "message": "cannot convert float infinity to integer"
+      },
+      "production_terminal": {
+        "children": [],
+        "captures_open": [],
+        "stderr_temps_closed": []
+      },
+      "after": {
+        "video": {
+          "exists": true,
+          "size": 1150,
+          "sha256": "0f9aa6ec687d422526c67976a472eaa8971626d63fbc7f097c8f50cc521c02f2"
+        },
+        "report": {
+          "exists": true,
+          "size": 749,
+          "sha256": "eaf223b47b133adfdcd5bd3c4578fbd7798bff15f884ae7ae3d1bf1ef4f6cb48"
+        }
+      },
+      "partial_paths": [],
+      "after_resource_cleanup_files": {
+        "video": {
+          "exists": true,
+          "size": 1150,
+          "sha256": "0f9aa6ec687d422526c67976a472eaa8971626d63fbc7f097c8f50cc521c02f2"
+        },
+        "report": {
+          "exists": true,
+          "size": 749,
+          "sha256": "eaf223b47b133adfdcd5bd3c4578fbd7798bff15f884ae7ae3d1bf1ef4f6cb48"
+        }
+      },
+      "harness_removed_partial_paths": [],
+      "after_harness_cleanup": {
+        "children": [],
+        "captures_open": [],
+        "stderr_temps_closed": []
+      },
+      "after_harness_cleanup_files": {
+        "video": {
+          "exists": true,
+          "size": 1150,
+          "sha256": "0f9aa6ec687d422526c67976a472eaa8971626d63fbc7f097c8f50cc521c02f2"
+        },
+        "report": {
+          "exists": true,
+          "size": 749,
+          "sha256": "eaf223b47b133adfdcd5bd3c4578fbd7798bff15f884ae7ae3d1bf1ef4f6cb48"
+        }
+      }
+    },
+    {
+      "name": "default_source_nan",
+      "entry": "actual run_render",
+      "before": {
+        "video": {
+          "exists": true,
+          "size": 1150,
+          "sha256": "0f9aa6ec687d422526c67976a472eaa8971626d63fbc7f097c8f50cc521c02f2"
+        },
+        "report": {
+          "exists": true,
+          "size": 721,
+          "sha256": "596bb3ac0ab82ec8ecae6209efd8180202d737c43766f4397562a4ef72f0a7ca"
+        }
+      },
+      "job": null,
+      "operation": null,
+      "exception": {
+        "type": "ValueError",
+        "message": "cannot convert float NaN to integer"
+      },
+      "production_terminal": {
+        "children": [
+          {
+            "pid": 136,
+            "args": [
+              "ffprobe",
+              "-v",
+              "error",
+              "-select_streams",
+              "a",
+              "-show_entries",
+              "stream=codec_name,codec_tag_string",
+              "-of",
+              "json",
+              "/tmp/openscrub-render-failure-20261117/default_source_nan/input.mp4"
+            ],
+            "returncode": 0,
+            "proc_state": null,
+            "stdin_closed": null,
+            "stdout_closed": true
+          },
+          {
+            "pid": 137,
+            "args": [
+              "ffmpeg",
+              "-y",
+              "-loglevel",
+              "error",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "bgr24",
+              "-s",
+              "64x64",
+              "-r",
+              "10.000000",
+              "-i",
+              "pipe:0",
+              "-i",
+              "/tmp/openscrub-render-failure-20261117/default_source_nan/input.mp4",
+              "-map",
+              "0:v:0",
+              "-map",
+              "1:a?",
+              "-map_metadata",
+              "-1",
+              "-map_chapters",
+              "-1",
+              "-c:v",
+              "libx264",
+              "-crf",
+              "18",
+              "-preset",
+              "fast",
+              "-pix_fmt",
+              "yuv420p",
+              "-c:a",
+              "copy",
+              "/tmp/openscrub-render-failure-20261117/default_source_nan/output.mp4"
+            ],
+            "returncode": null,
+            "proc_state": "State:\tR (running)",
+            "stdin_closed": false,
+            "stdout_closed": null
+          }
+        ],
+        "captures_open": [
+          true
+        ],
+        "stderr_temps_closed": [
+          false
+        ]
+      },
+      "after": {
+        "video": {
+          "exists": true,
+          "size": 1150,
+          "sha256": "0f9aa6ec687d422526c67976a472eaa8971626d63fbc7f097c8f50cc521c02f2"
+        },
+        "report": {
+          "exists": true,
+          "size": 721,
+          "sha256": "596bb3ac0ab82ec8ecae6209efd8180202d737c43766f4397562a4ef72f0a7ca"
+        }
+      },
+      "partial_paths": [],
+      "after_resource_cleanup_files": {
+        "video": {
+          "exists": true,
+          "size": 1150,
+          "sha256": "0f9aa6ec687d422526c67976a472eaa8971626d63fbc7f097c8f50cc521c02f2"
+        },
+        "report": {
+          "exists": true,
+          "size": 721,
+          "sha256": "596bb3ac0ab82ec8ecae6209efd8180202d737c43766f4397562a4ef72f0a7ca"
+        }
+      },
+      "harness_removed_partial_paths": [],
+      "after_harness_cleanup": {
+        "children": [
+          {
+            "pid": 136,
+            "args": [
+              "ffprobe",
+              "-v",
+              "error",
+              "-select_streams",
+              "a",
+              "-show_entries",
+              "stream=codec_name,codec_tag_string",
+              "-of",
+              "json",
+              "/tmp/openscrub-render-failure-20261117/default_source_nan/input.mp4"
+            ],
+            "returncode": 0,
+            "proc_state": null,
+            "stdin_closed": null,
+            "stdout_closed": true
+          },
+          {
+            "pid": 137,
+            "args": [
+              "ffmpeg",
+              "-y",
+              "-loglevel",
+              "error",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "bgr24",
+              "-s",
+              "64x64",
+              "-r",
+              "10.000000",
+              "-i",
+              "pipe:0",
+              "-i",
+              "/tmp/openscrub-render-failure-20261117/default_source_nan/input.mp4",
+              "-map",
+              "0:v:0",
+              "-map",
+              "1:a?",
+              "-map_metadata",
+              "-1",
+              "-map_chapters",
+              "-1",
+              "-c:v",
+              "libx264",
+              "-crf",
+              "18",
+              "-preset",
+              "fast",
+              "-pix_fmt",
+              "yuv420p",
+              "-c:a",
+              "copy",
+              "/tmp/openscrub-render-failure-20261117/default_source_nan/output.mp4"
+            ],
+            "returncode": -15,
+            "proc_state": null,
+            "stdin_closed": true,
+            "stdout_closed": null
+          }
+        ],
+        "captures_open": [
+          false
+        ],
+        "stderr_temps_closed": [
+          true
+        ]
+      },
+      "after_harness_cleanup_files": {
+        "video": {
+          "exists": true,
+          "size": 1150,
+          "sha256": "0f9aa6ec687d422526c67976a472eaa8971626d63fbc7f097c8f50cc521c02f2"
+        },
+        "report": {
+          "exists": true,
+          "size": 721,
+          "sha256": "596bb3ac0ab82ec8ecae6209efd8180202d737c43766f4397562a4ef72f0a7ca"
+        }
+      }
+    },
+    {
+      "name": "sdr_mid_render_nonfinite_translation",
+      "entry": "actual run_render",
+      "before": {
+        "video": {
+          "exists": true,
+          "size": 1150,
+          "sha256": "0f9aa6ec687d422526c67976a472eaa8971626d63fbc7f097c8f50cc521c02f2"
+        },
+        "report": {
+          "exists": true,
+          "size": 757,
+          "sha256": "bf77505240696530085af012a8b54d3af990d9b39a26b34ccc240bb8aab33afd"
+        }
+      },
+      "job": null,
+      "operation": null,
+      "exception": {
+        "type": "OverflowError",
+        "message": "cannot convert float infinity to integer"
+      },
+      "production_terminal": {
+        "children": [
+          {
+            "pid": 169,
+            "args": [
+              "ffprobe",
+              "-v",
+              "error",
+              "-select_streams",
+              "a",
+              "-show_entries",
+              "stream=codec_name,codec_tag_string",
+              "-of",
+              "json",
+              "/tmp/openscrub-render-failure-20261117/sdr_mid_render_nonfinite_translation/input.mp4"
+            ],
+            "returncode": 0,
+            "proc_state": null,
+            "stdin_closed": null,
+            "stdout_closed": true
+          },
+          {
+            "pid": 170,
+            "args": [
+              "ffmpeg",
+              "-y",
+              "-loglevel",
+              "error",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "bgr24",
+              "-s",
+              "64x64",
+              "-r",
+              "10.000000",
+              "-i",
+              "pipe:0",
+              "-i",
+              "/tmp/openscrub-render-failure-20261117/sdr_mid_render_nonfinite_translation/input.mp4",
+              "-map",
+              "0:v:0",
+              "-map",
+              "1:a?",
+              "-map_metadata",
+              "-1",
+              "-map_chapters",
+              "-1",
+              "-c:v",
+              "libx264",
+              "-crf",
+              "18",
+              "-preset",
+              "fast",
+              "-pix_fmt",
+              "yuv420p",
+              "-c:a",
+              "copy",
+              "/tmp/openscrub-render-failure-20261117/sdr_mid_render_nonfinite_translation/output.mp4"
+            ],
+            "returncode": null,
+            "proc_state": "State:\tR (running)",
+            "stdin_closed": false,
+            "stdout_closed": null
+          }
+        ],
+        "captures_open": [
+          true
+        ],
+        "stderr_temps_closed": [
+          false
+        ]
+      },
+      "after": {
+        "video": {
+          "exists": true,
+          "size": 1150,
+          "sha256": "0f9aa6ec687d422526c67976a472eaa8971626d63fbc7f097c8f50cc521c02f2"
+        },
+        "report": {
+          "exists": true,
+          "size": 757,
+          "sha256": "bf77505240696530085af012a8b54d3af990d9b39a26b34ccc240bb8aab33afd"
+        }
+      },
+      "partial_paths": [],
+      "after_resource_cleanup_files": {
+        "video": {
+          "exists": true,
+          "size": 1769,
+          "sha256": "08afdf097ad1fc2d7cda835b8a42a4dade09ff7f6e54ab5caee2570aefb0fdf9"
+        },
+        "report": {
+          "exists": true,
+          "size": 757,
+          "sha256": "bf77505240696530085af012a8b54d3af990d9b39a26b34ccc240bb8aab33afd"
+        }
+      },
+      "harness_removed_partial_paths": [
+        "/tmp/openscrub-render-failure-20261117/sdr_mid_render_nonfinite_translation/output.mp4"
+      ],
+      "after_harness_cleanup": {
+        "children": [
+          {
+            "pid": 169,
+            "args": [
+              "ffprobe",
+              "-v",
+              "error",
+              "-select_streams",
+              "a",
+              "-show_entries",
+              "stream=codec_name,codec_tag_string",
+              "-of",
+              "json",
+              "/tmp/openscrub-render-failure-20261117/sdr_mid_render_nonfinite_translation/input.mp4"
+            ],
+            "returncode": 0,
+            "proc_state": null,
+            "stdin_closed": null,
+            "stdout_closed": true
+          },
+          {
+            "pid": 170,
+            "args": [
+              "ffmpeg",
+              "-y",
+              "-loglevel",
+              "error",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "bgr24",
+              "-s",
+              "64x64",
+              "-r",
+              "10.000000",
+              "-i",
+              "pipe:0",
+              "-i",
+              "/tmp/openscrub-render-failure-20261117/sdr_mid_render_nonfinite_translation/input.mp4",
+              "-map",
+              "0:v:0",
+              "-map",
+              "1:a?",
+              "-map_metadata",
+              "-1",
+              "-map_chapters",
+              "-1",
+              "-c:v",
+              "libx264",
+              "-crf",
+              "18",
+              "-preset",
+              "fast",
+              "-pix_fmt",
+              "yuv420p",
+              "-c:a",
+              "copy",
+              "/tmp/openscrub-render-failure-20261117/sdr_mid_render_nonfinite_translation/output.mp4"
+            ],
+            "returncode": 255,
+            "proc_state": null,
+            "stdin_closed": true,
+            "stdout_closed": null
+          }
+        ],
+        "captures_open": [
+          false
+        ],
+        "stderr_temps_closed": [
+          true
+        ]
+      },
+      "after_harness_cleanup_files": {
+        "video": {
+          "exists": false,
+          "size": null,
+          "sha256": null
+        },
+        "report": {
+          "exists": true,
+          "size": 757,
+          "sha256": "bf77505240696530085af012a8b54d3af990d9b39a26b34ccc240bb8aab33afd"
+        }
+      }
+    },
+    {
+      "name": "hdr_mid_render_nonfinite_translation",
+      "entry": "actual run_render",
+      "before": {
+        "video": {
+          "exists": true,
+          "size": 1150,
+          "sha256": "0f9aa6ec687d422526c67976a472eaa8971626d63fbc7f097c8f50cc521c02f2"
+        },
+        "report": {
+          "exists": true,
+          "size": 757,
+          "sha256": "4fc82752ed3ca1d2163e2ee3b0d26e751e48f33e584147f50e51b7210e9ff802"
+        }
+      },
+      "job": null,
+      "operation": null,
+      "exception": {
+        "type": "OverflowError",
+        "message": "cannot convert float infinity to integer"
+      },
+      "production_terminal": {
+        "children": [
+          {
+            "pid": 240,
+            "args": [
+              "ffmpeg",
+              "-loglevel",
+              "error",
+              "-i",
+              "/tmp/openscrub-render-failure-20261117/hdr_mid_render_nonfinite_translation/input.mp4",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "yuv420p10le",
+              "pipe:1"
+            ],
+            "returncode": null,
+            "proc_state": "State:\tZ (zombie)",
+            "stdin_closed": null,
+            "stdout_closed": false
+          },
+          {
+            "pid": 241,
+            "args": [
+              "ffprobe",
+              "-v",
+              "error",
+              "-select_streams",
+              "a",
+              "-show_entries",
+              "stream=codec_name,codec_tag_string",
+              "-of",
+              "json",
+              "/tmp/openscrub-render-failure-20261117/hdr_mid_render_nonfinite_translation/input.mp4"
+            ],
+            "returncode": 0,
+            "proc_state": null,
+            "stdin_closed": null,
+            "stdout_closed": true
+          },
+          {
+            "pid": 279,
+            "args": [
+              "ffmpeg",
+              "-y",
+              "-loglevel",
+              "error",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "yuv420p10le",
+              "-s",
+              "64x64",
+              "-r",
+              "10.000000",
+              "-i",
+              "pipe:0",
+              "-i",
+              "/tmp/openscrub-render-failure-20261117/hdr_mid_render_nonfinite_translation/input.mp4",
+              "-map",
+              "0:v:0",
+              "-map",
+              "1:a?",
+              "-map_metadata",
+              "-1",
+              "-map_chapters",
+              "-1",
+              "-c:v",
+              "libx265",
+              "-crf",
+              "18",
+              "-preset",
+              "fast",
+              "-pix_fmt",
+              "yuv420p10le",
+              "-tag:v",
+              "hvc1",
+              "-c:a",
+              "copy",
+              "/tmp/openscrub-render-failure-20261117/hdr_mid_render_nonfinite_translation/output.mp4"
+            ],
+            "returncode": null,
+            "proc_state": "State:\tR (running)",
+            "stdin_closed": false,
+            "stdout_closed": null
+          }
+        ],
+        "captures_open": [
+          false
+        ],
+        "stderr_temps_closed": [
+          false
+        ]
+      },
+      "after": {
+        "video": {
+          "exists": true,
+          "size": 1150,
+          "sha256": "0f9aa6ec687d422526c67976a472eaa8971626d63fbc7f097c8f50cc521c02f2"
+        },
+        "report": {
+          "exists": true,
+          "size": 757,
+          "sha256": "4fc82752ed3ca1d2163e2ee3b0d26e751e48f33e584147f50e51b7210e9ff802"
+        }
+      },
+      "partial_paths": [],
+      "after_resource_cleanup_files": {
+        "video": {
+          "exists": true,
+          "size": 3478,
+          "sha256": "aa2efcfb68e434ebd2420df09f4b1d0fc59ce84f432cbce2618f2ea3f76cbdf6"
+        },
+        "report": {
+          "exists": true,
+          "size": 757,
+          "sha256": "4fc82752ed3ca1d2163e2ee3b0d26e751e48f33e584147f50e51b7210e9ff802"
+        }
+      },
+      "harness_removed_partial_paths": [
+        "/tmp/openscrub-render-failure-20261117/hdr_mid_render_nonfinite_translation/output.mp4"
+      ],
+      "after_harness_cleanup": {
+        "children": [
+          {
+            "pid": 240,
+            "args": [
+              "ffmpeg",
+              "-loglevel",
+              "error",
+              "-i",
+              "/tmp/openscrub-render-failure-20261117/hdr_mid_render_nonfinite_translation/input.mp4",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "yuv420p10le",
+              "pipe:1"
+            ],
+            "returncode": 0,
+            "proc_state": null,
+            "stdin_closed": null,
+            "stdout_closed": true
+          },
+          {
+            "pid": 241,
+            "args": [
+              "ffprobe",
+              "-v",
+              "error",
+              "-select_streams",
+              "a",
+              "-show_entries",
+              "stream=codec_name,codec_tag_string",
+              "-of",
+              "json",
+              "/tmp/openscrub-render-failure-20261117/hdr_mid_render_nonfinite_translation/input.mp4"
+            ],
+            "returncode": 0,
+            "proc_state": null,
+            "stdin_closed": null,
+            "stdout_closed": true
+          },
+          {
+            "pid": 279,
+            "args": [
+              "ffmpeg",
+              "-y",
+              "-loglevel",
+              "error",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "yuv420p10le",
+              "-s",
+              "64x64",
+              "-r",
+              "10.000000",
+              "-i",
+              "pipe:0",
+              "-i",
+              "/tmp/openscrub-render-failure-20261117/hdr_mid_render_nonfinite_translation/input.mp4",
+              "-map",
+              "0:v:0",
+              "-map",
+              "1:a?",
+              "-map_metadata",
+              "-1",
+              "-map_chapters",
+              "-1",
+              "-c:v",
+              "libx265",
+              "-crf",
+              "18",
+              "-preset",
+              "fast",
+              "-pix_fmt",
+              "yuv420p10le",
+              "-tag:v",
+              "hvc1",
+              "-c:a",
+              "copy",
+              "/tmp/openscrub-render-failure-20261117/hdr_mid_render_nonfinite_translation/output.mp4"
+            ],
+            "returncode": 255,
+            "proc_state": null,
+            "stdin_closed": true,
+            "stdout_closed": null
+          }
+        ],
+        "captures_open": [
+          false
+        ],
+        "stderr_temps_closed": [
+          true
+        ]
+      },
+      "after_harness_cleanup_files": {
+        "video": {
+          "exists": false,
+          "size": null,
+          "sha256": null
+        },
+        "report": {
+          "exists": true,
+          "size": 757,
+          "sha256": "4fc82752ed3ca1d2163e2ee3b0d26e751e48f33e584147f50e51b7210e9ff802"
+        }
+      }
+    },
+    {
+      "name": "direct_checkpoint_cancel",
+      "entry": "actual run_render",
+      "before": {
+        "video": {
+          "exists": true,
+          "size": 1150,
+          "sha256": "0f9aa6ec687d422526c67976a472eaa8971626d63fbc7f097c8f50cc521c02f2"
+        },
+        "report": {
+          "exists": true,
+          "size": 733,
+          "sha256": "68a424c9c7a7c89a8d283ab1ea8bd80c7d36bb00e55c603bd8e497ec43a96803"
+        }
+      },
+      "job": null,
+      "operation": null,
+      "exception": {
+        "type": "PipelineCancelled",
+        "message": ""
+      },
+      "production_terminal": {
+        "children": [
+          {
+            "pid": 363,
+            "args": [
+              "ffprobe",
+              "-v",
+              "error",
+              "-select_streams",
+              "a",
+              "-show_entries",
+              "stream=codec_name,codec_tag_string",
+              "-of",
+              "json",
+              "/tmp/openscrub-render-failure-20261117/direct_checkpoint_cancel/input.mp4"
+            ],
+            "returncode": 0,
+            "proc_state": null,
+            "stdin_closed": null,
+            "stdout_closed": true
+          },
+          {
+            "pid": 364,
+            "args": [
+              "ffmpeg",
+              "-y",
+              "-loglevel",
+              "error",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "bgr24",
+              "-s",
+              "64x64",
+              "-r",
+              "10.000000",
+              "-i",
+              "pipe:0",
+              "-i",
+              "/tmp/openscrub-render-failure-20261117/direct_checkpoint_cancel/input.mp4",
+              "-map",
+              "0:v:0",
+              "-map",
+              "1:a?",
+              "-map_metadata",
+              "-1",
+              "-map_chapters",
+              "-1",
+              "-c:v",
+              "libx264",
+              "-crf",
+              "18",
+              "-preset",
+              "fast",
+              "-pix_fmt",
+              "yuv420p",
+              "-c:a",
+              "copy",
+              "/tmp/openscrub-render-failure-20261117/direct_checkpoint_cancel/output.mp4"
+            ],
+            "returncode": -15,
+            "proc_state": null,
+            "stdin_closed": true,
+            "stdout_closed": null
+          }
+        ],
+        "captures_open": [
+          false
+        ],
+        "stderr_temps_closed": [
+          false
+        ]
+      },
+      "after": {
+        "video": {
+          "exists": false,
+          "size": null,
+          "sha256": null
+        },
+        "report": {
+          "exists": true,
+          "size": 733,
+          "sha256": "68a424c9c7a7c89a8d283ab1ea8bd80c7d36bb00e55c603bd8e497ec43a96803"
+        }
+      },
+      "partial_paths": [],
+      "after_resource_cleanup_files": {
+        "video": {
+          "exists": false,
+          "size": null,
+          "sha256": null
+        },
+        "report": {
+          "exists": true,
+          "size": 733,
+          "sha256": "68a424c9c7a7c89a8d283ab1ea8bd80c7d36bb00e55c603bd8e497ec43a96803"
+        }
+      },
+      "harness_removed_partial_paths": [],
+      "after_harness_cleanup": {
+        "children": [
+          {
+            "pid": 363,
+            "args": [
+              "ffprobe",
+              "-v",
+              "error",
+              "-select_streams",
+              "a",
+              "-show_entries",
+              "stream=codec_name,codec_tag_string",
+              "-of",
+              "json",
+              "/tmp/openscrub-render-failure-20261117/direct_checkpoint_cancel/input.mp4"
+            ],
+            "returncode": 0,
+            "proc_state": null,
+            "stdin_closed": null,
+            "stdout_closed": true
+          },
+          {
+            "pid": 364,
+            "args": [
+              "ffmpeg",
+              "-y",
+              "-loglevel",
+              "error",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "bgr24",
+              "-s",
+              "64x64",
+              "-r",
+              "10.000000",
+              "-i",
+              "pipe:0",
+              "-i",
+              "/tmp/openscrub-render-failure-20261117/direct_checkpoint_cancel/input.mp4",
+              "-map",
+              "0:v:0",
+              "-map",
+              "1:a?",
+              "-map_metadata",
+              "-1",
+              "-map_chapters",
+              "-1",
+              "-c:v",
+              "libx264",
+              "-crf",
+              "18",
+              "-preset",
+              "fast",
+              "-pix_fmt",
+              "yuv420p",
+              "-c:a",
+              "copy",
+              "/tmp/openscrub-render-failure-20261117/direct_checkpoint_cancel/output.mp4"
+            ],
+            "returncode": -15,
+            "proc_state": null,
+            "stdin_closed": true,
+            "stdout_closed": null
+          }
+        ],
+        "captures_open": [
+          false
+        ],
+        "stderr_temps_closed": [
+          true
+        ]
+      },
+      "after_harness_cleanup_files": {
+        "video": {
+          "exists": false,
+          "size": null,
+          "sha256": null
+        },
+        "report": {
+          "exists": true,
+          "size": 733,
+          "sha256": "68a424c9c7a7c89a8d283ab1ea8bd80c7d36bb00e55c603bd8e497ec43a96803"
+        }
+      }
+    },
+    {
+      "name": "worker_final_report_replace_failure",
+      "entry": "enqueue -> ordinary worker -> run_pipeline(from_report) -> run_render",
+      "injection": "task report os.replace raises OSError",
+      "before": {
+        "video": {
+          "exists": true,
+          "size": 1150,
+          "sha256": "0f9aa6ec687d422526c67976a472eaa8971626d63fbc7f097c8f50cc521c02f2"
+        },
+        "report": {
+          "exists": true,
+          "size": 755,
+          "sha256": "bd1a15fa185f0558314f40e67b271a2ac0eb0378a65d62afc006f46b85e65bfe"
+        }
+      },
+      "queued": {
+        "phase": "queued_render",
+        "error": null,
+        "output": "/tmp/openscrub-render-failure-20261117/worker_final_report_replace_failure/output.mp4",
+        "files_count": 1,
+        "files_work": 1,
+        "global_files_count": 1,
+        "active": true,
+        "operation_present": true,
+        "active_operation_current": true,
+        "active_released": false,
+        "active_source": "/tmp/openscrub-render-failure-20261117/worker_final_report_replace_failure/input.mp4",
+        "queue_count": 1,
+        "worker_current": null
+      },
+      "job_terminal": {
+        "phase": "error",
+        "error": "research-injected final report replace failure",
+        "output": "/tmp/openscrub-render-failure-20261117/worker_final_report_replace_failure/output.mp4",
+        "files_count": 0,
+        "files_work": 0,
+        "global_files_count": 0,
+        "active": false,
+        "operation_present": true,
+        "active_operation_current": false,
+        "active_released": null,
+        "active_source": null,
+        "queue_count": 0,
+        "worker_current": null
+      },
+      "production_terminal": {
+        "children": [
+          {
+            "pid": 366,
+            "args": [
+              "ffprobe",
+              "-v",
+              "error",
+              "-select_streams",
+              "v:0",
+              "-show_entries",
+              "stream=r_frame_rate,avg_frame_rate",
+              "-of",
+              "json",
+              "/tmp/openscrub-render-failure-20261117/worker_final_report_replace_failure/input.mp4"
+            ],
+            "returncode": 0,
+            "proc_state": null,
+            "stdin_closed": null,
+            "stdout_closed": true
+          },
+          {
+            "pid": 367,
+            "args": [
+              "ffprobe",
+              "-v",
+              "error",
+              "-select_streams",
+              "v:0",
+              "-show_entries",
+              "stream=color_transfer,color_primaries,pix_fmt",
+              "-of",
+              "json",
+              "/tmp/openscrub-render-failure-20261117/worker_final_report_replace_failure/input.mp4"
+            ],
+            "returncode": 0,
+            "proc_state": null,
+            "stdin_closed": null,
+            "stdout_closed": true
+          },
+          {
+            "pid": 384,
+            "args": [
+              "ffprobe",
+              "-v",
+              "error",
+              "-select_streams",
+              "a",
+              "-show_entries",
+              "stream=codec_name,codec_tag_string",
+              "-of",
+              "json",
+              "/tmp/openscrub-render-failure-20261117/worker_final_report_replace_failure/input.mp4"
+            ],
+            "returncode": 0,
+            "proc_state": null,
+            "stdin_closed": null,
+            "stdout_closed": true
+          },
+          {
+            "pid": 385,
+            "args": [
+              "ffmpeg",
+              "-y",
+              "-loglevel",
+              "error",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "bgr24",
+              "-s",
+              "64x64",
+              "-r",
+              "10.000000",
+              "-i",
+              "pipe:0",
+              "-i",
+              "/tmp/openscrub-render-failure-20261117/worker_final_report_replace_failure/input.mp4",
+              "-map",
+              "0:v:0",
+              "-map",
+              "1:a?",
+              "-map_metadata",
+              "-1",
+              "-map_chapters",
+              "-1",
+              "-c:v",
+              "libx264",
+              "-crf",
+              "18",
+              "-preset",
+              "fast",
+              "-pix_fmt",
+              "yuv420p",
+              "-c:a",
+              "copy",
+              "/tmp/openscrub-render-failure-20261117/worker_final_report_replace_failure/output.mp4"
+            ],
+            "returncode": 0,
+            "proc_state": null,
+            "stdin_closed": true,
+            "stdout_closed": null
+          }
+        ],
+        "captures_open": [
+          false
+        ],
+        "stderr_temps_closed": [
+          false
+        ]
+      },
+      "after": {
+        "video": {
+          "exists": true,
+          "size": 1800,
+          "sha256": "4e76a9aeeed4f748ca6e7f9f7c7ab5b3b62d46dd7acb4d1d6902c594ca9f3e6f"
+        },
+        "report": {
+          "exists": true,
+          "size": 755,
+          "sha256": "bd1a15fa185f0558314f40e67b271a2ac0eb0378a65d62afc006f46b85e65bfe"
+        }
+      },
+      "logs": [
+        "[1/2] Loading detections from /tmp/openscrub-render-failure-20261117/worker_final_report_replace_failure/report.json",
+        "      1 enabled detections",
+        "[4/4] Rendering -> /tmp/openscrub-render-failure-20261117/worker_final_report_replace_failure/output.mp4",
+        "      encoder: libx264 (CPU)",
+        "ERROR: research-injected final report replace failure"
+      ],
+      "partial_paths": [],
+      "after_harness_cleanup": {
+        "children": [
+          {
+            "pid": 366,
+            "args": [
+              "ffprobe",
+              "-v",
+              "error",
+              "-select_streams",
+              "v:0",
+              "-show_entries",
+              "stream=r_frame_rate,avg_frame_rate",
+              "-of",
+              "json",
+              "/tmp/openscrub-render-failure-20261117/worker_final_report_replace_failure/input.mp4"
+            ],
+            "returncode": 0,
+            "proc_state": null,
+            "stdin_closed": null,
+            "stdout_closed": true
+          },
+          {
+            "pid": 367,
+            "args": [
+              "ffprobe",
+              "-v",
+              "error",
+              "-select_streams",
+              "v:0",
+              "-show_entries",
+              "stream=color_transfer,color_primaries,pix_fmt",
+              "-of",
+              "json",
+              "/tmp/openscrub-render-failure-20261117/worker_final_report_replace_failure/input.mp4"
+            ],
+            "returncode": 0,
+            "proc_state": null,
+            "stdin_closed": null,
+            "stdout_closed": true
+          },
+          {
+            "pid": 384,
+            "args": [
+              "ffprobe",
+              "-v",
+              "error",
+              "-select_streams",
+              "a",
+              "-show_entries",
+              "stream=codec_name,codec_tag_string",
+              "-of",
+              "json",
+              "/tmp/openscrub-render-failure-20261117/worker_final_report_replace_failure/input.mp4"
+            ],
+            "returncode": 0,
+            "proc_state": null,
+            "stdin_closed": null,
+            "stdout_closed": true
+          },
+          {
+            "pid": 385,
+            "args": [
+              "ffmpeg",
+              "-y",
+              "-loglevel",
+              "error",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "bgr24",
+              "-s",
+              "64x64",
+              "-r",
+              "10.000000",
+              "-i",
+              "pipe:0",
+              "-i",
+              "/tmp/openscrub-render-failure-20261117/worker_final_report_replace_failure/input.mp4",
+              "-map",
+              "0:v:0",
+              "-map",
+              "1:a?",
+              "-map_metadata",
+              "-1",
+              "-map_chapters",
+              "-1",
+              "-c:v",
+              "libx264",
+              "-crf",
+              "18",
+              "-preset",
+              "fast",
+              "-pix_fmt",
+              "yuv420p",
+              "-c:a",
+              "copy",
+              "/tmp/openscrub-render-failure-20261117/worker_final_report_replace_failure/output.mp4"
+            ],
+            "returncode": 0,
+            "proc_state": null,
+            "stdin_closed": true,
+            "stdout_closed": null
+          }
+        ],
+        "captures_open": [
+          false
+        ],
+        "stderr_temps_closed": [
+          true
+        ]
+      }
+    },
+    {
+      "name": "worker_cancel_after_video_before_report_ack",
+      "entry": "enqueue -> ordinary worker -> run_pipeline(from_report) -> run_render",
+      "injection": "gate after actual output hashing",
+      "before": {
+        "video": {
+          "exists": true,
+          "size": 1150,
+          "sha256": "0f9aa6ec687d422526c67976a472eaa8971626d63fbc7f097c8f50cc521c02f2"
+        },
+        "report": {
+          "exists": true,
+          "size": 771,
+          "sha256": "f155f688a48db90cc4d9ba8dba4d867c7cda84c4bd7b511c89b76bc39f7c7f3b"
+        }
+      },
+      "queued": {
+        "phase": "queued_render",
+        "error": null,
+        "output": "/tmp/openscrub-render-failure-20261117/worker_cancel_after_video_before_report_ack/output.mp4",
+        "files_count": 1,
+        "files_work": 1,
+        "global_files_count": 1,
+        "active": true,
+        "operation_present": true,
+        "active_operation_current": true,
+        "active_released": false,
+        "active_source": "/tmp/openscrub-render-failure-20261117/worker_cancel_after_video_before_report_ack/input.mp4",
+        "queue_count": 1,
+        "worker_current": null
+      },
+      "at_hash_gate": {
+        "ownership": {
+          "phase": "rendering",
+          "error": null,
+          "output": "/tmp/openscrub-render-failure-20261117/worker_cancel_after_video_before_report_ack/output.mp4",
+          "files_count": 1,
+          "files_work": 1,
+          "global_files_count": 1,
+          "active": true,
+          "operation_present": true,
+          "active_operation_current": true,
+          "active_released": false,
+          "active_source": "/tmp/openscrub-render-failure-20261117/worker_cancel_after_video_before_report_ack/input.mp4",
+          "queue_count": 0,
+          "worker_current": "fda0c00e1649"
+        },
+        "video": {
+          "exists": true,
+          "size": 1800,
+          "sha256": "4e76a9aeeed4f748ca6e7f9f7c7ab5b3b62d46dd7acb4d1d6902c594ca9f3e6f"
+        },
+        "report": {
+          "exists": true,
+          "size": 771,
+          "sha256": "f155f688a48db90cc4d9ba8dba4d867c7cda84c4bd7b511c89b76bc39f7c7f3b"
+        },
+        "resources": {
+          "children": [
+            {
+              "pid": 440,
+              "args": [
+                "ffprobe",
+                "-v",
+                "error",
+                "-select_streams",
+                "v:0",
+                "-show_entries",
+                "stream=r_frame_rate,avg_frame_rate",
+                "-of",
+                "json",
+                "/tmp/openscrub-render-failure-20261117/worker_cancel_after_video_before_report_ack/input.mp4"
+              ],
+              "returncode": 0,
+              "proc_state": null,
+              "stdin_closed": null,
+              "stdout_closed": true
+            },
+            {
+              "pid": 441,
+              "args": [
+                "ffprobe",
+                "-v",
+                "error",
+                "-select_streams",
+                "v:0",
+                "-show_entries",
+                "stream=color_transfer,color_primaries,pix_fmt",
+                "-of",
+                "json",
+                "/tmp/openscrub-render-failure-20261117/worker_cancel_after_video_before_report_ack/input.mp4"
+              ],
+              "returncode": 0,
+              "proc_state": null,
+              "stdin_closed": null,
+              "stdout_closed": true
+            },
+            {
+              "pid": 458,
+              "args": [
+                "ffprobe",
+                "-v",
+                "error",
+                "-select_streams",
+                "a",
+                "-show_entries",
+                "stream=codec_name,codec_tag_string",
+                "-of",
+                "json",
+                "/tmp/openscrub-render-failure-20261117/worker_cancel_after_video_before_report_ack/input.mp4"
+              ],
+              "returncode": 0,
+              "proc_state": null,
+              "stdin_closed": null,
+              "stdout_closed": true
+            },
+            {
+              "pid": 459,
+              "args": [
+                "ffmpeg",
+                "-y",
+                "-loglevel",
+                "error",
+                "-f",
+                "rawvideo",
+                "-pix_fmt",
+                "bgr24",
+                "-s",
+                "64x64",
+                "-r",
+                "10.000000",
+                "-i",
+                "pipe:0",
+                "-i",
+                "/tmp/openscrub-render-failure-20261117/worker_cancel_after_video_before_report_ack/input.mp4",
+                "-map",
+                "0:v:0",
+                "-map",
+                "1:a?",
+                "-map_metadata",
+                "-1",
+                "-map_chapters",
+                "-1",
+                "-c:v",
+                "libx264",
+                "-crf",
+                "18",
+                "-preset",
+                "fast",
+                "-pix_fmt",
+                "yuv420p",
+                "-c:a",
+                "copy",
+                "/tmp/openscrub-render-failure-20261117/worker_cancel_after_video_before_report_ack/output.mp4"
+              ],
+              "returncode": 0,
+              "proc_state": null,
+              "stdin_closed": true,
+              "stdout_closed": null
+            }
+          ],
+          "captures_open": [
+            false
+          ],
+          "stderr_temps_closed": [
+            false
+          ]
+        }
+      },
+      "cancel_http_status": 200,
+      "after_cancel_ack": {
+        "phase": "cancelled",
+        "error": "cancelled by user",
+        "output": "/tmp/openscrub-render-failure-20261117/worker_cancel_after_video_before_report_ack/output.mp4",
+        "files_count": 1,
+        "files_work": 1,
+        "global_files_count": 1,
+        "active": true,
+        "operation_present": false,
+        "active_operation_current": false,
+        "active_released": false,
+        "active_source": "/tmp/openscrub-render-failure-20261117/worker_cancel_after_video_before_report_ack/input.mp4",
+        "queue_count": 0,
+        "worker_current": "fda0c00e1649"
+      },
+      "job_terminal": {
+        "phase": "cancelled",
+        "error": "cancelled by user",
+        "output": "/tmp/openscrub-render-failure-20261117/worker_cancel_after_video_before_report_ack/output.mp4",
+        "files_count": 0,
+        "files_work": 0,
+        "global_files_count": 0,
+        "active": false,
+        "operation_present": false,
+        "active_operation_current": false,
+        "active_released": null,
+        "active_source": null,
+        "queue_count": 0,
+        "worker_current": null
+      },
+      "production_terminal": {
+        "children": [
+          {
+            "pid": 440,
+            "args": [
+              "ffprobe",
+              "-v",
+              "error",
+              "-select_streams",
+              "v:0",
+              "-show_entries",
+              "stream=r_frame_rate,avg_frame_rate",
+              "-of",
+              "json",
+              "/tmp/openscrub-render-failure-20261117/worker_cancel_after_video_before_report_ack/input.mp4"
+            ],
+            "returncode": 0,
+            "proc_state": null,
+            "stdin_closed": null,
+            "stdout_closed": true
+          },
+          {
+            "pid": 441,
+            "args": [
+              "ffprobe",
+              "-v",
+              "error",
+              "-select_streams",
+              "v:0",
+              "-show_entries",
+              "stream=color_transfer,color_primaries,pix_fmt",
+              "-of",
+              "json",
+              "/tmp/openscrub-render-failure-20261117/worker_cancel_after_video_before_report_ack/input.mp4"
+            ],
+            "returncode": 0,
+            "proc_state": null,
+            "stdin_closed": null,
+            "stdout_closed": true
+          },
+          {
+            "pid": 458,
+            "args": [
+              "ffprobe",
+              "-v",
+              "error",
+              "-select_streams",
+              "a",
+              "-show_entries",
+              "stream=codec_name,codec_tag_string",
+              "-of",
+              "json",
+              "/tmp/openscrub-render-failure-20261117/worker_cancel_after_video_before_report_ack/input.mp4"
+            ],
+            "returncode": 0,
+            "proc_state": null,
+            "stdin_closed": null,
+            "stdout_closed": true
+          },
+          {
+            "pid": 459,
+            "args": [
+              "ffmpeg",
+              "-y",
+              "-loglevel",
+              "error",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "bgr24",
+              "-s",
+              "64x64",
+              "-r",
+              "10.000000",
+              "-i",
+              "pipe:0",
+              "-i",
+              "/tmp/openscrub-render-failure-20261117/worker_cancel_after_video_before_report_ack/input.mp4",
+              "-map",
+              "0:v:0",
+              "-map",
+              "1:a?",
+              "-map_metadata",
+              "-1",
+              "-map_chapters",
+              "-1",
+              "-c:v",
+              "libx264",
+              "-crf",
+              "18",
+              "-preset",
+              "fast",
+              "-pix_fmt",
+              "yuv420p",
+              "-c:a",
+              "copy",
+              "/tmp/openscrub-render-failure-20261117/worker_cancel_after_video_before_report_ack/output.mp4"
+            ],
+            "returncode": 0,
+            "proc_state": null,
+            "stdin_closed": true,
+            "stdout_closed": null
+          }
+        ],
+        "captures_open": [
+          false
+        ],
+        "stderr_temps_closed": [
+          false
+        ]
+      },
+      "after": {
+        "video": {
+          "exists": true,
+          "size": 1800,
+          "sha256": "4e76a9aeeed4f748ca6e7f9f7c7ab5b3b62d46dd7acb4d1d6902c594ca9f3e6f"
+        },
+        "report": {
+          "exists": true,
+          "size": 771,
+          "sha256": "f155f688a48db90cc4d9ba8dba4d867c7cda84c4bd7b511c89b76bc39f7c7f3b"
+        }
+      },
+      "logs": [
+        "[1/2] Loading detections from /tmp/openscrub-render-failure-20261117/worker_cancel_after_video_before_report_ack/report.json",
+        "      1 enabled detections",
+        "[4/4] Rendering -> /tmp/openscrub-render-failure-20261117/worker_cancel_after_video_before_report_ack/output.mp4",
+        "      encoder: libx264 (CPU)",
+        "\u2014 cancelled \u2014"
+      ],
+      "partial_paths": [],
+      "after_harness_cleanup": {
+        "children": [
+          {
+            "pid": 440,
+            "args": [
+              "ffprobe",
+              "-v",
+              "error",
+              "-select_streams",
+              "v:0",
+              "-show_entries",
+              "stream=r_frame_rate,avg_frame_rate",
+              "-of",
+              "json",
+              "/tmp/openscrub-render-failure-20261117/worker_cancel_after_video_before_report_ack/input.mp4"
+            ],
+            "returncode": 0,
+            "proc_state": null,
+            "stdin_closed": null,
+            "stdout_closed": true
+          },
+          {
+            "pid": 441,
+            "args": [
+              "ffprobe",
+              "-v",
+              "error",
+              "-select_streams",
+              "v:0",
+              "-show_entries",
+              "stream=color_transfer,color_primaries,pix_fmt",
+              "-of",
+              "json",
+              "/tmp/openscrub-render-failure-20261117/worker_cancel_after_video_before_report_ack/input.mp4"
+            ],
+            "returncode": 0,
+            "proc_state": null,
+            "stdin_closed": null,
+            "stdout_closed": true
+          },
+          {
+            "pid": 458,
+            "args": [
+              "ffprobe",
+              "-v",
+              "error",
+              "-select_streams",
+              "a",
+              "-show_entries",
+              "stream=codec_name,codec_tag_string",
+              "-of",
+              "json",
+              "/tmp/openscrub-render-failure-20261117/worker_cancel_after_video_before_report_ack/input.mp4"
+            ],
+            "returncode": 0,
+            "proc_state": null,
+            "stdin_closed": null,
+            "stdout_closed": true
+          },
+          {
+            "pid": 459,
+            "args": [
+              "ffmpeg",
+              "-y",
+              "-loglevel",
+              "error",
+              "-f",
+              "rawvideo",
+              "-pix_fmt",
+              "bgr24",
+              "-s",
+              "64x64",
+              "-r",
+              "10.000000",
+              "-i",
+              "pipe:0",
+              "-i",
+              "/tmp/openscrub-render-failure-20261117/worker_cancel_after_video_before_report_ack/input.mp4",
+              "-map",
+              "0:v:0",
+              "-map",
+              "1:a?",
+              "-map_metadata",
+              "-1",
+              "-map_chapters",
+              "-1",
+              "-c:v",
+              "libx264",
+              "-crf",
+              "18",
+              "-preset",
+              "fast",
+              "-pix_fmt",
+              "yuv420p",
+              "-c:a",
+              "copy",
+              "/tmp/openscrub-render-failure-20261117/worker_cancel_after_video_before_report_ack/output.mp4"
+            ],
+            "returncode": 0,
+            "proc_state": null,
+            "stdin_closed": true,
+            "stdout_closed": null
+          }
+        ],
+        "captures_open": [
+          false
+        ],
+        "stderr_temps_closed": [
+          true
+        ]
+      }
+    }
+  ],
+  "fixtures": {
+    "input.mp4": {
+      "exists": true,
+      "size": 1154,
+      "sha256": "b363d1b2d57bde828765880e1021a3735587760d6519f08dc7eabce9f3e0967c"
+    },
+    "previous.mp4": {
+      "exists": true,
+      "size": 1150,
+      "sha256": "0f9aa6ec687d422526c67976a472eaa8971626d63fbc7f097c8f50cc521c02f2"
+    }
+  }
+}

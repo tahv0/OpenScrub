@@ -1,0 +1,68 @@
+* Creating isolated environment: venv+pip...
+* Installing packages in isolated environment:
+  - hatchling
+> /tmp/build-env-q27ql2ks/bin/python -Im pip install --ignore-installed --use-
+  pep517 --no-warn-script-location --no-compile --no-input -r /tmp/build-
+  requirements-wyta2186.txt
+< WARNING: The directory '/home/tahv0/.cache/pip' or its parent directory is
+  not owned or is not writable by the current user. The cache has been
+  disabled. Check the permissions and owner of that directory. If executing
+  pip with sudo, you should use sudo's -H flag.
+< WARNING: Retrying (Retry(total=4, connect=None, read=None, redirect=None,
+  status=None)) after connection broken by
+  'NameResolutionError("HTTPSConnection(host='pypi.org', port=443): Failed to
+  resolve 'pypi.org' ([Errno -2] Name or service not known)")':
+  /simple/hatchling/
+< WARNING: Retrying (Retry(total=3, connect=None, read=None, redirect=None,
+  status=None)) after connection broken by
+  'NameResolutionError("HTTPSConnection(host='pypi.org', port=443): Failed to
+  resolve 'pypi.org' ([Errno -2] Name or service not known)")':
+  /simple/hatchling/
+< WARNING: Retrying (Retry(total=2, connect=None, read=None, redirect=None,
+  status=None)) after connection broken by
+  'NameResolutionError("HTTPSConnection(host='pypi.org', port=443): Failed to
+  resolve 'pypi.org' ([Errno -2] Name or service not known)")':
+  /simple/hatchling/
+< WARNING: Retrying (Retry(total=1, connect=None, read=None, redirect=None,
+  status=None)) after connection broken by
+  'NameResolutionError("HTTPSConnection(host='pypi.org', port=443): Failed to
+  resolve 'pypi.org' ([Errno -2] Name or service not known)")':
+  /simple/hatchling/
+< WARNING: Retrying (Retry(total=0, connect=None, read=None, redirect=None,
+  status=None)) after connection broken by
+  'NameResolutionError("HTTPSConnection(host='pypi.org', port=443): Failed to
+  resolve 'pypi.org' ([Errno -2] Name or service not known)")':
+  /simple/hatchling/
+< ERROR: Could not find a version that satisfies the requirement hatchling
+  (from versions: none)
+< ERROR: No matching distribution found for hatchling
+
+Traceback (most recent call last):
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/build/__main__.py", line 289, in _handle_build_error
+    yield
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/build/__main__.py", line 755, in main
+    built = run_build(args.srcdir, outdir)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/build/__main__.py", line 405, in build_package_via_sdist
+    sdist = _build(
+            ^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/build/__main__.py", line 272, in _build
+    with _bootstrap_build_env(
+         ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/python/cpython-3.12.16-linux-x86_64-gnu/lib/python3.12/contextlib.py", line 137, in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/build/__main__.py", line 233, in _bootstrap_build_env
+    install(builder.build_system_requires, _fresh=True)
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/build/env.py", line 234, in install
+    self._env_backend.install_dependencies(requirements, constraints, _fresh=_fresh)
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/build/env.py", line 436, in install_dependencies
+    run_subprocess(cmd, env=_pip_env())
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/build/_ctx.py", line 68, in run_subprocess
+    subprocess.run(cmd, capture_output=True, check=True, cwd=cwd, env=env)  # noqa: S603
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/python/cpython-3.12.16-linux-x86_64-gnu/lib/python3.12/subprocess.py", line 571, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['/tmp/build-env-q27ql2ks/bin/python', '-Im', 'pip', 'install', '--ignore-installed', '--use-pep517', '--no-warn-script-location', '--no-compile', '--no-input', '-r', '/tmp/build-requirements-wyta2186.txt']' returned non-zero exit status 1.
+
+ERROR Command '['/tmp/build-env-q27ql2ks/bin/python', '-Im', 'pip', 'install', '--ignore-installed', '--use-pep517', '--no-warn-script-location', '--no-compile', '--no-input', '-r', '/tmp/build-requirements-wyta2186.txt']' returned non-zero exit status 1.

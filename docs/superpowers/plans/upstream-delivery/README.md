@@ -118,7 +118,7 @@ The task cards below specify their own **what**, **why**, **when**, implementati
 
 ## Dependencies that actually matter
 
-- P01–P05 can each target Austin directly; none needs P06 or new optional state.
+- P01/P04/P05 use Austin plus the test-only B02a prerequisite. P02/P03 use the reviewed P07a browser ownership contract as an explicit dependency; neither copies server report features or adds optional state. Their standalone server limitation and complete roundtrip checks remain declared for C01.
 - P06 owns report transaction/publication correctness. P07 may use its contract for request replay; P08 consumes publication invalidation if that is the chosen cache design. Declare those dependencies explicitly rather than copying conflicting helpers.
 - P09's browser scheduling can be independent of P08's server cache. P10's decoding contract can be independent of either; share only if measured work justifies it.
 - P15 can build on P02's explicit actions, but view filters must not depend on O01 or a training label.

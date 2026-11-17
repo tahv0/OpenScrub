@@ -1,0 +1,22 @@
+Installed modules: /tmp/openscrub-task4/site/openscrub.py /tmp/openscrub-task4/site/openscrub_web.py
+usage: openscrub-web [-h] [--port PORT] [--host HOST] [--token TOKEN] [--http]
+                     [--retain-days RETAIN_DAYS]
+                     [--max-upload-gb MAX_UPLOAD_GB]
+
+options:
+  -h, --help            show this help message and exit
+  --port PORT
+  --host HOST
+  --token TOKEN         require this access token on every request (default:
+                        open — anyone on the network can use the server)
+  --http                serve plain HTTP (not recommended: video uploads and
+                        previews contain PII and would cross the network
+                        unencrypted)
+  --retain-days RETAIN_DAYS
+                        auto-delete job folders (which contain PII) after this
+                        many days (default 7; 0 = keep forever)
+  --max-upload-gb MAX_UPLOAD_GB
+                        largest browser upload accepted, in GB (default 8; 0 =
+                        unlimited; env OPENSCRUB_MAX_UPLOAD_GB works too).
+                        Very large files are better served in place via the
+                        'path on the server' box than uploaded.

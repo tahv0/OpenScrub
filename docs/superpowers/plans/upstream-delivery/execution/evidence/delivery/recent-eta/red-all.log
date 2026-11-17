@@ -1,0 +1,450 @@
+FFFFFFFF....F....F.FFFFF                                                 [100%]
+=================================== FAILURES ===================================
+________________ test_sustained_slow_tail_replaces_fast_prefix _________________
+
+clock = namespace(now=780, wall=10780)
+
+    def test_sustained_slow_tail_replaces_fast_prefix(clock):
+        job = {}
+        cb = web.WebCallbacks(job)
+        # 600 s at 10 units/s, then 180 s at 1 unit/s; 3820 units remain.
+        for t in range(0, 601, 5):
+            clock.now, clock.wall = t, 10000 + t
+            cb.progress("scan", t * 10, 10000)
+        for t in range(605, 781, 5):
+            clock.now, clock.wall = t, 10000 + t
+            cb.progress("scan", 6000 + t - 600, 10000)
+>       assert 3815 <= job["eta"] <= 3835
+E       assert 3815 <= 476
+
+tests/test_scan_eta.py:29: AssertionError
+__________ test_startup_waits_three_seconds_and_smooths_new_estimates __________
+
+clock = namespace(now=10, wall=10010)
+
+    def test_startup_waits_three_seconds_and_smooths_new_estimates(clock):
+        cb = web.WebCallbacks({})
+        assert observe(cb, clock, 0, 10) is None
+        assert observe(cb, clock, 2, 12) is None
+        assert observe(cb, clock, 3, 13) == 87
+        assert observe(cb, clock, 5, 15) == 86
+        # New rate is (40-10)/10 = 3/s, raw remaining 20 s.
+>       assert observe(cb, clock, 10, 40) == 43
+E       assert 70 == 43
+E        +  where 70 = observe(<openscrub_web.WebCallbacks object at 0x74edc98af170>, namespace(now=10, wall=10010), 10, 40)
+
+tests/test_scan_eta.py:48: AssertionError
+____________________ test_steady_rate_tracks_remaining_time ____________________
+
+clock = namespace(now=20, wall=10020)
+
+    def test_steady_rate_tracks_remaining_time(clock):
+        cb = web.WebCallbacks({})
+        for t in range(0, 101, 5):
+            eta = observe(cb, clock, t, t, 200)
+            if t >= 20:
+>               assert 200 - t <= eta <= 200 - t + 3
+E               assert 189 <= ((200 - 20) + 3)
+
+tests/test_scan_eta.py:56: AssertionError
+___________ test_zero_progress_and_mature_stall_have_no_useful_rate ____________
+
+clock = namespace(now=150, wall=10150)
+
+    def test_zero_progress_and_mature_stall_have_no_useful_rate(clock):
+        cb = web.WebCallbacks({})
+        for t in range(0, 151, 5):
+            assert observe(cb, clock, t, 0) is None
+        cb = web.WebCallbacks({})
+        observe(cb, clock, 0, 0)
+        assert observe(cb, clock, 20, 20) == 80
+        for t in range(25, 151, 5):
+            observe(cb, clock, t, 20)
+>       assert cb.job["eta"] is None  # Historical startup rate must not return.
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       assert 540 is None
+
+tests/test_scan_eta.py:68: AssertionError
+_____________ test_recent_rate_becomes_preferred_at_twenty_seconds _____________
+
+clock = namespace(now=400, wall=10400)
+
+    def test_recent_rate_becomes_preferred_at_twenty_seconds(clock):
+        cb = web.WebCallbacks({})
+        observe(cb, clock, 0, 0, 1000)
+        for t in range(5, 201, 5):
+            observe(cb, clock, t, t, 1000)
+        # A new, far-future observation prunes old history, retaining one
+        # predecessor (200,200); the new window is initially only 5 seconds.
+>       assert observe(cb, clock, 400, 300, 1000) == 1220
+E       assert 845 == 1220
+E        +  where 845 = observe(<openscrub_web.WebCallbacks object at 0x74edc98b84a0>, namespace(now=400, wall=10400), 400, 300, 1000)
+
+tests/test_scan_eta.py:78: AssertionError
+_________ test_subsample_and_repeated_calls_do_not_grow_sample_storage _________
+
+clock = namespace(now=4, wall=10004)
+
+    def test_subsample_and_repeated_calls_do_not_grow_sample_storage(clock):
+        cb = web.WebCallbacks({})
+        observe(cb, clock, 0, 0)
+        for t in range(1, 5):
+            observe(cb, clock, t, t)
+            observe(cb, clock, t, t)
+>       assert len(cb._rate_points) == 1
+                   ^^^^^^^^^^^^^^^
+E       AttributeError: 'WebCallbacks' object has no attribute '_rate_points'
+
+tests/test_scan_eta.py:88: AttributeError
+___________________ test_wall_clock_jump_does_not_change_eta ___________________
+
+clock = namespace(now=10, wall=-10000)
+
+    def test_wall_clock_jump_does_not_change_eta(clock):
+        cb = web.WebCallbacks({})
+        observe(cb, clock, 0, 0)
+        assert observe(cb, clock, 5, 5) == 95
+        clock.now, clock.wall = 10, -10000
+        cb.progress("scan", 10, 100)
+>       assert cb.job["eta"] == 92
+E       assert None == 92
+
+tests/test_scan_eta.py:99: AssertionError
+_____________ test_counter_regression_between_samples_starts_fresh _____________
+
+clock = namespace(now=5, wall=10005)
+
+    def test_counter_regression_between_samples_starts_fresh(clock):
+        cb = web.WebCallbacks({})
+        observe(cb, clock, 0, 10)
+        observe(cb, clock, 1, 15)
+        assert observe(cb, clock, 2, 14) is None
+>       assert observe(cb, clock, 5, 17) == 83
+E       assert 59 == 83
+E        +  where 59 = observe(<openscrub_web.WebCallbacks object at 0x74edc98bdc70>, namespace(now=5, wall=10005), 5, 17)
+
+tests/test_scan_eta.py:107: AssertionError
+_________ test_completion_resets_estimator_for_same_stage_next_attempt _________
+
+clock = namespace(now=6, wall=10006)
+
+    def test_completion_resets_estimator_for_same_stage_next_attempt(clock):
+        cb = web.WebCallbacks({})
+        observe(cb, clock, 0, 0)
+        observe(cb, clock, 5, 5)
+        assert observe(cb, clock, 6, 100) is None
+>       assert cb._rate_points == []
+               ^^^^^^^^^^^^^^^
+E       AttributeError: 'WebCallbacks' object has no attribute '_rate_points'
+
+tests/test_scan_eta.py:128: AttributeError
+_____ test_unusable_numeric_observations_never_publish_invalid_eta[1-inf] ______
+
+clock = namespace(now=5, wall=10005), cur = 1, total = inf
+
+    @pytest.mark.parametrize("cur,total", [
+        (0, 0), (0, -1), (float("nan"), 100),
+        (float("inf"), 100), (1, float("inf")), (1, float("nan")),
+        (1e-308, 1e308),
+    ])
+    def test_unusable_numeric_observations_never_publish_invalid_eta(clock, cur, total):
+        cb = web.WebCallbacks({})
+        observe(cb, clock, 0, 0)
+>       observe(cb, clock, 5, cur, total)
+
+tests/test_scan_eta.py:143: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_scan_eta.py:35: in observe
+    cb.progress(stage, cur, total)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <openscrub_web.WebCallbacks object at 0x74edc98bdeb0>, stage = 'scan'
+cur = 1, total = inf
+
+    def progress(self, stage, cur, total):
+        # scan frame loop -> first 45% of the bar; "post" (dense-track
+        # smoothing after the loop — previously a silent stall) -> 45-50%;
+        # render -> back half. Jobs without a post stage jump 45 -> 50,
+        # which reads as instant rather than stuck.
+        # Rounded to 5 decimals, not 3: on a long slow scan 3-decimal
+        # quantization froze the bar for 30s+ stretches, and the old
+        # client-side ETA (extrapolated from bar movement) blanked out.
+        base, span = {"scan": (0, 0.45),
+                      "post": (0.45, 0.05)}.get(stage, (0.5, 0.5))
+        self.job["progress"] = round(base + span * cur / max(total, 1), 5)
+    
+        # Server-side per-STAGE ETA from the stage's whole-run average
+        # rate (units/sec since the stage began). Each stage runs at its
+        # own real speed — extrapolating one ETA across the stitched bar
+        # (what the client used to do) made the estimate lurch at every
+        # phase boundary. The whole-stage average is stable by
+        # construction, and a light EMA on the published value keeps
+        # re-estimates gliding instead of stepping when the scan hits a
+        # fast-skip jump or a dense stretch.
+        now = time.time()
+        if stage != self._stage:
+            self._stage, self._t0, self._cur0 = stage, now, cur
+            self._eta = None
+            self.job["eta"] = None
+            return
+        done, elapsed = cur - self._cur0, now - self._t0
+        if cur < total and done > 0 and elapsed >= 3.0:
+            rem = (total - cur) * elapsed / done
+            self._eta = (rem if self._eta is None
+                         else 0.75 * self._eta + 0.25 * rem)
+>           self.job["eta"] = round(self._eta)
+                              ^^^^^^^^^^^^^^^^
+E           OverflowError: cannot convert float infinity to integer
+
+openscrub_web.py:409: OverflowError
+_ test_unusable_numeric_observations_never_publish_invalid_eta[1e-308-1e+308] __
+
+clock = namespace(now=5, wall=10005), cur = 1e-308, total = 1e+308
+
+    @pytest.mark.parametrize("cur,total", [
+        (0, 0), (0, -1), (float("nan"), 100),
+        (float("inf"), 100), (1, float("inf")), (1, float("nan")),
+        (1e-308, 1e308),
+    ])
+    def test_unusable_numeric_observations_never_publish_invalid_eta(clock, cur, total):
+        cb = web.WebCallbacks({})
+        observe(cb, clock, 0, 0)
+>       observe(cb, clock, 5, cur, total)
+
+tests/test_scan_eta.py:143: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_scan_eta.py:35: in observe
+    cb.progress(stage, cur, total)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <openscrub_web.WebCallbacks object at 0x74edc98c2780>, stage = 'scan'
+cur = 1e-308, total = 1e+308
+
+    def progress(self, stage, cur, total):
+        # scan frame loop -> first 45% of the bar; "post" (dense-track
+        # smoothing after the loop — previously a silent stall) -> 45-50%;
+        # render -> back half. Jobs without a post stage jump 45 -> 50,
+        # which reads as instant rather than stuck.
+        # Rounded to 5 decimals, not 3: on a long slow scan 3-decimal
+        # quantization froze the bar for 30s+ stretches, and the old
+        # client-side ETA (extrapolated from bar movement) blanked out.
+        base, span = {"scan": (0, 0.45),
+                      "post": (0.45, 0.05)}.get(stage, (0.5, 0.5))
+        self.job["progress"] = round(base + span * cur / max(total, 1), 5)
+    
+        # Server-side per-STAGE ETA from the stage's whole-run average
+        # rate (units/sec since the stage began). Each stage runs at its
+        # own real speed — extrapolating one ETA across the stitched bar
+        # (what the client used to do) made the estimate lurch at every
+        # phase boundary. The whole-stage average is stable by
+        # construction, and a light EMA on the published value keeps
+        # re-estimates gliding instead of stepping when the scan hits a
+        # fast-skip jump or a dense stretch.
+        now = time.time()
+        if stage != self._stage:
+            self._stage, self._t0, self._cur0 = stage, now, cur
+            self._eta = None
+            self.job["eta"] = None
+            return
+        done, elapsed = cur - self._cur0, now - self._t0
+        if cur < total and done > 0 and elapsed >= 3.0:
+            rem = (total - cur) * elapsed / done
+            self._eta = (rem if self._eta is None
+                         else 0.75 * self._eta + 0.25 * rem)
+>           self.job["eta"] = round(self._eta)
+                              ^^^^^^^^^^^^^^^^
+E           OverflowError: cannot convert float infinity to integer
+
+openscrub_web.py:409: OverflowError
+_________________ test_storage_stays_bounded_over_a_long_stage _________________
+
+clock = namespace(now=0, wall=10000)
+
+    def test_storage_stays_bounded_over_a_long_stage(clock):
+        cb = web.WebCallbacks({})
+        for t in range(0, 10001, 5):
+            observe(cb, clock, t, t, 20000)
+>           assert len(cb._rate_points) <= 26
+                       ^^^^^^^^^^^^^^^
+E           AttributeError: 'WebCallbacks' object has no attribute '_rate_points'
+
+tests/test_scan_eta.py:151: AttributeError
+________ test_worker_clears_published_eta_and_uses_fresh_callback[done] ________
+
+clock = namespace(now=5, wall=10005)
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x74edc98bd520>
+tmp_path = PosixPath('/tmp/pytest-of-tahv0/pytest-20/test_worker_clears_published_e0')
+result = 'done'
+
+    @pytest.mark.parametrize("result", ["done", "cancelled", "error"])
+    def test_worker_clears_published_eta_and_uses_fresh_callback(
+            clock, monkeypatch, tmp_path, result):
+        job = {"id": "eta-test", "dir": str(tmp_path), "options": {},
+               "log": [], "error": None, "stats": {}, "output": None}
+        callbacks = []
+        monkeypatch.setattr(web, "build_args", lambda *a, **kw: object())
+        monkeypatch.setattr(web.openscrub, "load_report", lambda *a: ([], {}, {}))
+    
+        def pipeline(args, cb):
+            callbacks.append(cb)
+            assert observe(cb, clock, 0, 10, stage="render") is None
+            assert observe(cb, clock, 5, 15, stage="render") == 85
+            if result == "cancelled":
+                raise web.openscrub.PipelineCancelled()
+            if result == "error":
+                raise RuntimeError("synthetic stage error")
+            return {"output": str(tmp_path / "result.mp4")}
+    
+        monkeypatch.setattr(web.openscrub, "run_pipeline", pipeline)
+        for _ in range(2):
+            web._run_job(job, "render")
+            assert job["phase"] == result
+>           assert web.job_public(job)["eta"] is None
+                   ^^^^^^^^^^^^^^^^^^^
+
+tests/test_scan_eta.py:179: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+job = {'id': 'eta-test', 'dir': '/tmp/pytest-of-tahv0/pytest-20/test_worker_clears_published_e0', 'options': {}, 'log': [], ...}
+
+    def job_public(job):
+>       return {k: job[k] for k in ("id", "name", "phase", "progress", "error",
+                   ^^^^^^
+                                    "stats")} | {
+            "eta": job.get("eta"),      # .get(): jobs rehydrated from disk lack it
+            # input size: lets the editor warn before re-uploading a file that
+            # is ALREADY on the server (issue #16 — each retry re-uploaded the
+            # same 18 GB until the disk filled)
+            "size": job.get("size") or 0,
+            "log_tail": job["log"][-30:],
+            "log_len": len(job["log"]),
+            "has_output": bool(job["output"] and os.path.exists(job["output"])),
+        }
+E       KeyError: 'name'
+
+openscrub_web.py:351: KeyError
+_____ test_worker_clears_published_eta_and_uses_fresh_callback[cancelled] ______
+
+clock = namespace(now=5, wall=10005)
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x74edc98c18b0>
+tmp_path = PosixPath('/tmp/pytest-of-tahv0/pytest-20/test_worker_clears_published_e1')
+result = 'cancelled'
+
+    @pytest.mark.parametrize("result", ["done", "cancelled", "error"])
+    def test_worker_clears_published_eta_and_uses_fresh_callback(
+            clock, monkeypatch, tmp_path, result):
+        job = {"id": "eta-test", "dir": str(tmp_path), "options": {},
+               "log": [], "error": None, "stats": {}, "output": None}
+        callbacks = []
+        monkeypatch.setattr(web, "build_args", lambda *a, **kw: object())
+        monkeypatch.setattr(web.openscrub, "load_report", lambda *a: ([], {}, {}))
+    
+        def pipeline(args, cb):
+            callbacks.append(cb)
+            assert observe(cb, clock, 0, 10, stage="render") is None
+            assert observe(cb, clock, 5, 15, stage="render") == 85
+            if result == "cancelled":
+                raise web.openscrub.PipelineCancelled()
+            if result == "error":
+                raise RuntimeError("synthetic stage error")
+            return {"output": str(tmp_path / "result.mp4")}
+    
+        monkeypatch.setattr(web.openscrub, "run_pipeline", pipeline)
+        for _ in range(2):
+            web._run_job(job, "render")
+            assert job["phase"] == result
+>           assert web.job_public(job)["eta"] is None
+                   ^^^^^^^^^^^^^^^^^^^
+
+tests/test_scan_eta.py:179: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+job = {'id': 'eta-test', 'dir': '/tmp/pytest-of-tahv0/pytest-20/test_worker_clears_published_e1', 'options': {}, 'log': [], ...}
+
+    def job_public(job):
+>       return {k: job[k] for k in ("id", "name", "phase", "progress", "error",
+                   ^^^^^^
+                                    "stats")} | {
+            "eta": job.get("eta"),      # .get(): jobs rehydrated from disk lack it
+            # input size: lets the editor warn before re-uploading a file that
+            # is ALREADY on the server (issue #16 — each retry re-uploaded the
+            # same 18 GB until the disk filled)
+            "size": job.get("size") or 0,
+            "log_tail": job["log"][-30:],
+            "log_len": len(job["log"]),
+            "has_output": bool(job["output"] and os.path.exists(job["output"])),
+        }
+E       KeyError: 'name'
+
+openscrub_web.py:351: KeyError
+_______ test_worker_clears_published_eta_and_uses_fresh_callback[error] ________
+
+clock = namespace(now=5, wall=10005)
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x74edc98c0140>
+tmp_path = PosixPath('/tmp/pytest-of-tahv0/pytest-20/test_worker_clears_published_e2')
+result = 'error'
+
+    @pytest.mark.parametrize("result", ["done", "cancelled", "error"])
+    def test_worker_clears_published_eta_and_uses_fresh_callback(
+            clock, monkeypatch, tmp_path, result):
+        job = {"id": "eta-test", "dir": str(tmp_path), "options": {},
+               "log": [], "error": None, "stats": {}, "output": None}
+        callbacks = []
+        monkeypatch.setattr(web, "build_args", lambda *a, **kw: object())
+        monkeypatch.setattr(web.openscrub, "load_report", lambda *a: ([], {}, {}))
+    
+        def pipeline(args, cb):
+            callbacks.append(cb)
+            assert observe(cb, clock, 0, 10, stage="render") is None
+            assert observe(cb, clock, 5, 15, stage="render") == 85
+            if result == "cancelled":
+                raise web.openscrub.PipelineCancelled()
+            if result == "error":
+                raise RuntimeError("synthetic stage error")
+            return {"output": str(tmp_path / "result.mp4")}
+    
+        monkeypatch.setattr(web.openscrub, "run_pipeline", pipeline)
+        for _ in range(2):
+            web._run_job(job, "render")
+            assert job["phase"] == result
+>           assert web.job_public(job)["eta"] is None
+                   ^^^^^^^^^^^^^^^^^^^
+
+tests/test_scan_eta.py:179: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+job = {'id': 'eta-test', 'dir': '/tmp/pytest-of-tahv0/pytest-20/test_worker_clears_published_e2', 'options': {}, 'log': ['ERROR: synthetic stage error'], ...}
+
+    def job_public(job):
+>       return {k: job[k] for k in ("id", "name", "phase", "progress", "error",
+                   ^^^^^^
+                                    "stats")} | {
+            "eta": job.get("eta"),      # .get(): jobs rehydrated from disk lack it
+            # input size: lets the editor warn before re-uploading a file that
+            # is ALREADY on the server (issue #16 — each retry re-uploaded the
+            # same 18 GB until the disk filled)
+            "size": job.get("size") or 0,
+            "log_tail": job["log"][-30:],
+            "log_len": len(job["log"]),
+            "has_output": bool(job["output"] and os.path.exists(job["output"])),
+        }
+E       KeyError: 'name'
+
+openscrub_web.py:351: KeyError
+=========================== short test summary info ============================
+FAILED tests/test_scan_eta.py::test_sustained_slow_tail_replaces_fast_prefix
+FAILED tests/test_scan_eta.py::test_startup_waits_three_seconds_and_smooths_new_estimates
+FAILED tests/test_scan_eta.py::test_steady_rate_tracks_remaining_time - asser...
+FAILED tests/test_scan_eta.py::test_zero_progress_and_mature_stall_have_no_useful_rate
+FAILED tests/test_scan_eta.py::test_recent_rate_becomes_preferred_at_twenty_seconds
+FAILED tests/test_scan_eta.py::test_subsample_and_repeated_calls_do_not_grow_sample_storage
+FAILED tests/test_scan_eta.py::test_wall_clock_jump_does_not_change_eta - ass...
+FAILED tests/test_scan_eta.py::test_counter_regression_between_samples_starts_fresh
+FAILED tests/test_scan_eta.py::test_completion_resets_estimator_for_same_stage_next_attempt
+FAILED tests/test_scan_eta.py::test_unusable_numeric_observations_never_publish_invalid_eta[1-inf]
+FAILED tests/test_scan_eta.py::test_unusable_numeric_observations_never_publish_invalid_eta[1e-308-1e+308]
+FAILED tests/test_scan_eta.py::test_storage_stays_bounded_over_a_long_stage
+FAILED tests/test_scan_eta.py::test_worker_clears_published_eta_and_uses_fresh_callback[done]
+FAILED tests/test_scan_eta.py::test_worker_clears_published_eta_and_uses_fresh_callback[cancelled]
+FAILED tests/test_scan_eta.py::test_worker_clears_published_eta_and_uses_fresh_callback[error]
+15 failed, 9 passed in 0.24s

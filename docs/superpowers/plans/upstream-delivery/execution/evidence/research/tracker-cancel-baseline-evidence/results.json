@@ -1,0 +1,1724 @@
+{
+  "pin": "12919c96c6f7558136b50d7b4d85e5e6b62f1971",
+  "imports": {
+    "openscrub": "/tmp/openscrub-tracker-cancel-20261117/pinned/openscrub.py",
+    "openscrub_web": "/tmp/openscrub-tracker-cancel-20261117/pinned/openscrub_web.py",
+    "openscrub_internal.lifetimes": "/tmp/openscrub-tracker-cancel-20261117/pinned/openscrub_internal/lifetimes.py",
+    "openscrub_internal.reports": "/tmp/openscrub-tracker-cancel-20261117/pinned/openscrub_internal/reports.py"
+  },
+  "python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]",
+  "opencv": "4.14.0",
+  "hold_append_line": 2535,
+  "hashes": {
+    "openscrub.py": "275de34766d3d64592222be5633906a3dcd2557ce78e2dd7b7d6fb8075fd0355",
+    "openscrub_web.py": "7762f0314df5e11e46a570af54cd20e928953e7bf92d55da7d648dad36e0fce2",
+    "openscrub_internal/lifetimes.py": "dbfc317c1c878b8e8a599391578504c44a8964199f2cdae6e2ed60a6336d6743"
+  },
+  "media": {
+    "steady.avi": {
+      "bytes": 97474,
+      "sha256": "c86c457904abc205119ba61da73ef391cb2425d9b71be92ec0906e82dd2f59bc"
+    },
+    "lost.avi": {
+      "bytes": 75312,
+      "sha256": "5409feb3733b8f8d4a29dc05411c872f80e8713331d44f1553ad9f50b7621761"
+    }
+  },
+  "cases": {
+    "steady_complete": {
+      "counts": {
+        "grabs": 15,
+        "reads": 22,
+        "matches": 42,
+        "hold_appends": 0,
+        "callback_polls": 0
+      },
+      "after_cancel": {
+        "grabs": 0,
+        "reads": 0,
+        "matches": 0,
+        "hold_appends": 0
+      },
+      "cancellation_snapshot": null,
+      "event_set": false,
+      "output": [
+        [
+          5.551115123125783e-17,
+          [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          0.9999937415122986
+        ],
+        [
+          0.20000000000000007,
+          [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          0.9999937415122986
+        ],
+        [
+          0.4000000000000001,
+          [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          0.9999937415122986
+        ],
+        [
+          0.6000000000000001,
+          [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          0.9999874234199524
+        ],
+        [
+          0.8,
+          [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          0.9999937415122986
+        ],
+        [
+          1.0,
+          [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          1.0
+        ],
+        [
+          1.2,
+          [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          0.9999937415122986
+        ],
+        [
+          1.4,
+          [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          1.0
+        ],
+        [
+          1.5999999999999999,
+          [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          0.9999874234199524
+        ],
+        [
+          1.7999999999999998,
+          [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          1.0
+        ],
+        [
+          1.9999999999999998,
+          [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          0.9999874234199524
+        ],
+        [
+          2.1999999999999997,
+          [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          0.9999874234199524
+        ],
+        [
+          2.4,
+          [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          0.9999874234199524
+        ],
+        [
+          2.6,
+          [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          1.0
+        ],
+        [
+          2.8000000000000003,
+          [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          0.9999937415122986
+        ]
+      ],
+      "exception": null,
+      "logs": [
+        "      downloading VitTrack model (~0.7 MB, one time)\u2026",
+        "      VitTrack download failed (P10C evidence: model downloads forbidden) \u2014 using template tracker"
+      ],
+      "grab_times": [
+        1.4,
+        1.5999999999999999,
+        1.7999999999999998,
+        1.9999999999999998,
+        2.1999999999999997,
+        2.4,
+        2.6,
+        2.8000000000000003,
+        1.2,
+        1.0,
+        0.8,
+        0.6000000000000001,
+        0.4000000000000001,
+        0.20000000000000007,
+        5.551115123125783e-17
+      ],
+      "natural_factory_returned_none": [
+        true
+      ],
+      "captures": [
+        {
+          "releases": 1,
+          "open": false,
+          "owner_at_release": [
+            null
+          ]
+        }
+      ]
+    },
+    "steady_cancel_after_match1": {
+      "counts": {
+        "grabs": 15,
+        "reads": 22,
+        "matches": 42,
+        "hold_appends": 0,
+        "callback_polls": 0
+      },
+      "after_cancel": {
+        "grabs": 13,
+        "reads": 19,
+        "matches": 41,
+        "hold_appends": 0
+      },
+      "cancellation_snapshot": {
+        "grabs": 2,
+        "reads": 3,
+        "matches": 1,
+        "hold_appends": 0,
+        "callback_polls": 0
+      },
+      "event_set": true,
+      "output": [
+        [
+          5.551115123125783e-17,
+          [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          0.9999937415122986
+        ],
+        [
+          0.20000000000000007,
+          [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          0.9999937415122986
+        ],
+        [
+          0.4000000000000001,
+          [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          0.9999937415122986
+        ],
+        [
+          0.6000000000000001,
+          [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          0.9999874234199524
+        ],
+        [
+          0.8,
+          [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          0.9999937415122986
+        ],
+        [
+          1.0,
+          [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          1.0
+        ],
+        [
+          1.2,
+          [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          0.9999937415122986
+        ],
+        [
+          1.4,
+          [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          1.0
+        ],
+        [
+          1.5999999999999999,
+          [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          0.9999874234199524
+        ],
+        [
+          1.7999999999999998,
+          [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          1.0
+        ],
+        [
+          1.9999999999999998,
+          [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          0.9999874234199524
+        ],
+        [
+          2.1999999999999997,
+          [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          0.9999874234199524
+        ],
+        [
+          2.4,
+          [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          0.9999874234199524
+        ],
+        [
+          2.6,
+          [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          1.0
+        ],
+        [
+          2.8000000000000003,
+          [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          0.9999937415122986
+        ]
+      ],
+      "exception": null,
+      "logs": [
+        "      downloading VitTrack model (~0.7 MB, one time)\u2026",
+        "      VitTrack download failed (P10C evidence: model downloads forbidden) \u2014 using template tracker"
+      ],
+      "grab_times": [
+        1.4,
+        1.5999999999999999,
+        1.7999999999999998,
+        1.9999999999999998,
+        2.1999999999999997,
+        2.4,
+        2.6,
+        2.8000000000000003,
+        1.2,
+        1.0,
+        0.8,
+        0.6000000000000001,
+        0.4000000000000001,
+        0.20000000000000007,
+        5.551115123125783e-17
+      ],
+      "natural_factory_returned_none": [
+        true
+      ],
+      "captures": [
+        {
+          "releases": 1,
+          "open": false,
+          "owner_at_release": [
+            null
+          ]
+        }
+      ],
+      "equals_uncancelled": true
+    },
+    "steady_precancelled": {
+      "counts": {
+        "grabs": 15,
+        "reads": 22,
+        "matches": 42,
+        "hold_appends": 0,
+        "callback_polls": 0
+      },
+      "after_cancel": {
+        "grabs": 15,
+        "reads": 22,
+        "matches": 42,
+        "hold_appends": 0
+      },
+      "cancellation_snapshot": {
+        "grabs": 0,
+        "reads": 0,
+        "matches": 0,
+        "hold_appends": 0,
+        "callback_polls": 0
+      },
+      "event_set": true,
+      "output": [
+        [
+          5.551115123125783e-17,
+          [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          0.9999937415122986
+        ],
+        [
+          0.20000000000000007,
+          [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          0.9999937415122986
+        ],
+        [
+          0.4000000000000001,
+          [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          0.9999937415122986
+        ],
+        [
+          0.6000000000000001,
+          [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          0.9999874234199524
+        ],
+        [
+          0.8,
+          [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          0.9999937415122986
+        ],
+        [
+          1.0,
+          [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          1.0
+        ],
+        [
+          1.2,
+          [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          0.9999937415122986
+        ],
+        [
+          1.4,
+          [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          1.0
+        ],
+        [
+          1.5999999999999999,
+          [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          0.9999874234199524
+        ],
+        [
+          1.7999999999999998,
+          [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          1.0
+        ],
+        [
+          1.9999999999999998,
+          [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          0.9999874234199524
+        ],
+        [
+          2.1999999999999997,
+          [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          0.9999874234199524
+        ],
+        [
+          2.4,
+          [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          0.9999874234199524
+        ],
+        [
+          2.6,
+          [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          1.0
+        ],
+        [
+          2.8000000000000003,
+          [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          0.9999937415122986
+        ]
+      ],
+      "exception": null,
+      "logs": [
+        "      downloading VitTrack model (~0.7 MB, one time)\u2026",
+        "      VitTrack download failed (P10C evidence: model downloads forbidden) \u2014 using template tracker"
+      ],
+      "grab_times": [
+        1.4,
+        1.5999999999999999,
+        1.7999999999999998,
+        1.9999999999999998,
+        2.1999999999999997,
+        2.4,
+        2.6,
+        2.8000000000000003,
+        1.2,
+        1.0,
+        0.8,
+        0.6000000000000001,
+        0.4000000000000001,
+        0.20000000000000007,
+        5.551115123125783e-17
+      ],
+      "natural_factory_returned_none": [
+        true
+      ],
+      "captures": [
+        {
+          "releases": 1,
+          "open": false,
+          "owner_at_release": [
+            null
+          ]
+        }
+      ],
+      "equals_uncancelled": true
+    },
+    "lost_complete": {
+      "counts": {
+        "grabs": 3,
+        "reads": 4,
+        "matches": 6,
+        "hold_appends": 14,
+        "callback_polls": 0
+      },
+      "after_cancel": {
+        "grabs": 0,
+        "reads": 0,
+        "matches": 0,
+        "hold_appends": 0
+      },
+      "cancellation_snapshot": null,
+      "event_set": false,
+      "output": [
+        [
+          5.551115123125783e-17,
+          [
+            32,
+            32,
+            64,
+            64
+          ],
+          0.0
+        ],
+        [
+          0.20000000000000007,
+          [
+            32,
+            32,
+            64,
+            64
+          ],
+          0.0
+        ],
+        [
+          0.4000000000000001,
+          [
+            32,
+            32,
+            64,
+            64
+          ],
+          0.0
+        ],
+        [
+          0.6000000000000001,
+          [
+            32,
+            32,
+            64,
+            64
+          ],
+          0.0
+        ],
+        [
+          0.8,
+          [
+            32,
+            32,
+            64,
+            64
+          ],
+          0.0
+        ],
+        [
+          1.0,
+          [
+            32,
+            32,
+            64,
+            64
+          ],
+          0.0
+        ],
+        [
+          1.2,
+          [
+            32,
+            32,
+            64,
+            64
+          ],
+          0.0
+        ],
+        [
+          1.4,
+          [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          1.0
+        ],
+        [
+          1.5999999999999999,
+          [
+            32,
+            32,
+            64,
+            64
+          ],
+          0.0
+        ],
+        [
+          1.7999999999999998,
+          [
+            32,
+            32,
+            64,
+            64
+          ],
+          0.0
+        ],
+        [
+          1.9999999999999998,
+          [
+            32,
+            32,
+            64,
+            64
+          ],
+          0.0
+        ],
+        [
+          2.1999999999999997,
+          [
+            32,
+            32,
+            64,
+            64
+          ],
+          0.0
+        ],
+        [
+          2.4,
+          [
+            32,
+            32,
+            64,
+            64
+          ],
+          0.0
+        ],
+        [
+          2.6,
+          [
+            32,
+            32,
+            64,
+            64
+          ],
+          0.0
+        ],
+        [
+          2.8000000000000003,
+          [
+            32,
+            32,
+            64,
+            64
+          ],
+          0.0
+        ]
+      ],
+      "exception": null,
+      "logs": [
+        "      downloading VitTrack model (~0.7 MB, one time)\u2026",
+        "      VitTrack download failed (P10C evidence: model downloads forbidden) \u2014 using template tracker",
+        "      track: LOST the object at t=1.4s \u2014 holding the last box to the window edge (review and trim if needed)",
+        "      track: LOST the object at t=1.4s \u2014 holding the last box to the window edge (review and trim if needed)"
+      ],
+      "grab_times": [
+        1.4,
+        1.5999999999999999,
+        1.2
+      ],
+      "natural_factory_returned_none": [
+        true
+      ],
+      "captures": [
+        {
+          "releases": 1,
+          "open": false,
+          "owner_at_release": [
+            null
+          ]
+        }
+      ]
+    },
+    "lost_cancel_at_hold_log": {
+      "counts": {
+        "grabs": 3,
+        "reads": 4,
+        "matches": 6,
+        "hold_appends": 14,
+        "callback_polls": 0
+      },
+      "after_cancel": {
+        "grabs": 1,
+        "reads": 1,
+        "matches": 3,
+        "hold_appends": 14
+      },
+      "cancellation_snapshot": {
+        "grabs": 2,
+        "reads": 3,
+        "matches": 3,
+        "hold_appends": 0,
+        "callback_polls": 0
+      },
+      "event_set": true,
+      "output": [
+        [
+          5.551115123125783e-17,
+          [
+            32,
+            32,
+            64,
+            64
+          ],
+          0.0
+        ],
+        [
+          0.20000000000000007,
+          [
+            32,
+            32,
+            64,
+            64
+          ],
+          0.0
+        ],
+        [
+          0.4000000000000001,
+          [
+            32,
+            32,
+            64,
+            64
+          ],
+          0.0
+        ],
+        [
+          0.6000000000000001,
+          [
+            32,
+            32,
+            64,
+            64
+          ],
+          0.0
+        ],
+        [
+          0.8,
+          [
+            32,
+            32,
+            64,
+            64
+          ],
+          0.0
+        ],
+        [
+          1.0,
+          [
+            32,
+            32,
+            64,
+            64
+          ],
+          0.0
+        ],
+        [
+          1.2,
+          [
+            32,
+            32,
+            64,
+            64
+          ],
+          0.0
+        ],
+        [
+          1.4,
+          [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          1.0
+        ],
+        [
+          1.5999999999999999,
+          [
+            32,
+            32,
+            64,
+            64
+          ],
+          0.0
+        ],
+        [
+          1.7999999999999998,
+          [
+            32,
+            32,
+            64,
+            64
+          ],
+          0.0
+        ],
+        [
+          1.9999999999999998,
+          [
+            32,
+            32,
+            64,
+            64
+          ],
+          0.0
+        ],
+        [
+          2.1999999999999997,
+          [
+            32,
+            32,
+            64,
+            64
+          ],
+          0.0
+        ],
+        [
+          2.4,
+          [
+            32,
+            32,
+            64,
+            64
+          ],
+          0.0
+        ],
+        [
+          2.6,
+          [
+            32,
+            32,
+            64,
+            64
+          ],
+          0.0
+        ],
+        [
+          2.8000000000000003,
+          [
+            32,
+            32,
+            64,
+            64
+          ],
+          0.0
+        ]
+      ],
+      "exception": null,
+      "logs": [
+        "      downloading VitTrack model (~0.7 MB, one time)\u2026",
+        "      VitTrack download failed (P10C evidence: model downloads forbidden) \u2014 using template tracker",
+        "      track: LOST the object at t=1.4s \u2014 holding the last box to the window edge (review and trim if needed)",
+        "      track: LOST the object at t=1.4s \u2014 holding the last box to the window edge (review and trim if needed)"
+      ],
+      "grab_times": [
+        1.4,
+        1.5999999999999999,
+        1.2
+      ],
+      "natural_factory_returned_none": [
+        true
+      ],
+      "captures": [
+        {
+          "releases": 1,
+          "open": false,
+          "owner_at_release": [
+            null
+          ]
+        }
+      ],
+      "equals_uncancelled": true
+    },
+    "lost_cancel_inside_hold": {
+      "counts": {
+        "grabs": 3,
+        "reads": 4,
+        "matches": 6,
+        "hold_appends": 14,
+        "callback_polls": 0
+      },
+      "after_cancel": {
+        "grabs": 1,
+        "reads": 1,
+        "matches": 3,
+        "hold_appends": 13
+      },
+      "cancellation_snapshot": {
+        "grabs": 2,
+        "reads": 3,
+        "matches": 3,
+        "hold_appends": 1,
+        "callback_polls": 0
+      },
+      "event_set": true,
+      "output": [
+        [
+          5.551115123125783e-17,
+          [
+            32,
+            32,
+            64,
+            64
+          ],
+          0.0
+        ],
+        [
+          0.20000000000000007,
+          [
+            32,
+            32,
+            64,
+            64
+          ],
+          0.0
+        ],
+        [
+          0.4000000000000001,
+          [
+            32,
+            32,
+            64,
+            64
+          ],
+          0.0
+        ],
+        [
+          0.6000000000000001,
+          [
+            32,
+            32,
+            64,
+            64
+          ],
+          0.0
+        ],
+        [
+          0.8,
+          [
+            32,
+            32,
+            64,
+            64
+          ],
+          0.0
+        ],
+        [
+          1.0,
+          [
+            32,
+            32,
+            64,
+            64
+          ],
+          0.0
+        ],
+        [
+          1.2,
+          [
+            32,
+            32,
+            64,
+            64
+          ],
+          0.0
+        ],
+        [
+          1.4,
+          [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          1.0
+        ],
+        [
+          1.5999999999999999,
+          [
+            32,
+            32,
+            64,
+            64
+          ],
+          0.0
+        ],
+        [
+          1.7999999999999998,
+          [
+            32,
+            32,
+            64,
+            64
+          ],
+          0.0
+        ],
+        [
+          1.9999999999999998,
+          [
+            32,
+            32,
+            64,
+            64
+          ],
+          0.0
+        ],
+        [
+          2.1999999999999997,
+          [
+            32,
+            32,
+            64,
+            64
+          ],
+          0.0
+        ],
+        [
+          2.4,
+          [
+            32,
+            32,
+            64,
+            64
+          ],
+          0.0
+        ],
+        [
+          2.6,
+          [
+            32,
+            32,
+            64,
+            64
+          ],
+          0.0
+        ],
+        [
+          2.8000000000000003,
+          [
+            32,
+            32,
+            64,
+            64
+          ],
+          0.0
+        ]
+      ],
+      "exception": null,
+      "logs": [
+        "      downloading VitTrack model (~0.7 MB, one time)\u2026",
+        "      VitTrack download failed (P10C evidence: model downloads forbidden) \u2014 using template tracker",
+        "      track: LOST the object at t=1.4s \u2014 holding the last box to the window edge (review and trim if needed)",
+        "      track: LOST the object at t=1.4s \u2014 holding the last box to the window edge (review and trim if needed)"
+      ],
+      "grab_times": [
+        1.4,
+        1.5999999999999999,
+        1.2
+      ],
+      "natural_factory_returned_none": [
+        true
+      ],
+      "captures": [
+        {
+          "releases": 1,
+          "open": false,
+          "owner_at_release": [
+            null
+          ]
+        }
+      ],
+      "equals_uncancelled": true
+    },
+    "small_complete": {
+      "counts": {
+        "grabs": 0,
+        "reads": 0,
+        "matches": 0,
+        "hold_appends": 0,
+        "callback_polls": 0
+      },
+      "after_cancel": {
+        "grabs": 0,
+        "reads": 0,
+        "matches": 0,
+        "hold_appends": 0
+      },
+      "cancellation_snapshot": null,
+      "event_set": false,
+      "output": [],
+      "exception": null,
+      "logs": [
+        "      track: region too small to track reliably"
+      ],
+      "grab_times": [],
+      "natural_factory_returned_none": [],
+      "captures": [
+        {
+          "releases": 1,
+          "open": false,
+          "owner_at_release": [
+            null
+          ]
+        }
+      ]
+    },
+    "small_precancelled": {
+      "counts": {
+        "grabs": 0,
+        "reads": 0,
+        "matches": 0,
+        "hold_appends": 0,
+        "callback_polls": 0
+      },
+      "after_cancel": {
+        "grabs": 0,
+        "reads": 0,
+        "matches": 0,
+        "hold_appends": 0
+      },
+      "cancellation_snapshot": {
+        "grabs": 0,
+        "reads": 0,
+        "matches": 0,
+        "hold_appends": 0,
+        "callback_polls": 0
+      },
+      "event_set": true,
+      "output": [],
+      "exception": null,
+      "logs": [
+        "      track: region too small to track reliably"
+      ],
+      "grab_times": [],
+      "natural_factory_returned_none": [],
+      "captures": [
+        {
+          "releases": 1,
+          "open": false,
+          "owner_at_release": [
+            null
+          ]
+        }
+      ]
+    },
+    "missing_complete": {
+      "counts": {
+        "grabs": 0,
+        "reads": 0,
+        "matches": 0,
+        "hold_appends": 0,
+        "callback_polls": 0
+      },
+      "after_cancel": {
+        "grabs": 0,
+        "reads": 0,
+        "matches": 0,
+        "hold_appends": 0
+      },
+      "cancellation_snapshot": null,
+      "event_set": false,
+      "output": [],
+      "exception": null,
+      "logs": [],
+      "grab_times": [],
+      "natural_factory_returned_none": [],
+      "captures": [
+        {
+          "releases": 1,
+          "open": false,
+          "owner_at_release": [
+            null
+          ]
+        }
+      ]
+    },
+    "missing_precancelled": {
+      "counts": {
+        "grabs": 0,
+        "reads": 0,
+        "matches": 0,
+        "hold_appends": 0,
+        "callback_polls": 0
+      },
+      "after_cancel": {
+        "grabs": 0,
+        "reads": 0,
+        "matches": 0,
+        "hold_appends": 0
+      },
+      "cancellation_snapshot": {
+        "grabs": 0,
+        "reads": 0,
+        "matches": 0,
+        "hold_appends": 0,
+        "callback_polls": 0
+      },
+      "event_set": true,
+      "output": [],
+      "exception": null,
+      "logs": [],
+      "grab_times": [],
+      "natural_factory_returned_none": [],
+      "captures": [
+        {
+          "releases": 1,
+          "open": false,
+          "owner_at_release": [
+            null
+          ]
+        }
+      ]
+    },
+    "person_cancel_exception_controlled": {
+      "counts": {
+        "grabs": 15,
+        "reads": 22,
+        "matches": 42,
+        "hold_appends": 0,
+        "callback_polls": 0
+      },
+      "after_cancel": {
+        "grabs": 15,
+        "reads": 22,
+        "matches": 42,
+        "hold_appends": 0
+      },
+      "cancellation_snapshot": {
+        "grabs": 0,
+        "reads": 0,
+        "matches": 0,
+        "hold_appends": 0,
+        "callback_polls": 0
+      },
+      "event_set": true,
+      "output": [
+        [
+          5.551115123125783e-17,
+          [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          0.9999937415122986
+        ],
+        [
+          0.20000000000000007,
+          [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          0.9999937415122986
+        ],
+        [
+          0.4000000000000001,
+          [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          0.9999937415122986
+        ],
+        [
+          0.6000000000000001,
+          [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          0.9999874234199524
+        ],
+        [
+          0.8,
+          [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          0.9999937415122986
+        ],
+        [
+          1.0,
+          [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          1.0
+        ],
+        [
+          1.2,
+          [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          0.9999937415122986
+        ],
+        [
+          1.4,
+          [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          1.0
+        ],
+        [
+          1.5999999999999999,
+          [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          0.9999874234199524
+        ],
+        [
+          1.7999999999999998,
+          [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          1.0
+        ],
+        [
+          1.9999999999999998,
+          [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          0.9999874234199524
+        ],
+        [
+          2.1999999999999997,
+          [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          0.9999874234199524
+        ],
+        [
+          2.4,
+          [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          0.9999874234199524
+        ],
+        [
+          2.6,
+          [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          1.0
+        ],
+        [
+          2.8000000000000003,
+          [
+            32.0,
+            32.0,
+            64.0,
+            64.0
+          ],
+          0.9999937415122986
+        ]
+      ],
+      "exception": null,
+      "logs": [
+        "      track: person-detector path failed (controlled dense-person cancel boundary) \u2014 using the generic tracker",
+        "      track: nothing recognizable under the drawn box \u2014 tracking the region as a generic object",
+        "      downloading VitTrack model (~0.7 MB, one time)\u2026",
+        "      VitTrack download failed (P10C evidence: model downloads forbidden) \u2014 using template tracker"
+      ],
+      "grab_times": [
+        1.4,
+        1.5999999999999999,
+        1.7999999999999998,
+        1.9999999999999998,
+        2.1999999999999997,
+        2.4,
+        2.6,
+        2.8000000000000003,
+        1.2,
+        1.0,
+        0.8,
+        0.6000000000000001,
+        0.4000000000000001,
+        0.20000000000000007,
+        5.551115123125783e-17
+      ],
+      "natural_factory_returned_none": [
+        true
+      ],
+      "captures": [
+        {
+          "releases": 1,
+          "open": false,
+          "owner_at_release": [
+            null
+          ]
+        }
+      ]
+    },
+    "vit_precancelled_controlled_factory": {
+      "counts": {
+        "grabs": 2,
+        "reads": 2,
+        "matches": 0,
+        "hold_appends": 0,
+        "callback_polls": 1
+      },
+      "after_cancel": {
+        "grabs": 2,
+        "reads": 2,
+        "matches": 0,
+        "hold_appends": 0
+      },
+      "cancellation_snapshot": {
+        "grabs": 0,
+        "reads": 0,
+        "matches": 0,
+        "hold_appends": 0,
+        "callback_polls": 0
+      },
+      "event_set": true,
+      "output": null,
+      "exception": "PipelineCancelled: ",
+      "logs": [],
+      "grab_times": [
+        1.4,
+        1.4
+      ],
+      "natural_factory_returned_none": [],
+      "captures": [
+        {
+          "releases": 1,
+          "open": false,
+          "owner_at_release": [
+            null
+          ]
+        }
+      ]
+    }
+  },
+  "web": {
+    "start": [
+      200,
+      {
+        "ok": true
+      }
+    ],
+    "cancel": [
+      200,
+      {
+        "ok": true
+      }
+    ],
+    "owners_while_cancelled": 1,
+    "status_while_cancelled": [
+      200,
+      {
+        "added": 0,
+        "error": "cancelled by user",
+        "state": "done"
+      }
+    ],
+    "delete_while_cancelled": 409,
+    "probe": {
+      "counts": {
+        "grabs": 15,
+        "reads": 22,
+        "matches": 42,
+        "hold_appends": 0,
+        "callback_polls": 0
+      },
+      "after_cancel": {
+        "grabs": 13,
+        "reads": 19,
+        "matches": 41,
+        "hold_appends": 0
+      },
+      "cancellation_snapshot": {
+        "grabs": 2,
+        "reads": 3,
+        "matches": 1,
+        "hold_appends": 0,
+        "callback_polls": 0
+      },
+      "event_set": true,
+      "output": null,
+      "exception": null,
+      "logs": [],
+      "grab_times": [
+        1.4,
+        1.5999999999999999,
+        1.7999999999999998,
+        1.9999999999999998,
+        2.1999999999999997,
+        2.4,
+        2.6,
+        2.8000000000000003,
+        1.2,
+        1.0,
+        0.8,
+        0.6000000000000001,
+        0.4000000000000001,
+        0.20000000000000007,
+        5.551115123125783e-17
+      ],
+      "natural_factory_returned_none": [
+        true
+      ],
+      "captures": [
+        {
+          "releases": 1,
+          "open": false,
+          "owner_at_release": [
+            1
+          ]
+        }
+      ]
+    },
+    "report_unchanged": true,
+    "owners_after": 0,
+    "work_after": 0,
+    "tracker_lease_released": true,
+    "worker_threads_alive": 0,
+    "delete_after": 200
+  },
+  "download_attempts_blocked_before_network": 8,
+  "synthetic_temporary_directory_removed_on_exit": "/tmp/openscrub-tracker-cancel-20261117/p10c-gqurgl8y",
+  "synthetic_directory_exists_after_cleanup": false
+}

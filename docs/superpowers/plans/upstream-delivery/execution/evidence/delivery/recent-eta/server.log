@@ -1,0 +1,24 @@
+Task4 synthetic ETA server http://127.0.0.1:18487
+[2026-11-17 04:54:52,474] ERROR in app: Exception on /api/certinfo [GET]
+Traceback (most recent call last):
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", line 3668, in certinfo
+    cert_path, _, mode = active_cert_pair()
+                         ^^^^^^^^^^^^^^^^^^
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", line 186, in active_cert_pair
+    ensure_self_signed()
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", line 170, in ensure_self_signed
+    with open(AUTO_KEY, "wb") as f:
+         ^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/home/tahv0/.codex/worktrees/c832/OpenScrub/certs/auto_key.pem'

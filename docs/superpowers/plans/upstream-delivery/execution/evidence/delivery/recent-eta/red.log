@@ -1,0 +1,23 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+________________ test_sustained_slow_tail_replaces_fast_prefix _________________
+
+clock = namespace(now=780, wall=10780)
+
+    def test_sustained_slow_tail_replaces_fast_prefix(clock):
+        job = {}
+        cb = web.WebCallbacks(job)
+        # 600 s at 10 units/s, then 180 s at 1 unit/s; 3820 units remain.
+        for t in range(0, 601, 5):
+            clock.now, clock.wall = t, 10000 + t
+            cb.progress("scan", t * 10, 10000)
+        for t in range(605, 781, 5):
+            clock.now, clock.wall = t, 10000 + t
+            cb.progress("scan", 6000 + t - 600, 10000)
+>       assert 3815 <= job["eta"] <= 3835
+E       assert 3815 <= 476
+
+tests/test_scan_eta.py:29: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_scan_eta.py::test_sustained_slow_tail_replaces_fast_prefix
+1 failed in 0.03s

@@ -1,0 +1,8 @@
+openscrub --help -> 0, installed imports confirmed
+openscrub-web --help -> 0, installed imports confirmed
+GET / -> 200, installed emitted UI, no-store
+GET /api/jobs -> 200 JSON list
+GET /api/models/face -> 200 JSON dict
+GET /api/model_status -> 200 JSON dict
+GET /api/vault -> 200 JSON dict
+Installed web shutdown: 0

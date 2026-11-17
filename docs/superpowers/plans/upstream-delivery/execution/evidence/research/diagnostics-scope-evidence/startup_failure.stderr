@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/diagnostics-scope-evidence/probe_lifecycle.py", line 63, in <module>
+    web.main()
+  File "/tmp/openscrub-diagnostics-scope-20261117/12919c96c6f7558136b50d7b4d85e5e6b62f1971/openscrub_web.py", line 4699, in main
+    _serve(args.host, args.port, ssl_ctx)
+  File "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/diagnostics-scope-evidence/probe_lifecycle.py", line 61, in serve
+    raise RuntimeError('SERVE_EXCEPTION_SENTINEL')
+RuntimeError: SERVE_EXCEPTION_SENTINEL

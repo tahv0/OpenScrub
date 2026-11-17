@@ -1,0 +1,812 @@
+
+### 12919c96c6f7558136b50d7b4d85e5e6b62f1971/openscrub_web.py:490-555
+
+490: def new_job(video_path, options, name):
+491:     with _own_files():
+492:         return _new_job(video_path, options, name)
+493: 
+494: 
+495: def _new_job(video_path, options, name):
+496:     jid = uuid.uuid4().hex[:12]
+497:     jdir = os.path.join(JOBS_DIR, jid)
+498:     os.makedirs(jdir, exist_ok=True)
+499:     job = {
+500:         "id": jid, "dir": jdir, "video": video_path, "name": name,
+501:         "options": options, "phase": "queued", "progress": 0.0,
+502:         "eta": None, "size": 0,
+503:         "log": [], "error": None, "output": None, "created": time.time(),
+504:         "cancel": threading.Event(), "stats": {}, "qgen": 0,
+505:     }
+506:     FILES.initialize(job)
+507:     # keep the job's settings beside its upload: a scan that never finished
+508:     # has no report to recover them from, and a Retry after a restart then
+509:     # ran with DEFAULT settings (all categories) instead of the user's own
+510:     try:
+511:         with open(os.path.join(jdir, OPTIONS_FILE), "w",
+512:                   encoding="utf-8") as f:
+513:             json.dump(options, f)
+514:     except (OSError, TypeError, ValueError):
+515:         pass
+516:     with VAULT_LOCK:
+517:         with JOBS_LOCK:
+518:             JOBS[jid] = job
+519:         if has_request_context() and g.get("file_owner") is not None:
+520:             g.setdefault("file_children", []).append(FILES.reserve(job, work=True))
+521:     return job
+522: 
+523: 
+524: def job_public(job):
+525:     return {k: job[k] for k in ("id", "name", "phase", "progress", "error",
+526:                                 "stats")} | {
+527:         "eta": job.get("eta"),      # .get(): jobs rehydrated from disk lack it
+528:         # input size: lets the editor warn before re-uploading a file that
+529:         # is ALREADY on the server (issue #16 — each retry re-uploaded the
+530:         # same 18 GB until the disk filled)
+531:         "size": job.get("size") or 0,
+532:         "log_tail": job["log"][-30:],
+533:         "log_len": len(job["log"]),
+534:         "has_output": bool(job["output"] and os.path.exists(job["output"])),
+535:     }
+536: 
+537: 
+538: class WebCallbacks(openscrub.Callbacks):
+539:     wants_frames = True
+540: 
+541:     def __init__(self, job, cancel_event=None):
+542:         self.job = job
+543:         self.cancel_event = cancel_event if cancel_event is not None else job["cancel"]
+544:         self._last_frame = 0.0
+545:         self._stage = None          # ETA state: current stage,
+546:         self._t0 = 0.0              # when it started,
+547:         self._cur0 = 0             # its first cur value,
+548:         self._eta = None            # and the smoothed estimate
+549: 
+550:     def log(self, msg):
+551:         self.job["log"].append(msg)
+552: 
+553:     def progress(self, stage, cur, total):
+554:         # scan frame loop -> first 45% of the bar; "post" (dense-track
+555:         # smoothing after the loop — previously a silent stall) -> 45-50%;
+
+### 12919c96c6f7558136b50d7b4d85e5e6b62f1971/openscrub_web.py:903-949
+
+903: def worker():
+904:     """Run queued jobs forever. NOTHING may end this loop: it is the
+905:     server's only worker, and when it died (a SystemExit from argparse —
+906:     which a thread swallows silently) the job froze at "scanning" with an
+907:     empty log, Cancel was ignored and every later job queued forever until
+908:     the container was restarted. Every per-job failure, BaseException
+909:     included, now fails that job loudly and the loop carries on."""
+910:     while True:
+911:         try:
+912:             item = WORK_Q.get()
+913:         except BaseException:          # pragma: no cover — queue can't fail
+914:             time.sleep(1)
+915:             continue
+916:         if item is None:               # explicit stop (tests); the watchdog
+917:             WORK_Q.task_done()         # starts a fresh worker in production
+918:             return
+919:         lease = None
+920:         try:
+921:             jid, action = item[0], item[1]
+922:             gen = item[2] if len(item) > 2 else None
+923:             lease = item[3] if len(item) > 3 else None
+924:             with VAULT_LOCK:
+925:                 with JOBS_LOCK:
+926:                     job = JOBS.get(jid)
+927:                     stale = (job is None
+928:                              or (gen is not None and gen != job.get("qgen", 0))
+929:                              or job.get("phase") == "cancelled"
+930:                              or (lease is not None and (lease.released
+931:                                  or FILES.initialize(job) is not lease.state))
+932:                              or FILES.initialize(job).closed)
+933:                     if job is not None:
+934:                         FILES.initialize(job).queued.pop(gen, None)
+935:                     if not stale:
+936:                         # Cancel and this handoff share the same guard. Once
+937:                         # removed from queued, only the worker releases it.
+938:                         WORKER["current"] = jid
+939:                 if not stale and lease is None:  # old queue entries
+940:                     _validate_files_locked(job)
+941:                     lease = _reserve_files_locked(job, work=True)
+942:             if not stale:
+943:                 _run_job(job, action, lease)
+944:         except BaseException as e:     # belt and braces: never die
+945:             print(f"[web] worker: unexpected {type(e).__name__}: {e}",
+946:                   flush=True)
+947:         finally:
+948:             if lease is not None:
+949:                 _finish_operation(job, lease)
+
+### 12919c96c6f7558136b50d7b4d85e5e6b62f1971/openscrub_web.py:1096-1158
+
+1096:                 job["output"] = res["output"]
+1097:                 job["phase"] = "done"
+1098:                 job["progress"] = 1.0
+1099:                 job["eta"] = None
+1100:     except openscrub.PipelineCancelled:
+1101:         with files.report_lock:
+1102:             if _operation_valid(job, owner):
+1103:                 job["phase"] = "cancelled"
+1104:                 job["error"] = "cancelled by user"
+1105:     except BaseException as e:
+1106:         msg = str(e) or type(e).__name__
+1107:         if isinstance(e, SystemExit):
+1108:             msg = "the job stopped unexpectedly (exit %s)" % (e.code,)
+1109:         with files.report_lock:
+1110:             if _operation_valid(job, owner):
+1111:                 job["phase"] = "error"
+1112:                 job["error"] = msg
+1113:                 job["log"].append(f"ERROR: {msg}")
+1114:     finally:
+1115:         with files.report_lock:
+1116:             if _operation_valid(job, owner):
+1117:                 job["eta"] = None
+1118: 
+1119: 
+1120: def start_worker():
+1121:     t = threading.Thread(target=worker, daemon=True, name="job-worker")
+1122:     WORKER["thread"] = t
+1123:     t.start()
+1124:     return t
+1125: 
+1126: 
+1127: def check_worker():
+1128:     """Watchdog step: if the worker thread is gone, fail the job it was
+1129:     running (it can never finish now) and start a fresh worker so the
+1130:     queue keeps moving. Returns True when it had to restart one."""
+1131:     t = WORKER.get("thread")
+1132:     if t is not None and t.is_alive():
+1133:         return False
+1134:     jid = WORKER.get("current")
+1135:     with JOBS_LOCK:
+1136:         job = JOBS.get(jid) if jid else None
+1137:         if job is not None and job.get("phase") in _ACTIVE_PHASES:
+1138:             job["phase"] = "error"
+1139:             job["eta"] = None
+1140:             job["error"] = ("the job worker stopped unexpectedly — the "
+1141:                             "server restarted it; Retry re-runs the scan "
+1142:                             "with the file already on the server")
+1143:             job["log"].append("ERROR: " + job["error"])
+1144:     WORKER["current"] = None
+1145:     if t is not None:
+1146:         print("[web] job worker was not running — restarted it", flush=True)
+1147:     start_worker()
+1148:     return True
+1149: 
+1150: 
+1151: def _worker_watchdog():
+1152:     while True:
+1153:         time.sleep(5)
+1154:         try:
+1155:             check_worker()
+1156:         except Exception as e:
+1157:             print(f"[web] worker watchdog: {e}", flush=True)
+1158: 
+
+### 12919c96c6f7558136b50d7b4d85e5e6b62f1971/openscrub_web.py:1451-1457
+
+1451: @app.route("/api/jobs/<jid>/log")
+1452: def job_log(jid):
+1453:     job = JOBS.get(jid) or abort(404)
+1454:     frm = max(0, int(request.args.get("from", 0)))
+1455:     return jsonify({"from": frm, "lines": job["log"][frm:],
+1456:                     "len": len(job["log"])})
+1457: 
+
+### 12919c96c6f7558136b50d7b4d85e5e6b62f1971/openscrub_web.py:2739-2752
+
+2739:  document.getElementById("prog").value=j.progress;
+2740: 
+2741:  // incremental log append with stick-to-bottom (respects manual scroll-up)
+2742:  const lg=document.getElementById("log");
+2743:  const stick=lg.scrollTop+lg.clientHeight>=lg.scrollHeight-40;
+2744:  const nl=await (await fetch(`api/jobs/${id}/log?from=${LOGN}`)).json();
+2745:  if(!ownsView(id,gen))return;
+2746:  if(LOGN===0&&nl.len>400){LOGN=nl.len-400;nl.lines=nl.lines.slice(-400);}
+2747:  if(nl.lines.length){
+2748:   const NL=String.fromCharCode(10);
+2749:   lg.textContent+=(lg.textContent?NL:"")+nl.lines.join(NL);
+2750:   LOGN=nl.len;
+2751:   if(stick)lg.scrollTop=lg.scrollHeight;
+2752:  }
+
+### 12919c96c6f7558136b50d7b4d85e5e6b62f1971/openscrub_web.py:3944-3963
+
+3944: def _vault_lock_atexit():
+3945:     try:
+3946:         if vault_enabled() and VAULT["key"] is not None:
+3947:             # A Python signal can run while this very thread owns VAULT_LOCK.
+3948:             # Never join or wait for it; timeout is not permission to encrypt.
+3949:             # If the signal interrupted JOBS_LOCK itself, do not even
+3950:             # attempt VAULT_LOCK in the inverse order. Release this probe
+3951:             # before taking the normal VAULT_LOCK -> JOBS_LOCK path.
+3952:             if not JOBS_LOCK.acquire(blocking=False):
+3953:                 raise FilesBusy("job registry is in use")
+3954:             JOBS_LOCK.release()
+3955:             n = _vault_lock_now(blocking=False)
+3956:             print("vault: locked on shutdown (%d file(s) encrypted)" % n)
+3957:     except FilesBusy:
+3958:         print("vault: NOT locking on exit — job files or a lifecycle transition "
+3959:               "are still active; files may remain in plaintext. Restart and lock.")
+3960:     except Exception:
+3961:         print("vault: LOCK ON SHUTDOWN FAILED — job files may remain in plaintext. "
+3962:               "Restart the server and use the Lock button.")
+3963: 
+
+### 12919c96c6f7558136b50d7b4d85e5e6b62f1971/openscrub_web.py:4438-4513
+
+4438: def rehydrate_jobs():
+4439:     if vault_locked():
+4440:         return
+4441:     with _own_files():
+4442:         return _rehydrate_jobs()
+4443: 
+4444: 
+4445: def _rehydrate_jobs():
+4446:     """Re-register jobs found on disk after a restart. A job with a report
+4447:     is a reviewable job; one with an output file is a finished one — either
+4448:     way the person's work survives the server going down."""
+4449:     n = 0
+4450:     for jid in sorted(os.listdir(JOBS_DIR)):
+4451:         jdir = os.path.join(JOBS_DIR, jid)
+4452:         rep = os.path.join(jdir, "report.json")
+4453:         if not os.path.isdir(jdir):
+4454:             continue
+4455:         if os.path.exists(os.path.join(jdir, DELETE_MARKER)):
+4456:             # the user deleted this job but a file was still held open at
+4457:             # the time — finish the removal instead of resurrecting the
+4458:             # job as a zombie (restarts release whatever held the lock)
+4459:             _reap_job_dir(jdir, jid, retries=1)
+4460:             continue
+4461:         if jid in JOBS:
+4462:             continue
+4463:         if not os.path.exists(rep):
+4464:             # NO report: the scan never completed (crashed or the server
+4465:             # went down mid-scan). If the dir still holds an uploaded
+4466:             # input, surface it as a FAILED job instead of skipping it —
+4467:             # a skipped dir was an invisible orphan the UI could neither
+4468:             # retry nor delete, silently eating an 18 GB upload per
+4469:             # failed attempt (issue #16).
+4470:             up = next((os.path.join(jdir, "input" + e)
+4471:                        for e in sorted(MEDIA_EXTS)
+4472:                        if os.path.exists(os.path.join(jdir, "input" + e))),
+4473:                       None)
+4474:             if not up:
+4475:                 continue
+4476:             try:
+4477:                 size = os.path.getsize(up)
+4478:             except OSError:
+4479:                 size = 0
+4480:             opts = {}
+4481:             try:
+4482:                 with open(os.path.join(jdir, OPTIONS_FILE),
+4483:                           encoding="utf-8") as f:
+4484:                     opts = json.load(f)
+4485:                 if not isinstance(opts, dict):
+4486:                     opts = {}
+4487:             except (OSError, ValueError):
+4488:                 opts = {}
+4489:             job = {
+4490:                 "id": jid, "dir": jdir, "video": up,
+4491:                 "name": os.path.basename(up), "options": opts,
+4492:                 "phase": "error", "progress": 0.0, "size": size,
+4493:                 "log": ["(recovered after server restart — the scan had "
+4494:                         "not completed)"],
+4495:                 "error": "recovered after a server restart before the "
+4496:                          "scan finished — Retry re-runs it with "
+4497:                          + ("its original settings" if opts else
+4498:                             "default settings")
+4499:                          + " (the uploaded file was kept), or "
+4500:                          "Delete frees its disk space",
+4501:                 "output": None, "created": os.path.getmtime(jdir),
+4502:                 "cancel": threading.Event(), "stats": {},
+4503:             }
+4504:             FILES.initialize(job)
+4505:             with JOBS_LOCK:
+4506:                 JOBS[jid] = job
+4507:             n += 1
+4508:             continue
+4509:         try:
+4510:             with open(rep, encoding="utf-8") as f:
+4511:                 prov = json.load(f).get("provenance", {})
+4512:             video = prov.get("input")
+4513:             if not video or not os.path.exists(video):
+
+### 12919c96c6f7558136b50d7b4d85e5e6b62f1971/openscrub_web.py:4580-4633
+
+4580: def main():
+4581:     global TOKEN
+4582:     ap = argparse.ArgumentParser()
+4583:     ap.add_argument("--port", type=int, default=8384)
+4584:     ap.add_argument("--host", default="0.0.0.0")
+4585:     ap.add_argument("--token",
+4586:                     default=os.environ.get("OPENSCRUB_TOKEN") or None,
+4587:                     help="require this access token on every "
+4588:                     "request (default: open — anyone on the network can use "
+4589:                     "the server)")
+4590:     ap.add_argument("--http", action="store_true",
+4591:                     help="serve plain HTTP (not recommended: video uploads "
+4592:                          "and previews contain PII and would cross the "
+4593:                          "network unencrypted)")
+4594:     ap.add_argument("--retain-days", type=int, default=7,
+4595:                     help="auto-delete job folders (which contain PII) after "
+4596:                          "this many days (default 7; 0 = keep forever)")
+4597:     ap.add_argument("--max-upload-gb", default=None,
+4598:                     help="largest browser upload accepted, in GB (default 8; "
+4599:                          "0 = unlimited; env OPENSCRUB_MAX_UPLOAD_GB works "
+4600:                          "too). Very large files are better served in place "
+4601:                          "via the 'path on the server' box than uploaded.")
+4602:     args = ap.parse_args()
+4603:     TOKEN = args.token or None
+4604:     app.config["MAX_CONTENT_LENGTH"] = _max_upload_bytes(args.max_upload_gb)
+4605:     os.makedirs(JOBS_DIR, exist_ok=True)
+4606:     import atexit
+4607:     atexit.register(_vault_lock_atexit)
+4608:     # docker stop sends SIGTERM. Python's default SIGTERM disposition kills
+4609:     # the process WITHOUT running atexit hooks — and as PID 1 in a container
+4610:     # an unhandled SIGTERM is ignored outright, so the container just waits
+4611:     # out the grace period and gets SIGKILLed: either way the vault never
+4612:     # locked and job files stayed in plaintext (verified empirically).
+4613:     # sys.exit() is NOT enough here — cheroot's serve loop swallows the
+4614:     # SystemExit (also verified) — so the handler locks the vault itself and
+4615:     # then hard-exits. os._exit skips atexit, so the lock cannot run twice.
+4616:     # NOTE: encryption must finish within the stop grace period — give
+4617:     # Docker a generous one (docker stop -t 120).
+4618:     import signal
+4619:     _terming = []
+4620: 
+4621:     def _on_sigterm(sig, frm):
+4622:         if _terming:                      # second SIGTERM: just die
+4623:             os._exit(1)
+4624:         _terming.append(1)
+4625:         print("SIGTERM — locking vault before exit…")
+4626:         _vault_lock_atexit()
+4627:         os._exit(0)
+4628:     signal.signal(signal.SIGTERM, _on_sigterm)
+4629:     threading.Thread(target=_autolock_watcher, daemon=True).start()
+4630:     rehydrate_jobs()
+4631:     start_worker()
+4632:     threading.Thread(target=_worker_watchdog, daemon=True).start()
+4633:     if args.retain_days > 0:
+
+### 12919c96c6f7558136b50d7b4d85e5e6b62f1971/openscrub_web.py:4696-4734
+
+4696:     sys.stdout.flush()      # the banner must reach redirected logs NOW, not
+4697:     # when an 8KB block buffer eventually fills (a container ran "silent"
+4698:     # for minutes and the user debugged a healthy server)
+4699:     _serve(args.host, args.port, ssl_ctx)
+4700: 
+4701: 
+4702: def _serve(host, port, ssl_ctx):
+4703:     """Run under cheroot (a production WSGI server that supports TLS and
+4704:     Windows) when available; otherwise fall back to Flask's built-in dev
+4705:     server, which works fine for a small LAN but prints a warning."""
+4706:     try:
+4707:         from cheroot.wsgi import Server
+4708:     except ImportError:
+4709:         print("    (running on Flask's built-in server — `pip install cheroot`")
+4710:         print("     to switch to a production server and silence its warning)")
+4711:         app.run(host=host, port=port, threaded=True, ssl_context=ssl_ctx)
+4712:         return
+4713:     # A browser opens several connections per host (Safari preconnects up to
+4714:     # ~6), and each idle keep-alive connection holds a cheroot worker until
+4715:     # it times out — so the pool needs headroom well past one browser's
+4716:     # connection count or real requests queue behind idle sockets. 16 was
+4717:     # tight enough that a phone plus a laptop could stall; 64 is ample and
+4718:     # cheroot worker threads are cheap.
+4719:     server = Server((host, port), app, server_name="openscrub",
+4720:                     numthreads=64)
+4721:     # Browsers probing/rejecting the self-signed certificate abort mid-
+4722:     # handshake on every new socket, and cheroot logs each one. Harmless
+4723:     # noise (install a trusted cert to stop the aborts themselves) —
+4724:     # filter just that class of message, pass everything else through.
+4725:     _orig_log = server.error_log
+4726:     _TLS_NOISE = ("during handshake", "certificate unknown", "unknown ca",
+4727:                   "peer dropped the tls connection", "http request")
+4728: 
+4729:     def _quiet_log(msg="", level=20, traceback=False):
+4730:         if any(s in str(msg).lower() for s in _TLS_NOISE):
+4731:             return
+4732:         _orig_log(msg, level, traceback)
+4733: 
+4734:     server.error_log = _quiet_log
+
+### 12919c96c6f7558136b50d7b4d85e5e6b62f1971/openscrub.py:3398-3420
+
+3398: def _ffmpeg_failure(err_file, what, rc=None, hint=""):
+3399:     """RuntimeError carrying the TAIL of ffmpeg's own stderr (captured to
+3400:     a temp file), so the job log names the real cause — 'Could not find
+3401:     tag for codec ...' — instead of the '[Errno 32] Broken pipe' Python
+3402:     sees when the encoder exits mid-stream."""
+3403:     tail = ""
+3404:     try:
+3405:         err_file.seek(0)
+3406:         lines = [ln.strip() for ln in err_file.read().decode(
+3407:             "utf-8", "replace").splitlines() if ln.strip()]
+3408:         tail = " | ".join(lines[-4:])[-600:]
+3409:     except Exception:
+3410:         pass
+3411:     msg = "%s failed%s" % (what, (" (ffmpeg exit %s)" % rc)
+3412:                            if rc is not None else "")
+3413:     return RuntimeError(msg + (": " + tail if tail else
+3414:                                " — ffmpeg gave no error message")
+3415:                         + (" — " + hint if hint else ""))
+3416: 
+3417: 
+3418: def parse_audio_spans(spec, mode="mute"):
+3419:     """'12.5-19.0,84-90' -> [(12.5, 19.0, mode), ...]. Raises on garbage."""
+3420:     spans = []
+
+### 12919c96c6f7558136b50d7b4d85e5e6b62f1971/openscrub.py:3435-3445
+
+3435:     """Hooks for embedding the pipeline (GUI, batch runner, tests).
+3436:     The default implementation reproduces the CLI's print behavior."""
+3437:     wants_frames = False   # set True to receive scan_frame() calls
+3438: 
+3439:     def log(self, msg):
+3440:         print(msg, flush=True)
+3441: 
+3442:     def progress(self, stage, current, total):
+3443:         pass  # stage is "scan" or "render"
+3444: 
+3445:     def scan_frame(self, frame_bgr, t, found):
+
+### 12919c96c6f7558136b50d7b4d85e5e6b62f1971/openscrub.py:4791-4804
+
+4791:         # any graph OpenCV can build; fast, and honours the app's CUDA target.
+4792:         # OpenCV prints a red ERROR to stderr when it can't build a node (e.g.
+4793:         # the end2end NonMaxSuppression) even though we catch it and fall back
+4794:         # to onnxruntime — silence its logger just around this probe so a
+4795:         # working fallback doesn't look like a failure to the user. (Top-level
+4796:         # cv2.setLogLevel is thread-safe and present on 4.x/5.x; the older
+4797:         # cv2.utils.logging module is absent on headless 4.x builds.)
+4798:         _prev_ll = None
+4799:         try:
+4800:             _prev_ll = cv2.getLogLevel()
+4801:             cv2.setLogLevel(0)   # 0 = SILENT
+4802:         except Exception:
+4803:             _prev_ll = None
+4804:         try:
+
+### 12919c96c6f7558136b50d7b4d85e5e6b62f1971/openscrub.py:8059-8064
+
+8059:             tracker.anchor()
+8060:             if found:
+8061:                 cb.log(f"  t={t:7.2f}s  {len(found)} PII region(s): "
+8062:                        + ", ".join(sorted({d.category for d in found})))
+8063:             if cb.wants_frames:
+8064:                 shown = frame.copy()
+
+### 12919c96c6f7558136b50d7b4d85e5e6b62f1971/openscrub.py:8420-8425
+
+8420:     if recall_counts:
+8421:         top = sorted(recall_counts.items(), key=lambda kv: -kv[1])[:8]
+8422:         cb.log("      top recalled strings (check for false positives): "
+8423:                + ", ".join(f"'{k}'x{v}" for k, v in top))
+8424: 
+8425:     bands, _bsup = _suppress_textless_bands(bands, len(raw))
+
+### b7bc4172/openscrub_logging.py:23-43
+
+23: _JOB = ContextVar('openscrub_diagnostic_job', default=None)
+24: _SECRETS = []
+25: _ANSI = re.compile(r'\x1b\[[0-?]*[ -/]*[@-~]')
+26: _CREDENTIAL = re.compile(r'(?i)((?:token|password|secret|api[_-]?key|authorization)\s*[=:]\s*)([^\s&;]+)')
+27: 
+28: 
+29: def set_secrets(values):
+30:     global _SECRETS
+31:     _SECRETS = [str(v) for v in values if v]
+32: 
+33: 
+34: def _scrub(value, limit=None):
+35:     text = _ANSI.sub('', str(value))
+36:     for secret in _SECRETS:
+37:         text = text.replace(secret, '[REDACTED]')
+38:     text = _CREDENTIAL.sub(r'\1[REDACTED]', text)
+39:     if limit and len(text) > limit:
+40:         text = text[:limit] + ' [truncated]'
+41:     return text
+42: 
+43: 
+
+### b7bc4172/openscrub_logging.py:96-142
+
+96:     stage=(job.get('learning') or {}).get('stage') if job.get('phase')=='learning' else None
+97:     stage=stage or (job.get('_diagnostic_progress') or {}).get('stage','-')
+98:     return {'job_id':job.get('id','-'), 'phase':job.get('phase','-'), 'stage':stage}
+99: 
+100: 
+101: def event(name, job=None, level=logging.INFO, exc_info=None, **fields):
+102:     message = str(name)
+103:     if fields:
+104:         message += ' ' + ' '.join('%s=%s' % (k, _scrub(v, 8000)) for k,v in fields.items())
+105:     try:
+106:         logging.getLogger('openscrub.runtime').log(level, message, extra=_context(job), exc_info=exc_info)
+107:     except Exception:
+108:         # Last resort, without involving logging again.
+109:         try:
+110:             sys.__stderr__.write('OpenScrub diagnostic emission failed\n')
+111:         except Exception:
+112:             pass
+113: 
+114: 
+115: def exception(name, job=None, **fields):
+116:     event(name, job, level=logging.ERROR, exc_info=sys.exc_info(), **fields)
+117: 
+118: 
+119: class JobLog(list):
+120:     """Preserve the existing UI log API while persisting every added message."""
+121:     def __init__(self, job, previous):
+122:         super().__init__(previous)
+123:         self.job = job
+124: 
+125:     def append(self, message):
+126:         message = str(message)
+127:         super().append(message)
+128:         self.job['_diagnostic_activity'] = time.monotonic()
+129:         level = logging.ERROR if message.lstrip().startswith(('ERROR:', 'Learning stopped:')) else logging.INFO
+130:         event('job_message', self.job, level=level, message=message)
+131: 
+132:     def extend(self, messages):
+133:         for message in messages:
+134:             self.append(message)
+135: 
+136: 
+137: def attach_job(job):
+138:     if not isinstance(job.get('log'), JobLog):
+139:         job['log'] = JobLog(job, job.get('log', []))
+140: 
+141: 
+142: def bind_job(job):
+
+### b7bc4172/openscrub_logging.py:210-238
+
+210:         self.closed = False
+211:         self.logger = logging.getLogger('openscrub.runtime')
+212:         self.logger.setLevel(logging.INFO)
+213:         self.logger.propagate = False
+214:         formatter = _Formatter('%(asctime)sZ %(levelname)s pid=%(process)d thread=%(threadName)s job=%(job_id)s phase=%(phase)s stage=%(stage)s %(message)s', '%Y-%m-%dT%H:%M:%S')
+215:         self.console_handler = _ConsoleHandler(stream)
+216:         self.console_handler.setFormatter(formatter)
+217:         self.logger.addHandler(self.console_handler)
+218:         self.root_handler = None
+219:         try:
+220:             self.directory.mkdir(parents=True,exist_ok=True,mode=0o700)
+221:             if os.name != 'nt': self.directory.chmod(0o700)
+222:             self.file_handler = _FileHandler(self.directory/'openscrub.log', stream,
+223:                 maxBytes=max_bytes, backupCount=backups)
+224:             self.file_handler.setFormatter(formatter)
+225:             self.logger.addHandler(self.file_handler)
+226:             marker = self.directory/'running.json'
+227:             if marker.exists():
+228:                 try:
+229:                     old = json.loads(marker.read_text()[:131072])
+230:                 except (OSError,ValueError):
+231:                     old = {'previous_state':'unreadable'}
+232:                 event('previous_process_did_not_shutdown_cleanly', level=logging.WARNING,
+233:                       previous=old, note='Could be kill, crash, host shutdown or interrupted restart; not a diagnosis')
+234:         except OSError as error:
+235:             event('persistent_logging_unavailable',level=logging.ERROR,error=error)
+236:         self.marker()
+237: 
+238:     def marker(self):
+
+### b7bc4172/openscrub_logging.py:252-293
+
+252:             event('running_marker_write_failed',level=logging.ERROR,error=error)
+253: 
+254:     def install_hooks(self):
+255:         self.hooks=(sys.excepthook, threading.excepthook)
+256:         def main_exception(kind, value, tb):
+257:             event('process_unhandled_exception',level=logging.CRITICAL,exc_info=(kind,value,tb))
+258:         def thread_exception(args):
+259:             event('thread_unhandled_exception',level=logging.CRITICAL,
+260:                   exc_info=(args.exc_type,args.exc_value,args.exc_traceback),
+261:                   failed_thread=getattr(args.thread,'name','unknown'))
+262:         sys.excepthook=main_exception;threading.excepthook=thread_exception
+263:         # Capture warnings/errors from Flask, libraries and Python warnings.
+264:         owner=self
+265:         class Bridge(logging.Handler):
+266:             def emit(self, record):
+267:                 if not record.name.startswith('openscrub.runtime'):
+268:                     owner.logger.handle(record)
+269:         self.root_handler=Bridge(logging.WARNING)
+270:         logging.getLogger().addHandler(self.root_handler)
+271:         logging.captureWarnings(True)
+272:         try:
+273:             if self.file_handler:
+274:                 for suffix in (2,1):
+275:                     src=self.directory/('faults.log' if suffix==1 else 'faults.log.1')
+276:                     dst=self.directory/('faults.log.%d'%suffix)
+277:                     if src.exists():os.replace(src,dst)
+278:                 self.fault_file=open(self.directory/'faults.log','a',encoding='utf-8')
+279:                 if os.name!='nt':os.chmod(self.fault_file.name,0o600)
+280:                 self.fault_file.write('OpenScrub native fault log started %s pid=%d\n' % (time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime()),os.getpid()))
+281:                 self.fault_file.flush()
+282:                 faulthandler.enable(self.fault_file,all_threads=True)
+283:             else:
+284:                 faulthandler.enable(all_threads=True)
+285:         except (OSError,ValueError,RuntimeError) as error:
+286:             event('fault_handler_unavailable',level=logging.WARNING,error=error)
+287: 
+288:     def heartbeat_once(self, now=None):
+289:         now=self.clock() if now is None else now
+290:         with self.lock: jobs=list(self.active.values())
+291:         for job in jobs:
+292:             idle=max(0,now-job.get('_diagnostic_activity',now))
+293:             p=job.get('_diagnostic_progress') or {}
+
+### b7bc4172/openscrub_logging.py:295-349
+
+295:                   current=p.get('current','unknown'),total=p.get('total','unknown'),
+296:                   **_resources(self.data_root))
+297:             if idle>=300:
+298:                 event('no_recent_progress',job,level=logging.WARNING,
+299:                       seconds=round(idle),note='Worker may be slow or blocked; job is not cancelled')
+300:         self.marker()
+301: 
+302:     def start_monitor(self):
+303:         def watch():
+304:             while not self.stop.wait(30):
+305:                 try:self.heartbeat_once()
+306:                 except Exception:exception('logging_watchdog_failed')
+307:         self.thread=threading.Thread(target=watch,name='openscrub-log-watchdog',daemon=True)
+308:         self.thread.start()
+309: 
+310:     def close(self, clean=True):
+311:         if self.closed:return
+312:         self.closed=True;self.stop.set()
+313:         if self.thread and self.thread is not threading.current_thread():self.thread.join(timeout=1)
+314:         if self.active:
+315:             event('server_shutdown_with_active_jobs', level=logging.WARNING, active_jobs=list(self.active))
+316:         event('server_shutdown',active_jobs=list(self.active),clean=clean)
+317:         if clean and self.file_handler:
+318:             try:(self.directory/'running.json').unlink(missing_ok=True)
+319:             except OSError as error:event('running_marker_cleanup_failed',level=logging.WARNING,error=error)
+320:         if self.hooks:
+321:             sys.excepthook,threading.excepthook=self.hooks
+322:             logging.captureWarnings(False)
+323:         if self.root_handler:logging.getLogger().removeHandler(self.root_handler)
+324:         if self.fault_file:
+325:             faulthandler.disable();self.fault_file.close()
+326:         for handler in (self.file_handler,self.console_handler):
+327:             if handler:
+328:                 self.logger.removeHandler(handler);handler.close()
+329: 
+330: 
+331: def configure(data_root, stream=None, install_hooks=True, max_bytes=10*1024*1024, backups=5):
+332:     global _RUNTIME
+333:     if _RUNTIME:_RUNTIME.close()
+334:     _RUNTIME=RuntimeLogs(data_root, stream if stream is not None else sys.__stderr__,max_bytes,backups)
+335:     if install_hooks:
+336:         _RUNTIME.install_hooks();_RUNTIME.start_monitor()
+337:     event('server_logging_ready',log_directory=_RUNTIME.directory,rotation_bytes=max_bytes,backups=backups)
+338:     return _RUNTIME
+339: 
+340: 
+341: def shutdown(clean=True):
+342:     global _RUNTIME
+343:     if _RUNTIME:_RUNTIME.close(clean=clean);_RUNTIME=None
+344: 
+345: 
+346: # An unhandled exception must keep the marker even though atexit still runs.
+347: def _at_exit():
+348:     if _RUNTIME:_RUNTIME.close(clean=False)
+349: atexit.register(_at_exit)
+
+### b7bc4172/openscrub_web.py:938-967
+
+938: def diagnostic_request_finish(response):
+939:     from flask import g
+940:     elapsed = time.monotonic() - getattr(g, "diagnostic_started", time.monotonic())
+941:     request_id = getattr(g, "diagnostic_id", "unknown")
+942:     response.headers["X-OpenScrub-Request-ID"] = request_id
+943:     if response.status_code >= 400 or elapsed >= 5:
+944:         reason = ""
+945:         if response.status_code >= 400 and response.is_json and (response.content_length or 0) <= 16384:
+946:             data = response.get_json(silent=True)
+947:             if isinstance(data, dict) and isinstance(data.get("error"), str):
+948:                 reason = data["error"]
+949:         diagnostics.event("http_request_failed" if response.status_code >= 400 else "http_request_slow",
+950:             level=40 if response.status_code >= 500 else 30,
+951:             request_id=request_id, method=request.method,
+952:             route=str(request.url_rule) if request.url_rule else "unmatched",
+953:             status=response.status_code, elapsed_ms=round(elapsed * 1000, 1), reason=reason)
+954:     return response
+955: 
+956: 
+957: @app.teardown_request
+958: def diagnostic_request_teardown(error):
+959:     from flask import g
+960:     if error is not None:
+961:         diagnostics.event("http_unhandled_exception", level=40,
+962:             request_id=getattr(g, "diagnostic_id", "unknown"),
+963:             route=str(request.url_rule) if request.url_rule else "unmatched",
+964:             exc_info=(type(error), error, error.__traceback__))
+965:     token = g.pop("diagnostic_context", None)
+966:     if token is not None:
+967:         diagnostics.reset_job(token)
+
+### b7bc4172/openscrub_web.py:1545-1560
+
+1545: def _review_process(command):
+1546:     try:
+1547:         result = subprocess.run(command, capture_output=True,
+1548:                                 timeout=_REVIEW_TIMEOUT)
+1549:     except subprocess.TimeoutExpired:
+1550:         diagnostics.exception("preview_process_timeout", tool=os.path.basename(str(command[0])), timeout_seconds=_REVIEW_TIMEOUT)
+1551:         abort(504, description="Preview decoding timed out. Retry this finding; "
+1552:               "a video with very sparse keyframes may need a seekable scan copy.")
+1553:     except OSError:
+1554:         diagnostics.exception("preview_process_start_failed", tool=os.path.basename(str(command[0])))
+1555:         abort(503, description="FFmpeg and ffprobe are required for review previews.")
+1556:     if result.returncode:
+1557:         diagnostics.event("preview_process_failed", level=40, tool=os.path.basename(str(command[0])),
+1558:                           returncode=result.returncode, stderr=result.stderr.decode("utf-8", errors="replace")[-8000:])
+1559:         abort(422, description="Could not decode this video preview.")
+1560:     return result
+
+### b7bc4172/openscrub_web.py:6531-6538
+
+6531:                          "via the 'path on the server' box than uploaded.")
+6532:     args = ap.parse_args()
+6533:     TOKEN = args.token or None
+6534:     diagnostics.set_secrets([TOKEN])
+6535:     diagnostics.configure(_data_root())
+6536:     diagnostics.event("server_starting", version=openscrub.VERSION, python=sys.version.split()[0],
+6537:                       port=args.port, transport="http" if args.http else "https")
+6538:     app.config["MAX_CONTENT_LENGTH"] = _max_upload_bytes(args.max_upload_gb)
+
+### b7bc4172/openscrub_web.py:6667-6673
+
+6667:     # Cheroot's default stderr-only logger bypasses the persistent app log.
+6668:     def _quiet_log(msg="", level=20, traceback=False):
+6669:         # Retain server errors even when the browser disconnects or TLS fails.
+6670:         diagnostics.event("wsgi_server_error", level=max(30, level),
+6671:                           message=msg, exc_info=sys.exc_info() if traceback and sys.exc_info()[0] else None)
+6672: 
+6673:     server.error_log = _quiet_log
+
+### b7bc4172/learning_session.py:591-599
+
+591:     try:
+592:         check=subprocess.run(_training_command(script, 'preflight'),
+593:             capture_output=True,text=True,timeout=30)
+594:         if check.returncode:
+595:             diagnostics.event('training_preflight_failed',level=40,returncode=check.returncode,stderr=check.stderr)
+596:             problems.append('Training environment is not ready: '+(check.stderr.strip().splitlines() or ['unknown import failure'])[-1])
+597:     except (OSError,subprocess.TimeoutExpired) as e:
+598:         diagnostics.exception('training_preflight_process_failed')
+599:         problems.append('Training Python cannot run: '+str(e))
+
+### b7bc4172/learning_session.py:640-651
+
+640:         '--workers','0','--accept-ultralytics-license','--progress')
+641:     private_dir(versions)
+642:     logfile=Path(versions).parent/'training.log'
+643:     diagnostics.attach_job(job)
+644:     update_learning(job,'training','Starting the local training process',done=0,total=None,unit=None)
+645:     with open(logfile,'w',encoding='utf-8') as log:
+646:         process=subprocess.Popen(command,stdout=log,stderr=subprocess.STDOUT,
+647:                                  start_new_session=os.name!='nt')
+648:         diagnostics.event('training_process_started',job,child_pid=process.pid,logfile=logfile)
+649:         with open(logfile,encoding='utf-8',errors='replace') as output:
+650:             pending=''
+651:             def drain(final=False):
+
+### b7bc4172/learning_session.py:671-682
+
+671:                 if ordinary:job.setdefault('log',[]).extend(ordinary[-12:])
+672:             try:
+673:                 started=time.monotonic()
+674:                 while process.poll() is None:
+675:                     drain()
+676:                     update_learning(job) # Liveness is distinct from progress.
+677:                     if time.monotonic()-started>43200:raise TimeoutError('Training exceeded the 12-hour process limit')
+678:                     if job['cancel'].wait(.5):raise InterruptedError('Training cancelled; prior review retained')
+679:                 drain(final=True) # A fast child can finish between poll ticks.
+680:                 diagnostics.event('training_process_exited',job,child_pid=process.pid,returncode=process.returncode,
+681:                                   level=40 if process.returncode else 20)
+682:                 if process.returncode:

@@ -1,0 +1,11 @@
+{
+  "pin": "12919c96c6f7558136b50d7b4d85e5e6b62f1971",
+  "full_export_files_verified": 125,
+  "full_archive_sha256": "0db174c7af4548fda4a28048b48d546056b88f5328300fa7601dd1501753ca52",
+  "evidence_hashes": {
+    "reproduce.py": "a4f22a6c6957410a1e8c57ff251874cb09c811a0caacfbbbb6873ee637d94c9c",
+    "results.json": "07b94fd525581145781879fe8e017e38c47222e0db3cc1a0d3548a7b74cc5c8b",
+    "run.log": "13b9305f8b45981248a360260ea675c64020709c4a35f16be3409d37c8071b6c"
+  },
+  "saved_counts_and_cleanup_verified": true
+}

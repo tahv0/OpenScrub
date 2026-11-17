@@ -1,0 +1,8 @@
+============================================================
+openscrub web — open from any device on your LAN:
+    http://127.0.0.1:8384/?token=TOKEN_SENTINEL
+Jobs folder (contains PII): /tmp/openscrub-diagnostics-scope-20261117/runtime/sigterm/jobs — kept forever
+Do NOT expose this port to the internet.
+============================================================
+    WARNING: plain HTTP — PII crosses the network unencrypted.
+SIGTERM — locking vault before exit…

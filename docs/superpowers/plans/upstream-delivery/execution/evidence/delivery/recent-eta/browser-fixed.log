@@ -1,0 +1,91 @@
+{
+  "url": "http://127.0.0.1:18487/",
+  "title": "OpenScrub",
+  "viewports": [
+    "1365x950",
+    "390x844"
+  ],
+  "steps": [
+    {
+      "payload": {
+        "t": 0,
+        "stage": "scan",
+        "cur": 0,
+        "total": 100
+      },
+      "eta": null,
+      "progress": 0,
+      "phase": "scanning",
+      "text": ""
+    },
+    {
+      "payload": {
+        "t": 5,
+        "stage": "scan",
+        "cur": 10,
+        "total": 100
+      },
+      "eta": 45,
+      "progress": 0.045,
+      "phase": "scanning",
+      "text": "~45 s left"
+    },
+    {
+      "payload": {
+        "t": 20,
+        "stage": "scan",
+        "cur": 40,
+        "total": 100
+      },
+      "eta": 35,
+      "progress": 0.18,
+      "phase": "scanning",
+      "text": "~35 s left"
+    },
+    {
+      "payload": {
+        "t": 21,
+        "stage": "render",
+        "cur": 0,
+        "total": 100,
+        "phase": "rendering"
+      },
+      "eta": null,
+      "progress": 0.5,
+      "phase": "rendering",
+      "text": ""
+    },
+    {
+      "payload": {
+        "t": 24,
+        "stage": "render",
+        "cur": 3,
+        "total": 100
+      },
+      "eta": 97,
+      "progress": 0.515,
+      "phase": "rendering",
+      "text": "~2 min left"
+    },
+    {
+      "payload": {
+        "t": 30,
+        "stage": "render",
+        "cur": 100,
+        "total": 100
+      },
+      "eta": null,
+      "progress": 1,
+      "phase": "rendering",
+      "text": ""
+    }
+  ],
+  "errors": [],
+  "warnings": [
+    "Failed to load resource: the server responded with a status of 500 (INTERNAL SERVER ERROR)",
+    "Failed to load resource: the server responded with a status of 404 (NOT FOUND)",
+    "Failed to load resource: the server responded with a status of 404 (NOT FOUND)",
+    "Failed to load resource: the server responded with a status of 404 (NOT FOUND)",
+    "Failed to load resource: the server responded with a status of 404 (NOT FOUND)"
+  ]
+}

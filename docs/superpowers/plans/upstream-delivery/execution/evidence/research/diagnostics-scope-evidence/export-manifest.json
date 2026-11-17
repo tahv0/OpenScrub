@@ -1,0 +1,17 @@
+{
+  "12919c96c6f7558136b50d7b4d85e5e6b62f1971": {
+    "commit": "12919c96c6f7558136b50d7b4d85e5e6b62f1971",
+    "root": "/tmp/openscrub-diagnostics-scope-20261117/12919c96c6f7558136b50d7b4d85e5e6b62f1971",
+    "archive_bytes": 25139200
+  },
+  "b7bc4172": {
+    "commit": "b7bc41727590e970e622c6ce9b46511e5e4f0295",
+    "root": "/tmp/openscrub-diagnostics-scope-20261117/b7bc4172",
+    "archive_bytes": 25968640
+  },
+  "50e3816": {
+    "commit": "50e3816f361b0c0de673f4be90638c5d73149535",
+    "root": "/tmp/openscrub-diagnostics-scope-20261117/50e3816",
+    "archive_bytes": 25968640
+  }
+}

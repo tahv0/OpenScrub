@@ -30,6 +30,22 @@ Preserve upstream defaults, entry points, security refreshes, declared Python fl
 - [ ] **V:** Run `python -m pytest test_openscrub.py tests/test_runtime_logging.py -q`, full build and an installed startup/stop/error exercise. Inspect output and package contents; validate Windows behavior before claiming it.
 - [ ] **D/R/L:** PR material includes a concrete diagnostic gap, sample synthetic structured events, retention bounds and failure behavior. Keep training-subprocess telemetry and model-library events out.
 
+### P12A — persistent diagnostics, explicitly enabled
+
+The [scope research](execution/evidence/research/diagnostics-scope-research.md) confirms the gap: actual worker failure details disappear after a fresh-process recovery, while capturing console output can retain an access token and arbitrary errors. Use the proposed private module and one default-off CLI flag; do not transplant the donor's always-on raw message/exception/root logger. Disabled operation creates no files, threads or hooks.
+
+- [ ] **S/I:** Construct records from event-specific fixed enums and bounded finite counters only, with no arbitrary exception strings, paths, OCR/queries, crops, argv, headers or job dictionaries. Service/session-generated action references replace stable job IDs in persisted records. Keep existing UI error information unchanged.
+- [ ] **I/V:** Store sanitized service records outside the job vault, with explicit documentation that they survive job deletion/lock until rotation/removal. Cap each event/marker at1KiB, files at5MiB with two backups, one exclusive writer and at most one heartbeat per minute per active job. Remove finished action state. Previous-run markers establish only an unobserved clean close, never an OOM diagnosis.
+- [ ] **I/V:** Integrate only existing admission/operation/stage/finish/watchdog/shutdown owners, preserving lock order and vault refusal. Disable a failed sink without affecting jobs; no root/library/TLS/request or native fault capture. Test default-off, schema sentinels, rotation, second writer, failures, stale action, abrupt/clean exit and actual installed lifecycle. Research's inert-server startup/stop probes are not configured-server acceptance.
+- [ ] **D/R/L:** State the concrete diagnostic gap, opt-in retention/ownership, error classification and platform limits. Follow the retained research contract for exact schema/hooks and packaging; native Windows/frozen checks remain outstanding until executed.
+
+### P12B — bounded in-memory job logs and compatible cursors
+
+**What / why / when:** Separate long-job memory candidate: the actual baseline retains1,208 lines although public metadata displays only30. A display tail is not storage retention. Establish representative count/byte growth and choose justified bounds before implementation; this is independent of persistent P12A and reuses P03's authoritative response handling.
+
+- [ ] **E/S/I:** Bound producer storage with an explicit retained-base/next-sequence contract. Preserve absolute from/len semantics, clamp or reset obsolete cursors explicitly, and update ordinary job metadata/log routes coherently under concurrent append/retry/rehydration. Do not silently trim and renumber the list. Choose line/count/byte limits with recorded behaviour and truncation evidence, not arbitrary disappearance of diagnostics.
+- [ ] **V/D:** Exercise actual producer/routes/client after overflow, clear/retry, stale/future cursors and concurrent polling. Preserve current last30 metadata/last400 initial UI conventions unless a separate justified change is declared. Show measured retained storage and remaining transient/allocator costs; no whole-process RSS ceiling from list bounds. Keep persistence/schema/logger hooks in P12A.
+
 ## P13 — Docker cache and refresh improvements
 
 **What:** Reuse package downloads and avoid invalidating security-refresh work unnecessarily during local source-only rebuilds, preserving upstream's release/security workflow.
@@ -114,15 +130,31 @@ Preserve upstream defaults, entry points, security refreshes, declared Python fl
 - [ ] **V:** Exercise real report-to-SDR/HDR rendering, malformed/nonfinite/collinear/repeated polygons, existing empty controls, valid clipped polygons, unchanged outside pixels, and failure cleanup. Run suite/build. A narrow shared raster helper is justified only if it removes actual SDR/HDR divergence.
 - [ ] **D/R/L:** Lead with invalid polygon data inside a valid fallback box. State that an invalid box has no justified fallback; do not claim this patch resolves P16C or silently ignore invalid regions.
 
-### P16C — reject invalid regions before successful output
+### P16C — invalid geometry, render cleanup and output publication
 
-**What / why:** Establish a clear failure and cleanup contract for nonfinite, reversed or zero-area source/translated boxes. Research reproduced NaN-box failure and a reversed-box HDR render that reported success with zero coverage; the donor polygon fix leaves both unchanged.
+**What / why:** Establish separate contracts for invalid regions, owned render resources and preserving previous output. The [bounded actual-module research](execution/evidence/research/render-failure-boundary-research.md) on reviewed `12919c9` confirms that report/status transactions alone do not protect the previous video: failed report replacement or acknowledged cancellation can leave old JSON beside a newly encoded video. Direct cancellation deletes an existing final output, while geometry exceptions can bypass cleanup. These are separate failures and require separate reviewable changes.
 
-**When:** A separate P16 investigation/validation PR after its pre-output and error-lifecycle contract is exercised. The observed runtime defect is confirmed, but implementation and full-path validation remain open.
+**When:** P16C-G can be a small independent geometry PR; P16C-R follows the ownership inventory, with N09 kept independently reviewable. P16C-P depends on comprehensive resource cleanup and the reviewed P06 report/lifetime contracts. The parent card closes only after all three required contracts pass. None is a promise of crash-atomic video/report publication.
 
-- [ ] **E/I:** Validate four finite numeric coordinates with positive extents before opening output encoders where possible, plus a defensive render boundary for direct callers. Keep valid boxes extending beyond the frame and ordinary no-intersection clipping legal. Provide a useful geometry error rather than inventing a full-frame mask or returning an unredacted successful result.
-- [ ] **V:** Prove unsuccessful publication preserves prior reports/output and cleans decoder/encoder processes and partial files. Cover actual SDR/HDR, direct calls and ordinary report/worker paths. Separate existing process-cleanup defects if needed to keep the delivery reviewable.
-- [ ] **D/R/L:** Describe the exact corrupt-input trigger, failure behavior and preserved valid-input defaults; report any remaining output-lifecycle limits.
+#### P16C-G — validate source and derived regions
+
+- [ ] **E/S/I:** Validate four finite numeric source coordinates with positive extents before coverage transforms and encoder acquisition, plus defensive checks at direct SDR/HDR painting boundaries. Validate relevant fps, offsets, translation/band arrays and margin inputs under an explicit compatibility policy; finite inputs can still overflow when combined. Preserve disabled/unknown report data. Give a useful detection/frame error rather than incidental conversion errors or a successful unredacted render.
+- [ ] **I/V:** Keep valid offscreen boxes and ordinary empty intersections legal. Padding/clipping must not hide reversed or zero source extents. Invalid polygons inside a valid box remain P16B's fallback; an invalid box has no invented full-frame replacement. Check default/coverage modes, direct/worker SDR/HDR, per-frame overflow and valid clipping. Reuse existing geometry matrix evidence where applicable.
+- [ ] **D/R/L:** Claim early malformed-input rejection and unchanged valid-input defaults. This card alone does not protect previous output from arbitrary later failures.
+
+#### P16C-R — close all owned renderer resources
+
+- [ ] **E/S/I:** Cover acquisition through final wait with explicit ownership and cleanup for captures/VideoWriter, both children, all pipe endpoints and temporary stderr. Include partial construction, geometry/callback exceptions, cancellation, write failure and nonzero encoder exit. Preserve primary exceptions and useful encoder diagnostics; bounded terminate/wait/kill fallback must act only on owned children.
+- [ ] **V:** Keep exception tracebacks alive while asserting explicit closure and reaping, with tiny actual SDR/HDR/setup/mid-frame/final-wait cases and successful controls. Harness cleanup must be distinguished from production cleanup. N09's already-reaped-child/decoder-pipe case is a smaller prerequisite, not proof of this broader contract.
+- [ ] **D/R/L:** State that cleanup alone cannot restore a final path already written by the encoder. P16C-P owns final-path preservation; this PR may land first with that limit explicit.
+
+#### P16C-P — stage output before the final owned publication
+
+- [ ] **E/S/I:** Encode SDR/HDR/OpenCV fallback into a private sibling stage, preserving container/extension/encoder defaults. Video-only calls replace the final path only after successful computation. For report-producing calls, finish report construction and hashes against staged bytes outside locks while provenance names the final path. Failed computation or cancellation removes owned stages, preserving previous final paths.
+- [ ] **I:** Extend the caller's final publication hook to validate the exact operation and publish staged video/report plus success state under the stable report lock. Preserve P06B's admission lock order, selected-source pin, cancellation acknowledgement ordering and ownership through actual cleanup. No lease admission/release or large copy/hash work inside the report lock.
+- [ ] **I/V:** Ordinary second-file replacement failure requires transient rollback references/copies and restoration, including absence of old finals. Test each step and failed rollback itself. If restoration I/O fails, expose an explicit failed/recovery state and retain necessary task recovery files; do not promise impossible restoration. No database or permanent generation archive. Staging names must fit vault cleanup and packaging conventions.
+- [ ] **I/V:** Coordinate download stat/open with publication or derive metadata from one opened descriptor; retain that descriptor/lifetime through response close without holding the report lock for transfer. Pin output-frame decoder generations too. Test old streams/new commits, conditional/Range identity, cancel/retry and ordinary failures. Independent requests can straddle a commit; pair-level export snapshots need a separate explicit contract if required.
+- [ ] **D/R/L:** Record the exact previous-video/report guarantee and tested failure boundaries. Two replacements are not a crash-atomic pair. Directory durability, crash recovery, filesystem refusal and native Windows open-file replacement remain explicit separate limits. Run relevant suite/build/Python-floor and real output checks, then C01 combined lifetime/publication validation.
 
 ### P16D — keep editor overlays and pointer coordinates aligned on resize
 

@@ -1,0 +1,45 @@
+const {chromium}=require('/tmp/openscrub-save-as-20261116/node_modules/playwright');
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const ROOT='/tmp/openscrub-task4';
+(async()=>{
+ const browser=await chromium.launch({headless:true});
+ const page=await browser.newPage({viewport:{width:1365,height:950}});
+ const errors=[],warnings=[],steps=[],failedResponses=[];
+ page.on('response',r=>{if(r.status()>=400)failedResponses.push({url:r.url(),status:r.status()});});
+ page.on('pageerror',e=>errors.push(e.message));
+ page.on('console',m=>{if(['error','warning'].includes(m.type()))warnings.push(m.text());});
+ const base='http://127.0.0.1:18487';
+ const {id}=JSON.parse(fs.readFileSync(ROOT+'/server-job.json','utf8'));
+ await page.goto(base);
+ assert.equal(await page.title(),'OpenScrub');
+ assert.ok((await page.locator('body').innerText()).includes('OpenScrub'));
+ await page.getByRole('link',{name:'synthetic-eta-stage.mp4',exact:true}).click();
+ await page.locator('#eta').waitFor({state:'attached'});
+ await page.evaluate(()=>{clearInterval(POLL);POLL=null;});
+ async function step(payload,expected){
+  const observed=await (await page.request.post(base+'/_qa/observe',{data:payload})).json();
+  const metadata=await (await page.request.get(base+'/api/jobs/'+id)).json();
+  assert.deepEqual(metadata,observed);
+  await page.evaluate(async()=>{await refresh();});
+  const text=(await page.locator('#eta').innerText()).trim();
+  assert.equal(text,expected);
+  steps.push({payload,eta:metadata.eta,progress:metadata.progress,phase:metadata.phase,text});
+ }
+ await step({t:0,stage:'scan',cur:0,total:100},'');
+ await step({t:5,stage:'scan',cur:10,total:100},'~45 s left');
+ await page.screenshot({path:ROOT+'/scan.png'});
+ await step({t:20,stage:'scan',cur:40,total:100},'~35 s left');
+ await step({t:21,stage:'render',cur:0,total:100,phase:'rendering'},'');
+ await step({t:24,stage:'render',cur:3,total:100},'~2 min left');
+ await page.screenshot({path:ROOT+'/render.png'});
+ await page.setViewportSize({width:390,height:844});
+ await page.locator('#eta').scrollIntoViewIfNeeded();
+ await page.screenshot({path:ROOT+'/render-mobile.png'});
+ await step({t:30,stage:'render',cur:100,total:100},'');
+ assert.deepEqual(errors,[]);
+ const result={url:page.url(),title:await page.title(),viewports:['1365x950','390x844'],steps,errors,warnings,failedResponses};
+ fs.writeFileSync(ROOT+'/browser-results.json',JSON.stringify(result,null,2));
+ console.log(JSON.stringify(result,null,2));
+ await browser.close();
+})().catch(e=>{console.error(e);process.exit(1)});
