@@ -79,9 +79,11 @@ For ordinary file responses, use the valid response `Content-Length` matching th
 
 **When:** A small separate W1 correctness PR after its accepted-input and display contract is checked. It can accompany the early UX delivery sequence but does not belong in the P02 output-choice patch. The earlier browser research was blocked by a platform filter and produced no runtime report; do not retry that probe or claim its validation.
 
-- [ ] **E/S:** Recheck the ordinary basename-to-list/title path and existing escaping/text helpers against the selected upstream base. Keep filename normalization and download naming behavior intact; limit scope to the actual display sinks.
-- [ ] **I/V:** Verify ordinary punctuation, ampersands, quotation marks and Unicode names display unchanged as text without altering surrounding element structure or job-selection behavior. Use benign fixture names and actual emitted UI functions; no executable filename probes or broad security audit. Preserve accessible title/list text and exercise normal job switching.
+- [x] **E/S:** Recheck the ordinary basename-to-list/title path and existing escaping/text helpers against the selected upstream base. Keep filename normalization and download naming behavior intact; limit scope to the actual display sinks.
+- [x] **I/V:** Verify ordinary punctuation, ampersands, quotation marks and Unicode names display unchanged as text without altering surrounding element structure or job-selection behavior. Use benign fixture names and actual emitted UI functions; no executable filename probes or broad security audit. Preserve accessible title/list text and exercise normal job switching.
 - [ ] **D/R/L:** Explain the literal-name display correction with concrete benign examples, source provenance and exact validation. No external security report or publication is authorized by this card.
+
+**Local completion:** N11 is independently reviewed at `f399ebe1bd3c17561b44c06f7169a61e21becb43`. The [report](execution/evidence/delivery/task-119-report.md) and [review](execution/evidence/delivery/task-119-review.md) preserve exact-base benign RED, eight owning checks on each runtime, package identities and actual desktop intake/selection/download behavior; mobile evidence covers selected-title/layout only. The full run’s two low-disk failures passed after real headroom recovery. The earlier incomplete exit143 remains unexplained. No executable probe or broad security claim is part of this candidate.
 
 ## N12 — preserve first-scan sanity checks without backtracking
 

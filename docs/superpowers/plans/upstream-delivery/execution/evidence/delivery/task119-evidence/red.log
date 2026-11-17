@@ -1,0 +1,81 @@
+TASK119_IMPORT {"executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python", "opencv": "4.14.0", "python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]", "source": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py", "source_sha256": "0e4f0f9a7846080f591038d021aaf3ca6f01201d83ac32bbdc273f53d5067ee7"}
+F.FF.                                                                    [100%]
+=================================== FAILURES ===================================
+_ test_emitted_job_list_and_title_preserve_literal_name[Family &amp; friends \u2014 caf\xe9.mp4] _
+
+name = 'Family &amp; friends — café.mp4'
+
+    @pytest.mark.parametrize("name", NAMES)
+    def test_emitted_job_list_and_title_preserve_literal_name(name):
+        result = emitted_fragments([{"id": "a123456789ab", "name": name,
+                                    "phase": "queued"}])
+        listing = Fragment(result["list"])
+        title = Fragment(result["titles"][0])
+>       assert listing.text[1] == name
+E       AssertionError: assert 'Family & friends — café.mp4' == 'Family &amp;...ds — café.mp4'
+E         
+E         - Family &amp; friends — café.mp4
+E         ?         ----
+E         + Family & friends — café.mp4
+
+tests/test_job_filename_display.py:65: AssertionError
+_ test_emitted_job_list_and_title_preserve_literal_name[Literal &#38; and &quot; notes.mp4] _
+
+name = 'Literal &#38; and &quot; notes.mp4'
+
+    @pytest.mark.parametrize("name", NAMES)
+    def test_emitted_job_list_and_title_preserve_literal_name(name):
+        result = emitted_fragments([{"id": "a123456789ab", "name": name,
+                                    "phase": "queued"}])
+        listing = Fragment(result["list"])
+        title = Fragment(result["titles"][0])
+>       assert listing.text[1] == name
+E       assert 'Literal & and " notes.mp4' == 'Literal &#38...ot; notes.mp4'
+E         
+E         - Literal &#38; and &quot; notes.mp4
+E         ?          ----     ^^^^^^
+E         + Literal & and " notes.mp4
+E         ?               ^
+
+tests/test_job_filename_display.py:65: AssertionError
+________ test_intake_keeps_accepted_name_and_ordinary_downloads[upload] ________
+
+intake = 'upload'
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7a2578293cb0>
+tmp_path = PosixPath('/tmp/openscrub-task119/tmp/red/test_intake_keeps_accepted_nam0')
+
+    @pytest.mark.parametrize("intake", ["upload", "server"])
+    def test_intake_keeps_accepted_name_and_ordinary_downloads(intake, monkeypatch, tmp_path):
+        # Catch changes to accepted basenames/metadata/download naming while
+        # keeping the worker out of this route-only ownership test.
+        monkeypatch.setattr(web, "JOBS_DIR", str(tmp_path / "jobs"))
+        monkeypatch.setattr(web, "JOBS", {})
+        queued = []
+        monkeypatch.setattr(web, "enqueue", lambda job, mode: queued.append((job["id"], mode)))
+        monkeypatch.setenv("OPENSCRUB_MEDIA_ROOT", str(tmp_path))
+        client = web.app.test_client()
+        name = NAMES[0]
+        submitted = "folder\\" + name if intake == "upload" else str(tmp_path / name)
+        if intake == "upload":
+            data = {"video": (io.BytesIO(b"synthetic input"), submitted), "options": "{}"}
+        else:
+            (tmp_path / name).write_bytes(b"synthetic input")
+            data = {"server_path": submitted, "options": "{}"}
+        response = client.post("/api/jobs", data=data)
+        assert response.status_code == 200
+        jid, = response.get_json()["jobs"]
+        assert queued == [(jid, "scan")]
+        job = web.JOBS[jid]
+>       assert job["name"] == name
+E       AssertionError: assert 'folderFamily...ds — café.mp4' == 'Family &amp;...ds — café.mp4'
+E         
+E         - Family &amp; friends — café.mp4
+E         + folderFamily &amp; friends — café.mp4
+E         ? ++++++
+
+tests/test_job_filename_display.py:99: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_job_filename_display.py::test_emitted_job_list_and_title_preserve_literal_name[Family &amp; friends \u2014 caf\xe9.mp4]
+FAILED tests/test_job_filename_display.py::test_emitted_job_list_and_title_preserve_literal_name[Literal &#38; and &quot; notes.mp4]
+FAILED tests/test_job_filename_display.py::test_intake_keeps_accepted_name_and_ordinary_downloads[upload]
+3 failed, 2 passed in 0.33s

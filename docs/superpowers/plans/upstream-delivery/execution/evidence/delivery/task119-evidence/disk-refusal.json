@@ -1,0 +1,16 @@
+{
+  "disk_usage": {
+    "total": 10486738944,
+    "used": 9452740608,
+    "free": 1033998336
+  },
+  "full_session": 15715,
+  "full_exit": 1,
+  "first_session": 10580,
+  "first_exit": 143,
+  "first_cause": "unexplained incomplete run; no summary",
+  "full_tty": true,
+  "first_tty": false,
+  "pytest_overlap": false,
+  "timeouts": "No explicit command timeout available in exec_command schema; initial yield1000ms is not completion. No kill/process-group code in task server/browser harness; cleanup used owned write_stdin sessions only."
+}

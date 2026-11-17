@@ -1,0 +1,41 @@
+TASK119_IMPORT {"executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python", "opencv": "4.14.0", "python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]", "source": "/tmp/openscrub-task119/installed/openscrub.py", "source_sha256": "0e4f0f9a7846080f591038d021aaf3ca6f01201d83ac32bbdc273f53d5067ee7"}
+TASK119_WEB {"source": "/tmp/openscrub-task119/installed/openscrub_web.py", "sha256": "62aa7080eb2667f0d5a7c06e5be160ffe8aa5d8d72d7a6df0dc436a90ec33090"}
+{
+  "python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]",
+  "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+  "core_path": "/tmp/openscrub-task119/installed/openscrub.py",
+  "web_path": "/tmp/openscrub-task119/installed/openscrub_web.py",
+  "source_and_package_sha256": {
+    "openscrub.py": "0e4f0f9a7846080f591038d021aaf3ca6f01201d83ac32bbdc273f53d5067ee7",
+    "openscrub_web.py": "62aa7080eb2667f0d5a7c06e5be160ffe8aa5d8d72d7a6df0dc436a90ec33090",
+    "openscrub_setup.py": "d0362a038f8182e8fae510100085bb087f09f7e5cf7e11a780a24390b3037eaf",
+    "openscrub_update.py": "4d6a20f75d985a119f8421227c3bd88b17fd1b8eed44e353b127b5b49e733d55",
+    "openscrub_vault.py": "cc2db6a35d0b934502f1400b0d3a5b1f23ff8f63e6d24f9fc6fc4ab7baaebf82",
+    "zones_ui.py": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7",
+    "tests/test_job_filename_display.py": "d63e48116264ea247cda2d619fd25bf641a05ce8f68a92076a657601a87346dd",
+    "test_openscrub.py": "06cb21ce47e9b93dad5334bf15564fe9f74e2ab93881a017febcf4978b8ec3d1",
+    "pyproject.toml": "3b6e7f7759ca81f8e66d45caf6b5eeb5029a3b7434b32384ed3ec84ebc20a3c4"
+  },
+  "cli": {
+    "openscrub": {
+      "exit_code": 0,
+      "stdout_sha256": "eb76a71a7e1d822c66f05b008249b4f8a919606eaef552be00dc1a47381f8fc6"
+    },
+    "openscrub-web": {
+      "exit_code": 0,
+      "stdout_sha256": "9ffaf42bf805dde249bee4116287a7ac21b468a372ea2300eb721ae257a2edce"
+    }
+  },
+  "web_status": {
+    "/": 200,
+    "/api/jobs": 200,
+    "/api/models/face": 200,
+    "/api/model_status": 200,
+    "/api/vault": 200
+  },
+  "parser_defaults_equal": true,
+  "artifacts": {
+    "openscrub-1.0.96-py3-none-any.whl": "d6885581ae5b4ed6702f788bdf1a49d06a7aae12369b7e344d462335291be7af",
+    "openscrub-1.0.96.tar.gz": "ef74f621ca0427e81b4e46cd8e6da02304ffbcd0d645871f1d63de722b12cccb"
+  }
+}

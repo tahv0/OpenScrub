@@ -1,0 +1,32 @@
+{
+  "base": "e21ebdf6e3ee46e6c65050dc956a9a3459152269",
+  "source": "/home/tahv0/.codex/worktrees/c832/OpenScrub",
+  "files": {
+    "openscrub_web.py": {
+      "sha256": "62aa7080eb2667f0d5a7c06e5be160ffe8aa5d8d72d7a6df0dc436a90ec33090",
+      "bytes": 256337
+    },
+    "tests/test_job_filename_display.py": {
+      "sha256": "d63e48116264ea247cda2d619fd25bf641a05ce8f68a92076a657601a87346dd",
+      "bytes": 5023
+    },
+    "pyproject.toml": {
+      "sha256": "3b6e7f7759ca81f8e66d45caf6b5eeb5029a3b7434b32384ed3ec84ebc20a3c4",
+      "bytes": 4026
+    },
+    "CONTRIBUTING.md": {
+      "sha256": "a8be4ea71d3552056bb795ce4a806e6e60f53f33922e3b706caf8fc696015548",
+      "bytes": 1503
+    },
+    "openscrub.py": {
+      "sha256": "0e4f0f9a7846080f591038d021aaf3ca6f01201d83ac32bbdc273f53d5067ee7",
+      "bytes": 413860
+    },
+    "test_openscrub.py": {
+      "sha256": "06cb21ce47e9b93dad5334bf15564fe9f74e2ab93881a017febcf4978b8ec3d1",
+      "bytes": 191370
+    }
+  },
+  "head": "f399ebe1bd3c17561b44c06f7169a61e21becb43",
+  "branch": "pr/literal-job-filenames"
+}

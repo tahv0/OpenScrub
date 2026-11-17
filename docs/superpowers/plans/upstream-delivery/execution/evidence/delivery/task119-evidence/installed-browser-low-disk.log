@@ -1,0 +1,12 @@
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+507 !== 200
+
+    at /tmp/openscrub-task119/browser.cjs:14:8 {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: 507,
+  expected: 200,
+  operator: 'strictEqual',
+  diff: 'simple'
+}

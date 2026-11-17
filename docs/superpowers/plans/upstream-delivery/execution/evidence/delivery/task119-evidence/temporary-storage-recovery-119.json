@@ -1,0 +1,25 @@
+{
+  "reason": "Recover task119 actual upload guard headroom by removing only two generated raw duplicates with verified lossless archived and Git-committed copies. No user data, shared environments or active-task files selected.",
+  "free_bytes_before": 1034092544,
+  "free_bytes_after": 1239932928,
+  "removed_bytes": 205838724,
+  "files": [
+    {
+      "removed_duplicate": "/tmp/openscrub-task113/evidence/comparison-corrected.json",
+      "bytes": 102919362,
+      "sha256": "abc0c184eda8964e73905adc8a1ce701fe7850ba7d3e3b4d4cc1266f2c03b2c9",
+      "retained_lossless_copy": "/home/tahv0/src/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/evidence/delivery/task113-evidence/comparison-corrected.json.gz",
+      "gzip_sha256": "8623a5533ebd5f4d0c2958db47f0490df57c374a1d75082beb939911d14aeb0e",
+      "verified_checkpoint": "d11fe87cbb2f237bc1bef605a93fb95f17b6e9f5"
+    },
+    {
+      "removed_duplicate": "/tmp/openscrub-task113/evidence/comparison.json",
+      "bytes": 102919362,
+      "sha256": "6a2b977f63dc1bd48667794a4dc8cb3e97908d77898344ecfaaa0242a343adb4",
+      "retained_lossless_copy": "/home/tahv0/src/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/evidence/delivery/task113-evidence/comparison.json.gz",
+      "gzip_sha256": "7b4513b63977c400a47173792f6fb8923143cde449e3c28fe282a8d2942e8fe8",
+      "verified_checkpoint": "d11fe87cbb2f237bc1bef605a93fb95f17b6e9f5"
+    }
+  ],
+  "restoration": "gzip-decompress each retained copy to its original removed_duplicate path if needed."
+}

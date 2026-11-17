@@ -1,0 +1,80 @@
+TASK119_IMPORT {"executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python", "opencv": "4.14.0", "python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]", "source": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py", "source_sha256": "0e4f0f9a7846080f591038d021aaf3ca6f01201d83ac32bbdc273f53d5067ee7"}
+TASK119_WEB {"source": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", "sha256": "62aa7080eb2667f0d5a7c06e5be160ffe8aa5d8d72d7a6df0dc436a90ec33090"}
+........................................................................ [ 50%]
+.................................F.......................F............   [100%]
+=================================== FAILURES ===================================
+__________ test_upload_cap_configurable_and_413_explains_the_way_out ___________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7a8238b46570>
+
+    def test_upload_cap_configurable_and_413_explains_the_way_out(monkeypatch):
+        """A real 18 GB plate-removal upload died as a bare '413 Request
+        Entity Too Large' with no path forward. The cap is a dial now
+        (--max-upload-gb / OPENSCRUB_MAX_UPLOAD_GB, 0 = unlimited) and the
+        413 body is JSON that names BOTH remedies — raising the cap and the
+        'path on the server' box, which is the right route for huge files."""
+        import openscrub_web
+        mb = openscrub_web._max_upload_bytes
+        monkeypatch.delenv("OPENSCRUB_MAX_UPLOAD_GB", raising=False)
+        assert mb() == 8 * 1024 ** 3                 # default unchanged
+        assert mb("40") == 40 * 1024 ** 3            # CLI value wins
+        assert mb("0") is None                       # explicit 0 = unlimited
+        assert mb("garbage") == 8 * 1024 ** 3        # junk falls back, closed
+        monkeypatch.setenv("OPENSCRUB_MAX_UPLOAD_GB", "20")
+        assert mb() == 20 * 1024 ** 3                # env honored
+        assert mb("40") == 40 * 1024 ** 3            # CLI still beats env
+        old = openscrub_web.app.config["MAX_CONTENT_LENGTH"]
+        try:
+            openscrub_web.app.config["MAX_CONTENT_LENGTH"] = 1024
+            client = openscrub_web.app.test_client()
+            r = client.post("/api/jobs", data=b"x" * 4096,
+                            content_type="application/octet-stream")
+>           assert r.status_code == 413
+E           assert 507 == 413
+E            +  where 507 = <WrapperTestResponse streamed [507 INSUFFICIENT STORAGE]>.status_code
+
+test_openscrub.py:3248: AssertionError
+______________ test_server_path_intake_guard_precedes_size_lookup ______________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7a8238b241a0>
+tmp_path = PosixPath('/tmp/openscrub-task119/tmp/full-supervised/test_server_path_intake_guard_0')
+
+    def test_server_path_intake_guard_precedes_size_lookup(monkeypatch, tmp_path):
+        """Code-scanning #21 (py/path-injection): create_job's server-path
+        branch calls os.path.getsize on the request path (the duplicate-upload
+        size, v1.0.83). server_path_error confines the path first, but CodeQL's
+        barrier analysis is function-local, so the single-startswith
+        containment guard must ALSO sit inline in create_job, before the sink
+        — the same convention server_video and waveform follow. Pin both the
+        behavior and that ordering."""
+        import inspect
+        import shutil
+        import openscrub_web as w
+        src = inspect.getsource(w.create_job)
+        guard = src.find("if not p.startswith(r.rstrip(os.sep) + os.sep):")
+        sink = src.find("os.path.getsize(p)")
+        assert guard != -1, "inline containment guard missing from create_job"
+        assert sink != -1 and guard < sink, "guard must precede the getsize sink"
+    
+        media = tmp_path / "media"
+        media.mkdir()
+        inside = media / "clip.mp4"
+        inside.write_bytes(b"\x00" * 512)
+        outside = tmp_path / "elsewhere.mp4"
+        outside.write_bytes(b"\x00" * 64)
+        monkeypatch.setenv("OPENSCRUB_MEDIA_ROOT", str(media))
+        client = w.app.test_client()
+        n0 = len(w.JOBS)
+        r = client.post("/api/jobs", data={"server_path": str(outside),
+                                           "options": "{}"})
+>       assert r.status_code == 400 and len(w.JOBS) == n0, \
+            "a path outside the media root must be refused, no job created"
+E       AssertionError: a path outside the media root must be refused, no job created
+E       assert (507 == 400)
+E        +  where 507 = <WrapperTestResponse streamed [507 INSUFFICIENT STORAGE]>.status_code
+
+test_openscrub.py:3944: AssertionError
+=========================== short test summary info ============================
+FAILED test_openscrub.py::test_upload_cap_configurable_and_413_explains_the_way_out
+FAILED test_openscrub.py::test_server_path_intake_guard_precedes_size_lookup
+2 failed, 140 passed in 55.31s

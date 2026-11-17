@@ -1,0 +1,12 @@
+[
+  {
+    "path": "/tmp/openscrub-task119/evidence/evaluated-page-0.js",
+    "sha256": "5e3823a75ed7ed08e0ebc753d4d9fcc378cd413ed7e6f7772ff46657ffab1fcc",
+    "bytes": 42962
+  },
+  {
+    "path": "/tmp/openscrub-task119/evidence/evaluated-page-1.js",
+    "sha256": "e4215bc64e33afad72f68a2d4fe02e08a357431250200763e0a4256446a83d21",
+    "bytes": 57897
+  }
+]
