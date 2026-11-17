@@ -137,17 +137,21 @@ def render(kind, source, output, cb, **kwargs):
     return app.render(*common, False, encoder='x264', cb=cb, **kwargs)
 
 
-@pytest.mark.parametrize('kind', ['sdr', 'hdr', 'fallback'])
-@pytest.mark.parametrize('failure', ['success', 'metadata', 'callback', 'final',
-                                    'spawn', 'wait', 'release', 'cancel',
-                                    'cancel-release', 'log'])
+@pytest.mark.parametrize(('kind', 'failure'), [
+    (kind, failure)
+    for kind, failures in [
+        ('sdr', ['success', 'metadata', 'callback', 'final', 'spawn', 'wait',
+                 'release', 'cancel', 'cancel-release']),
+        ('hdr', ['success', 'metadata', 'callback', 'final', 'spawn', 'wait',
+                 'release', 'cancel', 'log']),
+        ('fallback', ['success', 'metadata', 'callback', 'final', 'release',
+                      'cancel', 'cancel-release']),
+    ]
+    for failure in failures
+])
 def test_owned_resources_across_render_lifetime(kind, failure, source,
                                                 tmp_path, monkeypatch):
     """Missing any setup/frame/finally release is visible before harness cleanup."""
-    if (kind == 'fallback' and failure in ('spawn', 'wait')
-            or kind != 'hdr' and failure == 'log'
-            or kind == 'hdr' and failure == 'cancel-release'):
-        pytest.skip('fallback owns no subprocess')
     output = tmp_path / 'output.mp4'
     if failure in ('metadata', 'spawn'):
         output.write_bytes(b'previous untouched output')
