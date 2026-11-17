@@ -135,3 +135,23 @@ def test_setup_usable_source_build_is_not_reported_missing(monkeypatch, capsys):
     line = next(line for line in output.splitlines() if "OpenCV face fallback:" in line)
     assert "[note]" in line and "unmanaged" in line
     assert "--force-reinstall" not in output
+
+
+@pytest.mark.parametrize("runtime,wheel", [("5.0.0", "4.14.0.94"), ("4.14.0", "5.0.0.93")])
+@pytest.mark.parametrize("consumer", ["installer", "setup"])
+def test_mismatched_runtime_cannot_receive_normal_wheel_repair(monkeypatch, capsys, runtime, wheel, consumer):
+    import sys
+    import openscrub_setup as setup
+    commands = wire(monkeypatch, [snapshot(version=runtime, distributions={"opencv-python": wheel})])
+    if consumer == "installer":
+        install.step_core(check=False, yes=True)
+    else:
+        monkeypatch.setattr(setup, "find_tesseract", lambda: "/tesseract")
+        monkeypatch.setattr(setup, "find_ffmpeg", lambda: "/ffmpeg")
+        monkeypatch.setitem(sys.modules, "spacy", None)
+        setup.main(["--check"])
+    output = capsys.readouterr().out
+    assert "--force-reinstall" not in output
+    assert "Reconcile cv2 ownership" in output
+    assert "unsupported" in output
+    assert not any("pip" in cmd for cmd in commands)

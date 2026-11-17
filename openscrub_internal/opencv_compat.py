@@ -141,14 +141,18 @@ def assess_opencv(snapshot):
 
 
 def opencv_repair_hint(snapshot, python_executable):
-    """Print a deliberate repair only when a sole normal wheel is identified."""
+    """Offer normal-wheel repair only with known agreeing runtime/wheel versions."""
     assessment = assess_opencv(snapshot)
     state = assessment["state"]
     command = subprocess.list2cmdline([python_executable]) if os.name == "nt" else shlex.quote(python_executable)
     rerun = "Rerun health checks in a fresh process: %s -m openscrub_setup --check (source: %s install.py --check)." % (command, command)
     if state == "healthy":
         return ""
-    if state in {"unsupported", "broken"} and set(snapshot["distributions"]) == {"opencv-python"}:
+    runtime = _version(snapshot["version"])
+    normal = _version(snapshot["distributions"].get("opencv-python"))
+    if (state in {"unsupported", "broken"}
+            and set(snapshot["distributions"]) == {"opencv-python"}
+            and runtime is not None and runtime == normal):
         return ('To deliberately restore the compatible normal wheel, run: %s -m pip install --force-reinstall "opencv-python<5". ' % command) + rerun
     if state == "missing":
         return ('Install the core requirement with %s -m pip install "opencv-python<5". ' % command) + rerun
