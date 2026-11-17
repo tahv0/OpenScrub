@@ -44,7 +44,8 @@ from flask import (Flask, Response, abort, jsonify, redirect, request, g,
                    send_file, has_request_context)
 
 import openscrub
-from openscrub_internal.reports import atomic_report
+from openscrub_internal.reports import atomic_report, _staged_report
+from openscrub_internal.render_delivery import _DeliveryRecoveryError, _has_render_recovery
 from openscrub_internal.lifetimes import FileOwners, OwnedIterable
 from openscrub_internal.job_logs import JobLog
 import zones_ui
@@ -550,7 +551,8 @@ def job_public(job):
         "log_bytes": logs["bytes"],
         "log_dropped": logs["dropped"],
         "log_truncated": logs["truncated"],
-        "has_output": bool(job["output"] and os.path.exists(job["output"])),
+        "has_output": bool(not FILES.initialize(job).recovery_required and job["output"] and os.path.exists(job["output"])),
+        "recovery_required": FILES.initialize(job).recovery_required,
         "download_name": video_name,
         "report_name": report_name,
     }
@@ -888,7 +890,20 @@ def _report_current(job):
             abort(409, "job is being deleted")
 
 
+def _recovery_gate(job):
+    if FILES.initialize(job).recovery_required:
+        abort(409, "render delivery requires recovery")
+
+
+def _publish_job_report_locked(job, path, doc):
+    """Caller owns this job's report transaction and file lifetime."""
+    with _staged_report(path, doc) as staged:
+        FILES.initialize(job).output_epoch += 1
+        os.replace(staged, os.path.abspath(path))
+
+
 def _edit_gate(job):
+    _recovery_gate(job)
     _report_current(job)
     if FILES.initialize(job).active is not None or job.get("phase") in _ACTIVE_PHASES:
         abort(409, "job work is queued, running or still cleaning up")
@@ -925,6 +940,7 @@ def _finish_operation(job, owner):
 def _reserve_queue_locked(job, action, prepared):
     """Transfer a PREPARED lifetime under report_lock, without vault nesting."""
     _report_current(job)
+    _recovery_gate(job)
     _begin_operation(job, prepared)
     with JOBS_LOCK:
         job["qgen"] = job.get("qgen", 0) + 1
@@ -1049,8 +1065,42 @@ def _run_job(job, action, owner=None):
         with files.report_lock:
             if not _operation_valid(job, owner) or owner.operation.is_set():
                 raise openscrub.PipelineCancelled()
-            atomic_report(path, doc)
+            _publish_job_report_locked(job, path, doc)
     cb.publish_report = publish_report
+    committed = False
+    def publish_render(delivery, summary):
+        nonlocal committed
+        with files.report_lock:
+            _recovery_gate(job)
+            if not _operation_valid(job, owner) or owner.operation.is_set():
+                raise openscrub.PipelineCancelled()
+            missing = object()
+            keys = ("output", "phase", "progress", "eta", "error")
+            previous = {key: job.get(key, missing) for key in keys}
+            def success():
+                job["output"] = summary["output"]
+                job["phase"] = "done"
+                job["progress"] = 1.0
+                job["eta"] = None
+                job["error"] = None
+            def restore():
+                for key, value in previous.items():
+                    if value is missing:
+                        job.pop(key, None)
+                    else:
+                        job[key] = value
+            def mutate():
+                files.output_epoch += 1
+            try:
+                delivery.commit(before_mutation=mutate, publish_success=success,
+                                restore_success=restore)
+            except _DeliveryRecoveryError as error:
+                files.recovery_required = True
+                files.recovery_diagnostics = error.rollback_diagnostics
+                job.update(phase="error", error="render delivery requires recovery", eta=None)
+                raise
+            committed = delivery.committed
+    cb.publish_render = publish_render
     source = owner.source if owner is not None else job["video"]
     try:
         if action == "scan":
@@ -1166,16 +1216,17 @@ def _run_job(job, action, owner=None):
             args = build_args(dict(job, video=owner.source), for_render=True)
             args._report_input = owner.source
             res = openscrub.run_pipeline(args, cb)
-            with files.report_lock:
-                if not _operation_valid(job, owner):
-                    return
-                job["output"] = res["output"]
-                job["phase"] = "done"
-                job["progress"] = 1.0
-                job["eta"] = None
+            # Compatibility for substituted pipelines which do not use the new
+            # hook. Actual renders publish their terminal fields inside it.
+            if not committed:
+                with files.report_lock:
+                    _recovery_gate(job)
+                    if not _operation_valid(job, owner) or owner.operation.is_set():
+                        return
+                    job.update(output=res["output"], phase="done", progress=1.0, eta=None)
     except openscrub.PipelineCancelled:
         with files.report_lock:
-            if _operation_valid(job, owner):
+            if not committed and not files.recovery_required and _operation_valid(job, owner):
                 job["phase"] = "cancelled"
                 job["error"] = "cancelled by user"
     except BaseException as e:
@@ -1183,7 +1234,7 @@ def _run_job(job, action, owner=None):
         if isinstance(e, SystemExit):
             msg = "the job stopped unexpectedly (exit %s)" % (e.code,)
         with files.report_lock:
-            if _operation_valid(job, owner):
+            if not committed and not files.recovery_required and _operation_valid(job, owner):
                 job["phase"] = "error"
                 job["error"] = msg
                 job["log"].append(f"ERROR: {msg}")
@@ -1271,6 +1322,8 @@ def enforce_vault_lock():
             if jid is not None and job is None:
                 abort(404)
             _validate_files_locked(job)
+            if job is not None and request.endpoint not in {"job_status", "job_log", "job_cancel"}:
+                _recovery_gate(job)
             read_source = request.endpoint in {
                 "job_retry", "job_render", "job_track_object", "job_mediainfo",
                 "job_detframe", "job_thumb", "job_frame_at", "job_video_stream"}
@@ -1934,7 +1987,7 @@ def job_save_edits(jid):
         if (len(doc["detections"]) != original_count
                 or any(original is missing or not _same_json_value(original, target[key])
                        for target, key, original in touched.values())):
-            atomic_report(path, doc)
+            _publish_job_report_locked(job, path, doc)
         # suggest allowlisting any string whose EVERY instance was disabled —
         # the review just taught us it's a recurring false positive
         per = {}
@@ -2050,7 +2103,7 @@ def job_track_object(jid):
                 new[-1]["t_end"] += 0.25
                 doc["detections"].extend(new)
                 path = os.path.join(job["dir"], "report.json")
-                atomic_report(path, doc)
+                _publish_job_report_locked(job, path, doc)
                 job["log"].append(
                     "      tracked object: %d position(s), %.1f-%.1fs "
                     "(review card added)" % (len(new),
@@ -5370,6 +5423,28 @@ def _rehydrate_jobs():
             _reap_job_dir(jdir, jid, retries=1)
             continue
         if jid in JOBS:
+            continue
+        if _has_render_recovery(jdir):
+            # Do not follow descriptor paths or infer validity from final names.
+            up = next((os.path.join(jdir, "input" + e) for e in sorted(MEDIA_EXTS)
+                       if os.path.isfile(os.path.join(jdir, "input" + e))), None)
+            opts = {}
+            try:
+                with open(os.path.join(jdir, OPTIONS_FILE), encoding="utf-8") as f:
+                    opts = json.load(f)
+                if not isinstance(opts, dict):
+                    opts = {}
+            except (OSError, ValueError):
+                pass
+            job = dict(id=jid, dir=jdir, video=up, name=os.path.basename(up) if up else jid,
+                       options=opts, phase="error", progress=0.0, size=0,
+                       log=JobLog(["render delivery requires recovery"]),
+                       error="render delivery requires recovery", output=None,
+                       created=os.path.getmtime(jdir), cancel=threading.Event(), stats={})
+            FILES.initialize(job).recovery_required = True
+            with JOBS_LOCK:
+                JOBS[jid] = job
+            n += 1
             continue
         if not os.path.exists(rep):
             # NO report: the scan never completed (crashed or the server

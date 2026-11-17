@@ -55,13 +55,13 @@ def test_same_id_concurrent_requests_append_once(store, monkeypatch):
     lock = ObservedLock()
     web.FILES.initialize(store.job).report_lock = lock
     entered, release = threading.Event(), threading.Event()
-    real = web.atomic_report
-    def publish(path, doc):
+    real = web._publish_job_report_locked
+    def publish(job, path, doc):
         if not entered.is_set():
             entered.set()
             assert release.wait(8)
-        real(path, doc)
-    monkeypatch.setattr(web, 'atomic_report', publish)
+        real(job, path, doc)
+    monkeypatch.setattr(web, '_publish_job_report_locked', publish)
     first = start_call('post', store.url + '/detections', json={'manual': [addition()]})
     second = None
     try:
