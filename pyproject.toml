@@ -34,7 +34,7 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Image Processing",
 ]
 dependencies = [
-    "opencv-python",
+    "opencv-python<5",
     "numpy",
     # License-plate models (open-image-models YOLOv9) are "end2end" ONNX
     # exports with a baked-in NonMaxSuppression node that OpenCV's DNN module

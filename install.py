@@ -28,6 +28,8 @@ import shutil
 import subprocess
 import sys
 
+from openscrub_internal.opencv_compat import assess_opencv, opencv_repair_hint, probe_opencv
+
 FROZEN = getattr(sys, "frozen", False)          # running as PyInstaller exe
 # In a onefile exe, __file__ points at a temp extraction dir that vanishes —
 # the project folder is wherever the exe itself lives.
@@ -37,7 +39,7 @@ IS_WIN = os.name == "nt"
 IS_MAC = platform.system() == "Darwin"
 IS_LINUX = platform.system() == "Linux"
 
-CORE_PKGS = ["opencv-python", "rapidfuzz", "pytesseract", "pillow",
+CORE_PKGS = ["opencv-python<5", "rapidfuzz", "pytesseract", "pillow",
              "flask", "pyyaml", "cryptography"]
 
 RESULTS = []
@@ -126,9 +128,25 @@ def step_python():
     return ok
 
 
+def step_opencv(check=True, yes=False, final=False):
+    snapshot = probe_opencv(PYTHON)
+    if not check and assess_opencv(snapshot)["state"] == "missing":
+        if ask("Install Python package: opencv-python<5?", yes):
+            pip("install", "opencv-python<5")
+            snapshot = probe_opencv(PYTHON)
+    assessment = assess_opencv(snapshot)
+    record("OpenCV face fallback" + (" (final)" if final else ""),
+           assessment["healthy"], assessment["state"] + "; " + assessment["evidence"])
+    hint = opencv_repair_hint(snapshot, PYTHON)
+    if hint:
+        log("  " + hint)
+    return assessment
+
+
 def step_core(check, yes):
+    step_opencv(check, yes)
     missing = [p for p, m in zip(
-        CORE_PKGS, ["cv2", "rapidfuzz", "pytesseract", "PIL",
+        CORE_PKGS[1:], ["rapidfuzz", "pytesseract", "PIL",
                     "flask", "yaml", "cryptography"]) if not have(m)]
     if not missing:
         record("Core Python packages", True, "all present")
@@ -395,6 +413,7 @@ def main():
     step_spacy(a.check, a.yes)
     step_system_tools(a.check, a.yes)
     step_paddle(a.check, a.yes, a.cpu_only)
+    final_opencv = step_opencv(final=True)
     step_directml(a.check, a.yes, a.cpu_only)
     step_nvenc()
     if not a.no_shortcut:
@@ -404,10 +423,13 @@ def main():
     bad = [s for s, ok, _ in RESULTS if not ok]
     if a.check:
         log(f" Check complete — {len(RESULTS) - len(bad)}/{len(RESULTS)} ready."
-            + ("" if not bad else " Run without --check to install."))
+            + ("" if not bad else " See diagnostics above for remaining items."))
     elif bad:
         log(" Finished with warnings: " + "; ".join(bad))
-        log(" Everything else works — Tesseract/x264 fallbacks cover gaps.")
+        if final_opencv["healthy"]:
+            log(" Everything else works — Tesseract/x264 fallbacks cover gaps.")
+        else:
+            log(" OpenCV needs attention; unavailable-model face fallback is not certified.")
     else:
         log(" Install complete.")
         log(f" Start OpenScrub: the '{'OpenScrub' if not a.no_shortcut else 'launcher'}'"

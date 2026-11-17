@@ -36,3 +36,14 @@ run a real render on a small synthetic video and sanity-check the report.
 
 See CLAUDE.md for the full architecture map, the category-alignment rule,
 and the verification workflow.
+
+OpenCV core compatibility regressions live in `tests/test_opencv_compat.py` and
+`tests/test_install_opencv_compat.py`; collect them with the existing root tests
+using `python -m pytest`. The core normal wheel stays `opencv-python<5` with
+Python >=3.9. After source updates or optional Paddle installs, run
+`python install.py --check` (installed package: `python -m openscrub_setup --check`).
+Source updates do not migrate dependencies. Use the reported interpreter for a
+deliberate bounded reinstall only when the diagnostic identifies a sole normal
+wheel. Mixed/alternate/source-built ownership needs deliberate reconciliation;
+keep CUDA's source-built OpenCV/NumPy provider path. Optional Paddle's contrib
+coexistence policy remains separate from this core bound.
