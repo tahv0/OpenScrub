@@ -361,6 +361,13 @@ def job_public(job):
     }
 
 
+# ETA observations belong to the callback, independently of UI polling.
+_ETA_WINDOW_SECONDS = 120.0
+_ETA_SAMPLE_SECONDS = 5.0
+_ETA_RECENT_MIN_SECONDS = 20.0
+_ETA_STARTUP_SECONDS = 3.0
+
+
 class WebCallbacks(openscrub.Callbacks):
     wants_frames = True
 
@@ -371,6 +378,8 @@ class WebCallbacks(openscrub.Callbacks):
         self._t0 = 0.0              # when it started,
         self._cur0 = 0             # its first cur value,
         self._eta = None            # and the smoothed estimate
+        self._rate_points = []      # recent monotonic (time, counter) samples
+        self._last_cur = None       # detect restarts even between samples
 
     def log(self, msg):
         self.job["log"].append(msg)
@@ -387,29 +396,48 @@ class WebCallbacks(openscrub.Callbacks):
                       "post": (0.45, 0.05)}.get(stage, (0.5, 0.5))
         self.job["progress"] = round(base + span * cur / max(total, 1), 5)
 
-        # Server-side per-STAGE ETA from the stage's whole-run average
-        # rate (units/sec since the stage began). Each stage runs at its
-        # own real speed — extrapolating one ETA across the stitched bar
-        # (what the client used to do) made the estimate lurch at every
-        # phase boundary. The whole-stage average is stable by
-        # construction, and a light EMA on the published value keeps
-        # re-estimates gliding instead of stepping when the scan hits a
-        # fast-skip jump or a dense stretch.
-        now = time.time()
-        if stage != self._stage:
-            self._stage, self._t0, self._cur0 = stage, now, cur
-            self._eta = None
-            self.job["eta"] = None
+        # A fast early prefix must not dominate a long stage's slow tail.
+        # Use the whole-stage rate only during startup, then a bounded
+        # recent window. Wall-clock adjustments cannot affect throughput.
+        now = time.monotonic()
+        if (not math.isfinite(cur) or not math.isfinite(total)
+                or total <= 0 or cur >= total):
+            self._stage = None
+            self._last_cur = None
+            self._rate_points.clear()
+            self._eta = self.job["eta"] = None
             return
+        if (stage != self._stage
+                or (self._last_cur is not None and cur < self._last_cur)):
+            self._stage, self._t0, self._cur0 = stage, now, cur
+            self._last_cur = cur
+            self._rate_points = [(now, cur)]
+            self._eta = self.job["eta"] = None
+            return
+        self._last_cur = cur
+        if now - self._rate_points[-1][0] >= _ETA_SAMPLE_SECONDS:
+            self._rate_points.append((now, cur))
+        cutoff = now - _ETA_WINDOW_SECONDS
+        # Keep at most one predecessor to include the crossing interval.
+        while len(self._rate_points) > 2 and self._rate_points[1][0] < cutoff:
+            self._rate_points.pop(0)
+
         done, elapsed = cur - self._cur0, now - self._t0
-        if cur < total and done > 0 and elapsed >= 3.0:
-            rem = (total - cur) * elapsed / done
-            self._eta = (rem if self._eta is None
-                         else 0.75 * self._eta + 0.25 * rem)
-            self.job["eta"] = round(self._eta)
-        else:
-            self._eta = None
-            self.job["eta"] = None
+        rate = done / elapsed if done > 0 and elapsed >= _ETA_STARTUP_SECONDS else 0
+        first, last = self._rate_points[0], self._rate_points[-1]
+        recent_seconds = last[0] - first[0]
+        if recent_seconds >= _ETA_RECENT_MIN_SECONDS:
+            # A mature stalled window has no useful rate; do not revive
+            # the optimistic whole-stage average in that case.
+            rate = (last[1] - first[1]) / recent_seconds
+        if math.isfinite(rate) and rate > 0:
+            rem = (total - cur) / rate
+            if math.isfinite(rem) and rem >= 0:
+                self._eta = (rem if self._eta is None
+                             else 0.35 * self._eta + 0.65 * rem)
+                self.job["eta"] = round(self._eta)
+                return
+        self._eta = self.job["eta"] = None
 
     def scan_frame(self, frame, t, found):
         now = time.time()
@@ -2143,7 +2171,7 @@ async function refresh(){
 
  // progress + ETA (updated in place — nothing is rebuilt).
  // The server sends a smoothed per-stage estimate (j.eta, seconds) built
- // from the stage's average processing rate — prefer it. The old
+ // from the stage's recent processing rate — prefer it. The old
  // client-side extrapolation from bar movement stays only as a fallback
  // (rehydrated jobs mid-phase), with its history reset on phase change so
  // it never extrapolates a scan-speed rate across the render phase.

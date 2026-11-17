@@ -116,4 +116,9 @@ include = [
     "NOTICE",
     "THIRD_PARTY_NOTICES.md",
     "test_openscrub.py",
+    "tests/",
+    "CONTRIBUTING.md",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["test_openscrub.py", "tests"]
