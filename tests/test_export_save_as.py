@@ -85,7 +85,7 @@ def run_js(scenario):
     node_bin = shutil.which("node")
     assert node_bin, "Node.js is required for embedded UI behavior tests (see CONTRIBUTING.md)"
     # This is the real evaluated Python string, not an independently copied JS helper.
-    source = web.APP_JS.split("function shellHtml(j)", 1)[1].split("async function refresh()", 1)[0]
+    source = web.APP_JS.split("function shellHtml(j)", 1)[1].split("async function refreshCycle(cycle)", 1)[0]
     source = "function shellHtml(j)" + source
     script = HARNESS + "\n" + source + r"""
 assert.equal(typeof saveExportAs,'function','Save As must be implemented');

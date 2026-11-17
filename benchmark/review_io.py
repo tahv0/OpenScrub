@@ -94,7 +94,12 @@ def export_source(repository, revision, destination):
     archive = subprocess.check_output(['git', '-C', str(repository), 'archive', revision])
     import io
     with tarfile.open(fileobj=io.BytesIO(archive)) as source:
-        source.extractall(destination)
+        # data_filter was security-backported to supported Python patch releases.
+        # Older Python 3.9 builds have no filter API and no default-change warning.
+        if hasattr(tarfile, 'data_filter'):
+            source.extractall(destination, filter='data')
+        else:
+            source.extractall(destination)
     entries = subprocess.check_output(['git', '-C', str(repository), 'ls-tree', '-r', '-z', revision]).split(b'\0')
     manifest = {}
     for entry in entries:

@@ -21,6 +21,7 @@ elements.set('detail',el());
 let now=0,seq=0;const timers=new Map();
 const listen=(type,fn)=>(events[type]??=[]).push(fn);
 const ctx=vm.createContext({console,AbortController,Set,Map,Promise,JSON,Math,Date,
+ performance:{now:()=>now},
  document:{hidden:false,getElementById:id=>elements.get(id)||null,querySelectorAll:()=>[],
  addEventListener:listen,createElement:el},window:{addEventListener:listen},detail:elements.get('detail'),
  setTimeout:(fn,ms)=>{const id=++seq;timers.set(id,{fn,at:now+ms});return id},clearTimeout:id=>timers.delete(id),

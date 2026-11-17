@@ -106,8 +106,8 @@ const tiny=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4
 const browser=await chromium.launch({headless:true,args:['--no-sandbox']});
 async function setup(name){
  const page=await browser.newPage({viewport:{width:1280,height:950}});
- const q={name,page,events:[],held:[],plans:[],errors:[],console:[],phase:'queued',progress:.2,logs:{A:['log-A'],B:['log-B']}};
- page.on('pageerror',e=>q.errors.push(e.message));page.on('console',m=>{if(['error','warning'].includes(m.type()))q.console.push(m.text())});
+ const q={name,page,events:[],held:[],plans:[],errors:[],console:[],injected:[],phase:'queued',progress:.2,logs:{A:['log-A'],B:['log-B']}};
+ page.on('pageerror',e=>q.errors.push(e.message));page.on('console',m=>{if(['error','warning'].includes(m.type()))q.console.push({text:m.text(),url:m.location().url})});
  page.on('dialog',d=>d.accept());await page.clock.install();
  await page.route('**/api/**',async route=>{
   const req=route.request(),u=new URL(req.url()),m=u.pathname.match(/^\/api\/jobs\/([^/]+)(?:\/(.*))?$/);
@@ -122,8 +122,9 @@ async function setup(name){
    kind==='detections'?{duration:10,detections:[{i:0,category:'mrn',text:'review-'+id,enabled:true,t_start:0,t_end:1,track:-1,person:-1}]}:
    kind==='mediainfo'?{duration:10,width:320,height:180}:kind==='report'?{detections:[],audio_redactions:[{t0:1,t1:2,mode:'mute'}]}:{ok:true};
   const plan=q.plans.find(p=>!p.used&&p.kind===kind&&(!p.id||p.id===id));
-  if(plan){plan.used=true;if(plan.body)body=plan.body;if(plan.abort)return route.abort('failed');
+  if(plan){plan.used=true;if(plan.body)body=plan.body;if(plan.abort){q.injected.push({kind:'network',url:req.url()});return route.abort('failed');}
    if(plan.hold)await new Promise(resolve=>q.held.push({id,kind,release:resolve}));}
+  if(plan?.status===503)q.injected.push({kind:'503',url:req.url()});
   await route.fulfill({status:plan?.status||200,contentType:'application/json',body:plan?.raw??JSON.stringify(body)}).catch(()=>{});
  });
  await page.goto(base);await page.clock.pauseAt(await page.evaluate(()=>Date.now()+100));assert.equal(await page.title(),'OpenScrub');assert.match(await page.locator('body').innerText(),/OpenScrub/);
@@ -135,10 +136,15 @@ async function advance(q,ms=900){await q.page.clock.runFor(ms);await pause(60)}
 async function finish(q){for(const h of q.held)h.release();await pause(30);
  assert.deepEqual(q.errors,[],'no unhandled page errors');
  assert.ok(q.events.every(e=>e.method==='GET'||e.method==='DELETE'),'wake/recovery never submit mutations');
- // Injected route failures/503 are expected Chromium console diagnostics.
- const unrelated=q.console.filter(s=>!s.includes('net::ERR_FAILED')&&!s.includes('503'));
- assert.deepEqual(unrelated,[],'unrelated browser console errors');
- results.push({name:q.name,events:q.events,expectedInjectedConsole:q.console,pageErrors:q.errors});await q.page.close();}
+ // Each diagnostic must consume an actual injection in this scenario and URL.
+ const remaining=[...q.injected];
+ for(const diagnostic of q.console){
+  const kind=diagnostic.text.includes('net::ERR_FAILED')?'network':diagnostic.text.includes('503')?'503':null;
+  const index=remaining.findIndex(i=>i.kind===kind&&i.url===diagnostic.url);
+  assert.ok(index>=0,JSON.stringify({scenario:q.name,unexpected:diagnostic,injections:q.injected}));
+  remaining.splice(index,1);
+ }
+ results.push({name:q.name,events:q.events,injections:q.injected,controlledConsole:q.console,pageErrors:q.errors});await q.page.close();}
 try{
  {
  const q=await setup('overlap-progress-log');q.plans.push({kind:'meta',hold:true,body:meta('A','queued',.8)});
@@ -218,7 +224,7 @@ try{
  }
 }finally{await browser.close()}
 if(process.env.POLLING_ARTIFACTS)fs.writeFileSync(process.env.POLLING_ARTIFACTS+'/browser-results.json',JSON.stringify(results,null,2));
-console.log(JSON.stringify(results.map(q=>({name:q.name,requests:q.events.length,pageErrors:q.pageErrors,expectedInjectedConsole:q.expectedInjectedConsole})),null,2));
+console.log(JSON.stringify(results.map(q=>({name:q.name,requests:q.events.length,pageErrors:q.pageErrors,controlledConsole:q.controlledConsole})),null,2));
 })().catch(e=>{console.error(e);process.exit(1)});
 """
 

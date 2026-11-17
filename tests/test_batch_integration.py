@@ -192,8 +192,24 @@ def test_actual_scan_review_save_render_export_and_fresh_reopen(store, socket_ap
     assert status==200 and body==Path(store.job['output']).read_bytes()
     assert '_redacted.mp4' in headers['Content-Disposition']
     idle()
-    cap=cv2.VideoCapture(store.job['output']);ok,frame=cap.read();cap.release()
-    assert ok and frame[40,24].mean()<20 and frame[40,8].mean()>140
+    # Selected/kept output must hold through the complete decoded clip.
+    cap=cv2.VideoCapture(store.job['output'])
+    frames=0
+    try:
+        while True:
+            ok,frame=cap.read()
+            if not ok:
+                break
+            assert frame[40,24].mean()<20 and frame[40,8].mean()>140
+            frames+=1
+    finally:
+        cap.release()
+    assert frames==60
+    status,_,body=socket_api('GET',store.url+'/detections')
+    assert status==200
+    rows=json.loads(body)['detections']
+    assert [r['i'] for r in rows]==list(range(len(rendered['detections'])))
+    assert [r['enabled'] for r in rows]==[r['enabled'] for r in rendered['detections']]
     fresh_reopen(store,rendered,payload)
     assert json.loads(store.path.read_text())==rendered
 
