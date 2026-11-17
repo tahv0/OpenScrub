@@ -2460,7 +2460,8 @@ progress{width:100%;height:12px;accent-color:var(--acc)}
 .badge{display:inline-block;background:#334155;color:#cbd5e1;border-radius:5px;
  padding:1px 6px;font-size:11px;margin-left:4px}
 #log{background:#020617;color:#cbd5e1;font:12px/1.4 ui-monospace,Consolas,monospace;
- padding:10px;border-radius:8px;height:180px;overflow:auto;white-space:pre-wrap}
+ padding:10px;border-radius:8px;height:180px;overflow:auto;white-space:pre-wrap;overflow-anchor:none}
+#log>span:empty{display:inline-block;min-height:1em}
 #preview img,#framewrap{max-width:100%;border-radius:8px}
 #framewrap{position:relative;display:inline-block}
 #framewrap canvas{position:absolute;left:0;top:0;cursor:crosshair}
@@ -2746,7 +2747,7 @@ async function applyTier(id){
  renderTiers();
 }
 refreshModelPanel();renderTiers();
-let CUR=null, EN={}, MAN=[], DUR=0, POLL=null, PHIST=[], PHPH="", LOGN=0, LOGE=null, LOGINIT=false, LOGRESET=false, SHELLPH=null, JOBSJSON="";
+let CUR=null, EN={}, MAN=[], DUR=0, POLL=null, PHIST=[], PHPH="", LOGN=0, LOGE=null, LOGINIT=false, RECENT_LOG=null, SHELLPH=null, JOBSJSON="";
 
 // VIEW_GEN advances on every openJob (including A -> B -> A) and removal.
 // Drafts live only in this page; late acknowledgements reconcile their owner,
@@ -2896,7 +2897,7 @@ async function delJob(id){
   alert(m);return;
  }
  REVIEW_DRAFTS.delete(id);
- if(CUR===id){disposeReview();REVIEW_LOAD++;beUnmount();stopPolling();VIEW_GEN++;CUR=null;EDITS=null;AUTO_REVIEW=null;REVIEW_REQUEST=null;detail.innerHTML="";}
+ if(CUR===id){disposeReview();REVIEW_LOAD++;beUnmount();stopPolling();disposeRecentLog();VIEW_GEN++;CUR=null;EDITS=null;AUTO_REVIEW=null;REVIEW_REQUEST=null;detail.innerHTML="";}
  JOBSJSON="";loadJobs();
 }
 async function openJob(id){
@@ -2910,17 +2911,139 @@ async function openJob(id){
   delete b.tlspans;delete b.audioSugg;delete b.audioTx;b.playing=false;
   trimReviewDraft(EDITS);
  }
- stopPolling();POLL_FAILURES=0;AUTO_REVIEW=null;REVIEW_REQUEST=null;
+ stopPolling();disposeRecentLog();POLL_FAILURES=0;AUTO_REVIEW=null;REVIEW_REQUEST=null;
  VIEW_GEN++;CUR=id;
  EDITS=REVIEW_DRAFTS.get(id);
  if(!EDITS){EDITS={en:{},enabled:{},manual:[],editor:emptyEditor(),busy:false,status:""};
   REVIEW_DRAFTS.set(id,EDITS);}
  EN=EDITS.en;MAN=EDITS.manual;BE=EDITS.editor;
- PHIST=[];PHPH="";LOGN=0;LOGE=null;LOGINIT=false;LOGRESET=false;SHELLPH=null;
+ PHIST=[];PHPH="";LOGN=0;LOGE=null;LOGINIT=false;SHELLPH=null;
  detail.innerHTML='<div id="pollStatus" role="status" aria-live="polite" style="margin:8px 0;color:#fbbf24"></div><div id="reviewSaveStatus" role="status" aria-live="polite" style="margin:8px 0;color:#fbbf24"></div>';
  saveStatus(EDITS,EDITS.status);
 
  refresh();
+}
+
+// One mounted view owns recent entry nodes, never a second transcript string.
+function disposeRecentLog(){
+ if(RECENT_LOG){RECENT_LOG.dispose();RECENT_LOG=null;}
+}
+function mountRecentLog(id,gen,element,note){
+ const MAX_ENTRIES=800,MAX_UNITS=1048576,ENTRY_UNITS=8192;
+ const SUFFIX="... [display entry truncated]",NL=String.fromCharCode(10);
+ let entries=[],units=0,saved=null,frame=null,disposed=false;
+ let omitted=false,truncated=false,displayTruncated=false,replaced=false,lost=false;
+ let width=element.clientWidth,height=element.clientHeight,ownedTop=element.scrollTop;
+ const owner={publish,dispose};
+ const current=()=>!disposed&&RECENT_LOG===owner&&ownsView(id,gen)&&document.getElementById("log")===element;
+ function status(){
+  const text=[replaced?"Log history was replaced.":"",omitted?"Earlier log messages were omitted.":"",
+   truncated?"Some log messages were truncated.":"",displayTruncated?"Some display entries were truncated.":"",
+   lost?"Reading position was omitted; showing oldest retained messages.":""].filter(Boolean).join(" ");
+  if(note.textContent!==text)note.textContent=text;
+ }
+ function capture(){
+  const bottom=element.scrollHeight-element.clientHeight-element.scrollTop<=40;
+  const top=element.getBoundingClientRect().top+element.clientTop;
+  let entry=entries.find(e=>e.node.getBoundingClientRect().bottom>top);
+  if(!entry)entry=entries[entries.length-1];
+  return {bottom,seq:entry?entry.seq:null,offset:entry?top-entry.node.getBoundingClientRect().top:0};
+ }
+ function remember(){saved=capture();ownedTop=element.scrollTop;}
+ function restore(anchor){
+  if(anchor.bottom){element.scrollTop=element.scrollHeight;}
+  else{
+   const entry=entries.find(e=>e.seq===anchor.seq);
+   if(entry){
+    const rect=entry.node.getBoundingClientRect(),top=element.getBoundingClientRect().top+element.clientTop;
+    // Preserve the entry and pixel offset, clamping an offset after rewrap.
+    const offset=Math.min(anchor.offset,Math.max(0,rect.height-1));
+    element.scrollTop=Math.max(0,Math.min(element.scrollHeight-element.clientHeight,
+     element.scrollTop+rect.top-top+offset));
+   }else{element.scrollTop=0;if(anchor.seq!==null)lost=true;}
+  }
+  remember();
+ }
+ function scroll(){
+  if(!current()||Math.abs(element.scrollTop-ownedTop)<.5)return;
+  lost=false;remember();status();
+ }
+ element.addEventListener("scroll",scroll,{passive:true});
+ const observer=typeof ResizeObserver==="undefined"?null:new ResizeObserver(()=>{
+  if(!current()||(width===element.clientWidth&&height===element.clientHeight))return;
+  width=element.clientWidth;height=element.clientHeight;
+  if(frame===null)frame=requestAnimationFrame(()=>{
+   frame=null;if(!current())return;
+   if(saved)restore(saved);status();
+  });
+ });
+ if(observer)observer.observe(element);
+ function entrySize(text){
+  if(text.length<=ENTRY_UNITS)return text.length;
+  let end=ENTRY_UNITS-SUFFIX.length;
+  const a=text.charCodeAt(end-1),b=text.charCodeAt(end);
+  if(a>=0xD800&&a<=0xDBFF&&b>=0xDC00&&b<=0xDFFF)end--;
+  return end+SUFFIX.length;
+ }
+ function clearSelection(removed){
+  if(!removed.length)return;
+  const selection=window.getSelection?.();
+  if(!selection||!element.contains(selection.anchorNode)||!element.contains(selection.focusNode))return;
+  if(removed.some(e=>e.node.contains(selection.anchorNode)||e.node.contains(selection.focusNode))||
+     selection.anchorNode===element||selection.focusNode===element)selection.removeAllRanges();
+ }
+ function publish(snapshot,replace,initial,modern){
+  if(!current())return;
+  const lines=snapshot.lines;
+  if(replace){omitted=false;truncated=false;displayTruncated=false;replaced=!initial;lost=false;}
+  if(modern){omitted=omitted||snapshot.base>0||snapshot.dropped>0;truncated=truncated||snapshot.truncated>0;}
+  if(!replace&&!lines.length){status();return;}
+  // Select only a surviving suffix, before creating or mounting its nodes.
+  const floor=replace?Math.max(0,lines.length-400):0;
+  const incoming=[];let total=0,start=lines.length;
+  while(start>floor&&incoming.length<MAX_ENTRIES){
+   const size=entrySize(lines[start-1]),next=total+size+(incoming.length?1:0);
+   if(next>MAX_UNITS)break;
+   incoming.push(size);total=next;start--;
+  }
+  let keep=entries.length;
+  if(!replace&&start===0){
+   while(keep>0&&incoming.length+entries.length-keep<MAX_ENTRIES){
+    const next=total+entries[keep-1].units+(incoming.length+entries.length-keep?1:0);
+    if(next>MAX_UNITS)break;
+    total=next;keep--;
+   }
+  }
+  // The final pre-mutation sample is after all polling awaits and validation.
+  const anchor=replace?null:capture(),removed=entries.slice(0,keep);
+  omitted=omitted||start>0||keep>0;
+  clearSelection(removed);
+  for(const entry of removed)entry.node.remove();
+  entries.splice(0,keep);
+  const fragment=document.createDocumentFragment();
+  for(let i=start;i<lines.length;i++){
+   const size=incoming[lines.length-1-i],source=lines[i];
+   const clipped=source.length>ENTRY_UNITS;
+   const node=document.createElement("span");node.dataset.seq=String(snapshot.from+i);
+   node.appendChild(document.createTextNode(clipped?source.slice(0,size-SUFFIX.length)+SUFFIX:source));
+   if(i<lines.length-1)node.appendChild(document.createTextNode(NL));
+   fragment.appendChild(node);entries.push({seq:snapshot.from+i,node,units:size});
+   displayTruncated=displayTruncated||clipped;
+  }
+  // Delimiters are distinct from stable content nodes, including empty entries.
+  if(start<lines.length&&entries.length>lines.length-start){
+   entries[entries.length-(lines.length-start)-1].node.appendChild(document.createTextNode(NL));
+  }
+  element.appendChild(fragment);units=total;
+  if(replace){element.scrollTop=element.scrollHeight;remember();}
+  else restore(anchor);
+  status();
+ }
+ function dispose(){
+  disposed=true;if(observer)observer.disconnect();if(frame!==null)cancelAnimationFrame(frame);
+  element.removeEventListener("scroll",scroll);entries.length=0;units=0;saved=null;frame=null;
+ }
+ return owner;
 }
 
 function shellHtml(j){
@@ -2931,8 +3054,8 @@ function shellHtml(j){
  <div style="margin-top:8px;text-align:center"><img id="pimg"
    style="max-width:100%;border-radius:8px;display:none;margin:0 auto"></div>
  <div id="pcap" style="font-size:12px;color:#94a3b8"></div>
- <div id="logStatus" role="status" style="margin-top:8px;color:#94a3b8"></div>
- <div id="log" style="margin-top:8px"></div>
+ <div id="logStatus" style="margin-top:8px;color:#94a3b8"></div>
+ <div id="log" tabindex="0" aria-label="Job log" aria-describedby="logStatus" style="margin-top:8px"></div>
  <div class="warn" id="warnbox" style="display:none;margin-top:8px"></div>
  </div>`;
 }
@@ -3083,6 +3206,7 @@ async function refreshCycle(cycle){
  EXPORT_NAMES={id,video:j.download_name,report:j.report_name};
  if(SHELLPH===null){
   detail.insertAdjacentHTML("afterbegin",shellHtml(j));SHELLPH="";
+  RECENT_LOG=mountRecentLog(id,gen,document.getElementById("log"),document.getElementById("logStatus"));
   const im=document.getElementById("pimg");
   im.onload=()=>{im.style.display="block";};   // show only once a real frame arrives
   im.onerror=()=>{im.style.display="none";};   // 404 before first preview: stay hidden
@@ -3111,9 +3235,7 @@ async function refreshCycle(cycle){
  document.getElementById("eta").textContent=eta;
  document.getElementById("prog").value=j.progress;
 
- // incremental log append with stick-to-bottom (respects manual scroll-up)
- const lg=document.getElementById("log");
- const stick=lg.scrollTop+lg.clientHeight>=lg.scrollHeight-40;
+ // Only a fully accepted body publishes to the mount-owned recent transcript.
  let nl=await pollJson(`api/jobs/${id}/log?from=${LOGN}${LOGE===null?"":"&epoch="+encodeURIComponent(LOGE)}`,cycle);
  if(!ownsView(id,gen)||!current())return;
  const index=n=>Number.isSafeInteger(n)&&n>=0;
@@ -3121,7 +3243,7 @@ async function refreshCycle(cycle){
   n.lines.every(line=>typeof line==="string");
  if(!validLog(nl))throw new Error("Invalid log update");
  const modern=["epoch","base","reset","dropped","truncated"].some(k=>k in nl);
- let replace=false,lines=nl.lines;
+ let replace=false,lines=nl.lines,nextEpoch=null;
  if(modern){
   if(!index(nl.base)||nl.base>nl.from||nl.from>nl.len||lines.length!==nl.len-nl.from||
      typeof nl.epoch!=="string"||!/^[A-Za-z0-9_-]{1,128}$/.test(nl.epoch)||
@@ -3130,16 +3252,11 @@ async function refreshCycle(cycle){
   const expected=LOGE!==null&&nl.epoch!==LOGE?"epoch":LOGN<nl.base?"stale":LOGN>nl.len?"future":null;
   if(nl.reset!==expected||nl.from!==(expected?nl.base:LOGN))throw new Error("Invalid log reset");
   replace=!LOGINIT||nl.reset!==null;
-  if(nl.reset==="epoch"||nl.reset==="future")LOGRESET=true;
-  LOGE=nl.epoch;
-  document.getElementById("logStatus").textContent=[
-   LOGRESET?"Log history was replaced.":"",
-   nl.dropped?"Earlier log messages were omitted.":"",
-   nl.truncated?"Some log messages were truncated.":""].filter(Boolean).join(" ");
+  nextEpoch=nl.epoch;
  }else{
   // Explicit old-backend branch: its shrink response may have from > len.
   if(nl.len<LOGN){
-   lg.textContent="";LOGN=0;
+   replace=true;
    if(nl.len){
     nl=await pollJson(`api/jobs/${id}/log?from=0`,cycle);
     if(!ownsView(id,gen)||!current())return;
@@ -3147,18 +3264,12 @@ async function refreshCycle(cycle){
      throw new Error("Invalid legacy log update");
    }
   }
-  if((nl.from!==LOGN&&nl.len!==0)||nl.lines.length!==Math.max(0,nl.len-nl.from))
+  if((nl.from!==(replace?0:LOGN)&&nl.len!==0)||nl.lines.length!==Math.max(0,nl.len-nl.from))
    throw new Error("Invalid log cursor");
-  replace=!LOGINIT||LOGN===0;lines=nl.lines;LOGE=null;
-  document.getElementById("logStatus").textContent="";
+  replace=replace||!LOGINIT;lines=nl.lines;
  }
- if(replace){lines=lines.slice(-400);lg.textContent="";}
- if(lines.length){
-  const NL=String.fromCharCode(10);
-  lg.textContent+=(lg.textContent?NL:"")+lines.join(NL);
-  if(stick)lg.scrollTop=lg.scrollHeight;
- }
- LOGN=nl.len;LOGINIT=true;
+ RECENT_LOG.publish(nl,replace,!LOGINIT,modern);
+ LOGN=nl.len;LOGE=nextEpoch;LOGINIT=true;
 
  // live preview: swap src in place (browser keeps old frame until new loads)
  const img=document.getElementById("pimg");
