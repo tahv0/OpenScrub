@@ -46,6 +46,7 @@ from flask import (Flask, Response, abort, jsonify, redirect, request, g,
 import openscrub
 from openscrub_internal.reports import atomic_report
 from openscrub_internal.lifetimes import FileOwners, OwnedIterable
+from openscrub_internal.job_logs import JobLog
 import zones_ui
 
 
@@ -503,7 +504,7 @@ def _new_job(video_path, options, name):
         "id": jid, "dir": jdir, "video": video_path, "name": name,
         "options": options, "phase": "queued", "progress": 0.0,
         "eta": None, "size": 0,
-        "log": [], "error": None, "output": None, "created": time.time(),
+        "log": JobLog(), "error": None, "output": None, "created": time.time(),
         "cancel": threading.Event(), "stats": {}, "qgen": 0,
     }
     FILES.initialize(job)
@@ -533,6 +534,7 @@ def export_filenames(job) -> tuple[str, str]:
 
 def job_public(job):
     video_name, report_name = export_filenames(job)
+    logs = job["log"].snapshot(tail=30)
     return {k: job[k] for k in ("id", "name", "phase", "progress", "error",
                                 "stats")} | {
         "eta": job.get("eta"),      # .get(): jobs rehydrated from disk lack it
@@ -540,8 +542,14 @@ def job_public(job):
         # is ALREADY on the server (issue #16 — each retry re-uploaded the
         # same 18 GB until the disk filled)
         "size": job.get("size") or 0,
-        "log_tail": job["log"][-30:],
-        "log_len": len(job["log"]),
+        "log_tail": logs["lines"],
+        "log_len": logs["len"],
+        "log_epoch": logs["epoch"],
+        "log_base": logs["base"],
+        "log_retained": logs["retained"],
+        "log_bytes": logs["bytes"],
+        "log_dropped": logs["dropped"],
+        "log_truncated": logs["truncated"],
         "has_output": bool(job["output"] and os.path.exists(job["output"])),
         "download_name": video_name,
         "report_name": report_name,
@@ -855,7 +863,7 @@ def _sanitize_argv(parser, argv, job=None):
             out[i + 1] = str(a.default)
             msg = "using the default %r" % (a.default,)
             i += 2
-        if job is not None and isinstance(job.get("log"), list):
+        if job is not None and isinstance(job.get("log"), JobLog):
             job["log"].append("NOTE: setting %s=%r is not valid — %s"
                               % (a.option_strings[0], v, msg))
     return out
@@ -1524,9 +1532,18 @@ def job_status(jid):
 @app.route("/api/jobs/<jid>/log")
 def job_log(jid):
     job = JOBS.get(jid) or abort(404)
-    frm = max(0, int(request.args.get("from", 0)))
-    return jsonify({"from": frm, "lines": job["log"][frm:],
-                    "len": len(job["log"])})
+    raw = request.args.get("from", "0")
+    epoch = request.args.get("epoch")
+    if len(raw) > 64 or (epoch is not None and len(epoch) > 128):
+        return jsonify({"error": "invalid log cursor"}), 400
+    try:
+        frm = max(0, int(raw))
+    except ValueError:
+        return jsonify({"error": "invalid log cursor"}), 400
+    snapshot = job["log"].snapshot(frm, epoch)
+    return jsonify({key: snapshot[key] for key in
+                    ("from", "lines", "len", "epoch", "base", "reset",
+                     "dropped", "truncated")})
 
 
 @app.route("/api/jobs/<jid>/preview.jpg")
@@ -2729,7 +2746,7 @@ async function applyTier(id){
  renderTiers();
 }
 refreshModelPanel();renderTiers();
-let CUR=null, EN={}, MAN=[], DUR=0, POLL=null, PHIST=[], PHPH="", LOGN=0, SHELLPH=null, JOBSJSON="";
+let CUR=null, EN={}, MAN=[], DUR=0, POLL=null, PHIST=[], PHPH="", LOGN=0, LOGE=null, LOGINIT=false, LOGRESET=false, SHELLPH=null, JOBSJSON="";
 
 // VIEW_GEN advances on every openJob (including A -> B -> A) and removal.
 // Drafts live only in this page; late acknowledgements reconcile their owner,
@@ -2899,7 +2916,7 @@ async function openJob(id){
  if(!EDITS){EDITS={en:{},enabled:{},manual:[],editor:emptyEditor(),busy:false,status:""};
   REVIEW_DRAFTS.set(id,EDITS);}
  EN=EDITS.en;MAN=EDITS.manual;BE=EDITS.editor;
- PHIST=[];PHPH="";LOGN=0;SHELLPH=null;
+ PHIST=[];PHPH="";LOGN=0;LOGE=null;LOGINIT=false;LOGRESET=false;SHELLPH=null;
  detail.innerHTML='<div id="pollStatus" role="status" aria-live="polite" style="margin:8px 0;color:#fbbf24"></div><div id="reviewSaveStatus" role="status" aria-live="polite" style="margin:8px 0;color:#fbbf24"></div>';
  saveStatus(EDITS,EDITS.status);
 
@@ -2914,6 +2931,7 @@ function shellHtml(j){
  <div style="margin-top:8px;text-align:center"><img id="pimg"
    style="max-width:100%;border-radius:8px;display:none;margin:0 auto"></div>
  <div id="pcap" style="font-size:12px;color:#94a3b8"></div>
+ <div id="logStatus" role="status" style="margin-top:8px;color:#94a3b8"></div>
  <div id="log" style="margin-top:8px"></div>
  <div class="warn" id="warnbox" style="display:none;margin-top:8px"></div>
  </div>`;
@@ -3096,28 +3114,51 @@ async function refreshCycle(cycle){
  // incremental log append with stick-to-bottom (respects manual scroll-up)
  const lg=document.getElementById("log");
  const stick=lg.scrollTop+lg.clientHeight>=lg.scrollHeight-40;
- let nl=await pollJson(`api/jobs/${id}/log?from=${LOGN}`,cycle);
+ let nl=await pollJson(`api/jobs/${id}/log?from=${LOGN}${LOGE===null?"":"&epoch="+encodeURIComponent(LOGE)}`,cycle);
  if(!ownsView(id,gen)||!current())return;
- const validLog=n=>n&&Number.isInteger(n.from)&&n.from>=0&&
-  Number.isInteger(n.len)&&n.len>=0&&Array.isArray(n.lines)&&
+ const index=n=>Number.isSafeInteger(n)&&n>=0;
+ const validLog=n=>n&&index(n.from)&&index(n.len)&&Array.isArray(n.lines)&&
   n.lines.every(line=>typeof line==="string");
  if(!validLog(nl))throw new Error("Invalid log update");
- if(nl.len<LOGN){
-  lg.textContent="";LOGN=0;
-  if(nl.len){
-   nl=await pollJson(`api/jobs/${id}/log?from=0`,cycle);
-   if(!ownsView(id,gen)||!current())return;
-   if(!validLog(nl))throw new Error("Invalid log update");
+ const modern=["epoch","base","reset","dropped","truncated"].some(k=>k in nl);
+ let replace=false,lines=nl.lines;
+ if(modern){
+  if(!index(nl.base)||nl.base>nl.from||nl.from>nl.len||lines.length!==nl.len-nl.from||
+     typeof nl.epoch!=="string"||!/^[A-Za-z0-9_-]{1,128}$/.test(nl.epoch)||
+     ![null,"stale","future","epoch"].includes(nl.reset)||!index(nl.dropped)||!index(nl.truncated))
+   throw new Error("Invalid log snapshot");
+  const expected=LOGE!==null&&nl.epoch!==LOGE?"epoch":LOGN<nl.base?"stale":LOGN>nl.len?"future":null;
+  if(nl.reset!==expected||nl.from!==(expected?nl.base:LOGN))throw new Error("Invalid log reset");
+  replace=!LOGINIT||nl.reset!==null;
+  if(nl.reset==="epoch"||nl.reset==="future")LOGRESET=true;
+  LOGE=nl.epoch;
+  document.getElementById("logStatus").textContent=[
+   LOGRESET?"Log history was replaced.":"",
+   nl.dropped?"Earlier log messages were omitted.":"",
+   nl.truncated?"Some log messages were truncated.":""].filter(Boolean).join(" ");
+ }else{
+  // Explicit old-backend branch: its shrink response may have from > len.
+  if(nl.len<LOGN){
+   lg.textContent="";LOGN=0;
+   if(nl.len){
+    nl=await pollJson(`api/jobs/${id}/log?from=0`,cycle);
+    if(!ownsView(id,gen)||!current())return;
+    if(!validLog(nl)||["epoch","base","reset","dropped","truncated"].some(k=>k in nl))
+     throw new Error("Invalid legacy log update");
+   }
   }
+  if((nl.from!==LOGN&&nl.len!==0)||nl.lines.length!==Math.max(0,nl.len-nl.from))
+   throw new Error("Invalid log cursor");
+  replace=!LOGINIT||LOGN===0;lines=nl.lines;LOGE=null;
+  document.getElementById("logStatus").textContent="";
  }
- if(nl.from!==LOGN&&nl.len!==0)throw new Error("Invalid log cursor");
- if(LOGN===0&&nl.len>400)nl.lines=nl.lines.slice(-400);
- if(nl.lines.length){
+ if(replace){lines=lines.slice(-400);lg.textContent="";}
+ if(lines.length){
   const NL=String.fromCharCode(10);
-  lg.textContent+=(lg.textContent?NL:"")+nl.lines.join(NL);
+  lg.textContent+=(lg.textContent?NL:"")+lines.join(NL);
   if(stick)lg.scrollTop=lg.scrollHeight;
  }
- LOGN=nl.len;
+ LOGN=nl.len;LOGINIT=true;
 
  // live preview: swap src in place (browser keeps old frame until new loads)
  const img=document.getElementById("pimg");
@@ -5247,8 +5288,8 @@ def _rehydrate_jobs():
                 "id": jid, "dir": jdir, "video": up,
                 "name": os.path.basename(up), "options": opts,
                 "phase": "error", "progress": 0.0, "size": size,
-                "log": ["(recovered after server restart — the scan had "
-                        "not completed)"],
+                "log": JobLog(["(recovered after server restart — the scan had "
+                               "not completed)"]),
                 "error": "recovered after a server restart before the "
                          "scan finished — Retry re-runs it with "
                          + ("its original settings" if opts else
@@ -5278,7 +5319,7 @@ def _rehydrate_jobs():
                 "options": prov.get("settings", {}) or {},
                 "phase": "done" if has_out else "review",
                 "progress": 1.0 if has_out else 0.5,
-                "log": ["(recovered after server restart)"],
+                "log": JobLog(["(recovered after server restart)"]),
                 "error": None, "output": out if has_out else None,
                 "created": os.path.getmtime(jdir),
                 "cancel": threading.Event(), "stats": {},

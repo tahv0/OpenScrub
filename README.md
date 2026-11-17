@@ -888,3 +888,25 @@ wheel; the core `<5` bound cannot prevent that conflict. The standalone installe
 checks OpenCV again after Paddle, while desktop/web provider install commands
 retain their existing choices. Recheck after optional installs; neither the bound
 nor a successful import certifies mixed flavors, GPU execution, or model accuracy.
+Job messages are kept in memory as a recent history: at most 2,000 entries
+and 512 KiB of UTF-8 payload per job, with each callback entry capped at 8 KiB
+including `... [message truncated]`. Embedded newlines remain one entry;
+lone surrogates become `?`. The browser shows fixed omission/truncation notes,
+starts with the latest 400 entries, and continues appending while open.
+This does not bound browser history or total process memory, and creates no
+persistent callback log. Retry appends to the same history.
+
+`GET /api/jobs/<id>/log?from=N&epoch=E` returns absolute `from`/`len` cursors,
+`lines`, `base`, `epoch`, `reset`, `dropped` and `truncated` in one snapshot.
+`len` counts all accepted entries, including evicted entries. An epoch change,
+stale cursor or future cursor replays retained history with `reset` set to
+`epoch`, `stale` or `future` respectively; an in-range request returns its
+suffix with `reset: null`. For example, with retained interval `[100,103)`,
+`from=20` returns `from=100,len=103,reset="stale"` and three entries. Send the
+accepted epoch on later polls to detect replacement even when the new history
+has grown past the old cursor. Numeric-only callers cannot detect every such
+replacement; older browsers must reload to use the updated reset handling.
+Malformed cursors return 400; `from` and `epoch` queries are limited to 64 and
+128 characters. Job metadata keeps its latest 30 entries and absolute
+`log_len`, adding coherent `log_epoch`, `log_base`, `log_retained`, `log_bytes`,
+`log_dropped` and `log_truncated` fields.
