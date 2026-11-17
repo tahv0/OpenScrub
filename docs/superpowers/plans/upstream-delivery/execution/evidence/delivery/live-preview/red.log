@@ -1,0 +1,1061 @@
+HTTP HTTP/1.1 200 OK {'Content-Disposition': 'inline; filename=preview.jpg', 'Content-Type': 'image/jpeg', 'Content-Length': '96380', 'Last-Modified': 'Tue, 17 Nov 2026 02:25:24 GMT', 'Cache-Control': 'no-cache, max-age=0', 'Expires': 'Tue, 17 Nov 2026 02:25:24 GMT', 'ETag': '"1794882324.073363-96380-4090239986"', 'Date': 'Tue, 17 Nov 2026 02:25:24 GMT', 'Accept-Ranges': 'bytes', 'Connection': 'close', 'Server': 'openscrub'} bytes 3329 sha256 ac757845e84629b627e18faea306583ec7dfabd22925e05b481a066d5f0e0771
+FHTTP HTTP/1.1 200 OK {'Content-Disposition': 'inline; filename=preview.jpg', 'Content-Type': 'image/jpeg', 'Content-Length': '96380', 'Last-Modified': 'Tue, 17 Nov 2026 02:25:24 GMT', 'Cache-Control': 'no-cache, max-age=0', 'Expires': 'Tue, 17 Nov 2026 02:25:24 GMT', 'ETag': '"1794882324.5964944-96380-4091091955"', 'Date': 'Tue, 17 Nov 2026 02:25:24 GMT', 'Accept-Ranges': 'bytes', 'Connection': 'close', 'Server': 'openscrub'} bytes 58060 sha256 adae3b9f26140d45138151d04415d4be92f1d36d07f4f04db55270cf84a796d7
+FHTTP HTTP/1.1 200 OK {'Content-Disposition': 'inline; filename=preview.jpg', 'Content-Type': 'image/jpeg', 'Content-Length': '96380', 'Last-Modified': 'Tue, 17 Nov 2026 02:25:25 GMT', 'Cache-Control': 'no-cache, max-age=0', 'Expires': 'Tue, 17 Nov 2026 02:25:25 GMT', 'ETag': '"1794882325.1224082-96380-4071365611"', 'Date': 'Tue, 17 Nov 2026 02:25:25 GMT', 'Accept-Ranges': 'bytes', 'Connection': 'close', 'Server': 'openscrub'} bytes 3329 sha256 ac757845e84629b627e18faea306583ec7dfabd22925e05b481a066d5f0e0771
+FFFFFFFFFFFFFFFFF..HTTP HTTP/1.1 404 NOT FOUND {'Content-Type': 'text/html; charset=utf-8', 'Content-Length': '207', 'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0', 'Pragma': 'no-cache', 'Expires': '0', 'Connection': 'close', 'Date': 'Tue, 17 Nov 2026 02:25:31 GMT', 'Server': 'openscrub'} bytes 207 sha256 e9639e3c4681ce85f852fbac48e2eeee5ba51296dbfec57c200d59b76237ab80
+HTTP HTTP/1.1 404 NOT FOUND {'Content-Type': 'text/html; charset=utf-8', 'Content-Length': '207', 'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0', 'Pragma': 'no-cache', 'Expires': '0', 'Connection': 'close', 'Date': 'Tue, 17 Nov 2026 02:25:31 GMT', 'Server': 'openscrub'} bytes 207 sha256 e9639e3c4681ce85f852fbac48e2eeee5ba51296dbfec57c200d59b76237ab80
+HTTP HTTP/1.1 200 OK {'Content-Disposition': 'inline; filename=preview.jpg', 'Content-Type': 'image/jpeg', 'Content-Length': '96380', 'Last-Modified': 'Tue, 17 Nov 2026 02:25:31 GMT', 'Cache-Control': 'no-cache, max-age=0', 'Expires': 'Tue, 17 Nov 2026 02:25:31 GMT', 'ETag': '"1794882331.9803963-96380-4122811399"', 'Date': 'Tue, 17 Nov 2026 02:25:31 GMT', 'Accept-Ranges': 'bytes', 'Connection': 'close', 'Server': 'openscrub'} bytes 96380 sha256 3a39eb931613d2a538eaf3415816e6459aa0ba9bd3d94d4c8f0ca968467f5d43
+HTTP HTTP/1.1 304 NOT MODIFIED {'Content-Disposition': 'inline; filename=preview.jpg', 'Cache-Control': 'no-cache, max-age=0', 'Expires': 'Tue, 17 Nov 2026 02:25:31 GMT', 'ETag': '"1794882331.9803963-96380-4122811399"', 'Date': 'Tue, 17 Nov 2026 02:25:31 GMT', 'Accept-Ranges': 'bytes', 'Connection': 'close', 'Server': 'openscrub'} bytes 0 sha256 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+HTTP HTTP/1.1 206 PARTIAL CONTENT {'Content-Disposition': 'inline; filename=preview.jpg', 'Content-Type': 'image/jpeg', 'Content-Length': '90', 'Last-Modified': 'Tue, 17 Nov 2026 02:25:31 GMT', 'Cache-Control': 'no-cache, max-age=0', 'Expires': 'Tue, 17 Nov 2026 02:25:31 GMT', 'ETag': '"1794882331.9803963-96380-4122811399"', 'Date': 'Tue, 17 Nov 2026 02:25:31 GMT', 'Accept-Ranges': 'bytes', 'Content-Range': 'bytes 10-99/96380', 'Connection': 'close', 'Server': 'openscrub'} bytes 90 sha256 1d7cc1d0e764bcc42449b844594bc1c9c9ae1e9b8fde5eff82417dfbbf1ee733
+HTTP HTTP/1.1 416 REQUESTED RANGE NOT SATISFIABLE {'Content-Type': 'text/html; charset=utf-8', 'Content-Range': 'bytes */96380', 'Content-Length': '177', 'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0', 'Pragma': 'no-cache', 'Expires': '0', 'Connection': 'close', 'Date': 'Tue, 17 Nov 2026 02:25:31 GMT', 'Server': 'openscrub'} bytes 177 sha256 26bc5cda8f07821b1c7fbe05f9bfff3b12cbf88df35c6f0136176034c6a97b18
+HTTP HTTP/1.1 200 OK {'Content-Disposition': 'inline; filename=preview.jpg', 'Content-Type': 'image/jpeg', 'Content-Length': '3329', 'Last-Modified': 'Tue, 17 Nov 2026 02:25:31 GMT', 'Cache-Control': 'no-cache, max-age=0', 'Expires': 'Tue, 17 Nov 2026 02:25:31 GMT', 'ETag': '"1794882331.9861455-3329-4122811399"', 'Date': 'Tue, 17 Nov 2026 02:25:31 GMT', 'Accept-Ranges': 'bytes', 'Connection': 'close', 'Server': 'openscrub'} bytes 3329 sha256 ac757845e84629b627e18faea306583ec7dfabd22925e05b481a066d5f0e0771
+HTTP HTTP/1.1 304 NOT MODIFIED {'Content-Disposition': 'inline; filename=preview.jpg', 'Cache-Control': 'no-cache, max-age=0', 'Expires': 'Tue, 17 Nov 2026 02:25:31 GMT', 'ETag': '"1794882331.9861455-3329-4122811399"', 'Date': 'Tue, 17 Nov 2026 02:25:31 GMT', 'Accept-Ranges': 'bytes', 'Connection': 'close', 'Server': 'openscrub'} bytes 0 sha256 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+F
+=================================== FAILURES ===================================
+_________ test_http_publication_after_headers_and_between_chunks[1-1] __________
+
+preview = ({'id': 'preview-test', 'dir': '/tmp/openscrub-task5/red-tmp/test_http_publication_after_he0', 'log': [], 'cancel': <t...crx<\x16\xca\x93vr\xf9\xf4\xbf\x97\x9e\xfb\xbf\x9b\xec\x1e\xd6|\xaej\xf7[j\xd6\x9dv\xd2\xc9[\xae\x8e\xfb\xdc\xff\xd9'])
+http = <function http.<locals>.fetch at 0x72c9c3f145e0>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x72c9fd037a70>
+read_number = 1, newer = 1
+
+    @pytest.mark.parametrize("read_number,newer", [(1, 1), (2, 2)])
+    def test_http_publication_after_headers_and_between_chunks(preview, http, monkeypatch,
+                                                              read_number, newer):
+        """Later publication must not mutate a response already being iterated."""
+        job, path, frames, expected = preview
+        publish(job, frames[0])
+        reached, resume = threading.Event(), threading.Event()
+        original = werkzeug.wsgi.FileWrapper.__next__
+        reads = []
+    
+        def observed_next(wrapper):
+            reads.append(wrapper.buffer_size)
+            if len(reads) == read_number:
+                reached.set()
+                assert resume.wait(10), "response read was not released"
+            return original(wrapper)
+    
+        monkeypatch.setattr(werkzeug.wsgi.FileWrapper, "__next__", observed_next)
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            result = pool.submit(http)
+            try:
+                assert reached.wait(10), "ordinary response read not reached"
+                publish(job, frames[newer])
+            finally:
+                resume.set()
+            response = result.result(timeout=10)
+        assert reads[:read_number] == [8192] * read_number
+        assert path.read_bytes() == expected[newer]
+>       assert_jpeg(response, expected[0])
+
+tests/test_live_preview.py:138: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+response = (200, {'Content-Disposition': 'inline; filename=preview.jpg', 'Content-Type': 'image/jpeg', 'Content-Length': '96380',...0\x02\x8a(\xa0\x02\x8a(\xa0\x02\x8a(\xa0\x02\x8a(\xa0\x02\x8a(\xa0\x02\x8a(\xa0\x02\x8a(\xa0\x02\x8a(\xa0\x0f\xff\xd9')
+expected = b'\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00\xff\xdb\x00C\x00\n\x07\x07\x08\x07\x06\n\x08\x0...6\x17a\xe9\x8a\xceI6\xa3\x1e\xabn\xba\xe8\xff\x00\xa6\xbb\xdf\xca\xa4\xadhZ\xe9\xee\xbaz\xde\xf7\xd9\xdf_-\xd9\xff\xd9'
+
+    def assert_jpeg(response, expected):
+        status, headers, body = response
+        assert status == 200
+>       assert body == expected
+E       AssertionError: assert b'\xff\xd8\xf...0\x0f\xff\xd9' == b'\xff\xd8\xf...-\xd9\xff\xd9'
+E         
+E         At index 623 diff: b'\xe7' != b'\x8a'
+E         Use -v to get more diff
+
+tests/test_live_preview.py:101: AssertionError
+_________ test_http_publication_after_headers_and_between_chunks[2-2] __________
+
+preview = ({'id': 'preview-test', 'dir': '/tmp/openscrub-task5/red-tmp/test_http_publication_after_he1', 'log': [], 'cancel': <t...crx<\x16\xca\x93vr\xf9\xf4\xbf\x97\x9e\xfb\xbf\x9b\xec\x1e\xd6|\xaej\xf7[j\xd6\x9dv\xd2\xc9[\xae\x8e\xfb\xdc\xff\xd9'])
+http = <function http.<locals>.fetch at 0x72c9c3fe0ae0>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x72c9fd037d10>
+read_number = 2, newer = 2
+
+    @pytest.mark.parametrize("read_number,newer", [(1, 1), (2, 2)])
+    def test_http_publication_after_headers_and_between_chunks(preview, http, monkeypatch,
+                                                              read_number, newer):
+        """Later publication must not mutate a response already being iterated."""
+        job, path, frames, expected = preview
+        publish(job, frames[0])
+        reached, resume = threading.Event(), threading.Event()
+        original = werkzeug.wsgi.FileWrapper.__next__
+        reads = []
+    
+        def observed_next(wrapper):
+            reads.append(wrapper.buffer_size)
+            if len(reads) == read_number:
+                reached.set()
+                assert resume.wait(10), "response read was not released"
+            return original(wrapper)
+    
+        monkeypatch.setattr(werkzeug.wsgi.FileWrapper, "__next__", observed_next)
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            result = pool.submit(http)
+            try:
+                assert reached.wait(10), "ordinary response read not reached"
+                publish(job, frames[newer])
+            finally:
+                resume.set()
+            response = result.result(timeout=10)
+        assert reads[:read_number] == [8192] * read_number
+        assert path.read_bytes() == expected[newer]
+>       assert_jpeg(response, expected[0])
+
+tests/test_live_preview.py:138: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+response = (200, {'Content-Disposition': 'inline; filename=preview.jpg', 'Content-Type': 'image/jpeg', 'Content-Length': '96380',...1crx<\x16\xca\x93vr\xf9\xf4\xbf\x97\x9e\xfb\xbf\x9b\xec\x1e\xd6|\xaej\xf7[j\xd6\x9dv\xd2\xc9[\xae\x8e\xfb\xdc\xff\xd9')
+expected = b'\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00\xff\xdb\x00C\x00\n\x07\x07\x08\x07\x06\n\x08\x0...6\x17a\xe9\x8a\xceI6\xa3\x1e\xabn\xba\xe8\xff\x00\xa6\xbb\xdf\xca\xa4\xadhZ\xe9\xee\xbaz\xde\xf7\xd9\xdf_-\xd9\xff\xd9'
+
+    def assert_jpeg(response, expected):
+        status, headers, body = response
+        assert status == 200
+>       assert body == expected
+E       AssertionError: assert b'\xff\xd8\xf...b\xdc\xff\xd9' == b'\xff\xd8\xf...-\xd9\xff\xd9'
+E         
+E         At index 8192 diff: b'\xfc' != b'\xaa'
+E         Use -v to get more diff
+
+tests/test_live_preview.py:101: AssertionError
+______ test_http_replacement_before_open_uses_same_generation_for_length _______
+
+preview = ({'id': 'preview-test', 'dir': '/tmp/openscrub-task5/red-tmp/test_http_replacement_before_o0', 'log': [], 'cancel': <t...crx<\x16\xca\x93vr\xf9\xf4\xbf\x97\x9e\xfb\xbf\x9b\xec\x1e\xd6|\xaej\xf7[j\xd6\x9dv\xd2\xc9[\xae\x8e\xfb\xdc\xff\xd9'])
+http = <function http.<locals>.fetch at 0x72c9bb503060>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x72c9fd037110>
+
+    def test_http_replacement_before_open_uses_same_generation_for_length(preview, http,
+                                                                        monkeypatch):
+        """Replacement at the old stat/open gap must keep length and bytes together."""
+        job, path, frames, expected = preview
+        publish(job, frames[0])
+        stage = path.parent / "staged"
+        stage.mkdir()
+        publish({"dir": str(stage)}, frames[1])
+        reached, resume = threading.Event(), threading.Event()
+        original_open = builtins.open
+    
+        def observed_open(file, mode="r", *args, **kwargs):
+            if os.fspath(file) == str(path) and mode == "rb":
+                reached.set()
+                assert resume.wait(10), "preview open was not released"
+            return original_open(file, mode, *args, **kwargs)
+    
+        monkeypatch.setattr(builtins, "open", observed_open)
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            result = pool.submit(http)
+            try:
+                assert reached.wait(10), "preview open not reached"
+                os.replace(stage / "preview.jpg", path)
+            finally:
+                resume.set()
+            response = result.result(timeout=10)
+>       assert_jpeg(response, expected[1])
+
+tests/test_live_preview.py:167: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+response = (200, {'Content-Disposition': 'inline; filename=preview.jpg', 'Content-Type': 'image/jpeg', 'Content-Length': '96380',...0\x02\x8a(\xa0\x02\x8a(\xa0\x02\x8a(\xa0\x02\x8a(\xa0\x02\x8a(\xa0\x02\x8a(\xa0\x02\x8a(\xa0\x02\x8a(\xa0\x0f\xff\xd9')
+expected = b'\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00\xff\xdb\x00C\x00\n\x07\x07\x08\x07\x06\n\x08\x0...a0\x02\x8a(\xa0\x02\x8a(\xa0\x02\x8a(\xa0\x02\x8a(\xa0\x02\x8a(\xa0\x02\x8a(\xa0\x02\x8a(\xa0\x02\x8a(\xa0\x0f\xff\xd9'
+
+    def assert_jpeg(response, expected):
+        status, headers, body = response
+        assert status == 200
+        assert body == expected
+>       assert int(headers["Content-Length"]) == len(body)
+E       AssertionError: assert 96380 == 3329
+E        +  where 96380 = int('96380')
+E        +  and   3329 = len(b'\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00\xff\xdb\x00C\x00\n\x07\x07\x08\x07\x06\n\x08\x0...a0\x02\x8a(\xa0\x02\x8a(\xa0\x02\x8a(\xa0\x02\x8a(\xa0\x02\x8a(\xa0\x02\x8a(\xa0\x02\x8a(\xa0\x02\x8a(\xa0\x0f\xff\xd9')
+
+tests/test_live_preview.py:102: AssertionError
+________________ test_publication_preserves_an_open_generation _________________
+
+preview = ({'id': 'preview-test', 'dir': '/tmp/openscrub-task5/red-tmp/test_publication_preserves_an_0', 'log': [], 'cancel': <t...crx<\x16\xca\x93vr\xf9\xf4\xbf\x97\x9e\xfb\xbf\x9b\xec\x1e\xd6|\xaej\xf7[j\xd6\x9dv\xd2\xc9[\xae\x8e\xfb\xdc\xff\xd9'])
+
+    def test_publication_preserves_an_open_generation(preview):
+        """A snapshot acquisition spanning publication must read the complete old JPEG."""
+        job, path, frames, expected = preview
+        publish(job, frames[0])
+        with path.open("rb") as snapshot:
+            prefix = snapshot.read(8192)
+            publish(job, frames[2])
+            body = prefix + snapshot.read()
+>       assert body == expected[0]
+E       AssertionError: assert b'\xff\xd8\xf...b\xdc\xff\xd9' == b'\xff\xd8\xf...-\xd9\xff\xd9'
+E         
+E         At index 8192 diff: b'\xfc' != b'\xaa'
+E         Use -v to get more diff
+
+tests/test_live_preview.py:178: AssertionError
+_ test_failed_publication_retains_bytes_cleans_up_and_retries[False-encode-false] _
+
+preview = ({'id': 'preview-test', 'dir': '/tmp/openscrub-task5/red-tmp/test_failed_publication_retain0', 'log': [], 'cancel': <t...crx<\x16\xca\x93vr\xf9\xf4\xbf\x97\x9e\xfb\xbf\x9b\xec\x1e\xd6|\xaej\xf7[j\xd6\x9dv\xd2\xc9[\xae\x8e\xfb\xdc\xff\xd9'])
+http = <function http.<locals>.fetch at 0x72c9bb559940>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x72c9bb511df0>
+failure = 'encode-false', prior = False
+
+    @pytest.mark.parametrize("failure", ["encode-false", "encode-empty", "encode-error",
+                                         "temporary-create", "temporary-write", "replace"])
+    @pytest.mark.parametrize("prior", [False, True])
+    def test_failed_publication_retains_bytes_cleans_up_and_retries(preview, http, monkeypatch,
+                                                                  failure, prior):
+        job, path, frames, expected = preview
+        if prior:
+            publish(job, frames[0])
+        callback = web.WebCallbacks(job)
+        clock = [10.0]
+        monkeypatch.setattr(web, "time", SimpleNamespace(time=lambda: clock[0]))
+        with monkeypatch.context() as fault:
+            if failure == "encode-false":
+                fault.setattr(cv2, "imencode", lambda *args: (False, None))
+            elif failure == "encode-empty":
+                fault.setattr(cv2, "imencode", lambda *args: (True, np.array([], dtype=np.uint8)))
+            elif failure == "encode-error":
+                def fail_encode(*args):
+                    raise cv2.error("synthetic JPEG encoding failure")
+                fault.setattr(cv2, "imencode", fail_encode)
+            elif failure == "temporary-create":
+                def fail_create(*args, **kwargs):
+                    raise OSError("synthetic temporary creation failure")
+                fault.setattr(tempfile, "NamedTemporaryFile", fail_create)
+            elif failure == "temporary-write":
+                real_temporary = tempfile.NamedTemporaryFile
+    
+                class FailedWrite:
+                    def __init__(self, *args, **kwargs):
+                        self.file = real_temporary(*args, **kwargs)
+                        self.name = self.file.name
+                    def __enter__(self):
+                        self.file.__enter__()
+                        return self
+                    def __exit__(self, *args):
+                        return self.file.__exit__(*args)
+                    def write(self, data):
+                        self.file.write(data[:20])
+                        raise OSError("synthetic failure after partial temporary write")
+    
+                fault.setattr(tempfile, "NamedTemporaryFile", FailedWrite)
+            else:
+                def fail_replace(*args):
+                    raise OSError("synthetic replacement failure")
+                fault.setattr(os, "replace", fail_replace)
+            callback.scan_frame(frames[1], 1.0, 2)
+        assert callback._last_frame == 10.0  # even a failed attempt consumes the interval
+>       assert sorted(p.name for p in path.parent.iterdir()) == (["preview.jpg"] if prior else [])
+E       AssertionError: assert ['preview.jpg'] == []
+E         
+E         Left contains one more item: 'preview.jpg'
+E         Use -v to get more diff
+
+tests/test_live_preview.py:230: AssertionError
+_ test_failed_publication_retains_bytes_cleans_up_and_retries[False-encode-empty] _
+
+preview = ({'id': 'preview-test', 'dir': '/tmp/openscrub-task5/red-tmp/test_failed_publication_retain1', 'log': [], 'cancel': <t...crx<\x16\xca\x93vr\xf9\xf4\xbf\x97\x9e\xfb\xbf\x9b\xec\x1e\xd6|\xaej\xf7[j\xd6\x9dv\xd2\xc9[\xae\x8e\xfb\xdc\xff\xd9'])
+http = <function http.<locals>.fetch at 0x72c9bb56f880>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x72c9bb511f70>
+failure = 'encode-empty', prior = False
+
+    @pytest.mark.parametrize("failure", ["encode-false", "encode-empty", "encode-error",
+                                         "temporary-create", "temporary-write", "replace"])
+    @pytest.mark.parametrize("prior", [False, True])
+    def test_failed_publication_retains_bytes_cleans_up_and_retries(preview, http, monkeypatch,
+                                                                  failure, prior):
+        job, path, frames, expected = preview
+        if prior:
+            publish(job, frames[0])
+        callback = web.WebCallbacks(job)
+        clock = [10.0]
+        monkeypatch.setattr(web, "time", SimpleNamespace(time=lambda: clock[0]))
+        with monkeypatch.context() as fault:
+            if failure == "encode-false":
+                fault.setattr(cv2, "imencode", lambda *args: (False, None))
+            elif failure == "encode-empty":
+                fault.setattr(cv2, "imencode", lambda *args: (True, np.array([], dtype=np.uint8)))
+            elif failure == "encode-error":
+                def fail_encode(*args):
+                    raise cv2.error("synthetic JPEG encoding failure")
+                fault.setattr(cv2, "imencode", fail_encode)
+            elif failure == "temporary-create":
+                def fail_create(*args, **kwargs):
+                    raise OSError("synthetic temporary creation failure")
+                fault.setattr(tempfile, "NamedTemporaryFile", fail_create)
+            elif failure == "temporary-write":
+                real_temporary = tempfile.NamedTemporaryFile
+    
+                class FailedWrite:
+                    def __init__(self, *args, **kwargs):
+                        self.file = real_temporary(*args, **kwargs)
+                        self.name = self.file.name
+                    def __enter__(self):
+                        self.file.__enter__()
+                        return self
+                    def __exit__(self, *args):
+                        return self.file.__exit__(*args)
+                    def write(self, data):
+                        self.file.write(data[:20])
+                        raise OSError("synthetic failure after partial temporary write")
+    
+                fault.setattr(tempfile, "NamedTemporaryFile", FailedWrite)
+            else:
+                def fail_replace(*args):
+                    raise OSError("synthetic replacement failure")
+                fault.setattr(os, "replace", fail_replace)
+            callback.scan_frame(frames[1], 1.0, 2)
+        assert callback._last_frame == 10.0  # even a failed attempt consumes the interval
+>       assert sorted(p.name for p in path.parent.iterdir()) == (["preview.jpg"] if prior else [])
+E       AssertionError: assert ['preview.jpg'] == []
+E         
+E         Left contains one more item: 'preview.jpg'
+E         Use -v to get more diff
+
+tests/test_live_preview.py:230: AssertionError
+_ test_failed_publication_retains_bytes_cleans_up_and_retries[False-encode-error] _
+
+preview = ({'id': 'preview-test', 'dir': '/tmp/openscrub-task5/red-tmp/test_failed_publication_retain2', 'log': [], 'cancel': <t...crx<\x16\xca\x93vr\xf9\xf4\xbf\x97\x9e\xfb\xbf\x9b\xec\x1e\xd6|\xaej\xf7[j\xd6\x9dv\xd2\xc9[\xae\x8e\xfb\xdc\xff\xd9'])
+http = <function http.<locals>.fetch at 0x72c9bb5b9d00>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x72c9bb511b80>
+failure = 'encode-error', prior = False
+
+    @pytest.mark.parametrize("failure", ["encode-false", "encode-empty", "encode-error",
+                                         "temporary-create", "temporary-write", "replace"])
+    @pytest.mark.parametrize("prior", [False, True])
+    def test_failed_publication_retains_bytes_cleans_up_and_retries(preview, http, monkeypatch,
+                                                                  failure, prior):
+        job, path, frames, expected = preview
+        if prior:
+            publish(job, frames[0])
+        callback = web.WebCallbacks(job)
+        clock = [10.0]
+        monkeypatch.setattr(web, "time", SimpleNamespace(time=lambda: clock[0]))
+        with monkeypatch.context() as fault:
+            if failure == "encode-false":
+                fault.setattr(cv2, "imencode", lambda *args: (False, None))
+            elif failure == "encode-empty":
+                fault.setattr(cv2, "imencode", lambda *args: (True, np.array([], dtype=np.uint8)))
+            elif failure == "encode-error":
+                def fail_encode(*args):
+                    raise cv2.error("synthetic JPEG encoding failure")
+                fault.setattr(cv2, "imencode", fail_encode)
+            elif failure == "temporary-create":
+                def fail_create(*args, **kwargs):
+                    raise OSError("synthetic temporary creation failure")
+                fault.setattr(tempfile, "NamedTemporaryFile", fail_create)
+            elif failure == "temporary-write":
+                real_temporary = tempfile.NamedTemporaryFile
+    
+                class FailedWrite:
+                    def __init__(self, *args, **kwargs):
+                        self.file = real_temporary(*args, **kwargs)
+                        self.name = self.file.name
+                    def __enter__(self):
+                        self.file.__enter__()
+                        return self
+                    def __exit__(self, *args):
+                        return self.file.__exit__(*args)
+                    def write(self, data):
+                        self.file.write(data[:20])
+                        raise OSError("synthetic failure after partial temporary write")
+    
+                fault.setattr(tempfile, "NamedTemporaryFile", FailedWrite)
+            else:
+                def fail_replace(*args):
+                    raise OSError("synthetic replacement failure")
+                fault.setattr(os, "replace", fail_replace)
+            callback.scan_frame(frames[1], 1.0, 2)
+        assert callback._last_frame == 10.0  # even a failed attempt consumes the interval
+>       assert sorted(p.name for p in path.parent.iterdir()) == (["preview.jpg"] if prior else [])
+E       AssertionError: assert ['preview.jpg'] == []
+E         
+E         Left contains one more item: 'preview.jpg'
+E         Use -v to get more diff
+
+tests/test_live_preview.py:230: AssertionError
+_ test_failed_publication_retains_bytes_cleans_up_and_retries[False-temporary-create] _
+
+preview = ({'id': 'preview-test', 'dir': '/tmp/openscrub-task5/red-tmp/test_failed_publication_retain3', 'log': [], 'cancel': <t...crx<\x16\xca\x93vr\xf9\xf4\xbf\x97\x9e\xfb\xbf\x9b\xec\x1e\xd6|\xaej\xf7[j\xd6\x9dv\xd2\xc9[\xae\x8e\xfb\xdc\xff\xd9'])
+http = <function http.<locals>.fetch at 0x72c9bb5bc220>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x72c9bb5119d0>
+failure = 'temporary-create', prior = False
+
+    @pytest.mark.parametrize("failure", ["encode-false", "encode-empty", "encode-error",
+                                         "temporary-create", "temporary-write", "replace"])
+    @pytest.mark.parametrize("prior", [False, True])
+    def test_failed_publication_retains_bytes_cleans_up_and_retries(preview, http, monkeypatch,
+                                                                  failure, prior):
+        job, path, frames, expected = preview
+        if prior:
+            publish(job, frames[0])
+        callback = web.WebCallbacks(job)
+        clock = [10.0]
+        monkeypatch.setattr(web, "time", SimpleNamespace(time=lambda: clock[0]))
+        with monkeypatch.context() as fault:
+            if failure == "encode-false":
+                fault.setattr(cv2, "imencode", lambda *args: (False, None))
+            elif failure == "encode-empty":
+                fault.setattr(cv2, "imencode", lambda *args: (True, np.array([], dtype=np.uint8)))
+            elif failure == "encode-error":
+                def fail_encode(*args):
+                    raise cv2.error("synthetic JPEG encoding failure")
+                fault.setattr(cv2, "imencode", fail_encode)
+            elif failure == "temporary-create":
+                def fail_create(*args, **kwargs):
+                    raise OSError("synthetic temporary creation failure")
+                fault.setattr(tempfile, "NamedTemporaryFile", fail_create)
+            elif failure == "temporary-write":
+                real_temporary = tempfile.NamedTemporaryFile
+    
+                class FailedWrite:
+                    def __init__(self, *args, **kwargs):
+                        self.file = real_temporary(*args, **kwargs)
+                        self.name = self.file.name
+                    def __enter__(self):
+                        self.file.__enter__()
+                        return self
+                    def __exit__(self, *args):
+                        return self.file.__exit__(*args)
+                    def write(self, data):
+                        self.file.write(data[:20])
+                        raise OSError("synthetic failure after partial temporary write")
+    
+                fault.setattr(tempfile, "NamedTemporaryFile", FailedWrite)
+            else:
+                def fail_replace(*args):
+                    raise OSError("synthetic replacement failure")
+                fault.setattr(os, "replace", fail_replace)
+            callback.scan_frame(frames[1], 1.0, 2)
+        assert callback._last_frame == 10.0  # even a failed attempt consumes the interval
+>       assert sorted(p.name for p in path.parent.iterdir()) == (["preview.jpg"] if prior else [])
+E       AssertionError: assert ['preview.jpg'] == []
+E         
+E         Left contains one more item: 'preview.jpg'
+E         Use -v to get more diff
+
+tests/test_live_preview.py:230: AssertionError
+_ test_failed_publication_retains_bytes_cleans_up_and_retries[False-temporary-write] _
+
+preview = ({'id': 'preview-test', 'dir': '/tmp/openscrub-task5/red-tmp/test_failed_publication_retain4', 'log': [], 'cancel': <t...crx<\x16\xca\x93vr\xf9\xf4\xbf\x97\x9e\xfb\xbf\x9b\xec\x1e\xd6|\xaej\xf7[j\xd6\x9dv\xd2\xc9[\xae\x8e\xfb\xdc\xff\xd9'])
+http = <function http.<locals>.fetch at 0x72c9b2b05580>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x72c9bb511c10>
+failure = 'temporary-write', prior = False
+
+    @pytest.mark.parametrize("failure", ["encode-false", "encode-empty", "encode-error",
+                                         "temporary-create", "temporary-write", "replace"])
+    @pytest.mark.parametrize("prior", [False, True])
+    def test_failed_publication_retains_bytes_cleans_up_and_retries(preview, http, monkeypatch,
+                                                                  failure, prior):
+        job, path, frames, expected = preview
+        if prior:
+            publish(job, frames[0])
+        callback = web.WebCallbacks(job)
+        clock = [10.0]
+        monkeypatch.setattr(web, "time", SimpleNamespace(time=lambda: clock[0]))
+        with monkeypatch.context() as fault:
+            if failure == "encode-false":
+                fault.setattr(cv2, "imencode", lambda *args: (False, None))
+            elif failure == "encode-empty":
+                fault.setattr(cv2, "imencode", lambda *args: (True, np.array([], dtype=np.uint8)))
+            elif failure == "encode-error":
+                def fail_encode(*args):
+                    raise cv2.error("synthetic JPEG encoding failure")
+                fault.setattr(cv2, "imencode", fail_encode)
+            elif failure == "temporary-create":
+                def fail_create(*args, **kwargs):
+                    raise OSError("synthetic temporary creation failure")
+                fault.setattr(tempfile, "NamedTemporaryFile", fail_create)
+            elif failure == "temporary-write":
+                real_temporary = tempfile.NamedTemporaryFile
+    
+                class FailedWrite:
+                    def __init__(self, *args, **kwargs):
+                        self.file = real_temporary(*args, **kwargs)
+                        self.name = self.file.name
+                    def __enter__(self):
+                        self.file.__enter__()
+                        return self
+                    def __exit__(self, *args):
+                        return self.file.__exit__(*args)
+                    def write(self, data):
+                        self.file.write(data[:20])
+                        raise OSError("synthetic failure after partial temporary write")
+    
+                fault.setattr(tempfile, "NamedTemporaryFile", FailedWrite)
+            else:
+                def fail_replace(*args):
+                    raise OSError("synthetic replacement failure")
+                fault.setattr(os, "replace", fail_replace)
+            callback.scan_frame(frames[1], 1.0, 2)
+        assert callback._last_frame == 10.0  # even a failed attempt consumes the interval
+>       assert sorted(p.name for p in path.parent.iterdir()) == (["preview.jpg"] if prior else [])
+E       AssertionError: assert ['preview.jpg'] == []
+E         
+E         Left contains one more item: 'preview.jpg'
+E         Use -v to get more diff
+
+tests/test_live_preview.py:230: AssertionError
+__ test_failed_publication_retains_bytes_cleans_up_and_retries[False-replace] __
+
+preview = ({'id': 'preview-test', 'dir': '/tmp/openscrub-task5/red-tmp/test_failed_publication_retain5', 'log': [], 'cancel': <t...crx<\x16\xca\x93vr\xf9\xf4\xbf\x97\x9e\xfb\xbf\x9b\xec\x1e\xd6|\xaej\xf7[j\xd6\x9dv\xd2\xc9[\xae\x8e\xfb\xdc\xff\xd9'])
+http = <function http.<locals>.fetch at 0x72c9b2b40ea0>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x72c9bb5115e0>
+failure = 'replace', prior = False
+
+    @pytest.mark.parametrize("failure", ["encode-false", "encode-empty", "encode-error",
+                                         "temporary-create", "temporary-write", "replace"])
+    @pytest.mark.parametrize("prior", [False, True])
+    def test_failed_publication_retains_bytes_cleans_up_and_retries(preview, http, monkeypatch,
+                                                                  failure, prior):
+        job, path, frames, expected = preview
+        if prior:
+            publish(job, frames[0])
+        callback = web.WebCallbacks(job)
+        clock = [10.0]
+        monkeypatch.setattr(web, "time", SimpleNamespace(time=lambda: clock[0]))
+        with monkeypatch.context() as fault:
+            if failure == "encode-false":
+                fault.setattr(cv2, "imencode", lambda *args: (False, None))
+            elif failure == "encode-empty":
+                fault.setattr(cv2, "imencode", lambda *args: (True, np.array([], dtype=np.uint8)))
+            elif failure == "encode-error":
+                def fail_encode(*args):
+                    raise cv2.error("synthetic JPEG encoding failure")
+                fault.setattr(cv2, "imencode", fail_encode)
+            elif failure == "temporary-create":
+                def fail_create(*args, **kwargs):
+                    raise OSError("synthetic temporary creation failure")
+                fault.setattr(tempfile, "NamedTemporaryFile", fail_create)
+            elif failure == "temporary-write":
+                real_temporary = tempfile.NamedTemporaryFile
+    
+                class FailedWrite:
+                    def __init__(self, *args, **kwargs):
+                        self.file = real_temporary(*args, **kwargs)
+                        self.name = self.file.name
+                    def __enter__(self):
+                        self.file.__enter__()
+                        return self
+                    def __exit__(self, *args):
+                        return self.file.__exit__(*args)
+                    def write(self, data):
+                        self.file.write(data[:20])
+                        raise OSError("synthetic failure after partial temporary write")
+    
+                fault.setattr(tempfile, "NamedTemporaryFile", FailedWrite)
+            else:
+                def fail_replace(*args):
+                    raise OSError("synthetic replacement failure")
+                fault.setattr(os, "replace", fail_replace)
+            callback.scan_frame(frames[1], 1.0, 2)
+        assert callback._last_frame == 10.0  # even a failed attempt consumes the interval
+>       assert sorted(p.name for p in path.parent.iterdir()) == (["preview.jpg"] if prior else [])
+E       AssertionError: assert ['preview.jpg'] == []
+E         
+E         Left contains one more item: 'preview.jpg'
+E         Use -v to get more diff
+
+tests/test_live_preview.py:230: AssertionError
+_ test_failed_publication_retains_bytes_cleans_up_and_retries[True-encode-false] _
+
+preview = ({'id': 'preview-test', 'dir': '/tmp/openscrub-task5/red-tmp/test_failed_publication_retain6', 'log': [], 'cancel': <t...crx<\x16\xca\x93vr\xf9\xf4\xbf\x97\x9e\xfb\xbf\x9b\xec\x1e\xd6|\xaej\xf7[j\xd6\x9dv\xd2\xc9[\xae\x8e\xfb\xdc\xff\xd9'])
+http = <function http.<locals>.fetch at 0x72c9b2b7ee80>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x72c9b2b143b0>
+failure = 'encode-false', prior = True
+
+    @pytest.mark.parametrize("failure", ["encode-false", "encode-empty", "encode-error",
+                                         "temporary-create", "temporary-write", "replace"])
+    @pytest.mark.parametrize("prior", [False, True])
+    def test_failed_publication_retains_bytes_cleans_up_and_retries(preview, http, monkeypatch,
+                                                                  failure, prior):
+        job, path, frames, expected = preview
+        if prior:
+            publish(job, frames[0])
+        callback = web.WebCallbacks(job)
+        clock = [10.0]
+        monkeypatch.setattr(web, "time", SimpleNamespace(time=lambda: clock[0]))
+        with monkeypatch.context() as fault:
+            if failure == "encode-false":
+                fault.setattr(cv2, "imencode", lambda *args: (False, None))
+            elif failure == "encode-empty":
+                fault.setattr(cv2, "imencode", lambda *args: (True, np.array([], dtype=np.uint8)))
+            elif failure == "encode-error":
+                def fail_encode(*args):
+                    raise cv2.error("synthetic JPEG encoding failure")
+                fault.setattr(cv2, "imencode", fail_encode)
+            elif failure == "temporary-create":
+                def fail_create(*args, **kwargs):
+                    raise OSError("synthetic temporary creation failure")
+                fault.setattr(tempfile, "NamedTemporaryFile", fail_create)
+            elif failure == "temporary-write":
+                real_temporary = tempfile.NamedTemporaryFile
+    
+                class FailedWrite:
+                    def __init__(self, *args, **kwargs):
+                        self.file = real_temporary(*args, **kwargs)
+                        self.name = self.file.name
+                    def __enter__(self):
+                        self.file.__enter__()
+                        return self
+                    def __exit__(self, *args):
+                        return self.file.__exit__(*args)
+                    def write(self, data):
+                        self.file.write(data[:20])
+                        raise OSError("synthetic failure after partial temporary write")
+    
+                fault.setattr(tempfile, "NamedTemporaryFile", FailedWrite)
+            else:
+                def fail_replace(*args):
+                    raise OSError("synthetic replacement failure")
+                fault.setattr(os, "replace", fail_replace)
+            callback.scan_frame(frames[1], 1.0, 2)
+        assert callback._last_frame == 10.0  # even a failed attempt consumes the interval
+        assert sorted(p.name for p in path.parent.iterdir()) == (["preview.jpg"] if prior else [])
+        if prior:
+>           assert path.read_bytes() == expected[0]
+E           AssertionError: assert b'\xff\xd8\xf...0\x0f\xff\xd9' == b'\xff\xd8\xf...-\xd9\xff\xd9'
+E             
+E             At index 623 diff: b'\xe7' != b'\x8a'
+E             Use -v to get more diff
+
+tests/test_live_preview.py:232: AssertionError
+_ test_failed_publication_retains_bytes_cleans_up_and_retries[True-encode-empty] _
+
+preview = ({'id': 'preview-test', 'dir': '/tmp/openscrub-task5/red-tmp/test_failed_publication_retain7', 'log': [], 'cancel': <t...crx<\x16\xca\x93vr\xf9\xf4\xbf\x97\x9e\xfb\xbf\x9b\xec\x1e\xd6|\xaej\xf7[j\xd6\x9dv\xd2\xc9[\xae\x8e\xfb\xdc\xff\xd9'])
+http = <function http.<locals>.fetch at 0x72c9b2ba93a0>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x72c9b2b14a70>
+failure = 'encode-empty', prior = True
+
+    @pytest.mark.parametrize("failure", ["encode-false", "encode-empty", "encode-error",
+                                         "temporary-create", "temporary-write", "replace"])
+    @pytest.mark.parametrize("prior", [False, True])
+    def test_failed_publication_retains_bytes_cleans_up_and_retries(preview, http, monkeypatch,
+                                                                  failure, prior):
+        job, path, frames, expected = preview
+        if prior:
+            publish(job, frames[0])
+        callback = web.WebCallbacks(job)
+        clock = [10.0]
+        monkeypatch.setattr(web, "time", SimpleNamespace(time=lambda: clock[0]))
+        with monkeypatch.context() as fault:
+            if failure == "encode-false":
+                fault.setattr(cv2, "imencode", lambda *args: (False, None))
+            elif failure == "encode-empty":
+                fault.setattr(cv2, "imencode", lambda *args: (True, np.array([], dtype=np.uint8)))
+            elif failure == "encode-error":
+                def fail_encode(*args):
+                    raise cv2.error("synthetic JPEG encoding failure")
+                fault.setattr(cv2, "imencode", fail_encode)
+            elif failure == "temporary-create":
+                def fail_create(*args, **kwargs):
+                    raise OSError("synthetic temporary creation failure")
+                fault.setattr(tempfile, "NamedTemporaryFile", fail_create)
+            elif failure == "temporary-write":
+                real_temporary = tempfile.NamedTemporaryFile
+    
+                class FailedWrite:
+                    def __init__(self, *args, **kwargs):
+                        self.file = real_temporary(*args, **kwargs)
+                        self.name = self.file.name
+                    def __enter__(self):
+                        self.file.__enter__()
+                        return self
+                    def __exit__(self, *args):
+                        return self.file.__exit__(*args)
+                    def write(self, data):
+                        self.file.write(data[:20])
+                        raise OSError("synthetic failure after partial temporary write")
+    
+                fault.setattr(tempfile, "NamedTemporaryFile", FailedWrite)
+            else:
+                def fail_replace(*args):
+                    raise OSError("synthetic replacement failure")
+                fault.setattr(os, "replace", fail_replace)
+            callback.scan_frame(frames[1], 1.0, 2)
+        assert callback._last_frame == 10.0  # even a failed attempt consumes the interval
+        assert sorted(p.name for p in path.parent.iterdir()) == (["preview.jpg"] if prior else [])
+        if prior:
+>           assert path.read_bytes() == expected[0]
+E           AssertionError: assert b'\xff\xd8\xf...0\x0f\xff\xd9' == b'\xff\xd8\xf...-\xd9\xff\xd9'
+E             
+E             At index 623 diff: b'\xe7' != b'\x8a'
+E             Use -v to get more diff
+
+tests/test_live_preview.py:232: AssertionError
+_ test_failed_publication_retains_bytes_cleans_up_and_retries[True-encode-error] _
+
+preview = ({'id': 'preview-test', 'dir': '/tmp/openscrub-task5/red-tmp/test_failed_publication_retain8', 'log': [], 'cancel': <t...crx<\x16\xca\x93vr\xf9\xf4\xbf\x97\x9e\xfb\xbf\x9b\xec\x1e\xd6|\xaej\xf7[j\xd6\x9dv\xd2\xc9[\xae\x8e\xfb\xdc\xff\xd9'])
+http = <function http.<locals>.fetch at 0x72c9b2bdb600>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x72c9b2b14ad0>
+failure = 'encode-error', prior = True
+
+    @pytest.mark.parametrize("failure", ["encode-false", "encode-empty", "encode-error",
+                                         "temporary-create", "temporary-write", "replace"])
+    @pytest.mark.parametrize("prior", [False, True])
+    def test_failed_publication_retains_bytes_cleans_up_and_retries(preview, http, monkeypatch,
+                                                                  failure, prior):
+        job, path, frames, expected = preview
+        if prior:
+            publish(job, frames[0])
+        callback = web.WebCallbacks(job)
+        clock = [10.0]
+        monkeypatch.setattr(web, "time", SimpleNamespace(time=lambda: clock[0]))
+        with monkeypatch.context() as fault:
+            if failure == "encode-false":
+                fault.setattr(cv2, "imencode", lambda *args: (False, None))
+            elif failure == "encode-empty":
+                fault.setattr(cv2, "imencode", lambda *args: (True, np.array([], dtype=np.uint8)))
+            elif failure == "encode-error":
+                def fail_encode(*args):
+                    raise cv2.error("synthetic JPEG encoding failure")
+                fault.setattr(cv2, "imencode", fail_encode)
+            elif failure == "temporary-create":
+                def fail_create(*args, **kwargs):
+                    raise OSError("synthetic temporary creation failure")
+                fault.setattr(tempfile, "NamedTemporaryFile", fail_create)
+            elif failure == "temporary-write":
+                real_temporary = tempfile.NamedTemporaryFile
+    
+                class FailedWrite:
+                    def __init__(self, *args, **kwargs):
+                        self.file = real_temporary(*args, **kwargs)
+                        self.name = self.file.name
+                    def __enter__(self):
+                        self.file.__enter__()
+                        return self
+                    def __exit__(self, *args):
+                        return self.file.__exit__(*args)
+                    def write(self, data):
+                        self.file.write(data[:20])
+                        raise OSError("synthetic failure after partial temporary write")
+    
+                fault.setattr(tempfile, "NamedTemporaryFile", FailedWrite)
+            else:
+                def fail_replace(*args):
+                    raise OSError("synthetic replacement failure")
+                fault.setattr(os, "replace", fail_replace)
+            callback.scan_frame(frames[1], 1.0, 2)
+        assert callback._last_frame == 10.0  # even a failed attempt consumes the interval
+        assert sorted(p.name for p in path.parent.iterdir()) == (["preview.jpg"] if prior else [])
+        if prior:
+>           assert path.read_bytes() == expected[0]
+E           AssertionError: assert b'\xff\xd8\xf...0\x0f\xff\xd9' == b'\xff\xd8\xf...-\xd9\xff\xd9'
+E             
+E             At index 623 diff: b'\xe7' != b'\x8a'
+E             Use -v to get more diff
+
+tests/test_live_preview.py:232: AssertionError
+_ test_failed_publication_retains_bytes_cleans_up_and_retries[True-temporary-create] _
+
+preview = ({'id': 'preview-test', 'dir': '/tmp/openscrub-task5/red-tmp/test_failed_publication_retain9', 'log': [], 'cancel': <t...crx<\x16\xca\x93vr\xf9\xf4\xbf\x97\x9e\xfb\xbf\x9b\xec\x1e\xd6|\xaej\xf7[j\xd6\x9dv\xd2\xc9[\xae\x8e\xfb\xdc\xff\xd9'])
+http = <function http.<locals>.fetch at 0x72c9aa10ccc0>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x72c9b2b142c0>
+failure = 'temporary-create', prior = True
+
+    @pytest.mark.parametrize("failure", ["encode-false", "encode-empty", "encode-error",
+                                         "temporary-create", "temporary-write", "replace"])
+    @pytest.mark.parametrize("prior", [False, True])
+    def test_failed_publication_retains_bytes_cleans_up_and_retries(preview, http, monkeypatch,
+                                                                  failure, prior):
+        job, path, frames, expected = preview
+        if prior:
+            publish(job, frames[0])
+        callback = web.WebCallbacks(job)
+        clock = [10.0]
+        monkeypatch.setattr(web, "time", SimpleNamespace(time=lambda: clock[0]))
+        with monkeypatch.context() as fault:
+            if failure == "encode-false":
+                fault.setattr(cv2, "imencode", lambda *args: (False, None))
+            elif failure == "encode-empty":
+                fault.setattr(cv2, "imencode", lambda *args: (True, np.array([], dtype=np.uint8)))
+            elif failure == "encode-error":
+                def fail_encode(*args):
+                    raise cv2.error("synthetic JPEG encoding failure")
+                fault.setattr(cv2, "imencode", fail_encode)
+            elif failure == "temporary-create":
+                def fail_create(*args, **kwargs):
+                    raise OSError("synthetic temporary creation failure")
+                fault.setattr(tempfile, "NamedTemporaryFile", fail_create)
+            elif failure == "temporary-write":
+                real_temporary = tempfile.NamedTemporaryFile
+    
+                class FailedWrite:
+                    def __init__(self, *args, **kwargs):
+                        self.file = real_temporary(*args, **kwargs)
+                        self.name = self.file.name
+                    def __enter__(self):
+                        self.file.__enter__()
+                        return self
+                    def __exit__(self, *args):
+                        return self.file.__exit__(*args)
+                    def write(self, data):
+                        self.file.write(data[:20])
+                        raise OSError("synthetic failure after partial temporary write")
+    
+                fault.setattr(tempfile, "NamedTemporaryFile", FailedWrite)
+            else:
+                def fail_replace(*args):
+                    raise OSError("synthetic replacement failure")
+                fault.setattr(os, "replace", fail_replace)
+            callback.scan_frame(frames[1], 1.0, 2)
+        assert callback._last_frame == 10.0  # even a failed attempt consumes the interval
+        assert sorted(p.name for p in path.parent.iterdir()) == (["preview.jpg"] if prior else [])
+        if prior:
+>           assert path.read_bytes() == expected[0]
+E           AssertionError: assert b'\xff\xd8\xf...0\x0f\xff\xd9' == b'\xff\xd8\xf...-\xd9\xff\xd9'
+E             
+E             At index 623 diff: b'\xe7' != b'\x8a'
+E             Use -v to get more diff
+
+tests/test_live_preview.py:232: AssertionError
+_ test_failed_publication_retains_bytes_cleans_up_and_retries[True-temporary-write] _
+
+preview = ({'id': 'preview-test', 'dir': '/tmp/openscrub-task5/red-tmp/test_failed_publication_retain10', 'log': [], 'cancel': <...crx<\x16\xca\x93vr\xf9\xf4\xbf\x97\x9e\xfb\xbf\x9b\xec\x1e\xd6|\xaej\xf7[j\xd6\x9dv\xd2\xc9[\xae\x8e\xfb\xdc\xff\xd9'])
+http = <function http.<locals>.fetch at 0x72c9aa1507c0>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x72c9b2be0a40>
+failure = 'temporary-write', prior = True
+
+    @pytest.mark.parametrize("failure", ["encode-false", "encode-empty", "encode-error",
+                                         "temporary-create", "temporary-write", "replace"])
+    @pytest.mark.parametrize("prior", [False, True])
+    def test_failed_publication_retains_bytes_cleans_up_and_retries(preview, http, monkeypatch,
+                                                                  failure, prior):
+        job, path, frames, expected = preview
+        if prior:
+            publish(job, frames[0])
+        callback = web.WebCallbacks(job)
+        clock = [10.0]
+        monkeypatch.setattr(web, "time", SimpleNamespace(time=lambda: clock[0]))
+        with monkeypatch.context() as fault:
+            if failure == "encode-false":
+                fault.setattr(cv2, "imencode", lambda *args: (False, None))
+            elif failure == "encode-empty":
+                fault.setattr(cv2, "imencode", lambda *args: (True, np.array([], dtype=np.uint8)))
+            elif failure == "encode-error":
+                def fail_encode(*args):
+                    raise cv2.error("synthetic JPEG encoding failure")
+                fault.setattr(cv2, "imencode", fail_encode)
+            elif failure == "temporary-create":
+                def fail_create(*args, **kwargs):
+                    raise OSError("synthetic temporary creation failure")
+                fault.setattr(tempfile, "NamedTemporaryFile", fail_create)
+            elif failure == "temporary-write":
+                real_temporary = tempfile.NamedTemporaryFile
+    
+                class FailedWrite:
+                    def __init__(self, *args, **kwargs):
+                        self.file = real_temporary(*args, **kwargs)
+                        self.name = self.file.name
+                    def __enter__(self):
+                        self.file.__enter__()
+                        return self
+                    def __exit__(self, *args):
+                        return self.file.__exit__(*args)
+                    def write(self, data):
+                        self.file.write(data[:20])
+                        raise OSError("synthetic failure after partial temporary write")
+    
+                fault.setattr(tempfile, "NamedTemporaryFile", FailedWrite)
+            else:
+                def fail_replace(*args):
+                    raise OSError("synthetic replacement failure")
+                fault.setattr(os, "replace", fail_replace)
+            callback.scan_frame(frames[1], 1.0, 2)
+        assert callback._last_frame == 10.0  # even a failed attempt consumes the interval
+        assert sorted(p.name for p in path.parent.iterdir()) == (["preview.jpg"] if prior else [])
+        if prior:
+>           assert path.read_bytes() == expected[0]
+E           AssertionError: assert b'\xff\xd8\xf...0\x0f\xff\xd9' == b'\xff\xd8\xf...-\xd9\xff\xd9'
+E             
+E             At index 623 diff: b'\xe7' != b'\x8a'
+E             Use -v to get more diff
+
+tests/test_live_preview.py:232: AssertionError
+__ test_failed_publication_retains_bytes_cleans_up_and_retries[True-replace] ___
+
+preview = ({'id': 'preview-test', 'dir': '/tmp/openscrub-task5/red-tmp/test_failed_publication_retain11', 'log': [], 'cancel': <...crx<\x16\xca\x93vr\xf9\xf4\xbf\x97\x9e\xfb\xbf\x9b\xec\x1e\xd6|\xaej\xf7[j\xd6\x9dv\xd2\xc9[\xae\x8e\xfb\xdc\xff\xd9'])
+http = <function http.<locals>.fetch at 0x72c9aa18a660>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x72c9aa126ae0>
+failure = 'replace', prior = True
+
+    @pytest.mark.parametrize("failure", ["encode-false", "encode-empty", "encode-error",
+                                         "temporary-create", "temporary-write", "replace"])
+    @pytest.mark.parametrize("prior", [False, True])
+    def test_failed_publication_retains_bytes_cleans_up_and_retries(preview, http, monkeypatch,
+                                                                  failure, prior):
+        job, path, frames, expected = preview
+        if prior:
+            publish(job, frames[0])
+        callback = web.WebCallbacks(job)
+        clock = [10.0]
+        monkeypatch.setattr(web, "time", SimpleNamespace(time=lambda: clock[0]))
+        with monkeypatch.context() as fault:
+            if failure == "encode-false":
+                fault.setattr(cv2, "imencode", lambda *args: (False, None))
+            elif failure == "encode-empty":
+                fault.setattr(cv2, "imencode", lambda *args: (True, np.array([], dtype=np.uint8)))
+            elif failure == "encode-error":
+                def fail_encode(*args):
+                    raise cv2.error("synthetic JPEG encoding failure")
+                fault.setattr(cv2, "imencode", fail_encode)
+            elif failure == "temporary-create":
+                def fail_create(*args, **kwargs):
+                    raise OSError("synthetic temporary creation failure")
+                fault.setattr(tempfile, "NamedTemporaryFile", fail_create)
+            elif failure == "temporary-write":
+                real_temporary = tempfile.NamedTemporaryFile
+    
+                class FailedWrite:
+                    def __init__(self, *args, **kwargs):
+                        self.file = real_temporary(*args, **kwargs)
+                        self.name = self.file.name
+                    def __enter__(self):
+                        self.file.__enter__()
+                        return self
+                    def __exit__(self, *args):
+                        return self.file.__exit__(*args)
+                    def write(self, data):
+                        self.file.write(data[:20])
+                        raise OSError("synthetic failure after partial temporary write")
+    
+                fault.setattr(tempfile, "NamedTemporaryFile", FailedWrite)
+            else:
+                def fail_replace(*args):
+                    raise OSError("synthetic replacement failure")
+                fault.setattr(os, "replace", fail_replace)
+            callback.scan_frame(frames[1], 1.0, 2)
+        assert callback._last_frame == 10.0  # even a failed attempt consumes the interval
+        assert sorted(p.name for p in path.parent.iterdir()) == (["preview.jpg"] if prior else [])
+        if prior:
+>           assert path.read_bytes() == expected[0]
+E           AssertionError: assert b'\xff\xd8\xf...0\x0f\xff\xd9' == b'\xff\xd8\xf...-\xd9\xff\xd9'
+E             
+E             At index 623 diff: b'\xe7' != b'\x8a'
+E             Use -v to get more diff
+
+tests/test_live_preview.py:232: AssertionError
+___________ test_unrelated_errors_and_termination_propagate[error0] ____________
+
+preview = ({'id': 'preview-test', 'dir': '/tmp/openscrub-task5/red-tmp/test_unrelated_errors_and_term0', 'log': [], 'cancel': <t...crx<\x16\xca\x93vr\xf9\xf4\xbf\x97\x9e\xfb\xbf\x9b\xec\x1e\xd6|\xaej\xf7[j\xd6\x9dv\xd2\xc9[\xae\x8e\xfb\xdc\xff\xd9'])
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x72c9aa1241a0>
+error = ValueError('programmer error')
+
+    @pytest.mark.parametrize("error", [ValueError("programmer error"), KeyboardInterrupt(), SystemExit()])
+    def test_unrelated_errors_and_termination_propagate(preview, monkeypatch, error):
+        job, path, frames, expected = preview
+        publish(job, frames[0])
+    
+        def fail_encode(*args):
+            raise error
+    
+        monkeypatch.setattr(cv2, "imencode", fail_encode)
+>       with pytest.raises(type(error)):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE ValueError
+
+tests/test_live_preview.py:256: Failed
+___________ test_unrelated_errors_and_termination_propagate[error1] ____________
+
+preview = ({'id': 'preview-test', 'dir': '/tmp/openscrub-task5/red-tmp/test_unrelated_errors_and_term1', 'log': [], 'cancel': <t...crx<\x16\xca\x93vr\xf9\xf4\xbf\x97\x9e\xfb\xbf\x9b\xec\x1e\xd6|\xaej\xf7[j\xd6\x9dv\xd2\xc9[\xae\x8e\xfb\xdc\xff\xd9'])
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x72c9aa17eff0>
+error = KeyboardInterrupt()
+
+    @pytest.mark.parametrize("error", [ValueError("programmer error"), KeyboardInterrupt(), SystemExit()])
+    def test_unrelated_errors_and_termination_propagate(preview, monkeypatch, error):
+        job, path, frames, expected = preview
+        publish(job, frames[0])
+    
+        def fail_encode(*args):
+            raise error
+    
+        monkeypatch.setattr(cv2, "imencode", fail_encode)
+>       with pytest.raises(type(error)):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE KeyboardInterrupt
+
+tests/test_live_preview.py:256: Failed
+___________ test_unrelated_errors_and_termination_propagate[error2] ____________
+
+preview = ({'id': 'preview-test', 'dir': '/tmp/openscrub-task5/red-tmp/test_unrelated_errors_and_term2', 'log': [], 'cancel': <t...crx<\x16\xca\x93vr\xf9\xf4\xbf\x97\x9e\xfb\xbf\x9b\xec\x1e\xd6|\xaej\xf7[j\xd6\x9dv\xd2\xc9[\xae\x8e\xfb\xdc\xff\xd9'])
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x72c9aa17fe00>
+error = SystemExit()
+
+    @pytest.mark.parametrize("error", [ValueError("programmer error"), KeyboardInterrupt(), SystemExit()])
+    def test_unrelated_errors_and_termination_propagate(preview, monkeypatch, error):
+        job, path, frames, expected = preview
+        publish(job, frames[0])
+    
+        def fail_encode(*args):
+            raise error
+    
+        monkeypatch.setattr(cv2, "imencode", fail_encode)
+>       with pytest.raises(type(error)):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE SystemExit
+
+tests/test_live_preview.py:256: Failed
+_____________ test_http_missing_conditional_range_and_changed_etag _____________
+
+preview = ({'id': 'preview-test', 'dir': '/tmp/openscrub-task5/red-tmp/test_http_missing_conditional_0', 'log': [], 'cancel': <t...crx<\x16\xca\x93vr\xf9\xf4\xbf\x97\x9e\xfb\xbf\x9b\xec\x1e\xd6|\xaej\xf7[j\xd6\x9dv\xd2\xc9[\xae\x8e\xfb\xdc\xff\xd9'])
+http = <function http.<locals>.fetch at 0x72c9aa1a9300>
+
+    def test_http_missing_conditional_range_and_changed_etag(preview, http):
+        job, path, frames, expected = preview
+        assert http()[0] == 404
+        assert http(jid="no-such-job")[0] == 404
+        publish(job, frames[0])
+        response = http()
+        assert_jpeg(response, expected[0])
+        etag = response[1]["ETag"]
+        status, headers, body = http(headers={"If-None-Match": etag})
+        assert status == 304 and body == b""
+        assert headers["ETag"] == etag
+        assert headers["Cache-Control"] == "no-cache, max-age=0"
+        status, headers, body = http(headers={"Range": "bytes=10-99", "If-Range": etag})
+        assert status == 206 and body == expected[0][10:100]
+        assert headers["Content-Length"] == "90"
+        assert headers["Content-Range"] == f"bytes 10-99/{len(expected[0])}"
+        assert headers["ETag"] == etag
+        assert http(headers={"Range": f"bytes={len(expected[0])}-"})[0] == 416
+        # Equal size and mtime must not let a path-metadata ETag validate new bytes.
+        publish(job, frames[1])
+        first_solid = path.read_bytes()
+        solid_response = http()
+        stat = path.stat()
+        alternate = np.full_like(frames[1], (224, 24, 24))
+        publish(job, alternate)
+        second_solid = path.read_bytes()
+        assert second_solid != first_solid and len(second_solid) == len(first_solid)
+        os.utime(path, ns=(stat.st_atime_ns, stat.st_mtime_ns))
+>       assert_jpeg(http(headers={"If-None-Match": solid_response[1]["ETag"]}), second_solid)
+
+tests/test_live_preview.py:310: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+response = (304, {'Content-Disposition': 'inline; filename=preview.jpg', 'Cache-Control': 'no-cache, max-age=0', 'Expires': 'Tue, 17 Nov 2026 02:25:31 GMT', 'ETag': '"1794882331.9861455-3329-4122811399"', ...}, b'')
+expected = b'\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00\xff\xdb\x00C\x00\n\x07\x07\x08\x07\x06\n\x08\x0...a0\x02\x8a(\xa0\x02\x8a(\xa0\x02\x8a(\xa0\x02\x8a(\xa0\x02\x8a(\xa0\x02\x8a(\xa0\x02\x8a(\xa0\x02\x8a(\xa0\x0f\xff\xd9'
+
+    def assert_jpeg(response, expected):
+        status, headers, body = response
+>       assert status == 200
+E       assert 304 == 200
+
+tests/test_live_preview.py:100: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_live_preview.py::test_http_publication_after_headers_and_between_chunks[1-1]
+FAILED tests/test_live_preview.py::test_http_publication_after_headers_and_between_chunks[2-2]
+FAILED tests/test_live_preview.py::test_http_replacement_before_open_uses_same_generation_for_length
+FAILED tests/test_live_preview.py::test_publication_preserves_an_open_generation
+FAILED tests/test_live_preview.py::test_failed_publication_retains_bytes_cleans_up_and_retries[False-encode-false]
+FAILED tests/test_live_preview.py::test_failed_publication_retains_bytes_cleans_up_and_retries[False-encode-empty]
+FAILED tests/test_live_preview.py::test_failed_publication_retains_bytes_cleans_up_and_retries[False-encode-error]
+FAILED tests/test_live_preview.py::test_failed_publication_retains_bytes_cleans_up_and_retries[False-temporary-create]
+FAILED tests/test_live_preview.py::test_failed_publication_retains_bytes_cleans_up_and_retries[False-temporary-write]
+FAILED tests/test_live_preview.py::test_failed_publication_retains_bytes_cleans_up_and_retries[False-replace]
+FAILED tests/test_live_preview.py::test_failed_publication_retains_bytes_cleans_up_and_retries[True-encode-false]
+FAILED tests/test_live_preview.py::test_failed_publication_retains_bytes_cleans_up_and_retries[True-encode-empty]
+FAILED tests/test_live_preview.py::test_failed_publication_retains_bytes_cleans_up_and_retries[True-encode-error]
+FAILED tests/test_live_preview.py::test_failed_publication_retains_bytes_cleans_up_and_retries[True-temporary-create]
+FAILED tests/test_live_preview.py::test_failed_publication_retains_bytes_cleans_up_and_retries[True-temporary-write]
+FAILED tests/test_live_preview.py::test_failed_publication_retains_bytes_cleans_up_and_retries[True-replace]
+FAILED tests/test_live_preview.py::test_unrelated_errors_and_termination_propagate[error0]
+FAILED tests/test_live_preview.py::test_unrelated_errors_and_termination_propagate[error1]
+FAILED tests/test_live_preview.py::test_unrelated_errors_and_termination_propagate[error2]
+FAILED tests/test_live_preview.py::test_http_missing_conditional_range_and_changed_etag
+20 failed, 2 passed in 8.49s

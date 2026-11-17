@@ -1,0 +1,6 @@
+uv version: uv 0.13.8 (x86_64-unknown-linux-gnu)
+Initial pre-network option validation rejected combining --only-binary :all: with --no-build; retained only --only-binary :all:.
+Next pre-network validation required pylock.<name>.toml, not pylock-<name>.toml; corrected filenames.
+Initial valid Python 3.12 run in restricted sandbox exited 2 on DNS resolution: Failed to fetch https://pypi.org/simple/opencv-python/; failed to lookup address information: Temporary failure in name resolution. The subsequent identical authorized public-network run succeeded; its command/output are preserved.
+--emit-index-annotation was accepted with a warning that it is unsupported for pylock output. The explicit command/clean environment and per-artifact official URLs establish index identity.
+No offline replay, installed-environment dry run, source build, package install, tool upgrade, or runtime test was performed.

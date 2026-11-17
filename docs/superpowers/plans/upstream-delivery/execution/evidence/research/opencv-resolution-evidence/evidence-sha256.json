@@ -1,0 +1,82 @@
+{
+  "attempt-notes.txt": {
+    "bytes": 908,
+    "sha256": "4519041d401f3bba89b590a0ad1aedd712bd7b6f0f493cbffb358e9e3970efd3"
+  },
+  "collect_targets.py": {
+    "bytes": 912,
+    "sha256": "1ee6429500282193513ff62ab92a047cc9d00b281bceb9b284b1c89da24b3266"
+  },
+  "command-312-online.json": {
+    "bytes": 1284,
+    "sha256": "0758a0c4f50235efc6801454e3ea0ac727bdec661ee8a9368ef3cfc06fc650b4"
+  },
+  "command-39-online.json": {
+    "bytes": 1266,
+    "sha256": "2003b98bb9dca964f19b1fabf014da171160a5743768adad8919e13107a0bac5"
+  },
+  "core-candidate.in": {
+    "bytes": 103,
+    "sha256": "a953b90959297225f8b361917b7e1e733262b128e7b0275fd126b13cf86463ca"
+  },
+  "core-original.in": {
+    "bytes": 101,
+    "sha256": "01569b29707ee0fd18a5f03730ee676a5ac6c36d9e07e4235ee15d3dd80080eb"
+  },
+  "invalid-filename-resolver-312-online.log.gz": {
+    "bytes": 210,
+    "sha256": "b1720d0cdc99b7ec4ddff4301e29050404c7fcaaaff698a8406069430c284413"
+  },
+  "invalid-options-resolver-312-online.log.gz": {
+    "bytes": 363,
+    "sha256": "c1044c733451e07f1cd1e881f32b608556a8667fd0ce1dedb77fc16d246ae42e"
+  },
+  "metadata-declarations.json": {
+    "bytes": 32531,
+    "sha256": "5fcfa2eb4bedd9bb4f06488cfa4d46494dc7e8ad32ff0eb0aa0cec147a9bbd10"
+  },
+  "metadata.py": {
+    "bytes": 1723,
+    "sha256": "a808a978112b4faa9f5f31d6804ad11978fd3007edecd3e54e3a2e0aba358937"
+  },
+  "prepare.py": {
+    "bytes": 1814,
+    "sha256": "dbe9f3e89ff6b13b7461911cedf77a9db4428900ca63d34755272fba0650319a"
+  },
+  "pylock.312.toml": {
+    "bytes": 11600,
+    "sha256": "644fbacd0fe9d3182543a8ab4a9f07e7704510440fe68d579d78aaa5e33591ff"
+  },
+  "pylock.39.toml": {
+    "bytes": 13585,
+    "sha256": "975ef5a99933da9c760cf3b2600ee1330c9fcd9487fb41fbfbdebd8f7473b573"
+  },
+  "resolve.py": {
+    "bytes": 1946,
+    "sha256": "97bf80c3e28db7d7542aaaad8df226e52a31efe471845f6126cfb1d3f2fc8c4d"
+  },
+  "resolver-312-online.log.gz": {
+    "bytes": 10950,
+    "sha256": "db41ef6e068fd8bb4d4d06b9f61989ede19aa2a416aeb0c6084d7f566200b4a0"
+  },
+  "resolver-39-online.log.gz": {
+    "bytes": 13722,
+    "sha256": "396673d7a7437f02379920c6c2a77e5eec4b54307b9ad25dcf55847d113254b2"
+  },
+  "source-manifest.json": {
+    "bytes": 1871,
+    "sha256": "643f3f1a43dade6edee8b7d39b86ac595c43731e7a862be127a033fe04002ded"
+  },
+  "targets.json": {
+    "bytes": 1752,
+    "sha256": "6a6e69bd78ca039d41aabb8204f876007f0b0e0f18c97a4e5588d279df71b123"
+  },
+  "validate.py": {
+    "bytes": 4411,
+    "sha256": "e6e3521e36164495c4ef2d545b462d2de6ba6778ac90ec65e6e68e0ac9bdb20a"
+  },
+  "validation.json": {
+    "bytes": 49244,
+    "sha256": "c38b74b0b62c5e06ee4c4978ed8d5d26b55382c96f512474ff75ea58f71a7dc9"
+  }
+}

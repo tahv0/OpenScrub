@@ -620,6 +620,11 @@
     "sha256": "0eb83dd40ff243180811183c4f32181a23c75f0c5272764a6de49569193dfe94"
   },
   {
+    "path": "research/opencv-compat-source-plan.md",
+    "bytes": 7764,
+    "sha256": "4b473235470e90dbe03773283864b1cdb6b334ebf737e4637c04ffefafd513f6"
+  },
+  {
     "path": "research/opencv-install-scope-brief.md",
     "bytes": 3084,
     "sha256": "97bf7068e409eb625b8d0ea749dc76a9df8f164c479d600106a34a3ad53742a1"
@@ -648,6 +653,121 @@
     "path": "research/opencv-install-scope-research.md",
     "bytes": 22010,
     "sha256": "5cd2540053317a4161551a8cee97006a230c4b3f9fc79c4cbf91f5725cd3d100"
+  },
+  {
+    "path": "research/opencv-resolution-brief.md",
+    "bytes": 3490,
+    "sha256": "b51479d4d89d58a7ed6b13e7f00cd42466132006ca61b3d1911c73e2102a1b22"
+  },
+  {
+    "path": "research/opencv-resolution-evidence/attempt-notes.txt",
+    "bytes": 908,
+    "sha256": "4519041d401f3bba89b590a0ad1aedd712bd7b6f0f493cbffb358e9e3970efd3"
+  },
+  {
+    "path": "research/opencv-resolution-evidence/collect_targets.py",
+    "bytes": 912,
+    "sha256": "1ee6429500282193513ff62ab92a047cc9d00b281bceb9b284b1c89da24b3266"
+  },
+  {
+    "path": "research/opencv-resolution-evidence/command-312-online.json",
+    "bytes": 1284,
+    "sha256": "0758a0c4f50235efc6801454e3ea0ac727bdec661ee8a9368ef3cfc06fc650b4"
+  },
+  {
+    "path": "research/opencv-resolution-evidence/command-39-online.json",
+    "bytes": 1266,
+    "sha256": "2003b98bb9dca964f19b1fabf014da171160a5743768adad8919e13107a0bac5"
+  },
+  {
+    "path": "research/opencv-resolution-evidence/core-candidate.in",
+    "bytes": 103,
+    "sha256": "a953b90959297225f8b361917b7e1e733262b128e7b0275fd126b13cf86463ca"
+  },
+  {
+    "path": "research/opencv-resolution-evidence/core-original.in",
+    "bytes": 101,
+    "sha256": "01569b29707ee0fd18a5f03730ee676a5ac6c36d9e07e4235ee15d3dd80080eb"
+  },
+  {
+    "path": "research/opencv-resolution-evidence/evidence-sha256.json",
+    "bytes": 2656,
+    "sha256": "c3627bf2196111d26e3bf50fc250fd3540352e88105a06e0513350799e56e0ff"
+  },
+  {
+    "path": "research/opencv-resolution-evidence/invalid-filename-resolver-312-online.log.gz",
+    "bytes": 210,
+    "sha256": "b1720d0cdc99b7ec4ddff4301e29050404c7fcaaaff698a8406069430c284413"
+  },
+  {
+    "path": "research/opencv-resolution-evidence/invalid-options-resolver-312-online.log.gz",
+    "bytes": 363,
+    "sha256": "c1044c733451e07f1cd1e881f32b608556a8667fd0ce1dedb77fc16d246ae42e"
+  },
+  {
+    "path": "research/opencv-resolution-evidence/metadata-declarations.json",
+    "bytes": 32531,
+    "sha256": "5fcfa2eb4bedd9bb4f06488cfa4d46494dc7e8ad32ff0eb0aa0cec147a9bbd10"
+  },
+  {
+    "path": "research/opencv-resolution-evidence/metadata.py",
+    "bytes": 1723,
+    "sha256": "a808a978112b4faa9f5f31d6804ad11978fd3007edecd3e54e3a2e0aba358937"
+  },
+  {
+    "path": "research/opencv-resolution-evidence/prepare.py",
+    "bytes": 1814,
+    "sha256": "dbe9f3e89ff6b13b7461911cedf77a9db4428900ca63d34755272fba0650319a"
+  },
+  {
+    "path": "research/opencv-resolution-evidence/pylock.312.toml",
+    "bytes": 11600,
+    "sha256": "644fbacd0fe9d3182543a8ab4a9f07e7704510440fe68d579d78aaa5e33591ff"
+  },
+  {
+    "path": "research/opencv-resolution-evidence/pylock.39.toml",
+    "bytes": 13585,
+    "sha256": "975ef5a99933da9c760cf3b2600ee1330c9fcd9487fb41fbfbdebd8f7473b573"
+  },
+  {
+    "path": "research/opencv-resolution-evidence/resolve.py",
+    "bytes": 1946,
+    "sha256": "97bf80c3e28db7d7542aaaad8df226e52a31efe471845f6126cfb1d3f2fc8c4d"
+  },
+  {
+    "path": "research/opencv-resolution-evidence/resolver-312-online.log.gz",
+    "bytes": 10950,
+    "sha256": "db41ef6e068fd8bb4d4d06b9f61989ede19aa2a416aeb0c6084d7f566200b4a0"
+  },
+  {
+    "path": "research/opencv-resolution-evidence/resolver-39-online.log.gz",
+    "bytes": 13722,
+    "sha256": "396673d7a7437f02379920c6c2a77e5eec4b54307b9ad25dcf55847d113254b2"
+  },
+  {
+    "path": "research/opencv-resolution-evidence/source-manifest.json",
+    "bytes": 1871,
+    "sha256": "643f3f1a43dade6edee8b7d39b86ac595c43731e7a862be127a033fe04002ded"
+  },
+  {
+    "path": "research/opencv-resolution-evidence/targets.json",
+    "bytes": 1752,
+    "sha256": "6a6e69bd78ca039d41aabb8204f876007f0b0e0f18c97a4e5588d279df71b123"
+  },
+  {
+    "path": "research/opencv-resolution-evidence/validate.py",
+    "bytes": 4411,
+    "sha256": "e6e3521e36164495c4ef2d545b462d2de6ba6778ac90ec65e6e68e0ac9bdb20a"
+  },
+  {
+    "path": "research/opencv-resolution-evidence/validation.json",
+    "bytes": 49244,
+    "sha256": "c38b74b0b62c5e06ee4c4978ed8d5d26b55382c96f512474ff75ea58f71a7dc9"
+  },
+  {
+    "path": "research/opencv-resolution-research.md",
+    "bytes": 9120,
+    "sha256": "dc8566f0199ba53df61a03fce5a5c73a4cddd633aafb8e499d9feb0a17a06979"
   },
   {
     "path": "research/options-input-baseline-brief.md",
@@ -1690,6 +1810,156 @@
     "sha256": "fe2b7cd71747f66971a5836b7b5158e9d0481c752765475658119a2aa6f4e163"
   },
   {
+    "path": "delivery/live-preview/build.log",
+    "bytes": 233,
+    "sha256": "e5c41b396fbabed65896ae2e536ecd5502d284bbd5a22ed498e2c6b5c99deae7"
+  },
+  {
+    "path": "delivery/live-preview/check_installed.py",
+    "bytes": 4214,
+    "sha256": "e38ea01f3095d1b3de85dca061442cfeab2c44f9c1697054c8a8fb2846479bb8"
+  },
+  {
+    "path": "delivery/live-preview/check_package.py",
+    "bytes": 1705,
+    "sha256": "e36c4c9c9a25b434458711231bd7c34fe616a6f26009c5fdcc77c970514d9487"
+  },
+  {
+    "path": "delivery/live-preview/delivery.log",
+    "bytes": 84,
+    "sha256": "f736ead8a3fd9997172c0b5f6d1080593d29bd114951e531811d529ff94e18ff"
+  },
+  {
+    "path": "delivery/live-preview/env.sh",
+    "bytes": 421,
+    "sha256": "fc8882bce3d45f1632f7eed3564e2b8f94ff5391bf17ce569484075d691bf875"
+  },
+  {
+    "path": "delivery/live-preview/evidence-manifest.json",
+    "bytes": 3689,
+    "sha256": "6ddf3e0a2b1d1a8009bd121a959c53d237320d45c8bc9fc876f1e6b0afaf2b8a"
+  },
+  {
+    "path": "delivery/live-preview/floor.log",
+    "bytes": 17479,
+    "sha256": "3575de91fa97a882d95943e066efb9edf33a4c0ac4d0776437b236aee11fd28c"
+  },
+  {
+    "path": "delivery/live-preview/full.log",
+    "bytes": 271,
+    "sha256": "5e8dd3e60f311193fd470b1dae1d7cee6e24ebbc309a8daff379ac744f12a76b"
+  },
+  {
+    "path": "delivery/live-preview/green.log",
+    "bytes": 17479,
+    "sha256": "d587388138c72903603e9145f1ea36076d996bf2e4e6f96db4ecec6123d28705"
+  },
+  {
+    "path": "delivery/live-preview/imports312.log",
+    "bytes": 387,
+    "sha256": "3e15612d95cabfc017569a54898bd2dcebaad5bcee7dd2df518c23881aa6d923"
+  },
+  {
+    "path": "delivery/live-preview/imports39.log",
+    "bytes": 369,
+    "sha256": "ba26e19c6853b54dd3e7015af8c2f87b25892bf717bdfd26d67dec5ab467afcb"
+  },
+  {
+    "path": "delivery/live-preview/install.log",
+    "bytes": 269,
+    "sha256": "99b05bb54cd61b47f7feb1ead2ac1a059bd22a50db490d53163a985b4c91831c"
+  },
+  {
+    "path": "delivery/live-preview/installed-conditional.http",
+    "bytes": 327,
+    "sha256": "b2113baf61ff13eb478c3bbb40edeb22d0359f81982740b5465c93e084e1affd"
+  },
+  {
+    "path": "delivery/live-preview/installed-evidence.json",
+    "bytes": 3967,
+    "sha256": "d4b3bfa5ea0f09f3efd0a2047594dbc87bee0a3fa080768990966570a646d276"
+  },
+  {
+    "path": "delivery/live-preview/installed-imports.log",
+    "bytes": 415,
+    "sha256": "a3c632b5206fd4b56c4cb9ecf896726bb05fe9b9edb4c1f6247a7fec51e11e1f"
+  },
+  {
+    "path": "delivery/live-preview/installed-missing.http",
+    "bytes": 462,
+    "sha256": "f7d1a2a13f91ef73071334309dd1d71342c9cd398930fbcf9796079453a0185a"
+  },
+  {
+    "path": "delivery/live-preview/installed-preview.http",
+    "bytes": 96746,
+    "sha256": "43502f8711a1ed68f4dc6303453c26c30653edcbafe3f4036aedbd6775a9a032"
+  },
+  {
+    "path": "delivery/live-preview/installed-range.http",
+    "bytes": 500,
+    "sha256": "6a4d3ea9fec5e0aa2c45fbc00b99782b8397db02a6b7841eb1ce98a95b5c319c"
+  },
+  {
+    "path": "delivery/live-preview/installed-server.log",
+    "bytes": 673,
+    "sha256": "50f6aaeb70582a1b8fb7241c7eda6ce9e76cbb767a58aaa925304b067543dac7"
+  },
+  {
+    "path": "delivery/live-preview/installed.log",
+    "bytes": 127,
+    "sha256": "7f1e13e89263c1c04dfd51bc4c8d9e8383d6d55f6513914b93d6e58e6418882a"
+  },
+  {
+    "path": "delivery/live-preview/openscrub-help.log",
+    "bytes": 18082,
+    "sha256": "eb76a71a7e1d822c66f05b008249b4f8a919606eaef552be00dc1a47381f8fc6"
+  },
+  {
+    "path": "delivery/live-preview/openscrub-web-help.log",
+    "bytes": 1111,
+    "sha256": "9ffaf42bf805dde249bee4116287a7ac21b468a372ea2300eb721ae257a2edce"
+  },
+  {
+    "path": "delivery/live-preview/package-evidence.json",
+    "bytes": 2043,
+    "sha256": "95f92503cf198a677b4bd7c2d0bdf81a082c9eaf648d75c20081bcf2d3ba991a"
+  },
+  {
+    "path": "delivery/live-preview/red-extra.log",
+    "bytes": 10303,
+    "sha256": "0b6573cf7c29fa93238cffa1e381ccdd250e856205076ee26036faf22c53651d"
+  },
+  {
+    "path": "delivery/live-preview/red.log",
+    "bytes": 64058,
+    "sha256": "525d07d2bba6609c264083b3faa731822f51ea2c4ea9279f9e3c537cbe25ca7e"
+  },
+  {
+    "path": "delivery/live-preview/run_installed_server.py",
+    "bytes": 1218,
+    "sha256": "12b437de5f2ac178029565e3ffff3c0d853f4bbf99ad29ead20d9d07706c0295"
+  },
+  {
+    "path": "delivery/live-preview/sitecustomize.py",
+    "bytes": 1470,
+    "sha256": "6a6f6cefb5b9ba3358683a115c5d4ecb4f4b2166e792bd34ab11fa2380afe5ba"
+  },
+  {
+    "path": "delivery/live-preview/task5_isolation.py",
+    "bytes": 1525,
+    "sha256": "53abe0d2e84537c3d59daa6df4497e7e00e4629ac9d44c5c2f7030c848c807b1"
+  },
+  {
+    "path": "delivery/live-preview/verify_delivery.py",
+    "bytes": 1318,
+    "sha256": "1e8e96ec9d8b1d8f23e9a7f5c335b84dcf86bffa1d2f765ab5414b52cd5771d6"
+  },
+  {
+    "path": "delivery/live-preview/verify_imports.py",
+    "bytes": 461,
+    "sha256": "e67d5a2e3b07b8245d539fe8c19aee5767922d94fcf2dd039c662d8f9208dae9"
+  },
+  {
     "path": "delivery/manual-replay/browser-jobs.json",
     "bytes": 47,
     "sha256": "a369e390c741e3be21c6b26010a06b05003fc21dccfc267c8ffc5eb18bc8a29e"
@@ -2623,6 +2893,26 @@
     "path": "delivery/task-2-review.md",
     "bytes": 4809,
     "sha256": "a360d9f73e564d7531f8cd4dfcf9bcb931074ff18ab4e95f5499ae21eaa197fa"
+  },
+  {
+    "path": "delivery/task-5-brief.md",
+    "bytes": 5314,
+    "sha256": "76e433714c907cd3d459e0dc9f9ce475ee874f4d5fd6cac2b6f0154c6473f414"
+  },
+  {
+    "path": "delivery/task-5-pr.md",
+    "bytes": 3150,
+    "sha256": "9971948a4efa89597c2bef53684a29796f633770defb56a7ea97fd8493e83355"
+  },
+  {
+    "path": "delivery/task-5-report.md",
+    "bytes": 15719,
+    "sha256": "947ee65ed64c323ea42dd46d39f76311c71eee10fb8d128f5bf1f9d3bf53e330"
+  },
+  {
+    "path": "delivery/task-5-review.md",
+    "bytes": 8484,
+    "sha256": "ab78c58ec9de9aa26a822f69f58f390ffc719485ea8a8330c3df45d72d486556"
   },
   {
     "path": "delivery/task-61-brief.md",

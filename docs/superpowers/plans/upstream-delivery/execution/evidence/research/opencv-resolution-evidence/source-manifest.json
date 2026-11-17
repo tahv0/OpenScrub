@@ -1,0 +1,81 @@
+{
+  "commit": "e21ebdf6e3ee46e6c65050dc956a9a3459152269",
+  "tree": "795af785b672d397d2e287b5b963c10dcc4dbdf8",
+  "sources": {
+    "pyproject.toml": {
+      "blob": "2a60019772d14238c4c301d6bdfa965dbd628062",
+      "sha256": "7692271c613956392066f2fbc5329ea4eab8a656614d6e127710ba8b112fdbe3",
+      "bytes": 4012
+    },
+    "requirements.txt": {
+      "blob": "2bca4605ea363d447b331ef52e6e22279263d4a6",
+      "sha256": "9fccdf6ad2d0ea484f40906ba224881fb4f5b16ff44fdbf14819865c0d8fa6ee",
+      "bytes": 107
+    },
+    "install.py": {
+      "blob": "5b1d3de6141783a19c8bc83ecf8aae7cbf6fc1e4",
+      "sha256": "bdb1cfb39368d212c9a65384264533cbf7c825b5c261f7c2f2b42cfb8e02cbeb",
+      "bytes": 17050
+    }
+  },
+  "requires_python": ">=3.9",
+  "core_original": [
+    "opencv-python",
+    "numpy",
+    "onnxruntime",
+    "rapidfuzz",
+    "pytesseract",
+    "pillow",
+    "flask",
+    "pyyaml",
+    "cryptography",
+    "cheroot>=10.0"
+  ],
+  "core_candidate": [
+    "opencv-python<5",
+    "numpy",
+    "onnxruntime",
+    "rapidfuzz",
+    "pytesseract",
+    "pillow",
+    "flask",
+    "pyyaml",
+    "cryptography",
+    "cheroot>=10.0"
+  ],
+  "requirements_txt": [
+    "opencv-python",
+    "numpy",
+    "onnxruntime",
+    "rapidfuzz",
+    "pytesseract",
+    "pillow",
+    "spacy",
+    "flask",
+    "pyyaml",
+    "cryptography",
+    "cheroot>=10.0"
+  ],
+  "installer_core": [
+    "opencv-python",
+    "rapidfuzz",
+    "pytesseract",
+    "pillow",
+    "flask",
+    "pyyaml",
+    "cryptography"
+  ],
+  "candidate_delta": {
+    "removed": "opencv-python",
+    "added": "opencv-python<5",
+    "other_core_changes": false
+  },
+  "core-original.in": {
+    "sha256": "01569b29707ee0fd18a5f03730ee676a5ac6c36d9e07e4235ee15d3dd80080eb",
+    "bytes": 101
+  },
+  "core-candidate.in": {
+    "sha256": "a953b90959297225f8b361917b7e1e733262b128e7b0275fd126b13cf86463ca",
+    "bytes": 103
+  }
+}

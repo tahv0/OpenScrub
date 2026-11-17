@@ -1,0 +1,62 @@
+{
+  "312": {
+    "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+    "version": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]",
+    "version_info": [
+      3,
+      12,
+      16,
+      "final",
+      0
+    ],
+    "platform": "linux-x86_64",
+    "abi": "cpython-312-x86_64-linux-gnu",
+    "libc": [
+      "glibc",
+      "2.43"
+    ],
+    "marker_environment": {
+      "implementation_name": "cpython",
+      "implementation_version": "3.12.16",
+      "os_name": "posix",
+      "platform_machine": "x86_64",
+      "platform_release": "6.18.58.1-microsoft-standard-WSL2",
+      "platform_system": "Linux",
+      "platform_version": "#1 SMP PREEMPT_DYNAMIC Tue Oct 27 00:24:11 UTC 2026",
+      "python_full_version": "3.12.16",
+      "platform_python_implementation": "CPython",
+      "python_version": "3.12",
+      "sys_platform": "linux"
+    }
+  },
+  "39": {
+    "executable": "/tmp/openscrub-python39-20261117/venv/bin/python",
+    "version": "3.9.25 (main, Oct 31 2025, 23:00:23) \n[Clang 21.1.4 ]",
+    "version_info": [
+      3,
+      9,
+      25,
+      "final",
+      0
+    ],
+    "platform": "linux-x86_64",
+    "abi": "cpython-39-x86_64-linux-gnu",
+    "libc": [
+      "glibc",
+      "2.43"
+    ],
+    "marker_environment": {
+      "implementation_name": "cpython",
+      "implementation_version": "3.9.25",
+      "os_name": "posix",
+      "platform_machine": "x86_64",
+      "platform_release": "6.18.58.1-microsoft-standard-WSL2",
+      "platform_system": "Linux",
+      "platform_version": "#1 SMP PREEMPT_DYNAMIC Tue Oct 27 00:24:11 UTC 2026",
+      "python_full_version": "3.9.25",
+      "platform_python_implementation": "CPython",
+      "python_version": "3.9",
+      "sys_platform": "linux"
+    }
+  }
+}

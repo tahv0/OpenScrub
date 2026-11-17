@@ -15,9 +15,11 @@ These local planning records preserve synthetic research, completed-task reports
 | [Scan-option validation](delivery/task-108-report.md) / [fix review](delivery/task-108-fix1-review.md) | JSON400 before durable job creation, preserved object/default behavior and oversized-integer decoding coverage, with original/fix-head evidence distinguished. |
 | [HDR decoder cleanup](research/hdr-decoder-cleanup-baseline-research.md) | Actual cancellation/write-error pipe lifetime with retained exceptions, reaped children and successful HDR frame/tag controls. |
 | [Live-preview baseline](research/live-preview-baseline-research.md) | Torn responses and path-stat/open length races through actual Cheroot. |
+| [Live-preview snapshots](delivery/task-5-report.md) / [review](delivery/task-5-review.md) | Complete producer/response generations, exact real HTTP race bytes and conditional/range controls, with platform and per-response memory limits. |
 | [Editor resize](research/editor-resize-baseline-research.md) / [frame identity](research/frame-identity-baseline-research.md) | Separate display/pointer alignment and source-sample mismatches; no long-video speed claim. |
 | [Mask fidelity](research/mask-fidelity-research.md) | HDR chroma coverage and invalid-polygon cases, with separate rendering/output follow-ups. |
 | [OpenCV compatibility](research/opencv-compat-research.md) / [installer scope](research/opencv-install-scope-research.md) | Matched fallback defect plus primary package metadata; no product compatibility pin or optional-stack runtime acceptance yet. |
+| [OpenCV core resolution](research/opencv-resolution-research.md) | Fresh official-index metadata resolution for the proposed bound on actual Linux Python3.12/3.9 targets; no installs, wheel archives or optional-stack/runtime certification. |
 | [Python 3.9 environment](research/python39-verification-setup.md) | Reusable isolated floor environment and limited smoke/build evidence; full application-floor acceptance remains separate. |
 | [Save As](delivery/task-2-report.md) | Accepted-byte progress, real HTTP/OPFS behavior and browser/platform limits. |
 | [Tracker regression](delivery/task-90-report.md) | Nonvacuous identity-protection regression with a failing mutation control. |

@@ -1,0 +1,9 @@
+IMPORTS /tmp/openscrub-task5/install/lib/python3.12/site-packages/openscrub.py /tmp/openscrub-task5/install/lib/python3.12/site-packages/openscrub_web.py
+ENTRYPOINT /tmp/openscrub-task5/install/lib/python3.12/site-packages/bin/openscrub-web
+============================================================
+openscrub web — open from any device on your LAN:
+    http://127.0.0.1:39307/?token=task5-synthetic-token
+Jobs folder (contains PII): /tmp/openscrub-task5/installed-http/openscrub_jobs — kept forever
+Do NOT expose this port to the internet.
+============================================================
+    WARNING: plain HTTP — PII crosses the network unencrypted.

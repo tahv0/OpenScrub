@@ -1,0 +1,167 @@
+FFHTTP HTTP/1.1 500 INTERNAL SERVER ERROR {'Content-Type': 'text/html; charset=utf-8', 'Content-Length': '265', 'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0', 'Pragma': 'no-cache', 'Expires': '0', 'Connection': 'close', 'Date': 'Tue, 17 Nov 2026 02:26:31 GMT', 'Server': 'openscrub'} bytes 265 sha256 ae5163256b944013e27cbef0d2bcd33a6dacbb92463509f91d5f3df782142910
+Fsocket.error 'synthetic preview snapshot read failure'
+Traceback (most recent call last):
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/cheroot/server.py", line 1319, in communicate
+    req.respond()
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/cheroot/server.py", line 1110, in respond
+    self.server.gateway(self).respond()
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/cheroot/wsgi.py", line 150, in respond
+    for chunk in filter(None, response):
+                 ^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/werkzeug/wsgi.py", line 348, in __next__
+    data = self.file.read(self.buffer_size)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_live_preview.py", line 355, in read
+    raise OSError("synthetic preview snapshot read failure")
+OSError: synthetic preview snapshot read failure
+HTTP HTTP/1.1 200 OK {'Content-Disposition': 'inline; filename=preview.jpg', 'Content-Type': 'image/jpeg', 'Content-Length': '96380', 'Last-Modified': 'Tue, 17 Nov 2026 02:26:32 GMT', 'Cache-Control': 'no-cache, max-age=0', 'Expires': 'Tue, 17 Nov 2026 02:26:32 GMT', 'ETag': '"1794882392.2422762-96380-2726043228"', 'Date': 'Tue, 17 Nov 2026 02:26:32 GMT', 'Accept-Ranges': 'bytes', 'Connection': 'close', 'Server': 'openscrub'} bytes 0 sha256 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+F
+=================================== FAILURES ===================================
+________________ test_publication_helper_returns_boolean_status ________________
+
+preview = ({'id': 'preview-test', 'dir': '/tmp/openscrub-task5/red-extra-tmp/test_publication_helper_return0', 'log': [], 'cance...crx<\x16\xca\x93vr\xf9\xf4\xbf\x97\x9e\xfb\xbf\x9b\xec\x1e\xd6|\xaej\xf7[j\xd6\x9dv\xd2\xc9[\xae\x8e\xfb\xdc\xff\xd9'])
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x74a75f438b00>
+
+    def test_publication_helper_returns_boolean_status(preview, monkeypatch):
+        _, path, frames, expected = preview
+>       assert web._publish_preview_jpeg(path, frames[0], 70) is True
+               ^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: module 'openscrub_web' has no attribute '_publish_preview_jpeg'
+
+tests/test_live_preview.py:316: AttributeError
+_______ test_termination_during_replace_cleans_temporary_and_propagates ________
+
+preview = ({'id': 'preview-test', 'dir': '/tmp/openscrub-task5/red-extra-tmp/test_termination_during_replac0', 'log': [], 'cance...crx<\x16\xca\x93vr\xf9\xf4\xbf\x97\x9e\xfb\xbf\x9b\xec\x1e\xd6|\xaej\xf7[j\xd6\x9dv\xd2\xc9[\xae\x8e\xfb\xdc\xff\xd9'])
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x74a75f43dc10>
+
+    def test_termination_during_replace_cleans_temporary_and_propagates(preview, monkeypatch):
+        job, path, frames, expected = preview
+        publish(job, frames[0])
+    
+        def terminate(*args):
+            raise KeyboardInterrupt()
+    
+        monkeypatch.setattr(os, "replace", terminate)
+>       with pytest.raises(KeyboardInterrupt):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE KeyboardInterrupt
+
+tests/test_live_preview.py:330: Failed
+___ test_http_acquisition_failure_never_serves_partial_jpeg[disappeared-404] ___
+
+preview = ({'id': 'preview-test', 'dir': '/tmp/openscrub-task5/red-extra-tmp/test_http_acquisition_failure_0', 'log': [], 'cance...crx<\x16\xca\x93vr\xf9\xf4\xbf\x97\x9e\xfb\xbf\x9b\xec\x1e\xd6|\xaej\xf7[j\xd6\x9dv\xd2\xc9[\xae\x8e\xfb\xdc\xff\xd9'])
+http = <function http.<locals>.fetch at 0x74a7277e6160>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x74a75f4432f0>
+failure = 'disappeared', status = 404
+
+    @pytest.mark.parametrize("failure,status", [("disappeared", 404), ("read-error", 500)])
+    def test_http_acquisition_failure_never_serves_partial_jpeg(preview, http, monkeypatch,
+                                                              failure, status):
+        job, path, frames, _ = preview
+        publish(job, frames[0])
+        original_open = builtins.open
+    
+        class FailedRead:
+            def __init__(self, file):
+                self.file = file
+            def __getattr__(self, name):
+                return getattr(self.file, name)
+            def __enter__(self):
+                self.file.__enter__()
+                return self
+            def __exit__(self, *args):
+                return self.file.__exit__(*args)
+            def read(self, *args):
+                self.file.read(8192)
+                raise OSError("synthetic preview snapshot read failure")
+    
+        def observed_open(file, mode="r", *args, **kwargs):
+            if os.fspath(file) == str(path) and mode == "rb":
+                if failure == "disappeared":
+                    path.unlink()
+                else:
+                    return FailedRead(original_open(file, mode, *args, **kwargs))
+            return original_open(file, mode, *args, **kwargs)
+    
+        monkeypatch.setattr(builtins, "open", observed_open)
+        actual, headers, body = http()
+>       assert actual == status
+E       assert 500 == 404
+
+tests/test_live_preview.py:367: AssertionError
+------------------------------ Captured log call -------------------------------
+ERROR    openscrub_web:app.py:875 Exception on /api/jobs/preview-test/preview.jpg [GET]
+Traceback (most recent call last):
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", line 1080, in job_preview
+    return send_file(p, mimetype="image/jpeg", max_age=0)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/helpers.py", line 518, in send_file
+    return werkzeug.utils.send_file(  # type: ignore[return-value]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/werkzeug/utils.py", line 473, in send_file
+    file = open(path, "rb")  # type: ignore
+           ^^^^^^^^^^^^^^^^
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_live_preview.py", line 363, in observed_open
+    return original_open(file, mode, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/tmp/openscrub-task5/red-extra-tmp/test_http_acquisition_failure_0/preview.jpg'
+___ test_http_acquisition_failure_never_serves_partial_jpeg[read-error-500] ____
+
+preview = ({'id': 'preview-test', 'dir': '/tmp/openscrub-task5/red-extra-tmp/test_http_acquisition_failure_1', 'log': [], 'cance...crx<\x16\xca\x93vr\xf9\xf4\xbf\x97\x9e\xfb\xbf\x9b\xec\x1e\xd6|\xaej\xf7[j\xd6\x9dv\xd2\xc9[\xae\x8e\xfb\xdc\xff\xd9'])
+http = <function http.<locals>.fetch at 0x74a71119aa20>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x74a75f440470>
+failure = 'read-error', status = 500
+
+    @pytest.mark.parametrize("failure,status", [("disappeared", 404), ("read-error", 500)])
+    def test_http_acquisition_failure_never_serves_partial_jpeg(preview, http, monkeypatch,
+                                                              failure, status):
+        job, path, frames, _ = preview
+        publish(job, frames[0])
+        original_open = builtins.open
+    
+        class FailedRead:
+            def __init__(self, file):
+                self.file = file
+            def __getattr__(self, name):
+                return getattr(self.file, name)
+            def __enter__(self):
+                self.file.__enter__()
+                return self
+            def __exit__(self, *args):
+                return self.file.__exit__(*args)
+            def read(self, *args):
+                self.file.read(8192)
+                raise OSError("synthetic preview snapshot read failure")
+    
+        def observed_open(file, mode="r", *args, **kwargs):
+            if os.fspath(file) == str(path) and mode == "rb":
+                if failure == "disappeared":
+                    path.unlink()
+                else:
+                    return FailedRead(original_open(file, mode, *args, **kwargs))
+            return original_open(file, mode, *args, **kwargs)
+    
+        monkeypatch.setattr(builtins, "open", observed_open)
+        actual, headers, body = http()
+>       assert actual == status
+E       assert 200 == 500
+
+tests/test_live_preview.py:367: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_live_preview.py::test_publication_helper_returns_boolean_status
+FAILED tests/test_live_preview.py::test_termination_during_replace_cleans_temporary_and_propagates
+FAILED tests/test_live_preview.py::test_http_acquisition_failure_never_serves_partial_jpeg[disappeared-404]
+FAILED tests/test_live_preview.py::test_http_acquisition_failure_never_serves_partial_jpeg[read-error-500]
+4 failed, 22 deselected in 1.14s

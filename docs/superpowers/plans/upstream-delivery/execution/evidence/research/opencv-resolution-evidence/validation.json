@@ -1,0 +1,1507 @@
+{
+  "312": {
+    "status": "pass",
+    "target_python": "3.12.16",
+    "lock_requires_python": ">=3.12.16",
+    "package_count": 23,
+    "selected_versions": {
+      "blinker": "1.9.0",
+      "cffi": "2.1.1",
+      "cheroot": "11.1.2",
+      "click": "8.5.1",
+      "cryptography": "50.0.2",
+      "flask": "3.1.3",
+      "flatbuffers": "25.12.19",
+      "itsdangerous": "2.2.0",
+      "jaraco-functools": "4.6.0",
+      "jinja2": "3.1.6",
+      "markupsafe": "3.0.4",
+      "more-itertools": "11.2.1",
+      "numpy": "2.5.5",
+      "onnxruntime": "1.32.0",
+      "opencv-python": "4.14.0.94",
+      "packaging": "26.3",
+      "pillow": "13.0.0",
+      "protobuf": "7.36.2",
+      "pycparser": "3.12",
+      "pytesseract": "0.3.13",
+      "pyyaml": "6.0.3",
+      "rapidfuzz": "3.14.6",
+      "werkzeug": "3.1.9"
+    },
+    "selected_markers": {
+      "cffi": "platform_python_implementation != 'PyPy'",
+      "pycparser": "implementation_name != 'PyPy' and platform_python_implementation != 'PyPy'"
+    },
+    "requires_python": {
+      "blinker": ">=3.9",
+      "cffi": ">=3.10",
+      "cheroot": ">=3.8",
+      "click": ">=3.10",
+      "cryptography": ">=3.9, !=3.9.0, !=3.9.1",
+      "flask": ">=3.9",
+      "flatbuffers": null,
+      "itsdangerous": ">=3.8",
+      "jaraco-functools": ">=3.10",
+      "jinja2": ">=3.7",
+      "markupsafe": ">=3.9",
+      "more-itertools": ">=3.11",
+      "numpy": ">=3.12",
+      "onnxruntime": ">=3.11",
+      "opencv-python": ">=3.6",
+      "packaging": ">=3.9",
+      "pillow": ">=3.11",
+      "protobuf": ">=3.10",
+      "pycparser": ">=3.11",
+      "pytesseract": ">=3.8",
+      "pyyaml": ">=3.8",
+      "rapidfuzz": ">=3.11",
+      "werkzeug": ">=3.9"
+    },
+    "compatible_wheels": {
+      "blinker": [
+        "blinker-1.9.0-py3-none-any.whl"
+      ],
+      "cffi": [
+        "cffi-2.1.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl"
+      ],
+      "cheroot": [
+        "cheroot-11.1.2-py3-none-any.whl"
+      ],
+      "click": [
+        "click-8.5.1-py3-none-any.whl"
+      ],
+      "cryptography": [
+        "cryptography-50.0.2-cp311-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl",
+        "cryptography-50.0.2-cp311-abi3-manylinux_2_28_x86_64.whl",
+        "cryptography-50.0.2-cp311-abi3-manylinux_2_34_x86_64.whl",
+        "cryptography-50.0.2-cp39-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl",
+        "cryptography-50.0.2-cp39-abi3-manylinux_2_28_x86_64.whl",
+        "cryptography-50.0.2-cp39-abi3-manylinux_2_34_x86_64.whl"
+      ],
+      "flask": [
+        "flask-3.1.3-py3-none-any.whl"
+      ],
+      "flatbuffers": [
+        "flatbuffers-25.12.19-py2.py3-none-any.whl"
+      ],
+      "itsdangerous": [
+        "itsdangerous-2.2.0-py3-none-any.whl"
+      ],
+      "jaraco-functools": [
+        "jaraco_functools-4.6.0-py3-none-any.whl"
+      ],
+      "jinja2": [
+        "jinja2-3.1.6-py3-none-any.whl"
+      ],
+      "markupsafe": [
+        "markupsafe-3.0.4-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl"
+      ],
+      "more-itertools": [
+        "more_itertools-11.2.1-py3-none-any.whl"
+      ],
+      "numpy": [
+        "numpy-2.5.5-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl"
+      ],
+      "onnxruntime": [
+        "onnxruntime-1.32.0-cp312-cp312-manylinux_2_28_x86_64.whl"
+      ],
+      "opencv-python": [
+        "opencv_python-4.14.0.94-cp37-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl",
+        "opencv_python-4.14.0.94-cp37-abi3-manylinux_2_28_x86_64.whl"
+      ],
+      "packaging": [
+        "packaging-26.3-py3-none-any.whl"
+      ],
+      "pillow": [
+        "pillow-13.0.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl"
+      ],
+      "protobuf": [
+        "protobuf-7.36.2-cp310-abi3-manylinux2014_x86_64.whl",
+        "protobuf-7.36.2-py3-none-any.whl"
+      ],
+      "pycparser": [
+        "pycparser-3.12-py3-none-any.whl"
+      ],
+      "pytesseract": [
+        "pytesseract-0.3.13-py3-none-any.whl"
+      ],
+      "pyyaml": [
+        "pyyaml-6.0.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl"
+      ],
+      "rapidfuzz": [
+        "rapidfuzz-3.14.6-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl"
+      ],
+      "werkzeug": [
+        "werkzeug-3.1.9-py3-none-any.whl"
+      ]
+    },
+    "core_requirements_checked": [
+      "opencv-python<5",
+      "numpy",
+      "onnxruntime",
+      "rapidfuzz",
+      "pytesseract",
+      "pillow",
+      "flask",
+      "pyyaml",
+      "cryptography",
+      "cheroot>=10.0"
+    ],
+    "all_active_dependency_edges_valid": true,
+    "active_dependency_count": 20,
+    "dependency_edges": [
+      {
+        "from": "cffi",
+        "requirement": "pycparser; implementation_name != \"PyPy\"",
+        "active": true
+      },
+      {
+        "from": "cheroot",
+        "requirement": "more-itertools (>=2.6)",
+        "active": true
+      },
+      {
+        "from": "cheroot",
+        "requirement": "jaraco.functools",
+        "active": true
+      },
+      {
+        "from": "cheroot",
+        "requirement": "sphinx (>=1.8.2) ; extra == 'docs'",
+        "active": false
+      },
+      {
+        "from": "cheroot",
+        "requirement": "jaraco.packaging (>=3.2) ; extra == 'docs'",
+        "active": false
+      },
+      {
+        "from": "cheroot",
+        "requirement": "sphinx-tabs (>=1.1.0) ; extra == 'docs'",
+        "active": false
+      },
+      {
+        "from": "cheroot",
+        "requirement": "furo ; extra == 'docs'",
+        "active": false
+      },
+      {
+        "from": "cheroot",
+        "requirement": "python-dateutil ; extra == 'docs'",
+        "active": false
+      },
+      {
+        "from": "cheroot",
+        "requirement": "sphinxcontrib-apidoc (>=0.3.0) ; extra == 'docs'",
+        "active": false
+      },
+      {
+        "from": "cryptography",
+        "requirement": "cffi>=2.0.0 ; platform_python_implementation != 'PyPy'",
+        "active": true
+      },
+      {
+        "from": "cryptography",
+        "requirement": "typing-extensions>=4.13.2 ; python_full_version < '3.11'",
+        "active": false
+      },
+      {
+        "from": "cryptography",
+        "requirement": "bcrypt>=3.1.5 ; extra == 'ssh'",
+        "active": false
+      },
+      {
+        "from": "flask",
+        "requirement": "blinker>=1.9.0",
+        "active": true
+      },
+      {
+        "from": "flask",
+        "requirement": "click>=8.1.3",
+        "active": true
+      },
+      {
+        "from": "flask",
+        "requirement": "importlib-metadata>=3.6.0; python_version < '3.10'",
+        "active": false
+      },
+      {
+        "from": "flask",
+        "requirement": "itsdangerous>=2.2.0",
+        "active": true
+      },
+      {
+        "from": "flask",
+        "requirement": "jinja2>=3.1.2",
+        "active": true
+      },
+      {
+        "from": "flask",
+        "requirement": "markupsafe>=2.1.1",
+        "active": true
+      },
+      {
+        "from": "flask",
+        "requirement": "werkzeug>=3.1.0",
+        "active": true
+      },
+      {
+        "from": "flask",
+        "requirement": "asgiref>=3.2 ; extra == \"async\"",
+        "active": false
+      },
+      {
+        "from": "flask",
+        "requirement": "python-dotenv ; extra == \"dotenv\"",
+        "active": false
+      },
+      {
+        "from": "jaraco-functools",
+        "requirement": "more_itertools",
+        "active": true
+      },
+      {
+        "from": "jaraco-functools",
+        "requirement": "pytest!=8.1.*,>=6; extra == \"test\"",
+        "active": false
+      },
+      {
+        "from": "jaraco-functools",
+        "requirement": "jaraco.classes; extra == \"test\"",
+        "active": false
+      },
+      {
+        "from": "jaraco-functools",
+        "requirement": "sphinx>=3.5; extra == \"doc\"",
+        "active": false
+      },
+      {
+        "from": "jaraco-functools",
+        "requirement": "jaraco.packaging>=9.3; extra == \"doc\"",
+        "active": false
+      },
+      {
+        "from": "jaraco-functools",
+        "requirement": "rst.linker>=1.9; extra == \"doc\"",
+        "active": false
+      },
+      {
+        "from": "jaraco-functools",
+        "requirement": "furo; extra == \"doc\"",
+        "active": false
+      },
+      {
+        "from": "jaraco-functools",
+        "requirement": "sphinx-lint; extra == \"doc\"",
+        "active": false
+      },
+      {
+        "from": "jaraco-functools",
+        "requirement": "jaraco.tidelift>=1.4; extra == \"doc\"",
+        "active": false
+      },
+      {
+        "from": "jaraco-functools",
+        "requirement": "pytest-checkdocs>=2.14; extra == \"check\"",
+        "active": false
+      },
+      {
+        "from": "jaraco-functools",
+        "requirement": "pytest-ruff>=0.2.1; sys_platform != \"cygwin\" and extra == \"check\"",
+        "active": false
+      },
+      {
+        "from": "jaraco-functools",
+        "requirement": "pytest-cov; extra == \"cover\"",
+        "active": false
+      },
+      {
+        "from": "jaraco-functools",
+        "requirement": "pytest-enabler>=3.4; extra == \"enabler\"",
+        "active": false
+      },
+      {
+        "from": "jaraco-functools",
+        "requirement": "pytest-mypy>=1.0.1; platform_python_implementation != \"PyPy\" and extra == \"type\"",
+        "active": false
+      },
+      {
+        "from": "jinja2",
+        "requirement": "MarkupSafe>=2.0",
+        "active": true
+      },
+      {
+        "from": "jinja2",
+        "requirement": "Babel>=2.7 ; extra == \"i18n\"",
+        "active": false
+      },
+      {
+        "from": "onnxruntime",
+        "requirement": "flatbuffers",
+        "active": true
+      },
+      {
+        "from": "onnxruntime",
+        "requirement": "numpy>=1.21.6",
+        "active": true
+      },
+      {
+        "from": "onnxruntime",
+        "requirement": "packaging",
+        "active": true
+      },
+      {
+        "from": "onnxruntime",
+        "requirement": "protobuf>=4.25.8",
+        "active": true
+      },
+      {
+        "from": "onnxruntime",
+        "requirement": "sympy; extra == \"symbolic\"",
+        "active": false
+      },
+      {
+        "from": "onnxruntime",
+        "requirement": "ml_dtypes; extra == \"quantization\"",
+        "active": false
+      },
+      {
+        "from": "opencv-python",
+        "requirement": "numpy<2.0; python_version < \"3.9\"",
+        "active": false
+      },
+      {
+        "from": "opencv-python",
+        "requirement": "numpy>=2; python_version >= \"3.9\"",
+        "active": true
+      },
+      {
+        "from": "pillow",
+        "requirement": "furo; extra == \"docs\"",
+        "active": false
+      },
+      {
+        "from": "pillow",
+        "requirement": "olefile; extra == \"docs\"",
+        "active": false
+      },
+      {
+        "from": "pillow",
+        "requirement": "sphinx>=8.2; extra == \"docs\"",
+        "active": false
+      },
+      {
+        "from": "pillow",
+        "requirement": "sphinx-autobuild; extra == \"docs\"",
+        "active": false
+      },
+      {
+        "from": "pillow",
+        "requirement": "sphinx-copybutton; extra == \"docs\"",
+        "active": false
+      },
+      {
+        "from": "pillow",
+        "requirement": "sphinx-inline-tabs; extra == \"docs\"",
+        "active": false
+      },
+      {
+        "from": "pillow",
+        "requirement": "sphinxext-opengraph; extra == \"docs\"",
+        "active": false
+      },
+      {
+        "from": "pillow",
+        "requirement": "olefile; extra == \"fpx\"",
+        "active": false
+      },
+      {
+        "from": "pillow",
+        "requirement": "olefile; extra == \"mic\"",
+        "active": false
+      },
+      {
+        "from": "pillow",
+        "requirement": "arro3-compute; extra == \"test-arrow\"",
+        "active": false
+      },
+      {
+        "from": "pillow",
+        "requirement": "arro3-core; extra == \"test-arrow\"",
+        "active": false
+      },
+      {
+        "from": "pillow",
+        "requirement": "nanoarrow; extra == \"test-arrow\"",
+        "active": false
+      },
+      {
+        "from": "pillow",
+        "requirement": "pyarrow; extra == \"test-arrow\"",
+        "active": false
+      },
+      {
+        "from": "pillow",
+        "requirement": "coverage>=7.4.2; extra == \"tests\"",
+        "active": false
+      },
+      {
+        "from": "pillow",
+        "requirement": "defusedxml; extra == \"tests\"",
+        "active": false
+      },
+      {
+        "from": "pillow",
+        "requirement": "markdown2; extra == \"tests\"",
+        "active": false
+      },
+      {
+        "from": "pillow",
+        "requirement": "olefile; extra == \"tests\"",
+        "active": false
+      },
+      {
+        "from": "pillow",
+        "requirement": "packaging; extra == \"tests\"",
+        "active": false
+      },
+      {
+        "from": "pillow",
+        "requirement": "psutil; (sys_platform == \"linux\" or sys_platform == \"darwin\") and extra == \"tests\"",
+        "active": false
+      },
+      {
+        "from": "pillow",
+        "requirement": "pytest; extra == \"tests\"",
+        "active": false
+      },
+      {
+        "from": "pillow",
+        "requirement": "pytest-cov; extra == \"tests\"",
+        "active": false
+      },
+      {
+        "from": "pillow",
+        "requirement": "pytest-timeout; extra == \"tests\"",
+        "active": false
+      },
+      {
+        "from": "pillow",
+        "requirement": "pytest-xdist; extra == \"tests\"",
+        "active": false
+      },
+      {
+        "from": "pillow",
+        "requirement": "setuptools; extra == \"tests\"",
+        "active": false
+      },
+      {
+        "from": "pillow",
+        "requirement": "trove-classifiers>=2024.10.12; extra == \"tests\"",
+        "active": false
+      },
+      {
+        "from": "pillow",
+        "requirement": "defusedxml; extra == \"xmp\"",
+        "active": false
+      },
+      {
+        "from": "pytesseract",
+        "requirement": "packaging>=21.3",
+        "active": true
+      },
+      {
+        "from": "pytesseract",
+        "requirement": "Pillow>=8.0.0",
+        "active": true
+      },
+      {
+        "from": "rapidfuzz",
+        "requirement": "numpy; extra == \"all\"",
+        "active": false
+      },
+      {
+        "from": "werkzeug",
+        "requirement": "markupsafe>=2.1.1",
+        "active": true
+      },
+      {
+        "from": "werkzeug",
+        "requirement": "watchdog>=2.3 ; extra == \"watchdog\"",
+        "active": false
+      }
+    ],
+    "opencv_distributions": [
+      "opencv-python"
+    ],
+    "transitive_opencv_requirements": [],
+    "fresh_get_count": 46,
+    "fresh_get_urls": [
+      "https://pypi.org/simple/opencv-python/",
+      "https://pypi.org/simple/numpy/",
+      "https://pypi.org/simple/onnxruntime/",
+      "https://pypi.org/simple/rapidfuzz/",
+      "https://pypi.org/simple/pytesseract/",
+      "https://pypi.org/simple/flask/",
+      "https://pypi.org/simple/pyyaml/",
+      "https://pypi.org/simple/cryptography/",
+      "https://pypi.org/simple/cheroot/",
+      "https://pypi.org/simple/pillow/",
+      "https://files.pythonhosted.org/packages/7a/33/8312d7ce74670c9d39a532b2c246a853861120486be9443eebf048043637/pytesseract-0.3.13-py3-none-any.whl.metadata",
+      "https://files.pythonhosted.org/packages/7f/9c/34f6962f9b9e9c71f6e5ed806e0d0ff03c9d1b0b2340088a0cf4bce09b18/flask-3.1.3-py3-none-any.whl.metadata",
+      "https://files.pythonhosted.org/packages/8b/9d/b3589d3877982d4f2329302ef98a8026e7f4443c765c46cfecc8858c6b4b/pyyaml-6.0.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata",
+      "https://files.pythonhosted.org/packages/a3/81/55845186c20cba59f614991f4065dea148e48eeb9749893768c85ce64327/onnxruntime-1.32.0-cp312-cp312-manylinux_2_28_x86_64.whl.metadata",
+      "https://files.pythonhosted.org/packages/8f/96/97f176047c56726a61ddd02300b45b35d1451278c6182688a1fb27035e81/opencv_python-4.14.0.94-cp37-abi3-manylinux_2_28_x86_64.whl.metadata",
+      "https://files.pythonhosted.org/packages/41/99/af65511a10c4212438ac52bc5e45e486e7a04d292201ad84dfd9208fe9a8/cheroot-11.1.2-py3-none-any.whl.metadata",
+      "https://files.pythonhosted.org/packages/99/61/522b973ba38987b22a4a71beaed2ea6ac9fd4f687baaa2bc9a45100625e0/numpy-2.5.5-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata",
+      "https://files.pythonhosted.org/packages/d3/69/2c833a049475e0a3444e94c7d0aca0aa51d166374a449b09e92ac98138de/cryptography-50.0.2-cp311-abi3-manylinux_2_34_x86_64.whl.metadata",
+      "https://files.pythonhosted.org/packages/e6/99/fdf65cc539e266ab93546c261bdf98411fe165c6e4e13f9dbf597097192b/pillow-13.0.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata",
+      "https://pypi.org/simple/protobuf/",
+      "https://pypi.org/simple/flatbuffers/",
+      "https://pypi.org/simple/packaging/",
+      "https://files.pythonhosted.org/packages/e8/2d/d2a548598be01649e2d46231d151a6c56d10b964d94043a335ae56ea2d92/flatbuffers-25.12.19-py2.py3-none-any.whl.metadata",
+      "https://files.pythonhosted.org/packages/63/34/ba1c580383c9eada3711951fef0795c80b829a078d72188184bcab9dd527/packaging-26.3-py3-none-any.whl.metadata",
+      "https://files.pythonhosted.org/packages/13/da/49ab137f788a0e03e872d4c6b3d5c9c6c6bed4e4ccea381f69c4d186341b/rapidfuzz-3.14.6-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata",
+      "https://files.pythonhosted.org/packages/db/f3/3996583dd2906297a637af12114deddf7658af6e683fedb83be061983fb5/protobuf-7.36.2-cp310-abi3-manylinux2014_x86_64.whl.metadata",
+      "https://pypi.org/simple/werkzeug/",
+      "https://pypi.org/simple/blinker/",
+      "https://pypi.org/simple/click/",
+      "https://pypi.org/simple/itsdangerous/",
+      "https://pypi.org/simple/jinja2/",
+      "https://pypi.org/simple/markupsafe/",
+      "https://pypi.org/simple/cffi/",
+      "https://pypi.org/simple/more-itertools/",
+      "https://pypi.org/simple/jaraco-functools/",
+      "https://files.pythonhosted.org/packages/10/cb/f2ad4230dc2eb1a74edf38f1a38b9b52277f75bef262d8908e60d957e13c/blinker-1.9.0-py3-none-any.whl.metadata",
+      "https://files.pythonhosted.org/packages/a1/38/df03f564f43cec2684823f3cccae1a652ee7face1cbaa76fb223096e64d7/werkzeug-3.1.9-py3-none-any.whl.metadata",
+      "https://files.pythonhosted.org/packages/04/96/92447566d16df59b2a776c0fb82dbc4d9e07cd95062562af01e408583fc4/itsdangerous-2.2.0-py3-none-any.whl.metadata",
+      "https://files.pythonhosted.org/packages/62/a1/3d680cbfd5f4b8f15abc1d571870c5fc3e594bb582bc3b64ea099db13e56/jinja2-3.1.6-py3-none-any.whl.metadata",
+      "https://files.pythonhosted.org/packages/5d/57/3c4b1c6f2e0cc29ba023802458ea3d2a996f87085559e4a5f2192d549532/more_itertools-11.2.1-py3-none-any.whl.metadata",
+      "https://files.pythonhosted.org/packages/02/36/ecc85bc96c273dc8a11273ed4782272975e6338d4a3e9228621175edf0e3/jaraco_functools-4.6.0-py3-none-any.whl.metadata",
+      "https://files.pythonhosted.org/packages/31/7d/164b7ffc8624fe9efb4221bf9af485d5c1e41b9ae118045d2b6dc5457d8b/click-8.5.1-py3-none-any.whl.metadata",
+      "https://files.pythonhosted.org/packages/4f/a7/aeedb5140afa41fc74c225e9184ab96723a6e873b6ee1c9fede7283456d8/markupsafe-3.0.4-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata",
+      "https://files.pythonhosted.org/packages/b1/db/dceb9dd5b231e1da801793f8acc9f3c52a7e1afe40bb1aae37e02b0faad5/cffi-2.1.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata",
+      "https://pypi.org/simple/pycparser/",
+      "https://files.pythonhosted.org/packages/b6/ae/315bbeee126a769cbde43cf4908acb4b40408d8bf8bbf334dd7368d8dadf/pycparser-3.12-py3-none-any.whl.metadata"
+    ],
+    "only_index_and_metadata_gets": true,
+    "cache_file_bytes": 9324957,
+    "cache_wheel_archive_count": 0
+  },
+  "39": {
+    "status": "pass",
+    "target_python": "3.9.25",
+    "lock_requires_python": ">=3.9.25",
+    "package_count": 30,
+    "selected_versions": {
+      "blinker": "1.9.0",
+      "cffi": "2.0.0",
+      "cheroot": "11.1.2",
+      "click": "8.1.8",
+      "coloredlogs": "15.0.1",
+      "cryptography": "50.0.2",
+      "flask": "3.1.3",
+      "flatbuffers": "25.12.19",
+      "humanfriendly": "10.0",
+      "importlib-metadata": "8.7.1",
+      "itsdangerous": "2.2.0",
+      "jaraco-functools": "4.4.0",
+      "jinja2": "3.1.6",
+      "markupsafe": "3.0.4",
+      "more-itertools": "10.8.0",
+      "mpmath": "1.3.0",
+      "numpy": "2.0.2",
+      "onnxruntime": "1.19.2",
+      "opencv-python": "4.14.0.94",
+      "packaging": "26.3",
+      "pillow": "11.3.0",
+      "protobuf": "6.33.6",
+      "pycparser": "2.23",
+      "pytesseract": "0.3.13",
+      "pyyaml": "6.0.3",
+      "rapidfuzz": "3.13.0",
+      "sympy": "1.14.0",
+      "typing-extensions": "4.16.0",
+      "werkzeug": "3.1.9",
+      "zipp": "3.23.1"
+    },
+    "selected_markers": {
+      "cffi": "platform_python_implementation != 'PyPy'",
+      "importlib-metadata": "python_full_version < '3.10'",
+      "pycparser": "implementation_name != 'PyPy' and platform_python_implementation != 'PyPy'",
+      "typing-extensions": "python_full_version < '3.11'",
+      "zipp": "python_full_version < '3.10'"
+    },
+    "requires_python": {
+      "blinker": ">=3.9",
+      "cffi": ">=3.9",
+      "cheroot": ">=3.8",
+      "click": ">=3.7",
+      "coloredlogs": ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*",
+      "cryptography": ">=3.9, !=3.9.0, !=3.9.1",
+      "flask": ">=3.9",
+      "flatbuffers": null,
+      "humanfriendly": ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*",
+      "importlib-metadata": ">=3.9",
+      "itsdangerous": ">=3.8",
+      "jaraco-functools": ">=3.9",
+      "jinja2": ">=3.7",
+      "markupsafe": ">=3.9",
+      "more-itertools": ">=3.9",
+      "mpmath": null,
+      "numpy": ">=3.9",
+      "onnxruntime": null,
+      "opencv-python": ">=3.6",
+      "packaging": ">=3.9",
+      "pillow": ">=3.9",
+      "protobuf": ">=3.9",
+      "pycparser": ">=3.8",
+      "pytesseract": ">=3.8",
+      "pyyaml": ">=3.8",
+      "rapidfuzz": ">=3.9",
+      "sympy": ">=3.9",
+      "typing-extensions": ">=3.9",
+      "werkzeug": ">=3.9",
+      "zipp": ">=3.9"
+    },
+    "compatible_wheels": {
+      "blinker": [
+        "blinker-1.9.0-py3-none-any.whl"
+      ],
+      "cffi": [
+        "cffi-2.0.0-cp39-cp39-manylinux2014_x86_64.manylinux_2_17_x86_64.whl"
+      ],
+      "cheroot": [
+        "cheroot-11.1.2-py3-none-any.whl"
+      ],
+      "click": [
+        "click-8.1.8-py3-none-any.whl"
+      ],
+      "coloredlogs": [
+        "coloredlogs-15.0.1-py2.py3-none-any.whl"
+      ],
+      "cryptography": [
+        "cryptography-50.0.2-cp39-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl",
+        "cryptography-50.0.2-cp39-abi3-manylinux_2_28_x86_64.whl",
+        "cryptography-50.0.2-cp39-abi3-manylinux_2_34_x86_64.whl"
+      ],
+      "flask": [
+        "flask-3.1.3-py3-none-any.whl"
+      ],
+      "flatbuffers": [
+        "flatbuffers-25.12.19-py2.py3-none-any.whl"
+      ],
+      "humanfriendly": [
+        "humanfriendly-10.0-py2.py3-none-any.whl"
+      ],
+      "importlib-metadata": [
+        "importlib_metadata-8.7.1-py3-none-any.whl"
+      ],
+      "itsdangerous": [
+        "itsdangerous-2.2.0-py3-none-any.whl"
+      ],
+      "jaraco-functools": [
+        "jaraco_functools-4.4.0-py3-none-any.whl"
+      ],
+      "jinja2": [
+        "jinja2-3.1.6-py3-none-any.whl"
+      ],
+      "markupsafe": [
+        "markupsafe-3.0.4-cp39-cp39-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl"
+      ],
+      "more-itertools": [
+        "more_itertools-10.8.0-py3-none-any.whl"
+      ],
+      "mpmath": [
+        "mpmath-1.3.0-py3-none-any.whl"
+      ],
+      "numpy": [
+        "numpy-2.0.2-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
+      ],
+      "onnxruntime": [
+        "onnxruntime-1.19.2-cp39-cp39-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl"
+      ],
+      "opencv-python": [
+        "opencv_python-4.14.0.94-cp37-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl",
+        "opencv_python-4.14.0.94-cp37-abi3-manylinux_2_28_x86_64.whl"
+      ],
+      "packaging": [
+        "packaging-26.3-py3-none-any.whl"
+      ],
+      "pillow": [
+        "pillow-11.3.0-cp39-cp39-manylinux2014_x86_64.manylinux_2_17_x86_64.whl",
+        "pillow-11.3.0-cp39-cp39-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl"
+      ],
+      "protobuf": [
+        "protobuf-6.33.6-cp39-abi3-manylinux2014_x86_64.whl",
+        "protobuf-6.33.6-py3-none-any.whl"
+      ],
+      "pycparser": [
+        "pycparser-2.23-py3-none-any.whl"
+      ],
+      "pytesseract": [
+        "pytesseract-0.3.13-py3-none-any.whl"
+      ],
+      "pyyaml": [
+        "pyyaml-6.0.3-cp39-cp39-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl"
+      ],
+      "rapidfuzz": [
+        "rapidfuzz-3.13.0-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
+      ],
+      "sympy": [
+        "sympy-1.14.0-py3-none-any.whl"
+      ],
+      "typing-extensions": [
+        "typing_extensions-4.16.0-py3-none-any.whl"
+      ],
+      "werkzeug": [
+        "werkzeug-3.1.9-py3-none-any.whl"
+      ],
+      "zipp": [
+        "zipp-3.23.1-py3-none-any.whl"
+      ]
+    },
+    "core_requirements_checked": [
+      "opencv-python<5",
+      "numpy",
+      "onnxruntime",
+      "rapidfuzz",
+      "pytesseract",
+      "pillow",
+      "flask",
+      "pyyaml",
+      "cryptography",
+      "cheroot>=10.0"
+    ],
+    "all_active_dependency_edges_valid": true,
+    "active_dependency_count": 27,
+    "dependency_edges": [
+      {
+        "from": "cffi",
+        "requirement": "pycparser; implementation_name != \"PyPy\"",
+        "active": true
+      },
+      {
+        "from": "cheroot",
+        "requirement": "more-itertools (>=2.6)",
+        "active": true
+      },
+      {
+        "from": "cheroot",
+        "requirement": "jaraco.functools",
+        "active": true
+      },
+      {
+        "from": "cheroot",
+        "requirement": "sphinx (>=1.8.2) ; extra == 'docs'",
+        "active": false
+      },
+      {
+        "from": "cheroot",
+        "requirement": "jaraco.packaging (>=3.2) ; extra == 'docs'",
+        "active": false
+      },
+      {
+        "from": "cheroot",
+        "requirement": "sphinx-tabs (>=1.1.0) ; extra == 'docs'",
+        "active": false
+      },
+      {
+        "from": "cheroot",
+        "requirement": "furo ; extra == 'docs'",
+        "active": false
+      },
+      {
+        "from": "cheroot",
+        "requirement": "python-dateutil ; extra == 'docs'",
+        "active": false
+      },
+      {
+        "from": "cheroot",
+        "requirement": "sphinxcontrib-apidoc (>=0.3.0) ; extra == 'docs'",
+        "active": false
+      },
+      {
+        "from": "click",
+        "requirement": "colorama; platform_system == 'Windows'",
+        "active": false
+      },
+      {
+        "from": "click",
+        "requirement": "importlib-metadata; python_version < '3.8'",
+        "active": false
+      },
+      {
+        "from": "coloredlogs",
+        "requirement": "humanfriendly (>=9.1)",
+        "active": true
+      },
+      {
+        "from": "coloredlogs",
+        "requirement": "capturer (>=2.4) ; extra == 'cron'",
+        "active": false
+      },
+      {
+        "from": "cryptography",
+        "requirement": "cffi>=2.0.0 ; platform_python_implementation != 'PyPy'",
+        "active": true
+      },
+      {
+        "from": "cryptography",
+        "requirement": "typing-extensions>=4.13.2 ; python_full_version < '3.11'",
+        "active": true
+      },
+      {
+        "from": "cryptography",
+        "requirement": "bcrypt>=3.1.5 ; extra == 'ssh'",
+        "active": false
+      },
+      {
+        "from": "flask",
+        "requirement": "blinker>=1.9.0",
+        "active": true
+      },
+      {
+        "from": "flask",
+        "requirement": "click>=8.1.3",
+        "active": true
+      },
+      {
+        "from": "flask",
+        "requirement": "importlib-metadata>=3.6.0; python_version < '3.10'",
+        "active": true
+      },
+      {
+        "from": "flask",
+        "requirement": "itsdangerous>=2.2.0",
+        "active": true
+      },
+      {
+        "from": "flask",
+        "requirement": "jinja2>=3.1.2",
+        "active": true
+      },
+      {
+        "from": "flask",
+        "requirement": "markupsafe>=2.1.1",
+        "active": true
+      },
+      {
+        "from": "flask",
+        "requirement": "werkzeug>=3.1.0",
+        "active": true
+      },
+      {
+        "from": "flask",
+        "requirement": "asgiref>=3.2 ; extra == \"async\"",
+        "active": false
+      },
+      {
+        "from": "flask",
+        "requirement": "python-dotenv ; extra == \"dotenv\"",
+        "active": false
+      },
+      {
+        "from": "humanfriendly",
+        "requirement": "monotonic ; python_version == \"2.7\"",
+        "active": false
+      },
+      {
+        "from": "humanfriendly",
+        "requirement": "pyreadline ; sys_platform == \"win32\" and python_version<\"3.8\"",
+        "active": false
+      },
+      {
+        "from": "humanfriendly",
+        "requirement": "pyreadline3 ; sys_platform == \"win32\" and python_version>=\"3.8\"",
+        "active": false
+      },
+      {
+        "from": "importlib-metadata",
+        "requirement": "zipp>=3.20",
+        "active": true
+      },
+      {
+        "from": "importlib-metadata",
+        "requirement": "pytest!=8.1.*,>=6; extra == \"test\"",
+        "active": false
+      },
+      {
+        "from": "importlib-metadata",
+        "requirement": "packaging; extra == \"test\"",
+        "active": false
+      },
+      {
+        "from": "importlib-metadata",
+        "requirement": "pyfakefs; extra == \"test\"",
+        "active": false
+      },
+      {
+        "from": "importlib-metadata",
+        "requirement": "flufl.flake8; extra == \"test\"",
+        "active": false
+      },
+      {
+        "from": "importlib-metadata",
+        "requirement": "pytest-perf>=0.9.2; extra == \"test\"",
+        "active": false
+      },
+      {
+        "from": "importlib-metadata",
+        "requirement": "jaraco.test>=5.4; extra == \"test\"",
+        "active": false
+      },
+      {
+        "from": "importlib-metadata",
+        "requirement": "sphinx>=3.5; extra == \"doc\"",
+        "active": false
+      },
+      {
+        "from": "importlib-metadata",
+        "requirement": "jaraco.packaging>=9.3; extra == \"doc\"",
+        "active": false
+      },
+      {
+        "from": "importlib-metadata",
+        "requirement": "rst.linker>=1.9; extra == \"doc\"",
+        "active": false
+      },
+      {
+        "from": "importlib-metadata",
+        "requirement": "furo; extra == \"doc\"",
+        "active": false
+      },
+      {
+        "from": "importlib-metadata",
+        "requirement": "sphinx-lint; extra == \"doc\"",
+        "active": false
+      },
+      {
+        "from": "importlib-metadata",
+        "requirement": "jaraco.tidelift>=1.4; extra == \"doc\"",
+        "active": false
+      },
+      {
+        "from": "importlib-metadata",
+        "requirement": "ipython; extra == \"perf\"",
+        "active": false
+      },
+      {
+        "from": "importlib-metadata",
+        "requirement": "pytest-checkdocs>=2.4; extra == \"check\"",
+        "active": false
+      },
+      {
+        "from": "importlib-metadata",
+        "requirement": "pytest-ruff>=0.2.1; sys_platform != \"cygwin\" and extra == \"check\"",
+        "active": false
+      },
+      {
+        "from": "importlib-metadata",
+        "requirement": "pytest-cov; extra == \"cover\"",
+        "active": false
+      },
+      {
+        "from": "importlib-metadata",
+        "requirement": "pytest-enabler>=3.4; extra == \"enabler\"",
+        "active": false
+      },
+      {
+        "from": "importlib-metadata",
+        "requirement": "pytest-mypy>=1.0.1; extra == \"type\"",
+        "active": false
+      },
+      {
+        "from": "importlib-metadata",
+        "requirement": "mypy<1.19; platform_python_implementation == \"PyPy\" and extra == \"type\"",
+        "active": false
+      },
+      {
+        "from": "jaraco-functools",
+        "requirement": "more_itertools",
+        "active": true
+      },
+      {
+        "from": "jaraco-functools",
+        "requirement": "pytest!=8.1.*,>=6; extra == \"test\"",
+        "active": false
+      },
+      {
+        "from": "jaraco-functools",
+        "requirement": "jaraco.classes; extra == \"test\"",
+        "active": false
+      },
+      {
+        "from": "jaraco-functools",
+        "requirement": "sphinx>=3.5; extra == \"doc\"",
+        "active": false
+      },
+      {
+        "from": "jaraco-functools",
+        "requirement": "jaraco.packaging>=9.3; extra == \"doc\"",
+        "active": false
+      },
+      {
+        "from": "jaraco-functools",
+        "requirement": "rst.linker>=1.9; extra == \"doc\"",
+        "active": false
+      },
+      {
+        "from": "jaraco-functools",
+        "requirement": "furo; extra == \"doc\"",
+        "active": false
+      },
+      {
+        "from": "jaraco-functools",
+        "requirement": "sphinx-lint; extra == \"doc\"",
+        "active": false
+      },
+      {
+        "from": "jaraco-functools",
+        "requirement": "jaraco.tidelift>=1.4; extra == \"doc\"",
+        "active": false
+      },
+      {
+        "from": "jaraco-functools",
+        "requirement": "pytest-checkdocs>=2.4; extra == \"check\"",
+        "active": false
+      },
+      {
+        "from": "jaraco-functools",
+        "requirement": "pytest-ruff>=0.2.1; sys_platform != \"cygwin\" and extra == \"check\"",
+        "active": false
+      },
+      {
+        "from": "jaraco-functools",
+        "requirement": "pytest-cov; extra == \"cover\"",
+        "active": false
+      },
+      {
+        "from": "jaraco-functools",
+        "requirement": "pytest-enabler>=3.4; extra == \"enabler\"",
+        "active": false
+      },
+      {
+        "from": "jaraco-functools",
+        "requirement": "pytest-mypy>=1.0.1; extra == \"type\"",
+        "active": false
+      },
+      {
+        "from": "jaraco-functools",
+        "requirement": "mypy<1.19; platform_python_implementation == \"PyPy\" and extra == \"type\"",
+        "active": false
+      },
+      {
+        "from": "jinja2",
+        "requirement": "MarkupSafe>=2.0",
+        "active": true
+      },
+      {
+        "from": "jinja2",
+        "requirement": "Babel>=2.7 ; extra == \"i18n\"",
+        "active": false
+      },
+      {
+        "from": "mpmath",
+        "requirement": "pytest (>=4.6) ; extra == 'develop'",
+        "active": false
+      },
+      {
+        "from": "mpmath",
+        "requirement": "pycodestyle ; extra == 'develop'",
+        "active": false
+      },
+      {
+        "from": "mpmath",
+        "requirement": "pytest-cov ; extra == 'develop'",
+        "active": false
+      },
+      {
+        "from": "mpmath",
+        "requirement": "codecov ; extra == 'develop'",
+        "active": false
+      },
+      {
+        "from": "mpmath",
+        "requirement": "wheel ; extra == 'develop'",
+        "active": false
+      },
+      {
+        "from": "mpmath",
+        "requirement": "sphinx ; extra == 'docs'",
+        "active": false
+      },
+      {
+        "from": "mpmath",
+        "requirement": "gmpy2 (>=2.1.0a4) ; (platform_python_implementation != \"PyPy\") and extra == 'gmpy'",
+        "active": false
+      },
+      {
+        "from": "mpmath",
+        "requirement": "pytest (>=4.6) ; extra == 'tests'",
+        "active": false
+      },
+      {
+        "from": "onnxruntime",
+        "requirement": "coloredlogs",
+        "active": true
+      },
+      {
+        "from": "onnxruntime",
+        "requirement": "flatbuffers",
+        "active": true
+      },
+      {
+        "from": "onnxruntime",
+        "requirement": "numpy >=1.21.6",
+        "active": true
+      },
+      {
+        "from": "onnxruntime",
+        "requirement": "packaging",
+        "active": true
+      },
+      {
+        "from": "onnxruntime",
+        "requirement": "protobuf",
+        "active": true
+      },
+      {
+        "from": "onnxruntime",
+        "requirement": "sympy",
+        "active": true
+      },
+      {
+        "from": "opencv-python",
+        "requirement": "numpy<2.0; python_version < \"3.9\"",
+        "active": false
+      },
+      {
+        "from": "opencv-python",
+        "requirement": "numpy>=2; python_version >= \"3.9\"",
+        "active": true
+      },
+      {
+        "from": "pillow",
+        "requirement": "furo; extra == \"docs\"",
+        "active": false
+      },
+      {
+        "from": "pillow",
+        "requirement": "olefile; extra == \"docs\"",
+        "active": false
+      },
+      {
+        "from": "pillow",
+        "requirement": "sphinx>=8.2; extra == \"docs\"",
+        "active": false
+      },
+      {
+        "from": "pillow",
+        "requirement": "sphinx-autobuild; extra == \"docs\"",
+        "active": false
+      },
+      {
+        "from": "pillow",
+        "requirement": "sphinx-copybutton; extra == \"docs\"",
+        "active": false
+      },
+      {
+        "from": "pillow",
+        "requirement": "sphinx-inline-tabs; extra == \"docs\"",
+        "active": false
+      },
+      {
+        "from": "pillow",
+        "requirement": "sphinxext-opengraph; extra == \"docs\"",
+        "active": false
+      },
+      {
+        "from": "pillow",
+        "requirement": "olefile; extra == \"fpx\"",
+        "active": false
+      },
+      {
+        "from": "pillow",
+        "requirement": "olefile; extra == \"mic\"",
+        "active": false
+      },
+      {
+        "from": "pillow",
+        "requirement": "pyarrow; extra == \"test-arrow\"",
+        "active": false
+      },
+      {
+        "from": "pillow",
+        "requirement": "check-manifest; extra == \"tests\"",
+        "active": false
+      },
+      {
+        "from": "pillow",
+        "requirement": "coverage>=7.4.2; extra == \"tests\"",
+        "active": false
+      },
+      {
+        "from": "pillow",
+        "requirement": "defusedxml; extra == \"tests\"",
+        "active": false
+      },
+      {
+        "from": "pillow",
+        "requirement": "markdown2; extra == \"tests\"",
+        "active": false
+      },
+      {
+        "from": "pillow",
+        "requirement": "olefile; extra == \"tests\"",
+        "active": false
+      },
+      {
+        "from": "pillow",
+        "requirement": "packaging; extra == \"tests\"",
+        "active": false
+      },
+      {
+        "from": "pillow",
+        "requirement": "pyroma; extra == \"tests\"",
+        "active": false
+      },
+      {
+        "from": "pillow",
+        "requirement": "pytest; extra == \"tests\"",
+        "active": false
+      },
+      {
+        "from": "pillow",
+        "requirement": "pytest-cov; extra == \"tests\"",
+        "active": false
+      },
+      {
+        "from": "pillow",
+        "requirement": "pytest-timeout; extra == \"tests\"",
+        "active": false
+      },
+      {
+        "from": "pillow",
+        "requirement": "pytest-xdist; extra == \"tests\"",
+        "active": false
+      },
+      {
+        "from": "pillow",
+        "requirement": "trove-classifiers>=2024.10.12; extra == \"tests\"",
+        "active": false
+      },
+      {
+        "from": "pillow",
+        "requirement": "typing-extensions; python_version < \"3.10\" and extra == \"typing\"",
+        "active": false
+      },
+      {
+        "from": "pillow",
+        "requirement": "defusedxml; extra == \"xmp\"",
+        "active": false
+      },
+      {
+        "from": "pytesseract",
+        "requirement": "packaging>=21.3",
+        "active": true
+      },
+      {
+        "from": "pytesseract",
+        "requirement": "Pillow>=8.0.0",
+        "active": true
+      },
+      {
+        "from": "rapidfuzz",
+        "requirement": "numpy; extra == \"all\"",
+        "active": false
+      },
+      {
+        "from": "sympy",
+        "requirement": "mpmath<1.4,>=1.1.0",
+        "active": true
+      },
+      {
+        "from": "sympy",
+        "requirement": "pytest>=7.1.0; extra == \"dev\"",
+        "active": false
+      },
+      {
+        "from": "sympy",
+        "requirement": "hypothesis>=6.70.0; extra == \"dev\"",
+        "active": false
+      },
+      {
+        "from": "werkzeug",
+        "requirement": "markupsafe>=2.1.1",
+        "active": true
+      },
+      {
+        "from": "werkzeug",
+        "requirement": "watchdog>=2.3 ; extra == \"watchdog\"",
+        "active": false
+      },
+      {
+        "from": "zipp",
+        "requirement": "pytest!=8.1.*,>=6; extra == \"test\"",
+        "active": false
+      },
+      {
+        "from": "zipp",
+        "requirement": "jaraco.itertools; extra == \"test\"",
+        "active": false
+      },
+      {
+        "from": "zipp",
+        "requirement": "jaraco.functools; extra == \"test\"",
+        "active": false
+      },
+      {
+        "from": "zipp",
+        "requirement": "more_itertools; extra == \"test\"",
+        "active": false
+      },
+      {
+        "from": "zipp",
+        "requirement": "big-O; extra == \"test\"",
+        "active": false
+      },
+      {
+        "from": "zipp",
+        "requirement": "pytest-ignore-flaky; extra == \"test\"",
+        "active": false
+      },
+      {
+        "from": "zipp",
+        "requirement": "jaraco.test; extra == \"test\"",
+        "active": false
+      },
+      {
+        "from": "zipp",
+        "requirement": "sphinx>=3.5; extra == \"doc\"",
+        "active": false
+      },
+      {
+        "from": "zipp",
+        "requirement": "jaraco.packaging>=9.3; extra == \"doc\"",
+        "active": false
+      },
+      {
+        "from": "zipp",
+        "requirement": "rst.linker>=1.9; extra == \"doc\"",
+        "active": false
+      },
+      {
+        "from": "zipp",
+        "requirement": "furo; extra == \"doc\"",
+        "active": false
+      },
+      {
+        "from": "zipp",
+        "requirement": "sphinx-lint; extra == \"doc\"",
+        "active": false
+      },
+      {
+        "from": "zipp",
+        "requirement": "jaraco.tidelift>=1.4; extra == \"doc\"",
+        "active": false
+      },
+      {
+        "from": "zipp",
+        "requirement": "pytest-checkdocs>=2.4; extra == \"check\"",
+        "active": false
+      },
+      {
+        "from": "zipp",
+        "requirement": "pytest-ruff>=0.2.1; sys_platform != \"cygwin\" and extra == \"check\"",
+        "active": false
+      },
+      {
+        "from": "zipp",
+        "requirement": "pytest-cov; extra == \"cover\"",
+        "active": false
+      },
+      {
+        "from": "zipp",
+        "requirement": "pytest-enabler>=2.2; extra == \"enabler\"",
+        "active": false
+      },
+      {
+        "from": "zipp",
+        "requirement": "pytest-mypy; extra == \"type\"",
+        "active": false
+      }
+    ],
+    "opencv_distributions": [
+      "opencv-python"
+    ],
+    "transitive_opencv_requirements": [],
+    "fresh_get_count": 60,
+    "fresh_get_urls": [
+      "https://pypi.org/simple/opencv-python/",
+      "https://pypi.org/simple/numpy/",
+      "https://pypi.org/simple/rapidfuzz/",
+      "https://pypi.org/simple/pytesseract/",
+      "https://pypi.org/simple/pillow/",
+      "https://pypi.org/simple/flask/",
+      "https://pypi.org/simple/pyyaml/",
+      "https://pypi.org/simple/cryptography/",
+      "https://pypi.org/simple/onnxruntime/",
+      "https://pypi.org/simple/cheroot/",
+      "https://files.pythonhosted.org/packages/7a/33/8312d7ce74670c9d39a532b2c246a853861120486be9443eebf048043637/pytesseract-0.3.13-py3-none-any.whl.metadata",
+      "https://files.pythonhosted.org/packages/7f/9c/34f6962f9b9e9c71f6e5ed806e0d0ff03c9d1b0b2340088a0cf4bce09b18/flask-3.1.3-py3-none-any.whl.metadata",
+      "https://files.pythonhosted.org/packages/41/99/af65511a10c4212438ac52bc5e45e486e7a04d292201ad84dfd9208fe9a8/cheroot-11.1.2-py3-none-any.whl.metadata",
+      "https://files.pythonhosted.org/packages/73/b9/793686b2d54b531203c160ef12bec60228a0109c79bae6c1277961026770/pyyaml-6.0.3-cp39-cp39-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata",
+      "https://files.pythonhosted.org/packages/8f/96/97f176047c56726a61ddd02300b45b35d1451278c6182688a1fb27035e81/opencv_python-4.14.0.94-cp37-abi3-manylinux_2_28_x86_64.whl.metadata",
+      "https://files.pythonhosted.org/packages/40/cf/6b5c8e2fd9202d98988ab7cb5cc5c991704c4ad55f492ff408e4969f83f1/cryptography-50.0.2-cp39-abi3-manylinux_2_34_x86_64.whl.metadata",
+      "https://files.pythonhosted.org/packages/b9/14/78635daab4b07c0930c919d451b8bf8c164774e6a3413aed04a6d95758ce/numpy-2.0.2-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata",
+      "https://files.pythonhosted.org/packages/12/f4/39c395c98e9ecccb0751f80897a5d065d5070c69823b0c94e95b371b568c/onnxruntime-1.19.2-cp39-cp39-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata",
+      "https://pypi.org/simple/coloredlogs/",
+      "https://pypi.org/simple/flatbuffers/",
+      "https://pypi.org/simple/packaging/",
+      "https://pypi.org/simple/protobuf/",
+      "https://pypi.org/simple/sympy/",
+      "https://files.pythonhosted.org/packages/a2/09/77d55d46fd61b4a135c444fc97158ef34a095e5681d0a6c10b75bf356191/sympy-1.14.0-py3-none-any.whl.metadata",
+      "https://files.pythonhosted.org/packages/63/34/ba1c580383c9eada3711951fef0795c80b829a078d72188184bcab9dd527/packaging-26.3-py3-none-any.whl.metadata",
+      "https://files.pythonhosted.org/packages/e8/2d/d2a548598be01649e2d46231d151a6c56d10b964d94043a335ae56ea2d92/flatbuffers-25.12.19-py2.py3-none-any.whl.metadata",
+      "https://files.pythonhosted.org/packages/5e/00/861a4601e4685efd8161966cf35728806fb9df112b6951585bb194f74379/rapidfuzz-3.13.0-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata",
+      "https://files.pythonhosted.org/packages/a5/a0/98a3630f0b57f77bae67716562513d3032ae70414fcaf02750279c389a9e/pillow-11.3.0-cp39-cp39-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata",
+      "https://pypi.org/simple/itsdangerous/",
+      "https://pypi.org/simple/blinker/",
+      "https://pypi.org/simple/click/",
+      "https://pypi.org/simple/importlib-metadata/",
+      "https://pypi.org/simple/jinja2/",
+      "https://pypi.org/simple/markupsafe/",
+      "https://pypi.org/simple/werkzeug/",
+      "https://pypi.org/simple/more-itertools/",
+      "https://pypi.org/simple/cffi/",
+      "https://pypi.org/simple/typing-extensions/",
+      "https://pypi.org/simple/jaraco-functools/",
+      "https://files.pythonhosted.org/packages/10/cb/f2ad4230dc2eb1a74edf38f1a38b9b52277f75bef262d8908e60d957e13c/blinker-1.9.0-py3-none-any.whl.metadata",
+      "https://files.pythonhosted.org/packages/a1/38/df03f564f43cec2684823f3cccae1a652ee7face1cbaa76fb223096e64d7/werkzeug-3.1.9-py3-none-any.whl.metadata",
+      "https://files.pythonhosted.org/packages/55/a2/72769102a02abdb32faf9f10abbd4d9ba80b50949b2fe668c27e2432fa82/markupsafe-3.0.4-cp39-cp39-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata",
+      "https://files.pythonhosted.org/packages/49/d3/b8441a820a491ddfc024b0b0cf0393375b75ea13866d9c66727e54c2fc80/typing_extensions-4.16.0-py3-none-any.whl.metadata",
+      "https://files.pythonhosted.org/packages/62/a1/3d680cbfd5f4b8f15abc1d571870c5fc3e594bb582bc3b64ea099db13e56/jinja2-3.1.6-py3-none-any.whl.metadata",
+      "https://files.pythonhosted.org/packages/04/96/92447566d16df59b2a776c0fb82dbc4d9e07cd95062562af01e408583fc4/itsdangerous-2.2.0-py3-none-any.whl.metadata",
+      "https://files.pythonhosted.org/packages/a7/06/3d6badcf13db419e25b07041d9c7b4a2c331d3f4e7134445ec5df57714cd/coloredlogs-15.0.1-py2.py3-none-any.whl.metadata",
+      "https://pypi.org/simple/humanfriendly/",
+      "https://files.pythonhosted.org/packages/16/92/d1e32e3e0d894fe00b15ce28ad4944ab692713f2e7f0a99787405e43533a/protobuf-6.33.6-cp39-abi3-manylinux2014_x86_64.whl.metadata",
+      "https://pypi.org/simple/mpmath/",
+      "https://files.pythonhosted.org/packages/7e/d4/7ebdbd03970677812aac39c869717059dbb71a4cfc033ca6e5221787892c/click-8.1.8-py3-none-any.whl.metadata",
+      "https://files.pythonhosted.org/packages/f0/0f/310fb31e39e2d734ccaa2c0fb981ee41f7bd5056ce9bc29b2248bd569169/humanfriendly-10.0-py2.py3-none-any.whl.metadata",
+      "https://files.pythonhosted.org/packages/43/e3/7d92a15f894aa0c9c4b49b8ee9ac9850d6e63b03c9c32c0367a13ae62209/mpmath-1.3.0-py3-none-any.whl.metadata",
+      "https://files.pythonhosted.org/packages/fa/5e/f8e9a1d23b9c20a551a8a02ea3637b4642e22c2626e3a13a9a29cdea99eb/importlib_metadata-8.7.1-py3-none-any.whl.metadata",
+      "https://pypi.org/simple/zipp/",
+      "https://files.pythonhosted.org/packages/1f/74/cc4096ce66f5939042ae094e2e96f53426a979864aa1f96a621ad128be27/cffi-2.0.0-cp39-cp39-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata",
+      "https://pypi.org/simple/pycparser/",
+      "https://files.pythonhosted.org/packages/a4/8e/469e5a4a2f5855992e425f3cb33804cc07bf18d48f2db061aec61ce50270/more_itertools-10.8.0-py3-none-any.whl.metadata",
+      "https://files.pythonhosted.org/packages/fd/c4/813bb09f0985cb21e959f21f2464169eca882656849adf727ac7bb7e1767/jaraco_functools-4.4.0-py3-none-any.whl.metadata",
+      "https://files.pythonhosted.org/packages/08/8a/0861bec20485572fbddf3dfba2910e38fe249796cb73ecdeb74e07eeb8d3/zipp-3.23.1-py3-none-any.whl.metadata",
+      "https://files.pythonhosted.org/packages/a0/e3/59cd50310fc9b59512193629e1984c1f95e5c8ae6e5d8c69532ccc65a7fe/pycparser-2.23-py3-none-any.whl.metadata"
+    ],
+    "only_index_and_metadata_gets": true,
+    "cache_file_bytes": 9611505,
+    "cache_wheel_archive_count": 0
+  }
+}
