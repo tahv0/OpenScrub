@@ -1,0 +1,14 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_______ test_metadata_uncertainty_preserves_observed_fallback_capability _______
+
+    def test_metadata_uncertainty_preserves_observed_fallback_capability():
+        result = assess_opencv(snap(status="metadata_error", distributions={}))
+        assert result["state"] == "uncertain"
+>       assert result["fallback_usable"]
+E       assert False
+
+tests/test_opencv_compat.py:197: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_opencv_compat.py::test_metadata_uncertainty_preserves_observed_fallback_capability
+1 failed in 0.05s

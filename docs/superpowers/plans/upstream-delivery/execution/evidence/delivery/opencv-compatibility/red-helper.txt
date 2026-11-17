@@ -1,0 +1,16 @@
+
+==================================== ERRORS ====================================
+_________________ ERROR collecting tests/test_opencv_compat.py _________________
+ImportError while importing test module '/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_opencv_compat.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/tmp/openscrub-baseline-20261116/python/cpython-3.12.16-linux-x86_64-gnu/lib/python3.12/importlib/__init__.py:90: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_opencv_compat.py:10: in <module>
+    from openscrub_internal.opencv_compat import assess_opencv, opencv_repair_hint, probe_opencv
+E   ModuleNotFoundError: No module named 'openscrub_internal'
+=========================== short test summary info ============================
+ERROR tests/test_opencv_compat.py
+!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
+1 error in 0.08s

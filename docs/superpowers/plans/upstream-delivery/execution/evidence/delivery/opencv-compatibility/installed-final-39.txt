@@ -1,0 +1,43 @@
+OpenScrub setup — system prerequisites
+==============================================
+  [92m[ok][0m      OpenCV face fallback: healthy; runtime=4.14.0; path=/tmp/openscrub-python39-20261117/venv/lib/python3.9/site-packages/cv2/__init__.py; wheels=opencv-python==4.14.0.94; fallback=ok; probe=ok
+  [92m[ok][0m      Flask Python dependency
+  [92m[ok][0m      Tesseract OCR: /tmp/openscrub-baseline-20261116/tools/usr/bin/tesseract
+  [92m[ok][0m      FFmpeg: /tmp/openscrub-baseline-20261116/tools/usr/bin/ffmpeg
+  [93m[note][0m    name detection uses heuristics; for better accuracy: pip install "OpenScrub[ner]" then re-run openscrub-setup
+==============================================
+Done. Start the web app with:  openscrub-web
+  [OK] OpenCV face fallback — healthy; runtime=4.14.0; path=/tmp/openscrub-python39-20261117/venv/lib/python3.9/site-packages/cv2/__init__.py; wheels=opencv-python==4.14.0.94; fallback=ok; probe=ok
+  [OK] Core Python packages — all present
+{
+  "python": "3.9.25 (main, Oct 31 2025, 23:00:23) \n[Clang 21.1.4 ]",
+  "executable": "/tmp/openscrub-python39-20261117/venv/bin/python",
+  "imports": {
+    "openscrub": "/tmp/openscrub-task91/installed-final/openscrub.py",
+    "openscrub_setup": "/tmp/openscrub-task91/installed-final/openscrub_setup.py",
+    "openscrub_internal.opencv_compat": "/tmp/openscrub-task91/installed-final/openscrub_internal/opencv_compat.py"
+  },
+  "opencv": {
+    "status": "ok",
+    "version": "4.14.0",
+    "path": "/tmp/openscrub-python39-20261117/venv/lib/python3.9/site-packages/cv2/__init__.py",
+    "distributions": {
+      "opencv-python": "4.14.0.94"
+    },
+    "capability": "ok",
+    "detail": ""
+  },
+  "network_events": [],
+  "installer_results": [
+    [
+      "OpenCV face fallback",
+      true,
+      "healthy; runtime=4.14.0; path=/tmp/openscrub-python39-20261117/venv/lib/python3.9/site-packages/cv2/__init__.py; wheels=opencv-python==4.14.0.94; fallback=ok; probe=ok"
+    ],
+    [
+      "Core Python packages",
+      true,
+      "all present"
+    ]
+  ]
+}

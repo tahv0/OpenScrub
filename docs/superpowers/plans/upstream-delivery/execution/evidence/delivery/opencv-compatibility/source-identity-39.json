@@ -1,0 +1,17 @@
+{
+  "executable": "/tmp/openscrub-python39-20261117/venv/bin/python",
+  "version": "3.9.25 (main, Oct 31 2025, 23:00:23) \n[Clang 21.1.4 ]",
+  "engine": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py",
+  "helper": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_internal/opencv_compat.py",
+  "cv2": "/tmp/openscrub-python39-20261117/venv/lib/python3.9/site-packages/cv2/__init__.py",
+  "snapshot": {
+    "status": "ok",
+    "version": "4.14.0",
+    "path": "/tmp/openscrub-python39-20261117/venv/lib/python3.9/site-packages/cv2/__init__.py",
+    "distributions": {
+      "opencv-python": "4.14.0.94"
+    },
+    "capability": "ok",
+    "detail": ""
+  }
+}

@@ -1,0 +1,62 @@
+OpenScrub setup — system prerequisites
+==============================================
+  [92m[ok][0m      OpenCV face fallback: healthy; runtime=4.14.0; path=/tmp/openscrub-python39-20261117/venv/lib/python3.9/site-packages/cv2/__init__.py; wheels=opencv-python==4.14.0.94; fallback=ok; probe=ok
+  [92m[ok][0m      Flask Python dependency
+  [92m[ok][0m      Tesseract OCR: /tmp/openscrub-baseline-20261116/tools/usr/bin/tesseract
+  [92m[ok][0m      FFmpeg: /tmp/openscrub-baseline-20261116/tools/usr/bin/ffmpeg
+  [93m[note][0m    name detection uses heuristics; for better accuracy: pip install "OpenScrub[ner]" then re-run openscrub-setup
+==============================================
+Done. Start the web app with:  openscrub-web
+  [OK] OpenCV face fallback — healthy; runtime=4.14.0; path=/tmp/openscrub-python39-20261117/venv/lib/python3.9/site-packages/cv2/__init__.py; wheels=opencv-python==4.14.0.94; fallback=ok; probe=ok
+  [OK] Core Python packages — all present
+{
+  "python": "3.9.25 (main, Oct 31 2025, 23:00:23) \n[Clang 21.1.4 ]",
+  "executable": "/tmp/openscrub-python39-20261117/venv/bin/python",
+  "imports": {
+    "openscrub": "/tmp/openscrub-task91/fix1/installed/openscrub.py",
+    "openscrub_setup": "/tmp/openscrub-task91/fix1/installed/openscrub_setup.py",
+    "openscrub_internal.opencv_compat": "/tmp/openscrub-task91/fix1/installed/openscrub_internal/opencv_compat.py"
+  },
+  "opencv": {
+    "status": "ok",
+    "version": "4.14.0",
+    "path": "/tmp/openscrub-python39-20261117/venv/lib/python3.9/site-packages/cv2/__init__.py",
+    "distributions": {
+      "opencv-python": "4.14.0.94"
+    },
+    "capability": "ok",
+    "detail": ""
+  },
+  "network_events": [],
+  "installer_results": [
+    [
+      "OpenCV face fallback",
+      true,
+      "healthy; runtime=4.14.0; path=/tmp/openscrub-python39-20261117/venv/lib/python3.9/site-packages/cv2/__init__.py; wheels=opencv-python==4.14.0.94; fallback=ok; probe=ok"
+    ],
+    [
+      "Core Python packages",
+      true,
+      "all present"
+    ]
+  ]
+}
+{
+  "installed_controlled_mismatch_checks": [
+    {
+      "runtime": "5.0.0",
+      "wheel": "4.14.0.94",
+      "consumers": "installer+setup",
+      "output": "  [!!] OpenCV face fallback \u2014 unsupported; runtime=5.0.0; path=/controlled/shadow/cv2.so; wheels=opencv-python==4.14.0.94; fallback=ok; probe=ok\n  Reconcile cv2 ownership deliberately or use a clean core environment. Alternate wheels and unmanaged source/distro/frozen builds are not the normal managed wheel; for source-built CUDA OpenCV, verify the source build includes CascadeClassifier and readable Haar XML. Do not add another wheel flavor to repair mixed or uncertain ownership. Rerun health checks in a fresh process: /tmp/openscrub-python39-20261117/venv/bin/python -m openscrub_setup --check (source: /tmp/openscrub-python39-20261117/venv/bin/python install.py --check).\n  [OK] Core Python packages \u2014 all present\nOpenScrub setup \u2014 system prerequisites\n==============================================\n  \u001b[91m[missing]\u001b[0m OpenCV face fallback: unsupported; runtime=5.0.0; path=/controlled/shadow/cv2.so; wheels=opencv-python==4.14.0.94; fallback=ok; probe=ok\n  \u001b[93m[note]\u001b[0m    Reconcile cv2 ownership deliberately or use a clean core environment. Alternate wheels and unmanaged source/distro/frozen builds are not the normal managed wheel; for source-built CUDA OpenCV, verify the source build includes CascadeClassifier and readable Haar XML. Do not add another wheel flavor to repair mixed or uncertain ownership. Rerun health checks in a fresh process: /tmp/openscrub-python39-20261117/venv/bin/python -m openscrub_setup --check (source: /tmp/openscrub-python39-20261117/venv/bin/python install.py --check).\n  \u001b[92m[ok]\u001b[0m      Flask Python dependency\n  \u001b[92m[ok]\u001b[0m      Tesseract OCR: /tmp/openscrub-baseline-20261116/tools/usr/bin/tesseract\n  \u001b[92m[ok]\u001b[0m      FFmpeg: /tmp/openscrub-baseline-20261116/tools/usr/bin/ffmpeg\n  \u001b[93m[note]\u001b[0m    name detection uses heuristics; for better accuracy: pip install \"OpenScrub[ner]\" then re-run openscrub-setup\n==============================================\nDone. Start the web app with:  openscrub-web\n"
+    },
+    {
+      "runtime": "4.14.0",
+      "wheel": "5.0.0.93",
+      "consumers": "installer+setup",
+      "output": "  [!!] OpenCV face fallback \u2014 unsupported; runtime=4.14.0; path=/controlled/shadow/cv2.so; wheels=opencv-python==5.0.0.93; fallback=ok; probe=ok\n  Reconcile cv2 ownership deliberately or use a clean core environment. Alternate wheels and unmanaged source/distro/frozen builds are not the normal managed wheel; for source-built CUDA OpenCV, verify the source build includes CascadeClassifier and readable Haar XML. Do not add another wheel flavor to repair mixed or uncertain ownership. Rerun health checks in a fresh process: /tmp/openscrub-python39-20261117/venv/bin/python -m openscrub_setup --check (source: /tmp/openscrub-python39-20261117/venv/bin/python install.py --check).\n  [OK] Core Python packages \u2014 all present\nOpenScrub setup \u2014 system prerequisites\n==============================================\n  \u001b[91m[missing]\u001b[0m OpenCV face fallback: unsupported; runtime=4.14.0; path=/controlled/shadow/cv2.so; wheels=opencv-python==5.0.0.93; fallback=ok; probe=ok\n  \u001b[93m[note]\u001b[0m    Reconcile cv2 ownership deliberately or use a clean core environment. Alternate wheels and unmanaged source/distro/frozen builds are not the normal managed wheel; for source-built CUDA OpenCV, verify the source build includes CascadeClassifier and readable Haar XML. Do not add another wheel flavor to repair mixed or uncertain ownership. Rerun health checks in a fresh process: /tmp/openscrub-python39-20261117/venv/bin/python -m openscrub_setup --check (source: /tmp/openscrub-python39-20261117/venv/bin/python install.py --check).\n  \u001b[92m[ok]\u001b[0m      Flask Python dependency\n  \u001b[92m[ok]\u001b[0m      Tesseract OCR: /tmp/openscrub-baseline-20261116/tools/usr/bin/tesseract\n  \u001b[92m[ok]\u001b[0m      FFmpeg: /tmp/openscrub-baseline-20261116/tools/usr/bin/ffmpeg\n  \u001b[93m[note]\u001b[0m    name detection uses heuristics; for better accuracy: pip install \"OpenScrub[ner]\" then re-run openscrub-setup\n==============================================\nDone. Start the web app with:  openscrub-web\n"
+    }
+  ],
+  "positive_agreeing_unsupported_and_broken_controls": true,
+  "exact_installed_helper_source_bytes": true,
+  "network_events": []
+}

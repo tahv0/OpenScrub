@@ -1,0 +1,17 @@
+[
+  {
+    "path": "/tmp/openscrub-baseline-20261116/python/cpython-3.12.16-linux-x86_64-gnu/bin/python3.12",
+    "bytes": 31003064,
+    "sha256": "e74c565bbccaaf3c2ec6527962890418ab6fe740c19129b02ae1b7effc322230"
+  },
+  {
+    "path": "/tmp/openscrub-baseline-20261116/tools/usr/bin/ffprobe",
+    "bytes": 216864,
+    "sha256": "a6dac1e9e8631e04075d06854cc4069308aec279bb04683b4a0bca5e4f54b2fe"
+  },
+  {
+    "path": "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/cv2/cv2.abi3.so",
+    "bytes": 70818873,
+    "sha256": "8ed76bb37221f69b4670fda111e9c4746c2c8eea697af20da2f390d24e53c28c"
+  }
+]

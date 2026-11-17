@@ -1,0 +1,1 @@
+PASS: unchanged candidate/source/built metadata; exact shipped helper bytes; synthetic updater/local-data/pins/nonmutation; provider/default preservation

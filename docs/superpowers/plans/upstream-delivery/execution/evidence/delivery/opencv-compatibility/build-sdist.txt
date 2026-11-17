@@ -1,0 +1,48 @@
+* Creating isolated environment: venv+pip...
+* Installing packages in isolated environment:
+  - hatchling
+> /tmp/openscrub-task91/tmp39/build-env-iir7d3b4/bin/python -Im pip install
+  --ignore-installed --use-pep517 --no-warn-script-location --no-compile --no-
+  input -r /tmp/openscrub-task91/tmp39/build-requirements-rlu58ttb.txt
+< Looking in links: /tmp/openscrub-task620/build-wheelhouse
+< Processing /tmp/openscrub-task620/build-
+  wheelhouse/hatchling-1.33.0-py3-none-any.whl
+< Processing /tmp/openscrub-task620/build-wheelhouse/packaging-26.3-py3-none-
+  any.whl
+< Processing /tmp/openscrub-task620/build-wheelhouse/pathspec-1.1.1-py3-none-
+  any.whl
+< Processing /tmp/openscrub-task620/build-wheelhouse/pluggy-1.7.0-py3-none-
+  any.whl
+< Processing /tmp/openscrub-task620/build-
+  wheelhouse/trove_classifiers-2026.9.21.13-py3-none-any.whl
+< Processing /tmp/openscrub-task620/build-wheelhouse/tomlkit-0.15.2-py3-none-
+  any.whl
+< ERROR: Could not find a version that satisfies the requirement tomli>=1.2.2;
+  python_version < "3.11" (from hatchling) (from versions: none)
+< ERROR: No matching distribution found for tomli>=1.2.2; python_version <
+  "3.11"
+
+Traceback (most recent call last):
+  File "/tmp/openscrub-python39-20261117/venv/lib/python3.9/site-packages/build/__main__.py", line 228, in _handle_build_error
+    yield
+  File "/tmp/openscrub-python39-20261117/venv/lib/python3.9/site-packages/build/__main__.py", line 625, in main
+    built = build(
+  File "/tmp/openscrub-python39-20261117/venv/lib/python3.9/site-packages/build/__main__.py", line 288, in build_package
+    out = _build(
+  File "/tmp/openscrub-python39-20261117/venv/lib/python3.9/site-packages/build/__main__.py", line 212, in _build
+    with _bootstrap_build_env(
+  File "/tmp/openscrub-python39-20261117/python/cpython-3.9-linux-x86_64-gnu/lib/python3.9/contextlib.py", line 119, in __enter__
+    return next(self.gen)
+  File "/tmp/openscrub-python39-20261117/venv/lib/python3.9/site-packages/build/__main__.py", line 180, in _bootstrap_build_env
+    install(builder.build_system_requires)
+  File "/tmp/openscrub-python39-20261117/venv/lib/python3.9/site-packages/build/env.py", line 180, in install
+    self._env_backend.install_dependencies(requirements, constraints)
+  File "/tmp/openscrub-python39-20261117/venv/lib/python3.9/site-packages/build/env.py", line 358, in install_dependencies
+    run_subprocess(cmd, env=_pip_env())
+  File "/tmp/openscrub-python39-20261117/venv/lib/python3.9/site-packages/build/_ctx.py", line 78, in run_subprocess
+    subprocess.run(cmd, capture_output=True, check=True, cwd=cwd, env=env)  # noqa: S603
+  File "/tmp/openscrub-python39-20261117/python/cpython-3.9-linux-x86_64-gnu/lib/python3.9/subprocess.py", line 528, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['/tmp/openscrub-task91/tmp39/build-env-iir7d3b4/bin/python', '-Im', 'pip', 'install', '--ignore-installed', '--use-pep517', '--no-warn-script-location', '--no-compile', '--no-input', '-r', '/tmp/openscrub-task91/tmp39/build-requirements-rlu58ttb.txt']' returned non-zero exit status 1.
+
+ERROR Command '['/tmp/openscrub-task91/tmp39/build-env-iir7d3b4/bin/python', '-Im', 'pip', 'install', '--ignore-installed', '--use-pep517', '--no-warn-script-location', '--no-compile', '--no-input', '-r', '/tmp/openscrub-task91/tmp39/build-requirements-rlu58ttb.txt']' returned non-zero exit status 1.

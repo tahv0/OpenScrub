@@ -1,0 +1,10 @@
+{
+  "captures": 28,
+  "all_released": true,
+  "ffprobe_children": "All synchronous check_output calls returned and were reaped; timeout not reached.",
+  "servers": 0,
+  "browsers": 0,
+  "background_workers": 0,
+  "generated_media": 0,
+  "cleanup_needed": "No running task resource or task-local temporary media remains. Existing pinned export/media preserved unchanged."
+}

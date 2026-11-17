@@ -325,6 +325,56 @@
     "sha256": "31c9be9e7483b23433eb6f47370852610dbf95f8484c8ed2c85d27e5f4b6f2de"
   },
   {
+    "path": "research/exact-sample-feasibility-brief.md",
+    "bytes": 3953,
+    "sha256": "124f96b8e1f1f32908fc92b2368f0630b37827f9324c7132b7bcc9784f931a94"
+  },
+  {
+    "path": "research/exact-sample-feasibility-evidence/README.md",
+    "bytes": 3574,
+    "sha256": "f84c3b85fc32fbe633fd248f21654551932e4fa8f2d15e18b12f2b74d946e321"
+  },
+  {
+    "path": "research/exact-sample-feasibility-evidence/cleanup.json",
+    "bytes": 372,
+    "sha256": "74b6e89f24093a7170da4a1e75fc3cb25009cb87b022d94b84bf70e13f9b84e4"
+  },
+  {
+    "path": "research/exact-sample-feasibility-evidence/probe.log",
+    "bytes": 7473,
+    "sha256": "fab1bc95df251001b65acd6501f65c713385ef5059361b19051938c6203e106d"
+  },
+  {
+    "path": "research/exact-sample-feasibility-evidence/probe.py",
+    "bytes": 6990,
+    "sha256": "411be5b0c9cbe6167fc1aed19b5d2a19d333f7477cafa9a53818a49c725230cc"
+  },
+  {
+    "path": "research/exact-sample-feasibility-evidence/results.json",
+    "bytes": 115556,
+    "sha256": "62f47106fae4e3e5d3447962f53b93d9331a45e85c7737772490b0557b2c42b8"
+  },
+  {
+    "path": "research/exact-sample-feasibility-evidence/tool-identities.json",
+    "bytes": 618,
+    "sha256": "9167f699d3600f8698070afc9954f984e79cc89806ca77f9e9c7307ee304ead9"
+  },
+  {
+    "path": "research/exact-sample-feasibility-evidence/verification.log",
+    "bytes": 123,
+    "sha256": "e75ef343b0d2c20c8fb06a328bdf47cca4aace2442d317388740fb6d4076391b"
+  },
+  {
+    "path": "research/exact-sample-feasibility-evidence/verify.py",
+    "bytes": 1903,
+    "sha256": "8e4c075ee47c865fbee496d8f25a00a8664518b528ab88eb62a8d60b60201186"
+  },
+  {
+    "path": "research/exact-sample-feasibility-research.md",
+    "bytes": 27279,
+    "sha256": "a1f4fecf37658f913ce4adae4360cb0d2ff5a12474c00d400543774943410c14"
+  },
+  {
     "path": "research/frame-identity-baseline-brief.md",
     "bytes": 2736,
     "sha256": "dfc809e6846eb2135d8cba95558bf41bc349e3460f4d5bf74f2591a887faa8b5"
@@ -2790,6 +2840,281 @@
     "sha256": "eaca7cbc873594b7e81eac2fe408d338fcf1d42c5886b56c5bceff29c10f9baf"
   },
   {
+    "path": "delivery/opencv-compatibility/build-final-sdist.txt",
+    "bytes": 105,
+    "sha256": "698c36b11c9ccb12498a71ffd6e40daef8483f0c07231ec6b282f8eecf751f12"
+  },
+  {
+    "path": "delivery/opencv-compatibility/build-final-wheel.txt",
+    "bytes": 115,
+    "sha256": "fcc4bde03a73ac75152fbdd6506ad27872f70d670df3da55a8e0fed6a119f4cb"
+  },
+  {
+    "path": "delivery/opencv-compatibility/build-release-sdist.txt",
+    "bytes": 105,
+    "sha256": "698c36b11c9ccb12498a71ffd6e40daef8483f0c07231ec6b282f8eecf751f12"
+  },
+  {
+    "path": "delivery/opencv-compatibility/build-release-wheel.txt",
+    "bytes": 115,
+    "sha256": "fcc4bde03a73ac75152fbdd6506ad27872f70d670df3da55a8e0fed6a119f4cb"
+  },
+  {
+    "path": "delivery/opencv-compatibility/build-sdist-no-isolation.txt",
+    "bytes": 105,
+    "sha256": "698c36b11c9ccb12498a71ffd6e40daef8483f0c07231ec6b282f8eecf751f12"
+  },
+  {
+    "path": "delivery/opencv-compatibility/build-sdist.txt",
+    "bytes": 3434,
+    "sha256": "5a44b5ce66c1ae761c15918b3b588c84bd9de56c484be8ce1855b0dfc65d266b"
+  },
+  {
+    "path": "delivery/opencv-compatibility/build-wheel.txt",
+    "bytes": 115,
+    "sha256": "fcc4bde03a73ac75152fbdd6506ad27872f70d670df3da55a8e0fed6a119f4cb"
+  },
+  {
+    "path": "delivery/opencv-compatibility/env312.sh",
+    "bytes": 574,
+    "sha256": "bbda72d8e0185965578b8a6d1e7b78ef99f7119d793c2f938b0edf429b2d4b40"
+  },
+  {
+    "path": "delivery/opencv-compatibility/env39.sh",
+    "bytes": 539,
+    "sha256": "69fb29bf5cec999952e6004fb2a7823128a44b43589a472eae4b5bd390ecd1b8"
+  },
+  {
+    "path": "delivery/opencv-compatibility/fix1/build-sdist.txt",
+    "bytes": 105,
+    "sha256": "698c36b11c9ccb12498a71ffd6e40daef8483f0c07231ec6b282f8eecf751f12"
+  },
+  {
+    "path": "delivery/opencv-compatibility/fix1/build-wheel.txt",
+    "bytes": 115,
+    "sha256": "fcc4bde03a73ac75152fbdd6506ad27872f70d670df3da55a8e0fed6a119f4cb"
+  },
+  {
+    "path": "delivery/opencv-compatibility/fix1/fix-source-artifact-identities.json",
+    "bytes": 4607,
+    "sha256": "84a09684f7664408842566b2e86ae79ead09946ac207f0aa46998fa6add2e01a"
+  },
+  {
+    "path": "delivery/opencv-compatibility/fix1/focused-312.txt",
+    "bytes": 179,
+    "sha256": "439cb2d326780c91ca757577beb9488c5214754e2071b87365feec1badb7e847"
+  },
+  {
+    "path": "delivery/opencv-compatibility/fix1/focused-39.txt",
+    "bytes": 179,
+    "sha256": "f039fcc9cb41cd3068fe23fd0cb3fdb6461a2425bf00ab4c6717d54b5ae6eb65"
+  },
+  {
+    "path": "delivery/opencv-compatibility/fix1/install-wheel.txt",
+    "bytes": 201,
+    "sha256": "7e89b7335367f784010048d513f9f851e11822291db5669504713df3e2ced53b"
+  },
+  {
+    "path": "delivery/opencv-compatibility/fix1/installed-312.txt",
+    "bytes": 6691,
+    "sha256": "203e7aaae388aaf87c9f694c9846fb9746f488374f1474855c91c9ba9bbe9ca8"
+  },
+  {
+    "path": "delivery/opencv-compatibility/fix1/installed-39.txt",
+    "bytes": 6584,
+    "sha256": "1651c7aac03ec81afc537be4ced933abbf3dde5f4c412a593d8003ceef277ac2"
+  },
+  {
+    "path": "delivery/opencv-compatibility/fix1/installed_smoke.py",
+    "bytes": 3661,
+    "sha256": "01cb5f4a9acf07e06aabaa741f000dd573170da91b306855e21b9056beefffcc"
+  },
+  {
+    "path": "delivery/opencv-compatibility/fix1/package-updater-evidence.json",
+    "bytes": 4115,
+    "sha256": "8b2e19e4e13b850ff0b1201fceba57e7774ccee310eb911dfe7f7576f94c456b"
+  },
+  {
+    "path": "delivery/opencv-compatibility/fix1/package-updater.txt",
+    "bytes": 154,
+    "sha256": "7ec96a1e12ad509d3e2a436a6666249ccfd7e3f3eb814e95bf6b08d926230148"
+  },
+  {
+    "path": "delivery/opencv-compatibility/fix1/red.txt",
+    "bytes": 12210,
+    "sha256": "62d999103c0cdffd1b8b9111b7f9af31eec5aa7fd543b3b6fa50876590f2cc12"
+  },
+  {
+    "path": "delivery/opencv-compatibility/fix1/validate_packages.py",
+    "bytes": 7553,
+    "sha256": "a13108c301d8ce7bfc5bab4a0264331287200aecc52fe0cd1192939bbc90531f"
+  },
+  {
+    "path": "delivery/opencv-compatibility/focused-312.txt",
+    "bytes": 179,
+    "sha256": "a4195cb0b1f4f3829d9f0c409fb36f326912c3caa1579b403dac576216d50a35"
+  },
+  {
+    "path": "delivery/opencv-compatibility/focused-39.txt",
+    "bytes": 179,
+    "sha256": "f424a37a48dc51ca3ac2162d97fec84f0225bc015484dc44cb6050b4b6dc2bd2"
+  },
+  {
+    "path": "delivery/opencv-compatibility/focused-final-312.txt",
+    "bytes": 179,
+    "sha256": "aac86c7cd26619d5e092fba261ba069e2358a8652be146f45ff09ee0c0c79e70"
+  },
+  {
+    "path": "delivery/opencv-compatibility/focused-final-39.txt",
+    "bytes": 179,
+    "sha256": "f53e558c0d8ad3c6f8dfdd3b23d6986f9ba6782f8751d7a5360841a8bf13b46e"
+  },
+  {
+    "path": "delivery/opencv-compatibility/full-312.txt",
+    "bytes": 271,
+    "sha256": "579b8d8272d0c1e88cd1c9118a48c779738f800d23a84b872f6ebb9d3b839d27"
+  },
+  {
+    "path": "delivery/opencv-compatibility/full-final-312.txt",
+    "bytes": 271,
+    "sha256": "80362519252e086af67f23997ef9e9ff7d156418353455dba54dc73a2a5dccd6"
+  },
+  {
+    "path": "delivery/opencv-compatibility/full-release-312.txt",
+    "bytes": 271,
+    "sha256": "b9b9df4ab6c55106e9ce6c8521f9df684426f014593a0b7a21bed6137a65f3b6"
+  },
+  {
+    "path": "delivery/opencv-compatibility/green-1.txt",
+    "bytes": 1559,
+    "sha256": "35872f772272c147afc41755001263f8c6dfcc7833eb41822c14f4f211ff0993"
+  },
+  {
+    "path": "delivery/opencv-compatibility/green-2.txt",
+    "bytes": 99,
+    "sha256": "2d4f455f90d221505b422fa7db48b740fc4aad111891daafe61f8ae00cfc68ce"
+  },
+  {
+    "path": "delivery/opencv-compatibility/green-focused.txt",
+    "bytes": 179,
+    "sha256": "a73e2a5a948e160052c1551cb558d2689f62d2d8d9261178899fd745b11ed65f"
+  },
+  {
+    "path": "delivery/opencv-compatibility/harness/task91_isolation.py",
+    "bytes": 1415,
+    "sha256": "4c7fb52d31a0b0430c7386400f7353680f1db8b02b2f69dfa0cc7f8c1bf9f3bf"
+  },
+  {
+    "path": "delivery/opencv-compatibility/install-wheel-final.txt",
+    "bytes": 196,
+    "sha256": "c50b3e81b08a40a8f731bd2dc5985802d06e0760c80d4dbcb36af921f1b9e79e"
+  },
+  {
+    "path": "delivery/opencv-compatibility/install-wheel-release.txt",
+    "bytes": 196,
+    "sha256": "caaa39dd2fe5bb4b2d9d11e201ec8a0080ca2ace813a0df1676fb0ec73113d84"
+  },
+  {
+    "path": "delivery/opencv-compatibility/install-wheel.txt",
+    "bytes": 196,
+    "sha256": "a20b18ffbdbb2ab8772b380e100f3f0237e77a1f9bf5abf3b12413b5d8861ee4"
+  },
+  {
+    "path": "delivery/opencv-compatibility/installed-312.txt",
+    "bytes": 2069,
+    "sha256": "dcd09b5f98828c6d057bbfaa469695680abf36768d9d4b0f1e2a9ac2aa133c7f"
+  },
+  {
+    "path": "delivery/opencv-compatibility/installed-39.txt",
+    "bytes": 2026,
+    "sha256": "02191dc4f32deb7e29d3cf92628f3652c590f21ccb650ebfac2df8d21d8facfa"
+  },
+  {
+    "path": "delivery/opencv-compatibility/installed-final-312.txt",
+    "bytes": 2087,
+    "sha256": "66261e7648d59416240be619c2a29b95ef3e72d057bccaa681eeb144af79f967"
+  },
+  {
+    "path": "delivery/opencv-compatibility/installed-final-39.txt",
+    "bytes": 2044,
+    "sha256": "42bc148ca0560b5d7fec1c3a427c2a8c2171b2e28f3a915abeb97e94ea74a7d7"
+  },
+  {
+    "path": "delivery/opencv-compatibility/installed-release-312.txt",
+    "bytes": 2093,
+    "sha256": "8e941bc3d71e38453eca8c4e498ddc1411c36b1bf80c540d397cee52cb804a76"
+  },
+  {
+    "path": "delivery/opencv-compatibility/installed-release-39.txt",
+    "bytes": 2050,
+    "sha256": "cf27ca965132d1b944847f66e10de4377c5f3c91d9fb1b67e56e139921d337b0"
+  },
+  {
+    "path": "delivery/opencv-compatibility/installed_smoke.py",
+    "bytes": 1600,
+    "sha256": "61cc868bbd93adc46263ad72950008a0ce49cbb2f3a02af6489212791b0671aa"
+  },
+  {
+    "path": "delivery/opencv-compatibility/package-updater-evidence.json",
+    "bytes": 4095,
+    "sha256": "6f7be9840ae48c05e95a0198b62d49702a4bbfaa4a742d713756729b1733148b"
+  },
+  {
+    "path": "delivery/opencv-compatibility/package-updater-final.txt",
+    "bytes": 133,
+    "sha256": "10bde0ccf3b68f2806131c3cb7177983ffa5e8fc2e92a706d4f8bddd0a65f0a0"
+  },
+  {
+    "path": "delivery/opencv-compatibility/package-updater-release.txt",
+    "bytes": 133,
+    "sha256": "10bde0ccf3b68f2806131c3cb7177983ffa5e8fc2e92a706d4f8bddd0a65f0a0"
+  },
+  {
+    "path": "delivery/opencv-compatibility/package-updater.txt",
+    "bytes": 133,
+    "sha256": "10bde0ccf3b68f2806131c3cb7177983ffa5e8fc2e92a706d4f8bddd0a65f0a0"
+  },
+  {
+    "path": "delivery/opencv-compatibility/red-edges.txt",
+    "bytes": 1724,
+    "sha256": "e45d1b5223d15143b33f4d94ea6dd66c94bdc5cb10c9e4058ed7bacf2c5b0a4b"
+  },
+  {
+    "path": "delivery/opencv-compatibility/red-helper.txt",
+    "bytes": 1032,
+    "sha256": "3fc2d87cb28437cc51d1cc14563a39d147defcb86335b1ba87c3317d4a7a7954"
+  },
+  {
+    "path": "delivery/opencv-compatibility/red-metadata-capability.txt",
+    "bytes": 756,
+    "sha256": "0c087e66687c539de93c3056993db13288f9f30efa1788f36cd4cab9b33a9129"
+  },
+  {
+    "path": "delivery/opencv-compatibility/red-source-label.txt",
+    "bytes": 1551,
+    "sha256": "4b12100dff018de9716556537677b7d2f310a285cd99a374695757112d287d13"
+  },
+  {
+    "path": "delivery/opencv-compatibility/red.txt",
+    "bytes": 1548,
+    "sha256": "720cb529742d80f34ab05ef4e87e86eedcf24e9e7f704e855d73c5072e43f3c9"
+  },
+  {
+    "path": "delivery/opencv-compatibility/source-identity-312.json",
+    "bytes": 697,
+    "sha256": "25b6a3626f6d4ae604573cc7d154321ab0f5523b1f8b5ce1d8528ae9d91a7819"
+  },
+  {
+    "path": "delivery/opencv-compatibility/source-identity-39.json",
+    "bytes": 672,
+    "sha256": "68138beea3f3decddb5d969e57f1e512b6dca3a5bdfd2eefa99e98944a742646"
+  },
+  {
+    "path": "delivery/opencv-compatibility/validate_packages.py",
+    "bytes": 7201,
+    "sha256": "bd4aac10e0c8e45c35978f857303d732fd5a5f85a57876e9885c12ed49dbc07c"
+  },
+  {
     "path": "delivery/recent-eta/browser-final.log",
     "bytes": 2342,
     "sha256": "82dfd6ea624b67c2ee2e2c11c68f78115650d9b5447f6eae5eaf98ce7c795f1f"
@@ -4453,6 +4778,36 @@
     "path": "delivery/task-90-review.md",
     "bytes": 3293,
     "sha256": "c734a2ddca6814c11748b4129910deb58eb88eb4cc9a3943bc85f356477fae89"
+  },
+  {
+    "path": "delivery/task-91-brief.md",
+    "bytes": 8340,
+    "sha256": "7c318c70d7b69e7ce2bddb94fe48d685a55e74d859237aa130f9eecef9ddedec"
+  },
+  {
+    "path": "delivery/task-91-fix1-brief.md",
+    "bytes": 2960,
+    "sha256": "693999b72b828cf50ede759b4e367e85b7ac036bf6d58e59c06ccd0f3f4a8653"
+  },
+  {
+    "path": "delivery/task-91-fix1-review.md",
+    "bytes": 3240,
+    "sha256": "88f3a2e2ff80817548c48e10fb5ea88823863ad3a42426bdb3004d3cce022e89"
+  },
+  {
+    "path": "delivery/task-91-pr.md",
+    "bytes": 2388,
+    "sha256": "0299d939d2c2e4257bce7566979c348294d27a6b0f571e2a95814c3e7efd1df7"
+  },
+  {
+    "path": "delivery/task-91-report.md",
+    "bytes": 25265,
+    "sha256": "b916a9f6e8b9b86ccdc1cfc2438fd0ea0e159f75623ef6b6fb9756d44340439b"
+  },
+  {
+    "path": "delivery/task-91-review.md",
+    "bytes": 7355,
+    "sha256": "4ca70b0d64c1be40fc10d9147843a056a6ebbba691388905556c4c2551e12088"
   },
   {
     "path": "delivery/task61-evidence/build-final.log",

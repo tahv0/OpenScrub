@@ -1,0 +1,5 @@
+Using CPython 3.9.25
+Resolved 1 package in 1ms
+Prepared 1 package in 5ms
+Installed 1 package in 1ms
+ + openscrub==1.0.96 (from file:///tmp/openscrub-task91/dist/openscrub-1.0.96-py3-none-any.whl)

@@ -1,0 +1,1 @@
+PASS: candidate/source/built metadata, payloads, synthetic nested updater/local-data/pins/nonmutation, provider/default preservation

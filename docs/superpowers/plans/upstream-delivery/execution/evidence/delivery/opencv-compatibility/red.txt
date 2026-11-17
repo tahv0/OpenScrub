@@ -1,0 +1,26 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+__________________ test_importable_opencv5_is_not_core_ready ___________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7423e6f44fe0>
+capsys = <_pytest.capture.CaptureFixture object at 0x7423e6f45160>
+
+    def test_importable_opencv5_is_not_core_ready(monkeypatch, capsys):
+        def child(cmd, **kwargs):
+            if len(cmd) > 2 and cmd[1] == "-c" and "OPENSCRUB_OPENCV_PROBE" in cmd[2]:
+                return subprocess.CompletedProcess(cmd, 0, json.dumps(snapshot()), "")
+            return subprocess.CompletedProcess(cmd, 0, "", "")
+        monkeypatch.setattr(subprocess, "run", child)
+        monkeypatch.setattr(install, "PYTHON", "/selected/python")
+        monkeypatch.setattr(install, "RESULTS", [])
+        install.step_core(check=True, yes=False)
+>       assert any(not ok and "OpenCV" in name for name, ok, _ in install.RESULTS)
+E       assert False
+E        +  where False = any(<generator object test_importable_opencv5_is_not_core_ready.<locals>.<genexpr> at 0x7423afbb6dc0>)
+
+tests/test_install_opencv_compat.py:23: AssertionError
+----------------------------- Captured stdout call -----------------------------
+  [OK] Core Python packages — all present
+=========================== short test summary info ============================
+FAILED tests/test_install_opencv_compat.py::test_importable_opencv5_is_not_core_ready
+1 failed in 0.03s
