@@ -34,6 +34,8 @@ Focused regressions belong in `tests/test_<topic>.py`; keep the existing root
 suite. Save As behavior tests execute the real embedded JavaScript with Node.js
 (18+), which must be on PATH for local and CI runs.
 
+The HDR chroma encoder-input regressions also use synthetic FFmpeg/libx265 media.
+
 
 For web UI changes, also boot `python openscrub_web.py` and click through
 what you touched — and note the PAGE string is a normal (non-raw) Python

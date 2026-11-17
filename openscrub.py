@@ -3717,7 +3717,17 @@ def _blur_silhouette_yuv10(y, u, v, x1, y1, x2, y2, mode, polys,
         k = 2 * int(pad_px) + 1
         mask = cv2.dilate(mask, np.ones((k, k), np.uint8))
 
-    def _fill_masked(plane, px1, py1, px2, py2, black, kmin):
+    # Align the existing luma mask to the frame's global 2x2 chroma grid.
+    # A chroma cell is selected if any of its luma pixels are selected,
+    # including odd ROI origins and the final partial row/column.
+    cx1, cy1 = x1i // 2, y1i // 2
+    cw, ch = (x2i + 1) // 2 - cx1, (y2i + 1) // 2 - cy1
+    aligned = np.zeros((ch * 2, cw * 2), np.uint8)
+    ox, oy = x1i % 2, y1i % 2
+    aligned[oy:oy + rh, ox:ox + rw] = mask
+    chroma_mask = aligned.reshape(ch, 2, cw, 2).max(axis=(1, 3))
+
+    def _fill_masked(plane, px1, py1, px2, py2, black, kmin, m):
         if px2 <= px1 or py2 <= py1:
             return
         roi = plane[py1:py2, px1:px2]
@@ -3735,19 +3745,15 @@ def _blur_silhouette_yuv10(y, u, v, x1, y1, x2, y2, mode, polys,
         else:
             k = max(kmin, ((2 * max(px2 - px1, py2 - py1) // 3) | 1))
             filled = _gauss_big(roi, k)
-        m = mask
-        if m.shape != roi.shape:            # chroma planes are half-res
-            m = cv2.resize(mask, (roi.shape[1], roi.shape[0]),
-                           interpolation=cv2.INTER_NEAREST)
-        cv2.copyTo(filled, m, roi)
+        cv2.copyTo(filled, m[:roi.shape[0], :roi.shape[1]], roi)
 
-    _fill_masked(y, x1i, y1i, x2i, y2i, 64, 31)
+    _fill_masked(y, x1i, y1i, x2i, y2i, 64, 31, mask)
     _fill_masked(u, x1i // 2, y1i // 2,
                  min(u.shape[1], (x2i + 1) // 2),
-                 min(u.shape[0], (y2i + 1) // 2), 512, 15)
+                 min(u.shape[0], (y2i + 1) // 2), 512, 15, chroma_mask)
     _fill_masked(v, x1i // 2, y1i // 2,
                  min(v.shape[1], (x2i + 1) // 2),
-                 min(v.shape[0], (y2i + 1) // 2), 512, 15)
+                 min(v.shape[0], (y2i + 1) // 2), 512, 15, chroma_mask)
 
 
 def apply_coverage(dets, coverage, cb=None):

@@ -618,6 +618,7 @@ exercises the same end-to-end pipeline on synthetic videos — for this tool a r
 so the suite must stay green on every change. Browser save regressions evaluate
 the shipped JavaScript with Node when available; no npm package is needed.
 
+
 ## Feature notes
 
 - **Scan speed** (the selector above **Start scan**, or `--scan-speed`) —
