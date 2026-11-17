@@ -1,0 +1,20 @@
+[
+  "/usr/bin/python3",
+  "/home/tahv0/src/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/verify.py",
+  "--config",
+  "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/task653-evidence/config-39.json",
+  "--run-id",
+  "acceptance-39",
+  "run",
+  "--",
+  "-m",
+  "pytest",
+  "/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_tail_history_index.py",
+  "/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_reverse_recall_index.py",
+  "/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_first_scan_sanity.py",
+  "/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_dense_smoothing_io.py",
+  "/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_manual_tracker_cancel.py",
+  "/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_batch_integration.py",
+  "/home/tahv0/.codex/worktrees/c832/OpenScrub/test_openscrub.py::test_track_person_size_jump_handoff",
+  "-q"
+]

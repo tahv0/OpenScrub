@@ -4,7 +4,7 @@
 
 ### Global constraints
 
-Prepared only; NOT DISPATCHED while Task1633 owns product/runtime work. Preserve Austin defaults, Python>=3.9, existing C01 raw-report/source/operation/lifetime/replay/mask/cancellation and package owners. No training/workbench, P11D rejected prototype, optional policy, new dependency, unreviewed P patch, G/R/P feature composition or external publication. Do not move original candidate branches or user runtime data. One assigned implementer, then fresh independent review; no nested agents. This is a local combined-acceptance gate, not a new upstream feature PR.
+Root selected this gate after Task1633 implementation and review completed; actual isolated branch/agent dispatch is recorded in the ledger. Preserve Austin defaults, Python>=3.9, existing C01 raw-report/source/operation/lifetime/replay/mask/cancellation and package owners. No training/workbench, P11D rejected prototype, optional policy, new dependency, unreviewed P patch, G/R/P feature composition or external publication. Do not move original candidate branches or user runtime data. One assigned implementer, then fresh independent review; no nested agents. This is a local combined-acceptance gate, not a new upstream feature PR.
 
 ### What, why and when
 

@@ -1,0 +1,7 @@
+# Local integration: fourth-C01 aggregation and first-scan sanity
+
+This is a local integration review record, not a new upstream PR. On reviewed C01 `4b9bd7e576a8ae30369672b4b4722fc9752e233f`, compose the complete reviewed P11B runtime/fixture correction, P11C reverse-recall and N12 first-scan-warning commits. Preserve recursive packaging and both benchmark guidance owners; runtime hunks apply without semantic conflicts.
+
+Head: `117e41ac5ee857a6b367caf6ccbd479d78989ff2` on `integration/upstream-focused-core`. One added controlled-OCR/FFV1 scan/report regression verifies reverse-only early onset and fragment-only tail extension in two accepted and two zone-dropped records, including complete fields and order. Independent no-backtrack first-warning coverage remains intact.
+
+Validation:119 selected tests collected;119 pass on actual Python3.12.16 and119 pass serially on actual3.9.25, frozen source through reviewed helper081. Static provenance, owner hashes, unchanged Python>=3.9 metadata, recursive test/benchmark/private inclusion and clean diff pass. No performance claim or new dependency. Full combined suite, final packaging/installed startup, browser and G/R/P composition remain later gates. See [report](task-653-report.md) and [compact evidence](task653-evidence/README.md). Fresh independent review and working-ref advancement belong to root; nothing published.

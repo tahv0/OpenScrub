@@ -1,0 +1,18 @@
+{
+  "base": "4b9bd7e576a8ae30369672b4b4722fc9752e233f",
+  "head": "117e41ac5ee857a6b367caf6ccbd479d78989ff2",
+  "changed_definitions": [
+    "merge_detections",
+    "reverse_pass",
+    "run_scan"
+  ],
+  "unchanged_runtime_files": 13,
+  "sdist_recursive_files": 40,
+  "dockerfiles": [
+    "Dockerfile",
+    "Dockerfile.cuda",
+    "Dockerfile.intel"
+  ],
+  "helper_matches_reviewed081": true,
+  "status": "clean"
+}

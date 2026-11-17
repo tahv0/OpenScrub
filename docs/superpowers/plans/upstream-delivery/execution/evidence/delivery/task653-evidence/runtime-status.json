@@ -1,0 +1,11 @@
+{
+  "lock_absent": true,
+  "active_task_workloads": [],
+  "runs": [
+    "acceptance-312",
+    "acceptance-39",
+    "collect-312",
+    "discovery-312"
+  ],
+  "final_runtime_state": "idle; retained owned artifacts"
+}

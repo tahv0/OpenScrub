@@ -12,7 +12,7 @@
 
 ## Development efficiency — completed
 
-The user-prioritized [D01 development and verification efficiency](execution/development-efficiency-priority.md) is complete after independent tooling review and real adoption on Task1631/P16C-G. New tasks use the reviewed local verification helper and the current environment handoff, with explicit source identities and required checks. P16C-G geometry, P16C-R resource cleanup and P16C-P output preservation are independently approved on their declared bases. Next, integrate the reviewed core, browser and renderer contributions in bounded C01 gates. Separate PR boundaries and upstream defaults remain in force.
+The user-prioritized [D01 development and verification efficiency](execution/development-efficiency-priority.md) is complete after independent tooling review and real adoption on Task1631/P16C-G. New tasks use the reviewed local verification helper and the current environment handoff, with explicit source identities and required checks. P16C-G geometry, P16C-R resource cleanup and P16C-P output preservation are independently approved on their declared bases. The reviewed core batch is integrated locally at117e41a; browser and renderer contributions follow in bounded C01 gates. Separate PR boundaries and upstream defaults remain in force.
 
 ## Global constraints
 

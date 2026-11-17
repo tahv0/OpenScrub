@@ -1,0 +1,9 @@
+{
+  "tests/test_batch_integration.py::scan_setup": "2b93d55e4e4f93f2bb6b7677b32f1394292e1232351bb308ea8c02b367ed0137",
+  "tests/test_batch_integration.py::test_scan_reverse_onset_and_fragment_tail_preserve_partitioned_report": "5711190bff3bf13f650534c395ce5b713506243cd5896ef45630456f6c921c4a",
+  "tests/test_first_scan_sanity.py::scan_and_report": "067e13904b0aacbc3fae67160af3eafbd6e1e6a8b30be19d84396038206dc906",
+  "tests/test_polygon_fallback.py::tiny_media": "22bf1e314ea0ad617e5c664b4f79df74eaf00ae8b191ed7a40047e15d5023cc2",
+  "tests/test_manual_tracker_cancel.py::make_video": "5f18c8a4ce7dc335fb06909dd2c1115291e8f93c05732b5965233ff6e66d74cf",
+  "tests/test_manual_tracker_cancel.py::media": "6a0db8fb62e4ec76c082516b497a623c22b1ad7ad5a20b722abe9d3e3666a6ae",
+  "tests/test_report_roundtrip.py::review": "28019760c72f4f4ff41540ffc6bf85d06f6c4b7ce6ca3e87ea13692d451d45a3"
+}

@@ -1,0 +1,27 @@
+## Task 653: compose reviewed aggregation and first-scan fixes
+
+### Global constraints
+
+Root selected this gate after Task1633 implementation and review completed; actual isolated branch/agent dispatch is recorded in the ledger. Preserve Austin defaults, Python>=3.9, existing C01 raw-report/source/operation/lifetime/replay/mask/cancellation and package owners. No training/workbench, P11D rejected prototype, optional policy, new dependency, unreviewed P patch, G/R/P feature composition or external publication. Do not move original candidate branches or user runtime data. One assigned implementer, then fresh independent review; no nested agents. This is a local combined-acceptance gate, not a new upstream feature PR.
+
+### What, why and when
+
+After the current product/review cycle releases the native worktree, root may select this prepared core gate. Base is reviewed C01 `4b9bd7e576a8ae30369672b4b4722fc9752e233f`, not Austin or the independent P branch. Source-only fourth-integration-source-research.md and its supervisor adoption select three compatible integration gates; this first one combines distinct engine owners so their interaction is checked without waiting for final renderer composition. Full application adoption and final whole-C01 remain later gates.
+
+### Exact inputs and ownership
+
+Root creates `integration/upstream-focused-core` at exact4b9bd7e in the assigned native isolated worktree. Apply whole reviewed commits with `git cherry-pick -x`, in order: `e96deb59e1b3c36585672be4c74d90eb6d0a49b5`, `952af20da205133886ba69799e134b86d1654137`, `9d888708d08cccf6e5f0ec8c9cf81740d3868fa1`, `17dfe5d575306dea395b680205038e606ad598a2`. First two are P11B runtime plus benchmark-fixture correction; third P11C reverse recall; fourth N12 first-scan warning. Existing P11A/N08/N09/P06/P07/P16A/B/P10C/P02/P03 dependencies already exist under their exact C01 provenance; do not repick them. Verify named refs and ancestry first.
+
+Resolve imports/metadata/guidance offsets by keeping both actual owners; no wholesale source-file replacement. Preserve P11B chronological fallback and first-support semantics, P11C insertion order/gating/original Detection identities and mutation, N12 first low-OCR warning when backtracking is disabled, and C01 independent chroma/polygon/cancel/report fixtures. Keep recursive private/tests/benchmark includes and existing Python floor. A runtime semantic conflict requires an exact root ruling before inventing a new behavior. Preserve all original-to-composed mappings and actual resolution diff.
+
+No new framework/helper or performance algorithm. New test under tests/test_batch_integration.py only where a meaningful combined interaction is not already exercised: one controlled actual scan/report covers forward-tail lookup plus reverse recall and accepted/zone-dropped record order/fields, with the first-scan warning/no-backtrack control remaining independently testable. Reuse source fixtures; do not copy a passing output oracle or weaken existing assertions to fit changed source.
+
+### Verification and delivery
+
+Freeze source/HEAD before runtime acceptance. Use reviewed local helper and current verification-environment-handoff.md, explicit source/module/test/fixture/recipe hashes, actual prepared3.12 and3.9, task-owned `runtime/task653/runs` on the workspace filesystem (root creates at dispatch), unique serial runs, `login:false`, clean explicit system controller, guarded workload config, owned profile/cache/TMPDIR. Required socket escalation at the original invocation; cached models/tools only if the actual selected test needs them. No downloads/shared environment/helper edits or source mutation during work.
+
+Inspect and collect a bounded existing selection: tests/test_tail_history_index.py, tests/test_reverse_recall_index.py, tests/test_first_scan_sanity.py, relevant B02a/P10C/P11A and existing combined report/default-coverage controls plus the new combined-risk case if needed. Record exact files/node selection/rationale and run against frozen combined bytes on actual3.12 and3.9. One actual controlled-OCR/FFV1 scan/report control is correctness evidence, not detector accuracy or elapsed-time improvement. Existing before/after measurements remain their original independent-source evidence; no new benchmark/timing/RSS claim or measurement slot.
+
+Check affected test discovery and static recursive package/recipe inclusion. Run focused package/import/startup verification only where an actual changed boundary requires it; final whole combined suite/package/installed web acceptance is reserved for the later browser+renderer combined result. Do not automatically repeat a broad full suite or standalone browser/media/performance matrices for this intermediate core gate. Root may authorize broader work only for a concrete unresolved failure/interaction.
+
+Self-review/commit exact picks and justified combined test/resolution. Write task-653-report.md and task-653-pr.md (local integration record, no new upstream PR), compact task653-evidence excluding media/export/env/install trees. Include base/head/provenance, actual conflicts, old/new test contracts, command/output/hash evidence and explicitly unrun boundaries. Fresh independent review belongs to root before any advancement of the working integration reference. No publication, user-data migration/adoption or nested agents.

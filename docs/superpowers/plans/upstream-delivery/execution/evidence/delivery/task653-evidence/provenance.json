@@ -1,0 +1,75 @@
+{
+  "base": "4b9bd7e576a8ae30369672b4b4722fc9752e233f",
+  "head": "117e41ac5ee857a6b367caf6ccbd479d78989ff2",
+  "picks": [
+    {
+      "original": "e96deb59e1b3c36585672be4c74d90eb6d0a49b5",
+      "composed": "9999f25af550f14b9971131d1f76bf2767c9c595",
+      "parent": "4b9bd7e576a8ae30369672b4b4722fc9752e233f",
+      "original_parent": "e21ebdf6e3ee46e6c65050dc956a9a3459152269"
+    },
+    {
+      "original": "952af20da205133886ba69799e134b86d1654137",
+      "composed": "77e51306eea8467bb2607d9df2b29eb2ec9b8cf8",
+      "parent": "9999f25af550f14b9971131d1f76bf2767c9c595",
+      "original_parent": "e96deb59e1b3c36585672be4c74d90eb6d0a49b5"
+    },
+    {
+      "original": "9d888708d08cccf6e5f0ec8c9cf81740d3868fa1",
+      "composed": "afe0fd414736df4efca2586dc5147d20fabb4753",
+      "parent": "77e51306eea8467bb2607d9df2b29eb2ec9b8cf8",
+      "original_parent": "e21ebdf6e3ee46e6c65050dc956a9a3459152269"
+    },
+    {
+      "original": "17dfe5d575306dea395b680205038e606ad598a2",
+      "composed": "3a1dc0bd5aa864cec85d463f51a12168a04e0687",
+      "parent": "afe0fd414736df4efca2586dc5147d20fabb4753",
+      "original_parent": "e21ebdf6e3ee46e6c65050dc956a9a3459152269"
+    }
+  ],
+  "refs": [
+    "archive/integration-all-prs-2026-11-16 b4d0c75f25d91510fe1692f901d11853dc7db005",
+    "develop b4d0c75f25d91510fe1692f901d11853dc7db005",
+    "docs/upstream-delivery-plan f20218be28004b6d1456505e187d91e3eb9a42d9",
+    "integration/all-prs b4d0c75f25d91510fe1692f901d11853dc7db005",
+    "integration/render-publication-prerequisites 8768e86dc1cd57720fd1c22eb6b539ae6bda6cde",
+    "integration/report-prerequisites 3795d49f6293baf7b8c35534862a4881447e1b16",
+    "integration/upstream-focused 4b9bd7e576a8ae30369672b4b4722fc9752e233f",
+    "integration/upstream-focused-core 117e41ac5ee857a6b367caf6ccbd479d78989ff2",
+    "main 5d3a15ae683c08f368d6ba4bd0d2d77b4e7b8e2f",
+    "pr/atomic-report-publication 66787aa09a958154e81e75f9bdc54d9788feb843",
+    "pr/bounded-browser-logs f44e0b786ad065010fbfd2b8328350bde44116ec",
+    "pr/bounded-job-logs 2c7f2530893cb2ecd20dfe7803b6301ea34f9f9f",
+    "pr/dense-smoothing-prefix f19be5fe3b9176e568ea7bf761493bd267fee95e",
+    "pr/editor-resize-alignment 47e9f6d5614365e00d899c87df6c209cd7aaabf6",
+    "pr/explicit-review-choices 2ae3257b9752e2d976ff7a0d39955a13c133273a",
+    "pr/hdr-chroma-coverage 0c648c2e7d3e40304dce9ae878d14709966b1fe1",
+    "pr/hdr-decoder-cleanup ded411cbec308333d1416ae3d58b4f6e918d7849",
+    "pr/invalid-polygon-fallback a3c3193e8dff41ec0588e66443398048a5c15ece",
+    "pr/job-file-lifetimes c697d5a686d4dccbdf4f474567628d5d24e75a03",
+    "pr/literal-job-filenames f399ebe1bd3c17561b44c06f7169a61e21becb43",
+    "pr/live-preview-snapshots b70d42011168192cdf7a9ef93a5e9419a92a1cdb",
+    "pr/manual-addition-replay 12919c96c6f7558136b50d7b4d85e5e6b62f1971",
+    "pr/manual-tracker-cancellation 2004b22002b8317c26ea508ff8187acbcd0cfab2",
+    "pr/merge-candidate-discovery e21ebdf6e3ee46e6c65050dc956a9a3459152269",
+    "pr/no-backtrack-scan-sanity 17dfe5d575306dea395b680205038e606ad598a2",
+    "pr/opencv-fallback-compatibility a10e485962571a566f99225541735ab1ada1f4c0",
+    "pr/readable-report-serialization 4a62e49d2f0896b737081cc92e1f92e9bcaee93f",
+    "pr/recent-stage-eta d129e23e5fe144edb8bbd5675809c1877cfe4d0f",
+    "pr/render-geometry-validation 83af23b5fd3c5922d0d476ba2a6ae21a3598ced2",
+    "pr/render-output-publication a132081f1e609ed19deb4477044ee1c9b77871cc",
+    "pr/render-resource-cleanup 70ec464ca70b5e49751d778890f56029dced0b8a",
+    "pr/report-edit-transactions f2cdf4813c86296644911f3f0b09bfc56d3e03c5",
+    "pr/report-roundtrip-preservation 7063082ef2a2ff5e56d9aafacff9bd43363b05b3",
+    "pr/resilient-progress-polling 6ae212a35b094fc9466f1616afb2c5bb5c0497f8",
+    "pr/reverse-recall-index 9d888708d08cccf6e5f0ec8c9cf81740d3868fa1",
+    "pr/review-save-snapshots 92124753736e287ac800af91f0ac96f3e96c01be",
+    "pr/save-as-progress ca0f2ce7458347afd2e6156a97df580b6623767a",
+    "pr/scan-options-validation b26b6685b237ba1c4caffaaefb47b029a3205b51",
+    "pr/tail-history-index 952af20da205133886ba69799e134b86d1654137",
+    "pr/tracker-handoff-regression e21ebdf6e3ee46e6c65050dc956a9a3459152269",
+    "pr/unchanged-report-saves 3457efac574d74a7d2377cbc0d44bb0b87462c3a",
+    "pr/visible-first-thumbnails fe20dff7b73efb5afdbf3130e75a19c8b35ecba3",
+    "tools/local-verification 081816d93d6aaa18944fc88f251040cf11d4135f"
+  ]
+}

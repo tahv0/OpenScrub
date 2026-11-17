@@ -4,7 +4,7 @@
 
 ### Global constraints
 
-Prepared only; NOT DISPATCHED. Requires root-filled `<REVIEWED_CORE_COMBINED_HEAD>` after Task653 review and no other product/runtime owner. Preserve Austin defaults, Python>=3.9, C01 report/raw/source/operation/lifetime/replay, P01 accepted-byte download progress, P02 complete choices, P03 deadlines/cycles, P07 drafts/audio and all reviewed candidate bounds. No training/workbench, new dependency, unreviewed P/G/R composition, benchmark, user-data change/adoption, publication or nested agents. A local combined acceptance gate is not a new upstream feature PR.
+Prepared only; NOT DISPATCHED. Requires root-filled `117e41ac5ee857a6b367caf6ccbd479d78989ff2` after Task653 review and no other product/runtime owner. Preserve Austin defaults, Python>=3.9, C01 report/raw/source/operation/lifetime/replay, P01 accepted-byte download progress, P02 complete choices, P03 deadlines/cycles, P07 drafts/audio and all reviewed candidate bounds. No training/workbench, new dependency, unreviewed P/G/R composition, benchmark, user-data change/adoption, publication or nested agents. A local combined acceptance gate is not a new upstream feature PR.
 
 ### What, why and when
 

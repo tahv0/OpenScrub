@@ -1,0 +1,596 @@
+{
+  "collect-312": {
+    "fixtures": {},
+    "preflight_sha256": "41783e13c5a60ff274c4f18a97ebe3fbd7886052ece779b97f33b20bb405c5ff"
+  },
+  "discovery-312": {
+    "fixtures": {},
+    "preflight_sha256": "ed3d8b073a3fde76527813bc00b0bcd32a714f6744451645093252c717869509"
+  },
+  "acceptance-312": {
+    "fixtures": {
+      "pytest/test_three_word_first_scan_doe0/fixed.avi": {
+        "bytes": 620548,
+        "sha256": "1a878e11efe910cc7862a632a33245b8023d83fa07740e3a149d668ea2e428b3"
+      },
+      "pytest/test_default_backtracking_keep0/fixed.avi": {
+        "bytes": 620548,
+        "sha256": "1a878e11efe910cc7862a632a33245b8023d83fa07740e3a149d668ea2e428b3"
+      },
+      "pytest/test_combined_report_run_rende0/combined.mp4": {
+        "bytes": 4259,
+        "sha256": "c2487f3ae0f1b9061bef02f5fd6dfec14a0c05b6ace163813f1baa77855fe8ed"
+      },
+      "pytest/test_cancellation_during_model0/steady.avi": {
+        "bytes": 97474,
+        "sha256": "c86c457904abc205119ba61da73ef391cb2425d9b71be92ec0906e82dd2f59bc"
+      },
+      "pytest/test_cancellation_during_model0/lost.avi": {
+        "bytes": 75312,
+        "sha256": "5409feb3733b8f8d4a29dc05411c872f80e8713331d44f1553ad9f50b7621761"
+      },
+      "pytest/test_person_handoff_observes_c1/steady.avi": {
+        "bytes": 97474,
+        "sha256": "c86c457904abc205119ba61da73ef391cb2425d9b71be92ec0906e82dd2f59bc"
+      },
+      "pytest/test_person_handoff_observes_c1/lost.avi": {
+        "bytes": 75312,
+        "sha256": "5409feb3733b8f8d4a29dc05411c872f80e8713331d44f1553ad9f50b7621761"
+      },
+      "pytest/test_scan_reverse_onset_and_fr0/reverse-tail.avi": {
+        "bytes": 620184,
+        "sha256": "b9911c733db40b660e22fe9ee4892a49a0b21de9455569bfeff4e32a0a00d989"
+      },
+      "pytest/test_uncancelled_unusable_inpu0/steady.avi": {
+        "bytes": 97474,
+        "sha256": "c86c457904abc205119ba61da73ef391cb2425d9b71be92ec0906e82dd2f59bc"
+      },
+      "pytest/test_uncancelled_unusable_inpu0/lost.avi": {
+        "bytes": 75312,
+        "sha256": "5409feb3733b8f8d4a29dc05411c872f80e8713331d44f1553ad9f50b7621761"
+      },
+      "pytest/test_precancelled_request_prec1/steady.avi": {
+        "bytes": 97474,
+        "sha256": "c86c457904abc205119ba61da73ef391cb2425d9b71be92ec0906e82dd2f59bc"
+      },
+      "pytest/test_precancelled_request_prec1/lost.avi": {
+        "bytes": 75312,
+        "sha256": "5409feb3733b8f8d4a29dc05411c872f80e8713331d44f1553ad9f50b7621761"
+      },
+      "pytest/test_track_person_size_jump_ha0/engulf.mp4": {
+        "bytes": 97983,
+        "sha256": "045386bf388357b18f2f71f5312290333ce18695ae06781b29e8986a4ccc0514"
+      },
+      "pytest/test_uncancelled_unusable_inpu4/steady.avi": {
+        "bytes": 97474,
+        "sha256": "c86c457904abc205119ba61da73ef391cb2425d9b71be92ec0906e82dd2f59bc"
+      },
+      "pytest/test_uncancelled_unusable_inpu4/lost.avi": {
+        "bytes": 75312,
+        "sha256": "5409feb3733b8f8d4a29dc05411c872f80e8713331d44f1553ad9f50b7621761"
+      },
+      "pytest/test_unexpected_native_match_e0/steady.avi": {
+        "bytes": 97474,
+        "sha256": "c86c457904abc205119ba61da73ef391cb2425d9b71be92ec0906e82dd2f59bc"
+      },
+      "pytest/test_unexpected_native_match_e0/lost.avi": {
+        "bytes": 75312,
+        "sha256": "5409feb3733b8f8d4a29dc05411c872f80e8713331d44f1553ad9f50b7621761"
+      },
+      "pytest/test_natural_loss_cancels_at_h1/steady.avi": {
+        "bytes": 97474,
+        "sha256": "c86c457904abc205119ba61da73ef391cb2425d9b71be92ec0906e82dd2f59bc"
+      },
+      "pytest/test_natural_loss_cancels_at_h1/lost.avi": {
+        "bytes": 75312,
+        "sha256": "5409feb3733b8f8d4a29dc05411c872f80e8713331d44f1553ad9f50b7621761"
+      },
+      "pytest/test_person_handoff_observes_c0/steady.avi": {
+        "bytes": 97474,
+        "sha256": "c86c457904abc205119ba61da73ef391cb2425d9b71be92ec0906e82dd2f59bc"
+      },
+      "pytest/test_person_handoff_observes_c0/lost.avi": {
+        "bytes": 75312,
+        "sha256": "5409feb3733b8f8d4a29dc05411c872f80e8713331d44f1553ad9f50b7621761"
+      },
+      "pytest/test_combined_report_run_rende1/combined.mp4": {
+        "bytes": 3609,
+        "sha256": "884c7521c6cea1b229aec4289cea011f13d589dd3b49bcbc84103b2ad036268c"
+      },
+      "pytest/polygon-media0/source.yuv": {
+        "bytes": 24576,
+        "sha256": "7dc3947f5f6fbdb9d8ac07a09a61f744755640e5abc367d589b203086f0be85d"
+      },
+      "pytest/polygon-media0/hdr.mp4": {
+        "bytes": 3332,
+        "sha256": "7ee7383adc5dba8410b54d939e1f1607e27ddde307bf4bc57918f0eeea1fa43e"
+      },
+      "pytest/polygon-media0/sdr.mp4": {
+        "bytes": 5255,
+        "sha256": "ff75787aa1eb6dab44c6195d8788f38d19ef1cfb5cdfcb46a27fdaabda50c134"
+      },
+      "pytest/test_uncancelled_unusable_inpu1/steady.avi": {
+        "bytes": 97474,
+        "sha256": "c86c457904abc205119ba61da73ef391cb2425d9b71be92ec0906e82dd2f59bc"
+      },
+      "pytest/test_uncancelled_unusable_inpu1/lost.avi": {
+        "bytes": 75312,
+        "sha256": "5409feb3733b8f8d4a29dc05411c872f80e8713331d44f1553ad9f50b7621761"
+      },
+      "pytest/test_ordinary_person_failure_s0/steady.avi": {
+        "bytes": 97474,
+        "sha256": "c86c457904abc205119ba61da73ef391cb2425d9b71be92ec0906e82dd2f59bc"
+      },
+      "pytest/test_ordinary_person_failure_s0/lost.avi": {
+        "bytes": 75312,
+        "sha256": "5409feb3733b8f8d4a29dc05411c872f80e8713331d44f1553ad9f50b7621761"
+      },
+      "pytest/test_actual_scan_review_save_r0/input.avi": {
+        "bytes": 24766,
+        "sha256": "929b6cc4595d29f8db89dcaa0e6661631bb066deaa5497e874dbb6838f8c3638"
+      },
+      "pytest/test_uncancelled_unusable_inpu3/steady.avi": {
+        "bytes": 97474,
+        "sha256": "c86c457904abc205119ba61da73ef391cb2425d9b71be92ec0906e82dd2f59bc"
+      },
+      "pytest/test_uncancelled_unusable_inpu3/lost.avi": {
+        "bytes": 75312,
+        "sha256": "5409feb3733b8f8d4a29dc05411c872f80e8713331d44f1553ad9f50b7621761"
+      },
+      "pytest/test_three_word_first_scan_doe1/fixed.avi": {
+        "bytes": 620548,
+        "sha256": "1a878e11efe910cc7862a632a33245b8023d83fa07740e3a149d668ea2e428b3"
+      },
+      "pytest/test_cancellation_during_model1/steady.avi": {
+        "bytes": 97474,
+        "sha256": "c86c457904abc205119ba61da73ef391cb2425d9b71be92ec0906e82dd2f59bc"
+      },
+      "pytest/test_cancellation_during_model1/lost.avi": {
+        "bytes": 75312,
+        "sha256": "5409feb3733b8f8d4a29dc05411c872f80e8713331d44f1553ad9f50b7621761"
+      },
+      "pytest/test_first_low_word_scan_witho1/fixed.avi": {
+        "bytes": 620548,
+        "sha256": "1a878e11efe910cc7862a632a33245b8023d83fa07740e3a149d668ea2e428b3"
+      },
+      "pytest/test_ncc_cancels_after_forward1/steady.avi": {
+        "bytes": 97474,
+        "sha256": "c86c457904abc205119ba61da73ef391cb2425d9b71be92ec0906e82dd2f59bc"
+      },
+      "pytest/test_ncc_cancels_after_forward1/lost.avi": {
+        "bytes": 75312,
+        "sha256": "5409feb3733b8f8d4a29dc05411c872f80e8713331d44f1553ad9f50b7621761"
+      },
+      "pytest/test_controlled_ocr_scan_rever0/fixed.avi": {
+        "bytes": 620184,
+        "sha256": "b9911c733db40b660e22fe9ee4892a49a0b21de9455569bfeff4e32a0a00d989"
+      },
+      "pytest/test_person_handoff_observes_c3/steady.avi": {
+        "bytes": 97474,
+        "sha256": "c86c457904abc205119ba61da73ef391cb2425d9b71be92ec0906e82dd2f59bc"
+      },
+      "pytest/test_person_handoff_observes_c3/lost.avi": {
+        "bytes": 75312,
+        "sha256": "5409feb3733b8f8d4a29dc05411c872f80e8713331d44f1553ad9f50b7621761"
+      },
+      "pytest/test_precancelled_request_prec2/steady.avi": {
+        "bytes": 97474,
+        "sha256": "c86c457904abc205119ba61da73ef391cb2425d9b71be92ec0906e82dd2f59bc"
+      },
+      "pytest/test_precancelled_request_prec2/lost.avi": {
+        "bytes": 75312,
+        "sha256": "5409feb3733b8f8d4a29dc05411c872f80e8713331d44f1553ad9f50b7621761"
+      },
+      "pytest/test_first_low_word_scan_witho2/fixed.avi": {
+        "bytes": 620548,
+        "sha256": "1a878e11efe910cc7862a632a33245b8023d83fa07740e3a149d668ea2e428b3"
+      },
+      "pytest/test_uncancelled_unusable_inpu2/steady.avi": {
+        "bytes": 97474,
+        "sha256": "c86c457904abc205119ba61da73ef391cb2425d9b71be92ec0906e82dd2f59bc"
+      },
+      "pytest/test_uncancelled_unusable_inpu2/lost.avi": {
+        "bytes": 75312,
+        "sha256": "5409feb3733b8f8d4a29dc05411c872f80e8713331d44f1553ad9f50b7621761"
+      },
+      "pytest/test_marked_video_preserves_ma0/marked.avi": {
+        "bytes": 123812,
+        "sha256": "02680f9cddc8b0075003858da2b4602545ae27f77e1e2a336ad3c4537dc12ca6"
+      },
+      "pytest/test_ncc_cancels_after_forward0/steady.avi": {
+        "bytes": 97474,
+        "sha256": "c86c457904abc205119ba61da73ef391cb2425d9b71be92ec0906e82dd2f59bc"
+      },
+      "pytest/test_ncc_cancels_after_forward0/lost.avi": {
+        "bytes": 75312,
+        "sha256": "5409feb3733b8f8d4a29dc05411c872f80e8713331d44f1553ad9f50b7621761"
+      },
+      "pytest/test_precancelled_request_prec0/steady.avi": {
+        "bytes": 97474,
+        "sha256": "c86c457904abc205119ba61da73ef391cb2425d9b71be92ec0906e82dd2f59bc"
+      },
+      "pytest/test_precancelled_request_prec0/lost.avi": {
+        "bytes": 75312,
+        "sha256": "5409feb3733b8f8d4a29dc05411c872f80e8713331d44f1553ad9f50b7621761"
+      },
+      "pytest/test_run_scan_finalization_and0/fixed.avi": {
+        "bytes": 417028,
+        "sha256": "00854d2b8236990599711c8f6a81fa3ccb0b69561f7e49890f55791fee219e45"
+      },
+      "pytest/test_complete_uncancelled_samp0/steady.avi": {
+        "bytes": 97474,
+        "sha256": "c86c457904abc205119ba61da73ef391cb2425d9b71be92ec0906e82dd2f59bc"
+      },
+      "pytest/test_complete_uncancelled_samp0/lost.avi": {
+        "bytes": 75312,
+        "sha256": "5409feb3733b8f8d4a29dc05411c872f80e8713331d44f1553ad9f50b7621761"
+      },
+      "pytest/test_edge_free_low_word_scan_w0/fixed.avi": {
+        "bytes": 9132,
+        "sha256": "98916128396873fc0b566139bc5b220868be6e9651067798ff365b2323bc218c"
+      },
+      "pytest/test_natural_loss_cancels_at_h2/steady.avi": {
+        "bytes": 97474,
+        "sha256": "c86c457904abc205119ba61da73ef391cb2425d9b71be92ec0906e82dd2f59bc"
+      },
+      "pytest/test_natural_loss_cancels_at_h2/lost.avi": {
+        "bytes": 75312,
+        "sha256": "5409feb3733b8f8d4a29dc05411c872f80e8713331d44f1553ad9f50b7621761"
+      },
+      "pytest/test_first_low_word_scan_witho0/fixed.avi": {
+        "bytes": 620548,
+        "sha256": "1a878e11efe910cc7862a632a33245b8023d83fa07740e3a149d668ea2e428b3"
+      },
+      "pytest/test_person_handoff_observes_c2/steady.avi": {
+        "bytes": 97474,
+        "sha256": "c86c457904abc205119ba61da73ef391cb2425d9b71be92ec0906e82dd2f59bc"
+      },
+      "pytest/test_person_handoff_observes_c2/lost.avi": {
+        "bytes": 75312,
+        "sha256": "5409feb3733b8f8d4a29dc05411c872f80e8713331d44f1553ad9f50b7621761"
+      },
+      "pytest/test_vit_final_return_observes0/steady.avi": {
+        "bytes": 97474,
+        "sha256": "c86c457904abc205119ba61da73ef391cb2425d9b71be92ec0906e82dd2f59bc"
+      },
+      "pytest/test_vit_final_return_observes0/lost.avi": {
+        "bytes": 75312,
+        "sha256": "5409feb3733b8f8d4a29dc05411c872f80e8713331d44f1553ad9f50b7621761"
+      },
+      "pytest/test_complete_uncancelled_samp1/steady.avi": {
+        "bytes": 97474,
+        "sha256": "c86c457904abc205119ba61da73ef391cb2425d9b71be92ec0906e82dd2f59bc"
+      },
+      "pytest/test_complete_uncancelled_samp1/lost.avi": {
+        "bytes": 75312,
+        "sha256": "5409feb3733b8f8d4a29dc05411c872f80e8713331d44f1553ad9f50b7621761"
+      },
+      "pytest/test_natural_loss_cancels_at_h0/steady.avi": {
+        "bytes": 97474,
+        "sha256": "c86c457904abc205119ba61da73ef391cb2425d9b71be92ec0906e82dd2f59bc"
+      },
+      "pytest/test_natural_loss_cancels_at_h0/lost.avi": {
+        "bytes": 75312,
+        "sha256": "5409feb3733b8f8d4a29dc05411c872f80e8713331d44f1553ad9f50b7621761"
+      },
+      "pytest/test_actual_flask_tracker_canc0/steady.avi": {
+        "bytes": 97474,
+        "sha256": "c86c457904abc205119ba61da73ef391cb2425d9b71be92ec0906e82dd2f59bc"
+      },
+      "pytest/test_actual_flask_tracker_canc0/lost.avi": {
+        "bytes": 75312,
+        "sha256": "5409feb3733b8f8d4a29dc05411c872f80e8713331d44f1553ad9f50b7621761"
+      },
+      "pytest/test_actual_scan_preview_cance0/data/jobs/da3179b4f09e/input.avi": {
+        "bytes": 518850,
+        "sha256": "67f33f2b418638087d395f95d7d3512da55ea4a505253ea949ab3848a5fed2a7"
+      },
+      "pytest/test_actual_scan_review_save_r0/data/jobs/4390a53005ac/input.avi": {
+        "bytes": 15,
+        "sha256": "b391c25f082013a2ff1aee3d1ff5fbe7c732c1857bf243bd8009f62db063f493"
+      },
+      "pytest/test_actual_scan_review_save_r0/data/jobs/4390a53005ac/output.mp4": {
+        "bytes": 4262,
+        "sha256": "466087fa49ff81d28c1099f5a99478e7c6f2b9a769e1ecb1a68e424c0f0503c0"
+      },
+      "pytest/test_thousand_row_actual_http_0/data/jobs/47875d29eba4/input.avi": {
+        "bytes": 15,
+        "sha256": "b391c25f082013a2ff1aee3d1ff5fbe7c732c1857bf243bd8009f62db063f493"
+      }
+    },
+    "preflight_sha256": "b7addcb9c6d1a517706e4dfba76c079c0e80a52cff770d87300107e8890836a9"
+  },
+  "acceptance-39": {
+    "fixtures": {
+      "pytest/test_three_word_first_scan_doe0/fixed.avi": {
+        "bytes": 620548,
+        "sha256": "1a878e11efe910cc7862a632a33245b8023d83fa07740e3a149d668ea2e428b3"
+      },
+      "pytest/test_default_backtracking_keep0/fixed.avi": {
+        "bytes": 620548,
+        "sha256": "1a878e11efe910cc7862a632a33245b8023d83fa07740e3a149d668ea2e428b3"
+      },
+      "pytest/test_combined_report_run_rende0/combined.mp4": {
+        "bytes": 4259,
+        "sha256": "c2487f3ae0f1b9061bef02f5fd6dfec14a0c05b6ace163813f1baa77855fe8ed"
+      },
+      "pytest/test_cancellation_during_model0/steady.avi": {
+        "bytes": 97474,
+        "sha256": "c86c457904abc205119ba61da73ef391cb2425d9b71be92ec0906e82dd2f59bc"
+      },
+      "pytest/test_cancellation_during_model0/lost.avi": {
+        "bytes": 75312,
+        "sha256": "5409feb3733b8f8d4a29dc05411c872f80e8713331d44f1553ad9f50b7621761"
+      },
+      "pytest/test_person_handoff_observes_c1/steady.avi": {
+        "bytes": 97474,
+        "sha256": "c86c457904abc205119ba61da73ef391cb2425d9b71be92ec0906e82dd2f59bc"
+      },
+      "pytest/test_person_handoff_observes_c1/lost.avi": {
+        "bytes": 75312,
+        "sha256": "5409feb3733b8f8d4a29dc05411c872f80e8713331d44f1553ad9f50b7621761"
+      },
+      "pytest/test_scan_reverse_onset_and_fr0/reverse-tail.avi": {
+        "bytes": 620184,
+        "sha256": "b9911c733db40b660e22fe9ee4892a49a0b21de9455569bfeff4e32a0a00d989"
+      },
+      "pytest/test_uncancelled_unusable_inpu0/steady.avi": {
+        "bytes": 97474,
+        "sha256": "c86c457904abc205119ba61da73ef391cb2425d9b71be92ec0906e82dd2f59bc"
+      },
+      "pytest/test_uncancelled_unusable_inpu0/lost.avi": {
+        "bytes": 75312,
+        "sha256": "5409feb3733b8f8d4a29dc05411c872f80e8713331d44f1553ad9f50b7621761"
+      },
+      "pytest/test_precancelled_request_prec1/steady.avi": {
+        "bytes": 97474,
+        "sha256": "c86c457904abc205119ba61da73ef391cb2425d9b71be92ec0906e82dd2f59bc"
+      },
+      "pytest/test_precancelled_request_prec1/lost.avi": {
+        "bytes": 75312,
+        "sha256": "5409feb3733b8f8d4a29dc05411c872f80e8713331d44f1553ad9f50b7621761"
+      },
+      "pytest/test_track_person_size_jump_ha0/engulf.mp4": {
+        "bytes": 97983,
+        "sha256": "045386bf388357b18f2f71f5312290333ce18695ae06781b29e8986a4ccc0514"
+      },
+      "pytest/test_uncancelled_unusable_inpu4/steady.avi": {
+        "bytes": 97474,
+        "sha256": "c86c457904abc205119ba61da73ef391cb2425d9b71be92ec0906e82dd2f59bc"
+      },
+      "pytest/test_uncancelled_unusable_inpu4/lost.avi": {
+        "bytes": 75312,
+        "sha256": "5409feb3733b8f8d4a29dc05411c872f80e8713331d44f1553ad9f50b7621761"
+      },
+      "pytest/test_unexpected_native_match_e0/steady.avi": {
+        "bytes": 97474,
+        "sha256": "c86c457904abc205119ba61da73ef391cb2425d9b71be92ec0906e82dd2f59bc"
+      },
+      "pytest/test_unexpected_native_match_e0/lost.avi": {
+        "bytes": 75312,
+        "sha256": "5409feb3733b8f8d4a29dc05411c872f80e8713331d44f1553ad9f50b7621761"
+      },
+      "pytest/test_natural_loss_cancels_at_h1/steady.avi": {
+        "bytes": 97474,
+        "sha256": "c86c457904abc205119ba61da73ef391cb2425d9b71be92ec0906e82dd2f59bc"
+      },
+      "pytest/test_natural_loss_cancels_at_h1/lost.avi": {
+        "bytes": 75312,
+        "sha256": "5409feb3733b8f8d4a29dc05411c872f80e8713331d44f1553ad9f50b7621761"
+      },
+      "pytest/test_person_handoff_observes_c0/steady.avi": {
+        "bytes": 97474,
+        "sha256": "c86c457904abc205119ba61da73ef391cb2425d9b71be92ec0906e82dd2f59bc"
+      },
+      "pytest/test_person_handoff_observes_c0/lost.avi": {
+        "bytes": 75312,
+        "sha256": "5409feb3733b8f8d4a29dc05411c872f80e8713331d44f1553ad9f50b7621761"
+      },
+      "pytest/test_combined_report_run_rende1/combined.mp4": {
+        "bytes": 3609,
+        "sha256": "884c7521c6cea1b229aec4289cea011f13d589dd3b49bcbc84103b2ad036268c"
+      },
+      "pytest/polygon-media0/source.yuv": {
+        "bytes": 24576,
+        "sha256": "7dc3947f5f6fbdb9d8ac07a09a61f744755640e5abc367d589b203086f0be85d"
+      },
+      "pytest/polygon-media0/hdr.mp4": {
+        "bytes": 3332,
+        "sha256": "7ee7383adc5dba8410b54d939e1f1607e27ddde307bf4bc57918f0eeea1fa43e"
+      },
+      "pytest/polygon-media0/sdr.mp4": {
+        "bytes": 5255,
+        "sha256": "ff75787aa1eb6dab44c6195d8788f38d19ef1cfb5cdfcb46a27fdaabda50c134"
+      },
+      "pytest/test_uncancelled_unusable_inpu1/steady.avi": {
+        "bytes": 97474,
+        "sha256": "c86c457904abc205119ba61da73ef391cb2425d9b71be92ec0906e82dd2f59bc"
+      },
+      "pytest/test_uncancelled_unusable_inpu1/lost.avi": {
+        "bytes": 75312,
+        "sha256": "5409feb3733b8f8d4a29dc05411c872f80e8713331d44f1553ad9f50b7621761"
+      },
+      "pytest/test_ordinary_person_failure_s0/steady.avi": {
+        "bytes": 97474,
+        "sha256": "c86c457904abc205119ba61da73ef391cb2425d9b71be92ec0906e82dd2f59bc"
+      },
+      "pytest/test_ordinary_person_failure_s0/lost.avi": {
+        "bytes": 75312,
+        "sha256": "5409feb3733b8f8d4a29dc05411c872f80e8713331d44f1553ad9f50b7621761"
+      },
+      "pytest/test_actual_scan_review_save_r0/input.avi": {
+        "bytes": 24766,
+        "sha256": "929b6cc4595d29f8db89dcaa0e6661631bb066deaa5497e874dbb6838f8c3638"
+      },
+      "pytest/test_uncancelled_unusable_inpu3/steady.avi": {
+        "bytes": 97474,
+        "sha256": "c86c457904abc205119ba61da73ef391cb2425d9b71be92ec0906e82dd2f59bc"
+      },
+      "pytest/test_uncancelled_unusable_inpu3/lost.avi": {
+        "bytes": 75312,
+        "sha256": "5409feb3733b8f8d4a29dc05411c872f80e8713331d44f1553ad9f50b7621761"
+      },
+      "pytest/test_three_word_first_scan_doe1/fixed.avi": {
+        "bytes": 620548,
+        "sha256": "1a878e11efe910cc7862a632a33245b8023d83fa07740e3a149d668ea2e428b3"
+      },
+      "pytest/test_cancellation_during_model1/steady.avi": {
+        "bytes": 97474,
+        "sha256": "c86c457904abc205119ba61da73ef391cb2425d9b71be92ec0906e82dd2f59bc"
+      },
+      "pytest/test_cancellation_during_model1/lost.avi": {
+        "bytes": 75312,
+        "sha256": "5409feb3733b8f8d4a29dc05411c872f80e8713331d44f1553ad9f50b7621761"
+      },
+      "pytest/test_first_low_word_scan_witho1/fixed.avi": {
+        "bytes": 620548,
+        "sha256": "1a878e11efe910cc7862a632a33245b8023d83fa07740e3a149d668ea2e428b3"
+      },
+      "pytest/test_ncc_cancels_after_forward1/steady.avi": {
+        "bytes": 97474,
+        "sha256": "c86c457904abc205119ba61da73ef391cb2425d9b71be92ec0906e82dd2f59bc"
+      },
+      "pytest/test_ncc_cancels_after_forward1/lost.avi": {
+        "bytes": 75312,
+        "sha256": "5409feb3733b8f8d4a29dc05411c872f80e8713331d44f1553ad9f50b7621761"
+      },
+      "pytest/test_controlled_ocr_scan_rever0/fixed.avi": {
+        "bytes": 620184,
+        "sha256": "b9911c733db40b660e22fe9ee4892a49a0b21de9455569bfeff4e32a0a00d989"
+      },
+      "pytest/test_person_handoff_observes_c3/steady.avi": {
+        "bytes": 97474,
+        "sha256": "c86c457904abc205119ba61da73ef391cb2425d9b71be92ec0906e82dd2f59bc"
+      },
+      "pytest/test_person_handoff_observes_c3/lost.avi": {
+        "bytes": 75312,
+        "sha256": "5409feb3733b8f8d4a29dc05411c872f80e8713331d44f1553ad9f50b7621761"
+      },
+      "pytest/test_precancelled_request_prec2/steady.avi": {
+        "bytes": 97474,
+        "sha256": "c86c457904abc205119ba61da73ef391cb2425d9b71be92ec0906e82dd2f59bc"
+      },
+      "pytest/test_precancelled_request_prec2/lost.avi": {
+        "bytes": 75312,
+        "sha256": "5409feb3733b8f8d4a29dc05411c872f80e8713331d44f1553ad9f50b7621761"
+      },
+      "pytest/test_first_low_word_scan_witho2/fixed.avi": {
+        "bytes": 620548,
+        "sha256": "1a878e11efe910cc7862a632a33245b8023d83fa07740e3a149d668ea2e428b3"
+      },
+      "pytest/test_uncancelled_unusable_inpu2/steady.avi": {
+        "bytes": 97474,
+        "sha256": "c86c457904abc205119ba61da73ef391cb2425d9b71be92ec0906e82dd2f59bc"
+      },
+      "pytest/test_uncancelled_unusable_inpu2/lost.avi": {
+        "bytes": 75312,
+        "sha256": "5409feb3733b8f8d4a29dc05411c872f80e8713331d44f1553ad9f50b7621761"
+      },
+      "pytest/test_marked_video_preserves_ma0/marked.avi": {
+        "bytes": 123812,
+        "sha256": "02680f9cddc8b0075003858da2b4602545ae27f77e1e2a336ad3c4537dc12ca6"
+      },
+      "pytest/test_ncc_cancels_after_forward0/steady.avi": {
+        "bytes": 97474,
+        "sha256": "c86c457904abc205119ba61da73ef391cb2425d9b71be92ec0906e82dd2f59bc"
+      },
+      "pytest/test_ncc_cancels_after_forward0/lost.avi": {
+        "bytes": 75312,
+        "sha256": "5409feb3733b8f8d4a29dc05411c872f80e8713331d44f1553ad9f50b7621761"
+      },
+      "pytest/test_precancelled_request_prec0/steady.avi": {
+        "bytes": 97474,
+        "sha256": "c86c457904abc205119ba61da73ef391cb2425d9b71be92ec0906e82dd2f59bc"
+      },
+      "pytest/test_precancelled_request_prec0/lost.avi": {
+        "bytes": 75312,
+        "sha256": "5409feb3733b8f8d4a29dc05411c872f80e8713331d44f1553ad9f50b7621761"
+      },
+      "pytest/test_run_scan_finalization_and0/fixed.avi": {
+        "bytes": 417028,
+        "sha256": "00854d2b8236990599711c8f6a81fa3ccb0b69561f7e49890f55791fee219e45"
+      },
+      "pytest/test_complete_uncancelled_samp0/steady.avi": {
+        "bytes": 97474,
+        "sha256": "c86c457904abc205119ba61da73ef391cb2425d9b71be92ec0906e82dd2f59bc"
+      },
+      "pytest/test_complete_uncancelled_samp0/lost.avi": {
+        "bytes": 75312,
+        "sha256": "5409feb3733b8f8d4a29dc05411c872f80e8713331d44f1553ad9f50b7621761"
+      },
+      "pytest/test_edge_free_low_word_scan_w0/fixed.avi": {
+        "bytes": 9132,
+        "sha256": "98916128396873fc0b566139bc5b220868be6e9651067798ff365b2323bc218c"
+      },
+      "pytest/test_natural_loss_cancels_at_h2/steady.avi": {
+        "bytes": 97474,
+        "sha256": "c86c457904abc205119ba61da73ef391cb2425d9b71be92ec0906e82dd2f59bc"
+      },
+      "pytest/test_natural_loss_cancels_at_h2/lost.avi": {
+        "bytes": 75312,
+        "sha256": "5409feb3733b8f8d4a29dc05411c872f80e8713331d44f1553ad9f50b7621761"
+      },
+      "pytest/test_first_low_word_scan_witho0/fixed.avi": {
+        "bytes": 620548,
+        "sha256": "1a878e11efe910cc7862a632a33245b8023d83fa07740e3a149d668ea2e428b3"
+      },
+      "pytest/test_person_handoff_observes_c2/steady.avi": {
+        "bytes": 97474,
+        "sha256": "c86c457904abc205119ba61da73ef391cb2425d9b71be92ec0906e82dd2f59bc"
+      },
+      "pytest/test_person_handoff_observes_c2/lost.avi": {
+        "bytes": 75312,
+        "sha256": "5409feb3733b8f8d4a29dc05411c872f80e8713331d44f1553ad9f50b7621761"
+      },
+      "pytest/test_vit_final_return_observes0/steady.avi": {
+        "bytes": 97474,
+        "sha256": "c86c457904abc205119ba61da73ef391cb2425d9b71be92ec0906e82dd2f59bc"
+      },
+      "pytest/test_vit_final_return_observes0/lost.avi": {
+        "bytes": 75312,
+        "sha256": "5409feb3733b8f8d4a29dc05411c872f80e8713331d44f1553ad9f50b7621761"
+      },
+      "pytest/test_complete_uncancelled_samp1/steady.avi": {
+        "bytes": 97474,
+        "sha256": "c86c457904abc205119ba61da73ef391cb2425d9b71be92ec0906e82dd2f59bc"
+      },
+      "pytest/test_complete_uncancelled_samp1/lost.avi": {
+        "bytes": 75312,
+        "sha256": "5409feb3733b8f8d4a29dc05411c872f80e8713331d44f1553ad9f50b7621761"
+      },
+      "pytest/test_natural_loss_cancels_at_h0/steady.avi": {
+        "bytes": 97474,
+        "sha256": "c86c457904abc205119ba61da73ef391cb2425d9b71be92ec0906e82dd2f59bc"
+      },
+      "pytest/test_natural_loss_cancels_at_h0/lost.avi": {
+        "bytes": 75312,
+        "sha256": "5409feb3733b8f8d4a29dc05411c872f80e8713331d44f1553ad9f50b7621761"
+      },
+      "pytest/test_actual_flask_tracker_canc0/steady.avi": {
+        "bytes": 97474,
+        "sha256": "c86c457904abc205119ba61da73ef391cb2425d9b71be92ec0906e82dd2f59bc"
+      },
+      "pytest/test_actual_flask_tracker_canc0/lost.avi": {
+        "bytes": 75312,
+        "sha256": "5409feb3733b8f8d4a29dc05411c872f80e8713331d44f1553ad9f50b7621761"
+      },
+      "pytest/test_actual_scan_preview_cance0/data/jobs/cef492ef798f/input.avi": {
+        "bytes": 518850,
+        "sha256": "67f33f2b418638087d395f95d7d3512da55ea4a505253ea949ab3848a5fed2a7"
+      },
+      "pytest/test_actual_scan_review_save_r0/data/jobs/4f0058baa559/input.avi": {
+        "bytes": 15,
+        "sha256": "b391c25f082013a2ff1aee3d1ff5fbe7c732c1857bf243bd8009f62db063f493"
+      },
+      "pytest/test_actual_scan_review_save_r0/data/jobs/4f0058baa559/output.mp4": {
+        "bytes": 4262,
+        "sha256": "466087fa49ff81d28c1099f5a99478e7c6f2b9a769e1ecb1a68e424c0f0503c0"
+      },
+      "pytest/test_thousand_row_actual_http_0/data/jobs/ae09a8576662/input.avi": {
+        "bytes": 15,
+        "sha256": "b391c25f082013a2ff1aee3d1ff5fbe7c732c1857bf243bd8009f62db063f493"
+      }
+    },
+    "preflight_sha256": "485e95e12331a928a1b0c8d8ee2fd9196c68dfdfd336ccbdaac87e3b14485a49"
+  }
+}

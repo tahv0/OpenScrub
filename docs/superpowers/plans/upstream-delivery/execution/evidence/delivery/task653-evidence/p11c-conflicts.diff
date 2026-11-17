@@ -1,0 +1,114 @@
+diff --cc benchmark/README.md
+index 6b56236,80c80d0..0000000
+--- a/benchmark/README.md
++++ b/benchmark/README.md
+@@@ -324,58 -324,27 +324,85 @@@ unassisted one
+    struggles is the one worth believing.
+  
+  
+++<<<<<<< HEAD
+ +Report save I/O can be compared independently of inference:
+ +
+ +```sh
+ +python benchmark/review_io.py --scenario saves --rows 1000 10000 100000 \
+ +  --before-ref BASE_SHA --after-ref HEAD_SHA --repository . \
+ +  --evidence-dir /tmp/openscrub-review-io --output /tmp/openscrub-review-io/results.json
+ +```
+ +
+ +Use a fresh evidence directory and a runtime with the project dependencies.
+ +Both revisions are exported and checked against their pinned Git blobs; workers
+ +assert imported module paths and hashes. The benchmark warms both versions and
+ +alternates uninstrumented loopback HTTP requests (three warmups and five samples
+ +per version/scenario by default). Sparse and bulk values alternate on every
+ +request. Fresh workers count report parse/dump/staging/fsync/replacement and Python
+ +stream writes separately from request/response JSON. Results retain all samples,
+ +status codes, report/payload sizes, content hashes and Linux RSS observations.
+ +Keep other sustained workloads idle while measuring. High-water memory includes
+ +imports and fixture construction; sampled RSS can miss transient peaks. These
+ +measurements characterize a local warm-cache workload, not production capacity.
+ +
+ +For a pinned baseline that already skips unchanged-save publication, pass
+ +`--before-noop-publications 0`; the default `1` retains the historical
+ +pre-optimization comparison. This changes only counted-work expectations.
+ +To recover a completed timing set after a count-expectation error, import
+ +`count_operations(sources, rows, evidence_dir, before_noop_publications=0)`
+ +with the original pinned source manifests and a fresh evidence directory.
+ +Keep its result separate, reverify every exported source hash, and prove
+ +runtime-byte equality before relating timings to a tooling-only follow-up.
+ +Never relabel existing timing samples as another commit.
+ +
+ +For a baseline that already skips unchanged publication (for example `3457efa`),
+ +pass `--before-noop-publications 0`. The historical default remains 1.
+ +Separate counted workers report `report_encode` as publication encoding starts,
+ +`json_dump_calls` and `encoder_instances` as method-specific encoding starts,
+ +`stream_writes` as Python calls to the staging stream's `write`, and
+ +`stream_writelines` as calls to `writelines`. `encoder_chunks` counts pieces
+ +from the explicit public encoder iterator when used. TextIOWrapper's internal
+ +writes are not Python stream calls or measured OS syscalls. No counted latency
+ +is part of the uninstrumented HTTP comparison.
+ +### Tail-history finalization comparison
+ +
+ +`python benchmark/tail_history.py --base-source /path/to/base --head-source /path/to/candidate --output /tmp/tail-history.json`
+ +
+ +This imports each complete engine and compares `merge_detections` on deterministic
+ +ordinary OCR histories, including sparse detections over long history and a
+ +repeated-text control. Run it as the sole owned runtime workload. It records
+ +three warmups, five alternating measured pairs, full detection records, and
+ +separate work counts and allocation measurements. Inputs are fresh and prepared
+ +outside timing; index construction is included in each merge. These are bounded
+ +finalization measurements, with OCR inference and decoding excluded. Process
+ +maximum RSS includes both imported modules and native heaps and cannot attribute
+ +index memory. No five-sample population or long-video throughput claim is made.
+ +
+ +Run all discovered regression controls with `python -m pytest`, including the
+ +controlled-OCR `run_scan`/report fixture in `tests/test_tail_history_index.py`.
+++=======
++ ### Reverse recall finalization comparison
++ 
++ `reverse_recall.py` compares complete modules from two offline source exports:
++ 
++ ```sh
++ python benchmark/reverse_recall.py --base /path/to/base --head /path/to/head --output /tmp/reverse.json
++ ```
++ 
++ It validates deterministic email primary detections and memory construction at
++ the actual matcher boundary, then measures reverse recall and reverse plus merge
++ separately. Fresh mutable fixtures are prepared outside timing; normal GC stays
++ enabled. Each of three fixed cases (heterogeneous lengths with unmatched words,
++ same-length worst case, repeated early winner) gets three warmups and five
++ alternating base/head samples. The JSON retains every output, mutation, digest
++ and timing; tracing/allocation observations run after all timing. Coordinate
++ exclusive owned workloads before running. Five samples do not establish a p95.
++ 
++ This isolates post-scan work, including the temporary index and ordering costs.
++ The combination excludes inference, scanning, scope filtering, report writing,
++ backtracking and dense processing; it is not an end-to-end/default/4K claim.
++ Same-length candidates still require a full walk; a tiny repeated memory can
++ regress. The index retains O(memory) references and insertion serials until the
++ reverse call returns. Allocation observations exclude prebuilt inputs/strings
++ and do not establish a process RSS ceiling.
+++>>>>>>> 9d88870 (Index reverse recall candidates by length and digit type)
+diff --cc pyproject.toml
+index d4a51b0,46d3f73..0000000
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@@ -118,13 -116,7 +118,19 @@@ include = 
+      "NOTICE",
+      "THIRD_PARTY_NOTICES.md",
+      "test_openscrub.py",
+++<<<<<<< HEAD
+ +    "tests",
+ +    "CONTRIBUTING.md",
+ +    "benchmark",
+ +
+ +
+ +
+++=======
++     "tests/test_reverse_recall_index.py",
++     "benchmark/reverse_recall.py",
++     "benchmark/README.md",
+++>>>>>>> 9d88870 (Index reverse recall candidates by length and digit type)
+  ]
+ +
+ +[tool.pytest.ini_options]
+ +testpaths = ["test_openscrub.py", "tests"]

@@ -1,0 +1,22 @@
+diff --cc pyproject.toml
+index d4a51b0,960f306..0000000
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@@ -118,13 -116,5 +118,17 @@@ include = 
+      "NOTICE",
+      "THIRD_PARTY_NOTICES.md",
+      "test_openscrub.py",
+++<<<<<<< HEAD
+ +    "tests",
+ +    "CONTRIBUTING.md",
+ +    "benchmark",
+ +
+ +
+ +
+++=======
++     "tests/test_first_scan_sanity.py",
+++>>>>>>> 17dfe5d (fix: keep first OCR sanity check working without backtracking)
+  ]
+ +
+ +[tool.pytest.ini_options]
+ +testpaths = ["test_openscrub.py", "tests"]

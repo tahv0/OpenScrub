@@ -1,0 +1,141 @@
+ORIGINAL e96deb59e1b3c36585672be4c74d90eb6d0a49b5 -> COMPOSED 9999f25af550f14b9971131d1f76bf2767c9c595
+
+1:  e96deb5 ! 1:  9999f25 perf: skip irrelevant chronological OCR tail history
+    @@ Metadata
+      ## Commit message ##
+         perf: skip irrelevant chronological OCR tail history
+     
+    +    (cherry picked from commit e96deb59e1b3c36585672be4c74d90eb6d0a49b5)
+    +
+      ## benchmark/README.md ##
+    -@@ benchmark/README.md: unassisted one.
+    -   second is a claim about footage nobody has run yet.
+    - - Publish the failures next to the successes. A tool that says where it
+    -   struggles is the one worth believing.
+    -+
+    +@@ benchmark/README.md: Separate counted workers report `report_encode` as publication encoding starts,
+    + from the explicit public encoder iterator when used. TextIOWrapper's internal
+    + writes are not Python stream calls or measured OS syscalls. No counted latency
+    + is part of the uninstrumented HTTP comparison.
+     +### Tail-history finalization comparison
+     +
+     +`python benchmark/tail_history.py --base-source /path/to/base --head-source /path/to/candidate --output /tmp/tail-history.json`
+    @@ openscrub.py: Usage (see README.md):
+      import copy
+      import datetime
+      import hashlib
+    - import json
+    -+import math
+    - import os
+    - import re
+    - import shutil
+     @@ openscrub.py: def merge_detections(dets, hold, scans=None, bridge_gap=4.0, fuzz=None,
+          # coverage through that scan. A scan with no matching read stops the
+          # walk, so a real scene change never accretes stale blur.
+    @@ openscrub.py: def merge_detections(dets, hold, scans=None, bridge_gap=4.0, fuzz=
+                          continue
+                      if st - m.last_seen > bridge_gap:
+     
+    - ## pyproject.toml ##
+    -@@ pyproject.toml: include = [
+    -     "NOTICE",
+    -     "THIRD_PARTY_NOTICES.md",
+    -     "test_openscrub.py",
+    -+    "tests/test_tail_history_index.py",
+    -+    "benchmark/tail_history.py",
+    -+    "benchmark/README.md",
+    - ]
+    -
+      ## test_openscrub.py ##
+     @@
+      #!/usr/bin/env python3
+
+ORIGINAL 952af20da205133886ba69799e134b86d1654137 -> COMPOSED 77e51306eea8467bb2607d9df2b29eb2ec9b8cf8
+
+1:  952af20 ! 1:  77e5130 bench: model sparse OCR history with a benign prefix
+    @@ Metadata
+      ## Commit message ##
+         bench: model sparse OCR history with a benign prefix
+     
+    +    (cherry picked from commit 952af20da205133886ba69799e134b86d1654137)
+    +
+      ## benchmark/tail_history.py ##
+     @@ benchmark/tail_history.py: def fixture(module, n, k, mode):
+          for i in range(n):
+
+ORIGINAL 9d888708d08cccf6e5f0ec8c9cf81740d3868fa1 -> COMPOSED afe0fd414736df4efca2586dc5147d20fabb4753
+
+1:  9d88870 ! 1:  afe0fd4 Index reverse recall candidates by length and digit type
+    @@ Metadata
+      ## Commit message ##
+         Index reverse recall candidates by length and digit type
+     
+    +    (cherry picked from commit 9d888708d08cccf6e5f0ec8c9cf81740d3868fa1)
+    +
+      ## benchmark/README.md ##
+    -@@ benchmark/README.md: unassisted one.
+    -   second is a claim about footage nobody has run yet.
+    - - Publish the failures next to the successes. A tool that says where it
+    -   struggles is the one worth believing.
+    -+
+    -+
+    +@@ benchmark/README.md: Separate counted workers report `report_encode` as publication encoding starts,
+    + from the explicit public encoder iterator when used. TextIOWrapper's internal
+    + writes are not Python stream calls or measured OS syscalls. No counted latency
+    + is part of the uninstrumented HTTP comparison.
+    ++
+    + ### Tail-history finalization comparison
+    + 
+    + `python benchmark/tail_history.py --base-source /path/to/base --head-source /path/to/candidate --output /tmp/tail-history.json`
+    +@@ benchmark/README.md: index memory. No five-sample population or long-video throughput claim is made.
+    + 
+    + Run all discovered regression controls with `python -m pytest`, including the
+    + controlled-OCR `run_scan`/report fixture in `tests/test_tail_history_index.py`.
+     +### Reverse recall finalization comparison
+     +
+     +`reverse_recall.py` compares complete modules from two offline source exports:
+    @@ openscrub.py: def reverse_pass(scans, memory, cats, namer, lenient=76):
+                          continue
+                      if memory._gated(k, cat) is None:
+     
+    - ## pyproject.toml ##
+    -@@ pyproject.toml: include = [
+    -     "NOTICE",
+    -     "THIRD_PARTY_NOTICES.md",
+    -     "test_openscrub.py",
+    -+    "tests/test_reverse_recall_index.py",
+    -+    "benchmark/reverse_recall.py",
+    -+    "benchmark/README.md",
+    - ]
+    -
+      ## tests/test_reverse_recall_index.py (new) ##
+     @@
+     +"""Reverse recall contracts at the real module boundary, independent of indexing."""
+
+ORIGINAL 17dfe5d575306dea395b680205038e606ad598a2 -> COMPOSED 3a1dc0bd5aa864cec85d463f51a12168a04e0687
+
+1:  17dfe5d ! 1:  3a1dc0b fix: keep first OCR sanity check working without backtracking
+    @@ Metadata
+      ## Commit message ##
+         fix: keep first OCR sanity check working without backtracking
+     
+    +    (cherry picked from commit 17dfe5d575306dea395b680205038e606ad598a2)
+    +
+      ## openscrub.py ##
+     @@ openscrub.py: def run_scan(args, cb=None):
+                      # First-scan sanity: a text-dense frame that OCR read nothing
+    @@ openscrub.py: def run_scan(args, cb=None):
+                          cb.log("      *** OCR SANITY WARNING: the first scan read "
+                                 "almost no text, but the frame looks text-dense. "
+     
+    - ## pyproject.toml ##
+    -@@ pyproject.toml: include = [
+    -     "NOTICE",
+    -     "THIRD_PARTY_NOTICES.md",
+    -     "test_openscrub.py",
+    -+    "tests/test_first_scan_sanity.py",
+    - ]
+    -
+      ## tests/test_first_scan_sanity.py (new) ##
+     @@
+     +"""First-OCR sanity must work independently of optional backtracking.

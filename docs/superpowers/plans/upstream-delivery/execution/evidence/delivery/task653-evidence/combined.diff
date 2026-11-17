@@ -1,0 +1,1145 @@
+diff --git a/benchmark/README.md b/benchmark/README.md
+index 0232642..854adb8 100644
+--- a/benchmark/README.md
++++ b/benchmark/README.md
+@@ -363,3 +363,44 @@ Separate counted workers report `report_encode` as publication encoding starts,
+ from the explicit public encoder iterator when used. TextIOWrapper's internal
+ writes are not Python stream calls or measured OS syscalls. No counted latency
+ is part of the uninstrumented HTTP comparison.
++
++### Tail-history finalization comparison
++
++`python benchmark/tail_history.py --base-source /path/to/base --head-source /path/to/candidate --output /tmp/tail-history.json`
++
++This imports each complete engine and compares `merge_detections` on deterministic
++ordinary OCR histories, including sparse detections over long history and a
++repeated-text control. Run it as the sole owned runtime workload. It records
++three warmups, five alternating measured pairs, full detection records, and
++separate work counts and allocation measurements. Inputs are fresh and prepared
++outside timing; index construction is included in each merge. These are bounded
++finalization measurements, with OCR inference and decoding excluded. Process
++maximum RSS includes both imported modules and native heaps and cannot attribute
++index memory. No five-sample population or long-video throughput claim is made.
++
++Run all discovered regression controls with `python -m pytest`, including the
++controlled-OCR `run_scan`/report fixture in `tests/test_tail_history_index.py`.
++### Reverse recall finalization comparison
++
++`reverse_recall.py` compares complete modules from two offline source exports:
++
++```sh
++python benchmark/reverse_recall.py --base /path/to/base --head /path/to/head --output /tmp/reverse.json
++```
++
++It validates deterministic email primary detections and memory construction at
++the actual matcher boundary, then measures reverse recall and reverse plus merge
++separately. Fresh mutable fixtures are prepared outside timing; normal GC stays
++enabled. Each of three fixed cases (heterogeneous lengths with unmatched words,
++same-length worst case, repeated early winner) gets three warmups and five
++alternating base/head samples. The JSON retains every output, mutation, digest
++and timing; tracing/allocation observations run after all timing. Coordinate
++exclusive owned workloads before running. Five samples do not establish a p95.
++
++This isolates post-scan work, including the temporary index and ordering costs.
++The combination excludes inference, scanning, scope filtering, report writing,
++backtracking and dense processing; it is not an end-to-end/default/4K claim.
++Same-length candidates still require a full walk; a tiny repeated memory can
++regress. The index retains O(memory) references and insertion serials until the
++reverse call returns. Allocation observations exclude prebuilt inputs/strings
++and do not establish a process RSS ceiling.
+diff --git a/benchmark/reverse_recall.py b/benchmark/reverse_recall.py
+new file mode 100644
+index 0000000..44b7356
+--- /dev/null
++++ b/benchmark/reverse_recall.py
+@@ -0,0 +1,153 @@
++"""Offline full-module reverse/finalization comparison; no model inference."""
++import argparse, collections, dataclasses, gc, hashlib, importlib.util, inspect, json
++import pathlib, random, statistics, sys, time, tracemalloc
++from rapidfuzz import fuzz
++
++def load(name, root):
++    path = pathlib.Path(root).resolve() / 'openscrub.py'
++    spec = importlib.util.spec_from_file_location(name, path)
++    module = importlib.util.module_from_spec(spec)
++    sys.modules[name] = module
++    spec.loader.exec_module(module)
++    assert pathlib.Path(module.__file__).resolve() == path
++    module.cv2.setNumThreads(1)
++    return module
++
++
++def fixture(module, mode, n):
++    memory = module.PhiMemory()
++    raw, scans, misses = [], [], []
++    for i in range(n):
++        rng = random.Random(83011 + (0 if mode == 'repeated' else i))
++        size = 4 + (i * 17) % 77 if mode == 'heterogeneous' else 24
++        text = ''.join(rng.choice('abcdefghijklmnopqrstuvwxyz') for _ in range(size)) + '@sample.invalid'
++        miss = ('unmatched' if mode != 'same_length' else
++                ''.join(rng.choice('abcdefghijklmnopqrstuvwxyz') for _ in range(len(text))))
++        assert len(module.PhiMemory.norm(miss)) >= 4 and module.PhiMemory.norm(miss) not in module.STOPWORDS
++        words = [(text, (8, 8, 150, 28), .99), (miss, (8, 40, 150, 60), .99)]
++        t = i / 3
++        found = module.detect_phi(words, module.group_lines(words), t, (0., 0.), None, None)
++        assert len(found) == 1 and found[0].text == text and found[0].category == 'email'
++        assert memory.recall(miss) is None
++        raw.extend(found)
++        for d in found:
++            memory.add(d.text, d.category)
++        scans.append((t, (0., 0.), words))
++        misses.append(miss)
++    assert len(memory.items) == (1 if mode == 'repeated' else n)
++    assert all(memory.recall(w) is None for w in misses)
++    return scans, memory, raw
++
++
++def invoke(module, boundary, fixture_data):
++    scans, memory, raw = fixture_data
++    extra = module.reverse_pass(scans, memory, {'email'}, None)
++    if boundary == 'reverse':
++        return extra, extra
++    return module.merge_detections(raw + extra, hold=1/3 + .3, scans=scans, fuzz=fuzz), extra
++
++
++def values(result, extra, fixture_data):
++    scans, memory, raw = fixture_data
++    return dict(result=[dataclasses.asdict(d) for d in result],
++                raw_after=[dataclasses.asdict(d) for d in raw],
++                extra_after=[dataclasses.asdict(d) for d in extra],
++                memory_items=list(memory.items.items()), counts=list(memory.counts.items()))
++
++
++def digest(value):
++    return hashlib.sha256(json.dumps(value, sort_keys=True).encode()).hexdigest()
++
++
++def measure_work(module, data):
++    lines, start = inspect.getsourcelines(module.reverse_pass)
++    candidate = next(start + i for i, line in enumerate(lines) if line.strip() == 'if cat not in cats:')
++    construction = next((start+i for i,line in enumerate(lines)
++                         if line.strip().startswith('if type(key) is not str')), None)
++    counts = collections.Counter()
++    retained = {}
++    def trace(frame, event, arg):
++        if frame.f_code is module.reverse_pass.__code__:
++            if event == 'line':
++                if frame.f_lineno == candidate: counts['candidate_visits'] += 1
++                if frame.f_lineno == construction: counts['construction_entries'] += 1
++            elif event == 'return':
++                buckets = frame.f_locals.get('buckets')
++                if buckets:
++                    lists = [entries for by_length in buckets for entries in by_length.values()]
++                    entries = [entry for bucket in lists for entry in bucket]
++                    retained.update(entries=len(entries), buckets=len(lists),
++                        index_bytes_shallow=(sys.getsizeof(buckets) +
++                            sum(sys.getsizeof(d) for d in buckets) +
++                            sum(sys.getsizeof(b) for b in lists) +
++                            sum(sys.getsizeof(e) + sys.getsizeof(e[0]) for e in entries)))
++        return trace
++    sys.settrace(trace)
++    try:
++        result, extra = invoke(module, 'reverse', data)
++    finally:
++        sys.settrace(None)
++    return dict(counts=counts, live_index_at_return=retained, output_sha256=digest(values(result, extra, data)))
++
++
++def main():
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument('--base', required=True)
++    parser.add_argument('--head', required=True)
++    parser.add_argument('--output', required=True)
++    parser.add_argument('--scans', type=int, default=500)
++    args = parser.parse_args()
++    modules = {'base': load('reverse_base', args.base), 'head': load('reverse_head', args.head)}
++    assert gc.isenabled()
++    report = dict(python=sys.version, executable=sys.executable, gc_enabled=gc.isenabled(),
++                  settings=dict(scans=args.scans, seed=83011, warmups=3, samples=5,
++                                categories=['email'], hold=1/3+.3, lenient=76),
++                  source_sha256={label: hashlib.sha256(pathlib.Path(m.__file__).read_bytes()).hexdigest()
++                                 for label,m in modules.items()},
++                  benchmark_sha256=hashlib.sha256(pathlib.Path(__file__).read_bytes()).hexdigest(), cases=[])
++    # Timing finishes for EVERY case before tracing/allocation instrumentation starts.
++    for mode in ['heterogeneous', 'same_length', 'repeated']:
++        row = dict(case=mode, boundaries={})
++        data = fixture(modules['base'], mode, args.scans)
++        row['input_scans'] = data[0]
++        row['fixture'] = dict(scans=len(data[0]), words=sum(len(s[2]) for s in data[0]),
++            memory=len(data[1].items), primary=len(data[2]), eligible_words=sum(1 for scan in data[0] for word,_,_ in scan[2] if len(modules['base'].PhiMemory.norm(word))>=4 and modules['base'].PhiMemory.norm(word) not in modules['base'].STOPWORDS),
++            key_lengths=dict(collections.Counter(map(len,data[1].items))))
++        for boundary in ['reverse', 'reverse_plus_merge']:
++            runs = []
++            expected = None
++            for rep in range(8):
++                order = ['base', 'head'] if rep % 2 == 0 else ['head', 'base']
++                for label in order:
++                    module = modules[label]
++                    data = fixture(module, mode, args.scans)
++                    start = time.perf_counter_ns()
++                    result, extra = invoke(module, boundary, data)
++                    elapsed = time.perf_counter_ns() - start
++                    value = values(result, extra, data)
++                    if expected is None: expected = value
++                    assert value == expected, (mode, boundary, rep, label)
++                    runs.append(dict(repetition=rep, warmup=rep<3, module=label,
++                                     ns=elapsed, output_sha256=digest(value), value=value))
++            medians = {label: statistics.median(r['ns'] for r in runs
++                       if not r['warmup'] and r['module']==label) for label in modules}
++            row['boundaries'][boundary] = dict(median_ns=medians, runs=runs)
++            print(mode, boundary, medians, flush=True)
++        report['cases'].append(row)
++    for row in report['cases']:
++        row['instrumentation'] = {}
++        for label,module in modules.items():
++            data = fixture(module,row['case'],args.scans)
++            work = measure_work(module,data)
++            data = fixture(module,row['case'],args.scans)
++            tracemalloc.start()
++            result, extra = invoke(module,'reverse',data)
++            current, peak = tracemalloc.get_traced_memory()
++            tracemalloc.stop()
++            work['reverse_tracemalloc_bytes'] = dict(current=current,peak=peak)
++            work['allocation_output_sha256'] = digest(values(result,extra,data))
++            row['instrumentation'][label] = work
++    pathlib.Path(args.output).write_text(json.dumps(report,indent=2)+'\n')
++
++if __name__ == '__main__':
++    main()
+diff --git a/benchmark/tail_history.py b/benchmark/tail_history.py
+new file mode 100644
+index 0000000..7c63455
+--- /dev/null
++++ b/benchmark/tail_history.py
+@@ -0,0 +1,159 @@
++#!/usr/bin/env python3
++"""Compare complete modules' merge finalization, with inference excluded.
++
++Run with --base-source DIR --head-source DIR --output FILE. Both directories
++must contain complete source exports. Run alone, with no other owned runtime
++work. Inputs are prepared outside timing. Work tracing and tracemalloc runs are
++separate from timing. Five samples describe these fixtures, not a population.
++"""
++import argparse
++from collections import Counter
++from dataclasses import asdict
++import gc
++import hashlib
++import importlib.util
++import json
++from pathlib import Path
++import platform
++import random
++import resource
++import statistics
++import sys
++import time
++import tracemalloc
++
++from rapidfuzz import fuzz
++import cv2
++
++CASES = [(100, 100, "unique"), (300, 300, "unique"),
++         (10000, 30, "unique"), (1000, 1000, "repeated")]
++
++
++def load(root, name):
++    path = root.resolve() / "openscrub.py"
++    spec = importlib.util.spec_from_file_location(name, path)
++    module = importlib.util.module_from_spec(spec)
++    sys.modules[name] = module
++    spec.loader.exec_module(module)
++    assert Path(module.__file__).resolve() == path
++    return module
++
++
++def fixture(module, n, k, mode):
++    scans, detections = [], []
++    for i in range(n):
++        rng = random.Random(83011 + (i if mode == "unique" else 0))
++        text = "".join(rng.choice("abcdefghijklmnopqrstuvwxyz") for _ in range(24)) + "@sample.invalid"
++        if i < n - k:
++            text = "pending"  # Quiet prefix consistent with email-only detection.
++        scans.append((i / 3, (0., 0.), [(text, (8, 8, 150, 28), .99)]))
++        if i >= n - k:
++            detections.append(module.Detection(i / 3, 0., (8, 8, 150, 28), "email", text, .99))
++    return detections, scans
++
++
++def execute(module, inputs):
++    return module.merge_detections(inputs[0], .5, scans=inputs[1], fuzz=fuzz)
++
++
++def records(result):
++    return [asdict(d) for d in result]
++
++
++def digest(value):
++    return hashlib.sha256(json.dumps(value, sort_keys=True).encode()).hexdigest()
++
++
++def work(module, case):
++    lines = Path(module.__file__).read_text().splitlines()
++    markers = {
++        "tail_timestamp_visits": "if st <= m.last_seen + 0.01:",
++        "merge_candidate_visits": "if m.category != d.category or not boxes_overlap(m.cbox, d.cbox):",
++        "index_entries": "tail_times.append(st)",
++        "index_queries": "start = bisect_right(tail_times, m.last_seen + 0.01)",
++    }
++    by_line = {i + 1: key for key, text in markers.items()
++               for i, line in enumerate(lines) if line.strip() == text}
++    counts, index_bytes = Counter(), [0]
++    inputs = fixture(module, *case)
++
++    def trace(frame, event, arg):
++        if frame.f_code is module.merge_detections.__code__ and event == "line":
++            key = by_line.get(frame.f_lineno)
++            if key:
++                counts[key] += 1
++            # List owns references to existing timestamp objects, no copies.
++            if key == "index_queries":
++                index_bytes[0] = max(index_bytes[0], sys.getsizeof(frame.f_locals["tail_times"]))
++        return trace
++
++    sys.settrace(trace)
++    try:
++        result = execute(module, inputs)
++    finally:
++        sys.settrace(None)
++    inputs = fixture(module, *case)
++    gc.collect()
++    tracemalloc.start()
++    execute(module, inputs)
++    current, peak = tracemalloc.get_traced_memory()
++    tracemalloc.stop()
++    return dict(counts=counts, index_list_bytes=index_bytes[0],
++                merge_traced_current_bytes=current, merge_traced_peak_bytes=peak,
++                output_sha256=digest(records(result)))
++
++
++def main():
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument("--base-source", type=Path, required=True)
++    parser.add_argument("--head-source", type=Path, required=True)
++    parser.add_argument("--output", type=Path, required=True)
++    args = parser.parse_args()
++    modules = {"base": load(args.base_source, "tail_base"),
++               "head": load(args.head_source, "tail_head")}
++    cv2.setNumThreads(1)
++    report = dict(environment=dict(python=sys.version, executable=sys.executable,
++                                  platform=platform.platform(), opencv=cv2.__version__,
++                                  cwd=str(Path.cwd()), opencv_threads=cv2.getNumThreads()),
++                  script_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
++                  sources={name: dict(path=module.__file__, sha256=hashlib.sha256(
++                      Path(module.__file__).read_bytes()).hexdigest()) for name, module in modules.items()},
++                  warmups=3, samples=5, gc_enabled_during_timing=True, cases=[])
++    for case in CASES:
++        row = dict(scans=case[0], detections=case[1], mode=case[2], warmup_samples=[], samples=[], outputs={})
++        expected = None
++        for repetition in range(8):
++            order = ["base", "head"] if repetition % 2 == 0 else ["head", "base"]
++            sample = dict(repetition=repetition - 3, order=order, ns={}, output_sha256={})
++            for name in order:
++                inputs = fixture(modules[name], *case)
++                assert gc.isenabled(), "Compare ordinary runtime with GC enabled"
++                start = time.perf_counter_ns()
++                result = execute(modules[name], inputs)
++                elapsed = time.perf_counter_ns() - start
++                output = records(result)
++                if expected is None:
++                    expected = output
++                assert output == expected, (case, repetition, name)
++                sample["ns"][name] = elapsed
++                sample["output_sha256"][name] = digest(output)
++                row["outputs"][name] = output
++            if repetition >= 3:
++                row["samples"].append(sample)
++            else:
++                row["warmup_samples"].append(sample)
++        row["median_ns"] = {name: statistics.median(s["ns"][name] for s in row["samples"]) for name in modules}
++        row["head_change_percent"] = 100 * (row["median_ns"]["head"] / row["median_ns"]["base"] - 1)
++        report["cases"].append(row)
++    # Finish ALL timed cases before any tracing or allocation instrumentation.
++    for row, case in zip(report["cases"], CASES):
++        row["work_and_memory"] = {name: work(module, case) for name, module in modules.items()}
++    report["process_maxrss_kib_after_all_cases"] = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
++    report["memory_limit"] = "tracemalloc excludes native heaps; maxrss is whole-process cumulative high-water, not index attribution"
++    args.output.write_text(json.dumps(report, indent=2) + "\n")
++    for row in report["cases"]:
++        print({k: v for k, v in row.items() if k not in ("outputs", "warmup_samples", "samples")})
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/openscrub.py b/openscrub.py
+index 71c0d47..fc0b372 100644
+--- a/openscrub.py
++++ b/openscrub.py
+@@ -21,6 +21,7 @@ Usage (see README.md):
+ """
+ 
+ import argparse
++from bisect import bisect_right
+ import copy
+ import datetime
+ import hashlib
+@@ -3044,12 +3045,35 @@ def merge_detections(dets, hold, scans=None, bridge_gap=4.0, fuzz=None,
+     # coverage through that scan. A scan with no matching read stops the
+     # walk, so a real scene change never accretes stale blur.
+     if scans and fuzz:
++        # Reuse one timestamp index only when multiple text spans can benefit.
++        # Caller order remains authoritative: unusual/nonfinite timestamps or
++        # unordered histories use the original walk, including its failures.
++        tail_times = None
++        if (len(mergeable) > 1 and any(m.text for m in mergeable)
++                and type(scans) in (list, tuple)):
++            tail_times = []
++            for row in scans:
++                if type(row) not in (list, tuple) or len(row) != 3:
++                    tail_times = None
++                    break
++                st = row[0]
++                if (type(st) not in (int, float)
++                        or (type(st) is float and not math.isfinite(st))
++                        or (tail_times and st < tail_times[-1])):
++                    tail_times = None
++                    break
++                tail_times.append(st)
+         for m in merged:
+             if getattr(m, "dense", False) or not m.text:
+                 continue
+             mx1, my1, mx2, my2 = m.cbox
+             mt = PhiMemory.norm(m.text)
+-            for st, _cum, words in scans:
++            tail_scans = scans
++            if (tail_times is not None and type(m.last_seen) in (int, float)
++                    and (type(m.last_seen) is int or math.isfinite(m.last_seen))):
++                start = bisect_right(tail_times, m.last_seen + 0.01)
++                tail_scans = (scans[i] for i in range(start, len(scans)))
++            for st, _cum, words in tail_scans:
+                 if st <= m.last_seen + 0.01:
+                     continue
+                 if st - m.last_seen > bridge_gap:
+@@ -7181,7 +7205,10 @@ def reverse_pass(scans, memory, cats, namer, lenient=76):
+     already confirmed elsewhere in the video; gating rules still apply so a
+     one-off false positive can't spread."""
+     from rapidfuzz import fuzz
++    from heapq import merge
+     extra = []
++    buckets = None
++    prepared = False
+     for t, cum, words in scans:
+         for w, cbox, conf in words:
+             n = PhiMemory.norm(w)
+@@ -7189,7 +7216,39 @@ def reverse_pass(scans, memory, cats, namer, lenient=76):
+                 continue
+             if namer and namer._allowed(w):
+                 continue
+-            for k, cat in memory.items.items():
++            if not prepared:
++                prepared = True
++                # Read the current mapping, rather than PhiMemory's forward
++                # caches: ordinary callers can edit items before this pass.
++                # Malformed gate data must still fail in original candidate
++                # order, even for a key the length index would exclude.
++                if (type(memory.items) is dict
++                        and type(getattr(memory, "counts", None)) is dict
++                        and type(getattr(memory, "name_sightings", None)) is int
++                        and all(type(count) is int for count in memory.counts.values())):
++                    alpha, digits = {}, {}
++                    for serial, (key, category) in enumerate(memory.items.items()):
++                        if type(key) is not str or type(category) is not str:
++                            break
++                        target = digits if key.isdigit() else alpha
++                        target.setdefault(len(key), []).append((serial, key, category))
++                    else:
++                        buckets = alpha, digits
++            if buckets is None:
++                # Keep original traversal/error behavior for malformed data
++                # and mappings with their own ordering/iteration behavior.
++                candidates = ((0, key, category)
++                              for key, category in memory.items.items())
++            elif n.isdigit():
++                candidates = buckets[1].get(len(n), ())
++            else:
++                matching = [buckets[0][size] for size in range(len(n) - 2, len(n) + 3)
++                            if size in buckets[0]]
++                # Each bucket is ordered by the mapping's insertion serial.
++                # A fuzzy match inserted earlier must beat a later exact one.
++                candidates = (merge(*matching) if len(matching) > 1
++                              else matching[0] if matching else ())
++            for _, k, cat in candidates:
+                 if cat not in cats:
+                     continue
+                 if memory._gated(k, cat) is None:
+@@ -8112,7 +8171,12 @@ def run_scan(args, cb=None):
+                 # First-scan sanity: a text-dense frame that OCR read nothing
+                 # from means a broken OCR setup — say so in minute one, not
+                 # after a 40-minute render.
+-                _edges = cv2.Canny(small, 60, 180)
++                _sanity_small = small
++                if _sanity_small is None:
++                    _sanity_small = cv2.resize(
++                        cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY), None,
++                        fx=BT_SCALE, fy=BT_SCALE)
++                _edges = cv2.Canny(_sanity_small, 60, 180)
+                 if float((_edges > 0).mean()) > 0.02:
+                     cb.log("      *** OCR SANITY WARNING: the first scan read "
+                            "almost no text, but the frame looks text-dense. "
+diff --git a/test_openscrub.py b/test_openscrub.py
+index 640df7a..03fd82d 100644
+--- a/test_openscrub.py
++++ b/test_openscrub.py
+@@ -1,5 +1,5 @@
+ #!/usr/bin/env python3
+-"""Regression tests for openscrub. Run: pytest test_openscrub.py -v
++"""Regression tests for openscrub. Run all discovered controls: python -m pytest -v
+ For this tool a regression is not a bug, it's a PHI leak — these tests are
+ the gate for any change."""
+ 
+diff --git a/tests/test_batch_integration.py b/tests/test_batch_integration.py
+index 485a149..4d30d40 100644
+--- a/tests/test_batch_integration.py
++++ b/tests/test_batch_integration.py
+@@ -296,3 +296,59 @@ def test_combined_report_run_render_default_coverage_exact_input(path, tiny_medi
+             color_space="bt2020nc", color_transfer="smpte2084", color_primaries="bt2020")
+     assert output.stat().st_size > 0
+     assert report.read_text()  # orchestration does not replace the raw input report
++
++
++def test_scan_reverse_onset_and_fragment_tail_preserve_partitioned_report(tmp_path, monkeypatch):
++    """Reverse-only onset and tail-only fragments must survive both scope merges."""
++    from dataclasses import asdict
++
++    video = tmp_path / 'reverse-tail.avi'
++    frame = np.random.default_rng(1411).integers(0, 256, (96, 160, 3), dtype=np.uint8)
++    writer = cv2.VideoWriter(str(video), cv2.VideoWriter_fourcc(*'FFV1'), 6., (160, 96))
++    assert writer.isOpened(), 'lossless FFV1 fixture codec required'
++    try:
++        for _ in range(12):
++            writer.write(frame)
++    finally:
++        writer.release()
++    boxes = [(8, 8, 70, 28), (8, 55, 70, 75),
++             (90, 8, 150, 28), (90, 55, 150, 75)]
++    near = ['zzzdef#sample.invalid', 'zzzikl#sample.invalid',
++            'zzzpqr#sample.invalid', 'zzzvwx#sample.invalid']
++    exact = ['abcdef@sample.invalid', 'ghijkl@sample.invalid',
++             'mnopqr@sample.invalid', 'stuvwx@sample.invalid']
++
++    class ControlledOCR:
++        calls = 0
++        def read(self, image):
++            # No remembered PII exists at scan0. Scan1 seeds primary matches;
++            # later fragments are too short for recall but support the tail.
++            words = near if self.calls == 0 else exact if self.calls == 1 else ['sample'] * 4
++            self.calls += 1
++            return [(word, box, .99) for word, box in zip(words, boxes)]
++
++    ocr = ControlledOCR()
++    monkeypatch.setattr(openscrub, 'make_ocr', lambda *a, **kw: ocr)
++    parser = openscrub.build_parser()
++    args = openscrub._prep_args(parser.parse_args([
++        str(video), '--categories', 'email', '--engine', 'tesseract',
++        '--sample-interval', '0.3333333333333333', '--scroll-track', 'off',
++        '--adaptive', 'off', '--ocr-upscale', 'off', '--no-vfr-fix', '--no-backtrack']), parser)
++    args.zones_data = {'email': [(0., 0., .5, 1.)]}
++    state = openscrub.run_scan(args, openscrub.Callbacks())
++    expected = [dict(t_start=0., t_end=2.3, cbox=box, category='email', text=text,
++                     confidence=.99, aoff=(0., 0.), last_seen=5/3, dense=False,
++                     track=-1, person=-1, poly=()) for text, box in zip(near, boxes)]
++    assert [asdict(d) for d in state['detections']] == expected[:2]
++    assert [asdict(d) for d in state['zdropped']] == expected[2:]
++    assert state['stats'] == dict(scans=6, raw_hits=6, regions=2, recalls=0,
++                                  remembered=4, zone_dropped={'email': 6})
++    report = tmp_path / 'report.json'
++    openscrub.write_report(str(report), args, state)
++    document = json.loads(report.read_text())
++    rows = [dict(row, enabled=True) for row in expected[:2]]
++    rows += [dict(row, enabled=False, zone_dropped=True) for row in expected[2:]]
++    assert document['detections'] == json.loads(json.dumps(rows))
++    assert document['render_state'] == dict(fps=6., cum=[[0., 0.]] * 12,
++                                           bands=[[0., 0.]] * 12)
++    assert document['provenance']['input_sha256'] == hashlib.sha256(video.read_bytes()).hexdigest()
+diff --git a/tests/test_first_scan_sanity.py b/tests/test_first_scan_sanity.py
+new file mode 100644
+index 0000000..6e1cff7
+--- /dev/null
++++ b/tests/test_first_scan_sanity.py
+@@ -0,0 +1,182 @@
++"""First-OCR sanity must work independently of optional backtracking.
++
++Only OCR inference is controlled: lossless decoding, Canny, primary email
++matching, scan finalization, and report serialization use production code.
++"""
++from dataclasses import asdict
++from datetime import datetime
++import hashlib
++import json
++
++import cv2
++import numpy as np
++import pytest
++
++import openscrub as core
++
++
++SANITY_WARNING = (
++    "      *** OCR SANITY WARNING: the first scan read almost no text, but "
++    "the frame looks text-dense. If this recording contains text to redact, "
++    "check the OCR setup (run openscrub-setup, or install PaddleOCR) before "
++    "trusting this run.")
++EMAIL = ("alice@example.invalid", (8, 8, 78, 28), .99)
++FILLERS = [("status", (8, 40, 68, 60), .98),
++           ("active", (88, 40, 150, 60), .97)]
++
++
++def scan_and_report(tmp_path, monkeypatch, *, counts, busy=True,
++                    no_backtrack=True):
++    video = tmp_path / "fixed.avi"
++    frame = (np.random.default_rng(115).integers(
++        0, 256, (96, 160, 3), dtype=np.uint8) if busy else
++        np.full((96, 160, 3), 245, np.uint8))
++    writer = cv2.VideoWriter(str(video), cv2.VideoWriter_fourcc(*"FFV1"),
++                             6., (160, 96))
++    assert writer.isOpened(), "lossless FFV1 fixture codec required"
++    try:
++        for _ in range(12):
++            writer.write(frame)
++    finally:
++        writer.release()
++    cap = cv2.VideoCapture(str(video))
++    try:
++        ok, decoded = cap.read()
++        assert ok
++        assert np.array_equal(decoded, frame)
++    finally:
++        cap.release()
++    # Independently measure the fixture at the existing sanity resolution.
++    gray = cv2.cvtColor(decoded, cv2.COLOR_BGR2GRAY)
++    half = cv2.resize(gray, (80, 48))
++    density = np.count_nonzero(cv2.Canny(half, 60, 180)) / half.size
++    assert density > .02 if busy else density == 0.
++
++    class ControlledOCR:
++        def __init__(self):
++            self.counts = iter(counts)
++
++        def read(self, image):
++            assert np.array_equal(image, frame)
++            count = next(self.counts)
++            return ([EMAIL] + FILLERS)[:count]
++
++    monkeypatch.setattr(core, "make_ocr", lambda *a, **k: ControlledOCR())
++    parser = core.build_parser()
++    options = [str(video), "--categories", "email", "--engine", "tesseract",
++               "--sample-interval", "0.3333333333333333", "--scroll-track", "off",
++               "--adaptive", "off", "--ocr-upscale", "off", "--no-vfr-fix"]
++    if no_backtrack:
++        options.append("--no-backtrack")
++    args = core._prep_args(parser.parse_args(options), parser)
++    messages = []
++
++    class Quiet(core.Callbacks):
++        def log(self, message):
++            messages.append(message)
++
++    state = core.run_scan(args, Quiet())
++    assert args.no_backtrack is no_backtrack
++    if no_backtrack:
++        assert not any("backtrack:" in m for m in messages)
++    path = tmp_path / "report.json"
++    core.write_report(str(path), args, state)
++    document = json.loads(path.read_text())
++    return state, document, messages, hashlib.sha256(video.read_bytes()).hexdigest()
++
++
++def assert_scan_report(state, document, digest, tmp_path, *, has_email,
++                       no_backtrack=True):
++    # Six primary hits plus six reverse confirmations merge into one region.
++    expected = ([{
++        "t_start": 0., "t_end": 2.3, "cbox": (8, 8, 78, 28),
++        "category": "email", "text": "alice@example.invalid", "confidence": .99,
++        "aoff": (0., 0.), "last_seen": 5/3, "dense": False,
++        "track": -1, "person": -1, "poly": (),
++    }] if has_email else [])
++    assert dict(state, detections=[asdict(d) for d in state["detections"]]) == {
++        "fps": 6., "cum": [(0., 0.)] * 12, "bands": [(0., 0.)] * 12,
++        "detections": expected, "zdropped": [], "audio_suggestions": [],
++        "audio_transcript": [], "input_sha256": digest,
++        "stats": {"scans": 6, "raw_hits": 12 if has_email else 0,
++                  "regions": int(has_email), "recalls": 0,
++                  "remembered": int(has_email), "zone_dropped": {}},
++    }
++    # All Detection fields and report-only choices are pinned, including order.
++    assert document["detections"] == ([{
++        "t_start": 0., "t_end": 2.3, "cbox": [8, 8, 78, 28],
++        "category": "email", "text": "alice@example.invalid", "confidence": .99,
++        "aoff": [0., 0.], "last_seen": 5/3, "dense": False,
++        "track": -1, "person": -1, "poly": [], "enabled": True,
++    }] if has_email else [])
++    assert document["render_state"] == {
++        "fps": 6., "cum": [[0., 0.]] * 12, "bands": [[0., 0.]] * 12}
++    assert list(document) == ["provenance", "render_state", "detections"]
++    provenance = document["provenance"]
++    assert datetime.fromisoformat(provenance["timestamp"]).tzinfo is not None
++    assert provenance == {
++        "tool": "openscrub", "version": core.VERSION,
++        "timestamp": provenance["timestamp"], "input": str(tmp_path / "fixed.avi"),
++        "input_sha256": digest, "original_input": None,
++        "vfr_normalized": False, "hdr_tonemapped": False, "hdr_output": False,
++        "metadata_stripped": True, "zones": None, "windows": None,
++        "settings": {
++            "allow_names": None, "extra_names": None, "engine": "tesseract",
++            "device": "auto", "encoder": "auto", "no_ner": False,
++            "heuristic_names": "auto", "sample_interval": 1/3,
++            "scan_trigger": 60, "pad": 8, "no_vfr_fix": True,
++            "out_quality": "archival", "codec": "h264", "hdr_output": "match",
++            "tile": "auto", "face_heads": False, "dense_faces": False,
++            "dense_face_stride": 1, "scan_speed": "thorough", "plate_model": None,
++            "face_shape": "ellipse", "face_model": None, "plate_threshold": .35,
++            "person_model": None, "person_threshold": .5, "face_threshold": .6,
++            "draw_scores": False, "detect_scale": 1., "face_expand": .15,
++            "coverage": "tight", "mode": "blur", "mrn_regex": "",
++            "scroll_track": "off", "adaptive": "off", "phrase": [],
++            "phrases": None, "custom_regex": [], "bridge_gap": 4.,
++            "no_memory": False, "preview": False, "detect_windows": "",
++            "detect_windows_frac": "", "clip_frac": "", "mute_audio_tracks": "",
++            "audio_lane_count": None, "clip_start": 0., "clip_end": 0.,
++            "audio_pii": False, "audio_pii_model": "base", "audio_pii_apply": False,
++            "audio_redact": "", "audio_redact_mode": "mute", "overwrite": False,
++            "backtrack_window": 2.5, "no_backtrack": no_backtrack,
++            "skip_start": 0., "skip_end": 0., "zones": None, "windows": None,
++            "ignore_region": [], "ocr_upscale": "off", "paranoid": False,
++            "vfr": "auto", "categories": "email", "ignore_regions": [],
++            "zones_data": None, "windows_data": None,
++        },
++    }
++
++
++@pytest.mark.parametrize("count", [0, 1, 2])
++def test_first_low_word_scan_without_backtrack_warns_and_returns_report(
++        tmp_path, monkeypatch, count):
++    state, document, messages, digest = scan_and_report(
++        tmp_path, monkeypatch, counts=[count] * 6)
++    assert_scan_report(state, document, digest, tmp_path, has_email=count > 0)
++    assert [m for m in messages if "OCR SANITY WARNING" in m] == [SANITY_WARNING]
++
++
++def test_edge_free_low_word_scan_without_backtrack_returns_report_silently(
++        tmp_path, monkeypatch):
++    state, document, messages, digest = scan_and_report(
++        tmp_path, monkeypatch, counts=[1] * 6, busy=False)
++    assert_scan_report(state, document, digest, tmp_path, has_email=True)
++    assert not any("OCR SANITY WARNING" in m for m in messages)
++
++
++def test_default_backtracking_keeps_first_low_word_warning(tmp_path, monkeypatch):
++    state, document, messages, digest = scan_and_report(
++        tmp_path, monkeypatch, counts=[0] * 6, no_backtrack=False)
++    assert_scan_report(state, document, digest, tmp_path, has_email=False,
++                       no_backtrack=False)
++    assert [m for m in messages if "OCR SANITY WARNING" in m] == [SANITY_WARNING]
++
++
++@pytest.mark.parametrize("counts", [[3] * 6, [3, 1, 1, 1, 1, 1]])
++def test_three_word_first_scan_does_not_warn_on_later_sparse_scans(
++        tmp_path, monkeypatch, counts):
++    state, document, messages, digest = scan_and_report(
++        tmp_path, monkeypatch, counts=counts)
++    assert_scan_report(state, document, digest, tmp_path, has_email=True)
++    assert not any("OCR SANITY WARNING" in m for m in messages)
+diff --git a/tests/test_reverse_recall_index.py b/tests/test_reverse_recall_index.py
+new file mode 100644
+index 0000000..2cf8ec9
+--- /dev/null
++++ b/tests/test_reverse_recall_index.py
+@@ -0,0 +1,255 @@
++"""Reverse recall contracts at the real module boundary, independent of indexing."""
++from collections import OrderedDict
++from dataclasses import asdict
++
++import pytest
++import openscrub as core
++
++
++def remembered(*pairs):
++    memory = core.PhiMemory()
++    for word, category in pairs:
++        memory.add(word, category)
++    return memory
++
++
++def scan(*words):
++    return [(0., (0., 0.), [(w, (1, 2, 11, 12), .99) for w in words])]
++
++
++def record(text, category, t=0., box=(1, 2, 11, 12), confidence=.99,
++           offset=(0., 0.)):
++    return dict(t_start=t, t_end=t, cbox=box, category=category, text=text,
++                confidence=confidence, aoff=offset, last_seen=0., dense=False,
++                track=-1, person=-1, poly=())
++
++
++def observed(scans, memory, cats=None, namer=None, **kwargs):
++    return [asdict(d) for d in core.reverse_pass(
++        scans, memory, {'email', 'phone', 'mrn', 'name'} if cats is None else cats,
++        namer, **kwargs)]
++
++
++@pytest.mark.parametrize('cats,expected', [
++    ({'email', 'phone', 'mrn'}, 'email'), ({'phone', 'mrn'}, 'phone')])
++def test_earlier_fuzzy_key_beats_later_exact_across_lengths(cats, expected):
++    # Sorting length buckets or taking an exact shortcut changes the category.
++    memory = remembered(('alphaaa', 'email'), ('alpha', 'phone'), ('alphaa', 'mrn'))
++    assert observed(scan('alphaa'), memory, cats) == [record('alphaa', expected)]
++
++
++def test_under_gate_match_does_not_hide_later_eligible_winner():
++    memory = remembered(('alphaaa', 'name'), ('alpha', 'phone'))
++    assert observed(scan('alphaa'), memory) == [record('alphaa', 'phone')]
++    memory.add('ALPHAAA', 'mrn')  # Increment count without changing category/order.
++    assert observed(scan('alphaa'), memory) == [record('alphaa', 'name')]
++
++
++@pytest.mark.parametrize('key,query,hit', [
++    ('12345678', '12345678', True), ('12345678', '12345699', True),
++    ('12345678', '12345999', False), ('12345678', '123456789', False),
++    ('12345678', '1234567x', False), ('1234567x', '12345678', False),
++    ('１２３４５６７８', '１２３４５６９９', True),
++    ('¹²³⁴', '¹²³⁹', True), ('1234', '１２３４', False),
++])
++def test_numeric_two_mismatch_rule_keeps_unicode_digit_semantics(key, query, hit):
++    memory = remembered((key, 'mrn'))
++    assert observed(scan(query), memory) == ([record(query, 'mrn')] if hit else [])
++
++
++@pytest.mark.parametrize('key,query,lenient,hit', [
++    ('abcdef', 'abcd', 76, True), ('abcdefg', 'abcd', 0, False),
++    ('abcd', 'abcdef', 76, True), ('abcd', 'abcdefg', 0, False),
++    ('abc', 'abcd', 76, True), ('abcde', 'abxde', 80, True),
++    ('abcde', 'abxde', 80.01, False), ('abcdefg', 'abcxefg', 76, True),
++    ('abcdefg', 'abcxefg', 72, True),
++    ('abcdefgh', 'abxxefgh', 72, True), ('abcdefgh', 'abxxefgh', 76, False),
++])
++def test_alpha_length_and_inclusive_score_boundaries(key, query, lenient, hit):
++    memory = remembered((key, 'email'))
++    assert observed(scan(query), memory, lenient=lenient) == (
++        [record(query, 'email')] if hit else [])
++
++
++def test_normalization_allowlist_and_short_stopword_filtering():
++    memory = remembered(('alphaa', 'email'), ('active', 'email'), ('abc', 'email'))
++    namer = core.NameDetector(use_ner=False)
++    namer.allow = {'alphaa'}
++    assert observed(scan('(Alphaa.)', 'active', 'abc'), memory, namer=namer) == []
++    assert observed(scan('(Alphaa.)'), memory) == [record('(Alphaa.)', 'email')]
++
++
++def test_allowlist_receives_original_word_before_lookup():
++    # A caller's exact-word allowlist must not accidentally receive normalized text.
++    class OriginalWordAllowlist:
++        def _allowed(self, word):
++            return word == '(Alphaa.)'
++    memory = remembered(('alphaa', 'email'))
++    assert observed(scan('(Alphaa.)', 'alphaa'), memory,
++                    namer=OriginalWordAllowlist()) == [record('alphaa', 'email')]
++
++
++def test_unordered_one_shot_scans_keep_duplicates_conversion_and_all_defaults():
++    memory = remembered(('alphaa', 'email'))
++    scans = iter([(2., [3.5, -2.], [('Alphaa', (-1.9, 2.9, 11.1, 12.9), -.12356)] * 2),
++                  (0., [0., 1.], [('alphaa', (1, 2, 11, 12), .12356)]),
++                  (2., [3.5, -2.], [('ALPHAA', (1, 2, 11, 12), .9999)])])
++    assert observed(scans, memory) == [
++        record('Alphaa', 'email', 2., (-1, 2, 11, 12), -.124, (3.5, -2.)),
++        record('Alphaa', 'email', 2., (-1, 2, 11, 12), -.124, (3.5, -2.)),
++        record('alphaa', 'email', 0., confidence=.124, offset=(0., 1.)),
++        record('ALPHAA', 'email', 2., confidence=1., offset=(3.5, -2.))]
++
++
++def test_pre_call_mapping_and_count_mutations_are_visible_every_invocation():
++    memory = remembered(('alphaaa', 'name'), ('alpha', 'phone'))
++    assert observed(scan('alphaa'), memory) == [record('alphaa', 'phone')]
++    memory.items['alphaaa'] = 'email'
++    memory.items.pop('alpha')
++    memory.items['alphaa'] = 'mrn'
++    assert observed(scan('alphaa'), memory) == [record('alphaa', 'email')]
++    memory.items['alphaaa'] = 'name'
++    memory.counts['alphaaa'] = 2
++    assert observed(scan('alphaa'), memory) == [record('alphaa', 'name')]
++    memory.items.pop('alphaaa')
++    assert observed(scan('alphaa'), memory) == [record('alphaa', 'mrn')]
++
++
++@pytest.mark.parametrize('mapping', [dict, OrderedDict])
++def test_malformed_key_retains_category_gate_and_original_failure(mapping):
++    memory = remembered(('alphaa', 'email'))
++    memory.items = mapping([(None, 'phone'), ('alphaa', 'email')])
++    assert observed(scan('alphaa'), memory, {'email'}) == [record('alphaa', 'email')]
++    with pytest.raises(AttributeError):
++        observed(scan('alphaa'), memory, {'phone', 'email'})
++    assert observed([], memory) == []
++    assert observed(scan('abc', 'active'), memory) == []
++
++
++def test_nonstring_category_is_not_silently_dropped_or_eagerly_raised():
++    memory = remembered(('alphaa', 'email'))
++    memory.items['zzzz'] = []
++    assert observed(scan('alphaa'), memory) == [record('alphaa', 'email')]
++    with pytest.raises(TypeError):
++        observed(scan('nomatch'), memory)
++
++
++@pytest.mark.parametrize('box,confidence,error', [
++    (('bad', 2, 11, 12), .9, ValueError), ((1, 2, 11, 12), 'bad', ValueError)])
++def test_conversion_failures_only_occur_for_matched_words(box, confidence, error):
++    memory = remembered(('alphaa', 'email'))
++    assert observed([(0., (0., 0.), [('nomatch', box, confidence)])], memory) == []
++    with pytest.raises(error):
++        observed([(0., (0., 0.), [('alphaa', box, confidence)])], memory)
++
++
++def test_custom_mapping_iteration_order_keeps_its_original_priority():
++    class ReverseItems(dict):
++        def items(self):
++            return reversed(list(super().items()))
++    memory = remembered(('alphaaa', 'email'), ('alphaa', 'mrn'))
++    memory.items = ReverseItems(memory.items)
++    assert observed(scan('alphaa'), memory) == [record('alphaa', 'mrn')]
++
++
++def test_missing_mapping_is_only_accessed_for_an_eligible_word():
++    memory = core.PhiMemory()
++    memory.items = None
++    assert observed([], memory) == []
++    assert observed(scan('abc', 'active'), memory) == []
++    with pytest.raises(AttributeError):
++        observed(scan('alphaa'), memory)
++
++
++def test_controlled_ocr_scan_reverse_and_report_keep_accepted_and_zone_dropped(tmp_path, monkeypatch):
++    """Inference is controlled; scan, primary matching, reverse, merge/report are real."""
++    import json
++    import numpy as np
++
++    video = tmp_path / 'fixed.avi'
++    writer = core.cv2.VideoWriter(str(video), core.cv2.VideoWriter_fourcc(*'FFV1'),
++                                  6., (160, 96))
++    assert writer.isOpened()
++    frame = np.random.default_rng(1411).integers(0, 256, (96, 160, 3), dtype=np.uint8)
++    for _ in range(12):
++        writer.write(frame)
++    writer.release()
++
++    class ControlledOCR:
++        calls = 0
++        def read(self, image):
++            # Four altered characters: reverse's76 passes, forward's82 fails.
++            words = (['abcdef@sample.invalid', 'ghijkl@sample.invalid']
++                     if self.calls == 0 else
++                     ['zzzdef#sample.invalid', 'zzzikl#sample.invalid'])
++            self.calls += 1
++            return [(words[0], (8, 8, 70, 28), .99),
++                    (words[1], (90, 8, 150, 28), .99),
++                    ('active', (8, 40, 70, 60), .99)]
++
++    ocr = ControlledOCR()
++    monkeypatch.setattr(core, 'make_ocr', lambda *args, **kwargs: ocr)
++    parser = core.build_parser()
++    args = core._prep_args(parser.parse_args([
++        str(video), '--categories', 'email', '--engine', 'tesseract',
++        '--sample-interval', '0.3333333333333333', '--scroll-track', 'off',
++        '--adaptive', 'off', '--ocr-upscale', 'off', '--no-vfr-fix',
++        '--no-backtrack']), parser)
++    args.zones_data = {'email': [(0., 0., .5, 1.)]}
++
++    class Quiet(core.Callbacks):
++        def log(self, message):
++            pass
++
++    state = core.run_scan(args, Quiet())
++    assert ocr.calls == 6
++    assert state['stats'] == dict(scans=6, raw_hits=7, regions=1, recalls=0,
++                                  remembered=2, zone_dropped={'email': 7})
++    accepted = dict(record('abcdef@sample.invalid', 'email', box=(8, 8, 70, 28)),
++                    t_end=2.3, last_seen=5/3)
++    dropped = dict(record('ghijkl@sample.invalid', 'email', box=(90, 8, 150, 28)),
++                   t_end=2.3, last_seen=5/3)
++    assert [asdict(d) for d in state['detections']] == [accepted]
++    assert [asdict(d) for d in state['zdropped']] == [dropped]
++    report = tmp_path / 'report.json'
++    core.write_report(str(report), args, state)
++    document = json.loads(report.read_text())
++    assert document['detections'] == json.loads(json.dumps([
++        dict(accepted, enabled=True), dict(dropped, enabled=False, zone_dropped=True)]))
++    assert document['render_state'] == dict(fps=6., cum=[[0., 0.]] * 12,
++                                           bands=[[0., 0.]] * 12)
++
++
++@pytest.mark.parametrize('malformed,error', [
++    ('count', TypeError), ('counts_mapping', AttributeError), ('threshold', TypeError)])
++def test_malformed_gate_data_keeps_errors_before_length_rejection(malformed, error):
++    memory = remembered(('a-much-longer-remembered-name', 'name'), ('alphaa', 'email'))
++    if malformed == 'count':
++        memory.counts['a-much-longer-remembered-name'] = None
++    elif malformed == 'counts_mapping':
++        memory.counts = None
++    else:
++        memory.name_sightings = None
++    # Category rejection comes first, even for malformed name gate data.
++    assert observed(scan('alphaa'), memory, {'email'}) == [record('alphaa', 'email')]
++    with pytest.raises(error):
++        observed(scan('alphaa'), memory, {'email', 'name'})
++
++
++def test_defaultdict_counts_and_changed_sighting_threshold_keep_gate_meaning():
++    from collections import defaultdict
++    memory = remembered(('alphaaa', 'name'), ('alphaaa', 'name'), ('alpha', 'phone'))
++    memory.counts = defaultdict(int, memory.counts)
++    assert observed(scan('alphaa'), memory) == [record('alphaa', 'name')]
++    memory.name_sightings = 3
++    assert observed(scan('alphaa'), memory) == [record('alphaa', 'phone')]
++    assert dict(memory.counts) == {'alphaaa': 2, 'alpha': 1}
++
++
++def test_missing_gate_attributes_do_not_break_an_immediate_earlier_winner():
++    memory = remembered(('alphaa', 'email'), ('a-much-longer-name', 'name'))
++    del memory.counts
++    del memory.name_sightings
++    assert observed(scan('alphaa'), memory) == [record('alphaa', 'email')]
++    with pytest.raises(AttributeError):
++        observed(scan('nomatch'), memory)
+diff --git a/tests/test_tail_history_index.py b/tests/test_tail_history_index.py
+new file mode 100644
+index 0000000..43be68c
+--- /dev/null
++++ b/tests/test_tail_history_index.py
+@@ -0,0 +1,127 @@
++"""Tail coverage controls against the complete active engine (no old checkout)."""
++from dataclasses import asdict
++from decimal import Decimal
++import json
++
++import cv2
++import numpy as np
++import pytest
++from rapidfuzz import fuzz
++
++import openscrub as core
++
++BOX = (8, 8, 150, 28)
++TEXT = "alice@example.invalid"
++
++
++def detection(t=0., **fields):
++    return core.Detection(t, 99., BOX, "email", TEXT, .91,
++                          aoff=(2., 3.), track=7, person=4,
++                          poly=((.1, .2),), **fields)
++
++
++def record(start=0., end=.5, seen=0., **fields):
++    return dict(t_start=start, t_end=end, cbox=BOX, category="email",
++                text=TEXT, confidence=.91, aoff=(2., 3.), last_seen=seen,
++                dense=False, track=7, person=4, poly=((.1, .2),), **fields)
++
++
++def scan(t, text=TEXT, confidence=.99, box=BOX):
++    return (t, (0., 0.), [(text, box, confidence)])
++
++
++def merge(dets, scans, **kwargs):
++    return [asdict(d) for d in core.merge_detections(
++        dets, .5, scans=scans, fuzz=fuzz, **kwargs)]
++
++
++@pytest.mark.parametrize("history,end,seen", [
++    ([scan(0), scan(.5), scan(1)], 1.5, 1),
++    ([scan(.01, "different"), scan(.5)], 1., .5),
++    ([scan(.5), scan(.5, "different"), scan(.51, "different"), scan(1)], 1.5, 1),
++    ((scan(.5), scan(1)), 1.5, 1),
++    (iter([scan(.5), scan(1)]), 1.5, 1),
++    ([scan(.5), scan(1, "different"), ("invalid",)], 1., .5),
++    ([scan(.5), scan(1, "different"), scan(1.5)], 1., .5),
++    ([scan(.5, confidence=.49), scan(1)], .5, 0.),
++    ([scan(.5, confidence=.5), scan(1, box=(500, 500, 550, 520))], 1., .5),
++    ([scan(4.), scan(8.), scan(12.01)], 8.5, 8.),
++    # Caller order is meaningful: the earlier contradictory row is skipped
++    # after support at 2 advances last_seen, so sorting would lose coverage.
++    ([scan(2), scan(1, "different"), scan(3)], 3.5, 3),
++    ([(np.float64(.5), (0., 0.), [])], .5, 0.),
++    ([(float("nan"), (0., 0.), []), scan(.5)], .5, 0.),
++])
++def test_tail_records_preserve_support_boundaries_and_caller_order(history, end, seen):
++    # The second independent region makes this exercise shared history too.
++    other = core.Detection(0., 99., (500, 500, 550, 520), "phone", "5551234567", .8)
++    assert merge([detection(), other], history) == [
++        record(end=end, seen=seen),
++        dict(t_start=0., t_end=.5, cbox=(500, 500, 550, 520),
++             category="phone", text="5551234567", confidence=.8,
++             aoff=(0., 0.), last_seen=0., dense=False, track=-1, person=-1, poly=()),
++    ]
++
++
++def test_repeated_detections_keep_first_record_and_extend_later_support():
++    assert merge([detection(), detection(1.)], [scan(0.), scan(1.), scan(1.5)]) == [
++        record(end=2., seen=1.5)]
++
++
++@pytest.mark.parametrize("history,error", [
++    ([(None, (0., 0.), [])], TypeError),
++    ([(Decimal(".5"), (0., 0.), [])], TypeError),
++    ([("later", (0., 0.), [])], TypeError),
++    ([(0., (0., 0.))], ValueError),
++])
++def test_malformed_history_keeps_existing_failure(history, error):
++    with pytest.raises(error):
++        merge([detection(), core.Detection(1., 99., BOX, "phone", "5551234567", .8)], history)
++
++
++def test_empty_and_no_tail_paths_do_not_inspect_history():
++    assert merge([], [("invalid",)]) == []
++    dense = detection(dense=True)
++    assert merge([dense], [("invalid",)]) == [dict(record(end=99.), dense=True)]
++    assert merge([detection()], []) == [record()]
++    assert [asdict(d) for d in core.merge_detections(
++        [detection()], .5, scans=[("invalid",)], fuzz=None)] == [record()]
++
++
++def test_run_scan_finalization_and_report_with_controlled_ocr(tmp_path, monkeypatch):
++    """Real decoding, forward/reverse recall, merge, and report; OCR is controlled."""
++    clip = tmp_path / "fixed.avi"
++    writer = cv2.VideoWriter(str(clip), cv2.VideoWriter_fourcc(*"FFV1"), 6., (160, 96))
++    assert writer.isOpened()
++    frame = np.random.default_rng(1411).integers(0, 256, (96, 160, 3), dtype=np.uint8)
++    for _ in range(8):
++        writer.write(frame)
++    writer.release()
++
++    class OCR:
++        calls = 0
++        def read(self, image):
++            self.calls += 1
++            return [(TEXT, BOX, .99), ("bob@example.invalid", (8, 65, 150, 85), .99),
++                    ("ready", (85, 40, 150, 60), .99)]
++
++    ocr = OCR()
++    monkeypatch.setattr(core, "make_ocr", lambda *args, **kwargs: ocr)
++    parser = core.build_parser()
++    args = core._prep_args(parser.parse_args([
++        str(clip), "--categories", "email", "--engine", "tesseract",
++        "--sample-interval", "0.3333333333333333", "--scroll-track", "off",
++        "--adaptive", "off", "--ocr-upscale", "off", "--no-vfr-fix", "--no-backtrack",
++    ]), parser)
++    state = core.run_scan(args, core.Callbacks())
++    assert ocr.calls == state["stats"]["scans"] == 4
++    expected = dict(t_start=0., t_end=1.6333333333333333, cbox=BOX, category="email", text=TEXT,
++                    confidence=.99, aoff=(0., 0.), last_seen=1., dense=False,
++                    track=-1, person=-1, poly=())
++    expected_records = [expected, dict(expected, text="bob@example.invalid", cbox=(8, 65, 150, 85))]
++    assert [asdict(d) for d in state["detections"]] == expected_records
++    report = tmp_path / "report.json"
++    core.write_report(str(report), args, state)
++    doc = json.loads(report.read_text())
++    assert doc["detections"] == json.loads(json.dumps([dict(d, enabled=True) for d in expected_records]))
++    assert doc["render_state"]["cum"] == [[round(x, 1), round(y, 1)] for x, y in state["cum"]]
