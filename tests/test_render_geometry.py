@@ -274,3 +274,63 @@ def test_run_coverage_rounding_keeps_legal_empty_box(monkeypatch, hdr, pad):
                            hdr_source="in" if hdr else None, hdr_encoder="libx265")
     o.run_render(args, dict(detections=[d], cum=[(0, 0)], bands=[(0, 0)], fps=1, stats={}))
     assert observed == [(0, 0, 0, 0)]
+
+
+def metadata_capture(monkeypatch, width=16, height=16, count=1):
+    class Capture:
+        released = False
+        def get(self, field):
+            return {cv2.CAP_PROP_FRAME_WIDTH: width,
+                    cv2.CAP_PROP_FRAME_HEIGHT: height,
+                    cv2.CAP_PROP_FRAME_COUNT: count}[field]
+        def release(self):
+            self.released = True
+    cap = Capture()
+    monkeypatch.setattr(o.cv2, "VideoCapture", lambda *a: cap)
+    return cap
+
+
+@pytest.mark.parametrize("hdr", [False, True])
+@pytest.mark.parametrize("count", [1, -1])
+def test_renderer_admits_finite_negative_frame_count(monkeypatch, hdr, count):
+    cap = metadata_capture(monkeypatch, count=count)
+    class EncoderReached(Exception):
+        pass
+    def reached(*a, **kw):
+        if hdr:
+            assert cap.released  # metadata capture closes before HDR decoding
+            assert kw["bufsize"] == 16 * 16 * 6
+        raise EncoderReached()
+    monkeypatch.setattr(o, "nvenc_available", reached)
+    monkeypatch.setattr(o.subprocess, "Popen", reached)
+    args = dict(src="in", dst="out", detections=[], cum=[(0, 0)],
+                bands=[(0, 0)], fps=1, pad=0, mode="box")
+    try:
+        with pytest.raises(EncoderReached):
+            if hdr:
+                o.render_hdr(**args, encoder="libx265", tags={})
+            else:
+                o.render(**args, preview=False)
+    finally:
+        cap.release()  # harness ownership at the deliberate acquisition fault
+
+
+@pytest.mark.parametrize("hdr", [False, True])
+@pytest.mark.parametrize("field,value", [("width", 0), ("width", -1),
+                                         ("height", 0), ("height", -1),
+                                         ("width", np.nan), ("height", np.inf),
+                                         ("count", np.nan), ("count", np.inf)])
+def test_renderer_rejects_unusable_metadata(monkeypatch, hdr, field, value):
+    cap = metadata_capture(monkeypatch, **{field: value})
+    def acquired(*a, **kw):
+        pytest.fail("native decoder/encoder acquired with unusable metadata")
+    monkeypatch.setattr(o, "nvenc_available", acquired)
+    monkeypatch.setattr(o.subprocess, "Popen", acquired)
+    args = dict(src="in", dst="out", detections=[], cum=[(0, 0)],
+                bands=[(0, 0)], fps=1, pad=0, mode="box")
+    with pytest.raises(ValueError, match=r"geometry.*video dimensions/count"):
+        if hdr:
+            o.render_hdr(**args, encoder="libx265", tags={})
+        else:
+            o.render(**args, preview=False)
+    assert cap.released
