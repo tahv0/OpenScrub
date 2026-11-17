@@ -1,0 +1,39 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_____________________ test_emitted_page_polling_acceptance _____________________
+
+polling_http = 'http://127.0.0.1:33759'
+
+    def test_emitted_page_polling_acceptance(polling_http):
+        node = shutil.which('node')
+        if not node:
+            pytest.skip('Node needed for optional Playwright acceptance')
+        available = subprocess.run([node, '-e', "require('playwright')"], capture_output=True)
+        if available.returncode:
+            pytest.skip('Existing Playwright required; no frontend dependencies installed')
+        env = dict(os.environ, POLLING_BASE=polling_http)
+        result = subprocess.run([node, '-e', BROWSER], capture_output=True, text=True, env=env, timeout=120)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+E         
+E         5 !== 1
+E         
+E             at [eval]:49:9
+E             at runNextTicks (node:internal/process/task_queues:64:5)
+E             at process.processImmediate (node:internal/timers:452:9)
+E             at process.callbackTrampoline (node:internal/async_hooks:130:17) {
+E           generatedMessage: true,
+E           code: 'ERR_ASSERTION',
+E           actual: 5,
+E           expected: 1,
+E           operator: 'strictEqual',
+E           diff: 'simple'
+E         }
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', "\nconst {chromium}=require('playwright'),assert=require('node:assert/st...age: true,\n  code: 'ERR_ASSERTION',\n  actual: 5,\n  expected: 1,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n").returncode
+
+tests/test_job_polling_browser.py:234: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_job_polling_browser.py::test_emitted_page_polling_acceptance
+1 failed in 1.48s

@@ -1,0 +1,42 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_________________ test_online_wake_replaces_pending_work_once __________________
+
+    def test_online_wake_replaces_pending_work_once():
+>       run_js("""openJob('A');const old=queue.shift();emit('online');emit('focus');emit('pageshow');
+        await advance(0);assert.equal(old.options.signal.aborted,true);assert.equal(calls.length,2);
+        old.reject(Error('late failure'));await tick();await cycle();assert.equal(timers.size,1);""")
+
+tests/test_job_polling_node.py:153: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "openJob('A');const old=queue.shift();emit('online');emit('focus');emit('pageshow');\n    await advance(0);assert.equa....equal(calls.length,2);\n    old.reject(Error('late failure'));await tick();await cycle();assert.equal(timers.size,1);"
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node needed for emitted polling JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+E         
+E         false !== true
+E         
+E             at evalmachine.<anonymous>:2:29
+E             at async [eval]:40:12 {
+E           generatedMessage: true,
+E           code: 'ERR_ASSERTION',
+E           actual: false,
+E           expected: true,
+E           operator: 'strictEqual',
+E           diff: 'simple'
+E         }
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...ue,\n  code: 'ERR_ASSERTION',\n  actual: false,\n  expected: true,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n").returncode
+
+tests/test_job_polling_node.py:59: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_job_polling_node.py::test_online_wake_replaces_pending_work_once
+1 failed, 20 deselected in 0.15s

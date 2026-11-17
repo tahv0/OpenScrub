@@ -1,0 +1,6 @@
+GET / 200
+GET /api/jobs 200
+GET /api/jobs/d9d2c218b1e3 200
+GET /api/jobs/d9d2c218b1e3/log?from=0 200
+Installed source: /tmp/openscrub-task3/installed/openscrub_web.py
+sdist includes all tests; wheel/installed source match active source

@@ -1,0 +1,1130 @@
+FFFFFFFFFFFF.FFF.FFF                                                     [100%]
+=================================== FAILURES ===================================
+_______________ test_same_view_single_cycle_and_completion_delay _______________
+
+    def test_same_view_single_cycle_and_completion_delay():
+>       run_js("""openJob('A');refresh();refresh();await advance(1800);
+        assert.equal(calls.length,1,'pending metadata must coalesce');
+        await reply(job('scanning',0.8));refresh();await advance(900);
+        assert.equal(calls.length,2,'pending log must coalesce');
+        await reply(log(['one']));assert.equal(elements.get('log').textContent,'one');
+        await advance(899);assert.equal(calls.length,2);await advance(1);assert.equal(calls.length,3);
+        await cycle('scanning');assert.equal(elements.get('prog').value,0.2);
+        assert.equal(elements.get('log').textContent,'one');""")
+
+tests/test_job_polling_node.py:63: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "openJob('A');refresh();refresh();await advance(1800);\n    assert.equal(calls.length,1,'pending metadata must coalesc...le('scanning');assert.equal(elements.get('prog').value,0.2);\n    assert.equal(elements.get('log').textContent,'one');"
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node needed for emitted polling JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: AssertionError [ERR_ASSERTION]: pending metadata must coalesce
+E         
+E         5 !== 1
+E         
+E             at evalmachine.<anonymous>:2:12
+E             at async [eval]:40:12 {
+E           generatedMessage: false,
+E           code: 'ERR_ASSERTION',
+E           actual: 5,
+E           expected: 1,
+E           operator: 'strictEqual',
+E           diff: 'simple'
+E         }
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...ge: false,\n  code: 'ERR_ASSERTION',\n  actual: 5,\n  expected: 1,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n").returncode
+
+tests/test_job_polling_node.py:59: AssertionError
+_________ test_whole_operation_deadline_releases_ignore_abort[headers] _________
+
+kind = 'headers'
+
+    @pytest.mark.parametrize('kind', ['headers', 'body'])
+    def test_whole_operation_deadline_releases_ignore_abort(kind):
+>       run_js("""openJob('A');const old=queue.shift();let release;
+        if(KIND==='body'){old.resolve({ok:true,json:()=>new Promise(r=>release=r)});await tick();}
+        await advance(14999);assert.equal(calls.length,1);await advance(1);
+        assert.equal(old.options.signal.aborted,true);assert.match(elements.get('pollStatus').textContent,/retry/i);
+        await advance(900);assert.equal(calls.length,2);await cycle();
+        if(release)release(job('queued',0.9));else old.resolve(response(job('queued',0.9)));
+        await tick();assert.equal(elements.get('prog').value,0.2);assert.equal(elements.get('pollStatus').textContent,'');
+        assert.equal(timers.size,1,'losing operation must not retain timers');""".replace('KIND', json.dumps(kind)))
+
+tests/test_job_polling_node.py:75: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = 'openJob(\'A\');const old=queue.shift();let release;\n    if("headers"===\'body\'){old.resolve({ok:true,json:()=>new P...s.get(\'pollStatus\').textContent,\'\');\n    assert.equal(timers.size,1,\'losing operation must not retain timers\');'
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node needed for emitted polling JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+E         
+E         17 !== 1
+E         
+E             at evalmachine.<anonymous>:3:33
+E             at async [eval]:40:12 {
+E           generatedMessage: true,
+E           code: 'ERR_ASSERTION',
+E           actual: 17,
+E           expected: 1,
+E           operator: 'strictEqual',
+E           diff: 'simple'
+E         }
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...ge: true,\n  code: 'ERR_ASSERTION',\n  actual: 17,\n  expected: 1,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n").returncode
+
+tests/test_job_polling_node.py:59: AssertionError
+__________ test_whole_operation_deadline_releases_ignore_abort[body] ___________
+
+kind = 'body'
+
+    @pytest.mark.parametrize('kind', ['headers', 'body'])
+    def test_whole_operation_deadline_releases_ignore_abort(kind):
+>       run_js("""openJob('A');const old=queue.shift();let release;
+        if(KIND==='body'){old.resolve({ok:true,json:()=>new Promise(r=>release=r)});await tick();}
+        await advance(14999);assert.equal(calls.length,1);await advance(1);
+        assert.equal(old.options.signal.aborted,true);assert.match(elements.get('pollStatus').textContent,/retry/i);
+        await advance(900);assert.equal(calls.length,2);await cycle();
+        if(release)release(job('queued',0.9));else old.resolve(response(job('queued',0.9)));
+        await tick();assert.equal(elements.get('prog').value,0.2);assert.equal(elements.get('pollStatus').textContent,'');
+        assert.equal(timers.size,1,'losing operation must not retain timers');""".replace('KIND', json.dumps(kind)))
+
+tests/test_job_polling_node.py:75: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = 'openJob(\'A\');const old=queue.shift();let release;\n    if("body"===\'body\'){old.resolve({ok:true,json:()=>new Prom...s.get(\'pollStatus\').textContent,\'\');\n    assert.equal(timers.size,1,\'losing operation must not retain timers\');'
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node needed for emitted polling JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+E         
+E         17 !== 1
+E         
+E             at evalmachine.<anonymous>:3:33
+E             at async [eval]:40:12 {
+E           generatedMessage: true,
+E           code: 'ERR_ASSERTION',
+E           actual: 17,
+E           expected: 1,
+E           operator: 'strictEqual',
+E           diff: 'simple'
+E         }
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...ge: true,\n  code: 'ERR_ASSERTION',\n  actual: 17,\n  expected: 1,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n").returncode
+
+tests/test_job_polling_node.py:59: AssertionError
+________ test_failures_retain_valid_dom_then_recover[network-metadata] _________
+
+stage = 'metadata', kind = 'network'
+
+    @pytest.mark.parametrize('stage', ['metadata', 'log'])
+    @pytest.mark.parametrize('kind', ['network', 'json', '503'])
+    def test_failures_retain_valid_dom_then_recover(stage, kind):
+>       run_js("""openJob('A');await cycle('queued',['kept']);await advance(900);
+        if(STAGE==='log')await reply(job('queued',0.4));
+        const req=queue.shift();if(KIND==='network')req.reject(Error('offline'));
+        else if(KIND==='json')req.resolve({ok:true,json:async()=>{throw Error('invalid')}});
+        else req.resolve(response({error:'unavailable'},503));await tick();
+        assert.equal(elements.get('log').textContent,'kept');assert.match(elements.get('pollStatus').textContent,/retry/i);
+        assert.ok(!elements.get('detail').innerHTML.includes('undefined'));
+        await advance(900);await cycle();assert.equal(elements.get('pollStatus').textContent,'');
+        assert.ok(calls.every(c=>!c.options.method),'recovery must never mutate jobs');
+        """.replace('STAGE', json.dumps(stage)).replace('KIND', json.dumps(kind)))
+
+tests/test_job_polling_node.py:88: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = 'openJob(\'A\');await cycle(\'queued\',[\'kept\']);await advance(900);\n    if("metadata"===\'log\')await reply(job(\'...tus\').textContent,\'\');\n    assert.ok(calls.every(c=>!c.options.method),\'recovery must never mutate jobs\');\n    '
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node needed for emitted polling JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: TypeError: Cannot read properties of undefined (reading 'textContent')
+E             at evalmachine.<anonymous>:6:97
+E             at async [eval]:40:12
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...ead properties of undefined (reading 'textContent')\n    at evalmachine.<anonymous>:6:97\n    at async [eval]:40:12\n").returncode
+
+tests/test_job_polling_node.py:59: AssertionError
+___________ test_failures_retain_valid_dom_then_recover[network-log] ___________
+
+stage = 'log', kind = 'network'
+
+    @pytest.mark.parametrize('stage', ['metadata', 'log'])
+    @pytest.mark.parametrize('kind', ['network', 'json', '503'])
+    def test_failures_retain_valid_dom_then_recover(stage, kind):
+>       run_js("""openJob('A');await cycle('queued',['kept']);await advance(900);
+        if(STAGE==='log')await reply(job('queued',0.4));
+        const req=queue.shift();if(KIND==='network')req.reject(Error('offline'));
+        else if(KIND==='json')req.resolve({ok:true,json:async()=>{throw Error('invalid')}});
+        else req.resolve(response({error:'unavailable'},503));await tick();
+        assert.equal(elements.get('log').textContent,'kept');assert.match(elements.get('pollStatus').textContent,/retry/i);
+        assert.ok(!elements.get('detail').innerHTML.includes('undefined'));
+        await advance(900);await cycle();assert.equal(elements.get('pollStatus').textContent,'');
+        assert.ok(calls.every(c=>!c.options.method),'recovery must never mutate jobs');
+        """.replace('STAGE', json.dumps(stage)).replace('KIND', json.dumps(kind)))
+
+tests/test_job_polling_node.py:88: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = 'openJob(\'A\');await cycle(\'queued\',[\'kept\']);await advance(900);\n    if("log"===\'log\')await reply(job(\'queue...tus\').textContent,\'\');\n    assert.ok(calls.every(c=>!c.options.method),\'recovery must never mutate jobs\');\n    '
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node needed for emitted polling JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: TypeError: Cannot read properties of undefined (reading 'textContent')
+E             at evalmachine.<anonymous>:6:97
+E             at async [eval]:40:12
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...ead properties of undefined (reading 'textContent')\n    at evalmachine.<anonymous>:6:97\n    at async [eval]:40:12\n").returncode
+
+tests/test_job_polling_node.py:59: AssertionError
+__________ test_failures_retain_valid_dom_then_recover[json-metadata] __________
+
+stage = 'metadata', kind = 'json'
+
+    @pytest.mark.parametrize('stage', ['metadata', 'log'])
+    @pytest.mark.parametrize('kind', ['network', 'json', '503'])
+    def test_failures_retain_valid_dom_then_recover(stage, kind):
+>       run_js("""openJob('A');await cycle('queued',['kept']);await advance(900);
+        if(STAGE==='log')await reply(job('queued',0.4));
+        const req=queue.shift();if(KIND==='network')req.reject(Error('offline'));
+        else if(KIND==='json')req.resolve({ok:true,json:async()=>{throw Error('invalid')}});
+        else req.resolve(response({error:'unavailable'},503));await tick();
+        assert.equal(elements.get('log').textContent,'kept');assert.match(elements.get('pollStatus').textContent,/retry/i);
+        assert.ok(!elements.get('detail').innerHTML.includes('undefined'));
+        await advance(900);await cycle();assert.equal(elements.get('pollStatus').textContent,'');
+        assert.ok(calls.every(c=>!c.options.method),'recovery must never mutate jobs');
+        """.replace('STAGE', json.dumps(stage)).replace('KIND', json.dumps(kind)))
+
+tests/test_job_polling_node.py:88: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = 'openJob(\'A\');await cycle(\'queued\',[\'kept\']);await advance(900);\n    if("metadata"===\'log\')await reply(job(\'...tus\').textContent,\'\');\n    assert.ok(calls.every(c=>!c.options.method),\'recovery must never mutate jobs\');\n    '
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node needed for emitted polling JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: TypeError: Cannot read properties of undefined (reading 'textContent')
+E             at evalmachine.<anonymous>:6:97
+E             at async [eval]:40:12
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...ead properties of undefined (reading 'textContent')\n    at evalmachine.<anonymous>:6:97\n    at async [eval]:40:12\n").returncode
+
+tests/test_job_polling_node.py:59: AssertionError
+____________ test_failures_retain_valid_dom_then_recover[json-log] _____________
+
+stage = 'log', kind = 'json'
+
+    @pytest.mark.parametrize('stage', ['metadata', 'log'])
+    @pytest.mark.parametrize('kind', ['network', 'json', '503'])
+    def test_failures_retain_valid_dom_then_recover(stage, kind):
+>       run_js("""openJob('A');await cycle('queued',['kept']);await advance(900);
+        if(STAGE==='log')await reply(job('queued',0.4));
+        const req=queue.shift();if(KIND==='network')req.reject(Error('offline'));
+        else if(KIND==='json')req.resolve({ok:true,json:async()=>{throw Error('invalid')}});
+        else req.resolve(response({error:'unavailable'},503));await tick();
+        assert.equal(elements.get('log').textContent,'kept');assert.match(elements.get('pollStatus').textContent,/retry/i);
+        assert.ok(!elements.get('detail').innerHTML.includes('undefined'));
+        await advance(900);await cycle();assert.equal(elements.get('pollStatus').textContent,'');
+        assert.ok(calls.every(c=>!c.options.method),'recovery must never mutate jobs');
+        """.replace('STAGE', json.dumps(stage)).replace('KIND', json.dumps(kind)))
+
+tests/test_job_polling_node.py:88: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = 'openJob(\'A\');await cycle(\'queued\',[\'kept\']);await advance(900);\n    if("log"===\'log\')await reply(job(\'queue...tus\').textContent,\'\');\n    assert.ok(calls.every(c=>!c.options.method),\'recovery must never mutate jobs\');\n    '
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node needed for emitted polling JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: TypeError: Cannot read properties of undefined (reading 'textContent')
+E             at evalmachine.<anonymous>:6:97
+E             at async [eval]:40:12
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...ead properties of undefined (reading 'textContent')\n    at evalmachine.<anonymous>:6:97\n    at async [eval]:40:12\n").returncode
+
+tests/test_job_polling_node.py:59: AssertionError
+__________ test_failures_retain_valid_dom_then_recover[503-metadata] ___________
+
+stage = 'metadata', kind = '503'
+
+    @pytest.mark.parametrize('stage', ['metadata', 'log'])
+    @pytest.mark.parametrize('kind', ['network', 'json', '503'])
+    def test_failures_retain_valid_dom_then_recover(stage, kind):
+>       run_js("""openJob('A');await cycle('queued',['kept']);await advance(900);
+        if(STAGE==='log')await reply(job('queued',0.4));
+        const req=queue.shift();if(KIND==='network')req.reject(Error('offline'));
+        else if(KIND==='json')req.resolve({ok:true,json:async()=>{throw Error('invalid')}});
+        else req.resolve(response({error:'unavailable'},503));await tick();
+        assert.equal(elements.get('log').textContent,'kept');assert.match(elements.get('pollStatus').textContent,/retry/i);
+        assert.ok(!elements.get('detail').innerHTML.includes('undefined'));
+        await advance(900);await cycle();assert.equal(elements.get('pollStatus').textContent,'');
+        assert.ok(calls.every(c=>!c.options.method),'recovery must never mutate jobs');
+        """.replace('STAGE', json.dumps(stage)).replace('KIND', json.dumps(kind)))
+
+tests/test_job_polling_node.py:88: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = 'openJob(\'A\');await cycle(\'queued\',[\'kept\']);await advance(900);\n    if("metadata"===\'log\')await reply(job(\'...tus\').textContent,\'\');\n    assert.ok(calls.every(c=>!c.options.method),\'recovery must never mutate jobs\');\n    '
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node needed for emitted polling JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: TypeError: Cannot read properties of undefined (reading 'textContent')
+E             at evalmachine.<anonymous>:6:97
+E             at async [eval]:40:12
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...ead properties of undefined (reading 'textContent')\n    at evalmachine.<anonymous>:6:97\n    at async [eval]:40:12\n").returncode
+
+tests/test_job_polling_node.py:59: AssertionError
+_____________ test_failures_retain_valid_dom_then_recover[503-log] _____________
+
+stage = 'log', kind = '503'
+
+    @pytest.mark.parametrize('stage', ['metadata', 'log'])
+    @pytest.mark.parametrize('kind', ['network', 'json', '503'])
+    def test_failures_retain_valid_dom_then_recover(stage, kind):
+>       run_js("""openJob('A');await cycle('queued',['kept']);await advance(900);
+        if(STAGE==='log')await reply(job('queued',0.4));
+        const req=queue.shift();if(KIND==='network')req.reject(Error('offline'));
+        else if(KIND==='json')req.resolve({ok:true,json:async()=>{throw Error('invalid')}});
+        else req.resolve(response({error:'unavailable'},503));await tick();
+        assert.equal(elements.get('log').textContent,'kept');assert.match(elements.get('pollStatus').textContent,/retry/i);
+        assert.ok(!elements.get('detail').innerHTML.includes('undefined'));
+        await advance(900);await cycle();assert.equal(elements.get('pollStatus').textContent,'');
+        assert.ok(calls.every(c=>!c.options.method),'recovery must never mutate jobs');
+        """.replace('STAGE', json.dumps(stage)).replace('KIND', json.dumps(kind)))
+
+tests/test_job_polling_node.py:88: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = 'openJob(\'A\');await cycle(\'queued\',[\'kept\']);await advance(900);\n    if("log"===\'log\')await reply(job(\'queue...tus\').textContent,\'\');\n    assert.ok(calls.every(c=>!c.options.method),\'recovery must never mutate jobs\');\n    '
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node needed for emitted polling JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: TypeError: Cannot read properties of undefined (reading 'textContent')
+E             at evalmachine.<anonymous>:6:97
+E             at async [eval]:40:12
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...ead properties of undefined (reading 'textContent')\n    at evalmachine.<anonymous>:6:97\n    at async [eval]:40:12\n").returncode
+
+tests/test_job_polling_node.py:59: AssertionError
+________________ test_initial_failure_and_bounded_backoff_reset ________________
+
+    def test_initial_failure_and_bounded_backoff_reset():
+>       run_js("""openJob('A');for(const delay of [900,1800,3600,7200,10000,10000]){
+        queue.shift().reject(Error('offline'));await tick();assert.match(elements.get('pollStatus').textContent,/retry/i);
+        const n=calls.length;await advance(delay-1);assert.equal(calls.length,n);await advance(1);assert.equal(calls.length,n+1);}
+        await cycle();await advance(900);assert.equal(calls.length,9);""")
+
+tests/test_job_polling_node.py:101: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "openJob('A');for(const delay of [900,1800,3600,7200,10000,10000]){\n    queue.shift().reject(Error('offline'));await ...;await advance(1);assert.equal(calls.length,n+1);}\n    await cycle();await advance(900);assert.equal(calls.length,9);"
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node needed for emitted polling JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: TypeError: Cannot read properties of undefined (reading 'textContent')
+E             at evalmachine.<anonymous>:2:96
+E             at async [eval]:40:12
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...ead properties of undefined (reading 'textContent')\n    at evalmachine.<anonymous>:2:96\n    at async [eval]:40:12\n").returncode
+
+tests/test_job_polling_node.py:59: AssertionError
+____________ test_obsolete_finally_cannot_control_new_view[reopen] _____________
+
+mode = 'reopen'
+
+    @pytest.mark.parametrize('mode', ['reopen', 'aba', 'delete'])
+    def test_obsolete_finally_cannot_control_new_view(mode):
+>       run_js("""openJob('A');const old=queue.shift();
+        if(MODE==='delete'){const p=delJob('A');await reply({ok:true});await p;old.resolve(response(job()));await tick();
+          await advance(20000);assert.equal(CUR,null);assert.equal(timers.size,0);assert.equal(calls.length,2);return;}
+        if(MODE==='aba'){openJob('B');queue.shift();}openJob('A');await tick();
+        assert.equal(old.options.signal.aborted,true);const current=queue[0];
+        old.resolve(response(job('done',1)));await tick();refresh();assert.equal(queue[0],current);assert.equal(queue.length,1);
+        await cycle();assert.equal(elements.get('prog').value,0.2);assert.equal(timers.size,1);
+        """.replace('MODE', json.dumps(mode)))
+
+tests/test_job_polling_node.py:109: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = 'openJob(\'A\');const old=queue.shift();\n    if("reopen"===\'delete\'){const p=delJob(\'A\');await reply({ok:true});a...(queue.length,1);\n    await cycle();assert.equal(elements.get(\'prog\').value,0.2);assert.equal(timers.size,1);\n    '
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node needed for emitted polling JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: TypeError: Cannot read properties of undefined (reading 'aborted')
+E             at evalmachine.<anonymous>:5:37
+E             at async [eval]:40:12
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...ot read properties of undefined (reading 'aborted')\n    at evalmachine.<anonymous>:5:37\n    at async [eval]:40:12\n").returncode
+
+tests/test_job_polling_node.py:59: AssertionError
+______________ test_obsolete_finally_cannot_control_new_view[aba] ______________
+
+mode = 'aba'
+
+    @pytest.mark.parametrize('mode', ['reopen', 'aba', 'delete'])
+    def test_obsolete_finally_cannot_control_new_view(mode):
+>       run_js("""openJob('A');const old=queue.shift();
+        if(MODE==='delete'){const p=delJob('A');await reply({ok:true});await p;old.resolve(response(job()));await tick();
+          await advance(20000);assert.equal(CUR,null);assert.equal(timers.size,0);assert.equal(calls.length,2);return;}
+        if(MODE==='aba'){openJob('B');queue.shift();}openJob('A');await tick();
+        assert.equal(old.options.signal.aborted,true);const current=queue[0];
+        old.resolve(response(job('done',1)));await tick();refresh();assert.equal(queue[0],current);assert.equal(queue.length,1);
+        await cycle();assert.equal(elements.get('prog').value,0.2);assert.equal(timers.size,1);
+        """.replace('MODE', json.dumps(mode)))
+
+tests/test_job_polling_node.py:109: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = 'openJob(\'A\');const old=queue.shift();\n    if("aba"===\'delete\'){const p=delJob(\'A\');await reply({ok:true});awai...(queue.length,1);\n    await cycle();assert.equal(elements.get(\'prog\').value,0.2);assert.equal(timers.size,1);\n    '
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node needed for emitted polling JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: TypeError: Cannot read properties of undefined (reading 'aborted')
+E             at evalmachine.<anonymous>:5:37
+E             at async [eval]:40:12
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...ot read properties of undefined (reading 'aborted')\n    at evalmachine.<anonymous>:5:37\n    at async [eval]:40:12\n").returncode
+
+tests/test_job_polling_node.py:59: AssertionError
+________ test_authoritative_empty_shrunk_cursor_initial_tail_and_scroll ________
+
+    def test_authoritative_empty_shrunk_cursor_initial_tail_and_scroll():
+>       run_js("""openJob('A');await reply(job());await reply(log(Array.from({length:405},(_,i)=>'L'+i),405,0));
+        const lg=elements.get('log');assert.equal(lg.textContent.split('\\n').length,400);assert.ok(lg.textContent.startsWith('L5\\n'));
+        assert.equal(LOGN,405);assert.equal(lg.scrollTop,100);lg.scrollTop=0;lg.scrollHeight=1000;
+        await advance(900);await reply(job());await reply(log([],1,405));
+        assert.equal(lg.textContent,'');assert.equal(LOGN,0);assert.ok(queue[0].url.endsWith('from=0'));
+        await reply(log(['new'],1,0));assert.equal(lg.textContent,'new');assert.equal(LOGN,1);assert.equal(lg.scrollTop,0);
+        await advance(900);await cycle();assert.equal(LOGN,0,'empty len=0 is authoritative');""")
+
+tests/test_job_polling_node.py:120: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "openJob('A');await reply(job());await reply(log(Array.from({length:405},(_,i)=>'L'+i),405,0));\n    const lg=elements...sert.equal(lg.scrollTop,0);\n    await advance(900);await cycle();assert.equal(LOGN,0,'empty len=0 is authoritative');"
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node needed for emitted polling JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+E         + actual - expected
+E         
+E         + 'L5\n' +
+E         +   'L6\n' +
+E         +   'L7\n' +
+E         +   'L8\n' +
+E         +   'L9\n' +
+E         +   'L10\n' +
+E         +   'L11\n' +
+E         +   'L12\n' +
+E         +   'L13\n' +
+E         +   'L14\n' +
+E         +   'L15\n' +
+E         +   'L16\n' +
+E         +   'L17\n' +
+E         +   'L18\n' +
+E         +   'L19\n' +
+E         +   'L20\n' +
+E         +   'L21\n' +
+E         +   'L22\n' +
+E         +   'L23\n' +
+E         +   'L24\n' +
+E         +   'L25\n' +
+E         +   'L26\n' +
+E         +   'L27\n' +
+E         +   'L28\n' +
+E         +   'L29\n' +
+E         +   'L30\n' +
+E         +   'L31\n' +
+E         +   'L32\n' +
+E         +   'L33\n' +
+E         +   'L34\n' +
+E         +   'L35\n' +
+E         +   'L36\n' +
+E         +   'L37\n' +
+E         +   'L38\n' +
+E         +   'L39\n' +
+E         +   'L40\n' +
+E         +   'L41\n' +
+E         +   'L42\n' +
+E         +   'L43\n' +
+E         +   'L44\n' +
+E         +   'L45\n' +
+E         +   'L46\n' +
+E         +   'L47\n' +
+E         +   'L48\n' +
+E         +   'L49\n' +
+E         +   'L50\n' +
+E         +   'L51\n' +
+E         +   'L52\n' +
+E         +   'L53\n' +
+E         +   'L54\n' +
+E         +   'L55\n' +
+E         +   'L56\n' +
+E         +   'L57\n' +
+E         +   'L58\n' +
+E         +   'L59\n' +
+E         +   'L60\n' +
+E         +   'L61\n' +
+E         +   'L62\n' +
+E         +   'L63\n' +
+E         +   'L64\n' +
+E         +   'L65\n' +
+E         +   'L66\n' +
+E         +   'L67\n' +
+E         +   'L68\n' +
+E         +   'L69\n' +
+E         +   'L70\n' +
+E         +   'L71\n' +
+E         +   'L72\n' +
+E         +   'L73\n' +
+E         +   'L74\n' +
+E         +   'L75\n' +
+E         +   'L76\n' +
+E         +   'L77\n' +
+E         +   'L78\n' +
+E         +   'L79\n' +
+E         +   'L80\n' +
+E         +   'L81\n' +
+E         +   'L82\n' +
+E         +   'L83\n' +
+E         +   'L84\n' +
+E         +   'L85\n' +
+E         +   'L86\n' +
+E         +   'L87\n' +
+E         +   'L88\n' +
+E         +   'L89\n' +
+E         +   'L90\n' +
+E         +   'L91\n' +
+E         +   'L92\n' +
+E         +   'L93\n' +
+E         +   'L94\n' +
+E         +   'L95\n' +
+E         +   'L96\n' +
+E         +   'L97\n' +
+E         +   'L98\n' +
+E         +   'L99\n' +
+E         +   'L100\n' +
+E         +   'L101\n' +
+E         +   'L102\n' +
+E         +   'L103\n' +
+E         +   'L104\n' +
+E         +   'L105\n' +
+E         +   'L106\n' +
+E         +   'L107\n' +
+E         +   'L108\n' +
+E         +   'L109\n' +
+E         +   'L110\n' +
+E         +   'L111\n' +
+E         +   'L112\n' +
+E         +   'L113\n' +
+E         +   'L114\n' +
+E         +   'L115\n' +
+E         +   'L116\n' +
+E         +   'L117\n' +
+E         +   'L118\n' +
+E         +   'L119\n' +
+E         +   'L120\n' +
+E         +   'L121\n' +
+E         +   'L122\n' +
+E         +   'L123\n' +
+E         +   'L124\n' +
+E         +   'L125\n' +
+E         +   'L126\n' +
+E         +   'L127\n' +
+E         +   'L128\n' +
+E         +   'L129\n' +
+E         +   'L130\n' +
+E         +   'L131\n' +
+E         +   'L132\n' +
+E         +   'L133\n' +
+E         +   'L134\n' +
+E         +   'L135\n' +
+E         +   'L136\n' +
+E         +   'L137\n' +
+E         +   'L138\n' +
+E         +   'L139\n' +
+E         +   'L140\n' +
+E         +   'L141\n' +
+E         +   'L142\n' +
+E         +   'L143\n' +
+E         +   'L144\n' +
+E         +   'L145\n' +
+E         +   'L146\n' +
+E         +   'L147\n' +
+E         +   'L148\n' +
+E         +   'L149\n' +
+E         +   'L150\n' +
+E         +   'L151\n' +
+E         +   'L152\n' +
+E         +   'L153\n' +
+E         +   'L154\n' +
+E         +   'L155\n' +
+E         +   'L156\n' +
+E         +   'L157\n' +
+E         +   'L158\n' +
+E         +   'L159\n' +
+E         +   'L160\n' +
+E         +   'L161\n' +
+E         +   'L162\n' +
+E         +   'L163\n' +
+E         +   'L164\n' +
+E         +   'L165\n' +
+E         +   'L166\n' +
+E         +   'L167\n' +
+E         +   'L168\n' +
+E         +   'L169\n' +
+E         +   'L170\n' +
+E         +   'L171\n' +
+E         +   'L172\n' +
+E         +   'L173\n' +
+E         +   'L174\n' +
+E         +   'L175\n' +
+E         +   'L176\n' +
+E         +   'L177\n' +
+E         +   'L178\n' +
+E         +   'L179\n' +
+E         +   'L180\n' +
+E         +   'L181\n' +
+E         +   'L182\n' +
+E         +   'L183\n' +
+E         +   'L184\n' +
+E         +   'L185\n' +
+E         +   'L186\n' +
+E         +   'L187\n' +
+E         +   'L188\n' +
+E         +   'L189\n' +
+E         +   'L190\n' +
+E         +   'L191\n' +
+E         +   'L192\n' +
+E         +   'L193\n' +
+E         +   'L194\n' +
+E         +   'L195\n' +
+E         +   'L196\n' +
+E         +   'L197\n' +
+E         +   'L198\n' +
+E         +   'L199\n' +
+E         +   'L200\n' +
+E         +   'L201\n' +
+E         +   'L202\n' +
+E         +   'L203\n' +
+E         +   'L204\n' +
+E         +   'L205\n' +
+E         +   'L206\n' +
+E         +   'L207\n' +
+E         +   'L208\n' +
+E         +   'L209\n' +
+E         +   'L210\n' +
+E         +   'L211\n' +
+E         +   'L212\n' +
+E         +   'L213\n' +
+E         +   'L214\n' +
+E         +   'L215\n' +
+E         +   'L216\n' +
+E         +   'L217\n' +
+E         +   'L218\n' +
+E         +   'L219\n' +
+E         +   'L220\n' +
+E         +   'L221\n' +
+E         +   'L222\n' +
+E         +   'L223\n' +
+E         +   'L224\n' +
+E         +   'L225\n' +
+E         +   'L226\n' +
+E         +   'L227\n' +
+E         +   'L228\n' +
+E         +   'L229\n' +
+E         +   'L230\n' +
+E         +   'L231\n' +
+E         +   'L232\n' +
+E         +   'L233\n' +
+E         +   'L234\n' +
+E         +   'L235\n' +
+E         +   'L236\n' +
+E         +   'L237\n' +
+E         +   'L238\n' +
+E         +   'L239\n' +
+E         +   'L240\n' +
+E         +   'L241\n' +
+E         +   'L242\n' +
+E         +   'L243\n' +
+E         +   'L244\n' +
+E         +   'L245\n' +
+E         +   'L246\n' +
+E         +   'L247\n' +
+E         +   'L248\n' +
+E         +   'L249\n' +
+E         +   'L250\n' +
+E         +   'L251\n' +
+E         +   'L252\n' +
+E         +   'L253\n' +
+E         +   'L254\n' +
+E         +   'L255\n' +
+E         +   'L256\n' +
+E         +   'L257\n' +
+E         +   'L258\n' +
+E         +   'L259\n' +
+E         +   'L260\n' +
+E         +   'L261\n' +
+E         +   'L262\n' +
+E         +   'L263\n' +
+E         +   'L264\n' +
+E         +   'L265\n' +
+E         +   'L266\n' +
+E         +   'L267\n' +
+E         +   'L268\n' +
+E         +   'L269\n' +
+E         +   'L270\n' +
+E         +   'L271\n' +
+E         +   'L272\n' +
+E         +   'L273\n' +
+E         +   'L274\n' +
+E         +   'L275\n' +
+E         +   'L276\n' +
+E         +   'L277\n' +
+E         +   'L278\n' +
+E         +   'L279\n' +
+E         +   'L280\n' +
+E         +   'L281\n' +
+E         +   'L282\n' +
+E         +   'L283\n' +
+E         +   'L284\n' +
+E         +   'L285\n' +
+E         +   'L286\n' +
+E         +   'L287\n' +
+E         +   'L288\n' +
+E         +   'L289\n' +
+E         +   'L290\n' +
+E         +   'L291\n' +
+E         +   'L292\n' +
+E         +   'L293\n' +
+E         +   'L294\n' +
+E         +   'L295\n' +
+E         +   'L296\n' +
+E         +   'L297\n' +
+E         +   'L298\n' +
+E         +   'L299\n' +
+E         +   'L300\n' +
+E         +   'L301\n' +
+E         +   'L302\n' +
+E         +   'L303\n' +
+E         +   'L304\n' +
+E         +   'L305\n' +
+E         +   'L306\n' +
+E         +   'L307\n' +
+E         +   'L308\n' +
+E         +   'L309\n' +
+E         +   'L310\n' +
+E         +   'L311\n' +
+E         +   'L312\n' +
+E         +   'L313\n' +
+E         +   'L314\n' +
+E         +   'L315\n' +
+E         +   'L316\n' +
+E         +   'L317\n' +
+E         +   'L318\n' +
+E         +   'L319\n' +
+E         +   'L320\n' +
+E         +   'L321\n' +
+E         +   'L322\n' +
+E         +   'L323\n' +
+E         +   'L324\n' +
+E         +   'L325\n' +
+E         +   'L326\n' +
+E         +   'L327\n' +
+E         +   'L328\n' +
+E         +   'L329\n' +
+E         +   'L330\n' +
+E         +   'L331\n' +
+E         +   'L332\n' +
+E         +   'L333\n' +
+E         +   'L334\n' +
+E         +   'L335\n' +
+E         +   'L336\n' +
+E         +   'L337\n' +
+E         +   'L338\n' +
+E         +   'L339\n' +
+E         +   'L340\n' +
+E         +   'L341\n' +
+E         +   'L342\n' +
+E         +   'L343\n' +
+E         +   'L344\n' +
+E         +   'L345\n' +
+E         +   'L346\n' +
+E         +   'L347\n' +
+E         +   'L348\n' +
+E         +   'L349\n' +
+E         +   'L350\n' +
+E         +   'L351\n' +
+E         +   'L352\n' +
+E         +   'L353\n' +
+E         +   'L354\n' +
+E         +   'L355\n' +
+E         +   'L356\n' +
+E         +   'L357\n' +
+E         +   'L358\n' +
+E         +   'L359\n' +
+E         +   'L360\n' +
+E         +   'L361\n' +
+E         +   'L362\n' +
+E         +   'L363\n' +
+E         +   'L364\n' +
+E         +   'L365\n' +
+E         +   'L366\n' +
+E         +   'L367\n' +
+E         +   'L368\n' +
+E         +   'L369\n' +
+E         +   'L370\n' +
+E         +   'L371\n' +
+E         +   'L372\n' +
+E         +   'L373\n' +
+E         +   'L374\n' +
+E         +   'L375\n' +
+E         +   'L376\n' +
+E         +   'L377\n' +
+E         +   'L378\n' +
+E         +   'L379\n' +
+E         +   'L380\n' +
+E         +   'L381\n' +
+E         +   'L382\n' +
+E         +   'L383\n' +
+E         +   'L384\n' +
+E         +   'L385\n' +
+E         +   'L386\n' +
+E         +   'L387\n' +
+E         +   'L388\n' +
+E         +   'L389\n' +
+E         +   'L390\n' +
+E         +   'L391\n' +
+E         +   'L392\n' +
+E         +   'L393\n' +
+E         +   'L394\n' +
+E         +   'L395\n' +
+E         +   'L396\n' +
+E         +   'L397\n' +
+E         +   'L398\n' +
+E         +   'L399\n' +
+E         +   'L400\n' +
+E         +   'L401\n' +
+E         +   'L402\n' +
+E         +   'L403\n' +
+E         +   'L404'
+E         - ''
+E         
+E             at evalmachine.<anonymous>:5:12
+E             at async [eval]:40:12 {
+E           generatedMessage: true,
+E           code: 'ERR_ASSERTION',
+E           actual: 'L5\nL6\nL7\nL8\nL9\nL10\nL11\nL12\nL13\nL14\n...',
+E           expected: '',
+E           operator: 'strictEqual',
+E           diff: 'simple'
+E         }
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...7\\nL8\\nL9\\nL10\\nL11\\nL12\\nL13\\nL14\\n...',\n  expected: '',\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n").returncode
+
+tests/test_job_polling_node.py:59: AssertionError
+______________ test_automatic_review_eligibility_and_retry[done] _______________
+
+transition = 'done'
+
+    @pytest.mark.parametrize('transition', ['done', 'return', 'same', 'manual', 'failure'])
+    def test_automatic_review_eligibility_and_retry(transition):
+>       run_js("""openJob('A');await cycle('review');const detections=queue.shift();
+        assert.ok(detections.url.endsWith('/detections'));await advance(900);assert.ok(queue[0].url==='api/jobs/A');
+        if(TRANSITION==='failure'){detections.reject(Error('offline'));await tick();await cycle('review');
+          assert.ok(queue[0].url.endsWith('/detections'));await reply({duration:3,detections:[]});assert.equal(DUR,3);return;}
+        await cycle(TRANSITION==='same'?'review':'done');
+        if(TRANSITION==='return'){await advance(900);await cycle('review');}
+        if(TRANSITION==='manual'){const p=loadReview();await reply({duration:3,detections:[]});await p;}
+        detections.resolve(response({duration:99,detections:[]}));await tick();
+        assert.equal(DUR,TRANSITION==='same'?99:TRANSITION==='manual'?3:0);
+        """.replace('TRANSITION', json.dumps(transition)))
+
+tests/test_job_polling_node.py:131: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = 'openJob(\'A\');await cycle(\'review\');const detections=queue.shift();\n    assert.ok(detections.url.endsWith(\'/dete...{duration:99,detections:[]}));await tick();\n    assert.equal(DUR,"done"===\'same\'?99:"done"===\'manual\'?3:0);\n    '
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node needed for emitted polling JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+E         
+E         99 !== 0
+E         
+E             at evalmachine.<anonymous>:9:12
+E             at async [eval]:40:12 {
+E           generatedMessage: true,
+E           code: 'ERR_ASSERTION',
+E           actual: 99,
+E           expected: 0,
+E           operator: 'strictEqual',
+E           diff: 'simple'
+E         }
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...ge: true,\n  code: 'ERR_ASSERTION',\n  actual: 99,\n  expected: 0,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n").returncode
+
+tests/test_job_polling_node.py:59: AssertionError
+_____________ test_automatic_review_eligibility_and_retry[return] ______________
+
+transition = 'return'
+
+    @pytest.mark.parametrize('transition', ['done', 'return', 'same', 'manual', 'failure'])
+    def test_automatic_review_eligibility_and_retry(transition):
+>       run_js("""openJob('A');await cycle('review');const detections=queue.shift();
+        assert.ok(detections.url.endsWith('/detections'));await advance(900);assert.ok(queue[0].url==='api/jobs/A');
+        if(TRANSITION==='failure'){detections.reject(Error('offline'));await tick();await cycle('review');
+          assert.ok(queue[0].url.endsWith('/detections'));await reply({duration:3,detections:[]});assert.equal(DUR,3);return;}
+        await cycle(TRANSITION==='same'?'review':'done');
+        if(TRANSITION==='return'){await advance(900);await cycle('review');}
+        if(TRANSITION==='manual'){const p=loadReview();await reply({duration:3,detections:[]});await p;}
+        detections.resolve(response({duration:99,detections:[]}));await tick();
+        assert.equal(DUR,TRANSITION==='same'?99:TRANSITION==='manual'?3:0);
+        """.replace('TRANSITION', json.dumps(transition)))
+
+tests/test_job_polling_node.py:131: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = 'openJob(\'A\');await cycle(\'review\');const detections=queue.shift();\n    assert.ok(detections.url.endsWith(\'/dete...ation:99,detections:[]}));await tick();\n    assert.equal(DUR,"return"===\'same\'?99:"return"===\'manual\'?3:0);\n    '
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node needed for emitted polling JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+E         
+E         99 !== 0
+E         
+E             at evalmachine.<anonymous>:9:12
+E             at async [eval]:40:12 {
+E           generatedMessage: true,
+E           code: 'ERR_ASSERTION',
+E           actual: 99,
+E           expected: 0,
+E           operator: 'strictEqual',
+E           diff: 'simple'
+E         }
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...ge: true,\n  code: 'ERR_ASSERTION',\n  actual: 99,\n  expected: 0,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n").returncode
+
+tests/test_job_polling_node.py:59: AssertionError
+_____________ test_automatic_review_eligibility_and_retry[manual] ______________
+
+transition = 'manual'
+
+    @pytest.mark.parametrize('transition', ['done', 'return', 'same', 'manual', 'failure'])
+    def test_automatic_review_eligibility_and_retry(transition):
+>       run_js("""openJob('A');await cycle('review');const detections=queue.shift();
+        assert.ok(detections.url.endsWith('/detections'));await advance(900);assert.ok(queue[0].url==='api/jobs/A');
+        if(TRANSITION==='failure'){detections.reject(Error('offline'));await tick();await cycle('review');
+          assert.ok(queue[0].url.endsWith('/detections'));await reply({duration:3,detections:[]});assert.equal(DUR,3);return;}
+        await cycle(TRANSITION==='same'?'review':'done');
+        if(TRANSITION==='return'){await advance(900);await cycle('review');}
+        if(TRANSITION==='manual'){const p=loadReview();await reply({duration:3,detections:[]});await p;}
+        detections.resolve(response({duration:99,detections:[]}));await tick();
+        assert.equal(DUR,TRANSITION==='same'?99:TRANSITION==='manual'?3:0);
+        """.replace('TRANSITION', json.dumps(transition)))
+
+tests/test_job_polling_node.py:131: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = 'openJob(\'A\');await cycle(\'review\');const detections=queue.shift();\n    assert.ok(detections.url.endsWith(\'/dete...ation:99,detections:[]}));await tick();\n    assert.equal(DUR,"manual"===\'same\'?99:"manual"===\'manual\'?3:0);\n    '
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node needed for emitted polling JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+E         
+E         99 !== 3
+E         
+E             at evalmachine.<anonymous>:9:12
+E             at async [eval]:40:12 {
+E           generatedMessage: true,
+E           code: 'ERR_ASSERTION',
+E           actual: 99,
+E           expected: 3,
+E           operator: 'strictEqual',
+E           diff: 'simple'
+E         }
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...ge: true,\n  code: 'ERR_ASSERTION',\n  actual: 99,\n  expected: 3,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n").returncode
+
+tests/test_job_polling_node.py:59: AssertionError
+_____________ test_automatic_review_eligibility_and_retry[failure] _____________
+
+transition = 'failure'
+
+    @pytest.mark.parametrize('transition', ['done', 'return', 'same', 'manual', 'failure'])
+    def test_automatic_review_eligibility_and_retry(transition):
+>       run_js("""openJob('A');await cycle('review');const detections=queue.shift();
+        assert.ok(detections.url.endsWith('/detections'));await advance(900);assert.ok(queue[0].url==='api/jobs/A');
+        if(TRANSITION==='failure'){detections.reject(Error('offline'));await tick();await cycle('review');
+          assert.ok(queue[0].url.endsWith('/detections'));await reply({duration:3,detections:[]});assert.equal(DUR,3);return;}
+        await cycle(TRANSITION==='same'?'review':'done');
+        if(TRANSITION==='return'){await advance(900);await cycle('review');}
+        if(TRANSITION==='manual'){const p=loadReview();await reply({duration:3,detections:[]});await p;}
+        detections.resolve(response({duration:99,detections:[]}));await tick();
+        assert.equal(DUR,TRANSITION==='same'?99:TRANSITION==='manual'?3:0);
+        """.replace('TRANSITION', json.dumps(transition)))
+
+tests/test_job_polling_node.py:131: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = 'openJob(\'A\');await cycle(\'review\');const detections=queue.shift();\n    assert.ok(detections.url.endsWith(\'/dete...ion:99,detections:[]}));await tick();\n    assert.equal(DUR,"failure"===\'same\'?99:"failure"===\'manual\'?3:0);\n    '
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node needed for emitted polling JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: TypeError: Cannot read properties of undefined (reading 'url')
+E             at evalmachine.<anonymous>:4:26
+E             at async [eval]:40:12
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...Cannot read properties of undefined (reading 'url')\n    at evalmachine.<anonymous>:4:26\n    at async [eval]:40:12\n").returncode
+
+tests/test_job_polling_node.py:59: AssertionError
+__________________ test_hide_wake_bursts_cancel_and_coalesce ___________________
+
+    def test_hide_wake_bursts_cancel_and_coalesce():
+>       run_js("""openJob('A');const old=queue.shift();document.hidden=true;emit('visibilitychange');await tick();
+        assert.equal(old.options.signal.aborted,true);await advance(20000);assert.equal(calls.length,1);
+        document.hidden=false;emit('visibilitychange');emit('focus');emit('pageshow');emit('online');await advance(0);
+        assert.equal(calls.length,2);old.resolve(response(job('done',1)));await tick();await cycle();
+        emit('focus');emit('online');await advance(0);assert.equal(calls.length,3);refresh();assert.equal(calls.length,3);
+        assert.ok(calls.every(c=>!c.options.method));""")
+
+tests/test_job_polling_node.py:144: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "openJob('A');const old=queue.shift();document.hidden=true;emit('visibilitychange');await tick();\n    assert.equal(ol...ssert.equal(calls.length,3);refresh();assert.equal(calls.length,3);\n    assert.ok(calls.every(c=>!c.options.method));"
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node needed for emitted polling JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: TypeError: Cannot read properties of undefined (reading 'aborted')
+E             at evalmachine.<anonymous>:2:37
+E             at async [eval]:40:12
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...ot read properties of undefined (reading 'aborted')\n    at evalmachine.<anonymous>:2:37\n    at async [eval]:40:12\n").returncode
+
+tests/test_job_polling_node.py:59: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_job_polling_node.py::test_same_view_single_cycle_and_completion_delay
+FAILED tests/test_job_polling_node.py::test_whole_operation_deadline_releases_ignore_abort[headers]
+FAILED tests/test_job_polling_node.py::test_whole_operation_deadline_releases_ignore_abort[body]
+FAILED tests/test_job_polling_node.py::test_failures_retain_valid_dom_then_recover[network-metadata]
+FAILED tests/test_job_polling_node.py::test_failures_retain_valid_dom_then_recover[network-log]
+FAILED tests/test_job_polling_node.py::test_failures_retain_valid_dom_then_recover[json-metadata]
+FAILED tests/test_job_polling_node.py::test_failures_retain_valid_dom_then_recover[json-log]
+FAILED tests/test_job_polling_node.py::test_failures_retain_valid_dom_then_recover[503-metadata]
+FAILED tests/test_job_polling_node.py::test_failures_retain_valid_dom_then_recover[503-log]
+FAILED tests/test_job_polling_node.py::test_initial_failure_and_bounded_backoff_reset
+FAILED tests/test_job_polling_node.py::test_obsolete_finally_cannot_control_new_view[reopen]
+FAILED tests/test_job_polling_node.py::test_obsolete_finally_cannot_control_new_view[aba]
+FAILED tests/test_job_polling_node.py::test_authoritative_empty_shrunk_cursor_initial_tail_and_scroll
+FAILED tests/test_job_polling_node.py::test_automatic_review_eligibility_and_retry[done]
+FAILED tests/test_job_polling_node.py::test_automatic_review_eligibility_and_retry[return]
+FAILED tests/test_job_polling_node.py::test_automatic_review_eligibility_and_retry[manual]
+FAILED tests/test_job_polling_node.py::test_automatic_review_eligibility_and_retry[failure]
+FAILED tests/test_job_polling_node.py::test_hide_wake_bursts_cancel_and_coalesce
+18 failed, 2 passed in 2.44s

@@ -1,0 +1,116 @@
+[
+  {
+    "name": "overlap-progress-log",
+    "requests": 4,
+    "pageErrors": [],
+    "expectedInjectedConsole": []
+  },
+  {
+    "name": "real-HTTP-meta-held-body-deadline",
+    "requests": 3,
+    "pageErrors": [],
+    "expectedInjectedConsole": []
+  },
+  {
+    "name": "real-HTTP-log-held-body-deadline",
+    "requests": 4,
+    "pageErrors": [],
+    "expectedInjectedConsole": []
+  },
+  {
+    "name": "real-HTTP-meta-body-switch",
+    "requests": 3,
+    "pageErrors": [],
+    "expectedInjectedConsole": []
+  },
+  {
+    "name": "real-HTTP-log-body-switch",
+    "requests": 4,
+    "pageErrors": [],
+    "expectedInjectedConsole": []
+  },
+  {
+    "name": "initial-network-recovery",
+    "requests": 3,
+    "pageErrors": [],
+    "expectedInjectedConsole": [
+      "Failed to load resource: net::ERR_FAILED"
+    ]
+  },
+  {
+    "name": "initial-json-recovery",
+    "requests": 3,
+    "pageErrors": [],
+    "expectedInjectedConsole": []
+  },
+  {
+    "name": "initial-503-recovery",
+    "requests": 3,
+    "pageErrors": [],
+    "expectedInjectedConsole": [
+      "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+    ]
+  },
+  {
+    "name": "obsolete-same",
+    "requests": 3,
+    "pageErrors": [],
+    "expectedInjectedConsole": []
+  },
+  {
+    "name": "obsolete-aba",
+    "requests": 5,
+    "pageErrors": [],
+    "expectedInjectedConsole": []
+  },
+  {
+    "name": "obsolete-delete",
+    "requests": 2,
+    "pageErrors": [],
+    "expectedInjectedConsole": []
+  },
+  {
+    "name": "cursor-tail-scroll-reset",
+    "requests": 7,
+    "pageErrors": [],
+    "expectedInjectedConsole": []
+  },
+  {
+    "name": "automatic-review-done",
+    "requests": 5,
+    "pageErrors": [],
+    "expectedInjectedConsole": []
+  },
+  {
+    "name": "automatic-review-return",
+    "requests": 9,
+    "pageErrors": [],
+    "expectedInjectedConsole": []
+  },
+  {
+    "name": "automatic-review-same",
+    "requests": 6,
+    "pageErrors": [],
+    "expectedInjectedConsole": []
+  },
+  {
+    "name": "automatic-review-failure",
+    "requests": 10,
+    "pageErrors": [],
+    "expectedInjectedConsole": [
+      "Failed to load resource: net::ERR_FAILED"
+    ]
+  },
+  {
+    "name": "automatic-review-manual",
+    "requests": 7,
+    "pageErrors": [],
+    "expectedInjectedConsole": []
+  },
+  {
+    "name": "lifecycle-wake-and-Austin-help-preview",
+    "requests": 13,
+    "pageErrors": [],
+    "expectedInjectedConsole": []
+  }
+]

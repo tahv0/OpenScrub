@@ -3105,6 +3105,106 @@
     "sha256": "c5a67f40240b0891a25952b9bb5d5e0cb0853e7235a61331268faafb5d6a3568"
   },
   {
+    "path": "delivery/resilient-polling/baseline_browser.py",
+    "bytes": 521,
+    "sha256": "3d6a799389200221d58098c96e14b49fb78b34cb6d0c69e19996d4b9b885f69b"
+  },
+  {
+    "path": "delivery/resilient-polling/browser-iteration.log",
+    "bytes": 98,
+    "sha256": "66c818660130c258b21946808413b82b9b7b7ef725fb3b84d55ad3e66f3bd459"
+  },
+  {
+    "path": "delivery/resilient-polling/browser-results.json",
+    "bytes": 12664,
+    "sha256": "f62706c468c65912de59b72c6e09deec07388a68bb9f3f0aacb75591514ce42d"
+  },
+  {
+    "path": "delivery/resilient-polling/browser-summary.log",
+    "bytes": 2430,
+    "sha256": "2564ff7cf22c81fc49591481f1891dda57db4c086d9e316d790c789c4ec32b60"
+  },
+  {
+    "path": "delivery/resilient-polling/final-build.log",
+    "bytes": 233,
+    "sha256": "e5c41b396fbabed65896ae2e536ecd5502d284bbd5a22ed498e2c6b5c99deae7"
+  },
+  {
+    "path": "delivery/resilient-polling/final-focused.log",
+    "bytes": 180,
+    "sha256": "545982a4eef95ed58236e6cc81c8984f765e6c363826eb6853b7936da1ef179b"
+  },
+  {
+    "path": "delivery/resilient-polling/final-full.log",
+    "bytes": 351,
+    "sha256": "7f716cf99bd788464435dbc2bb0a3336dfa56bca8b64b878d139c590ac58f7e5"
+  },
+  {
+    "path": "delivery/resilient-polling/final-install.log",
+    "bytes": 269,
+    "sha256": "190aaf23ac5112c27676792de97e07e3c2dd9a5d53f50f100de3c58a32711fe9"
+  },
+  {
+    "path": "delivery/resilient-polling/final-python39.log",
+    "bytes": 196,
+    "sha256": "40d624c3f0ce6e8572bcccccf469cc8e4b64f0a3d9fbdc587380cb4e811e8b07"
+  },
+  {
+    "path": "delivery/resilient-polling/green-focused.log",
+    "bytes": 179,
+    "sha256": "6e17038d9c0bdeb03f2bc01c8bda0eb2dd1658a592b7d9b4234226bf57791b4f"
+  },
+  {
+    "path": "delivery/resilient-polling/green-node.log",
+    "bytes": 5121,
+    "sha256": "c37fb95ac88675e922df6b8ccca883fd21f8f16b69c3f2405566d2c1bc6b8c2a"
+  },
+  {
+    "path": "delivery/resilient-polling/installed-cli-help.log",
+    "bytes": 18082,
+    "sha256": "eb76a71a7e1d822c66f05b008249b4f8a919606eaef552be00dc1a47381f8fc6"
+  },
+  {
+    "path": "delivery/resilient-polling/installed-smoke.log",
+    "bytes": 236,
+    "sha256": "b87ffc14f84bb1f403529e5b67a665a4454ec4d235c4f8888fe07f86660322d7"
+  },
+  {
+    "path": "delivery/resilient-polling/installed-web-help.log",
+    "bytes": 1111,
+    "sha256": "9ffaf42bf805dde249bee4116287a7ac21b468a372ea2300eb721ae257a2edce"
+  },
+  {
+    "path": "delivery/resilient-polling/installed_smoke.py",
+    "bytes": 2316,
+    "sha256": "721661d635649527e1afface890702e6cbfb9d5b315659fd8360a5d9f95f7852"
+  },
+  {
+    "path": "delivery/resilient-polling/polling-review-preview.png",
+    "bytes": 57134,
+    "sha256": "a76697dbdb3253b4a95200423f40fa5f8469f19522ae052998cc80cfdedb2f1a"
+  },
+  {
+    "path": "delivery/resilient-polling/red-browser.log",
+    "bytes": 2052,
+    "sha256": "ecce27d81a6b2577be3139c73c0e3a72cdca63b0d904e5465f6e5a2bcfc20c86"
+  },
+  {
+    "path": "delivery/resilient-polling/red-node.log",
+    "bytes": 56186,
+    "sha256": "46687fed9729edde899d9418493c235ef3a6e808645193a4a84434642e3befce"
+  },
+  {
+    "path": "delivery/resilient-polling/red-online.log",
+    "bytes": 2394,
+    "sha256": "ededabe6b2aa80e719067327c0fb05cb43afbe3ee2596a35c4d23b71c4f9c32d"
+  },
+  {
+    "path": "delivery/resilient-polling/source-identity.log",
+    "bytes": 61,
+    "sha256": "6f8b70d3f0874a23080883c9a0fadbe622fcde4091b14d6fadda85fdad6b5f76"
+  },
+  {
     "path": "delivery/review-choices/browser-results.json",
     "bytes": 7186,
     "sha256": "a716ccd3d7b1531321bbb316e32fb5f2038686432bd9319f2f2da08074aa5c2f"
@@ -3803,6 +3903,26 @@
     "path": "delivery/task-20-review.md",
     "bytes": 5462,
     "sha256": "9bf42c7929ef1f8122d90a3981eefc789880e5a8bb336f6a36ed615a65c8f2c3"
+  },
+  {
+    "path": "delivery/task-3-brief.md",
+    "bytes": 7415,
+    "sha256": "a8ae9af6e400675c2adea304ac513daeb39aa777194987ed93d3edc8c19a9bf1"
+  },
+  {
+    "path": "delivery/task-3-pr.md",
+    "bytes": 3032,
+    "sha256": "4375ae690f05f81f862b948ce81b29b01a832e0f3814f0d2e7fe90fd046d2337"
+  },
+  {
+    "path": "delivery/task-3-report.md",
+    "bytes": 13475,
+    "sha256": "075875a4b375180d6039216d86a8b0b2c644a71c27b7835bda7bd4a656f9731c"
+  },
+  {
+    "path": "delivery/task-3-review.md",
+    "bytes": 6968,
+    "sha256": "8f49b26619aa3ea67f0caf761c3e20ef907fb1716d6133c2897aa19944b778f6"
   },
   {
     "path": "delivery/task-4-brief.md",

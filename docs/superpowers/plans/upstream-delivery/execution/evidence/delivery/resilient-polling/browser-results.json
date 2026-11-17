@@ -1,0 +1,698 @@
+[
+  {
+    "name": "overlap-progress-log",
+    "events": [
+      {
+        "id": "A",
+        "kind": "meta",
+        "query": "",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "log",
+        "query": "?from=0",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "meta",
+        "query": "",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "log",
+        "query": "?from=1",
+        "method": "GET"
+      }
+    ],
+    "expectedInjectedConsole": [],
+    "pageErrors": []
+  },
+  {
+    "name": "real-HTTP-meta-held-body-deadline",
+    "events": [
+      {
+        "id": "A",
+        "kind": "meta",
+        "query": "",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "meta",
+        "query": "",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "log",
+        "query": "?from=0",
+        "method": "GET"
+      }
+    ],
+    "expectedInjectedConsole": [],
+    "pageErrors": []
+  },
+  {
+    "name": "real-HTTP-log-held-body-deadline",
+    "events": [
+      {
+        "id": "A",
+        "kind": "meta",
+        "query": "",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "log",
+        "query": "?from=0",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "meta",
+        "query": "",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "log",
+        "query": "?from=0",
+        "method": "GET"
+      }
+    ],
+    "expectedInjectedConsole": [],
+    "pageErrors": []
+  },
+  {
+    "name": "real-HTTP-meta-body-switch",
+    "events": [
+      {
+        "id": "A",
+        "kind": "meta",
+        "query": "",
+        "method": "GET"
+      },
+      {
+        "id": "B",
+        "kind": "meta",
+        "query": "",
+        "method": "GET"
+      },
+      {
+        "id": "B",
+        "kind": "log",
+        "query": "?from=0",
+        "method": "GET"
+      }
+    ],
+    "expectedInjectedConsole": [],
+    "pageErrors": []
+  },
+  {
+    "name": "real-HTTP-log-body-switch",
+    "events": [
+      {
+        "id": "A",
+        "kind": "meta",
+        "query": "",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "log",
+        "query": "?from=0",
+        "method": "GET"
+      },
+      {
+        "id": "B",
+        "kind": "meta",
+        "query": "",
+        "method": "GET"
+      },
+      {
+        "id": "B",
+        "kind": "log",
+        "query": "?from=0",
+        "method": "GET"
+      }
+    ],
+    "expectedInjectedConsole": [],
+    "pageErrors": []
+  },
+  {
+    "name": "initial-network-recovery",
+    "events": [
+      {
+        "id": "A",
+        "kind": "meta",
+        "query": "",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "meta",
+        "query": "",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "log",
+        "query": "?from=0",
+        "method": "GET"
+      }
+    ],
+    "expectedInjectedConsole": [
+      "Failed to load resource: net::ERR_FAILED"
+    ],
+    "pageErrors": []
+  },
+  {
+    "name": "initial-json-recovery",
+    "events": [
+      {
+        "id": "A",
+        "kind": "meta",
+        "query": "",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "meta",
+        "query": "",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "log",
+        "query": "?from=0",
+        "method": "GET"
+      }
+    ],
+    "expectedInjectedConsole": [],
+    "pageErrors": []
+  },
+  {
+    "name": "initial-503-recovery",
+    "events": [
+      {
+        "id": "A",
+        "kind": "meta",
+        "query": "",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "meta",
+        "query": "",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "log",
+        "query": "?from=0",
+        "method": "GET"
+      }
+    ],
+    "expectedInjectedConsole": [
+      "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+    ],
+    "pageErrors": []
+  },
+  {
+    "name": "obsolete-same",
+    "events": [
+      {
+        "id": "A",
+        "kind": "meta",
+        "query": "",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "meta",
+        "query": "",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "log",
+        "query": "?from=0",
+        "method": "GET"
+      }
+    ],
+    "expectedInjectedConsole": [],
+    "pageErrors": []
+  },
+  {
+    "name": "obsolete-aba",
+    "events": [
+      {
+        "id": "A",
+        "kind": "meta",
+        "query": "",
+        "method": "GET"
+      },
+      {
+        "id": "B",
+        "kind": "meta",
+        "query": "",
+        "method": "GET"
+      },
+      {
+        "id": "B",
+        "kind": "log",
+        "query": "?from=0",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "meta",
+        "query": "",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "log",
+        "query": "?from=0",
+        "method": "GET"
+      }
+    ],
+    "expectedInjectedConsole": [],
+    "pageErrors": []
+  },
+  {
+    "name": "obsolete-delete",
+    "events": [
+      {
+        "id": "A",
+        "kind": "meta",
+        "query": "",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "meta",
+        "query": "",
+        "method": "DELETE"
+      }
+    ],
+    "expectedInjectedConsole": [],
+    "pageErrors": []
+  },
+  {
+    "name": "cursor-tail-scroll-reset",
+    "events": [
+      {
+        "id": "A",
+        "kind": "meta",
+        "query": "",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "log",
+        "query": "?from=0",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "meta",
+        "query": "",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "log",
+        "query": "?from=405",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "log",
+        "query": "?from=0",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "meta",
+        "query": "",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "log",
+        "query": "?from=1",
+        "method": "GET"
+      }
+    ],
+    "expectedInjectedConsole": [],
+    "pageErrors": []
+  },
+  {
+    "name": "automatic-review-done",
+    "events": [
+      {
+        "id": "A",
+        "kind": "meta",
+        "query": "",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "log",
+        "query": "?from=0",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "detections",
+        "query": "",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "meta",
+        "query": "",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "log",
+        "query": "?from=1",
+        "method": "GET"
+      }
+    ],
+    "expectedInjectedConsole": [],
+    "pageErrors": []
+  },
+  {
+    "name": "automatic-review-return",
+    "events": [
+      {
+        "id": "A",
+        "kind": "meta",
+        "query": "",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "log",
+        "query": "?from=0",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "detections",
+        "query": "",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "meta",
+        "query": "",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "log",
+        "query": "?from=1",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "meta",
+        "query": "",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "log",
+        "query": "?from=1",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "detections",
+        "query": "",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "thumb/0",
+        "query": "",
+        "method": "GET"
+      }
+    ],
+    "expectedInjectedConsole": [],
+    "pageErrors": []
+  },
+  {
+    "name": "automatic-review-same",
+    "events": [
+      {
+        "id": "A",
+        "kind": "meta",
+        "query": "",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "log",
+        "query": "?from=0",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "detections",
+        "query": "",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "meta",
+        "query": "",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "log",
+        "query": "?from=1",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "thumb/0",
+        "query": "",
+        "method": "GET"
+      }
+    ],
+    "expectedInjectedConsole": [],
+    "pageErrors": []
+  },
+  {
+    "name": "automatic-review-failure",
+    "events": [
+      {
+        "id": "A",
+        "kind": "meta",
+        "query": "",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "log",
+        "query": "?from=0",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "detections",
+        "query": "",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "thumb/0",
+        "query": "",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "meta",
+        "query": "",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "log",
+        "query": "?from=0",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "detections",
+        "query": "",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "meta",
+        "query": "",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "log",
+        "query": "?from=1",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "detections",
+        "query": "",
+        "method": "GET"
+      }
+    ],
+    "expectedInjectedConsole": [
+      "Failed to load resource: net::ERR_FAILED"
+    ],
+    "pageErrors": []
+  },
+  {
+    "name": "automatic-review-manual",
+    "events": [
+      {
+        "id": "A",
+        "kind": "meta",
+        "query": "",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "log",
+        "query": "?from=0",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "detections",
+        "query": "",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "meta",
+        "query": "",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "log",
+        "query": "?from=1",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "detections",
+        "query": "",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "thumb/0",
+        "query": "",
+        "method": "GET"
+      }
+    ],
+    "expectedInjectedConsole": [],
+    "pageErrors": []
+  },
+  {
+    "name": "lifecycle-wake-and-Austin-help-preview",
+    "events": [
+      {
+        "id": "A",
+        "kind": "meta",
+        "query": "",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "log",
+        "query": "?from=0",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "meta",
+        "query": "",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "log",
+        "query": "?from=1",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "meta",
+        "query": "",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "log",
+        "query": "?from=1",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "detections",
+        "query": "",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "thumb/0",
+        "query": "",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "detframe/0",
+        "query": "",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "mediainfo",
+        "query": "",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "report",
+        "query": "",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "boxes_at",
+        "query": "?t=0&all=1",
+        "method": "GET"
+      },
+      {
+        "id": "A",
+        "kind": "frame_at",
+        "query": "?t=0",
+        "method": "GET"
+      }
+    ],
+    "expectedInjectedConsole": [],
+    "pageErrors": []
+  }
+]
