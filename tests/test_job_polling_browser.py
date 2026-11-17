@@ -265,6 +265,9 @@ try{
  assert.ok(await q.page.locator('.qm').count()>0);await q.page.locator('summary').filter({hasText:'Advanced settings'}).click();await q.page.locator('.qm:visible').first().click();
  assert.ok(await q.page.locator('.qm.open').count()>0);
  q.phase='review';await advance(q);await wait(async()=>await q.page.locator('#review').count()===1);
+ // P09 mounts cards only near the viewport; Advanced settings moved this
+ // retained review below the fold. Scroll the real card window before acting.
+ await q.page.locator('#detwrap').scrollIntoViewIfNeeded();
  await q.page.locator('#det0 img').click();await wait(async()=>await q.page.locator('#lb img').evaluate(e=>e.naturalWidth>0));await q.page.locator('#lb').click();
  await q.page.getByRole('button',{name:'▶ Preview video & edit boxes (before rendering)'}).click();await wait(async()=>await q.page.locator('#beCv').count()===1);
  assert.ok(await q.page.locator('#beCv').evaluate(e=>e.width>0));
