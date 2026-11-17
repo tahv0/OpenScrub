@@ -58,7 +58,7 @@ def run_js(scenario):
     node = shutil.which("node")
     if not node:
         pytest.skip("Node is needed to evaluate the embedded review JavaScript")
-    script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+    script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps("ReviewScheduler.prototype.start=function(){};" + scenario) + ";" + HARNESS
     result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
     assert result.returncode == 0, result.stdout + result.stderr
 
