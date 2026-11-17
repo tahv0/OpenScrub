@@ -2471,6 +2471,13 @@ def track_manual_region(video, box, t_ref, t0, t1, cb=None,
     Returns [(t, (x1, y1, x2, y2), score), ...] sorted by t — screen-space
     boxes, one per step_frames. Empty if the video/box is unusable."""
     log = (cb.log if cb else print)
+
+    def _check_cancelled():
+        if cb is not None and cb.cancelled():
+            raise PipelineCancelled()
+
+    # Cancellation takes precedence even when the input is unusable.
+    _check_cancelled()
     cap = cv2.VideoCapture(video)
     try:
         if not cap.isOpened():
@@ -2506,10 +2513,13 @@ def track_manual_region(video, box, t_ref, t0, t1, cb=None,
                 ps = _track_person_dense(video, box, t_ref, t0, t1,
                                          person_det, log, step_frames=1,
                                          cancelled=(cb.cancelled if cb else None))
+            except PipelineCancelled:
+                raise
             except Exception as e:
                 log("      track: person-detector path failed (%s) — using "
                     "the generic tracker" % e)
                 ps = []
+            _check_cancelled()
             if ps:
                 live = sum(1 for x in ps if x[2] > 0.0) / float(len(ps))
                 if live >= 0.5:
@@ -2539,10 +2549,12 @@ def track_manual_region(video, box, t_ref, t0, t1, cb=None,
                 "box to the window edge (review and trim if needed)" % t)
             t2 = t + direction * step
             while t0 - 1e-6 <= t2 <= t1 + 1e-6:
+                _check_cancelled()
                 out.append((t2, (cur[0], cur[1], cur[2], cur[3]), 0.0))
                 t2 += direction * step
 
         vit = _vittrack_factory(log)
+        _check_cancelled()
         if vit is not None:
             fr0 = None
             for dt in (0.0, 0.066, -0.066, 0.33, -0.33, 1.0):
@@ -2640,6 +2652,7 @@ def track_manual_region(video, box, t_ref, t0, t1, cb=None,
                             % ("forward" if direction > 0 else "backward",
                                t2, len(samples)))
                     t = t2
+            _check_cancelled()
             samples.sort(key=lambda s: s[0])
             return samples
 
@@ -2672,6 +2685,7 @@ def track_manual_region(video, box, t_ref, t0, t1, cb=None,
             s_cum = 1.0                 # cumulative scale vs the drawn box
             t = t_ref
             while True:
+                _check_cancelled()
                 t2 = t + direction * step
                 if t2 < t0 - 1e-6 or t2 > t1 + 1e-6:
                     break
@@ -2717,6 +2731,7 @@ def track_manual_region(video, box, t_ref, t0, t1, cb=None,
                         % ("forward" if direction > 0 else "backward",
                            t2, len(samples)))
                 t = t2
+        _check_cancelled()
         samples.sort(key=lambda s: s[0])
         return samples
     finally:
