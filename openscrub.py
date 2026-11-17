@@ -25,6 +25,7 @@ import copy
 import datetime
 import hashlib
 import json
+import math
 import os
 import re
 import shutil
@@ -3114,7 +3115,106 @@ def _gauss_big(roi, k):
     return cv2.resize(small, (w, h), interpolation=cv2.INTER_LINEAR)
 
 
+def _geometry_finite(values, size, stage, field):
+    """Check ordinary scalar coordinates without coercing their arithmetic."""
+    try:
+        valid = len(values) == size and all(
+            isinstance(values[i], (int, float, np.integer, np.floating))
+            and math.isfinite(values[i]) for i in range(size))
+    except (TypeError, ValueError, IndexError, OverflowError):
+        valid = False
+    if not valid:
+        raise ValueError(f"render geometry {stage}: invalid {field}") from None
+
+
+def _geometry_detections(detections, stage):
+    for ordinal, d in enumerate(detections, 1):
+        where = f"{stage} detection {ordinal}"
+        _geometry_finite(d.cbox, 4, where, "cbox")
+        if d.cbox[2] <= d.cbox[0] or d.cbox[3] <= d.cbox[1]:
+            raise ValueError(f"render geometry {where}: invalid cbox extents")
+        _geometry_finite(d.aoff, 2, where, "aoff")
+        _geometry_finite((d.t_start,), 1, where, "t_start")
+        _geometry_finite((d.t_end,), 1, where, "t_end")
+        if d.t_end < d.t_start:
+            raise ValueError(f"render geometry {where}: invalid t_end order")
+
+
+def _geometry_preflight(detections, cum, bands, fps, pad, band_margin, stage):
+    _geometry_detections(detections, stage)
+    for field, value in (("fps", fps), ("pad", pad),
+                         ("band_margin", band_margin)):
+        _geometry_finite((value,), 1, stage, field)
+    if fps <= 0:
+        raise ValueError(f"render geometry {stage}: invalid fps")
+    for field, trajectory in (("cum", cum), ("bands", bands)):
+        try:
+            length = len(trajectory)
+        except TypeError:
+            length = 0
+        if not length:
+            raise ValueError(f"render geometry {stage}: invalid {field}")
+        for i in range(length):
+            _geometry_finite(trajectory[i], 2, stage, f"{field} entry {i}")
+
+
+def _geometry_box(d, ox, oy, pad, stage):
+    # Shared by SDR/HDR: clipping or the drift cap must not hide overflow.
+    try:
+        with np.errstate(over="raise", invalid="raise"):
+            dx, dy = ox - d.aoff[0], oy - d.aoff[1]
+            _geometry_finite((dx, dy), 2, stage, "drift offset")
+            distance = abs(dx) + abs(dy)
+            _geometry_finite((distance,), 1, stage, "drift distance")
+            drift = min(24.0, 0.05 * distance)
+            px = pad + drift
+            _geometry_finite((px,), 1, stage, "effective padding")
+            pbox = (d.cbox[0] + ox, d.cbox[1] + oy,
+                    d.cbox[2] + ox, d.cbox[3] + oy)
+            _geometry_finite(pbox, 4, stage, "translated box")
+            box = (pbox[0] - px, pbox[1] - px, pbox[2] + px, pbox[3] + px)
+            _geometry_finite(box, 4, stage, "padded box")
+    except (OverflowError, FloatingPointError):
+        raise ValueError(f"render geometry {stage}: invalid box arithmetic") from None
+    return box, pbox, px
+
+
+def _geometry_bands(bx, by, w, h, margin, stage):
+    try:
+        with np.errstate(over="raise", invalid="raise"):
+            boxes = []
+            if by < -2:
+                boxes.append((0, h - (abs(by) + margin), w, h))
+            elif by > 2:
+                boxes.append((0, 0, w, by + margin))
+            if bx < -2:
+                boxes.append((w - (abs(bx) + margin), 0, w, h))
+            elif bx > 2:
+                boxes.append((0, 0, bx + margin, h))
+            for box in boxes:
+                _geometry_finite(box, 4, stage, "band box")
+    except (OverflowError, FloatingPointError):
+        raise ValueError(f"render geometry {stage}: invalid band arithmetic") from None
+    return boxes
+
+
+def _geometry_metadata(cap, stage):
+    try:
+        values = (cap.get(cv2.CAP_PROP_FRAME_WIDTH),
+                  cap.get(cv2.CAP_PROP_FRAME_HEIGHT),
+                  cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        _geometry_finite(values, 3, stage, "video dimensions/count")
+        w, h, total = (int(value) for value in values)
+        if w <= 0 or h <= 0 or total < 0:
+            raise ValueError(f"render geometry {stage}: invalid video dimensions/count")
+    except Exception:
+        cap.release()
+        raise
+    return w, h, total
+
+
 def blur_region(frame, x1, y1, x2, y2, mode, shape="rect"):
+    _geometry_finite((x1, y1, x2, y2), 4, "paint", "box")
     h, w = frame.shape[:2]
     x1 = max(0, int(x1)); y1 = max(0, int(y1))
     x2 = min(w, int(x2)); y2 = min(h, int(y2))
@@ -3189,6 +3289,8 @@ def blur_silhouette(frame, x1, y1, x2, y2, mode, polys, poly_box,
     outward — the silhouette version of the box pad: over-blur beats
     under-blur. Any degenerate mask falls back to the full box redaction
     (fail closed), never to nothing."""
+    _geometry_finite((x1, y1, x2, y2), 4, "paint", "box")
+    _geometry_finite((pad_px,), 1, "paint", "padding")
     h, w = frame.shape[:2]
     x1i, y1i = max(0, int(x1)), max(0, int(y1))
     x2i, y2i = min(w, int(x2)), min(h, int(y2))
@@ -3622,6 +3724,7 @@ def _blur_yuv10(y, u, v, x1, y1, x2, y2, mode, shape="rect"):
     half-res. Working in the native YUV domain means untouched pixels never
     go through ANY colorspace conversion — the HDR signal passes straight
     through."""
+    _geometry_finite((x1, y1, x2, y2), 4, "paint", "box")
     h, w = y.shape
     x1 = max(0, int(x1)); y1 = max(0, int(y1))
     x2 = min(w, int(x2)); y2 = min(h, int(y2))
@@ -3688,6 +3791,8 @@ def _blur_silhouette_yuv10(y, u, v, x1, y1, x2, y2, mode, polys,
     (dilated) mask — untouched pixels never leave the native YUV domain.
     Degenerate masks fall back to the full box (fail closed), exactly
     like the SDR version."""
+    _geometry_finite((x1, y1, x2, y2), 4, "paint", "box")
+    _geometry_finite((pad_px,), 1, "paint", "padding")
     h, w = y.shape
     x1i, y1i = max(0, int(x1)), max(0, int(y1))
     x2i, y2i = min(w, int(x2)), min(h, int(y2))
@@ -3760,19 +3865,22 @@ def apply_coverage(dets, coverage, cb=None):
     GLIDES instead of bobbing — body outline, build, and step cadence
     are all destroyed. Returns a NEW list (originals untouched: the
     report keeps tight samples so a re-render can change coverage)."""
+    _geometry_detections(dets, "coverage")
     if coverage not in ("box", "concealed"):
         return dets
     out, per_track = [], {}
-    for d in dets:
+    for ordinal, d in enumerate(dets, 1):
         if getattr(d, "dense", False) and d.category in ("person", "manual"):
             c = copy.copy(d)
             c.poly = ()
             out.append(c)
             if coverage == "concealed" and getattr(d, "track", -1) >= 0:
-                per_track.setdefault(c.track, []).append(c)
+                per_track.setdefault(c.track, []).append((ordinal, c))
         else:
             out.append(d)
-    for ds in per_track.values():
+    for entries in per_track.values():
+        ordinals = {id(d): ordinal for ordinal, d in entries}
+        ds = [d for _, d in entries]
         ds.sort(key=lambda x: x.t_start)
         ts = [x.t_start for x in ds]
         boxes = [x.cbox for x in ds]
@@ -3790,9 +3898,15 @@ def apply_coverage(dets, coverage, cb=None):
                 x1, y1 = min(x1, b[0]), min(y1, b[1])
                 x2, y2 = max(x2, b[2]), max(y2, b[3])
                 j += 1
-            px, py = 0.12 * (x2 - x1), 0.12 * (y2 - y1)
-            new.append((int(x1 - px), int(y1 - py),
-                        int(x2 + px), int(y2 + py)))
+            where = f"coverage detection {ordinals[id(ds[i])]}"
+            try:
+                with np.errstate(over="raise", invalid="raise"):
+                    px, py = 0.12 * (x2 - x1), 0.12 * (y2 - y1)
+                    expanded = (x1 - px, y1 - py, x2 + px, y2 + py)
+                    _geometry_finite(expanded, 4, where, "expanded cbox")
+            except (OverflowError, FloatingPointError):
+                raise ValueError(f"render geometry {where}: invalid expanded cbox arithmetic") from None
+            new.append(tuple(int(value) for value in expanded))
         for x, nb in zip(ds, new):
             x.cbox = nb
     if cb:
@@ -3897,10 +4011,9 @@ def render_hdr(src, dst, detections, cum, bands, fps, pad, mode,
     def _mode_for(cat):
         return mode_map.get(cat, mode)
     cb = cb or Callbacks()
+    _geometry_preflight(detections, cum, bands, fps, pad, band_margin, "HDR")
     meta = cv2.VideoCapture(src)
-    w = int(meta.get(cv2.CAP_PROP_FRAME_WIDTH))
-    h = int(meta.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    total = int(meta.get(cv2.CAP_PROP_FRAME_COUNT))
+    w, h, total = _geometry_metadata(meta, "HDR")
     meta.release()
     cb.log(f"      encoder: {encoder} 10-bit"
            + (" (GPU)" if encoder.endswith(("_nvenc", "_qsv")) else " (CPU)"))
@@ -3959,6 +4072,7 @@ def render_hdr(src, dst, detections, cum, bands, fps, pad, mode,
          *vargs, *targs, *acodec, dst],
         stdin=subprocess.PIPE, stderr=ff_err)
 
+    ordinals = {id(d): i for i, d in enumerate(detections, 1)}
     buckets = {}
     for d in detections:
         for s in range(int(d.t_start), int(d.t_end) + 2):
@@ -3995,41 +4109,32 @@ def render_hdr(src, dst, detections, cum, bands, fps, pad, mode,
         u = buf[ysz:ysz + csz].reshape(h // 2, w // 2)
         v = buf[ysz + csz:].reshape(h // 2, w // 2)
         t = idx / fps
+        _geometry_finite((t,), 1, f"frame {idx}", "time")
         ox, oy = cum[min(idx, len(cum) - 1)]
+        _geometry_finite((ox, oy), 2, f"frame {idx}", "cum")
 
         act = [d for d in buckets.get(int(t), [])
                if d.t_start - 0.01 <= t <= d.t_end + 0.01]
         for d in _dedupe_dense(act):
-            drift = min(24.0, 0.05 * (abs(ox - d.aoff[0]) + abs(oy - d.aoff[1])))
-            px = pad + drift
+            box, pbox, px = _geometry_box(
+                d, ox, oy, pad, f"HDR detection {ordinals[id(d)]} frame {idx}")
             if d.poly:
-                _blur_silhouette_yuv10(
-                    y, u, v, d.cbox[0] + ox - px, d.cbox[1] + oy - px,
-                    d.cbox[2] + ox + px, d.cbox[3] + oy + px,
-                    _mode_for(d.category), d.poly,
-                    (d.cbox[0] + ox, d.cbox[1] + oy,
-                     d.cbox[2] + ox, d.cbox[3] + oy), pad_px=px)
+                _blur_silhouette_yuv10(y, u, v, *box, _mode_for(d.category),
+                                       d.poly, pbox, pad_px=px)
             else:
-                _blur_yuv10(y, u, v, d.cbox[0] + ox - px, d.cbox[1] + oy - px,
-                            d.cbox[2] + ox + px, d.cbox[3] + oy + px,
-                            _mode_for(d.category),
+                _blur_yuv10(y, u, v, *box, _mode_for(d.category),
                             shape=("ellipse" if d.category == "face"
                                    and face_shape == "ellipse" else "rect"))
 
         bx, by = bands[min(idx, len(bands) - 1)]
+        _geometry_finite((bx, by), 2, f"frame {idx}", "bands")
         vals = set(mode_map.values()) | {mode}
         band_mode = ("box" if ("box" in vals or "inpaint" in vals)
                      else "mosaic" if "mosaic" in vals else "blur")
         def band(x1, y1_, x2, y2_):
             _blur_yuv10(y, u, v, x1, y1_, x2, y2_, band_mode)
-        if by < -2:
-            band(0, h - (abs(by) + band_margin), w, h)
-        elif by > 2:
-            band(0, 0, w, by + band_margin)
-        if bx < -2:
-            band(w - (abs(bx) + band_margin), 0, w, h)
-        elif bx > 2:
-            band(0, 0, bx + band_margin, h)
+        for box in _geometry_bands(bx, by, w, h, band_margin, f"HDR frame {idx}"):
+            band(*box)
 
         try:
             enc.stdin.write(buf.tobytes())
@@ -4071,10 +4176,9 @@ def render(src, dst, detections, cum, bands, fps, pad, mode, preview,
     def _mode_for(cat):
         return mode_map.get(cat, mode)
     cb = cb or Callbacks()
+    _geometry_preflight(detections, cum, bands, fps, pad, band_margin, "SDR")
     cap = cv2.VideoCapture(src)
-    w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    w, h, total = _geometry_metadata(cap, "SDR")
 
     # --- output sink: single-pass ffmpeg pipe (NVENC if available) ---
     proc = None
@@ -4161,6 +4265,7 @@ def render(src, dst, detections, cum, bands, fps, pad, mode, preview,
         out = cv2.VideoWriter(tmp_video, cv2.VideoWriter_fourcc(*"mp4v"),
                               fps, (w, h))
 
+    ordinals = {id(d): i for i, d in enumerate(detections, 1)}
     buckets = {}
     for d in detections:
         for s in range(int(d.t_start), int(d.t_end) + 2):
@@ -4199,6 +4304,7 @@ def render(src, dst, detections, cum, bands, fps, pad, mode, preview,
         if not ok:
             break
         t = idx / fps
+        _geometry_finite((t,), 1, f"frame {idx}", "time")
         if clip:
             if t < clip[0] - 1e-6:          # seek undershoot guard
                 idx += 1
@@ -4206,21 +4312,14 @@ def render(src, dst, detections, cum, bands, fps, pad, mode, preview,
             if clip[1] is not None and t > clip[1] + 1e-6:
                 break                       # keep-window over: stop encoding
         ox, oy = cum[min(idx, len(cum) - 1)]
+        _geometry_finite((ox, oy), 2, f"frame {idx}", "cum")
 
         # 1. tracked PII boxes, translated by scroll offset
         act = [d for d in buckets.get(int(t), [])
                if d.t_start - 0.01 <= t <= d.t_end + 0.01]
         for d in _dedupe_dense(act):
-            # drift allowance: residual tracking error grows (slowly) with
-            # distance scrolled since detection — expand the box to cover it
-            drift = min(24.0, 0.05 * (abs(ox - d.aoff[0]) + abs(oy - d.aoff[1])))
-            px = pad + drift
-            x1 = d.cbox[0] + ox - px
-            y1 = d.cbox[1] + oy - px
-            x2 = d.cbox[2] + ox + px
-            y2 = d.cbox[3] + oy + px
-            pbox = (d.cbox[0] + ox, d.cbox[1] + oy,
-                    d.cbox[2] + ox, d.cbox[3] + oy)
+            (x1, y1, x2, y2), pbox, px = _geometry_box(
+                d, ox, oy, pad, f"SDR detection {ordinals[id(d)]} frame {idx}")
             if preview:
                 cv2.rectangle(frame, (int(max(0, x1)), int(max(0, y1))),
                               (int(min(w, x2)), int(min(h, y2))), (0, 0, 255), 2)
@@ -4248,6 +4347,7 @@ def render(src, dst, detections, cum, bands, fps, pad, mode, preview,
 
         # 2. safety bands: unscanned content that scrolled into view
         bx, by = bands[min(idx, len(bands) - 1)]
+        _geometry_finite((bx, by), 2, f"frame {idx}", "bands")
         vals = set(mode_map.values()) | {mode}
         band_mode = ("box" if ("box" in vals or "inpaint" in vals)
                      else "mosaic" if "mosaic" in vals else "blur")  # never weaker
@@ -4256,14 +4356,8 @@ def render(src, dst, detections, cum, bands, fps, pad, mode, preview,
                 cv2.rectangle(frame, (int(x1), int(y1)), (int(x2 - 1), int(y2 - 1)), (0, 165, 255), 2)
             else:
                 blur_region(frame, x1, y1, x2, y2, band_mode)
-        if by < -2:      # content moved up -> unscanned strip entering at bottom
-            band(0, h - (abs(by) + band_margin), w, h)
-        elif by > 2:     # content moved down -> unscanned strip at top
-            band(0, 0, w, by + band_margin)
-        if bx < -2:      # content moved left -> strip at right
-            band(w - (abs(bx) + band_margin), 0, w, h)
-        elif bx > 2:
-            band(0, 0, bx + band_margin, h)
+        for box in _geometry_bands(bx, by, w, h, band_margin, f"SDR frame {idx}"):
+            band(*box)
 
         if proc is not None:
             try:
@@ -8434,6 +8528,8 @@ def run_scan(args, cb=None):
 
 def run_render(args, state, cb=None):
     cb = cb or Callbacks()
+    _geometry_preflight(state["detections"], state["cum"], state["bands"],
+                        state["fps"], args.pad, 25, "run_render")
     dst = args.output or os.path.splitext(args.video)[0] + (
         "_preview.mp4" if args.preview else "_redacted.mp4")
     cb.log(f"[4/4] Rendering -> {dst}")
