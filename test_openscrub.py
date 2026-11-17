@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Regression tests for openscrub. Run: pytest test_openscrub.py -v
+"""Regression tests for openscrub. Run all discovered controls: python -m pytest -v
 For this tool a regression is not a bug, it's a PHI leak — these tests are
 the gate for any change."""
 

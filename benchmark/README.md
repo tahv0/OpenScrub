@@ -322,3 +322,20 @@ unassisted one.
   second is a claim about footage nobody has run yet.
 - Publish the failures next to the successes. A tool that says where it
   struggles is the one worth believing.
+
+### Tail-history finalization comparison
+
+`python benchmark/tail_history.py --base-source /path/to/base --head-source /path/to/candidate --output /tmp/tail-history.json`
+
+This imports each complete engine and compares `merge_detections` on deterministic
+ordinary OCR histories, including sparse detections over long history and a
+repeated-text control. Run it as the sole owned runtime workload. It records
+three warmups, five alternating measured pairs, full detection records, and
+separate work counts and allocation measurements. Inputs are fresh and prepared
+outside timing; index construction is included in each merge. These are bounded
+finalization measurements, with OCR inference and decoding excluded. Process
+maximum RSS includes both imported modules and native heaps and cannot attribute
+index memory. No five-sample population or long-video throughput claim is made.
+
+Run all discovered regression controls with `python -m pytest`, including the
+controlled-OCR `run_scan`/report fixture in `tests/test_tail_history_index.py`.

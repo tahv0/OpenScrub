@@ -21,10 +21,12 @@ Usage (see README.md):
 """
 
 import argparse
+from bisect import bisect_right
 import copy
 import datetime
 import hashlib
 import json
+import math
 import os
 import re
 import shutil
@@ -3024,12 +3026,35 @@ def merge_detections(dets, hold, scans=None, bridge_gap=4.0, fuzz=None,
     # coverage through that scan. A scan with no matching read stops the
     # walk, so a real scene change never accretes stale blur.
     if scans and fuzz:
+        # Reuse one timestamp index only when multiple text spans can benefit.
+        # Caller order remains authoritative: unusual/nonfinite timestamps or
+        # unordered histories use the original walk, including its failures.
+        tail_times = None
+        if (len(mergeable) > 1 and any(m.text for m in mergeable)
+                and type(scans) in (list, tuple)):
+            tail_times = []
+            for row in scans:
+                if type(row) not in (list, tuple) or len(row) != 3:
+                    tail_times = None
+                    break
+                st = row[0]
+                if (type(st) not in (int, float)
+                        or (type(st) is float and not math.isfinite(st))
+                        or (tail_times and st < tail_times[-1])):
+                    tail_times = None
+                    break
+                tail_times.append(st)
         for m in merged:
             if getattr(m, "dense", False) or not m.text:
                 continue
             mx1, my1, mx2, my2 = m.cbox
             mt = PhiMemory.norm(m.text)
-            for st, _cum, words in scans:
+            tail_scans = scans
+            if (tail_times is not None and type(m.last_seen) in (int, float)
+                    and (type(m.last_seen) is int or math.isfinite(m.last_seen))):
+                start = bisect_right(tail_times, m.last_seen + 0.01)
+                tail_scans = (scans[i] for i in range(start, len(scans)))
+            for st, _cum, words in tail_scans:
                 if st <= m.last_seen + 0.01:
                     continue
                 if st - m.last_seen > bridge_gap:
