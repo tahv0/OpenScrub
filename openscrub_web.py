@@ -1342,13 +1342,18 @@ def enforce_vault_lock():
 
 @app.after_request
 def _finish_file_response(response):
-    for child in g.pop("file_children", []):
-        child.release()
+    children = g.pop("file_children", [])
     lease = g.pop("file_owner", None)
-    if lease is not None:
-        if response.direct_passthrough:
+    if response.direct_passthrough:
+        if lease is None and children:
+            lease = children.pop(0)
+        if lease is not None:
+            lease.related.extend(children)
             response.response = OwnedIterable(response.response, lease)
-        else:
+    else:
+        for child in children:
+            child.release()
+        if lease is not None:
             lease.release()  # detached JSON/JPEG bytes no longer read job files
     return response
 
@@ -1911,6 +1916,54 @@ def job_frame_at(jid):
 
 
 
+def _send_open_file(path, **options):
+    """One opened generation supplies body, metadata, conditional and Range."""
+    stream = open(path, "rb")
+    response = None
+    try:
+        st = os.fstat(stream.fileno())
+        conditional = options.pop("conditional", True)
+        options.setdefault("download_name", os.path.basename(path))
+        # No hash/media read or path-based X-Sendfile; fstat describes exactly
+        # this open inode, even after final names change during transfer.
+        etag = "%x-%x-%x-%x-%x" % (st.st_dev, st.st_ino, st.st_size,
+                                    st.st_mtime_ns, st.st_ctime_ns)
+        response = send_file(stream, conditional=False, etag=etag,
+                             last_modified=st.st_mtime, **options)
+        response.content_length = st.st_size
+        if conditional:
+            response.make_conditional(request.environ, accept_ranges=True,
+                                      complete_length=st.st_size)
+        return response
+    except BaseException:
+        if response is not None:
+            response.close()
+        stream.close()
+        raise
+
+
+def _send_job_source(job, **options):
+    for attempt in range(2):
+        snapshot = _capture_frame_source(job)
+        state = snapshot["source_state"] or snapshot["state"]
+        owner = snapshot["source_job"] or job
+        response = error = None
+        with state.report_lock:
+            _report_current(owner)
+            _recovery_gate(owner)
+            try:
+                response = _send_open_file(snapshot["path"], **options)
+            except Exception as caught:
+                error = caught
+        if _frame_source_current(snapshot):
+            if error is not None:
+                raise error
+            return response
+        if response is not None:
+            response.close()
+    abort(409, "output changed during frame read; retry")
+
+
 @app.route("/api/jobs/<jid>/video")
 def job_video_stream(jid):
     """Range-aware stream of the job's scan video so review can PLAY the
@@ -1919,10 +1972,8 @@ def job_video_stream(jid):
     reads — for HDR/VFR jobs that is the normalized SDR scan copy, which
     every browser can decode."""
     job = JOBS.get(jid) or abort(404)
-    video = _job_video(job)
-    if not (video and os.path.exists(video)):
-        abort(404)
-    return send_file(video, conditional=True)
+    return _send_job_source(job, conditional=True)
+
 
 
 def _same_json_value(left, right):
@@ -2491,17 +2542,22 @@ def job_render(jid):
 @app.route("/api/jobs/<jid>/download")
 def job_download(jid):
     job = JOBS.get(jid) or abort(404)
-    if not job["output"] or not os.path.exists(job["output"]):
-        abort(404)
-    return send_file(job["output"], as_attachment=True,
-                     download_name=export_filenames(job)[0])
+    with FILES.initialize(job).report_lock:
+        _report_current(job)
+        _recovery_gate(job)
+        if not job["output"]:
+            abort(404)
+        return _send_open_file(job["output"], as_attachment=True,
+                               download_name=export_filenames(job)[0])
 
 
 @app.route("/api/jobs/<jid>/report")
 def job_report(jid):
     job = JOBS.get(jid) or abort(404)
     with FILES.initialize(job).report_lock:
-        return send_file(os.path.join(job["dir"], "report.json"),
+        _report_current(job)
+        _recovery_gate(job)
+        return _send_open_file(os.path.join(job["dir"], "report.json"),
                          as_attachment=True,
                          download_name=export_filenames(job)[1])
 
@@ -5348,7 +5404,14 @@ def server_video():
         os.path.splitdrive(p)[0] + os.sep)
     if not p.startswith(r.rstrip(os.sep) + os.sep):
         return jsonify({"error": "server path is outside OPENSCRUB_MEDIA_ROOT"}), 400
-    return send_file(p, conditional=True)
+    lease = g.get("file_owner")
+    if lease is not None and lease.source_job is not None:
+        owner = lease.source_job
+        with lease.source_state.report_lock:
+            _report_current(owner)
+            _recovery_gate(owner)
+            return _send_open_file(p, conditional=True)
+    return _send_open_file(p, conditional=True)
 
 
 @app.route("/api/waveform")

@@ -544,12 +544,12 @@ def socket_api(store, monkeypatch):
     try:
         assert ready.wait(8) and not errors, errors
         port = servers[0].socket.getsockname()[1]
-        def api(method, path, payload=None):
+        def api(method, path, payload=None, headers=None):
             connection = http.client.HTTPConnection('127.0.0.1', port, timeout=8)
             try:
                 body = json.dumps(payload) if payload is not None else None
                 connection.request(method, path, body=body, headers={
-                    'Content-Type': 'application/json', 'Connection': 'close'})
+                    'Content-Type': 'application/json', 'Connection': 'close', **(headers or {})})
                 result = connection.getresponse()
                 return result.status, dict(result.getheaders()), result.read()
             finally:
