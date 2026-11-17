@@ -1,0 +1,176 @@
+FFFFFFF.                                                                 [100%]
+=================================== FAILURES ===================================
+_____________ test_overlapping_sparse_saves_preserve_both_choices ______________
+
+store = namespace(root=PosixPath('/tmp/openscrub-task622/red2-tmp/test_overlapping_sparse_saves_0/data'), jobs=PosixPath('/tmp...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x702673d07ec0>, url='/api/jobs/0c15b0c28cf9')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7026b557a600>
+
+    def test_overlapping_sparse_saves_preserve_both_choices(store, monkeypatch):
+        two_rows(store)
+        lock = ObservedLock()
+        web.FILES.initialize(store.job).report_lock = lock
+        staged, release = threading.Event(), threading.Event()
+        real = web.atomic_report
+        def publish(path, doc):
+            if not staged.is_set():
+                staged.set()
+                assert release.wait(8)
+            return real(path, doc)
+        monkeypatch.setattr(web, 'atomic_report', publish)
+        first = start_call('post', store.url + '/detections', json={'enabled': {'0': False}})
+        second = None
+        try:
+            assert staged.wait(5)
+            second = start_call('post', store.url + '/detections', json={'enabled': {'1': False}})
+>           assert lock.waiting.wait(2), 'second save never attempted the per-job report lock'
+E           AssertionError: second save never attempted the per-job report lock
+E           assert False
+E            +  where False = wait(2)
+E            +    where wait = <threading.Event at 0x7026b557a960: unset>.wait
+E            +      where <threading.Event at 0x7026b557a960: unset> = <test_report_transactions.ObservedLock object at 0x7026b5579f40>.waiting
+
+tests/test_report_transactions.py:55: AssertionError
+_____________ test_active_worker_rejects_save_and_tracking[queued] _____________
+
+store = namespace(root=PosixPath('/tmp/openscrub-task622/red2-tmp/test_active_worker_rejects_sav0/data'), jobs=PosixPath('/tmp...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x70267df8bf60>, url='/api/jobs/f7c16eef77e0')
+phase = 'queued'
+
+    @pytest.mark.parametrize('phase', ['queued', 'scanning', 'queued_render', 'rendering'])
+    def test_active_worker_rejects_save_and_tracking(store, phase):
+        before = store.path.read_bytes()
+        store.job['phase'] = phase
+>       assert request('post', store.url + '/detections', json={'enabled': {'0': False}}).status_code == 409
+E       AssertionError: assert 200 == 409
+E        +  where 200 = <WrapperTestResponse 45 bytes [200 OK]>.status_code
+E        +    where <WrapperTestResponse 45 bytes [200 OK]> = request('post', ('/api/jobs/f7c16eef77e0' + '/detections'), json={'enabled': {'0': False}})
+E        +      where '/api/jobs/f7c16eef77e0' = namespace(root=PosixPath('/tmp/openscrub-task622/red2-tmp/test_active_worker_rejects_sav0/data'), jobs=PosixPath('/tmp...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x70267df8bf60>, url='/api/jobs/f7c16eef77e0').url
+
+tests/test_report_transactions.py:70: AssertionError
+____________ test_active_worker_rejects_save_and_tracking[scanning] ____________
+
+store = namespace(root=PosixPath('/tmp/openscrub-task622/red2-tmp/test_active_worker_rejects_sav1/data'), jobs=PosixPath('/tmp...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x702673d07c40>, url='/api/jobs/790117af638b')
+phase = 'scanning'
+
+    @pytest.mark.parametrize('phase', ['queued', 'scanning', 'queued_render', 'rendering'])
+    def test_active_worker_rejects_save_and_tracking(store, phase):
+        before = store.path.read_bytes()
+        store.job['phase'] = phase
+>       assert request('post', store.url + '/detections', json={'enabled': {'0': False}}).status_code == 409
+E       AssertionError: assert 200 == 409
+E        +  where 200 = <WrapperTestResponse 45 bytes [200 OK]>.status_code
+E        +    where <WrapperTestResponse 45 bytes [200 OK]> = request('post', ('/api/jobs/790117af638b' + '/detections'), json={'enabled': {'0': False}})
+E        +      where '/api/jobs/790117af638b' = namespace(root=PosixPath('/tmp/openscrub-task622/red2-tmp/test_active_worker_rejects_sav1/data'), jobs=PosixPath('/tmp...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x702673d07c40>, url='/api/jobs/790117af638b').url
+
+tests/test_report_transactions.py:70: AssertionError
+_________ test_active_worker_rejects_save_and_tracking[queued_render] __________
+
+store = namespace(root=PosixPath('/tmp/openscrub-task622/red2-tmp/test_active_worker_rejects_sav2/data'), jobs=PosixPath('/tmp...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7026377ad1c0>, url='/api/jobs/b0aca410734d')
+phase = 'queued_render'
+
+    @pytest.mark.parametrize('phase', ['queued', 'scanning', 'queued_render', 'rendering'])
+    def test_active_worker_rejects_save_and_tracking(store, phase):
+        before = store.path.read_bytes()
+        store.job['phase'] = phase
+>       assert request('post', store.url + '/detections', json={'enabled': {'0': False}}).status_code == 409
+E       AssertionError: assert 200 == 409
+E        +  where 200 = <WrapperTestResponse 45 bytes [200 OK]>.status_code
+E        +    where <WrapperTestResponse 45 bytes [200 OK]> = request('post', ('/api/jobs/b0aca410734d' + '/detections'), json={'enabled': {'0': False}})
+E        +      where '/api/jobs/b0aca410734d' = namespace(root=PosixPath('/tmp/openscrub-task622/red2-tmp/test_active_worker_rejects_sav2/data'), jobs=PosixPath('/tmp...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7026377ad1c0>, url='/api/jobs/b0aca410734d').url
+
+tests/test_report_transactions.py:70: AssertionError
+___________ test_active_worker_rejects_save_and_tracking[rendering] ____________
+
+store = namespace(root=PosixPath('/tmp/openscrub-task622/red2-tmp/test_active_worker_rejects_sav3/data'), jobs=PosixPath('/tmp...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7026377ad300>, url='/api/jobs/73a69c1e9366')
+phase = 'rendering'
+
+    @pytest.mark.parametrize('phase', ['queued', 'scanning', 'queued_render', 'rendering'])
+    def test_active_worker_rejects_save_and_tracking(store, phase):
+        before = store.path.read_bytes()
+        store.job['phase'] = phase
+>       assert request('post', store.url + '/detections', json={'enabled': {'0': False}}).status_code == 409
+E       AssertionError: assert 200 == 409
+E        +  where 200 = <WrapperTestResponse 45 bytes [200 OK]>.status_code
+E        +    where <WrapperTestResponse 45 bytes [200 OK]> = request('post', ('/api/jobs/73a69c1e9366' + '/detections'), json={'enabled': {'0': False}})
+E        +      where '/api/jobs/73a69c1e9366' = namespace(root=PosixPath('/tmp/openscrub-task622/red2-tmp/test_active_worker_rejects_sav3/data'), jobs=PosixPath('/tmp...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7026377ad300>, url='/api/jobs/73a69c1e9366').url
+
+tests/test_report_transactions.py:70: AssertionError
+_______________________ test_missing_report_save_is_404 ________________________
+
+store = namespace(root=PosixPath('/tmp/openscrub-task622/red2-tmp/test_missing_report_save_is_400/data'), jobs=PosixPath('/tmp...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x702673d07880>, url='/api/jobs/900c7fc3592d')
+
+    def test_missing_report_save_is_404(store):
+        store.path.unlink()
+>       assert request('post', store.url + '/detections', json={}).status_code == 404
+E       AssertionError: assert 500 == 404
+E        +  where 500 = <WrapperTestResponse 265 bytes [500 INTERNAL SERVER ERROR]>.status_code
+E        +    where <WrapperTestResponse 265 bytes [500 INTERNAL SERVER ERROR]> = request('post', ('/api/jobs/900c7fc3592d' + '/detections'), json={})
+E        +      where '/api/jobs/900c7fc3592d' = namespace(root=PosixPath('/tmp/openscrub-task622/red2-tmp/test_missing_report_save_is_400/data'), jobs=PosixPath('/tmp...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x702673d07880>, url='/api/jobs/900c7fc3592d').url
+
+tests/test_report_transactions.py:77: AssertionError
+------------------------------ Captured log call -------------------------------
+ERROR    openscrub_web:app.py:875 Exception on /api/jobs/900c7fc3592d/detections [POST]
+Traceback (most recent call last):
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", line 1597, in job_save_edits
+    doc = _load_job_report(job)
+          ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", line 1398, in _load_job_report
+    with open(os.path.join(job["dir"], "report.json"), encoding="utf-8") as f:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/tmp/openscrub-task622/red2-tmp/test_missing_report_save_is_400/data/jobs/900c7fc3592d/report.json'
+_______ test_cancel_during_render_compute_rejects_real_final_publication _______
+
+store = namespace(root=PosixPath('/tmp/openscrub-task622/red2-tmp/test_cancel_during_render_comp0/data'), jobs=PosixPath('/tmp...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x70267df88040>, url='/api/jobs/f9f35fa1a080')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7026b557caa0>
+
+    def test_cancel_during_render_compute_rejects_real_final_publication(store, monkeypatch):
+        two_rows(store)
+        entered, release = threading.Event(), threading.Event()
+        callbacks = []
+        monkeypatch.setattr(openscrub, 'normalize_vfr', lambda *a: None)
+        def render(src, dst, *args, **kwargs):
+            callbacks.append(kwargs['cb'])
+            entered.set()
+            assert release.wait(8)
+            Path(dst).write_bytes(b'synthetic encoded output')
+        monkeypatch.setattr(openscrub, 'render', render)
+        assert request('post', store.url + '/render').status_code == 200
+        before = store.path.read_bytes()
+        thread = run_worker()
+        try:
+            assert entered.wait(5)
+            assert request('post', store.url + '/cancel').status_code == 200
+            assert callbacks[0].cancelled()
+            # A reusable Event alone must not revalidate the obsolete operation.
+            store.job['cancel'].clear()
+        finally:
+            release.set()
+            join(thread)
+>       assert store.path.read_bytes() == before, 'cancelled renderer published obsolete provenance'
+E       AssertionError: cancelled renderer published obsolete provenance
+E       assert b'{\n "proven...e\n  }\n ]\n}' == b'{"provenanc...ure": true}]}'
+E         
+E         At index 1 diff: b'\n' != b'"'
+E         Use -v to get more diff
+
+tests/test_report_transactions.py:115: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_report_transactions.py::test_overlapping_sparse_saves_preserve_both_choices
+FAILED tests/test_report_transactions.py::test_active_worker_rejects_save_and_tracking[queued]
+FAILED tests/test_report_transactions.py::test_active_worker_rejects_save_and_tracking[scanning]
+FAILED tests/test_report_transactions.py::test_active_worker_rejects_save_and_tracking[queued_render]
+FAILED tests/test_report_transactions.py::test_active_worker_rejects_save_and_tracking[rendering]
+FAILED tests/test_report_transactions.py::test_missing_report_save_is_404 - A...
+FAILED tests/test_report_transactions.py::test_cancel_during_render_compute_rejects_real_final_publication
+7 failed, 1 passed in 2.18s

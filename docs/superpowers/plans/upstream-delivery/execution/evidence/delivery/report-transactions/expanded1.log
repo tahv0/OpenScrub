@@ -1,0 +1,145 @@
+.....................s.E..F                                              [100%]
+==================================== ERRORS ====================================
+___ ERROR at teardown of test_cancel_final_worker_boundary[scan-publishing] ____
+
+tmp_path = PosixPath('/tmp/openscrub-task622/expanded1-tmp/test_cancel_final_worker_bound2')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7a52760e1d30>
+
+    @pytest.fixture
+    def store(tmp_path, monkeypatch):
+        root = tmp_path / 'data'
+        root.mkdir()
+        jobs = root / 'jobs'
+        jobs.mkdir()
+        monkeypatch.setattr(web, '_data_root', lambda: str(root))
+        monkeypatch.setattr(web, 'JOBS_DIR', str(jobs))
+        monkeypatch.setattr(web, 'JOBS', {})
+        monkeypatch.setattr(web, 'WORK_Q', queue.Queue())
+        monkeypatch.setattr(web, 'WORKER', {'current': None, 'thread': None})
+        monkeypatch.setattr(web, 'VAULT', {'key': None})
+        # A fresh ownership domain isolates every route schedule, once implemented.
+        if hasattr(web, 'FILES'):
+            monkeypatch.setattr(web, 'FILES', type(web.FILES)(web.VAULT_LOCK))
+        monkeypatch.setattr(web, 'TOKEN', None)
+        monkeypatch.setitem(web.app.config, 'TESTING', False)
+        monkeypatch.setitem(web.app.config, 'PROPAGATE_EXCEPTIONS', False)
+        job = web.new_job('', {}, 'synthetic.avi')
+        video = Path(job['dir']) / 'input.avi'
+        video.write_bytes(b'synthetic video')
+        job.update(video=str(video), phase='review')
+        doc = {'provenance': {'input': str(video), 'settings': {}},
+               'render_state': {'fps': 30, 'cum': [[0, 0]] * 30},
+               'detections': [dict(t_start=0, t_end=1, cbox=[1, 2, 8, 9],
+                                  category='name', text='synthetic', confidence=.9,
+                                  aoff=[0, 0], last_seen=.5, enabled=True)],
+               'custom': {'preserved': True}}
+        path = Path(job['dir']) / 'report.json'
+        path.write_text(json.dumps(doc))
+        def enable():
+            key = vault.create_keystore(str(root), 'synthetic-password')
+            web.VAULT['key'] = key
+            return key
+        result = SimpleNamespace(root=root, jobs=jobs, job=job, path=path,
+                                 doc=doc, enable=enable,
+                                 url='/api/jobs/' + job['id'])
+        yield result
+        if hasattr(web, 'FILES'):
+>           assert web.FILES.count == 0, 'file ownership leaked'
+E           AssertionError: file ownership leaked
+E           assert 1 == 0
+E            +  where 1 = <openscrub_internal.lifetimes.FileOwners object at 0x7a52760e1fd0>.count
+E            +    where <openscrub_internal.lifetimes.FileOwners object at 0x7a52760e1fd0> = web.FILES
+
+tests/test_job_lifecycle.py:57: AssertionError
+=================================== FAILURES ===================================
+_____________ test_cancel_final_worker_boundary[render-publishing] _____________
+
+store = namespace(root=PosixPath('/tmp/openscrub-task622/expanded1-tmp/test_cancel_final_worker_bound5/data'), jobs=PosixPath(...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7a5200b36e80>, url='/api/jobs/b852a2399c8e')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7a52760e7080>
+action = 'render', stage = 'publishing'
+
+    @pytest.mark.parametrize('stage', ['constructed', 'hashed', 'publishing'])
+    @pytest.mark.parametrize('action', ['scan', 'render'])
+    def test_cancel_final_worker_boundary(store, monkeypatch, action, stage):
+        two_rows(store)
+        before = store.path.read_bytes()
+        entered, release = threading.Event(), threading.Event()
+        lock = ObservedLock()
+        web.FILES.initialize(store.job).report_lock = lock
+        callbacks = []
+        monkeypatch.setattr(openscrub, 'normalize_vfr', lambda *a: None)
+        def render(src, dst, *args, **kwargs):
+            callbacks.append(kwargs['cb'])
+            Path(dst).write_bytes(b'synthetic encoded output')
+        monkeypatch.setattr(openscrub, 'render', render)
+        def scan(args, cb):
+            callbacks.append(cb)
+            return dict(fps=30, cum=[[0,0]], bands=[[0,0]], detections=[], stats={})
+        monkeypatch.setattr(openscrub, 'run_scan', scan)
+        if stage == 'constructed':
+            real_write = openscrub.write_report
+            def write(path, args, state, output_path=None, publisher=None):
+                def pause(target, doc):
+                    entered.set()
+                    assert release.wait(8)
+                    publisher(target, doc)
+                return real_write(path, args, state, output_path, publisher=pause)
+            monkeypatch.setattr(openscrub, 'write_report', write)
+        elif stage == 'hashed':
+            if action == 'scan':
+                pytest.skip('scan has no output hash; construction/publication cases cover scan')
+            real_hash = openscrub.sha256_file
+            def sha(path, *args, **kwargs):
+                value = real_hash(path, *args, **kwargs)
+                if Path(path).name.startswith('output.'):
+                    entered.set()
+                    assert release.wait(8)
+                return value
+            monkeypatch.setattr(openscrub, 'sha256_file', sha)
+        else:
+            real_replace = reports.os.replace
+            def replace(src, dst):
+                if str(dst) == str(store.path):
+                    entered.set()
+                    assert release.wait(8)
+                return real_replace(src, dst)
+            monkeypatch.setattr(reports.os, 'replace', replace)
+        if action == 'render':
+            assert request('post', store.url + '/render').status_code == 200
+        else:
+            store.job['phase'] = 'error'
+            assert request('post', store.url + '/retry').status_code == 200
+        thread = run_worker()
+        cancel = None
+        try:
+            assert entered.wait(5)
+            lock.waiting.clear()
+            cancel = start_call('post', store.url + '/cancel')
+            if stage == 'publishing':
+                assert lock.waiting.wait(5), 'cancel did not wait for committing publisher'
+                assert callbacks[0].cancelled(), 'Event must reach compute before report lock'
+                assert not cancel[1].is_set()
+            else:
+                assert finish(cancel).status_code == 200
+                cancel = None
+                assert callbacks[0].cancelled()
+                store.job['cancel'].clear()
+                # Cancelled worker still owns resources and closes mutation gates.
+                assert request('post', store.url + '/detections', json={}).status_code == 409
+                assert request('post', store.url + '/retry').status_code == 409
+        finally:
+            release.set()
+            if cancel:
+                assert finish(cancel).status_code == 200
+            join(thread)
+>       assert store.job['phase'] == 'cancelled'
+E       AssertionError: assert 'done' == 'cancelled'
+E         
+E         - cancelled
+E         + done
+
+tests/test_report_transactions.py:504: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_report_transactions.py::test_cancel_final_worker_boundary[render-publishing]
+ERROR tests/test_report_transactions.py::test_cancel_final_worker_boundary[scan-publishing]
+1 failed, 24 passed, 1 skipped, 1 error in 0.30s

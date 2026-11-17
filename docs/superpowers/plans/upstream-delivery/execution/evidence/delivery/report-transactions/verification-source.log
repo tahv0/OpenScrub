@@ -1,0 +1,16 @@
+{
+  "python": "3.12.16",
+  "versions": {
+    "opencv-python": "4.14.0.94",
+    "numpy": "2.5.5",
+    "cheroot": "11.1.2",
+    "pytest": "9.2.0",
+    "build": "1.6.1"
+  },
+  "source": {
+    "openscrub.py": "275de34766d3d64592222be5633906a3dcd2557ce78e2dd7b7d6fb8075fd0355",
+    "openscrub_web.py": "8621413a6bb4d1e940c9313c06479be1b5627e566eff3c76f7760bf85227e4ca",
+    "openscrub_internal/lifetimes.py": "dbfc317c1c878b8e8a599391578504c44a8964199f2cdae6e2ed60a6336d6743",
+    "tests/test_report_transactions.py": "e07c18b6823ed79b6ac0c3e1bad74d1740655ae67054e57888871f8cdd3b6ef8"
+  }
+}

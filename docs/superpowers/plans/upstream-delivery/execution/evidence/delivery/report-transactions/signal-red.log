@@ -1,0 +1,39 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+___________ test_cancel_signal_during_queue_admission_is_not_cleared ___________
+
+store = namespace(root=PosixPath('/tmp/openscrub-task622/signal-red-tmp/test_cancel_signal_during_queu0/data'), jobs=PosixPath...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7b15d8d17ba0>, url='/api/jobs/ccb2f775f0ab')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7b1622f7fb90>
+
+    def test_cancel_signal_during_queue_admission_is_not_cleared(store, monkeypatch):
+        entered = threading.Event()
+        lock = ObservedLock()
+        web.FILES.initialize(store.job).report_lock = lock
+        operations = []
+        real = web._begin_operation
+        def begin(job, owner):
+            real(job, owner)
+            operations.append(owner.operation)
+            entered.set()
+            assert lock.waiting.wait(8)
+        monkeypatch.setattr(web, '_begin_operation', begin)
+        render = start_call('post', store.url + '/render')
+        cancel = None
+        try:
+            assert entered.wait(5)
+            cancel = start_call('post', store.url + '/cancel')
+        finally:
+            assert finish(render).status_code == 200
+            if cancel:
+                assert finish(cancel).status_code == 200
+            join(run_worker())
+>       assert operations[0].is_set(), 'admission cleared a captured cancellation signal'
+E       AssertionError: admission cleared a captured cancellation signal
+E       assert False
+E        +  where False = is_set()
+E        +    where is_set = <threading.Event at 0x7b1622f7e9f0: unset>.is_set
+
+tests/test_report_transactions.py:809: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_report_transactions.py::test_cancel_signal_during_queue_admission_is_not_cleared
+1 failed in 0.22s

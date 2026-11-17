@@ -19,8 +19,10 @@ These local planning records preserve synthetic research, completed-task reports
 | [Tracker regression](delivery/task-90-report.md) | Nonvacuous identity-protection regression with a failing mutation control. |
 | [Atomic reports](delivery/task-61-report.md) / [complete roundtrip](delivery/task-64-report.md) | Complete report publication and preservation; independent concurrency work follows. |
 | [Browser save snapshots](delivery/task-71-report.md) / [audio fix review](delivery/task-71-fix1-review.md) | Pending/current draft ownership and the narrow reviewed audio correction. |
+| [Manual replay contract](research/manual-replay-contract-research.md) | Existing committed-before-ack indexed-edit flow and the need for immutable creation data; actual JS plus explicitly isolated server-function checks, not full HTTP/render/restart acceptance. |
 | [Combined report prerequisites](delivery/task-620-report.md) | Reviewed prerequisite assembly, full combined suite and actual save/render/reopen scenario. |
 | [Job file lifetimes](delivery/task-621-report.md) / [fix review](delivery/task-621-fix1-review.md) | Store/job/selected-source ownership, actual WSGI close and allowlist refusal behavior, with initial and amended-head verification distinguished. |
+| [Report transactions](delivery/task-622-report.md) / [review](delivery/task-622-review.md) | Latest-document updates, current tracker IDs, captured cancellation and final report/status publication, with stabilized-source runtime/build evidence. |
 | [Dense smoothing](dense-smoothing/task-111-report.md) | Full-module before/after measurements and exact output comparisons, with retained fixture recipes. |
 
 The [manifest](retained-manifest.json) records hashes and sizes of the retained files. Report prose and raw results are retained; relative documentation links are adjusted for this location. Raw logs may retain original whitespace and failed harness/setup invocations. Those failures are explained in the reports rather than removed from the evidence.

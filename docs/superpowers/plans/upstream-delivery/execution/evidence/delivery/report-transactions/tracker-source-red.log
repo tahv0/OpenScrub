@@ -1,0 +1,64 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+___ test_tracker_rejects_source_prepared_before_scan_normalization_finishes ____
+
+store = namespace(root=PosixPath('/tmp/openscrub-task622/tracker-source-red-tmp/test_tracker_rejects_source_pr0/data'), jobs=P...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x725333dacea0>, url='/api/jobs/872316500e5f')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x72536aec3a40>
+
+    def test_tracker_rejects_source_prepared_before_scan_normalization_finishes(store, monkeypatch):
+        scanning, finish_scan = threading.Event(), threading.Event()
+        prepared, finish_prepare = threading.Event(), threading.Event()
+        normalized = Path(store.job['dir']) / 'normalized.avi'
+        normalized.write_bytes(b'synthetic normalized video')
+        background, responses = [], []
+        real_start = web._start_owned_thread
+        def start(*args):
+            thread = real_start(*args)
+            background.append(thread)
+            return thread
+        monkeypatch.setattr(web, '_start_owned_thread', start)
+        def scan(args, cb):
+            scanning.set()
+            assert finish_scan.wait(8)
+            args.original_video, args.video = args.video, str(normalized)
+            return dict(fps=10, cum=[[1,2]], bands=[[0,0]], detections=[], stats={})
+        monkeypatch.setattr(openscrub, 'run_scan', scan)
+        monkeypatch.setattr(openscrub, 'PersonDetector', lambda *a, **kw: None)
+        monkeypatch.setattr(openscrub, 'track_manual_region', lambda *a, **kw: [(0, [1,2,8,9], .9)])
+        real_own = web._own_files
+        def own(job=None, work=False):
+            lease = real_own(job, work)
+            if work and threading.current_thread().name == 'late-tracker-source':
+                prepared.set()
+                assert finish_prepare.wait(8)
+            return lease
+        monkeypatch.setattr(web, '_own_files', own)
+        store.job['phase'] = 'error'
+        assert request('post', store.url + '/retry').status_code == 200
+        worker = run_worker()
+        tracker_call = threading.Thread(name='late-tracker-source', target=lambda: responses.append(track(store)))
+        try:
+            assert scanning.wait(5)
+            tracker_call.start()
+            assert prepared.wait(5)
+            finish_scan.set()
+            join(worker)
+            for thread in background:
+                join(thread)
+            assert store.job['video'] == str(normalized)
+        finally:
+            finish_scan.set()
+            finish_prepare.set()
+            join(worker)
+            if tracker_call.ident:
+                join(tracker_call)
+            for thread in background:
+                join(thread)
+>       assert responses[0].status_code == 409
+E       assert 200 == 409
+E        +  where 200 = <WrapperTestResponse 12 bytes [200 OK]>.status_code
+
+tests/test_report_transactions.py:894: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_report_transactions.py::test_tracker_rejects_source_prepared_before_scan_normalization_finishes
+1 failed in 0.24s

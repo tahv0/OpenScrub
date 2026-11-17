@@ -1,0 +1,37 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+______ test_render_rechecks_prepared_operation_after_intervening_tracker _______
+
+store = namespace(root=PosixPath('/tmp/openscrub-task622/snapshot-red-tmp/test_render_rechecks_prepared_0/data'), jobs=PosixPa...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7648a5c08900>, url='/api/jobs/60720c52ab38')
+tracker = (<threading.Event at 0x7648a5563b00: set>, <threading.Event at 0x7648a5563a70: set>, [<Thread(Thread-2 (run), stopped daemon 130051254187712)>], [<openscrub_web.job_track_object.<locals>._run.<locals>.L object at 0x7648a553e660>])
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7648a5563500>
+
+    def test_render_rechecks_prepared_operation_after_intervening_tracker(store, tracker, monkeypatch):
+        selected, release = threading.Event(), threading.Event()
+        real = web._select_render_input
+        def select(job, owner):
+            real(job, owner)
+            if not selected.is_set():
+                selected.set()
+                assert release.wait(8)
+        monkeypatch.setattr(web, '_select_render_input', select)
+        render = start_call('post', store.url + '/render')
+        entered, release_tracker, threads, _ = tracker
+        try:
+            assert selected.wait(5)
+            assert track(store).status_code == 200
+            assert entered.wait(5)
+            release_tracker.set()
+            join(threads[0])
+        finally:
+            release.set()
+            response = finish(render)
+        try:
+>           assert response.status_code == 409
+E           assert 200 == 409
+E            +  where 200 = <WrapperTestResponse 12 bytes [200 OK]>.status_code
+
+tests/test_report_transactions.py:834: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_report_transactions.py::test_render_rechecks_prepared_operation_after_intervening_tracker
+1 failed in 0.23s

@@ -1,0 +1,136 @@
+Pinned export source evidence; line numbers are source file line numbers.
+
+MAN references (entire production file):
+2416: let CUR=null, EN={}, MAN=[], DUR=0, POLL=null, PHIST=[], PHPH="", LOGN=0, SHELLPH=null, JOBSJSON="";
+2500:  EN=EDITS.en;MAN=EDITS.manual;BE=EDITS.editor;
+3495:  if(!confirm("Enable at-rest encryption?\\n\\nTHERE IS NO PASSWORD RESET. If you lose this password, every encrypted job file is PERMANENTLY UNRECOVERABLE.\\n\\nContinue?"))return;
+3795:                     "FILES PERMANENTLY UNRECOVERABLE."})
+
+openscrub_web.py:1437-1448: GET detections mapping
+1437:         items.append({"i": i, "category": d["category"], "text": d["text"],
+1438:                       "t_start": d["t_start"], "t_end": round(d["t_end"], 2),
+1439:                       "enabled": d.get("enabled", True),
+1440:                       "track": d.get("track", -1),
+1441:                       "person": d.get("person", -1),
+1442:                       "confidence": d.get("confidence", 0),
+1443:                       "zone_dropped": bool(d.get("zone_dropped"))})
+1444:     return jsonify({"detections": items,
+1445:                     "fps": doc["render_state"]["fps"],
+1446:                     "duration": len(doc["render_state"]["cum"]) /
+1447:                                 doc["render_state"]["fps"]})
+1448: 
+
+openscrub_web.py:1645-1647: POST acknowledgement
+1645:                      if len(states) >= 2 and not any(states))
+1646:     return jsonify({"ok": True, "total": len(doc["detections"]),
+1647:                     "suggest_allowlist": suggest})
+
+openscrub_web.py:2921-2926: Orange addition paint
+2921:  for(const a of BE.adds){
+2922:   if(BE.t<a.t0-0.01||BE.t>a.t1+0.01)continue;
+2923:   const[a1,b1,a2,b2]=a.box.map(v=>v*s);
+2924:   x.fillStyle="rgba(245,158,11,.25)";x.strokeStyle="#f59e0b";x.lineWidth=2;
+2925:   x.fillRect(a1,b1,a2-a1,b2-b1);x.strokeRect(a1,b1,a2-a1,b2-b1);
+2926:  }
+
+openscrub_web.py:2989-3008: Ordinary addition producer
+2989:   if(BE.add){
+2990:    if(!BE.addAnchor){BE.addAnchor=p;BE.addFloat=p;}
+2991:    else{
+2992:     const a=BE.addAnchor,q=p;BE.addAnchor=null;BE.addFloat=null;
+2993:     const box=[Math.min(a[0],q[0]),Math.min(a[1],q[1]),
+2994:                Math.max(a[0],q[0]),Math.max(a[1],q[1])];
+2995:     if(box[2]-box[0]>6&&box[3]-box[1]>6){
+2996:      const t0=Math.max(0,+(BE.t-0.5).toFixed(1)),
+2997:            t1=Math.min(BE.dur,+(BE.t+3).toFixed(1));
+2998:      const fr=prompt("Blur this region FROM (seconds):",t0);
+2999:      if(fr===null){beDraw();return;}
+3000:      const to=prompt("...TO (seconds):",t1);
+3001:      if(to===null){beDraw();return;}
+3002:      BE.adds.push({box,t0:Math.max(0,+fr||0),
+3003:                    t1:Math.min(BE.dur,+to||t1),tref:BE.t});
+3004:     }
+3005:     beDraw();
+3006:    }
+3007:    return;
+3008:   }
+
+openscrub_web.py:3018-3045: Indexed selection and mutation
+3018:   const hit=[...BE.boxes].reverse().find(b=>{
+3019:    const[a1,b1,a2,b2]=b.box;
+3020:    return p[0]>=a1&&p[0]<=a2&&p[1]>=b1&&p[1]<=b2;});
+3021:   BE.sel=hit?hit.i:-1;
+3022:   document.getElementById("beRm").style.display=hit?"inline-block":"none";
+3023:   if(hit)beShowTimes(hit);
+3024:   else document.getElementById("beTimes").style.display="none";
+3025:   beDraw();
+3026:  });
+3027:  cv.addEventListener("pointermove",e=>{
+3028:   if(BE.add&&BE.addAnchor){BE.addFloat=pt(e);beDraw();return;}
+3029:   if(!BE.drag||BE.sel<0)return;
+3030:   const p=pt(e),b=BE.boxes.find(x=>x.i===BE.sel);if(!b)return;
+3031:   let[a1,b1,a2,b2]=b.box;
+3032:   if(BE.drag.kind==="move"){
+3033:    const w0=a2-a1,h0=b2-b1;a1=p[0]-BE.drag.off[0];b1=p[1]-BE.drag.off[1];
+3034:    a2=a1+w0;b2=b1+h0;
+3035:   }else{
+3036:    if(BE.drag.ci===0){a1=p[0];b1=p[1];}
+3037:    if(BE.drag.ci===1){a2=p[0];b1=p[1];}
+3038:    if(BE.drag.ci===2){a1=p[0];b2=p[1];}
+3039:    if(BE.drag.ci===3){a2=p[0];b2=p[1];}
+3040:   }
+3041:   b.box=[Math.min(a1,a2),Math.min(b1,b2),Math.max(a1,a2),Math.max(b1,b2)];
+3042:   BE.ov[BE.sel]=[b.box[0]-BE.ox,b.box[1]-BE.oy,b.box[2]-BE.ox,b.box[3]-BE.oy];
+3043:   beDraw();
+3044:  });
+3045:  cv.addEventListener("pointerup",()=>{BE.drag=null;});
+
+openscrub_web.py:3309-3338: Snapshot and acknowledgement
+3309: function acknowledgeMap(current,submitted){
+3310:  for(const [key,value] of Object.entries(submitted))
+3311:   if(sameEdit(current[key],value))delete current[key];
+3312: }
+3313: function acknowledgeAdds(current,refs,submitted){
+3314:  for(let i=current.length-1;i>=0;i--){
+3315:   const index=refs.indexOf(current[i]);
+3316:   if(index>=0&&sameEdit(current[i],submitted[index]))current.splice(i,1);
+3317:  }
+3318: }
+3319: async function saveAndRender(){
+3320:  const id=CUR,gen=VIEW_GEN,d=EDITS;
+3321:  if(!id||!d||d.busy)return false;
+3322:  const b=d.editor,manRefs=[...d.manual],addRefs=[...b.adds];
+3323:  const man=copyEdit(d.manual),adds=copyEdit(b.adds);
+3324:  const payload=copyEdit({enabled:d.enabled,manual:[...man,...adds.map(a=>({
+3325:   t_start:a.t0,t_end:a.t1,t_ref:a.tref,screen_box:a.box}))],
+3326:   box_overrides:b.ov,time_overrides:b.times});
+3327:  // Plain review must never wipe audio that the editor has not loaded.
+3328:  if(b.audioLoaded&&!sameEdit(b.audio,b.audioSaved)){payload.audio=copyEdit(b.audio);}
+3329:  d.audioInFlight=payload.audio!==undefined;
+3330:  d.busy=true;saveStatus(d,"Saving edits… You can keep editing; newer edits stay pending.");
+3331:  let saved=false;
+3332:  try{
+3333:   const result=await reviewPost(`api/jobs/${id}/detections`,payload);
+3334:   saved=true;d.audioInFlight=false;
+3335:   acknowledgeMap(d.enabled,payload.enabled);
+3336:   acknowledgeMap(b.ov,payload.box_overrides);acknowledgeMap(b.times,payload.time_overrides);
+3337:   acknowledgeAdds(d.manual,manRefs,man);acknowledgeAdds(b.adds,addRefs,adds);
+3338:   if(payload.audio!==undefined)b.audioSaved=copyEdit(payload.audio);
+
+openscrub.py:6305-6320: raw-document publication
+6305:     source = state.get("source_report")
+6306:     if source is not None:
+6307:         # A render consumes enabled Detection objects, but publishes the full
+6308:         # review document: Keep choices, row positions and unknown fields are
+6309:         # user data, not a serialization of the render subset.
+6310:         doc = dict(source)
+6311:         previous = dict(source.get("provenance", {}))
+6312:         settings = dict(previous.get("settings", {}))
+6313:         settings.update(prov["settings"])
+6314:         prov["settings"] = settings
+6315:         # Output hashes/paths must describe this render, never an older one.
+6316:         previous.pop("output", None)
+6317:         previous.pop("output_sha256", None)
+6318:         previous.update(prov)
+6319:         doc["provenance"] = previous
+6320:     else:

@@ -1,0 +1,15 @@
+{
+  "commit": "c697d5a686d4dccbdf4f474567628d5d24e75a03",
+  "tree": "d63112f12d3a7893f83c96a8595b071a62ed9700",
+  "fullExportFileCount": 123,
+  "exportVerification": "All 123 exported blob contents independently matched pinned git ls-tree object IDs.",
+  "export": "/tmp/openscrub-manual-replay-contract-20261117/source",
+  "appJsSha256": "860a6c8b28b5660446d490554f59e07bf936900bcd8b39de4ac84f55a3561a1f",
+  "sourceFiles": {
+    "openscrub_web.py": "53385453acaaa1c15d57808c502775bfdfbcb5d778d08ac4217768674e1a60d8",
+    "openscrub.py": "c500dfd91d2fd038c4792bd32900894745c5009fce839b10f8d747dc4dc30591",
+    "openscrub_internal/reports.py": "e8a7429c0b5430ee290f6635ca5d5a93445d3f0fe9bb0f58e57fec891ee01b7f",
+    "tests/test_review_save_failures.py": "745fcb9f554256ea4721ed9ced37a0f69e9db7f713db5ef2d821f0d59e0ada9a"
+  },
+  "node": "v22.22.1"
+}

@@ -1,0 +1,74 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+________ test_late_cancel_of_captured_operation_cannot_cancel_new_retry ________
+
+store = namespace(root=PosixPath('/tmp/openscrub-task622/late-red-tmp/test_late_cancel_of_captured_o0/data'), jobs=PosixPath('...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x74cccb980b80>, url='/api/jobs/f60404ac0ff8')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x74cd02f7c2c0>
+
+    def test_late_cancel_of_captured_operation_cannot_cancel_new_retry(store, monkeypatch):
+        two_rows(store)
+        computing, release_compute = threading.Event(), threading.Event()
+        waiting_cancel, release_cancel = threading.Event(), threading.Event()
+        lock = ObservedLock()
+        class DelayedCancelLock:
+            def __enter__(self):
+                if threading.current_thread().name == 'captured-old-cancel':
+                    waiting_cancel.set()
+                    assert release_cancel.wait(8)
+                return lock.__enter__()
+            def __exit__(self, *args):
+                lock.__exit__(*args)
+        web.FILES.initialize(store.job).report_lock = DelayedCancelLock()
+        monkeypatch.setattr(openscrub, 'normalize_vfr', lambda *a: None)
+        def compute(src, dst, *args, **kwargs):
+            computing.set()
+            assert release_compute.wait(8)
+            if kwargs['cb'].cancelled():
+                raise openscrub.PipelineCancelled()
+            Path(dst).write_bytes(b'synthetic output')
+        monkeypatch.setattr(openscrub, 'render', compute)
+        monkeypatch.setattr(openscrub, 'run_scan', lambda *a: dict(
+            fps=30, cum=[[0,0]], bands=[[0,0]], detections=[], stats={}))
+        background = []
+        real = web._start_owned_thread
+        def start(*args):
+            thread = real(*args)
+            background.append(thread)
+            return thread
+        monkeypatch.setattr(web, '_start_owned_thread', start)
+        assert request('post', store.url + '/render').status_code == 200
+        worker = run_worker()
+        responses = []
+        cancel = threading.Thread(name='captured-old-cancel', target=lambda: responses.append(
+            request('post', store.url + '/cancel')))
+        try:
+            assert computing.wait(5)
+            cancel.start()
+            assert waiting_cancel.wait(5)
+            assert store.job['cancel'].is_set()
+            release_compute.set()
+            join(worker)
+            assert request('post', store.url + '/retry').status_code == 200
+            assert store.job['phase'] == 'queued'
+            operation = web.FILES.initialize(store.job).operation
+            assert not store.job['cancel'].is_set()
+        finally:
+            release_compute.set()
+            release_cancel.set()
+            if cancel.ident:
+                join(cancel)
+            join(worker)
+        try:
+            assert responses[0].status_code == 200
+>           assert web.FILES.initialize(store.job).operation is operation
+E           AssertionError: assert <object object at 0x74cd028d5350> is <object object at 0x74cd028d53e0>
+E            +  where <object object at 0x74cd028d5350> = <openscrub_internal.lifetimes._JobFiles object at 0x74cd02f7f290>.operation
+E            +    where <openscrub_internal.lifetimes._JobFiles object at 0x74cd02f7f290> = <function FileOwners.initialize at 0x74cccbf05300>({'id': 'f60404ac0ff8', 'dir': '/tmp/openscrub-task622/late-red-tmp/test_late_cancel_of_captured_o0/data/jobs/f60404ac0...b-task622/late-red-tmp/test_late_cancel_of_captured_o0/data/jobs/f60404ac0ff8/input.avi', 'name': 'synthetic.avi', ...})
+E            +      where <function FileOwners.initialize at 0x74cccbf05300> = <openscrub_internal.lifetimes.FileOwners object at 0x74cd02f7c590>.initialize
+E            +        where <openscrub_internal.lifetimes.FileOwners object at 0x74cd02f7c590> = web.FILES
+E            +      and   {'id': 'f60404ac0ff8', 'dir': '/tmp/openscrub-task622/late-red-tmp/test_late_cancel_of_captured_o0/data/jobs/f60404ac0...b-task622/late-red-tmp/test_late_cancel_of_captured_o0/data/jobs/f60404ac0ff8/input.avi', 'name': 'synthetic.avi', ...} = namespace(root=PosixPath('/tmp/openscrub-task622/late-red-tmp/test_late_cancel_of_captured_o0/data'), jobs=PosixPath('...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x74cccb980b80>, url='/api/jobs/f60404ac0ff8').job
+
+tests/test_report_transactions.py:767: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_report_transactions.py::test_late_cancel_of_captured_operation_cannot_cancel_new_retry
+1 failed in 0.22s

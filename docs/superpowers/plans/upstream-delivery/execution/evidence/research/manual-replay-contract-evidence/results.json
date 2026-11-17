@@ -1,0 +1,411 @@
+{
+  "source": "c697d5a686d4dccbdf4f474567628d5d24e75a03",
+  "method": "Actual APP_JS through existing P07a Node harness; actual AST route bodies on task-owned JSON, no HTTP/browser.",
+  "server": {
+    "ack": {
+      "ok": true,
+      "total": 2,
+      "suggest_allowlist": []
+    },
+    "boxes": {
+      "t": 1.0,
+      "ox": 0,
+      "oy": 0,
+      "boxes": [
+        {
+          "i": 1,
+          "category": "manual",
+          "enabled": true,
+          "text": "user-drawn",
+          "t_start": 0.0,
+          "t_end": 4.0,
+          "box": [
+            20,
+            20,
+            60,
+            60
+          ]
+        }
+      ]
+    }
+  },
+  "interactions": [
+    {
+      "mode": "ack",
+      "beforeSave": {
+        "adds": [
+          {
+            "box": [
+              20,
+              20,
+              60,
+              60
+            ],
+            "t0": 0,
+            "t1": 4,
+            "tref": 1
+          }
+        ],
+        "ov": {},
+        "times": {},
+        "enabled": {},
+        "sel": -1,
+        "status": "",
+        "calls": []
+      },
+      "duringSave": {
+        "adds": [
+          {
+            "box": [
+              20,
+              20,
+              60,
+              60
+            ],
+            "t0": 0,
+            "t1": 4,
+            "tref": 1
+          }
+        ],
+        "ov": {
+          "1": [
+            30,
+            30,
+            80,
+            90
+          ]
+        },
+        "times": {
+          "1": [
+            0.5,
+            5
+          ]
+        },
+        "enabled": {
+          "1": false
+        },
+        "sel": -1,
+        "status": "Saving edits\u2026 You can keep editing; newer edits stay pending.",
+        "calls": [
+          {
+            "url": "api/jobs/A/detections",
+            "body": {
+              "enabled": {},
+              "manual": [
+                {
+                  "t_start": 0,
+                  "t_end": 4,
+                  "t_ref": 1,
+                  "screen_box": [
+                    20,
+                    20,
+                    60,
+                    60
+                  ]
+                }
+              ],
+              "box_overrides": {},
+              "time_overrides": {}
+            }
+          },
+          {
+            "url": "api/jobs/A/boxes_at?t=1&all=1",
+            "body": null
+          }
+        ]
+      },
+      "afterResponse": {
+        "adds": [],
+        "ov": {
+          "1": [
+            30,
+            30,
+            80,
+            90
+          ]
+        },
+        "times": {
+          "1": [
+            0.5,
+            5
+          ]
+        },
+        "enabled": {
+          "1": false
+        },
+        "sel": -1,
+        "status": "Submitted edits saved. Newer edits are still pending \u2014 save again to include them before rendering.",
+        "calls": [
+          {
+            "url": "api/jobs/A/detections",
+            "body": {
+              "enabled": {},
+              "manual": [
+                {
+                  "t_start": 0,
+                  "t_end": 4,
+                  "t_ref": 1,
+                  "screen_box": [
+                    20,
+                    20,
+                    60,
+                    60
+                  ]
+                }
+              ],
+              "box_overrides": {},
+              "time_overrides": {}
+            }
+          },
+          {
+            "url": "api/jobs/A/boxes_at?t=1&all=1",
+            "body": null
+          }
+        ]
+      },
+      "retryPayload": {
+        "enabled": {
+          "1": false
+        },
+        "manual": [],
+        "box_overrides": {
+          "1": [
+            30,
+            30,
+            80,
+            90
+          ]
+        },
+        "time_overrides": {
+          "1": [
+            0.5,
+            5
+          ]
+        }
+      },
+      "originalCreationRetained": true,
+      "responseRowMapping": null
+    },
+    {
+      "mode": "lost",
+      "beforeSave": {
+        "adds": [
+          {
+            "box": [
+              20,
+              20,
+              60,
+              60
+            ],
+            "t0": 0,
+            "t1": 4,
+            "tref": 1
+          }
+        ],
+        "ov": {},
+        "times": {},
+        "enabled": {},
+        "sel": -1,
+        "status": "",
+        "calls": []
+      },
+      "duringSave": {
+        "adds": [
+          {
+            "box": [
+              20,
+              20,
+              60,
+              60
+            ],
+            "t0": 0,
+            "t1": 4,
+            "tref": 1
+          }
+        ],
+        "ov": {
+          "1": [
+            30,
+            30,
+            80,
+            90
+          ]
+        },
+        "times": {
+          "1": [
+            0.5,
+            5
+          ]
+        },
+        "enabled": {
+          "1": false
+        },
+        "sel": -1,
+        "status": "Saving edits\u2026 You can keep editing; newer edits stay pending.",
+        "calls": [
+          {
+            "url": "api/jobs/A/detections",
+            "body": {
+              "enabled": {},
+              "manual": [
+                {
+                  "t_start": 0,
+                  "t_end": 4,
+                  "t_ref": 1,
+                  "screen_box": [
+                    20,
+                    20,
+                    60,
+                    60
+                  ]
+                }
+              ],
+              "box_overrides": {},
+              "time_overrides": {}
+            }
+          },
+          {
+            "url": "api/jobs/A/boxes_at?t=1&all=1",
+            "body": null
+          }
+        ]
+      },
+      "afterResponse": {
+        "adds": [
+          {
+            "box": [
+              20,
+              20,
+              60,
+              60
+            ],
+            "t0": 0,
+            "t1": 4,
+            "tref": 1
+          }
+        ],
+        "ov": {
+          "1": [
+            30,
+            30,
+            80,
+            90
+          ]
+        },
+        "times": {
+          "1": [
+            0.5,
+            5
+          ]
+        },
+        "enabled": {
+          "1": false
+        },
+        "sel": -1,
+        "status": "Save was not confirmed; drafts retained. Retry with Save. ack lost after commit",
+        "calls": [
+          {
+            "url": "api/jobs/A/detections",
+            "body": {
+              "enabled": {},
+              "manual": [
+                {
+                  "t_start": 0,
+                  "t_end": 4,
+                  "t_ref": 1,
+                  "screen_box": [
+                    20,
+                    20,
+                    60,
+                    60
+                  ]
+                }
+              ],
+              "box_overrides": {},
+              "time_overrides": {}
+            }
+          },
+          {
+            "url": "api/jobs/A/boxes_at?t=1&all=1",
+            "body": null
+          }
+        ]
+      },
+      "retryPayload": {
+        "enabled": {
+          "1": false
+        },
+        "manual": [
+          {
+            "t_start": 0,
+            "t_end": 4,
+            "t_ref": 1,
+            "screen_box": [
+              20,
+              20,
+              60,
+              60
+            ]
+          }
+        ],
+        "box_overrides": {
+          "1": [
+            30,
+            30,
+            80,
+            90
+          ]
+        },
+        "time_overrides": {
+          "1": [
+            0.5,
+            5
+          ]
+        }
+      },
+      "originalCreationRetained": true,
+      "responseRowMapping": null
+    }
+  ],
+  "comparisonConflict": {
+    "originalCreation": {
+      "t_start": 0.0,
+      "t_end": 4.0,
+      "cbox": [
+        20,
+        20,
+        60,
+        60
+      ],
+      "aoff": [
+        0,
+        0
+      ]
+    },
+    "laterCurrentRow": {
+      "t_start": 0.5,
+      "t_end": 5.0,
+      "cbox": [
+        30.0,
+        30.0,
+        80.0,
+        90.0
+      ],
+      "aoff": [
+        0,
+        0
+      ]
+    },
+    "liveEnabled": false,
+    "originalReplayEqualsCurrentRow": false,
+    "immutableCreationRecordWouldStillMatch": true,
+    "explanation": "Proposed immutable record is a solution, not implemented behavior."
+  },
+  "additivePreservation": {
+    "method": "Actual write_report raw source_report publication plus fresh JSON load; no rendering or server restart.",
+    "proposedMetadataSeededForProbe": true,
+    "rowsPreserved": true,
+    "idPreserved": true,
+    "immutableCreationPreserved": true
+  }
+}

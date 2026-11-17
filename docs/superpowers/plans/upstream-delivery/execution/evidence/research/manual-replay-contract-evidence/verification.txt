@@ -1,0 +1,42 @@
+Pinned source: c697d5a686d4dccbdf4f474567628d5d24e75a03
+Tree: d63112f12d3a7893f83c96a8595b071a62ed9700
+Full export: /tmp/openscrub-manual-replay-contract-20261117/source
+Preparation: git archive <pinned commit> | tar -x -C <source>
+Independent integrity check: git ls-tree -r -z <pinned commit>; compute Git
+blob SHA-1 over each exported file and compare to the recorded object ID.
+Result: all 123 exported blob contents match the pinned tree.
+
+Final command:
+python3 /home/tahv0/src/OpenScrub/.superpowers/sdd/README/manual-replay-contract-evidence/probe.py
+Exit: 0
+Output:
+{
+  "scenarios": 2,
+  "pointerHandlers": "actual beHook",
+  "creationDraftEditable": false,
+  "committedUnacknowledgedRowEditable": true,
+  "currentRowComparisonConflict": true,
+  "report": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/manual-replay-contract-evidence/results.json"
+}
+
+Method and limits:
+- Actual evaluated APP_JS and the existing P07a Node VM harness.
+- Actual beHook event listeners, beAddMode, beScrub, beApplyTimes, beRemove,
+  saveAndRender, acknowledgement and status functions; synthetic DOM/network.
+- Exact AST-isolated job_save_edits, job_boxes_at and job_detections bodies
+  with minimal route/request interfaces and actual atomic_report file writer.
+  No full app import, Flask server or real HTTP was exercised.
+- Acknowledged and lost-acknowledgement paths both retain newer indexed edits.
+- Current-row comparison conflict demonstrated using genuine captured indexed
+  patches and the exact AST-isolated server save function body.
+- Existing raw-document write_report preserves seeded proposed additive fields
+  and disabled row order across publication/fresh JSON read. This is not
+  implementation of IDs and not an actual render/server restart test.
+- The research retry is deliberately rejected before commit; the previously
+  established legacy duplicate-on-replay baseline was not repeated.
+- No suite/build, browser, media/model work, installs, dependency changes,
+  product/Git changes, active Task622 worktree access, or subagents.
+
+Harness correction during preparation: expose MODE/SERVER fixture constants
+inside the existing VM context. The initial missing-constant error occurred
+before the interaction assertions and was not a product failure.

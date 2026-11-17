@@ -1,0 +1,34 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+____ test_cancelled_deleted_queue_ticket_cleans_up_without_stopping_worker _____
+
+store = namespace(root=PosixPath('/tmp/openscrub-task622/stale-red-tmp/test_cancelled_deleted_queue_t0/data'), jobs=PosixPath(...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x72f89eb574c0>, url='/api/jobs/2525e649fafb')
+
+    def test_cancelled_deleted_queue_ticket_cleans_up_without_stopping_worker(store):
+        assert request('post', store.url + '/render').status_code == 200
+        assert request('post', store.url + '/cancel').status_code == 200
+        assert request('delete', store.url).status_code == 200
+        web.WORK_Q.put(None)
+>       web.worker()
+
+tests/test_report_transactions.py:782: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+openscrub_web.py:947: in worker
+    _finish_operation(job, lease)
+openscrub_web.py:840: in _finish_operation
+    files = FILES.initialize(job)
+            ^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+job = None
+
+    @staticmethod
+    def initialize(job):
+>       return job.setdefault("_files", _JobFiles())
+               ^^^^^^^^^^^^^^
+E       AttributeError: 'NoneType' object has no attribute 'setdefault'
+
+openscrub_internal/lifetimes.py:31: AttributeError
+=========================== short test summary info ============================
+FAILED tests/test_report_transactions.py::test_cancelled_deleted_queue_ticket_cleans_up_without_stopping_worker
+1 failed in 0.24s
