@@ -41,13 +41,13 @@ def test_overlapping_sparse_saves_preserve_both_choices(store, monkeypatch):
     lock = ObservedLock()
     web.FILES.initialize(store.job).report_lock = lock
     staged, release = threading.Event(), threading.Event()
-    real = web.atomic_report
-    def publish(path, doc):
+    real = web._publish_job_report_locked
+    def publish(job, path, doc):
         if not staged.is_set():
             staged.set()
             assert release.wait(8)
-        return real(path, doc)
-    monkeypatch.setattr(web, 'atomic_report', publish)
+        return real(job, path, doc)
+    monkeypatch.setattr(web, '_publish_job_report_locked', publish)
     first = start_call('post', store.url + '/detections', json={'enabled': {'0': False}})
     second = None
     try:
@@ -100,7 +100,7 @@ def test_cancel_during_render_compute_rejects_real_final_publication(store, monk
         entered.set()
         assert release.wait(8)
         Path(dst).write_bytes(b'synthetic encoded output')
-    monkeypatch.setattr(openscrub, 'render', render)
+    monkeypatch.setattr(openscrub, '_render_into', render)
     assert request('post', store.url + '/render').status_code == 200
     before = store.path.read_bytes()
     thread = run_worker()
@@ -237,13 +237,13 @@ def test_tracker_commit_then_waiting_save_merges(store, tracker, monkeypatch):
     staged, release_publish = threading.Event(), threading.Event()
     lock = ObservedLock()
     web.FILES.initialize(store.job).report_lock = lock
-    real = web.atomic_report
-    def publish(path, doc):
+    real = web._publish_job_report_locked
+    def publish(job, path, doc):
         if any('track' in d for d in doc['detections']) and not staged.is_set():
             staged.set()
             assert release_publish.wait(8)
-        real(path, doc)
-    monkeypatch.setattr(web, 'atomic_report', publish)
+        real(job, path, doc)
+    monkeypatch.setattr(web, '_publish_job_report_locked', publish)
     assert track(store).status_code == 200
     assert entered.wait(5)
     release_compute.set()
@@ -337,13 +337,13 @@ def test_distinct_jobs_commit_independently(store, monkeypatch):
     path = Path(second['dir']) / 'report.json'
     path.write_bytes(store.path.read_bytes())
     staged, release = threading.Event(), threading.Event()
-    real = web.atomic_report
+    real = web._publish_job_report_locked
     def publish(target, doc):
         if target == str(store.path):
             staged.set()
             assert release.wait(8)
         real(target, doc)
-    monkeypatch.setattr(web, 'atomic_report', publish)
+    monkeypatch.setattr(web, '_publish_job_report_locked', publish)
     call = start_call('post', store.url + '/detections', json={'enabled': {'0': False}})
     try:
         assert staged.wait(5)
@@ -359,13 +359,13 @@ def test_overlapping_combined_edits_keep_additive_fields_and_own_responses(store
     staged, release = threading.Event(), threading.Event()
     lock = ObservedLock()
     web.FILES.initialize(store.job).report_lock = lock
-    real = web.atomic_report
-    def publish(path, doc):
+    real = web._publish_job_report_locked
+    def publish(job, path, doc):
         if not staged.is_set():
             staged.set()
             assert release.wait(8)
-        real(path, doc)
-    monkeypatch.setattr(web, 'atomic_report', publish)
+        real(job, path, doc)
+    monkeypatch.setattr(web, '_publish_job_report_locked', publish)
     first = start_call('post', store.url + '/detections', json={
         'box_overrides': {'0': [3,4,10,11]}, 'time_overrides': {'0': [.1,.8]},
         'manual': [{'t_start': 0, 't_end': 1, 'screen_box': [2,3,4,5]}]})
@@ -398,13 +398,13 @@ def test_save_wins_before_render_admission_and_queued_gate_closes(store, monkeyp
     staged, release = threading.Event(), threading.Event()
     lock = ObservedLock()
     web.FILES.initialize(store.job).report_lock = lock
-    real = web.atomic_report
-    def publish(path, doc):
+    real = web._publish_job_report_locked
+    def publish(job, path, doc):
         if not staged.is_set():
             staged.set()
             assert release.wait(8)
-        real(path, doc)
-    monkeypatch.setattr(web, 'atomic_report', publish)
+        real(job, path, doc)
+    monkeypatch.setattr(web, '_publish_job_report_locked', publish)
     save = start_call('post', store.url + '/detections', json={'enabled': {'0': False}})
     render = None
     try:
@@ -423,7 +423,7 @@ def test_save_wins_before_render_admission_and_queued_gate_closes(store, monkeyp
     def compute(src, dst, *a, **kw):
         snapshots.append(json.loads(store.path.read_text()))
         Path(dst).write_bytes(b'synthetic output')
-    monkeypatch.setattr(openscrub, 'render', compute)
+    monkeypatch.setattr(openscrub, '_render_into', compute)
     join(run_worker())
     assert snapshots[0]['detections'][0]['enabled'] is False
     assert [d['enabled'] for d in json.loads(store.path.read_text())['detections']] == [False, True]
@@ -448,7 +448,7 @@ def test_cancel_final_worker_boundary(store, monkeypatch, action, stage):
     def render(src, dst, *args, **kwargs):
         callbacks.append(kwargs['cb'])
         Path(dst).write_bytes(b'synthetic encoded output')
-    monkeypatch.setattr(openscrub, 'render', render)
+    monkeypatch.setattr(openscrub, '_render_into', render)
     def scan(args, cb):
         callbacks.append(cb)
         return dict(fps=30, cum=[[0,0]], bands=[[0,0]], detections=[], stats={})
@@ -568,13 +568,13 @@ def test_real_socket_overlapping_sparse_saves(store, socket_api, monkeypatch):
     staged, release = threading.Event(), threading.Event()
     lock = ObservedLock()
     web.FILES.initialize(store.job).report_lock = lock
-    real = web.atomic_report
-    def publish(path, doc):
+    real = web._publish_job_report_locked
+    def publish(job, path, doc):
         if not staged.is_set():
             staged.set()
             assert release.wait(8)
-        real(path, doc)
-    monkeypatch.setattr(web, 'atomic_report', publish)
+        real(job, path, doc)
+    monkeypatch.setattr(web, '_publish_job_report_locked', publish)
     values = []
     def post(index):
         values.append(socket_api('POST', store.url + '/detections', {'enabled': {str(index): False}}))
@@ -679,13 +679,13 @@ def test_waiting_transaction_keeps_vault_delete_retention_busy(store, monkeypatc
     staged, release = threading.Event(), threading.Event()
     lock = ObservedLock()
     web.FILES.initialize(store.job).report_lock = lock
-    real = web.atomic_report
-    def publish(path, doc):
+    real = web._publish_job_report_locked
+    def publish(job, path, doc):
         if not staged.is_set():
             staged.set()
             assert release.wait(8)
-        real(path, doc)
-    monkeypatch.setattr(web, 'atomic_report', publish)
+        real(job, path, doc)
+    monkeypatch.setattr(web, '_publish_job_report_locked', publish)
     first = start_call('post', store.url + '/detections', json={'enabled': {'0': False}})
     second = None
     try:
@@ -733,7 +733,7 @@ def test_late_cancel_of_captured_operation_cannot_cancel_new_retry(store, monkey
         if kwargs['cb'].cancelled():
             raise openscrub.PipelineCancelled()
         Path(dst).write_bytes(b'synthetic output')
-    monkeypatch.setattr(openscrub, 'render', compute)
+    monkeypatch.setattr(openscrub, '_render_into', compute)
     monkeypatch.setattr(openscrub, 'run_scan', lambda *a: dict(
         fps=30, cum=[[0,0]], bands=[[0,0]], detections=[], stats={}))
     background = []

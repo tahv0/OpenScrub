@@ -214,7 +214,7 @@ def test_from_report_reads_one_coherent_snapshot(review, monkeypatch):
 
 
 def test_render_objects_are_separate_from_retained_review_rows(review, monkeypatch):
-    original_render = openscrub.render
+    original_render = openscrub._render_into
     def mutate_then_render(src, dst, detections, *args, **kwargs):
         # Coverage/render transformations may edit decoded objects. Such edits
         # must never replace the exact saved review representation.
@@ -222,7 +222,7 @@ def test_render_objects_are_separate_from_retained_review_rows(review, monkeypat
         detections[0].cbox = (30, 30, 35, 35)
         detections[2].poly[0][0][0] = .25
         return original_render(src, dst, detections, *args, **kwargs)
-    monkeypatch.setattr(openscrub, 'render', mutate_then_render)
+    monkeypatch.setattr(openscrub, '_render_into', mutate_then_render)
     openscrub.run_pipeline(render_args(review), Quiet())
     assert_review_preserved(review.doc, read(review.path))
 
@@ -233,7 +233,7 @@ def test_failure_before_publication_preserves_existing_report(review, monkeypatc
     def fail(*args, **kwargs):
         raise OSError('synthetic ' + failure + ' failure')
     if failure == 'render':
-        monkeypatch.setattr(openscrub, 'render', fail)
+        monkeypatch.setattr(openscrub, '_render_into', fail)
     else:
         from openscrub_internal import reports
         monkeypatch.setattr(reports.os, 'replace', fail)

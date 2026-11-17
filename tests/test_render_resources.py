@@ -458,7 +458,7 @@ def test_stdin_close_error_keeps_zero_exit_failure_or_encoder_diagnostic(
                 monkeypatch.setattr(enc.stdin, 'close', close)
 
         try:
-            render(kind, src, output, Callbacks())
+            render(kind, src, output, Callbacks(), into=True)
         except BaseException as error:
             held.append(error)
         assert len(held) == 1

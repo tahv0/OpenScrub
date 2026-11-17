@@ -19,6 +19,9 @@ class _JobFiles:
         self.report_lock = threading.Lock()
         self.operation = None
         self.active = None
+        self.output_epoch = 0
+        self.recovery_required = False
+        self.recovery_diagnostics = ()
 
 
 class FileOwners:
@@ -45,6 +48,8 @@ class _Lease:
         self.released = False
         self.related = []
         self.source = None
+        self.source_job = None
+        self.source_state = None
         self.report_input = False
         self.operation = None
 

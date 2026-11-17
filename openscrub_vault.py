@@ -1,3 +1,4 @@
+from openscrub_internal.render_delivery import _is_discardable_render_stage
 #!/usr/bin/env python3
 """openscrub_vault.py — password-based at-rest encryption for the job store.
 
@@ -165,7 +166,7 @@ def encrypt_tree(key, root):
     """Encrypt every not-yet-encrypted file under root. Returns count."""
     n = 0
     for p in list(_walk_files(root)):
-        if p.endswith(".tmp"):
+        if _is_discardable_render_stage(p):
             try:
                 os.remove(p)                   # leftover from a crash
             except FileNotFoundError:
@@ -180,7 +181,7 @@ def decrypt_tree(key, root):
     """Decrypt every encrypted file under root. Returns count."""
     n = 0
     for p in list(_walk_files(root)):
-        if p.endswith(".tmp"):
+        if _is_discardable_render_stage(p):
             try:
                 os.remove(p)
             except FileNotFoundError:
@@ -195,7 +196,7 @@ def tree_locked_state(root):
     """-> (n_encrypted, n_plain) under root (ignores .tmp leftovers)."""
     enc = plain = 0
     for p in _walk_files(root):
-        if p.endswith(".tmp"):
+        if _is_discardable_render_stage(p):
             continue
         if is_encrypted(p):
             enc += 1
