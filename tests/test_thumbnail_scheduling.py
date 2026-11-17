@@ -17,7 +17,7 @@ from test_review_save_failures import HARNESS, app_js
 LIFECYCLE_HARNESS = HARNESS.replace(
     'const elements=new Map();', 'const elements=new Map(),windowEvents=new Map();'
 ).replace('({elements,console,', '({elements,windowEvents,console,').replace(
-    'window:{},',
+    'window:{addEventListener(){}},',
     'window:{addEventListener:(name,fn)=>windowEvents.set(name,fn),'
     'removeEventListener:(name,fn)=>{if(windowEvents.get(name)===fn)windowEvents.delete(name)}},'
 )
