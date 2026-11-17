@@ -219,3 +219,145 @@ def test_detached_frame_can_return_after_successful_validation_then_commit(store
     response=request('get',store.url+'/frame_at')
     assert response.status_code==200 and len(handles)==1
     assert web.cv2.imdecode(np.frombuffer(response.data,np.uint8),1).mean()>150
+
+
+@pytest.mark.parametrize('managed_alias', [False, True])
+@pytest.mark.parametrize('schedule', ['recovery', 'stable', 'stale-retry'])
+def test_source_response_ownership_through_revalidation(store, monkeypatch,
+                                                       managed_alias, schedule):
+    """Real descriptors stay locally owned until validation transfers them.
+
+    Retain every response, descriptor and recovery traceback. Production close
+    assertions precede unconditional harness containment, so GC cannot pass RED.
+    """
+    from openscrub_internal import lifetimes
+    from werkzeug.exceptions import HTTPException
+
+    source_job = store.job
+    payload = b'synthetic source generation' * 20000
+    source_path = Path(source_job['video'])
+    if managed_alias:
+        source_path = Path(source_job['dir']) / 'output.mp4'
+    source_path.write_bytes(payload)
+    target_job = (web.new_job(str(source_path), {}, 'managed-alias.mp4')
+                  if managed_alias else source_job)
+    target_job['phase'] = 'review'
+    source_state = web.FILES.initialize(source_job)
+    target_state = web.FILES.initialize(target_job)
+    expected_leases = 2 if managed_alias else 1
+    streams, opened, real_closes = [], [], []
+    descriptor_closes, response_closes, releases, retained_errors = [], [], [], []
+    actual_send = web.send_file
+    actual_open = web._send_open_file
+    actual_validate = web._frame_source_current
+    actual_release = lifetimes._Lease.release_locked
+
+    def outside_shared_locks():
+        assert not source_state.report_lock.locked()
+        assert not target_state.report_lock.locked()
+        assert not web.VAULT_LOCK.locked()
+        assert not web.JOBS_LOCK.locked()
+
+    def send(stream, **options):
+        # Inspect the actual opened file passed to Flask, not a replacement
+        # fake iterator or an inferred path-based response generation.
+        assert os.fstat(stream.fileno()).st_size == len(payload)
+        streams.append(stream)
+        close = stream.close
+        def close_descriptor():
+            outside_shared_locks()
+            descriptor_closes.append(stream)
+            return close()
+        monkeypatch.setattr(stream, 'close', close_descriptor)
+        return actual_send(stream, **options)
+
+    def open_response(path, **options):
+        assert str(path) == str(source_path)
+        if opened:
+            # A stale first attempt must close before opening a new attempt,
+            # while both attempts share the same admitted request lifetime.
+            assert schedule == 'stale-retry'
+            assert streams[0].closed
+            assert response_closes == [opened[0]]
+            assert web.FILES.count == expected_leases and not releases
+        response = actual_open(path, **options)
+        close = response.close
+        real_closes.append(close)
+        def close_response():
+            outside_shared_locks()
+            response_closes.append(response)
+            return close()
+        monkeypatch.setattr(response, 'close', close_response)
+        opened.append(response)
+        return response
+
+    def validate(snapshot):
+        outside_shared_locks()
+        assert snapshot['source_job'] is source_job
+        assert snapshot['source_state'] is source_state
+        assert not streams[-1].closed
+        if len(opened) == 1:
+            with source_state.report_lock:
+                if schedule == 'recovery':
+                    source_state.recovery_required = True
+                elif schedule == 'stale-retry':
+                    source_state.output_epoch += 1
+        try:
+            return actual_validate(snapshot)
+        except HTTPException as error:
+            retained_errors.append(error)
+            raise
+
+    def release(lease):
+        before = lease.released
+        try:
+            return actual_release(lease)
+        finally:
+            if not before and lease.released:
+                releases.append(lease)
+
+    monkeypatch.setattr(web, 'send_file', send)
+    monkeypatch.setattr(web, '_send_open_file', open_response)
+    monkeypatch.setattr(web, '_frame_source_current', validate)
+    monkeypatch.setattr(lifetimes._Lease, 'release_locked', release)
+    route_response = None
+    with web.app.test_client() as client:
+        try:
+            route_response = client.get('/api/jobs/' + target_job['id'] + '/video',
+                                        buffered=False)
+            if schedule == 'recovery':
+                assert route_response.status_code == 409
+                assert b'render delivery requires recovery' in route_response.data
+                assert len(retained_errors) == 1
+                assert retained_errors[0].code == 409
+                assert retained_errors[0].__traceback__ is not None
+                assert len(opened) == 1
+                assert all(stream.closed for stream in streams), (
+                    'untransferred source descriptor remains open after recovery409')
+                assert response_closes == opened
+            else:
+                assert route_response.status_code == 200
+                assert not retained_errors
+                assert len(opened) == (2 if schedule == 'stale-retry' else 1)
+                assert not streams[-1].closed, 'validated stream closed before transfer'
+                assert response_closes == opened[:-1]
+                assert web.FILES.count == expected_leases and not releases
+                chunk = next(iter(route_response.response))
+                assert payload.startswith(chunk)
+                assert not streams[-1].closed
+                route_response.close()
+                assert all(stream.closed for stream in streams)
+            assert descriptor_closes == streams
+            assert web.FILES.count == source_state.count == target_state.count == 0
+            assert len(releases) == expected_leases
+            assert len({id(lease) for lease in releases}) == expected_leases
+            route_response.close()  # ordinary repeated response close is harmless
+            assert descriptor_closes == streams
+            assert len(releases) == expected_leases
+        finally:
+            # Containment only after production assertions, including on RED.
+            if route_response is not None:
+                route_response.close()
+            for stream, close in zip(streams, real_closes):
+                if not stream.closed:
+                    close()
