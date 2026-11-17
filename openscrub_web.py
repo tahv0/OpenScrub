@@ -363,6 +363,8 @@ def _reserve_files_locked(job=None, work=False, read_source=True, source=None):
     source_job = _source_job_locked(source) if source else None
     lease = FILES.reserve(job, work)
     lease.source = source
+    lease.source_job = source_job
+    lease.source_state = FILES.initialize(source_job) if source_job is not None else None
     if source_job is not None and source_job is not job:
         lease.related.append(FILES.reserve(source_job))
     return lease
@@ -407,6 +409,8 @@ def _select_render_input(job, owner):
             # External filesystem changes remain outside web coordination.
             if os.path.exists(candidate):
                 owner.source = candidate
+                owner.source_job = source_job
+                owner.source_state = FILES.initialize(source_job) if source_job is not None else None
                 selected = True
         finally:
             if added is not None and not selected:
@@ -424,6 +428,8 @@ def _request_source_path(path):
         if source_job is not None:
             lease = FILES.reserve(source_job)
             lease.source = canonical
+            lease.source_job = source_job
+            lease.source_state = FILES.initialize(source_job)
             if g.get("file_owner") is None:
                 g.file_owner = lease
             else:
@@ -454,6 +460,10 @@ def _update_job_source(job, path, owner):
                     token.state is not FILES.initialize(source_job)
                     for token in [owner] + owner.related):
                 owner.related.append(FILES.reserve(source_job))
+        if owner is not None:
+            owner.source = canonical
+            owner.source_job = source_job
+            owner.source_state = FILES.initialize(source_job) if source_job is not None else None
         job["video"] = canonical
 
 
@@ -1562,15 +1572,78 @@ def _load_job_report(job):
         return json.load(f)
 
 
+def _capture_frame_source(job, output=False):
+    """Capture admitted selection and its owners using sequential short locks."""
+    state = FILES.initialize(job)
+    lease = g.get("file_owner") if has_request_context() else None
+    with state.report_lock:
+        _report_current(job)
+        _recovery_gate(job)
+        selected_output = job.get("output") if output else None
+        path = selected_output or _job_video(job)
+        epoch = state.output_epoch
+        source_job = job
+        source_state = state
+        if not selected_output and lease is not None and lease.state is state:
+            source_job, source_state = lease.source_job, lease.source_state
+    source_epoch = None
+    if source_job is not None and source_state is not state:
+        with source_state.report_lock:
+            _report_current(source_job)
+            _recovery_gate(source_job)
+            source_epoch = source_state.output_epoch
+    return dict(job=job, state=state, epoch=epoch, path=path, output=output,
+                selection=selected_output, source_job=source_job,
+                source_state=source_state, source_epoch=source_epoch)
+
+
+def _frame_source_current(snapshot):
+    job, state = snapshot["job"], snapshot["state"]
+    with state.report_lock:
+        _report_current(job)
+        _recovery_gate(job)
+        selected = job.get("output") if snapshot["output"] else None
+        if (FILES.initialize(job) is not state or state.output_epoch != snapshot["epoch"]
+                or selected != snapshot["selection"]
+                or (selected or _job_video(job)) != snapshot["path"]):
+            return False
+    source_job, source_state = snapshot["source_job"], snapshot["source_state"]
+    if source_job is not None and source_state is not state:
+        with source_state.report_lock:
+            _report_current(source_job)
+            _recovery_gate(source_job)
+            if (FILES.initialize(source_job) is not source_state
+                    or source_state.output_epoch != snapshot["source_epoch"]):
+                return False
+    return True
+
+
+def _validated_frame_read(job, output, decode):
+    for attempt in range(2):
+        snapshot = _capture_frame_source(job, output)
+        error = None
+        try:
+            value = decode(snapshot["path"])
+        except Exception as caught:
+            error = caught
+        if _frame_source_current(snapshot):
+            if error is not None:
+                raise error
+            return value
+    abort(409, "output changed during frame read; retry")
+
+
 def _frame_at(job, t, rstate):
-    cap = cv2.VideoCapture(_job_video(job))
-    try:
-        fps = rstate["fps"]
-        cap.set(cv2.CAP_PROP_POS_FRAMES, int(t * fps))
-        ok, frame = cap.read()
-        return frame if ok else None
-    finally:
-        cap.release()
+    def decode(path):
+        cap = cv2.VideoCapture(path)
+        try:
+            fps = rstate["fps"]
+            cap.set(cv2.CAP_PROP_POS_FRAMES, int(t * fps))
+            ok, frame = cap.read()
+            return frame.copy() if ok else None
+        finally:
+            cap.release()
+    return _validated_frame_read(job, False, decode)
 
 
 
@@ -1714,28 +1787,30 @@ def job_thumb(jid, i):
 def job_frame_at(jid):
     job = JOBS.get(jid) or abort(404)
     t = max(0.0, float(request.args.get("t", 0)))
-    path = (job["output"] if request.args.get("src") == "output"
-            and job.get("output") else _job_video(job))
-    cap = cv2.VideoCapture(path)
-    # seek by TIMESTAMP, not frame index: the original upload is often VFR
-    # (iPhone), where index = t*fps drifts out of sync with the CFR output
-    # and can overshoot the file entirely (broken compare pane)
-    try:
-        frame = None
-        for tt in (t, max(0.0, t - 0.34), max(0.0, t - 1.0), 0.0):
-            cap.set(cv2.CAP_PROP_POS_MSEC, tt * 1000)
-            ok, fr = cap.read()
-            if ok:
-                frame = fr
-                break   # walk back instead of 404ing at the very end of the file
-            if tt == 0.0:
-                break
-    finally:
-        cap.release()
-    if frame is None:
-        abort(404)
-    ok, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 82])
-    return Response(buf.tobytes(), mimetype="image/jpeg")
+    def decode(path):
+        cap = cv2.VideoCapture(path)
+        # Timestamp seeking/backoff preserves VFR and near-end behavior.
+        try:
+            frame = None
+            for tt in (t, max(0.0, t - 0.34), max(0.0, t - 1.0), 0.0):
+                cap.set(cv2.CAP_PROP_POS_MSEC, tt * 1000)
+                ok, fr = cap.read()
+                if ok:
+                    frame = fr
+                    break
+                if tt == 0.0:
+                    break
+        finally:
+            cap.release()
+        if frame is None:
+            abort(404)
+        ok, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 82])
+        if not ok:
+            abort(404)
+        return buf.tobytes()
+    payload = _validated_frame_read(job, request.args.get("src") == "output", decode)
+    return Response(payload, mimetype="image/jpeg")
+
 
 
 @app.route("/api/jobs/<jid>/video")
