@@ -1,0 +1,3 @@
+TASK115_IMPORT {"executable": "/tmp/openscrub-python39-20261117/venv/bin/python", "opencv": "4.14.0", "python": "3.9.25 (main, Oct 31 2025, 23:00:23) \n[Clang 21.1.4 ]", "source": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py", "source_sha256": "413a4b0758219b5ed700e8feddb2e0a02a992c36b8a4a4dbfd9045c81eb72f82"}
+............................                                             [100%]
+28 passed, 113 deselected in 17.18s

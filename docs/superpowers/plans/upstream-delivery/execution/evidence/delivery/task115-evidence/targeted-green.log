@@ -1,0 +1,16 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.16, pytest-9.2.0, pluggy-1.7.0 -- /tmp/openscrub-baseline-20261116/venv-opencv4/bin/python
+cachedir: /tmp/openscrub-task115/cache312
+rootdir: /home/tahv0/.codex/worktrees/c832/OpenScrub
+configfile: pyproject.toml
+collecting ... collected 7 items
+
+tests/test_first_scan_sanity.py::test_first_low_word_scan_without_backtrack_warns_and_returns_report[0] PASSED [ 14%]
+tests/test_first_scan_sanity.py::test_first_low_word_scan_without_backtrack_warns_and_returns_report[1] PASSED [ 28%]
+tests/test_first_scan_sanity.py::test_first_low_word_scan_without_backtrack_warns_and_returns_report[2] PASSED [ 42%]
+tests/test_first_scan_sanity.py::test_edge_free_low_word_scan_without_backtrack_returns_report_silently PASSED [ 57%]
+tests/test_first_scan_sanity.py::test_default_backtracking_keeps_first_low_word_warning PASSED [ 71%]
+tests/test_first_scan_sanity.py::test_three_word_first_scan_does_not_warn_on_later_sparse_scans[counts0] PASSED [ 85%]
+tests/test_first_scan_sanity.py::test_three_word_first_scan_does_not_warn_on_later_sparse_scans[counts1] PASSED [100%]
+
+============================== 7 passed in 0.27s ===============================

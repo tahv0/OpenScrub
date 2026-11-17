@@ -1,0 +1,25 @@
+# Prepared verification environment handoff
+
+This is an execution aid for already authorized isolated candidates, not product code or a new acceptance result. Use the task brief for scope and required checks. Native checkout is /home/tahv0/.codex/worktrees/c832/OpenScrub; original /home/tahv0/src/OpenScrub owns planning/evidence. Root assigns one product/runtime implementer and the exact branch/base. Never switch another owner's branch or spawn agents.
+
+## Runtime and isolation
+
+- Actual3.12: source /tmp/openscrub-baseline-20261116/env-opencv4.sh. Actual3.9: source /tmp/openscrub-python39-20261117/env.sh. Capture actual versions in your report; do not assume dependency versions match between interpreters.
+- Use /tmp/openscrub-task<TASK> for every mutable settings/model/cache/profile/job/temp/fixture path. Copy and retarget relevant sitecustomize/floor hooks BEFORE collection; earlier hooks reject a new task root. Do not weaken isolation or mutate prepared environments. Cached YuNet is /tmp/openscrub-baseline-20261116/synthetic-data/models-opencv4/face_detection_yunet_2023mar.onnx (232589 bytes, SHA2568f2383e4dd3cfbb4553ea8718107fc0423210dc964f9f4280604804ed2552fa4). New optional models/network installs need the task's explicit scope.
+- Assert the imported product file and hash before any base/native/floor/installed application execution. Native cwd can shadow an exported base despite PYTHONPATH; run base controls from an isolated task cwd. Do not count an accidental editable-native import as candidate/base evidence.
+- Existing venv editable .pth files can append native paths even when the installed target resolves first. For strict installed checks, filter checkout paths in task-local sitecustomize, including CLI children. Never edit the shared venv. Remove bootstrap PYTHONPATH for installed runtime checks.
+- Run pytest invocations serially unless genuinely independent filesystem/temp ownership is established. Prefer a distinct task-local --basetemp per invocation (native/base/floor/installed), within the isolation allowlist. Pytest can remove an existing basetemp on startup: parallel base controls invalidated Task115's first full run by deleting its real-media fixture. No test/build/harness cleanup may delete another active invocation's data.
+
+## Offline packaging
+
+Actual3.12 has build but may not have Hatch/pip in the active environment. Cached build wheels are under /tmp/openscrub-task620/build-wheelhouse. Install required cached backend wheels into TASK/build-tools, using actual3.12 python -m pip with temporary PYTHONPATH=/tmp/openscrub-baseline-20261116/bootstrap/lib/python3.14/site-packages, --no-index and --no-deps. That path supplies pip; never execute the bootstrap3.14 Python. Keep tool installation task-local. Then use no-isolation build with the prepared backend path.
+
+Build the sdist, extract it into a task directory, and build the wheel FROM that extracted sdist. Assert required runtime/test/benchmark/private-module bytes and the Python floor. Install the wheel --no-deps into a task-local target and verify source/default/CLI/web boundaries required by the brief. Exact source equality can bind a retained startup after a later test/benchmark-only rebuild; do not repeat unrelated suites/startup without a specific reason. Test-client HTTP is not a listening-server/browser claim.
+
+## Verification and evidence discipline
+
+Stabilize meaningful focused behavior controls and fixtures before one normal full suite. A failed or invalidated run is retained with its cause; repeat only the affected gate after correction. Distinguish runtime/test/benchmark revisions and full versus later focused counts. Expected warnings belong in captured/asserted owning tests; fixture/setup errors are not product RED evidence.
+
+Timing needs a root-granted exclusive agent-owned slot and explicit release. Predeclare source/benchmark/fixture hashes, ordinary-input consistency, settings, boundaries, warmups/samples and instrumentation order. Normal GC and fresh mutable fixtures outside timing unless the approved task explicitly differs. Instrumentation follows all timing; retain every sample/output/regression and avoid selective reruns. Median of five samples is not p95. Shared host observations are not hard memory/platform/throughput guarantees.
+
+Keep compact evidence in the task's SDD evidence directory: commands, relevant logs, source/package identities, fixtures/recipes and complete result records. Exclude media, environment, installed/source-export trees and user data. Large repeated JSON may be losslessly gzip-compressed; retain compressed/uncompressed sizes/hashes and decode/reparse verification. Reports name what ran and what remains unverified. Root archives evidence and checkpoints docs after fresh review; no external publication is authorized.

@@ -89,9 +89,11 @@ For ordinary file responses, use the valid response `Content-Length` matching th
 
 **When:** A small separate reliability PR before further performance work. It needs only the reviewed B02a verification prerequisite; reverse-recall indexing is not a dependency.
 
-- [ ] **E/I:** Reproduce the exact-base crash through actual decoding, `run_scan`, Canny and report output, controlling only OCR at its existing inference boundary. Reuse the existing small grayscale image when available, otherwise construct it lazily inside the low-word-count sanity guard. Preserve disabled backtracking, first-scan gating, Canny thresholds, edge-density threshold and warning behavior.
-- [ ] **V/D:** Cover zero/one/two words, edge-rich and edge-free input, enabled-backtracking and three-word controls, and later sparse OCR. Preserve complete detections/report output; run focused/full/floor/package checks. No broad exception suppression, unconditional extra per-frame work, model-quality claim or unrelated index changes.
+- [x] **E/I:** Reproduce the exact-base crash through actual decoding, `run_scan`, Canny and report output, controlling only OCR at its existing inference boundary. Reuse the existing small grayscale image when available, otherwise construct it lazily inside the low-word-count sanity guard. Preserve disabled backtracking, first-scan gating, Canny thresholds, edge-density threshold and warning behavior.
+- [x] **V/D:** Cover zero/one/two words, edge-rich and edge-free input, enabled-backtracking and three-word controls, and later sparse OCR. Preserve complete detections/report output; run focused/full/floor/package checks. No broad exception suppression, unconditional extra per-frame work, model-quality claim or unrelated index changes.
 - [ ] **R/L:** Keep a focused PR describing the ordinary flag/first-scan trigger and verified warning/report behavior. Native-platform/inference prevalence and upstream submission remain separate.
+
+**Local completion:** N12 is independently reviewed at `17dfe5d575306dea395b680205038e606ad598a2`. The [report](execution/evidence/delivery/task-115-report.md) and [review](execution/evidence/delivery/task-115-review.md) retain the exact-base failure, seven actual decoded-video scan/report cases and final full/floor/installed checks. The initial shared-temporary-directory verification failure is disclosed separately from the valid sequential 141-pass full run. One test-comment precision nit is deferred to final readiness; upstream publication and combined acceptance remain separate.
 
 ## P03 — resilient progress polling
 

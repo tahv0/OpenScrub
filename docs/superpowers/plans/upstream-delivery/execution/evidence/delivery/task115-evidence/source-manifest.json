@@ -1,0 +1,17 @@
+{
+  "base_commit": "e21ebdf6e3ee46e6c65050dc956a9a3459152269",
+  "branch": "pr/no-backtrack-scan-sanity",
+  "native": "/home/tahv0/.codex/worktrees/c832/OpenScrub",
+  "final_files": {
+    "openscrub.py": "413a4b0758219b5ed700e8feddb2e0a02a992c36b8a4a4dbfd9045c81eb72f82",
+    "pyproject.toml": "72c987559a66acf7626f8d257e1159739467930696099758248aa215214ae35c",
+    "tests/test_first_scan_sanity.py": "90d8b3162cc052d90a70171fed1ef5d3ce98ce06776799f8792b88d7c6aab802"
+  },
+  "base_source_sha256": "0e4f0f9a7846080f591038d021aaf3ca6f01201d83ac32bbdc273f53d5067ee7",
+  "cached_model": {
+    "path": "/tmp/openscrub-task115/runtime/models/face_detection_yunet_2023mar.onnx",
+    "bytes": 232589,
+    "sha256": "8f2383e4dd3cfbb4553ea8718107fc0423210dc964f9f4280604804ed2552fa4"
+  },
+  "head_commit": "17dfe5d575306dea395b680205038e606ad598a2"
+}
