@@ -12,6 +12,16 @@ import pytest
 from test_review_save_failures import HARNESS, app_js
 
 
+# Register the shipped page transition listener while evaluating APP_JS. The
+# map and tiny DOM below adapt browser primitives only, never reconciliation.
+LIFECYCLE_HARNESS = HARNESS.replace(
+    'const elements=new Map();', 'const elements=new Map(),windowEvents=new Map();'
+).replace('({elements,console,', '({elements,windowEvents,console,').replace(
+    'window:{},',
+    'window:{addEventListener:(name,fn)=>windowEvents.set(name,fn),'
+    'removeEventListener:(name,fn)=>{if(windowEvents.get(name)===fn)windowEvents.delete(name)}},'
+)
+
 PRIMITIVES = r"""
 const row=(i,enabled=true,category='face',person=-1,track=-1,confidence=.5,zone_dropped=false)=>({
  i,enabled,category,person,track,confidence,zone_dropped,text:'synthetic '+i,t_start:i/10,t_end:2+i/10});
@@ -23,7 +33,7 @@ def run(scenario):
     node = shutil.which('node')
     if not node:
         pytest.skip('Node is needed to evaluate the embedded review JavaScript')
-    script = 'const SOURCE=' + json.dumps(app_js()) + ';const SCENARIO=' + json.dumps(PRIMITIVES + scenario) + ';' + HARNESS
+    script = 'const SOURCE=' + json.dumps(app_js()) + ';const SCENARIO=' + json.dumps(PRIMITIVES + scenario) + ';' + LIFECYCLE_HARNESS
     result = subprocess.run([node, '-e', script], capture_output=True, text=True, timeout=15)
     assert result.returncode == 0, result.stdout + result.stderr
 
@@ -142,4 +152,105 @@ def test_complete_group_order_and_once_per_bulk_editor_refresh():
     REVIEW_META={sections,byId:new Map(sections.flatMap(s=>s.cards.map(c=>[c.id,c])))};
     let filter=0,draw=0;elements.set('beCv',{});beFilter=()=>filter++;beDraw=()=>draw++;
     setAll('face',false);eq([filter,draw],[1,1]);eq([EN[0],EN[1],EN[2],EN[3],EN[4]],[false,false,false,false,false]);
+    """)
+
+
+STRUCTURE = r"""
+var gridTop=-3000,gridWidth=200;
+class PrimitiveNode{
+ constructor(type='div'){
+  this.type=type;this.children=[];this.style={};this.dataset={};this.isConnected=true;
+  this.classList={toggle(){},add(){},remove(){}};
+ }
+ get clientWidth(){return gridWidth}
+ get nextElementSibling(){if(!this.parentElement)return null;const siblings=this.parentElement.children;return siblings[siblings.indexOf(this)+1]||null}
+ contains(node){for(let n=node;n;n=n.parentElement)if(n===this)return true;return false}
+ insertBefore(node,next){
+  if(node===next)return node;
+  if(node.parentElement){
+   if(node.contains(document.activeElement))document.activeElement=null;
+   const siblings=node.parentElement.children;siblings.splice(siblings.indexOf(node),1);
+  }
+  const index=next?this.children.indexOf(next):this.children.length;
+  if(index<0)throw Error('reference node outside parent');
+  this.children.splice(index,0,node);node.parentElement=this;node.connect(true);return node;
+ }
+ appendChild(node){return this.insertBefore(node,null)}
+ connect(on){this.isConnected=on;this.children.forEach(n=>n.connect(on))}
+ remove(){if(this.parentElement){const siblings=this.parentElement.children;siblings.splice(siblings.indexOf(this),1);this.parentElement=null}this.connect(false)}
+ setAttribute(){}removeAttribute(){}addEventListener(){}removeEventListener(){}
+ getBoundingClientRect(){const top=this.type==='grid'?gridTop:this.type==='card'?this.parentElement.getBoundingClientRect().top:gridTop+(parseFloat(this.style.top)||0);return{top,bottom:top+260,width:gridWidth,height:260}}
+ closest(selector){if(selector==='.det')return this.type==='card'?this:this.parentElement?.closest(selector);return null}
+ focus(){document.activeElement=this}
+ querySelector(selector){return selector==='img'?this.img:selector==='button'?this.button:null}
+ set innerHTML(html){
+  const card=new PrimitiveNode('card');card.id='det'+html.match(/id="det(\d+)"/)[1];
+  card.img=new PrimitiveNode('img');card.button=new PrimitiveNode('button');
+  card.appendChild(card.img);card.appendChild(card.button);this.firstElementChild=card;
+ }
+}
+var grid,root;
+getComputedStyle=()=>({gridTemplateColumns:gridWidth===200?'200px':'195px 195px'});
+ResizeObserver=class{observe(){}unobserve(){}disconnect(){}};
+requestAnimationFrame=()=>1;cancelAnimationFrame=()=>{};
+Object.assign(window,{innerHeight:800,scrollY:0,scrollBy(){},scrollTo(){}});
+function structure(count=30){
+ if(!CUR)openJob('A');
+ grid=new PrimitiveNode('grid');root=new PrimitiveNode('root');
+ const status=new PrimitiveNode(),prev=new PrimitiveNode(),next=new PrimitiveNode();
+ root.querySelector=selector=>selector.startsWith('[data-review-section')?grid:selector==='[data-review-range]'?status:selector==='[data-review-prev]'?prev:selector==='[data-review-next]'?next:null;
+ root.appendChild(grid);elements.set('review',root);document.createElement=()=>new PrimitiveNode();
+ const sections=reviewDescriptors(Array.from({length:count},(_,n)=>row(n+1)));
+ const meta={sections,byId:new Map(sections.flatMap(s=>s.cards.map(c=>[c.id,c])))};
+ REVIEW_SCHED=new ReviewScheduler(CUR,VIEW_GEN,root,meta);REVIEW_SCHED.start();return REVIEW_SCHED;
+}
+function domIds(){return grid.children.filter(n=>n.className==='grid3 reviewrow').flatMap(n=>n.children.map(c=>+c.id.slice(3)))}
+function structureCounts(){return{rows:grid.children.filter(n=>n.className==='grid3 reviewrow').length,spacers:grid.children.filter(n=>n.className==='reviewspacer').length,cards:domIds().length}}
+"""
+
+
+def test_upward_rows_and_width_repartition_keep_dom_order_and_focused_control():
+    run(STRUCTURE + """ReviewScheduler.prototype.updateQueue=function(){};
+    const s=structure();eq(domIds(),[12,13,14,15,16,17]);
+    gridTop=-2000;s.layout();eq(domIds(),[8,9,10,11,12,13]);
+    const control=s.bindings.get(12).button||s.bindings.get(12).card.button;
+    control.focus();gridWidth=400;s.layout();
+    eq(domIds(),[...domIds()].sort((a,b)=>a-b));
+    if(document.activeElement!==control||!control.isConnected)throw Error('repartition replaced/lost focused control');
+    gridWidth=200;s.layout();eq(domIds(),[...domIds()].sort((a,b)=>a-b));
+    if(document.activeElement!==control)throw Error('focused row reorder lost focus');
+    """)
+
+
+def test_pagehide_pageshow_releases_all_owned_rows_and_spacers():
+    run(STRUCTURE + """ReviewScheduler.prototype.updateQueue=function(){};gridTop=100;structure(1);
+    eq(structureCounts(),{rows:1,spacers:2,cards:1});
+    for(let n=0;n<3;n++){
+     const old=REVIEW_SCHED;windowEvents.get('pagehide')();
+     eq(structureCounts(),{rows:0,spacers:0,cards:0});
+     eq([old.sections[0].rows.size,old.sections[0].spacers.length,old.bindings.size,old.listeners.length],[0,0,0,0]);
+     windowEvents.get('pageshow')();eq(structureCounts(),{rows:1,spacers:2,cards:1});
+    }
+    """)
+
+
+def test_pagehide_pageshow_preserves_exhausted_view_budget_without_old_bindings():
+    run(NETWORK + STRUCTURE + """gridTop=100;const s=structure(1);
+    for(const delay of [600,1200,1800]){tasks.at(-1).reject(Error('network'));await tick();advance(delay);await tick();}
+    tasks.at(-1).reject(Error('network'));await tick();eq(tasks.length,4);eq(s.retries.get(1).failures,4);
+    for(let n=0;n<3;n++){
+     const old=REVIEW_SCHED,oldBinding=old.bindings.get(1);windowEvents.get('pagehide')();
+     eq(old.retries.get(1).failures,4);eq(old.bindings.size,0);eq(timers.size,0);
+     windowEvents.get('pageshow')();eq(REVIEW_SCHED.retries.get(1).failures,4);eq(tasks.length,4);
+     if(REVIEW_SCHED.bindings.get(1)===oldBinding)throw Error('old binding retained on restore');
+    }
+    disposeReview();structure(1);eq(REVIEW_SCHED.retries.get(1).failures,0);eq(tasks.length,5);
+    """)
+
+
+def test_pagehide_pageshow_preserves_retry_deadline_and_recreates_only_live_timer():
+    run(NETWORK + STRUCTURE + """gridTop=100;structure(1);tasks[0].reject(Error('network'));await tick();
+    const stale=[...timers.values()][0].fn;advance(200);windowEvents.get('pagehide')();eq(timers.size,0);
+    windowEvents.get('pageshow')();eq(REVIEW_SCHED.retries.get(1).readyAt,600);eq(timers.size,1);
+    stale();eq(tasks.length,1);advance(399);eq(tasks.length,1);advance(1);await tick();eq(tasks.length,2);
     """)
