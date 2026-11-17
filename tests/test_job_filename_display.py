@@ -39,10 +39,10 @@ def emitted_fragments(jobs):
         pytest.skip("Node is needed to evaluate emitted job UI JavaScript")
     # The real emitted functions, including any local name boundary, run
     # with only their HTTP and output sinks supplied by this harness.
-    script = web.APP_JS.split("let CUR=null", 1)[1]
-    script = "let CUR=null" + script.split("async function retryJob", 1)[0]
+    script = 'let JOBSJSON="";\n' + web.APP_JS.split("// Job names are text", 1)[1].split("async function retryJob", 1)[0]
+    script = script.replace(" inside the list link and detail heading.\n", "", 1)
     script += "function shellHtml(j)" + web.APP_JS.split("function shellHtml(j)", 1)[1].split(
-        "async function refresh", 1)[0]
+        "// Save As exports", 1)[0]
     script += """
 const data=JSON.parse(process.argv[1]);
 const jobs={innerHTML:''};

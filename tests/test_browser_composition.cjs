@@ -88,11 +88,6 @@ const pause=ms=>new Promise(r=>setTimeout(r,ms));
   assert.deepEqual(await fresh.evaluate(()=>BE.audio),[{t0:1,t1:1.2,mode:'bleep'}]);
   records.push({heldSuccessfulAck:true,failedSave:true,freshRawAudioReopen:true,rows:saved.detections.length});
   await fresh.screenshot({path:root+'/combined-desktop.png'});await fresh.close();
-  // Initiating job retains written/total/finalizing UI while another view opens.
-  await page.evaluate(()=>{window.downloadGate={};window.showSaveFilePicker=async()=>({createWritable:async()=>({write:async()=>new Promise(r=>downloadGate.write=r),close:async()=>new Promise(r=>downloadGate.close=r)})})});
-  // Download bytes are controlled; the P01 owning Node suite checks exact
-  // accepted-byte accounting and initiating-job finalizing statuses separately.
-  records.push({downloadBoundary:'complete P01 emitted-JS owner suite; no duplicate socket download stub'});
   assert.deepEqual(errors,[]);const expected=diagnostics.filter(d=>/503|423|409/.test(d.text));
   assert.equal(diagnostics.length,expected.length,JSON.stringify(diagnostics));
   const report={records,errors,diagnostics,browser:browser.version(),url:page.url(),title:await page.title(),viewports:[[1280,950],[390,844]],lifecycle:'controlled pagehide/pageshow; native BFCache/visibility not claimed'};

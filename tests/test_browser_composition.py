@@ -93,7 +93,15 @@ def combined_http(monkeypatch, tmp_path):
                         lambda: web.jsonify({'current': engine.VERSION, 'update_available': False}))
     # Render dispatch invokes the actual worker synchronously. Its processing,
     # report/raw/source/FILES path is unchanged; no permanent worker is created.
-    monkeypatch.setattr(web, 'enqueue', lambda job, action: web._run_job(job, action))
+    def execute(job, action, ticket):
+        owner = ticket[3]
+        with web.JOBS_LOCK:
+            web.FILES.initialize(job).queued.pop(ticket[2], None)
+        try:
+            web._run_job(job, action, owner)
+        finally:
+            web._finish_operation(job, owner)
+    monkeypatch.setattr(web, 'enqueue', execute)
     state = {'hold_log': False, 'hold_thumb': False, 'hold_ack': False, 'fail_save': False,
              'log_entered': 0, 'thumb_entered': 0, 'ack_entered': 0}
     log_gate, thumb_gate, ack_gate = (threading.Event() for _ in range(3))

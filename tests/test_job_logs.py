@@ -1,5 +1,6 @@
 """Bounded job callbacks, atomic cursors and lifecycle ownership."""
 import json
+from pathlib import Path
 import threading
 
 import pytest
@@ -111,9 +112,10 @@ def test_negative_cursor_and_retry_keep_store_epoch(monkeypatch, tmp_path):
     import openscrub_web as web
     monkeypatch.setattr(web, 'JOBS_DIR', str(tmp_path))
     monkeypatch.setattr(web, 'enqueue', lambda *_: None)
-    video = tmp_path / 'input.mp4'
+    job = web.new_job('', {}, 'retry')
+    video = Path(job['dir']) / 'input.mp4'
     video.write_bytes(b'')
-    job = web.new_job(str(video), {}, 'retry')
+    job['video'] = str(video)
     web.WebCallbacks(job).log('before')
     client = web.app.test_client()
     before = client.get('/api/jobs/' + job['id'] + '/log?from=-2').get_json()
@@ -124,6 +126,12 @@ def test_negative_cursor_and_retry_keep_store_epoch(monkeypatch, tmp_path):
     after = client.get('/api/jobs/' + job['id'] + '/log?from=1&epoch=' + before['epoch']).get_json()
     assert after['epoch'] == before['epoch'] and job['log'] is owner
     assert after['len'] == 2 and 'retrying scan' in after['lines'][0]
+    # Release the deliberately unconsumed queue reservation, like a cancelled
+    # real worker; this fixture does not execute the scan.
+    files = web.FILES.initialize(job)
+    for lease in list(files.queued.values()):
+        web._finish_operation(job, lease)
+    files.queued.clear()
 
 
 def test_two_event_controlled_producers_and_http_readers(monkeypatch, tmp_path):
@@ -212,16 +220,20 @@ def test_thumbnail_and_tracking_callbacks_stay_with_their_job(monkeypatch, tmp_p
     monkeypatch.setattr(web.threading, 'Thread', DeferredThread)
     monkeypatch.setattr(web, 'build_args', lambda *_: object())
     monkeypatch.setattr(web.openscrub, 'run_scan', lambda *_: {'stats': {}})
-    monkeypatch.setattr(web.openscrub, 'write_report', lambda *_: None)
+    monkeypatch.setattr(web.openscrub, 'write_report', lambda *_, **kwargs: None)
     monkeypatch.setattr(web, '_load_job_report', lambda *_: {'render_state': {'fps': 1, 'cum': [[0, 0]]}, 'detections': []})
     class Capture:
         def release(self):
             pass
-    monkeypatch.setattr(web.cv2, 'VideoCapture', lambda *_: Capture())
+    sources = []
+    monkeypatch.setattr(web.cv2, 'VideoCapture', lambda source: (sources.append(source), Capture())[1])
     web._run_job(old, 'scan')
     replacement = web.new_job('', {}, 'replacement')
     web.JOBS[old['id']] = replacement
+    selected = old['video']
+    old['video'] = 'late source must not replace lease'
     deferred.pop(0)()
+    assert sources == [selected or None]
     assert any('thumbnails pre-generated' in s for s in old['log'].snapshot()['lines'])
     assert replacement['log'].snapshot()['lines'] == []
     # Actual manual-tracking route creates its ordinary engine callback.

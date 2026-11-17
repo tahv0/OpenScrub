@@ -38,6 +38,8 @@ const ctx=vm.createContext({console,AbortController,Set,Map,Promise,JSON,Math,Da
 vm.runInContext(SOURCE.slice(0,SOURCE.indexOf('loadPersist();loadCertInfo();loadJobs();setInterval(loadJobs,5000);')).replace(/^refreshModelPanel\(\);renderTiers\(\);$/m,''),ctx);
 Object.assign(ctx,{elements,events,timers,assert});
 vm.runInContext(`
+// Scheduling/layout is covered by its own complete owner suite and browser.
+ReviewScheduler.prototype.start=function(){};
 loadJobs=()=>{};showPanel=()=>{};initMarquee=()=>{};
 var calls=[],queue=[];
 fetch=(url,options={})=>{const r={url,options};calls.push(r);return new Promise((resolve,reject)=>{
