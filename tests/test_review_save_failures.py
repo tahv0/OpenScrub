@@ -35,6 +35,7 @@ const ctx=vm.createContext({elements,console,Set,Map,JSON,Date,Math,Promise,
 // Skip startup I/O only; every function under test is evaluated from the Python string.
 vm.runInContext(SOURCE.slice(0,SOURCE.indexOf('loadPersist();loadCertInfo();loadJobs();setInterval(loadJobs,5000);')).replace(/^refreshModelPanel\(\);renderTiers\(\);$/m,''),ctx);
 vm.runInContext(`
+const actualLoadPersist=loadPersist;
 refresh=()=>{};loadJobs=()=>{};loadPersist=()=>{};
 var calls=[],queue=[];
 fetch=(url,options={})=>{calls.push({url,body:options.body?JSON.parse(options.body):null});
@@ -345,3 +346,39 @@ def test_lifecycle_rejections_keep_current_review_and_drafts(action, status):
       throw Error('lifecycle rejection claimed success or omitted failure');
     if(calls.length!==1)throw Error('rejected lifecycle request started another action');
     """.replace('ACTION', action).replace('STATUS', str(status)))
+
+
+@pytest.mark.parametrize('action', ['loadPersist()', 'rmPersist("synthetic-one")', 'clearPersist()'])
+@pytest.mark.parametrize('failure', ['locked', 'recovery', 'network'])
+def test_allowlist_refusal_preserves_display_and_reports_error(action, failure):
+    run_js("""loadPersist=actualLoadPersist;confirm=()=>true;
+    for(const id of ['persistlist','persistnote','clearpersist'])
+      elements.set(id,document.createElement('div'));
+    const list=elements.get('persistlist'),note=elements.get('persistnote');
+    list.innerHTML='existing safe words';note.textContent='existing note';
+    const p=ACTION;const pending=queue.shift();
+    if(FAILURE==='network')pending.reject(Error('offline'));
+    else pending.resolve({ok:false,status:423,json:async()=>{throw Error('HTML refusal')}});
+    let escaped=null;try{await p}catch(e){escaped=e}
+    if(escaped)throw Error('allowlist refusal escaped as unhandled rejection');
+    if(list.innerHTML!=='existing safe words')throw Error('failed allowlist request cleared display');
+    if(note.style.display!=='block'||note.textContent==='existing note'||!note.textContent)
+      throw Error('allowlist refusal was not shown in existing note');
+    if(calls.length!==1)throw Error('rejected mutation started an unconfirmed reload');
+    """.replace('ACTION', action).replace('FAILURE', json.dumps(failure)))
+
+
+@pytest.mark.parametrize('action', ['loadPersist()', 'rmPersist("synthetic-one")', 'clearPersist()'])
+def test_allowlist_ready_success_updates_display_after_acknowledgement(action):
+    run_js("""loadPersist=actualLoadPersist;confirm=()=>true;
+    for(const id of ['persistlist','persistnote','clearpersist'])
+      elements.set(id,document.createElement('div'));
+    elements.get('persistlist').innerHTML='old display';
+    const p=ACTION;
+    if(!IS_READ){await reply({ok:true,count:1});}
+    if(calls.length!==(IS_READ?1:2))throw Error('ready mutation did not reload after ack');
+    await reply({words:['synthetic-two'],path:'/synthetic/allowlist.txt'});await p;
+    if(!elements.get('persistlist').innerHTML.includes('synthetic-two'))
+      throw Error('ready allowlist response was not displayed');
+    if(elements.get('clearpersist').style.display!=='inline-block')throw Error('ready controls hidden');
+    """.replace('ACTION', action).replace('IS_READ', 'true' if action == 'loadPersist()' else 'false'))

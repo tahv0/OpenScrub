@@ -6050,7 +6050,8 @@ def sha256_file(path, chunk=1 << 20):
 
 
 def _settings_dict(args):
-    skip = {"video", "output", "report", "from_report", "batch", "config"}
+    skip = {"video", "output", "report", "from_report", "batch", "config",
+            "_report_input"}
     out = {k: v for k, v in vars(args).items()
            if k not in skip and isinstance(v, (str, int, float, bool, list,
                                                tuple, type(None)))}
@@ -8538,14 +8539,20 @@ def run_pipeline(args, cb=None):
                     for s in source.get("audio_redactions", [])]
             except (TypeError, ValueError, KeyError):
                 pass
-        orig = prov.get("original_input")
-        if orig and os.path.exists(orig) \
-                and os.path.abspath(orig) != os.path.abspath(args.video):
-            # re-renders must start from the TRUE original so intake can
-            # re-derive the HDR/CFR context (cached intermediates are
-            # reused). Rendering straight from the tone-mapped scan copy
-            # silently downgraded HDR jobs to SDR output.
-            args.video = orig
+        selected_input = getattr(args, "_report_input", None)
+        if selected_input is not None:
+            # An in-process caller already selected/owns this exact input.
+            # Do not follow newer provenance into a source it did not admit.
+            args.video = selected_input
+        else:
+            orig = prov.get("original_input")
+            if orig and os.path.exists(orig) \
+                    and os.path.abspath(orig) != os.path.abspath(args.video):
+                # re-renders must start from the TRUE original so intake can
+                # re-derive the HDR/CFR context (cached intermediates are
+                # reused). Rendering straight from the tone-mapped scan copy
+                # silently downgraded HDR jobs to SDR output.
+                args.video = orig
         normalize_vfr(args, cb)
         if rstate is None:
             raise RuntimeError("report has no render_state — re-run a scan "

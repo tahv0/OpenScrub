@@ -38,6 +38,7 @@ class _Lease:
         self.released = False
         self.related = []
         self.source = None
+        self.report_input = False
 
     def release_locked(self):
         if self.released:

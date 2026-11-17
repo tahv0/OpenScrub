@@ -340,7 +340,7 @@ def _validate_files_locked(job=None):
             abort(409, "job is being deleted")
 
 
-def _source_job_locked(canonical):
+def _source_job_locked(canonical, missing_ok=False):
     root = os.path.realpath(JOBS_DIR).rstrip(os.sep) + os.sep
     if not canonical.startswith(root):
         return None
@@ -348,20 +348,70 @@ def _source_job_locked(canonical):
     with JOBS_LOCK:
         source_job = JOBS.get(jid)
     if source_job is None:
+        if missing_ok:
+            return None
         abort(404, "source job is no longer available")
     _validate_files_locked(source_job)
     return source_job
 
 
-def _reserve_files_locked(job=None, work=False, read_source=True):
-    source = (os.path.realpath(job["video"])
-              if read_source and job and job.get("video") else None)
+def _reserve_files_locked(job=None, work=False, read_source=True, source=None):
+    source = (os.path.realpath(source if source is not None else job["video"])
+              if read_source and job and (source is not None or job.get("video")) else None)
     source_job = _source_job_locked(source) if source else None
     lease = FILES.reserve(job, work)
     lease.source = source
     if source_job is not None and source_job is not job:
         lease.related.append(FILES.reserve(source_job))
     return lease
+
+
+def _select_render_input(job, owner):
+    """Resolve original-input provenance while the report/current source is owned.
+
+    Only source selection is pinned, not the report document or its edits.
+    Missing originals keep the engine's fallback to the current input. An
+    extant unregistered/deleting job source is never admitted for reading.
+    """
+    try:
+        doc = _load_job_report(job)
+        prov = doc.get("provenance", {}) if isinstance(doc, dict) else {}
+        original = prov.get("original_input")
+    except (OSError, ValueError, TypeError, AttributeError):
+        # Keep asynchronous missing/invalid-report errors in run_pipeline.
+        original = None
+    if original:
+        candidate = os.path.realpath(original)
+        added = None
+        with VAULT_LOCK:
+            _validate_files_locked(job)
+            source_job = _source_job_locked(candidate, missing_ok=True)
+            root = os.path.realpath(JOBS_DIR).rstrip(os.sep) + os.sep
+            if source_job is None and candidate.startswith(root):
+                # No live owner exists. Only inspect absence, under the store
+                # admission boundary: never open an orphan/condemned source.
+                if os.path.exists(candidate):
+                    abort(404, "source job is no longer available")
+                owner.report_input = True
+                return
+            if source_job is not None and all(
+                    token.state is not FILES.initialize(source_job)
+                    for token in [owner] + owner.related):
+                added = FILES.reserve(source_job)
+                owner.related.append(added)
+        selected = False
+        try:
+            # Live containing jobs are reserved BEFORE this first source stat.
+            # External filesystem changes remain outside web coordination.
+            if os.path.exists(candidate):
+                owner.source = candidate
+                selected = True
+        finally:
+            if added is not None and not selected:
+                with VAULT_LOCK:
+                    owner.related.remove(added)
+                    added.release_locked()
+    owner.report_input = True
 
 
 def _request_source_path(path):
@@ -747,9 +797,11 @@ WORKER = {"current": None, "thread": None}
 _ACTIVE_PHASES = ("queued", "scanning", "rendering", "queued_render")
 
 
-def _reserve_queue_locked(job, action):
+def _reserve_queue_locked(job, action, render_owner=None):
     _validate_files_locked(job)
-    lease = _reserve_files_locked(job, work=True)
+    lease = _reserve_files_locked(job, work=True,
+                source=render_owner.source if render_owner is not None else None)
+    lease.report_input = bool(render_owner is not None and render_owner.report_input)
     with JOBS_LOCK:
         job["qgen"] = job.get("qgen", 0) + 1
         gen = job["qgen"]
@@ -765,8 +817,14 @@ def enqueue(job, action, ticket=None):
     idempotently released lease and old generation prevent it running a retry.
     """
     if ticket is None:
-        with VAULT_LOCK:
-            ticket = _reserve_queue_locked(job, action)
+        if action == "render":
+            with _own_files(job) as admission:
+                _select_render_input(job, admission)
+                with VAULT_LOCK:
+                    ticket = _reserve_queue_locked(job, action, admission)
+        else:
+            with VAULT_LOCK:
+                ticket = _reserve_queue_locked(job, action)
     try:
         WORK_Q.put(ticket)
     except BaseException:
@@ -832,6 +890,9 @@ def worker():
 
 
 def _run_job(job, action, owner=None):
+    if owner is None:
+        with _own_files(job, work=True) as owner:
+            return _run_job(job, action, owner)
     jid = job["id"]
     cb = WebCallbacks(job)
     source = owner.source if owner is not None else job["video"]
@@ -932,7 +993,10 @@ def _run_job(job, action, owner=None):
             job["eta"] = None
         elif action == "render":
             job["phase"] = "rendering"
-            args = build_args(dict(job, video=source), for_render=True)
+            if not owner.report_input:  # compatibility with older queue entries
+                _select_render_input(job, owner)
+            args = build_args(dict(job, video=owner.source), for_render=True)
+            args._report_input = owner.source
             res = openscrub.run_pipeline(args, cb)
             job["output"] = res["output"]
             # refresh report with output hash
@@ -1020,6 +1084,9 @@ def _touch_activity():
 @app.before_request
 def enforce_vault_lock():
     """Admit file work before intake parsing or a view captures a job."""
+    if request.endpoint == "allowlist":
+        g.file_owner = _own_files()  # shared file lives directly in JOBS_DIR
+        return
     if request.path.startswith("/api/jobs"):
         # Deletion closes admissions itself, without becoming its own busy owner.
         if request.endpoint == "job_delete":
@@ -1916,8 +1983,8 @@ def allowlist():
         body = request.get_json(force=True)
         existing = []
         if os.path.exists(path):
-            existing = [l.strip() for l in open(path, encoding="utf-8")
-                        if l.strip()]
+            with open(path, encoding="utf-8") as file:
+                existing = [line.strip() for line in file if line.strip()]
         for wd in body.get("words", []):
             wd = wd.strip()
             if wd and wd not in existing:
@@ -1932,27 +1999,42 @@ def allowlist():
         return jsonify({"ok": True, "count": len(existing)})
     words = []
     if os.path.exists(path):
-        words = [l.strip() for l in open(path, encoding="utf-8") if l.strip()]
+        with open(path, encoding="utf-8") as file:
+            words = [line.strip() for line in file if line.strip()]
     return jsonify({"words": words, "path": path})
 
 
 @app.route("/api/jobs/<jid>/render", methods=["POST"])
 def job_render(jid):
     job = JOBS.get(jid) or abort(404)
-    with VAULT_LOCK:
-        _validate_files_locked(job)
+    def refusal():
         if job["phase"] in ("rendering", "queued_render"):
             return jsonify({"ok": True, "note": "render already in progress"})
         if FILES.initialize(job).work:
             return jsonify({"error": "job work is still cleaning up"}), 409
         if job["phase"] not in ("review", "done", "error", "cancelled"):
             return jsonify({"error": f"cannot render from phase {job['phase']}"}), 400
+    with VAULT_LOCK:
+        _validate_files_locked(job)
+        rejected = refusal()
+        if rejected is not None:
+            return rejected
+    # JSON I/O and source existence checks run outside the transition mutex,
+    # under the request lease. Reserve the selected source before queueing.
+    admission = g.file_owner
+    _select_render_input(job, admission)
+    with VAULT_LOCK:
+        _validate_files_locked(job)
+        rejected = refusal()
+        if rejected is not None:
+            return rejected
+        ticket = _reserve_queue_locked(job, "render", admission)
         job["phase"] = "queued_render"
         job["cancel"].clear()
         job["error"] = None
-        ticket = _reserve_queue_locked(job, "render")
     enqueue(job, "render", ticket)
     return jsonify({"ok": True})
+
 
 
 @app.route("/api/jobs/<jid>/download")
@@ -3291,34 +3373,48 @@ async function saveAndRender(){
   return false;
  }finally{d.audioInFlight=false;d.busy=false;saveStatus(d,d.status);if(d!==EDITS)trimReviewDraft(d);}
 }
+function persistFailure(error){
+ const nt=document.getElementById("persistnote"),message=String(error.message||error);
+ nt.style.display="block";nt.style.color="#f87171";
+ nt.textContent=message.includes("HTTP 423")?
+  "Allow-list unavailable: the vault is locked or needs recovery. Unlock and retry.":
+  "Allow-list request failed: "+message;
+}
 async function loadPersist(){
- const a=await (await fetch("api/allowlist")).json();
- const el=document.getElementById("persistlist"),
-       nt=document.getElementById("persistnote");
- el.innerHTML=(a.words||[]).map(x=>
-  `<div class="pw">${x}<span title="remove from allow-list"
-    onclick="rmPersist('${x.replace(/'/g,"")}')">✕</span></div>`).join("");
- if((a.words||[]).length){
-  nt.style.display="block";
-  nt.textContent="Green words load automatically from "+a.path+
-   " — marked safe during previous reviews. They are always applied in "+
-   "addition to anything typed above. Click ✕ to remove one.";
- }else nt.style.display="none";
- document.getElementById("clearpersist").style.display=
-  (a.words||[]).length?"inline-block":"none";
+ try{
+  const response=await fetch("api/allowlist");
+  if(!response.ok)throw Error("Request failed (HTTP "+response.status+")");
+  const a=await response.json();
+  if(!a||!Array.isArray(a.words))throw Error("Invalid allow-list response");
+  const el=document.getElementById("persistlist"),
+        nt=document.getElementById("persistnote");
+  const html=a.words.map(x=>
+   `<div class="pw">${x}<span title="remove from allow-list"
+     onclick="rmPersist('${x.replace(/'/g,"")}')">✕</span></div>`).join("");
+  el.innerHTML=html;nt.style.color="";
+  if(a.words.length){
+   nt.style.display="block";
+   nt.textContent="Green words load automatically from "+a.path+
+    " — marked safe during previous reviews. They are always applied in "+
+    "addition to anything typed above. Click ✕ to remove one.";
+  }else nt.style.display="none";
+  document.getElementById("clearpersist").style.display=
+   a.words.length?"inline-block":"none";
+  return true;
+ }catch(error){persistFailure(error);return false;}
 }
 async function clearPersist(){
  if(!confirm("Remove ALL learned safe words? Future scans will flag them again until re-reviewed."))return;
- await fetch("api/allowlist",{method:"POST",
-  headers:{"Content-Type":"application/json"},
-  body:JSON.stringify({clear:true})});
- loadPersist();
+ try{
+  await reviewPost("api/allowlist",{clear:true});
+  return await loadPersist();
+ }catch(error){persistFailure(error);return false;}
 }
 async function rmPersist(word){
- await fetch("api/allowlist",{method:"POST",
-  headers:{"Content-Type":"application/json"},
-  body:JSON.stringify({remove:[word]})});
- loadPersist();
+ try{
+  await reviewPost("api/allowlist",{remove:[word]});
+  return await loadPersist();
+ }catch(error){persistFailure(error);return false;}
 }
 async function loadCertInfo(){
  try{
