@@ -84,6 +84,7 @@ def main():
                OPENSCRUB_LOG_BENCH_CHROMIUM=str(args.chromium.resolve()))
     try:
         log = root / 'logs' / ('measurement-' + args.label + '-' + args.phase + '.log')
+        log.parent.mkdir(parents=True, exist_ok=True)
         try:
             result = subprocess.run([str(args.node.resolve()), str(Path(__file__).with_suffix('.js'))], env=env,
                                     capture_output=True, text=True, timeout=1800)
