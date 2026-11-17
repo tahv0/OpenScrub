@@ -121,6 +121,7 @@ include = [
     "tests",
     "CONTRIBUTING.md",
     "benchmark",
+
 ]
 
 [tool.pytest.ini_options]
