@@ -28,6 +28,7 @@ import json
 import math
 import os
 import queue
+import re
 import secrets
 import sys
 import socket
@@ -1698,6 +1699,23 @@ def job_video_stream(jid):
     return send_file(video, conditional=True)
 
 
+def _valid_manual_creation(value):
+    """Only immutable, finite creation records can establish replay equality."""
+    def numbers(items, size):
+        try:
+            return (isinstance(items, list) and len(items) == size
+                    and all(type(v) in (int, float) and math.isfinite(v)
+                            for v in items))
+        except OverflowError:
+            return False
+    return (isinstance(value, dict)
+            and set(value) == {"t_start", "t_end", "cbox", "aoff"}
+            and numbers([value["t_start"], value["t_end"]], 2)
+            and numbers(value["cbox"], 4)
+            and all(type(v) is int for v in value["cbox"])
+            and numbers(value["aoff"], 2))
+
+
 @app.route("/api/jobs/<jid>/detections", methods=["POST"])
 def job_save_edits(jid):
     job = JOBS.get(jid) or abort(404)
@@ -1727,18 +1745,51 @@ def job_save_edits(jid):
                     doc["detections"][i]["last_seen"] = min(
                         max(doc["detections"][i].get("last_seen", t0), t0), t1)
         rs = doc["render_state"]
+        # Read identities from this transaction's latest raw document. Never
+        # reconstruct creation from a row's mutable current geometry/choices.
+        identified = {}
+        for d in doc["detections"]:
+            identity = d.get("manual_id")
+            if isinstance(identity, str):
+                identified.setdefault(identity, []).append(d)
         for m in edits.get("manual", []):
-            t0 = float(m["t_start"]); t1 = float(m["t_end"])
-            tref = float(m.get("t_ref", t0))
-            fidx = min(int(tref * rs["fps"]), len(rs["cum"]) - 1)
-            ox, oy = rs["cum"][fidx]
-            b = m["screen_box"]
-            doc["detections"].append({
-                "t_start": t0, "t_end": t1,
-                "cbox": [int(b[0] - ox), int(b[1] - oy),
-                         int(b[2] - ox), int(b[3] - oy)],
-                "category": "manual", "text": "user-drawn", "confidence": 1.0,
-                "aoff": [ox, oy], "last_seen": t0, "enabled": True})
+            has_id = "manual_id" in m
+            identity = m.get("manual_id")
+            if has_id and (not isinstance(identity, str) or
+                           re.fullmatch(r"[A-Za-z0-9._:-]{1,128}", identity) is None):
+                return jsonify(error="Invalid manual_id: expected 1–128 ASCII letters, digits or ._:-"), 400
+            try:
+                t0 = float(m["t_start"]); t1 = float(m["t_end"])
+                tref = float(m.get("t_ref", t0))
+                b = m["screen_box"]
+                if has_id and (len(b) != 4 or not all(math.isfinite(v) for v in [t0, t1, tref, *b])):
+                    raise ValueError("non-finite creation or invalid box")
+                fidx = min(int(tref * rs["fps"]), len(rs["cum"]) - 1)
+                ox, oy = rs["cum"][fidx]
+                creation = {"t_start": t0, "t_end": t1,
+                            "cbox": [int(b[0] - ox), int(b[1] - oy),
+                                     int(b[2] - ox), int(b[3] - oy)],
+                            "aoff": [ox, oy]}
+                if has_id and not _valid_manual_creation(creation):
+                    raise ValueError("invalid effective creation")
+            except (KeyError, TypeError, ValueError, OverflowError, IndexError):
+                if has_id:
+                    return jsonify(error="Invalid manual creation: finite times, four coordinates and two offsets required"), 400
+                raise
+            if has_id and identity in identified:
+                rows = identified[identity]
+                if (len(rows) != 1 or not _valid_manual_creation(rows[0].get("manual_creation"))
+                        or rows[0]["manual_creation"] != creation):
+                    return jsonify(error="manual_id conflict: creation differs, is missing/invalid, or matches multiple rows"), 409
+                continue
+            row = dict(creation, category="manual", text="user-drawn", confidence=1.0,
+                       last_seen=t0, enabled=True)
+            if has_id:
+                # Separate lists keep later indexed edits independent of creation.
+                row.update(manual_id=identity, manual_creation={
+                    **creation, "cbox": list(creation["cbox"]), "aoff": list(creation["aoff"])})
+                identified[identity] = [row]
+            doc["detections"].append(row)
         if "audio" in edits:
             # audio redaction spans (mute/bleep): stored in the report so the
             # --from-report render applies them and re-renders keep them
@@ -3104,6 +3155,16 @@ function beShowTimes(b){
  document.getElementById("beT0").value=b.t_start.toFixed(1);
  document.getElementById("beT1").value=b.t_end.toFixed(1);
 }
+function manualId(){
+ const c=globalThis.crypto;
+ if(c&&typeof c.randomUUID==="function")return c.randomUUID();
+ if(!c||typeof c.getRandomValues!=="function")
+  throw Error("Secure random generation is unavailable. Use a browser with crypto support to add a box.");
+ const b=c.getRandomValues(new Uint8Array(16));
+ b[6]=(b[6]&15)|64;b[8]=(b[8]&63)|128;
+ const h=Array.from(b,v=>v.toString(16).padStart(2,"0")).join("");
+ return `${h.slice(0,8)}-${h.slice(8,12)}-${h.slice(12,16)}-${h.slice(16,20)}-${h.slice(20)}`;
+}
 function beHook(){
  const cv=document.getElementById("beCv");
  const pt=e=>{const r=cv.getBoundingClientRect();
@@ -3137,8 +3198,10 @@ function beHook(){
      if(fr===null){beDraw();return;}
      const to=prompt("...TO (seconds):",t1);
      if(to===null){beDraw();return;}
-     BE.adds.push({box,t0:Math.max(0,+fr||0),
-                   t1:Math.min(BE.dur,+to||t1),tref:BE.t});
+     try{
+      BE.adds.push({manual_id:manualId(),box,t0:Math.max(0,+fr||0),
+                    t1:Math.min(BE.dur,+to||t1),tref:BE.t});
+     }catch(e){saveStatus(EDITS,"Could not add box: "+e.message);}
     }
     beDraw();
    }
@@ -3457,10 +3520,15 @@ function acknowledgeAdds(current,refs,submitted){
 async function saveAndRender(){
  const id=CUR,gen=VIEW_GEN,d=EDITS;
  if(!id||!d||d.busy)return false;
- const b=d.editor,manRefs=[...d.manual],addRefs=[...b.adds];
+ const b=d.editor;
+ try{
+  // Compatibility drafts acquire an identity once, on the original object.
+  for(const a of [...d.manual,...b.adds])if(!Object.prototype.hasOwnProperty.call(a,"manual_id"))a.manual_id=manualId();
+ }catch(e){saveStatus(d,"Could not save edits: "+e.message);return false;}
+ const manRefs=[...d.manual],addRefs=[...b.adds];
  const man=copyEdit(d.manual),adds=copyEdit(b.adds);
  const payload=copyEdit({enabled:d.enabled,manual:[...man,...adds.map(a=>({
-  t_start:a.t0,t_end:a.t1,t_ref:a.tref,screen_box:a.box}))],
+  manual_id:a.manual_id,t_start:a.t0,t_end:a.t1,t_ref:a.tref,screen_box:a.box}))],
   box_overrides:b.ov,time_overrides:b.times});
  // Plain review must never wipe audio that the editor has not loaded.
  if(b.audioLoaded&&!sameEdit(b.audio,b.audioSaved)){payload.audio=copyEdit(b.audio);}

@@ -27,7 +27,7 @@ function el(){return {textContent:'',innerHTML:'',style:{},dataset:{},disabled:f
  classList:{toggle(){},remove(){}},remove(){this.removed=true},
  addEventListener(){},querySelector(){return null},insertAdjacentHTML(){}}}
 for(const id of ['detail','beslot','review','reviewSaveStatus'])elements.set(id,el());
-const ctx=vm.createContext({elements,console,Set,Map,JSON,Date,Math,Promise,
+const ctx=vm.createContext({elements,console,assert,Set,Map,JSON,Date,Math,Promise,crypto:require("node:crypto").webcrypto,
  document:{getElementById:id=>elements.get(id)||null,querySelector:s=>elements.get(s.slice(1))||null,
  querySelectorAll:()=>[],addEventListener(){},createElement:el},
  detail:elements.get('detail'),window:{},setInterval:()=>1,clearInterval(){},setTimeout(){},
@@ -382,3 +382,21 @@ def test_allowlist_ready_success_updates_display_after_acknowledgement(action):
       throw Error('ready allowlist response was not displayed');
     if(elements.get('clearpersist').style.display!=='inline-block')throw Error('ready controls hidden');
     """.replace('ACTION', action).replace('IS_READ', 'true' if action == 'loadPersist()' else 'false'))
+
+
+@pytest.mark.parametrize("fallback", [False, True])
+def test_manual_id_is_generated_once_retained_and_serialized_on_retry(fallback):
+    run_js("""setup();if(FALLBACK)crypto={getRandomValues:crypto.getRandomValues.bind(crypto)};
+    const p=saveAndRender();const ids=calls[0].body.manual.map(m=>m.manual_id);
+    assert(ids.every(id=>/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(id)));
+    assert.notEqual(ids[0],ids[1]);await reply({error:'lost response'},500);await p;
+    openJob('B');openJob('A');const q=saveAndRender();
+    assert.deepEqual(calls[1].body.manual.map(m=>m.manual_id),ids);
+    await reply();await reply();await q;""".replace('FALLBACK', str(fallback).lower()))
+
+
+def test_missing_secure_randomness_retains_drafts_and_reports_error():
+    run_js("""setup();crypto={};const p=saveAndRender();await p;
+    assert.equal(calls.length,0);assert.equal(BE.adds.length,1);assert.equal(MAN.length,1);
+    assert(document.getElementById('reviewSaveStatus').textContent.includes('random'));
+    assert(!EDITS.busy);""")
