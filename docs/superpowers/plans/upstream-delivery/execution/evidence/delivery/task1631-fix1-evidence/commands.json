@@ -1,0 +1,149 @@
+[
+  {
+    "log": "final312.log",
+    "argv": [
+      "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "-m",
+      "pytest",
+      "/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py",
+      "-q",
+      "--tb=short",
+      "-o",
+      "pythonpath=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1631/adapters",
+      "-p",
+      "task1631_fixture",
+      "--basetemp=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1631/runs/task1631-fix1-589748b0202843e09075e8b5ad857085/pytest",
+      "-o",
+      "cache_dir=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1631/runs/task1631-fix1-589748b0202843e09075e8b5ad857085/cache/pytest"
+    ]
+  },
+  {
+    "log": "final39.log",
+    "argv": [
+      "/tmp/openscrub-python39-20261117/venv/bin/python",
+      "-m",
+      "pytest",
+      "/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py",
+      "-q",
+      "--tb=short",
+      "-o",
+      "pythonpath=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1631/adapters",
+      "-p",
+      "task1631_fixture",
+      "--basetemp=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1631/runs/task1631-fix1-703ac65354c14ce18870936f2d91723b/pytest",
+      "-o",
+      "cache_dir=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1631/runs/task1631-fix1-703ac65354c14ce18870936f2d91723b/cache/pytest"
+    ]
+  },
+  {
+    "log": "green-development312.log",
+    "argv": [
+      "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "-m",
+      "pytest",
+      "/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py",
+      "-q",
+      "--tb=short",
+      "-o",
+      "pythonpath=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1631/adapters",
+      "-p",
+      "task1631_fixture",
+      "--basetemp=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1631/runs/task1631-fix1-5008e4ed10ed4f3f865e7ddb81fb3a6c/pytest",
+      "-o",
+      "cache_dir=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1631/runs/task1631-fix1-5008e4ed10ed4f3f865e7ddb81fb3a6c/cache/pytest"
+    ]
+  },
+  {
+    "log": "package.log",
+    "argv": [
+      "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "-m",
+      "build",
+      "--sdist",
+      "--no-isolation",
+      "--outdir",
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1631/runs/task1631-fix1-1472ad5c24424a208491cb6199d3fbba/dist",
+      "/home/tahv0/.codex/worktrees/c832/OpenScrub"
+    ]
+  },
+  {
+    "log": "package.log",
+    "argv": [
+      "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "-m",
+      "build",
+      "--wheel",
+      "--no-isolation",
+      "--outdir",
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1631/runs/task1631-fix1-1472ad5c24424a208491cb6199d3fbba/wheel",
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1631/runs/task1631-fix1-1472ad5c24424a208491cb6199d3fbba/extracted/openscrub-1.0.96"
+    ]
+  },
+  {
+    "log": "package.log",
+    "argv": [
+      "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "-m",
+      "pip",
+      "install",
+      "--no-index",
+      "--no-deps",
+      "--no-compile",
+      "--target",
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1631/runs/task1631-fix1-1472ad5c24424a208491cb6199d3fbba/site-packages",
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1631/runs/task1631-fix1-1472ad5c24424a208491cb6199d3fbba/wheel/openscrub-1.0.96-py3-none-any.whl"
+    ]
+  },
+  {
+    "log": "package.log",
+    "argv": [
+      "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "-c",
+      "print(\"INSTALLED_IDENTITY_DEFAULTS_OK\")"
+    ]
+  },
+  {
+    "log": "package.log",
+    "argv": [
+      "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1631/runs/task1631-fix1-1472ad5c24424a208491cb6199d3fbba/site-packages/bin/openscrub",
+      "--help"
+    ]
+  },
+  {
+    "log": "package.log",
+    "argv": [
+      "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1631/listening_smoke.py",
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1631/runs/task1631-fix1-1472ad5c24424a208491cb6199d3fbba/site-packages"
+    ]
+  },
+  {
+    "log": "preflight312.log",
+    "argv": [
+      "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "-c",
+      "print(\"IMPORT_PREFLIGHT_OK\")"
+    ]
+  },
+  {
+    "log": "red312.log",
+    "argv": [
+      "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "-m",
+      "pytest",
+      "/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py",
+      "-q",
+      "--tb=short",
+      "-k",
+      "finite_negative_frame_count or unusable_metadata",
+      "-o",
+      "pythonpath=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1631/adapters",
+      "-p",
+      "task1631_fixture",
+      "--basetemp=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1631/runs/task1631-fix1-22d7f6ffaea5483ba5064445f6360f70/pytest",
+      "-o",
+      "cache_dir=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1631/runs/task1631-fix1-22d7f6ffaea5483ba5064445f6360f70/cache/pytest"
+    ]
+  }
+]

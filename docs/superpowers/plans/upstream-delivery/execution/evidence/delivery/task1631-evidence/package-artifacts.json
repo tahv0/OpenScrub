@@ -1,0 +1,35 @@
+{
+  "sdist": {
+    "file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1631/runs/task1631-543af675a884436a84553b6b12603a85/dist/openscrub-1.0.96.tar.gz",
+    "bytes": 528630,
+    "sha256": "1949139dd05721b46d97fef69e3ee2f2170b90e970ef88a16586e51f1c530a12"
+  },
+  "wheel": {
+    "file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1631/runs/task1631-543af675a884436a84553b6b12603a85/wheel/openscrub-1.0.96-py3-none-any.whl",
+    "bytes": 435458,
+    "sha256": "9be777128f554f23ccfe2b26137a07e8b2295252d0c94c0a23e2aaca82a4d8f9"
+  },
+  "head": "bddf01602782ff571cbb267c8099df5ff1cfc46a",
+  "base": "e21ebdf6e3ee46e6c65050dc956a9a3459152269",
+  "requires_python": ">=3.9",
+  "sdist_files": [
+    "openscrub.py",
+    "openscrub_web.py",
+    "zones_ui.py",
+    "openscrub_update.py",
+    "openscrub_setup.py",
+    "openscrub_vault.py",
+    "pyproject.toml",
+    "test_openscrub.py",
+    "tests/test_render_geometry.py"
+  ],
+  "wheel_files": [
+    "openscrub.py",
+    "openscrub_web.py",
+    "zones_ui.py",
+    "openscrub_update.py",
+    "openscrub_setup.py",
+    "openscrub_vault.py"
+  ],
+  "note": "Task-owned manifest after helper completed artifact checks/install/CLI; helper listener failed at sandbox socket construction; exact target is resumed separately."
+}

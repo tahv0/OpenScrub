@@ -1,0 +1,23 @@
+{
+  "base": "e21ebdf6e3ee46e6c65050dc956a9a3459152269",
+  "fix_base": "7415e5a7526696a33f78a8c209bf062239a31d1c",
+  "head": "83af23b5fd3c5922d0d476ba2a6ae21a3598ced2",
+  "files": {
+    "openscrub.py": {
+      "bytes": 420026,
+      "sha256": "870c217e517e55b812158768c96f2e85c77e41176c625cd4acca83c3afe6e06f"
+    },
+    "tests/test_render_geometry.py": {
+      "bytes": 15387,
+      "sha256": "c62297f0dd3aacc4124b9f6bbcfd9308696224b765fcdb6ff63a6f8edc8eee00"
+    },
+    "openscrub_web.py": {
+      "bytes": 256131,
+      "sha256": "9835e1137abee62c0a78e2669ed8bae7059e36bf4bed9f5c7a44f0eb8b40ed3a"
+    },
+    "pyproject.toml": {
+      "bytes": 4049,
+      "sha256": "a5f3bedc2bed50c0ba9df10c7ce1c7f2525905ba11fcbd00410fb573e451c6ae"
+    }
+  }
+}

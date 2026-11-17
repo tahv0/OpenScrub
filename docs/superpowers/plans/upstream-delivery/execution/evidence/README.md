@@ -82,3 +82,7 @@ The [editor resize handoff](research/source-plans/editor-resize-source-plan.md.t
 ### D01 local verification tooling
 
 [Task901 report](delivery/task-901-report.md), [independent review](delivery/task-901-review.md), [fix report](delivery/task-901-fix1-report.md) and [scoped approval](delivery/task-901-fix1-review.md) retain the setup/package boundary and both closed Important findings. [Original evidence](delivery/task901-evidence/README.md), [review probes](delivery/task901-review-evidence/README.md) and [fix evidence](delivery/task901-fix1-evidence/README.md) preserve complete observations; runtime environments/exports are excluded. The [reviewed local helper](../tooling/README.md) is outside upstream feature PRs. Next-real-task adoption and deferred Minor M1 remain explicit in the [D01 record](../development-efficiency-priority.md).
+
+### P16C-G geometry validation and D01 adoption
+
+[Task1631 report](delivery/task-1631-report.md), [independent review](delivery/task-1631-review.md), [fix report](delivery/task-1631-fix1-report.md) and [scoped approval](delivery/task-1631-fix1-review.md) preserve exact-source geometry/control evidence. Original owning48 RED/GREEN, NumPy-wrap chronology, rounded-empty coverage correction and historical setup failures remain distinct. Full243 at741 is followed by final129 geometry checks on both interpreters and final-byte package/startup at83af23b. The same record establishes D01’s real adoption; [D01 is complete](../development-efficiency-priority.md). R/P/P06D/C01 remain separate.

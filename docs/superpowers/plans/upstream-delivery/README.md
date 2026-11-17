@@ -10,9 +10,9 @@
 
 **Spec:** [Decisions and research](decisions-and-research.md), incorporating this conversation. [Original extraction outline](../2026-11-16-upstream-extraction.md) and [preservation/PR ledger](../2026-11-16-upstream-pr-map.md) retain donor history. This directory supplies the detailed delivery sequence and task contracts; where the older outline is less specific, use these researched details.
 
-## Next priority — development efficiency
+## Development efficiency — completed
 
-The user requested on 2026-11-17 that technical improvements which speed development and reduce unnecessary agent work go first. Complete the currently owned implementation/review cycle, then take [D01 — development and verification efficiency](execution/development-efficiency-priority.md) before starting another product feature. This is a bounded local tooling task; it preserves required validation and the separate upstream PR boundaries.
+The user-prioritized [D01 development and verification efficiency](execution/development-efficiency-priority.md) is complete after independent tooling review and real adoption on Task1631/P16C-G. New tasks use the reviewed local verification helper and the current environment handoff, with explicit source identities and required checks. The next selected generic contribution is P16C-R render-resource cleanup; separate PR boundaries and upstream defaults remain in force.
 
 ## Global constraints
 

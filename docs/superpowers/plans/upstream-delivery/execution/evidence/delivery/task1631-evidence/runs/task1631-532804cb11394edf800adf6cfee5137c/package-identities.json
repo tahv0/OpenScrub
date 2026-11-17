@@ -1,0 +1,32 @@
+{
+  "sdist": {
+    "file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1631/runs/task1631-532804cb11394edf800adf6cfee5137c/dist/openscrub-1.0.96.tar.gz",
+    "sha256": "50cb88759c53dc0dd144b5821c17f6cf602a4b5b8f992e0405bac477d0f91476",
+    "bytes": 529073
+  },
+  "wheel": {
+    "file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1631/runs/task1631-532804cb11394edf800adf6cfee5137c/wheel/openscrub-1.0.96-py3-none-any.whl",
+    "sha256": "ec721a7d92247bba7dd5d94352040fd28702094d547d5c278a3504baa967b11e",
+    "bytes": 435687
+  },
+  "sdist_files": [
+    "openscrub.py",
+    "openscrub_web.py",
+    "zones_ui.py",
+    "openscrub_update.py",
+    "openscrub_setup.py",
+    "openscrub_vault.py",
+    "pyproject.toml",
+    "test_openscrub.py",
+    "tests/test_render_geometry.py"
+  ],
+  "wheel_files": [
+    "openscrub.py",
+    "openscrub_web.py",
+    "zones_ui.py",
+    "openscrub_update.py",
+    "openscrub_setup.py",
+    "openscrub_vault.py"
+  ],
+  "requires_python": ">=3.9"
+}

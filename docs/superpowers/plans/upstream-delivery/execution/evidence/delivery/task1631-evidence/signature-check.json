@@ -1,0 +1,15 @@
+{
+  "base": "e21ebdf6e3ee46e6c65050dc956a9a3459152269",
+  "head": "7415e5a7526696a33f78a8c209bf062239a31d1c",
+  "core_sha256": "fdabaea16f12be75b8410ed1be998f8866a0fea151ff9c0b904fea6950403926",
+  "results": {
+    "render": "exact AST arguments/defaults preserved",
+    "render_hdr": "exact AST arguments/defaults preserved",
+    "run_render": "exact AST arguments/defaults preserved",
+    "blur_region": "exact AST arguments/defaults preserved",
+    "blur_silhouette": "exact AST arguments/defaults preserved",
+    "_blur_yuv10": "exact AST arguments/defaults preserved",
+    "_blur_silhouette_yuv10": "exact AST arguments/defaults preserved",
+    "apply_coverage": "exact AST arguments/defaults preserved"
+  }
+}

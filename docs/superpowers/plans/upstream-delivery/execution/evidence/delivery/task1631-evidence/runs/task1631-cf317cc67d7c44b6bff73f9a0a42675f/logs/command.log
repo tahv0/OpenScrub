@@ -1,0 +1,1656 @@
+DEFAULT_PATHS {"jobs": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_jobs", "models": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1631/runs/task1631-cf317cc67d7c44b6bff73f9a0a42675f/profile/.openscrub/models"}
+ACTIVE_SOURCE {"executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python", "python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]", "sources": {"openscrub": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py", "sha256": "0e4f0f9a7846080f591038d021aaf3ca6f01201d83ac32bbdc273f53d5067ee7"}, "openscrub_setup": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_setup.py", "sha256": "d0362a038f8182e8fae510100085bb087f09f7e5cf7e11a780a24390b3037eaf"}, "openscrub_update": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_update.py", "sha256": "4d6a20f75d985a119f8421227c3bd88b17fd1b8eed44e353b127b5b49e733d55"}, "openscrub_vault": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_vault.py", "sha256": "cc2db6a35d0b934502f1400b0d3a5b1f23ff8f63e6d24f9fc6fc4ab7baaebf82"}, "openscrub_web": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", "sha256": "9835e1137abee62c0a78e2669ed8bae7059e36bf4bed9f5c7a44f0eb8b40ed3a"}, "zones_ui": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/zones_ui.py", "sha256": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7"}}}
+FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF                         [100%]
+=================================== FAILURES ===================================
+__________________ test_primary_before_acquisition[box0-run] ___________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7cc17d252fc0>
+where = 'run', box = (0, 0, 0, 1)
+
+    @pytest.mark.parametrize("where", ["run", "sdr", "hdr"])
+    @pytest.mark.parametrize("box", [(0, 0, 0, 1), (2, 0, 1, 1), (0, 3, 1, 2),
+                                      (0, 0, np.nan, 1), (0, 0, 1, np.inf),
+                                      (0, 1, 2), (0, 0, "secret", 1)])
+    def test_primary_before_acquisition(monkeypatch, where, box):
+        with pytest.raises(ValueError, match=r"geometry.*detection 1.*cbox") as exc:
+>           boundary(monkeypatch, where, [detection(box)])
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:38: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:23: in boundary
+    return o.run_render(args, dict(detections=dets, cum=cum, bands=bands,
+/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py:8471: in run_render
+    dets_r = apply_coverage(state["detections"],
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+a = ([Detection(t_start=0, t_end=0, cbox=(0, 0, 0, 1), category='person', text='private', confidence=1.0, aoff=(0.0, 0.0), last_seen=0.0, dense=False, track=-1, person=-1, poly=())], 'concealed', <openscrub.Callbacks object at 0x7cc17d253230>)
+k = {}
+
+    def acquired(*a, **k):
+>       pytest.fail("native acquisition or coverage happened before validation")
+E       Failed: native acquisition or coverage happened before validation
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:16: Failed
+----------------------------- Captured stdout call -----------------------------
+[4/4] Rendering -> out
+__________________ test_primary_before_acquisition[box0-sdr] ___________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7cc17d2530e0>
+where = 'sdr', box = (0, 0, 0, 1)
+
+    @pytest.mark.parametrize("where", ["run", "sdr", "hdr"])
+    @pytest.mark.parametrize("box", [(0, 0, 0, 1), (2, 0, 1, 1), (0, 3, 1, 2),
+                                      (0, 0, np.nan, 1), (0, 0, 1, np.inf),
+                                      (0, 1, 2), (0, 0, "secret", 1)])
+    def test_primary_before_acquisition(monkeypatch, where, box):
+        with pytest.raises(ValueError, match=r"geometry.*detection 1.*cbox") as exc:
+>           boundary(monkeypatch, where, [detection(box)])
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:38: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:29: in boundary
+    return o.render(**options, preview=False)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py:4074: in render
+    cap = cv2.VideoCapture(src)
+          ^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+a = ('in',), k = {}
+
+    def acquired(*a, **k):
+>       pytest.fail("native acquisition or coverage happened before validation")
+E       Failed: native acquisition or coverage happened before validation
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:16: Failed
+__________________ test_primary_before_acquisition[box0-hdr] ___________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7cc17d255700>
+where = 'hdr', box = (0, 0, 0, 1)
+
+    @pytest.mark.parametrize("where", ["run", "sdr", "hdr"])
+    @pytest.mark.parametrize("box", [(0, 0, 0, 1), (2, 0, 1, 1), (0, 3, 1, 2),
+                                      (0, 0, np.nan, 1), (0, 0, 1, np.inf),
+                                      (0, 1, 2), (0, 0, "secret", 1)])
+    def test_primary_before_acquisition(monkeypatch, where, box):
+        with pytest.raises(ValueError, match=r"geometry.*detection 1.*cbox") as exc:
+>           boundary(monkeypatch, where, [detection(box)])
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:38: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:28: in boundary
+    return o.render_hdr(**options, encoder="libx265", tags={})
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py:3900: in render_hdr
+    meta = cv2.VideoCapture(src)
+           ^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+a = ('in',), k = {}
+
+    def acquired(*a, **k):
+>       pytest.fail("native acquisition or coverage happened before validation")
+E       Failed: native acquisition or coverage happened before validation
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:16: Failed
+__________________ test_primary_before_acquisition[box1-run] ___________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7cc17d255c70>
+where = 'run', box = (2, 0, 1, 1)
+
+    @pytest.mark.parametrize("where", ["run", "sdr", "hdr"])
+    @pytest.mark.parametrize("box", [(0, 0, 0, 1), (2, 0, 1, 1), (0, 3, 1, 2),
+                                      (0, 0, np.nan, 1), (0, 0, 1, np.inf),
+                                      (0, 1, 2), (0, 0, "secret", 1)])
+    def test_primary_before_acquisition(monkeypatch, where, box):
+        with pytest.raises(ValueError, match=r"geometry.*detection 1.*cbox") as exc:
+>           boundary(monkeypatch, where, [detection(box)])
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:38: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:23: in boundary
+    return o.run_render(args, dict(detections=dets, cum=cum, bands=bands,
+/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py:8471: in run_render
+    dets_r = apply_coverage(state["detections"],
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+a = ([Detection(t_start=0, t_end=0, cbox=(2, 0, 1, 1), category='person', text='private', confidence=1.0, aoff=(0.0, 0.0), last_seen=0.0, dense=False, track=-1, person=-1, poly=())], 'concealed', <openscrub.Callbacks object at 0x7cc17d2554f0>)
+k = {}
+
+    def acquired(*a, **k):
+>       pytest.fail("native acquisition or coverage happened before validation")
+E       Failed: native acquisition or coverage happened before validation
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:16: Failed
+----------------------------- Captured stdout call -----------------------------
+[4/4] Rendering -> out
+__________________ test_primary_before_acquisition[box1-sdr] ___________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7cc17d256420>
+where = 'sdr', box = (2, 0, 1, 1)
+
+    @pytest.mark.parametrize("where", ["run", "sdr", "hdr"])
+    @pytest.mark.parametrize("box", [(0, 0, 0, 1), (2, 0, 1, 1), (0, 3, 1, 2),
+                                      (0, 0, np.nan, 1), (0, 0, 1, np.inf),
+                                      (0, 1, 2), (0, 0, "secret", 1)])
+    def test_primary_before_acquisition(monkeypatch, where, box):
+        with pytest.raises(ValueError, match=r"geometry.*detection 1.*cbox") as exc:
+>           boundary(monkeypatch, where, [detection(box)])
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:38: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:29: in boundary
+    return o.render(**options, preview=False)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py:4074: in render
+    cap = cv2.VideoCapture(src)
+          ^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+a = ('in',), k = {}
+
+    def acquired(*a, **k):
+>       pytest.fail("native acquisition or coverage happened before validation")
+E       Failed: native acquisition or coverage happened before validation
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:16: Failed
+__________________ test_primary_before_acquisition[box1-hdr] ___________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7cc17d25a0c0>
+where = 'hdr', box = (2, 0, 1, 1)
+
+    @pytest.mark.parametrize("where", ["run", "sdr", "hdr"])
+    @pytest.mark.parametrize("box", [(0, 0, 0, 1), (2, 0, 1, 1), (0, 3, 1, 2),
+                                      (0, 0, np.nan, 1), (0, 0, 1, np.inf),
+                                      (0, 1, 2), (0, 0, "secret", 1)])
+    def test_primary_before_acquisition(monkeypatch, where, box):
+        with pytest.raises(ValueError, match=r"geometry.*detection 1.*cbox") as exc:
+>           boundary(monkeypatch, where, [detection(box)])
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:38: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:28: in boundary
+    return o.render_hdr(**options, encoder="libx265", tags={})
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py:3900: in render_hdr
+    meta = cv2.VideoCapture(src)
+           ^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+a = ('in',), k = {}
+
+    def acquired(*a, **k):
+>       pytest.fail("native acquisition or coverage happened before validation")
+E       Failed: native acquisition or coverage happened before validation
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:16: Failed
+__________________ test_primary_before_acquisition[box2-run] ___________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7cc17d2525d0>
+where = 'run', box = (0, 3, 1, 2)
+
+    @pytest.mark.parametrize("where", ["run", "sdr", "hdr"])
+    @pytest.mark.parametrize("box", [(0, 0, 0, 1), (2, 0, 1, 1), (0, 3, 1, 2),
+                                      (0, 0, np.nan, 1), (0, 0, 1, np.inf),
+                                      (0, 1, 2), (0, 0, "secret", 1)])
+    def test_primary_before_acquisition(monkeypatch, where, box):
+        with pytest.raises(ValueError, match=r"geometry.*detection 1.*cbox") as exc:
+>           boundary(monkeypatch, where, [detection(box)])
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:38: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:23: in boundary
+    return o.run_render(args, dict(detections=dets, cum=cum, bands=bands,
+/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py:8471: in run_render
+    dets_r = apply_coverage(state["detections"],
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+a = ([Detection(t_start=0, t_end=0, cbox=(0, 3, 1, 2), category='person', text='private', confidence=1.0, aoff=(0.0, 0.0), last_seen=0.0, dense=False, track=-1, person=-1, poly=())], 'concealed', <openscrub.Callbacks object at 0x7cc17d253470>)
+k = {}
+
+    def acquired(*a, **k):
+>       pytest.fail("native acquisition or coverage happened before validation")
+E       Failed: native acquisition or coverage happened before validation
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:16: Failed
+----------------------------- Captured stdout call -----------------------------
+[4/4] Rendering -> out
+__________________ test_primary_before_acquisition[box2-sdr] ___________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7cc17d254d40>
+where = 'sdr', box = (0, 3, 1, 2)
+
+    @pytest.mark.parametrize("where", ["run", "sdr", "hdr"])
+    @pytest.mark.parametrize("box", [(0, 0, 0, 1), (2, 0, 1, 1), (0, 3, 1, 2),
+                                      (0, 0, np.nan, 1), (0, 0, 1, np.inf),
+                                      (0, 1, 2), (0, 0, "secret", 1)])
+    def test_primary_before_acquisition(monkeypatch, where, box):
+        with pytest.raises(ValueError, match=r"geometry.*detection 1.*cbox") as exc:
+>           boundary(monkeypatch, where, [detection(box)])
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:38: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:29: in boundary
+    return o.render(**options, preview=False)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py:4074: in render
+    cap = cv2.VideoCapture(src)
+          ^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+a = ('in',), k = {}
+
+    def acquired(*a, **k):
+>       pytest.fail("native acquisition or coverage happened before validation")
+E       Failed: native acquisition or coverage happened before validation
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:16: Failed
+__________________ test_primary_before_acquisition[box2-hdr] ___________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7cc17d25aed0>
+where = 'hdr', box = (0, 3, 1, 2)
+
+    @pytest.mark.parametrize("where", ["run", "sdr", "hdr"])
+    @pytest.mark.parametrize("box", [(0, 0, 0, 1), (2, 0, 1, 1), (0, 3, 1, 2),
+                                      (0, 0, np.nan, 1), (0, 0, 1, np.inf),
+                                      (0, 1, 2), (0, 0, "secret", 1)])
+    def test_primary_before_acquisition(monkeypatch, where, box):
+        with pytest.raises(ValueError, match=r"geometry.*detection 1.*cbox") as exc:
+>           boundary(monkeypatch, where, [detection(box)])
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:38: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:28: in boundary
+    return o.render_hdr(**options, encoder="libx265", tags={})
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py:3900: in render_hdr
+    meta = cv2.VideoCapture(src)
+           ^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+a = ('in',), k = {}
+
+    def acquired(*a, **k):
+>       pytest.fail("native acquisition or coverage happened before validation")
+E       Failed: native acquisition or coverage happened before validation
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:16: Failed
+__________________ test_primary_before_acquisition[box3-run] ___________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7cc17d259a00>
+where = 'run', box = (0, 0, nan, 1)
+
+    @pytest.mark.parametrize("where", ["run", "sdr", "hdr"])
+    @pytest.mark.parametrize("box", [(0, 0, 0, 1), (2, 0, 1, 1), (0, 3, 1, 2),
+                                      (0, 0, np.nan, 1), (0, 0, 1, np.inf),
+                                      (0, 1, 2), (0, 0, "secret", 1)])
+    def test_primary_before_acquisition(monkeypatch, where, box):
+        with pytest.raises(ValueError, match=r"geometry.*detection 1.*cbox") as exc:
+>           boundary(monkeypatch, where, [detection(box)])
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:38: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:23: in boundary
+    return o.run_render(args, dict(detections=dets, cum=cum, bands=bands,
+/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py:8471: in run_render
+    dets_r = apply_coverage(state["detections"],
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+a = ([Detection(t_start=0, t_end=0, cbox=(0, 0, nan, 1), category='person', text='private', confidence=1.0, aoff=(0.0, 0.0...ast_seen=0.0, dense=False, track=-1, person=-1, poly=())], 'concealed', <openscrub.Callbacks object at 0x7cc17d25a960>)
+k = {}
+
+    def acquired(*a, **k):
+>       pytest.fail("native acquisition or coverage happened before validation")
+E       Failed: native acquisition or coverage happened before validation
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:16: Failed
+----------------------------- Captured stdout call -----------------------------
+[4/4] Rendering -> out
+__________________ test_primary_before_acquisition[box3-sdr] ___________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7cc17d25e690>
+where = 'sdr', box = (0, 0, nan, 1)
+
+    @pytest.mark.parametrize("where", ["run", "sdr", "hdr"])
+    @pytest.mark.parametrize("box", [(0, 0, 0, 1), (2, 0, 1, 1), (0, 3, 1, 2),
+                                      (0, 0, np.nan, 1), (0, 0, 1, np.inf),
+                                      (0, 1, 2), (0, 0, "secret", 1)])
+    def test_primary_before_acquisition(monkeypatch, where, box):
+        with pytest.raises(ValueError, match=r"geometry.*detection 1.*cbox") as exc:
+>           boundary(monkeypatch, where, [detection(box)])
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:38: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:29: in boundary
+    return o.render(**options, preview=False)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py:4074: in render
+    cap = cv2.VideoCapture(src)
+          ^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+a = ('in',), k = {}
+
+    def acquired(*a, **k):
+>       pytest.fail("native acquisition or coverage happened before validation")
+E       Failed: native acquisition or coverage happened before validation
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:16: Failed
+__________________ test_primary_before_acquisition[box3-hdr] ___________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7cc17d25e990>
+where = 'hdr', box = (0, 0, nan, 1)
+
+    @pytest.mark.parametrize("where", ["run", "sdr", "hdr"])
+    @pytest.mark.parametrize("box", [(0, 0, 0, 1), (2, 0, 1, 1), (0, 3, 1, 2),
+                                      (0, 0, np.nan, 1), (0, 0, 1, np.inf),
+                                      (0, 1, 2), (0, 0, "secret", 1)])
+    def test_primary_before_acquisition(monkeypatch, where, box):
+        with pytest.raises(ValueError, match=r"geometry.*detection 1.*cbox") as exc:
+>           boundary(monkeypatch, where, [detection(box)])
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:38: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:28: in boundary
+    return o.render_hdr(**options, encoder="libx265", tags={})
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py:3900: in render_hdr
+    meta = cv2.VideoCapture(src)
+           ^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+a = ('in',), k = {}
+
+    def acquired(*a, **k):
+>       pytest.fail("native acquisition or coverage happened before validation")
+E       Failed: native acquisition or coverage happened before validation
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:16: Failed
+__________________ test_primary_before_acquisition[box4-run] ___________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7cc17d25bb60>
+where = 'run', box = (0, 0, 1, inf)
+
+    @pytest.mark.parametrize("where", ["run", "sdr", "hdr"])
+    @pytest.mark.parametrize("box", [(0, 0, 0, 1), (2, 0, 1, 1), (0, 3, 1, 2),
+                                      (0, 0, np.nan, 1), (0, 0, 1, np.inf),
+                                      (0, 1, 2), (0, 0, "secret", 1)])
+    def test_primary_before_acquisition(monkeypatch, where, box):
+        with pytest.raises(ValueError, match=r"geometry.*detection 1.*cbox") as exc:
+>           boundary(monkeypatch, where, [detection(box)])
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:38: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:23: in boundary
+    return o.run_render(args, dict(detections=dets, cum=cum, bands=bands,
+/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py:8471: in run_render
+    dets_r = apply_coverage(state["detections"],
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+a = ([Detection(t_start=0, t_end=0, cbox=(0, 0, 1, inf), category='person', text='private', confidence=1.0, aoff=(0.0, 0.0...ast_seen=0.0, dense=False, track=-1, person=-1, poly=())], 'concealed', <openscrub.Callbacks object at 0x7cc17d25a8d0>)
+k = {}
+
+    def acquired(*a, **k):
+>       pytest.fail("native acquisition or coverage happened before validation")
+E       Failed: native acquisition or coverage happened before validation
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:16: Failed
+----------------------------- Captured stdout call -----------------------------
+[4/4] Rendering -> out
+__________________ test_primary_before_acquisition[box4-sdr] ___________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7cc17d252b10>
+where = 'sdr', box = (0, 0, 1, inf)
+
+    @pytest.mark.parametrize("where", ["run", "sdr", "hdr"])
+    @pytest.mark.parametrize("box", [(0, 0, 0, 1), (2, 0, 1, 1), (0, 3, 1, 2),
+                                      (0, 0, np.nan, 1), (0, 0, 1, np.inf),
+                                      (0, 1, 2), (0, 0, "secret", 1)])
+    def test_primary_before_acquisition(monkeypatch, where, box):
+        with pytest.raises(ValueError, match=r"geometry.*detection 1.*cbox") as exc:
+>           boundary(monkeypatch, where, [detection(box)])
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:38: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:29: in boundary
+    return o.render(**options, preview=False)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py:4074: in render
+    cap = cv2.VideoCapture(src)
+          ^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+a = ('in',), k = {}
+
+    def acquired(*a, **k):
+>       pytest.fail("native acquisition or coverage happened before validation")
+E       Failed: native acquisition or coverage happened before validation
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:16: Failed
+__________________ test_primary_before_acquisition[box4-hdr] ___________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7cc17d2557c0>
+where = 'hdr', box = (0, 0, 1, inf)
+
+    @pytest.mark.parametrize("where", ["run", "sdr", "hdr"])
+    @pytest.mark.parametrize("box", [(0, 0, 0, 1), (2, 0, 1, 1), (0, 3, 1, 2),
+                                      (0, 0, np.nan, 1), (0, 0, 1, np.inf),
+                                      (0, 1, 2), (0, 0, "secret", 1)])
+    def test_primary_before_acquisition(monkeypatch, where, box):
+        with pytest.raises(ValueError, match=r"geometry.*detection 1.*cbox") as exc:
+>           boundary(monkeypatch, where, [detection(box)])
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:38: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:28: in boundary
+    return o.render_hdr(**options, encoder="libx265", tags={})
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py:3900: in render_hdr
+    meta = cv2.VideoCapture(src)
+           ^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+a = ('in',), k = {}
+
+    def acquired(*a, **k):
+>       pytest.fail("native acquisition or coverage happened before validation")
+E       Failed: native acquisition or coverage happened before validation
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:16: Failed
+__________________ test_primary_before_acquisition[box5-run] ___________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7cc17d25fec0>
+where = 'run', box = (0, 1, 2)
+
+    @pytest.mark.parametrize("where", ["run", "sdr", "hdr"])
+    @pytest.mark.parametrize("box", [(0, 0, 0, 1), (2, 0, 1, 1), (0, 3, 1, 2),
+                                      (0, 0, np.nan, 1), (0, 0, 1, np.inf),
+                                      (0, 1, 2), (0, 0, "secret", 1)])
+    def test_primary_before_acquisition(monkeypatch, where, box):
+        with pytest.raises(ValueError, match=r"geometry.*detection 1.*cbox") as exc:
+>           boundary(monkeypatch, where, [detection(box)])
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:38: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:23: in boundary
+    return o.run_render(args, dict(detections=dets, cum=cum, bands=bands,
+/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py:8471: in run_render
+    dets_r = apply_coverage(state["detections"],
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+a = ([Detection(t_start=0, t_end=0, cbox=(0, 1, 2), category='person', text='private', confidence=1.0, aoff=(0.0, 0.0), last_seen=0.0, dense=False, track=-1, person=-1, poly=())], 'concealed', <openscrub.Callbacks object at 0x7cc17d25ddc0>)
+k = {}
+
+    def acquired(*a, **k):
+>       pytest.fail("native acquisition or coverage happened before validation")
+E       Failed: native acquisition or coverage happened before validation
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:16: Failed
+----------------------------- Captured stdout call -----------------------------
+[4/4] Rendering -> out
+__________________ test_primary_before_acquisition[box5-sdr] ___________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7cc17d25d9a0>
+where = 'sdr', box = (0, 1, 2)
+
+    @pytest.mark.parametrize("where", ["run", "sdr", "hdr"])
+    @pytest.mark.parametrize("box", [(0, 0, 0, 1), (2, 0, 1, 1), (0, 3, 1, 2),
+                                      (0, 0, np.nan, 1), (0, 0, 1, np.inf),
+                                      (0, 1, 2), (0, 0, "secret", 1)])
+    def test_primary_before_acquisition(monkeypatch, where, box):
+        with pytest.raises(ValueError, match=r"geometry.*detection 1.*cbox") as exc:
+>           boundary(monkeypatch, where, [detection(box)])
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:38: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:29: in boundary
+    return o.render(**options, preview=False)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py:4074: in render
+    cap = cv2.VideoCapture(src)
+          ^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+a = ('in',), k = {}
+
+    def acquired(*a, **k):
+>       pytest.fail("native acquisition or coverage happened before validation")
+E       Failed: native acquisition or coverage happened before validation
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:16: Failed
+__________________ test_primary_before_acquisition[box5-hdr] ___________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7cc17d260260>
+where = 'hdr', box = (0, 1, 2)
+
+    @pytest.mark.parametrize("where", ["run", "sdr", "hdr"])
+    @pytest.mark.parametrize("box", [(0, 0, 0, 1), (2, 0, 1, 1), (0, 3, 1, 2),
+                                      (0, 0, np.nan, 1), (0, 0, 1, np.inf),
+                                      (0, 1, 2), (0, 0, "secret", 1)])
+    def test_primary_before_acquisition(monkeypatch, where, box):
+        with pytest.raises(ValueError, match=r"geometry.*detection 1.*cbox") as exc:
+>           boundary(monkeypatch, where, [detection(box)])
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:38: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:28: in boundary
+    return o.render_hdr(**options, encoder="libx265", tags={})
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py:3900: in render_hdr
+    meta = cv2.VideoCapture(src)
+           ^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+a = ('in',), k = {}
+
+    def acquired(*a, **k):
+>       pytest.fail("native acquisition or coverage happened before validation")
+E       Failed: native acquisition or coverage happened before validation
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:16: Failed
+__________________ test_primary_before_acquisition[box6-run] ___________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7cc17d25e840>
+where = 'run', box = (0, 0, 'secret', 1)
+
+    @pytest.mark.parametrize("where", ["run", "sdr", "hdr"])
+    @pytest.mark.parametrize("box", [(0, 0, 0, 1), (2, 0, 1, 1), (0, 3, 1, 2),
+                                      (0, 0, np.nan, 1), (0, 0, 1, np.inf),
+                                      (0, 1, 2), (0, 0, "secret", 1)])
+    def test_primary_before_acquisition(monkeypatch, where, box):
+        with pytest.raises(ValueError, match=r"geometry.*detection 1.*cbox") as exc:
+>           boundary(monkeypatch, where, [detection(box)])
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:38: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:23: in boundary
+    return o.run_render(args, dict(detections=dets, cum=cum, bands=bands,
+/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py:8471: in run_render
+    dets_r = apply_coverage(state["detections"],
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+a = ([Detection(t_start=0, t_end=0, cbox=(0, 0, 'secret', 1), category='person', text='private', confidence=1.0, aoff=(0.0...ast_seen=0.0, dense=False, track=-1, person=-1, poly=())], 'concealed', <openscrub.Callbacks object at 0x7cc17d25c770>)
+k = {}
+
+    def acquired(*a, **k):
+>       pytest.fail("native acquisition or coverage happened before validation")
+E       Failed: native acquisition or coverage happened before validation
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:16: Failed
+----------------------------- Captured stdout call -----------------------------
+[4/4] Rendering -> out
+__________________ test_primary_before_acquisition[box6-sdr] ___________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7cc17d25fcb0>
+where = 'sdr', box = (0, 0, 'secret', 1)
+
+    @pytest.mark.parametrize("where", ["run", "sdr", "hdr"])
+    @pytest.mark.parametrize("box", [(0, 0, 0, 1), (2, 0, 1, 1), (0, 3, 1, 2),
+                                      (0, 0, np.nan, 1), (0, 0, 1, np.inf),
+                                      (0, 1, 2), (0, 0, "secret", 1)])
+    def test_primary_before_acquisition(monkeypatch, where, box):
+        with pytest.raises(ValueError, match=r"geometry.*detection 1.*cbox") as exc:
+>           boundary(monkeypatch, where, [detection(box)])
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:38: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:29: in boundary
+    return o.render(**options, preview=False)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py:4074: in render
+    cap = cv2.VideoCapture(src)
+          ^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+a = ('in',), k = {}
+
+    def acquired(*a, **k):
+>       pytest.fail("native acquisition or coverage happened before validation")
+E       Failed: native acquisition or coverage happened before validation
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:16: Failed
+__________________ test_primary_before_acquisition[box6-hdr] ___________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7cc17d255f70>
+where = 'hdr', box = (0, 0, 'secret', 1)
+
+    @pytest.mark.parametrize("where", ["run", "sdr", "hdr"])
+    @pytest.mark.parametrize("box", [(0, 0, 0, 1), (2, 0, 1, 1), (0, 3, 1, 2),
+                                      (0, 0, np.nan, 1), (0, 0, 1, np.inf),
+                                      (0, 1, 2), (0, 0, "secret", 1)])
+    def test_primary_before_acquisition(monkeypatch, where, box):
+        with pytest.raises(ValueError, match=r"geometry.*detection 1.*cbox") as exc:
+>           boundary(monkeypatch, where, [detection(box)])
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:38: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:28: in boundary
+    return o.render_hdr(**options, encoder="libx265", tags={})
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py:3900: in render_hdr
+    meta = cv2.VideoCapture(src)
+           ^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+a = ('in',), k = {}
+
+    def acquired(*a, **k):
+>       pytest.fail("native acquisition or coverage happened before validation")
+E       Failed: native acquisition or coverage happened before validation
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:16: Failed
+_______________ test_prerequisites_before_acquisition[fps-0-run] _______________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7cc17d260080>
+where = 'run', field = 'fps', value = 0
+
+    @pytest.mark.parametrize("where", ["run", "sdr", "hdr"])
+    @pytest.mark.parametrize("field,value", [("fps", 0), ("fps", np.inf),
+                                             ("pad", np.nan), ("cum", []),
+                                             ("cum", [(0, np.inf)]),
+                                             ("bands", [(np.nan, 0)])])
+    def test_prerequisites_before_acquisition(monkeypatch, where, field, value):
+        with pytest.raises(ValueError, match="geometry.*" + field):
+>           boundary(monkeypatch, where, [detection()], **{field: value})
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:49: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:23: in boundary
+    return o.run_render(args, dict(detections=dets, cum=cum, bands=bands,
+/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py:8471: in run_render
+    dets_r = apply_coverage(state["detections"],
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+a = ([Detection(t_start=0, t_end=0, cbox=(2, 2, 10, 10), category='person', text='private', confidence=1.0, aoff=(0.0, 0.0...ast_seen=0.0, dense=False, track=-1, person=-1, poly=())], 'concealed', <openscrub.Callbacks object at 0x7cc17d261280>)
+k = {}
+
+    def acquired(*a, **k):
+>       pytest.fail("native acquisition or coverage happened before validation")
+E       Failed: native acquisition or coverage happened before validation
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:16: Failed
+----------------------------- Captured stdout call -----------------------------
+[4/4] Rendering -> out
+_______________ test_prerequisites_before_acquisition[fps-0-sdr] _______________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7cc17d260ef0>
+where = 'sdr', field = 'fps', value = 0
+
+    @pytest.mark.parametrize("where", ["run", "sdr", "hdr"])
+    @pytest.mark.parametrize("field,value", [("fps", 0), ("fps", np.inf),
+                                             ("pad", np.nan), ("cum", []),
+                                             ("cum", [(0, np.inf)]),
+                                             ("bands", [(np.nan, 0)])])
+    def test_prerequisites_before_acquisition(monkeypatch, where, field, value):
+        with pytest.raises(ValueError, match="geometry.*" + field):
+>           boundary(monkeypatch, where, [detection()], **{field: value})
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:49: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:29: in boundary
+    return o.render(**options, preview=False)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py:4074: in render
+    cap = cv2.VideoCapture(src)
+          ^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+a = ('in',), k = {}
+
+    def acquired(*a, **k):
+>       pytest.fail("native acquisition or coverage happened before validation")
+E       Failed: native acquisition or coverage happened before validation
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:16: Failed
+_______________ test_prerequisites_before_acquisition[fps-0-hdr] _______________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7cc17d261550>
+where = 'hdr', field = 'fps', value = 0
+
+    @pytest.mark.parametrize("where", ["run", "sdr", "hdr"])
+    @pytest.mark.parametrize("field,value", [("fps", 0), ("fps", np.inf),
+                                             ("pad", np.nan), ("cum", []),
+                                             ("cum", [(0, np.inf)]),
+                                             ("bands", [(np.nan, 0)])])
+    def test_prerequisites_before_acquisition(monkeypatch, where, field, value):
+        with pytest.raises(ValueError, match="geometry.*" + field):
+>           boundary(monkeypatch, where, [detection()], **{field: value})
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:49: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:28: in boundary
+    return o.render_hdr(**options, encoder="libx265", tags={})
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py:3900: in render_hdr
+    meta = cv2.VideoCapture(src)
+           ^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+a = ('in',), k = {}
+
+    def acquired(*a, **k):
+>       pytest.fail("native acquisition or coverage happened before validation")
+E       Failed: native acquisition or coverage happened before validation
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:16: Failed
+______________ test_prerequisites_before_acquisition[fps-inf-run] ______________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7cc17d2598b0>
+where = 'run', field = 'fps', value = inf
+
+    @pytest.mark.parametrize("where", ["run", "sdr", "hdr"])
+    @pytest.mark.parametrize("field,value", [("fps", 0), ("fps", np.inf),
+                                             ("pad", np.nan), ("cum", []),
+                                             ("cum", [(0, np.inf)]),
+                                             ("bands", [(np.nan, 0)])])
+    def test_prerequisites_before_acquisition(monkeypatch, where, field, value):
+        with pytest.raises(ValueError, match="geometry.*" + field):
+>           boundary(monkeypatch, where, [detection()], **{field: value})
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:49: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:23: in boundary
+    return o.run_render(args, dict(detections=dets, cum=cum, bands=bands,
+/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py:8471: in run_render
+    dets_r = apply_coverage(state["detections"],
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+a = ([Detection(t_start=0, t_end=0, cbox=(2, 2, 10, 10), category='person', text='private', confidence=1.0, aoff=(0.0, 0.0...ast_seen=0.0, dense=False, track=-1, person=-1, poly=())], 'concealed', <openscrub.Callbacks object at 0x7cc17d253470>)
+k = {}
+
+    def acquired(*a, **k):
+>       pytest.fail("native acquisition or coverage happened before validation")
+E       Failed: native acquisition or coverage happened before validation
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:16: Failed
+----------------------------- Captured stdout call -----------------------------
+[4/4] Rendering -> out
+______________ test_prerequisites_before_acquisition[fps-inf-sdr] ______________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7cc17d25f770>
+where = 'sdr', field = 'fps', value = inf
+
+    @pytest.mark.parametrize("where", ["run", "sdr", "hdr"])
+    @pytest.mark.parametrize("field,value", [("fps", 0), ("fps", np.inf),
+                                             ("pad", np.nan), ("cum", []),
+                                             ("cum", [(0, np.inf)]),
+                                             ("bands", [(np.nan, 0)])])
+    def test_prerequisites_before_acquisition(monkeypatch, where, field, value):
+        with pytest.raises(ValueError, match="geometry.*" + field):
+>           boundary(monkeypatch, where, [detection()], **{field: value})
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:49: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:29: in boundary
+    return o.render(**options, preview=False)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py:4074: in render
+    cap = cv2.VideoCapture(src)
+          ^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+a = ('in',), k = {}
+
+    def acquired(*a, **k):
+>       pytest.fail("native acquisition or coverage happened before validation")
+E       Failed: native acquisition or coverage happened before validation
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:16: Failed
+______________ test_prerequisites_before_acquisition[fps-inf-hdr] ______________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7cc17d260320>
+where = 'hdr', field = 'fps', value = inf
+
+    @pytest.mark.parametrize("where", ["run", "sdr", "hdr"])
+    @pytest.mark.parametrize("field,value", [("fps", 0), ("fps", np.inf),
+                                             ("pad", np.nan), ("cum", []),
+                                             ("cum", [(0, np.inf)]),
+                                             ("bands", [(np.nan, 0)])])
+    def test_prerequisites_before_acquisition(monkeypatch, where, field, value):
+        with pytest.raises(ValueError, match="geometry.*" + field):
+>           boundary(monkeypatch, where, [detection()], **{field: value})
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:49: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:28: in boundary
+    return o.render_hdr(**options, encoder="libx265", tags={})
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py:3900: in render_hdr
+    meta = cv2.VideoCapture(src)
+           ^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+a = ('in',), k = {}
+
+    def acquired(*a, **k):
+>       pytest.fail("native acquisition or coverage happened before validation")
+E       Failed: native acquisition or coverage happened before validation
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:16: Failed
+______________ test_prerequisites_before_acquisition[pad-nan-run] ______________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7cc17d260980>
+where = 'run', field = 'pad', value = nan
+
+    @pytest.mark.parametrize("where", ["run", "sdr", "hdr"])
+    @pytest.mark.parametrize("field,value", [("fps", 0), ("fps", np.inf),
+                                             ("pad", np.nan), ("cum", []),
+                                             ("cum", [(0, np.inf)]),
+                                             ("bands", [(np.nan, 0)])])
+    def test_prerequisites_before_acquisition(monkeypatch, where, field, value):
+        with pytest.raises(ValueError, match="geometry.*" + field):
+>           boundary(monkeypatch, where, [detection()], **{field: value})
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:49: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:23: in boundary
+    return o.run_render(args, dict(detections=dets, cum=cum, bands=bands,
+/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py:8471: in run_render
+    dets_r = apply_coverage(state["detections"],
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+a = ([Detection(t_start=0, t_end=0, cbox=(2, 2, 10, 10), category='person', text='private', confidence=1.0, aoff=(0.0, 0.0...ast_seen=0.0, dense=False, track=-1, person=-1, poly=())], 'concealed', <openscrub.Callbacks object at 0x7cc17d261b50>)
+k = {}
+
+    def acquired(*a, **k):
+>       pytest.fail("native acquisition or coverage happened before validation")
+E       Failed: native acquisition or coverage happened before validation
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:16: Failed
+----------------------------- Captured stdout call -----------------------------
+[4/4] Rendering -> out
+______________ test_prerequisites_before_acquisition[pad-nan-sdr] ______________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7cc17d268350>
+where = 'sdr', field = 'pad', value = nan
+
+    @pytest.mark.parametrize("where", ["run", "sdr", "hdr"])
+    @pytest.mark.parametrize("field,value", [("fps", 0), ("fps", np.inf),
+                                             ("pad", np.nan), ("cum", []),
+                                             ("cum", [(0, np.inf)]),
+                                             ("bands", [(np.nan, 0)])])
+    def test_prerequisites_before_acquisition(monkeypatch, where, field, value):
+        with pytest.raises(ValueError, match="geometry.*" + field):
+>           boundary(monkeypatch, where, [detection()], **{field: value})
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:49: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:29: in boundary
+    return o.render(**options, preview=False)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py:4074: in render
+    cap = cv2.VideoCapture(src)
+          ^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+a = ('in',), k = {}
+
+    def acquired(*a, **k):
+>       pytest.fail("native acquisition or coverage happened before validation")
+E       Failed: native acquisition or coverage happened before validation
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:16: Failed
+______________ test_prerequisites_before_acquisition[pad-nan-hdr] ______________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7cc17d269190>
+where = 'hdr', field = 'pad', value = nan
+
+    @pytest.mark.parametrize("where", ["run", "sdr", "hdr"])
+    @pytest.mark.parametrize("field,value", [("fps", 0), ("fps", np.inf),
+                                             ("pad", np.nan), ("cum", []),
+                                             ("cum", [(0, np.inf)]),
+                                             ("bands", [(np.nan, 0)])])
+    def test_prerequisites_before_acquisition(monkeypatch, where, field, value):
+        with pytest.raises(ValueError, match="geometry.*" + field):
+>           boundary(monkeypatch, where, [detection()], **{field: value})
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:49: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:28: in boundary
+    return o.render_hdr(**options, encoder="libx265", tags={})
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py:3900: in render_hdr
+    meta = cv2.VideoCapture(src)
+           ^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+a = ('in',), k = {}
+
+    def acquired(*a, **k):
+>       pytest.fail("native acquisition or coverage happened before validation")
+E       Failed: native acquisition or coverage happened before validation
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:16: Failed
+____________ test_prerequisites_before_acquisition[cum-value3-run] _____________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7cc17d2628d0>
+where = 'run', field = 'cum', value = []
+
+    @pytest.mark.parametrize("where", ["run", "sdr", "hdr"])
+    @pytest.mark.parametrize("field,value", [("fps", 0), ("fps", np.inf),
+                                             ("pad", np.nan), ("cum", []),
+                                             ("cum", [(0, np.inf)]),
+                                             ("bands", [(np.nan, 0)])])
+    def test_prerequisites_before_acquisition(monkeypatch, where, field, value):
+        with pytest.raises(ValueError, match="geometry.*" + field):
+>           boundary(monkeypatch, where, [detection()], **{field: value})
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:49: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:23: in boundary
+    return o.run_render(args, dict(detections=dets, cum=cum, bands=bands,
+/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py:8471: in run_render
+    dets_r = apply_coverage(state["detections"],
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+a = ([Detection(t_start=0, t_end=0, cbox=(2, 2, 10, 10), category='person', text='private', confidence=1.0, aoff=(0.0, 0.0...ast_seen=0.0, dense=False, track=-1, person=-1, poly=())], 'concealed', <openscrub.Callbacks object at 0x7cc17d263a40>)
+k = {}
+
+    def acquired(*a, **k):
+>       pytest.fail("native acquisition or coverage happened before validation")
+E       Failed: native acquisition or coverage happened before validation
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:16: Failed
+----------------------------- Captured stdout call -----------------------------
+[4/4] Rendering -> out
+____________ test_prerequisites_before_acquisition[cum-value3-sdr] _____________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7cc17d2600b0>
+where = 'sdr', field = 'cum', value = []
+
+    @pytest.mark.parametrize("where", ["run", "sdr", "hdr"])
+    @pytest.mark.parametrize("field,value", [("fps", 0), ("fps", np.inf),
+                                             ("pad", np.nan), ("cum", []),
+                                             ("cum", [(0, np.inf)]),
+                                             ("bands", [(np.nan, 0)])])
+    def test_prerequisites_before_acquisition(monkeypatch, where, field, value):
+        with pytest.raises(ValueError, match="geometry.*" + field):
+>           boundary(monkeypatch, where, [detection()], **{field: value})
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:49: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:29: in boundary
+    return o.render(**options, preview=False)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py:4074: in render
+    cap = cv2.VideoCapture(src)
+          ^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+a = ('in',), k = {}
+
+    def acquired(*a, **k):
+>       pytest.fail("native acquisition or coverage happened before validation")
+E       Failed: native acquisition or coverage happened before validation
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:16: Failed
+____________ test_prerequisites_before_acquisition[cum-value3-hdr] _____________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7cc17d2564e0>
+where = 'hdr', field = 'cum', value = []
+
+    @pytest.mark.parametrize("where", ["run", "sdr", "hdr"])
+    @pytest.mark.parametrize("field,value", [("fps", 0), ("fps", np.inf),
+                                             ("pad", np.nan), ("cum", []),
+                                             ("cum", [(0, np.inf)]),
+                                             ("bands", [(np.nan, 0)])])
+    def test_prerequisites_before_acquisition(monkeypatch, where, field, value):
+        with pytest.raises(ValueError, match="geometry.*" + field):
+>           boundary(monkeypatch, where, [detection()], **{field: value})
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:49: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:28: in boundary
+    return o.render_hdr(**options, encoder="libx265", tags={})
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py:3900: in render_hdr
+    meta = cv2.VideoCapture(src)
+           ^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+a = ('in',), k = {}
+
+    def acquired(*a, **k):
+>       pytest.fail("native acquisition or coverage happened before validation")
+E       Failed: native acquisition or coverage happened before validation
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:16: Failed
+____________ test_prerequisites_before_acquisition[cum-value4-run] _____________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7cc17d268050>
+where = 'run', field = 'cum', value = [(0, inf)]
+
+    @pytest.mark.parametrize("where", ["run", "sdr", "hdr"])
+    @pytest.mark.parametrize("field,value", [("fps", 0), ("fps", np.inf),
+                                             ("pad", np.nan), ("cum", []),
+                                             ("cum", [(0, np.inf)]),
+                                             ("bands", [(np.nan, 0)])])
+    def test_prerequisites_before_acquisition(monkeypatch, where, field, value):
+        with pytest.raises(ValueError, match="geometry.*" + field):
+>           boundary(monkeypatch, where, [detection()], **{field: value})
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:49: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:23: in boundary
+    return o.run_render(args, dict(detections=dets, cum=cum, bands=bands,
+/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py:8471: in run_render
+    dets_r = apply_coverage(state["detections"],
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+a = ([Detection(t_start=0, t_end=0, cbox=(2, 2, 10, 10), category='person', text='private', confidence=1.0, aoff=(0.0, 0.0...ast_seen=0.0, dense=False, track=-1, person=-1, poly=())], 'concealed', <openscrub.Callbacks object at 0x7cc17d2684a0>)
+k = {}
+
+    def acquired(*a, **k):
+>       pytest.fail("native acquisition or coverage happened before validation")
+E       Failed: native acquisition or coverage happened before validation
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:16: Failed
+----------------------------- Captured stdout call -----------------------------
+[4/4] Rendering -> out
+____________ test_prerequisites_before_acquisition[cum-value4-sdr] _____________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7cc17d2c9940>
+where = 'sdr', field = 'cum', value = [(0, inf)]
+
+    @pytest.mark.parametrize("where", ["run", "sdr", "hdr"])
+    @pytest.mark.parametrize("field,value", [("fps", 0), ("fps", np.inf),
+                                             ("pad", np.nan), ("cum", []),
+                                             ("cum", [(0, np.inf)]),
+                                             ("bands", [(np.nan, 0)])])
+    def test_prerequisites_before_acquisition(monkeypatch, where, field, value):
+        with pytest.raises(ValueError, match="geometry.*" + field):
+>           boundary(monkeypatch, where, [detection()], **{field: value})
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:49: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:29: in boundary
+    return o.render(**options, preview=False)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py:4074: in render
+    cap = cv2.VideoCapture(src)
+          ^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+a = ('in',), k = {}
+
+    def acquired(*a, **k):
+>       pytest.fail("native acquisition or coverage happened before validation")
+E       Failed: native acquisition or coverage happened before validation
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:16: Failed
+____________ test_prerequisites_before_acquisition[cum-value4-hdr] _____________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7cc17d2ca5d0>
+where = 'hdr', field = 'cum', value = [(0, inf)]
+
+    @pytest.mark.parametrize("where", ["run", "sdr", "hdr"])
+    @pytest.mark.parametrize("field,value", [("fps", 0), ("fps", np.inf),
+                                             ("pad", np.nan), ("cum", []),
+                                             ("cum", [(0, np.inf)]),
+                                             ("bands", [(np.nan, 0)])])
+    def test_prerequisites_before_acquisition(monkeypatch, where, field, value):
+        with pytest.raises(ValueError, match="geometry.*" + field):
+>           boundary(monkeypatch, where, [detection()], **{field: value})
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:49: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:28: in boundary
+    return o.render_hdr(**options, encoder="libx265", tags={})
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py:3900: in render_hdr
+    meta = cv2.VideoCapture(src)
+           ^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+a = ('in',), k = {}
+
+    def acquired(*a, **k):
+>       pytest.fail("native acquisition or coverage happened before validation")
+E       Failed: native acquisition or coverage happened before validation
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:16: Failed
+___________ test_prerequisites_before_acquisition[bands-value5-run] ____________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7cc17d26bc50>
+where = 'run', field = 'bands', value = [(nan, 0)]
+
+    @pytest.mark.parametrize("where", ["run", "sdr", "hdr"])
+    @pytest.mark.parametrize("field,value", [("fps", 0), ("fps", np.inf),
+                                             ("pad", np.nan), ("cum", []),
+                                             ("cum", [(0, np.inf)]),
+                                             ("bands", [(np.nan, 0)])])
+    def test_prerequisites_before_acquisition(monkeypatch, where, field, value):
+        with pytest.raises(ValueError, match="geometry.*" + field):
+>           boundary(monkeypatch, where, [detection()], **{field: value})
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:49: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:23: in boundary
+    return o.run_render(args, dict(detections=dets, cum=cum, bands=bands,
+/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py:8471: in run_render
+    dets_r = apply_coverage(state["detections"],
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+a = ([Detection(t_start=0, t_end=0, cbox=(2, 2, 10, 10), category='person', text='private', confidence=1.0, aoff=(0.0, 0.0...ast_seen=0.0, dense=False, track=-1, person=-1, poly=())], 'concealed', <openscrub.Callbacks object at 0x7cc17d269a00>)
+k = {}
+
+    def acquired(*a, **k):
+>       pytest.fail("native acquisition or coverage happened before validation")
+E       Failed: native acquisition or coverage happened before validation
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:16: Failed
+----------------------------- Captured stdout call -----------------------------
+[4/4] Rendering -> out
+___________ test_prerequisites_before_acquisition[bands-value5-sdr] ____________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7cc17d25e120>
+where = 'sdr', field = 'bands', value = [(nan, 0)]
+
+    @pytest.mark.parametrize("where", ["run", "sdr", "hdr"])
+    @pytest.mark.parametrize("field,value", [("fps", 0), ("fps", np.inf),
+                                             ("pad", np.nan), ("cum", []),
+                                             ("cum", [(0, np.inf)]),
+                                             ("bands", [(np.nan, 0)])])
+    def test_prerequisites_before_acquisition(monkeypatch, where, field, value):
+        with pytest.raises(ValueError, match="geometry.*" + field):
+>           boundary(monkeypatch, where, [detection()], **{field: value})
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:49: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:29: in boundary
+    return o.render(**options, preview=False)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py:4074: in render
+    cap = cv2.VideoCapture(src)
+          ^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+a = ('in',), k = {}
+
+    def acquired(*a, **k):
+>       pytest.fail("native acquisition or coverage happened before validation")
+E       Failed: native acquisition or coverage happened before validation
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:16: Failed
+___________ test_prerequisites_before_acquisition[bands-value5-hdr] ____________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7cc17d2600e0>
+where = 'hdr', field = 'bands', value = [(nan, 0)]
+
+    @pytest.mark.parametrize("where", ["run", "sdr", "hdr"])
+    @pytest.mark.parametrize("field,value", [("fps", 0), ("fps", np.inf),
+                                             ("pad", np.nan), ("cum", []),
+                                             ("cum", [(0, np.inf)]),
+                                             ("bands", [(np.nan, 0)])])
+    def test_prerequisites_before_acquisition(monkeypatch, where, field, value):
+        with pytest.raises(ValueError, match="geometry.*" + field):
+>           boundary(monkeypatch, where, [detection()], **{field: value})
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:49: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:28: in boundary
+    return o.render_hdr(**options, encoder="libx265", tags={})
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py:3900: in render_hdr
+    meta = cv2.VideoCapture(src)
+           ^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+a = ('in',), k = {}
+
+    def acquired(*a, **k):
+>       pytest.fail("native acquisition or coverage happened before validation")
+E       Failed: native acquisition or coverage happened before validation
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:16: Failed
+__________________ test_detection_prerequisites[aoff-value0] ___________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7cc17d2c9370>
+field = 'aoff', value = (0, inf)
+
+    @pytest.mark.parametrize("field,value", [("aoff", (0, np.inf)),
+                                             ("t_start", np.nan), ("t_end", -1)])
+    def test_detection_prerequisites(monkeypatch, field, value):
+        d = detection()
+        setattr(d, field, value)
+        with pytest.raises(ValueError, match="geometry.*detection 1.*" + field):
+>           boundary(monkeypatch, "sdr", [d])
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:58: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:29: in boundary
+    return o.render(**options, preview=False)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py:4074: in render
+    cap = cv2.VideoCapture(src)
+          ^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+a = ('in',), k = {}
+
+    def acquired(*a, **k):
+>       pytest.fail("native acquisition or coverage happened before validation")
+E       Failed: native acquisition or coverage happened before validation
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:16: Failed
+__________________ test_detection_prerequisites[t_start-nan] ___________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7cc17d2c8770>
+field = 't_start', value = nan
+
+    @pytest.mark.parametrize("field,value", [("aoff", (0, np.inf)),
+                                             ("t_start", np.nan), ("t_end", -1)])
+    def test_detection_prerequisites(monkeypatch, field, value):
+        d = detection()
+        setattr(d, field, value)
+        with pytest.raises(ValueError, match="geometry.*detection 1.*" + field):
+>           boundary(monkeypatch, "sdr", [d])
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:58: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:29: in boundary
+    return o.render(**options, preview=False)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py:4074: in render
+    cap = cv2.VideoCapture(src)
+          ^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+a = ('in',), k = {}
+
+    def acquired(*a, **k):
+>       pytest.fail("native acquisition or coverage happened before validation")
+E       Failed: native acquisition or coverage happened before validation
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:16: Failed
+____________________ test_detection_prerequisites[t_end--1] ____________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7cc17d2973e0>
+field = 't_end', value = -1
+
+    @pytest.mark.parametrize("field,value", [("aoff", (0, np.inf)),
+                                             ("t_start", np.nan), ("t_end", -1)])
+    def test_detection_prerequisites(monkeypatch, field, value):
+        d = detection()
+        setattr(d, field, value)
+        with pytest.raises(ValueError, match="geometry.*detection 1.*" + field):
+>           boundary(monkeypatch, "sdr", [d])
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:58: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:29: in boundary
+    return o.render(**options, preview=False)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py:4074: in render
+    cap = cv2.VideoCapture(src)
+          ^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+a = ('in',), k = {}
+
+    def acquired(*a, **k):
+>       pytest.fail("native acquisition or coverage happened before validation")
+E       Failed: native acquisition or coverage happened before validation
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:16: Failed
+_________________ test_direct_paint_finite_guard[blur_region] __________________
+
+name = 'blur_region'
+
+    @pytest.mark.parametrize("name", ["blur_region", "blur_silhouette", "_blur_yuv10", "_blur_silhouette_yuv10"])
+    def test_direct_paint_finite_guard(name):
+        frame = np.full((16, 16, 3), 100, np.uint8)
+        planes = (np.full((16, 16), 300, np.uint16),
+                  np.full((8, 8), 512, np.uint16), np.full((8, 8), 512, np.uint16))
+        args = planes if "yuv10" in name else (frame,)
+        extra = dict(polys=(), poly_box=(1, 1, 4, 4)) if "silhouette" in name else {}
+>       with pytest.raises(ValueError, match=r"geometry.*paint.*box"):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AssertionError: Regex pattern did not match.
+E         Expected regex: 'geometry.*paint.*box'
+E         Actual message: 'cannot convert float NaN to integer'
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:68: AssertionError
+_______________ test_direct_paint_finite_guard[blur_silhouette] ________________
+
+name = 'blur_silhouette'
+
+    @pytest.mark.parametrize("name", ["blur_region", "blur_silhouette", "_blur_yuv10", "_blur_silhouette_yuv10"])
+    def test_direct_paint_finite_guard(name):
+        frame = np.full((16, 16, 3), 100, np.uint8)
+        planes = (np.full((16, 16), 300, np.uint16),
+                  np.full((8, 8), 512, np.uint16), np.full((8, 8), 512, np.uint16))
+        args = planes if "yuv10" in name else (frame,)
+        extra = dict(polys=(), poly_box=(1, 1, 4, 4)) if "silhouette" in name else {}
+>       with pytest.raises(ValueError, match=r"geometry.*paint.*box"):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AssertionError: Regex pattern did not match.
+E         Expected regex: 'geometry.*paint.*box'
+E         Actual message: 'cannot convert float NaN to integer'
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:68: AssertionError
+_________________ test_direct_paint_finite_guard[_blur_yuv10] __________________
+
+name = '_blur_yuv10'
+
+    @pytest.mark.parametrize("name", ["blur_region", "blur_silhouette", "_blur_yuv10", "_blur_silhouette_yuv10"])
+    def test_direct_paint_finite_guard(name):
+        frame = np.full((16, 16, 3), 100, np.uint8)
+        planes = (np.full((16, 16), 300, np.uint16),
+                  np.full((8, 8), 512, np.uint16), np.full((8, 8), 512, np.uint16))
+        args = planes if "yuv10" in name else (frame,)
+        extra = dict(polys=(), poly_box=(1, 1, 4, 4)) if "silhouette" in name else {}
+>       with pytest.raises(ValueError, match=r"geometry.*paint.*box"):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AssertionError: Regex pattern did not match.
+E         Expected regex: 'geometry.*paint.*box'
+E         Actual message: 'cannot convert float NaN to integer'
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:68: AssertionError
+____________ test_direct_paint_finite_guard[_blur_silhouette_yuv10] ____________
+
+name = '_blur_silhouette_yuv10'
+
+    @pytest.mark.parametrize("name", ["blur_region", "blur_silhouette", "_blur_yuv10", "_blur_silhouette_yuv10"])
+    def test_direct_paint_finite_guard(name):
+        frame = np.full((16, 16, 3), 100, np.uint8)
+        planes = (np.full((16, 16), 300, np.uint16),
+                  np.full((8, 8), 512, np.uint16), np.full((8, 8), 512, np.uint16))
+        args = planes if "yuv10" in name else (frame,)
+        extra = dict(polys=(), poly_box=(1, 1, 4, 4)) if "silhouette" in name else {}
+>       with pytest.raises(ValueError, match=r"geometry.*paint.*box"):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AssertionError: Regex pattern did not match.
+E         Expected regex: 'geometry.*paint.*box'
+E         Actual message: 'cannot convert float NaN to integer'
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:68: AssertionError
+__________________ test_actual_frame_derived_overflow[False] ___________________
+
+tmp_path = PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1631/runs/task1631-cf317cc67d7c44b6bff73f9a0a42675f/pytest/test_actual_frame_derived_over0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7cc17d2977d0>
+preview = False
+
+    @pytest.mark.parametrize("preview", [False, True])
+    def test_actual_frame_derived_overflow(tmp_path, monkeypatch, preview):
+        src = tiny_video(tmp_path)
+        monkeypatch.setattr(o, "nvenc_available", lambda *a: None)
+        # Observe the real frame calculation; keep this G test independent of R cleanup.
+        captures, writers = [], []
+        capture, writer = o.cv2.VideoCapture, o.cv2.VideoWriter
+        def cap(*a):
+            result = capture(*a); captures.append(result); return result
+        def sink(*a):
+            result = writer(*a); writers.append(result); return result
+        monkeypatch.setattr(o.cv2, "VideoCapture", cap)
+        monkeypatch.setattr(o.cv2, "VideoWriter", sink)
+        try:
+>           with pytest.raises(ValueError, match=r"geometry.*detection 1.*frame 0.*drift"):
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E           Failed: DID NOT RAISE ValueError
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:96: Failed
+----------------------------- Captured stdout call -----------------------------
+      encoder: OpenCV mp4v (ffmpeg not found — no audio!)
+___________________ test_actual_frame_derived_overflow[True] ___________________
+
+tmp_path = PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1631/runs/task1631-cf317cc67d7c44b6bff73f9a0a42675f/pytest/test_actual_frame_derived_over1')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7cc17d044ef0>
+preview = True
+
+    @pytest.mark.parametrize("preview", [False, True])
+    def test_actual_frame_derived_overflow(tmp_path, monkeypatch, preview):
+        src = tiny_video(tmp_path)
+        monkeypatch.setattr(o, "nvenc_available", lambda *a: None)
+        # Observe the real frame calculation; keep this G test independent of R cleanup.
+        captures, writers = [], []
+        capture, writer = o.cv2.VideoCapture, o.cv2.VideoWriter
+        def cap(*a):
+            result = capture(*a); captures.append(result); return result
+        def sink(*a):
+            result = writer(*a); writers.append(result); return result
+        monkeypatch.setattr(o.cv2, "VideoCapture", cap)
+        monkeypatch.setattr(o.cv2, "VideoWriter", sink)
+        try:
+            with pytest.raises(ValueError, match=r"geometry.*detection 1.*frame 0.*drift"):
+>               o.render(str(src), str(tmp_path / "out.avi"),
+                         [detection(aoff=(-1e308, 0))], [(1e308, 0)], [(0, 0)],
+                         1, 0, "box", preview)
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:97: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+src = '/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1631/runs/task1631-cf317cc67d7c44b6bff73f9a0a42675f/pytest/test_actual_frame_derived_over1/tiny.avi'
+dst = '/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1631/runs/task1631-cf317cc67d7c44b6bff73f9a0a42675f/pytest/test_actual_frame_derived_over1/out.avi'
+detections = [Detection(t_start=0, t_end=0, cbox=(2, 2, 10, 10), category='person', text='private', confidence=1.0, aoff=(-1e+308, 0), last_seen=0.0, dense=False, track=-1, person=-1, poly=())]
+cum = [(1e+308, 0)], bands = [(0, 0)], fps = 1, pad = 0, mode = 'box'
+preview = True, encoder = 'auto', band_margin = 25, progress_every = 60
+cb = <openscrub.Callbacks object at 0x7cc17d0472c0>, mode_map = {}
+draw_scores = False, vcodec = 'h264', face_shape = 'ellipse', audio_spans = None
+clip = None, mute_tracks = (), out_quality = 'archival', audio_lanes = None
+
+    def render(src, dst, detections, cum, bands, fps, pad, mode, preview,
+               encoder="auto", band_margin=25, progress_every=60, cb=None,
+               mode_map=None, draw_scores=False, vcodec="h264",
+               face_shape="ellipse", audio_spans=None, clip=None,
+               mute_tracks=(), out_quality="archival", audio_lanes=None):
+        # mode_map: {category: "blur"|"box"} overrides the global `mode` per
+        # category. Lets you black-box the reversible-blur-vulnerable categories
+        # (SSN, MRN, account numbers) while blurring faces, in one render.
+        mode_map = mode_map or {}
+        def _mode_for(cat):
+            return mode_map.get(cat, mode)
+        cb = cb or Callbacks()
+        cap = cv2.VideoCapture(src)
+        w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    
+        # --- output sink: single-pass ffmpeg pipe (NVENC if available) ---
+        proc = None
+        ff_err = None
+        out = None
+        tmp_video = None
+        codec = nvenc_available(encoder, cb)
+        if vcodec == "hevc" and codec:
+            henc = hevc10_encoder(encoder, cb)   # verified hevc encoder ladder
+            if henc is None:
+                cb.log("      note: no HEVC encoder available — falling back "
+                       "to H.264")
+            else:
+                codec = henc
+        if codec:
+            cb.log(f"      encoder: {codec}"
+                   + (" (GPU)" if codec.endswith(("_nvenc", "_qsv"))
+                      else " (CPU)"))
+            q = _out_q(codec, out_quality)
+            if codec == "h264_nvenc":
+                vargs = ["-c:v", "h264_nvenc", "-preset", "p4", "-cq", q]
+            elif codec == "hevc_nvenc":
+                vargs = ["-c:v", "hevc_nvenc", "-preset", "p4", "-cq", q]
+            elif codec == "h264_qsv":
+                vargs = ["-c:v", "h264_qsv", "-preset", "medium",
+                         "-global_quality", q]
+            elif codec == "hevc_qsv":
+                vargs = ["-c:v", "hevc_qsv", "-preset", "medium",
+                         "-global_quality", q]
+            elif codec == "libx265":
+                vargs = ["-c:v", "libx265", "-crf", q, "-preset", "fast"]
+            else:
+                vargs = ["-c:v", "libx264", "-crf", q, "-preset", "fast"]
+            vargs += _rate_cap_args(codec, out_quality, w, h, fps)
+            if codec in ("hevc_nvenc", "hevc_qsv", "libx265") \
+                    and os.path.splitext(dst)[1].lower() in (".mp4", ".mov"):
+                vargs += ["-tag:v", "hvc1"]      # QuickTime/Apple compatibility
+            # output trim ("keep bookends"): only [cs, ce] of the video reaches
+            # the output. The piped video restarts at 0, so the audio input is
+            # seeked the same way and any redaction spans shift accordingly.
+            cs, ce = (clip if clip else (0.0, None))
+            aspans_eff = audio_spans
+            ain_opts = []
+            if clip:
+                ain_opts = ["-ss", f"{cs:.3f}"] + (
+                    ["-to", f"{ce:.3f}"] if ce is not None else [])
+                aspans_eff = [(max(0.0, a - cs), b - cs, m)
+                              for a, b, m in (audio_spans or [])
+                              if b > cs and (ce is None or a < ce)]
+                cb.log(f"      output trim: keeping {cs:.1f}s"
+                       f"–{(ce if ce is not None else 'end')}"
+                       + ("s" if ce is not None else ""))
+            amap, acodec = audio_ffmpeg_args(
+                src, aspans_eff, mute_tracks=mute_tracks,
+                container=os.path.splitext(dst)[1] or ".mp4",
+                lane_count=audio_lanes, log=cb.log)
+            if aspans_eff and amap:
+                cb.log("      audio: %d span(s) redacted (%s)" % (
+                    len(aspans_eff),
+                    ", ".join(sorted({m for _, _, m in aspans_eff}))))
+            cmd = ["ffmpeg", "-y", "-loglevel", "error",
+                   "-f", "rawvideo", "-pix_fmt", "bgr24",
+                   "-s", f"{w}x{h}", "-r", f"{fps:.6f}", "-i", "pipe:0",
+                   *ain_opts, "-i", src, "-map", "0:v:0", *amap,
+                   # a redacted file must not carry the source's GPS
+                   # position, capture time, or device identifiers — strip
+                   # ALL container and stream metadata
+                   "-map_metadata", "-1", "-map_chapters", "-1",
+                   *vargs, "-pix_fmt", "yuv420p", *acodec, dst]
+            # ffmpeg's stderr goes to a temp FILE (a pipe could fill and
+            # deadlock the frame writes): when the encoder dies, its own
+            # error message is what the job log needs — a bare "[Errno 32]
+            # Broken pipe" diagnosed nothing
+            ff_err = tempfile.TemporaryFile()
+            gpu_hint = ("if it persists, try the x264 encoder"
+                        if codec.endswith(("_nvenc", "_qsv")) else "")
+            proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stderr=ff_err)
+        else:
+            if audio_spans:
+                cb.log("      WARNING: audio redaction requires ffmpeg — the "
+                       "OpenCV fallback writes NO audio at all.")
+            cb.log("      encoder: OpenCV mp4v (ffmpeg not found — no audio!)")
+            tmp_video = dst + ".noaudio.mp4"
+            out = cv2.VideoWriter(tmp_video, cv2.VideoWriter_fourcc(*"mp4v"),
+                                  fps, (w, h))
+    
+        buckets = {}
+        for d in detections:
+            for s in range(int(d.t_start), int(d.t_end) + 2):
+                buckets.setdefault(s, []).append(d)
+    
+        def cleanup_partial():
+            cap.release()
+            if proc is not None:
+                try:
+                    proc.stdin.close()
+                except Exception:
+                    pass
+                proc.terminate()
+                proc.wait()
+            if out is not None:
+                out.release()
+            for p in (dst, tmp_video):
+                if p and os.path.exists(p):
+                    try:
+                        os.remove(p)
+                    except OSError:
+                        pass
+    
+        idx = 0
+        if clip and clip[0] > 0.5:
+            tgt = int(clip[0] * fps)
+            if _seek_cap(cap, tgt, fps):     # verified — a lying seek would
+                idx = tgt                    # shift the whole trimmed render
+            # unseekable: decode from 0; the undershoot guard below skips
+            # frames before the clip start one by one
+        while True:
+            if idx % 30 == 0 and cb.cancelled():
+                cleanup_partial()
+                raise PipelineCancelled()
+            ok, frame = cap.read()
+            if not ok:
+                break
+            t = idx / fps
+            if clip:
+                if t < clip[0] - 1e-6:          # seek undershoot guard
+                    idx += 1
+                    continue
+                if clip[1] is not None and t > clip[1] + 1e-6:
+                    break                       # keep-window over: stop encoding
+            ox, oy = cum[min(idx, len(cum) - 1)]
+    
+            # 1. tracked PII boxes, translated by scroll offset
+            act = [d for d in buckets.get(int(t), [])
+                   if d.t_start - 0.01 <= t <= d.t_end + 0.01]
+            for d in _dedupe_dense(act):
+                # drift allowance: residual tracking error grows (slowly) with
+                # distance scrolled since detection — expand the box to cover it
+                drift = min(24.0, 0.05 * (abs(ox - d.aoff[0]) + abs(oy - d.aoff[1])))
+                px = pad + drift
+                x1 = d.cbox[0] + ox - px
+                y1 = d.cbox[1] + oy - px
+                x2 = d.cbox[2] + ox + px
+                y2 = d.cbox[3] + oy + px
+                pbox = (d.cbox[0] + ox, d.cbox[1] + oy,
+                        d.cbox[2] + ox, d.cbox[3] + oy)
+                if preview:
+>                   cv2.rectangle(frame, (int(max(0, x1)), int(max(0, y1))),
+                                  (int(min(w, x2)), int(min(h, y2))), (0, 0, 255), 2)
+E                   cv2.error: OpenCV(4.14.0) :-1: error: (-5:Bad argument) in function 'rectangle'
+E                   > Overload resolution failed:
+E                   >  - Can't parse 'pt1'. Sequence item with index 0 has a wrong type
+E                   >  - Can't parse 'rec'. Expected sequence length 4, got 2
+E                   >  - Can't parse 'pt1'. Sequence item with index 0 has a wrong type
+E                   >  - Can't parse 'rec'. Expected sequence length 4, got 2
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py:4225: error
+----------------------------- Captured stdout call -----------------------------
+      encoder: OpenCV mp4v (ffmpeg not found — no audio!)
+=========================== short test summary info ============================
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py::test_primary_before_acquisition[box0-run]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py::test_primary_before_acquisition[box0-sdr]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py::test_primary_before_acquisition[box0-hdr]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py::test_primary_before_acquisition[box1-run]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py::test_primary_before_acquisition[box1-sdr]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py::test_primary_before_acquisition[box1-hdr]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py::test_primary_before_acquisition[box2-run]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py::test_primary_before_acquisition[box2-sdr]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py::test_primary_before_acquisition[box2-hdr]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py::test_primary_before_acquisition[box3-run]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py::test_primary_before_acquisition[box3-sdr]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py::test_primary_before_acquisition[box3-hdr]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py::test_primary_before_acquisition[box4-run]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py::test_primary_before_acquisition[box4-sdr]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py::test_primary_before_acquisition[box4-hdr]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py::test_primary_before_acquisition[box5-run]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py::test_primary_before_acquisition[box5-sdr]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py::test_primary_before_acquisition[box5-hdr]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py::test_primary_before_acquisition[box6-run]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py::test_primary_before_acquisition[box6-sdr]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py::test_primary_before_acquisition[box6-hdr]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py::test_prerequisites_before_acquisition[fps-0-run]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py::test_prerequisites_before_acquisition[fps-0-sdr]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py::test_prerequisites_before_acquisition[fps-0-hdr]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py::test_prerequisites_before_acquisition[fps-inf-run]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py::test_prerequisites_before_acquisition[fps-inf-sdr]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py::test_prerequisites_before_acquisition[fps-inf-hdr]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py::test_prerequisites_before_acquisition[pad-nan-run]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py::test_prerequisites_before_acquisition[pad-nan-sdr]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py::test_prerequisites_before_acquisition[pad-nan-hdr]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py::test_prerequisites_before_acquisition[cum-value3-run]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py::test_prerequisites_before_acquisition[cum-value3-sdr]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py::test_prerequisites_before_acquisition[cum-value3-hdr]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py::test_prerequisites_before_acquisition[cum-value4-run]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py::test_prerequisites_before_acquisition[cum-value4-sdr]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py::test_prerequisites_before_acquisition[cum-value4-hdr]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py::test_prerequisites_before_acquisition[bands-value5-run]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py::test_prerequisites_before_acquisition[bands-value5-sdr]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py::test_prerequisites_before_acquisition[bands-value5-hdr]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py::test_detection_prerequisites[aoff-value0]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py::test_detection_prerequisites[t_start-nan]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py::test_detection_prerequisites[t_end--1]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py::test_direct_paint_finite_guard[blur_region]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py::test_direct_paint_finite_guard[blur_silhouette]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py::test_direct_paint_finite_guard[_blur_yuv10]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py::test_direct_paint_finite_guard[_blur_silhouette_yuv10]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py::test_actual_frame_derived_overflow[False]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py::test_actual_frame_derived_overflow[True]
+48 failed in 4.04s

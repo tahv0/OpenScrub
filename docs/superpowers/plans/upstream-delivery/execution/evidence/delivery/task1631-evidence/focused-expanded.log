@@ -1,0 +1,24 @@
+PREFLIGHT {"base": "e21ebdf6e3ee46e6c65050dc956a9a3459152269", "files": 9, "free_bytes": 803554869248, "head": "e21ebdf6e3ee46e6c65050dc956a9a3459152269", "manifest_sha256": "ad5209b1d68916c09910c50694be3152151571ecccf395466d2d0e11e2edfa2e", "policy": "development", "prerequisites": [{"executable": true, "path": "/tmp/openscrub-baseline-20261116/tools/usr/bin/ffmpeg"}], "python": {"executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python", "version": [3, 12, 16]}, "run": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1631/runs/task1631-9d805535bf3440619490e364adc07576", "source": "/home/tahv0/.codex/worktrees/c832/OpenScrub"}
+COMMAND ["/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python", "-m", "pytest", "/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py", "-q", "--tb=short", "--basetemp=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1631/runs/task1631-9d805535bf3440619490e364adc07576/pytest", "-o", "cache_dir=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1631/runs/task1631-9d805535bf3440619490e364adc07576/cache/pytest"]
+DEFAULT_PATHS {"jobs": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_jobs", "models": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1631/runs/task1631-9d805535bf3440619490e364adc07576/profile/.openscrub/models"}
+ACTIVE_SOURCE {"executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python", "python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]", "sources": {"openscrub": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py", "sha256": "eae41bdd9ea1d1d90605139511c21b0d8c1ff46d2d3eb5e356724d8aaae6b59c"}, "openscrub_setup": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_setup.py", "sha256": "d0362a038f8182e8fae510100085bb087f09f7e5cf7e11a780a24390b3037eaf"}, "openscrub_update": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_update.py", "sha256": "4d6a20f75d985a119f8421227c3bd88b17fd1b8eed44e353b127b5b49e733d55"}, "openscrub_vault": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_vault.py", "sha256": "cc2db6a35d0b934502f1400b0d3a5b1f23ff8f63e6d24f9fc6fc4ab7baaebf82"}, "openscrub_web": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", "sha256": "9835e1137abee62c0a78e2669ed8bae7059e36bf4bed9f5c7a44f0eb8b40ed3a"}, "zones_ui": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/zones_ui.py", "sha256": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7"}}}
+...................................................F.................... [ 87%]
+.........F                                                               [100%]
+=================================== FAILURES ===================================
+_______________ test_coverage_overflow_before_integer_conversion _______________
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:114: in test_coverage_overflow_before_integer_conversion
+    o.apply_coverage([detection((-1e308, 0, 1e308, 10), dense=True, track=1)],
+/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py:3858: in apply_coverage
+    per_track.setdefault(c.track, []).append((ordinal, c))
+                                              ^^^^^^^
+E   NameError: name 'ordinal' is not defined
+_______________ test_disabled_additive_report_row_not_validated ________________
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py:210: in test_disabled_additive_report_row_not_validated
+    o._geometry_preflight(dets, state["cum"], state["bands"], state["fps"], 0, 25, "test")
+                                ^^^^^^^^^^^^
+E   TypeError: 'NoneType' object is not subscriptable
+=========================== short test summary info ============================
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py::test_coverage_overflow_before_integer_conversion
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_render_geometry.py::test_disabled_additive_report_row_not_validated
+2 failed, 80 passed in 0.24s
+RESULT {"exit": 1, "log": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1631/runs/task1631-9d805535bf3440619490e364adc07576/logs/command.log", "sha256": "ee7e221eb3d385d841d7f40d5d0d013e22b624db6f54a3273b0e9fded397a8f9"}

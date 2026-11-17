@@ -1,0 +1,51 @@
+{
+  "task": "task1631",
+  "scratch": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1631/runs",
+  "source": "/home/tahv0/.codex/worktrees/c832/OpenScrub",
+  "source_kind": "git",
+  "base": "e21ebdf6e3ee46e6c65050dc956a9a3459152269",
+  "head": "bddf01602782ff571cbb267c8099df5ff1cfc46a",
+  "policy": "development",
+  "files": {
+    "openscrub.py": "fdabaea16f12be75b8410ed1be998f8866a0fea151ff9c0b904fea6950403926",
+    "openscrub_web.py": "9835e1137abee62c0a78e2669ed8bae7059e36bf4bed9f5c7a44f0eb8b40ed3a",
+    "zones_ui.py": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7",
+    "openscrub_update.py": "4d6a20f75d985a119f8421227c3bd88b17fd1b8eed44e353b127b5b49e733d55",
+    "openscrub_setup.py": "d0362a038f8182e8fae510100085bb087f09f7e5cf7e11a780a24390b3037eaf",
+    "openscrub_vault.py": "cc2db6a35d0b934502f1400b0d3a5b1f23ff8f63e6d24f9fc6fc4ab7baaebf82",
+    "pyproject.toml": "a5f3bedc2bed50c0ba9df10c7ce1c7f2525905ba11fcbd00410fb573e451c6ae",
+    "test_openscrub.py": "06cb21ce47e9b93dad5334bf15564fe9f74e2ab93881a017febcf4978b8ec3d1",
+    "tests/test_render_geometry.py": "2d8cf33ee1a0ee3b69f9523a6f9eb4cf74c7f106c171430abf62d321e2c1a6f1"
+  },
+  "modules": {
+    "openscrub": "openscrub.py",
+    "openscrub_web": "openscrub_web.py",
+    "zones_ui": "zones_ui.py",
+    "openscrub_update": "openscrub_update.py",
+    "openscrub_setup": "openscrub_setup.py",
+    "openscrub_vault": "openscrub_vault.py"
+  },
+  "python": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+  "python_version": [
+    3,
+    12,
+    16
+  ],
+  "min_free_bytes": 2000000000,
+  "configure_app": true,
+  "prerequisites": [
+    {
+      "path": "/tmp/openscrub-baseline-20261116/tools/usr/bin/ffmpeg",
+      "executable": true
+    },
+    {
+      "path": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1631/adapters/test_coverage_rounding.py",
+      "sha256": "fe727f4096dd2b5eb6ac887b0bb6951e2d2c117b270bf842dd702723fbb55556"
+    }
+  ],
+  "environment": {
+    "LD_LIBRARY_PATH": "/tmp/openscrub-baseline-20261116/tools/usr/lib/x86_64-linux-gnu:/tmp/openscrub-baseline-20261116/tools/usr/lib/x86_64-linux-gnu/pulseaudio",
+    "TESSDATA_PREFIX": "/tmp/openscrub-baseline-20261116/tools/usr/share/tesseract-ocr/5/tessdata",
+    "PATH": "/tmp/openscrub-baseline-20261116/tools/usr/bin:/usr/bin:/bin"
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "source": "/home/tahv0/.codex/worktrees/c832/OpenScrub",
+  "base": "e21ebdf6e3ee46e6c65050dc956a9a3459152269",
+  "head": "e21ebdf6e3ee46e6c65050dc956a9a3459152269",
+  "policy": "development",
+  "files": {
+    "openscrub.py": "0e4f0f9a7846080f591038d021aaf3ca6f01201d83ac32bbdc273f53d5067ee7",
+    "openscrub_web.py": "9835e1137abee62c0a78e2669ed8bae7059e36bf4bed9f5c7a44f0eb8b40ed3a",
+    "zones_ui.py": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7",
+    "openscrub_update.py": "4d6a20f75d985a119f8421227c3bd88b17fd1b8eed44e353b127b5b49e733d55",
+    "openscrub_setup.py": "d0362a038f8182e8fae510100085bb087f09f7e5cf7e11a780a24390b3037eaf",
+    "openscrub_vault.py": "cc2db6a35d0b934502f1400b0d3a5b1f23ff8f63e6d24f9fc6fc4ab7baaebf82",
+    "pyproject.toml": "7692271c613956392066f2fbc5329ea4eab8a656614d6e127710ba8b112fdbe3",
+    "test_openscrub.py": "06cb21ce47e9b93dad5334bf15564fe9f74e2ab93881a017febcf4978b8ec3d1",
+    "tests/test_render_geometry.py": "718f05f7239414a2579b9ac65090e7dc0dd53d06f95db68b07df04c5b827ed93"
+  },
+  "python": {
+    "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+    "version": [
+      3,
+      12,
+      16
+    ]
+  },
+  "free_bytes": 803555762176,
+  "prerequisites": [
+    {
+      "path": "/tmp/openscrub-baseline-20261116/tools/usr/bin/ffmpeg",
+      "executable": true
+    }
+  ]
+}

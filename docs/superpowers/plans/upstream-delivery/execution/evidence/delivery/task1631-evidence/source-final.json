@@ -1,0 +1,26 @@
+{
+  "base": "e21ebdf6e3ee46e6c65050dc956a9a3459152269",
+  "head": "7415e5a7526696a33f78a8c209bf062239a31d1c",
+  "files": {
+    "openscrub.py": {
+      "bytes": 420039,
+      "sha256": "fdabaea16f12be75b8410ed1be998f8866a0fea151ff9c0b904fea6950403926"
+    },
+    "openscrub_web.py": {
+      "bytes": 256131,
+      "sha256": "9835e1137abee62c0a78e2669ed8bae7059e36bf4bed9f5c7a44f0eb8b40ed3a"
+    },
+    "pyproject.toml": {
+      "bytes": 4049,
+      "sha256": "a5f3bedc2bed50c0ba9df10c7ce1c7f2525905ba11fcbd00410fb573e451c6ae"
+    },
+    "test_openscrub.py": {
+      "bytes": 191370,
+      "sha256": "06cb21ce47e9b93dad5334bf15564fe9f74e2ab93881a017febcf4978b8ec3d1"
+    },
+    "tests/test_render_geometry.py": {
+      "bytes": 12847,
+      "sha256": "2d8cf33ee1a0ee3b69f9523a6f9eb4cf74c7f106c171430abf62d321e2c1a6f1"
+    }
+  }
+}
