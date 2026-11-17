@@ -1,0 +1,7 @@
+/home/tahv0/.codex/worktrees/c832/OpenScrub/benchmark/review_io.py:97: DeprecationWarning: Python 3.14 will, by default, filter extracted tar archives and reject files or modify their metadata. Use the filter argument to control this behavior.
+  source.extractall(destination)
+/home/tahv0/.codex/worktrees/c832/OpenScrub/benchmark/review_io.py:97: DeprecationWarning: Python 3.14 will, by default, filter extracted tar archives and reject files or modify their metadata. Use the filter argument to control this behavior.
+  source.extractall(destination)
+{"rows": 10, "operation": "noop", "summary": {"before": {"n": 5, "min_ms": 9.605083, "median_ms": 9.713681, "p95_ms": 10.029467, "max_ms": 10.029467}, "after": {"n": 5, "min_ms": 1.344036, "median_ms": 1.405956, "p95_ms": 1.643774, "max_ms": 1.643774}}}
+{"rows": 10, "operation": "sparse", "summary": {"before": {"n": 5, "min_ms": 9.576712, "median_ms": 9.655471, "p95_ms": 9.703621, "max_ms": 9.703621}, "after": {"n": 5, "min_ms": 9.537363, "median_ms": 9.557603, "p95_ms": 9.828298, "max_ms": 9.828298}}}
+{"rows": 10, "operation": "bulk", "summary": {"before": {"n": 5, "min_ms": 9.561229, "median_ms": 9.643811, "p95_ms": 9.7046, "max_ms": 9.7046}, "after": {"n": 5, "min_ms": 9.587722, "median_ms": 9.742041, "p95_ms": 10.610828, "max_ms": 10.610828}}}

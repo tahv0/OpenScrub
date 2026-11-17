@@ -1,0 +1,118 @@
+## 617c9ac7:openscrub.py:714-735
+714:     dense: bool = False        # per-frame dense-face detection: never merged
+715:                                # across positions (it tracks a moving face)
+716:     track: int = -1            # dense detections of the same physical object
+717:                                # share a track id, so review shows ONE item
+718:                                # per face instead of hundreds of frames
+719:     person: int = -1           # face tracks clustered by facial IDENTITY
+720:                                # (SFace embeddings): one review decision per
+721:                                # PERSON, applied to all their appearances
+722:     plate_quad: tuple = ()    # four normalized plate corners, ordered clockwise
+723:     poly: tuple = ()           # silhouette contour(s) from a segmentation
+724:                                # model, points NORMALIZED to cbox (0..1) —
+725:                                # render blurs ONLY inside them (person
+726:                                # category); empty = plain box redaction
+727: 
+728: 
+729: class PhiMemory:
+730:     """Remembers every string ever confirmed as PII in this video. At each
+731:     scan, all OCR'd words are checked against memory, so a name identified
+732:     once gets blurred on every later appearance — anywhere on screen — even
+733:     when NER/heuristics fail on that occurrence. Alpha strings match fuzzily
+734:     (handles OCR misreads); numeric strings require same length with at most
+735:     one differing digit (so benign numbers don't collide with MRNs)."""
+
+## 617c9ac7:openscrub.py:3708-3740
+3708:         t = idx / fps
+3709:         ox, oy = cum[min(idx, len(cum) - 1)]
+3710: 
+3711:         act = [d for d in buckets.get(int(t), [])
+3712:                if d.t_start - 0.01 <= t <= d.t_end + 0.01]
+3713:         for d in _dedupe_dense(act):
+3714:             drift = min(24.0, 0.05 * (abs(ox - d.aoff[0]) + abs(oy - d.aoff[1])))
+3715:             px = pad + drift
+3716:             if d.category == "plate" and len(d.plate_quad) == 4:
+3717:                 # Use four human-adjusted corners, not the oversized bbox.
+3718:                 _blur_silhouette_yuv10(
+3719:                     y, u, v, d.cbox[0] + ox - 2, d.cbox[1] + oy - 2,
+3720:                     d.cbox[2] + ox + 2, d.cbox[3] + oy + 2,
+3721:                     _mode_for(d.category), (d.plate_quad,),
+3722:                     (d.cbox[0] + ox, d.cbox[1] + oy,
+3723:                      d.cbox[2] + ox, d.cbox[3] + oy), pad_px=1)
+3724:             elif d.poly:
+3725:                 _blur_silhouette_yuv10(
+3726:                     y, u, v, d.cbox[0] + ox - px, d.cbox[1] + oy - px,
+3727:                     d.cbox[2] + ox + px, d.cbox[3] + oy + px,
+3728:                     _mode_for(d.category), d.poly,
+3729:                     (d.cbox[0] + ox, d.cbox[1] + oy,
+3730:                      d.cbox[2] + ox, d.cbox[3] + oy), pad_px=px)
+3731:             else:
+3732:                 _blur_yuv10(y, u, v, d.cbox[0] + ox - px, d.cbox[1] + oy - px,
+3733:                             d.cbox[2] + ox + px, d.cbox[3] + oy + px,
+3734:                             _mode_for(d.category),
+3735:                             shape=("ellipse" if d.category == "face"
+3736:                                    and face_shape == "ellipse" else "rect"))
+3737: 
+3738:         bx, by = bands[min(idx, len(bands) - 1)]
+3739:         vals = set(mode_map.values()) | {mode}
+3740:         band_mode = ("box" if ("box" in vals or "inpaint" in vals)
+
+## 617c9ac7:openscrub.py:3932-3961
+3932:                     if len(arr) >= 3:
+3933:                         cv2.polylines(frame, [arr], True, (0, 0, 255), 2)
+3934:                 label = d.category
+3935:                 if draw_scores and d.category == "face":
+3936:                     label = f"face {d.confidence:.2f}"
+3937:                 cv2.putText(frame, label, (int(max(0, x1)), int(max(12, y1 - 4))),
+3938:                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
+3939:             elif d.category == "plate" and len(d.plate_quad) == 4:
+3940:                 # Tight skewed mask: ignore the global box padding.
+3941:                 blur_silhouette(frame, pbox[0]-2, pbox[1]-2,
+3942:                                 pbox[2]+2, pbox[3]+2,
+3943:                                 _mode_for(d.category), (d.plate_quad,),
+3944:                                 pbox, pad_px=1)
+3945:             elif d.poly:
+3946:                 # segmentation silhouette: mask only the body, not the box —
+3947:                 # px (pad+drift) becomes an outward mask dilation
+3948:                 blur_silhouette(frame, x1, y1, x2, y2, _mode_for(d.category),
+3949:                                 d.poly, pbox, pad_px=px)
+3950:             else:
+3951:                 blur_region(frame, x1, y1, x2, y2, _mode_for(d.category),
+3952:                             shape=("ellipse" if d.category == "face"
+3953:                                    and face_shape == "ellipse" else "rect"))
+3954: 
+3955:         # 2. safety bands: unscanned content that scrolled into view
+3956:         bx, by = bands[min(idx, len(bands) - 1)]
+3957:         vals = set(mode_map.values()) | {mode}
+3958:         band_mode = ("box" if ("box" in vals or "inpaint" in vals)
+3959:                      else "mosaic" if "mosaic" in vals else "blur")  # never weaker
+3960:         def band(x1, y1, x2, y2):
+3961:             if preview:
+
+## 617c9ac7:openscrub.py:5990-6015
+5990:     dets = []
+5991:     for r in rows:
+5992:         if not r.get("enabled", True):
+5993:             continue
+5994:         dets.append(Detection(
+5995:             t_start=float(r["t_start"]), t_end=float(r["t_end"]),
+5996:             cbox=tuple(r["cbox"]), category=r["category"], text=r["text"],
+5997:             confidence=float(r.get("confidence", 1.0)),
+5998:             aoff=tuple(r.get("aoff", (0.0, 0.0))),
+5999:             last_seen=float(r.get("last_seen", r["t_start"])),
+6000:             # dense/track must survive the round trip: rendering rewrites the
+6001:             # report from rehydrated detections, and losing track ids here
+6002:             # exploded the re-opened review into one card per frame sample
+6003:             dense=bool(r.get("dense", False)),
+6004:             track=int(r.get("track", -1)),
+6005:             person=int(r.get("person", -1)),
+6006:             plate_quad=tuple(tuple(pt) for pt in (r.get("plate_quad") or ())),
+6007:             poly=tuple(r.get("poly") or ())))
+6008:     return dets, state, prov
+6009: 
+6010: 
+6011: # ----------------------------------------------------------------------------
+6012: # Variable frame rate (VFR) handling
+6013: # ----------------------------------------------------------------------------
+6014: 
+6015: def _probe_duration(path):

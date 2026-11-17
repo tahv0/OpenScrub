@@ -1,0 +1,38 @@
+[
+  {
+    "short": "617c9ac7",
+    "commit": "617c9ac7a46be14a943f93618749568c1ff1ca1b",
+    "tree": "abad8ca75a934aaebd13f9afbcbc80f60b1b2771",
+    "diff_sha256": "23a9a26b5e9cc89474f1435dddc35830896179c84717d5404f23ab422f256526",
+    "diff_bytes": 3152
+  },
+  {
+    "short": "5c0782f",
+    "commit": "5c0782fbdc1397e8bf42f5920868336b9a4c089d",
+    "tree": "27cc212198852b40ab01e1deb2b73ec306a96c8a",
+    "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "diff_bytes": 0,
+    "diff_note": "Merge commit: default git show selected paths emitted no combined diff; concrete parent-one delta recorded separately in 5c0782f-first-parent.diff."
+  },
+  {
+    "short": "ccff62f",
+    "commit": "ccff62f1580e65f0e00348b240e0c67f02638437",
+    "tree": "471daf4988e53f1874157f26e7fff0147c5810fa",
+    "diff_sha256": "1dc3c120c9a386921c1cae94499cbeb7faf72ab90fa1aad19c3017a7bb6d43d9",
+    "diff_bytes": 12574
+  },
+  {
+    "short": "eedef89",
+    "commit": "eedef893b18c4aaa878c26df8348167bc3535736",
+    "tree": "81e4ea06da4569713ba8e4cac46c9edfb3f76224",
+    "diff_sha256": "0094a5ce9d6d1089bf7374c5bba0380489538d1c5f1d9c1c2762f996eab7f2e5",
+    "diff_bytes": 15290
+  },
+  {
+    "short": "8697c28",
+    "commit": "8697c2811db6cfda644f730284e037f7294b47cc",
+    "tree": "91f4d97c843585795a22ddffc075a58b82f29832",
+    "diff_sha256": "5f146f286edde5fff6efdc834e82282d9e3f7428682550b6e232549293adcf59",
+    "diff_bytes": 20209
+  }
+]

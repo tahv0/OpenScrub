@@ -1,0 +1,10 @@
+{
+  "absence_default_serialization": true,
+  "raw_explicit_data_preserved": true,
+  "ack_uses_existing_equality": true,
+  "equal_and_different_values": true,
+  "public_schema_provisional": true,
+  "hdr_parent_open": true,
+  "missing_links": [],
+  "runtime_checks_run": false
+}

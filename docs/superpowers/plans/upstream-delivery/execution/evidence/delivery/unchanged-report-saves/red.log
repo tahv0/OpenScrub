@@ -1,0 +1,535 @@
+FFFFFFFFFFFFFF                                                           [100%]
+=================================== FAILURES ===================================
+_ test_unchanged_save_preserves_exact_file_and_skips_publication[edits0-False] _
+
+review = namespace(path=PosixPath('/tmp/openscrub-task631/red-tmp/test_unchanged_save_preserves_0/jobs/synthetic/report.json'),...'t1': 0.2, 'mode': 'mute'}], 'custom_future_field': {'preserved': True}}, client=<FlaskClient <Flask 'openscrub_web'>>)
+report_work = {'parse': 1, 'dump': 1, 'stage': 1, 'fsync': 1, ...}
+canonical = False, edits = {}
+
+    @pytest.mark.parametrize('canonical', [False, True])
+    @pytest.mark.parametrize('edits', [
+        {}, {'enabled': {'0': 'false', '1': True}},
+        {'box_overrides': {'0': ['1', 2, 8., 9]}},
+        {'time_overrides': {'0': ['0', 1]}},
+        {'audio': [{'t0': '.1', 't1': '.2', 'mode': 'unsupported', 'ignored': True}]},
+        {'enabled': {'00': False, '-1': False, '999': False},
+         'box_overrides': {'999': None, '0': [1]},
+         'time_overrides': {'-1': None, '0': [1, 0]}},
+        {'box_overrides': {'0': [4, 5, 6, 7], '00': [1, 2, 8, 9]},
+         'time_overrides': {'0': [.1, .9], '00': [0, 1]}},
+    ])
+    def test_unchanged_save_preserves_exact_file_and_skips_publication(review, report_work, canonical, edits):
+        # Unconditional publication loses metadata even for byte-identical JSON.
+        doc = finite_review(review)
+        review.path.write_text(json.dumps(doc, indent=1 if canonical else None))
+        if os.name != 'nt':
+            review.path.chmod(0o640)
+        os.utime(review.path, ns=(1000000000, 2000000000))
+        before = file_snapshot(review.path)
+        response = review.client.post('/api/jobs/synthetic/detections', json=edits)
+        assert response.status_code == 200
+        assert response.json == {'ok': True, 'total': 2, 'suggest_allowlist': []}
+>       assert file_snapshot(review.path) == before
+E       assert (b'{\n "prove...057529, 33152) == (b'{"provenan...675234, 33184)
+E         
+E         At index 0 diff: b'{\n "provenance": {\n  "input": "/tmp/openscrub-task631/red-tmp/test_unchanged_save_preserves_0/jobs/synthetic/input.avi",\n  "settings": {}\n },\n "render_state": {\n  "fps": 30,\n  "cum": [\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n...
+E         
+E         ...Full output truncated, use '-vv' to show
+
+tests/test_large_report_io.py:290: AssertionError
+_ test_unchanged_save_preserves_exact_file_and_skips_publication[edits0-True] __
+
+review = namespace(path=PosixPath('/tmp/openscrub-task631/red-tmp/test_unchanged_save_preserves_1/jobs/synthetic/report.json'),...'t1': 0.2, 'mode': 'mute'}], 'custom_future_field': {'preserved': True}}, client=<FlaskClient <Flask 'openscrub_web'>>)
+report_work = {'parse': 1, 'dump': 1, 'stage': 1, 'fsync': 1, ...}
+canonical = True, edits = {}
+
+    @pytest.mark.parametrize('canonical', [False, True])
+    @pytest.mark.parametrize('edits', [
+        {}, {'enabled': {'0': 'false', '1': True}},
+        {'box_overrides': {'0': ['1', 2, 8., 9]}},
+        {'time_overrides': {'0': ['0', 1]}},
+        {'audio': [{'t0': '.1', 't1': '.2', 'mode': 'unsupported', 'ignored': True}]},
+        {'enabled': {'00': False, '-1': False, '999': False},
+         'box_overrides': {'999': None, '0': [1]},
+         'time_overrides': {'-1': None, '0': [1, 0]}},
+        {'box_overrides': {'0': [4, 5, 6, 7], '00': [1, 2, 8, 9]},
+         'time_overrides': {'0': [.1, .9], '00': [0, 1]}},
+    ])
+    def test_unchanged_save_preserves_exact_file_and_skips_publication(review, report_work, canonical, edits):
+        # Unconditional publication loses metadata even for byte-identical JSON.
+        doc = finite_review(review)
+        review.path.write_text(json.dumps(doc, indent=1 if canonical else None))
+        if os.name != 'nt':
+            review.path.chmod(0o640)
+        os.utime(review.path, ns=(1000000000, 2000000000))
+        before = file_snapshot(review.path)
+        response = review.client.post('/api/jobs/synthetic/detections', json=edits)
+        assert response.status_code == 200
+        assert response.json == {'ok': True, 'total': 2, 'suggest_allowlist': []}
+>       assert file_snapshot(review.path) == before
+E       assert (b'{\n "prove...941735, 33152) == (b'{\n "prove...320032, 33184)
+E         
+E         At index 2 diff: 243295 != 243294
+E         Use -v to get more diff
+
+tests/test_large_report_io.py:290: AssertionError
+_ test_unchanged_save_preserves_exact_file_and_skips_publication[edits1-False] _
+
+review = namespace(path=PosixPath('/tmp/openscrub-task631/red-tmp/test_unchanged_save_preserves_2/jobs/synthetic/report.json'),...'t1': 0.2, 'mode': 'mute'}], 'custom_future_field': {'preserved': True}}, client=<FlaskClient <Flask 'openscrub_web'>>)
+report_work = {'parse': 1, 'dump': 1, 'stage': 1, 'fsync': 1, ...}
+canonical = False, edits = {'enabled': {'0': 'false', '1': True}}
+
+    @pytest.mark.parametrize('canonical', [False, True])
+    @pytest.mark.parametrize('edits', [
+        {}, {'enabled': {'0': 'false', '1': True}},
+        {'box_overrides': {'0': ['1', 2, 8., 9]}},
+        {'time_overrides': {'0': ['0', 1]}},
+        {'audio': [{'t0': '.1', 't1': '.2', 'mode': 'unsupported', 'ignored': True}]},
+        {'enabled': {'00': False, '-1': False, '999': False},
+         'box_overrides': {'999': None, '0': [1]},
+         'time_overrides': {'-1': None, '0': [1, 0]}},
+        {'box_overrides': {'0': [4, 5, 6, 7], '00': [1, 2, 8, 9]},
+         'time_overrides': {'0': [.1, .9], '00': [0, 1]}},
+    ])
+    def test_unchanged_save_preserves_exact_file_and_skips_publication(review, report_work, canonical, edits):
+        # Unconditional publication loses metadata even for byte-identical JSON.
+        doc = finite_review(review)
+        review.path.write_text(json.dumps(doc, indent=1 if canonical else None))
+        if os.name != 'nt':
+            review.path.chmod(0o640)
+        os.utime(review.path, ns=(1000000000, 2000000000))
+        before = file_snapshot(review.path)
+        response = review.client.post('/api/jobs/synthetic/detections', json=edits)
+        assert response.status_code == 200
+        assert response.json == {'ok': True, 'total': 2, 'suggest_allowlist': []}
+>       assert file_snapshot(review.path) == before
+E       assert (b'{\n "prove...640416, 33152) == (b'{"provenan...056002, 33184)
+E         
+E         At index 0 diff: b'{\n "provenance": {\n  "input": "/tmp/openscrub-task631/red-tmp/test_unchanged_save_preserves_2/jobs/synthetic/input.avi",\n  "settings": {}\n },\n "render_state": {\n  "fps": 30,\n  "cum": [\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n...
+E         
+E         ...Full output truncated, use '-vv' to show
+
+tests/test_large_report_io.py:290: AssertionError
+_ test_unchanged_save_preserves_exact_file_and_skips_publication[edits1-True] __
+
+review = namespace(path=PosixPath('/tmp/openscrub-task631/red-tmp/test_unchanged_save_preserves_3/jobs/synthetic/report.json'),...'t1': 0.2, 'mode': 'mute'}], 'custom_future_field': {'preserved': True}}, client=<FlaskClient <Flask 'openscrub_web'>>)
+report_work = {'parse': 1, 'dump': 1, 'stage': 1, 'fsync': 1, ...}
+canonical = True, edits = {'enabled': {'0': 'false', '1': True}}
+
+    @pytest.mark.parametrize('canonical', [False, True])
+    @pytest.mark.parametrize('edits', [
+        {}, {'enabled': {'0': 'false', '1': True}},
+        {'box_overrides': {'0': ['1', 2, 8., 9]}},
+        {'time_overrides': {'0': ['0', 1]}},
+        {'audio': [{'t0': '.1', 't1': '.2', 'mode': 'unsupported', 'ignored': True}]},
+        {'enabled': {'00': False, '-1': False, '999': False},
+         'box_overrides': {'999': None, '0': [1]},
+         'time_overrides': {'-1': None, '0': [1, 0]}},
+        {'box_overrides': {'0': [4, 5, 6, 7], '00': [1, 2, 8, 9]},
+         'time_overrides': {'0': [.1, .9], '00': [0, 1]}},
+    ])
+    def test_unchanged_save_preserves_exact_file_and_skips_publication(review, report_work, canonical, edits):
+        # Unconditional publication loses metadata even for byte-identical JSON.
+        doc = finite_review(review)
+        review.path.write_text(json.dumps(doc, indent=1 if canonical else None))
+        if os.name != 'nt':
+            review.path.chmod(0o640)
+        os.utime(review.path, ns=(1000000000, 2000000000))
+        before = file_snapshot(review.path)
+        response = review.client.post('/api/jobs/synthetic/detections', json=edits)
+        assert response.status_code == 200
+        assert response.json == {'ok': True, 'total': 2, 'suggest_allowlist': []}
+>       assert file_snapshot(review.path) == before
+E       assert (b'{\n "prove...178339, 33152) == (b'{\n "prove...621835, 33184)
+E         
+E         At index 2 diff: 243309 != 243308
+E         Use -v to get more diff
+
+tests/test_large_report_io.py:290: AssertionError
+_ test_unchanged_save_preserves_exact_file_and_skips_publication[edits2-False] _
+
+review = namespace(path=PosixPath('/tmp/openscrub-task631/red-tmp/test_unchanged_save_preserves_4/jobs/synthetic/report.json'),...'t1': 0.2, 'mode': 'mute'}], 'custom_future_field': {'preserved': True}}, client=<FlaskClient <Flask 'openscrub_web'>>)
+report_work = {'parse': 1, 'dump': 1, 'stage': 1, 'fsync': 1, ...}
+canonical = False, edits = {'box_overrides': {'0': ['1', 2, 8.0, 9]}}
+
+    @pytest.mark.parametrize('canonical', [False, True])
+    @pytest.mark.parametrize('edits', [
+        {}, {'enabled': {'0': 'false', '1': True}},
+        {'box_overrides': {'0': ['1', 2, 8., 9]}},
+        {'time_overrides': {'0': ['0', 1]}},
+        {'audio': [{'t0': '.1', 't1': '.2', 'mode': 'unsupported', 'ignored': True}]},
+        {'enabled': {'00': False, '-1': False, '999': False},
+         'box_overrides': {'999': None, '0': [1]},
+         'time_overrides': {'-1': None, '0': [1, 0]}},
+        {'box_overrides': {'0': [4, 5, 6, 7], '00': [1, 2, 8, 9]},
+         'time_overrides': {'0': [.1, .9], '00': [0, 1]}},
+    ])
+    def test_unchanged_save_preserves_exact_file_and_skips_publication(review, report_work, canonical, edits):
+        # Unconditional publication loses metadata even for byte-identical JSON.
+        doc = finite_review(review)
+        review.path.write_text(json.dumps(doc, indent=1 if canonical else None))
+        if os.name != 'nt':
+            review.path.chmod(0o640)
+        os.utime(review.path, ns=(1000000000, 2000000000))
+        before = file_snapshot(review.path)
+        response = review.client.post('/api/jobs/synthetic/detections', json=edits)
+        assert response.status_code == 200
+        assert response.json == {'ok': True, 'total': 2, 'suggest_allowlist': []}
+>       assert file_snapshot(review.path) == before
+E       assert (b'{\n "prove...655872, 33152) == (b'{"provenan...069598, 33184)
+E         
+E         At index 0 diff: b'{\n "provenance": {\n  "input": "/tmp/openscrub-task631/red-tmp/test_unchanged_save_preserves_4/jobs/synthetic/input.avi",\n  "settings": {}\n },\n "render_state": {\n  "fps": 30,\n  "cum": [\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n...
+E         
+E         ...Full output truncated, use '-vv' to show
+
+tests/test_large_report_io.py:290: AssertionError
+_ test_unchanged_save_preserves_exact_file_and_skips_publication[edits2-True] __
+
+review = namespace(path=PosixPath('/tmp/openscrub-task631/red-tmp/test_unchanged_save_preserves_5/jobs/synthetic/report.json'),...'t1': 0.2, 'mode': 'mute'}], 'custom_future_field': {'preserved': True}}, client=<FlaskClient <Flask 'openscrub_web'>>)
+report_work = {'parse': 1, 'dump': 1, 'stage': 1, 'fsync': 1, ...}
+canonical = True, edits = {'box_overrides': {'0': ['1', 2, 8.0, 9]}}
+
+    @pytest.mark.parametrize('canonical', [False, True])
+    @pytest.mark.parametrize('edits', [
+        {}, {'enabled': {'0': 'false', '1': True}},
+        {'box_overrides': {'0': ['1', 2, 8., 9]}},
+        {'time_overrides': {'0': ['0', 1]}},
+        {'audio': [{'t0': '.1', 't1': '.2', 'mode': 'unsupported', 'ignored': True}]},
+        {'enabled': {'00': False, '-1': False, '999': False},
+         'box_overrides': {'999': None, '0': [1]},
+         'time_overrides': {'-1': None, '0': [1, 0]}},
+        {'box_overrides': {'0': [4, 5, 6, 7], '00': [1, 2, 8, 9]},
+         'time_overrides': {'0': [.1, .9], '00': [0, 1]}},
+    ])
+    def test_unchanged_save_preserves_exact_file_and_skips_publication(review, report_work, canonical, edits):
+        # Unconditional publication loses metadata even for byte-identical JSON.
+        doc = finite_review(review)
+        review.path.write_text(json.dumps(doc, indent=1 if canonical else None))
+        if os.name != 'nt':
+            review.path.chmod(0o640)
+        os.utime(review.path, ns=(1000000000, 2000000000))
+        before = file_snapshot(review.path)
+        response = review.client.post('/api/jobs/synthetic/detections', json=edits)
+        assert response.status_code == 200
+        assert response.json == {'ok': True, 'total': 2, 'suggest_allowlist': []}
+>       assert file_snapshot(review.path) == before
+E       assert (b'{\n "prove...171936, 33152) == (b'{\n "prove...616911, 33184)
+E         
+E         At index 2 diff: 243323 != 243322
+E         Use -v to get more diff
+
+tests/test_large_report_io.py:290: AssertionError
+_ test_unchanged_save_preserves_exact_file_and_skips_publication[edits3-False] _
+
+review = namespace(path=PosixPath('/tmp/openscrub-task631/red-tmp/test_unchanged_save_preserves_6/jobs/synthetic/report.json'),...'t1': 0.2, 'mode': 'mute'}], 'custom_future_field': {'preserved': True}}, client=<FlaskClient <Flask 'openscrub_web'>>)
+report_work = {'parse': 1, 'dump': 1, 'stage': 1, 'fsync': 1, ...}
+canonical = False, edits = {'time_overrides': {'0': ['0', 1]}}
+
+    @pytest.mark.parametrize('canonical', [False, True])
+    @pytest.mark.parametrize('edits', [
+        {}, {'enabled': {'0': 'false', '1': True}},
+        {'box_overrides': {'0': ['1', 2, 8., 9]}},
+        {'time_overrides': {'0': ['0', 1]}},
+        {'audio': [{'t0': '.1', 't1': '.2', 'mode': 'unsupported', 'ignored': True}]},
+        {'enabled': {'00': False, '-1': False, '999': False},
+         'box_overrides': {'999': None, '0': [1]},
+         'time_overrides': {'-1': None, '0': [1, 0]}},
+        {'box_overrides': {'0': [4, 5, 6, 7], '00': [1, 2, 8, 9]},
+         'time_overrides': {'0': [.1, .9], '00': [0, 1]}},
+    ])
+    def test_unchanged_save_preserves_exact_file_and_skips_publication(review, report_work, canonical, edits):
+        # Unconditional publication loses metadata even for byte-identical JSON.
+        doc = finite_review(review)
+        review.path.write_text(json.dumps(doc, indent=1 if canonical else None))
+        if os.name != 'nt':
+            review.path.chmod(0o640)
+        os.utime(review.path, ns=(1000000000, 2000000000))
+        before = file_snapshot(review.path)
+        response = review.client.post('/api/jobs/synthetic/detections', json=edits)
+        assert response.status_code == 200
+        assert response.json == {'ok': True, 'total': 2, 'suggest_allowlist': []}
+>       assert file_snapshot(review.path) == before
+E       assert (b'{\n "prove...723849, 33152) == (b'{"provenan...173434, 33184)
+E         
+E         At index 0 diff: b'{\n "provenance": {\n  "input": "/tmp/openscrub-task631/red-tmp/test_unchanged_save_preserves_6/jobs/synthetic/input.avi",\n  "settings": {}\n },\n "render_state": {\n  "fps": 30,\n  "cum": [\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n...
+E         
+E         ...Full output truncated, use '-vv' to show
+
+tests/test_large_report_io.py:290: AssertionError
+_ test_unchanged_save_preserves_exact_file_and_skips_publication[edits3-True] __
+
+review = namespace(path=PosixPath('/tmp/openscrub-task631/red-tmp/test_unchanged_save_preserves_7/jobs/synthetic/report.json'),...'t1': 0.2, 'mode': 'mute'}], 'custom_future_field': {'preserved': True}}, client=<FlaskClient <Flask 'openscrub_web'>>)
+report_work = {'parse': 1, 'dump': 1, 'stage': 1, 'fsync': 1, ...}
+canonical = True, edits = {'time_overrides': {'0': ['0', 1]}}
+
+    @pytest.mark.parametrize('canonical', [False, True])
+    @pytest.mark.parametrize('edits', [
+        {}, {'enabled': {'0': 'false', '1': True}},
+        {'box_overrides': {'0': ['1', 2, 8., 9]}},
+        {'time_overrides': {'0': ['0', 1]}},
+        {'audio': [{'t0': '.1', 't1': '.2', 'mode': 'unsupported', 'ignored': True}]},
+        {'enabled': {'00': False, '-1': False, '999': False},
+         'box_overrides': {'999': None, '0': [1]},
+         'time_overrides': {'-1': None, '0': [1, 0]}},
+        {'box_overrides': {'0': [4, 5, 6, 7], '00': [1, 2, 8, 9]},
+         'time_overrides': {'0': [.1, .9], '00': [0, 1]}},
+    ])
+    def test_unchanged_save_preserves_exact_file_and_skips_publication(review, report_work, canonical, edits):
+        # Unconditional publication loses metadata even for byte-identical JSON.
+        doc = finite_review(review)
+        review.path.write_text(json.dumps(doc, indent=1 if canonical else None))
+        if os.name != 'nt':
+            review.path.chmod(0o640)
+        os.utime(review.path, ns=(1000000000, 2000000000))
+        before = file_snapshot(review.path)
+        response = review.client.post('/api/jobs/synthetic/detections', json=edits)
+        assert response.status_code == 200
+        assert response.json == {'ok': True, 'total': 2, 'suggest_allowlist': []}
+>       assert file_snapshot(review.path) == before
+E       assert (b'{\n "prove...935395, 33152) == (b'{\n "prove...355051, 33184)
+E         
+E         At index 2 diff: 243337 != 243336
+E         Use -v to get more diff
+
+tests/test_large_report_io.py:290: AssertionError
+_ test_unchanged_save_preserves_exact_file_and_skips_publication[edits4-False] _
+
+review = namespace(path=PosixPath('/tmp/openscrub-task631/red-tmp/test_unchanged_save_preserves_8/jobs/synthetic/report.json'),...'t1': 0.2, 'mode': 'mute'}], 'custom_future_field': {'preserved': True}}, client=<FlaskClient <Flask 'openscrub_web'>>)
+report_work = {'parse': 1, 'dump': 1, 'stage': 1, 'fsync': 1, ...}
+canonical = False
+edits = {'audio': [{'t0': '.1', 't1': '.2', 'mode': 'unsupported', 'ignored': True}]}
+
+    @pytest.mark.parametrize('canonical', [False, True])
+    @pytest.mark.parametrize('edits', [
+        {}, {'enabled': {'0': 'false', '1': True}},
+        {'box_overrides': {'0': ['1', 2, 8., 9]}},
+        {'time_overrides': {'0': ['0', 1]}},
+        {'audio': [{'t0': '.1', 't1': '.2', 'mode': 'unsupported', 'ignored': True}]},
+        {'enabled': {'00': False, '-1': False, '999': False},
+         'box_overrides': {'999': None, '0': [1]},
+         'time_overrides': {'-1': None, '0': [1, 0]}},
+        {'box_overrides': {'0': [4, 5, 6, 7], '00': [1, 2, 8, 9]},
+         'time_overrides': {'0': [.1, .9], '00': [0, 1]}},
+    ])
+    def test_unchanged_save_preserves_exact_file_and_skips_publication(review, report_work, canonical, edits):
+        # Unconditional publication loses metadata even for byte-identical JSON.
+        doc = finite_review(review)
+        review.path.write_text(json.dumps(doc, indent=1 if canonical else None))
+        if os.name != 'nt':
+            review.path.chmod(0o640)
+        os.utime(review.path, ns=(1000000000, 2000000000))
+        before = file_snapshot(review.path)
+        response = review.client.post('/api/jobs/synthetic/detections', json=edits)
+        assert response.status_code == 200
+        assert response.json == {'ok': True, 'total': 2, 'suggest_allowlist': []}
+>       assert file_snapshot(review.path) == before
+E       assert (b'{\n "prove...731245, 33152) == (b'{"provenan...175601, 33184)
+E         
+E         At index 0 diff: b'{\n "provenance": {\n  "input": "/tmp/openscrub-task631/red-tmp/test_unchanged_save_preserves_8/jobs/synthetic/input.avi",\n  "settings": {}\n },\n "render_state": {\n  "fps": 30,\n  "cum": [\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n...
+E         
+E         ...Full output truncated, use '-vv' to show
+
+tests/test_large_report_io.py:290: AssertionError
+_ test_unchanged_save_preserves_exact_file_and_skips_publication[edits4-True] __
+
+review = namespace(path=PosixPath('/tmp/openscrub-task631/red-tmp/test_unchanged_save_preserves_9/jobs/synthetic/report.json'),...'t1': 0.2, 'mode': 'mute'}], 'custom_future_field': {'preserved': True}}, client=<FlaskClient <Flask 'openscrub_web'>>)
+report_work = {'parse': 1, 'dump': 1, 'stage': 1, 'fsync': 1, ...}
+canonical = True
+edits = {'audio': [{'t0': '.1', 't1': '.2', 'mode': 'unsupported', 'ignored': True}]}
+
+    @pytest.mark.parametrize('canonical', [False, True])
+    @pytest.mark.parametrize('edits', [
+        {}, {'enabled': {'0': 'false', '1': True}},
+        {'box_overrides': {'0': ['1', 2, 8., 9]}},
+        {'time_overrides': {'0': ['0', 1]}},
+        {'audio': [{'t0': '.1', 't1': '.2', 'mode': 'unsupported', 'ignored': True}]},
+        {'enabled': {'00': False, '-1': False, '999': False},
+         'box_overrides': {'999': None, '0': [1]},
+         'time_overrides': {'-1': None, '0': [1, 0]}},
+        {'box_overrides': {'0': [4, 5, 6, 7], '00': [1, 2, 8, 9]},
+         'time_overrides': {'0': [.1, .9], '00': [0, 1]}},
+    ])
+    def test_unchanged_save_preserves_exact_file_and_skips_publication(review, report_work, canonical, edits):
+        # Unconditional publication loses metadata even for byte-identical JSON.
+        doc = finite_review(review)
+        review.path.write_text(json.dumps(doc, indent=1 if canonical else None))
+        if os.name != 'nt':
+            review.path.chmod(0o640)
+        os.utime(review.path, ns=(1000000000, 2000000000))
+        before = file_snapshot(review.path)
+        response = review.client.post('/api/jobs/synthetic/detections', json=edits)
+        assert response.status_code == 200
+        assert response.json == {'ok': True, 'total': 2, 'suggest_allowlist': []}
+>       assert file_snapshot(review.path) == before
+E       assert (b'{\n "prove...360297, 33152) == (b'{\n "prove...806783, 33184)
+E         
+E         At index 2 diff: 243351 != 243350
+E         Use -v to get more diff
+
+tests/test_large_report_io.py:290: AssertionError
+_ test_unchanged_save_preserves_exact_file_and_skips_publication[edits5-False] _
+
+review = namespace(path=PosixPath('/tmp/openscrub-task631/red-tmp/test_unchanged_save_preserves_10/jobs/synthetic/report.json')...'t1': 0.2, 'mode': 'mute'}], 'custom_future_field': {'preserved': True}}, client=<FlaskClient <Flask 'openscrub_web'>>)
+report_work = {'parse': 1, 'dump': 1, 'stage': 1, 'fsync': 1, ...}
+canonical = False
+edits = {'enabled': {'00': False, '-1': False, '999': False}, 'box_overrides': {'999': None, '0': [1]}, 'time_overrides': {'-1': None, '0': [1, 0]}}
+
+    @pytest.mark.parametrize('canonical', [False, True])
+    @pytest.mark.parametrize('edits', [
+        {}, {'enabled': {'0': 'false', '1': True}},
+        {'box_overrides': {'0': ['1', 2, 8., 9]}},
+        {'time_overrides': {'0': ['0', 1]}},
+        {'audio': [{'t0': '.1', 't1': '.2', 'mode': 'unsupported', 'ignored': True}]},
+        {'enabled': {'00': False, '-1': False, '999': False},
+         'box_overrides': {'999': None, '0': [1]},
+         'time_overrides': {'-1': None, '0': [1, 0]}},
+        {'box_overrides': {'0': [4, 5, 6, 7], '00': [1, 2, 8, 9]},
+         'time_overrides': {'0': [.1, .9], '00': [0, 1]}},
+    ])
+    def test_unchanged_save_preserves_exact_file_and_skips_publication(review, report_work, canonical, edits):
+        # Unconditional publication loses metadata even for byte-identical JSON.
+        doc = finite_review(review)
+        review.path.write_text(json.dumps(doc, indent=1 if canonical else None))
+        if os.name != 'nt':
+            review.path.chmod(0o640)
+        os.utime(review.path, ns=(1000000000, 2000000000))
+        before = file_snapshot(review.path)
+        response = review.client.post('/api/jobs/synthetic/detections', json=edits)
+        assert response.status_code == 200
+        assert response.json == {'ok': True, 'total': 2, 'suggest_allowlist': []}
+>       assert file_snapshot(review.path) == before
+E       assert (b'{\n "prove...859080, 33152) == (b'{"provenan...279836, 33184)
+E         
+E         At index 0 diff: b'{\n "provenance": {\n  "input": "/tmp/openscrub-task631/red-tmp/test_unchanged_save_preserves_10/jobs/synthetic/input.avi",\n  "settings": {}\n },\n "render_state": {\n  "fps": 30,\n  "cum": [\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\...
+E         
+E         ...Full output truncated, use '-vv' to show
+
+tests/test_large_report_io.py:290: AssertionError
+_ test_unchanged_save_preserves_exact_file_and_skips_publication[edits5-True] __
+
+review = namespace(path=PosixPath('/tmp/openscrub-task631/red-tmp/test_unchanged_save_preserves_11/jobs/synthetic/report.json')...'t1': 0.2, 'mode': 'mute'}], 'custom_future_field': {'preserved': True}}, client=<FlaskClient <Flask 'openscrub_web'>>)
+report_work = {'parse': 1, 'dump': 1, 'stage': 1, 'fsync': 1, ...}
+canonical = True
+edits = {'enabled': {'00': False, '-1': False, '999': False}, 'box_overrides': {'999': None, '0': [1]}, 'time_overrides': {'-1': None, '0': [1, 0]}}
+
+    @pytest.mark.parametrize('canonical', [False, True])
+    @pytest.mark.parametrize('edits', [
+        {}, {'enabled': {'0': 'false', '1': True}},
+        {'box_overrides': {'0': ['1', 2, 8., 9]}},
+        {'time_overrides': {'0': ['0', 1]}},
+        {'audio': [{'t0': '.1', 't1': '.2', 'mode': 'unsupported', 'ignored': True}]},
+        {'enabled': {'00': False, '-1': False, '999': False},
+         'box_overrides': {'999': None, '0': [1]},
+         'time_overrides': {'-1': None, '0': [1, 0]}},
+        {'box_overrides': {'0': [4, 5, 6, 7], '00': [1, 2, 8, 9]},
+         'time_overrides': {'0': [.1, .9], '00': [0, 1]}},
+    ])
+    def test_unchanged_save_preserves_exact_file_and_skips_publication(review, report_work, canonical, edits):
+        # Unconditional publication loses metadata even for byte-identical JSON.
+        doc = finite_review(review)
+        review.path.write_text(json.dumps(doc, indent=1 if canonical else None))
+        if os.name != 'nt':
+            review.path.chmod(0o640)
+        os.utime(review.path, ns=(1000000000, 2000000000))
+        before = file_snapshot(review.path)
+        response = review.client.post('/api/jobs/synthetic/detections', json=edits)
+        assert response.status_code == 200
+        assert response.json == {'ok': True, 'total': 2, 'suggest_allowlist': []}
+>       assert file_snapshot(review.path) == before
+E       assert (b'{\n "prove...515062, 33152) == (b'{\n "prove...952478, 33184)
+E         
+E         At index 2 diff: 243365 != 243364
+E         Use -v to get more diff
+
+tests/test_large_report_io.py:290: AssertionError
+_ test_unchanged_save_preserves_exact_file_and_skips_publication[edits6-False] _
+
+review = namespace(path=PosixPath('/tmp/openscrub-task631/red-tmp/test_unchanged_save_preserves_12/jobs/synthetic/report.json')...'t1': 0.2, 'mode': 'mute'}], 'custom_future_field': {'preserved': True}}, client=<FlaskClient <Flask 'openscrub_web'>>)
+report_work = {'parse': 1, 'dump': 1, 'stage': 1, 'fsync': 1, ...}
+canonical = False
+edits = {'box_overrides': {'0': [4, 5, 6, 7], '00': [1, 2, 8, 9]}, 'time_overrides': {'0': [0.1, 0.9], '00': [0, 1]}}
+
+    @pytest.mark.parametrize('canonical', [False, True])
+    @pytest.mark.parametrize('edits', [
+        {}, {'enabled': {'0': 'false', '1': True}},
+        {'box_overrides': {'0': ['1', 2, 8., 9]}},
+        {'time_overrides': {'0': ['0', 1]}},
+        {'audio': [{'t0': '.1', 't1': '.2', 'mode': 'unsupported', 'ignored': True}]},
+        {'enabled': {'00': False, '-1': False, '999': False},
+         'box_overrides': {'999': None, '0': [1]},
+         'time_overrides': {'-1': None, '0': [1, 0]}},
+        {'box_overrides': {'0': [4, 5, 6, 7], '00': [1, 2, 8, 9]},
+         'time_overrides': {'0': [.1, .9], '00': [0, 1]}},
+    ])
+    def test_unchanged_save_preserves_exact_file_and_skips_publication(review, report_work, canonical, edits):
+        # Unconditional publication loses metadata even for byte-identical JSON.
+        doc = finite_review(review)
+        review.path.write_text(json.dumps(doc, indent=1 if canonical else None))
+        if os.name != 'nt':
+            review.path.chmod(0o640)
+        os.utime(review.path, ns=(1000000000, 2000000000))
+        before = file_snapshot(review.path)
+        response = review.client.post('/api/jobs/synthetic/detections', json=edits)
+        assert response.status_code == 200
+        assert response.json == {'ok': True, 'total': 2, 'suggest_allowlist': []}
+>       assert file_snapshot(review.path) == before
+E       assert (b'{\n "prove...545880, 33152) == (b'{"provenan...464031, 33184)
+E         
+E         At index 0 diff: b'{\n "provenance": {\n  "input": "/tmp/openscrub-task631/red-tmp/test_unchanged_save_preserves_12/jobs/synthetic/input.avi",\n  "settings": {}\n },\n "render_state": {\n  "fps": 30,\n  "cum": [\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\n   [\n    0,\n    0\n   ],\...
+E         
+E         ...Full output truncated, use '-vv' to show
+
+tests/test_large_report_io.py:290: AssertionError
+_ test_unchanged_save_preserves_exact_file_and_skips_publication[edits6-True] __
+
+review = namespace(path=PosixPath('/tmp/openscrub-task631/red-tmp/test_unchanged_save_preserves_13/jobs/synthetic/report.json')...'t1': 0.2, 'mode': 'mute'}], 'custom_future_field': {'preserved': True}}, client=<FlaskClient <Flask 'openscrub_web'>>)
+report_work = {'parse': 1, 'dump': 1, 'stage': 1, 'fsync': 1, ...}
+canonical = True
+edits = {'box_overrides': {'0': [4, 5, 6, 7], '00': [1, 2, 8, 9]}, 'time_overrides': {'0': [0.1, 0.9], '00': [0, 1]}}
+
+    @pytest.mark.parametrize('canonical', [False, True])
+    @pytest.mark.parametrize('edits', [
+        {}, {'enabled': {'0': 'false', '1': True}},
+        {'box_overrides': {'0': ['1', 2, 8., 9]}},
+        {'time_overrides': {'0': ['0', 1]}},
+        {'audio': [{'t0': '.1', 't1': '.2', 'mode': 'unsupported', 'ignored': True}]},
+        {'enabled': {'00': False, '-1': False, '999': False},
+         'box_overrides': {'999': None, '0': [1]},
+         'time_overrides': {'-1': None, '0': [1, 0]}},
+        {'box_overrides': {'0': [4, 5, 6, 7], '00': [1, 2, 8, 9]},
+         'time_overrides': {'0': [.1, .9], '00': [0, 1]}},
+    ])
+    def test_unchanged_save_preserves_exact_file_and_skips_publication(review, report_work, canonical, edits):
+        # Unconditional publication loses metadata even for byte-identical JSON.
+        doc = finite_review(review)
+        review.path.write_text(json.dumps(doc, indent=1 if canonical else None))
+        if os.name != 'nt':
+            review.path.chmod(0o640)
+        os.utime(review.path, ns=(1000000000, 2000000000))
+        before = file_snapshot(review.path)
+        response = review.client.post('/api/jobs/synthetic/detections', json=edits)
+        assert response.status_code == 200
+        assert response.json == {'ok': True, 'total': 2, 'suggest_allowlist': []}
+>       assert file_snapshot(review.path) == before
+E       assert (b'{\n "prove...061553, 33152) == (b'{\n "prove...458979, 33184)
+E         
+E         At index 2 diff: 243379 != 243378
+E         Use -v to get more diff
+
+tests/test_large_report_io.py:290: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_large_report_io.py::test_unchanged_save_preserves_exact_file_and_skips_publication[edits0-False]
+FAILED tests/test_large_report_io.py::test_unchanged_save_preserves_exact_file_and_skips_publication[edits0-True]
+FAILED tests/test_large_report_io.py::test_unchanged_save_preserves_exact_file_and_skips_publication[edits1-False]
+FAILED tests/test_large_report_io.py::test_unchanged_save_preserves_exact_file_and_skips_publication[edits1-True]
+FAILED tests/test_large_report_io.py::test_unchanged_save_preserves_exact_file_and_skips_publication[edits2-False]
+FAILED tests/test_large_report_io.py::test_unchanged_save_preserves_exact_file_and_skips_publication[edits2-True]
+FAILED tests/test_large_report_io.py::test_unchanged_save_preserves_exact_file_and_skips_publication[edits3-False]
+FAILED tests/test_large_report_io.py::test_unchanged_save_preserves_exact_file_and_skips_publication[edits3-True]
+FAILED tests/test_large_report_io.py::test_unchanged_save_preserves_exact_file_and_skips_publication[edits4-False]
+FAILED tests/test_large_report_io.py::test_unchanged_save_preserves_exact_file_and_skips_publication[edits4-True]
+FAILED tests/test_large_report_io.py::test_unchanged_save_preserves_exact_file_and_skips_publication[edits5-False]
+FAILED tests/test_large_report_io.py::test_unchanged_save_preserves_exact_file_and_skips_publication[edits5-True]
+FAILED tests/test_large_report_io.py::test_unchanged_save_preserves_exact_file_and_skips_publication[edits6-False]
+FAILED tests/test_large_report_io.py::test_unchanged_save_preserves_exact_file_and_skips_publication[edits6-True]
+14 failed, 41 deselected in 0.20s

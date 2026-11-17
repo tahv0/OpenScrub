@@ -1,0 +1,18 @@
+{
+  "base": "12919c96c6f7558136b50d7b4d85e5e6b62f1971",
+  "head": "12919c96c6f7558136b50d7b4d85e5e6b62f1971",
+  "exact_sdist_source_and_tests": true,
+  "exact_wheel_source": true,
+  "all_packaged_python39_grammar": true,
+  "unchanged_cli_defaults_web_build_args_source_pin": true,
+  "node_syntax": true,
+  "unchanged_project_metadata": true,
+  "static_container_frozen_inclusion": true,
+  "sha256": {
+    "openscrub.py": "275de34766d3d64592222be5633906a3dcd2557ce78e2dd7b7d6fb8075fd0355",
+    "openscrub_web.py": "fc0eea772aec5b9ecba7a957b260e8e3121937f98fd6ff785c8df6dc9788c5a5",
+    "openscrub_internal/__init__.py": "c35c063c010e329c5dad13782e7b67438ed4b2d1faf975d4f01be2773a18e022",
+    "openscrub_internal/lifetimes.py": "dbfc317c1c878b8e8a599391578504c44a8964199f2cdae6e2ed60a6336d6743",
+    "openscrub_internal/reports.py": "e8a7429c0b5430ee290f6635ca5d5a93445d3f0fe9bb0f58e57fec891ee01b7f"
+  }
+}

@@ -1,0 +1,4 @@
+openscrub /home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py
+openscrub_web /home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py
+openscrub_internal.reports /home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_internal/reports.py
+3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]

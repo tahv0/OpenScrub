@@ -1,0 +1,383 @@
+## 5c0782f:openscrub_web.py:1320-1438
+1320:         pass
+1321: 
+1322: 
+1323: def _plate_editor_crop(box, points, width, height):
+1324:     """View-sized crop around an editable plate, including skewed corners.
+1325: 
+1326:     Keep enough context to find the edges of a narrow/distant plate, while
+1327:     magnifying it instead of showing the full video frame at 4K scale.
+1328:     """
+1329:     xs = [float(box[0]), float(box[2])] + [float(p[0]) for p in points]
+1330:     ys = [float(box[1]), float(box[3])] + [float(p[1]) for p in points]
+1331:     xmin, xmax = min(xs), max(xs)
+1332:     ymin, ymax = min(ys), max(ys)
+1333:     pad_x = max(32.0, 0.40 * (xmax - xmin))
+1334:     pad_y = max(28.0, 1.50 * (ymax - ymin))
+1335:     x1 = max(0, int(np.floor(xmin - pad_x)))
+1336:     y1 = max(0, int(np.floor(ymin - pad_y)))
+1337:     x2 = min(width, int(np.ceil(xmax + pad_x)))
+1338:     y2 = min(height, int(np.ceil(ymax + pad_y)))
+1339:     if x2 <= x1 or y2 <= y1:
+1340:         abort(400, description="Plate is outside the video frame")
+1341:     return [x1, y1, x2, y2]
+1342: 
+1343: 
+1344: def _plate_editor_snapshot(job, index):
+1345:     """One consistent source frame and crop for GET, image and POST."""
+1346:     doc = _load_job_report(job)
+1347:     rows = doc.get("detections", [])
+1348:     if not (0 <= index < len(rows)) or rows[index].get("category") != "plate":
+1349:         abort(404)
+1350:     d = rows[index]
+1351:     rs = doc["render_state"]
+1352:     fps = float(rs["fps"])
+1353:     if not rs.get("cum") or fps <= 0:
+1354:         abort(400, description="Review timeline not available")
+1355:     tref = min(max(float(d.get("last_seen", d["t_start"])),
+1356:                    float(d["t_start"])), float(d["t_end"]))
+1357:     fidx = min(max(0, int(tref * fps)), len(rs["cum"]) - 1)
+1358:     ox, oy = rs["cum"][fidx]
+1359:     box = [float(d["cbox"][0]) + ox, float(d["cbox"][1]) + oy,
+1360:            float(d["cbox"][2]) + ox, float(d["cbox"][3]) + oy]
+1361:     bw, bh = box[2] - box[0], box[3] - box[1]
+1362:     if bw <= 0 or bh <= 0:
+1363:         abort(400, description="Invalid plate detection box")
+1364:     frame = _frame_at(job, tref, rs)
+1365:     if frame is None:
+1366:         abort(404, description="Could not decode plate frame")
+1367:     q = d.get("plate_quad") or ((0., 0.), (1., 0.), (1., 1.), (0., 1.))
+1368:     points = [[box[0] + float(x) * bw, box[1] + float(y) * bh]
+1369:               for x, y in q]
+1370:     crop = _plate_editor_crop(box, points, frame.shape[1], frame.shape[0])
+1371:     return doc, d, frame, tref, box, points, crop
+1372: 
+1373: 
+1374: @app.route("/api/jobs/<jid>/plate_quad/<int:i>/frame")
+1375: def job_plate_quad_frame(jid, i):
+1376:     """Unredacted close-up used only by the authenticated review editor."""
+1377:     job = JOBS.get(jid) or abort(404)
+1378:     _, _, frame, _, _, _, crop = _plate_editor_snapshot(job, i)
+1379:     x1, y1, x2, y2 = crop
+1380:     success, encoded = cv2.imencode(
+1381:         ".jpg", frame[y1:y2, x1:x2], [cv2.IMWRITE_JPEG_QUALITY, 95])
+1382:     if not success:
+1383:         abort(500, description="Could not encode the review frame")
+1384:     response = Response(encoded.tobytes(), mimetype="image/jpeg")
+1385:     response.headers["Cache-Control"] = "no-store"
+1386:     return response
+1387: 
+1388: 
+1389: @app.route("/api/jobs/<jid>/plate_quad/<int:i>", methods=["GET", "POST"])
+1390: def job_plate_quad(jid, i):
+1391:     """Drag/re-draw four plate corners; save only user-verified geometry."""
+1392:     job = JOBS.get(jid) or abort(404)
+1393:     if request.method == "POST" and job["phase"] not in (
+1394:             "paused", "review", "done"):
+1395:         return jsonify({"error": "Cannot edit plates while scanning"}), 409
+1396:     doc, d, frame, tref, box, points, crop = _plate_editor_snapshot(job, i)
+1397:     if request.method == "GET":
+1398:         return jsonify({"i": i, "t": tref, "width": frame.shape[1],
+1399:                         "height": frame.shape[0], "box": box,
+1400:                         "crop": crop, "points": points,
+1401:                         "track": d.get("track", -1)})
+1402:     payload = request.get_json(silent=True) or {}
+1403:     try:
+1404:         p = np.asarray(payload["points"], dtype=np.float64)
+1405:     except (KeyError, TypeError, ValueError):
+1406:         return jsonify({"error": "Four corner points required"}), 400
+1407:     if p.shape != (4, 2) or not np.isfinite(p).all():
+1408:         return jsonify({"error": "Invalid corner coordinates"}), 400
+1409:     h, w = frame.shape[:2]
+1410:     if (np.any(p[:, 0] < 0) or np.any(p[:, 0] >= w) or
+1411:             np.any(p[:, 1] < 0) or np.any(p[:, 1] >= h)):
+1412:         return jsonify({"error": "Corners must be inside the video frame"}), 400
+1413:     contour = p.astype(np.float32).reshape((-1, 1, 2))
+1414:     if (not cv2.isContourConvex(contour) or
+1415:             cv2.contourArea(contour) < 8.0):
+1416:         return jsonify({"error": "Corners must form a convex quadrilateral"}), 400
+1417:     bw, bh = box[2] - box[0], box[3] - box[1]
+1418:     q = [[round((float(x) - box[0]) / bw, 6),
+1419:           round((float(y) - box[1]) / bh, 6)] for x, y in p]
+1420:     d["verified_label"] = "plate"
+1421:     apply_track = payload.get("apply_track") is True
+1422:     tid = d.get("track", -1)
+1423:     changed = 0
+1424:     for j, r in enumerate(doc["detections"]):
+1425:         if j != i and not (apply_track and tid >= 0 and
+1426:                            r.get("track", -1) == tid and
+1427:                            r.get("category") == "plate"):
+1428:             continue
+1429:         r["plate_quad"] = q
+1430:         changed += 1
+1431:     _save_verified_plate_sample(job, frame, p, i, tref)
+1432:     stop_review.atomic_report(
+1433:         os.path.join(job["dir"], "report.json"), doc)
+1434:     return jsonify({"ok": True, "applied": changed,
+1435:                     "verified_samples_added": 1})
+1436: 
+1437: 
+1438: def _requested_review_frame(rstate):
+
+## 5c0782f:openscrub_web.py:3190-3220
+3190:    '" style="max-width:96%;max-height:96%;border-radius:8px">';
+3191:   return;
+3192:  }
+3193:  let d;
+3194:  try{
+3195:   const res=await fetch("api/jobs/"+CUR+"/plate_quad/"+i);
+3196:   if(!res.ok){
+3197:    let details={};try{details=await res.json();}catch(_){}
+3198:    throw new Error(details.error||"HTTP "+res.status);
+3199:   }
+3200:   d=await res.json();
+3201:   if(!d.crop||d.crop.length!==4||!d.points||d.points.length!==4)
+3202:    throw new Error("Invalid plate editor geometry");
+3203:  }catch(error){
+3204:   alert("Could not open four-corner editor: "+error.message);
+3205:   return;
+3206:  }
+3207:  closePlateQuad();
+3208:  const ov=document.createElement("div");
+3209:  ov.id="plateQuadOverlay";
+3210:  ov.setAttribute("role","dialog");
+3211:  ov.setAttribute("aria-modal","true");
+3212:  ov.setAttribute("aria-labelledby","qHeading");
+3213:  ov.style.cssText="position:fixed;inset:0;z-index:1500;"+
+3214:   "background:rgba(2,6,23,.96);display:flex;align-items:center;"+
+3215:   "justify-content:center;padding:12px;overflow:auto";
+3216:  const crop=d.crop,cw=crop[2]-crop[0],ch=crop[3]-crop[1];
+3217:  const viewWidth=Math.max(130,Math.floor(Math.min(
+3218:   900,innerWidth*.88,cw*5,Math.max(160,innerHeight*.60)*cw/ch)));
+3219:  ov.innerHTML=
+3220:   '<div id="qDialog" style="width:min(94vw,980px);max-height:95vh;'+
+
+## 5c0782f:openscrub_web.py:3240-3400
+3240:    '<button type="button" id="qReset" class="sec">Reset</button>'+
+3241:    '<span id="qHint" style="font-size:12px;color:#4ade80">'+
+3242:     'Drag the green numbered handles on the preview</span></div>'+
+3243:   '<label style="font-size:12px;display:flex;gap:8px;align-items:center">'+
+3244:    '<input id="qTrack" type="checkbox"> Apply the shape to this detection track '+
+3245:    '(approximate — verify changing perspective)</label>'+
+3246:   '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px">'+
+3247:    '<button type="button" id="qSave">Save four corners</button>'+
+3248:    '<span id="qStatus" role="status" style="font-size:12px;color:#cbd5e1"></span>'+
+3249:    '</div></div>';
+3250:  document.body.appendChild(ov); // Attach before looking up controls.
+3251:  ov.onclick=e=>{if(e.target===ov)closePlateQuad();};
+3252:  ov.onpointerdown=e=>e.stopPropagation();
+3253:  const img=ov.querySelector("#qImg"),cv=ov.querySelector("#qCv");
+3254:  const hint=ov.querySelector("#qHint"),save=ov.querySelector("#qSave");
+3255:  const starting=d.points.map(p=>p.slice());
+3256:  QEDIT={i,points:starting.map(p=>p.slice()),starting,
+3257:         crop,width:d.width,height:d.height,drawing:false,dragging:-1};
+3258:  let imageReady=false;
+3259:  function viewSize(){
+3260:   // Make canvas pixels match the *displayed* photo (including max-height).
+3261:   // A fullscreen video frame here previously made 8px-high plates impossible to edit.
+3262:   const rect=img.getBoundingClientRect();
+3263:   if(rect.width<1||rect.height<1)return false;
+3264:   const rw=Math.max(1,Math.round(rect.width)),rh=Math.max(1,Math.round(rect.height));
+3265:   if(cv.width!==rw)cv.width=rw;
+3266:   if(cv.height!==rh)cv.height=rh;
+3267:   cv.style.width=rect.width+"px";cv.style.height=rect.height+"px";
+3268:   return true;
+3269:  }
+3270:  function draw(){
+3271:   if(!QEDIT||!imageReady||!viewSize())return;
+3272:   const x=cv.getContext("2d"),sx=cv.width/cw,sy=cv.height/ch;
+3273:   const p=QEDIT.points;
+3274:   x.clearRect(0,0,cv.width,cv.height);
+3275:   if(p.length){
+3276:    x.beginPath();
+3277:    p.forEach((v,k)=>{const px=(v[0]-crop[0])*sx,py=(v[1]-crop[1])*sy;
+3278:     if(k)x.lineTo(px,py);else x.moveTo(px,py);});
+3279:    if(p.length===4)x.closePath();
+3280:    x.fillStyle="rgba(34,197,94,.18)";
+3281:    if(p.length===4)x.fill();
+3282:    x.lineWidth=2;x.strokeStyle="#4ade80";x.stroke();
+3283:    p.forEach((v,k)=>{
+3284:     const px=(v[0]-crop[0])*sx,py=(v[1]-crop[1])*sy;
+3285:     x.beginPath();x.arc(px,py,11,0,Math.PI*2);
+3286:     x.fillStyle="#0f172a";x.fill();
+3287:     x.lineWidth=3;x.strokeStyle="#4ade80";x.stroke();
+3288:     x.fillStyle="#fff";x.font="bold 13px sans-serif";x.textAlign="center";
+3289:     x.fillText(String(k+1),px,py+4);
+3290:    });
+3291:   }
+3292:  }
+3293:  function point(e){
+3294:   const r=cv.getBoundingClientRect();
+3295:   return [
+3296:    Math.max(0,Math.min(d.width-1,crop[0]+(e.clientX-r.left)/Math.max(1,r.width)*cw)),
+3297:    Math.max(0,Math.min(d.height-1,crop[1]+(e.clientY-r.top)/Math.max(1,r.height)*ch))
+3298:   ];
+3299:  }
+3300:  function updateHint(){
+3301:   if(!QEDIT)return;
+3302:   hint.textContent=QEDIT.drawing
+3303:    ?"Click corner "+(QEDIT.points.length+1)+" of 4 on the plate preview"
+3304:    :"Drag green handles. Redraw lets you place all four corners again.";
+3305:   save.disabled=!imageReady||QEDIT.points.length!==4;
+3306:  }
+3307:  img.onload=()=>{
+3308:   imageReady=true;
+3309:   img.removeAttribute("aria-busy");
+3310:   draw();updateHint();
+3311:  };
+3312:  img.onerror=()=>{
+3313:   imageReady=false;save.disabled=true;
+3314:   hint.textContent="Could not load the plate image. Close and retry.";
+3315:  };
+3316:  img.setAttribute("aria-busy","true");
+3317:  img.src="api/jobs/"+CUR+"/plate_quad/"+i+"/frame";
+3318:  if(img.complete&&img.naturalWidth)img.onload();
+3319:  const onResize=()=>draw();
+3320:  const resizeObserver=typeof ResizeObserver!=="undefined"?new ResizeObserver(onResize):null;
+3321:  if(resizeObserver)resizeObserver.observe(img);
+3322:  // Observe rendered dimensions so the overlay follows responsive scaling.
+3323:  if(QEDIT)QEDIT.resizeObserver=resizeObserver;
+3324:  ov.querySelector("#qClose").onclick=closePlateQuad;
+3325:  ov.querySelector("#qRedraw").onclick=()=>{
+3326:   if(!QEDIT)return;
+3327:   QEDIT.drawing=true;QEDIT.dragging=-1;QEDIT.points=[];
+3328:   updateHint();draw();
+3329:  };
+3330:  ov.querySelector("#qReset").onclick=()=>{
+3331:   if(!QEDIT)return;
+3332:   QEDIT.drawing=false;QEDIT.dragging=-1;
+3333:   QEDIT.points=starting.map(p=>p.slice());
+3334:   updateHint();draw();
+3335:  };
+3336:  cv.addEventListener("pointerdown",e=>{
+3337:   if(!QEDIT||!imageReady)return;
+3338:   e.preventDefault();e.stopPropagation();
+3339:   const p=point(e);
+3340:   if(QEDIT.drawing){
+3341:    QEDIT.points.push(p);
+3342:    if(QEDIT.points.length===4)QEDIT.drawing=false;
+3343:    updateHint();draw();return;
+3344:   }
+3345:   const r=cv.getBoundingClientRect();
+3346:   const dsx=r.width/cw,dsy=r.height/ch;
+3347:   let nearest=-1,best=Infinity;
+3348:   QEDIT.points.forEach((v,k)=>{
+3349:    const dist=Math.hypot((v[0]-p[0])*dsx,(v[1]-p[1])*dsy);
+3350:    if(dist<best){nearest=k;best=dist;}
+3351:   });
+3352:   if(best<=36){
+3353:    QEDIT.dragging=nearest;
+3354:    cv.setPointerCapture(e.pointerId);
+3355:   }else{
+3356:    hint.textContent="Select a green numbered handle, or click Redraw 4 corners.";
+3357:   }
+3358:  });
+3359:  cv.addEventListener("pointermove",e=>{
+3360:   if(!QEDIT||QEDIT.dragging<0)return;
+3361:   e.preventDefault();e.stopPropagation();
+3362:   QEDIT.points[QEDIT.dragging]=point(e);
+3363:   draw();
+3364:  });
+3365:  function endDrag(){if(QEDIT)QEDIT.dragging=-1;}
+3366:  cv.addEventListener("pointerup",endDrag);
+3367:  cv.addEventListener("pointercancel",endDrag);
+3368:  save.onclick=async()=>{
+3369:   if(!QEDIT||QEDIT.points.length!==4||!imageReady)return;
+3370:   save.disabled=true;
+3371:   const status=ov.querySelector("#qStatus");
+3372:   status.textContent="Saving four corners…";
+3373:   try{
+3374:    const res=await fetch("api/jobs/"+CUR+"/plate_quad/"+i,{method:"POST",
+3375:     headers:{"Content-Type":"application/json"},
+3376:     body:JSON.stringify({points:QEDIT.points,
+3377:      apply_track:ov.querySelector("#qTrack").checked})});
+3378:    let data={};try{data=await res.json();}catch(_){}
+3379:    if(!res.ok)throw new Error(data.error||"HTTP "+res.status);
+3380:    VLBL[i]="plate";
+3381:    const label=document.getElementById("vlabel"+i);
+3382:    if(label)label.textContent="Confirmed plate";
+3383:    status.textContent="Saved "+data.applied+
+3384:     " box(es); 1 verified training sample stored locally.";
+3385:    if(document.getElementById("beCv"))beScrub();
+3386:   }catch(error){
+3387:    status.textContent="Save failed: "+error.message;
+3388:   }finally{save.disabled=false;}
+3389:  };
+3390:  updateHint();
+3391: }
+3392: function beRemove(){
+3393:  if(BE.sel<0)return;
+3394:  applyDet(BE.sel,false);   // syncs thumbnail + refilters editor
+3395:  BE.sel=-1;
+3396:  document.getElementById("beRm").style.display="none";
+3397:  document.getElementById("beTimes").style.display="none";
+3398: }
+3399: async function beSave(){
+3400:  const ok=await saveAndRender(SHELLPH==="paused");
+
+## 5c0782f:openscrub_web.py:3165-3184
+3165: }
+3166: 
+3167: let QEDIT=null;
+3168: function closePlateQuad(){
+3169:  if(QEDIT&&QEDIT.resizeObserver)QEDIT.resizeObserver.disconnect();
+3170:  const ov=document.getElementById("plateQuadOverlay");
+3171:  if(ov)ov.remove();
+3172:  QEDIT=null;
+3173: }
+3174: function openPlateQuad(e,i){
+3175:  // Editing an individual plate must never start the card marquee.
+3176:  if(e){e.preventDefault();e.stopPropagation();}
+3177:  clearSel();
+3178:  return zoomDet(i,true);
+3179: }
+3180: async function zoomDet(i,forcePlate=false){
+3181:  const el=document.getElementById("det"+i);
+3182:  if(!forcePlate&&(!el||el.dataset.cat!=="plate")){
+3183:   let ov=document.getElementById("lb");
+3184:   if(!ov){ov=document.createElement("div");ov.id="lb";document.body.appendChild(ov);}
+
+## 5c0782f:openscrub_web.py:3259-3301
+3259:  function viewSize(){
+3260:   // Make canvas pixels match the *displayed* photo (including max-height).
+3261:   // A fullscreen video frame here previously made 8px-high plates impossible to edit.
+3262:   const rect=img.getBoundingClientRect();
+3263:   if(rect.width<1||rect.height<1)return false;
+3264:   const rw=Math.max(1,Math.round(rect.width)),rh=Math.max(1,Math.round(rect.height));
+3265:   if(cv.width!==rw)cv.width=rw;
+3266:   if(cv.height!==rh)cv.height=rh;
+3267:   cv.style.width=rect.width+"px";cv.style.height=rect.height+"px";
+3268:   return true;
+3269:  }
+3270:  function draw(){
+3271:   if(!QEDIT||!imageReady||!viewSize())return;
+3272:   const x=cv.getContext("2d"),sx=cv.width/cw,sy=cv.height/ch;
+3273:   const p=QEDIT.points;
+3274:   x.clearRect(0,0,cv.width,cv.height);
+3275:   if(p.length){
+3276:    x.beginPath();
+3277:    p.forEach((v,k)=>{const px=(v[0]-crop[0])*sx,py=(v[1]-crop[1])*sy;
+3278:     if(k)x.lineTo(px,py);else x.moveTo(px,py);});
+3279:    if(p.length===4)x.closePath();
+3280:    x.fillStyle="rgba(34,197,94,.18)";
+3281:    if(p.length===4)x.fill();
+3282:    x.lineWidth=2;x.strokeStyle="#4ade80";x.stroke();
+3283:    p.forEach((v,k)=>{
+3284:     const px=(v[0]-crop[0])*sx,py=(v[1]-crop[1])*sy;
+3285:     x.beginPath();x.arc(px,py,11,0,Math.PI*2);
+3286:     x.fillStyle="#0f172a";x.fill();
+3287:     x.lineWidth=3;x.strokeStyle="#4ade80";x.stroke();
+3288:     x.fillStyle="#fff";x.font="bold 13px sans-serif";x.textAlign="center";
+3289:     x.fillText(String(k+1),px,py+4);
+3290:    });
+3291:   }
+3292:  }
+3293:  function point(e){
+3294:   const r=cv.getBoundingClientRect();
+3295:   return [
+3296:    Math.max(0,Math.min(d.width-1,crop[0]+(e.clientX-r.left)/Math.max(1,r.width)*cw)),
+3297:    Math.max(0,Math.min(d.height-1,crop[1]+(e.clientY-r.top)/Math.max(1,r.height)*ch))
+3298:   ];
+3299:  }
+3300:  function updateHint(){
+3301:   if(!QEDIT)return;

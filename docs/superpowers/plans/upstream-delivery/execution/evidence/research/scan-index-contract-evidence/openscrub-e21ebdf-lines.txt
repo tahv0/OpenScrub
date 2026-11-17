@@ -1,0 +1,541 @@
+   730	@dataclass
+   731	class Detection:
+   732	    t_start: float
+   733	    t_end: float
+   734	    cbox: tuple          # box in CONTENT coordinates (x1,y1,x2,y2)
+   735	    category: str
+   736	    text: str
+   737	    confidence: float
+   738	    aoff: tuple = (0.0, 0.0)   # cumulative offset when detected (drift anchor)
+   739	    last_seen: float = 0.0     # time of last positive sighting (t_end incl. hold)
+   740	    dense: bool = False        # per-frame dense-face detection: never merged
+   741	                               # across positions (it tracks a moving face)
+   742	    track: int = -1            # dense detections of the same physical object
+   743	                               # share a track id, so review shows ONE item
+   744	                               # per face instead of hundreds of frames
+   745	    person: int = -1           # face tracks clustered by facial IDENTITY
+   746	                               # (SFace embeddings): one review decision per
+   747	                               # PERSON, applied to all their appearances
+   748	    poly: tuple = ()           # silhouette contour(s) from a segmentation
+   749	                               # model, points NORMALIZED to cbox (0..1) —
+   750	                               # render blurs ONLY inside them (person
+   751	                               # category); empty = plain box redaction
+   752	
+   753	
+   754	class PhiMemory:
+   755	    """Remembers every string ever confirmed as PII in this video. At each
+   756	    scan, all OCR'd words are checked against memory, so a name identified
+   757	    once gets blurred on every later appearance — anywhere on screen — even
+   758	    when NER/heuristics fail on that occurrence. Alpha strings match fuzzily
+   759	    (handles OCR misreads); numeric strings require same length with at most
+   760	    one differing digit (so benign numbers don't collide with MRNs)."""
+   761	
+   762	    IMMEDIATE = {"dob", "phone", "ssn", "email", "mrn", "address",
+   763	                 "qrcode", "screen", "anytext", "phrase",
+   764	                 "apikey", "ipaddr", "card", "plate", "person"}
+   765	
+   766	    def __init__(self, threshold=82, name_sightings=2):
+   767	        from rapidfuzz import fuzz
+   768	        self.fuzz = fuzz
+   769	        self.threshold = threshold
+   770	        self.name_sightings = name_sightings
+   771	        self.items = {}    # normalized text -> category
+   772	        self.counts = {}   # normalized text -> primary-detector sightings
+   773	        # Recall used to scan every remembered string for every OCR word.
+   774	        # Long recordings therefore got progressively slower as memory grew.
+   775	        # Length buckets (contributed by Tuomas Aho) keep each search local
+   776	        # to plausible candidates, and every bucket is matched in ONE
+   777	        # compiled rapidfuzz batch call instead of a Python loop — the
+   778	        # per-string fuzzy comparisons were the real cost. Matching rules
+   779	        # are unchanged: same scores, same thresholds, and the FIRST
+   780	        # remembered match still wins (lowest insertion serial).
+   781	        self._alpha = {}    # length -> ([text], [insertion serial])
+   782	        self._digits = {}   # length -> [text], insertion-ordered
+   783	        self._memory_serial = 0
+   784	
+   785	    @staticmethod
+   786	    def norm(s):
+   787	        return s.strip(".,:;()[]").lower()
+   788	
+   789	    def add(self, text, category, primary=True):
+   790	        if category in ("face", "manual"):
+   791	            return
+   792	        n = self.norm(text)
+   793	        if len(n) >= 3 and n not in STOPWORDS:
+   794	            if n not in self.items:
+   795	                self.items[n] = category
+   796	                if n.isdigit():
+   797	                    self._digits.setdefault(len(n), []).append(n)
+   798	                else:
+   799	                    keys, serials = self._alpha.setdefault(len(n), ([], []))
+   800	                    keys.append(n)
+   801	                    serials.append(self._memory_serial)
+   802	                self._memory_serial += 1
+   803	            if primary:
+   804	                self.counts[n] = self.counts.get(n, 0) + 1
+   805	
+   806	    def _gated(self, key, cat):
+   807	        """Names must be seen by a primary detector on name_sightings
+   808	        separate scans before memory starts recalling them — one bad
+   809	        NER hit shouldn't multiply across the whole video. Regex
+   810	        categories are high-precision and recall immediately."""
+   811	        if cat in self.IMMEDIATE:
+   812	            return cat
+   813	        return cat if self.counts.get(key, 0) >= self.name_sightings else None
+   814	
+   815	    def recall(self, word):
+   816	        n = self.norm(word)
+   817	        if len(n) < 3 or n in STOPWORDS:
+   818	            return None
+   819	        if n in self.items:
+   820	            return self._gated(n, self.items[n])
+   821	        from rapidfuzz import process
+   822	        from rapidfuzz.distance import Hamming
+   823	        if n.isdigit():
+   824	            # same length, at most one differing digit; first remembered wins
+   825	            keys = self._digits.get(len(n))
+   826	            if keys:
+   827	                hits = process.extract(n, keys, scorer=Hamming.distance,
+   828	                                       score_cutoff=1, limit=None,
+   829	                                       processor=None)
+   830	                if hits:
+   831	                    k = keys[min(h[2] for h in hits)]
+   832	                    return self._gated(k, self.items[k])
+   833	            return None
+   834	        if len(n) >= 4:
+   835	            best = None                     # (insertion serial, text)
+   836	            for size in range(max(3, len(n) - 2), len(n) + 3):
+   837	                bucket = self._alpha.get(size)
+   838	                if not bucket:
+   839	                    continue
+   840	                keys, serials = bucket
+   841	                for _, _, i in process.extract(
+   842	                        n, keys, scorer=self.fuzz.ratio,
+   843	                        score_cutoff=self.threshold, limit=None,
+   844	                        processor=None):
+   845	                    if best is None or serials[i] < best[0]:
+   846	                        best = (serials[i], keys[i])
+   847	            if best is not None:
+   848	                return self._gated(best[1], self.items[best[1]])
+   849	        return None
+  1323	# ----------------------------------------------------------------------------
+  1324	# Temporal merge (in content coordinates)
+  1325	# ----------------------------------------------------------------------------
+  1326	
+  1327	def boxes_overlap(a, b, slack=12):
+  1328	    return not (a[2] + slack < b[0] or b[2] + slack < a[0]
+  1329	                or a[3] + slack < b[1] or b[3] + slack < a[1])
+  1330	
+  2915	def merge_detections(dets, hold, scans=None, bridge_gap=4.0, fuzz=None,
+  2916	                     gap_check=None):
+  2917	    """Chain detections of the same category whose content boxes overlap.
+  2918	
+  2919	    Short gaps (within `hold`) chain unconditionally, as before. Longer gaps
+  2920	    up to `bridge_gap` seconds are BRIDGED — kept blurred straight through —
+  2921	    unless an intermediate scan positively saw different, readable text in
+  2922	    that region (i.e. the content genuinely changed). An empty or unreadable
+  2923	    region during the gap is treated as an OCR miss and stays covered:
+  2924	    fail closed, never flash PII."""
+  2925	    dets = sorted(dets, key=lambda d: d.t_start)
+  2926	    merged = []
+  2927	    mergeable = []  # Non-dense detections only
+  2928	
+  2929	    def contradicted(m, t_from, t_to):
+  2930	        """True only if the gap contains STABLE different text — the same
+  2931	        different string read on two or more scans. A single divergent read
+  2932	        is far more likely to be the mouse cursor sitting over the word (or
+  2933	        another transient occlusion) garbling OCR than genuinely new content:
+  2934	        real replacement text reads consistently, cursor garble varies every
+  2935	        scan. Fail closed — an unstable read keeps the region blurred."""
+  2936	        if not scans:
+  2937	            return False
+  2938	        mx1, my1, mx2, my2 = m.cbox
+  2939	        seen = {}
+  2940	        for st, _cum, words in scans:
+  2941	            if not (t_from + 0.01 < st < t_to - 0.01):
+  2942	                continue
+  2943	            for txt, (x1, y1, x2, y2), conf in words:
+  2944	                if conf < 0.6:
+  2945	                    continue
+  2946	                cxm = (x1 + x2) / 2
+  2947	                cym = (y1 + y2) / 2
+  2948	                if mx1 - 6 <= cxm <= mx2 + 6 and my1 - 4 <= cym <= my2 + 4:
+  2949	                    n = PhiMemory.norm(txt)
+  2950	                    if fuzz:
+  2951	                        mt = PhiMemory.norm(m.text)
+  2952	                        # partial_ratio catches cursor-occluded reads of the
+  2953	                        # SAME word ("errin" ~ "herrin"): those are evidence
+  2954	                        # the word is still there, never evidence it changed
+  2955	                        same = (fuzz.ratio(n, mt) >= 70
+  2956	                                or fuzz.partial_ratio(n, mt) >= 85)
+  2957	                    else:
+  2958	                        same = False
+  2959	                    if not same and len(n) >= 3:
+  2960	                        seen[n] = seen.get(n, 0) + 1
+  2961	                        if seen[n] >= 2:
+  2962	                            return True
+  2963	        return False
+  2964	
+  2965	    for d in dets:
+  2966	        d.last_seen = d.t_start
+  2967	        if getattr(d, 'dense', False):
+  2968	            merged.append(d)
+  2969	            continue
+  2970	        if not getattr(d, "dense", False):
+  2971	            # dense samples keep their sub-frame hold: stamping them with the
+  2972	            # multi-second OCR hold leaves every PAST position blurred for
+  2973	            # `hold` seconds — a trail of stale boxes marching away from a
+  2974	            # moving face. Their continuity across detector flicker and the
+  2975	            # onset gap is handled per-track by smooth_dense_tracks().
+  2976	            d.t_end = d.t_start + hold
+  2977	        for m in reversed(mergeable):
+  2978	            if m.category != d.category or not boxes_overlap(m.cbox, d.cbox):
+  2979	                continue
+  2980	            if getattr(d, "dense", False) or getattr(m, "dense", False):
+  2981	                # dense face boxes are per-frame position samples of a possibly
+  2982	                # moving face — never merge them, or the bounding box balloons
+  2983	                # to cover the whole path. Each stands alone with its short
+  2984	                # hold, so the blur rides the face frame by frame.
+  2985	                continue
+  2986	            # different readable text in the same spot is a DIFFERENT object
+  2987	            # (e.g. names sliding through one row of an inner-scrolling list)
+  2988	            # — never fuse them, or the region's text and its frames diverge
+  2989	            if fuzz and m.text and d.text:
+  2990	                _mn = PhiMemory.norm(m.text)
+  2991	                _dn = PhiMemory.norm(d.text)
+  2992	                if (fuzz.ratio(_mn, _dn) < 70
+  2993	                        and fuzz.partial_ratio(_mn, _dn) < 85):
+  2994	                    continue
+  2995	            gap = d.t_start - m.last_seen
+  2996	            ok = gap <= hold
+  2997	            if not ok and not contradicted(m, m.last_seen, d.t_start):
+  2998	                if gap <= bridge_gap:
+  2999	                    ok = True
+  3000	                elif gap_check is not None:
+  3001	                    # beyond the configured bridge: ask the pixels. The file
+  3002	                    # is checked at points inside the gap — bridge any length
+  3003	                    # of gap the content verifiably persisted through, refuse
+  3004	                    # if it visibly changed. The knob stops mattering.
+  3005	                    ok = gap_check(m, m.last_seen, d.t_start)
+  3006	            if ok:
+  3007	                m.last_seen = max(m.last_seen, d.t_start)
+  3008	                m.t_end = max(m.t_end, d.t_end)
+  3009	                m.cbox = (min(m.cbox[0], d.cbox[0]), min(m.cbox[1], d.cbox[1]),
+  3010	                          max(m.cbox[2], d.cbox[2]), max(m.cbox[3], d.cbox[3]))
+  3011	                break
+  3012	        else:
+  3013	            merged.append(d)
+  3014	            mergeable.append(d)
+  3015	
+  3016	    # Tail extension: a span ends `hold` after its LAST positive detection,
+  3017	    # but the text often outlives that detection — under heavy compression
+  3018	    # the final scans read only fragments ('4111.' '1111-1111' '1111'),
+  3019	    # which fail the full pattern yet are strong evidence the string is
+  3020	    # still on screen (the benchmark's compressed card leaked exactly this
+  3021	    # tail). Walk the scans PAST each span's last sighting: while a scan's
+  3022	    # words in the region fuzzy-match the span text (the same same-word
+  3023	    # test contradicted() uses), the content verifiably persisted — extend
+  3024	    # coverage through that scan. A scan with no matching read stops the
+  3025	    # walk, so a real scene change never accretes stale blur.
+  3026	    if scans and fuzz:
+  3027	        for m in merged:
+  3028	            if getattr(m, "dense", False) or not m.text:
+  3029	                continue
+  3030	            mx1, my1, mx2, my2 = m.cbox
+  3031	            mt = PhiMemory.norm(m.text)
+  3032	            for st, _cum, words in scans:
+  3033	                if st <= m.last_seen + 0.01:
+  3034	                    continue
+  3035	                if st - m.last_seen > bridge_gap:
+  3036	                    break
+  3037	                support = False
+  3038	                for txt, (x1, y1, x2, y2), conf in words:
+  3039	                    if conf < 0.5:
+  3040	                        continue
+  3041	                    cxm = (x1 + x2) / 2
+  3042	                    cym = (y1 + y2) / 2
+  3043	                    if not (mx1 - 6 <= cxm <= mx2 + 6
+  3044	                            and my1 - 4 <= cym <= my2 + 4):
+  3045	                        continue
+  3046	                    n = PhiMemory.norm(txt)
+  3047	                    if len(n) >= 3 and (fuzz.ratio(n, mt) >= 70
+  3048	                                        or fuzz.partial_ratio(n, mt) >= 85):
+  3049	                        support = True
+  3050	                        break
+  3051	                if not support:
+  3052	                    break
+  3053	                m.last_seen = st
+  3054	                m.t_end = max(m.t_end, st + hold)
+  3055	    return merged
+  6287	def write_report(path, args, state, output_path=None):
+  6288	    prov = {
+  6289	        "tool": "openscrub", "version": VERSION,
+  6290	        "timestamp": datetime.datetime.now().astimezone().isoformat(),
+  6291	        "input": os.path.abspath(args.video),
+  6292	        "input_sha256": state.get("input_sha256"),
+  6293	        "original_input": (os.path.abspath(args.original_video)
+  6294	                           if getattr(args, "original_video", None) else None),
+  6295	        "vfr_normalized": bool(getattr(args, "original_video", None)),
+  6296	        "hdr_tonemapped": bool(getattr(args, "hdr_tonemapped", False)),
+  6297	        "hdr_output": bool(getattr(args, "hdr_source", None)),
+  6298	        "metadata_stripped": True,   # renders pass -map_metadata -1
+  6299	        "zones": getattr(args, "zones_data", None),
+  6300	        "windows": getattr(args, "windows_data", None),
+  6301	        "settings": _settings_dict(args),
+  6302	    }
+  6303	    if output_path and os.path.exists(output_path):
+  6304	        prov["output"] = os.path.abspath(output_path)
+  6305	        prov["output_sha256"] = sha256_file(output_path)
+  6306	    doc = {
+  6307	        "provenance": prov,
+  6308	        "render_state": {
+  6309	            "fps": state["fps"],
+  6310	            "cum": [[round(x, 1), round(y, 1)] for x, y in state["cum"]],
+  6311	            "bands": [[round(x, 1), round(y, 1)] for x, y in state["bands"]],
+  6312	        },
+  6313	        "detections": ([dict(asdict(d), enabled=True)
+  6314	                        for d in state["detections"]]
+  6315	                       + [dict(asdict(d), enabled=False, zone_dropped=True)
+  6316	                          for d in state.get("zdropped", [])]),
+  6317	    }
+  6318	    # additive field: audio redaction spans survive report round-trips (the
+  6319	    # web review stores them here; the render-end rewrite must not drop them)
+  6320	    aspans = getattr(args, "audio_spans", None)
+  6321	    if aspans:
+  6322	        doc["audio_redactions"] = [
+  6323	            {"t0": a, "t1": b, "mode": m} for a, b, m in aspans]
+  6324	    if state.get("audio_suggestions"):
+  6325	        doc["audio_suggestions"] = state["audio_suggestions"]
+  6326	    if state.get("audio_transcript"):
+  6327	        doc["audio_transcript"] = state["audio_transcript"]
+  6328	    with open(path, "w", encoding="utf-8") as f:
+  6329	        json.dump(doc, f, indent=1)
+  6330	    try:
+  6331	        os.chmod(path, 0o600)
+  6332	    except OSError:
+  6333	        pass
+  6334	
+  7096	def reverse_pass(scans, memory, cats, namer, lenient=76):
+  7097	    """After the scan, re-search every OCR'd word against remembered PII at
+  7098	    a more lenient threshold. Catches near-misses (OCR misreads) of strings
+  7099	    already confirmed elsewhere in the video; gating rules still apply so a
+  7100	    one-off false positive can't spread."""
+  7101	    from rapidfuzz import fuzz
+  7102	    extra = []
+  7103	    for t, cum, words in scans:
+  7104	        for w, cbox, conf in words:
+  7105	            n = PhiMemory.norm(w)
+  7106	            if len(n) < 4 or n in STOPWORDS:
+  7107	                continue
+  7108	            if namer and namer._allowed(w):
+  7109	                continue
+  7110	            for k, cat in memory.items.items():
+  7111	                if cat not in cats:
+  7112	                    continue
+  7113	                if memory._gated(k, cat) is None:
+  7114	                    continue
+  7115	                if k.isdigit() or n.isdigit():
+  7116	                    hit = (k.isdigit() and n.isdigit() and len(k) == len(n)
+  7117	                           and sum(a != b for a, b in zip(k, n)) <= 2)
+  7118	                else:
+  7119	                    hit = (abs(len(k) - len(n)) <= 2
+  7120	                           and fuzz.ratio(k, n) >= lenient)
+  7121	                if hit:
+  7122	                    extra.append(Detection(t, t,
+  7123	                                           tuple(int(v) for v in cbox),
+  7124	                                           cat, w, round(float(conf), 3),
+  7125	                                           tuple(cum)))
+  7126	                    break
+  7127	    return extra
+  7159	def run_scan(args, cb=None):
+  7160	    """Scan pass only: OCR + face detection + tracking. Returns a state dict
+  7161	    consumed by run_render (and serialized into --report files)."""
+  7162	    cb = cb or Callbacks()
+  7163	    if not args.video or not os.path.exists(args.video):
+  7164	        raise RuntimeError(f"input not found: {args.video}")
+  7165	    # normalize attributes that may be absent when args come from an older
+  7166	    # embedder (GUI/web) rather than _prep_args
+  7167	    for attr, default in (("ignore_regions", []), ("config", None),
+  7168	                          ("from_report", None), ("face_expand", 0.15),
+  7169	                          ("no_vfr_fix", False)):
+  7170	        if not hasattr(args, attr):
+  7171	            setattr(args, attr, default)
+  7172	    normalize_vfr(args, cb)
+  7173	    cats = {c.strip() for c in args.categories.split(",")
+  7174	            if c.strip() and c.strip() != "none"}
+  7175	    # per-window categories (unified editor) extend the load set: a category
+  7176	    # any window asks for must have its engines loaded, whatever --categories
+  7177	    # says. Union only ever ADDS detection — fail closed.
+  7178	    for _w in (getattr(args, "windows_data", None) or []):
+  7190	    # actually need — a faces-only job must not pay for PaddleOCR (seconds
+  7191	    # of startup + 2-3 GB of RAM) or spaCy.
+  7192	    text_cats = cats - {"face", "plate", "person", "qrcode", "screen",
+  7193	                        "anytext"}
+  7194	
+  7195	    cb.log(f"[1/4] OCR engine   (openscrub v{VERSION})")
+  7196	    if text_cats:
+  7197	        ocr = make_ocr(args.engine, device=args.device)
+  7198	        cb.log(f"      using {type(ocr).__name__}")
+  7199	    else:
+  7200	        ocr = None
+  7201	        cb.log("      skipped — no text categories selected "
+  7202	               f"({', '.join(sorted(cats))} only): detector-only scan")
+  7203	
+  7204	    cb.log("[2/4] Detectors")
+  7205	    if cuda_dnn_available():
+  7206	        cb.log("      OpenCV DNN: CUDA (GPU-accelerated face detection "
+  7207	               "+ identity grouping)")
+  7208	    if "name" in cats:
+  7209	        namer = NameDetector(allow_names=args.allow_names,
+  7210	                             extra_names=args.extra_names,
+  7211	                             use_ner=not args.no_ner,
+  7212	                             heuristic=args.heuristic_names)
+  7213	        modes = []
+  7505	                   "motion) — scroll tracking and safety bands off; "
+  7506	                   "detections are screen-anchored. Force with "
+  7507	                   "--scroll-track on if this is actually a screen "
+  7508	                   "recording.")
+  7509	    tracker = ScrollTracker()
+  7510	    memory = None if (args.no_memory or not text_cats) else PhiMemory(
+  7511	        threshold=78 if getattr(args, "paranoid", False) else 82)
+  7512	    cum = []
+  7513	    bands = []
+  7514	    raw = []
+  7515	    scans = []
+  7883	            if memory is not None:
+  7884	                primary_found = list(found)
+  7885	                flagged = {tuple(b) for _, b, _ in
+  7886	                           ((d.text, (d.cbox[0] + cx, d.cbox[1] + cy,
+  7887	                                      d.cbox[2] + cx, d.cbox[3] + cy), 0)
+  7888	                            for d in found)}
+  7889	                for w, box, conf in words:
+  7890	                    if tuple(box) in flagged:
+  7891	                        continue
+  7892	                    cat = memory.recall(w)
+  7893	                    if cat and cat in cats and not (namer and namer._allowed(w)):
+  7894	                        cbox = (int(box[0] - cx), int(box[1] - cy),
+  7895	                                int(box[2] - cx), int(box[3] - cy))
+  7896	                        found.append(Detection(t, t, cbox, cat, w,
+  7897	                                               round(float(conf), 3), (cx, cy)))
+  7898	                        n_recalled += 1
+  7899	                        k = PhiMemory.norm(w)
+  7900	                        recall_counts[k] = recall_counts.get(k, 0) + 1
+  7901	                # only primary detections build memory (recalls must not
+  7902	                # self-reinforce a false positive)
+  7903	                for d in primary_found:
+  7904	                    memory.add(d.text, d.category, primary=True)
+  7905	
+  8023	            raw.extend(found)
+  8024	            if ocr is not None:
+  8025	                scans.append((t, (cx, cy),
+  8026	                              [(w, (b[0] - cx, b[1] - cy,
+  8027	                                    b[2] - cx, b[3] - cy), c)
+  8028	                               for w, b, c in words]))
+  8119	    cap.release()
+  8120	
+  8121	    if memory is not None:
+  8122	        extra = reverse_pass(scans, memory, cats, namer,
+  8123	                             lenient=72 if getattr(args, "paranoid", False) else 76)
+  8124	        if args.ignore_regions:
+  8125	            extra = [d for d in extra if not in_ignore_region(
+  8126	                (d.cbox[0] + d.aoff[0], d.cbox[1] + d.aoff[1],
+  8127	                 d.cbox[2] + d.aoff[0], d.cbox[3] + d.aoff[1]),
+  8128	                args.ignore_regions)]
+  8129	        if scoped:
+  8130	            kept = []
+  8131	            for d in extra:
+  8132	                _st = _scope_at(d.t_start)
+  8133	                if d.category not in _st:
+  8134	                    win_inactive[d.category] = \
+  8135	                        win_inactive.get(d.category, 0) + 1
+  8136	                    continue
+  8137	                rects = _st[d.category]
+  8138	                sb = (d.cbox[0] + d.aoff[0], d.cbox[1] + d.aoff[1],
+  8139	                      d.cbox[2] + d.aoff[0], d.cbox[3] + d.aoff[1])
+  8140	                if rects and not in_any_zone(sb, rects):
+  8141	                    zone_dropped[d.category] = zone_dropped.get(d.category, 0) + 1
+  8142	                    zdrop_raw.append(d)
+  8143	                else:
+  8144	                    kept.append(d)
+  8145	            extra = kept
+  8146	        if extra:
+  8147	            cb.log(f"      reverse pass: {len(extra)} additional near-miss "
+  8148	                   "region(s) from remembered PII")
+  8149	            raw.extend(extra)
+  8150	    hold = args.sample_interval + 0.3
+  8151	    from rapidfuzz import fuzz as _fuzz
+  8224	    _gap_stats = {"checked": 0, "bridged": 0}
+  8225	    _gap_cap = {"cap": None}
+  8226	
+  8227	    def _gap_check(m, t_from, t_to):
+  8228	        """Visual gap verification: template-match the region at points
+  8229	        inside [t_from, t_to]. True only if the content is present at ALL
+  8230	        sampled points — then the dropout was an OCR miss and the blur may
+  8231	        bridge it, however long the gap. Any point where it's absent or
+  8232	        changed means the content genuinely went away: refuse. Dense
+  8233	        detections never reach here (they never merge)."""
+  8234	        if _gap_cap["cap"] is None:
+  8235	            _gap_cap["cap"] = cv2.VideoCapture(args.video)
+  8236	        cap3 = _gap_cap["cap"]
+  8237	
+  8238	        def _frame_small(t):
+  8239	            fr = _grab_frame(cap3, t,
+  8240	                             cap3.get(cv2.CAP_PROP_FPS) or 30.0)
+  8241	            if fr is None:
+  8242	                return None
+  8243	            return cv2.resize(cv2.cvtColor(fr, cv2.COLOR_BGR2GRAY), None,
+  8244	                              fx=BT_SCALE, fy=BT_SCALE)
+  8245	        ref = _frame_small(t_from)
+  8246	        if ref is None:
+  8247	            return False
+  8248	        ox, oy = m.aoff
+  8249	        x1 = int((m.cbox[0] + ox) * BT_SCALE)
+  8250	        y1 = int((m.cbox[1] + oy) * BT_SCALE)
+  8251	        x2 = int((m.cbox[2] + ox) * BT_SCALE)
+  8252	        y2 = int((m.cbox[3] + oy) * BT_SCALE)
+  8253	        rh, rw = ref.shape[:2]
+  8254	        x1, y1, x2, y2 = max(0, x1), max(0, y1), min(rw, x2), min(rh, y2)
+  8255	        if x2 - x1 < 6 or y2 - y1 < 4:
+  8256	            return False
+  8257	        tmpl = ref[y1:y2, x1:x2]
+  8258	        if float(tmpl.std()) < 4:
+  8259	            return False                 # featureless: cannot verify
+  8260	        th_, tw_ = tmpl.shape
+  8261	        M = 10
+  8262	        n_pts = min(5, max(2, int(t_to - t_from)))
+  8263	        _gap_stats["checked"] += 1
+  8264	        for i in range(1, n_pts + 1):
+  8265	            t = t_from + (t_to - t_from) * i / (n_pts + 1)
+  8266	            sm = _frame_small(t)
+  8267	            if sm is None:
+  8268	                return False
+  8269	            bx1, by1 = max(0, x1 - M), max(0, y1 - M)
+  8270	            bx2, by2 = min(rw, x1 + tw_ + M), min(rh, y1 + th_ + M)
+  8271	            if bx2 - bx1 < tw_ or by2 - by1 < th_:
+  8272	                return False
+  8273	            reg = sm[by1:by2, bx1:bx2]
+  8274	            if float(cv2.matchTemplate(reg, tmpl,
+  8275	                                       cv2.TM_CCOEFF_NORMED).max()) < 0.6:
+  8276	                return False             # absent or changed: do not bridge
+  8277	        _gap_stats["bridged"] += 1
+  8278	        return True
+  8279	
+  8280	    detections = merge_detections(raw, hold=hold, scans=scans,
+  8281	                                  bridge_gap=args.bridge_gap, fuzz=_fuzz,
+  8282	                                  gap_check=_gap_check)
+  8283	    zdropped = merge_detections(zdrop_raw, hold=hold, scans=scans,
+  8284	                                bridge_gap=args.bridge_gap, fuzz=_fuzz,
+  8285	                                gap_check=_gap_check) if zdrop_raw else []
+  8286	    if _gap_cap["cap"] is not None:
+  8287	        _gap_cap["cap"].release()
+  8420	            getattr(args, "original_video", None) or args.video, cats, cb,
+  8421	            model_size=getattr(args, "audio_pii_model", "base") or "base",
+  8422	            nlp=getattr(namer, "nlp", None) if namer else None,
+  8423	            custom_res=custom_res, phrases=phrases)
+  8424	
+  8425	    return {"fps": fps, "cum": cum, "bands": bands, "detections": detections,
+  8426	            "zdropped": zdropped, "audio_suggestions": audio_sugg,
+  8427	            "audio_transcript": audio_tx,
+  8428	            "input_sha256": sha256_file(args.video),
+  8429	            "stats": {"scans": n_scans, "raw_hits": len(raw),
+  8430	                      "regions": len(detections), "recalls": n_recalled,

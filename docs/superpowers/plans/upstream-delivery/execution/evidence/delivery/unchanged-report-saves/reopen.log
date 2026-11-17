@@ -1,0 +1,10 @@
+  recovered 3 job(s) from /tmp/openscrub-task631/browser-runtime/openscrub_jobs
+{
+  "fresh_process_HTTP_reopen": true,
+  "same_value_publication_skipped": true,
+  "output_decoded": true,
+  "kept_region_mean": 176.33333333333334,
+  "output_bytes": 2334,
+  "report_sha256": "0487310ce1fd17f088feb7639c17c39d9ef635b050bbebc11845f80d61eb9cb4",
+  "active_source": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py"
+}

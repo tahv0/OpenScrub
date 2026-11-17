@@ -1,0 +1,12 @@
+   674	def _run_job(job, action):
+   675	    jid = job["id"]
+   676	    cb = WebCallbacks(job)
+   677	    try:
+   678	        if action == "scan":
+   679	            job["phase"] = "scanning"
+   680	            job["log"].append("— scan started —")
+   681	            args = build_args(job)
+   682	            state = openscrub.run_scan(args, cb)
+   683	            openscrub.write_report(os.path.join(job["dir"], "report.json"),
+   684	                                  args, state)
+   685	            job["stats"] = state["stats"]

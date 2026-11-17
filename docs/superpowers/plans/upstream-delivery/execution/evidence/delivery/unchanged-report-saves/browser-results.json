@@ -1,0 +1,405 @@
+{
+  "url": "http://127.0.0.1:18463/",
+  "title": "OpenScrub",
+  "requests": [
+    {
+      "enabled": {
+        "0": false
+      },
+      "manual": [],
+      "box_overrides": {},
+      "time_overrides": {}
+    },
+    {
+      "enabled": {
+        "0": true
+      },
+      "manual": [],
+      "box_overrides": {},
+      "time_overrides": {}
+    },
+    {
+      "enabled": {
+        "0": false
+      },
+      "manual": [],
+      "box_overrides": {},
+      "time_overrides": {}
+    }
+  ],
+  "renders": 1,
+  "publications": [
+    {
+      "save_route": true,
+      "failed": true
+    },
+    {
+      "save_route": false,
+      "failed": false,
+      "complete": true
+    }
+  ],
+  "errors": [],
+  "console": [
+    "Failed to load resource: the server responded with a status of 500 (INTERNAL SERVER ERROR)"
+  ],
+  "current": {
+    "provenance": {
+      "input": "/tmp/openscrub-task631/browser-runtime/openscrub_jobs/9b60b0595efb/input.avi",
+      "settings": {
+        "allow_names": null,
+        "extra_names": null,
+        "engine": "auto",
+        "device": "auto",
+        "encoder": "x264",
+        "no_ner": false,
+        "heuristic_names": "auto",
+        "sample_interval": 0.5,
+        "scan_trigger": 60,
+        "pad": 0,
+        "no_vfr_fix": false,
+        "out_quality": "archival",
+        "codec": "h264",
+        "hdr_output": "match",
+        "tile": "auto",
+        "face_heads": false,
+        "dense_faces": false,
+        "dense_face_stride": 1,
+        "scan_speed": "thorough",
+        "plate_model": null,
+        "face_shape": "ellipse",
+        "face_model": null,
+        "plate_threshold": 0.35,
+        "person_model": null,
+        "person_threshold": 0.5,
+        "face_threshold": 0.6,
+        "draw_scores": false,
+        "detect_scale": 1,
+        "face_expand": 0.15,
+        "coverage": "tight",
+        "mode": "box",
+        "mrn_regex": "",
+        "scroll_track": "auto",
+        "adaptive": "on",
+        "phrase": [],
+        "phrases": null,
+        "custom_regex": [],
+        "bridge_gap": 4,
+        "no_memory": false,
+        "preview": false,
+        "detect_windows": "",
+        "detect_windows_frac": "",
+        "clip_frac": "",
+        "mute_audio_tracks": "",
+        "audio_lane_count": null,
+        "clip_start": 0,
+        "clip_end": 0,
+        "audio_pii": false,
+        "audio_pii_model": "base",
+        "audio_pii_apply": false,
+        "audio_redact": "",
+        "audio_redact_mode": "mute",
+        "overwrite": false,
+        "backtrack_window": 2.5,
+        "no_backtrack": false,
+        "skip_start": 0,
+        "skip_end": 0,
+        "zones": null,
+        "windows": null,
+        "ignore_region": [],
+        "ocr_upscale": "auto",
+        "paranoid": false,
+        "vfr": "auto",
+        "categories": "name,dob,phone,ssn,email,address,card,apikey,ipaddr,plate,face,person",
+        "ignore_regions": [],
+        "zones_data": null,
+        "windows_data": null,
+        "audio_spans": []
+      },
+      "tool": "openscrub",
+      "version": "1.0.96",
+      "timestamp": "2026-11-17T06:19:29.061780+02:00",
+      "input_sha256": "c55d0014fc53d331fe6e066832ff7e50502d8ad43d69ac41b40a68f8f5e61795",
+      "original_input": null,
+      "vfr_normalized": false,
+      "hdr_tonemapped": false,
+      "hdr_output": false,
+      "metadata_stripped": true,
+      "zones": null,
+      "windows": null,
+      "output": "/tmp/openscrub-task631/browser-runtime/openscrub_jobs/9b60b0595efb/output.mp4",
+      "output_sha256": "6f116e202cd01165282c2a91c965d0b1d01c20b862fe0e009282c09d27a7a521"
+    },
+    "render_state": {
+      "fps": 30,
+      "cum": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ]
+      ],
+      "bands": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ]
+      ]
+    },
+    "detections": [
+      {
+        "t_start": 0,
+        "t_end": 0.8,
+        "cbox": [
+          10,
+          10,
+          30,
+          30
+        ],
+        "category": "manual",
+        "text": "synthetic",
+        "confidence": 1,
+        "aoff": [
+          0,
+          0
+        ],
+        "last_seen": 0.5,
+        "enabled": false
+      }
+    ],
+    "custom": {
+      "preserved": true
+    }
+  }
+}

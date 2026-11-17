@@ -1,0 +1,14 @@
+Research date: 2026-11-17
+Source-only operations executed:
+  git cat-file -t 12919c96c6f7558136b50d7b4d85e5e6b62f1971
+  git archive 12919c96c6f7558136b50d7b4d85e5e6b62f1971
+  git rev-parse <pin> and <pin>^{tree}
+  git ls-tree -rz --full-tree <pin>
+  git show <pin>:openscrub.py and openscrub_web.py
+  git show --format=fuller <donor> -- <selected product/test paths>
+  git diff 5c0782f^1 5c0782f -- openscrub_web.py
+  rg/sed/Python file reads over pinned export, required SDD reports and preservation ledger
+  Python tar extraction, source SHA256/Git blob verification, evidence/report writing and local link checking
+The exact export manifest lists every file, byte count and hash; relevant excerpts retain original source line numbers. Donor hashes/diffs are in donor-identities.json.
+No production imports, tests, browser, benchmark, suite, build, models, media generation, external network publication, branches or product edits.
+Acceptance fixtures in the report are proposed and unrun. Prior runtime observations are attributed to their own SDD reports and older exact pins, not rerun here.

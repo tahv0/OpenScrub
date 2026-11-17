@@ -1,0 +1,195 @@
+    96	def test_memory_two_sighting_gate():
+    97	    m = openscrub.PhiMemory()
+    98	    m.add("Henderson", "name", primary=True)
+    99	    assert m.recall("Henderson") is None            # 1 sighting: gated
+   100	    m.add("Henderson", "name", primary=True)
+   101	    assert m.recall("Henderson") == "name"          # 2 sightings: recalls
+   102	    m.add("5015550142", "phone", primary=True)
+   103	    assert m.recall("5015550142") == "phone"        # regex cats: immediate
+   104	    m.add("face", "face")                           # never memorized
+   105	    assert "face" not in m.items
+   106	
+   107	
+   108	def test_memory_fuzzy_recall_never_scans_the_full_history():
+   109	    m = openscrub.PhiMemory()
+   110	    for i in range(2000):
+   111	        m.add("unrelated-token-%04d" % i, "name", primary=True)
+   112	        m.add("unrelated-token-%04d" % i, "name", primary=True)
+   113	    m.add("Henderson", "name", primary=True)
+   114	    m.add("Henderson", "name", primary=True)
+   115	    m.add("5015550142", "phone", primary=True)
+   116	
+   117	    class NoFullIteration(dict):
+   118	        def items(self):
+   119	            raise AssertionError("recall walked the complete remembered-string history")
+   120	
+   121	    m.items = NoFullIteration(m.items)
+   122	    assert m.recall("Henders0n") == "name"
+   123	    assert m.recall("5015550143") == "phone"
+   124	
+   125	
+   126	def test_indexed_memory_preserves_first_remembered_fuzzy_match():
+   127	    m = openscrub.PhiMemory(threshold=50)
+   128	    m.add("alpha", "first", primary=True)
+   129	    m.add("alpha", "first", primary=True)
+   130	    m.add("alphaaa", "second", primary=True)
+   131	    m.add("alphaaa", "second", primary=True)
+   132	    assert m.recall("alphaa") == "first"
+   133	
+   134	
+   135	def test_batched_memory_recall_matches_reference_scan():
+   136	    """The indexed + batched recall must return EXACTLY what the original
+   137	    linear scan returned (same scores, thresholds, first-remembered tie
+   138	    break, name gating) — a privacy tool can't trade recall for speed.
+   139	    Differential check against a verbatim copy of the old algorithm."""
+   140	    import random
+   141	    import string
+   142	    from rapidfuzz import fuzz
+   143	
+   144	    def reference(m, word):
+   145	        n = m.norm(word)
+   146	        if len(n) < 3 or n in openscrub.STOPWORDS:
+   147	            return None
+   148	        if n in m.items:
+   149	            return m._gated(n, m.items[n])
+   150	        if n.isdigit():
+   151	            for k, cat in m.items.items():
+   152	                if (k.isdigit() and len(k) == len(n)
+   153	                        and sum(a != b for a, b in zip(k, n)) <= 1):
+   154	                    return m._gated(k, cat)
+   155	            return None
+   156	        if len(n) >= 4:
+   157	            for k, cat in m.items.items():
+   158	                if (not k.isdigit() and abs(len(k) - len(n)) <= 2
+   159	                        and fuzz.ratio(k, n) >= m.threshold):
+   160	                    return m._gated(k, cat)
+   161	        return None
+   162	
+   163	    rng = random.Random(7)
+   164	
+   165	    def mutate(s):
+   166	        s = list(s)
+   167	        for _ in range(rng.randint(0, 3)):
+   168	            i = rng.randrange(len(s))
+   169	            op = rng.random()
+   170	            if op < 0.4:
+   171	                s[i] = rng.choice("abcdeh0123")
+   172	            elif op < 0.7:
+   173	                s.insert(i, rng.choice("abcdeh"))
+   174	            elif len(s) > 3:
+   175	                s.pop(i)
+   176	        return "".join(s)
+   177	
+   178	    for thr in (50, 82, 90):
+   179	        m = openscrub.PhiMemory(threshold=thr)
+   180	        pool = []
+   181	        for _ in range(300):        # tiny alphabet => many ties
+   182	            if pool and rng.random() < 0.3:
+   183	                w = mutate(rng.choice(pool))
+   184	            elif rng.random() < 0.3:
+   185	                w = "".join(rng.choice(string.digits)
+   186	                            for _ in range(rng.randint(3, 11)))
+   187	            else:
+   188	                w = "".join(rng.choice("abcdeh")
+   189	                            for _ in range(rng.randint(3, 12)))
+   190	            m.add(w, rng.choice(["name", "phone", "ssn", "plate"]),
+   191	                  primary=rng.random() < 0.7)
+   192	            pool.append(w)
+   193	        for _ in range(400):
+   194	            q = mutate(rng.choice(pool))
+   195	            assert m.recall(q) == reference(m, q), (thr, q)
+   740	def test_dense_hold_not_extended_by_merge():
+   741	    """Dense per-frame samples must keep their sub-frame hold through
+   742	    merge_detections: stamping them with the multi-second OCR hold left a
+   743	    trail of stale blur boxes along a moving face's path (v1.0.21 bug)."""
+   744	    d = openscrub.Detection(5.0, 5.01, (100, 100, 160, 160), "face", "face",
+   745	                            0.9, (0, 0), dense=True)
+   746	    merged = openscrub.merge_detections([d], hold=2.3)
+   747	    assert merged[0].t_end <= 5.02, \
+   748	        "dense sample t_end must not be extended by the OCR hold"
+  2776	def test_merge_tail_extends_through_supporting_scans():
+  2777	    """A span ends `hold` after its last full detection, but heavily
+  2778	    compressed footage keeps showing the string while OCR reads only
+  2779	    fragments — the benchmark's compressed card was exposed for its last
+  2780	    0.7s exactly this way. Scans whose region words fuzzy-match the span
+  2781	    text extend coverage; a scan reading different text stops the walk."""
+  2782	    from rapidfuzz import fuzz
+  2783	    def mk():
+  2784	        return openscrub.Detection(t_start=0.0, t_end=0.0,
+  2785	                                   cbox=(100, 100, 300, 120),
+  2786	                                   category="card", text="4111111111111111",
+  2787	                                   confidence=0.9)
+  2788	    frag = lambda t, txt: (t, 0.0, [(txt, (110, 102, 220, 118), 0.9)])
+  2789	    scans = [frag(1.0, "4111."), frag(2.0, "1111-1111"),
+  2790	             frag(3.0, "TOTALLY DIFFERENT")]
+  2791	    m = openscrub.merge_detections([mk()], hold=0.8, scans=scans,
+  2792	                                   fuzz=fuzz)[0]
+  2793	    assert m.t_end == pytest.approx(2.8), m.t_end   # 2.0 + hold, stopped at 3.0
+  2794	    # no supporting scans -> tail stays at plain hold
+  2795	    m = openscrub.merge_detections([mk()], hold=0.8,
+  2796	                                   scans=[frag(1.0, "UNRELATED")],
+  2797	                                   fuzz=fuzz)[0]
+  2798	    assert m.t_end == pytest.approx(0.8), m.t_end
+  3786	def test_dense_merge_skips_pairwise_comparisons(monkeypatch):
+  3787	    """Per-frame detections must never enter the generic merge search."""
+  3788	    def forbidden(*args):
+  3789	        raise AssertionError(
+  3790	            "Dense detections must not require box comparisons"
+  3791	        )
+  3792	
+  3793	    monkeypatch.setattr(openscrub, "boxes_overlap", forbidden)
+  3794	
+  3795	    dets = [
+  3796	        openscrub.Detection(
+  3797	            i / 60, i / 60 + 0.005,
+  3798	            (100, 100, 160, 160),
+  3799	            "face", "face", 0.9,
+  3800	            dense=True
+  3801	        )
+  3802	        for i in range(1000)
+  3803	    ]
+  3804	
+  3805	    result = openscrub.merge_detections(dets, hold=0.8)
+  3806	
+  3807	    assert len(result) == len(dets)
+  3808	    assert all(a is b for a, b in zip(result, dets))
+  3809	    assert all(d.t_end - d.t_start < 0.01 for d in result)
+  3810	
+  3811	
+  3812	def test_mixed_merge_excludes_dense_candidates(monkeypatch):
+  3813	    """Sparse detections still merge, without searching dense samples."""
+  3814	    original_overlap = openscrub.boxes_overlap
+  3815	    calls = []
+  3816	
+  3817	    def counted_overlap(a, b):
+  3818	        calls.append((a, b))
+  3819	        return original_overlap(a, b)
+  3820	
+  3821	    monkeypatch.setattr(
+  3822	        openscrub, "boxes_overlap", counted_overlap
+  3823	    )
+  3824	
+  3825	    def make(t, dense):
+  3826	        return openscrub.Detection(
+  3827	            t, t + 0.01,
+  3828	            (100, 100, 160, 160),
+  3829	            "face", "face", 0.9,
+  3830	            dense=dense
+  3831	        )
+  3832	
+  3833	    sparse1 = make(0.0, False)
+  3834	    dense1 = make(0.1, True)
+  3835	    sparse2 = make(0.2, False)
+  3836	    dense2 = make(0.3, True)
+  3837	
+  3838	    result = openscrub.merge_detections(
+  3839	        [sparse1, dense1, sparse2, dense2],
+  3840	        hold=0.8
+  3841	    )
+  3842	
+  3843	    assert len(result) == 3
+  3844	    assert result[0] is sparse1
+  3845	    assert result[1] is dense1
+  3846	    assert result[2] is dense2
+  3847	    assert len(calls) == 1
+  3848	    assert abs(sparse1.t_end - 1.0) < 1e-9

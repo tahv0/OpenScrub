@@ -1,0 +1,668 @@
+## 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub_web.py:369-412
+369: 
+370: def _select_render_input(job, owner):
+371:     """Resolve original-input provenance while the report/current source is owned.
+372: 
+373:     Only source selection is pinned, not the report document or its edits.
+374:     Missing originals keep the engine's fallback to the current input. An
+375:     extant unregistered/deleting job source is never admitted for reading.
+376:     """
+377:     try:
+378:         doc = _load_job_report(job)
+379:         prov = doc.get("provenance", {}) if isinstance(doc, dict) else {}
+380:         original = prov.get("original_input")
+381:     except (OSError, ValueError, TypeError, AttributeError):
+382:         # Keep asynchronous missing/invalid-report errors in run_pipeline.
+383:         original = None
+384:     if original:
+385:         candidate = os.path.realpath(original)
+386:         added = None
+387:         with VAULT_LOCK:
+388:             _validate_files_locked(job)
+389:             source_job = _source_job_locked(candidate, missing_ok=True)
+390:             root = os.path.realpath(JOBS_DIR).rstrip(os.sep) + os.sep
+391:             if source_job is None and candidate.startswith(root):
+392:                 # No live owner exists. Only inspect absence, under the store
+393:                 # admission boundary: never open an orphan/condemned source.
+394:                 if os.path.exists(candidate):
+395:                     abort(404, "source job is no longer available")
+396:                 owner.report_input = True
+397:                 return
+398:             if source_job is not None and all(
+399:                     token.state is not FILES.initialize(source_job)
+400:                     for token in [owner] + owner.related):
+401:                 added = FILES.reserve(source_job)
+402:                 owner.related.append(added)
+403:         selected = False
+404:         try:
+405:             # Live containing jobs are reserved BEFORE this first source stat.
+406:             # External filesystem changes remain outside web coordination.
+407:             if os.path.exists(candidate):
+408:                 owner.source = candidate
+409:                 selected = True
+410:         finally:
+411:             if added is not None and not selected:
+412:                 with VAULT_LOCK:
+
+## 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub_web.py:433-455
+433: def _job_video(job):
+434:     # Requests use their admitted source even if scan normalization updates
+435:     # the live job while a decoder is waiting. Worker/thread callers snapshot
+436:     # their own lease's source before starting work.
+437:     if has_request_context():
+438:         lease = g.get("file_owner")
+439:         if lease is not None and lease.state is FILES.initialize(job):
+440:             return lease.source or job.get("video")
+441:     return job.get("video")
+442: 
+443: 
+444: def _update_job_source(job, path, owner):
+445:     canonical = os.path.realpath(path)
+446:     with VAULT_LOCK:
+447:         _validate_files_locked(job)
+448:         source_job = _source_job_locked(canonical)
+449:         if source_job is not None and source_job is not job:
+450:             # Reserve before following a changed normalized input. This stays
+451:             # with the worker through its final report/provenance access.
+452:             if owner is not None and all(
+453:                     token.state is not FILES.initialize(source_job)
+454:                     for token in [owner] + owner.related):
+455:                 owner.related.append(FILES.reserve(source_job))
+
+## 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub_web.py:802-822
+802: def _report_current(job):
+803:     """Identity lookup only; caller owns report_lock and a file lifetime.
+804: 
+805:     Admission takes VAULT_LOCK -> JOBS_LOCK and releases both before this
+806:     boundary. Never acquire VAULT_LOCK (including lease release) inside it.
+807:     """
+808:     with JOBS_LOCK:
+809:         if not any(current is job for current in JOBS.values()):
+810:             abort(404)
+811:         if FILES.initialize(job).closed:
+812:             abort(409, "job is being deleted")
+813: 
+814: 
+815: def _edit_gate(job):
+816:     _report_current(job)
+817:     if FILES.initialize(job).active is not None or job.get("phase") in _ACTIVE_PHASES:
+818:         abort(409, "job work is queued, running or still cleaning up")
+819: 
+820: 
+821: def _operation_valid(job, owner):
+822:     files = FILES.initialize(job)
+
+## 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub_web.py:954-995
+954: def _run_job(job, action, owner=None):
+955:     if owner is None:
+956:         owner = _prepare_work(job, action)
+957:         try:
+958:             with FILES.initialize(job).report_lock:
+959:                 _begin_operation(job, owner)
+960:             return _run_job(job, action, owner)
+961:         finally:
+962:             _finish_operation(job, owner)
+963:     jid = job["id"]
+964:     files = FILES.initialize(job)
+965:     with files.report_lock:
+966:         if owner.operation is None:  # compatibility with old queue entries
+967:             _begin_operation(job, owner)
+968:         if not _operation_valid(job, owner):
+969:             return
+970:         job["phase"] = "scanning" if action == "scan" else "rendering"
+971:     cb = WebCallbacks(job, owner.operation)
+972:     def publish_report(path, doc):
+973:         with files.report_lock:
+974:             if not _operation_valid(job, owner) or owner.operation.is_set():
+975:                 raise openscrub.PipelineCancelled()
+976:             atomic_report(path, doc)
+977:     cb.publish_report = publish_report
+978:     source = owner.source if owner is not None else job["video"]
+979:     try:
+980:         if action == "scan":
+981:             job["log"].append("— scan started —")
+982:             args = build_args(dict(job, video=source))
+983:             state = openscrub.run_scan(args, cb)
+984:             openscrub.write_report(os.path.join(job["dir"], "report.json"),
+985:                                   args, state, publisher=cb.publish_report)
+986:             with files.report_lock:
+987:                 if not _operation_valid(job, owner):
+988:                     return
+989:                 job["stats"] = state["stats"]
+990:             try:
+991:                 prov = _load_job_report(job).get("provenance", {})
+992:                 if (prov.get("vfr_normalized")
+993:                         and os.path.exists(prov.get("input", ""))):
+994:                     _update_job_source(job, prov["input"], owner)
+995:                     job["log"].append(
+
+## 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub_web.py:1512-1607
+1512: def _frame_at(job, t, rstate):
+1513:     cap = cv2.VideoCapture(_job_video(job))
+1514:     try:
+1515:         fps = rstate["fps"]
+1516:         cap.set(cv2.CAP_PROP_POS_FRAMES, int(t * fps))
+1517:         ok, frame = cap.read()
+1518:         return frame if ok else None
+1519:     finally:
+1520:         cap.release()
+1521: 
+1522: 
+1523: 
+1524: @app.route("/api/jobs/<jid>/mediainfo")
+1525: def job_mediainfo(jid):
+1526:     """Basic video properties straight from the file — available in every
+1527:     job phase, no scan report required."""
+1528:     job = JOBS.get(jid) or abort(404)
+1529:     cap = cv2.VideoCapture(_job_video(job))
+1530:     try:
+1531:         fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+1532:         n = cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0
+1533:         w_ = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+1534:         h_ = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+1535:     finally:
+1536:         cap.release()
+1537:     return jsonify({"duration": n / fps if fps else 0, "fps": fps,
+1538:                     "width": w_, "height": h_})
+1539: 
+1540: 
+1541: @app.route("/api/jobs/<jid>/detections")
+1542: def job_detections(jid):
+1543:     job = JOBS.get(jid) or abort(404)
+1544:     doc = _load_job_report(job)
+1545:     items = []
+1546:     for i, d in enumerate(doc["detections"]):
+1547:         items.append({"i": i, "category": d["category"], "text": d["text"],
+1548:                       "t_start": d["t_start"], "t_end": round(d["t_end"], 2),
+1549:                       "enabled": d.get("enabled", True),
+1550:                       "track": d.get("track", -1),
+1551:                       "person": d.get("person", -1),
+1552:                       "confidence": d.get("confidence", 0),
+1553:                       "zone_dropped": bool(d.get("zone_dropped"))})
+1554:     return jsonify({"detections": items,
+1555:                     "fps": doc["render_state"]["fps"],
+1556:                     "duration": len(doc["render_state"]["cum"]) /
+1557:                                 doc["render_state"]["fps"]})
+1558: 
+1559: 
+1560: @app.route("/api/jobs/<jid>/detframe/<int:i>")
+1561: def job_detframe(jid, i):
+1562:     """Full video frame at a real sighting of detection i, with its box
+1563:     outlined — the review lightbox."""
+1564:     job = JOBS.get(jid) or abort(404)
+1565:     doc = _load_job_report(job)
+1566:     d = doc["detections"][i]
+1567:     rs = doc["render_state"]
+1568:     tref = min(max(d.get("last_seen", d["t_start"]), d["t_start"]), d["t_end"])
+1569:     fidx = min(int(tref * rs["fps"]), len(rs["cum"]) - 1)
+1570:     ox, oy = rs["cum"][fidx]
+1571:     frame = _frame_at(job, tref, rs)
+1572:     if frame is None:
+1573:         abort(404)
+1574:     x1, y1 = int(d["cbox"][0] + ox), int(d["cbox"][1] + oy)
+1575:     x2, y2 = int(d["cbox"][2] + ox), int(d["cbox"][3] + oy)
+1576:     cv2.rectangle(frame, (x1 - 4, y1 - 4), (x2 + 4, y2 + 4), (0, 0, 255), 3)
+1577:     ok, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 84])
+1578:     from flask import Response
+1579:     return Response(buf.tobytes(), mimetype="image/jpeg")
+1580: 
+1581: 
+1582: @app.route("/api/jobs/<jid>/boxes_at")
+1583: def job_boxes_at(jid):
+1584:     """Active blur boxes (screen coords) at time t, plus the scroll offset so
+1585:     the client can convert edited boxes back to content coordinates."""
+1586:     job = JOBS.get(jid) or abort(404)
+1587:     doc = _load_job_report(job)
+1588:     rs = doc["render_state"]
+1589:     t = float(request.args.get("t", 0))
+1590:     fidx = min(int(t * rs["fps"]), len(rs["cum"]) - 1)
+1591:     ox, oy = rs["cum"][fidx]
+1592:     boxes = []
+1593:     want_all = request.args.get("all") == "1"
+1594:     for i, d in enumerate(doc["detections"]):
+1595:         if not (d["t_start"] - 0.01 <= t <= d["t_end"] + 0.01):
+1596:             continue
+1597:         if not want_all and not d.get("enabled", True):
+1598:             continue
+1599:         if True:
+1600:             boxes.append({"i": i, "category": d["category"],
+1601:                           "enabled": d.get("enabled", True),
+1602:                           "text": d.get("text", ""),
+1603:                           "t_start": d["t_start"], "t_end": d["t_end"],
+1604:                           "box": [d["cbox"][0] + ox, d["cbox"][1] + oy,
+1605:                                   d["cbox"][2] + ox, d["cbox"][3] + oy]})
+1606:     return jsonify({"t": t, "ox": ox, "oy": oy, "boxes": boxes})
+1607: 
+
+## 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub_web.py:1660-1820
+1660: @app.route("/api/jobs/<jid>/frame_at")
+1661: def job_frame_at(jid):
+1662:     job = JOBS.get(jid) or abort(404)
+1663:     t = max(0.0, float(request.args.get("t", 0)))
+1664:     path = (job["output"] if request.args.get("src") == "output"
+1665:             and job.get("output") else _job_video(job))
+1666:     cap = cv2.VideoCapture(path)
+1667:     # seek by TIMESTAMP, not frame index: the original upload is often VFR
+1668:     # (iPhone), where index = t*fps drifts out of sync with the CFR output
+1669:     # and can overshoot the file entirely (broken compare pane)
+1670:     try:
+1671:         frame = None
+1672:         for tt in (t, max(0.0, t - 0.34), max(0.0, t - 1.0), 0.0):
+1673:             cap.set(cv2.CAP_PROP_POS_MSEC, tt * 1000)
+1674:             ok, fr = cap.read()
+1675:             if ok:
+1676:                 frame = fr
+1677:                 break   # walk back instead of 404ing at the very end of the file
+1678:             if tt == 0.0:
+1679:                 break
+1680:     finally:
+1681:         cap.release()
+1682:     if frame is None:
+1683:         abort(404)
+1684:     ok, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 82])
+1685:     return Response(buf.tobytes(), mimetype="image/jpeg")
+1686: 
+1687: 
+1688: @app.route("/api/jobs/<jid>/video")
+1689: def job_video_stream(jid):
+1690:     """Range-aware stream of the job's scan video so review can PLAY the
+1691:     footage with live boxes (issue #17: the box editor was scrub-only,
+1692:     'you cannot play review and see hits'). Serves the same file frame_at
+1693:     reads — for HDR/VFR jobs that is the normalized SDR scan copy, which
+1694:     every browser can decode."""
+1695:     job = JOBS.get(jid) or abort(404)
+1696:     video = _job_video(job)
+1697:     if not (video and os.path.exists(video)):
+1698:         abort(404)
+1699:     return send_file(video, conditional=True)
+1700: 
+1701: 
+1702: def _valid_manual_creation(value):
+1703:     """Only immutable, finite creation records can establish replay equality."""
+1704:     def numbers(items, size):
+1705:         try:
+1706:             return (isinstance(items, list) and len(items) == size
+1707:                     and all(type(v) in (int, float) and math.isfinite(v)
+1708:                             for v in items))
+1709:         except OverflowError:
+1710:             return False
+1711:     return (isinstance(value, dict)
+1712:             and set(value) == {"t_start", "t_end", "cbox", "aoff"}
+1713:             and numbers([value["t_start"], value["t_end"]], 2)
+1714:             and numbers(value["cbox"], 4)
+1715:             and all(type(v) is int for v in value["cbox"])
+1716:             and numbers(value["aoff"], 2))
+1717: 
+1718: 
+1719: @app.route("/api/jobs/<jid>/detections", methods=["POST"])
+1720: def job_save_edits(jid):
+1721:     job = JOBS.get(jid) or abort(404)
+1722:     edits = request.get_json(force=True)
+1723:     path = os.path.join(job["dir"], "report.json")
+1724:     with FILES.initialize(job).report_lock:
+1725:         _edit_gate(job)
+1726:         try:
+1727:             doc = _load_job_report(job)
+1728:         except FileNotFoundError:
+1729:             abort(404, "job report not found")
+1730:         enabled = edits.get("enabled", {})
+1731:         for i, d in enumerate(doc["detections"]):
+1732:             if str(i) in enabled:
+1733:                 d["enabled"] = bool(enabled[str(i)])
+1734:         for i, box in (edits.get("box_overrides") or {}).items():
+1735:             i = int(i)
+1736:             if 0 <= i < len(doc["detections"]) and len(box) == 4:
+1737:                 doc["detections"][i]["cbox"] = [float(v) for v in box]
+1738:         for i, span in (edits.get("time_overrides") or {}).items():
+1739:             i = int(i)
+1740:             if 0 <= i < len(doc["detections"]) and len(span) == 2:
+1741:                 t0, t1 = float(span[0]), float(span[1])
+1742:                 if t1 > t0 >= 0:
+1743:                     doc["detections"][i]["t_start"] = t0
+1744:                     doc["detections"][i]["t_end"] = t1
+1745:                     doc["detections"][i]["last_seen"] = min(
+1746:                         max(doc["detections"][i].get("last_seen", t0), t0), t1)
+1747:         rs = doc["render_state"]
+1748:         # Read identities from this transaction's latest raw document. Never
+1749:         # reconstruct creation from a row's mutable current geometry/choices.
+1750:         identified = {}
+1751:         for d in doc["detections"]:
+1752:             identity = d.get("manual_id")
+1753:             if isinstance(identity, str):
+1754:                 identified.setdefault(identity, []).append(d)
+1755:         for m in edits.get("manual", []):
+1756:             has_id = "manual_id" in m
+1757:             identity = m.get("manual_id")
+1758:             if has_id and (not isinstance(identity, str) or
+1759:                            re.fullmatch(r"[A-Za-z0-9._:-]{1,128}", identity) is None):
+1760:                 return jsonify(error="Invalid manual_id: expected 1–128 ASCII letters, digits or ._:-"), 400
+1761:             try:
+1762:                 t0 = float(m["t_start"]); t1 = float(m["t_end"])
+1763:                 tref = float(m.get("t_ref", t0))
+1764:                 b = m["screen_box"]
+1765:                 if has_id and (len(b) != 4 or not all(math.isfinite(v) for v in [t0, t1, tref, *b])):
+1766:                     raise ValueError("non-finite creation or invalid box")
+1767:                 fidx = min(int(tref * rs["fps"]), len(rs["cum"]) - 1)
+1768:                 ox, oy = rs["cum"][fidx]
+1769:                 creation = {"t_start": t0, "t_end": t1,
+1770:                             "cbox": [int(b[0] - ox), int(b[1] - oy),
+1771:                                      int(b[2] - ox), int(b[3] - oy)],
+1772:                             "aoff": [ox, oy]}
+1773:                 if has_id and not _valid_manual_creation(creation):
+1774:                     raise ValueError("invalid effective creation")
+1775:             except (KeyError, TypeError, ValueError, OverflowError, IndexError):
+1776:                 if has_id:
+1777:                     return jsonify(error="Invalid manual creation: finite times, four coordinates and two offsets required"), 400
+1778:                 raise
+1779:             if has_id and identity in identified:
+1780:                 rows = identified[identity]
+1781:                 if (len(rows) != 1 or not _valid_manual_creation(rows[0].get("manual_creation"))
+1782:                         or rows[0]["manual_creation"] != creation):
+1783:                     return jsonify(error="manual_id conflict: creation differs, is missing/invalid, or matches multiple rows"), 409
+1784:                 continue
+1785:             row = dict(creation, category="manual", text="user-drawn", confidence=1.0,
+1786:                        last_seen=t0, enabled=True)
+1787:             if has_id:
+1788:                 # Separate lists keep later indexed edits independent of creation.
+1789:                 row.update(manual_id=identity, manual_creation={
+1790:                     **creation, "cbox": list(creation["cbox"]), "aoff": list(creation["aoff"])})
+1791:                 identified[identity] = [row]
+1792:             doc["detections"].append(row)
+1793:         if "audio" in edits:
+1794:             # audio redaction spans (mute/bleep): stored in the report so the
+1795:             # --from-report render applies them and re-renders keep them
+1796:             doc["audio_redactions"] = [
+1797:                 {"t0": float(s["t0"]), "t1": float(s["t1"]),
+1798:                  "mode": (s.get("mode") if s.get("mode") in ("mute", "bleep")
+1799:                           else "mute")}
+1800:                 for s in (edits.get("audio") or [])
+1801:                 if float(s.get("t1", 0)) > float(s.get("t0", 0)) >= 0]
+1802:         atomic_report(path, doc)
+1803:         # suggest allowlisting any string whose EVERY instance was disabled —
+1804:         # the review just taught us it's a recurring false positive
+1805:         per = {}
+1806:         for d in doc["detections"]:
+1807:             if d["category"] in ("name",):
+1808:                 per.setdefault(d["text"], []).append(d.get("enabled", True))
+1809:         suggest = sorted(t for t, states in per.items()
+1810:                          if len(states) >= 2 and not any(states))
+1811:         return jsonify({"ok": True, "total": len(doc["detections"]),
+1812:                         "suggest_allowlist": suggest})
+1813: 
+1814: 
+1815: @app.route("/api/jobs/<jid>/track_object", methods=["POST"])
+1816: def job_track_object(jid):
+1817:     """Targeted redaction: the user circled an object on one frame and
+1818:     picked a time window on the review timeline — template-track it through
+1819:     that window and add the result as a dense track in the report, so the
+1820:     review shows one card (with fan-out) and the render blurs it wherever
+
+## 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub_web.py:2800-2871
+2800: async function loadBoxEdit(fromReview){
+2801:  const id=CUR,gen=VIEW_GEN,editor=BE;
+2802:  showPanel(fromReview?"boxedit_rev":"boxedit");
+2803:  const mi=await (await fetch(`api/jobs/${id}/mediainfo`)).json();
+2804:  if(!ownsView(id,gen)||BE!==editor)return;
+2805:  // in review: the slot right under the Preview button; on done: the actions slot
+2806:  let c=document.getElementById("beslot")||document.getElementById("beslot_done");
+2807:  if(!c){c=document.createElement("div");c.id="beslot";c.style.width="100%";
+2808:   (document.getElementById("review")||document.getElementById("jobcard")||detail)
+2809:    .appendChild(c);}
+2810:  Object.assign(BE,{dur:mi.duration,win:[0,mi.duration],trk:false,muteArm:false,tlDrag:null,
+2811:      audioSel:-1,tlspans:[]});
+2812: 
+2813:  c.innerHTML=`<div class="row" style="margin-top:8px">
+2814:   <button class="sec" id="bePlay" style="padding:3px 11px" title="Play the video with live boxes — pause to edit them" onclick="beTogglePlay()">&#9654;</button>t=
+2815:   <input type="range" id="beT" min="0" max="${Math.max(0.2,mi.duration-0.1).toFixed(1)}"
+2816:    step="0.1" value="0" style="flex:1" oninput="beScrub()"><span id="beL">0s</span></div>
+2817:   <div style="position:relative;display:inline-block;max-width:100%">
+2818:    <img id="beImg" style="max-width:100%;border-radius:8px">
+2819:    <video id="beVid" style="max-width:100%;border-radius:8px;display:none" playsinline preload="none"></video>
+2820:    <canvas id="beCv" style="position:absolute;left:0;top:0;touch-action:none"></canvas></div>
+2821:   <canvas id="beTL" style="width:100%;height:72px;display:block;margin-top:6px;
+2822:    border-radius:6px;touch-action:none;cursor:crosshair"
+2823:    title="Timeline: colored spans = detections. Drag the orange handles to set the active window; click to seek."></canvas>
+2824:   <div class="row" style="font-size:12.5px;align-items:center;margin-top:2px">
+2825:    <span id="beWinL" style="color:#94a3b8">window: whole video</span>
+2826:    <button class="sec" style="padding:3px 8px;font-size:12px" onclick="beWinReset()">reset window</button>
+2827:    <span style="flex:1"></span>
+2828:    <select id="beAMode" style="font-size:12px"><option value="mute">mute</option>
+2829:     <option value="bleep">bleep</option></select>
+2830:    <button class="tog" id="beMute" onclick="beMuteMode()">&#128263; Audio span</button>
+2831:    <button class="danger" id="beARm" style="display:none" onclick="beAudioRm()">Delete span</button></div>
+2832:   <div id="beASugg" style="display:none;margin-top:6px"></div>
+2833:   <div id="beATx" style="display:none;margin-top:6px"></div>
+2834:   <div class="row" style="margin-top:6px">
+2835:    <button class="tog" id="beAdd" onclick="beAddMode()">&#65291; Add box</button>
+2836:    <button class="tog" id="beTrk" onclick="beTrackMode()">&#8857; Track object</button>
+2837:    <button class="danger" id="beRm" style="display:none" onclick="beRemove()">Remove blur</button>
+2838:    <span id="beTimes" style="display:none;align-items:center;gap:4px;font-size:13px">
+2839:     from <input type="number" id="beT0" step="0.1" min="0" style="width:74px">
+2840:     to <input type="number" id="beT1" step="0.1" style="width:74px"> s
+2841:     <button class="sec" onclick="beApplyTimes()">Apply times</button></span>
+2842:    <span id="beTrkSt" style="display:none;font-size:13px;color:#fbbf24">tracking&#8230;</span>
+2843:    <button data-save-edits onclick="beSave()">Save changes &amp; re-render</button></div>
+2844:   <p style="font-size:12px;color:#94a3b8;margin:4px 0 0">&#9654; plays the
+2845:    video with the boxes moving live (pause to edit). Click a red box to
+2846:    select — drag inside to move, a corner to resize, edit its from/to times,
+2847:    or remove its blur. &#65291; Add box: drag a static region. &#8857; Track object:
+2848:    drag the timeline handles to the part of the video you care about, scrub
+2849:    to a frame where the object is clear, draw a box around it — it will be
+2850:    followed and blurred through the window. &#128263; Audio span: drag on the
+2851:    timeline's bottom lane to silence (or bleep) that stretch of sound.</p>`;
+2852:  const img=document.getElementById("beImg");
+2853:  img.onload=()=>{if(!ownsView(id,gen)||BE!==editor||document.getElementById("beImg")!==img||BE.playing)return;const cv=document.getElementById("beCv");
+2854:   cv.width=img.clientWidth;cv.height=img.clientHeight;
+2855:   BE.scale=img.clientWidth/(img.naturalWidth||1);beDraw();};
+2856:  const bv=document.getElementById("beVid");
+2857:  const stop=()=>{if(ownsView(id,gen)&&BE===editor&&document.getElementById("beVid")===bv&&BE.playing)bePlayStop();};
+2858:  bv.addEventListener("pause",stop);bv.addEventListener("ended",stop);
+2859:  saveStatus(EDITS,EDITS.status);
+2860:  beHook();tlHook();await tlInit();
+2861:  if(ownsView(id,gen)&&BE===editor)beScrub();
+2862: }
+2863: 
+2864: // ---- playback with live boxes (issue #17: review was scrub-only) ----
+2865: async function beTogglePlay(){
+2866:  const id=CUR,gen=VIEW_GEN,editor=BE;
+2867:  const v=document.getElementById("beVid"),img=document.getElementById("beImg");
+2868:  if(!v)return;
+2869:  const current=()=>ownsView(id,gen)&&BE===editor&&document.getElementById("beVid")===v;
+2870:  if(BE.playing){v.pause();return;}          // the pause handler cleans up
+2871:  if(!v.src)v.src=`api/jobs/${CUR}/video`;
+
+## 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub_web.py:3074-3145
+3074:  },1500);
+3075: }
+3076: async function beScrub(){
+3077:  const id=CUR,gen=VIEW_GEN,editor=BE;
+3078:  const sl=document.getElementById("beT");if(!sl)return; // editor was closed
+3079:  if(BE.playing){               // dragging the slider while playing = seek
+3080:   const v=document.getElementById("beVid");
+3081:   if(v)v.currentTime=+sl.value;
+3082:   return;                      // the rAF loop keeps label/boxes in sync
+3083:  }
+3084:  BE.sel=-1;document.getElementById("beRm").style.display="none";
+3085:  document.getElementById("beTimes").style.display="none";
+3086:  BE.t=+document.getElementById("beT").value;
+3087:  document.getElementById("beL").textContent=BE.t.toFixed(1)+"s";
+3088:  document.getElementById("beImg").src=`api/jobs/${CUR}/frame_at?t=${BE.t}`;
+3089:  const d=await (await fetch(`api/jobs/${id}/boxes_at?t=${BE.t}&all=1`)).json();
+3090:  if(!ownsView(id,gen)||BE!==editor)return;
+3091:  BE.ox=d.ox;BE.oy=d.oy;BE.raw=d.boxes;
+3092:  beFilter();beDraw();beTLDraw();
+3093: }
+3094: function beFilter(){
+3095:  BE.boxes=(BE.raw||[]).filter(b=>{
+3096:   const on=(b.i in EN)?EN[b.i]:b.enabled;   // live: review toggles apply here
+3097:   return on;
+3098:  }).map(b=>{
+3099:   let bb=b;
+3100:   if(BE.ov[b.i]){const o=BE.ov[b.i];
+3101:    bb={...b,box:[o[0]+BE.ox,o[1]+BE.oy,o[2]+BE.ox,o[3]+BE.oy]};}
+3102:   if(BE.times[b.i]){bb={...bb,t_start:BE.times[b.i][0],t_end:BE.times[b.i][1]};}
+3103:   return bb;
+3104:  });
+3105: }
+3106: function beDraw(){
+3107:  const cv=document.getElementById("beCv");if(!cv)return;
+3108:  const x=cv.getContext("2d"),s=BE.scale;
+3109:  x.clearRect(0,0,cv.width,cv.height);
+3110:  for(const a of BE.adds){
+3111:   if(BE.t<a.t0-0.01||BE.t>a.t1+0.01)continue;
+3112:   const[a1,b1,a2,b2]=a.box.map(v=>v*s);
+3113:   x.fillStyle="rgba(245,158,11,.25)";x.strokeStyle="#f59e0b";x.lineWidth=2;
+3114:   x.fillRect(a1,b1,a2-a1,b2-b1);x.strokeRect(a1,b1,a2-a1,b2-b1);
+3115:  }
+3116:  if(BE.add&&BE.addAnchor&&BE.addFloat){
+3117:   const[p,q]=[BE.addAnchor,BE.addFloat];
+3118:   x.strokeStyle="#f59e0b";x.setLineDash([6,4]);x.lineWidth=2;
+3119:   x.strokeRect(Math.min(p[0],q[0])*s,Math.min(p[1],q[1])*s,
+3120:    Math.abs(q[0]-p[0])*s,Math.abs(q[1]-p[1])*s);x.setLineDash([]);
+3121:  }
+3122:  for(const b of BE.boxes){
+3123:   const[a1,b1,a2,b2]=b.box.map(v=>v*s);
+3124:   x.fillStyle=b.i===BE.sel?"rgba(37,99,235,.25)":"rgba(220,38,38,.22)";
+3125:   x.strokeStyle=b.i===BE.sel?"#2563eb":"#dc2626";x.lineWidth=2;
+3126:   x.fillRect(a1,b1,a2-a1,b2-b1);x.strokeRect(a1,b1,a2-a1,b2-b1);
+3127:   if(b.i===BE.sel)for(const[hx,hy] of [[a1,b1],[a2,b1],[a1,b2],[a2,b2]]){
+3128:    x.fillStyle="#fff";x.fillRect(hx-5,hy-5,10,10);
+3129:    x.strokeRect(hx-5,hy-5,10,10);}
+3130:  }
+3131: }
+3132: function beAddMode(){
+3133:  BE.add=!BE.add;BE.addAnchor=null;BE.sel=-1;
+3134:  BE.trk=false;BE.muteArm=false;
+3135:  document.getElementById("beAdd").classList.toggle("on",BE.add);
+3136:  const tb=document.getElementById("beTrk");if(tb)tb.classList.remove("on");
+3137:  const mb=document.getElementById("beMute");if(mb)mb.classList.remove("on");
+3138:  document.getElementById("beRm").style.display="none";
+3139:  document.getElementById("beTimes").style.display="none";
+3140:  beDraw();
+3141: }
+3142: function beApplyTimes(){
+3143:  if(BE.sel<0)return;
+3144:  const t0=+document.getElementById("beT0").value,
+3145:        t1=+document.getElementById("beT1").value;
+
+## 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub_web.py:3160-3190
+3160:  if(c&&typeof c.randomUUID==="function")return c.randomUUID();
+3161:  if(!c||typeof c.getRandomValues!=="function")
+3162:   throw Error("Secure random generation is unavailable. Use a browser with crypto support to add a box.");
+3163:  const b=c.getRandomValues(new Uint8Array(16));
+3164:  b[6]=(b[6]&15)|64;b[8]=(b[8]&63)|128;
+3165:  const h=Array.from(b,v=>v.toString(16).padStart(2,"0")).join("");
+3166:  return `${h.slice(0,8)}-${h.slice(8,12)}-${h.slice(12,16)}-${h.slice(16,20)}-${h.slice(20)}`;
+3167: }
+3168: function beHook(){
+3169:  const cv=document.getElementById("beCv");
+3170:  const pt=e=>{const r=cv.getBoundingClientRect();
+3171:   return[(e.clientX-r.left)/BE.scale,(e.clientY-r.top)/BE.scale];};
+3172:  cv.addEventListener("pointerdown",e=>{
+3173:   const p=pt(e);cv.setPointerCapture(e.pointerId);
+3174:   if(BE.trk){
+3175:    // Track object: same two-click box draw as Add box, but on completion
+3176:    // the region is template-tracked through the active timeline window
+3177:    if(!BE.addAnchor){BE.addAnchor=p;BE.addFloat=p;}
+3178:    else{
+3179:     const a=BE.addAnchor,q=p;BE.addAnchor=null;BE.addFloat=null;
+3180:     const box=[Math.min(a[0],q[0]),Math.min(a[1],q[1]),
+3181:                Math.max(a[0],q[0]),Math.max(a[1],q[1])];
+3182:     BE.trk=false;document.getElementById("beTrk").classList.remove("on");
+3183:     if(box[2]-box[0]>10&&box[3]-box[1]>10)beTrackGo(box);
+3184:     beDraw();
+3185:    }
+3186:    return;
+3187:   }
+3188:   if(BE.add){
+3189:    if(!BE.addAnchor){BE.addAnchor=p;BE.addFloat=p;}
+3190:    else{
+
+## 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub_web.py:3497-3583
+3497: document.addEventListener("keydown",e=>{
+3498:  if(e.key==="Escape"){clearSel();
+3499:   const lb=document.getElementById("lb");if(lb)lb.remove();}});
+3500: 
+3501: async function reviewPost(url,payload){
+3502:  const response=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},
+3503:   ...(payload===undefined?{}:{body:JSON.stringify(payload)})});
+3504:  let body;
+3505:  try{body=await response.json();}catch(e){throw Error("Invalid server response (HTTP "+response.status+")");}
+3506:  if(!response.ok||!body||body.error||body.ok!==true)
+3507:   throw Error((body&&body.error)||("Request failed (HTTP "+response.status+")"));
+3508:  return body;
+3509: }
+3510: function acknowledgeMap(current,submitted){
+3511:  for(const [key,value] of Object.entries(submitted))
+3512:   if(sameEdit(current[key],value))delete current[key];
+3513: }
+3514: function acknowledgeAdds(current,refs,submitted){
+3515:  for(let i=current.length-1;i>=0;i--){
+3516:   const index=refs.indexOf(current[i]);
+3517:   if(index>=0&&sameEdit(current[i],submitted[index]))current.splice(i,1);
+3518:  }
+3519: }
+3520: async function saveAndRender(){
+3521:  const id=CUR,gen=VIEW_GEN,d=EDITS;
+3522:  if(!id||!d||d.busy)return false;
+3523:  const b=d.editor;
+3524:  try{
+3525:   // Compatibility drafts acquire an identity once, on the original object.
+3526:   for(const a of [...d.manual,...b.adds])if(!Object.prototype.hasOwnProperty.call(a,"manual_id"))a.manual_id=manualId();
+3527:  }catch(e){saveStatus(d,"Could not save edits: "+e.message);return false;}
+3528:  const manRefs=[...d.manual],addRefs=[...b.adds];
+3529:  const man=copyEdit(d.manual),adds=copyEdit(b.adds);
+3530:  const payload=copyEdit({enabled:d.enabled,manual:[...man,...adds.map(a=>({
+3531:   manual_id:a.manual_id,t_start:a.t0,t_end:a.t1,t_ref:a.tref,screen_box:a.box}))],
+3532:   box_overrides:b.ov,time_overrides:b.times});
+3533:  // Plain review must never wipe audio that the editor has not loaded.
+3534:  if(b.audioLoaded&&!sameEdit(b.audio,b.audioSaved)){payload.audio=copyEdit(b.audio);}
+3535:  d.audioInFlight=payload.audio!==undefined;
+3536:  d.busy=true;saveStatus(d,"Saving edits… You can keep editing; newer edits stay pending.");
+3537:  let saved=false;
+3538:  try{
+3539:   const result=await reviewPost(`api/jobs/${id}/detections`,payload);
+3540:   saved=true;d.audioInFlight=false;
+3541:   acknowledgeMap(d.enabled,payload.enabled);
+3542:   acknowledgeMap(b.ov,payload.box_overrides);acknowledgeMap(b.times,payload.time_overrides);
+3543:   acknowledgeAdds(d.manual,manRefs,man);acknowledgeAdds(b.adds,addRefs,adds);
+3544:   if(payload.audio!==undefined)b.audioSaved=copyEdit(payload.audio);
+3545:   // A switched-away view never opens a confirmation or changes current UI.
+3546:   if(!ownsView(id,gen)){
+3547:    saveStatus(d,"Edits saved. Review pending edits, then save to render this job.");return false;
+3548:   }
+3549:   let allowError="";
+3550:   if(result.suggest_allowlist&&result.suggest_allowlist.length&&
+3551:      confirm("You disabled every instance of: "+result.suggest_allowlist.join(", ")+". Add these to the permanent allow-list so future scans skip them?")){
+3552:    try{await reviewPost("api/allowlist",{words:result.suggest_allowlist});loadPersist();}
+3553:    catch(e){allowError=" Allow-list update failed: "+e.message;}
+3554:   }
+3555:   if(!ownsView(id,gen)){
+3556:    saveStatus(d,"Edits saved. Review pending edits, then save to render this job."+allowError);return false;
+3557:   }
+3558:   if(hasReviewEdits(d)){
+3559:    saveStatus(d,"Submitted edits saved. Newer edits are still pending — save again to include them before rendering."+allowError);return false;
+3560:   }
+3561:   saveStatus(d,"Edits saved; requesting render…");
+3562:   await reviewPost(`api/jobs/${id}/render`);
+3563:   // Edits can also arrive while the render request is pending.
+3564:   if(hasReviewEdits(d)){
+3565:    saveStatus(d,"Render started with submitted edits. Newer edits are pending — save again to render them."+allowError);return true;
+3566:   }
+3567:   saveStatus(d,"Rendering with saved edits…"+allowError);
+3568:   if(ownsView(id,gen)){
+3569:    const rv=document.getElementById("review");if(rv)rv.remove();
+3570:    const c=document.getElementById("beslot_done");if(c)c.innerHTML="rendering with your edits…";
+3571:   }
+3572:   return true;
+3573:  }catch(e){
+3574:   // A failed response leaves the audio baseline uncertain. Retain even a
+3575:   // newer toggle-back to the old baseline and deliberately send it on retry.
+3576:   if(!saved&&payload.audio!==undefined)b.audioSaved=null;
+3577:   saveStatus(d,(saved?"Edits saved; render was not confirmed. Retry with Save to render. ":
+3578:    "Save was not confirmed; drafts retained. Retry with Save. ")+e.message);
+3579:   return false;
+3580:  }finally{d.audioInFlight=false;d.busy=false;saveStatus(d,d.status);if(d!==EDITS)trimReviewDraft(d);}
+3581: }
+3582: function persistFailure(error){
+3583:  const nt=document.getElementById("persistnote"),message=String(error.message||error);

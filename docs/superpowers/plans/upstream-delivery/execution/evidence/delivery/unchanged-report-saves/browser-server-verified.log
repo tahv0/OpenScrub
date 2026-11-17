@@ -1,0 +1,20 @@
+ready
+[2026-11-17 06:19:28,728] ERROR in app: Exception on /api/jobs/9b60b0595efb/detections [POST]
+Traceback (most recent call last):
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", line 1839, in job_save_edits
+    atomic_report(path, doc)
+  File "/tmp/openscrub-task631/serve_browser.py", line 28, in publish
+    raise OSError('injected real save publication failure')
+OSError: injected real save publication failure

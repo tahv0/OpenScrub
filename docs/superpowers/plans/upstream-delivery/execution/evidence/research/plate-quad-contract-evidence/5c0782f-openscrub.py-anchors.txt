@@ -1,0 +1,94 @@
+## 5c0782f:openscrub.py:716-733
+716:     dense: bool = False        # per-frame dense-face detection: never merged
+717:                                # across positions (it tracks a moving face)
+718:     track: int = -1            # dense detections of the same physical object
+719:                                # share a track id, so review shows ONE item
+720:                                # per face instead of hundreds of frames
+721:     person: int = -1           # face tracks clustered by facial IDENTITY
+722:                                # (SFace embeddings): one review decision per
+723:                                # PERSON, applied to all their appearances
+724:     verified_label: str = ""  # explicit 'plate' or 'not_plate' review, not a default
+725:     plate_quad: tuple = ()    # four normalized plate corners, ordered clockwise
+726:     poly: tuple = ()           # silhouette contour(s) from a segmentation
+727:                                # model, points NORMALIZED to cbox (0..1) —
+728:                                # render blurs ONLY inside them (person
+729:                                # category); empty = plain box redaction
+730:     poly_holes: tuple = ()     # exclusion rings per outer component
+731:     mask_pad: float = -1       # pixels; -1 inherits global padding
+732:     frame_index: int = -1      # exact source frame; -1 retains legacy timing
+733:     fallback_reason: str = ""  # additive narrow-plate diagnostic
+
+## 5c0782f:openscrub.py:3074-3080
+3074: def _plate_quad_pixels(box, quad):
+3075:     """Map relative plate corners to pixels, including skew outside the bbox."""
+3076:     x1, y1, x2, y2 = box
+3077:     return tuple((x1 + float(p[0]) * (x2 - x1),
+3078:                   y1 + float(p[1]) * (y2 - y1)) for p in quad)
+3079: 
+3080: 
+
+## 5c0782f:openscrub.py:3900-3925
+3900:         ox, oy = cum[min(idx, len(cum) - 1)]
+3901: 
+3902:         act = [d for d in buckets.get(int(t), [])
+3903:                if _sample_active(d, idx, t)]
+3904:         for d in _dedupe_dense(act):
+3905:             px = _detection_pad(d, pad, (ox, oy))
+3906:             if d.category == "plate" and len(d.plate_quad) == 4:
+3907:                 # Use four human-adjusted corners, not the oversized bbox.
+3908:                 base = (d.cbox[0] + ox, d.cbox[1] + oy,
+3909:                         d.cbox[2] + ox, d.cbox[3] + oy)
+3910:                 quad = _plate_quad_pixels(base, d.plate_quad)
+3911:                 _blur_silhouette_yuv10(
+3912:                     y, u, v, min(p[0] for p in quad) - 2,
+3913:                     min(p[1] for p in quad) - 2,
+3914:                     max(p[0] for p in quad) + 2,
+3915:                     max(p[1] for p in quad) + 2,
+3916:                     _mode_for(d.category), (d.plate_quad,),
+3917:                     base, pad_px=1)
+3918:             elif d.poly:
+3919:                 _blur_silhouette_yuv10(
+3920:                     y, u, v, d.cbox[0] + ox - px, d.cbox[1] + oy - px,
+3921:                     d.cbox[2] + ox + px, d.cbox[3] + oy + px,
+3922:                     _mode_for(d.category), d.poly,
+3923:                     (d.cbox[0] + ox, d.cbox[1] + oy,
+3924:                      d.cbox[2] + ox, d.cbox[3] + oy), pad_px=px,
+3925:                     poly_holes=d.poly_holes)
+
+## 5c0782f:openscrub.py:4135-4170
+4135:             pbox = (d.cbox[0] + ox, d.cbox[1] + oy,
+4136:                     d.cbox[2] + ox, d.cbox[3] + oy)
+4137:             if preview:
+4138:                 if d.category == "plate" and len(d.plate_quad) == 4:
+4139:                     vertices = np.asarray(
+4140:                         _plate_quad_pixels(pbox, d.plate_quad), dtype=np.int32)
+4141:                     cv2.polylines(frame, [vertices], True, (0, 0, 255), 2)
+4142:                 else:
+4143:                     cv2.rectangle(frame, (int(max(0, x1)), int(max(0, y1))),
+4144:                                   (int(min(w, x2)), int(min(h, y2))),
+4145:                                   (0, 0, 255), 2)
+4146:                 if d.poly:
+4147:                     region, mask = rasterize_mask(frame.shape, (x1, y1, x2, y2),
+4148:                                                   d.poly, pbox, px, d.poly_holes)
+4149:                     contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+4150:                     cv2.drawContours(frame, contours, -1, (0, 0, 255), 2,
+4151:                                      offset=(region[0], region[1]))
+4152:                 label = d.category
+4153:                 if draw_scores and d.category == "face":
+4154:                     label = f"face {d.confidence:.2f}"
+4155:                 cv2.putText(frame, label, (int(max(0, x1)), int(max(12, y1 - 4))),
+4156:                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
+4157:             elif d.category == "plate" and len(d.plate_quad) == 4:
+4158:                 # Tight skewed mask: ignore the global box padding.
+4159:                 quad = _plate_quad_pixels(pbox, d.plate_quad)
+4160:                 blur_silhouette(frame, min(p[0] for p in quad)-2,
+4161:                                 min(p[1] for p in quad)-2,
+4162:                                 max(p[0] for p in quad)+2,
+4163:                                 max(p[1] for p in quad)+2,
+4164:                                 _mode_for(d.category), (d.plate_quad,),
+4165:                                 pbox, pad_px=1)
+4166:             elif d.poly:
+4167:                 # segmentation silhouette: mask only the body, not the box —
+4168:                 # px (pad+drift) becomes an outward mask dilation
+4169:                 blur_silhouette(frame, x1, y1, x2, y2, _mode_for(d.category),
+4170:                                 d.poly, pbox, pad_px=px, poly_holes=d.poly_holes)

@@ -1,0 +1,752 @@
+## 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub.py:730-755
+730: # ----------------------------------------------------------------------------
+731: 
+732: @dataclass
+733: class Detection:
+734:     t_start: float
+735:     t_end: float
+736:     cbox: tuple          # box in CONTENT coordinates (x1,y1,x2,y2)
+737:     category: str
+738:     text: str
+739:     confidence: float
+740:     aoff: tuple = (0.0, 0.0)   # cumulative offset when detected (drift anchor)
+741:     last_seen: float = 0.0     # time of last positive sighting (t_end incl. hold)
+742:     dense: bool = False        # per-frame dense-face detection: never merged
+743:                                # across positions (it tracks a moving face)
+744:     track: int = -1            # dense detections of the same physical object
+745:                                # share a track id, so review shows ONE item
+746:                                # per face instead of hundreds of frames
+747:     person: int = -1           # face tracks clustered by facial IDENTITY
+748:                                # (SFace embeddings): one review decision per
+749:                                # PERSON, applied to all their appearances
+750:     poly: tuple = ()           # silhouette contour(s) from a segmentation
+751:                                # model, points NORMALIZED to cbox (0..1) —
+752:                                # render blurs ONLY inside them (person
+753:                                # category); empty = plain box redaction
+754: 
+755: 
+
+## 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub.py:3179-3228
+3179: def blur_silhouette(frame, x1, y1, x2, y2, mode, polys, poly_box,
+3180:                     pad_px=0):
+3181:     """Redact ONLY the pixels inside a detection's silhouette polygon(s) —
+3182:     the segmentation-model equivalent of blur_region, so a walking person's
+3183:     body is masked without a box of blurred background around them.
+3184: 
+3185:     (x1..y2) is the PADDED region to operate in; poly points are normalized
+3186:     to poly_box (the unpadded detection box). pad_px dilates the mask
+3187:     outward — the silhouette version of the box pad: over-blur beats
+3188:     under-blur. Any degenerate mask falls back to the full box redaction
+3189:     (fail closed), never to nothing."""
+3190:     h, w = frame.shape[:2]
+3191:     x1i, y1i = max(0, int(x1)), max(0, int(y1))
+3192:     x2i, y2i = min(w, int(x2)), min(h, int(y2))
+3193:     if x2i <= x1i or y2i <= y1i:
+3194:         return
+3195:     if not polys:
+3196:         blur_region(frame, x1, y1, x2, y2, mode)
+3197:         return
+3198:     pbx1, pby1, pbx2, pby2 = poly_box
+3199:     pbw, pbh = max(1.0, pbx2 - pbx1), max(1.0, pby2 - pby1)
+3200:     rw, rh = x2i - x1i, y2i - y1i
+3201:     mask = np.zeros((rh, rw), np.uint8)
+3202:     for pts in polys:
+3203:         arr = np.array([[int(round(float(qx) * pbw + pbx1)) - x1i,
+3204:                          int(round(float(qy) * pbh + pby1)) - y1i]
+3205:                         for qx, qy in pts], np.int32)
+3206:         if len(arr) >= 3:
+3207:             cv2.fillPoly(mask, [arr], 255)
+3208:     if not mask.any():
+3209:         blur_region(frame, x1, y1, x2, y2, mode)   # fail closed
+3210:         return
+3211:     if pad_px > 0:
+3212:         k = 2 * int(pad_px) + 1
+3213:         mask = cv2.dilate(mask, np.ones((k, k), np.uint8))
+3214:     roi = frame[y1i:y2i, x1i:x2i]
+3215:     if mode == "box":
+3216:         filled = np.zeros_like(roi)
+3217:     elif mode == "inpaint":
+3218:         filled = _inpaint_fill(frame, x1i, y1i, x2i, y2i)
+3219:     elif mode == "mosaic":
+3220:         fw = max(6, rw // 14)
+3221:         small = cv2.resize(roi, (max(1, rw // fw), max(1, rh // fw)),
+3222:                            interpolation=cv2.INTER_LINEAR)
+3223:         filled = cv2.resize(small, (rw, rh), interpolation=cv2.INTER_NEAREST)
+3224:     else:
+3225:         k = max(31, ((2 * max(rw, rh) // 3) | 1))
+3226:         filled = _gauss_big(roi, k)
+3227:     cv2.copyTo(filled, mask, roi)
+3228: 
+
+## 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub.py:3680-3745
+3680: 
+3681: 
+3682: def _blur_silhouette_yuv10(y, u, v, x1, y1, x2, y2, mode, polys,
+3683:                            poly_box, pad_px=0):
+3684:     """blur_silhouette for the 10-bit planar HDR path: rasterize the
+3685:     silhouette at luma resolution and redact each plane only inside the
+3686:     (dilated) mask — untouched pixels never leave the native YUV domain.
+3687:     Degenerate masks fall back to the full box (fail closed), exactly
+3688:     like the SDR version."""
+3689:     h, w = y.shape
+3690:     x1i, y1i = max(0, int(x1)), max(0, int(y1))
+3691:     x2i, y2i = min(w, int(x2)), min(h, int(y2))
+3692:     if x2i <= x1i or y2i <= y1i:
+3693:         return
+3694:     if not polys:
+3695:         _blur_yuv10(y, u, v, x1, y1, x2, y2, mode)
+3696:         return
+3697:     pbx1, pby1, pbx2, pby2 = poly_box
+3698:     pbw, pbh = max(1.0, pbx2 - pbx1), max(1.0, pby2 - pby1)
+3699:     rw, rh = x2i - x1i, y2i - y1i
+3700:     mask = np.zeros((rh, rw), np.uint8)
+3701:     for pts in polys:
+3702:         arr = np.array([[int(round(float(qx) * pbw + pbx1)) - x1i,
+3703:                          int(round(float(qy) * pbh + pby1)) - y1i]
+3704:                         for qx, qy in pts], np.int32)
+3705:         if len(arr) >= 3:
+3706:             cv2.fillPoly(mask, [arr], 255)
+3707:     if not mask.any():
+3708:         _blur_yuv10(y, u, v, x1, y1, x2, y2, mode)     # fail closed
+3709:         return
+3710:     if pad_px > 0:
+3711:         k = 2 * int(pad_px) + 1
+3712:         mask = cv2.dilate(mask, np.ones((k, k), np.uint8))
+3713: 
+3714:     def _fill_masked(plane, px1, py1, px2, py2, black, kmin):
+3715:         if px2 <= px1 or py2 <= py1:
+3716:             return
+3717:         roi = plane[py1:py2, px1:px2]
+3718:         if mode == "box":
+3719:             filled = np.full_like(roi, black)
+3720:         elif mode == "inpaint":
+3721:             filled = _inpaint_fill(plane, px1, py1, px2, py2)
+3722:         elif mode == "mosaic":
+3723:             fw = max(6, (px2 - px1) // 14)
+3724:             small = cv2.resize(roi, (max(1, (px2 - px1) // fw),
+3725:                                      max(1, (py2 - py1) // fw)),
+3726:                                interpolation=cv2.INTER_LINEAR)
+3727:             filled = cv2.resize(small, (px2 - px1, py2 - py1),
+3728:                                 interpolation=cv2.INTER_NEAREST)
+3729:         else:
+3730:             k = max(kmin, ((2 * max(px2 - px1, py2 - py1) // 3) | 1))
+3731:             filled = _gauss_big(roi, k)
+3732:         m = mask
+3733:         if m.shape != roi.shape:            # chroma planes are half-res
+3734:             m = cv2.resize(mask, (roi.shape[1], roi.shape[0]),
+3735:                            interpolation=cv2.INTER_NEAREST)
+3736:         cv2.copyTo(filled, m, roi)
+3737: 
+3738:     _fill_masked(y, x1i, y1i, x2i, y2i, 64, 31)
+3739:     _fill_masked(u, x1i // 2, y1i // 2,
+3740:                  min(u.shape[1], (x2i + 1) // 2),
+3741:                  min(u.shape[0], (y2i + 1) // 2), 512, 15)
+3742:     _fill_masked(v, x1i // 2, y1i // 2,
+3743:                  min(v.shape[1], (x2i + 1) // 2),
+3744:                  min(v.shape[0], (y2i + 1) // 2), 512, 15)
+3745: 
+
+## 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub.py:3747-3800
+3747: def apply_coverage(dets, coverage, cb=None):
+3748:     """Render-time coverage level for body-shaped redactions (dense
+3749:     'person' and tracked-object 'manual' samples).
+3750: 
+3751:     'tight' (default) keeps the silhouette masks — best looking, least
+3752:     protective: body build, height, and walking gait survive, and gait
+3753:     recognizers consume exactly the silhouette sequences it produces.
+3754:     'box' blurs the full detection box — hides body shape, but a box
+3755:     that bobs with every step still leaks cadence. 'concealed' is
+3756:     witness-grade: silhouettes dropped AND each track's box becomes the
+3757:     union of its neighbours within ±0.6s plus a 12% pad, so the cover
+3758:     GLIDES instead of bobbing — body outline, build, and step cadence
+3759:     are all destroyed. Returns a NEW list (originals untouched: the
+3760:     report keeps tight samples so a re-render can change coverage)."""
+3761:     if coverage not in ("box", "concealed"):
+3762:         return dets
+3763:     out, per_track = [], {}
+3764:     for d in dets:
+3765:         if getattr(d, "dense", False) and d.category in ("person", "manual"):
+3766:             c = copy.copy(d)
+3767:             c.poly = ()
+3768:             out.append(c)
+3769:             if coverage == "concealed" and getattr(d, "track", -1) >= 0:
+3770:                 per_track.setdefault(c.track, []).append(c)
+3771:         else:
+3772:             out.append(d)
+3773:     for ds in per_track.values():
+3774:         ds.sort(key=lambda x: x.t_start)
+3775:         ts = [x.t_start for x in ds]
+3776:         boxes = [x.cbox for x in ds]
+3777:         n = len(ds)
+3778:         lo = 0
+3779:         new = []
+3780:         for i in range(n):
+3781:             while ts[i] - ts[lo] > 0.6:
+3782:                 lo += 1
+3783:             x1 = y1 = float("inf")
+3784:             x2 = y2 = float("-inf")
+3785:             j = lo
+3786:             while j < n and ts[j] - ts[i] <= 0.6:
+3787:                 b = boxes[j]
+3788:                 x1, y1 = min(x1, b[0]), min(y1, b[1])
+3789:                 x2, y2 = max(x2, b[2]), max(y2, b[3])
+3790:                 j += 1
+3791:             px, py = 0.12 * (x2 - x1), 0.12 * (y2 - y1)
+3792:             new.append((int(x1 - px), int(y1 - py),
+3793:                         int(x2 + px), int(y2 + py)))
+3794:         for x, nb in zip(ds, new):
+3795:             x.cbox = nb
+3796:     if cb:
+3797:         cb.log("      coverage: %s — silhouettes replaced with %s"
+3798:                % (coverage, "full detection boxes" if coverage == "box"
+3799:                   else "gliding oversized boxes (body shape and walking "
+3800:                        "gait concealed)"))
+
+## 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub.py:3885-3915
+3885: def render_hdr(src, dst, detections, cum, bands, fps, pad, mode,
+3886:                encoder, tags, band_margin=25, progress_every=60, cb=None,
+3887:                mode_map=None, face_shape="ellipse", audio_spans=None,
+3888:                mute_tracks=(), out_quality="archival", audio_lanes=None):
+3889:     """render(), but 10-bit end to end: decode the HDR source to raw
+3890:     yuv420p10le, blur the planes in place, encode 10-bit HEVC with the
+3891:     source's color tags (PQ/HLG + BT.2020) carried over. `hvc1` tagging
+3892:     keeps QuickTime/Apple players happy. No preview mode — previews use
+3893:     the SDR copy."""
+3894:     mode_map = mode_map or {}
+3895:     def _mode_for(cat):
+3896:         return mode_map.get(cat, mode)
+3897:     cb = cb or Callbacks()
+3898:     meta = cv2.VideoCapture(src)
+3899:     w = int(meta.get(cv2.CAP_PROP_FRAME_WIDTH))
+3900:     h = int(meta.get(cv2.CAP_PROP_FRAME_HEIGHT))
+3901:     total = int(meta.get(cv2.CAP_PROP_FRAME_COUNT))
+3902:     meta.release()
+3903:     cb.log(f"      encoder: {encoder} 10-bit"
+3904:            + (" (GPU)" if encoder.endswith(("_nvenc", "_qsv")) else " (CPU)"))
+3905: 
+3906:     dec = subprocess.Popen(
+3907:         ["ffmpeg", "-loglevel", "error", "-i", src,
+3908:          "-f", "rawvideo", "-pix_fmt", "yuv420p10le", "pipe:1"],
+3909:         stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+3910:         bufsize=w * h * 6)
+3911:     q = _out_q(encoder, out_quality)
+3912:     vargs = (["-c:v", "hevc_nvenc", "-preset", "p4", "-cq", q,
+3913:               "-profile:v", "main10", "-pix_fmt", "p010le"]
+3914:              if encoder == "hevc_nvenc" else
+3915:              ["-c:v", "hevc_qsv", "-preset", "medium",
+
+## 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub.py:3982-4020
+3982: 
+3983:     idx = 0
+3984:     while True:
+3985:         if idx % 30 == 0 and cb.cancelled():
+3986:             cleanup_partial()
+3987:             raise PipelineCancelled()
+3988:         raw = dec.stdout.read(fbytes)
+3989:         if len(raw) < fbytes:
+3990:             break
+3991:         buf = np.frombuffer(raw, dtype=np.uint16).copy()
+3992:         y = buf[:ysz].reshape(h, w)
+3993:         u = buf[ysz:ysz + csz].reshape(h // 2, w // 2)
+3994:         v = buf[ysz + csz:].reshape(h // 2, w // 2)
+3995:         t = idx / fps
+3996:         ox, oy = cum[min(idx, len(cum) - 1)]
+3997: 
+3998:         act = [d for d in buckets.get(int(t), [])
+3999:                if d.t_start - 0.01 <= t <= d.t_end + 0.01]
+4000:         for d in _dedupe_dense(act):
+4001:             drift = min(24.0, 0.05 * (abs(ox - d.aoff[0]) + abs(oy - d.aoff[1])))
+4002:             px = pad + drift
+4003:             if d.poly:
+4004:                 _blur_silhouette_yuv10(
+4005:                     y, u, v, d.cbox[0] + ox - px, d.cbox[1] + oy - px,
+4006:                     d.cbox[2] + ox + px, d.cbox[3] + oy + px,
+4007:                     _mode_for(d.category), d.poly,
+4008:                     (d.cbox[0] + ox, d.cbox[1] + oy,
+4009:                      d.cbox[2] + ox, d.cbox[3] + oy), pad_px=px)
+4010:             else:
+4011:                 _blur_yuv10(y, u, v, d.cbox[0] + ox - px, d.cbox[1] + oy - px,
+4012:                             d.cbox[2] + ox + px, d.cbox[3] + oy + px,
+4013:                             _mode_for(d.category),
+4014:                             shape=("ellipse" if d.category == "face"
+4015:                                    and face_shape == "ellipse" else "rect"))
+4016: 
+4017:         bx, by = bands[min(idx, len(bands) - 1)]
+4018:         vals = set(mode_map.values()) | {mode}
+4019:         band_mode = ("box" if ("box" in vals or "inpaint" in vals)
+4020:                      else "mosaic" if "mosaic" in vals else "blur")
+
+## 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub.py:4060-4080
+4060: def render(src, dst, detections, cum, bands, fps, pad, mode, preview,
+4061:            encoder="auto", band_margin=25, progress_every=60, cb=None,
+4062:            mode_map=None, draw_scores=False, vcodec="h264",
+4063:            face_shape="ellipse", audio_spans=None, clip=None,
+4064:            mute_tracks=(), out_quality="archival", audio_lanes=None):
+4065:     # mode_map: {category: "blur"|"box"} overrides the global `mode` per
+4066:     # category. Lets you black-box the reversible-blur-vulnerable categories
+4067:     # (SSN, MRN, account numbers) while blurring faces, in one render.
+4068:     mode_map = mode_map or {}
+4069:     def _mode_for(cat):
+4070:         return mode_map.get(cat, mode)
+4071:     cb = cb or Callbacks()
+4072:     cap = cv2.VideoCapture(src)
+4073:     w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+4074:     h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+4075:     total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+4076: 
+4077:     # --- output sink: single-pass ffmpeg pipe (NVENC if available) ---
+4078:     proc = None
+4079:     ff_err = None
+4080:     out = None
+
+## 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub.py:4180-4252
+4180:                 try:
+4181:                     os.remove(p)
+4182:                 except OSError:
+4183:                     pass
+4184: 
+4185:     idx = 0
+4186:     if clip and clip[0] > 0.5:
+4187:         tgt = int(clip[0] * fps)
+4188:         if _seek_cap(cap, tgt, fps):     # verified — a lying seek would
+4189:             idx = tgt                    # shift the whole trimmed render
+4190:         # unseekable: decode from 0; the undershoot guard below skips
+4191:         # frames before the clip start one by one
+4192:     while True:
+4193:         if idx % 30 == 0 and cb.cancelled():
+4194:             cleanup_partial()
+4195:             raise PipelineCancelled()
+4196:         ok, frame = cap.read()
+4197:         if not ok:
+4198:             break
+4199:         t = idx / fps
+4200:         if clip:
+4201:             if t < clip[0] - 1e-6:          # seek undershoot guard
+4202:                 idx += 1
+4203:                 continue
+4204:             if clip[1] is not None and t > clip[1] + 1e-6:
+4205:                 break                       # keep-window over: stop encoding
+4206:         ox, oy = cum[min(idx, len(cum) - 1)]
+4207: 
+4208:         # 1. tracked PII boxes, translated by scroll offset
+4209:         act = [d for d in buckets.get(int(t), [])
+4210:                if d.t_start - 0.01 <= t <= d.t_end + 0.01]
+4211:         for d in _dedupe_dense(act):
+4212:             # drift allowance: residual tracking error grows (slowly) with
+4213:             # distance scrolled since detection — expand the box to cover it
+4214:             drift = min(24.0, 0.05 * (abs(ox - d.aoff[0]) + abs(oy - d.aoff[1])))
+4215:             px = pad + drift
+4216:             x1 = d.cbox[0] + ox - px
+4217:             y1 = d.cbox[1] + oy - px
+4218:             x2 = d.cbox[2] + ox + px
+4219:             y2 = d.cbox[3] + oy + px
+4220:             pbox = (d.cbox[0] + ox, d.cbox[1] + oy,
+4221:                     d.cbox[2] + ox, d.cbox[3] + oy)
+4222:             if preview:
+4223:                 cv2.rectangle(frame, (int(max(0, x1)), int(max(0, y1))),
+4224:                               (int(min(w, x2)), int(min(h, y2))), (0, 0, 255), 2)
+4225:                 for pts in (d.poly or ()):
+4226:                     arr = np.array(
+4227:                         [[int(float(qx) * (pbox[2] - pbox[0]) + pbox[0]),
+4228:                           int(float(qy) * (pbox[3] - pbox[1]) + pbox[1])]
+4229:                          for qx, qy in pts], np.int32)
+4230:                     if len(arr) >= 3:
+4231:                         cv2.polylines(frame, [arr], True, (0, 0, 255), 2)
+4232:                 label = d.category
+4233:                 if draw_scores and d.category == "face":
+4234:                     label = f"face {d.confidence:.2f}"
+4235:                 cv2.putText(frame, label, (int(max(0, x1)), int(max(12, y1 - 4))),
+4236:                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
+4237:             elif d.poly:
+4238:                 # segmentation silhouette: mask only the body, not the box —
+4239:                 # px (pad+drift) becomes an outward mask dilation
+4240:                 blur_silhouette(frame, x1, y1, x2, y2, _mode_for(d.category),
+4241:                                 d.poly, pbox, pad_px=px)
+4242:             else:
+4243:                 blur_region(frame, x1, y1, x2, y2, _mode_for(d.category),
+4244:                             shape=("ellipse" if d.category == "face"
+4245:                                    and face_shape == "ellipse" else "rect"))
+4246: 
+4247:         # 2. safety bands: unscanned content that scrolled into view
+4248:         bx, by = bands[min(idx, len(bands) - 1)]
+4249:         vals = set(mode_map.values()) | {mode}
+4250:         band_mode = ("box" if ("box" in vals or "inpaint" in vals)
+4251:                      else "mosaic" if "mosaic" in vals else "blur")  # never weaker
+4252:         def band(x1, y1, x2, y2):
+
+## 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub.py:6286-6381
+6286: def write_report(path, args, state, output_path=None, publisher=None):
+6287:     prov = {
+6288:         "tool": "openscrub", "version": VERSION,
+6289:         "timestamp": datetime.datetime.now().astimezone().isoformat(),
+6290:         "input": os.path.abspath(args.video),
+6291:         "input_sha256": state.get("input_sha256"),
+6292:         "original_input": (os.path.abspath(args.original_video)
+6293:                            if getattr(args, "original_video", None) else None),
+6294:         "vfr_normalized": bool(getattr(args, "original_video", None)),
+6295:         "hdr_tonemapped": bool(getattr(args, "hdr_tonemapped", False)),
+6296:         "hdr_output": bool(getattr(args, "hdr_source", None)),
+6297:         "metadata_stripped": True,   # renders pass -map_metadata -1
+6298:         "zones": getattr(args, "zones_data", None),
+6299:         "windows": getattr(args, "windows_data", None),
+6300:         "settings": _settings_dict(args),
+6301:     }
+6302:     if output_path and os.path.exists(output_path):
+6303:         prov["output"] = os.path.abspath(output_path)
+6304:         prov["output_sha256"] = sha256_file(output_path)
+6305:     source = state.get("source_report")
+6306:     if source is not None:
+6307:         # A render consumes enabled Detection objects, but publishes the full
+6308:         # review document: Keep choices, row positions and unknown fields are
+6309:         # user data, not a serialization of the render subset.
+6310:         doc = dict(source)
+6311:         previous = dict(source.get("provenance", {}))
+6312:         settings = dict(previous.get("settings", {}))
+6313:         settings.update(prov["settings"])
+6314:         prov["settings"] = settings
+6315:         # Output hashes/paths must describe this render, never an older one.
+6316:         previous.pop("output", None)
+6317:         previous.pop("output_sha256", None)
+6318:         previous.update(prov)
+6319:         doc["provenance"] = previous
+6320:     else:
+6321:         doc = {
+6322:             "provenance": prov,
+6323:             "render_state": {
+6324:                 "fps": state["fps"],
+6325:                 "cum": [[round(x, 1), round(y, 1)] for x, y in state["cum"]],
+6326:                 "bands": [[round(x, 1), round(y, 1)] for x, y in state["bands"]],
+6327:             },
+6328:             "detections": ([dict(asdict(d), enabled=True)
+6329:                             for d in state["detections"]]
+6330:                            + [dict(asdict(d), enabled=False, zone_dropped=True)
+6331:                               for d in state.get("zdropped", [])]),
+6332:         }
+6333:         if state.get("audio_suggestions"):
+6334:             doc["audio_suggestions"] = state["audio_suggestions"]
+6335:         if state.get("audio_transcript"):
+6336:             doc["audio_transcript"] = state["audio_transcript"]
+6337:     aspans = getattr(args, "audio_spans", None)
+6338:     if ((source is None and aspans)
+6339:             or (source is not None and state.get("audio_redactions_overridden"))):
+6340:         # An explicit empty list clears saved spans. Otherwise preserve the raw
+6341:         # saved representation, including additive fields on individual spans.
+6342:         doc["audio_redactions"] = [
+6343:             {"t0": a, "t1": b, "mode": m} for a, b, m in (aspans or [])]
+6344:     # Construction and output hashing precede an optional caller-owned final
+6345:     # publication boundary. CLI/GUI and old callback callers keep atomic bytes.
+6346:     (publisher or atomic_report)(path, doc)
+6347: 
+6348: 
+6349: def load_report(path):
+6350:     """-> (detections, render_state, provenance). Accepts v3 plain-list
+6351:     reports (no render_state) and v4 dict reports; disabled detections are
+6352:     dropped."""
+6353:     with open(path, encoding="utf-8") as f:
+6354:         doc = json.load(f)
+6355:     return _decode_report(doc)
+6356: 
+6357: 
+6358: def _decode_report(doc):
+6359:     """Decode the enabled render subset of one already-read report snapshot."""
+6360:     if isinstance(doc, list):
+6361:         rows, state, prov = doc, None, {}
+6362:     else:
+6363:         rows, state, prov = doc.get("detections", []), doc.get("render_state"), \
+6364:             doc.get("provenance", {})
+6365:     dets = []
+6366:     for r in rows:
+6367:         if not r.get("enabled", True):
+6368:             continue
+6369:         dets.append(Detection(
+6370:             t_start=float(r["t_start"]), t_end=float(r["t_end"]),
+6371:             cbox=tuple(r["cbox"]), category=r["category"], text=r["text"],
+6372:             confidence=float(r.get("confidence", 1.0)),
+6373:             aoff=tuple(r.get("aoff", (0.0, 0.0))),
+6374:             last_seen=float(r.get("last_seen", r["t_start"])),
+6375:             # Preserve grouping in the enabled subset used by the renderer.
+6376:             dense=bool(r.get("dense", False)),
+6377:             track=int(r.get("track", -1)),
+6378:             person=int(r.get("person", -1)),
+6379:             poly=tuple(copy.deepcopy(r.get("poly") or ()))))
+6380:     return dets, state, prov
+6381: 
+
+## 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub.py:6496-6539
+6496: def _scan_copy_matches(ref, copy, tol=2):
+6497:     """(ok, n_ref, n_copy) — a 1:1 (non-resampling) scan copy must carry
+6498:     exactly the source's frames: the scan reads it by frame INDEX, so a
+6499:     single dropped or duplicated frame silently shifts every detection
+6500:     made after it onto the wrong output frames (misplaced blur — seen on
+6501:     a real GPU box whose NVENC copy desynced). Counting requires a full
+6502:     decode of both files; that cost is nothing next to the scan itself
+6503:     and it is the only check that catches the failure."""
+6504:     n_ref, n_cp = _count_video_frames(ref), _count_video_frames(copy)
+6505:     if n_ref is None or n_cp is None:
+6506:         return True, n_ref, n_cp        # can't measure — don't block
+6507:     return abs(n_ref - n_cp) <= tol, n_ref, n_cp
+6508: 
+6509: 
+6510: def normalize_vfr(args, cb):
+6511:     """Intake normalization: VFR input is transcoded to CFR (frame->time
+6512:     mapping assumes CFR); HDR input additionally gets a tone-mapped SDR
+6513:     BT.709 copy for SCANNING (detectors are 8-bit, and naive decode washes
+6514:     colors out). When the output should stay HDR (--hdr-output match, the
+6515:     default), a 10-bit CFR HDR source is kept for the render and
+6516:     args.hdr_source/hdr_encoder/hdr_tags are set. Reuses NVENC when
+6517:     available. No-op for CFR SDR input."""
+6518:     if getattr(args, "no_vfr_fix", False) or getattr(args, "vfr", "auto") == "ignore":
+6519:         return
+6520:     is_vfr, avg = probe_vfr(args.video)
+6521:     is_hdr, hdesc = probe_hdr(args.video)
+6522:     if is_hdr and not (_ffmpeg_has("zscale") and _ffmpeg_has("tonemap")):
+6523:         cb.log(f"      NOTE: input looks HDR ({hdesc}) but this ffmpeg build "
+6524:                "lacks the zscale/tonemap filters — processing without tone "
+6525:                "mapping; colors may look washed out in the output.")
+6526:         is_hdr = False
+6527:     if not is_vfr and not is_hdr:
+6528:         return
+6529:     target = int(round(avg)) if avg and 10 <= avg <= 120 else 30
+6530:     out_ref = args.output or os.path.splitext(args.video)[0] + "_redacted.mp4"
+6531:     base = os.path.join(os.path.dirname(os.path.abspath(out_ref)),
+6532:                         os.path.splitext(os.path.basename(args.video))[0])
+6533:     src0 = args.video
+6534: 
+6535:     def _cached(path):
+6536:         return (os.path.exists(path)
+6537:                 and os.path.getmtime(path) > os.path.getmtime(src0))
+6538: 
+6539:     def _encode(inp, outp, cfr, tonemap, vargs, extra=None):
+
+## 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub.py:6590-6605
+6590: 
+6591:     if not is_hdr:
+6592:         fixed = base + ".cfr.mp4"
+6593:         if _cached(fixed):
+6594:             cb.log(f"      reusing existing {os.path.basename(fixed)}")
+6595:         else:
+6596:             _encode(src0, fixed, cfr=True, tonemap=False, vargs=sdr_vargs)
+6597:         args.original_video = src0
+6598:         args.hdr_tonemapped = False
+6599:         args.video = fixed
+6600:         return
+6601: 
+6602:     # ---- HDR input ----
+6603:     want_hdr = getattr(args, "hdr_output", "match") != "sdr"
+6604:     henc = hevc10_encoder(getattr(args, "encoder", "auto"), cb) if want_hdr \
+6605:         else None
+
+## 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub.py:6612-6689
+6612:     # 1. the timeline the whole job runs on: CFR, still 10-bit HDR when the
+6613:     #    output should stay HDR (VFR HDR sources need this extra pass so the
+6614:     #    scan copy and the render source share exact frame times)
+6615:     hdr_src = src0
+6616:     if is_vfr:
+6617:         if want_hdr:
+6618:             hdr_src = base + ".cfr.hdr.mp4"
+6619:             if _cached(hdr_src):
+6620:                 cb.log(f"      reusing existing {os.path.basename(hdr_src)}")
+6621:             else:
+6622:                 hv = (["-c:v", "hevc_nvenc", "-preset", "p4", "-cq", "18",
+6623:                        "-profile:v", "main10", "-pix_fmt", "p010le"]
+6624:                       if henc == "hevc_nvenc" else
+6625:                       ["-c:v", "hevc_qsv", "-preset", "medium",
+6626:                        "-global_quality", "18", "-profile:v", "main10",
+6627:                        "-pix_fmt", "p010le"]
+6628:                       if henc == "hevc_qsv" else
+6629:                       ["-c:v", "libx265", "-crf", "18", "-preset",
+6630:                        "fast", "-pix_fmt", "yuv420p10le"])
+6631:                 keep = [a for kv in color_tags(src0).items() for a in kv]
+6632:                 _encode(src0, hdr_src, cfr=True, tonemap=False,
+6633:                         vargs=hv, extra=keep + ["-tag:v", "hvc1"])
+6634:         else:
+6635:             hdr_src = None   # no HDR render: single combined pass below
+6636: 
+6637:     # 2. tone-mapped SDR copy for scanning (and for the output when the
+6638:     #    user chose SDR / no 10-bit encoder exists)
+6639:     sdr = base + ".sdr.mp4"
+6640:     cb.log(f"      input is {hdesc} HDR — tone-mapping a copy to SDR "
+6641:            "(BT.709) for detection"
+6642:            + ("" if want_hdr else "; output will be SDR"))
+6643:     if _cached(sdr):
+6644:         cb.log(f"      reusing existing {os.path.basename(sdr)}")
+6645:     else:
+6646:         sdr_ref = hdr_src or src0
+6647:         sdr_cfr = is_vfr and hdr_src is None
+6648:         _encode(sdr_ref, sdr, cfr=sdr_cfr, tonemap=True, vargs=sdr_vargs)
+6649:         if not sdr_cfr:
+6650:             # fail closed: the scan trusts this copy's frame indexes as
+6651:             # timestamps. A GPU encode that drops or duplicates even a few
+6652:             # frames shifts every later detection onto the wrong output
+6653:             # frames — blur lands beside the subject with no error
+6654:             # anywhere. Verify the copy 1:1; redo on the CPU encoder if
+6655:             # it lies; refuse to scan if even that can't match.
+6656:             ok, n_ref, n_cp = _scan_copy_matches(sdr_ref, sdr)
+6657:             if not ok:
+6658:                 cb.log(f"      NOTE: scan copy came out with {n_cp} frames "
+6659:                        f"but the source has {n_ref} — this encoder "
+6660:                        "desynced the timeline (detections would blur the "
+6661:                        "wrong moments). Re-encoding the copy with libx264 "
+6662:                        "(CPU).")
+6663:                 try:
+6664:                     os.remove(sdr)      # never leave a lying copy for the
+6665:                 except OSError:         # mtime cache to reuse
+6666:                     pass
+6667:                 _encode(sdr_ref, sdr, cfr=False, tonemap=True,
+6668:                         vargs=["-c:v", "libx264", "-crf", "18",
+6669:                                "-preset", "fast", "-pix_fmt", "yuv420p"])
+6670:                 ok, n_ref, n_cp = _scan_copy_matches(sdr_ref, sdr)
+6671:                 if not ok:
+6672:                     try:
+6673:                         os.remove(sdr)
+6674:                     except OSError:
+6675:                         pass
+6676:                     raise RuntimeError(
+6677:                         "scan copy could not be created with a faithful "
+6678:                         f"timeline ({n_cp} vs {n_ref} frames) — refusing "
+6679:                         "to scan a desynced copy (blur would land at the "
+6680:                         "wrong times)")
+6681: 
+6682:     args.original_video = src0
+6683:     args.hdr_tonemapped = True
+6684:     args.video = sdr
+6685:     if want_hdr:
+6686:         args.hdr_source = hdr_src if hdr_src else src0
+6687:         args.hdr_encoder = henc
+6688:         args.hdr_tags = color_tags(args.hdr_source)
+6689:         cb.log(f"      HDR output: preserving {hdesc} — 10-bit HEVC "
+
+## 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub.py:8448-8580
+8448:                       "zone_dropped": zone_dropped}}
+8449: 
+8450: 
+8451: def run_render(args, state, cb=None):
+8452:     cb = cb or Callbacks()
+8453:     dst = args.output or os.path.splitext(args.video)[0] + (
+8454:         "_preview.mp4" if args.preview else "_redacted.mp4")
+8455:     cb.log(f"[4/4] Rendering -> {dst}")
+8456:     aspans = getattr(args, "audio_spans", None)
+8457:     if getattr(args, "audio_pii_apply", False):
+8458:         sugg = state.get("audio_suggestions") or []
+8459:         if sugg:
+8460:             aspans = list(aspans or []) + [
+8461:                 (s["t0"], s["t1"], "mute") for s in sugg]
+8462:             cb.log("      spoken-PII: %d suggested span(s) applied as "
+8463:                    "mute (--audio-pii-apply)" % len(sugg))
+8464:             args.audio_spans = aspans
+8465:             state["audio_redactions_overridden"] = True
+8466:     mt = (getattr(args, "mute_audio_tracks", "") or "").strip()
+8467:     mute_tracks = ("all" if mt == "all"
+8468:                    else tuple(int(x) for x in mt.split(",") if x.strip()))
+8469:     cf = (getattr(args, "clip_frac", "") or "").strip()
+8470:     if cf:
+8471:         # fractions of duration (web UI) — resolve against the server's own
+8472:         # measurement so an iPhone's reported length can't shift the trim
+8473:         _dur = _probe_duration(args.video) or (
+8474:             len(state.get("cum", [])) / (state.get("fps") or 30.0))
+8475:         a, _, b = cf.partition("-")
+8476:         cs = max(0.0, min(1.0, float(a))) * _dur
+8477:         bf = float(b)
+8478:         ce = (bf * _dur) if bf < 0.999 else 0.0    # ~1.0 == to end
+8479:     else:
+8480:         cs = float(getattr(args, "clip_start", 0) or 0)
+8481:         ce = float(getattr(args, "clip_end", 0) or 0)
+8482:     clip = ((cs, ce if ce > 0 else None)
+8483:             if (cs > 0 or ce > 0) else None)
+8484:     if clip and getattr(args, "hdr_source", None) and not args.preview:
+8485:         cb.log("      NOTE: output trim is not yet supported on HDR output — "
+8486:                "rendering full length. Use --hdr-output sdr to trim.")
+8487:         clip = None
+8488:     dets_r = apply_coverage(state["detections"],
+8489:                             getattr(args, "coverage", "tight"), cb)
+8490:     out_q = getattr(args, "out_quality", "archival") or "archival"
+8491:     if out_q != "archival":
+8492:         cb.log(f"      output quality: {out_q} (smaller file; archival is "
+8493:                "the visually-lossless default)")
+8494:     if getattr(args, "hdr_source", None) and not args.preview:
+8495:         render_hdr(args.hdr_source, dst, dets_r, state["cum"],
+8496:                    state["bands"], state["fps"], pad=args.pad, mode=args.mode,
+8497:                    encoder=args.hdr_encoder,
+8498:                    tags=getattr(args, "hdr_tags", {}),
+8499:                    face_shape=getattr(args, "face_shape", "ellipse"),
+8500:                    mode_map=getattr(args, "mode_map", None),
+8501:                    audio_spans=aspans, mute_tracks=mute_tracks, cb=cb,
+8502:                    out_quality=out_q,
+8503:                    audio_lanes=getattr(args, "audio_lane_count", None))
+8504:     else:
+8505:         render(args.video, dst, dets_r, state["cum"],
+8506:                state["bands"],
+8507:                state["fps"], pad=args.pad, mode=args.mode, preview=args.preview,
+8508:                mode_map=getattr(args, "mode_map", None),
+8509:                draw_scores=bool(getattr(args, "draw_scores", False)),
+8510:                vcodec=getattr(args, "codec", "h264"),
+8511:                face_shape=getattr(args, "face_shape", "ellipse"),
+8512:                encoder=args.encoder, audio_spans=aspans, clip=clip,
+8513:                mute_tracks=mute_tracks, cb=cb, out_quality=out_q,
+8514:                audio_lanes=getattr(args, "audio_lane_count", None))
+8515:     if args.report:
+8516:         write_report(args.report, args, state, output_path=dst,
+8517:                      publisher=getattr(cb, "publish_report", None))
+8518:         cb.log(f"      audit report: {args.report} (contains PII text — protect it)")
+8519:     cb.log("done.")
+8520:     return dict(state["stats"], output=dst)
+8521: 
+8522: 
+8523: def run_pipeline(args, cb=None):
+8524:     """Scan + render (or render-only with --from-report). Returns a summary
+8525:     dict; raises PipelineCancelled if cb cancels."""
+8526:     cb = cb or Callbacks()
+8527:     if getattr(args, "audio_redact", ""):
+8528:         args.audio_spans = parse_audio_spans(args.audio_redact,
+8529:                                              args.audio_redact_mode)
+8530:     if getattr(args, "from_report", None):
+8531:         cb.log(f"[1/2] Loading detections from {args.from_report}")
+8532:         # Read once so geometry, choices, audio and provenance come from the
+8533:         # same snapshot. The raw document stays separate from render objects.
+8534:         with open(args.from_report, encoding="utf-8") as f:
+8535:             source = json.load(f)
+8536:         dets, rstate, prov = _decode_report(source)
+8537:         audio_overridden = getattr(args, "audio_spans", None) is not None
+8538:         if not audio_overridden and isinstance(source, dict):
+8539:             try:
+8540:                 args.audio_spans = [
+8541:                     (float(s["t0"]), float(s["t1"]), s.get("mode", "mute"))
+8542:                     for s in source.get("audio_redactions", [])]
+8543:             except (TypeError, ValueError, KeyError):
+8544:                 pass
+8545:         selected_input = getattr(args, "_report_input", None)
+8546:         if selected_input is not None:
+8547:             # An in-process caller already selected/owns this exact input.
+8548:             # Do not follow newer provenance into a source it did not admit.
+8549:             args.video = selected_input
+8550:         else:
+8551:             orig = prov.get("original_input")
+8552:             if orig and os.path.exists(orig) \
+8553:                     and os.path.abspath(orig) != os.path.abspath(args.video):
+8554:                 # re-renders must start from the TRUE original so intake can
+8555:                 # re-derive the HDR/CFR context (cached intermediates are
+8556:                 # reused). Rendering straight from the tone-mapped scan copy
+8557:                 # silently downgraded HDR jobs to SDR output.
+8558:                 args.video = orig
+8559:         normalize_vfr(args, cb)
+8560:         if rstate is None:
+8561:             raise RuntimeError("report has no render_state — re-run a scan "
+8562:                                "with --report using openscrub v4+")
+8563:         cb.log(f"      {len(dets)} enabled detections")
+8564:         in_sha = sha256_file(args.video)
+8565:         if prov.get("input_sha256") and prov["input_sha256"] != in_sha:
+8566:             cb.log("      WARNING: input file differs from the one this report "
+8567:                    "was made from (sha256 mismatch) — blur positions may be wrong")
+8568:         state = {"fps": rstate["fps"],
+8569:                  "cum": [tuple(v) for v in rstate["cum"]],
+8570:                  "bands": [tuple(v) for v in rstate["bands"]],
+8571:                  "detections": dets, "input_sha256": in_sha,
+8572:                  "source_report": source,
+8573:                  "audio_redactions_overridden": audio_overridden,
+8574:                  "audio_suggestions": copy.deepcopy(source.get("audio_suggestions")),
+8575:                  "stats": {"scans": 0, "raw_hits": 0, "regions": len(dets),
+8576:                            "recalls": 0, "remembered": 0}}
+8577:         return run_render(args, state, cb)
+8578:     state = run_scan(args, cb)
+8579:     return run_render(args, state, cb)
+8580: 

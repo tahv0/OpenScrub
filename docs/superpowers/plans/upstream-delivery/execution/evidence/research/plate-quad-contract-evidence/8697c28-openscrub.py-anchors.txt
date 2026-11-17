@@ -1,0 +1,234 @@
+## 8697c28:openscrub.py:3090-3185
+3090:         filled = _gauss_big(roi, k)
+3091:     cv2.copyTo(filled, mask, roi)
+3092: 
+3093: 
+3094: def probe_audio_streams(src):
+3095:     """Number of audio streams in the file (0 if none / no ffprobe)."""
+3096:     try:
+3097:         out = subprocess.run(
+3098:             ["ffprobe", "-v", "error", "-select_streams", "a",
+3099:              "-show_entries", "stream=index", "-of", "csv=p=0", src],
+3100:             capture_output=True, text=True, timeout=30).stdout
+3101:         return len([ln for ln in out.splitlines() if ln.strip()])
+3102:     except Exception:
+3103:         return 0
+3104: 
+3105: 
+3106: def probe_has_audio(src):
+3107:     """True if the file has at least one audio stream (ffprobe)."""
+3108:     return probe_audio_streams(src) > 0
+3109: 
+3110: 
+3111: def audio_ffmpeg_args(src, spans, ain=1, mute_tracks=()):
+3112:     """ffmpeg (map_args, codec_args) for the render output's audio.
+3113: 
+3114:     spans: [(t0, t1, mode)] with mode "mute" or "bleep" — spoken names,
+3115:     numbers, and addresses leak PII no matter how good the visual blur is,
+3116:     so the renderer can silence (or tone over) marked time ranges.
+3117:     mute_tracks: 1-based audio-track numbers to REMOVE from the output
+3118:     entirely (or "all") — multi-track sources (game + mic commentary,
+3119:     camera + lav) keep their other tracks. ALL of the source's audio
+3120:     tracks are carried through (not just the first, as before); span
+3121:     redaction applies to every kept track. Audio re-encodes (aac) only
+3122:     when spans exist — otherwise kept tracks stream-copy."""
+3123:     spans = [(float(a), float(b), (m or "mute"))
+3124:              for a, b, m in (spans or []) if float(b) > float(a) >= 0]
+3125:     n = probe_audio_streams(src)
+3126:     if n == 0:
+3127:         return (["-map", f"{ain}:a?"], ["-c:a", "copy"])
+3128:     if mute_tracks == "all" or (mute_tracks and "all" in mute_tracks):
+3129:         return ([], [])                       # no audio in the output
+3130:     muted = {int(x) for x in mute_tracks or ()}
+3131:     kept = [i for i in range(n) if (i + 1) not in muted]
+3132:     if not kept:
+3133:         return ([], [])
+3134:     if not spans:
+3135:         if len(kept) == n:
+3136:             return (["-map", f"{ain}:a?"], ["-c:a", "copy"])
+3137:         maps = []
+3138:         for i in kept:
+3139:             maps += ["-map", f"{ain}:a:{i}"]
+3140:         return (maps, ["-c:a", "copy"])
+3141:     allx = "+".join(f"between(t,{a:.3f},{b:.3f})" for a, b, _ in spans)
+3142:     bx = "+".join(f"between(t,{a:.3f},{b:.3f})"
+3143:                   for a, b, m in spans if m == "bleep")
+3144:     fc, maps = [], []
+3145:     if bx and len(kept) > 1:
+3146:         fc.append("sine=frequency=1000[tn];[tn]asplit=%d%s"
+3147:                   % (len(kept), "".join(f"[t{k}]" for k in range(len(kept)))))
+3148:     elif bx:
+3149:         fc.append("sine=frequency=1000[t0]")
+3150:     for k, i in enumerate(kept):
+3151:         if bx:
+3152:             fc.append(f"[{ain}:a:{i}]volume=enable='{allx}':volume=0[m{k}]")
+3153:             fc.append(f"[t{k}]volume=enable='not({bx})':volume=0,"
+3154:                       f"volume=0.3[b{k}]")
+3155:             fc.append(f"[m{k}][b{k}]amix=inputs=2:duration=first:"
+3156:                       f"normalize=0[o{k}]")
+3157:             maps += ["-map", f"[o{k}]"]
+3158:         else:
+3159:             fc.append(f"[{ain}:a:{i}]volume=enable='{allx}':volume=0[o{k}]")
+3160:             maps += ["-map", f"[o{k}]"]
+3161:     return (["-filter_complex", ";".join(fc)] + maps,
+3162:             ["-c:a", "aac", "-b:a", "192k"])
+3163: 
+3164: 
+3165: def parse_audio_spans(spec, mode="mute"):
+3166:     """'12.5-19.0,84-90' -> [(12.5, 19.0, mode), ...]. Raises on garbage."""
+3167:     spans = []
+3168:     for part in (spec or "").split(","):
+3169:         part = part.strip()
+3170:         if not part:
+3171:             continue
+3172:         a, _, b = part.partition("-")
+3173:         spans.append((float(a), float(b), mode))
+3174:     return spans
+3175: 
+3176: 
+3177: class PipelineCancelled(Exception):
+3178:     """Raised internally when a Callbacks.cancelled() returns True."""
+3179: 
+3180: 
+3181: class Callbacks:
+3182:     """Hooks for embedding the pipeline (GUI, batch runner, tests).
+3183:     The default implementation reproduces the CLI's print behavior."""
+3184:     wants_frames = False   # set True to receive scan_frame() calls
+3185: 
+
+## 8697c28:openscrub.py:3012-3082
+3012:         frame[y1:y2, x1:x2] = filled
+3013: 
+3014: 
+3015: def effective_mask_pad(override, default):
+3016:     try:
+3017:         value = float(override)
+3018:         return value if np.isfinite(value) and value >= 0 else default
+3019:     except (TypeError, ValueError, OverflowError):
+3020:         return default
+3021: 
+3022: 
+3023: def rasterize_mask(shape, region, polys, poly_box, pad_px=0, poly_holes=()):
+3024:     """Return clipped region and its mask. Invalid geometry covers the region."""
+3025:     h, w = shape[:2]
+3026:     x1, y1, x2, y2 = region
+3027:     x1i, y1i = max(0, int(x1)), max(0, int(y1))
+3028:     x2i, y2i = min(w, int(x2)), min(h, int(y2))
+3029:     rw, rh = max(0, x2i - x1i), max(0, y2i - y1i)
+3030:     mask = np.zeros((rh, rw), np.uint8)
+3031:     if not rw or not rh:
+3032:         return (x1i, y1i, x2i, y2i), mask
+3033:     try:
+3034:         pbx1, pby1, pbx2, pby2 = map(float, poly_box)
+3035:         if (not all(np.isfinite([pbx1, pby1, pbx2, pby2])) or
+3036:             max(abs(pbx1), abs(pby1), abs(pbx2), abs(pby2)) > 10000000 or
+3037:             pbx2 <= pbx1 or pby2 <= pby1):
+3038:             raise ValueError('invalid box')
+3039:         if not polys or (poly_holes and len(poly_holes) != len(polys)):
+3040:             raise ValueError('invalid components')
+3041:         def ring(points):
+3042:             a = np.asarray(points, dtype=float)
+3043:             if (a.ndim != 2 or a.shape[1] != 2 or len(a) < 3 or
+3044:                 not np.isfinite(a).all() or (a < 0).any() or (a > 1).any()):
+3045:                 raise ValueError('invalid ring')
+3046:             a = np.rint(a * [pbx2-pbx1, pby2-pby1] + [pbx1-x1i, pby1-y1i]).astype(np.int32)
+3047:             if abs(cv2.contourArea(a)) < 0.5:
+3048:                 raise ValueError('degenerate ring')
+3049:             return a
+3050:         pad = max(0, int(pad_px))
+3051:         # Limit kernel to the region dimensions; larger padding is equivalent.
+3052:         pad = min(pad, max(rw, rh))
+3053:         for i, points in enumerate(polys):
+3054:             component = np.zeros_like(mask)
+3055:             cv2.fillPoly(component, [ring(points)], 255)
+3056:             if pad:
+3057:                 component = cv2.dilate(component, None, iterations=pad)
+3058:             for hole in (poly_holes[i] if poly_holes else ()):
+3059:                 cv2.fillPoly(component, [ring(hole)], 0)
+3060:             if not component.any():
+3061:                 raise ValueError("empty component")
+3062:             mask = cv2.bitwise_or(mask, component)
+3063:         if not mask.any():
+3064:             raise ValueError('empty mask')
+3065:     except (ValueError, TypeError, OverflowError, IndexError, cv2.error):
+3066:         mask[:] = 255
+3067:     return (x1i, y1i, x2i, y2i), mask
+3068: 
+3069: 
+3070: def blur_silhouette(frame, x1, y1, x2, y2, mode, polys, poly_box,
+3071:                     pad_px=0, poly_holes=()):
+3072:     """Redact a compound silhouette, falling back to its box on invalid input."""
+3073:     (x1i, y1i, x2i, y2i), mask = rasterize_mask(
+3074:         frame.shape, (x1, y1, x2, y2), polys, poly_box, pad_px, poly_holes)
+3075:     rw, rh = x2i-x1i, y2i-y1i
+3076:     if not rw or not rh:
+3077:         return
+3078:     roi = frame[y1i:y2i, x1i:x2i]
+3079:     if mode == "box":
+3080:         filled = np.zeros_like(roi)
+3081:     elif mode == "inpaint":
+3082:         filled = _inpaint_fill(frame, x1i, y1i, x2i, y2i)
+
+## 8697c28:openscrub.py:3408-3469
+3408:             vx1, vy1, vx2, vy2 = 0, 0, rw, rh
+3409:             if edge_l: vx1 = -rw
+3410:             if edge_t: vy1 = -rh
+3411:             if edge_r: vx2 = 2 * rw
+3412:             if edge_b: vy2 = 2 * rh
+3413:             if (vx1, vy1, vx2, vy2) != (0, 0, rw, rh):
+3414:                 cv2.ellipse(mask, ((vx1 + vx2) // 2, (vy1 + vy2) // 2),
+3415:                             (max(1, (vx2 - vx1) // 2),
+3416:                              max(1, (vy2 - vy1) // 2)),
+3417:                             0, 0, 360, 255, -1)
+3418:             cv2.copyTo(filled, mask, roi)
+3419:         else:
+3420:             plane[py1:py2, px1:px2] = filled
+3421: 
+3422:     _fill(y, x1, y1, x2, y2, 64, 31)          # 10-bit limited-range black
+3423:     cx1, cy1 = x1 // 2, y1 // 2
+3424:     cx2, cy2 = min(w // 2, (x2 + 1) // 2), min(h // 2, (y2 + 1) // 2)
+3425:     _fill(u, cx1, cy1, cx2, cy2, 512, 15)
+3426:     _fill(v, cx1, cy1, cx2, cy2, 512, 15)
+3427: 
+3428: 
+3429: def _blur_silhouette_yuv10(y, u, v, x1, y1, x2, y2, mode, polys,
+3430:                            poly_box, pad_px=0, poly_holes=()):
+3431:     """Apply the shared luma mask to native 10-bit planes."""
+3432:     (x1i, y1i, x2i, y2i), mask = rasterize_mask(
+3433:         y.shape, (x1, y1, x2, y2), polys, poly_box, pad_px, poly_holes)
+3434:     if not mask.size:
+3435:         return
+3436:     # Map luma pixels to their actual 2x2 chroma cells, including odd origins.
+3437:     aligned = np.zeros((2*((y2i+1)//2-y1i//2),
+3438:                         2*((x2i+1)//2-x1i//2)), np.uint8)
+3439:     aligned[y1i%2:y1i%2+mask.shape[0], x1i%2:x1i%2+mask.shape[1]] = mask
+3440:     cmask = aligned.reshape(aligned.shape[0]//2, 2, aligned.shape[1]//2, 2).max(axis=(1, 3))
+3441: 
+3442:     def _fill_masked(plane, px1, py1, px2, py2, black, kmin):
+3443:         if px2 <= px1 or py2 <= py1:
+3444:             return
+3445:         roi = plane[py1:py2, px1:px2]
+3446:         if mode == "box":
+3447:             filled = np.full_like(roi, black)
+3448:         elif mode == "inpaint":
+3449:             filled = _inpaint_fill(plane, px1, py1, px2, py2)
+3450:         elif mode == "mosaic":
+3451:             fw = max(6, (px2 - px1) // 14)
+3452:             small = cv2.resize(roi, (max(1, (px2 - px1) // fw),
+3453:                                      max(1, (py2 - py1) // fw)),
+3454:                                interpolation=cv2.INTER_LINEAR)
+3455:             filled = cv2.resize(small, (px2 - px1, py2 - py1),
+3456:                                 interpolation=cv2.INTER_NEAREST)
+3457:         else:
+3458:             k = max(kmin, ((2 * max(px2 - px1, py2 - py1) // 3) | 1))
+3459:             filled = _gauss_big(roi, k)
+3460:         m = mask
+3461:         if m.shape != roi.shape:            # chroma planes are half-res
+3462:             m = cmask
+3463:         cv2.copyTo(filled, m, roi)
+3464: 
+3465:     _fill_masked(y, x1i, y1i, x2i, y2i, 64, 31)
+3466:     _fill_masked(u, x1i // 2, y1i // 2,
+3467:                  min(u.shape[1], (x2i + 1) // 2),
+3468:                  min(u.shape[0], (y2i + 1) // 2), 512, 15)
+3469:     _fill_masked(v, x1i // 2, y1i // 2,

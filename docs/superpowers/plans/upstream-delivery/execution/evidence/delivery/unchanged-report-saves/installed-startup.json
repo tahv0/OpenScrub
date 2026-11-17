@@ -1,0 +1,14 @@
+{
+  "installed_module_probe": [
+    "/tmp/openscrub-task631/installed/site-packages/openscrub.py",
+    "/tmp/openscrub-task631/installed-profile/run-23lcwyhd/.local/share/OpenScrub/openscrub_jobs"
+  ],
+  "actual_cli_help": true,
+  "actual_web_entrypoint_cheroot": true,
+  "homepage_and_job_api": true,
+  "real_vault_setup_lock_unlock": true,
+  "allowlist_ready_locked_recovered": true,
+  "idle_sigterm_exit": 0,
+  "runtime_data_root": "/tmp/openscrub-task631/installed-profile/run-23lcwyhd",
+  "no_model_fetches": true
+}

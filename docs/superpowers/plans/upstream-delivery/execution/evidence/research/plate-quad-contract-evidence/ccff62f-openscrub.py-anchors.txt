@@ -1,0 +1,154 @@
+## ccff62f:openscrub.py:716-734
+716:                                # across positions (it tracks a moving face)
+717:     track: int = -1            # dense detections of the same physical object
+718:                                # share a track id, so review shows ONE item
+719:                                # per face instead of hundreds of frames
+720:     person: int = -1           # face tracks clustered by facial IDENTITY
+721:                                # (SFace embeddings): one review decision per
+722:                                # PERSON, applied to all their appearances
+723:     verified_label: str = ""  # explicit 'plate' or 'not_plate' review, not a default
+724:     plate_quad: tuple = ()    # four normalized plate corners, ordered clockwise
+725:     poly: tuple = ()           # silhouette contour(s) from a segmentation
+726:                                # model, points NORMALIZED to cbox (0..1) —
+727:                                # render blurs ONLY inside them (person
+728:                                # category); empty = plain box redaction
+729:     poly_holes: tuple = ()     # exclusion rings per outer component
+730:     mask_pad: float = -1       # pixels; -1 inherits global padding
+731:     frame_index: int = -1      # exact source frame; -1 retains legacy timing
+732:     fallback_reason: str = ""  # additive narrow-plate diagnostic
+733: 
+734: 
+
+## ccff62f:openscrub.py:3073-3080
+3073: def _plate_quad_pixels(box, quad):
+3074:     """Map relative plate corners to pixels, including skew outside the bbox."""
+3075:     x1, y1, x2, y2 = box
+3076:     return tuple((x1 + float(p[0]) * (x2 - x1),
+3077:                   y1 + float(p[1]) * (y2 - y1)) for p in quad)
+3078: 
+3079: 
+3080: def blur_silhouette(frame, x1, y1, x2, y2, mode, polys, poly_box,
+
+## ccff62f:openscrub.py:3780-3820
+3780:             break
+3781:         buf = np.frombuffer(raw, dtype=np.uint16).copy()
+3782:         y = buf[:ysz].reshape(h, w)
+3783:         u = buf[ysz:ysz + csz].reshape(h // 2, w // 2)
+3784:         v = buf[ysz + csz:].reshape(h // 2, w // 2)
+3785:         t = idx / fps
+3786:         ox, oy = cum[min(idx, len(cum) - 1)]
+3787: 
+3788:         act = [d for d in buckets.get(int(t), [])
+3789:                if _sample_active(d, idx, t)]
+3790:         for d in _dedupe_dense(act):
+3791:             px = _detection_pad(d, pad, (ox, oy))
+3792:             if d.category == "plate" and len(d.plate_quad) == 4:
+3793:                 # Use four human-adjusted corners, not the oversized bbox.
+3794:                 base = (d.cbox[0] + ox, d.cbox[1] + oy,
+3795:                         d.cbox[2] + ox, d.cbox[3] + oy)
+3796:                 quad = _plate_quad_pixels(base, d.plate_quad)
+3797:                 _blur_silhouette_yuv10(
+3798:                     y, u, v, min(p[0] for p in quad) - 2,
+3799:                     min(p[1] for p in quad) - 2,
+3800:                     max(p[0] for p in quad) + 2,
+3801:                     max(p[1] for p in quad) + 2,
+3802:                     _mode_for(d.category), (d.plate_quad,),
+3803:                     base, pad_px=1)
+3804:             elif d.poly:
+3805:                 _blur_silhouette_yuv10(
+3806:                     y, u, v, d.cbox[0] + ox - px, d.cbox[1] + oy - px,
+3807:                     d.cbox[2] + ox + px, d.cbox[3] + oy + px,
+3808:                     _mode_for(d.category), d.poly,
+3809:                     (d.cbox[0] + ox, d.cbox[1] + oy,
+3810:                      d.cbox[2] + ox, d.cbox[3] + oy), pad_px=px,
+3811:                     poly_holes=d.poly_holes)
+3812:             else:
+3813:                 _blur_yuv10(y, u, v, d.cbox[0] + ox - px, d.cbox[1] + oy - px,
+3814:                             d.cbox[2] + ox + px, d.cbox[3] + oy + px,
+3815:                             _mode_for(d.category),
+3816:                             shape=("ellipse" if d.category == "face"
+3817:                                    and face_shape == "ellipse" else "rect"))
+3818: 
+3819:         bx, by = bands[min(idx, len(bands) - 1)]
+3820:         vals = set(mode_map.values()) | {mode}
+
+## ccff62f:openscrub.py:3995-4040
+3995:             # drift allowance: residual tracking error grows (slowly) with
+3996:             # distance scrolled since detection — expand the box to cover it
+3997:             px = _detection_pad(d, pad, (ox, oy))
+3998:             x1 = d.cbox[0] + ox - px
+3999:             y1 = d.cbox[1] + oy - px
+4000:             x2 = d.cbox[2] + ox + px
+4001:             y2 = d.cbox[3] + oy + px
+4002:             pbox = (d.cbox[0] + ox, d.cbox[1] + oy,
+4003:                     d.cbox[2] + ox, d.cbox[3] + oy)
+4004:             if preview:
+4005:                 if d.category == "plate" and len(d.plate_quad) == 4:
+4006:                     vertices = np.asarray(
+4007:                         _plate_quad_pixels(pbox, d.plate_quad), dtype=np.int32)
+4008:                     cv2.polylines(frame, [vertices], True, (0, 0, 255), 2)
+4009:                 else:
+4010:                     cv2.rectangle(frame, (int(max(0, x1)), int(max(0, y1))),
+4011:                                   (int(min(w, x2)), int(min(h, y2))),
+4012:                                   (0, 0, 255), 2)
+4013:                 if d.poly:
+4014:                     region, mask = rasterize_mask(frame.shape, (x1, y1, x2, y2),
+4015:                                                   d.poly, pbox, px, d.poly_holes)
+4016:                     contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+4017:                     cv2.drawContours(frame, contours, -1, (0, 0, 255), 2,
+4018:                                      offset=(region[0], region[1]))
+4019:                 label = d.category
+4020:                 if draw_scores and d.category == "face":
+4021:                     label = f"face {d.confidence:.2f}"
+4022:                 cv2.putText(frame, label, (int(max(0, x1)), int(max(12, y1 - 4))),
+4023:                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
+4024:             elif d.category == "plate" and len(d.plate_quad) == 4:
+4025:                 # Tight skewed mask: ignore the global box padding.
+4026:                 quad = _plate_quad_pixels(pbox, d.plate_quad)
+4027:                 blur_silhouette(frame, min(p[0] for p in quad)-2,
+4028:                                 min(p[1] for p in quad)-2,
+4029:                                 max(p[0] for p in quad)+2,
+4030:                                 max(p[1] for p in quad)+2,
+4031:                                 _mode_for(d.category), (d.plate_quad,),
+4032:                                 pbox, pad_px=1)
+4033:             elif d.poly:
+4034:                 # segmentation silhouette: mask only the body, not the box —
+4035:                 # px (pad+drift) becomes an outward mask dilation
+4036:                 blur_silhouette(frame, x1, y1, x2, y2, _mode_for(d.category),
+4037:                                 d.poly, pbox, pad_px=px, poly_holes=d.poly_holes)
+4038:             else:
+4039:                 blur_region(frame, x1, y1, x2, y2, _mode_for(d.category),
+4040:                             shape=("ellipse" if d.category == "face"
+
+## ccff62f:openscrub.py:6250-6280
+6250:         dets.append(Detection(
+6251:             t_start=float(r["t_start"]), t_end=float(r["t_end"]),
+6252:             cbox=tuple(r["cbox"]), category=r["category"], text=r["text"],
+6253:             confidence=float(r.get("confidence", 1.0)),
+6254:             aoff=tuple(r.get("aoff", (0.0, 0.0))),
+6255:             last_seen=float(r.get("last_seen", r["t_start"])),
+6256:             # dense/track must survive the round trip: rendering rewrites the
+6257:             # report from rehydrated detections, and losing track ids here
+6258:             # exploded the re-opened review into one card per frame sample
+6259:             dense=bool(r.get("dense", False)),
+6260:             track=int(r.get("track", -1)),
+6261:             person=int(r.get("person", -1)),
+6262:             plate_quad=tuple(tuple(pt) for pt in (r.get("plate_quad") or ())),
+6263:             verified_label=(r.get("verified_label")
+6264:                             if r.get("verified_label") in ("plate", "not_plate")
+6265:                             else ""),
+6266:             poly=tuple(r.get("poly") or ())))
+6267:             poly=_tuples(r.get("poly") or ()),
+6268:             poly_holes=_tuples(r.get("poly_holes") or ()),
+6269:             mask_pad=r.get("mask_pad", -1),
+6270:             frame_index=int(r.get("frame_index", -1)),
+6271:             fallback_reason=r.get("fallback_reason", "")))
+6272:     return dets, state, prov
+6273: 
+6274: 
+6275: # ----------------------------------------------------------------------------
+6276: # Variable frame rate (VFR) handling
+6277: # ----------------------------------------------------------------------------
+6278: 
+6279: def _probe_duration(path):
+6280:     """Video duration in seconds via ffprobe (0.0 if unavailable). The

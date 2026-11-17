@@ -246,6 +246,8 @@ Proposed contract: `get_snapshot(job_id, report_path, source_identity) -> (docum
 
 **When:** Separate W2 investigation/PR after P11B or independently when a safe equivalence contract and representative benefit are demonstrated. Do not bundle it with a timestamp-only optimization.
 
+The [source contract research](execution/evidence/research/scan-index-contract-research.md) proposes a local index rebuilt from actual memory insertion order: numeric keys at the same length; nonnumeric keys within ±2 lengths merged by original insertion serial. Keep the existing predicate authoritative, including first eligible fuzzy match before a later exact key. Do not reuse forward recall or persistent caches with different semantics. Construction is O(M) retained references; same-length and early-winner histories remain explicit cost controls. No generic hook-purity or plugin-dispatch framework is required.
+
 - [ ] **E/S/I:** Preserve reverse pass's lower lenient thresholds, numeric same-length/two-digit tolerance, name-sighting gates, category/allowlist filtering and first eligible insertion-order match. Reusing forward recall unchanged is not equivalent. Identify a bounded candidate index that preserves those semantics before implementation.
 - [ ] **V/D:** Compare every resulting detection and order, including unmatched words, ambiguous eligible keys, numeric/name cases and filtering. Measure index construction plus lookup work on fixed histories, run relevant/full tests and build. Leave the candidate open or close without code if meaningful benefit cannot be established safely.
 
@@ -254,6 +256,8 @@ Proposed contract: `get_snapshot(job_id, report_path, source_identity) -> (docum
 **What / why:** Distinct text regions leave a growing `mergeable` list. The same controlled 10/50/100 unique histories visit 55/1,275/5,050 prior candidates, separate from the tail-history and reverse-pass work.
 
 **When:** A later separate W2 candidate because candidate ordering and geometric verification make this riskier than skipping timestamps. Source/work-count evidence alone is not a shipped improvement.
+
+The same source research rules out category-only indexing as a fix for the demonstrated all-email traversal; it leaves those candidate counts unchanged, and existing code already skips cross-category geometry calls. A dynamic spatial candidate filter remains conditional. Preserve newest region-birth priority (not latest observation), inclusive12px box slack, growing union boxes, actual input-object mutations and callback order. Partial-ratio/empty-text bypass makes naive exact-text or length pruning unsafe. Include maintenance, prefix traversal and order-restoration cost before adopting any index; do not add category scaffolding for an unproven later optimization.
 
 - [ ] **E/S:** Measure realistic distinct-region workloads and identify an index that retains reverse candidate priority, overlapping-box/union behavior and visual long-gap verification. An arbitrary age cutoff would drop intentionally mergeable verified gaps and is not acceptable.
 - [ ] **I/V/D:** Implement only after the equivalence boundary is explicit. Preserve all output fields/order and source-frame verification; include difficult overlap/gap/duplicate cases, actual scan/merge invocation, measured before/after costs, relevant/full tests and build. Keep this candidate's acceptance or no-adoption reasoning separate from P11B/C.
