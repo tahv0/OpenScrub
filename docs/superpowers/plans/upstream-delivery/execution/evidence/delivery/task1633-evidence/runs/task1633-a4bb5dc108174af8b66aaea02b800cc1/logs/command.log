@@ -1,0 +1,663 @@
+DEFAULT_PATHS {"jobs": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/candidate-export/openscrub_jobs", "models": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/runs/task1633-a4bb5dc108174af8b66aaea02b800cc1/profile/.openscrub/models"}
+ACTIVE_SOURCE {"executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python", "python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]", "sources": {"openscrub": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/candidate-export/openscrub.py", "sha256": "6d3d03c5ace66115d593abe4cae51a402b06d3156f2dfa84fbad2aaafd6b8b44"}, "openscrub_internal": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/candidate-export/openscrub_internal/__init__.py", "sha256": "c35c063c010e329c5dad13782e7b67438ed4b2d1faf975d4f01be2773a18e022"}, "openscrub_internal.lifetimes": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/candidate-export/openscrub_internal/lifetimes.py", "sha256": "ce97f619c3ab75b2eaad69e631ba6100b432cef2e84bc0088b8a5d2eb9cd51dc"}, "openscrub_internal.render_delivery": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/candidate-export/openscrub_internal/render_delivery.py", "sha256": "bfe03679a86878ff2a4fc2bf523fdffbca093a920a7961550fa1b5c2459a2b03"}, "openscrub_internal.reports": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/candidate-export/openscrub_internal/reports.py", "sha256": "ff8fcbbccbb6be0ce072d9416a4edab6c9d3e0d546735a50c114f564c75fc5fa"}, "openscrub_setup": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/candidate-export/openscrub_setup.py", "sha256": "d0362a038f8182e8fae510100085bb087f09f7e5cf7e11a780a24390b3037eaf"}, "openscrub_update": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/candidate-export/openscrub_update.py", "sha256": "4d6a20f75d985a119f8421227c3bd88b17fd1b8eed44e353b127b5b49e733d55"}, "openscrub_vault": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/candidate-export/openscrub_vault.py", "sha256": "05e7c08dc170b83fb53d71abb802b20b7ee7c1edebfd49a00c8d0ac269781e40"}, "openscrub_web": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/candidate-export/openscrub_web.py", "sha256": "1b5657852b172f8675a90de173029f6bae4bcc3e6c00237c7cdaadde4a307b9a"}, "zones_ui": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/candidate-export/zones_ui.py", "sha256": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7"}}}
+......................F................................................. [ 36%]
+......................F....FF.EEE......E................................ [ 73%]
+.E.................................................                      [100%]
+==================================== ERRORS ====================================
+_________ ERROR at setup of test_real_socket_overlapping_sparse_saves __________
+
+store = namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/runs/task1633-a4bb5dc1081...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x766043c3d4e0>, url='/api/jobs/5c3058c09c60')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x76604434e300>
+
+    @pytest.fixture
+    def socket_api(store, monkeypatch):
+        import http.client
+        from cheroot import wsgi
+        ready = threading.Event()
+        servers, errors = [], []
+        real = wsgi.Server.prepare
+        def prepare(server):
+            real(server)
+            servers.append(server)
+            ready.set()
+        monkeypatch.setattr(wsgi.Server, 'prepare', prepare)
+        def serve():
+            try:
+                web._serve('127.0.0.1', 0, None)
+            except BaseException as error:
+                errors.append(error)
+                ready.set()
+        thread = threading.Thread(target=serve)
+        thread.start()
+        try:
+>           assert ready.wait(8) and not errors, errors
+E           AssertionError: [OSError("No socket could be created -- (('127.0.0.1', 0): [Errno 1] Operation not permitted)")]
+E           assert (True and not [OSError("No socket could be created -- (('127.0.0.1', 0): [Errno 1] Operation not permitted)")])
+E            +  where True = wait(8)
+E            +    where wait = <threading.Event at 0x7660440abef0: set>.wait
+
+../../candidate-export/tests/test_report_transactions.py:546: AssertionError
+
+During handling of the above exception, another exception occurred:
+
+store = namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/runs/task1633-a4bb5dc1081...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x766043c3d4e0>, url='/api/jobs/5c3058c09c60')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x76604434e300>
+
+    @pytest.fixture
+    def socket_api(store, monkeypatch):
+        import http.client
+        from cheroot import wsgi
+        ready = threading.Event()
+        servers, errors = [], []
+        real = wsgi.Server.prepare
+        def prepare(server):
+            real(server)
+            servers.append(server)
+            ready.set()
+        monkeypatch.setattr(wsgi.Server, 'prepare', prepare)
+        def serve():
+            try:
+                web._serve('127.0.0.1', 0, None)
+            except BaseException as error:
+                errors.append(error)
+                ready.set()
+        thread = threading.Thread(target=serve)
+        thread.start()
+        try:
+            assert ready.wait(8) and not errors, errors
+            port = servers[0].socket.getsockname()[1]
+            def api(method, path, payload=None):
+                connection = http.client.HTTPConnection('127.0.0.1', port, timeout=8)
+                try:
+                    body = json.dumps(payload) if payload is not None else None
+                    connection.request(method, path, body=body, headers={
+                        'Content-Type': 'application/json', 'Connection': 'close'})
+                    result = connection.getresponse()
+                    return result.status, dict(result.getheaders()), result.read()
+                finally:
+                    connection.close()
+            yield api
+        finally:
+            for server in servers:
+                server.stop()
+            join(thread)
+>           assert not errors
+E           assert not [OSError("No socket could be created -- (('127.0.0.1', 0): [Errno 1] Operation not permitted)")]
+
+../../candidate-export/tests/test_report_transactions.py:563: AssertionError
+______ ERROR at setup of test_report_download_stat_open_is_one_generation ______
+
+store = namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/runs/task1633-a4bb5dc1081...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7660441545e0>, url='/api/jobs/8f7f7e031493')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x766043ffbfb0>
+
+    @pytest.fixture
+    def socket_api(store, monkeypatch):
+        import http.client
+        from cheroot import wsgi
+        ready = threading.Event()
+        servers, errors = [], []
+        real = wsgi.Server.prepare
+        def prepare(server):
+            real(server)
+            servers.append(server)
+            ready.set()
+        monkeypatch.setattr(wsgi.Server, 'prepare', prepare)
+        def serve():
+            try:
+                web._serve('127.0.0.1', 0, None)
+            except BaseException as error:
+                errors.append(error)
+                ready.set()
+        thread = threading.Thread(target=serve)
+        thread.start()
+        try:
+>           assert ready.wait(8) and not errors, errors
+E           AssertionError: [OSError("No socket could be created -- (('127.0.0.1', 0): [Errno 1] Operation not permitted)")]
+E           assert (True and not [OSError("No socket could be created -- (('127.0.0.1', 0): [Errno 1] Operation not permitted)")])
+E            +  where True = wait(8)
+E            +    where wait = <threading.Event at 0x766043ff9490: set>.wait
+
+../../candidate-export/tests/test_report_transactions.py:546: AssertionError
+
+During handling of the above exception, another exception occurred:
+
+store = namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/runs/task1633-a4bb5dc1081...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7660441545e0>, url='/api/jobs/8f7f7e031493')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x766043ffbfb0>
+
+    @pytest.fixture
+    def socket_api(store, monkeypatch):
+        import http.client
+        from cheroot import wsgi
+        ready = threading.Event()
+        servers, errors = [], []
+        real = wsgi.Server.prepare
+        def prepare(server):
+            real(server)
+            servers.append(server)
+            ready.set()
+        monkeypatch.setattr(wsgi.Server, 'prepare', prepare)
+        def serve():
+            try:
+                web._serve('127.0.0.1', 0, None)
+            except BaseException as error:
+                errors.append(error)
+                ready.set()
+        thread = threading.Thread(target=serve)
+        thread.start()
+        try:
+            assert ready.wait(8) and not errors, errors
+            port = servers[0].socket.getsockname()[1]
+            def api(method, path, payload=None):
+                connection = http.client.HTTPConnection('127.0.0.1', port, timeout=8)
+                try:
+                    body = json.dumps(payload) if payload is not None else None
+                    connection.request(method, path, body=body, headers={
+                        'Content-Type': 'application/json', 'Connection': 'close'})
+                    result = connection.getresponse()
+                    return result.status, dict(result.getheaders()), result.read()
+                finally:
+                    connection.close()
+            yield api
+        finally:
+            for server in servers:
+                server.stop()
+            join(thread)
+>           assert not errors
+E           assert not [OSError("No socket could be created -- (('127.0.0.1', 0): [Errno 1] Operation not permitted)")]
+
+../../candidate-export/tests/test_report_transactions.py:563: AssertionError
+_____ ERROR at setup of test_real_socket_save_track_real_render_and_reopen _____
+
+store = namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/runs/task1633-a4bb5dc1081...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x766044154400>, url='/api/jobs/aa7f95ec3c47')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x766043ffa420>
+
+    @pytest.fixture
+    def socket_api(store, monkeypatch):
+        import http.client
+        from cheroot import wsgi
+        ready = threading.Event()
+        servers, errors = [], []
+        real = wsgi.Server.prepare
+        def prepare(server):
+            real(server)
+            servers.append(server)
+            ready.set()
+        monkeypatch.setattr(wsgi.Server, 'prepare', prepare)
+        def serve():
+            try:
+                web._serve('127.0.0.1', 0, None)
+            except BaseException as error:
+                errors.append(error)
+                ready.set()
+        thread = threading.Thread(target=serve)
+        thread.start()
+        try:
+>           assert ready.wait(8) and not errors, errors
+E           AssertionError: [OSError("No socket could be created -- (('127.0.0.1', 0): [Errno 1] Operation not permitted)")]
+E           assert (True and not [OSError("No socket could be created -- (('127.0.0.1', 0): [Errno 1] Operation not permitted)")])
+E            +  where True = wait(8)
+E            +    where wait = <threading.Event at 0x766043ffa9f0: set>.wait
+
+../../candidate-export/tests/test_report_transactions.py:546: AssertionError
+
+During handling of the above exception, another exception occurred:
+
+store = namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/runs/task1633-a4bb5dc1081...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x766044154400>, url='/api/jobs/aa7f95ec3c47')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x766043ffa420>
+
+    @pytest.fixture
+    def socket_api(store, monkeypatch):
+        import http.client
+        from cheroot import wsgi
+        ready = threading.Event()
+        servers, errors = [], []
+        real = wsgi.Server.prepare
+        def prepare(server):
+            real(server)
+            servers.append(server)
+            ready.set()
+        monkeypatch.setattr(wsgi.Server, 'prepare', prepare)
+        def serve():
+            try:
+                web._serve('127.0.0.1', 0, None)
+            except BaseException as error:
+                errors.append(error)
+                ready.set()
+        thread = threading.Thread(target=serve)
+        thread.start()
+        try:
+            assert ready.wait(8) and not errors, errors
+            port = servers[0].socket.getsockname()[1]
+            def api(method, path, payload=None):
+                connection = http.client.HTTPConnection('127.0.0.1', port, timeout=8)
+                try:
+                    body = json.dumps(payload) if payload is not None else None
+                    connection.request(method, path, body=body, headers={
+                        'Content-Type': 'application/json', 'Connection': 'close'})
+                    result = connection.getresponse()
+                    return result.status, dict(result.getheaders()), result.read()
+                finally:
+                    connection.close()
+            yield api
+        finally:
+            for server in servers:
+                server.stop()
+            join(thread)
+>           assert not errors
+E           assert not [OSError("No socket could be created -- (('127.0.0.1', 0): [Errno 1] Operation not permitted)")]
+
+../../candidate-export/tests/test_report_transactions.py:563: AssertionError
+___ ERROR at setup of test_committed_http_response_lost_then_identical_retry ___
+
+store = namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/runs/task1633-a4bb5dc1081...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x766044157b00>, url='/api/jobs/f81e762f2580')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7660441cb500>
+
+    @pytest.fixture
+    def socket_api(store, monkeypatch):
+        import http.client
+        from cheroot import wsgi
+        ready = threading.Event()
+        servers, errors = [], []
+        real = wsgi.Server.prepare
+        def prepare(server):
+            real(server)
+            servers.append(server)
+            ready.set()
+        monkeypatch.setattr(wsgi.Server, 'prepare', prepare)
+        def serve():
+            try:
+                web._serve('127.0.0.1', 0, None)
+            except BaseException as error:
+                errors.append(error)
+                ready.set()
+        thread = threading.Thread(target=serve)
+        thread.start()
+        try:
+>           assert ready.wait(8) and not errors, errors
+E           AssertionError: [OSError("No socket could be created -- (('127.0.0.1', 0): [Errno 1] Operation not permitted)")]
+E           assert (True and not [OSError("No socket could be created -- (('127.0.0.1', 0): [Errno 1] Operation not permitted)")])
+E            +  where True = wait(8)
+E            +    where wait = <threading.Event at 0x766043ffbe90: set>.wait
+
+../../candidate-export/tests/test_report_transactions.py:546: AssertionError
+
+During handling of the above exception, another exception occurred:
+
+store = namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/runs/task1633-a4bb5dc1081...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x766044157b00>, url='/api/jobs/f81e762f2580')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7660441cb500>
+
+    @pytest.fixture
+    def socket_api(store, monkeypatch):
+        import http.client
+        from cheroot import wsgi
+        ready = threading.Event()
+        servers, errors = [], []
+        real = wsgi.Server.prepare
+        def prepare(server):
+            real(server)
+            servers.append(server)
+            ready.set()
+        monkeypatch.setattr(wsgi.Server, 'prepare', prepare)
+        def serve():
+            try:
+                web._serve('127.0.0.1', 0, None)
+            except BaseException as error:
+                errors.append(error)
+                ready.set()
+        thread = threading.Thread(target=serve)
+        thread.start()
+        try:
+            assert ready.wait(8) and not errors, errors
+            port = servers[0].socket.getsockname()[1]
+            def api(method, path, payload=None):
+                connection = http.client.HTTPConnection('127.0.0.1', port, timeout=8)
+                try:
+                    body = json.dumps(payload) if payload is not None else None
+                    connection.request(method, path, body=body, headers={
+                        'Content-Type': 'application/json', 'Connection': 'close'})
+                    result = connection.getresponse()
+                    return result.status, dict(result.getheaders()), result.read()
+                finally:
+                    connection.close()
+            yield api
+        finally:
+            for server in servers:
+                server.stop()
+            join(thread)
+>           assert not errors
+E           assert not [OSError("No socket could be created -- (('127.0.0.1', 0): [Errno 1] Operation not permitted)")]
+
+../../candidate-export/tests/test_report_transactions.py:563: AssertionError
+_ ERROR at setup of test_real_render_and_fresh_server_process_preserve_creation_and_current_choices _
+
+store = namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/runs/task1633-a4bb5dc1081...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x766043bf5760>, url='/api/jobs/ac4b86e2631d')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x766043ff98e0>
+
+    @pytest.fixture
+    def socket_api(store, monkeypatch):
+        import http.client
+        from cheroot import wsgi
+        ready = threading.Event()
+        servers, errors = [], []
+        real = wsgi.Server.prepare
+        def prepare(server):
+            real(server)
+            servers.append(server)
+            ready.set()
+        monkeypatch.setattr(wsgi.Server, 'prepare', prepare)
+        def serve():
+            try:
+                web._serve('127.0.0.1', 0, None)
+            except BaseException as error:
+                errors.append(error)
+                ready.set()
+        thread = threading.Thread(target=serve)
+        thread.start()
+        try:
+>           assert ready.wait(8) and not errors, errors
+E           AssertionError: [OSError("No socket could be created -- (('127.0.0.1', 0): [Errno 1] Operation not permitted)")]
+E           assert (True and not [OSError("No socket could be created -- (('127.0.0.1', 0): [Errno 1] Operation not permitted)")])
+E            +  where True = wait(8)
+E            +    where wait = <threading.Event at 0x7660441c93a0: set>.wait
+
+../../candidate-export/tests/test_report_transactions.py:546: AssertionError
+
+During handling of the above exception, another exception occurred:
+
+store = namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/runs/task1633-a4bb5dc1081...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x766043bf5760>, url='/api/jobs/ac4b86e2631d')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x766043ff98e0>
+
+    @pytest.fixture
+    def socket_api(store, monkeypatch):
+        import http.client
+        from cheroot import wsgi
+        ready = threading.Event()
+        servers, errors = [], []
+        real = wsgi.Server.prepare
+        def prepare(server):
+            real(server)
+            servers.append(server)
+            ready.set()
+        monkeypatch.setattr(wsgi.Server, 'prepare', prepare)
+        def serve():
+            try:
+                web._serve('127.0.0.1', 0, None)
+            except BaseException as error:
+                errors.append(error)
+                ready.set()
+        thread = threading.Thread(target=serve)
+        thread.start()
+        try:
+            assert ready.wait(8) and not errors, errors
+            port = servers[0].socket.getsockname()[1]
+            def api(method, path, payload=None):
+                connection = http.client.HTTPConnection('127.0.0.1', port, timeout=8)
+                try:
+                    body = json.dumps(payload) if payload is not None else None
+                    connection.request(method, path, body=body, headers={
+                        'Content-Type': 'application/json', 'Connection': 'close'})
+                    result = connection.getresponse()
+                    return result.status, dict(result.getheaders()), result.read()
+                finally:
+                    connection.close()
+            yield api
+        finally:
+            for server in servers:
+                server.stop()
+            join(thread)
+>           assert not errors
+E           assert not [OSError("No socket could be created -- (('127.0.0.1', 0): [Errno 1] Operation not permitted)")]
+
+../../candidate-export/tests/test_report_transactions.py:563: AssertionError
+=================================== FAILURES ===================================
+_________________ test_pair_and_done_commit_before_cancel_ack __________________
+
+store = namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/runs/task1633-a4bb5dc1081...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x766043875440>, url='/api/jobs/a1775e2fc47b')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7660446d6f60>
+
+    def test_pair_and_done_commit_before_cancel_ack(store, monkeypatch):
+        import openscrub_web as web
+        from test_job_lifecycle import request
+        monkeypatch.setattr(app, 'normalize_vfr', lambda *args: None)
+        def body(src, dst, *args, **kwargs): Path(dst).write_bytes(b'new video')
+        monkeypatch.setattr(app, '_render_into', body)
+        real_unlink = os.unlink
+        seen = []
+        def unlink(path, *args, **kwargs):
+            if '.render-recovery-' in str(path) and str(path).endswith('.json'):
+                assert store.job['phase'] == 'done'
+                assert Path(store.job['output']).read_bytes() == b'new video'
+                seen.append(True)
+                store.job['cancel'].set() # signal before acknowledgement may follow committed success
+            return real_unlink(path, *args, **kwargs)
+        monkeypatch.setattr(os, 'unlink', unlink)
+        web._run_job(store.job, 'render')
+>       assert seen and store.job['phase'] == 'done'
+E       assert ([])
+
+../../candidate-export/tests/test_render_publication.py:202: AssertionError
+___________________ test_distinct_jobs_commit_independently ____________________
+
+store = namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/runs/task1633-a4bb5dc1081...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x766043c3e5c0>, url='/api/jobs/19757d8d04de')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7660446425d0>
+
+    def test_distinct_jobs_commit_independently(store, monkeypatch):
+        second = web.new_job(store.job['video'], {}, 'second.avi')
+        second['phase'] = 'review'
+        path = Path(second['dir']) / 'report.json'
+        path.write_bytes(store.path.read_bytes())
+        staged, release = threading.Event(), threading.Event()
+        real = web._publish_job_report_locked
+        def publish(target, doc):
+            if target == str(store.path):
+                staged.set()
+                assert release.wait(8)
+            real(target, doc)
+        monkeypatch.setattr(web, '_publish_job_report_locked', publish)
+        call = start_call('post', store.url + '/detections', json={'enabled': {'0': False}})
+        try:
+>           assert staged.wait(5)
+E           assert False
+E            +  where False = wait(5)
+E            +    where wait = <threading.Event at 0x766044353ad0: unset>.wait
+
+../../candidate-export/tests/test_report_transactions.py:349: AssertionError
+
+During handling of the above exception, another exception occurred:
+
+store = namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/runs/task1633-a4bb5dc1081...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x766043c3e5c0>, url='/api/jobs/19757d8d04de')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7660446425d0>
+
+    def test_distinct_jobs_commit_independently(store, monkeypatch):
+        second = web.new_job(store.job['video'], {}, 'second.avi')
+        second['phase'] = 'review'
+        path = Path(second['dir']) / 'report.json'
+        path.write_bytes(store.path.read_bytes())
+        staged, release = threading.Event(), threading.Event()
+        real = web._publish_job_report_locked
+        def publish(target, doc):
+            if target == str(store.path):
+                staged.set()
+                assert release.wait(8)
+            real(target, doc)
+        monkeypatch.setattr(web, '_publish_job_report_locked', publish)
+        call = start_call('post', store.url + '/detections', json={'enabled': {'0': False}})
+        try:
+            assert staged.wait(5)
+            assert request('post', '/api/jobs/' + second['id'] + '/detections', json={'enabled': {'0': False}}).status_code == 200
+            assert json.loads(path.read_text())['detections'][0]['enabled'] is False
+        finally:
+            release.set()
+>           assert finish(call).status_code == 200
+E           assert 500 == 200
+E            +  where 500 = <WrapperTestResponse 265 bytes [500 INTERNAL SERVER ERROR]>.status_code
+E            +    where <WrapperTestResponse 265 bytes [500 INTERNAL SERVER ERROR]> = finish((<Thread(Thread-24 (run), stopped 130155745801920)>, <threading.Event at 0x7660445c7080: set>, [], [<WrapperTestResponse 265 bytes [500 INTERNAL SERVER ERROR]>]))
+
+../../candidate-export/tests/test_report_transactions.py:354: AssertionError
+------------------------------ Captured log call -------------------------------
+ERROR    openscrub_web:app.py:875 Exception on /api/jobs/19757d8d04de/detections [POST]
+Traceback (most recent call last):
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/candidate-export/openscrub_web.py", line 1892, in job_save_edits
+    _publish_job_report_locked(job, path, doc)
+TypeError: test_distinct_jobs_commit_independently.<locals>.publish() takes 2 positional arguments but 3 were given
+____________ test_cancel_final_worker_boundary[render-constructed] _____________
+
+store = namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/runs/task1633-a4bb5dc1081...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x766043c3fb00>, url='/api/jobs/aa7fa4153699')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x766044363380>
+action = 'render', stage = 'constructed'
+
+    @pytest.mark.parametrize(('action', 'stage'), [('scan', 'constructed'), ('scan', 'publishing'), ('render', 'constructed'), ('render', 'hashed'), ('render', 'publishing')])
+    def test_cancel_final_worker_boundary(store, monkeypatch, action, stage):
+        two_rows(store)
+        before = store.path.read_bytes()
+        entered, release = threading.Event(), threading.Event()
+        lock = ObservedLock()
+        web.FILES.initialize(store.job).report_lock = lock
+        callbacks, background = [], []
+        real_start = web._start_owned_thread
+        def start(*args):
+            thread = real_start(*args)
+            background.append(thread)
+            return thread
+        monkeypatch.setattr(web, '_start_owned_thread', start)
+        monkeypatch.setattr(openscrub, 'normalize_vfr', lambda *a: None)
+        def render(src, dst, *args, **kwargs):
+            callbacks.append(kwargs['cb'])
+            Path(dst).write_bytes(b'synthetic encoded output')
+        monkeypatch.setattr(openscrub, '_render_into', render)
+        def scan(args, cb):
+            callbacks.append(cb)
+            return dict(fps=30, cum=[[0,0]], bands=[[0,0]], detections=[], stats={})
+        monkeypatch.setattr(openscrub, 'run_scan', scan)
+        if stage == 'constructed':
+            real_write = openscrub.write_report
+            def write(path, args, state, output_path=None, publisher=None):
+                def pause(target, doc):
+                    entered.set()
+                    assert release.wait(8)
+                    publisher(target, doc)
+                return real_write(path, args, state, output_path, publisher=pause)
+            monkeypatch.setattr(openscrub, 'write_report', write)
+        elif stage == 'hashed':
+            real_hash = openscrub.sha256_file
+            def sha(path, *args, **kwargs):
+                value = real_hash(path, *args, **kwargs)
+                if Path(path).name.startswith('output.'):
+                    entered.set()
+                    assert release.wait(8)
+                return value
+            monkeypatch.setattr(openscrub, 'sha256_file', sha)
+        else:
+            real_replace = reports.os.replace
+            def replace(src, dst):
+                if str(dst) == str(store.path):
+                    entered.set()
+                    assert release.wait(8)
+                return real_replace(src, dst)
+            monkeypatch.setattr(reports.os, 'replace', replace)
+        if action == 'render':
+            assert request('post', store.url + '/render').status_code == 200
+        else:
+            store.job['phase'] = 'error'
+            assert request('post', store.url + '/retry').status_code == 200
+        thread = run_worker()
+        cancel = None
+        try:
+>           assert entered.wait(5)
+E           assert False
+E            +  where False = wait(5)
+E            +    where wait = <threading.Event at 0x766044360110: unset>.wait
+
+../../candidate-export/tests/test_report_transactions.py:490: AssertionError
+_______________ test_cancel_final_worker_boundary[render-hashed] _______________
+
+store = namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/runs/task1633-a4bb5dc1081...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x766043c3cc20>, url='/api/jobs/21cc495de627')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x766044355ca0>
+action = 'render', stage = 'hashed'
+
+    @pytest.mark.parametrize(('action', 'stage'), [('scan', 'constructed'), ('scan', 'publishing'), ('render', 'constructed'), ('render', 'hashed'), ('render', 'publishing')])
+    def test_cancel_final_worker_boundary(store, monkeypatch, action, stage):
+        two_rows(store)
+        before = store.path.read_bytes()
+        entered, release = threading.Event(), threading.Event()
+        lock = ObservedLock()
+        web.FILES.initialize(store.job).report_lock = lock
+        callbacks, background = [], []
+        real_start = web._start_owned_thread
+        def start(*args):
+            thread = real_start(*args)
+            background.append(thread)
+            return thread
+        monkeypatch.setattr(web, '_start_owned_thread', start)
+        monkeypatch.setattr(openscrub, 'normalize_vfr', lambda *a: None)
+        def render(src, dst, *args, **kwargs):
+            callbacks.append(kwargs['cb'])
+            Path(dst).write_bytes(b'synthetic encoded output')
+        monkeypatch.setattr(openscrub, '_render_into', render)
+        def scan(args, cb):
+            callbacks.append(cb)
+            return dict(fps=30, cum=[[0,0]], bands=[[0,0]], detections=[], stats={})
+        monkeypatch.setattr(openscrub, 'run_scan', scan)
+        if stage == 'constructed':
+            real_write = openscrub.write_report
+            def write(path, args, state, output_path=None, publisher=None):
+                def pause(target, doc):
+                    entered.set()
+                    assert release.wait(8)
+                    publisher(target, doc)
+                return real_write(path, args, state, output_path, publisher=pause)
+            monkeypatch.setattr(openscrub, 'write_report', write)
+        elif stage == 'hashed':
+            real_hash = openscrub.sha256_file
+            def sha(path, *args, **kwargs):
+                value = real_hash(path, *args, **kwargs)
+                if Path(path).name.startswith('output.'):
+                    entered.set()
+                    assert release.wait(8)
+                return value
+            monkeypatch.setattr(openscrub, 'sha256_file', sha)
+        else:
+            real_replace = reports.os.replace
+            def replace(src, dst):
+                if str(dst) == str(store.path):
+                    entered.set()
+                    assert release.wait(8)
+                return real_replace(src, dst)
+            monkeypatch.setattr(reports.os, 'replace', replace)
+        if action == 'render':
+            assert request('post', store.url + '/render').status_code == 200
+        else:
+            store.job['phase'] = 'error'
+            assert request('post', store.url + '/retry').status_code == 200
+        thread = run_worker()
+        cancel = None
+        try:
+>           assert entered.wait(5)
+E           assert False
+E            +  where False = wait(5)
+E            +    where wait = <threading.Event at 0x766044353f20: unset>.wait
+
+../../candidate-export/tests/test_report_transactions.py:490: AssertionError
+=========================== short test summary info ============================
+FAILED ../../candidate-export/tests/test_render_publication.py::test_pair_and_done_commit_before_cancel_ack
+FAILED ../../candidate-export/tests/test_report_transactions.py::test_distinct_jobs_commit_independently
+FAILED ../../candidate-export/tests/test_report_transactions.py::test_cancel_final_worker_boundary[render-constructed]
+FAILED ../../candidate-export/tests/test_report_transactions.py::test_cancel_final_worker_boundary[render-hashed]
+ERROR ../../candidate-export/tests/test_report_transactions.py::test_real_socket_overlapping_sparse_saves
+ERROR ../../candidate-export/tests/test_report_transactions.py::test_report_download_stat_open_is_one_generation
+ERROR ../../candidate-export/tests/test_report_transactions.py::test_real_socket_save_track_real_render_and_reopen
+ERROR ../../candidate-export/tests/test_manual_addition_replay.py::test_committed_http_response_lost_then_identical_retry
+ERROR ../../candidate-export/tests/test_manual_addition_replay.py::test_real_render_and_fresh_server_process_preserve_creation_and_current_choices
+4 failed, 186 passed, 5 errors in 37.68s

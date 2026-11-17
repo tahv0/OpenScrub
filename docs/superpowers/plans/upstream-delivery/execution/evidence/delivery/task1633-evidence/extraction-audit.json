@@ -1,0 +1,17 @@
+{
+  "base": "8768e86dc1cd57720fd1c22eb6b539ae6bda6cde",
+  "head": "64647f22e303af259f2cd7372fd1dc7c3be6e02a",
+  "checks": {
+    "render": {
+      "public_signature_equal": true,
+      "extracted_body_equal_R": true
+    },
+    "render_hdr": {
+      "public_signature_equal": true,
+      "extracted_body_equal_R": true
+    },
+    "write_report": {
+      "public_signature_equal": true
+    }
+  }
+}

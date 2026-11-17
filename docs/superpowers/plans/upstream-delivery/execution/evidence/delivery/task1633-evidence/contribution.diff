@@ -1,0 +1,1997 @@
+diff --git a/openscrub.py b/openscrub.py
+index 4df105d..f411da3 100644
+--- a/openscrub.py
++++ b/openscrub.py
+@@ -38,6 +38,7 @@ import cv2
+ import numpy as np
+ 
+ from openscrub_internal.reports import atomic_report
++from openscrub_internal.render_delivery import _RenderDelivery
+ 
+ VERSION = "1.0.96"
+ 
+@@ -3932,10 +3933,32 @@ def _stop_render_children(children):
+     return errors
+ 
+ 
++def render(src, dst, detections, cum, bands, fps, pad, mode, preview,
++           encoder="auto", band_margin=25, progress_every=60, cb=None,
++           mode_map=None, draw_scores=False, vcodec="h264",
++           face_shape="ellipse", audio_spans=None, clip=None,
++           mute_tracks=(), out_quality="archival", audio_lanes=None):
++    with _RenderDelivery(dst) as delivery:
++        result = _render_into(src, delivery.video_stage, detections, cum, bands, fps, pad, mode, preview, encoder, band_margin, progress_every, cb, mode_map, draw_scores, vcodec, face_shape, audio_spans, clip, mute_tracks, out_quality, audio_lanes)
++        delivery.prepare_rollback()
++        delivery.commit()
++        return result
++
++
+ def render_hdr(src, dst, detections, cum, bands, fps, pad, mode,
+                encoder, tags, band_margin=25, progress_every=60, cb=None,
+                mode_map=None, face_shape="ellipse", audio_spans=None,
+                mute_tracks=(), out_quality="archival", audio_lanes=None):
++    with _RenderDelivery(dst) as delivery:
++        result = _render_hdr_into(src, delivery.video_stage, detections, cum, bands, fps, pad, mode, encoder, tags, band_margin, progress_every, cb, mode_map, face_shape, audio_spans, mute_tracks, out_quality, audio_lanes)
++        delivery.prepare_rollback()
++        delivery.commit()
++        return result
++
++def _render_hdr_into(src, dst, detections, cum, bands, fps, pad, mode,
++               encoder, tags, band_margin=25, progress_every=60, cb=None,
++               mode_map=None, face_shape="ellipse", audio_spans=None,
++               mute_tracks=(), out_quality="archival", audio_lanes=None):
+     """render(), but 10-bit end to end: decode the HDR source to raw
+     yuv420p10le, blur the planes in place, encode 10-bit HEVC with the
+     source's color tags (PQ/HLG + BT.2020) carried over. `hvc1` tagging
+@@ -4143,7 +4166,7 @@ def render_hdr(src, dst, detections, cum, bands, fps, pad, mode,
+                 pass
+ 
+ 
+-def render(src, dst, detections, cum, bands, fps, pad, mode, preview,
++def _render_into(src, dst, detections, cum, bands, fps, pad, mode, preview,
+            encoder="auto", band_margin=25, progress_every=60, cb=None,
+            mode_map=None, draw_scores=False, vcodec="h264",
+            face_shape="ellipse", audio_spans=None, clip=None,
+@@ -6401,7 +6424,7 @@ def transcribe_audio_pii(video, cats, cb, model_size="base", nlp=None,
+             pass
+ 
+ 
+-def write_report(path, args, state, output_path=None, publisher=None):
++def _report_document(args, state, output_path=None, output_bytes_path=None):
+     prov = {
+         "tool": "openscrub", "version": VERSION,
+         "timestamp": datetime.datetime.now().astimezone().isoformat(),
+@@ -6417,9 +6440,10 @@ def write_report(path, args, state, output_path=None, publisher=None):
+         "windows": getattr(args, "windows_data", None),
+         "settings": _settings_dict(args),
+     }
+-    if output_path and os.path.exists(output_path):
++    output_bytes_path = output_bytes_path or output_path
++    if output_path and os.path.exists(output_bytes_path):
+         prov["output"] = os.path.abspath(output_path)
+-        prov["output_sha256"] = sha256_file(output_path)
++        prov["output_sha256"] = sha256_file(output_bytes_path)
+     source = state.get("source_report")
+     if source is not None:
+         # A render consumes enabled Detection objects, but publishes the full
+@@ -6461,7 +6485,11 @@ def write_report(path, args, state, output_path=None, publisher=None):
+             {"t0": a, "t1": b, "mode": m} for a, b, m in (aspans or [])]
+     # Construction and output hashing precede an optional caller-owned final
+     # publication boundary. CLI/GUI and old callback callers keep atomic bytes.
+-    (publisher or atomic_report)(path, doc)
++    return doc
++
++
++def write_report(path, args, state, output_path=None, publisher=None):
++    (publisher or atomic_report)(path, _report_document(args, state, output_path))
+ 
+ 
+ def load_report(path):
+@@ -8609,33 +8637,44 @@ def run_render(args, state, cb=None):
+     if out_q != "archival":
+         cb.log(f"      output quality: {out_q} (smaller file; archival is "
+                "the visually-lossless default)")
+-    if getattr(args, "hdr_source", None) and not args.preview:
+-        render_hdr(args.hdr_source, dst, dets_r, state["cum"],
+-                   state["bands"], state["fps"], pad=args.pad, mode=args.mode,
+-                   encoder=args.hdr_encoder,
+-                   tags=getattr(args, "hdr_tags", {}),
+-                   face_shape=getattr(args, "face_shape", "ellipse"),
++    summary = dict(state["stats"], output=dst)
++    with _RenderDelivery(dst, args.report) as delivery:
++        if getattr(args, "hdr_source", None) and not args.preview:
++            _render_hdr_into(args.hdr_source, delivery.video_stage, dets_r, state["cum"],
++                       state["bands"], state["fps"], pad=args.pad, mode=args.mode,
++                       encoder=args.hdr_encoder,
++                       tags=getattr(args, "hdr_tags", {}),
++                       face_shape=getattr(args, "face_shape", "ellipse"),
++                       mode_map=getattr(args, "mode_map", None),
++                       audio_spans=aspans, mute_tracks=mute_tracks, cb=cb,
++                       out_quality=out_q,
++                       audio_lanes=getattr(args, "audio_lane_count", None))
++        else:
++            _render_into(args.video, delivery.video_stage, dets_r, state["cum"],
++                   state["bands"],
++                   state["fps"], pad=args.pad, mode=args.mode, preview=args.preview,
+                    mode_map=getattr(args, "mode_map", None),
+-                   audio_spans=aspans, mute_tracks=mute_tracks, cb=cb,
+-                   out_quality=out_q,
++                   draw_scores=bool(getattr(args, "draw_scores", False)),
++                   vcodec=getattr(args, "codec", "h264"),
++                   face_shape=getattr(args, "face_shape", "ellipse"),
++                   encoder=args.encoder, audio_spans=aspans, clip=clip,
++                   mute_tracks=mute_tracks, cb=cb, out_quality=out_q,
+                    audio_lanes=getattr(args, "audio_lane_count", None))
+-    else:
+-        render(args.video, dst, dets_r, state["cum"],
+-               state["bands"],
+-               state["fps"], pad=args.pad, mode=args.mode, preview=args.preview,
+-               mode_map=getattr(args, "mode_map", None),
+-               draw_scores=bool(getattr(args, "draw_scores", False)),
+-               vcodec=getattr(args, "codec", "h264"),
+-               face_shape=getattr(args, "face_shape", "ellipse"),
+-               encoder=args.encoder, audio_spans=aspans, clip=clip,
+-               mute_tracks=mute_tracks, cb=cb, out_quality=out_q,
+-               audio_lanes=getattr(args, "audio_lane_count", None))
+-    if args.report:
+-        write_report(args.report, args, state, output_path=dst,
+-                     publisher=getattr(cb, "publish_report", None))
+-        cb.log(f"      audit report: {args.report} (contains PII text — protect it)")
+-    cb.log("done.")
+-    return dict(state["stats"], output=dst)
++        if args.report:
++            delivery.prepare_report(_report_document(args, state, dst, delivery.video_stage),
++                                    legacy_publisher=(None if getattr(cb, "publish_render", None)
++                                                      else getattr(cb, "publish_report", None)))
++            cb.log(f"      audit report: {args.report} (contains PII text — protect it)")
++        cb.log("done.")
++        delivery.prepare_rollback()
++        publish = getattr(cb, "publish_render", None)
++        if publish:
++            publish(delivery, summary)
++        else:
++            if cb.cancelled():
++                raise PipelineCancelled()
++            delivery.commit()
++    return summary
+ 
+ 
+ def run_pipeline(args, cb=None):
+diff --git a/openscrub_internal/lifetimes.py b/openscrub_internal/lifetimes.py
+index 992adfb..1f7eb36 100644
+--- a/openscrub_internal/lifetimes.py
++++ b/openscrub_internal/lifetimes.py
+@@ -19,6 +19,9 @@ class _JobFiles:
+         self.report_lock = threading.Lock()
+         self.operation = None
+         self.active = None
++        self.output_epoch = 0
++        self.recovery_required = False
++        self.recovery_diagnostics = ()
+ 
+ 
+ class FileOwners:
+@@ -45,6 +48,8 @@ class _Lease:
+         self.released = False
+         self.related = []
+         self.source = None
++        self.source_job = None
++        self.source_state = None
+         self.report_input = False
+         self.operation = None
+ 
+diff --git a/openscrub_internal/render_delivery.py b/openscrub_internal/render_delivery.py
+new file mode 100644
+index 0000000..3daea4e
+--- /dev/null
++++ b/openscrub_internal/render_delivery.py
+@@ -0,0 +1,203 @@
++"""Transient render stage and ordinary-exception pair publication ownership.
++
++No cross-process coordination or crash-atomic/durable transaction is promised.
++Callers provide their existing short publication lock and keep input lifetimes.
++"""
++from contextlib import ExitStack
++import json
++import os
++import re
++import shutil
++import stat
++import uuid
++
++from .reports import _staged_report
++
++_STAGE = re.compile(r'^\.render-[0-9a-f]{32}\.tmp(?:\.[^.\/\\]+)?(?:\.noaudio\.mp4)?$')
++_RECOVERY = re.compile(r'^\.render-recovery-[0-9a-f]{32}\.json$')
++
++
++def _is_discardable_render_stage(path):
++    name = os.path.basename(path)
++    return name.endswith('.tmp') or _STAGE.fullmatch(name) is not None
++
++
++def _has_render_recovery(directory):
++    # The strict name alone is conservative evidence. Never trust descriptor
++    # contents as authority to open paths or restore files on restart.
++    return any(_RECOVERY.fullmatch(name) for name in os.listdir(directory))
++
++
++class _DeliveryRecoveryError(RuntimeError):
++    def __init__(self, primary, diagnostics):
++        self.primary = primary
++        self.rollback_diagnostics = tuple(diagnostics[:8])
++        super().__init__('render delivery requires recovery')
++
++
++def _entry_key(path):
++    return os.path.normcase(os.path.join(os.path.realpath(os.path.dirname(path)),
++                                        os.path.basename(path)))
++
++
++def _identity(path):
++    parent = os.path.dirname(path)
++    pst = os.stat(parent)
++    directory = (os.path.realpath(parent), pst.st_dev, pst.st_ino)
++    try:
++        st = os.lstat(path)
++    except FileNotFoundError:
++        return directory, None
++    entry = (st.st_dev, st.st_ino, st.st_mode, st.st_size,
++             st.st_mtime_ns, st.st_ctime_ns,
++             os.readlink(path) if stat.S_ISLNK(st.st_mode) else None)
++    return directory, entry
++
++
++def _exclusive(path):
++    return os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
++
++
++class _RenderDelivery:
++    def __init__(self, video_path, report_path=None):
++        self.video_path = os.path.abspath(video_path)
++        self.report_path = os.path.abspath(report_path) if report_path else None
++        if self.report_path and _entry_key(self.video_path) == _entry_key(self.report_path):
++            raise ValueError('video and report require distinct destination entries')
++        self.token = uuid.uuid4().hex
++        self.video_stage = os.path.join(os.path.dirname(self.video_path),
++            '.render-' + self.token + '.tmp' + os.path.splitext(self.video_path)[1])
++        self.committed = False
++        self.recovery_required = False
++        self.cleanup_diagnostics = []
++        self._stack = ExitStack()
++        self._report_stage = None
++        self._doc = self._legacy = None
++        self._old = []
++        self._descriptor = None
++        self._prepared = False
++
++    def __enter__(self):
++        os.close(_exclusive(self.video_stage))
++        return self
++
++    def prepare_report(self, doc, legacy_publisher=None):
++        self._doc, self._legacy = doc, legacy_publisher
++        if self.report_path and legacy_publisher is None:
++            self._report_stage = self._stack.enter_context(_staged_report(self.report_path, doc))
++
++    def prepare_rollback(self):
++        if self._prepared:
++            return
++        for role, path in [('video', self.video_path), ('report', self.report_path)]:
++            if path is None:
++                continue
++            before = _identity(path)
++            backup = os.path.join(os.path.dirname(path),
++                                  '.render-recovery-' + self.token + '.' + role)
++            # Register ownership before fallible copy/flush/close operations.
++            old = dict(path=path, identity=before, backup=None, role=role)
++            self._old.append(old)
++            if before[1] is not None:
++                kind = before[1][2]
++                if stat.S_ISLNK(kind):
++                    os.symlink(before[1][-1], backup)
++                    old['backup'] = backup
++                elif stat.S_ISREG(kind):
++                    fd = _exclusive(backup)
++                    old['backup'] = backup
++                    with os.fdopen(fd, 'wb') as out, open(path, 'rb') as src:
++                        shutil.copyfileobj(src, out)
++                        out.flush()
++                        os.fsync(out.fileno())
++                else:
++                    raise ValueError('unsupported render destination entry')
++            if _identity(path) != before:
++                raise RuntimeError('render destination changed during backup')
++        descriptor = os.path.join(os.path.dirname(self.report_path or self.video_path),
++                                  '.render-recovery-' + self.token + '.json')
++        fd = _exclusive(descriptor)
++        self._descriptor = descriptor
++        with os.fdopen(fd, 'w', encoding='utf-8') as out:
++            json.dump(dict(version=1, token=self.token, finals=[dict(
++                role=o['role'], path=o['path'], present=o['identity'][1] is not None,
++                backup=o['backup']) for o in self._old]), out)
++            out.flush()
++            os.fsync(out.fileno())
++        self._prepared = True
++
++    def commit(self, *, before_mutation=None, publish_success=None, restore_success=None):
++        if self.committed:
++            raise RuntimeError('render delivery already committed')
++        if not self._prepared:
++            raise RuntimeError('render rollback must be prepared before commit')
++        if any(_identity(old['path']) != old['identity'] for old in self._old):
++            raise RuntimeError('render destination changed before publication')
++        attempted = []
++        try:
++            for old in self._old:
++                attempted.append(old)
++                if before_mutation:
++                    before_mutation()
++                if old['role'] == 'video':
++                    os.replace(self.video_stage, self.video_path)
++                elif self._legacy is not None:
++                    self._legacy(self.report_path, self._doc)
++                else:
++                    os.replace(self._report_stage, self.report_path)
++            if publish_success:
++                publish_success()
++            # Last fallible authoritative action; backups are still present.
++            os.unlink(self._descriptor)
++            self._descriptor = None
++            self.committed = True
++        except BaseException as primary:
++            diagnostics = []
++            if restore_success:
++                try:
++                    restore_success()
++                except BaseException as error:
++                    diagnostics.append('terminal restoration: ' + type(error).__name__)
++            for old in reversed(attempted):
++                try:
++                    if before_mutation:
++                        before_mutation()
++                    if old['backup'] is not None:
++                        os.replace(old['backup'], old['path'])
++                        old['backup'] = None
++                    else:
++                        try:
++                            os.unlink(old['path'])
++                        except FileNotFoundError:
++                            pass
++                except BaseException as error:
++                    diagnostics.append(old['role'] + ' restoration: ' + type(error).__name__)
++            if not diagnostics:
++                try:
++                    os.unlink(self._descriptor)
++                    self._descriptor = None
++                except BaseException as error:
++                    diagnostics.append('descriptor retirement: ' + type(error).__name__)
++            if diagnostics:
++                self.recovery_required = True
++                raise _DeliveryRecoveryError(primary, diagnostics) from primary
++            raise
++
++    def __exit__(self, *exc):
++        if self.recovery_required:
++            # Necessary leftovers remain discoverable; the report stage may
++            # still be owned by its context, so deliberately do not exit it.
++            self._stack.close()
++            return
++        try:
++            self._stack.close()
++        except Exception as error:
++            self.cleanup_diagnostics.append(type(error).__name__)
++        for path in [self.video_stage, self.video_stage + '.noaudio.mp4', self._descriptor] + [old['backup'] for old in self._old]:
++            if path is not None:
++                try:
++                    os.unlink(path)
++                except FileNotFoundError:
++                    pass
++                except OSError as error:
++                    self.cleanup_diagnostics.append(type(error).__name__)
+diff --git a/openscrub_internal/reports.py b/openscrub_internal/reports.py
+index e6b6ca1..9a02766 100644
+--- a/openscrub_internal/reports.py
++++ b/openscrub_internal/reports.py
+@@ -1,10 +1,12 @@
+ """Publish complete report JSON without truncating the previous report."""
++from contextlib import contextmanager
+ import json
+ import os
+ import tempfile
+ 
+ 
+-def atomic_report(path, report) -> None:
++@contextmanager
++def _staged_report(path, report):
+     """Stage private UTF-8 JSON beside *path*, sync, close, then replace it.
+ 
+     A failure before replacement leaves the previous report intact and raises.
+@@ -32,7 +34,7 @@ def atomic_report(path, report) -> None:
+             stream.flush()
+             os.fsync(stream.fileno())
+         # Close first: Windows cannot rename an open staging file.
+-        os.replace(staged, path)
++        yield staged
+     finally:
+         if staged is not None:
+             try:
+@@ -41,3 +43,9 @@ def atomic_report(path, report) -> None:
+                 # After replace the name is gone. On cleanup failure leave a
+                 # .tmp for vault crash cleanup without masking the write error.
+                 pass
++
++
++def atomic_report(path, report) -> None:
++    """Publish one closed shared-serializer stage."""
++    with _staged_report(path, report) as staged:
++        os.replace(staged, os.path.abspath(path))
+diff --git a/openscrub_vault.py b/openscrub_vault.py
+index f2ad09e..689cbdc 100644
+--- a/openscrub_vault.py
++++ b/openscrub_vault.py
+@@ -25,6 +25,8 @@ THERE IS NO PASSWORD RESET. Losing the password makes encrypted files
+ permanently unrecoverable — that is the entire point of the feature.
+ """
+ 
++from openscrub_internal.render_delivery import _is_discardable_render_stage
++
+ import base64
+ import json
+ import os
+@@ -165,7 +167,7 @@ def encrypt_tree(key, root):
+     """Encrypt every not-yet-encrypted file under root. Returns count."""
+     n = 0
+     for p in list(_walk_files(root)):
+-        if p.endswith(".tmp"):
++        if _is_discardable_render_stage(p):
+             try:
+                 os.remove(p)                   # leftover from a crash
+             except FileNotFoundError:
+@@ -180,7 +182,7 @@ def decrypt_tree(key, root):
+     """Decrypt every encrypted file under root. Returns count."""
+     n = 0
+     for p in list(_walk_files(root)):
+-        if p.endswith(".tmp"):
++        if _is_discardable_render_stage(p):
+             try:
+                 os.remove(p)
+             except FileNotFoundError:
+@@ -195,7 +197,7 @@ def tree_locked_state(root):
+     """-> (n_encrypted, n_plain) under root (ignores .tmp leftovers)."""
+     enc = plain = 0
+     for p in _walk_files(root):
+-        if p.endswith(".tmp"):
++        if _is_discardable_render_stage(p):
+             continue
+         if is_encrypted(p):
+             enc += 1
+diff --git a/openscrub_web.py b/openscrub_web.py
+index faf7825..db6e091 100644
+--- a/openscrub_web.py
++++ b/openscrub_web.py
+@@ -41,7 +41,8 @@ from flask import (Flask, Response, abort, jsonify, redirect, request, g,
+                    send_file, has_request_context)
+ 
+ import openscrub
+-from openscrub_internal.reports import atomic_report
++from openscrub_internal.reports import _staged_report
++from openscrub_internal.render_delivery import _DeliveryRecoveryError, _has_render_recovery
+ from openscrub_internal.lifetimes import FileOwners, OwnedIterable
+ import zones_ui
+ 
+@@ -353,6 +354,7 @@ def _source_job_locked(canonical, missing_ok=False):
+             return None
+         abort(404, "source job is no longer available")
+     _validate_files_locked(source_job)
++    _recovery_gate(source_job)
+     return source_job
+ 
+ 
+@@ -362,6 +364,8 @@ def _reserve_files_locked(job=None, work=False, read_source=True, source=None):
+     source_job = _source_job_locked(source) if source else None
+     lease = FILES.reserve(job, work)
+     lease.source = source
++    lease.source_job = source_job
++    lease.source_state = FILES.initialize(source_job) if source_job is not None else None
+     if source_job is not None and source_job is not job:
+         lease.related.append(FILES.reserve(source_job))
+     return lease
+@@ -406,6 +410,8 @@ def _select_render_input(job, owner):
+             # External filesystem changes remain outside web coordination.
+             if os.path.exists(candidate):
+                 owner.source = candidate
++                owner.source_job = source_job
++                owner.source_state = FILES.initialize(source_job) if source_job is not None else None
+                 selected = True
+         finally:
+             if added is not None and not selected:
+@@ -423,6 +429,8 @@ def _request_source_path(path):
+         if source_job is not None:
+             lease = FILES.reserve(source_job)
+             lease.source = canonical
++            lease.source_job = source_job
++            lease.source_state = FILES.initialize(source_job)
+             if g.get("file_owner") is None:
+                 g.file_owner = lease
+             else:
+@@ -453,6 +461,10 @@ def _update_job_source(job, path, owner):
+                     token.state is not FILES.initialize(source_job)
+                     for token in [owner] + owner.related):
+                 owner.related.append(FILES.reserve(source_job))
++        if owner is not None:
++            owner.source = canonical
++            owner.source_job = source_job
++            owner.source_state = FILES.initialize(source_job) if source_job is not None else None
+         job["video"] = canonical
+ 
+ 
+@@ -531,7 +543,8 @@ def job_public(job):
+         "size": job.get("size") or 0,
+         "log_tail": job["log"][-30:],
+         "log_len": len(job["log"]),
+-        "has_output": bool(job["output"] and os.path.exists(job["output"])),
++        "has_output": bool(not FILES.initialize(job).recovery_required and job["output"] and os.path.exists(job["output"])),
++        "recovery_required": FILES.initialize(job).recovery_required,
+     }
+ 
+ 
+@@ -812,7 +825,20 @@ def _report_current(job):
+             abort(409, "job is being deleted")
+ 
+ 
++def _recovery_gate(job):
++    if FILES.initialize(job).recovery_required:
++        abort(409, "render delivery requires recovery")
++
++
++def _publish_job_report_locked(job, path, doc):
++    """Caller owns this job's report transaction and file lifetime."""
++    with _staged_report(path, doc) as staged:
++        FILES.initialize(job).output_epoch += 1
++        os.replace(staged, os.path.abspath(path))
++
++
+ def _edit_gate(job):
++    _recovery_gate(job)
+     _report_current(job)
+     if FILES.initialize(job).active is not None or job.get("phase") in _ACTIVE_PHASES:
+         abort(409, "job work is queued, running or still cleaning up")
+@@ -849,6 +875,7 @@ def _finish_operation(job, owner):
+ def _reserve_queue_locked(job, action, prepared):
+     """Transfer a PREPARED lifetime under report_lock, without vault nesting."""
+     _report_current(job)
++    _recovery_gate(job)
+     _begin_operation(job, prepared)
+     with JOBS_LOCK:
+         job["qgen"] = job.get("qgen", 0) + 1
+@@ -973,8 +1000,42 @@ def _run_job(job, action, owner=None):
+         with files.report_lock:
+             if not _operation_valid(job, owner) or owner.operation.is_set():
+                 raise openscrub.PipelineCancelled()
+-            atomic_report(path, doc)
++            _publish_job_report_locked(job, path, doc)
+     cb.publish_report = publish_report
++    committed = False
++    def publish_render(delivery, summary):
++        nonlocal committed
++        with files.report_lock:
++            _recovery_gate(job)
++            if not _operation_valid(job, owner) or owner.operation.is_set():
++                raise openscrub.PipelineCancelled()
++            missing = object()
++            keys = ("output", "phase", "progress", "eta", "error")
++            previous = {key: job.get(key, missing) for key in keys}
++            def success():
++                job["output"] = summary["output"]
++                job["phase"] = "done"
++                job["progress"] = 1.0
++                job["eta"] = None
++                job["error"] = None
++            def restore():
++                for key, value in previous.items():
++                    if value is missing:
++                        job.pop(key, None)
++                    else:
++                        job[key] = value
++            def mutate():
++                files.output_epoch += 1
++            try:
++                delivery.commit(before_mutation=mutate, publish_success=success,
++                                restore_success=restore)
++            except _DeliveryRecoveryError as error:
++                files.recovery_required = True
++                files.recovery_diagnostics = error.rollback_diagnostics
++                job.update(phase="error", error="render delivery requires recovery", eta=None)
++                raise
++            committed = delivery.committed
++    cb.publish_render = publish_render
+     source = owner.source if owner is not None else job["video"]
+     try:
+         if action == "scan":
+@@ -1090,24 +1151,33 @@ def _run_job(job, action, owner=None):
+             args = build_args(dict(job, video=owner.source), for_render=True)
+             args._report_input = owner.source
+             res = openscrub.run_pipeline(args, cb)
+-            with files.report_lock:
+-                if not _operation_valid(job, owner):
+-                    return
+-                job["output"] = res["output"]
+-                job["phase"] = "done"
+-                job["progress"] = 1.0
+-                job["eta"] = None
++            # Compatibility for substituted pipelines which do not use the new
++            # hook. Actual renders publish their terminal fields inside it.
++            if not committed:
++                with files.report_lock:
++                    _recovery_gate(job)
++                    if not _operation_valid(job, owner) or owner.operation.is_set():
++                        return
++                    job.update(output=res["output"], phase="done", progress=1.0, eta=None)
+     except openscrub.PipelineCancelled:
++        recovery = _has_render_recovery(job["dir"])
+         with files.report_lock:
+-            if _operation_valid(job, owner):
++            if recovery:
++                files.recovery_required = True
++                job.update(phase="error", error="render delivery requires recovery", eta=None)
++            if not committed and not files.recovery_required and _operation_valid(job, owner):
+                 job["phase"] = "cancelled"
+                 job["error"] = "cancelled by user"
+     except BaseException as e:
+         msg = str(e) or type(e).__name__
+         if isinstance(e, SystemExit):
+             msg = "the job stopped unexpectedly (exit %s)" % (e.code,)
++        recovery = _has_render_recovery(job["dir"])
+         with files.report_lock:
+-            if _operation_valid(job, owner):
++            if recovery:
++                files.recovery_required = True
++                job.update(phase="error", error="render delivery requires recovery", eta=None)
++            if not committed and not files.recovery_required and _operation_valid(job, owner):
+                 job["phase"] = "error"
+                 job["error"] = msg
+                 job["log"].append(f"ERROR: {msg}")
+@@ -1195,6 +1265,8 @@ def enforce_vault_lock():
+             if jid is not None and job is None:
+                 abort(404)
+             _validate_files_locked(job)
++            if job is not None and request.endpoint not in {"job_status", "job_log", "job_cancel"}:
++                _recovery_gate(job)
+             read_source = request.endpoint in {
+                 "job_retry", "job_render", "job_track_object", "job_mediainfo",
+                 "job_detframe", "job_thumb", "job_frame_at", "job_video_stream"}
+@@ -1203,13 +1275,18 @@ def enforce_vault_lock():
+ 
+ @app.after_request
+ def _finish_file_response(response):
+-    for child in g.pop("file_children", []):
+-        child.release()
++    children = g.pop("file_children", [])
+     lease = g.pop("file_owner", None)
+-    if lease is not None:
+-        if response.direct_passthrough:
++    if response.direct_passthrough:
++        if lease is None and children:
++            lease = children.pop(0)
++        if lease is not None:
++            lease.related.extend(children)
+             response.response = OwnedIterable(response.response, lease)
+-        else:
++    else:
++        for child in children:
++            child.release()
++        if lease is not None:
+             lease.release()  # detached JSON/JPEG bytes no longer read job files
+     return response
+ 
+@@ -1509,15 +1586,78 @@ def _load_job_report(job):
+         return json.load(f)
+ 
+ 
++def _capture_frame_source(job, output=False):
++    """Capture admitted selection and its owners using sequential short locks."""
++    state = FILES.initialize(job)
++    lease = g.get("file_owner") if has_request_context() else None
++    with state.report_lock:
++        _report_current(job)
++        _recovery_gate(job)
++        selected_output = job.get("output") if output else None
++        path = selected_output or _job_video(job)
++        epoch = state.output_epoch
++        source_job = job
++        source_state = state
++        if not selected_output and lease is not None and lease.state is state:
++            source_job, source_state = lease.source_job, lease.source_state
++    source_epoch = None
++    if source_job is not None and source_state is not state:
++        with source_state.report_lock:
++            _report_current(source_job)
++            _recovery_gate(source_job)
++            source_epoch = source_state.output_epoch
++    return dict(job=job, state=state, epoch=epoch, path=path, output=output,
++                selection=selected_output, source_job=source_job,
++                source_state=source_state, source_epoch=source_epoch)
++
++
++def _frame_source_current(snapshot):
++    job, state = snapshot["job"], snapshot["state"]
++    with state.report_lock:
++        _report_current(job)
++        _recovery_gate(job)
++        selected = job.get("output") if snapshot["output"] else None
++        if (FILES.initialize(job) is not state or state.output_epoch != snapshot["epoch"]
++                or selected != snapshot["selection"]
++                or (selected or _job_video(job)) != snapshot["path"]):
++            return False
++    source_job, source_state = snapshot["source_job"], snapshot["source_state"]
++    if source_job is not None and source_state is not state:
++        with source_state.report_lock:
++            _report_current(source_job)
++            _recovery_gate(source_job)
++            if (FILES.initialize(source_job) is not source_state
++                    or source_state.output_epoch != snapshot["source_epoch"]):
++                return False
++    return True
++
++
++def _validated_frame_read(job, output, decode):
++    for attempt in range(2):
++        snapshot = _capture_frame_source(job, output)
++        error = None
++        try:
++            value = decode(snapshot["path"])
++        except Exception as caught:
++            error = caught
++        if _frame_source_current(snapshot):
++            if error is not None:
++                raise error
++            return value
++    abort(409, "output changed during frame read; retry")
++
++
+ def _frame_at(job, t, rstate):
+-    cap = cv2.VideoCapture(_job_video(job))
+-    try:
+-        fps = rstate["fps"]
+-        cap.set(cv2.CAP_PROP_POS_FRAMES, int(t * fps))
+-        ok, frame = cap.read()
+-        return frame if ok else None
+-    finally:
+-        cap.release()
++    def decode(path):
++        cap = cv2.VideoCapture(path)
++        try:
++            fps = rstate["fps"]
++            cap.set(cv2.CAP_PROP_POS_FRAMES, int(t * fps))
++            ok, frame = cap.read()
++            return frame.copy() if ok else None
++        finally:
++            cap.release()
++    return _validated_frame_read(job, False, decode)
+ 
+ 
+ 
+@@ -1661,28 +1801,83 @@ def job_thumb(jid, i):
+ def job_frame_at(jid):
+     job = JOBS.get(jid) or abort(404)
+     t = max(0.0, float(request.args.get("t", 0)))
+-    path = (job["output"] if request.args.get("src") == "output"
+-            and job.get("output") else _job_video(job))
+-    cap = cv2.VideoCapture(path)
+-    # seek by TIMESTAMP, not frame index: the original upload is often VFR
+-    # (iPhone), where index = t*fps drifts out of sync with the CFR output
+-    # and can overshoot the file entirely (broken compare pane)
++    def decode(path):
++        cap = cv2.VideoCapture(path)
++        # Timestamp seeking/backoff preserves VFR and near-end behavior.
++        try:
++            frame = None
++            for tt in (t, max(0.0, t - 0.34), max(0.0, t - 1.0), 0.0):
++                cap.set(cv2.CAP_PROP_POS_MSEC, tt * 1000)
++                ok, fr = cap.read()
++                if ok:
++                    frame = fr
++                    break
++                if tt == 0.0:
++                    break
++        finally:
++            cap.release()
++        if frame is None:
++            abort(404)
++        ok, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 82])
++        if not ok:
++            abort(404)
++        return buf.tobytes()
++    payload = _validated_frame_read(job, request.args.get("src") == "output", decode)
++    return Response(payload, mimetype="image/jpeg")
++
++
++
++def _send_open_file(path, **options):
++    """One opened generation supplies body, metadata, conditional and Range."""
++    if not path:
++        abort(404)
+     try:
+-        frame = None
+-        for tt in (t, max(0.0, t - 0.34), max(0.0, t - 1.0), 0.0):
+-            cap.set(cv2.CAP_PROP_POS_MSEC, tt * 1000)
+-            ok, fr = cap.read()
+-            if ok:
+-                frame = fr
+-                break   # walk back instead of 404ing at the very end of the file
+-            if tt == 0.0:
+-                break
+-    finally:
+-        cap.release()
+-    if frame is None:
++        stream = open(path, "rb")
++    except FileNotFoundError:
+         abort(404)
+-    ok, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 82])
+-    return Response(buf.tobytes(), mimetype="image/jpeg")
++    response = None
++    try:
++        st = os.fstat(stream.fileno())
++        conditional = options.pop("conditional", True)
++        options.setdefault("download_name", os.path.basename(path))
++        # No hash/media read or path-based X-Sendfile; fstat describes exactly
++        # this open inode, even after final names change during transfer.
++        etag = "%x-%x-%x-%x-%x" % (st.st_dev, st.st_ino, st.st_size,
++                                    st.st_mtime_ns, st.st_ctime_ns)
++        response = send_file(stream, conditional=False, etag=etag,
++                             last_modified=st.st_mtime, **options)
++        response.content_length = st.st_size
++        if conditional:
++            response.make_conditional(request.environ, accept_ranges=True,
++                                      complete_length=st.st_size)
++        return response
++    except BaseException:
++        if response is not None:
++            response.close()
++        stream.close()
++        raise
++
++
++def _send_job_source(job, **options):
++    for attempt in range(2):
++        snapshot = _capture_frame_source(job)
++        state = snapshot["source_state"] or snapshot["state"]
++        owner = snapshot["source_job"] or job
++        response = error = None
++        with state.report_lock:
++            _report_current(owner)
++            _recovery_gate(owner)
++            try:
++                response = _send_open_file(snapshot["path"], **options)
++            except Exception as caught:
++                error = caught
++        if _frame_source_current(snapshot):
++            if error is not None:
++                raise error
++            return response
++        if response is not None:
++            response.close()
++    abort(409, "output changed during frame read; retry")
+ 
+ 
+ @app.route("/api/jobs/<jid>/video")
+@@ -1693,10 +1888,8 @@ def job_video_stream(jid):
+     reads — for HDR/VFR jobs that is the normalized SDR scan copy, which
+     every browser can decode."""
+     job = JOBS.get(jid) or abort(404)
+-    video = _job_video(job)
+-    if not (video and os.path.exists(video)):
+-        abort(404)
+-    return send_file(video, conditional=True)
++    return _send_job_source(job, conditional=True)
++
+ 
+ 
+ def _same_json_value(left, right):
+@@ -1836,7 +2029,7 @@ def job_save_edits(jid):
+         if (len(doc["detections"]) != original_count
+                 or any(original is missing or not _same_json_value(original, target[key])
+                        for target, key, original in touched.values())):
+-            atomic_report(path, doc)
++            _publish_job_report_locked(job, path, doc)
+         # suggest allowlisting any string whose EVERY instance was disabled —
+         # the review just taught us it's a recurring false positive
+         per = {}
+@@ -1952,7 +2145,7 @@ def job_track_object(jid):
+                 new[-1]["t_end"] += 0.25
+                 doc["detections"].extend(new)
+                 path = os.path.join(job["dir"], "report.json")
+-                atomic_report(path, doc)
++                _publish_job_report_locked(job, path, doc)
+                 job["log"].append(
+                     "      tracked object: %d position(s), %.1f-%.1fs "
+                     "(review card added)" % (len(new),
+@@ -2265,21 +2458,25 @@ def job_render(jid):
+ @app.route("/api/jobs/<jid>/download")
+ def job_download(jid):
+     job = JOBS.get(jid) or abort(404)
+-    if not job["output"] or not os.path.exists(job["output"]):
+-        abort(404)
+-    # download name must carry the REAL container extension: a .mkv render
+-    # saved as "_redacted.mp4" looks like the format choice was ignored
+-    ext = os.path.splitext(job["output"])[1] or ".mp4"
+-    return send_file(job["output"], as_attachment=True,
+-                     download_name=os.path.splitext(job["name"])[0]
+-                     + "_redacted" + ext)
++    with FILES.initialize(job).report_lock:
++        _report_current(job)
++        _recovery_gate(job)
++        if not job["output"]:
++            abort(404)
++        ext = os.path.splitext(job["output"])[1] or ".mp4"
++        return _send_open_file(job["output"], as_attachment=True,
++                              download_name=os.path.splitext(job["name"])[0]
++                              + "_redacted" + ext)
++
+ 
+ 
+ @app.route("/api/jobs/<jid>/report")
+ def job_report(jid):
+     job = JOBS.get(jid) or abort(404)
+     with FILES.initialize(job).report_lock:
+-        return send_file(os.path.join(job["dir"], "report.json"),
++        _report_current(job)
++        _recovery_gate(job)
++        return _send_open_file(os.path.join(job["dir"], "report.json"),
+                          as_attachment=True,
+                          download_name=os.path.splitext(job["name"])[0]
+                          + "_audit.json")
+@@ -4346,7 +4543,14 @@ def server_video():
+         os.path.splitdrive(p)[0] + os.sep)
+     if not p.startswith(r.rstrip(os.sep) + os.sep):
+         return jsonify({"error": "server path is outside OPENSCRUB_MEDIA_ROOT"}), 400
+-    return send_file(p, conditional=True)
++    lease = g.get("file_owner")
++    if lease is not None and lease.source_job is not None:
++        owner = lease.source_job
++        with lease.source_state.report_lock:
++            _report_current(owner)
++            _recovery_gate(owner)
++            return _send_open_file(p, conditional=True)
++    return _send_open_file(p, conditional=True)
+ 
+ 
+ @app.route("/api/waveform")
+@@ -4497,6 +4701,28 @@ def _rehydrate_jobs():
+             continue
+         if jid in JOBS:
+             continue
++        if _has_render_recovery(jdir):
++            # Do not follow descriptor paths or infer validity from final names.
++            up = next((os.path.join(jdir, "input" + e) for e in sorted(MEDIA_EXTS)
++                       if os.path.isfile(os.path.join(jdir, "input" + e))), None)
++            opts = {}
++            try:
++                with open(os.path.join(jdir, OPTIONS_FILE), encoding="utf-8") as f:
++                    opts = json.load(f)
++                if not isinstance(opts, dict):
++                    opts = {}
++            except (OSError, ValueError):
++                pass
++            job = dict(id=jid, dir=jdir, video=up, name=os.path.basename(up) if up else jid,
++                       options=opts, phase="error", progress=0.0, size=0,
++                       log=["render delivery requires recovery"],
++                       error="render delivery requires recovery", output=None,
++                       created=os.path.getmtime(jdir), cancel=threading.Event(), stats={})
++            FILES.initialize(job).recovery_required = True
++            with JOBS_LOCK:
++                JOBS[jid] = job
++            n += 1
++            continue
+         if not os.path.exists(rep):
+             # NO report: the scan never completed (crashed or the server
+             # went down mid-scan). If the dir still holds an uploaded
+diff --git a/tests/test_hdr_decoder_cleanup.py b/tests/test_hdr_decoder_cleanup.py
+index c7ce6f7..61808b1 100644
+--- a/tests/test_hdr_decoder_cleanup.py
++++ b/tests/test_hdr_decoder_cleanup.py
+@@ -189,7 +189,7 @@ def test_hdr_partial_cleanup_closes_pipes_with_retained_traceback(
+             frames.append(tb.tb_frame.f_code)
+             tb = tb.tb_next
+         assert openscrub.run_render.__code__ in frames
+-        assert openscrub.render_hdr.__code__ in frames
++        assert openscrub._render_hdr_into.__code__ in frames
+         if failure == "cancel":
+             assert type(error) is openscrub.PipelineCancelled
+         else:
+@@ -209,14 +209,14 @@ def test_hdr_success_keeps_source_bytes_frames_and_tags(
+     output = tmp_path / "success.mp4"
+     args, state = _args_state(source, output)
+     captured = []
+-    lines, start = inspect.getsourcelines(openscrub.render_hdr)
++    lines, start = inspect.getsourcelines(openscrub._render_hdr_into)
+     tree = ast.parse("".join(lines))
+     write_line, = [start + n.lineno - 1 for n in ast.walk(tree)
+                    if isinstance(n, ast.Expr) and isinstance(n.value, ast.Call)
+                    and ast.unparse(n.value.func) == "enc.stdin.write"]
+ 
+     def trace(frame, event, arg):
+-        if frame.f_code is openscrub.render_hdr.__code__:
++        if frame.f_code is openscrub._render_hdr_into.__code__:
+             if event == "line" and frame.f_lineno == write_line:
+                 captured.append(frame.f_locals["buf"].tobytes())
+             return trace
+diff --git a/tests/test_manual_addition_replay.py b/tests/test_manual_addition_replay.py
+index 2a6a09f..641124b 100644
+--- a/tests/test_manual_addition_replay.py
++++ b/tests/test_manual_addition_replay.py
+@@ -55,13 +55,13 @@ def test_same_id_concurrent_requests_append_once(store, monkeypatch):
+     lock = ObservedLock()
+     web.FILES.initialize(store.job).report_lock = lock
+     entered, release = threading.Event(), threading.Event()
+-    real = web.atomic_report
+-    def publish(path, doc):
++    real = web._publish_job_report_locked
++    def publish(job, path, doc):
+         if not entered.is_set():
+             entered.set()
+             assert release.wait(8)
+-        real(path, doc)
+-    monkeypatch.setattr(web, 'atomic_report', publish)
++        real(job, path, doc)
++    monkeypatch.setattr(web, '_publish_job_report_locked', publish)
+     first = start_call('post', store.url + '/detections', json={'manual': [addition()]})
+     second = None
+     try:
+diff --git a/tests/test_render_publication.py b/tests/test_render_publication.py
+new file mode 100644
+index 0000000..d318db9
+--- /dev/null
++++ b/tests/test_render_publication.py
+@@ -0,0 +1,386 @@
++"""Owning staged-render/publication schedules; footage and faults are synthetic."""
++import hashlib
++import json
++import os
++from pathlib import Path
++
++import pytest
++import openscrub as app
++from test_report_roundtrip import review, render_args, Quiet, assert_review_preserved
++from test_render_resources import source, owners, assert_closed, render as direct_render
++
++
++@pytest.mark.parametrize('present', [False, True])
++@pytest.mark.parametrize('failure', ['callback', 'cancel', 'final'])
++def test_render_failure_or_cancel_preserves_previous_or_absent_final(source, tmp_path, monkeypatch, present, failure):
++    output = tmp_path / 'output.mp4'
++    if present:
++        output.write_bytes(b'previous video')
++    class Stop(Quiet):
++        def progress(self, stage, done, total):
++            if failure == 'final' and done == total:
++                raise RuntimeError('final sentinel')
++            if failure == 'callback':
++                raise RuntimeError('compute sentinel')
++        def cancelled(self):
++            return failure == 'cancel'
++        def log(self, message):
++            if failure == 'final' and message.startswith('rendered'):
++                raise RuntimeError('final sentinel')
++    with owners(monkeypatch) as observed:
++        with pytest.raises((RuntimeError, app.PipelineCancelled)) as caught:
++            direct_render('sdr', source, output, Stop())
++        assert caught.value.__traceback__ is not None
++        assert_closed(observed)
++        assert output.exists() is present
++        if present:
++            assert output.read_bytes() == b'previous video'
++        assert not list(tmp_path.glob('.render-*.tmp*'))
++
++
++def test_final_untouched_until_computation_and_report_ready(review, monkeypatch):
++    review.output.write_bytes(b'previous video')
++    old_report = review.path.read_bytes()
++    real_hash = app.sha256_file
++    seen = []
++    def hashed(path):
++        if '.render-' in str(path):
++            assert review.output.read_bytes() == b'previous video'
++            assert review.path.read_bytes() == old_report
++            seen.append(str(path))
++        return real_hash(path)
++    monkeypatch.setattr(app, 'sha256_file', hashed)
++    result = app.run_pipeline(render_args(review), Quiet())
++    assert seen and result['output'] == str(review.output)
++    assert not list(review.path.parent.glob('.render-*.tmp*'))
++    saved = json.loads(review.path.read_text())
++    assert_review_preserved(review.doc, saved)
++    assert saved['provenance']['output'] == str(review.output)
++    assert saved['provenance']['output_sha256'] == real_hash(review.output)
++
++
++def test_report_hash_reads_stage_but_names_final(review, monkeypatch):
++    sentinel = RuntimeError('hash sentinel')
++    review.output.write_bytes(b'previous video')
++    old_report = review.path.read_bytes()
++    real = app.sha256_file
++    def fail_output(path):
++        if str(path) != str(review.video):
++            raise sentinel
++        return real(path)
++    monkeypatch.setattr(app, 'sha256_file', fail_output)
++    with pytest.raises(RuntimeError) as caught:
++        app.run_pipeline(render_args(review), Quiet())
++    assert caught.value is sentinel
++    assert review.output.read_bytes() == b'previous video'
++    assert review.path.read_bytes() == old_report
++
++
++@pytest.mark.parametrize('writes,raises', [(True, True), (False, False)])
++def test_legacy_report_publisher_write_raise_and_no_write(review, writes, raises):
++    review.output.write_bytes(b'previous video')
++    old_report = review.path.read_bytes()
++    sentinel = RuntimeError('legacy sentinel')
++    calls = []
++    class Legacy(Quiet):
++        def publish_report(self, path, doc):
++            calls.append((path, doc))
++            assert review.output.read_bytes() != b'previous video'
++            if writes:
++                Path(path).write_text(json.dumps(doc))
++            if raises:
++                raise sentinel
++    if raises:
++        with pytest.raises(RuntimeError) as caught:
++            app.run_pipeline(render_args(review), Legacy())
++        assert caught.value is sentinel
++        assert review.output.read_bytes() == b'previous video'
++    else:
++        assert app.run_pipeline(render_args(review), Legacy())['output'] == str(review.output)
++    assert len(calls) == 1 and calls[0][0] == str(review.path)
++    assert_review_preserved(review.doc, calls[0][1])
++    assert review.path.read_bytes() == old_report
++
++
++def test_same_source_video_fallback_preserves_original_until_commit(source, monkeypatch):
++    original = source.read_bytes()
++    monkeypatch.setattr(app, 'nvenc_available', lambda *args: None)
++    class Check(Quiet):
++        def progress(self, *args, **kwargs):
++            assert source.read_bytes() == original
++    direct_render('sdr', source, source, Check())
++    assert source.read_bytes() != original
++
++
++@pytest.mark.parametrize('video_present,report_present', [(False,False),(True,False),(False,True),(True,True)])
++@pytest.mark.parametrize('failed_role', ['video','report'])
++def test_pair_publication_restores_each_previous_presence_case(tmp_path, monkeypatch, video_present, report_present, failed_role):
++    from openscrub_internal import render_delivery as delivery
++    video, report = tmp_path/'output.mp4', tmp_path/'report.json'
++    if video_present: video.write_bytes(b'old video')
++    if report_present: report.write_bytes(b'old report')
++    sentinel = OSError('replace sentinel')
++    real = os.replace
++    def replace(src, dst):
++        if Path(src).name.startswith('.render-') and '.tmp' in Path(src).name and failed_role == 'video':
++            raise sentinel
++        if Path(src).name.startswith('.report-') and failed_role == 'report':
++            raise sentinel
++        return real(src, dst)
++    with delivery._RenderDelivery(str(video), str(report)) as owned:
++        Path(owned.video_stage).write_bytes(b'new video')
++        owned.prepare_report({'new': True})
++        owned.prepare_rollback()
++        monkeypatch.setattr(delivery.os, 'replace', replace)
++        with pytest.raises(OSError) as caught: owned.commit()
++        assert caught.value is sentinel
++    assert video.exists() is video_present and report.exists() is report_present
++    if video_present: assert video.read_bytes() == b'old video'
++    if report_present: assert report.read_bytes() == b'old report'
++    assert not list(tmp_path.glob('.render-*'))
++
++
++def test_precommit_identity_change_rejects_stale_backup(tmp_path):
++    from openscrub_internal.render_delivery import _RenderDelivery
++    video = tmp_path/'output.mp4'; video.write_bytes(b'old')
++    with _RenderDelivery(str(video)) as owned:
++        Path(owned.video_stage).write_bytes(b'new')
++        owned.prepare_rollback()
++        video.write_bytes(b'changed externally')
++        with pytest.raises(RuntimeError, match='changed before'): owned.commit()
++    assert video.read_bytes() == b'changed externally'
++
++
++@pytest.mark.parametrize('fault', ['rollback','descriptor'])
++def test_rollback_or_descriptor_unlink_failure_exposes_recovery(tmp_path, monkeypatch, fault):
++    from openscrub_internal import render_delivery as delivery
++    video, report = tmp_path/'output.mp4', tmp_path/'report.json'
++    video.write_bytes(b'old video'); report.write_bytes(b'old report')
++    real_replace, real_unlink = os.replace, os.unlink
++    primary = OSError('primary')
++    def replace(src, dst):
++        if Path(src).name.startswith('.report-'):
++            raise primary
++        if fault == 'rollback' and str(src).endswith('.video'):
++            raise OSError('restore sentinel')
++        return real_replace(src, dst)
++    def unlink(path, *args, **kwargs):
++        if fault == 'descriptor' and str(path).endswith('.json') and '.render-recovery-' in str(path):
++            raise primary
++        return real_unlink(path, *args, **kwargs)
++    with delivery._RenderDelivery(str(video), str(report)) as owned:
++        Path(owned.video_stage).write_bytes(b'new video')
++        owned.prepare_report({'new': True}); owned.prepare_rollback()
++        monkeypatch.setattr(delivery.os, 'replace', replace if fault == 'rollback' else real_replace)
++        monkeypatch.setattr(delivery.os, 'unlink', unlink)
++        with pytest.raises(delivery._DeliveryRecoveryError) as caught: owned.commit()
++        assert caught.value.primary is primary and owned.recovery_required
++    assert len(list(tmp_path.glob('.render-recovery-*.json'))) == 1
++    if fault == 'rollback':
++        assert len(list(tmp_path.glob('.render-recovery-*.video'))) == 1
++    else:
++        assert video.read_bytes() == b'old video' and report.read_bytes() == b'old report'
++
++
++def test_pair_and_done_commit_before_cancel_ack(store, monkeypatch):
++    import openscrub_web as web
++    from test_job_lifecycle import request
++    store.doc['render_state']['bands'] = [[0,0]] * 30
++    store.path.write_text(json.dumps(store.doc))
++    monkeypatch.setattr(app, 'normalize_vfr', lambda *args: None)
++    def body(src, dst, *args, **kwargs): Path(dst).write_bytes(b'new video')
++    monkeypatch.setattr(app, '_render_into', body)
++    real_unlink = os.unlink
++    seen = []
++    def unlink(path, *args, **kwargs):
++        if '.render-recovery-' in str(path) and str(path).endswith('.json'):
++            assert store.job['phase'] == 'done'
++            assert Path(store.job['output']).read_bytes() == b'new video'
++            seen.append(True)
++            store.job['cancel'].set() # signal before acknowledgement may follow committed success
++        return real_unlink(path, *args, **kwargs)
++    monkeypatch.setattr(os, 'unlink', unlink)
++    web._run_job(store.job, 'render')
++    assert seen and store.job['phase'] == 'done'
++    assert web.FILES.initialize(store.job).output_epoch == 2
++    assert request('post', store.url+'/cancel').status_code == 200
++    assert store.job['phase'] == 'done'
++
++
++def test_recovery_marker_rehydrates_without_report_and_refuses_unsafe_routes(store):
++    import openscrub_web as web
++    from test_job_lifecycle import request
++    marker=Path(store.job['dir'])/('.render-recovery-'+'a'*32+'.json')
++    marker.write_text('malformed deliberately')
++    store.path.unlink()
++    web.JOBS.clear(); web._rehydrate_jobs()
++    job=next(iter(web.JOBS.values()))
++    assert web.job_public(job)['recovery_required'] is True
++    assert job['phase'] == 'error'
++    for method, suffix in [('get','download'),('get','report'),('get','frame_at?src=output'),('post','render'),('post','retry'),('post','detections'),('post','track_object')]:
++        response=request(method, store.url+'/'+suffix, json={} if method=='post' else None)
++        assert response.status_code == 409, (suffix,response.data)
++        assert b'render delivery requires recovery' in response.data
++    assert request('get',store.url).status_code == 200
++
++
++from test_job_lifecycle import store
++
++
++@pytest.mark.parametrize('kind',['parent-symlink','hardlink','final-symlink'])
++def test_destination_entry_alias_semantics(tmp_path,kind):
++    from openscrub_internal.render_delivery import _RenderDelivery
++    directory=tmp_path/'real';directory.mkdir();video=directory/'output.mp4';report=directory/'report.json'
++    video.write_bytes(b'old video')
++    if kind=='parent-symlink':
++        alias=tmp_path/'alias';alias.symlink_to(directory,target_is_directory=True)
++        with pytest.raises(ValueError,match='distinct destination'):
++            _RenderDelivery(str(video),str(alias/'output.mp4'))
++        return
++    target=directory/'untouched';target.write_bytes(b'link target')
++    if kind=='hardlink': os.link(video,report)
++    else: report.symlink_to(target)
++    with _RenderDelivery(str(video),str(report)) as owned:
++        Path(owned.video_stage).write_bytes(b'new video');owned.prepare_report({'new':True});owned.prepare_rollback();owned.commit()
++    assert video.read_bytes()==b'new video' and json.loads(report.read_text())=={'new':True}
++    assert target.read_bytes()==b'link target' and not report.is_symlink()
++
++
++@pytest.mark.parametrize('kind',['sdr','hdr','fallback'])
++def test_real_direct_stage_containers_and_resources(source,tmp_path,monkeypatch,kind):
++    output=tmp_path/('output.mov' if kind=='sdr' else 'output.mkv' if kind=='hdr' else 'output')
++    output.write_bytes(b'previous')
++    if kind=='fallback': monkeypatch.setattr(app,'nvenc_available',lambda *args:None)
++    class Check(Quiet):
++        def progress(self,*args): assert output.read_bytes()==b'previous'
++    with owners(monkeypatch) as observed:
++        direct_render(kind,source,output,Check())
++        assert_closed(observed)
++        assert output.read_bytes()!=b'previous'
++        assert not list(tmp_path.glob('.render-*.tmp*'))
++
++
++@pytest.mark.parametrize('role',['video','report'])
++@pytest.mark.parametrize('present',[True,False])
++def test_each_restore_attempt_failure_retains_recovery(tmp_path,monkeypatch,role,present):
++    from openscrub_internal import render_delivery as delivery
++    video,report=tmp_path/'output.mp4',tmp_path/'report.json'
++    for path in [video,report]:
++        if present:path.write_bytes(b'old')
++    real_replace,real_unlink=os.replace,os.unlink
++    target=str(video if role=='video' else report)
++    primary=RuntimeError('terminal sentinel')
++    def replace(src,dst):
++        if str(dst)==target and '.render-recovery-' in str(src):raise OSError('restore sentinel')
++        return real_replace(src,dst)
++    def unlink(path,*args,**kwargs):
++        if str(path)==target:raise OSError('absence sentinel')
++        return real_unlink(path,*args,**kwargs)
++    with delivery._RenderDelivery(str(video),str(report)) as owned:
++        Path(owned.video_stage).write_bytes(b'new');owned.prepare_report({'new':True});owned.prepare_rollback()
++        monkeypatch.setattr(os,'replace',replace);monkeypatch.setattr(os,'unlink',unlink)
++        def fail():raise primary
++        with pytest.raises(delivery._DeliveryRecoveryError) as caught:owned.commit(publish_success=fail)
++        assert caught.value.primary is primary
++    assert list(tmp_path.glob('.render-recovery-*.json'))
++    if present:assert list(tmp_path.glob('.render-recovery-*.'+role))
++
++
++def test_postcommit_notification_or_backup_cleanup_cannot_relabel_success(review,monkeypatch):
++    real_unlink=os.unlink
++    def unlink(path,*args,**kwargs):
++        if str(path).endswith('.video') and '.render-recovery-' in str(path): raise OSError('backup cleanup')
++        return real_unlink(path,*args,**kwargs)
++    review.output.write_bytes(b'previous')
++    monkeypatch.setattr(os,'unlink',unlink)
++    result=app.run_pipeline(render_args(review),Quiet())
++    assert result['output']==str(review.output)
++    assert json.loads(review.path.read_text())['provenance']['output_sha256']==app.sha256_file(review.output)
++
++
++def test_cleanup_descriptor_failure_before_commit_is_visible_to_live_job(store,monkeypatch):
++    import openscrub_web as web
++    store.doc['render_state']['bands']=[[0,0]]*30;store.path.write_text(json.dumps(store.doc))
++    monkeypatch.setattr(app,'normalize_vfr',lambda *args:None)
++    monkeypatch.setattr(app,'_render_into',lambda src,dst,*args,**kwargs:Path(dst).write_bytes(b'new'))
++    real_prepare=__import__('openscrub_internal.render_delivery',fromlist=['_RenderDelivery'])._RenderDelivery.prepare_rollback
++    def prepare(owned):
++        real_prepare(owned)
++        store.job['cancel'].set()
++    from openscrub_internal import render_delivery as delivery
++    monkeypatch.setattr(delivery._RenderDelivery,'prepare_rollback',prepare)
++    real_unlink=os.unlink
++    def unlink(path,*args,**kwargs):
++        if str(path).endswith('.json') and '.render-recovery-' in str(path): raise OSError('descriptor cleanup')
++        return real_unlink(path,*args,**kwargs)
++    monkeypatch.setattr(os,'unlink',unlink)
++    web._run_job(store.job,'render')
++    assert web.FILES.initialize(store.job).recovery_required
++    assert store.job['error']=='render delivery requires recovery'
++
++
++def test_vault_roundtrip_keeps_recovery_and_only_discards_reserved_stages(tmp_path):
++    import openscrub_vault as vault
++    key=os.urandom(32)
++    retained=['.render-recovery-'+'a'*32+'.json','.render-recovery-'+'a'*32+'.video','.render-user.tmp.mp4','.hidden']
++    discarded=['.render-'+'b'*32+'.tmp.mp4','.render-'+'c'*32+'.tmp.mov.noaudio.mp4','.report-arbitrary.tmp']
++    for name in retained+discarded:(tmp_path/name).write_bytes(b'sensitive')
++    assert vault.encrypt_tree(key,str(tmp_path))==len(retained)
++    assert all(not (tmp_path/name).exists() for name in discarded)
++    assert vault.decrypt_tree(key,str(tmp_path))==len(retained)
++    assert all((tmp_path/name).read_bytes()==b'sensitive' for name in retained)
++
++
++def test_terminal_assignment_failure_restores_pair_and_fields(store,monkeypatch):
++    import openscrub_web as web
++    store.doc['render_state']['bands']=[[0,0]]*30;store.path.write_text(json.dumps(store.doc))
++    old_report=store.path.read_bytes();output=Path(store.job['dir'])/'output.mp4';output.write_bytes(b'old video')
++    primary=RuntimeError('terminal assignment sentinel')
++    class FailOnce(dict):
++        failed=False
++        def __setitem__(self,key,value):
++            if key=='phase' and value=='done' and not self.failed:
++                self.failed=True;raise primary
++            return super().__setitem__(key,value)
++    job=FailOnce(store.job);job['output']=str(output);web.JOBS[job['id']]=job;store.job=job
++    monkeypatch.setattr(app,'normalize_vfr',lambda *args:None)
++    monkeypatch.setattr(app,'_render_into',lambda src,dst,*args,**kwargs:Path(dst).write_bytes(b'new'))
++    web._run_job(job,'render')
++    assert job['phase']=='error' and job['error']==str(primary)
++    assert job['output']==str(output) and output.read_bytes()==b'old video'
++    assert store.path.read_bytes()==old_report and web.FILES.initialize(job).output_epoch==4
++
++
++def test_acknowledged_cancel_prevents_pair_mutation(store,monkeypatch):
++    import openscrub_web as web
++    from openscrub_internal import render_delivery as delivery
++    from test_job_lifecycle import request
++    store.doc['render_state']['bands']=[[0,0]]*30;store.path.write_text(json.dumps(store.doc))
++    old_report=store.path.read_bytes();output=Path(store.job['dir'])/'output.mp4';output.write_bytes(b'old video')
++    store.job['output']=str(output)
++    monkeypatch.setattr(app,'normalize_vfr',lambda *args:None)
++    monkeypatch.setattr(app,'_render_into',lambda src,dst,*args,**kwargs:Path(dst).write_bytes(b'new'))
++    real=delivery._RenderDelivery.prepare_rollback
++    def prepare(owned):
++        real(owned)
++        assert request('post',store.url+'/cancel').status_code==200
++        assert store.job['phase']=='cancelled'
++    monkeypatch.setattr(delivery._RenderDelivery,'prepare_rollback',prepare)
++    web._run_job(store.job,'render')
++    assert output.read_bytes()==b'old video' and store.path.read_bytes()==old_report
++    assert web.FILES.initialize(store.job).output_epoch==0
++
++
++def test_postcommit_pipeline_notification_cannot_relabel_web_success(store,monkeypatch):
++    import openscrub_web as web
++    store.doc['render_state']['bands']=[[0,0]]*30;store.path.write_text(json.dumps(store.doc))
++    monkeypatch.setattr(app,'normalize_vfr',lambda *args:None)
++    monkeypatch.setattr(app,'_render_into',lambda src,dst,*args,**kwargs:Path(dst).write_bytes(b'new'))
++    real=app.run_pipeline
++    def pipeline(*args,**kwargs):
++        real(*args,**kwargs)
++        raise OSError('postcommit notification')
++    monkeypatch.setattr(app,'run_pipeline',pipeline)
++    web._run_job(store.job,'render')
++    assert store.job['phase']=='done' and store.job['error'] is None
++    assert Path(store.job['output']).read_bytes()==b'new'
+diff --git a/tests/test_render_resources.py b/tests/test_render_resources.py
+index f780b81..fb9a42d 100644
+--- a/tests/test_render_resources.py
++++ b/tests/test_render_resources.py
+@@ -131,11 +131,12 @@ def assert_closed(observed):
+ 
+ 
+ def render(kind, source, output, cb, **kwargs):
++    into = kwargs.pop("into", False)
+     common = (str(source), str(output), [], [(0, 0)] * 3,
+               [(0, 0)] * 3, 3.0, 0, 'box')
+     if kind == 'hdr':
+-        return app.render_hdr(*common, 'libx265', {}, cb=cb, **kwargs)
+-    return app.render(*common, False, encoder='x264', cb=cb, **kwargs)
++        return (app._render_hdr_into if into else app.render_hdr)(*common, 'libx265', {}, cb=cb, **kwargs)
++    return (app._render_into if into else app.render)(*common, False, encoder='x264', cb=cb, **kwargs)
+ 
+ 
+ @pytest.mark.parametrize(('kind', 'failure'), [
+@@ -220,7 +221,7 @@ def test_encoder_error_keeps_stderr_and_closes_owners(kind, source, tmp_path,
+     held = []
+     with owners(monkeypatch) as observed:
+         try:
+-            render(kind, source, output, app.Callbacks())
++            render(kind, source, output, app.Callbacks(), into=True)
+         except BaseException as error:
+             held.append(error)
+         assert len(held) == 1
+@@ -241,7 +242,7 @@ def test_failed_writer_is_released_without_deleting_previous(source, tmp_path,
+     Path(str(output) + '.noaudio.mp4').mkdir()
+     with owners(monkeypatch) as observed:
+         with pytest.raises(RuntimeError, match='writer|Writer|output') as held:
+-            render('fallback', source, output, app.Callbacks())
++            render('fallback', source, output, app.Callbacks(), into=True)
+         assert held.value.__traceback__ is not None
+         assert output.read_bytes() == b'previous'
+         assert_closed(observed)
+@@ -263,7 +264,7 @@ def test_nonzero_final_encoder_wait_retains_stderr(kind, tmp_path, monkeypatch):
+ 
+     with owners(monkeypatch) as observed:
+         with pytest.raises(RuntimeError, match='encode.*failed') as held:
+-            render(kind, src, output, Callbacks(), progress_every=1)
++            render(kind, src, output, Callbacks(), progress_every=1, into=True)
+         assert progress == [1, 2, 3, 3]
+         assert 'No such file or directory' in str(held.value)
+         enc, = [p for p in observed[2] if 'pipe:0' in p.args]
+@@ -457,7 +458,7 @@ def test_stdin_close_error_keeps_zero_exit_failure_or_encoder_diagnostic(
+                 monkeypatch.setattr(enc.stdin, 'close', close)
+ 
+         try:
+-            render(kind, src, output, Callbacks())
++            render(kind, src, output, Callbacks(), into=True)
+         except BaseException as error:
+             held.append(error)
+         assert len(held) == 1
+diff --git a/tests/test_render_response_publication.py b/tests/test_render_response_publication.py
+new file mode 100644
+index 0000000..4b11625
+--- /dev/null
++++ b/tests/test_render_response_publication.py
+@@ -0,0 +1,221 @@
++"""Short reads validate managed publication epochs; streams own real descriptors."""
++import os
++from pathlib import Path
++
++import numpy as np
++import pytest
++
++import openscrub_web as web
++from test_job_lifecycle import store, request
++
++
++@pytest.mark.parametrize('overlap', ['constructor','read','constructor-error','read-error'])
++def test_frame_retries_commit_during_constructor_or_read(store, monkeypatch, overlap):
++    output=Path(store.job['dir'])/'output.mp4';output.write_bytes(b'old')
++    store.job['output']=str(output)
++    files=web.FILES.initialize(store.job)
++    handles=[]
++    class Capture:
++        def __init__(self,path):
++            assert not files.report_lock.locked()
++            self.closed=False;handles.append(self)
++            if len(handles)==1 and overlap.startswith('constructor'):
++                with files.report_lock:
++                    files.output_epoch += 1
++                    output.write_bytes(b'new')
++                if overlap.endswith('error'): raise OSError('overlapped constructor')
++        def set(self,*args): pass
++        def read(self):
++            assert not files.report_lock.locked()
++            if len(handles)==1 and overlap.startswith('read'):
++                with files.report_lock:
++                    files.output_epoch += 1
++                    output.write_bytes(b'new')
++                if overlap.endswith('error'): raise OSError('overlapped read')
++            return True,np.full((8,8,3),20 if len(handles)==1 else 200,dtype=np.uint8)
++        def release(self): self.closed=True
++    monkeypatch.setattr(web.cv2,'VideoCapture',Capture)
++    response=request('get',store.url+'/frame_at?src=output')
++    assert response.status_code==200,response.data
++    assert len(handles)==2
++    # A constructor which raises did not return ownership; every acquired
++    # capture is released by production before this assertion.
++    assert all(h.closed for h in handles[(1 if overlap=='constructor-error' else 0):])
++    frame=web.cv2.imdecode(np.frombuffer(response.data,np.uint8),1)
++    assert frame.mean()>150
++
++
++def test_frame_two_invalidations_returns_explicit_stale(store, monkeypatch):
++    files=web.FILES.initialize(store.job); handles=[]
++    class Capture:
++        def __init__(self,path): self.closed=False;handles.append(self)
++        def set(self,*args): pass
++        def read(self):
++            with files.report_lock: files.output_epoch += 1
++            return False,None
++        def release(self): self.closed=True
++    monkeypatch.setattr(web.cv2,'VideoCapture',Capture)
++    response=request('get',store.url+'/frame_at?src=output')
++    assert response.status_code==409,response.data
++    assert b'output changed during frame read; retry' in response.data
++    assert len(handles)==2 and all(h.closed for h in handles)
++
++
++@pytest.mark.parametrize("failure", ["first", "terminal"])
++def test_frame_rejects_failed_attempt_and_successful_rollback_aba(store, monkeypatch, failure):
++    from openscrub_internal.render_delivery import _RenderDelivery
++    output=Path(store.job['dir'])/'output.mp4';output.write_bytes(b'old')
++    store.job['output']=str(output);files=web.FILES.initialize(store.job)
++    report_before=store.path.read_bytes();handles=[]
++    class Capture:
++        def __init__(self,path): handles.append(self);self.closed=False
++        def set(self,*args): pass
++        def read(self):
++            if len(handles)==1:
++                with _RenderDelivery(str(output),str(store.path)) as owned:
++                    Path(owned.video_stage).write_bytes(b'new');owned.prepare_report({'new':True});owned.prepare_rollback()
++                    def mutate(): files.output_epoch += 1
++                    def fail(): raise OSError('terminal assignment')
++                    real_replace=os.replace
++                    def replace(src,dst):
++                        if failure=='first' and str(src)==owned.video_stage: raise OSError('first attempt no change')
++                        return real_replace(src,dst)
++                    with monkeypatch.context() as patch:
++                        patch.setattr(os,'replace',replace)
++                        with files.report_lock,pytest.raises(OSError): owned.commit(before_mutation=mutate,publish_success=fail)
++                assert output.read_bytes()==b'old' and store.path.read_bytes()==report_before
++            return True,np.full((8,8,3),len(handles)*70,np.uint8)
++        def release(self): self.closed=True
++    monkeypatch.setattr(web.cv2,'VideoCapture',Capture)
++    assert request('get',store.url+'/frame_at?src=output').status_code==200
++    assert len(handles)==2 and files.output_epoch==(2 if failure=="first" else 4) and all(h.closed for h in handles)
++
++
++def test_frame_stable_error_and_postvalidation_commit(store,monkeypatch):
++    class Capture:
++        def __init__(self,path): pass
++        def set(self,*args): pass
++        def read(self): return False,None
++        def release(self): pass
++    monkeypatch.setattr(web.cv2,'VideoCapture',Capture)
++    assert request('get',store.url+'/frame_at').status_code==404
++
++
++def test_managed_source_alias_uses_source_owner(store,monkeypatch):
++    source=store.job
++    output=Path(source['dir'])/'output.mp4';output.write_bytes(b'old')
++    target=web.new_job(str(output),{},'alias.mp4');target['phase']='review'
++    source_files=web.FILES.initialize(source);target_files=web.FILES.initialize(target)
++    handles=[]
++    class Capture:
++        def __init__(self,path):
++            assert path==str(output);handles.append(self);self.closed=False
++        def set(self,*args): pass
++        def read(self):
++            assert not source_files.report_lock.locked() and not target_files.report_lock.locked()
++            if len(handles)==1:
++                with source_files.report_lock: source_files.output_epoch += 1
++            return True,np.ones((8,8,3),np.uint8)
++        def release(self): self.closed=True
++    monkeypatch.setattr(web.cv2,'VideoCapture',Capture)
++    assert request('get','/api/jobs/'+target['id']+'/frame_at').status_code==200
++    assert len(handles)==2 and all(h.closed for h in handles)
++
++
++from test_report_transactions import socket_api
++
++
++@pytest.mark.parametrize('endpoint',['download','report','video','server'])
++def test_download_report_range_metadata_matches_open_generation(store,socket_api,monkeypatch,endpoint):
++    import email.utils
++    from urllib.parse import quote
++    output=Path(store.job['dir'])/'output.mp4';payload=bytes(range(128))*4
++    output.write_bytes(payload);Path(store.job['video']).write_bytes(payload)
++    store.job.update(output=str(output),phase='done')
++    if endpoint=='report': payload=store.path.read_bytes()
++    url=('/api/server_video?path='+quote(str(output)) if endpoint=='server' else store.url+'/'+endpoint)
++    # The response helper must pin its descriptor even if path offload was set.
++    monkeypatch.setitem(web.app.config,'USE_X_SENDFILE',True)
++    status,headers,body=socket_api('GET',url)
++    assert status==200 and body==payload and 'X-Sendfile' not in headers
++    assert int(headers['Content-Length'])==len(payload)
++    etag=headers['ETag'];modified=headers['Last-Modified']
++    assert email.utils.parsedate_to_datetime(modified)
++    for value,expected in [('bytes=3-9',payload[3:10]),('bytes=-5',payload[-5:])]:
++        status,headers,body=socket_api('GET',url,headers={'Range':value})
++        assert status==206 and body==expected and int(headers['Content-Length'])==len(expected)
++        assert headers['ETag']==etag
++    status,headers,body=socket_api('GET',url,headers={'Range':'bytes=999999-1000000'})
++    assert status==416 and headers['Content-Range']=='bytes */%d'%len(payload)
++    for condition in [{'If-None-Match':etag},{'If-Modified-Since':modified}]:
++        status,headers,body=socket_api('GET',url,headers=condition)
++        assert status==304 and body==b''
++    status,headers,body=socket_api('GET',url,headers={'Range':'bytes=3-9','If-Range':etag})
++    assert status==206 and body==payload[3:10]
++    status,headers,body=socket_api('GET',url,headers={'Range':'bytes=3-9','If-Range':modified})
++    assert status==206 and body==payload[3:10]
++    status,headers,body=socket_api('GET',url,headers={'Range':'bytes=3-9','If-Range':'"older-generation"'})
++    assert status==200 and body==payload
++    status,headers,body=socket_api('HEAD',url)
++    assert status==200 and body==b'' and int(headers['Content-Length'])==len(payload)
++    assert web.FILES.count==0
++
++
++@pytest.mark.parametrize('rollback',[False,True])
++def test_open_old_stream_survives_new_commit_or_rollback(store,monkeypatch,rollback):
++    from openscrub_internal.render_delivery import _RenderDelivery
++    output=Path(store.job['dir'])/'output.mp4';payload=b'old generation'*20000;output.write_bytes(payload)
++    store.job.update(output=str(output),phase='done')
++    files=web.FILES.initialize(store.job)
++    with web.app.test_client() as client:
++        response=client.get(store.url+'/download',buffered=False)
++        try:
++            assert web.FILES.count==1
++            with _RenderDelivery(str(output),str(store.path)) as owned:
++                Path(owned.video_stage).write_bytes(b'new generation')
++                owned.prepare_report({'new':True});owned.prepare_rollback()
++                def mutate(): files.output_epoch+=1
++                def terminal():
++                    if rollback: raise OSError('terminal failure')
++                with files.report_lock:
++                    if rollback:
++                        with pytest.raises(OSError): owned.commit(before_mutation=mutate,publish_success=terminal)
++                    else: owned.commit(before_mutation=mutate,publish_success=terminal)
++            assert not files.report_lock.locked()
++            assert response.get_data()==payload
++        finally: response.close()
++    assert web.FILES.count==0
++
++
++def test_managed_alias_stream_keeps_source_lease_until_close(store):
++    output=Path(store.job['dir'])/'output.mp4';output.write_bytes(b'source generation'*20000)
++    target=web.new_job(str(output),{},'alias.mp4');target['phase']='review'
++    source_files=web.FILES.initialize(store.job)
++    with web.app.test_client() as client:
++        response=client.get('/api/jobs/'+target['id']+'/video',buffered=False)
++        try:
++            assert source_files.count==1 and web.FILES.count==2
++            assert not source_files.report_lock.locked()
++            assert request('delete',store.url).status_code==409
++        finally: response.close()
++    assert source_files.count==0 and web.FILES.count==0
++
++
++def test_detached_frame_can_return_after_successful_validation_then_commit(store,monkeypatch):
++    handles=[];files=web.FILES.initialize(store.job)
++    class Capture:
++        def __init__(self,path): self.closed=False;handles.append(self)
++        def set(self,*args): pass
++        def read(self): return True,np.full((8,8,3),170,np.uint8)
++        def release(self): self.closed=True
++    monkeypatch.setattr(web.cv2,'VideoCapture',Capture)
++    real=web._frame_source_current
++    def validate(snapshot):
++        current=real(snapshot)
++        assert handles[-1].closed
++        with files.report_lock: files.output_epoch+=1
++        return current
++    monkeypatch.setattr(web,'_frame_source_current',validate)
++    response=request('get',store.url+'/frame_at')
++    assert response.status_code==200 and len(handles)==1
++    assert web.cv2.imdecode(np.frombuffer(response.data,np.uint8),1).mean()>150
+diff --git a/tests/test_report_roundtrip.py b/tests/test_report_roundtrip.py
+index af5b549..7cd1dfb 100644
+--- a/tests/test_report_roundtrip.py
++++ b/tests/test_report_roundtrip.py
+@@ -202,19 +202,23 @@ def test_distinct_destination_and_successive_renders_preserve_source(review):
+ 
+ def test_from_report_reads_one_coherent_snapshot(review, monkeypatch):
+     original_open = builtins.open
+-    reads = []
++    reads, backups = [], []
+     def counted_open(path, mode='r', *args, **kwargs):
+-        if Path(path) == review.path and 'r' in mode:
+-            reads.append(path)
++        if Path(path) == review.path:
++            if mode == 'r':
++                reads.append(path)
++            elif mode == 'rb':
++                backups.append(path)
+         return original_open(path, mode, *args, **kwargs)
+     monkeypatch.setattr(builtins, 'open', counted_open)
+     openscrub.run_pipeline(render_args(review), Quiet())
+     assert len(reads) == 1
++    assert len(backups) == 1  # byte backup does not construct a second review snapshot
+     assert_review_preserved(review.doc, read(review.path))
+ 
+ 
+ def test_render_objects_are_separate_from_retained_review_rows(review, monkeypatch):
+-    original_render = openscrub.render
++    original_render = openscrub._render_into
+     def mutate_then_render(src, dst, detections, *args, **kwargs):
+         # Coverage/render transformations may edit decoded objects. Such edits
+         # must never replace the exact saved review representation.
+@@ -222,7 +226,7 @@ def test_render_objects_are_separate_from_retained_review_rows(review, monkeypat
+         detections[0].cbox = (30, 30, 35, 35)
+         detections[2].poly[0][0][0] = .25
+         return original_render(src, dst, detections, *args, **kwargs)
+-    monkeypatch.setattr(openscrub, 'render', mutate_then_render)
++    monkeypatch.setattr(openscrub, '_render_into', mutate_then_render)
+     openscrub.run_pipeline(render_args(review), Quiet())
+     assert_review_preserved(review.doc, read(review.path))
+ 
+@@ -233,7 +237,7 @@ def test_failure_before_publication_preserves_existing_report(review, monkeypatc
+     def fail(*args, **kwargs):
+         raise OSError('synthetic ' + failure + ' failure')
+     if failure == 'render':
+-        monkeypatch.setattr(openscrub, 'render', fail)
++        monkeypatch.setattr(openscrub, '_render_into', fail)
+     else:
+         from openscrub_internal import reports
+         monkeypatch.setattr(reports.os, 'replace', fail)
+diff --git a/tests/test_report_transactions.py b/tests/test_report_transactions.py
+index ad1085b..e071d95 100644
+--- a/tests/test_report_transactions.py
++++ b/tests/test_report_transactions.py
+@@ -41,13 +41,13 @@ def test_overlapping_sparse_saves_preserve_both_choices(store, monkeypatch):
+     lock = ObservedLock()
+     web.FILES.initialize(store.job).report_lock = lock
+     staged, release = threading.Event(), threading.Event()
+-    real = web.atomic_report
+-    def publish(path, doc):
++    real = web._publish_job_report_locked
++    def publish(job, path, doc):
+         if not staged.is_set():
+             staged.set()
+             assert release.wait(8)
+-        return real(path, doc)
+-    monkeypatch.setattr(web, 'atomic_report', publish)
++        return real(job, path, doc)
++    monkeypatch.setattr(web, '_publish_job_report_locked', publish)
+     first = start_call('post', store.url + '/detections', json={'enabled': {'0': False}})
+     second = None
+     try:
+@@ -100,7 +100,7 @@ def test_cancel_during_render_compute_rejects_real_final_publication(store, monk
+         entered.set()
+         assert release.wait(8)
+         Path(dst).write_bytes(b'synthetic encoded output')
+-    monkeypatch.setattr(openscrub, 'render', render)
++    monkeypatch.setattr(openscrub, '_render_into', render)
+     assert request('post', store.url + '/render').status_code == 200
+     before = store.path.read_bytes()
+     thread = run_worker()
+@@ -216,7 +216,7 @@ def test_tracker_latest_id_and_offsets_survive_save(store, tracker):
+         doc['detections'][-1]['track'] = 42
+         doc['render_state']['fps'] = 10
+         doc['render_state']['cum'] = [[2,3]] * 30
+-        web.atomic_report(str(store.path), doc)
++        web._publish_job_report_locked(store.job, str(store.path), doc)
+     release.set()
+     join(threads[0])
+     doc = json.loads(store.path.read_text())
+@@ -237,13 +237,13 @@ def test_tracker_commit_then_waiting_save_merges(store, tracker, monkeypatch):
+     staged, release_publish = threading.Event(), threading.Event()
+     lock = ObservedLock()
+     web.FILES.initialize(store.job).report_lock = lock
+-    real = web.atomic_report
+-    def publish(path, doc):
++    real = web._publish_job_report_locked
++    def publish(job, path, doc):
+         if any('track' in d for d in doc['detections']) and not staged.is_set():
+             staged.set()
+             assert release_publish.wait(8)
+-        real(path, doc)
+-    monkeypatch.setattr(web, 'atomic_report', publish)
++        real(job, path, doc)
++    monkeypatch.setattr(web, '_publish_job_report_locked', publish)
+     assert track(store).status_code == 200
+     assert entered.wait(5)
+     release_compute.set()
+@@ -337,13 +337,13 @@ def test_distinct_jobs_commit_independently(store, monkeypatch):
+     path = Path(second['dir']) / 'report.json'
+     path.write_bytes(store.path.read_bytes())
+     staged, release = threading.Event(), threading.Event()
+-    real = web.atomic_report
+-    def publish(target, doc):
++    real = web._publish_job_report_locked
++    def publish(job, target, doc):
+         if target == str(store.path):
+             staged.set()
+             assert release.wait(8)
+-        real(target, doc)
+-    monkeypatch.setattr(web, 'atomic_report', publish)
++        real(job, target, doc)
++    monkeypatch.setattr(web, '_publish_job_report_locked', publish)
+     call = start_call('post', store.url + '/detections', json={'enabled': {'0': False}})
+     try:
+         assert staged.wait(5)
+@@ -359,13 +359,13 @@ def test_overlapping_combined_edits_keep_additive_fields_and_own_responses(store
+     staged, release = threading.Event(), threading.Event()
+     lock = ObservedLock()
+     web.FILES.initialize(store.job).report_lock = lock
+-    real = web.atomic_report
+-    def publish(path, doc):
++    real = web._publish_job_report_locked
++    def publish(job, path, doc):
+         if not staged.is_set():
+             staged.set()
+             assert release.wait(8)
+-        real(path, doc)
+-    monkeypatch.setattr(web, 'atomic_report', publish)
++        real(job, path, doc)
++    monkeypatch.setattr(web, '_publish_job_report_locked', publish)
+     first = start_call('post', store.url + '/detections', json={
+         'box_overrides': {'0': [3,4,10,11]}, 'time_overrides': {'0': [.1,.8]},
+         'manual': [{'t_start': 0, 't_end': 1, 'screen_box': [2,3,4,5]}]})
+@@ -398,13 +398,13 @@ def test_save_wins_before_render_admission_and_queued_gate_closes(store, monkeyp
+     staged, release = threading.Event(), threading.Event()
+     lock = ObservedLock()
+     web.FILES.initialize(store.job).report_lock = lock
+-    real = web.atomic_report
+-    def publish(path, doc):
++    real = web._publish_job_report_locked
++    def publish(job, path, doc):
+         if not staged.is_set():
+             staged.set()
+             assert release.wait(8)
+-        real(path, doc)
+-    monkeypatch.setattr(web, 'atomic_report', publish)
++        real(job, path, doc)
++    monkeypatch.setattr(web, '_publish_job_report_locked', publish)
+     save = start_call('post', store.url + '/detections', json={'enabled': {'0': False}})
+     render = None
+     try:
+@@ -423,7 +423,7 @@ def test_save_wins_before_render_admission_and_queued_gate_closes(store, monkeyp
+     def compute(src, dst, *a, **kw):
+         snapshots.append(json.loads(store.path.read_text()))
+         Path(dst).write_bytes(b'synthetic output')
+-    monkeypatch.setattr(openscrub, 'render', compute)
++    monkeypatch.setattr(openscrub, '_render_into', compute)
+     join(run_worker())
+     assert snapshots[0]['detections'][0]['enabled'] is False
+     assert [d['enabled'] for d in json.loads(store.path.read_text())['detections']] == [False, True]
+@@ -448,25 +448,24 @@ def test_cancel_final_worker_boundary(store, monkeypatch, action, stage):
+     def render(src, dst, *args, **kwargs):
+         callbacks.append(kwargs['cb'])
+         Path(dst).write_bytes(b'synthetic encoded output')
+-    monkeypatch.setattr(openscrub, 'render', render)
++    monkeypatch.setattr(openscrub, '_render_into', render)
+     def scan(args, cb):
+         callbacks.append(cb)
+         return dict(fps=30, cum=[[0,0]], bands=[[0,0]], detections=[], stats={})
+     monkeypatch.setattr(openscrub, 'run_scan', scan)
+     if stage == 'constructed':
+-        real_write = openscrub.write_report
+-        def write(path, args, state, output_path=None, publisher=None):
+-            def pause(target, doc):
+-                entered.set()
+-                assert release.wait(8)
+-                publisher(target, doc)
+-            return real_write(path, args, state, output_path, publisher=pause)
+-        monkeypatch.setattr(openscrub, 'write_report', write)
++        real_document = openscrub._report_document
++        def document(*args, **kwargs):
++            doc = real_document(*args, **kwargs)
++            entered.set()
++            assert release.wait(8)
++            return doc
++        monkeypatch.setattr(openscrub, '_report_document', document)
+     elif stage == 'hashed':
+         real_hash = openscrub.sha256_file
+         def sha(path, *args, **kwargs):
+             value = real_hash(path, *args, **kwargs)
+-            if Path(path).name.startswith('output.'):
++            if Path(path).name.startswith('.render-'):
+                 entered.set()
+                 assert release.wait(8)
+             return value
+@@ -545,12 +544,12 @@ def socket_api(store, monkeypatch):
+     try:
+         assert ready.wait(8) and not errors, errors
+         port = servers[0].socket.getsockname()[1]
+-        def api(method, path, payload=None):
++        def api(method, path, payload=None, headers=None):
+             connection = http.client.HTTPConnection('127.0.0.1', port, timeout=8)
+             try:
+                 body = json.dumps(payload) if payload is not None else None
+                 connection.request(method, path, body=body, headers={
+-                    'Content-Type': 'application/json', 'Connection': 'close'})
++                    'Content-Type': 'application/json', 'Connection': 'close', **(headers or {})})
+                 result = connection.getresponse()
+                 return result.status, dict(result.getheaders()), result.read()
+             finally:
+@@ -568,13 +567,13 @@ def test_real_socket_overlapping_sparse_saves(store, socket_api, monkeypatch):
+     staged, release = threading.Event(), threading.Event()
+     lock = ObservedLock()
+     web.FILES.initialize(store.job).report_lock = lock
+-    real = web.atomic_report
+-    def publish(path, doc):
++    real = web._publish_job_report_locked
++    def publish(job, path, doc):
+         if not staged.is_set():
+             staged.set()
+             assert release.wait(8)
+-        real(path, doc)
+-    monkeypatch.setattr(web, 'atomic_report', publish)
++        real(job, path, doc)
++    monkeypatch.setattr(web, '_publish_job_report_locked', publish)
+     values = []
+     def post(index):
+         values.append(socket_api('POST', store.url + '/detections', {'enabled': {str(index): False}}))
+@@ -599,13 +598,13 @@ def test_report_download_stat_open_is_one_generation(store, socket_api, monkeypa
+     lock = ObservedLock()
+     web.FILES.initialize(store.job).report_lock = lock
+     before = store.path.read_bytes()
+-    real_send = web.send_file
++    real_send = web._send_open_file
+     def send(*args, **kwargs):
+         if str(args[0]) == str(store.path):
+             entered.set()
+             assert release.wait(8)
+         return real_send(*args, **kwargs)
+-    monkeypatch.setattr(web, 'send_file', send)
++    monkeypatch.setattr(web, '_send_open_file', send)
+     values = []
+     thread = threading.Thread(target=lambda: values.append(socket_api('GET', store.url + '/report')))
+     thread.start()
+@@ -679,13 +678,13 @@ def test_waiting_transaction_keeps_vault_delete_retention_busy(store, monkeypatc
+     staged, release = threading.Event(), threading.Event()
+     lock = ObservedLock()
+     web.FILES.initialize(store.job).report_lock = lock
+-    real = web.atomic_report
+-    def publish(path, doc):
++    real = web._publish_job_report_locked
++    def publish(job, path, doc):
+         if not staged.is_set():
+             staged.set()
+             assert release.wait(8)
+-        real(path, doc)
+-    monkeypatch.setattr(web, 'atomic_report', publish)
++        real(job, path, doc)
++    monkeypatch.setattr(web, '_publish_job_report_locked', publish)
+     first = start_call('post', store.url + '/detections', json={'enabled': {'0': False}})
+     second = None
+     try:
+@@ -733,7 +732,7 @@ def test_late_cancel_of_captured_operation_cannot_cancel_new_retry(store, monkey
+         if kwargs['cb'].cancelled():
+             raise openscrub.PipelineCancelled()
+         Path(dst).write_bytes(b'synthetic output')
+-    monkeypatch.setattr(openscrub, 'render', compute)
++    monkeypatch.setattr(openscrub, '_render_into', compute)
+     monkeypatch.setattr(openscrub, 'run_scan', lambda *a: dict(
+         fps=30, cum=[[0,0]], bands=[[0,0]], detections=[], stats={}))
+     background = []

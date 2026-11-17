@@ -1,0 +1,206 @@
+DEFAULT_PATHS {"jobs": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/candidate-export/openscrub_jobs", "models": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/runs/task1633-f3d63a17ccfa4bff8f2942b468193e70/profile/.openscrub/models"}
+ACTIVE_SOURCE {"executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python", "python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]", "sources": {"openscrub": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/candidate-export/openscrub.py", "sha256": "6d3d03c5ace66115d593abe4cae51a402b06d3156f2dfa84fbad2aaafd6b8b44"}, "openscrub_internal": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/candidate-export/openscrub_internal/__init__.py", "sha256": "c35c063c010e329c5dad13782e7b67438ed4b2d1faf975d4f01be2773a18e022"}, "openscrub_internal.lifetimes": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/candidate-export/openscrub_internal/lifetimes.py", "sha256": "ce97f619c3ab75b2eaad69e631ba6100b432cef2e84bc0088b8a5d2eb9cd51dc"}, "openscrub_internal.render_delivery": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/candidate-export/openscrub_internal/render_delivery.py", "sha256": "bfe03679a86878ff2a4fc2bf523fdffbca093a920a7961550fa1b5c2459a2b03"}, "openscrub_internal.reports": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/candidate-export/openscrub_internal/reports.py", "sha256": "ff8fcbbccbb6be0ce072d9416a4edab6c9d3e0d546735a50c114f564c75fc5fa"}, "openscrub_setup": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/candidate-export/openscrub_setup.py", "sha256": "d0362a038f8182e8fae510100085bb087f09f7e5cf7e11a780a24390b3037eaf"}, "openscrub_update": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/candidate-export/openscrub_update.py", "sha256": "4d6a20f75d985a119f8421227c3bd88b17fd1b8eed44e353b127b5b49e733d55"}, "openscrub_vault": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/candidate-export/openscrub_vault.py", "sha256": "05e7c08dc170b83fb53d71abb802b20b7ee7c1edebfd49a00c8d0ac269781e40"}, "openscrub_web": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/candidate-export/openscrub_web.py", "sha256": "b53f766eed7b3be0b3389e1f6cdad95452d4c7e86ac99e77d9a5132b86aaf728"}, "zones_ui": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/candidate-export/zones_ui.py", "sha256": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7"}}}
+FFFF...                                                                  [100%]
+=================================== FAILURES ===================================
+____ test_download_report_range_metadata_matches_open_generation[download] _____
+
+store = namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/runs/task1633-f3d63a17ccf...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x72dbdf1ced40>, url='/api/jobs/2035d0372d3f')
+socket_api = <function socket_api.<locals>.api at 0x72dbdf554400>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x72dbdfc65b50>
+endpoint = 'download'
+
+    @pytest.mark.parametrize('endpoint',['download','report','video','server'])
+    def test_download_report_range_metadata_matches_open_generation(store,socket_api,monkeypatch,endpoint):
+        import email.utils
+        from urllib.parse import quote
+        output=Path(store.job['dir'])/'output.mp4';payload=bytes(range(128))*4
+        output.write_bytes(payload);Path(store.job['video']).write_bytes(payload)
+        store.job.update(output=str(output),phase='done')
+        if endpoint=='report': payload=store.path.read_bytes()
+        url=('/api/server_video?path='+quote(str(output)) if endpoint=='server' else store.url+'/'+endpoint)
+        # The response helper must pin its descriptor even if path offload was set.
+        monkeypatch.setitem(web.app.config,'USE_X_SENDFILE',True)
+>       status,headers,body=socket_api('GET',url)
+                            ^^^^^^^^^^^^^^^^^^^^^
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_response_publication.py:132: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_report_transactions.py:554: in api
+    return result.status, dict(result.getheaders()), result.read()
+                                                     ^^^^^^^^^^^^^
+/tmp/openscrub-baseline-20261116/python/cpython-3.12.16-linux-x86_64-gnu/lib/python3.12/http/client.py:510: in read
+    s = self._safe_read(self.length)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <http.client.HTTPResponse object at 0x72dbdfe782b0>, amt = 512
+
+    def _safe_read(self, amt):
+        """Read the number of bytes requested.
+    
+        This function should be used when <amt> bytes "should" be present for
+        reading. If the bytes are truly not available (due to EOF), then the
+        IncompleteRead exception can be used to detect the problem.
+        """
+        cursize = min(amt, _MIN_READ_BUF_SIZE)
+        data = self.fp.read(cursize)
+        if len(data) >= amt:
+            return data
+        if len(data) < cursize:
+>           raise IncompleteRead(data, amt - len(data))
+E           http.client.IncompleteRead: IncompleteRead(0 bytes read, 512 more expected)
+
+/tmp/openscrub-baseline-20261116/python/cpython-3.12.16-linux-x86_64-gnu/lib/python3.12/http/client.py:671: IncompleteRead
+_____ test_download_report_range_metadata_matches_open_generation[report] ______
+
+store = namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/runs/task1633-f3d63a17ccf...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x72dbdf555800>, url='/api/jobs/538288c8600a')
+socket_api = <function socket_api.<locals>.api at 0x72dbdf0e9080>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x72dbdfc64c50>
+endpoint = 'report'
+
+    @pytest.mark.parametrize('endpoint',['download','report','video','server'])
+    def test_download_report_range_metadata_matches_open_generation(store,socket_api,monkeypatch,endpoint):
+        import email.utils
+        from urllib.parse import quote
+        output=Path(store.job['dir'])/'output.mp4';payload=bytes(range(128))*4
+        output.write_bytes(payload);Path(store.job['video']).write_bytes(payload)
+        store.job.update(output=str(output),phase='done')
+        if endpoint=='report': payload=store.path.read_bytes()
+        url=('/api/server_video?path='+quote(str(output)) if endpoint=='server' else store.url+'/'+endpoint)
+        # The response helper must pin its descriptor even if path offload was set.
+        monkeypatch.setitem(web.app.config,'USE_X_SENDFILE',True)
+>       status,headers,body=socket_api('GET',url)
+                            ^^^^^^^^^^^^^^^^^^^^^
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_response_publication.py:132: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_report_transactions.py:554: in api
+    return result.status, dict(result.getheaders()), result.read()
+                                                     ^^^^^^^^^^^^^
+/tmp/openscrub-baseline-20261116/python/cpython-3.12.16-linux-x86_64-gnu/lib/python3.12/http/client.py:510: in read
+    s = self._safe_read(self.length)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <http.client.HTTPResponse object at 0x72dbdf018670>, amt = 716
+
+    def _safe_read(self, amt):
+        """Read the number of bytes requested.
+    
+        This function should be used when <amt> bytes "should" be present for
+        reading. If the bytes are truly not available (due to EOF), then the
+        IncompleteRead exception can be used to detect the problem.
+        """
+        cursize = min(amt, _MIN_READ_BUF_SIZE)
+        data = self.fp.read(cursize)
+        if len(data) >= amt:
+            return data
+        if len(data) < cursize:
+>           raise IncompleteRead(data, amt - len(data))
+E           http.client.IncompleteRead: IncompleteRead(0 bytes read, 716 more expected)
+
+/tmp/openscrub-baseline-20261116/python/cpython-3.12.16-linux-x86_64-gnu/lib/python3.12/http/client.py:671: IncompleteRead
+______ test_download_report_range_metadata_matches_open_generation[video] ______
+
+store = namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/runs/task1633-f3d63a17ccf...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x72dbdf0e9300>, url='/api/jobs/752f2764b749')
+socket_api = <function socket_api.<locals>.api at 0x72dbdf8732e0>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x72dbdeff5460>
+endpoint = 'video'
+
+    @pytest.mark.parametrize('endpoint',['download','report','video','server'])
+    def test_download_report_range_metadata_matches_open_generation(store,socket_api,monkeypatch,endpoint):
+        import email.utils
+        from urllib.parse import quote
+        output=Path(store.job['dir'])/'output.mp4';payload=bytes(range(128))*4
+        output.write_bytes(payload);Path(store.job['video']).write_bytes(payload)
+        store.job.update(output=str(output),phase='done')
+        if endpoint=='report': payload=store.path.read_bytes()
+        url=('/api/server_video?path='+quote(str(output)) if endpoint=='server' else store.url+'/'+endpoint)
+        # The response helper must pin its descriptor even if path offload was set.
+        monkeypatch.setitem(web.app.config,'USE_X_SENDFILE',True)
+>       status,headers,body=socket_api('GET',url)
+                            ^^^^^^^^^^^^^^^^^^^^^
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_response_publication.py:132: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_report_transactions.py:554: in api
+    return result.status, dict(result.getheaders()), result.read()
+                                                     ^^^^^^^^^^^^^
+/tmp/openscrub-baseline-20261116/python/cpython-3.12.16-linux-x86_64-gnu/lib/python3.12/http/client.py:510: in read
+    s = self._safe_read(self.length)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <http.client.HTTPResponse object at 0x72dbdf857700>, amt = 512
+
+    def _safe_read(self, amt):
+        """Read the number of bytes requested.
+    
+        This function should be used when <amt> bytes "should" be present for
+        reading. If the bytes are truly not available (due to EOF), then the
+        IncompleteRead exception can be used to detect the problem.
+        """
+        cursize = min(amt, _MIN_READ_BUF_SIZE)
+        data = self.fp.read(cursize)
+        if len(data) >= amt:
+            return data
+        if len(data) < cursize:
+>           raise IncompleteRead(data, amt - len(data))
+E           http.client.IncompleteRead: IncompleteRead(0 bytes read, 512 more expected)
+
+/tmp/openscrub-baseline-20261116/python/cpython-3.12.16-linux-x86_64-gnu/lib/python3.12/http/client.py:671: IncompleteRead
+_____ test_download_report_range_metadata_matches_open_generation[server] ______
+
+store = namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/runs/task1633-f3d63a17ccf...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x72dbdf873420>, url='/api/jobs/24f393ec708b')
+socket_api = <function socket_api.<locals>.api at 0x72dbdf881b20>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x72dbdf0195e0>
+endpoint = 'server'
+
+    @pytest.mark.parametrize('endpoint',['download','report','video','server'])
+    def test_download_report_range_metadata_matches_open_generation(store,socket_api,monkeypatch,endpoint):
+        import email.utils
+        from urllib.parse import quote
+        output=Path(store.job['dir'])/'output.mp4';payload=bytes(range(128))*4
+        output.write_bytes(payload);Path(store.job['video']).write_bytes(payload)
+        store.job.update(output=str(output),phase='done')
+        if endpoint=='report': payload=store.path.read_bytes()
+        url=('/api/server_video?path='+quote(str(output)) if endpoint=='server' else store.url+'/'+endpoint)
+        # The response helper must pin its descriptor even if path offload was set.
+        monkeypatch.setitem(web.app.config,'USE_X_SENDFILE',True)
+>       status,headers,body=socket_api('GET',url)
+                            ^^^^^^^^^^^^^^^^^^^^^
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_response_publication.py:132: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_report_transactions.py:554: in api
+    return result.status, dict(result.getheaders()), result.read()
+                                                     ^^^^^^^^^^^^^
+/tmp/openscrub-baseline-20261116/python/cpython-3.12.16-linux-x86_64-gnu/lib/python3.12/http/client.py:510: in read
+    s = self._safe_read(self.length)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <http.client.HTTPResponse object at 0x72dbdf8c7a30>, amt = 512
+
+    def _safe_read(self, amt):
+        """Read the number of bytes requested.
+    
+        This function should be used when <amt> bytes "should" be present for
+        reading. If the bytes are truly not available (due to EOF), then the
+        IncompleteRead exception can be used to detect the problem.
+        """
+        cursize = min(amt, _MIN_READ_BUF_SIZE)
+        data = self.fp.read(cursize)
+        if len(data) >= amt:
+            return data
+        if len(data) < cursize:
+>           raise IncompleteRead(data, amt - len(data))
+E           http.client.IncompleteRead: IncompleteRead(0 bytes read, 512 more expected)
+
+/tmp/openscrub-baseline-20261116/python/cpython-3.12.16-linux-x86_64-gnu/lib/python3.12/http/client.py:671: IncompleteRead
+=========================== short test summary info ============================
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_render_response_publication.py::test_download_report_range_metadata_matches_open_generation[download]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_render_response_publication.py::test_download_report_range_metadata_matches_open_generation[report]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_render_response_publication.py::test_download_report_range_metadata_matches_open_generation[video]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_render_response_publication.py::test_download_report_range_metadata_matches_open_generation[server]
+4 failed, 3 passed, 8 deselected in 2.39s

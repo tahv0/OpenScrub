@@ -1,0 +1,142 @@
+{
+  "status": "SOURCE-ONLY; P candidate unapproved; no runtime acceptance",
+  "refs": {
+    "P_candidate": "64647f22e303af259f2cd7372fd1dc7c3be6e02a",
+    "P_base": "8768e86dc1cd57720fd1c22eb6b539ae6bda6cde",
+    "G_reviewed": "83af23b5fd3c5922d0d476ba2a6ae21a3598ced2",
+    "C01_reviewed": "4b9bd7e576a8ae30369672b4b4722fc9752e233f"
+  },
+  "R_extraction_source_ast_checks": [
+    {
+      "R_source": "render",
+      "P_extraction": "_render_into",
+      "args_identical": true,
+      "body_identical": true
+    },
+    {
+      "R_source": "render_hdr",
+      "P_extraction": "_render_hdr_into",
+      "args_identical": true,
+      "body_identical": true
+    }
+  ],
+  "symbols": {
+    "P_candidate": {
+      "render": {
+        "line": 3936,
+        "end_line": 3945,
+        "signature": "render(src, dst, detections, cum, bands, fps, pad, mode, preview, encoder='auto', band_margin=25, progress_every=60, cb=None, mode_map=None, draw_scores=False, vcodec='h264', face_shape='ellipse', audio_spans=None, clip=None, mute_tracks=(), out_quality='archival', audio_lanes=None)",
+        "body_ast_sha256": "e1648bb743ac752dd250454ceb9e2ad3a8ed6643f9ba0609021eae2a0c319690"
+      },
+      "render_hdr": {
+        "line": 3948,
+        "end_line": 3956,
+        "signature": "render_hdr(src, dst, detections, cum, bands, fps, pad, mode, encoder, tags, band_margin=25, progress_every=60, cb=None, mode_map=None, face_shape='ellipse', audio_spans=None, mute_tracks=(), out_quality='archival', audio_lanes=None)",
+        "body_ast_sha256": "146f287ff69d1e9390bd6043106f239f6090b75568e8b1708418dd825619bad9"
+      },
+      "_render_into": {
+        "line": 4169,
+        "end_line": 4438,
+        "signature": "_render_into(src, dst, detections, cum, bands, fps, pad, mode, preview, encoder='auto', band_margin=25, progress_every=60, cb=None, mode_map=None, draw_scores=False, vcodec='h264', face_shape='ellipse', audio_spans=None, clip=None, mute_tracks=(), out_quality='archival', audio_lanes=None)",
+        "body_ast_sha256": "978aaccc5d87a28f096fec87e39a0dd658fa4677bb0a27dbb388e43598cadd74"
+      },
+      "_render_hdr_into": {
+        "line": 3958,
+        "end_line": 4166,
+        "signature": "_render_hdr_into(src, dst, detections, cum, bands, fps, pad, mode, encoder, tags, band_margin=25, progress_every=60, cb=None, mode_map=None, face_shape='ellipse', audio_spans=None, mute_tracks=(), out_quality='archival', audio_lanes=None)",
+        "body_ast_sha256": "4b32a05471432cb52809f176da51f3c5b586aeae7a7d9c45c31c7a248edf6abb"
+      },
+      "run_render": {
+        "line": 8597,
+        "end_line": 8677,
+        "signature": "run_render(args, state, cb=None)",
+        "body_ast_sha256": "d7cab6e79cdfb00e0485514f1bf9ef7ade76b338c3560b2fefb4a812bea01479"
+      },
+      "write_report": {
+        "line": 6491,
+        "end_line": 6492,
+        "signature": "write_report(path, args, state, output_path=None, publisher=None)",
+        "body_ast_sha256": "2f0b61bccf504ab56839c88c84dd8ec6632cbd5dc2896b0c7653c6cd18f5e112"
+      },
+      "_report_document": {
+        "line": 6427,
+        "end_line": 6488,
+        "signature": "_report_document(args, state, output_path=None, output_bytes_path=None)",
+        "body_ast_sha256": "1bd4d48af2b310cbc9fb951fd9cbf694ad05239242a56acefa515dd23778db56"
+      }
+    },
+    "G_reviewed": {
+      "_geometry_metadata": {
+        "line": 3201,
+        "end_line": 3213,
+        "signature": "_geometry_metadata(cap, stage)",
+        "body_ast_sha256": "4dd99b6e0853be20ab42651a32be8c06431c88c4434acb404324a5fde89884a1"
+      },
+      "_geometry_preflight": {
+        "line": 3143,
+        "end_line": 3158,
+        "signature": "_geometry_preflight(detections, cum, bands, fps, pad, band_margin, stage)",
+        "body_ast_sha256": "bd7070f512fd767583bff642c61e0537bb868a8805d17c76f1fb0ea48fd505f3"
+      },
+      "_geometry_detections": {
+        "line": 3130,
+        "end_line": 3140,
+        "signature": "_geometry_detections(detections, stage)",
+        "body_ast_sha256": "4dc3ebdc67765c1e99874ce64b6c1e937fd0f4a0547707d193714c1ff4172663"
+      },
+      "_geometry_finite": {
+        "line": 3118,
+        "end_line": 3127,
+        "signature": "_geometry_finite(values, size, stage, field)",
+        "body_ast_sha256": "1aaf059cc5a9a0deee4b44e1b79fa935508cec04fdefa1b6d72ed03b5c7b5526"
+      },
+      "_geometry_box": {
+        "line": 3161,
+        "end_line": 3179,
+        "signature": "_geometry_box(d, ox, oy, pad, stage)",
+        "body_ast_sha256": "1748550d503107245d577e64f43fffd2b1336ed39b3dbeedf560f293e18ce219"
+      },
+      "_geometry_bands": {
+        "line": 3182,
+        "end_line": 3198,
+        "signature": "_geometry_bands(bx, by, w, h, margin, stage)",
+        "body_ast_sha256": "f60b9d2cea386776a6ea92d6baec54208bc0278bec11dc5c45e4ad1f4668bb26"
+      },
+      "render": {
+        "line": 4184,
+        "end_line": 4193,
+        "signature": "render(src, dst, detections, cum, bands, fps, pad, mode, preview, encoder='auto', band_margin=25, progress_every=60, cb=None, mode_map=None, draw_scores=False, vcodec='h264', face_shape='ellipse', audio_spans=None, clip=None, mute_tracks=(), out_quality='archival', audio_lanes=None)",
+        "body_ast_sha256": "730845e1b6b95c44eccc709c83da21c77d8fd0fe2efdb0b9ee891b7b8ba87123"
+      },
+      "render_hdr": {
+        "line": 4001,
+        "end_line": 4014,
+        "signature": "render_hdr(src, dst, detections, cum, bands, fps, pad, mode, encoder, tags, band_margin=25, progress_every=60, cb=None, mode_map=None, face_shape='ellipse', audio_spans=None, mute_tracks=(), out_quality='archival', audio_lanes=None)",
+        "body_ast_sha256": "a5af904dfeb75ed1d3ffcd5abfe650b743492b4dd5e0cbf8293e08774bb52eec"
+      },
+      "_render": {
+        "line": 4196,
+        "end_line": 4423,
+        "signature": "_render(src, dst, detections, cum, bands, fps, pad, mode, preview, encoder='auto', band_margin=25, progress_every=60, cb=None, mode_map=None, draw_scores=False, vcodec='h264', face_shape='ellipse', audio_spans=None, clip=None, mute_tracks=(), out_quality='archival', audio_lanes=None)",
+        "body_ast_sha256": "3dcfc0060380f5c0e2912b85a1af1d0b1824f691df5490cfb3c2385cbd60ffe0"
+      },
+      "_render_hdr": {
+        "line": 4017,
+        "end_line": 4181,
+        "signature": "_render_hdr(src, dst, detections, cum, bands, fps, pad, mode, encoder, tags, band_margin=25, progress_every=60, cb=None, mode_map=None, face_shape='ellipse', audio_spans=None, mute_tracks=(), out_quality='archival', audio_lanes=None)",
+        "body_ast_sha256": "eac3689628e07971d9ad3333d38fc2926fa26fcaaad77a2bdf3bc6f1be857ff6"
+      },
+      "run_render": {
+        "line": 8559,
+        "end_line": 8628,
+        "signature": "run_render(args, state, cb=None)",
+        "body_ast_sha256": "f5a75b20924b91af39d612bd9a3c3bd9ef6ed87e93ced037598d7f7626979576"
+      }
+    }
+  },
+  "G_metadata_repository_occurrences": [
+    "83af23b5fd3c5922d0d476ba2a6ae21a3598ced2:openscrub.py:3201:def _geometry_metadata(cap, stage):",
+    "83af23b5fd3c5922d0d476ba2a6ae21a3598ced2:openscrub.py:4033:    w, h, total = _geometry_metadata(meta, \"HDR\")",
+    "83af23b5fd3c5922d0d476ba2a6ae21a3598ced2:openscrub.py:4211:    w, h, total = _geometry_metadata(cap, \"SDR\")"
+  ]
+}

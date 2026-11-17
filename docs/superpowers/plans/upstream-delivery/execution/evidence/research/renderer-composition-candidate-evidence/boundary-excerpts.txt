@@ -1,0 +1,220 @@
+
+### G_reviewed 83af23b5fd3c5922d0d476ba2a6ae21a3598ced2:openscrub.py
+3201:def _geometry_metadata(cap, stage):
+3202:    try:
+3203:        values = (cap.get(cv2.CAP_PROP_FRAME_WIDTH),
+3204:                  cap.get(cv2.CAP_PROP_FRAME_HEIGHT),
+3205:                  cap.get(cv2.CAP_PROP_FRAME_COUNT))
+3206:        _geometry_finite(values, 3, stage, "video dimensions/count")
+3207:        w, h, total = (int(value) for value in values)
+3208:        if w <= 0 or h <= 0:
+3209:            raise ValueError(f"render geometry {stage}: invalid video dimensions/count")
+3210:    except Exception:
+3211:        cap.release()
+3212:        raise
+3213:    return w, h, total
+
+### P_candidate 64647f22e303af259f2cd7372fd1dc7c3be6e02a:openscrub.py
+3936:def render(src, dst, detections, cum, bands, fps, pad, mode, preview,
+3937:           encoder="auto", band_margin=25, progress_every=60, cb=None,
+3938:           mode_map=None, draw_scores=False, vcodec="h264",
+3939:           face_shape="ellipse", audio_spans=None, clip=None,
+3940:           mute_tracks=(), out_quality="archival", audio_lanes=None):
+3941:    with _RenderDelivery(dst) as delivery:
+3942:        result = _render_into(src, delivery.video_stage, detections, cum, bands, fps, pad, mode, preview, encoder, band_margin, progress_every, cb, mode_map, draw_scores, vcodec, face_shape, audio_spans, clip, mute_tracks, out_quality, audio_lanes)
+3943:        delivery.prepare_rollback()
+3944:        delivery.commit()
+3945:        return result
+3946:
+3947:
+3948:def render_hdr(src, dst, detections, cum, bands, fps, pad, mode,
+3949:               encoder, tags, band_margin=25, progress_every=60, cb=None,
+3950:               mode_map=None, face_shape="ellipse", audio_spans=None,
+3951:               mute_tracks=(), out_quality="archival", audio_lanes=None):
+3952:    with _RenderDelivery(dst) as delivery:
+3953:        result = _render_hdr_into(src, delivery.video_stage, detections, cum, bands, fps, pad, mode, encoder, tags, band_margin, progress_every, cb, mode_map, face_shape, audio_spans, mute_tracks, out_quality, audio_lanes)
+3954:        delivery.prepare_rollback()
+3955:        delivery.commit()
+3956:        return result
+3957:
+3958:def _render_hdr_into(src, dst, detections, cum, bands, fps, pad, mode,
+3959:               encoder, tags, band_margin=25, progress_every=60, cb=None,
+3960:               mode_map=None, face_shape="ellipse", audio_spans=None,
+3961:               mute_tracks=(), out_quality="archival", audio_lanes=None):
+3962:    """render(), but 10-bit end to end: decode the HDR source to raw
+3963:    yuv420p10le, blur the planes in place, encode 10-bit HEVC with the
+3964:    source's color tags (PQ/HLG + BT.2020) carried over. `hvc1` tagging
+3965:    keeps QuickTime/Apple players happy. No preview mode — previews use
+3966:    the SDR copy."""
+3967:    mode_map = mode_map or {}
+3968:    def _mode_for(cat):
+3969:        return mode_map.get(cat, mode)
+3970:    cb = cb or Callbacks()
+3971:    meta = dec = enc = ff_err = None
+3972:    remove_partial = False
+3973:    cleanup_errors = []
+3974:    primary = None
+3975:    try:
+3976:        meta = cv2.VideoCapture(src)
+3977:        w = int(meta.get(cv2.CAP_PROP_FRAME_WIDTH))
+3978:        h = int(meta.get(cv2.CAP_PROP_FRAME_HEIGHT))
+3979:        total = int(meta.get(cv2.CAP_PROP_FRAME_COUNT))
+3980:        meta.release()
+3981:        meta = None
+3982:        cb.log(f"      encoder: {encoder} 10-bit"
+
+### P_candidate 64647f22e303af259f2cd7372fd1dc7c3be6e02a:openscrub.py
+4136:    except BaseException as error:
+4137:        primary = error
+4138:        raise
+4139:    finally:
+4140:        cleanup_errors.extend(_stop_render_children((dec, enc)))
+4141:        for resource, action in ((meta, "release"), (ff_err, "close")):
+4142:            if resource is not None:
+4143:                try:
+4144:                    getattr(resource, action)()
+4145:                except BaseException as error:
+4146:                    cleanup_errors.append(error)
+
+### P_candidate 64647f22e303af259f2cd7372fd1dc7c3be6e02a:openscrub.py
+4179:        return mode_map.get(cat, mode)
+4180:    cb = cb or Callbacks()
+4181:    cap = proc = out = ff_err = tmp_video = None
+4182:    remove_partial = False
+4183:    cleanup_errors = []
+4184:    primary = None
+4185:    try:
+4186:        cap = cv2.VideoCapture(src)
+4187:        w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+4188:        h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+4189:        total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+4190:
+4191:        # --- output sink: single-pass ffmpeg pipe (NVENC if available) ---
+4192:        codec = nvenc_available(encoder, cb)
+
+### P_candidate 64647f22e303af259f2cd7372fd1dc7c3be6e02a:openscrub.py
+4408:    except BaseException as error:
+4409:        primary = error
+4410:        raise
+4411:    finally:
+4412:        cleanup_errors.extend(_stop_render_children((proc,)))
+4413:        for resource, action in ((cap, "release"), (out, "release"), (ff_err, "close")):
+4414:            if resource is not None:
+4415:                try:
+4416:                    getattr(resource, action)()
+4417:                except BaseException as error:
+4418:                    cleanup_errors.append(error)
+
+### P_candidate 64647f22e303af259f2cd7372fd1dc7c3be6e02a:openscrub.py
+8597:def run_render(args, state, cb=None):
+8598:    cb = cb or Callbacks()
+8599:    dst = args.output or os.path.splitext(args.video)[0] + (
+8600:        "_preview.mp4" if args.preview else "_redacted.mp4")
+8601:    cb.log(f"[4/4] Rendering -> {dst}")
+8602:    aspans = getattr(args, "audio_spans", None)
+8603:    if getattr(args, "audio_pii_apply", False):
+8604:        sugg = state.get("audio_suggestions") or []
+
+### P_candidate 64647f22e303af259f2cd7372fd1dc7c3be6e02a:openscrub.py
+8633:        clip = None
+8634:    dets_r = apply_coverage(state["detections"],
+8635:                            getattr(args, "coverage", "tight"), cb)
+8636:    out_q = getattr(args, "out_quality", "archival") or "archival"
+8637:    if out_q != "archival":
+8638:        cb.log(f"      output quality: {out_q} (smaller file; archival is "
+8639:               "the visually-lossless default)")
+8640:    summary = dict(state["stats"], output=dst)
+8641:    with _RenderDelivery(dst, args.report) as delivery:
+8642:        if getattr(args, "hdr_source", None) and not args.preview:
+8643:            _render_hdr_into(args.hdr_source, delivery.video_stage, dets_r, state["cum"],
+8644:                       state["bands"], state["fps"], pad=args.pad, mode=args.mode,
+8645:                       encoder=args.hdr_encoder,
+8646:                       tags=getattr(args, "hdr_tags", {}),
+8647:                       face_shape=getattr(args, "face_shape", "ellipse"),
+8648:                       mode_map=getattr(args, "mode_map", None),
+8649:                       audio_spans=aspans, mute_tracks=mute_tracks, cb=cb,
+8650:                       out_quality=out_q,
+8651:                       audio_lanes=getattr(args, "audio_lane_count", None))
+8652:        else:
+8653:            _render_into(args.video, delivery.video_stage, dets_r, state["cum"],
+8654:                   state["bands"],
+8655:                   state["fps"], pad=args.pad, mode=args.mode, preview=args.preview,
+8656:                   mode_map=getattr(args, "mode_map", None),
+8657:                   draw_scores=bool(getattr(args, "draw_scores", False)),
+8658:                   vcodec=getattr(args, "codec", "h264"),
+8659:                   face_shape=getattr(args, "face_shape", "ellipse"),
+8660:                   encoder=args.encoder, audio_spans=aspans, clip=clip,
+8661:                   mute_tracks=mute_tracks, cb=cb, out_quality=out_q,
+8662:                   audio_lanes=getattr(args, "audio_lane_count", None))
+8663:        if args.report:
+8664:            delivery.prepare_report(_report_document(args, state, dst, delivery.video_stage),
+8665:                                    legacy_publisher=(None if getattr(cb, "publish_render", None)
+8666:                                                      else getattr(cb, "publish_report", None)))
+8667:            cb.log(f"      audit report: {args.report} (contains PII text — protect it)")
+8668:        cb.log("done.")
+8669:        delivery.prepare_rollback()
+8670:        publish = getattr(cb, "publish_render", None)
+8671:        if publish:
+8672:            publish(delivery, summary)
+8673:        else:
+8674:            if cb.cancelled():
+8675:                raise PipelineCancelled()
+8676:            delivery.commit()
+8677:    return summary
+
+### G_reviewed 83af23b5fd3c5922d0d476ba2a6ae21a3598ced2:tests/test_render_geometry.py
+238:@pytest.mark.parametrize("start,end,expected", [(-1, 2, (-1, 2)), (0, 0, None),
+239:                                                (2, -1, (2, None))])
+240:def test_existing_clip_policy(monkeypatch, start, end, expected):
+241:    observed = []
+242:    monkeypatch.setattr(o, "_render", lambda *a, **kw: observed.append(kw["clip"]))
+243:    args = SimpleNamespace(output="out", video="in", preview=False, report=None,
+244:                           pad=0, mode="box", encoder="cpu", clip_start=start,
+245:                           clip_end=end)
+246:    o.run_render(args, dict(detections=[], cum=[(0, 0)], bands=[(0, 0)], fps=1, stats={}))
+247:    assert observed == [expected]
+
+### G_reviewed 83af23b5fd3c5922d0d476ba2a6ae21a3598ced2:tests/test_render_geometry.py
+264:@pytest.mark.parametrize("hdr", [False, True])
+265:@pytest.mark.parametrize("pad", [0, 1])
+266:def test_run_coverage_rounding_keeps_legal_empty_box(monkeypatch, hdr, pad):
+267:    observed = []
+268:    name = "_render_hdr" if hdr else "_render"
+269:    monkeypatch.setattr(o, name, lambda *a, **kw: observed.append(a[2][0].cbox),
+270:                        raising=False)
+271:    d = detection((.1, .1, .2, .2), dense=True, track=1)
+272:    args = SimpleNamespace(output="out", video="in", preview=False, report=None,
+273:                           pad=pad, mode="box", encoder="cpu", coverage="concealed",
+274:                           hdr_source="in" if hdr else None, hdr_encoder="libx265")
+275:    o.run_render(args, dict(detections=[d], cum=[(0, 0)], bands=[(0, 0)], fps=1, stats={}))
+276:    assert observed == [(0, 0, 0, 0)]
+
+### C01_reviewed 4b9bd7e576a8ae30369672b4b4722fc9752e233f:tests/test_hdr_chroma_coverage.py
+162:def _observe_encoder(monkeypatch, owner):
+163:    """Read the real encoder-write argument without replacing commands or IO."""
+164:    children, error_files, captured = [], [], []
+165:    popen = subprocess.Popen
+166:    temporary_file = openscrub.tempfile.TemporaryFile
+167:    lines, start = inspect.getsourcelines(owner)
+168:    writes = {start + n.lineno - 1 for n in ast.walk(ast.parse("".join(lines)))
+169:              if isinstance(n, ast.Expr) and isinstance(n.value, ast.Call)
+170:              and isinstance(n.value.func, ast.Attribute)
+
+### C01_reviewed 4b9bd7e576a8ae30369672b4b4722fc9752e233f:tests/test_hdr_chroma_coverage.py
+183:    def trace(frame, event, arg):
+184:        if frame.f_code is owner.__code__:
+185:            if event == "line" and frame.f_lineno in writes:
+186:                data = frame.f_locals["buf"] if owner is openscrub.render_hdr else frame.f_locals["frame"]
+187:                captured.append(data.tobytes())
+188:            return trace
+
+### C01_reviewed 4b9bd7e576a8ae30369672b4b4722fc9752e233f:tests/test_polygon_fallback.py
+212:def observe_render(monkeypatch, path):
+213:    """Observe real pre-write values; contain real resources even for baseline errors."""
+214:    children, streams, captures, frames = [], [], [], []
+215:    original_popen = subprocess.Popen
+216:    original_capture = cv2.VideoCapture
+217:    target = scrub.render_hdr if path == "hdr" else scrub.render
+218:    lines, start = inspect.getsourcelines(target)
+219:    write_line = next(start + i for i, line in enumerate(lines)
+220:                      if ("enc.stdin.write(" if path == "hdr" else "proc.stdin.write(") in line)

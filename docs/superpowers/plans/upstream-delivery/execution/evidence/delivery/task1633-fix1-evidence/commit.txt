@@ -1,0 +1,7 @@
+commit a132081f1e609ed19deb4477044ee1c9b77871cc
+Author:     Tuomas Aho <tuomas.aho@outlook.com>
+AuthorDate: Tue Nov 17 23:36:48 2026 +0200
+Commit:     Tuomas Aho <tuomas.aho@outlook.com>
+CommitDate: Tue Nov 17 23:36:48 2026 +0200
+
+    Close locally owned source responses when revalidation raises

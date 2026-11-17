@@ -1,0 +1,10 @@
+{
+  "test": "test_real_render_and_fresh_route_reopen_keep_all_ten_rows",
+  "script_sha256": "0d4819f9b6d8291b05f12794b8dcde090095967f8e4990a808ea805b1012813d",
+  "stdout_sha256": "085cbea00697b3d2e079735098d60cfe6a6387c086b9a7740a78f7764465afd5",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "verified_records": [
+    "DEFAULT_PATHS",
+    "ACTIVE_SOURCE"
+  ]
+}

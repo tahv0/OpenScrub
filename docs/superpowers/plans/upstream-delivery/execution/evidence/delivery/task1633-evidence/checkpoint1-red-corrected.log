@@ -1,0 +1,125 @@
+PREFLIGHT {"base": "8768e86dc1cd57720fd1c22eb6b539ae6bda6cde", "files": 38, "free_bytes": 803401330688, "head": "8768e86dc1cd57720fd1c22eb6b539ae6bda6cde", "manifest_sha256": "fc1bcc6680df3e6879e7cd55e9449725ceb8286811fd48e65ef2d35aa3fe000c", "policy": "frozen", "prerequisites": [{"executable": true, "path": "/tmp/openscrub-baseline-20261116/tools/usr/bin/ffmpeg", "sha256": "bdf6aabffdba7411edff8d36c389d695257fcdf823d196020176e117612862f6"}, {"executable": true, "path": "/tmp/openscrub-baseline-20261116/tools/usr/bin/ffprobe", "sha256": "a6dac1e9e8631e04075d06854cc4069308aec279bb04683b4a0bca5e4f54b2fe"}, {"executable": true, "path": "/tmp/openscrub-baseline-20261116/tools/usr/bin/tesseract", "sha256": "644efa639b77a21b1096a6ced155112f0c730d05c7db871d52f4b2eb16bdf42a"}, {"path": "/home/tahv0/src/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/verification_hook.py", "sha256": "4b25e217fcf8fc2ada1147a9c26ff5cdb51884809328854d4dafd3b36fb8e5a0"}, {"path": "/home/tahv0/src/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/sitecustomize.py", "sha256": "035c1187d46c85ce2c3f3c092822d8171c3b67e99a7270717a12169b2c3be302"}, {"path": "/home/tahv0/src/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/verify.py", "sha256": "354cf49b0c83d11f3945137fbdffc3ac6b2793f1217ac39a9b62270097940067"}, {"path": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/adapters/freeze.py", "sha256": "450c600648ede6fd9fb3f72d4d19821dbbca1dfba2d89203f55715b4b3f362a2"}, {"path": "/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_publication.py", "sha256": "e4c3f3e9f82a1b68aa0d9fadb402ea90612c4d4c3b39466ee1350d623d9a14cd"}], "python": {"executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python", "version": [3, 12, 16]}, "run": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/runs/task1633-c70d8222df5049bba5f911b7c000e76b", "source": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/base-export"}
+COMMAND ["/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python", "-m", "pytest", "/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_publication.py", "-q", "--basetemp=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/runs/task1633-c70d8222df5049bba5f911b7c000e76b/pytest", "-o", "cache_dir=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/runs/task1633-c70d8222df5049bba5f911b7c000e76b/cache/pytest"]
+DEFAULT_PATHS {"jobs": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/base-export/openscrub_jobs", "models": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/runs/task1633-c70d8222df5049bba5f911b7c000e76b/profile/.openscrub/models"}
+ACTIVE_SOURCE {"executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python", "python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]", "sources": {"openscrub": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/base-export/openscrub.py", "sha256": "e42e03e893ad49931454bc18ed6e18fa2ee4e4d87cb1f8806762142c8b494b1f"}, "openscrub_internal": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/base-export/openscrub_internal/__init__.py", "sha256": "c35c063c010e329c5dad13782e7b67438ed4b2d1faf975d4f01be2773a18e022"}, "openscrub_internal.lifetimes": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/base-export/openscrub_internal/lifetimes.py", "sha256": "dbfc317c1c878b8e8a599391578504c44a8964199f2cdae6e2ed60a6336d6743"}, "openscrub_internal.reports": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/base-export/openscrub_internal/reports.py", "sha256": "eec9d568fc18f08ee35469ba864c5526120ae11152e8fe6f4d15007ab42d2427"}, "openscrub_setup": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/base-export/openscrub_setup.py", "sha256": "d0362a038f8182e8fae510100085bb087f09f7e5cf7e11a780a24390b3037eaf"}, "openscrub_update": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/base-export/openscrub_update.py", "sha256": "4d6a20f75d985a119f8421227c3bd88b17fd1b8eed44e353b127b5b49e733d55"}, "openscrub_vault": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/base-export/openscrub_vault.py", "sha256": "da1b7fe4da389352fbc594abddcc563278b26009d8f342d4154ffa305bf4dfa4"}, "openscrub_web": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/base-export/openscrub_web.py", "sha256": "fc0eea772aec5b9ecba7a957b260e8e3121937f98fd6ff785c8df6dc9788c5a5"}, "zones_ui": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/base-export/zones_ui.py", "sha256": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7"}}}
+...F..FFF..                                                              [100%]
+=================================== FAILURES ===================================
+_ test_render_failure_or_cancel_preserves_previous_or_absent_final[cancel-True] _
+
+source = PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/runs/task1633-c70d8222df5049bba5f911b7c000e76b/pytest/test_render_failure_or_cancel_3/input.mp4')
+tmp_path = PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/runs/task1633-c70d8222df5049bba5f911b7c000e76b/pytest/test_render_failure_or_cancel_3')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fd27e3556a0>
+present = True, failure = 'cancel'
+
+    @pytest.mark.parametrize('present', [False, True])
+    @pytest.mark.parametrize('failure', ['callback', 'cancel', 'final'])
+    def test_render_failure_or_cancel_preserves_previous_or_absent_final(source, tmp_path, monkeypatch, present, failure):
+        output = tmp_path / 'output.mp4'
+        if present:
+            output.write_bytes(b'previous video')
+        class Stop(Quiet):
+            def progress(self, stage, done, total):
+                if failure == 'final' and done == total:
+                    raise RuntimeError('final sentinel')
+                if failure == 'callback':
+                    raise RuntimeError('compute sentinel')
+            def cancelled(self):
+                return failure == 'cancel'
+            def log(self, message):
+                if failure == 'final' and message.startswith('rendered'):
+                    raise RuntimeError('final sentinel')
+        with owners(monkeypatch) as observed:
+            with pytest.raises((RuntimeError, app.PipelineCancelled)) as caught:
+                direct_render('sdr', source, output, Stop())
+            assert caught.value.__traceback__ is not None
+            assert_closed(observed)
+>           assert output.exists() is present
+E           AssertionError: assert False is True
+E            +  where False = exists()
+E            +    where exists = PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/runs/task1633-c70d8222df5049bba5f911b7c000e76b/pytest/test_render_failure_or_cancel_3/output.mp4').exists
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_publication.py:35: AssertionError
+___________ test_final_untouched_until_computation_and_report_ready ____________
+
+review = namespace(video=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/runs/task1633-c70d8222df.../runtime/task1633/runs/task1633-c70d8222df5049bba5f911b7c000e76b/pytest/test_final_untouched_until_com0/rendered.mp4'))
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fd22d65b3b0>
+
+    def test_final_untouched_until_computation_and_report_ready(review, monkeypatch):
+        review.output.write_bytes(b'previous video')
+        old_report = review.path.read_bytes()
+        real_hash = app.sha256_file
+        seen = []
+        def hashed(path):
+            if '.render-' in str(path):
+                assert review.output.read_bytes() == b'previous video'
+                assert review.path.read_bytes() == old_report
+                seen.append(str(path))
+            return real_hash(path)
+        monkeypatch.setattr(app, 'sha256_file', hashed)
+        result = app.run_pipeline(render_args(review), Quiet())
+>       assert seen and result['output'] == str(review.output)
+E       assert ([])
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_publication.py:54: AssertionError
+_________________ test_report_hash_reads_stage_but_names_final _________________
+
+review = namespace(video=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/runs/task1633-c70d8222df.../runtime/task1633/runs/task1633-c70d8222df5049bba5f911b7c000e76b/pytest/test_report_hash_reads_stage_b0/rendered.mp4'))
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fd2abbbbb00>
+
+    def test_report_hash_reads_stage_but_names_final(review, monkeypatch):
+        sentinel = RuntimeError('hash sentinel')
+        review.output.write_bytes(b'previous video')
+        old_report = review.path.read_bytes()
+        real = app.sha256_file
+        def fail_output(path):
+            if str(path) != str(review.video):
+                raise sentinel
+            return real(path)
+        monkeypatch.setattr(app, 'sha256_file', fail_output)
+        with pytest.raises(RuntimeError) as caught:
+            app.run_pipeline(render_args(review), Quiet())
+        assert caught.value is sentinel
+>       assert review.output.read_bytes() == b'previous video'
+E       AssertionError: assert b'\x00\x00\x0...0Lavf62.3.100' == b'previous video'
+E         
+E         At index 0 diff: b'\x00' != b'p'
+E         Use -v to get more diff
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_publication.py:75: AssertionError
+_______ test_legacy_report_publisher_write_raise_and_no_write[True-True] _______
+
+review = namespace(video=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/runs/task1633-c70d8222df.../runtime/task1633/runs/task1633-c70d8222df5049bba5f911b7c000e76b/pytest/test_legacy_report_publisher_w0/rendered.mp4'))
+writes = True, raises = True
+
+    @pytest.mark.parametrize('writes,raises', [(True, True), (False, False)])
+    def test_legacy_report_publisher_write_raise_and_no_write(review, writes, raises):
+        review.output.write_bytes(b'previous video')
+        old_report = review.path.read_bytes()
+        sentinel = RuntimeError('legacy sentinel')
+        calls = []
+        class Legacy(Quiet):
+            def publish_report(self, path, doc):
+                calls.append((path, doc))
+                assert review.output.read_bytes() != b'previous video'
+                if writes:
+                    Path(path).write_text(json.dumps(doc))
+                if raises:
+                    raise sentinel
+        if raises:
+            with pytest.raises(RuntimeError) as caught:
+                app.run_pipeline(render_args(review), Legacy())
+            assert caught.value is sentinel
+>           assert review.output.read_bytes() == b'previous video'
+E           AssertionError: assert b'\x00\x00\x0...0Lavf62.3.100' == b'previous video'
+E             
+E             At index 0 diff: b'\x00' != b'p'
+E             Use -v to get more diff
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_publication.py:97: AssertionError
+=========================== short test summary info ============================
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_render_publication.py::test_render_failure_or_cancel_preserves_previous_or_absent_final[cancel-True]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_render_publication.py::test_final_untouched_until_computation_and_report_ready
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_render_publication.py::test_report_hash_reads_stage_but_names_final
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_render_publication.py::test_legacy_report_publisher_write_raise_and_no_write[True-True]
+4 failed, 7 passed in 1.33s
+RESULT {"exit": 1, "log": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/runs/task1633-c70d8222df5049bba5f911b7c000e76b/logs/command.log", "sha256": "bf9aa759f4e22b0cc688280125041fe17d1151fbdd55f037a902e6f424f5cdeb"}

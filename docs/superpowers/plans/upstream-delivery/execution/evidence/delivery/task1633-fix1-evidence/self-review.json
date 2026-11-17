@@ -1,0 +1,17 @@
+{
+  "base": "64647f22e303af259f2cd7372fd1dc7c3be6e02a",
+  "head": "a132081f1e609ed19deb4477044ee1c9b77871cc",
+  "web_signature_unchanged": true,
+  "other_web_ast_unchanged": true,
+  "existing_owning_tests_ast_unchanged": true,
+  "new_test": "test_source_response_ownership_through_revalidation",
+  "schedules": [
+    "direct recovery",
+    "alias recovery",
+    "direct stable",
+    "alias stable",
+    "direct stale retry",
+    "alias stale retry"
+  ],
+  "minor_M1": "deferred unchanged"
+}

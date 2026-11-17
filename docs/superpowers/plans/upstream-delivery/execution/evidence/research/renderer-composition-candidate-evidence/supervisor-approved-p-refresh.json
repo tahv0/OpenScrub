@@ -1,0 +1,42 @@
+{
+  "candidate_ref": "64647f22e303af259f2cd7372fd1dc7c3be6e02a",
+  "approved_p_ref": "a132081f1e609ed19deb4477044ee1c9b77871cc",
+  "review": "task-1633-fix1-review.md",
+  "candidate_report_prefix_bytes": 15121,
+  "candidate_report_prefix_sha256": "0121d8e46209100bf0ccd85277f36d7f14fc0af18b5c96818854c3f263984f0c",
+  "routing_files_unchanged": [
+    {
+      "path": "openscrub.py",
+      "bytes": 425230,
+      "sha256": "6d3d03c5ace66115d593abe4cae51a402b06d3156f2dfa84fbad2aaafd6b8b44",
+      "unchanged_from_candidate": true
+    },
+    {
+      "path": "openscrub_internal/render_delivery.py",
+      "bytes": 8528,
+      "sha256": "82db35dff22f5f3bdcb2f4565cef8b1d87396700fbf5eb9df6816f05bc1df6d6",
+      "unchanged_from_candidate": true
+    },
+    {
+      "path": "openscrub_internal/reports.py",
+      "bytes": 2326,
+      "sha256": "ff8fcbbccbb6be0ce072d9416a4edab6c9d3e0d546735a50c114f564c75fc5fa",
+      "unchanged_from_candidate": true
+    },
+    {
+      "path": "openscrub_internal/lifetimes.py",
+      "bytes": 3106,
+      "sha256": "ce97f619c3ab75b2eaad69e631ba6100b432cef2e84bc0088b8a5d2eb9cd51dc",
+      "unchanged_from_candidate": true
+    },
+    {
+      "path": "openscrub_vault.py",
+      "bytes": 7079,
+      "sha256": "616bec78a6c4ddbdea098878de2f230b7487e5e4c5714ec8e7f5bf8dbaee9c59",
+      "unchanged_from_candidate": true
+    }
+  ],
+  "web_ast_equal_excluding_only": "_send_job_source",
+  "web_sha256": "78dbc96db2de6479508f62dd8220279afa10a7579d8a28eb89f6d3ef885e6162",
+  "kind": "source-only supervisor composition adoption; no combined runtime proof"
+}

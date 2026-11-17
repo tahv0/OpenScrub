@@ -1,0 +1,79 @@
+commit 64647f22e303af259f2cd7372fd1dc7c3be6e02a
+Author:     Tuomas Aho <tuomas.aho@outlook.com>
+AuthorDate: Tue Nov 17 23:14:12 2026 +0200
+Commit:     Tuomas Aho <tuomas.aho@outlook.com>
+CommitDate: Tue Nov 17 23:14:12 2026 +0200
+
+    Preserve inherited HDR and report observers at the staged ownership boundaries
+
+commit 4e6926f7408be9e6c62a9819c3e859dafb268e65
+Author:     Tuomas Aho <tuomas.aho@outlook.com>
+AuthorDate: Tue Nov 17 23:09:25 2026 +0200
+Commit:     Tuomas Aho <tuomas.aho@outlook.com>
+CommitDate: Tue Nov 17 23:09:25 2026 +0200
+
+    Cover failed-no-change epochs and detached postvalidation frames
+
+commit ef735cbfb25fd150b4d7a844baef6bbe162a54e7
+Author:     Tuomas Aho <tuomas.aho@outlook.com>
+AuthorDate: Tue Nov 17 23:07:19 2026 +0200
+Commit:     Tuomas Aho <tuomas.aho@outlook.com>
+CommitDate: Tue Nov 17 23:07:19 2026 +0200
+
+    Cover terminal assignment rollback and cancellation acknowledgement ordering
+
+commit 350953fc7073e4b6b8abc57345c7a3719b09984e
+Author:     Tuomas Aho <tuomas.aho@outlook.com>
+AuthorDate: Tue Nov 17 23:06:45 2026 +0200
+Commit:     Tuomas Aho <tuomas.aho@outlook.com>
+CommitDate: Tue Nov 17 23:06:45 2026 +0200
+
+    Keep residual recovery descriptors visible after precommit cleanup refusal
+
+commit e5237a242e74fb7082d3b65e003517c66d313137
+Author:     Tuomas Aho <tuomas.aho@outlook.com>
+AuthorDate: Tue Nov 17 23:04:12 2026 +0200
+Commit:     Tuomas Aho <tuomas.aho@outlook.com>
+CommitDate: Tue Nov 17 23:04:12 2026 +0200
+
+    Stream one descriptor generation with coherent Range metadata and leases
+
+commit 72c42f8eed36ec665b19a1a796b0fffcab17c6de
+Author:     Tuomas Aho <tuomas.aho@outlook.com>
+AuthorDate: Tue Nov 17 23:02:02 2026 +0200
+Commit:     Tuomas Aho <tuomas.aho@outlook.com>
+CommitDate: Tue Nov 17 23:02:02 2026 +0200
+
+    Validate short frame reads against admitted owner epochs with one retry
+
+commit 7dd964ab18483683ce32b2afb0d81add8645ed3f
+Author:     Tuomas Aho <tuomas.aho@outlook.com>
+AuthorDate: Tue Nov 17 22:59:39 2026 +0200
+Commit:     Tuomas Aho <tuomas.aho@outlook.com>
+CommitDate: Tue Nov 17 22:59:39 2026 +0200
+
+    Follow staged report construction in inherited cancellation schedules
+
+commit 6dfcfb12c345bae21816d979f302d2420d5c14cf
+Author:     Tuomas Aho <tuomas.aho@outlook.com>
+AuthorDate: Tue Nov 17 22:58:10 2026 +0200
+Commit:     Tuomas Aho <tuomas.aho@outlook.com>
+CommitDate: Tue Nov 17 22:58:10 2026 +0200
+
+    Publish render pair and web success under one operation boundary
+
+commit 2150c8f02fda4e61dad66977f1ae5de23ebb2da5
+Author:     Tuomas Aho <tuomas.aho@outlook.com>
+AuthorDate: Tue Nov 17 22:55:22 2026 +0200
+Commit:     Tuomas Aho <tuomas.aho@outlook.com>
+CommitDate: Tue Nov 17 22:55:22 2026 +0200
+
+    Keep inherited encoder fault controls on extracted R body boundary
+
+commit e40102b34b613753a97a179953855cbe6a69d563
+Author:     Tuomas Aho <tuomas.aho@outlook.com>
+AuthorDate: Tue Nov 17 22:54:25 2026 +0200
+Commit:     Tuomas Aho <tuomas.aho@outlook.com>
+CommitDate: Tue Nov 17 22:54:25 2026 +0200
+
+    Stage renderer output and share closed report stages before publication

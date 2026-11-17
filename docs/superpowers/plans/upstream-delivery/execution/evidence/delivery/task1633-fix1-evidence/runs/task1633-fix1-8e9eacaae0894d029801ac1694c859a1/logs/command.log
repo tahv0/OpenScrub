@@ -1,0 +1,256 @@
+DEFAULT_PATHS {"jobs": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/fix1/base-export/openscrub_jobs", "models": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/runs/task1633-fix1-8e9eacaae0894d029801ac1694c859a1/profile/.openscrub/models"}
+ACTIVE_SOURCE {"executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python", "python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]", "sources": {"openscrub": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/fix1/base-export/openscrub.py", "sha256": "6d3d03c5ace66115d593abe4cae51a402b06d3156f2dfa84fbad2aaafd6b8b44"}, "openscrub_internal": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/fix1/base-export/openscrub_internal/__init__.py", "sha256": "c35c063c010e329c5dad13782e7b67438ed4b2d1faf975d4f01be2773a18e022"}, "openscrub_internal.lifetimes": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/fix1/base-export/openscrub_internal/lifetimes.py", "sha256": "ce97f619c3ab75b2eaad69e631ba6100b432cef2e84bc0088b8a5d2eb9cd51dc"}, "openscrub_internal.render_delivery": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/fix1/base-export/openscrub_internal/render_delivery.py", "sha256": "82db35dff22f5f3bdcb2f4565cef8b1d87396700fbf5eb9df6816f05bc1df6d6"}, "openscrub_internal.reports": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/fix1/base-export/openscrub_internal/reports.py", "sha256": "ff8fcbbccbb6be0ce072d9416a4edab6c9d3e0d546735a50c114f564c75fc5fa"}, "openscrub_setup": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/fix1/base-export/openscrub_setup.py", "sha256": "d0362a038f8182e8fae510100085bb087f09f7e5cf7e11a780a24390b3037eaf"}, "openscrub_update": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/fix1/base-export/openscrub_update.py", "sha256": "4d6a20f75d985a119f8421227c3bd88b17fd1b8eed44e353b127b5b49e733d55"}, "openscrub_vault": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/fix1/base-export/openscrub_vault.py", "sha256": "616bec78a6c4ddbdea098878de2f230b7487e5e4c5714ec8e7f5bf8dbaee9c59"}, "openscrub_web": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/fix1/base-export/openscrub_web.py", "sha256": "69fa4cd212f5cb23ae15a2371c5df3e76fc4d8d62853bfd75965b34c35fe93db"}, "zones_ui": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/fix1/base-export/zones_ui.py", "sha256": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7"}}}
+FF....                                                                   [100%]
+=================================== FAILURES ===================================
+_____ test_source_response_ownership_through_revalidation[recovery-False] ______
+
+store = namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/runs/task1633-fix1-8e9eac...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7b0c7aa76ca0>, url='/api/jobs/94c62d7d2ca7')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7b0cd098e6c0>
+managed_alias = False, schedule = 'recovery'
+
+    @pytest.mark.parametrize('managed_alias', [False, True])
+    @pytest.mark.parametrize('schedule', ['recovery', 'stable', 'stale-retry'])
+    def test_source_response_ownership_through_revalidation(store, monkeypatch,
+                                                           managed_alias, schedule):
+        """Real descriptors stay locally owned until validation transfers them.
+    
+        Retain every response, descriptor and recovery traceback. Production close
+        assertions precede unconditional harness containment, so GC cannot pass RED.
+        """
+        from openscrub_internal import lifetimes
+        from werkzeug.exceptions import HTTPException
+    
+        source_job = store.job
+        payload = b'synthetic source generation' * 20000
+        source_path = Path(source_job['video'])
+        if managed_alias:
+            source_path = Path(source_job['dir']) / 'output.mp4'
+        source_path.write_bytes(payload)
+        target_job = (web.new_job(str(source_path), {}, 'managed-alias.mp4')
+                      if managed_alias else source_job)
+        target_job['phase'] = 'review'
+        source_state = web.FILES.initialize(source_job)
+        target_state = web.FILES.initialize(target_job)
+        expected_leases = 2 if managed_alias else 1
+        streams, opened, real_closes = [], [], []
+        descriptor_closes, response_closes, releases, retained_errors = [], [], [], []
+        actual_send = web.send_file
+        actual_open = web._send_open_file
+        actual_validate = web._frame_source_current
+        actual_release = lifetimes._Lease.release_locked
+    
+        def outside_shared_locks():
+            assert not source_state.report_lock.locked()
+            assert not target_state.report_lock.locked()
+            assert not web.VAULT_LOCK.locked()
+            assert not web.JOBS_LOCK.locked()
+    
+        def send(stream, **options):
+            # Inspect the actual opened file passed to Flask, not a replacement
+            # fake iterator or an inferred path-based response generation.
+            assert os.fstat(stream.fileno()).st_size == len(payload)
+            streams.append(stream)
+            close = stream.close
+            def close_descriptor():
+                outside_shared_locks()
+                descriptor_closes.append(stream)
+                return close()
+            monkeypatch.setattr(stream, 'close', close_descriptor)
+            return actual_send(stream, **options)
+    
+        def open_response(path, **options):
+            assert str(path) == str(source_path)
+            if opened:
+                # A stale first attempt must close before opening a new attempt,
+                # while both attempts share the same admitted request lifetime.
+                assert schedule == 'stale-retry'
+                assert streams[0].closed
+                assert response_closes == [opened[0]]
+                assert web.FILES.count == expected_leases and not releases
+            response = actual_open(path, **options)
+            close = response.close
+            real_closes.append(close)
+            def close_response():
+                outside_shared_locks()
+                response_closes.append(response)
+                return close()
+            monkeypatch.setattr(response, 'close', close_response)
+            opened.append(response)
+            return response
+    
+        def validate(snapshot):
+            outside_shared_locks()
+            assert snapshot['source_job'] is source_job
+            assert snapshot['source_state'] is source_state
+            assert not streams[-1].closed
+            if len(opened) == 1:
+                with source_state.report_lock:
+                    if schedule == 'recovery':
+                        source_state.recovery_required = True
+                    elif schedule == 'stale-retry':
+                        source_state.output_epoch += 1
+            try:
+                return actual_validate(snapshot)
+            except HTTPException as error:
+                retained_errors.append(error)
+                raise
+    
+        def release(lease):
+            before = lease.released
+            try:
+                return actual_release(lease)
+            finally:
+                if not before and lease.released:
+                    releases.append(lease)
+    
+        monkeypatch.setattr(web, 'send_file', send)
+        monkeypatch.setattr(web, '_send_open_file', open_response)
+        monkeypatch.setattr(web, '_frame_source_current', validate)
+        monkeypatch.setattr(lifetimes._Lease, 'release_locked', release)
+        route_response = None
+        with web.app.test_client() as client:
+            try:
+                route_response = client.get('/api/jobs/' + target_job['id'] + '/video',
+                                            buffered=False)
+                if schedule == 'recovery':
+                    assert route_response.status_code == 409
+                    assert b'render delivery requires recovery' in route_response.data
+                    assert len(retained_errors) == 1
+                    assert retained_errors[0].code == 409
+                    assert retained_errors[0].__traceback__ is not None
+                    assert len(opened) == 1
+>                   assert all(stream.closed for stream in streams), (
+                        'untransferred source descriptor remains open after recovery409')
+E                       AssertionError: untransferred source descriptor remains open after recovery409
+E                       assert False
+E                        +  where False = all(<generator object test_source_response_ownership_through_revalidation.<locals>.<genexpr> at 0x7b0c7acd47c0>)
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_response_publication.py:335: AssertionError
+______ test_source_response_ownership_through_revalidation[recovery-True] ______
+
+store = namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/runs/task1633-fix1-8e9eac...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7b0c7aa76b60>, url='/api/jobs/20e571329ca3')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7b0cd098db20>
+managed_alias = True, schedule = 'recovery'
+
+    @pytest.mark.parametrize('managed_alias', [False, True])
+    @pytest.mark.parametrize('schedule', ['recovery', 'stable', 'stale-retry'])
+    def test_source_response_ownership_through_revalidation(store, monkeypatch,
+                                                           managed_alias, schedule):
+        """Real descriptors stay locally owned until validation transfers them.
+    
+        Retain every response, descriptor and recovery traceback. Production close
+        assertions precede unconditional harness containment, so GC cannot pass RED.
+        """
+        from openscrub_internal import lifetimes
+        from werkzeug.exceptions import HTTPException
+    
+        source_job = store.job
+        payload = b'synthetic source generation' * 20000
+        source_path = Path(source_job['video'])
+        if managed_alias:
+            source_path = Path(source_job['dir']) / 'output.mp4'
+        source_path.write_bytes(payload)
+        target_job = (web.new_job(str(source_path), {}, 'managed-alias.mp4')
+                      if managed_alias else source_job)
+        target_job['phase'] = 'review'
+        source_state = web.FILES.initialize(source_job)
+        target_state = web.FILES.initialize(target_job)
+        expected_leases = 2 if managed_alias else 1
+        streams, opened, real_closes = [], [], []
+        descriptor_closes, response_closes, releases, retained_errors = [], [], [], []
+        actual_send = web.send_file
+        actual_open = web._send_open_file
+        actual_validate = web._frame_source_current
+        actual_release = lifetimes._Lease.release_locked
+    
+        def outside_shared_locks():
+            assert not source_state.report_lock.locked()
+            assert not target_state.report_lock.locked()
+            assert not web.VAULT_LOCK.locked()
+            assert not web.JOBS_LOCK.locked()
+    
+        def send(stream, **options):
+            # Inspect the actual opened file passed to Flask, not a replacement
+            # fake iterator or an inferred path-based response generation.
+            assert os.fstat(stream.fileno()).st_size == len(payload)
+            streams.append(stream)
+            close = stream.close
+            def close_descriptor():
+                outside_shared_locks()
+                descriptor_closes.append(stream)
+                return close()
+            monkeypatch.setattr(stream, 'close', close_descriptor)
+            return actual_send(stream, **options)
+    
+        def open_response(path, **options):
+            assert str(path) == str(source_path)
+            if opened:
+                # A stale first attempt must close before opening a new attempt,
+                # while both attempts share the same admitted request lifetime.
+                assert schedule == 'stale-retry'
+                assert streams[0].closed
+                assert response_closes == [opened[0]]
+                assert web.FILES.count == expected_leases and not releases
+            response = actual_open(path, **options)
+            close = response.close
+            real_closes.append(close)
+            def close_response():
+                outside_shared_locks()
+                response_closes.append(response)
+                return close()
+            monkeypatch.setattr(response, 'close', close_response)
+            opened.append(response)
+            return response
+    
+        def validate(snapshot):
+            outside_shared_locks()
+            assert snapshot['source_job'] is source_job
+            assert snapshot['source_state'] is source_state
+            assert not streams[-1].closed
+            if len(opened) == 1:
+                with source_state.report_lock:
+                    if schedule == 'recovery':
+                        source_state.recovery_required = True
+                    elif schedule == 'stale-retry':
+                        source_state.output_epoch += 1
+            try:
+                return actual_validate(snapshot)
+            except HTTPException as error:
+                retained_errors.append(error)
+                raise
+    
+        def release(lease):
+            before = lease.released
+            try:
+                return actual_release(lease)
+            finally:
+                if not before and lease.released:
+                    releases.append(lease)
+    
+        monkeypatch.setattr(web, 'send_file', send)
+        monkeypatch.setattr(web, '_send_open_file', open_response)
+        monkeypatch.setattr(web, '_frame_source_current', validate)
+        monkeypatch.setattr(lifetimes._Lease, 'release_locked', release)
+        route_response = None
+        with web.app.test_client() as client:
+            try:
+                route_response = client.get('/api/jobs/' + target_job['id'] + '/video',
+                                            buffered=False)
+                if schedule == 'recovery':
+                    assert route_response.status_code == 409
+                    assert b'render delivery requires recovery' in route_response.data
+                    assert len(retained_errors) == 1
+                    assert retained_errors[0].code == 409
+                    assert retained_errors[0].__traceback__ is not None
+                    assert len(opened) == 1
+>                   assert all(stream.closed for stream in streams), (
+                        'untransferred source descriptor remains open after recovery409')
+E                       AssertionError: untransferred source descriptor remains open after recovery409
+E                       assert False
+E                        +  where False = all(<generator object test_source_response_ownership_through_revalidation.<locals>.<genexpr> at 0x7b0c7acd59c0>)
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_response_publication.py:335: AssertionError
+=========================== short test summary info ============================
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_render_response_publication.py::test_source_response_ownership_through_revalidation[recovery-False]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_render_response_publication.py::test_source_response_ownership_through_revalidation[recovery-True]
+2 failed, 4 passed in 0.36s

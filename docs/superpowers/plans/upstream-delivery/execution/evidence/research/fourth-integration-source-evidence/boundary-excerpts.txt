@@ -1,0 +1,149 @@
+
+### 4b9bd7e576a8ae30369672b4b4722fc9752e233f:openscrub_web.py
+534:def job_public(job):
+535:    video_name, report_name = export_filenames(job)
+536:    return {k: job[k] for k in ("id", "name", "phase", "progress", "error",
+537:                                "stats")} | {
+538:        "eta": job.get("eta"),      # .get(): jobs rehydrated from disk lack it
+539:        # input size: lets the editor warn before re-uploading a file that
+540:        # is ALREADY on the server (issue #16 — each retry re-uploaded the
+541:        # same 18 GB until the disk filled)
+542:        "size": job.get("size") or 0,
+543:        "log_tail": job["log"][-30:],
+544:        "log_len": len(job["log"]),
+545:        "has_output": bool(job["output"] and os.path.exists(job["output"])),
+546:        "download_name": video_name,
+547:        "report_name": report_name,
+548:    }
+
+### 4b9bd7e576a8ae30369672b4b4722fc9752e233f:openscrub_web.py
+1068:            def _pregen(jb=job, video=thumbnail_owner.source):
+1069:                """One pass through the video with a single decoder:
+1070:                thumbnails come out in seconds instead of minutes.
+1071:                Sorting by reference time keeps seeks short and forward-
+
+### 4b9bd7e576a8ae30369672b4b4722fc9752e233f:openscrub_web.py
+2871:async function openJob(id){
+2872: const video=document.getElementById("beVid");
+2873: if(video){try{video.pause();}catch(e){}}
+2874: if(EDITS){
+2875:  // Retain edit bookkeeping, not fetched box/report/transcript display data.
+2876:  EDITS.en={};
+2877:  const b=EDITS.editor;delete b.raw;b.boxes=[];
+2878:  delete b.tlspans;delete b.audioSugg;delete b.audioTx;b.playing=false;
+2879:  trimReviewDraft(EDITS);
+2880: }
+2881: stopPolling();POLL_FAILURES=0;AUTO_REVIEW=null;REVIEW_REQUEST=null;
+2882: VIEW_GEN++;CUR=id;
+2883: EDITS=REVIEW_DRAFTS.get(id);
+2884: if(!EDITS){EDITS={en:{},enabled:{},manual:[],editor:emptyEditor(),busy:false,status:""};
+2885:  REVIEW_DRAFTS.set(id,EDITS);}
+2886: EN=EDITS.en;MAN=EDITS.manual;BE=EDITS.editor;
+2887: PHIST=[];PHPH="";LOGN=0;SHELLPH=null;
+2888: detail.innerHTML='<div id="pollStatus" role="status" aria-live="polite" style="margin:8px 0;color:#fbbf24"></div><div id="reviewSaveStatus" role="status" aria-live="polite" style="margin:8px 0;color:#fbbf24"></div>';
+2889: saveStatus(EDITS,EDITS.status);
+2890:
+
+### fe20dff7b73efb5afdbf3130e75a19c8b35ecba3:openscrub_web.py
+2164:async function openJob(id){
+2165: disposeReview();REVIEW_LOAD++;
+2166: const video=document.getElementById("beVid");
+2167: if(video){try{video.pause();}catch(e){}}
+2168: if(EDITS){
+2169:  // Retain edit bookkeeping, not fetched box/report/transcript display data.
+
+### f44e0b786ad065010fbfd2b8328350bde44116ec:openscrub_web.py
+2269:function disposeRecentLog(){
+2270: if(RECENT_LOG){RECENT_LOG.dispose();RECENT_LOG=null;}
+2271:}
+2272:function mountRecentLog(id,gen,element,note){
+2273: const MAX_ENTRIES=800,MAX_UNITS=1048576,ENTRY_UNITS=8192;
+2274: const SUFFIX="... [display entry truncated]",NL=String.fromCharCode(10);
+2275: let entries=[],units=0,saved=null,frame=null,disposed=false;
+2276: let omitted=false,truncated=false,displayTruncated=false,replaced=false,lost=false;
+2277: let width=element.clientWidth,height=element.clientHeight,ownedTop=element.scrollTop;
+2278: const owner={publish,dispose};
+2279: const current=()=>!disposed&&RECENT_LOG===owner&&ownsView(id,gen)&&document.getElementById("log")===element;
+2280: function status(){
+
+### 47e9f6d5614365e00d899c87df6c209cd7aaabf6:openscrub_web.py
+2285:function beUnmount(){
+2286: const view=BE_VIEW;if(!view)return;
+2287: BE_VIEW=null;view.observer.disconnect();
+2288: beEndGesture(view.editor,view.cv);
+2289:}
+2290:function beMount(img,vid,cv,id,gen,editor){
+2291: beUnmount();
+2292: const view={img,vid,cv,id,gen,editor,transform:null};
+2293: view.current=()=>BE_VIEW===view&&ownsView(id,gen)&&BE===editor&&
+2294:  document.getElementById("beCv")===cv;
+
+### 83af23b5fd3c5922d0d476ba2a6ae21a3598ced2:openscrub.py
+3201:def _geometry_metadata(cap, stage):
+3202:    try:
+3203:        values = (cap.get(cv2.CAP_PROP_FRAME_WIDTH),
+3204:                  cap.get(cv2.CAP_PROP_FRAME_HEIGHT),
+3205:                  cap.get(cv2.CAP_PROP_FRAME_COUNT))
+3206:        _geometry_finite(values, 3, stage, "video dimensions/count")
+3207:        w, h, total = (int(value) for value in values)
+3208:        if w <= 0 or h <= 0:
+3209:            raise ValueError(f"render geometry {stage}: invalid video dimensions/count")
+3210:    except Exception:
+3211:        cap.release()
+3212:        raise
+3213:    return w, h, total
+3214:
+3215:
+3216:def blur_region(frame, x1, y1, x2, y2, mode, shape="rect"):
+
+### 70ec464ca70b5e49751d778890f56029dced0b8a:openscrub.py
+3937:def render_hdr(src, dst, detections, cum, bands, fps, pad, mode,
+3938:               encoder, tags, band_margin=25, progress_every=60, cb=None,
+3939:               mode_map=None, face_shape="ellipse", audio_spans=None,
+3940:               mute_tracks=(), out_quality="archival", audio_lanes=None):
+3941:    """render(), but 10-bit end to end: decode the HDR source to raw
+3942:    yuv420p10le, blur the planes in place, encode 10-bit HEVC with the
+3943:    source's color tags (PQ/HLG + BT.2020) carried over. `hvc1` tagging
+3944:    keeps QuickTime/Apple players happy. No preview mode — previews use
+3945:    the SDR copy."""
+3946:    mode_map = mode_map or {}
+3947:    def _mode_for(cat):
+3948:        return mode_map.get(cat, mode)
+3949:    cb = cb or Callbacks()
+3950:    meta = dec = enc = ff_err = None
+3951:    remove_partial = False
+3952:    cleanup_errors = []
+3953:    primary = None
+3954:    try:
+3955:        meta = cv2.VideoCapture(src)
+3956:        w = int(meta.get(cv2.CAP_PROP_FRAME_WIDTH))
+
+### 83af23b5fd3c5922d0d476ba2a6ae21a3598ced2:openscrub.py
+4017:def _render_hdr(src, dst, detections, cum, bands, fps, pad, mode,
+4018:               encoder, tags, band_margin=25, progress_every=60, cb=None,
+4019:               mode_map=None, face_shape="ellipse", audio_spans=None,
+4020:               mute_tracks=(), out_quality="archival", audio_lanes=None):
+4021:    """render(), but 10-bit end to end: decode the HDR source to raw
+4022:    yuv420p10le, blur the planes in place, encode 10-bit HEVC with the
+4023:    source's color tags (PQ/HLG + BT.2020) carried over. `hvc1` tagging
+4024:    keeps QuickTime/Apple players happy. No preview mode — previews use
+4025:    the SDR copy."""
+4026:    # render_hdr() checks source extents; run_render() checks them before coverage.
+4027:    # Coverage may legally round a positive source box to an empty integer box.
+4028:    mode_map = mode_map or {}
+4029:    def _mode_for(cat):
+4030:        return mode_map.get(cat, mode)
+4031:    cb = cb or Callbacks()
+
+### 83af23b5fd3c5922d0d476ba2a6ae21a3598ced2:tests/test_render_geometry.py
+201:def test_disabled_additive_report_row_not_validated(tmp_path):
+202:    import json
+203:    path = tmp_path / "report.json"
+204:    path.write_text(json.dumps({"detections": [dict(t_start=0, t_end=0,
+205:                    cbox=[0, 0, 4, 4], category="person", text="", confidence=1),
+206:                    {"enabled": False, "cbox": [0, 0, 0, 0], "unknown": "kept"}],
+207:                    "render_state": {"fps": 1, "cum": [[0, 0]], "bands": [[0, 0]]}}))
+208:    dets, state, _ = o.load_report(str(path))
+209:    assert len(dets) == 1
+210:    o._geometry_preflight(dets, state["cum"], state["bands"], state["fps"], 0, 25, "test")
+211:    assert json.loads(path.read_text())["detections"][1]["unknown"] == "kept"

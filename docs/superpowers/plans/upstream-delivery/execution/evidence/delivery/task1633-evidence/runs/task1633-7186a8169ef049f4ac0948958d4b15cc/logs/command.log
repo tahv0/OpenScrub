@@ -1,0 +1,392 @@
+DEFAULT_PATHS {"jobs": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/candidate-export/openscrub_jobs", "models": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/runs/task1633-7186a8169ef049f4ac0948958d4b15cc/profile/.openscrub/models"}
+ACTIVE_SOURCE {"executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python", "python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]", "sources": {"openscrub": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/candidate-export/openscrub.py", "sha256": "6d3d03c5ace66115d593abe4cae51a402b06d3156f2dfa84fbad2aaafd6b8b44"}, "openscrub_internal": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/candidate-export/openscrub_internal/__init__.py", "sha256": "c35c063c010e329c5dad13782e7b67438ed4b2d1faf975d4f01be2773a18e022"}, "openscrub_internal.lifetimes": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/candidate-export/openscrub_internal/lifetimes.py", "sha256": "dbfc317c1c878b8e8a599391578504c44a8964199f2cdae6e2ed60a6336d6743"}, "openscrub_internal.render_delivery": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/candidate-export/openscrub_internal/render_delivery.py", "sha256": "bfe03679a86878ff2a4fc2bf523fdffbca093a920a7961550fa1b5c2459a2b03"}, "openscrub_internal.reports": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/candidate-export/openscrub_internal/reports.py", "sha256": "ff8fcbbccbb6be0ce072d9416a4edab6c9d3e0d546735a50c114f564c75fc5fa"}, "openscrub_setup": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/candidate-export/openscrub_setup.py", "sha256": "d0362a038f8182e8fae510100085bb087f09f7e5cf7e11a780a24390b3037eaf"}, "openscrub_update": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/candidate-export/openscrub_update.py", "sha256": "4d6a20f75d985a119f8421227c3bd88b17fd1b8eed44e353b127b5b49e733d55"}, "openscrub_vault": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/candidate-export/openscrub_vault.py", "sha256": "da1b7fe4da389352fbc594abddcc563278b26009d8f342d4154ffa305bf4dfa4"}, "openscrub_web": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/candidate-export/openscrub_web.py", "sha256": "fc0eea772aec5b9ecba7a957b260e8e3121937f98fd6ff785c8df6dc9788c5a5"}, "zones_ui": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/candidate-export/zones_ui.py", "sha256": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7"}}}
+....................................FFFFF...............FFFF............ [ 90%]
+........                                                                 [100%]
+=================================== FAILURES ===================================
+____________ test_encoder_error_keeps_stderr_and_closes_owners[sdr] ____________
+
+kind = 'sdr'
+source = PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/runs/task1633-7186a8169ef049f4ac0948958d4b15cc/pytest/test_encoder_error_keeps_stder0/input.mp4')
+tmp_path = PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/runs/task1633-7186a8169ef049f4ac0948958d4b15cc/pytest/test_encoder_error_keeps_stder0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x774efc868290>
+
+    @pytest.mark.parametrize('kind', ['sdr', 'hdr'])
+    def test_encoder_error_keeps_stderr_and_closes_owners(kind, source, tmp_path,
+                                                          monkeypatch):
+        """Real FFmpeg rejects its task-owned destination; retain diagnostic and IO."""
+        output = tmp_path / 'missing-directory' / 'output.mp4'
+        held = []
+        with owners(monkeypatch) as observed:
+            try:
+                render(kind, source, output, app.Callbacks())
+            except BaseException as error:
+                held.append(error)
+            assert len(held) == 1
+>           assert isinstance(held[0], RuntimeError)
+E           AssertionError: assert False
+E            +  where False = isinstance(FileNotFoundError(2, 'No such file or directory'), RuntimeError)
+
+../../candidate-export/tests/test_render_resources.py:227: AssertionError
+____________ test_encoder_error_keeps_stderr_and_closes_owners[hdr] ____________
+
+kind = 'hdr'
+source = PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/runs/task1633-7186a8169ef049f4ac0948958d4b15cc/pytest/test_encoder_error_keeps_stder1/input.mp4')
+tmp_path = PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/runs/task1633-7186a8169ef049f4ac0948958d4b15cc/pytest/test_encoder_error_keeps_stder1')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x774efc9d7f50>
+
+    @pytest.mark.parametrize('kind', ['sdr', 'hdr'])
+    def test_encoder_error_keeps_stderr_and_closes_owners(kind, source, tmp_path,
+                                                          monkeypatch):
+        """Real FFmpeg rejects its task-owned destination; retain diagnostic and IO."""
+        output = tmp_path / 'missing-directory' / 'output.mp4'
+        held = []
+        with owners(monkeypatch) as observed:
+            try:
+                render(kind, source, output, app.Callbacks())
+            except BaseException as error:
+                held.append(error)
+            assert len(held) == 1
+>           assert isinstance(held[0], RuntimeError)
+E           AssertionError: assert False
+E            +  where False = isinstance(FileNotFoundError(2, 'No such file or directory'), RuntimeError)
+
+../../candidate-export/tests/test_render_resources.py:227: AssertionError
+___________ test_failed_writer_is_released_without_deleting_previous ___________
+
+source = PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/runs/task1633-7186a8169ef049f4ac0948958d4b15cc/pytest/test_failed_writer_is_released0/input.mp4')
+tmp_path = PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/runs/task1633-7186a8169ef049f4ac0948958d4b15cc/pytest/test_failed_writer_is_released0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x774efc9d6090>
+
+    def test_failed_writer_is_released_without_deleting_previous(source, tmp_path,
+                                                                 monkeypatch):
+        """A real failed-open VideoWriter must fail instead of replacing the output."""
+        monkeypatch.setattr(app, 'nvenc_available', lambda *a: None)
+        output = tmp_path / 'previous.mp4'
+        output.write_bytes(b'previous')
+        # The exact fallback destination cannot open because it is a directory.
+        Path(str(output) + '.noaudio.mp4').mkdir()
+        with owners(monkeypatch) as observed:
+>           with pytest.raises(RuntimeError, match='writer|Writer|output') as held:
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E           Failed: DID NOT RAISE RuntimeError
+
+../../candidate-export/tests/test_render_resources.py:243: Failed
+----------------------------- Captured stdout call -----------------------------
+      encoder: OpenCV mp4v (ffmpeg not found — no audio!)
+_____________ test_nonzero_final_encoder_wait_retains_stderr[sdr] ______________
+
+kind = 'sdr'
+tmp_path = PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/runs/task1633-7186a8169ef049f4ac0948958d4b15cc/pytest/test_nonzero_final_encoder_wai0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x774efc86a930>
+
+    @pytest.mark.parametrize('kind', ['sdr', 'hdr'])
+    def test_nonzero_final_encoder_wait_retains_stderr(kind, tmp_path, monkeypatch):
+        """Sub-buffer frames reach EOF before FFmpeg rejects its output path."""
+        src = tmp_path / 'small.mp4'
+        subprocess.run(['ffmpeg', '-v', 'error', '-y', '-f', 'lavfi', '-i',
+                        'color=c=blue:s=16x16:r=3:d=1', '-c:v', 'mpeg4', str(src)],
+                       check=True, capture_output=True, timeout=30)
+        output = tmp_path / 'missing' / 'output.mp4'
+        progress = []
+    
+        class Callbacks(app.Callbacks):
+            def progress(self, stage, done, total):
+                progress.append(done)
+    
+        with owners(monkeypatch) as observed:
+            with pytest.raises(RuntimeError, match='encode.*failed') as held:
+>               render(kind, src, output, Callbacks(), progress_every=1)
+
+../../candidate-export/tests/test_render_resources.py:266: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+../../candidate-export/tests/test_render_resources.py:138: in render
+    return app.render(*common, False, encoder='x264', cb=cb, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../../candidate-export/openscrub.py:3941: in render
+    with _RenderDelivery(dst) as delivery:
+         ^^^^^^^^^^^^^^^^^^^^
+../../candidate-export/openscrub_internal/render_delivery.py:81: in __enter__
+    os.close(_exclusive(self.video_stage))
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+path = '/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/runs/task1633-7186a8169ef049f4ac0948958d4b15cc/pytest/test_nonzero_final_encoder_wai0/missing/.render-13a5524165c14b3ba96d9a62c9a2e133.tmp.mp4'
+
+    def _exclusive(path):
+>       return os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       FileNotFoundError: [Errno 2] No such file or directory: '/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/runs/task1633-7186a8169ef049f4ac0948958d4b15cc/pytest/test_nonzero_final_encoder_wai0/missing/.render-13a5524165c14b3ba96d9a62c9a2e133.tmp.mp4'
+
+../../candidate-export/openscrub_internal/render_delivery.py:58: FileNotFoundError
+_____________ test_nonzero_final_encoder_wait_retains_stderr[hdr] ______________
+
+kind = 'hdr'
+tmp_path = PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/runs/task1633-7186a8169ef049f4ac0948958d4b15cc/pytest/test_nonzero_final_encoder_wai1')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x774efc86b980>
+
+    @pytest.mark.parametrize('kind', ['sdr', 'hdr'])
+    def test_nonzero_final_encoder_wait_retains_stderr(kind, tmp_path, monkeypatch):
+        """Sub-buffer frames reach EOF before FFmpeg rejects its output path."""
+        src = tmp_path / 'small.mp4'
+        subprocess.run(['ffmpeg', '-v', 'error', '-y', '-f', 'lavfi', '-i',
+                        'color=c=blue:s=16x16:r=3:d=1', '-c:v', 'mpeg4', str(src)],
+                       check=True, capture_output=True, timeout=30)
+        output = tmp_path / 'missing' / 'output.mp4'
+        progress = []
+    
+        class Callbacks(app.Callbacks):
+            def progress(self, stage, done, total):
+                progress.append(done)
+    
+        with owners(monkeypatch) as observed:
+            with pytest.raises(RuntimeError, match='encode.*failed') as held:
+>               render(kind, src, output, Callbacks(), progress_every=1)
+
+../../candidate-export/tests/test_render_resources.py:266: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+../../candidate-export/tests/test_render_resources.py:137: in render
+    return app.render_hdr(*common, 'libx265', {}, cb=cb, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../../candidate-export/openscrub.py:3952: in render_hdr
+    with _RenderDelivery(dst) as delivery:
+         ^^^^^^^^^^^^^^^^^^^^
+../../candidate-export/openscrub_internal/render_delivery.py:81: in __enter__
+    os.close(_exclusive(self.video_stage))
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+path = '/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/runs/task1633-7186a8169ef049f4ac0948958d4b15cc/pytest/test_nonzero_final_encoder_wai1/missing/.render-6f1912df97e642dcb11e064d3adbc7d7.tmp.mp4'
+
+    def _exclusive(path):
+>       return os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       FileNotFoundError: [Errno 2] No such file or directory: '/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/runs/task1633-7186a8169ef049f4ac0948958d4b15cc/pytest/test_nonzero_final_encoder_wai1/missing/.render-6f1912df97e642dcb11e064d3adbc7d7.tmp.mp4'
+
+../../candidate-export/openscrub_internal/render_delivery.py:58: FileNotFoundError
+_ test_stdin_close_error_keeps_zero_exit_failure_or_encoder_diagnostic[False-sdr] _
+
+kind = 'sdr', encoder_fails = False
+tmp_path = PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/runs/task1633-7186a8169ef049f4ac0948958d4b15cc/pytest/test_stdin_close_error_keeps_z0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x774efc85c9e0>
+
+    @pytest.mark.parametrize('kind', ['sdr', 'hdr'])
+    @pytest.mark.parametrize('encoder_fails', [False, True])
+    def test_stdin_close_error_keeps_zero_exit_failure_or_encoder_diagnostic(
+            kind, encoder_fails, tmp_path, monkeypatch):
+        """An exact real close followed by OSError cannot silently become success."""
+        src = tmp_path / 'small.mp4'
+        subprocess.run(['ffmpeg', '-v', 'error', '-y', '-f', 'lavfi', '-i',
+                        'color=c=blue:s=16x16:r=3:d=1', '-c:v', 'mpeg4', str(src)],
+                       check=True, capture_output=True, timeout=30)
+        output = tmp_path / 'missing' / 'out.mp4' if encoder_fails else tmp_path / 'out.mp4'
+        close_error = OSError('stdin close sentinel')
+        calls = []
+        held = []
+        with owners(monkeypatch) as observed:
+            class Callbacks(app.Callbacks):
+                def progress(self, stage, done, total):
+                    enc, = [p for p in observed[2] if 'pipe:0' in p.args]
+                    actual_close = enc.stdin.close
+    
+                    def close():
+                        if calls:
+                            return actual_close()
+                        calls.append(True)
+                        try:
+                            actual_close()
+                        finally:
+                            raise close_error
+    
+                    monkeypatch.setattr(enc.stdin, 'close', close)
+    
+            try:
+                render(kind, src, output, Callbacks())
+            except BaseException as error:
+                held.append(error)
+            assert len(held) == 1
+            assert held[0].__traceback__ is not None and calls == [True]
+            enc, = [p for p in observed[2] if 'pipe:0' in p.args]
+            if encoder_fails:
+                assert type(held[0]) is RuntimeError
+                assert 'encode' in str(held[0]) and 'No such file or directory' in str(held[0])
+                assert enc.returncode != 0
+                assert 'stdin close sentinel' in ' '.join(held[0].render_cleanup_errors)
+            else:
+                assert held[0] is close_error
+>               assert enc.returncode == 0 and output.is_file()
+E               AssertionError: assert (0 == 0 and False)
+E                +  where 0 = <Child: returncode: 0 args: ['ffmpeg', '-y', '-loglevel', 'error', '-f', 'ra...>.returncode
+E                +  and   False = is_file()
+E                +    where is_file = PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/runs/task1633-7186a8169ef049f4ac0948958d4b15cc/pytest/test_stdin_close_error_keeps_z0/out.mp4').is_file
+
+../../candidate-export/tests/test_render_resources.py:473: AssertionError
+----------------------------- Captured stdout call -----------------------------
+      encoder: libx264 (CPU)
+_ test_stdin_close_error_keeps_zero_exit_failure_or_encoder_diagnostic[False-hdr] _
+
+kind = 'hdr', encoder_fails = False
+tmp_path = PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/runs/task1633-7186a8169ef049f4ac0948958d4b15cc/pytest/test_stdin_close_error_keeps_z1')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x774efc86b980>
+
+    @pytest.mark.parametrize('kind', ['sdr', 'hdr'])
+    @pytest.mark.parametrize('encoder_fails', [False, True])
+    def test_stdin_close_error_keeps_zero_exit_failure_or_encoder_diagnostic(
+            kind, encoder_fails, tmp_path, monkeypatch):
+        """An exact real close followed by OSError cannot silently become success."""
+        src = tmp_path / 'small.mp4'
+        subprocess.run(['ffmpeg', '-v', 'error', '-y', '-f', 'lavfi', '-i',
+                        'color=c=blue:s=16x16:r=3:d=1', '-c:v', 'mpeg4', str(src)],
+                       check=True, capture_output=True, timeout=30)
+        output = tmp_path / 'missing' / 'out.mp4' if encoder_fails else tmp_path / 'out.mp4'
+        close_error = OSError('stdin close sentinel')
+        calls = []
+        held = []
+        with owners(monkeypatch) as observed:
+            class Callbacks(app.Callbacks):
+                def progress(self, stage, done, total):
+                    enc, = [p for p in observed[2] if 'pipe:0' in p.args]
+                    actual_close = enc.stdin.close
+    
+                    def close():
+                        if calls:
+                            return actual_close()
+                        calls.append(True)
+                        try:
+                            actual_close()
+                        finally:
+                            raise close_error
+    
+                    monkeypatch.setattr(enc.stdin, 'close', close)
+    
+            try:
+                render(kind, src, output, Callbacks())
+            except BaseException as error:
+                held.append(error)
+            assert len(held) == 1
+            assert held[0].__traceback__ is not None and calls == [True]
+            enc, = [p for p in observed[2] if 'pipe:0' in p.args]
+            if encoder_fails:
+                assert type(held[0]) is RuntimeError
+                assert 'encode' in str(held[0]) and 'No such file or directory' in str(held[0])
+                assert enc.returncode != 0
+                assert 'stdin close sentinel' in ' '.join(held[0].render_cleanup_errors)
+            else:
+                assert held[0] is close_error
+>               assert enc.returncode == 0 and output.is_file()
+E               AssertionError: assert (0 == 0 and False)
+E                +  where 0 = <Child: returncode: 0 args: ['ffmpeg', '-y', '-loglevel', 'error', '-f', 'ra...>.returncode
+E                +  and   False = is_file()
+E                +    where is_file = PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/runs/task1633-7186a8169ef049f4ac0948958d4b15cc/pytest/test_stdin_close_error_keeps_z1/out.mp4').is_file
+
+../../candidate-export/tests/test_render_resources.py:473: AssertionError
+----------------------------- Captured stdout call -----------------------------
+      encoder: libx265 10-bit (CPU)
+_ test_stdin_close_error_keeps_zero_exit_failure_or_encoder_diagnostic[True-sdr] _
+
+kind = 'sdr', encoder_fails = True
+tmp_path = PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/runs/task1633-7186a8169ef049f4ac0948958d4b15cc/pytest/test_stdin_close_error_keeps_z2')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x774efc868080>
+
+    @pytest.mark.parametrize('kind', ['sdr', 'hdr'])
+    @pytest.mark.parametrize('encoder_fails', [False, True])
+    def test_stdin_close_error_keeps_zero_exit_failure_or_encoder_diagnostic(
+            kind, encoder_fails, tmp_path, monkeypatch):
+        """An exact real close followed by OSError cannot silently become success."""
+        src = tmp_path / 'small.mp4'
+        subprocess.run(['ffmpeg', '-v', 'error', '-y', '-f', 'lavfi', '-i',
+                        'color=c=blue:s=16x16:r=3:d=1', '-c:v', 'mpeg4', str(src)],
+                       check=True, capture_output=True, timeout=30)
+        output = tmp_path / 'missing' / 'out.mp4' if encoder_fails else tmp_path / 'out.mp4'
+        close_error = OSError('stdin close sentinel')
+        calls = []
+        held = []
+        with owners(monkeypatch) as observed:
+            class Callbacks(app.Callbacks):
+                def progress(self, stage, done, total):
+                    enc, = [p for p in observed[2] if 'pipe:0' in p.args]
+                    actual_close = enc.stdin.close
+    
+                    def close():
+                        if calls:
+                            return actual_close()
+                        calls.append(True)
+                        try:
+                            actual_close()
+                        finally:
+                            raise close_error
+    
+                    monkeypatch.setattr(enc.stdin, 'close', close)
+    
+            try:
+                render(kind, src, output, Callbacks())
+            except BaseException as error:
+                held.append(error)
+            assert len(held) == 1
+>           assert held[0].__traceback__ is not None and calls == [True]
+E           AssertionError: assert (<traceback object at 0x774efc4f6440> is not None and [] == [True]
+E            +  where <traceback object at 0x774efc4f6440> = FileNotFoundError(2, 'No such file or directory').__traceback__
+E             
+E             Right contains one more item: True
+E             Use -v to get more diff)
+
+../../candidate-export/tests/test_render_resources.py:464: AssertionError
+_ test_stdin_close_error_keeps_zero_exit_failure_or_encoder_diagnostic[True-hdr] _
+
+kind = 'hdr', encoder_fails = True
+tmp_path = PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1633/runs/task1633-7186a8169ef049f4ac0948958d4b15cc/pytest/test_stdin_close_error_keeps_z3')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x774f557ac9e0>
+
+    @pytest.mark.parametrize('kind', ['sdr', 'hdr'])
+    @pytest.mark.parametrize('encoder_fails', [False, True])
+    def test_stdin_close_error_keeps_zero_exit_failure_or_encoder_diagnostic(
+            kind, encoder_fails, tmp_path, monkeypatch):
+        """An exact real close followed by OSError cannot silently become success."""
+        src = tmp_path / 'small.mp4'
+        subprocess.run(['ffmpeg', '-v', 'error', '-y', '-f', 'lavfi', '-i',
+                        'color=c=blue:s=16x16:r=3:d=1', '-c:v', 'mpeg4', str(src)],
+                       check=True, capture_output=True, timeout=30)
+        output = tmp_path / 'missing' / 'out.mp4' if encoder_fails else tmp_path / 'out.mp4'
+        close_error = OSError('stdin close sentinel')
+        calls = []
+        held = []
+        with owners(monkeypatch) as observed:
+            class Callbacks(app.Callbacks):
+                def progress(self, stage, done, total):
+                    enc, = [p for p in observed[2] if 'pipe:0' in p.args]
+                    actual_close = enc.stdin.close
+    
+                    def close():
+                        if calls:
+                            return actual_close()
+                        calls.append(True)
+                        try:
+                            actual_close()
+                        finally:
+                            raise close_error
+    
+                    monkeypatch.setattr(enc.stdin, 'close', close)
+    
+            try:
+                render(kind, src, output, Callbacks())
+            except BaseException as error:
+                held.append(error)
+            assert len(held) == 1
+>           assert held[0].__traceback__ is not None and calls == [True]
+E           AssertionError: assert (<traceback object at 0x774efc483840> is not None and [] == [True]
+E            +  where <traceback object at 0x774efc483840> = FileNotFoundError(2, 'No such file or directory').__traceback__
+E             
+E             Right contains one more item: True
+E             Use -v to get more diff)
+
+../../candidate-export/tests/test_render_resources.py:464: AssertionError
+=========================== short test summary info ============================
+FAILED ../../candidate-export/tests/test_render_resources.py::test_encoder_error_keeps_stderr_and_closes_owners[sdr]
+FAILED ../../candidate-export/tests/test_render_resources.py::test_encoder_error_keeps_stderr_and_closes_owners[hdr]
+FAILED ../../candidate-export/tests/test_render_resources.py::test_failed_writer_is_released_without_deleting_previous
+FAILED ../../candidate-export/tests/test_render_resources.py::test_nonzero_final_encoder_wait_retains_stderr[sdr]
+FAILED ../../candidate-export/tests/test_render_resources.py::test_nonzero_final_encoder_wait_retains_stderr[hdr]
+FAILED ../../candidate-export/tests/test_render_resources.py::test_stdin_close_error_keeps_zero_exit_failure_or_encoder_diagnostic[False-sdr]
+FAILED ../../candidate-export/tests/test_render_resources.py::test_stdin_close_error_keeps_zero_exit_failure_or_encoder_diagnostic[False-hdr]
+FAILED ../../candidate-export/tests/test_render_resources.py::test_stdin_close_error_keeps_zero_exit_failure_or_encoder_diagnostic[True-sdr]
+FAILED ../../candidate-export/tests/test_render_resources.py::test_stdin_close_error_keeps_zero_exit_failure_or_encoder_diagnostic[True-hdr]
+9 failed, 71 passed in 19.11s
