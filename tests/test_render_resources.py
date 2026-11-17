@@ -131,11 +131,12 @@ def assert_closed(observed):
 
 
 def render(kind, source, output, cb, **kwargs):
+    into = kwargs.pop("into", False)
     common = (str(source), str(output), [], [(0, 0)] * 3,
               [(0, 0)] * 3, 3.0, 0, 'box')
     if kind == 'hdr':
-        return app.render_hdr(*common, 'libx265', {}, cb=cb, **kwargs)
-    return app.render(*common, False, encoder='x264', cb=cb, **kwargs)
+        return (app._render_hdr_into if into else app.render_hdr)(*common, 'libx265', {}, cb=cb, **kwargs)
+    return (app._render_into if into else app.render)(*common, False, encoder='x264', cb=cb, **kwargs)
 
 
 @pytest.mark.parametrize(('kind', 'failure'), [
@@ -220,7 +221,7 @@ def test_encoder_error_keeps_stderr_and_closes_owners(kind, source, tmp_path,
     held = []
     with owners(monkeypatch) as observed:
         try:
-            render(kind, source, output, app.Callbacks())
+            render(kind, source, output, app.Callbacks(), into=True)
         except BaseException as error:
             held.append(error)
         assert len(held) == 1
@@ -241,7 +242,7 @@ def test_failed_writer_is_released_without_deleting_previous(source, tmp_path,
     Path(str(output) + '.noaudio.mp4').mkdir()
     with owners(monkeypatch) as observed:
         with pytest.raises(RuntimeError, match='writer|Writer|output') as held:
-            render('fallback', source, output, app.Callbacks())
+            render('fallback', source, output, app.Callbacks(), into=True)
         assert held.value.__traceback__ is not None
         assert output.read_bytes() == b'previous'
         assert_closed(observed)
@@ -263,7 +264,7 @@ def test_nonzero_final_encoder_wait_retains_stderr(kind, tmp_path, monkeypatch):
 
     with owners(monkeypatch) as observed:
         with pytest.raises(RuntimeError, match='encode.*failed') as held:
-            render(kind, src, output, Callbacks(), progress_every=1)
+            render(kind, src, output, Callbacks(), progress_every=1, into=True)
         assert progress == [1, 2, 3, 3]
         assert 'No such file or directory' in str(held.value)
         enc, = [p for p in observed[2] if 'pipe:0' in p.args]
