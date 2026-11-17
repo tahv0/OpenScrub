@@ -1,0 +1,84 @@
+--- base/openscrub.py
++++ candidate/openscrub.py
+@@ -2926,6 +2926,35 @@
+     merged = []
+     mergeable = []  # Non-dense detections only
+ 
++    # The local broad phase supports ordinary finite boxes and distinct
++    # Detection objects. Unsupported data keeps the original traversal;
++    # merely checking eligibility must not raise an otherwise unreached error.
++    from bisect import bisect_left, bisect_right, insort
++    from math import isfinite
++    indexed = type(hold) in (int, float) and type(bridge_gap) in (int, float)
++    seen_ids = set()
++    for item in dets:
++        if not indexed or type(item) is not Detection or id(item) in seen_ids:
++            indexed = False
++            break
++        seen_ids.add(id(item))
++        values = item.__dict__
++        box = values.get('cbox')
++        timestamp = values.get('t_start')
++        if (type(values.get('category')) is not str
++                or type(values.get('dense', False)) is not bool
++                or type(timestamp) not in (int, float)
++                or (type(timestamp) is float and not isfinite(timestamp))
++                or type(box) not in (tuple, list) or len(box) != 4
++                or any(type(v) not in (int, float)
++                       or (type(v) is float and not isfinite(v)) for v in box)
++                or box[0] >= box[2] or box[1] >= box[3]):
++            indexed = False
++            break
++    del seen_ids
++    by_category = {}
++    births = {}
++
+     def contradicted(m, t_from, t_to):
+         """True only if the gap contains STABLE different text — the same
+         different string read on two or more scans. A single divergent read
+@@ -2974,7 +3003,19 @@
+             # moving face. Their continuity across detector flicker and the
+             # onset gap is handled per-track by smooth_dense_tracks().
+             d.t_end = d.t_start + hold
+-        for m in reversed(mergeable):
++        if indexed:
++            endpoints = by_category.get(d.category, ())
++            stop = bisect_right(endpoints, (d.cbox[2] + 12, float('inf')))
++            candidates = []
++            for candidate_index in range(stop):
++                entry = endpoints[candidate_index]
++                if entry[2].cbox[2] + 12 >= d.cbox[0]:
++                    candidates.append(entry)
++            candidates.sort(key=lambda entry: entry[1], reverse=True)
++            candidate_order = (entry[2] for entry in candidates)
++        else:
++            candidate_order = reversed(mergeable)
++        for m in candidate_order:
+             if m.category != d.category or not boxes_overlap(m.cbox, d.cbox):
+                 continue
+             if getattr(d, "dense", False) or getattr(m, "dense", False):
+@@ -3006,12 +3047,24 @@
+             if ok:
+                 m.last_seen = max(m.last_seen, d.t_start)
+                 m.t_end = max(m.t_end, d.t_end)
++                old_left = m.cbox[0]
+                 m.cbox = (min(m.cbox[0], d.cbox[0]), min(m.cbox[1], d.cbox[1]),
+                           max(m.cbox[2], d.cbox[2]), max(m.cbox[3], d.cbox[3]))
++                if indexed and m.cbox[0] != old_left:
++                    endpoints = by_category[m.category]
++                    birth = births[id(m)]
++                    position = bisect_left(endpoints, (old_left, birth))
++                    endpoints.pop(position)
++                    insort(endpoints, (m.cbox[0], birth, m))
+                 break
+         else:
+             merged.append(d)
+             mergeable.append(d)
++            if indexed:
++                birth = len(mergeable) - 1
++                births[id(d)] = birth
++                endpoints = by_category.setdefault(d.category, [])
++                insort(endpoints, (d.cbox[0], birth, d))
+ 
+     # Tail extension: a span ends `hold` after its LAST positive detection,
+     # but the text often outlives that detection — under heavy compression

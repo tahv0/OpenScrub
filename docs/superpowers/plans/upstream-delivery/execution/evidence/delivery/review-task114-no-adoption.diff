@@ -1,0 +1,11 @@
+Task114 conditional no-adoption review package
+Base: e21ebdf6e3ee46e6c65050dc956a9a3459152269
+Head: e21ebdf6e3ee46e6c65050dc956a9a3459152269
+Native branch: pr/merge-candidate-discovery
+
+The standard review-package helper rejected the deliberately empty range (exit3). This package records equivalent read-only checks; no empty commit was created.
+
+Commands: git status --porcelain; git log --oneline BASE..HEAD; git diff --stat BASE HEAD; git diff -U10 BASE HEAD.
+All four command outputs are empty. No product/test/package change is selected.
+
+Review the rejected experimental patch and retained measurement evidence named by task-114-report.md to assess the no-adoption decision, not as proposed product code.

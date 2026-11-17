@@ -1,0 +1,365 @@
+{
+  "derivation": "raw sort-line events include key-lambda events; actual order restorations = raw minus emitted key elements, independently checked against cProfile list.sort calls. Original measurements unchanged.",
+  "cases": [
+    {
+      "name": "mixed_grid_120",
+      "initial_baseline_median_ms": 3.330244,
+      "comparison_samples_ms": {
+        "base": [
+          3.312385,
+          3.211075,
+          3.159195,
+          3.161645,
+          3.219135
+        ],
+        "head": [
+          4.708602,
+          4.029003,
+          4.104533,
+          3.917463,
+          4.218213
+        ]
+      },
+      "comparison_median_ms": {
+        "base": 3.211075,
+        "head": 4.104533
+      },
+      "head_over_base_ratio": 1.2782426445972144,
+      "change_percent": 27.824264459721437,
+      "final_predicate_visits": {
+        "base": 7260,
+        "head": 660
+      },
+      "corrected_index_work": {
+        "emitted_entries_and_order_elements": 1200,
+        "endpoint_prefix_entries": 3020,
+        "insertion_reference_shifts": 890,
+        "insertions": 120,
+        "max_category_regions": 40,
+        "order_restorations": 240,
+        "raw_sort_line_events": 1440
+      },
+      "traced_python_peak_bytes": {
+        "base": 8028,
+        "head": 31570
+      },
+      "output_sha256": "e3943c7ed455dd70333623a63d60a73b162cf49853ccfdf0532415f4a2192d5c",
+      "all_outputs_equal": true
+    },
+    {
+      "name": "mixed_grid_480",
+      "initial_baseline_median_ms": 158.424506,
+      "comparison_samples_ms": {
+        "base": [
+          161.521322,
+          156.287844,
+          159.796578,
+          157.367251,
+          158.47881
+        ],
+        "head": [
+          160.951626,
+          161.525486,
+          162.807943,
+          166.577747,
+          163.277772
+        ]
+      },
+      "comparison_median_ms": {
+        "base": 158.47881,
+        "head": 162.807943
+      },
+      "head_over_base_ratio": 1.0273167939612873,
+      "change_percent": 2.731679396128728,
+      "final_predicate_visits": {
+        "base": 115440,
+        "head": 9840
+      },
+      "corrected_index_work": {
+        "emitted_entries_and_order_elements": 19200,
+        "endpoint_prefix_entries": 48080,
+        "insertion_reference_shifts": 14360,
+        "insertions": 480,
+        "max_category_regions": 160,
+        "order_restorations": 960,
+        "raw_sort_line_events": 20160
+      },
+      "traced_python_peak_bytes": {
+        "base": 37576,
+        "head": 142962
+      },
+      "output_sha256": "ccd5313daa34ebd23c570f3a33056ce69e0941916ecce65f6ab7b01fb9bb4e1a",
+      "all_outputs_equal": true
+    },
+    {
+      "name": "email_grid_120",
+      "initial_baseline_median_ms": 1.909057,
+      "comparison_samples_ms": {
+        "base": [
+          1.743777,
+          1.774297,
+          1.803606,
+          1.785257,
+          1.839247
+        ],
+        "head": [
+          2.690255,
+          2.756725,
+          2.722805,
+          2.768895,
+          2.761585
+        ]
+      },
+      "comparison_median_ms": {
+        "base": 1.785257,
+        "head": 2.756725
+      },
+      "head_over_base_ratio": 1.544161428858702,
+      "change_percent": 54.4161428858702,
+      "final_predicate_visits": {
+        "base": 7260,
+        "head": 1860
+      },
+      "corrected_index_work": {
+        "emitted_entries_and_order_elements": 3600,
+        "endpoint_prefix_entries": 9180,
+        "insertion_reference_shifts": 2610,
+        "insertions": 120,
+        "max_category_regions": 120,
+        "order_restorations": 240,
+        "raw_sort_line_events": 3840
+      },
+      "traced_python_peak_bytes": {
+        "base": 8062,
+        "head": 29948
+      },
+      "output_sha256": "856be39e511edb6c6345ef91693762d757f830f874d60d1594ad3f584264a792",
+      "all_outputs_equal": true
+    },
+    {
+      "name": "email_grid_480",
+      "initial_baseline_median_ms": 28.810221,
+      "comparison_samples_ms": {
+        "base": [
+          26.474595,
+          26.840154,
+          26.869614,
+          26.646394,
+          26.820324
+        ],
+        "head": [
+          38.451884,
+          37.407697,
+          36.876677,
+          36.974337,
+          37.256998
+        ]
+      },
+      "comparison_median_ms": {
+        "base": 26.820324,
+        "head": 37.256998
+      },
+      "head_over_base_ratio": 1.3891330320990904,
+      "change_percent": 38.913303209909046,
+      "final_predicate_visits": {
+        "base": 115440,
+        "head": 29040
+      },
+      "corrected_index_work": {
+        "emitted_entries_and_order_elements": 57600,
+        "endpoint_prefix_entries": 144720,
+        "insertion_reference_shifts": 42840,
+        "insertions": 480,
+        "max_category_regions": 480,
+        "order_restorations": 960,
+        "raw_sort_line_events": 58560
+      },
+      "traced_python_peak_bytes": {
+        "base": 37374,
+        "head": 144312
+      },
+      "output_sha256": "3155de8c920e108e9d6f75e4e2c792c2af826dd47be3465c2bb26bf0fbf1cfc8",
+      "all_outputs_equal": true
+    },
+    {
+      "name": "email_colocated_120",
+      "initial_baseline_median_ms": 26.138076,
+      "comparison_samples_ms": {
+        "base": [
+          29.668699,
+          26.001917,
+          27.920223,
+          25.638826,
+          25.584665
+        ],
+        "head": [
+          32.152045,
+          29.346649,
+          29.976648,
+          28.935639,
+          29.03011
+        ]
+      },
+      "comparison_median_ms": {
+        "base": 26.001917,
+        "head": 29.346649
+      },
+      "head_over_base_ratio": 1.128634054173775,
+      "change_percent": 12.863405417377493,
+      "final_predicate_visits": {
+        "base": 7260,
+        "head": 7260
+      },
+      "corrected_index_work": {
+        "emitted_entries_and_order_elements": 14400,
+        "endpoint_prefix_entries": 14400,
+        "insertion_reference_shifts": 0,
+        "insertions": 120,
+        "max_category_regions": 120,
+        "order_restorations": 240,
+        "raw_sort_line_events": 14640
+      },
+      "traced_python_peak_bytes": {
+        "base": 8178,
+        "head": 31484
+      },
+      "output_sha256": "f6cac0d2207f795feea2804a83e7ab29f51bc09ed699b96ce06997a93615ebf2",
+      "all_outputs_equal": true
+    },
+    {
+      "name": "email_colocated_480",
+      "initial_baseline_median_ms": 411.5637,
+      "comparison_samples_ms": {
+        "base": [
+          405.749757,
+          400.892876,
+          409.71344,
+          400.662915,
+          403.226823
+        ],
+        "head": [
+          454.346764,
+          450.50914,
+          453.835705,
+          456.450971,
+          451.464116
+        ]
+      },
+      "comparison_median_ms": {
+        "base": 403.226823,
+        "head": 453.835705
+      },
+      "head_over_base_ratio": 1.1255097109449983,
+      "change_percent": 12.550971094499829,
+      "final_predicate_visits": {
+        "base": 115440,
+        "head": 115440
+      },
+      "corrected_index_work": {
+        "emitted_entries_and_order_elements": 230400,
+        "endpoint_prefix_entries": 230400,
+        "insertion_reference_shifts": 0,
+        "insertions": 480,
+        "max_category_regions": 480,
+        "order_restorations": 960,
+        "raw_sort_line_events": 231360
+      },
+      "traced_python_peak_bytes": {
+        "base": 37490,
+        "head": 182712
+      },
+      "output_sha256": "38b27febda9e6a2febf67568bdaff08b00082d8034fddae406475ff971fc4cab",
+      "all_outputs_equal": true
+    },
+    {
+      "name": "repeated_colocated_120",
+      "initial_baseline_median_ms": 0.355309,
+      "comparison_samples_ms": {
+        "base": [
+          0.343979,
+          0.34383,
+          0.340919,
+          0.369799,
+          0.33958
+        ],
+        "head": [
+          0.846889,
+          0.816449,
+          0.854418,
+          0.876272,
+          0.863738
+        ]
+      },
+      "comparison_median_ms": {
+        "base": 0.34383,
+        "head": 0.854418
+      },
+      "head_over_base_ratio": 2.4850013087863188,
+      "change_percent": 148.50013087863186,
+      "final_predicate_visits": {
+        "base": 239,
+        "head": 239
+      },
+      "corrected_index_work": {
+        "emitted_entries_and_order_elements": 239,
+        "endpoint_prefix_entries": 239,
+        "insertion_reference_shifts": 0,
+        "insertions": 1,
+        "max_category_regions": 1,
+        "order_restorations": 240,
+        "raw_sort_line_events": 479
+      },
+      "traced_python_peak_bytes": {
+        "base": 5926,
+        "head": 28840
+      },
+      "output_sha256": "23bf8b0730a6aba4b4c7503e1d316277010edaabd475e2894489e2d2179b4791",
+      "all_outputs_equal": true
+    },
+    {
+      "name": "repeated_colocated_480",
+      "initial_baseline_median_ms": 1.445138,
+      "comparison_samples_ms": {
+        "base": [
+          1.472778,
+          1.340308,
+          1.355238,
+          1.348847,
+          1.332908
+        ],
+        "head": [
+          3.240285,
+          3.343924,
+          3.309365,
+          3.368264,
+          3.271474
+        ]
+      },
+      "comparison_median_ms": {
+        "base": 1.348847,
+        "head": 3.309365
+      },
+      "head_over_base_ratio": 2.4534769325208865,
+      "change_percent": 145.34769325208865,
+      "final_predicate_visits": {
+        "base": 959,
+        "head": 959
+      },
+      "corrected_index_work": {
+        "emitted_entries_and_order_elements": 959,
+        "endpoint_prefix_entries": 959,
+        "insertion_reference_shifts": 0,
+        "insertions": 1,
+        "max_category_regions": 1,
+        "order_restorations": 960,
+        "raw_sort_line_events": 1919
+      },
+      "traced_python_peak_bytes": {
+        "base": 28966,
+        "head": 128296
+      },
+      "output_sha256": "9780c2daab88ebca110820bacd76d1e6a18c9cf58ab4f2ed9bfdac2cfc0dd126",
+      "all_outputs_equal": true
+    }
+  ]
+}

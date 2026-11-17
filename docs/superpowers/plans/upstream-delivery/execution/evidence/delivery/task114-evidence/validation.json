@@ -1,0 +1,287 @@
+{
+  "python": "3.12.16",
+  "opencv": "4.14.0",
+  "numpy": "2.5.5",
+  "rapidfuzz": "3.14.6",
+  "gc_enabled": true,
+  "fixtures_sha256": "47ea381ff16aa7c5228664b3246609d32ddb54db6f991c5e30a378967b282da3",
+  "fixtures_compressed_sha256": "98252575b603f90962482747e8012144e9348a51245f4e43c06736d9b3b7f9bf",
+  "cases": [
+    {
+      "case": "mixed_grid_120",
+      "actual_primary_count": 120,
+      "raw_count": 240,
+      "category_counts": {
+        "email": 80,
+        "phone": 80,
+        "mrn": 80
+      },
+      "unique_email_count": 40,
+      "email_pair_max_ratio": 60.60606060606061,
+      "email_pair_max_partial": 62.96296296296296,
+      "email_matching_pairs": 0,
+      "benign": [
+        {
+          "text": "velvet",
+          "normalized": "velvet",
+          "stopword": false,
+          "forward_recall": null,
+          "reverse_matches": []
+        },
+        {
+          "text": "harbor",
+          "normalized": "harbor",
+          "stopword": false,
+          "forward_recall": null,
+          "reverse_matches": []
+        }
+      ],
+      "frame": [
+        1280,
+        720
+      ],
+      "positions": 48,
+      "recipe_sha256": "b31ac83161135a6d74a875c8ffa681a88ab732e339ae02aca8ddb1a81d1b56cb"
+    },
+    {
+      "case": "mixed_grid_480",
+      "actual_primary_count": 480,
+      "raw_count": 960,
+      "category_counts": {
+        "email": 320,
+        "phone": 320,
+        "mrn": 320
+      },
+      "unique_email_count": 160,
+      "email_pair_max_ratio": 60.60606060606061,
+      "email_pair_max_partial": 65.45454545454545,
+      "email_matching_pairs": 0,
+      "benign": [
+        {
+          "text": "velvet",
+          "normalized": "velvet",
+          "stopword": false,
+          "forward_recall": null,
+          "reverse_matches": []
+        },
+        {
+          "text": "harbor",
+          "normalized": "harbor",
+          "stopword": false,
+          "forward_recall": null,
+          "reverse_matches": []
+        }
+      ],
+      "frame": [
+        1280,
+        720
+      ],
+      "positions": 48,
+      "recipe_sha256": "2e12aecf8a2cae31cb0ec3a5a4e6bf6283ff9a9079159db00b5be2d92ada65b9"
+    },
+    {
+      "case": "email_grid_120",
+      "actual_primary_count": 120,
+      "raw_count": 240,
+      "category_counts": {
+        "email": 240
+      },
+      "unique_email_count": 120,
+      "email_pair_max_ratio": 60.60606060606061,
+      "email_pair_max_partial": 68.0,
+      "email_matching_pairs": 0,
+      "benign": [
+        {
+          "text": "velvet",
+          "normalized": "velvet",
+          "stopword": false,
+          "forward_recall": null,
+          "reverse_matches": []
+        },
+        {
+          "text": "harbor",
+          "normalized": "harbor",
+          "stopword": false,
+          "forward_recall": null,
+          "reverse_matches": []
+        }
+      ],
+      "frame": [
+        1280,
+        720
+      ],
+      "positions": 48,
+      "recipe_sha256": "8978c50746a61cf97c8d3b48c036b02e3e1a5d35610e372d8dfc6660f80c8300"
+    },
+    {
+      "case": "email_grid_480",
+      "actual_primary_count": 480,
+      "raw_count": 960,
+      "category_counts": {
+        "email": 960
+      },
+      "unique_email_count": 480,
+      "email_pair_max_ratio": 63.63636363636363,
+      "email_pair_max_partial": 69.23076923076923,
+      "email_matching_pairs": 0,
+      "benign": [
+        {
+          "text": "velvet",
+          "normalized": "velvet",
+          "stopword": false,
+          "forward_recall": null,
+          "reverse_matches": []
+        },
+        {
+          "text": "harbor",
+          "normalized": "harbor",
+          "stopword": false,
+          "forward_recall": null,
+          "reverse_matches": []
+        }
+      ],
+      "frame": [
+        1280,
+        720
+      ],
+      "positions": 48,
+      "recipe_sha256": "2ed62f2b4c5330571a8e6183a100144269b802f4e0b42a54d9c4272d233019af"
+    },
+    {
+      "case": "email_colocated_120",
+      "actual_primary_count": 120,
+      "raw_count": 240,
+      "category_counts": {
+        "email": 240
+      },
+      "unique_email_count": 120,
+      "email_pair_max_ratio": 60.60606060606061,
+      "email_pair_max_partial": 68.0,
+      "email_matching_pairs": 0,
+      "benign": [
+        {
+          "text": "velvet",
+          "normalized": "velvet",
+          "stopword": false,
+          "forward_recall": null,
+          "reverse_matches": []
+        },
+        {
+          "text": "harbor",
+          "normalized": "harbor",
+          "stopword": false,
+          "forward_recall": null,
+          "reverse_matches": []
+        }
+      ],
+      "frame": [
+        1280,
+        720
+      ],
+      "positions": 1,
+      "recipe_sha256": "cfd45466cb3259ad32744528061ae16558520182bcd8e8ab0884f2d094c18718"
+    },
+    {
+      "case": "email_colocated_480",
+      "actual_primary_count": 480,
+      "raw_count": 960,
+      "category_counts": {
+        "email": 960
+      },
+      "unique_email_count": 480,
+      "email_pair_max_ratio": 63.63636363636363,
+      "email_pair_max_partial": 69.23076923076923,
+      "email_matching_pairs": 0,
+      "benign": [
+        {
+          "text": "velvet",
+          "normalized": "velvet",
+          "stopword": false,
+          "forward_recall": null,
+          "reverse_matches": []
+        },
+        {
+          "text": "harbor",
+          "normalized": "harbor",
+          "stopword": false,
+          "forward_recall": null,
+          "reverse_matches": []
+        }
+      ],
+      "frame": [
+        1280,
+        720
+      ],
+      "positions": 1,
+      "recipe_sha256": "6e9d89acd7a85bf5332d8ab72c7c08b3b9ecc462214576a4d7a3f09cf450d135"
+    },
+    {
+      "case": "repeated_colocated_120",
+      "actual_primary_count": 120,
+      "raw_count": 240,
+      "category_counts": {
+        "email": 240
+      },
+      "unique_email_count": 1,
+      "email_pair_max_ratio": 0,
+      "email_pair_max_partial": 0,
+      "email_matching_pairs": 0,
+      "benign": [
+        {
+          "text": "velvet",
+          "normalized": "velvet",
+          "stopword": false,
+          "forward_recall": null,
+          "reverse_matches": []
+        },
+        {
+          "text": "harbor",
+          "normalized": "harbor",
+          "stopword": false,
+          "forward_recall": null,
+          "reverse_matches": []
+        }
+      ],
+      "frame": [
+        1280,
+        720
+      ],
+      "positions": 1,
+      "recipe_sha256": "6671e475c4e23d2e9eb2bd6651b4575de21ec35f058400bdf602332079e281a1"
+    },
+    {
+      "case": "repeated_colocated_480",
+      "actual_primary_count": 480,
+      "raw_count": 960,
+      "category_counts": {
+        "email": 960
+      },
+      "unique_email_count": 1,
+      "email_pair_max_ratio": 0,
+      "email_pair_max_partial": 0,
+      "email_matching_pairs": 0,
+      "benign": [
+        {
+          "text": "velvet",
+          "normalized": "velvet",
+          "stopword": false,
+          "forward_recall": null,
+          "reverse_matches": []
+        },
+        {
+          "text": "harbor",
+          "normalized": "harbor",
+          "stopword": false,
+          "forward_recall": null,
+          "reverse_matches": []
+        }
+      ],
+      "frame": [
+        1280,
+        720
+      ],
+      "positions": 1,
+      "recipe_sha256": "eacbd936b26901ad88a20a05726de1f22548f30fbf6eccc8dfc3793092dc8a55"
+    }
+  ]
+}

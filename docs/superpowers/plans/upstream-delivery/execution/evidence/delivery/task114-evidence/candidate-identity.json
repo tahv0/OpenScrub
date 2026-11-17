@@ -1,0 +1,6 @@
+{
+  "base_commit": "e21ebdf6e3ee46e6c65050dc956a9a3459152269",
+  "candidate_module_sha256": "0d3c47ac3a6a30867c7678145275ee72cd5765d9674aaa016f754881e58d88ea",
+  "candidate_patch_sha256": "bfd4f6cb4d057adb287a3496f64132655afc38b882557d2d1ca5bff8a7469d4b",
+  "status": "disposable experiment; no adoption"
+}
