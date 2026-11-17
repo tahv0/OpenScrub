@@ -1,0 +1,1192 @@
+........................................................................ [ 10%]
+........................................................................ [ 20%]
+................FFFFFFFFFFFFFFFFFFFFF................................... [ 30%]
+........................................................................ [ 41%]
+........................................................................ [ 51%]
+........................................................................ [ 61%]
+........................................................................ [ 72%]
+........................................................................ [ 82%]
+........................................................................ [ 92%]
+..................................................                       [100%]
+=================================== FAILURES ===================================
+______________________ test_picker_cancel_does_not_fetch _______________________
+
+    def test_picker_cancel_does_not_fetch():
+>       run_js(r"""
+    pickerError=Object.assign(new Error('cancel'),{name:'AbortError'});
+    await saveExportAs('video',node('save-video'));
+    assert.equal(pickerCalls[0].suggestedName,'road.cam_redacted.mkv');
+    assert.deepEqual(requests,[]);assert.equal(node('save-video').disabled,false);
+    assert.equal(intervals.size,0);assert.doesNotMatch(status(),/failed|Saved/i);
+    """)
+
+tests/test_export_save_as.py:102: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "\npickerError=Object.assign(new Error('cancel'),{name:'AbortError'});\nawait saveExportAs('video',node('save-video'))...l(node('save-video').disabled,false);\nassert.equal(intervals.size,0);assert.doesNotMatch(status(),/failed|Saved/i);\n"
+
+    def run_js(scenario):
+        node_bin = shutil.which("node")
+        assert node_bin, "Node.js is required for embedded UI behavior tests (see CONTRIBUTING.md)"
+        # This is the real evaluated Python string, not an independently copied JS helper.
+        source = web.APP_JS.split("function shellHtml(j)", 1)[1].split("async function refresh()", 1)[0]
+        source = "function shellHtml(j)" + source
+        script = HARNESS + "\n" + source + r"""
+    assert.equal(typeof saveExportAs,'function','Save As must be implemented');
+    EXPORT_NAMES={id:'alpha',video:'road.cam_redacted.mkv',report:'road.cam_audit.json'};
+    let completed=false;
+    process.on('beforeExit',()=>assert.equal(completed,true,'async scenario did not finish'));
+    (async()=>{
+    """ + scenario + "\n})().then(()=>{completed=true;}).catch(e=>{console.error(e);process.exitCode=1;});"
+        result = subprocess.run([node_bin, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: [eval]:307
+E         let BE=emptyEditor();
+E                ^
+E         
+E         ReferenceError: emptyEditor is not defined
+E             at [eval]:307:8
+E             at [eval]:1307:86
+E             at runScriptInThisContext (node:internal/vm:209:10)
+E             at node:internal/process/execution:446:12
+E             at [eval]-wrapper:6:24
+E             at runScriptInContext (node:internal/process/execution:444:60)
+E             at evalFunction (node:internal/process/execution:88:30)
+E             at evalScript (node:internal/process/execution:100:3)
+E             at node:internal/main/eval_string:74:3
+E         
+E         Node.js v22.22.1
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', '\nconst assert = require(\'node:assert/strict\');\nlet CUR=\'alpha\', n... evalScript (node:internal/process/execution:100:3)\n    at node:internal/main/eval_string:74:3\n\nNode.js v22.22.1\n').returncode
+
+tests/test_export_save_as.py:98: AssertionError
+_________________ test_job_switch_keeps_original_export_target _________________
+
+    def test_job_switch_keeps_original_export_target():
+>       run_js(r"""
+    pickerGate=deferred();const pending=saveExportAs('video',node('save-video'));
+    assert.equal(pickerCalls.length,1); // picker invoked synchronously in the gesture
+    CUR='beta';EXPORT_NAMES={id:'beta',video:'other_redacted.mp4',report:'other_audit.json'};
+    node('export-video').dataset.job='beta';pickerGate.resolve();await pending;
+    assert.deepEqual(requests,['api/jobs/alpha/download']);
+    assert.equal(pickerCalls[0].suggestedName,'road.cam_redacted.mkv');
+    """)
+
+tests/test_export_save_as.py:112: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "\npickerGate=deferred();const pending=saveExportAs('video',node('save-video'));\nassert.equal(pickerCalls.length,1); ...eepEqual(requests,['api/jobs/alpha/download']);\nassert.equal(pickerCalls[0].suggestedName,'road.cam_redacted.mkv');\n"
+
+    def run_js(scenario):
+        node_bin = shutil.which("node")
+        assert node_bin, "Node.js is required for embedded UI behavior tests (see CONTRIBUTING.md)"
+        # This is the real evaluated Python string, not an independently copied JS helper.
+        source = web.APP_JS.split("function shellHtml(j)", 1)[1].split("async function refresh()", 1)[0]
+        source = "function shellHtml(j)" + source
+        script = HARNESS + "\n" + source + r"""
+    assert.equal(typeof saveExportAs,'function','Save As must be implemented');
+    EXPORT_NAMES={id:'alpha',video:'road.cam_redacted.mkv',report:'road.cam_audit.json'};
+    let completed=false;
+    process.on('beforeExit',()=>assert.equal(completed,true,'async scenario did not finish'));
+    (async()=>{
+    """ + scenario + "\n})().then(()=>{completed=true;}).catch(e=>{console.error(e);process.exitCode=1;});"
+        result = subprocess.run([node_bin, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: [eval]:307
+E         let BE=emptyEditor();
+E                ^
+E         
+E         ReferenceError: emptyEditor is not defined
+E             at [eval]:307:8
+E             at [eval]:1308:86
+E             at runScriptInThisContext (node:internal/vm:209:10)
+E             at node:internal/process/execution:446:12
+E             at [eval]-wrapper:6:24
+E             at runScriptInContext (node:internal/process/execution:444:60)
+E             at evalFunction (node:internal/process/execution:88:30)
+E             at evalScript (node:internal/process/execution:100:3)
+E             at node:internal/main/eval_string:74:3
+E         
+E         Node.js v22.22.1
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', '\nconst assert = require(\'node:assert/strict\');\nlet CUR=\'alpha\', n... evalScript (node:internal/process/execution:100:3)\n    at node:internal/main/eval_string:74:3\n\nNode.js v22.22.1\n').returncode
+
+tests/test_export_save_as.py:98: AssertionError
+__________________ test_save_progress_counts_completed_writes __________________
+
+    def test_save_progress_counts_completed_writes():
+>       run_js(r"""
+    chunks=[new Uint8Array(4),new Uint8Array(6)];length='10';writeGate=deferred();closeGate=deferred();
+    const pending=saveExportAs('video',node('save-video'));await flush();await tick(250);
+    assert.equal(progress().value,0);assert.equal(reads,1); // backpressure
+    writeGate.resolve();await flush();await tick(250);
+    assert.equal(progress().value,10);assert.equal(progress().max,10);
+    assert.match(status(),/10 B \/ 10 B/);assert.doesNotMatch(status(),/Saved/);
+    closeGate.resolve();await pending;assert.match(status(),/Saved/);assert.equal(closed,1);
+    assert.equal(intervals.size,0);
+    """)
+
+tests/test_export_save_as.py:123: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "\nchunks=[new Uint8Array(4),new Uint8Array(6)];length='10';writeGate=deferred();closeGate=deferred();\nconst pending=...Gate.resolve();await pending;assert.match(status(),/Saved/);assert.equal(closed,1);\nassert.equal(intervals.size,0);\n"
+
+    def run_js(scenario):
+        node_bin = shutil.which("node")
+        assert node_bin, "Node.js is required for embedded UI behavior tests (see CONTRIBUTING.md)"
+        # This is the real evaluated Python string, not an independently copied JS helper.
+        source = web.APP_JS.split("function shellHtml(j)", 1)[1].split("async function refresh()", 1)[0]
+        source = "function shellHtml(j)" + source
+        script = HARNESS + "\n" + source + r"""
+    assert.equal(typeof saveExportAs,'function','Save As must be implemented');
+    EXPORT_NAMES={id:'alpha',video:'road.cam_redacted.mkv',report:'road.cam_audit.json'};
+    let completed=false;
+    process.on('beforeExit',()=>assert.equal(completed,true,'async scenario did not finish'));
+    (async()=>{
+    """ + scenario + "\n})().then(()=>{completed=true;}).catch(e=>{console.error(e);process.exitCode=1;});"
+        result = subprocess.run([node_bin, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: [eval]:307
+E         let BE=emptyEditor();
+E                ^
+E         
+E         ReferenceError: emptyEditor is not defined
+E             at [eval]:307:8
+E             at [eval]:1310:86
+E             at runScriptInThisContext (node:internal/vm:209:10)
+E             at node:internal/process/execution:446:12
+E             at [eval]-wrapper:6:24
+E             at runScriptInContext (node:internal/process/execution:444:60)
+E             at evalFunction (node:internal/process/execution:88:30)
+E             at evalScript (node:internal/process/execution:100:3)
+E             at node:internal/main/eval_string:74:3
+E         
+E         Node.js v22.22.1
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', '\nconst assert = require(\'node:assert/strict\');\nlet CUR=\'alpha\', n... evalScript (node:internal/process/execution:100:3)\n    at node:internal/main/eval_string:74:3\n\nNode.js v22.22.1\n').returncode
+
+tests/test_export_save_as.py:98: AssertionError
+_________________ test_save_progress_unknown_total[None-None] __________________
+
+header = None, encoding = None
+
+    @pytest.mark.parametrize("header,encoding", [(None, None), ("bad", None), ("-1", None),
+                                                  ("9007199254740992", None), ("4", "gzip")])
+    def test_save_progress_unknown_total(header, encoding):
+>       run_js("length=" + json.dumps(header) + ";encoding=" + json.dumps(encoding) + r""";
+    closeGate=deferred();const pending=saveExportAs('video',node('save-video'));await flush();await tick(1000);
+    assert.match(status(),/4 B/);assert.match(status(),/elapsed/);
+    assert.doesNotMatch(status(),/%|left|\//);assert.equal(progress().attrs.value,undefined);
+    closeGate.resolve();await pending;assert.match(status(),/Saved/);
+    """)
+
+tests/test_export_save_as.py:138: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "length=null;encoding=null;\ncloseGate=deferred();const pending=saveExportAs('video',node('save-video'));await flush()...);assert.equal(progress().attrs.value,undefined);\ncloseGate.resolve();await pending;assert.match(status(),/Saved/);\n"
+
+    def run_js(scenario):
+        node_bin = shutil.which("node")
+        assert node_bin, "Node.js is required for embedded UI behavior tests (see CONTRIBUTING.md)"
+        # This is the real evaluated Python string, not an independently copied JS helper.
+        source = web.APP_JS.split("function shellHtml(j)", 1)[1].split("async function refresh()", 1)[0]
+        source = "function shellHtml(j)" + source
+        script = HARNESS + "\n" + source + r"""
+    assert.equal(typeof saveExportAs,'function','Save As must be implemented');
+    EXPORT_NAMES={id:'alpha',video:'road.cam_redacted.mkv',report:'road.cam_audit.json'};
+    let completed=false;
+    process.on('beforeExit',()=>assert.equal(completed,true,'async scenario did not finish'));
+    (async()=>{
+    """ + scenario + "\n})().then(()=>{completed=true;}).catch(e=>{console.error(e);process.exitCode=1;});"
+        result = subprocess.run([node_bin, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: [eval]:307
+E         let BE=emptyEditor();
+E                ^
+E         
+E         ReferenceError: emptyEditor is not defined
+E             at [eval]:307:8
+E             at [eval]:1306:86
+E             at runScriptInThisContext (node:internal/vm:209:10)
+E             at node:internal/process/execution:446:12
+E             at [eval]-wrapper:6:24
+E             at runScriptInContext (node:internal/process/execution:444:60)
+E             at evalFunction (node:internal/process/execution:88:30)
+E             at evalScript (node:internal/process/execution:100:3)
+E             at node:internal/main/eval_string:74:3
+E         
+E         Node.js v22.22.1
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', '\nconst assert = require(\'node:assert/strict\');\nlet CUR=\'alpha\', n... evalScript (node:internal/process/execution:100:3)\n    at node:internal/main/eval_string:74:3\n\nNode.js v22.22.1\n').returncode
+
+tests/test_export_save_as.py:98: AssertionError
+__________________ test_save_progress_unknown_total[bad-None] __________________
+
+header = 'bad', encoding = None
+
+    @pytest.mark.parametrize("header,encoding", [(None, None), ("bad", None), ("-1", None),
+                                                  ("9007199254740992", None), ("4", "gzip")])
+    def test_save_progress_unknown_total(header, encoding):
+>       run_js("length=" + json.dumps(header) + ";encoding=" + json.dumps(encoding) + r""";
+    closeGate=deferred();const pending=saveExportAs('video',node('save-video'));await flush();await tick(1000);
+    assert.match(status(),/4 B/);assert.match(status(),/elapsed/);
+    assert.doesNotMatch(status(),/%|left|\//);assert.equal(progress().attrs.value,undefined);
+    closeGate.resolve();await pending;assert.match(status(),/Saved/);
+    """)
+
+tests/test_export_save_as.py:138: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = 'length="bad";encoding=null;\ncloseGate=deferred();const pending=saveExportAs(\'video\',node(\'save-video\'));await fl...);assert.equal(progress().attrs.value,undefined);\ncloseGate.resolve();await pending;assert.match(status(),/Saved/);\n'
+
+    def run_js(scenario):
+        node_bin = shutil.which("node")
+        assert node_bin, "Node.js is required for embedded UI behavior tests (see CONTRIBUTING.md)"
+        # This is the real evaluated Python string, not an independently copied JS helper.
+        source = web.APP_JS.split("function shellHtml(j)", 1)[1].split("async function refresh()", 1)[0]
+        source = "function shellHtml(j)" + source
+        script = HARNESS + "\n" + source + r"""
+    assert.equal(typeof saveExportAs,'function','Save As must be implemented');
+    EXPORT_NAMES={id:'alpha',video:'road.cam_redacted.mkv',report:'road.cam_audit.json'};
+    let completed=false;
+    process.on('beforeExit',()=>assert.equal(completed,true,'async scenario did not finish'));
+    (async()=>{
+    """ + scenario + "\n})().then(()=>{completed=true;}).catch(e=>{console.error(e);process.exitCode=1;});"
+        result = subprocess.run([node_bin, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: [eval]:307
+E         let BE=emptyEditor();
+E                ^
+E         
+E         ReferenceError: emptyEditor is not defined
+E             at [eval]:307:8
+E             at [eval]:1306:86
+E             at runScriptInThisContext (node:internal/vm:209:10)
+E             at node:internal/process/execution:446:12
+E             at [eval]-wrapper:6:24
+E             at runScriptInContext (node:internal/process/execution:444:60)
+E             at evalFunction (node:internal/process/execution:88:30)
+E             at evalScript (node:internal/process/execution:100:3)
+E             at node:internal/main/eval_string:74:3
+E         
+E         Node.js v22.22.1
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', '\nconst assert = require(\'node:assert/strict\');\nlet CUR=\'alpha\', n... evalScript (node:internal/process/execution:100:3)\n    at node:internal/main/eval_string:74:3\n\nNode.js v22.22.1\n').returncode
+
+tests/test_export_save_as.py:98: AssertionError
+__________________ test_save_progress_unknown_total[-1-None] ___________________
+
+header = '-1', encoding = None
+
+    @pytest.mark.parametrize("header,encoding", [(None, None), ("bad", None), ("-1", None),
+                                                  ("9007199254740992", None), ("4", "gzip")])
+    def test_save_progress_unknown_total(header, encoding):
+>       run_js("length=" + json.dumps(header) + ";encoding=" + json.dumps(encoding) + r""";
+    closeGate=deferred();const pending=saveExportAs('video',node('save-video'));await flush();await tick(1000);
+    assert.match(status(),/4 B/);assert.match(status(),/elapsed/);
+    assert.doesNotMatch(status(),/%|left|\//);assert.equal(progress().attrs.value,undefined);
+    closeGate.resolve();await pending;assert.match(status(),/Saved/);
+    """)
+
+tests/test_export_save_as.py:138: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = 'length="-1";encoding=null;\ncloseGate=deferred();const pending=saveExportAs(\'video\',node(\'save-video\'));await flu...);assert.equal(progress().attrs.value,undefined);\ncloseGate.resolve();await pending;assert.match(status(),/Saved/);\n'
+
+    def run_js(scenario):
+        node_bin = shutil.which("node")
+        assert node_bin, "Node.js is required for embedded UI behavior tests (see CONTRIBUTING.md)"
+        # This is the real evaluated Python string, not an independently copied JS helper.
+        source = web.APP_JS.split("function shellHtml(j)", 1)[1].split("async function refresh()", 1)[0]
+        source = "function shellHtml(j)" + source
+        script = HARNESS + "\n" + source + r"""
+    assert.equal(typeof saveExportAs,'function','Save As must be implemented');
+    EXPORT_NAMES={id:'alpha',video:'road.cam_redacted.mkv',report:'road.cam_audit.json'};
+    let completed=false;
+    process.on('beforeExit',()=>assert.equal(completed,true,'async scenario did not finish'));
+    (async()=>{
+    """ + scenario + "\n})().then(()=>{completed=true;}).catch(e=>{console.error(e);process.exitCode=1;});"
+        result = subprocess.run([node_bin, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: [eval]:307
+E         let BE=emptyEditor();
+E                ^
+E         
+E         ReferenceError: emptyEditor is not defined
+E             at [eval]:307:8
+E             at [eval]:1306:86
+E             at runScriptInThisContext (node:internal/vm:209:10)
+E             at node:internal/process/execution:446:12
+E             at [eval]-wrapper:6:24
+E             at runScriptInContext (node:internal/process/execution:444:60)
+E             at evalFunction (node:internal/process/execution:88:30)
+E             at evalScript (node:internal/process/execution:100:3)
+E             at node:internal/main/eval_string:74:3
+E         
+E         Node.js v22.22.1
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', '\nconst assert = require(\'node:assert/strict\');\nlet CUR=\'alpha\', n... evalScript (node:internal/process/execution:100:3)\n    at node:internal/main/eval_string:74:3\n\nNode.js v22.22.1\n').returncode
+
+tests/test_export_save_as.py:98: AssertionError
+___________ test_save_progress_unknown_total[9007199254740992-None] ____________
+
+header = '9007199254740992', encoding = None
+
+    @pytest.mark.parametrize("header,encoding", [(None, None), ("bad", None), ("-1", None),
+                                                  ("9007199254740992", None), ("4", "gzip")])
+    def test_save_progress_unknown_total(header, encoding):
+>       run_js("length=" + json.dumps(header) + ";encoding=" + json.dumps(encoding) + r""";
+    closeGate=deferred();const pending=saveExportAs('video',node('save-video'));await flush();await tick(1000);
+    assert.match(status(),/4 B/);assert.match(status(),/elapsed/);
+    assert.doesNotMatch(status(),/%|left|\//);assert.equal(progress().attrs.value,undefined);
+    closeGate.resolve();await pending;assert.match(status(),/Saved/);
+    """)
+
+tests/test_export_save_as.py:138: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = 'length="9007199254740992";encoding=null;\ncloseGate=deferred();const pending=saveExportAs(\'video\',node(\'save-video...);assert.equal(progress().attrs.value,undefined);\ncloseGate.resolve();await pending;assert.match(status(),/Saved/);\n'
+
+    def run_js(scenario):
+        node_bin = shutil.which("node")
+        assert node_bin, "Node.js is required for embedded UI behavior tests (see CONTRIBUTING.md)"
+        # This is the real evaluated Python string, not an independently copied JS helper.
+        source = web.APP_JS.split("function shellHtml(j)", 1)[1].split("async function refresh()", 1)[0]
+        source = "function shellHtml(j)" + source
+        script = HARNESS + "\n" + source + r"""
+    assert.equal(typeof saveExportAs,'function','Save As must be implemented');
+    EXPORT_NAMES={id:'alpha',video:'road.cam_redacted.mkv',report:'road.cam_audit.json'};
+    let completed=false;
+    process.on('beforeExit',()=>assert.equal(completed,true,'async scenario did not finish'));
+    (async()=>{
+    """ + scenario + "\n})().then(()=>{completed=true;}).catch(e=>{console.error(e);process.exitCode=1;});"
+        result = subprocess.run([node_bin, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: [eval]:307
+E         let BE=emptyEditor();
+E                ^
+E         
+E         ReferenceError: emptyEditor is not defined
+E             at [eval]:307:8
+E             at [eval]:1306:86
+E             at runScriptInThisContext (node:internal/vm:209:10)
+E             at node:internal/process/execution:446:12
+E             at [eval]-wrapper:6:24
+E             at runScriptInContext (node:internal/process/execution:444:60)
+E             at evalFunction (node:internal/process/execution:88:30)
+E             at evalScript (node:internal/process/execution:100:3)
+E             at node:internal/main/eval_string:74:3
+E         
+E         Node.js v22.22.1
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', '\nconst assert = require(\'node:assert/strict\');\nlet CUR=\'alpha\', n... evalScript (node:internal/process/execution:100:3)\n    at node:internal/main/eval_string:74:3\n\nNode.js v22.22.1\n').returncode
+
+tests/test_export_save_as.py:98: AssertionError
+___________________ test_save_progress_unknown_total[4-gzip] ___________________
+
+header = '4', encoding = 'gzip'
+
+    @pytest.mark.parametrize("header,encoding", [(None, None), ("bad", None), ("-1", None),
+                                                  ("9007199254740992", None), ("4", "gzip")])
+    def test_save_progress_unknown_total(header, encoding):
+>       run_js("length=" + json.dumps(header) + ";encoding=" + json.dumps(encoding) + r""";
+    closeGate=deferred();const pending=saveExportAs('video',node('save-video'));await flush();await tick(1000);
+    assert.match(status(),/4 B/);assert.match(status(),/elapsed/);
+    assert.doesNotMatch(status(),/%|left|\//);assert.equal(progress().attrs.value,undefined);
+    closeGate.resolve();await pending;assert.match(status(),/Saved/);
+    """)
+
+tests/test_export_save_as.py:138: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = 'length="4";encoding="gzip";\ncloseGate=deferred();const pending=saveExportAs(\'video\',node(\'save-video\'));await fl...);assert.equal(progress().attrs.value,undefined);\ncloseGate.resolve();await pending;assert.match(status(),/Saved/);\n'
+
+    def run_js(scenario):
+        node_bin = shutil.which("node")
+        assert node_bin, "Node.js is required for embedded UI behavior tests (see CONTRIBUTING.md)"
+        # This is the real evaluated Python string, not an independently copied JS helper.
+        source = web.APP_JS.split("function shellHtml(j)", 1)[1].split("async function refresh()", 1)[0]
+        source = "function shellHtml(j)" + source
+        script = HARNESS + "\n" + source + r"""
+    assert.equal(typeof saveExportAs,'function','Save As must be implemented');
+    EXPORT_NAMES={id:'alpha',video:'road.cam_redacted.mkv',report:'road.cam_audit.json'};
+    let completed=false;
+    process.on('beforeExit',()=>assert.equal(completed,true,'async scenario did not finish'));
+    (async()=>{
+    """ + scenario + "\n})().then(()=>{completed=true;}).catch(e=>{console.error(e);process.exitCode=1;});"
+        result = subprocess.run([node_bin, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: [eval]:307
+E         let BE=emptyEditor();
+E                ^
+E         
+E         ReferenceError: emptyEditor is not defined
+E             at [eval]:307:8
+E             at [eval]:1306:86
+E             at runScriptInThisContext (node:internal/vm:209:10)
+E             at node:internal/process/execution:446:12
+E             at [eval]-wrapper:6:24
+E             at runScriptInContext (node:internal/process/execution:444:60)
+E             at evalFunction (node:internal/process/execution:88:30)
+E             at evalScript (node:internal/process/execution:100:3)
+E             at node:internal/main/eval_string:74:3
+E         
+E         Node.js v22.22.1
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', '\nconst assert = require(\'node:assert/strict\');\nlet CUR=\'alpha\', n... evalScript (node:internal/process/execution:100:3)\n    at node:internal/main/eval_string:74:3\n\nNode.js v22.22.1\n').returncode
+
+tests/test_export_save_as.py:98: AssertionError
+__________________ test_save_progress_waiting_and_finalizing ___________________
+
+    def test_save_progress_waiting_and_finalizing():
+>       run_js(r"""
+    chunks=[new Uint8Array(4),new Uint8Array(4)];length='8';writeGate=deferred();closeGate=deferred();
+    const pending=saveExportAs('video',node('save-video'));await flush();await tick(3000);
+    writeGate.resolve();await flush();await tick(250);
+    assert.match(status(),/Finalizing/);assert.doesNotMatch(status(),/Saved|left/);
+    assert.match(status(),/elapsed/);closeGate.resolve();await pending;
+    assert.match(status(),/Saved/);assert.equal(intervals.size,0);
+    """)
+
+tests/test_export_save_as.py:147: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "\nchunks=[new Uint8Array(4),new Uint8Array(4)];length='8';writeGate=deferred();closeGate=deferred();\nconst pending=s...atus(),/elapsed/);closeGate.resolve();await pending;\nassert.match(status(),/Saved/);assert.equal(intervals.size,0);\n"
+
+    def run_js(scenario):
+        node_bin = shutil.which("node")
+        assert node_bin, "Node.js is required for embedded UI behavior tests (see CONTRIBUTING.md)"
+        # This is the real evaluated Python string, not an independently copied JS helper.
+        source = web.APP_JS.split("function shellHtml(j)", 1)[1].split("async function refresh()", 1)[0]
+        source = "function shellHtml(j)" + source
+        script = HARNESS + "\n" + source + r"""
+    assert.equal(typeof saveExportAs,'function','Save As must be implemented');
+    EXPORT_NAMES={id:'alpha',video:'road.cam_redacted.mkv',report:'road.cam_audit.json'};
+    let completed=false;
+    process.on('beforeExit',()=>assert.equal(completed,true,'async scenario did not finish'));
+    (async()=>{
+    """ + scenario + "\n})().then(()=>{completed=true;}).catch(e=>{console.error(e);process.exitCode=1;});"
+        result = subprocess.run([node_bin, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: [eval]:307
+E         let BE=emptyEditor();
+E                ^
+E         
+E         ReferenceError: emptyEditor is not defined
+E             at [eval]:307:8
+E             at [eval]:1308:86
+E             at runScriptInThisContext (node:internal/vm:209:10)
+E             at node:internal/process/execution:446:12
+E             at [eval]-wrapper:6:24
+E             at runScriptInContext (node:internal/process/execution:444:60)
+E             at evalFunction (node:internal/process/execution:88:30)
+E             at evalScript (node:internal/process/execution:100:3)
+E             at node:internal/main/eval_string:74:3
+E         
+E         Node.js v22.22.1
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', '\nconst assert = require(\'node:assert/strict\');\nlet CUR=\'alpha\', n... evalScript (node:internal/process/execution:100:3)\n    at node:internal/main/eval_string:74:3\n\nNode.js v22.22.1\n').returncode
+
+tests/test_export_save_as.py:98: AssertionError
+__________________ test_save_progress_waiting_hides_stale_eta __________________
+
+    def test_save_progress_waiting_hides_stale_eta():
+>       run_js(r"""
+    chunks=[new Uint8Array(4),new Uint8Array(4),new Uint8Array(4)];length='12';writeGate=deferred();
+    const pending=saveExportAs('video',node('save-video'));await flush();await tick(3000);
+    const first=writeGate;writeGate=deferred();first.resolve();await flush();await tick(250);
+    assert.equal(progress().value,4);assert.match(status(),/left/);
+    await tick(5000);assert.match(status(),/Waiting for data or disk/);
+    assert.match(status(),/elapsed/);assert.doesNotMatch(status(),/left/);assert.equal(progress().value,4);
+    writeGate.resolve();await pending;
+    """)
+
+tests/test_export_save_as.py:158: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "\nchunks=[new Uint8Array(4),new Uint8Array(4),new Uint8Array(4)];length='12';writeGate=deferred();\nconst pending=sav...elapsed/);assert.doesNotMatch(status(),/left/);assert.equal(progress().value,4);\nwriteGate.resolve();await pending;\n"
+
+    def run_js(scenario):
+        node_bin = shutil.which("node")
+        assert node_bin, "Node.js is required for embedded UI behavior tests (see CONTRIBUTING.md)"
+        # This is the real evaluated Python string, not an independently copied JS helper.
+        source = web.APP_JS.split("function shellHtml(j)", 1)[1].split("async function refresh()", 1)[0]
+        source = "function shellHtml(j)" + source
+        script = HARNESS + "\n" + source + r"""
+    assert.equal(typeof saveExportAs,'function','Save As must be implemented');
+    EXPORT_NAMES={id:'alpha',video:'road.cam_redacted.mkv',report:'road.cam_audit.json'};
+    let completed=false;
+    process.on('beforeExit',()=>assert.equal(completed,true,'async scenario did not finish'));
+    (async()=>{
+    """ + scenario + "\n})().then(()=>{completed=true;}).catch(e=>{console.error(e);process.exitCode=1;});"
+        result = subprocess.run([node_bin, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: [eval]:307
+E         let BE=emptyEditor();
+E                ^
+E         
+E         ReferenceError: emptyEditor is not defined
+E             at [eval]:307:8
+E             at [eval]:1309:86
+E             at runScriptInThisContext (node:internal/vm:209:10)
+E             at node:internal/process/execution:446:12
+E             at [eval]-wrapper:6:24
+E             at runScriptInContext (node:internal/process/execution:444:60)
+E             at evalFunction (node:internal/process/execution:88:30)
+E             at evalScript (node:internal/process/execution:100:3)
+E             at node:internal/main/eval_string:74:3
+E         
+E         Node.js v22.22.1
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', '\nconst assert = require(\'node:assert/strict\');\nlet CUR=\'alpha\', n... evalScript (node:internal/process/execution:100:3)\n    at node:internal/main/eval_string:74:3\n\nNode.js v22.22.1\n').returncode
+
+tests/test_export_save_as.py:98: AssertionError
+__________________ test_save_progress_stays_with_original_job __________________
+
+    def test_save_progress_stays_with_original_job():
+>       run_js(r"""
+    writeGate=deferred();const pending=saveExportAs('video',node('save-video'));await flush();
+    CUR='beta';node('export-video').dataset.job='beta';node('export-video-status').textContent='beta status';
+    await tick(5500);assert.equal(status(),'beta status');
+    CUR='alpha';node('export-video').dataset.job='alpha';renderExportProgress();
+    assert.match(status(),/Waiting/);writeGate.resolve();await pending;
+    assert.match(status(),/Saved/);
+    // Ordinary refresh/remount restores the completed state, and a repeat is allowed.
+    node('export-video-status').textContent='';renderExportProgress();assert.match(status(),/Saved/);
+    chunks=[new Uint8Array(4)];await saveExportAs('video',node('save-video'));
+    assert.equal(closed,2);assert.equal(intervals.size,0);
+    """)
+
+tests/test_export_save_as.py:170: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "\nwriteGate=deferred();const pending=saveExportAs('video',node('save-video'));await flush();\nCUR='beta';node('export...nt8Array(4)];await saveExportAs('video',node('save-video'));\nassert.equal(closed,2);assert.equal(intervals.size,0);\n"
+
+    def run_js(scenario):
+        node_bin = shutil.which("node")
+        assert node_bin, "Node.js is required for embedded UI behavior tests (see CONTRIBUTING.md)"
+        # This is the real evaluated Python string, not an independently copied JS helper.
+        source = web.APP_JS.split("function shellHtml(j)", 1)[1].split("async function refresh()", 1)[0]
+        source = "function shellHtml(j)" + source
+        script = HARNESS + "\n" + source + r"""
+    assert.equal(typeof saveExportAs,'function','Save As must be implemented');
+    EXPORT_NAMES={id:'alpha',video:'road.cam_redacted.mkv',report:'road.cam_audit.json'};
+    let completed=false;
+    process.on('beforeExit',()=>assert.equal(completed,true,'async scenario did not finish'));
+    (async()=>{
+    """ + scenario + "\n})().then(()=>{completed=true;}).catch(e=>{console.error(e);process.exitCode=1;});"
+        result = subprocess.run([node_bin, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: [eval]:307
+E         let BE=emptyEditor();
+E                ^
+E         
+E         ReferenceError: emptyEditor is not defined
+E             at [eval]:307:8
+E             at [eval]:1312:86
+E             at runScriptInThisContext (node:internal/vm:209:10)
+E             at node:internal/process/execution:446:12
+E             at [eval]-wrapper:6:24
+E             at runScriptInContext (node:internal/process/execution:444:60)
+E             at evalFunction (node:internal/process/execution:88:30)
+E             at evalScript (node:internal/process/execution:100:3)
+E             at node:internal/main/eval_string:74:3
+E         
+E         Node.js v22.22.1
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', '\nconst assert = require(\'node:assert/strict\');\nlet CUR=\'alpha\', n... evalScript (node:internal/process/execution:100:3)\n    at node:internal/main/eval_string:74:3\n\nNode.js v22.22.1\n').returncode
+
+tests/test_export_save_as.py:98: AssertionError
+____________ test_save_progress_completion_and_failures[scenario0] _____________
+
+scenario = "length='0';chunks=[];await saveExportAs('video',node('save-video'));assert.match(status(),/Saved/);assert.equal(closed,1);"
+
+    @pytest.mark.parametrize("scenario", [
+        "length='0';chunks=[];await saveExportAs('video',node('save-video'));assert.match(status(),/Saved/);assert.equal(closed,1);",
+        "length='5';await saveExportAs('video',node('save-video'));assert.match(status(),/failed/i);assert.equal(closed,0);assert.equal(aborted,1);",
+        "writeError=new Error('disk full');await saveExportAs('video',node('save-video'));assert.match(status(),/disk full/);assert.equal(cancelled,1);assert.equal(aborted,1);assert.equal(closed,0);",
+        "closeError=new Error('close denied');await saveExportAs('video',node('save-video'));assert.match(status(),/close denied/);assert.equal(aborted,1);assert.doesNotMatch(status(),/Saved/);",
+        "fetchError=new Error('network lost');await saveExportAs('video',node('save-video'));assert.match(status(),/network lost/);",
+        "ok=false;await saveExportAs('video',node('save-video'));assert.match(status(),/locked/);",
+        "hasBody=false;await saveExportAs('video',node('save-video'));assert.match(status(),/stream/);",
+    ])
+    def test_save_progress_completion_and_failures(scenario):
+>       run_js(scenario + "assert.equal(intervals.size,0);assert.equal(node('save-video').disabled,false);")
+
+tests/test_export_save_as.py:194: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "length='0';chunks=[];await saveExportAs('video',node('save-video'));assert.match(status(),/Saved/);assert.equal(closed,1);assert.equal(intervals.size,0);assert.equal(node('save-video').disabled,false);"
+
+    def run_js(scenario):
+        node_bin = shutil.which("node")
+        assert node_bin, "Node.js is required for embedded UI behavior tests (see CONTRIBUTING.md)"
+        # This is the real evaluated Python string, not an independently copied JS helper.
+        source = web.APP_JS.split("function shellHtml(j)", 1)[1].split("async function refresh()", 1)[0]
+        source = "function shellHtml(j)" + source
+        script = HARNESS + "\n" + source + r"""
+    assert.equal(typeof saveExportAs,'function','Save As must be implemented');
+    EXPORT_NAMES={id:'alpha',video:'road.cam_redacted.mkv',report:'road.cam_audit.json'};
+    let completed=false;
+    process.on('beforeExit',()=>assert.equal(completed,true,'async scenario did not finish'));
+    (async()=>{
+    """ + scenario + "\n})().then(()=>{completed=true;}).catch(e=>{console.error(e);process.exitCode=1;});"
+        result = subprocess.run([node_bin, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: [eval]:307
+E         let BE=emptyEditor();
+E                ^
+E         
+E         ReferenceError: emptyEditor is not defined
+E             at [eval]:307:8
+E             at [eval]:1301:86
+E             at runScriptInThisContext (node:internal/vm:209:10)
+E             at node:internal/process/execution:446:12
+E             at [eval]-wrapper:6:24
+E             at runScriptInContext (node:internal/process/execution:444:60)
+E             at evalFunction (node:internal/process/execution:88:30)
+E             at evalScript (node:internal/process/execution:100:3)
+E             at node:internal/main/eval_string:74:3
+E         
+E         Node.js v22.22.1
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', '\nconst assert = require(\'node:assert/strict\');\nlet CUR=\'alpha\', n... evalScript (node:internal/process/execution:100:3)\n    at node:internal/main/eval_string:74:3\n\nNode.js v22.22.1\n').returncode
+
+tests/test_export_save_as.py:98: AssertionError
+____________ test_save_progress_completion_and_failures[scenario1] _____________
+
+scenario = "length='5';await saveExportAs('video',node('save-video'));assert.match(status(),/failed/i);assert.equal(closed,0);assert.equal(aborted,1);"
+
+    @pytest.mark.parametrize("scenario", [
+        "length='0';chunks=[];await saveExportAs('video',node('save-video'));assert.match(status(),/Saved/);assert.equal(closed,1);",
+        "length='5';await saveExportAs('video',node('save-video'));assert.match(status(),/failed/i);assert.equal(closed,0);assert.equal(aborted,1);",
+        "writeError=new Error('disk full');await saveExportAs('video',node('save-video'));assert.match(status(),/disk full/);assert.equal(cancelled,1);assert.equal(aborted,1);assert.equal(closed,0);",
+        "closeError=new Error('close denied');await saveExportAs('video',node('save-video'));assert.match(status(),/close denied/);assert.equal(aborted,1);assert.doesNotMatch(status(),/Saved/);",
+        "fetchError=new Error('network lost');await saveExportAs('video',node('save-video'));assert.match(status(),/network lost/);",
+        "ok=false;await saveExportAs('video',node('save-video'));assert.match(status(),/locked/);",
+        "hasBody=false;await saveExportAs('video',node('save-video'));assert.match(status(),/stream/);",
+    ])
+    def test_save_progress_completion_and_failures(scenario):
+>       run_js(scenario + "assert.equal(intervals.size,0);assert.equal(node('save-video').disabled,false);")
+
+tests/test_export_save_as.py:194: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "length='5';await saveExportAs('video',node('save-video'));assert.match(status(),/failed/i);assert.equal(closed,0);assert.equal(aborted,1);assert.equal(intervals.size,0);assert.equal(node('save-video').disabled,false);"
+
+    def run_js(scenario):
+        node_bin = shutil.which("node")
+        assert node_bin, "Node.js is required for embedded UI behavior tests (see CONTRIBUTING.md)"
+        # This is the real evaluated Python string, not an independently copied JS helper.
+        source = web.APP_JS.split("function shellHtml(j)", 1)[1].split("async function refresh()", 1)[0]
+        source = "function shellHtml(j)" + source
+        script = HARNESS + "\n" + source + r"""
+    assert.equal(typeof saveExportAs,'function','Save As must be implemented');
+    EXPORT_NAMES={id:'alpha',video:'road.cam_redacted.mkv',report:'road.cam_audit.json'};
+    let completed=false;
+    process.on('beforeExit',()=>assert.equal(completed,true,'async scenario did not finish'));
+    (async()=>{
+    """ + scenario + "\n})().then(()=>{completed=true;}).catch(e=>{console.error(e);process.exitCode=1;});"
+        result = subprocess.run([node_bin, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: [eval]:307
+E         let BE=emptyEditor();
+E                ^
+E         
+E         ReferenceError: emptyEditor is not defined
+E             at [eval]:307:8
+E             at [eval]:1301:86
+E             at runScriptInThisContext (node:internal/vm:209:10)
+E             at node:internal/process/execution:446:12
+E             at [eval]-wrapper:6:24
+E             at runScriptInContext (node:internal/process/execution:444:60)
+E             at evalFunction (node:internal/process/execution:88:30)
+E             at evalScript (node:internal/process/execution:100:3)
+E             at node:internal/main/eval_string:74:3
+E         
+E         Node.js v22.22.1
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', '\nconst assert = require(\'node:assert/strict\');\nlet CUR=\'alpha\', n... evalScript (node:internal/process/execution:100:3)\n    at node:internal/main/eval_string:74:3\n\nNode.js v22.22.1\n').returncode
+
+tests/test_export_save_as.py:98: AssertionError
+____________ test_save_progress_completion_and_failures[scenario2] _____________
+
+scenario = "writeError=new Error('disk full');await saveExportAs('video',node('save-video'));assert.match(status(),/disk full/);assert.equal(cancelled,1);assert.equal(aborted,1);assert.equal(closed,0);"
+
+    @pytest.mark.parametrize("scenario", [
+        "length='0';chunks=[];await saveExportAs('video',node('save-video'));assert.match(status(),/Saved/);assert.equal(closed,1);",
+        "length='5';await saveExportAs('video',node('save-video'));assert.match(status(),/failed/i);assert.equal(closed,0);assert.equal(aborted,1);",
+        "writeError=new Error('disk full');await saveExportAs('video',node('save-video'));assert.match(status(),/disk full/);assert.equal(cancelled,1);assert.equal(aborted,1);assert.equal(closed,0);",
+        "closeError=new Error('close denied');await saveExportAs('video',node('save-video'));assert.match(status(),/close denied/);assert.equal(aborted,1);assert.doesNotMatch(status(),/Saved/);",
+        "fetchError=new Error('network lost');await saveExportAs('video',node('save-video'));assert.match(status(),/network lost/);",
+        "ok=false;await saveExportAs('video',node('save-video'));assert.match(status(),/locked/);",
+        "hasBody=false;await saveExportAs('video',node('save-video'));assert.match(status(),/stream/);",
+    ])
+    def test_save_progress_completion_and_failures(scenario):
+>       run_js(scenario + "assert.equal(intervals.size,0);assert.equal(node('save-video').disabled,false);")
+
+tests/test_export_save_as.py:194: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "writeError=new Error('disk full');await saveExportAs('video',node('save-video'));assert.match(status(),/disk full/);a...qual(aborted,1);assert.equal(closed,0);assert.equal(intervals.size,0);assert.equal(node('save-video').disabled,false);"
+
+    def run_js(scenario):
+        node_bin = shutil.which("node")
+        assert node_bin, "Node.js is required for embedded UI behavior tests (see CONTRIBUTING.md)"
+        # This is the real evaluated Python string, not an independently copied JS helper.
+        source = web.APP_JS.split("function shellHtml(j)", 1)[1].split("async function refresh()", 1)[0]
+        source = "function shellHtml(j)" + source
+        script = HARNESS + "\n" + source + r"""
+    assert.equal(typeof saveExportAs,'function','Save As must be implemented');
+    EXPORT_NAMES={id:'alpha',video:'road.cam_redacted.mkv',report:'road.cam_audit.json'};
+    let completed=false;
+    process.on('beforeExit',()=>assert.equal(completed,true,'async scenario did not finish'));
+    (async()=>{
+    """ + scenario + "\n})().then(()=>{completed=true;}).catch(e=>{console.error(e);process.exitCode=1;});"
+        result = subprocess.run([node_bin, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: [eval]:307
+E         let BE=emptyEditor();
+E                ^
+E         
+E         ReferenceError: emptyEditor is not defined
+E             at [eval]:307:8
+E             at [eval]:1301:86
+E             at runScriptInThisContext (node:internal/vm:209:10)
+E             at node:internal/process/execution:446:12
+E             at [eval]-wrapper:6:24
+E             at runScriptInContext (node:internal/process/execution:444:60)
+E             at evalFunction (node:internal/process/execution:88:30)
+E             at evalScript (node:internal/process/execution:100:3)
+E             at node:internal/main/eval_string:74:3
+E         
+E         Node.js v22.22.1
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', '\nconst assert = require(\'node:assert/strict\');\nlet CUR=\'alpha\', n... evalScript (node:internal/process/execution:100:3)\n    at node:internal/main/eval_string:74:3\n\nNode.js v22.22.1\n').returncode
+
+tests/test_export_save_as.py:98: AssertionError
+____________ test_save_progress_completion_and_failures[scenario3] _____________
+
+scenario = "closeError=new Error('close denied');await saveExportAs('video',node('save-video'));assert.match(status(),/close denied/);assert.equal(aborted,1);assert.doesNotMatch(status(),/Saved/);"
+
+    @pytest.mark.parametrize("scenario", [
+        "length='0';chunks=[];await saveExportAs('video',node('save-video'));assert.match(status(),/Saved/);assert.equal(closed,1);",
+        "length='5';await saveExportAs('video',node('save-video'));assert.match(status(),/failed/i);assert.equal(closed,0);assert.equal(aborted,1);",
+        "writeError=new Error('disk full');await saveExportAs('video',node('save-video'));assert.match(status(),/disk full/);assert.equal(cancelled,1);assert.equal(aborted,1);assert.equal(closed,0);",
+        "closeError=new Error('close denied');await saveExportAs('video',node('save-video'));assert.match(status(),/close denied/);assert.equal(aborted,1);assert.doesNotMatch(status(),/Saved/);",
+        "fetchError=new Error('network lost');await saveExportAs('video',node('save-video'));assert.match(status(),/network lost/);",
+        "ok=false;await saveExportAs('video',node('save-video'));assert.match(status(),/locked/);",
+        "hasBody=false;await saveExportAs('video',node('save-video'));assert.match(status(),/stream/);",
+    ])
+    def test_save_progress_completion_and_failures(scenario):
+>       run_js(scenario + "assert.equal(intervals.size,0);assert.equal(node('save-video').disabled,false);")
+
+tests/test_export_save_as.py:194: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "closeError=new Error('close denied');await saveExportAs('video',node('save-video'));assert.match(status(),/close deni...;assert.doesNotMatch(status(),/Saved/);assert.equal(intervals.size,0);assert.equal(node('save-video').disabled,false);"
+
+    def run_js(scenario):
+        node_bin = shutil.which("node")
+        assert node_bin, "Node.js is required for embedded UI behavior tests (see CONTRIBUTING.md)"
+        # This is the real evaluated Python string, not an independently copied JS helper.
+        source = web.APP_JS.split("function shellHtml(j)", 1)[1].split("async function refresh()", 1)[0]
+        source = "function shellHtml(j)" + source
+        script = HARNESS + "\n" + source + r"""
+    assert.equal(typeof saveExportAs,'function','Save As must be implemented');
+    EXPORT_NAMES={id:'alpha',video:'road.cam_redacted.mkv',report:'road.cam_audit.json'};
+    let completed=false;
+    process.on('beforeExit',()=>assert.equal(completed,true,'async scenario did not finish'));
+    (async()=>{
+    """ + scenario + "\n})().then(()=>{completed=true;}).catch(e=>{console.error(e);process.exitCode=1;});"
+        result = subprocess.run([node_bin, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: [eval]:307
+E         let BE=emptyEditor();
+E                ^
+E         
+E         ReferenceError: emptyEditor is not defined
+E             at [eval]:307:8
+E             at [eval]:1301:86
+E             at runScriptInThisContext (node:internal/vm:209:10)
+E             at node:internal/process/execution:446:12
+E             at [eval]-wrapper:6:24
+E             at runScriptInContext (node:internal/process/execution:444:60)
+E             at evalFunction (node:internal/process/execution:88:30)
+E             at evalScript (node:internal/process/execution:100:3)
+E             at node:internal/main/eval_string:74:3
+E         
+E         Node.js v22.22.1
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', '\nconst assert = require(\'node:assert/strict\');\nlet CUR=\'alpha\', n... evalScript (node:internal/process/execution:100:3)\n    at node:internal/main/eval_string:74:3\n\nNode.js v22.22.1\n').returncode
+
+tests/test_export_save_as.py:98: AssertionError
+____________ test_save_progress_completion_and_failures[scenario4] _____________
+
+scenario = "fetchError=new Error('network lost');await saveExportAs('video',node('save-video'));assert.match(status(),/network lost/);"
+
+    @pytest.mark.parametrize("scenario", [
+        "length='0';chunks=[];await saveExportAs('video',node('save-video'));assert.match(status(),/Saved/);assert.equal(closed,1);",
+        "length='5';await saveExportAs('video',node('save-video'));assert.match(status(),/failed/i);assert.equal(closed,0);assert.equal(aborted,1);",
+        "writeError=new Error('disk full');await saveExportAs('video',node('save-video'));assert.match(status(),/disk full/);assert.equal(cancelled,1);assert.equal(aborted,1);assert.equal(closed,0);",
+        "closeError=new Error('close denied');await saveExportAs('video',node('save-video'));assert.match(status(),/close denied/);assert.equal(aborted,1);assert.doesNotMatch(status(),/Saved/);",
+        "fetchError=new Error('network lost');await saveExportAs('video',node('save-video'));assert.match(status(),/network lost/);",
+        "ok=false;await saveExportAs('video',node('save-video'));assert.match(status(),/locked/);",
+        "hasBody=false;await saveExportAs('video',node('save-video'));assert.match(status(),/stream/);",
+    ])
+    def test_save_progress_completion_and_failures(scenario):
+>       run_js(scenario + "assert.equal(intervals.size,0);assert.equal(node('save-video').disabled,false);")
+
+tests/test_export_save_as.py:194: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "fetchError=new Error('network lost');await saveExportAs('video',node('save-video'));assert.match(status(),/network lost/);assert.equal(intervals.size,0);assert.equal(node('save-video').disabled,false);"
+
+    def run_js(scenario):
+        node_bin = shutil.which("node")
+        assert node_bin, "Node.js is required for embedded UI behavior tests (see CONTRIBUTING.md)"
+        # This is the real evaluated Python string, not an independently copied JS helper.
+        source = web.APP_JS.split("function shellHtml(j)", 1)[1].split("async function refresh()", 1)[0]
+        source = "function shellHtml(j)" + source
+        script = HARNESS + "\n" + source + r"""
+    assert.equal(typeof saveExportAs,'function','Save As must be implemented');
+    EXPORT_NAMES={id:'alpha',video:'road.cam_redacted.mkv',report:'road.cam_audit.json'};
+    let completed=false;
+    process.on('beforeExit',()=>assert.equal(completed,true,'async scenario did not finish'));
+    (async()=>{
+    """ + scenario + "\n})().then(()=>{completed=true;}).catch(e=>{console.error(e);process.exitCode=1;});"
+        result = subprocess.run([node_bin, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: [eval]:307
+E         let BE=emptyEditor();
+E                ^
+E         
+E         ReferenceError: emptyEditor is not defined
+E             at [eval]:307:8
+E             at [eval]:1301:86
+E             at runScriptInThisContext (node:internal/vm:209:10)
+E             at node:internal/process/execution:446:12
+E             at [eval]-wrapper:6:24
+E             at runScriptInContext (node:internal/process/execution:444:60)
+E             at evalFunction (node:internal/process/execution:88:30)
+E             at evalScript (node:internal/process/execution:100:3)
+E             at node:internal/main/eval_string:74:3
+E         
+E         Node.js v22.22.1
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', '\nconst assert = require(\'node:assert/strict\');\nlet CUR=\'alpha\', n... evalScript (node:internal/process/execution:100:3)\n    at node:internal/main/eval_string:74:3\n\nNode.js v22.22.1\n').returncode
+
+tests/test_export_save_as.py:98: AssertionError
+_ test_save_progress_completion_and_failures[ok=false;await saveExportAs('video',node('save-video'));assert.match(status(),/locked/);] _
+
+scenario = "ok=false;await saveExportAs('video',node('save-video'));assert.match(status(),/locked/);"
+
+    @pytest.mark.parametrize("scenario", [
+        "length='0';chunks=[];await saveExportAs('video',node('save-video'));assert.match(status(),/Saved/);assert.equal(closed,1);",
+        "length='5';await saveExportAs('video',node('save-video'));assert.match(status(),/failed/i);assert.equal(closed,0);assert.equal(aborted,1);",
+        "writeError=new Error('disk full');await saveExportAs('video',node('save-video'));assert.match(status(),/disk full/);assert.equal(cancelled,1);assert.equal(aborted,1);assert.equal(closed,0);",
+        "closeError=new Error('close denied');await saveExportAs('video',node('save-video'));assert.match(status(),/close denied/);assert.equal(aborted,1);assert.doesNotMatch(status(),/Saved/);",
+        "fetchError=new Error('network lost');await saveExportAs('video',node('save-video'));assert.match(status(),/network lost/);",
+        "ok=false;await saveExportAs('video',node('save-video'));assert.match(status(),/locked/);",
+        "hasBody=false;await saveExportAs('video',node('save-video'));assert.match(status(),/stream/);",
+    ])
+    def test_save_progress_completion_and_failures(scenario):
+>       run_js(scenario + "assert.equal(intervals.size,0);assert.equal(node('save-video').disabled,false);")
+
+tests/test_export_save_as.py:194: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "ok=false;await saveExportAs('video',node('save-video'));assert.match(status(),/locked/);assert.equal(intervals.size,0);assert.equal(node('save-video').disabled,false);"
+
+    def run_js(scenario):
+        node_bin = shutil.which("node")
+        assert node_bin, "Node.js is required for embedded UI behavior tests (see CONTRIBUTING.md)"
+        # This is the real evaluated Python string, not an independently copied JS helper.
+        source = web.APP_JS.split("function shellHtml(j)", 1)[1].split("async function refresh()", 1)[0]
+        source = "function shellHtml(j)" + source
+        script = HARNESS + "\n" + source + r"""
+    assert.equal(typeof saveExportAs,'function','Save As must be implemented');
+    EXPORT_NAMES={id:'alpha',video:'road.cam_redacted.mkv',report:'road.cam_audit.json'};
+    let completed=false;
+    process.on('beforeExit',()=>assert.equal(completed,true,'async scenario did not finish'));
+    (async()=>{
+    """ + scenario + "\n})().then(()=>{completed=true;}).catch(e=>{console.error(e);process.exitCode=1;});"
+        result = subprocess.run([node_bin, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: [eval]:307
+E         let BE=emptyEditor();
+E                ^
+E         
+E         ReferenceError: emptyEditor is not defined
+E             at [eval]:307:8
+E             at [eval]:1301:86
+E             at runScriptInThisContext (node:internal/vm:209:10)
+E             at node:internal/process/execution:446:12
+E             at [eval]-wrapper:6:24
+E             at runScriptInContext (node:internal/process/execution:444:60)
+E             at evalFunction (node:internal/process/execution:88:30)
+E             at evalScript (node:internal/process/execution:100:3)
+E             at node:internal/main/eval_string:74:3
+E         
+E         Node.js v22.22.1
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', '\nconst assert = require(\'node:assert/strict\');\nlet CUR=\'alpha\', n... evalScript (node:internal/process/execution:100:3)\n    at node:internal/main/eval_string:74:3\n\nNode.js v22.22.1\n').returncode
+
+tests/test_export_save_as.py:98: AssertionError
+_ test_save_progress_completion_and_failures[hasBody=false;await saveExportAs('video',node('save-video'));assert.match(status(),/stream/);] _
+
+scenario = "hasBody=false;await saveExportAs('video',node('save-video'));assert.match(status(),/stream/);"
+
+    @pytest.mark.parametrize("scenario", [
+        "length='0';chunks=[];await saveExportAs('video',node('save-video'));assert.match(status(),/Saved/);assert.equal(closed,1);",
+        "length='5';await saveExportAs('video',node('save-video'));assert.match(status(),/failed/i);assert.equal(closed,0);assert.equal(aborted,1);",
+        "writeError=new Error('disk full');await saveExportAs('video',node('save-video'));assert.match(status(),/disk full/);assert.equal(cancelled,1);assert.equal(aborted,1);assert.equal(closed,0);",
+        "closeError=new Error('close denied');await saveExportAs('video',node('save-video'));assert.match(status(),/close denied/);assert.equal(aborted,1);assert.doesNotMatch(status(),/Saved/);",
+        "fetchError=new Error('network lost');await saveExportAs('video',node('save-video'));assert.match(status(),/network lost/);",
+        "ok=false;await saveExportAs('video',node('save-video'));assert.match(status(),/locked/);",
+        "hasBody=false;await saveExportAs('video',node('save-video'));assert.match(status(),/stream/);",
+    ])
+    def test_save_progress_completion_and_failures(scenario):
+>       run_js(scenario + "assert.equal(intervals.size,0);assert.equal(node('save-video').disabled,false);")
+
+tests/test_export_save_as.py:194: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "hasBody=false;await saveExportAs('video',node('save-video'));assert.match(status(),/stream/);assert.equal(intervals.size,0);assert.equal(node('save-video').disabled,false);"
+
+    def run_js(scenario):
+        node_bin = shutil.which("node")
+        assert node_bin, "Node.js is required for embedded UI behavior tests (see CONTRIBUTING.md)"
+        # This is the real evaluated Python string, not an independently copied JS helper.
+        source = web.APP_JS.split("function shellHtml(j)", 1)[1].split("async function refresh()", 1)[0]
+        source = "function shellHtml(j)" + source
+        script = HARNESS + "\n" + source + r"""
+    assert.equal(typeof saveExportAs,'function','Save As must be implemented');
+    EXPORT_NAMES={id:'alpha',video:'road.cam_redacted.mkv',report:'road.cam_audit.json'};
+    let completed=false;
+    process.on('beforeExit',()=>assert.equal(completed,true,'async scenario did not finish'));
+    (async()=>{
+    """ + scenario + "\n})().then(()=>{completed=true;}).catch(e=>{console.error(e);process.exitCode=1;});"
+        result = subprocess.run([node_bin, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: [eval]:307
+E         let BE=emptyEditor();
+E                ^
+E         
+E         ReferenceError: emptyEditor is not defined
+E             at [eval]:307:8
+E             at [eval]:1301:86
+E             at runScriptInThisContext (node:internal/vm:209:10)
+E             at node:internal/process/execution:446:12
+E             at [eval]-wrapper:6:24
+E             at runScriptInContext (node:internal/process/execution:444:60)
+E             at evalFunction (node:internal/process/execution:88:30)
+E             at evalScript (node:internal/process/execution:100:3)
+E             at node:internal/main/eval_string:74:3
+E         
+E         Node.js v22.22.1
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', '\nconst assert = require(\'node:assert/strict\');\nlet CUR=\'alpha\', n... evalScript (node:internal/process/execution:100:3)\n    at node:internal/main/eval_string:74:3\n\nNode.js v22.22.1\n').returncode
+
+tests/test_export_save_as.py:98: AssertionError
+_________ test_save_progress_throttles_visuals_and_live_announcements __________
+
+    def test_save_progress_throttles_visuals_and_live_announcements():
+>       run_js(r"""
+    readGate=deferred();const pending=saveExportAs('video',node('save-video'));await flush();
+    await tick(250);const visual=changes.get('export-video-status'),live=changes.get('export-video-live');
+    await tick(50);assert.equal(changes.get('export-video-status'),visual);
+    await tick(200);assert.ok(changes.get('export-video-status')>visual);
+    assert.equal(changes.get('export-video-live'),live);
+    await tick(1750);assert.ok(changes.get('export-video-live')>live);
+    readGate.resolve();await pending;
+    """)
+
+tests/test_export_save_as.py:198: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "\nreadGate=deferred();const pending=saveExportAs('video',node('save-video'));await flush();\nawait tick(250);const vi...live'),live);\nawait tick(1750);assert.ok(changes.get('export-video-live')>live);\nreadGate.resolve();await pending;\n"
+
+    def run_js(scenario):
+        node_bin = shutil.which("node")
+        assert node_bin, "Node.js is required for embedded UI behavior tests (see CONTRIBUTING.md)"
+        # This is the real evaluated Python string, not an independently copied JS helper.
+        source = web.APP_JS.split("function shellHtml(j)", 1)[1].split("async function refresh()", 1)[0]
+        source = "function shellHtml(j)" + source
+        script = HARNESS + "\n" + source + r"""
+    assert.equal(typeof saveExportAs,'function','Save As must be implemented');
+    EXPORT_NAMES={id:'alpha',video:'road.cam_redacted.mkv',report:'road.cam_audit.json'};
+    let completed=false;
+    process.on('beforeExit',()=>assert.equal(completed,true,'async scenario did not finish'));
+    (async()=>{
+    """ + scenario + "\n})().then(()=>{completed=true;}).catch(e=>{console.error(e);process.exitCode=1;});"
+        result = subprocess.run([node_bin, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: [eval]:307
+E         let BE=emptyEditor();
+E                ^
+E         
+E         ReferenceError: emptyEditor is not defined
+E             at [eval]:307:8
+E             at [eval]:1309:86
+E             at runScriptInThisContext (node:internal/vm:209:10)
+E             at node:internal/process/execution:446:12
+E             at [eval]-wrapper:6:24
+E             at runScriptInContext (node:internal/process/execution:444:60)
+E             at evalFunction (node:internal/process/execution:88:30)
+E             at evalScript (node:internal/process/execution:100:3)
+E             at node:internal/main/eval_string:74:3
+E         
+E         Node.js v22.22.1
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', '\nconst assert = require(\'node:assert/strict\');\nlet CUR=\'alpha\', n... evalScript (node:internal/process/execution:100:3)\n    at node:internal/main/eval_string:74:3\n\nNode.js v22.22.1\n').returncode
+
+tests/test_export_save_as.py:98: AssertionError
+________________ test_save_report_and_direct_download_feedback _________________
+
+    def test_save_report_and_direct_download_feedback():
+>       run_js(r"""
+    await saveExportAs('report',node('save-report'));
+    assert.deepEqual(requests,['api/jobs/alpha/report']);
+    assert.equal(pickerCalls[0].suggestedName,'road.cam_audit.json');
+    assert.match(node('export-report-status').textContent,/Saved/);
+    exportDownloadStarted('video');assert.match(status(),/Download started — see browser downloads/);
+    assert.equal(progress().hidden,true);assert.doesNotMatch(status(),/Saved|%|left/);
+    """)
+
+tests/test_export_save_as.py:210: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "\nawait saveExportAs('report',node('save-report'));\nassert.deepEqual(requests,['api/jobs/alpha/report']);\nassert.eq...arted — see browser downloads/);\nassert.equal(progress().hidden,true);assert.doesNotMatch(status(),/Saved|%|left/);\n"
+
+    def run_js(scenario):
+        node_bin = shutil.which("node")
+        assert node_bin, "Node.js is required for embedded UI behavior tests (see CONTRIBUTING.md)"
+        # This is the real evaluated Python string, not an independently copied JS helper.
+        source = web.APP_JS.split("function shellHtml(j)", 1)[1].split("async function refresh()", 1)[0]
+        source = "function shellHtml(j)" + source
+        script = HARNESS + "\n" + source + r"""
+    assert.equal(typeof saveExportAs,'function','Save As must be implemented');
+    EXPORT_NAMES={id:'alpha',video:'road.cam_redacted.mkv',report:'road.cam_audit.json'};
+    let completed=false;
+    process.on('beforeExit',()=>assert.equal(completed,true,'async scenario did not finish'));
+    (async()=>{
+    """ + scenario + "\n})().then(()=>{completed=true;}).catch(e=>{console.error(e);process.exitCode=1;});"
+        result = subprocess.run([node_bin, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: [eval]:307
+E         let BE=emptyEditor();
+E                ^
+E         
+E         ReferenceError: emptyEditor is not defined
+E             at [eval]:307:8
+E             at [eval]:1308:86
+E             at runScriptInThisContext (node:internal/vm:209:10)
+E             at node:internal/process/execution:446:12
+E             at [eval]-wrapper:6:24
+E             at runScriptInContext (node:internal/process/execution:444:60)
+E             at evalFunction (node:internal/process/execution:88:30)
+E             at evalScript (node:internal/process/execution:100:3)
+E             at node:internal/main/eval_string:74:3
+E         
+E         Node.js v22.22.1
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', '\nconst assert = require(\'node:assert/strict\');\nlet CUR=\'alpha\', n... evalScript (node:internal/process/execution:100:3)\n    at node:internal/main/eval_string:74:3\n\nNode.js v22.22.1\n').returncode
+
+tests/test_export_save_as.py:98: AssertionError
+_______________ test_save_progress_rate_uses_recent_ten_seconds ________________
+
+    def test_save_progress_rate_uses_recent_ten_seconds():
+>       run_js(r"""
+    length='200000';chunks=[new Uint8Array(4000),new Uint8Array(100000),new Uint8Array(96000)];
+    writeGate=deferred();const pending=saveExportAs('video',node('save-video'));await flush();
+    await tick(3000);let gate=writeGate;writeGate=deferred();gate.resolve();await flush();
+    await tick(13000);gate=writeGate;writeGate=deferred();gate.resolve();await flush();await tick(250);
+    assert.match(status(),/10.0 KB\/s/);assert.equal(progress().value,104000);
+    writeGate.resolve();await pending;
+    """)
+
+tests/test_export_save_as.py:221: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "\nlength='200000';chunks=[new Uint8Array(4000),new Uint8Array(100000),new Uint8Array(96000)];\nwriteGate=deferred();c...0);\nassert.match(status(),/10.0 KB\\/s/);assert.equal(progress().value,104000);\nwriteGate.resolve();await pending;\n"
+
+    def run_js(scenario):
+        node_bin = shutil.which("node")
+        assert node_bin, "Node.js is required for embedded UI behavior tests (see CONTRIBUTING.md)"
+        # This is the real evaluated Python string, not an independently copied JS helper.
+        source = web.APP_JS.split("function shellHtml(j)", 1)[1].split("async function refresh()", 1)[0]
+        source = "function shellHtml(j)" + source
+        script = HARNESS + "\n" + source + r"""
+    assert.equal(typeof saveExportAs,'function','Save As must be implemented');
+    EXPORT_NAMES={id:'alpha',video:'road.cam_redacted.mkv',report:'road.cam_audit.json'};
+    let completed=false;
+    process.on('beforeExit',()=>assert.equal(completed,true,'async scenario did not finish'));
+    (async()=>{
+    """ + scenario + "\n})().then(()=>{completed=true;}).catch(e=>{console.error(e);process.exitCode=1;});"
+        result = subprocess.run([node_bin, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: [eval]:307
+E         let BE=emptyEditor();
+E                ^
+E         
+E         ReferenceError: emptyEditor is not defined
+E             at [eval]:307:8
+E             at [eval]:1308:86
+E             at runScriptInThisContext (node:internal/vm:209:10)
+E             at node:internal/process/execution:446:12
+E             at [eval]-wrapper:6:24
+E             at runScriptInContext (node:internal/process/execution:444:60)
+E             at evalFunction (node:internal/process/execution:88:30)
+E             at evalScript (node:internal/process/execution:100:3)
+E             at node:internal/main/eval_string:74:3
+E         
+E         Node.js v22.22.1
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', '\nconst assert = require(\'node:assert/strict\');\nlet CUR=\'alpha\', n... evalScript (node:internal/process/execution:100:3)\n    at node:internal/main/eval_string:74:3\n\nNode.js v22.22.1\n').returncode
+
+tests/test_export_save_as.py:98: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_export_save_as.py::test_picker_cancel_does_not_fetch - Asse...
+FAILED tests/test_export_save_as.py::test_job_switch_keeps_original_export_target
+FAILED tests/test_export_save_as.py::test_save_progress_counts_completed_writes
+FAILED tests/test_export_save_as.py::test_save_progress_unknown_total[None-None]
+FAILED tests/test_export_save_as.py::test_save_progress_unknown_total[bad-None]
+FAILED tests/test_export_save_as.py::test_save_progress_unknown_total[-1-None]
+FAILED tests/test_export_save_as.py::test_save_progress_unknown_total[9007199254740992-None]
+FAILED tests/test_export_save_as.py::test_save_progress_unknown_total[4-gzip]
+FAILED tests/test_export_save_as.py::test_save_progress_waiting_and_finalizing
+FAILED tests/test_export_save_as.py::test_save_progress_waiting_hides_stale_eta
+FAILED tests/test_export_save_as.py::test_save_progress_stays_with_original_job
+FAILED tests/test_export_save_as.py::test_save_progress_completion_and_failures[scenario0]
+FAILED tests/test_export_save_as.py::test_save_progress_completion_and_failures[scenario1]
+FAILED tests/test_export_save_as.py::test_save_progress_completion_and_failures[scenario2]
+FAILED tests/test_export_save_as.py::test_save_progress_completion_and_failures[scenario3]
+FAILED tests/test_export_save_as.py::test_save_progress_completion_and_failures[scenario4]
+FAILED tests/test_export_save_as.py::test_save_progress_completion_and_failures[ok=false;await saveExportAs('video',node('save-video'));assert.match(status(),/locked/);]
+FAILED tests/test_export_save_as.py::test_save_progress_completion_and_failures[hasBody=false;await saveExportAs('video',node('save-video'));assert.match(status(),/stream/);]
+FAILED tests/test_export_save_as.py::test_save_progress_throttles_visuals_and_live_announcements
+FAILED tests/test_export_save_as.py::test_save_report_and_direct_download_feedback
+FAILED tests/test_export_save_as.py::test_save_progress_rate_uses_recent_ten_seconds
+21 failed, 677 passed in 139.69s (0:02:19)

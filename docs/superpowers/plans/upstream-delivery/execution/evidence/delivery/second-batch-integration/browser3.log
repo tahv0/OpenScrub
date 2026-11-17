@@ -1,0 +1,36 @@
+AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
++ actual - expected
+... Skipped lines
+
+  {
+    audio_redactions: [
+      {
+        future: true,
+        mode: 'mute',
+...
+      output: '/tmp/openscrub-task651/synthetic-data/browser-runtime/openscrub_jobs/17742ca3fc45/output.mp4',
++     output_sha256: '83d016733c5efbfff779c8b232ab8d80e747ff74fec93b183ee5af6e16930810',
+-     output_sha256: 'ce95d80070ba6ff251626a61ff78b56caaf1571f815ef3f85c8ba3f8bec67d69',
+      settings: {
+        adaptive: 'on',
+        allow_names: null,
+        audio_lane_count: null,
+        audio_pii: false,
+...
+      },
++     timestamp: '2026-11-17T07:19:38.866318+02:00',
+-     timestamp: '2026-11-17T07:19:38.190962+02:00',
+      tool: 'openscrub',
+      version: '1.0.96',
+      vfr_normalized: false,
+      windows: null,
+      zones: null
+
+    at /tmp/openscrub-task651/browser.cjs:83:8 {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: [Object],
+  expected: [Object],
+  operator: 'deepStrictEqual',
+  diff: 'simple'
+}

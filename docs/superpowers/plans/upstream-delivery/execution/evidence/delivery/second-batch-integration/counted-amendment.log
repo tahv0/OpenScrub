@@ -1,0 +1,74 @@
+{
+  "noop": {
+    "before": {
+      "report_parse": 1,
+      "report_dump": 0,
+      "stage": 0,
+      "fsync": 0,
+      "replace": 0,
+      "stream_writes": 0,
+      "serialized_characters": 0,
+      "request_json": 1,
+      "response_json": 1
+    },
+    "after": {
+      "report_parse": 1,
+      "report_dump": 0,
+      "stage": 0,
+      "fsync": 0,
+      "replace": 0,
+      "stream_writes": 0,
+      "serialized_characters": 0,
+      "request_json": 1,
+      "response_json": 1
+    }
+  },
+  "sparse": {
+    "before": {
+      "report_parse": 1,
+      "report_dump": 1,
+      "stage": 1,
+      "fsync": 1,
+      "replace": 1,
+      "stream_writes": 12460177,
+      "serialized_characters": 69956371,
+      "request_json": 1,
+      "response_json": 1
+    },
+    "after": {
+      "report_parse": 1,
+      "report_dump": 1,
+      "stage": 1,
+      "fsync": 1,
+      "replace": 1,
+      "stream_writes": 12460177,
+      "serialized_characters": 69956371,
+      "request_json": 1,
+      "response_json": 1
+    }
+  },
+  "bulk": {
+    "before": {
+      "report_parse": 1,
+      "report_dump": 1,
+      "stage": 1,
+      "fsync": 1,
+      "replace": 1,
+      "stream_writes": 12460177,
+      "serialized_characters": 70038188,
+      "request_json": 1,
+      "response_json": 1
+    },
+    "after": {
+      "report_parse": 1,
+      "report_dump": 1,
+      "stage": 1,
+      "fsync": 1,
+      "replace": 1,
+      "stream_writes": 12460177,
+      "serialized_characters": 70038188,
+      "request_json": 1,
+      "response_json": 1
+    }
+  }
+}

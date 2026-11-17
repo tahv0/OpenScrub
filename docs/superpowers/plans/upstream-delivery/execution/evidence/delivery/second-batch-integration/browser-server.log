@@ -1,0 +1,20 @@
+Task651 browser server ready
+Traceback (most recent call last):
+  File "/tmp/openscrub-task651/serve_browser.py", line 89, in <module>
+    server.start()
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/cheroot/server.py", line 1935, in start
+    self.serve()
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/cheroot/server.py", line 1907, in serve
+    self._connections.run(self.expiration_interval)
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/cheroot/connections.py", line 205, in run
+    self._run(expiration_interval)
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/cheroot/connections.py", line 240, in _run
+    active_list = self._selector.select(timeout=select_timeout)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/cheroot/connections.py", line 106, in select
+    for key, _ in self._selector.select(timeout=timeout)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/python/cpython-3.12.16-linux-x86_64-gnu/lib/python3.12/selectors.py", line 468, in select
+    fd_event_list = self._selector.poll(timeout, max_ev)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+KeyboardInterrupt

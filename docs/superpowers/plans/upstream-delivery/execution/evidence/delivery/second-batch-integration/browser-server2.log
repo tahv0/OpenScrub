@@ -1,0 +1,9 @@
+Task651 browser server ready
+Traceback (most recent call last):
+  File "/tmp/openscrub-task651/serve_browser.py", line 89, in <module>
+    server.start()
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/cheroot/server.py", line 1934, in start
+    self.prepare()
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/cheroot/server.py", line 1858, in prepare
+    raise socket.error(msg)
+OSError: No socket could be created -- (('127.0.0.1', 18651): [Errno 98] Address already in use)

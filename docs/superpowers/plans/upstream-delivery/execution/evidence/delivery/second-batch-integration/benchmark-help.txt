@@ -1,0 +1,31 @@
+usage: review_io.py [-h] [--scenario {saves}] [--rows ROWS [ROWS ...]]
+                    [--repository REPOSITORY] [--before-ref BEFORE_REF]
+                    [--after-ref AFTER_REF] [--evidence-dir EVIDENCE_DIR]
+                    [--output OUTPUT] [--before-noop-publications {0,1}]
+                    [--warmups WARMUPS] [--samples SAMPLES]
+
+Compare pinned report-save sources over loopback HTTP, without inference.
+Example (run in a prepared runtime with Flask, Cheroot and engine
+dependencies): python benchmark/review_io.py --scenario saves --rows 1000
+10000 100000 --before-ref BASE_SHA --after-ref HEAD_SHA --repository .
+--evidence-dir /tmp/review-io --output /tmp/review-io/results.json Exports are
+verified against every pinned Git blob before import. Timing workers have no
+route instrumentation. Separate workers count report/request/response
+operations. RSS sampling is external via Linux /proc; high-water includes
+fixture construction/imports, and all raw samples, identities and boundaries
+are retained.
+
+options:
+  -h, --help            show this help message and exit
+  --scenario {saves}
+  --rows ROWS [ROWS ...]
+  --repository REPOSITORY
+  --before-ref BEFORE_REF
+  --after-ref AFTER_REF
+  --evidence-dir EVIDENCE_DIR
+  --output OUTPUT
+  --before-noop-publications {0,1}
+                        expected baseline no-op publications; use 0 for an
+                        already optimized baseline
+  --warmups WARMUPS
+  --samples SAMPLES

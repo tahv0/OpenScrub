@@ -1,0 +1,12 @@
+{"rows": 100000, "operation": "noop", "summary": {"before": {"n": 5, "min_ms": 947.027195, "median_ms": 960.152493, "p95_ms": 1167.692137, "max_ms": 1167.692137}, "after": {"n": 5, "min_ms": 935.347661, "median_ms": 956.053608, "p95_ms": 1155.8018, "max_ms": 1155.8018}}}
+{"rows": 100000, "operation": "sparse", "summary": {"before": {"n": 5, "min_ms": 5118.455133, "median_ms": 5273.147905, "p95_ms": 5595.441572, "max_ms": 5595.441572}, "after": {"n": 5, "min_ms": 5165.501496, "median_ms": 5277.212919, "p95_ms": 5496.194017, "max_ms": 5496.194017}}}
+{"rows": 100000, "operation": "bulk", "summary": {"before": {"n": 5, "min_ms": 5449.256363, "median_ms": 5490.879176, "p95_ms": 5729.735432, "max_ms": 5729.735432}, "after": {"n": 5, "min_ms": 5359.735464, "median_ms": 5402.773276, "p95_ms": 5607.949222, "max_ms": 5607.949222}}}
+Traceback (most recent call last):
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/benchmark/review_io.py", line 376, in <module>
+    main()
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/benchmark/review_io.py", line 372, in main
+    run(args)
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/benchmark/review_io.py", line 340, in run
+    assert all(counts[k] == writes for k in ('report_dump','stage','fsync','replace'))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError

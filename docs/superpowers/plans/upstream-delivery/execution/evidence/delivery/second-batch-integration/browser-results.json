@@ -1,0 +1,502 @@
+{
+  "origin": "http://127.0.0.1:18651",
+  "title": "OpenScrub",
+  "ids": {
+    "alpha": "4784041ab48c",
+    "beta": "f3c59ec77039"
+  },
+  "errors": [],
+  "controlledDiagnostics": [
+    {
+      "text": "Failed to load resource: the server responded with a status of 503 (SERVICE UNAVAILABLE)",
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c"
+    },
+    {
+      "text": "Failed to load resource: the server responded with a status of 500 (INTERNAL SERVER ERROR)",
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c/detections"
+    }
+  ],
+  "requests": [
+    {
+      "url": "http://127.0.0.1:18651/",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/model_status",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/custom_cats",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/models/face",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/quality_tier",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/allowlist",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/certinfo",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/update_check",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/vault",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/extras",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/models/plate",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/models/person",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c/log?from=0",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c/detections",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c/thumb/1",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c/thumb/2",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c/thumb/10",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c/thumb/3",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c/thumb/4",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c/thumb/6",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c/thumb/7",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c/thumb/12",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c/detections",
+      "method": "POST"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c/download",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c/log?from=13",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c/log?from=13",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/f3c59ec77039",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/f3c59ec77039/log?from=0",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c/log?from=0",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c/detections",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c/detections",
+      "method": "POST"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c/log?from=13",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c/log?from=13",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c/log?from=13",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c/log?from=13",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c/log?from=13",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c/log?from=13",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c/log?from=13",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c/log?from=13",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c/log?from=13",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c/log?from=13",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c/log?from=13",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c/log?from=13",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c/log?from=13",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c/log?from=13",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c/log?from=13",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c/log?from=13",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c/log?from=13",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c/detections",
+      "method": "POST"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c/render",
+      "method": "POST"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c/log?from=13",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c/log?from=0",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c/detections",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c/thumb/8",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c/thumb/9",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c/detections",
+      "method": "POST"
+    },
+    {
+      "url": "http://127.0.0.1:18651/api/jobs/4784041ab48c/render",
+      "method": "POST"
+    }
+  ],
+  "expected": [
+    false,
+    false,
+    true,
+    false,
+    true,
+    true,
+    true,
+    true,
+    true,
+    false,
+    true,
+    false,
+    true
+  ],
+  "rows": 14,
+  "output": "/tmp/openscrub-task651/synthetic-data/browser-runtime/openscrub_jobs/4784041ab48c/output.mp4",
+  "reportPath": "/tmp/openscrub-task651/synthetic-data/browser-runtime/openscrub_jobs/4784041ab48c/report.json",
+  "checks": [
+    "real controlled-OCR scan",
+    "same-value no-op skips publisher and still renders",
+    "newer different draft across poll503/body deadline/recovery and job switch",
+    "no unintended render or duplicate logs",
+    "real failed publication retains draft",
+    "Save As accepted-byte status separate from polling; full destination bytes",
+    "repeated explicit group/zone controls",
+    "manual replay ID",
+    "all raw rows/indices/audio/additive data after actual render and fresh view"
+  ]
+}

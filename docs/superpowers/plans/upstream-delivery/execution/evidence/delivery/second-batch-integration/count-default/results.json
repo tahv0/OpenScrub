@@ -1,0 +1,275 @@
+{
+  "noop": {
+    "before": {
+      "milliseconds": 15.702047,
+      "status": 200,
+      "response_bytes": 66,
+      "file_after": {
+        "bytes": 107080,
+        "inode": 285400,
+        "mtime_ns": 1794893697941216258
+      },
+      "response": {
+        "ok": true,
+        "suggest_allowlist": [
+          "synthetic-recurring"
+        ],
+        "total": 6
+      },
+      "payload_bytes": 2,
+      "rss_samples": [
+        {
+          "VmHWM_kib": 93788,
+          "VmRSS_kib": 93788
+        },
+        {
+          "VmHWM_kib": 94148,
+          "VmRSS_kib": 94148
+        },
+        {
+          "VmHWM_kib": 94156,
+          "VmRSS_kib": 94156
+        },
+        {
+          "VmHWM_kib": 94332,
+          "VmRSS_kib": 94332
+        },
+        {
+          "VmHWM_kib": 94332,
+          "VmRSS_kib": 94332
+        }
+      ],
+      "client_memory": {
+        "VmHWM_kib": 40148,
+        "VmRSS_kib": 40048
+      },
+      "after": {
+        "memory": {
+          "VmHWM_kib": 94332,
+          "VmRSS_kib": 94332
+        },
+        "counts": {
+          "report_parse": 1,
+          "report_dump": 1,
+          "stage": 1,
+          "fsync": 1,
+          "replace": 1,
+          "stream_writes": 18733,
+          "serialized_characters": 107080,
+          "request_json": 1,
+          "response_json": 1
+        },
+        "owners": 0
+      },
+      "version": "before",
+      "worker": {
+        "pid": 1197103,
+        "url": "http://127.0.0.1:49525/api/jobs/360654bcd55f/detections",
+        "path": "/tmp/openscrub-task651/count-default/6-counted-before/runtime/openscrub_jobs/360654bcd55f/report.json",
+        "imported": {
+          "openscrub": "/tmp/openscrub-task631/measurement/export-before/openscrub.py",
+          "openscrub_web": "/tmp/openscrub-task631/measurement/export-before/openscrub_web.py",
+          "openscrub_internal.reports": "/tmp/openscrub-task631/measurement/export-before/openscrub_internal/reports.py"
+        },
+        "imported_memory": {
+          "VmHWM_kib": 92532,
+          "VmRSS_kib": 92532
+        },
+        "fixture_memory": {
+          "VmHWM_kib": 93112,
+          "VmRSS_kib": 93112
+        },
+        "ready_memory": {
+          "VmHWM_kib": 93648,
+          "VmRSS_kib": 93648
+        },
+        "initial_file": {
+          "bytes": 107080,
+          "inode": 285399,
+          "device": 137,
+          "mtime_ns": 1794893697905513454,
+          "mode": 33188,
+          "sha256": "2f08ffcbaf01a31ff4fad7d8674362b2f022fdb63891667c6a44d3ce3802a4e3"
+        }
+      }
+    }
+  },
+  "sparse": {
+    "before": {
+      "milliseconds": 13.15271,
+      "status": 200,
+      "response_bytes": 45,
+      "file_after": {
+        "bytes": 107079,
+        "inode": 285401,
+        "mtime_ns": 1794893697969217623
+      },
+      "response": {
+        "ok": true,
+        "suggest_allowlist": [],
+        "total": 6
+      },
+      "payload_bytes": 24,
+      "rss_samples": [
+        {
+          "VmHWM_kib": 94332,
+          "VmRSS_kib": 94332
+        },
+        {
+          "VmHWM_kib": 94556,
+          "VmRSS_kib": 94556
+        },
+        {
+          "VmHWM_kib": 94556,
+          "VmRSS_kib": 94556
+        },
+        {
+          "VmHWM_kib": 94564,
+          "VmRSS_kib": 94564
+        }
+      ],
+      "client_memory": {
+        "VmHWM_kib": 40148,
+        "VmRSS_kib": 40048
+      },
+      "after": {
+        "memory": {
+          "VmHWM_kib": 94564,
+          "VmRSS_kib": 94564
+        },
+        "counts": {
+          "report_parse": 1,
+          "report_dump": 1,
+          "stage": 1,
+          "fsync": 1,
+          "replace": 1,
+          "stream_writes": 18733,
+          "serialized_characters": 107079,
+          "request_json": 1,
+          "response_json": 1
+        },
+        "owners": 0
+      },
+      "version": "before",
+      "worker": {
+        "pid": 1197103,
+        "url": "http://127.0.0.1:49525/api/jobs/360654bcd55f/detections",
+        "path": "/tmp/openscrub-task651/count-default/6-counted-before/runtime/openscrub_jobs/360654bcd55f/report.json",
+        "imported": {
+          "openscrub": "/tmp/openscrub-task631/measurement/export-before/openscrub.py",
+          "openscrub_web": "/tmp/openscrub-task631/measurement/export-before/openscrub_web.py",
+          "openscrub_internal.reports": "/tmp/openscrub-task631/measurement/export-before/openscrub_internal/reports.py"
+        },
+        "imported_memory": {
+          "VmHWM_kib": 92532,
+          "VmRSS_kib": 92532
+        },
+        "fixture_memory": {
+          "VmHWM_kib": 93112,
+          "VmRSS_kib": 93112
+        },
+        "ready_memory": {
+          "VmHWM_kib": 93648,
+          "VmRSS_kib": 93648
+        },
+        "initial_file": {
+          "bytes": 107080,
+          "inode": 285399,
+          "device": 137,
+          "mtime_ns": 1794893697905513454,
+          "mode": 33188,
+          "sha256": "2f08ffcbaf01a31ff4fad7d8674362b2f022fdb63891667c6a44d3ce3802a4e3"
+        }
+      }
+    }
+  },
+  "bulk": {
+    "before": {
+      "milliseconds": 12.464773,
+      "status": 200,
+      "response_bytes": 45,
+      "file_after": {
+        "bytes": 107082,
+        "inode": 285402,
+        "mtime_ns": 1794893697997218987
+      },
+      "response": {
+        "ok": true,
+        "suggest_allowlist": [],
+        "total": 6
+      },
+      "payload_bytes": 83,
+      "rss_samples": [
+        {
+          "VmHWM_kib": 94564,
+          "VmRSS_kib": 94564
+        },
+        {
+          "VmHWM_kib": 94616,
+          "VmRSS_kib": 94616
+        },
+        {
+          "VmHWM_kib": 94616,
+          "VmRSS_kib": 94616
+        },
+        {
+          "VmHWM_kib": 94620,
+          "VmRSS_kib": 94620
+        }
+      ],
+      "client_memory": {
+        "VmHWM_kib": 40148,
+        "VmRSS_kib": 40048
+      },
+      "after": {
+        "memory": {
+          "VmHWM_kib": 94620,
+          "VmRSS_kib": 94620
+        },
+        "counts": {
+          "report_parse": 1,
+          "report_dump": 1,
+          "stage": 1,
+          "fsync": 1,
+          "replace": 1,
+          "stream_writes": 18733,
+          "serialized_characters": 107082,
+          "request_json": 1,
+          "response_json": 1
+        },
+        "owners": 0
+      },
+      "version": "before",
+      "worker": {
+        "pid": 1197103,
+        "url": "http://127.0.0.1:49525/api/jobs/360654bcd55f/detections",
+        "path": "/tmp/openscrub-task651/count-default/6-counted-before/runtime/openscrub_jobs/360654bcd55f/report.json",
+        "imported": {
+          "openscrub": "/tmp/openscrub-task631/measurement/export-before/openscrub.py",
+          "openscrub_web": "/tmp/openscrub-task631/measurement/export-before/openscrub_web.py",
+          "openscrub_internal.reports": "/tmp/openscrub-task631/measurement/export-before/openscrub_internal/reports.py"
+        },
+        "imported_memory": {
+          "VmHWM_kib": 92532,
+          "VmRSS_kib": 92532
+        },
+        "fixture_memory": {
+          "VmHWM_kib": 93112,
+          "VmRSS_kib": 93112
+        },
+        "ready_memory": {
+          "VmHWM_kib": 93648,
+          "VmRSS_kib": 93648
+        },
+        "initial_file": {
+          "bytes": 107080,
+          "inode": 285399,
+          "device": 137,
+          "mtime_ns": 1794893697905513454,
+          "mode": 33188,
+          "sha256": "2f08ffcbaf01a31ff4fad7d8674362b2f022fdb63891667c6a44d3ce3802a4e3"
+        }
+      }
+    }
+  }
+}

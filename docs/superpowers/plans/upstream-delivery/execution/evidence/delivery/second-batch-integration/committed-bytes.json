@@ -1,0 +1,18 @@
+{
+  "base": "aa07a0664ec0b9d3d592adba19e5e1e473e906ac",
+  "head": "ac6496810b03d8b062ab9da150aeea1e62285fed",
+  "clean": true,
+  "frozen_committed_files": 47,
+  "wheel_installed_source_exact_commit": true,
+  "candidate_refs": {
+    "pr/explicit-review-choices": "2ae3257b9752e2d976ff7a0d39955a13c133273a",
+    "pr/resilient-progress-polling": "6ae212a35b094fc9466f1616afb2c5bb5c0497f8",
+    "pr/unchanged-report-saves": "3457efac574d74a7d2377cbc0d44bb0b87462c3a",
+    "pr/opencv-fallback-compatibility": "a10e485962571a566f99225541735ab1ada1f4c0"
+  },
+  "all_x_provenance_present": true,
+  "artifacts": {
+    "openscrub-1.0.96-py3-none-any.whl": "eeb78af83070a9f02dc138de02e71b911e3576daff2dd68842436a52c131c610",
+    "openscrub-1.0.96.tar.gz": "ea9ade903689255210869ce7778f7f44786eb1525c6572520bee64d84f4a8863"
+  }
+}
