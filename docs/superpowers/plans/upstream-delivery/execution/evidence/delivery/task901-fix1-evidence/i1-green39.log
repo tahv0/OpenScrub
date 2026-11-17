@@ -1,0 +1,11 @@
+test_file_adapter_keeps_installed_source (test_verification.VerificationTests) ... ok
+test_file_adapter_keeps_selected_source (test_verification.VerificationTests) ... ok
+test_file_child_keeps_installed_source (test_verification.VerificationTests) ... ok
+test_file_child_keeps_selected_source (test_verification.VerificationTests) ... ok
+test_module_child_keeps_installed_source (test_verification.VerificationTests) ... ok
+test_module_child_keeps_selected_source (test_verification.VerificationTests) ... ok
+
+----------------------------------------------------------------------
+Ran 6 tests in 0.699s
+
+OK

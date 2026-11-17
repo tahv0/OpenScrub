@@ -1,0 +1,4 @@
+ACTIVE_SOURCE {"executable": "/tmp/openscrub-python39-20261117/venv/bin/python", "python": "3.9.25 (main, Oct 31 2025, 23:00:23) \n[Clang 21.1.4 ]", "sources": {"sample": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-mx8i9rm3/source/sample.py", "sha256": "3e29430f1f5190ce5b49d92306ff0a807804a34c425ce0eca201f29817ad5015"}}}
+ACTIVE_SOURCE {"executable": "/tmp/openscrub-python39-20261117/venv/bin/python", "python": "3.9.25 (main, Oct 31 2025, 23:00:23) \n[Clang 21.1.4 ]", "sources": {"sample": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-mx8i9rm3/source/sample.py", "sha256": "3e29430f1f5190ce5b49d92306ff0a807804a34c425ce0eca201f29817ad5015"}}}
+FAILURE_OUTPUT
+SUCCESS_OUTPUT

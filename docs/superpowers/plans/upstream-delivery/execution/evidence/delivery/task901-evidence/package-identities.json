@@ -1,0 +1,41 @@
+{
+  "sdist": {
+    "file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/product-runs/package312-final/dist/openscrub-1.0.96.tar.gz",
+    "sha256": "a23d7a70fb086ad618e67e4ae31292b8a4954201b75fc2aa0c880969c8db2703",
+    "bytes": 569239
+  },
+  "wheel": {
+    "file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/product-runs/package312-final/wheel/openscrub-1.0.96-py3-none-any.whl",
+    "sha256": "912bd8f54571eb75fb41236ebc247a426d1272bc54fa7f36a46acec470e0997d",
+    "bytes": 443575
+  },
+  "sdist_files": [
+    "openscrub.py",
+    "openscrub_web.py",
+    "zones_ui.py",
+    "openscrub_internal/__init__.py",
+    "openscrub_internal/job_logs.py",
+    "tests/test_job_logs.py",
+    "tests/test_job_polling_node.py",
+    "tests/test_job_polling_browser.py",
+    "tests/test_browser_log_retention.py",
+    "tests/test_browser_log_benchmark.py",
+    "test_openscrub.py",
+    "pyproject.toml",
+    "README.md",
+    "benchmark/browser_logs.py",
+    "benchmark/browser_logs.js",
+    "benchmark/browser_logs_env.py",
+    "benchmark/browser_logs_summary.py",
+    "benchmark/README.md"
+  ],
+  "wheel_files": [
+    "openscrub.py",
+    "openscrub_web.py",
+    "zones_ui.py",
+    "openscrub_internal/__init__.py",
+    "openscrub_internal/job_logs.py",
+    "openscrub_update.py"
+  ],
+  "requires_python": ">=3.9"
+}

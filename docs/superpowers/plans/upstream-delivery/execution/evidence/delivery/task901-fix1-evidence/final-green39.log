@@ -1,0 +1,30 @@
+test_conflicting_owner_is_not_removed (test_verification.VerificationTests) ... ok
+test_direct_child_isolation_and_result_persistence (test_verification.VerificationTests) ... ok
+test_file_adapter_keeps_installed_source (test_verification.VerificationTests) ... ok
+test_file_adapter_keeps_selected_source (test_verification.VerificationTests) ... ok
+test_file_child_keeps_installed_source (test_verification.VerificationTests) ... ok
+test_file_child_keeps_selected_source (test_verification.VerificationTests) ... ok
+test_git_frozen_rejects_dirty_but_development_is_explicit (test_verification.VerificationTests) ... ok
+test_import_alias_and_prerequisite_hash_fail_before_workload (test_verification.VerificationTests) ... ok
+test_installed_filters_editable_source_and_checks_target_bytes (test_verification.VerificationTests) ... ok
+test_module_child_keeps_installed_source (test_verification.VerificationTests) ... ok
+test_module_child_keeps_selected_source (test_verification.VerificationTests) ... ok
+test_nested_import_path_rejection_does_not_execute_unselected_parent (test_verification.VerificationTests) ... ok
+test_prefixed_pytest_refuses_workers_and_ownership_overrides (test_verification.VerificationTests) ... ok
+test_prefixed_pytest_uses_owned_basetemp_and_cache (test_verification.VerificationTests) ... ok
+test_pytest_uses_owned_basetemp_and_same_hook (test_verification.VerificationTests) ... ok
+test_refuses_missing_prerequisite_and_low_space (test_verification.VerificationTests) ... ok
+test_refuses_symlink_scratch (test_verification.VerificationTests) ... ok
+test_refuses_unsafe_scratch_and_creates_nothing (test_verification.VerificationTests) ... ok
+test_refuses_wrong_hash (test_verification.VerificationTests) ... ok
+test_refuses_wrong_interpreter (test_verification.VerificationTests) ... ok
+test_refuses_wrong_source (test_verification.VerificationTests) ... ok
+test_source_default_jobs_can_be_checkout_relative_before_retargeting (test_verification.VerificationTests) ... ok
+test_source_identity_is_rechecked_in_cli_child (test_verification.VerificationTests) ... ok
+test_unique_runs_and_duplicate_run_preserves_existing_output (test_verification.VerificationTests) ... ok
+test_unsupported_and_combined_interpreter_options_are_rejected (test_verification.VerificationTests) ... ok
+
+----------------------------------------------------------------------
+Ran 25 tests in 3.254s
+
+OK

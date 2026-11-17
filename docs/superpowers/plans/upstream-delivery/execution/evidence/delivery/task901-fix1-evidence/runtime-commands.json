@@ -1,0 +1,94 @@
+[
+  {
+    "command": [
+      "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "/home/tahv0/.codex/worktrees/c832/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/verify.py",
+      "--config",
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fix1/source312.json",
+      "--run-id",
+      "source312",
+      "preflight"
+    ],
+    "exit": 0,
+    "log": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/task901-fix1-evidence/source312.log"
+  },
+  {
+    "command": [
+      "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "/home/tahv0/.codex/worktrees/c832/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/verify.py",
+      "--config",
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fix1/installed312.json",
+      "--run-id",
+      "cli312",
+      "run",
+      "--",
+      "-B",
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/product-runs/package312-final/site-packages/bin/openscrub",
+      "--help"
+    ],
+    "exit": 0,
+    "log": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/task901-fix1-evidence/cli312.log"
+  },
+  {
+    "command": [
+      "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "/home/tahv0/.codex/worktrees/c832/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/verify.py",
+      "--config",
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fix1/installed312.json",
+      "--run-id",
+      "http312",
+      "run",
+      "--",
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/task901-evidence/listening_smoke.py",
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/product-runs/package312-final/site-packages"
+    ],
+    "exit": 0,
+    "log": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/task901-fix1-evidence/http312.log"
+  },
+  {
+    "command": [
+      "/tmp/openscrub-python39-20261117/venv/bin/python",
+      "/home/tahv0/.codex/worktrees/c832/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/verify.py",
+      "--config",
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fix1/source39.json",
+      "--run-id",
+      "source39",
+      "preflight"
+    ],
+    "exit": 0,
+    "log": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/task901-fix1-evidence/source39.log"
+  },
+  {
+    "command": [
+      "/tmp/openscrub-python39-20261117/venv/bin/python",
+      "/home/tahv0/.codex/worktrees/c832/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/verify.py",
+      "--config",
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fix1/installed39.json",
+      "--run-id",
+      "cli39",
+      "run",
+      "--",
+      "-B",
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/product-runs/package312-final/site-packages/bin/openscrub",
+      "--help"
+    ],
+    "exit": 0,
+    "log": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/task901-fix1-evidence/cli39.log"
+  },
+  {
+    "command": [
+      "/tmp/openscrub-python39-20261117/venv/bin/python",
+      "/home/tahv0/.codex/worktrees/c832/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/verify.py",
+      "--config",
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fix1/installed39.json",
+      "--run-id",
+      "http39",
+      "run",
+      "--",
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/task901-evidence/listening_smoke.py",
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/product-runs/package312-final/site-packages"
+    ],
+    "exit": 0,
+    "log": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/task901-fix1-evidence/http39.log"
+  }
+]

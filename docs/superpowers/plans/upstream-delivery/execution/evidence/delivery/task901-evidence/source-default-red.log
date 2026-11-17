@@ -1,0 +1,32 @@
+test_conflicting_owner_is_not_removed (test_verification.VerificationTests.test_conflicting_owner_is_not_removed) ... ok
+test_direct_child_isolation_and_result_persistence (test_verification.VerificationTests.test_direct_child_isolation_and_result_persistence) ... ok
+test_git_frozen_rejects_dirty_but_development_is_explicit (test_verification.VerificationTests.test_git_frozen_rejects_dirty_but_development_is_explicit) ... ok
+test_import_alias_and_prerequisite_hash_fail_before_workload (test_verification.VerificationTests.test_import_alias_and_prerequisite_hash_fail_before_workload) ... ok
+test_installed_filters_editable_source_and_checks_target_bytes (test_verification.VerificationTests.test_installed_filters_editable_source_and_checks_target_bytes) ... ok
+test_pytest_uses_owned_basetemp_and_same_hook (test_verification.VerificationTests.test_pytest_uses_owned_basetemp_and_same_hook) ... ok
+test_refuses_missing_prerequisite_and_low_space (test_verification.VerificationTests.test_refuses_missing_prerequisite_and_low_space) ... ok
+test_refuses_symlink_scratch (test_verification.VerificationTests.test_refuses_symlink_scratch) ... ok
+test_refuses_unsafe_scratch_and_creates_nothing (test_verification.VerificationTests.test_refuses_unsafe_scratch_and_creates_nothing) ... ok
+test_refuses_wrong_hash (test_verification.VerificationTests.test_refuses_wrong_hash) ... ok
+test_refuses_wrong_interpreter (test_verification.VerificationTests.test_refuses_wrong_interpreter) ... ok
+test_refuses_wrong_source (test_verification.VerificationTests.test_refuses_wrong_source) ... ok
+test_source_default_jobs_can_be_checkout_relative_before_retargeting (test_verification.VerificationTests.test_source_default_jobs_can_be_checkout_relative_before_retargeting) ... FAIL
+test_source_identity_is_rechecked_in_cli_child (test_verification.VerificationTests.test_source_identity_is_rechecked_in_cli_child) ... ok
+test_unique_runs_and_duplicate_run_preserves_existing_output (test_verification.VerificationTests.test_unique_runs_and_duplicate_run_preserves_existing_output) ... ok
+
+======================================================================
+FAIL: test_source_default_jobs_can_be_checkout_relative_before_retargeting (test_verification.VerificationTests.test_source_default_jobs_can_be_checkout_relative_before_retargeting)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/tests/test_verification.py", line 153, in test_source_default_jobs_can_be_checkout_relative_before_retargeting
+    self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+AssertionError: 78 != 0 : PREFLIGHT {"base": "fixture-base", "files": {"openscrub.py": "ece2925b33bb95032370b0c0b5a730d66b704b9a8099c69ba1a0b268afb92188", "openscrub_web.py": "7f1f4ecf1ae52519b7721dfd2db1499f5acd2f0447d2f34a58d3309d256ffe0b", "sample.py": "3e29430f1f5190ce5b49d92306ff0a807804a34c425ce0eca201f29817ad5015"}, "free_bytes": 803542700032, "head": "fixture-head", "policy": "frozen", "prerequisites": [], "python": {"executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python", "version": [3, 12, 16]}, "run": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-2op43ucl/scratch/test901-11c19f49ce794512a0953393fd5fce56", "source": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-2op43ucl/source"}
+COMMAND ["/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python", "-c", "import os, openscrub_web; from pathlib import Path; assert Path(openscrub_web.JOBS_DIR).is_relative_to(Path(os.environ['VERIFY_RUN']) / 'app')"]
+VERIFICATION STARTUP ERROR: RuntimeError('default path escaped task profile: /home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-2op43ucl/source/openscrub_jobs')
+RESULT {"exit": 78, "log": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-2op43ucl/scratch/test901-11c19f49ce794512a0953393fd5fce56/logs/command.log", "sha256": "2a66a811ac1af90e932b1b39f54d00ac4b385e95c1e3ac2207be3d0ce043948c"}
+
+
+----------------------------------------------------------------------
+Ran 15 tests in 1.798s
+
+FAILED (failures=1)

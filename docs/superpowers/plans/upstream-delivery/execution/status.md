@@ -1,6 +1,6 @@
 # Upstream delivery execution record
 
-**Next priority:** P12C implementation and independent review are complete. Take [D01 development and verification efficiency](development-efficiency-priority.md) before another product feature. Preserve the active owner and existing verification gates; its bounded tooling pass must then prove adoption on the next real task.
+**Active priority:** [D01 development and verification efficiency](development-efficiency-priority.md): local tooling is independently approved at `081816d` after one fix round. Its [usage](tooling/README.md) and [evidence](evidence/delivery/task-901-report.md) are preserved. Actual adoption on prepared Task1631/P16C-G is next; D01 remains open until that result is recorded.
 
 Updated 2026-11-17 (Europe/Helsinki). User selected supervisor-led execution with GPT-6.1 Sol high implementers and subagents. This is a local delivery record, not an upstream PR body or a claim that the whole plan is complete.
 

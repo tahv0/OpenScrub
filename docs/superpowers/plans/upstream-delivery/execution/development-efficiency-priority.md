@@ -1,6 +1,6 @@
 # D01 — development and verification efficiency
 
-**Status:** Prioritized by the user on 2026-11-17; implementation remains open.
+**Status:** Task901 tooling is independently reviewed at `081816d93d6aaa18944fc88f251040cf11d4135f` (initial `afbd207`, documentation base `0467743`). [Usage](tooling/README.md), [implementation report](evidence/delivery/task-901-report.md) and [fix review](evidence/delivery/task-901-fix1-review.md) are retained. Adoption on Task1631/P16C-G remains open; D01 is not yet complete.
 
 **What:** Remove repeated environment setup and avoidable verification failures with a small amount of reusable local tooling and tighter task handoffs.
 
@@ -23,11 +23,17 @@
 
 ## Boundaries and completion
 
-- [ ] Reuse working helpers first. Keep any new scripts under existing local tooling, with scratch data on the designated workspace filesystem and a unique task/run directory. Do not add repository-root clutter, a general workflow framework or a new toolchain.
-- [ ] Preserve meaningful regression checks, compatibility checks and independent review. Label setup failures separately from product failures. Do not turn evidence reuse into a blind cache of passing results.
-- [ ] Preserve isolated settings, models, profiles, ports and temporary directories. Do not share mutable pytest roots or overlap benchmark timing with competing work. Do not prune other tasks' caches or data to make space.
-- [ ] Leave active implementation, branch ownership, shared environments and product behavior untouched. Do not restart completed work or reduce the user's requested implementation model quality.
+- [x] Reuse working helpers first. Keep any new scripts under existing local tooling, with scratch data on the designated workspace filesystem and a unique task/run directory. Do not add repository-root clutter, a general workflow framework or a new toolchain.
+- [x] Preserve meaningful regression checks, compatibility checks and independent review. Label setup failures separately from product failures. Do not turn evidence reuse into a blind cache of passing results.
+- [x] Preserve isolated settings, models, profiles, ports and temporary directories. Do not share mutable pytest roots or overlap benchmark timing with competing work. Do not prune other tasks' caches or data to make space.
+- [x] Leave active implementation, branch ownership, shared environments and product behavior untouched. Do not restart completed work or reduce the user's requested implementation model quality.
 - [ ] Retain a concise usage recipe, helper verification results and the before/after observations through the existing documentation/evidence process. Record the next real task's adoption result rather than starting a continuing optimization project.
-- [ ] Keep D01 outside unrelated feature PRs. Any generally useful developer tooling proposed to Austin later needs its own small, portable diff; local machine paths and execution archives are not upstream deliverables.
+- [x] Keep D01 outside unrelated feature PRs. Any generally useful developer tooling proposed to Austin later needs its own small, portable diff; local machine paths and execution archives are not upstream deliverables.
 
 **Done means:** The next implementer can use the established environment and required verification path without rebuilding the setup instructions, common setup errors fail early, and the required product evidence remains intact. Close the task with measured benefits and any specific remaining limits, then return to the focused contribution queue.
+
+## Reviewed tooling result and adoption gate
+
+The helper consolidates twelve repeated setup responsibilities into four caller actions: freeze the selected source and gates, provide one explicit environment/configuration, invoke the required checks, and invoke/inspect the package path. This is a documented reduction in manual responsibilities, not a measured wall-clock saving. The original16 focused cases passed on each actual Python3.12/3.9. Independent review found direct-script import shadowing and prefixed-pytest ownership gaps; the fix's final25 cases pass on both, and the same final tests reproduce16 failing assertions against the old helper on each interpreter. Six affected source/default, installed CLI and listening-server checks also pass. The unchanged package artifacts were reused; no product-wide suite or timing was repeated for this tooling work.
+
+Caller-selected module/file inventories remain explicit, including package parents. Python hooks do not provide OS/native containment; adapters still own ports and child cleanup. Minor M1 (an implicit tar-extraction filter warning in successful package output) is deferred for readiness. The next real task must record actual use, any setup failures, remaining task-specific adapters and the required product evidence before D01 closes.

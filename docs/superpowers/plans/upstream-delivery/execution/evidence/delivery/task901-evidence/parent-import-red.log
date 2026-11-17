@@ -1,0 +1,29 @@
+test_conflicting_owner_is_not_removed (test_verification.VerificationTests.test_conflicting_owner_is_not_removed) ... ok
+test_direct_child_isolation_and_result_persistence (test_verification.VerificationTests.test_direct_child_isolation_and_result_persistence) ... ok
+test_git_frozen_rejects_dirty_but_development_is_explicit (test_verification.VerificationTests.test_git_frozen_rejects_dirty_but_development_is_explicit) ... ok
+test_import_alias_and_prerequisite_hash_fail_before_workload (test_verification.VerificationTests.test_import_alias_and_prerequisite_hash_fail_before_workload) ... ok
+test_installed_filters_editable_source_and_checks_target_bytes (test_verification.VerificationTests.test_installed_filters_editable_source_and_checks_target_bytes) ... ok
+test_nested_import_path_rejection_does_not_execute_unselected_parent (test_verification.VerificationTests.test_nested_import_path_rejection_does_not_execute_unselected_parent) ... FAIL
+test_pytest_uses_owned_basetemp_and_same_hook (test_verification.VerificationTests.test_pytest_uses_owned_basetemp_and_same_hook) ... ok
+test_refuses_missing_prerequisite_and_low_space (test_verification.VerificationTests.test_refuses_missing_prerequisite_and_low_space) ... ok
+test_refuses_symlink_scratch (test_verification.VerificationTests.test_refuses_symlink_scratch) ... ok
+test_refuses_unsafe_scratch_and_creates_nothing (test_verification.VerificationTests.test_refuses_unsafe_scratch_and_creates_nothing) ... ok
+test_refuses_wrong_hash (test_verification.VerificationTests.test_refuses_wrong_hash) ... ok
+test_refuses_wrong_interpreter (test_verification.VerificationTests.test_refuses_wrong_interpreter) ... ok
+test_refuses_wrong_source (test_verification.VerificationTests.test_refuses_wrong_source) ... ok
+test_source_default_jobs_can_be_checkout_relative_before_retargeting (test_verification.VerificationTests.test_source_default_jobs_can_be_checkout_relative_before_retargeting) ... ok
+test_source_identity_is_rechecked_in_cli_child (test_verification.VerificationTests.test_source_identity_is_rechecked_in_cli_child) ... ok
+test_unique_runs_and_duplicate_run_preserves_existing_output (test_verification.VerificationTests.test_unique_runs_and_duplicate_run_preserves_existing_output) ... ok
+
+======================================================================
+FAIL: test_nested_import_path_rejection_does_not_execute_unselected_parent (test_verification.VerificationTests.test_nested_import_path_rejection_does_not_execute_unselected_parent)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/tests/test_verification.py", line 169, in test_nested_import_path_rejection_does_not_execute_unselected_parent
+    self.assertIn('import path mismatch', result.stdout)
+AssertionError: 'import path mismatch' not found in 'PREFLIGHT {"base": "fixture-base", "files": 1, "free_bytes": 803531870208, "head": "fixture-head", "manifest_sha256": "9e40987c1277363f879f0b6c95ae8c6a0360d7dfd472294ce6a01476739c43ae", "policy": "frozen", "prerequisites": [], "python": {"executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python", "version": [3, 12, 16]}, "run": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-68t0msk1/scratch/test901-dff34f29530848a1b082fc4f5c362680", "source": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-68t0msk1/source"}\nCOMMAND ["/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python", "-c", "print(\\"IMPORT_PREFLIGHT_OK\\")"]\nVERIFICATION STARTUP ERROR: RuntimeError(\'UNSELECTED_PARENT_EXECUTED\')\nRESULT {"exit": 78, "log": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-68t0msk1/scratch/test901-dff34f29530848a1b082fc4f5c362680/logs/command.log", "sha256": "8dde67ad76255b43b9e77c7892656019a99598a9ec54393798a6b621cc602ca4"}\n'
+
+----------------------------------------------------------------------
+Ran 16 tests in 1.867s
+
+FAILED (failures=1)

@@ -1,0 +1,2 @@
+ARGUMENT_PROBE ["/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python", "-B", "-m", "pytest", "fixture.py", "-n", "2"]
+ARGUMENT_PROBE ["/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python", "-Es", "-c", "pass"]

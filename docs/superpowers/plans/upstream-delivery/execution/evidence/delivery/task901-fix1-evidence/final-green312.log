@@ -1,0 +1,30 @@
+test_conflicting_owner_is_not_removed (test_verification.VerificationTests.test_conflicting_owner_is_not_removed) ... ok
+test_direct_child_isolation_and_result_persistence (test_verification.VerificationTests.test_direct_child_isolation_and_result_persistence) ... ok
+test_file_adapter_keeps_installed_source (test_verification.VerificationTests.test_file_adapter_keeps_installed_source) ... ok
+test_file_adapter_keeps_selected_source (test_verification.VerificationTests.test_file_adapter_keeps_selected_source) ... ok
+test_file_child_keeps_installed_source (test_verification.VerificationTests.test_file_child_keeps_installed_source) ... ok
+test_file_child_keeps_selected_source (test_verification.VerificationTests.test_file_child_keeps_selected_source) ... ok
+test_git_frozen_rejects_dirty_but_development_is_explicit (test_verification.VerificationTests.test_git_frozen_rejects_dirty_but_development_is_explicit) ... ok
+test_import_alias_and_prerequisite_hash_fail_before_workload (test_verification.VerificationTests.test_import_alias_and_prerequisite_hash_fail_before_workload) ... ok
+test_installed_filters_editable_source_and_checks_target_bytes (test_verification.VerificationTests.test_installed_filters_editable_source_and_checks_target_bytes) ... ok
+test_module_child_keeps_installed_source (test_verification.VerificationTests.test_module_child_keeps_installed_source) ... ok
+test_module_child_keeps_selected_source (test_verification.VerificationTests.test_module_child_keeps_selected_source) ... ok
+test_nested_import_path_rejection_does_not_execute_unselected_parent (test_verification.VerificationTests.test_nested_import_path_rejection_does_not_execute_unselected_parent) ... ok
+test_prefixed_pytest_refuses_workers_and_ownership_overrides (test_verification.VerificationTests.test_prefixed_pytest_refuses_workers_and_ownership_overrides) ... ok
+test_prefixed_pytest_uses_owned_basetemp_and_cache (test_verification.VerificationTests.test_prefixed_pytest_uses_owned_basetemp_and_cache) ... ok
+test_pytest_uses_owned_basetemp_and_same_hook (test_verification.VerificationTests.test_pytest_uses_owned_basetemp_and_same_hook) ... ok
+test_refuses_missing_prerequisite_and_low_space (test_verification.VerificationTests.test_refuses_missing_prerequisite_and_low_space) ... ok
+test_refuses_symlink_scratch (test_verification.VerificationTests.test_refuses_symlink_scratch) ... ok
+test_refuses_unsafe_scratch_and_creates_nothing (test_verification.VerificationTests.test_refuses_unsafe_scratch_and_creates_nothing) ... ok
+test_refuses_wrong_hash (test_verification.VerificationTests.test_refuses_wrong_hash) ... ok
+test_refuses_wrong_interpreter (test_verification.VerificationTests.test_refuses_wrong_interpreter) ... ok
+test_refuses_wrong_source (test_verification.VerificationTests.test_refuses_wrong_source) ... ok
+test_source_default_jobs_can_be_checkout_relative_before_retargeting (test_verification.VerificationTests.test_source_default_jobs_can_be_checkout_relative_before_retargeting) ... ok
+test_source_identity_is_rechecked_in_cli_child (test_verification.VerificationTests.test_source_identity_is_rechecked_in_cli_child) ... ok
+test_unique_runs_and_duplicate_run_preserves_existing_output (test_verification.VerificationTests.test_unique_runs_and_duplicate_run_preserves_existing_output) ... ok
+test_unsupported_and_combined_interpreter_options_are_rejected (test_verification.VerificationTests.test_unsupported_and_combined_interpreter_options_are_rejected) ... ok
+
+----------------------------------------------------------------------
+Ran 25 tests in 3.073s
+
+OK

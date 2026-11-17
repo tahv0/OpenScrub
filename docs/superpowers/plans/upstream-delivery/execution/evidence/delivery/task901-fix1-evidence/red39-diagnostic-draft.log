@@ -1,0 +1,304 @@
+test_conflicting_owner_is_not_removed (test_verification.VerificationTests) ... ok
+test_direct_child_isolation_and_result_persistence (test_verification.VerificationTests) ... ok
+test_file_adapter_keeps_installed_source (test_verification.VerificationTests) ... FAIL
+test_file_adapter_keeps_selected_source (test_verification.VerificationTests) ... FAIL
+test_file_child_keeps_installed_source (test_verification.VerificationTests) ... FAIL
+test_file_child_keeps_selected_source (test_verification.VerificationTests) ... FAIL
+test_git_frozen_rejects_dirty_but_development_is_explicit (test_verification.VerificationTests) ... ok
+test_import_alias_and_prerequisite_hash_fail_before_workload (test_verification.VerificationTests) ... ok
+test_installed_filters_editable_source_and_checks_target_bytes (test_verification.VerificationTests) ... ok
+test_module_child_keeps_installed_source (test_verification.VerificationTests) ... FAIL
+test_module_child_keeps_selected_source (test_verification.VerificationTests) ... FAIL
+test_nested_import_path_rejection_does_not_execute_unselected_parent (test_verification.VerificationTests) ... ok
+test_prefixed_pytest_refuses_workers_and_ownership_overrides (test_verification.VerificationTests) ... test_prefixed_pytest_uses_owned_basetemp_and_cache (test_verification.VerificationTests) ... FAIL
+test_pytest_uses_owned_basetemp_and_same_hook (test_verification.VerificationTests) ... ok
+test_refuses_missing_prerequisite_and_low_space (test_verification.VerificationTests) ... ok
+test_refuses_symlink_scratch (test_verification.VerificationTests) ... ok
+test_refuses_unsafe_scratch_and_creates_nothing (test_verification.VerificationTests) ... ok
+test_refuses_wrong_hash (test_verification.VerificationTests) ... ok
+test_refuses_wrong_interpreter (test_verification.VerificationTests) ... ok
+test_refuses_wrong_source (test_verification.VerificationTests) ... ok
+test_source_default_jobs_can_be_checkout_relative_before_retargeting (test_verification.VerificationTests) ... ok
+test_source_identity_is_rechecked_in_cli_child (test_verification.VerificationTests) ... ok
+test_unique_runs_and_duplicate_run_preserves_existing_output (test_verification.VerificationTests) ... ok
+test_unsupported_and_combined_interpreter_options_are_rejected (test_verification.VerificationTests) ... 
+======================================================================
+FAIL: test_file_adapter_keeps_installed_source (test_verification.VerificationTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/tests/test_verification.py", line 197, in test_file_adapter_keeps_installed_source
+    self.file_origin_case(installed=True)
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/tests/test_verification.py", line 190, in file_origin_case
+    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+AssertionError: 1 != 0 : PREFLIGHT {"base": "fixture-base", "files": 1, "free_bytes": 803515449344, "head": "fixture-head", "manifest_sha256": "71e339ee022460d5c0f1d233c78d4e9cb203acf9d7a4cfc5c54c60f974fe3eb3", "policy": "frozen", "prerequisites": [], "python": {"executable": "/tmp/openscrub-python39-20261117/venv/bin/python", "version": [3, 9, 25]}, "run": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-d2kf7d4x/scratch/test901-3e8f788564b74175b99065075234931a", "source": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-d2kf7d4x/source"}
+COMMAND ["/tmp/openscrub-python39-20261117/venv/bin/python", "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-d2kf7d4x/adapter/main.py", "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-d2kf7d4x/target"]
+ACTIVE_SOURCE {"executable": "/tmp/openscrub-python39-20261117/venv/bin/python", "python": "3.9.25 (main, Oct 31 2025, 23:00:23) \n[Clang 21.1.4 ]", "sources": {"sample": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-d2kf7d4x/target/sample.py", "sha256": "3e29430f1f5190ce5b49d92306ff0a807804a34c425ce0eca201f29817ad5015"}}}
+EXECUTED_IMPORT /home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-d2kf7d4x/adapter/sample.py 99
+Traceback (most recent call last):
+  File "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-d2kf7d4x/adapter/main.py", line 4, in <module>
+    assert sample.VALUE == 17, (sample.__file__, sample.VALUE)
+AssertionError: ('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-d2kf7d4x/adapter/sample.py', 99)
+RESULT {"exit": 1, "log": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-d2kf7d4x/scratch/test901-3e8f788564b74175b99065075234931a/logs/command.log", "sha256": "802ae4ca90848eb9181f84d74a5d501ddc13afc2f3cbbecfdb2b4721eb302000"}
+
+
+======================================================================
+FAIL: test_file_adapter_keeps_selected_source (test_verification.VerificationTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/tests/test_verification.py", line 194, in test_file_adapter_keeps_selected_source
+    self.file_origin_case()
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/tests/test_verification.py", line 190, in file_origin_case
+    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+AssertionError: 1 != 0 : PREFLIGHT {"base": "fixture-base", "files": 1, "free_bytes": 803515342848, "head": "fixture-head", "manifest_sha256": "461ca06901cf0d63dc022ee721e3ce4d15e7080b212965d0b00017d57a629144", "policy": "frozen", "prerequisites": [], "python": {"executable": "/tmp/openscrub-python39-20261117/venv/bin/python", "version": [3, 9, 25]}, "run": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-c1ix4zmp/scratch/test901-db829f91c45b4c2cb025d11f0040b689", "source": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-c1ix4zmp/source"}
+COMMAND ["/tmp/openscrub-python39-20261117/venv/bin/python", "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-c1ix4zmp/adapter/main.py", "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-c1ix4zmp/source"]
+ACTIVE_SOURCE {"executable": "/tmp/openscrub-python39-20261117/venv/bin/python", "python": "3.9.25 (main, Oct 31 2025, 23:00:23) \n[Clang 21.1.4 ]", "sources": {"sample": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-c1ix4zmp/source/sample.py", "sha256": "3e29430f1f5190ce5b49d92306ff0a807804a34c425ce0eca201f29817ad5015"}}}
+EXECUTED_IMPORT /home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-c1ix4zmp/adapter/sample.py 99
+Traceback (most recent call last):
+  File "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-c1ix4zmp/adapter/main.py", line 4, in <module>
+    assert sample.VALUE == 17, (sample.__file__, sample.VALUE)
+AssertionError: ('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-c1ix4zmp/adapter/sample.py', 99)
+RESULT {"exit": 1, "log": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-c1ix4zmp/scratch/test901-db829f91c45b4c2cb025d11f0040b689/logs/command.log", "sha256": "5b7714c6dd6a16938b333b0f5cce806156df05fddcf93b05463c38694e0766cb"}
+
+
+======================================================================
+FAIL: test_file_child_keeps_installed_source (test_verification.VerificationTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/tests/test_verification.py", line 203, in test_file_child_keeps_installed_source
+    self.file_origin_case(installed=True, child=True)
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/tests/test_verification.py", line 190, in file_origin_case
+    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+AssertionError: 1 != 0 : PREFLIGHT {"base": "fixture-base", "files": 1, "free_bytes": 803515215872, "head": "fixture-head", "manifest_sha256": "247053db325bbbd837af58842f188f5da32a08b72f4474cf86acd31bc5996158", "policy": "frozen", "prerequisites": [], "python": {"executable": "/tmp/openscrub-python39-20261117/venv/bin/python", "version": [3, 9, 25]}, "run": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-gvav18g7/scratch/test901-3ab05e31e9594080ae014ad280819a36", "source": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-gvav18g7/source"}
+COMMAND ["/tmp/openscrub-python39-20261117/venv/bin/python", "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-gvav18g7/adapter/main.py", "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-gvav18g7/adapter/children/probe.py", "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-gvav18g7/target"]
+ACTIVE_SOURCE {"executable": "/tmp/openscrub-python39-20261117/venv/bin/python", "python": "3.9.25 (main, Oct 31 2025, 23:00:23) \n[Clang 21.1.4 ]", "sources": {"sample": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-gvav18g7/target/sample.py", "sha256": "3e29430f1f5190ce5b49d92306ff0a807804a34c425ce0eca201f29817ad5015"}}}
+ACTIVE_SOURCE {"executable": "/tmp/openscrub-python39-20261117/venv/bin/python", "python": "3.9.25 (main, Oct 31 2025, 23:00:23) \n[Clang 21.1.4 ]", "sources": {"sample": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-gvav18g7/target/sample.py", "sha256": "3e29430f1f5190ce5b49d92306ff0a807804a34c425ce0eca201f29817ad5015"}}}
+EXECUTED_IMPORT /home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-gvav18g7/adapter/children/sample.py 101
+Traceback (most recent call last):
+  File "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-gvav18g7/adapter/children/probe.py", line 4, in <module>
+    assert sample.VALUE == 17, (sample.__file__, sample.VALUE)
+AssertionError: ('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-gvav18g7/adapter/children/sample.py', 101)
+Traceback (most recent call last):
+  File "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-gvav18g7/adapter/main.py", line 2, in <module>
+    subprocess.run([sys.executable, sys.argv[1], sys.argv[2]], check=True)
+  File "/tmp/openscrub-python39-20261117/python/cpython-3.9-linux-x86_64-gnu/lib/python3.9/subprocess.py", line 528, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['/tmp/openscrub-python39-20261117/venv/bin/python', '/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-gvav18g7/adapter/children/probe.py', '/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-gvav18g7/target']' returned non-zero exit status 1.
+RESULT {"exit": 1, "log": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-gvav18g7/scratch/test901-3ab05e31e9594080ae014ad280819a36/logs/command.log", "sha256": "823096336ac0f7a79ad703c64ae3be5c51dbb060d7acabcac5962d86feeeb464"}
+
+
+======================================================================
+FAIL: test_file_child_keeps_selected_source (test_verification.VerificationTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/tests/test_verification.py", line 200, in test_file_child_keeps_selected_source
+    self.file_origin_case(child=True)
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/tests/test_verification.py", line 190, in file_origin_case
+    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+AssertionError: 1 != 0 : PREFLIGHT {"base": "fixture-base", "files": 1, "free_bytes": 803515097088, "head": "fixture-head", "manifest_sha256": "1919aacf880f1b433a101e20b0fa9a1c1c6bb67477150daa949f3c90563ac0dc", "policy": "frozen", "prerequisites": [], "python": {"executable": "/tmp/openscrub-python39-20261117/venv/bin/python", "version": [3, 9, 25]}, "run": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-kpiepz3w/scratch/test901-635d7f84f888463481692dc25c63ab7b", "source": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-kpiepz3w/source"}
+COMMAND ["/tmp/openscrub-python39-20261117/venv/bin/python", "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-kpiepz3w/adapter/main.py", "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-kpiepz3w/adapter/children/probe.py", "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-kpiepz3w/source"]
+ACTIVE_SOURCE {"executable": "/tmp/openscrub-python39-20261117/venv/bin/python", "python": "3.9.25 (main, Oct 31 2025, 23:00:23) \n[Clang 21.1.4 ]", "sources": {"sample": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-kpiepz3w/source/sample.py", "sha256": "3e29430f1f5190ce5b49d92306ff0a807804a34c425ce0eca201f29817ad5015"}}}
+ACTIVE_SOURCE {"executable": "/tmp/openscrub-python39-20261117/venv/bin/python", "python": "3.9.25 (main, Oct 31 2025, 23:00:23) \n[Clang 21.1.4 ]", "sources": {"sample": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-kpiepz3w/source/sample.py", "sha256": "3e29430f1f5190ce5b49d92306ff0a807804a34c425ce0eca201f29817ad5015"}}}
+EXECUTED_IMPORT /home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-kpiepz3w/adapter/children/sample.py 101
+Traceback (most recent call last):
+  File "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-kpiepz3w/adapter/children/probe.py", line 4, in <module>
+    assert sample.VALUE == 17, (sample.__file__, sample.VALUE)
+AssertionError: ('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-kpiepz3w/adapter/children/sample.py', 101)
+Traceback (most recent call last):
+  File "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-kpiepz3w/adapter/main.py", line 2, in <module>
+    subprocess.run([sys.executable, sys.argv[1], sys.argv[2]], check=True)
+  File "/tmp/openscrub-python39-20261117/python/cpython-3.9-linux-x86_64-gnu/lib/python3.9/subprocess.py", line 528, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['/tmp/openscrub-python39-20261117/venv/bin/python', '/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-kpiepz3w/adapter/children/probe.py', '/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-kpiepz3w/source']' returned non-zero exit status 1.
+RESULT {"exit": 1, "log": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-kpiepz3w/scratch/test901-635d7f84f888463481692dc25c63ab7b/logs/command.log", "sha256": "8188049a118f2f6561804f77e9c6dc5c88f1af3a69cb87120d9f41cac838e3a1"}
+
+
+======================================================================
+FAIL: test_module_child_keeps_installed_source (test_verification.VerificationTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/tests/test_verification.py", line 209, in test_module_child_keeps_installed_source
+    self.file_origin_case(installed=True, child=True, module=True)
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/tests/test_verification.py", line 191, in file_origin_case
+    self.assertIn('MODULE_SELECTED_17' if module else 'EXECUTED_IMPORT ' + str(selected / 'sample.py') + ' 17', result.stdout)
+AssertionError: 'MODULE_SELECTED_17' not found in 'PREFLIGHT {"base": "fixture-base", "files": 1, "free_bytes": 803514490880, "head": "fixture-head", "manifest_sha256": "3fd310022ffbb865294a02e63634e1928b0798cde09ccf19a8afe5d42f46c5b4", "policy": "frozen", "prerequisites": [], "python": {"executable": "/tmp/openscrub-python39-20261117/venv/bin/python", "version": [3, 9, 25]}, "run": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-2f7t615j/scratch/test901-668bbc474e044f2e9e80f9d4937cf6cb", "source": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-2f7t615j/source"}\nCOMMAND ["/tmp/openscrub-python39-20261117/venv/bin/python", "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-2f7t615j/adapter/main.py", "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-2f7t615j/adapter/children/probe.py", "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-2f7t615j/target"]\nACTIVE_SOURCE {"executable": "/tmp/openscrub-python39-20261117/venv/bin/python", "python": "3.9.25 (main, Oct 31 2025, 23:00:23) \\n[Clang 21.1.4 ]", "sources": {"sample": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-2f7t615j/target/sample.py", "sha256": "739eed251fa7a2961bb3348b833ed58f028493beac8eebbdb93ec92ecd713548"}}}\nACTIVE_SOURCE {"executable": "/tmp/openscrub-python39-20261117/venv/bin/python", "python": "3.9.25 (main, Oct 31 2025, 23:00:23) \\n[Clang 21.1.4 ]", "sources": {"sample": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-2f7t615j/target/sample.py", "sha256": "739eed251fa7a2961bb3348b833ed58f028493beac8eebbdb93ec92ecd713548"}}}\nRESULT {"exit": 0, "log": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-2f7t615j/scratch/test901-668bbc474e044f2e9e80f9d4937cf6cb/logs/command.log", "sha256": "dc61f072ba36f63db8f7cb5d8d4e5ea6edb58541e31556bb51f2d146f4cad7b9"}\n'
+
+======================================================================
+FAIL: test_module_child_keeps_selected_source (test_verification.VerificationTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/tests/test_verification.py", line 206, in test_module_child_keeps_selected_source
+    self.file_origin_case(child=True, module=True)
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/tests/test_verification.py", line 191, in file_origin_case
+    self.assertIn('MODULE_SELECTED_17' if module else 'EXECUTED_IMPORT ' + str(selected / 'sample.py') + ' 17', result.stdout)
+AssertionError: 'MODULE_SELECTED_17' not found in 'PREFLIGHT {"base": "fixture-base", "files": 1, "free_bytes": 803514368000, "head": "fixture-head", "manifest_sha256": "202c11f8a52333d1df6d161a3a9dc12b341d9431c2c6563d7f38f6312da8b74f", "policy": "frozen", "prerequisites": [], "python": {"executable": "/tmp/openscrub-python39-20261117/venv/bin/python", "version": [3, 9, 25]}, "run": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-l4uz3cor/scratch/test901-04c3b97ee71f4c9794227e85e40822d5", "source": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-l4uz3cor/source"}\nCOMMAND ["/tmp/openscrub-python39-20261117/venv/bin/python", "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-l4uz3cor/adapter/main.py", "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-l4uz3cor/adapter/children/probe.py", "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-l4uz3cor/source"]\nACTIVE_SOURCE {"executable": "/tmp/openscrub-python39-20261117/venv/bin/python", "python": "3.9.25 (main, Oct 31 2025, 23:00:23) \\n[Clang 21.1.4 ]", "sources": {"sample": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-l4uz3cor/source/sample.py", "sha256": "739eed251fa7a2961bb3348b833ed58f028493beac8eebbdb93ec92ecd713548"}}}\nACTIVE_SOURCE {"executable": "/tmp/openscrub-python39-20261117/venv/bin/python", "python": "3.9.25 (main, Oct 31 2025, 23:00:23) \\n[Clang 21.1.4 ]", "sources": {"sample": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-l4uz3cor/source/sample.py", "sha256": "739eed251fa7a2961bb3348b833ed58f028493beac8eebbdb93ec92ecd713548"}}}\nRESULT {"exit": 0, "log": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-l4uz3cor/scratch/test901-04c3b97ee71f4c9794227e85e40822d5/logs/command.log", "sha256": "6c141d6685623bf6a56ed1ed8cbb3f4db32b73ed22f73f5af4f62023033e355a"}\n'
+
+======================================================================
+FAIL: test_prefixed_pytest_refuses_workers_and_ownership_overrides (test_verification.VerificationTests) (options=['-n', '2'])
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/tests/test_verification.py", line 224, in test_prefixed_pytest_refuses_workers_and_ownership_overrides
+    build_command(self.config, self.root / 'scratch/run', ['-B', '-u', '-m', 'pytest', 'fixture.py'] + options)
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_prefixed_pytest_refuses_workers_and_ownership_overrides (test_verification.VerificationTests) (options=['--numprocesses=2'])
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/tests/test_verification.py", line 224, in test_prefixed_pytest_refuses_workers_and_ownership_overrides
+    build_command(self.config, self.root / 'scratch/run', ['-B', '-u', '-m', 'pytest', 'fixture.py'] + options)
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_prefixed_pytest_refuses_workers_and_ownership_overrides (test_verification.VerificationTests) (options=['--dist', 'load'])
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/tests/test_verification.py", line 224, in test_prefixed_pytest_refuses_workers_and_ownership_overrides
+    build_command(self.config, self.root / 'scratch/run', ['-B', '-u', '-m', 'pytest', 'fixture.py'] + options)
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_prefixed_pytest_refuses_workers_and_ownership_overrides (test_verification.VerificationTests) (options=['--basetemp', '/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-qrlnl6mr/other'])
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/tests/test_verification.py", line 224, in test_prefixed_pytest_refuses_workers_and_ownership_overrides
+    build_command(self.config, self.root / 'scratch/run', ['-B', '-u', '-m', 'pytest', 'fixture.py'] + options)
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_prefixed_pytest_refuses_workers_and_ownership_overrides (test_verification.VerificationTests) (options=['-o', 'cache_dir=other'])
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/tests/test_verification.py", line 224, in test_prefixed_pytest_refuses_workers_and_ownership_overrides
+    build_command(self.config, self.root / 'scratch/run', ['-B', '-u', '-m', 'pytest', 'fixture.py'] + options)
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_prefixed_pytest_uses_owned_basetemp_and_cache (test_verification.VerificationTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/tests/test_verification.py", line 215, in test_prefixed_pytest_uses_owned_basetemp_and_cache
+    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+AssertionError: 1 != 0 : PREFLIGHT {"base": "fixture-base", "files": 1, "free_bytes": 803514134528, "head": "fixture-head", "manifest_sha256": "9c6842475b3b2beab1b0c416fb93ab611b672c600271018dbcde6d5ceae4defa", "policy": "frozen", "prerequisites": [], "python": {"executable": "/tmp/openscrub-python39-20261117/venv/bin/python", "version": [3, 9, 25]}, "run": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-050rdqox/scratch/test901-dbac0bf359534d4798c3f79bf9e58c21", "source": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-050rdqox/source"}
+COMMAND ["/tmp/openscrub-python39-20261117/venv/bin/python", "-B", "-u", "-m", "pytest", "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-050rdqox/source/test_prefixed.py", "-q"]
+ACTIVE_SOURCE {"executable": "/tmp/openscrub-python39-20261117/venv/bin/python", "python": "3.9.25 (main, Oct 31 2025, 23:00:23) \n[Clang 21.1.4 ]", "sources": {"sample": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-050rdqox/source/sample.py", "sha256": "3e29430f1f5190ce5b49d92306ff0a807804a34c425ce0eca201f29817ad5015"}}}
+F                                                                        [100%]Traceback (most recent call last):
+  File "/tmp/openscrub-python39-20261117/python/cpython-3.9-linux-x86_64-gnu/lib/python3.9/runpy.py", line 197, in _run_module_as_main
+    return _run_code(code, main_globals, None,
+  File "/tmp/openscrub-python39-20261117/python/cpython-3.9-linux-x86_64-gnu/lib/python3.9/runpy.py", line 87, in _run_code
+    exec(code, run_globals)
+  File "/tmp/openscrub-python39-20261117/venv/lib/python3.9/site-packages/pytest/__main__.py", line 9, in <module>
+    raise SystemExit(pytest.console_main())
+  File "/tmp/openscrub-python39-20261117/venv/lib/python3.9/site-packages/_pytest/config/__init__.py", line 201, in console_main
+    code = main()
+  File "/tmp/openscrub-python39-20261117/venv/lib/python3.9/site-packages/_pytest/config/__init__.py", line 175, in main
+    ret: ExitCode | int = config.hook.pytest_cmdline_main(config=config)
+  File "/tmp/openscrub-python39-20261117/venv/lib/python3.9/site-packages/pluggy/_hooks.py", line 512, in __call__
+    return self._hookexec(self.name, self._hookimpls.copy(), kwargs, firstresult)
+  File "/tmp/openscrub-python39-20261117/venv/lib/python3.9/site-packages/pluggy/_manager.py", line 120, in _hookexec
+    return self._inner_hookexec(hook_name, methods, kwargs, firstresult)
+  File "/tmp/openscrub-python39-20261117/venv/lib/python3.9/site-packages/pluggy/_callers.py", line 167, in _multicall
+    raise exception
+  File "/tmp/openscrub-python39-20261117/venv/lib/python3.9/site-packages/pluggy/_callers.py", line 121, in _multicall
+    res = hook_impl.function(*args)
+  File "/tmp/openscrub-python39-20261117/venv/lib/python3.9/site-packages/_pytest/main.py", line 336, in pytest_cmdline_main
+    return wrap_session(config, _main)
+  File "/tmp/openscrub-python39-20261117/venv/lib/python3.9/site-packages/_pytest/main.py", line 324, in wrap_session
+    config.hook.pytest_sessionfinish(
+  File "/tmp/openscrub-python39-20261117/venv/lib/python3.9/site-packages/pluggy/_hooks.py", line 512, in __call__
+    return self._hookexec(self.name, self._hookimpls.copy(), kwargs, firstresult)
+  File "/tmp/openscrub-python39-20261117/venv/lib/python3.9/site-packages/pluggy/_manager.py", line 120, in _hookexec
+    return self._inner_hookexec(hook_name, methods, kwargs, firstresult)
+  File "/tmp/openscrub-python39-20261117/venv/lib/python3.9/site-packages/pluggy/_callers.py", line 167, in _multicall
+    raise exception
+  File "/tmp/openscrub-python39-20261117/venv/lib/python3.9/site-packages/pluggy/_callers.py", line 139, in _multicall
+    teardown.throw(exception)
+  File "/tmp/openscrub-python39-20261117/venv/lib/python3.9/site-packages/_pytest/logging.py", line 873, in pytest_sessionfinish
+    return (yield)
+  File "/tmp/openscrub-python39-20261117/venv/lib/python3.9/site-packages/pluggy/_callers.py", line 139, in _multicall
+    teardown.throw(exception)
+  File "/tmp/openscrub-python39-20261117/venv/lib/python3.9/site-packages/_pytest/terminal.py", line 936, in pytest_sessionfinish
+    result = yield
+  File "/tmp/openscrub-python39-20261117/venv/lib/python3.9/site-packages/pluggy/_callers.py", line 139, in _multicall
+    teardown.throw(exception)
+  File "/tmp/openscrub-python39-20261117/venv/lib/python3.9/site-packages/_pytest/warnings.py", line 119, in pytest_sessionfinish
+    return (yield)
+  File "/tmp/openscrub-python39-20261117/venv/lib/python3.9/site-packages/pluggy/_callers.py", line 121, in _multicall
+    res = hook_impl.function(*args)
+  File "/tmp/openscrub-python39-20261117/venv/lib/python3.9/site-packages/_pytest/cacheprovider.py", line 475, in pytest_sessionfinish
+    config.cache.set("cache/nodeids", sorted(self.cached_nodeids))
+  File "/tmp/openscrub-python39-20261117/venv/lib/python3.9/site-packages/_pytest/cacheprovider.py", line 184, in set
+    self._mkdir(path.parent)
+  File "/tmp/openscrub-python39-20261117/venv/lib/python3.9/site-packages/_pytest/cacheprovider.py", line 126, in _mkdir
+    self._ensure_cache_dir_and_supporting_files()
+  File "/tmp/openscrub-python39-20261117/venv/lib/python3.9/site-packages/_pytest/cacheprovider.py", line 208, in _ensure_cache_dir_and_supporting_files
+    self._cachedir.parent.mkdir(parents=True, exist_ok=True)
+  File "/tmp/openscrub-python39-20261117/python/cpython-3.9-linux-x86_64-gnu/lib/python3.9/pathlib.py", line 1251, in mkdir
+    self._accessor.mkdir(self, mode)
+  File "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-050rdqox/scratch/test901-dbac0bf359534d4798c3f79bf9e58c21/hooks/verification_hook.py", line 58, in audit
+    checked(args[0])
+  File "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-050rdqox/scratch/test901-dbac0bf359534d4798c3f79bf9e58c21/hooks/verification_hook.py", line 49, in checked
+    raise RuntimeError('verification write outside run: ' + str(resolved))
+RuntimeError: verification write outside run: /home/tahv0/src/OpenScrub
+RESULT {"exit": 1, "log": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task901/fixture-050rdqox/scratch/test901-dbac0bf359534d4798c3f79bf9e58c21/logs/command.log", "sha256": "039d885f7b3d88efd239ee09c12fddf6ee5499cd1be1156992ebb9f239b9407f"}
+
+
+======================================================================
+FAIL: test_unsupported_and_combined_interpreter_options_are_rejected (test_verification.VerificationTests) (options=['-Es', '-c', 'pass'])
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/tests/test_verification.py", line 232, in test_unsupported_and_combined_interpreter_options_are_rejected
+    build_command(self.config, self.root / 'scratch/run', options)
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_unsupported_and_combined_interpreter_options_are_rejected (test_verification.VerificationTests) (options=['-sE', '-m', 'pytest'])
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/tests/test_verification.py", line 232, in test_unsupported_and_combined_interpreter_options_are_rejected
+    build_command(self.config, self.root / 'scratch/run', options)
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_unsupported_and_combined_interpreter_options_are_rejected (test_verification.VerificationTests) (options=['-IS', '-c', 'pass'])
+----------------------------------------------------------------------
+ValueError: Python flags that bypass the startup guard are forbidden
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/tests/test_verification.py", line 232, in test_unsupported_and_combined_interpreter_options_are_rejected
+    build_command(self.config, self.root / 'scratch/run', options)
+AssertionError: "interpreter prefix" does not match "Python flags that bypass the startup guard are forbidden"
+
+======================================================================
+FAIL: test_unsupported_and_combined_interpreter_options_are_rejected (test_verification.VerificationTests) (options=['-B', '-S', '-c', 'pass'])
+----------------------------------------------------------------------
+ValueError: Python flags that bypass the startup guard are forbidden
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/tests/test_verification.py", line 232, in test_unsupported_and_combined_interpreter_options_are_rejected
+    build_command(self.config, self.root / 'scratch/run', options)
+AssertionError: "interpreter prefix" does not match "Python flags that bypass the startup guard are forbidden"
+
+======================================================================
+FAIL: test_unsupported_and_combined_interpreter_options_are_rejected (test_verification.VerificationTests) (options=['-Bu', '-c', 'pass'])
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/tests/test_verification.py", line 232, in test_unsupported_and_combined_interpreter_options_are_rejected
+    build_command(self.config, self.root / 'scratch/run', options)
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_unsupported_and_combined_interpreter_options_are_rejected (test_verification.VerificationTests) (options=['-X', 'dev', '-c', 'pass'])
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/tests/test_verification.py", line 232, in test_unsupported_and_combined_interpreter_options_are_rejected
+    build_command(self.config, self.root / 'scratch/run', options)
+AssertionError: ValueError not raised
+
+----------------------------------------------------------------------
+Ran 25 tests in 3.292s
+
+FAILED (failures=18)

@@ -1,0 +1,19 @@
+test_conflicting_owner_is_not_removed (test_verification.VerificationTests) ... ok
+test_direct_child_isolation_and_result_persistence (test_verification.VerificationTests) ... ok
+test_git_frozen_rejects_dirty_but_development_is_explicit (test_verification.VerificationTests) ... ok
+test_import_alias_and_prerequisite_hash_fail_before_workload (test_verification.VerificationTests) ... ok
+test_installed_filters_editable_source_and_checks_target_bytes (test_verification.VerificationTests) ... ok
+test_pytest_uses_owned_basetemp_and_same_hook (test_verification.VerificationTests) ... ok
+test_refuses_missing_prerequisite_and_low_space (test_verification.VerificationTests) ... ok
+test_refuses_symlink_scratch (test_verification.VerificationTests) ... ok
+test_refuses_unsafe_scratch_and_creates_nothing (test_verification.VerificationTests) ... ok
+test_refuses_wrong_hash (test_verification.VerificationTests) ... ok
+test_refuses_wrong_interpreter (test_verification.VerificationTests) ... ok
+test_refuses_wrong_source (test_verification.VerificationTests) ... ok
+test_source_identity_is_rechecked_in_cli_child (test_verification.VerificationTests) ... ok
+test_unique_runs_and_duplicate_run_preserves_existing_output (test_verification.VerificationTests) ... ok
+
+----------------------------------------------------------------------
+Ran 14 tests in 1.832s
+
+OK

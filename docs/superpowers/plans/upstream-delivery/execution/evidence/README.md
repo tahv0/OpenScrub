@@ -78,3 +78,7 @@ Scripts retain their original temporary paths and pinned-source assumptions. Rep
 Each upstream PR should carry only its relevant recipe, concise results and required regression tests. Before publication, replace scratch-only evidence references in that PR with its attached or committed material. No external publication is recorded here.
 
 The [editor resize handoff](research/source-plans/editor-resize-source-plan.md.txt) preserves the contract used by completed Task164; the [exact editor backend handoff](research/source-plans/exact-editor-backend-source-plan.md.txt) remains unrun. Other selected source plans are retained alongside them as exact text snapshots. Contracts alone are not implementation evidence; the execution record identifies completed candidates.
+
+### D01 local verification tooling
+
+[Task901 report](delivery/task-901-report.md), [independent review](delivery/task-901-review.md), [fix report](delivery/task-901-fix1-report.md) and [scoped approval](delivery/task-901-fix1-review.md) retain the setup/package boundary and both closed Important findings. [Original evidence](delivery/task901-evidence/README.md), [review probes](delivery/task901-review-evidence/README.md) and [fix evidence](delivery/task901-fix1-evidence/README.md) preserve complete observations; runtime environments/exports are excluded. The [reviewed local helper](../tooling/README.md) is outside upstream feature PRs. Next-real-task adoption and deferred Minor M1 remain explicit in the [D01 record](../development-efficiency-priority.md).

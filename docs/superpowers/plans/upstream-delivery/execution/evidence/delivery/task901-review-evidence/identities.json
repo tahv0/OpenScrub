@@ -1,0 +1,69 @@
+{
+  "base": "04677434d43d8acc54aebdcf9073db4d234f1ceb",
+  "head": "afbd2078a292e4ba2ced55ffdc89fcacaa27502e",
+  "helper_files": {
+    "docs/superpowers/plans/upstream-delivery/execution/tooling/README.md": {
+      "sha256": "d3a9e5d4c19da997db017a386abfaf2bf07db697c2463dabbf4509bbdad60b3a",
+      "matches_implementer_manifest": true
+    },
+    "docs/superpowers/plans/upstream-delivery/execution/tooling/sitecustomize.py": {
+      "sha256": "035c1187d46c85ce2c3f3c092822d8171c3b67e99a7270717a12169b2c3be302",
+      "matches_implementer_manifest": true
+    },
+    "docs/superpowers/plans/upstream-delivery/execution/tooling/tests/test_verification.py": {
+      "sha256": "bac1314ef1978517ea0f3823d99c34a8b918f7d3dc64775bce478d43406cc7c6",
+      "matches_implementer_manifest": true
+    },
+    "docs/superpowers/plans/upstream-delivery/execution/tooling/verification_hook.py": {
+      "sha256": "6dc0770c0d8c2b4b1c1821ac5ca3b47024fc3065e0efee1f9db80bd846f29d68",
+      "matches_implementer_manifest": true
+    },
+    "docs/superpowers/plans/upstream-delivery/execution/tooling/verify.py": {
+      "sha256": "899a1d96279fadf783c2352209eda098b440db4db2228aedf0ccee61b8744427",
+      "matches_implementer_manifest": true
+    }
+  },
+  "actual_workload_python": {
+    "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+    "version": [
+      3,
+      12,
+      16
+    ]
+  },
+  "source_policy": "frozen dummy export",
+  "files": {
+    "README.md": {
+      "sha256": "845af109beadfd251be97c8e5b839f0df7c7469f99b6a149741caae240f6e161",
+      "bytes": 1769
+    },
+    "adapter-probe.py": {
+      "sha256": "ff5fc17b4345987ff8e293b3537a6d62c423f3f168719531df5860b90823ecaf",
+      "bytes": 108
+    },
+    "adapter-sample.py": {
+      "sha256": "a69d4e37f095ea0015e2629dadb887ef9d713eb7175d7943da697ebf2393fcb3",
+      "bytes": 11
+    },
+    "argument-probe.log": {
+      "sha256": "8d408c4bfe43cf2d23e8b403ebef05b8cacf939d66e0bf3de2433842e64e8911",
+      "bytes": 220
+    },
+    "config.json": {
+      "sha256": "d6c4e6eeae6ab95bbb3f64c8dd3ec40f9986c958b0adbb33031e18c40d005079",
+      "bytes": 644
+    },
+    "probe.py": {
+      "sha256": "fc1678ea80a44ecfb30a9555620167141719a28820038f1b99f716dca8a8de30",
+      "bytes": 2580
+    },
+    "script-origin-transcript.log": {
+      "sha256": "85d6b7ccc7c87d180784101455c38de8cd81d262896be29300b32548931d8dae",
+      "bytes": 1599
+    },
+    "selected-sample.py": {
+      "sha256": "3e29430f1f5190ce5b49d92306ff0a807804a34c425ce0eca201f29817ad5015",
+      "bytes": 11
+    }
+  }
+}
