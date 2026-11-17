@@ -9,8 +9,10 @@ These local planning records preserve synthetic research, completed-task reports
 | [Thumbnail baseline](research/thumbnail-baseline-research.md) | Warm-hit parse avoidance, repeated cold work and visibly stale crops after report/source changes. |
 | [Review scheduling](research/review-scheduling-baseline-research.md) | Actual 1k/10k eager cards/requests, scroll and job-switch ordering, and reuse of P07a draft ownership. |
 | [Output-choice baseline](research/review-choices-baseline-research.md) | Repeated toggle/mixed-state behavior, existing group/editor scope and native keyboard/help controls; full emitted UI with controlled HTTP. |
+| [Polling baseline](research/polling-baseline-research.md) | Existing P07a view fences, same-view overlapping cycles/log duplicates, held HTTP bodies, error recovery and automatic review phase eligibility. |
 | [Scan history](research/scan-history-baseline-research.md) | Removed preview-cache donor closure and three distinct final-aggregation work-count candidates; controlled OCR input, no inference-throughput claim. |
 | [Scan-option input](research/options-input-baseline-research.md) | Malformed/non-object options across actual upload/server-path routes, accepted controls and complete synthetic cleanup. |
+| [Scan-option validation](delivery/task-108-report.md) / [fix review](delivery/task-108-fix1-review.md) | JSON400 before durable job creation, preserved object/default behavior and oversized-integer decoding coverage, with original/fix-head evidence distinguished. |
 | [HDR decoder cleanup](research/hdr-decoder-cleanup-baseline-research.md) | Actual cancellation/write-error pipe lifetime with retained exceptions, reaped children and successful HDR frame/tag controls. |
 | [Live-preview baseline](research/live-preview-baseline-research.md) | Torn responses and path-stat/open length races through actual Cheroot. |
 | [Editor resize](research/editor-resize-baseline-research.md) / [frame identity](research/frame-identity-baseline-research.md) | Separate display/pointer alignment and source-sample mismatches; no long-video speed claim. |

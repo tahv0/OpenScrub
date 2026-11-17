@@ -1,0 +1,126 @@
+[
+  {
+    "name": "late-metadata-after-switch",
+    "requests": 3,
+    "errors": [],
+    "cur": "B",
+    "log": "log-B"
+  },
+  {
+    "name": "late-log-after-switch",
+    "requests": 4,
+    "errors": [],
+    "cur": "B",
+    "log": "log-B"
+  },
+  {
+    "name": "same-job-reopen-fences-old-generation",
+    "requests": 3,
+    "errors": [],
+    "cur": "A",
+    "log": "log-A"
+  },
+  {
+    "name": "delete-while-metadata-pending",
+    "requests": 2,
+    "errors": [],
+    "cur": null
+  },
+  {
+    "name": "actual-late-log-body-after-switch",
+    "requests": 4,
+    "errors": [],
+    "cur": "B",
+    "log": "log-B"
+  },
+  {
+    "name": "timer-overlap-duplicate-log",
+    "requests": 6,
+    "errors": [],
+    "cur": "A",
+    "log": "log-A\nlog-A\nlog-A"
+  },
+  {
+    "name": "same-view-late-metadata-regresses-progress",
+    "requests": 4,
+    "errors": [],
+    "cur": "A",
+    "log": "log-A"
+  },
+  {
+    "name": "metadata-headers-with-unfinished-body",
+    "requests": 6,
+    "errors": [],
+    "cur": "A",
+    "log": "log-A\nlog-A"
+  },
+  {
+    "name": "transient-metadata-network-failure-then-success",
+    "requests": 3,
+    "errors": [
+      "Failed to fetch"
+    ],
+    "cur": "A",
+    "log": "log-A"
+  },
+  {
+    "name": "transient-log-network-failure-then-success",
+    "requests": 4,
+    "errors": [
+      "Failed to fetch"
+    ],
+    "cur": "A",
+    "log": "log-A"
+  },
+  {
+    "name": "authoritative-log-length-shrinks",
+    "requests": 6,
+    "errors": [],
+    "cur": "A",
+    "log": "A0\nA1\nA2\nA3\nA4"
+  },
+  {
+    "name": "stale-same-view-poll-starts-review-after-done",
+    "requests": 6,
+    "errors": [],
+    "cur": "A",
+    "log": "log-A"
+  },
+  {
+    "name": "pending-review-publishes-after-newer-done-phase",
+    "requests": 6,
+    "errors": [],
+    "cur": "A",
+    "log": "log-A"
+  },
+  {
+    "name": "http503-json-is-published-without-status-check",
+    "requests": 3,
+    "errors": [
+      "Failed to set the 'value' property on 'HTMLProgressElement': The provided double value is non-finite."
+    ],
+    "cur": "A",
+    "log": "log-A"
+  },
+  {
+    "name": "downstream-review-after-switch",
+    "requests": 7,
+    "errors": [],
+    "cur": "B",
+    "log": "log-B"
+  },
+  {
+    "name": "downstream-audio-report-after-switch",
+    "requests": 10,
+    "errors": [],
+    "cur": "B",
+    "log": "log-B"
+  },
+  {
+    "name": "simulated-hidden-and-frozen-tab-resume",
+    "requests": 6,
+    "errors": [],
+    "cur": "A",
+    "log": "log-A"
+  }
+]

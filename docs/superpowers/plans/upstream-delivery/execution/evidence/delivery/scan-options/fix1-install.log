@@ -1,0 +1,5 @@
+Using CPython 3.12.16 interpreter at: /tmp/openscrub-baseline-20261116/venv-opencv4/bin/python
+Resolved 1 package in 1ms
+Prepared 1 package in 5ms
+Installed 1 package in 1ms
+ + openscrub==1.0.96 (from file:///tmp/openscrub-task108/fix1-dist/openscrub-1.0.96-py3-none-any.whl)

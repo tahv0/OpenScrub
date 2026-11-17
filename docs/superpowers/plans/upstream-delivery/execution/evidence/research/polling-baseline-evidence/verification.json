@@ -1,0 +1,13 @@
+{
+  "status": "passed",
+  "pin": "92124753736e287ac800af91f0ac96f3e96c01be",
+  "tracked_export_files_identical": 114,
+  "full_unmodified_app_js_in_emitted_page": true,
+  "scenario_count": 17,
+  "all_browser_route_gates_released": true,
+  "actual_http_body_gates_completed": true,
+  "expected_fault_scenarios_only": true,
+  "server_log_clean": true,
+  "no_product_changes": true,
+  "unavailable": "Native background-tab throttling/OS suspension timing; ignore-abort helper implementation (future tests)"
+}

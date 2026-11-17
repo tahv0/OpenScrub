@@ -1,0 +1,1851 @@
+{
+  "browser": "Chromium/Playwright existing fallback",
+  "results": [
+    {
+      "name": "late-metadata-after-switch",
+      "snapshot": {
+        "cur": "B",
+        "gen": 2,
+        "progress": 0.2,
+        "heading": "synthetic job B\n  queued",
+        "phase": "queued",
+        "log": "log-B",
+        "logN": 1,
+        "detail": "synthetic job B\n  queued\n \n \n \n \n log-B\n \n ",
+        "audio": [],
+        "drafts": 2,
+        "poll": true
+      },
+      "events": [
+        {
+          "id": "A",
+          "kind": "meta",
+          "query": "",
+          "method": "GET",
+          "n": 1,
+          "done": true,
+          "held": true,
+          "payload": {
+            "id": "A",
+            "name": "LATE-A",
+            "phase": "queued",
+            "progress": 0.9,
+            "error": null,
+            "stats": {},
+            "eta": null,
+            "has_output": false
+          }
+        },
+        {
+          "id": "B",
+          "kind": "meta",
+          "query": "",
+          "method": "GET",
+          "n": 2,
+          "done": true,
+          "payload": {
+            "id": "B",
+            "name": "synthetic job B",
+            "phase": "queued",
+            "progress": 0.2,
+            "error": null,
+            "stats": {},
+            "eta": null,
+            "has_output": false
+          }
+        },
+        {
+          "id": "B",
+          "kind": "log",
+          "query": "?from=0",
+          "method": "GET",
+          "n": 3,
+          "done": true,
+          "payload": {
+            "from": 0,
+            "lines": [
+              "log-B"
+            ],
+            "len": 1
+          }
+        }
+      ],
+      "errors": [],
+      "console": [],
+      "unreleasedGates": 0
+    },
+    {
+      "name": "late-log-after-switch",
+      "snapshot": {
+        "cur": "B",
+        "gen": 2,
+        "progress": 0.2,
+        "heading": "synthetic job B\n  queued",
+        "phase": "queued",
+        "log": "log-B",
+        "logN": 1,
+        "detail": "synthetic job B\n  queued\n \n \n \n \n log-B\n \n ",
+        "audio": [],
+        "drafts": 2,
+        "poll": true
+      },
+      "events": [
+        {
+          "id": "A",
+          "kind": "meta",
+          "query": "",
+          "method": "GET",
+          "n": 1,
+          "done": true,
+          "payload": {
+            "id": "A",
+            "name": "synthetic job A",
+            "phase": "queued",
+            "progress": 0.2,
+            "error": null,
+            "stats": {},
+            "eta": null,
+            "has_output": false
+          }
+        },
+        {
+          "id": "A",
+          "kind": "log",
+          "query": "?from=0",
+          "method": "GET",
+          "n": 2,
+          "done": true,
+          "held": true,
+          "payload": {
+            "from": 0,
+            "lines": [
+              "log-A"
+            ],
+            "len": 1
+          }
+        },
+        {
+          "id": "B",
+          "kind": "meta",
+          "query": "",
+          "method": "GET",
+          "n": 3,
+          "done": true,
+          "payload": {
+            "id": "B",
+            "name": "synthetic job B",
+            "phase": "queued",
+            "progress": 0.2,
+            "error": null,
+            "stats": {},
+            "eta": null,
+            "has_output": false
+          }
+        },
+        {
+          "id": "B",
+          "kind": "log",
+          "query": "?from=0",
+          "method": "GET",
+          "n": 4,
+          "done": true,
+          "payload": {
+            "from": 0,
+            "lines": [
+              "log-B"
+            ],
+            "len": 1
+          }
+        }
+      ],
+      "errors": [],
+      "console": [],
+      "unreleasedGates": 0
+    },
+    {
+      "name": "same-job-reopen-fences-old-generation",
+      "snapshot": {
+        "cur": "A",
+        "gen": 2,
+        "progress": 0.2,
+        "heading": "synthetic job A\n  queued",
+        "phase": "queued",
+        "log": "log-A",
+        "logN": 1,
+        "detail": "synthetic job A\n  queued\n \n \n \n \n log-A\n \n ",
+        "audio": [],
+        "drafts": 1,
+        "poll": true
+      },
+      "events": [
+        {
+          "id": "A",
+          "kind": "meta",
+          "query": "",
+          "method": "GET",
+          "n": 1,
+          "done": true,
+          "held": true,
+          "payload": {
+            "id": "A",
+            "name": "LATE-SAME-A",
+            "phase": "queued",
+            "progress": 0.9,
+            "error": null,
+            "stats": {},
+            "eta": null,
+            "has_output": false
+          }
+        },
+        {
+          "id": "A",
+          "kind": "meta",
+          "query": "",
+          "method": "GET",
+          "n": 2,
+          "done": true,
+          "payload": {
+            "id": "A",
+            "name": "synthetic job A",
+            "phase": "queued",
+            "progress": 0.2,
+            "error": null,
+            "stats": {},
+            "eta": null,
+            "has_output": false
+          }
+        },
+        {
+          "id": "A",
+          "kind": "log",
+          "query": "?from=0",
+          "method": "GET",
+          "n": 3,
+          "done": true,
+          "payload": {
+            "from": 0,
+            "lines": [
+              "log-A"
+            ],
+            "len": 1
+          }
+        }
+      ],
+      "errors": [],
+      "console": [],
+      "unreleasedGates": 0
+    },
+    {
+      "name": "delete-while-metadata-pending",
+      "snapshot": {
+        "cur": null,
+        "gen": 2,
+        "logN": 0,
+        "detail": "",
+        "audio": [],
+        "drafts": 0,
+        "poll": true
+      },
+      "events": [
+        {
+          "id": "A",
+          "kind": "meta",
+          "query": "",
+          "method": "GET",
+          "n": 1,
+          "done": true,
+          "held": true,
+          "payload": {
+            "id": "A",
+            "name": "synthetic job A",
+            "phase": "queued",
+            "progress": 0.2,
+            "error": null,
+            "stats": {},
+            "eta": null,
+            "has_output": false
+          }
+        },
+        {
+          "id": "A",
+          "kind": "meta",
+          "query": "",
+          "method": "DELETE",
+          "n": 2,
+          "done": true,
+          "payload": {
+            "ok": true
+          }
+        }
+      ],
+      "errors": [],
+      "console": [],
+      "unreleasedGates": 0,
+      "afterDeletionFakeMs": 2701,
+      "noNewJobRequests": true
+    },
+    {
+      "name": "actual-late-log-body-after-switch",
+      "snapshot": {
+        "cur": "B",
+        "gen": 2,
+        "progress": 0.2,
+        "heading": "synthetic job B\n  queued",
+        "phase": "queued",
+        "log": "log-B",
+        "logN": 1,
+        "detail": "synthetic job B\n  queued\n \n \n \n \n log-B\n \n ",
+        "audio": [],
+        "drafts": 2,
+        "poll": true
+      },
+      "events": [
+        {
+          "id": "A",
+          "kind": "meta",
+          "query": "",
+          "method": "GET",
+          "n": 1,
+          "done": true,
+          "payload": {
+            "id": "A",
+            "name": "synthetic job A",
+            "phase": "queued",
+            "progress": 0.2,
+            "error": null,
+            "stats": {},
+            "eta": null,
+            "has_output": false
+          }
+        },
+        {
+          "id": "A",
+          "kind": "log",
+          "query": "?from=0",
+          "method": "GET",
+          "n": 2,
+          "done": false,
+          "pass": true
+        },
+        {
+          "id": "B",
+          "kind": "meta",
+          "query": "",
+          "method": "GET",
+          "n": 3,
+          "done": true,
+          "payload": {
+            "id": "B",
+            "name": "synthetic job B",
+            "phase": "queued",
+            "progress": 0.2,
+            "error": null,
+            "stats": {},
+            "eta": null,
+            "has_output": false
+          }
+        },
+        {
+          "id": "B",
+          "kind": "log",
+          "query": "?from=0",
+          "method": "GET",
+          "n": 4,
+          "done": false,
+          "pass": true
+        }
+      ],
+      "errors": [],
+      "console": [],
+      "unreleasedGates": 0,
+      "before": {
+        "cur": "A",
+        "gen": 1,
+        "progress": 0.2,
+        "heading": "synthetic job A\n  queued",
+        "phase": "queued",
+        "log": "",
+        "logN": 0,
+        "detail": "synthetic job A\n  queued\n \n \n \n \n \n \n ",
+        "audio": [],
+        "drafts": 1,
+        "poll": true
+      },
+      "headers": 1,
+      "finished": 1
+    },
+    {
+      "name": "timer-overlap-duplicate-log",
+      "snapshot": {
+        "cur": "A",
+        "gen": 1,
+        "progress": 0.2,
+        "heading": "synthetic job A\n  queued",
+        "phase": "queued",
+        "log": "log-A\nlog-A\nlog-A",
+        "logN": 1,
+        "detail": "synthetic job A\n  queued\n \n \n \n \n log-A\nlog-A\nlog-A\n \n ",
+        "audio": [],
+        "drafts": 1,
+        "poll": true
+      },
+      "events": [
+        {
+          "id": "A",
+          "kind": "meta",
+          "query": "",
+          "method": "GET",
+          "n": 1,
+          "done": true,
+          "payload": {
+            "id": "A",
+            "name": "synthetic job A",
+            "phase": "queued",
+            "progress": 0.2,
+            "error": null,
+            "stats": {},
+            "eta": null,
+            "has_output": false
+          }
+        },
+        {
+          "id": "A",
+          "kind": "log",
+          "query": "?from=0",
+          "method": "GET",
+          "n": 2,
+          "done": true,
+          "held": true,
+          "payload": {
+            "from": 0,
+            "lines": [
+              "log-A"
+            ],
+            "len": 1
+          }
+        },
+        {
+          "id": "A",
+          "kind": "meta",
+          "query": "",
+          "method": "GET",
+          "n": 3,
+          "done": true,
+          "payload": {
+            "id": "A",
+            "name": "synthetic job A",
+            "phase": "queued",
+            "progress": 0.2,
+            "error": null,
+            "stats": {},
+            "eta": null,
+            "has_output": false
+          }
+        },
+        {
+          "id": "A",
+          "kind": "log",
+          "query": "?from=0",
+          "method": "GET",
+          "n": 4,
+          "done": true,
+          "held": true,
+          "payload": {
+            "from": 0,
+            "lines": [
+              "log-A"
+            ],
+            "len": 1
+          }
+        },
+        {
+          "id": "A",
+          "kind": "meta",
+          "query": "",
+          "method": "GET",
+          "n": 5,
+          "done": true,
+          "payload": {
+            "id": "A",
+            "name": "synthetic job A",
+            "phase": "queued",
+            "progress": 0.2,
+            "error": null,
+            "stats": {},
+            "eta": null,
+            "has_output": false
+          }
+        },
+        {
+          "id": "A",
+          "kind": "log",
+          "query": "?from=0",
+          "method": "GET",
+          "n": 6,
+          "done": true,
+          "held": true,
+          "payload": {
+            "from": 0,
+            "lines": [
+              "log-A"
+            ],
+            "len": 1
+          }
+        }
+      ],
+      "errors": [],
+      "console": [],
+      "unreleasedGates": 0,
+      "pendingCycles": 3,
+      "before": {
+        "cur": "A",
+        "gen": 1,
+        "progress": 0.2,
+        "heading": "synthetic job A\n  queued",
+        "phase": "queued",
+        "log": "",
+        "logN": 0,
+        "detail": "synthetic job A\n  queued\n \n \n \n \n \n \n ",
+        "audio": [],
+        "drafts": 1,
+        "poll": true
+      }
+    },
+    {
+      "name": "same-view-late-metadata-regresses-progress",
+      "snapshot": {
+        "cur": "A",
+        "gen": 1,
+        "progress": 0.1,
+        "heading": "synthetic job A\n  queued",
+        "phase": "queued",
+        "log": "log-A",
+        "logN": 1,
+        "detail": "synthetic job A\n  queued\n \n \n \n \n log-A\n \n ",
+        "audio": [],
+        "drafts": 1,
+        "poll": true
+      },
+      "events": [
+        {
+          "id": "A",
+          "kind": "meta",
+          "query": "",
+          "method": "GET",
+          "n": 1,
+          "done": true,
+          "held": true,
+          "payload": {
+            "id": "A",
+            "name": "synthetic job A",
+            "phase": "queued",
+            "progress": 0.1,
+            "error": null,
+            "stats": {},
+            "eta": null,
+            "has_output": false
+          }
+        },
+        {
+          "id": "A",
+          "kind": "meta",
+          "query": "",
+          "method": "GET",
+          "n": 2,
+          "done": true,
+          "payload": {
+            "id": "A",
+            "name": "synthetic job A",
+            "phase": "queued",
+            "progress": 0.8,
+            "error": null,
+            "stats": {},
+            "eta": null,
+            "has_output": false
+          }
+        },
+        {
+          "id": "A",
+          "kind": "log",
+          "query": "?from=0",
+          "method": "GET",
+          "n": 3,
+          "done": true,
+          "payload": {
+            "from": 0,
+            "lines": [
+              "log-A"
+            ],
+            "len": 1
+          }
+        },
+        {
+          "id": "A",
+          "kind": "log",
+          "query": "?from=1",
+          "method": "GET",
+          "n": 4,
+          "done": true,
+          "payload": {
+            "from": 1,
+            "lines": [],
+            "len": 1
+          }
+        }
+      ],
+      "errors": [],
+      "console": [],
+      "unreleasedGates": 0,
+      "before": {
+        "cur": "A",
+        "gen": 1,
+        "progress": 0.8,
+        "heading": "synthetic job A\n  queued",
+        "phase": "queued",
+        "log": "log-A",
+        "logN": 1,
+        "detail": "synthetic job A\n  queued\n \n \n \n \n log-A\n \n ",
+        "audio": [],
+        "drafts": 1,
+        "poll": true
+      }
+    },
+    {
+      "name": "metadata-headers-with-unfinished-body",
+      "snapshot": {
+        "cur": "A",
+        "gen": 1,
+        "progress": 0.2,
+        "heading": "synthetic job A\n  queued",
+        "phase": "queued",
+        "log": "log-A\nlog-A",
+        "logN": 1,
+        "detail": "synthetic job A\n  queued\n \n \n \n \n log-A\nlog-A\n \n ",
+        "audio": [],
+        "drafts": 1,
+        "poll": true
+      },
+      "events": [
+        {
+          "id": "A",
+          "kind": "meta",
+          "query": "",
+          "method": "GET",
+          "n": 1,
+          "done": false,
+          "pass": true
+        },
+        {
+          "id": "A",
+          "kind": "meta",
+          "query": "",
+          "method": "GET",
+          "n": 2,
+          "done": false,
+          "pass": true
+        },
+        {
+          "id": "A",
+          "kind": "meta",
+          "query": "",
+          "method": "GET",
+          "n": 3,
+          "done": false,
+          "pass": true
+        },
+        {
+          "id": "A",
+          "kind": "log",
+          "query": "?from=0",
+          "method": "GET",
+          "n": 4,
+          "done": true,
+          "payload": {
+            "from": 0,
+            "lines": [
+              "log-A"
+            ],
+            "len": 1
+          }
+        },
+        {
+          "id": "A",
+          "kind": "log",
+          "query": "?from=0",
+          "method": "GET",
+          "n": 5,
+          "done": true,
+          "payload": {
+            "from": 0,
+            "lines": [
+              "log-A"
+            ],
+            "len": 1
+          }
+        },
+        {
+          "id": "A",
+          "kind": "log",
+          "query": "?from=1",
+          "method": "GET",
+          "n": 6,
+          "done": true,
+          "payload": {
+            "from": 1,
+            "lines": [],
+            "len": 1
+          }
+        }
+      ],
+      "errors": [],
+      "console": [],
+      "unreleasedGates": 0,
+      "atHeaders": {
+        "cur": "A",
+        "gen": 1,
+        "logN": 0,
+        "detail": "",
+        "audio": [],
+        "drafts": 1,
+        "poll": true
+      },
+      "before": {
+        "headers": 3,
+        "bodyFinished": 2,
+        "snapshot": {
+          "cur": "A",
+          "gen": 1,
+          "progress": 0.2,
+          "heading": "synthetic job A\n  queued",
+          "phase": "queued",
+          "log": "log-A\nlog-A",
+          "logN": 1,
+          "detail": "synthetic job A\n  queued\n \n \n \n \n log-A\nlog-A\n \n ",
+          "audio": [],
+          "drafts": 1,
+          "poll": true
+        },
+        "server": {
+          "entered": 8,
+          "released": 7,
+          "stream_kind": "meta",
+          "stream_next": false
+        }
+      },
+      "after": {
+        "headers": 3,
+        "bodyFinished": 3,
+        "server": {
+          "entered": 8,
+          "released": 8,
+          "stream_kind": "meta",
+          "stream_next": false
+        }
+      }
+    },
+    {
+      "name": "transient-metadata-network-failure-then-success",
+      "snapshot": {
+        "cur": "A",
+        "gen": 1,
+        "progress": 0.2,
+        "heading": "synthetic job A\n  queued",
+        "phase": "queued",
+        "log": "log-A",
+        "logN": 1,
+        "detail": "synthetic job A\n  queued\n \n \n \n \n log-A\n \n ",
+        "audio": [],
+        "drafts": 1,
+        "poll": true
+      },
+      "events": [
+        {
+          "id": "A",
+          "kind": "meta",
+          "query": "",
+          "method": "GET",
+          "n": 1,
+          "done": true,
+          "abort": true
+        },
+        {
+          "id": "A",
+          "kind": "meta",
+          "query": "",
+          "method": "GET",
+          "n": 2,
+          "done": true,
+          "payload": {
+            "id": "A",
+            "name": "synthetic job A",
+            "phase": "queued",
+            "progress": 0.2,
+            "error": null,
+            "stats": {},
+            "eta": null,
+            "has_output": false
+          }
+        },
+        {
+          "id": "A",
+          "kind": "log",
+          "query": "?from=0",
+          "method": "GET",
+          "n": 3,
+          "done": true,
+          "payload": {
+            "from": 0,
+            "lines": [
+              "log-A"
+            ],
+            "len": 1
+          }
+        }
+      ],
+      "errors": [
+        "Failed to fetch"
+      ],
+      "console": [
+        "Failed to load resource: net::ERR_FAILED"
+      ],
+      "unreleasedGates": 0,
+      "failed": {
+        "cur": "A",
+        "gen": 1,
+        "logN": 0,
+        "detail": "",
+        "audio": [],
+        "drafts": 1,
+        "poll": true
+      }
+    },
+    {
+      "name": "transient-log-network-failure-then-success",
+      "snapshot": {
+        "cur": "A",
+        "gen": 1,
+        "progress": 0.2,
+        "heading": "synthetic job A\n  queued",
+        "phase": "queued",
+        "log": "log-A",
+        "logN": 1,
+        "detail": "synthetic job A\n  queued\n \n \n \n \n log-A\n \n ",
+        "audio": [],
+        "drafts": 1,
+        "poll": true
+      },
+      "events": [
+        {
+          "id": "A",
+          "kind": "meta",
+          "query": "",
+          "method": "GET",
+          "n": 1,
+          "done": true,
+          "payload": {
+            "id": "A",
+            "name": "synthetic job A",
+            "phase": "queued",
+            "progress": 0.2,
+            "error": null,
+            "stats": {},
+            "eta": null,
+            "has_output": false
+          }
+        },
+        {
+          "id": "A",
+          "kind": "log",
+          "query": "?from=0",
+          "method": "GET",
+          "n": 2,
+          "done": true,
+          "abort": true
+        },
+        {
+          "id": "A",
+          "kind": "meta",
+          "query": "",
+          "method": "GET",
+          "n": 3,
+          "done": true,
+          "payload": {
+            "id": "A",
+            "name": "synthetic job A",
+            "phase": "queued",
+            "progress": 0.2,
+            "error": null,
+            "stats": {},
+            "eta": null,
+            "has_output": false
+          }
+        },
+        {
+          "id": "A",
+          "kind": "log",
+          "query": "?from=0",
+          "method": "GET",
+          "n": 4,
+          "done": true,
+          "payload": {
+            "from": 0,
+            "lines": [
+              "log-A"
+            ],
+            "len": 1
+          }
+        }
+      ],
+      "errors": [
+        "Failed to fetch"
+      ],
+      "console": [
+        "Failed to load resource: net::ERR_FAILED"
+      ],
+      "unreleasedGates": 0,
+      "failed": {
+        "cur": "A",
+        "gen": 1,
+        "progress": 0.2,
+        "heading": "synthetic job A\n  queued",
+        "phase": "queued",
+        "log": "",
+        "logN": 0,
+        "detail": "synthetic job A\n  queued\n \n \n \n \n \n \n ",
+        "audio": [],
+        "drafts": 1,
+        "poll": true
+      }
+    },
+    {
+      "name": "authoritative-log-length-shrinks",
+      "snapshot": {
+        "cur": "A",
+        "gen": 1,
+        "progress": 0.2,
+        "heading": "synthetic job A\n  queued",
+        "phase": "queued",
+        "log": "A0\nA1\nA2\nA3\nA4",
+        "logN": 5,
+        "detail": "synthetic job A\n  queued\n \n \n \n \n A0\nA1\nA2\nA3\nA4\n \n ",
+        "audio": [],
+        "drafts": 1,
+        "poll": true
+      },
+      "events": [
+        {
+          "id": "A",
+          "kind": "meta",
+          "query": "",
+          "method": "GET",
+          "n": 1,
+          "done": true,
+          "payload": {
+            "id": "A",
+            "name": "synthetic job A",
+            "phase": "queued",
+            "progress": 0.2,
+            "error": null,
+            "stats": {},
+            "eta": null,
+            "has_output": false
+          }
+        },
+        {
+          "id": "A",
+          "kind": "log",
+          "query": "?from=0",
+          "method": "GET",
+          "n": 2,
+          "done": true,
+          "payload": {
+            "from": 0,
+            "lines": [
+              "A0",
+              "A1",
+              "A2",
+              "A3",
+              "A4"
+            ],
+            "len": 5
+          }
+        },
+        {
+          "id": "A",
+          "kind": "meta",
+          "query": "",
+          "method": "GET",
+          "n": 3,
+          "done": true,
+          "payload": {
+            "id": "A",
+            "name": "synthetic job A",
+            "phase": "queued",
+            "progress": 0.2,
+            "error": null,
+            "stats": {},
+            "eta": null,
+            "has_output": false
+          }
+        },
+        {
+          "id": "A",
+          "kind": "log",
+          "query": "?from=5",
+          "method": "GET",
+          "n": 4,
+          "done": true,
+          "payload": {
+            "from": 5,
+            "lines": [],
+            "len": 1
+          }
+        },
+        {
+          "id": "A",
+          "kind": "meta",
+          "query": "",
+          "method": "GET",
+          "n": 5,
+          "done": true,
+          "payload": {
+            "id": "A",
+            "name": "synthetic job A",
+            "phase": "queued",
+            "progress": 0.2,
+            "error": null,
+            "stats": {},
+            "eta": null,
+            "has_output": false
+          }
+        },
+        {
+          "id": "A",
+          "kind": "log",
+          "query": "?from=5",
+          "method": "GET",
+          "n": 6,
+          "done": true,
+          "payload": {
+            "from": 5,
+            "lines": [],
+            "len": 1
+          }
+        }
+      ],
+      "errors": [],
+      "console": [],
+      "unreleasedGates": 0
+    },
+    {
+      "name": "stale-same-view-poll-starts-review-after-done",
+      "snapshot": {
+        "cur": "A",
+        "gen": 1,
+        "progress": 1,
+        "heading": "synthetic job A\n  review",
+        "phase": "review",
+        "log": "log-A",
+        "logN": 1,
+        "review": "Review — red = will be blurred,\n green = kept visible. Drag a box around several to bulk-set.\n \n  ▶ Preview video & edit boxes\n  (before rendering)\n \n regex 1\n  all on\n  all off\n    \n    \"review-A\" 90% 0.0–1.0s\n    Blur\n   \n \n Save edits & render\n missed something? use\n  ▶ Preview video & edit boxes above — its ＋ Add box replaces the old\n  add-region tool",
+        "detail": "synthetic job A\n  review\n \n \n \n \n log-A\n \n Review — red = will be blurred,\n green = kept visible. Drag a box around several to bulk-set.\n \n  ▶ Preview video & edit boxes\n  (before rendering)\n \n regex 1\n  all on\n  all off\n    \n    \"review-A\" 90% 0.0–1.0s\n    Blur\n   \n \n Save edits & render\n missed something? use\n  ▶ Preview video & edit boxes above — its ＋ Add box replaces the old\n  add-region tool",
+        "audio": [],
+        "drafts": 1,
+        "poll": true
+      },
+      "events": [
+        {
+          "id": "A",
+          "kind": "meta",
+          "query": "",
+          "method": "GET",
+          "n": 1,
+          "done": true,
+          "held": true,
+          "payload": {
+            "id": "A",
+            "name": "synthetic job A",
+            "phase": "review",
+            "progress": 1,
+            "error": null,
+            "stats": {},
+            "eta": null,
+            "has_output": false
+          }
+        },
+        {
+          "id": "A",
+          "kind": "meta",
+          "query": "",
+          "method": "GET",
+          "n": 2,
+          "done": true,
+          "payload": {
+            "id": "A",
+            "name": "synthetic job A",
+            "phase": "done",
+            "progress": 1,
+            "error": null,
+            "stats": {},
+            "eta": null,
+            "has_output": true
+          }
+        },
+        {
+          "id": "A",
+          "kind": "log",
+          "query": "?from=0",
+          "method": "GET",
+          "n": 3,
+          "done": true,
+          "payload": {
+            "from": 0,
+            "lines": [
+              "log-A"
+            ],
+            "len": 1
+          }
+        },
+        {
+          "id": "A",
+          "kind": "log",
+          "query": "?from=1",
+          "method": "GET",
+          "n": 4,
+          "done": true,
+          "payload": {
+            "from": 1,
+            "lines": [],
+            "len": 1
+          }
+        },
+        {
+          "id": "A",
+          "kind": "detections",
+          "query": "",
+          "method": "GET",
+          "n": 5,
+          "done": true,
+          "payload": {
+            "duration": 10,
+            "detections": [
+              {
+                "i": 0,
+                "category": "mrn",
+                "text": "review-A",
+                "enabled": true,
+                "t_start": 0,
+                "t_end": 1,
+                "track": -1,
+                "person": -1,
+                "confidence": 0.9
+              }
+            ]
+          }
+        },
+        {
+          "id": "A",
+          "kind": "thumb/0",
+          "query": "",
+          "method": "GET",
+          "n": 6,
+          "done": true
+        }
+      ],
+      "errors": [],
+      "console": [],
+      "unreleasedGates": 0,
+      "before": {
+        "cur": "A",
+        "gen": 1,
+        "progress": 1,
+        "heading": "synthetic job A\n  done",
+        "phase": "done",
+        "log": "log-A",
+        "logN": 1,
+        "detail": "synthetic job A\n  done\n \n Download redacted video\n    Download audit report\n    Re-open review\n    Compare before/after\n    Preview & edit blur boxes\n    Reminder: scrub the result before\n    sharing. This tool is best-effort, not a compliance guarantee.\n    \n    \n \n \n log-A\n \n ",
+        "audio": [],
+        "drafts": 1,
+        "poll": true
+      }
+    },
+    {
+      "name": "pending-review-publishes-after-newer-done-phase",
+      "snapshot": {
+        "cur": "A",
+        "gen": 1,
+        "progress": 0.2,
+        "heading": "synthetic job A\n  done",
+        "phase": "done",
+        "log": "log-A",
+        "logN": 1,
+        "review": "Review — red = will be blurred,\n green = kept visible. Drag a box around several to bulk-set.\n \n  ▶ Preview video & edit boxes\n  (before rendering)\n \n regex 1\n  all on\n  all off\n    \n    \"review-A\" 90% 0.0–1.0s\n    Blur\n   \n \n Save edits & render\n missed something? use\n  ▶ Preview video & edit boxes above — its ＋ Add box replaces the old\n  add-region tool",
+        "detail": "synthetic job A\n  done\n \n \n \n \n log-A\n \n Review — red = will be blurred,\n green = kept visible. Drag a box around several to bulk-set.\n \n  ▶ Preview video & edit boxes\n  (before rendering)\n \n regex 1\n  all on\n  all off\n    \n    \"review-A\" 90% 0.0–1.0s\n    Blur\n   \n \n Save edits & render\n missed something? use\n  ▶ Preview video & edit boxes above — its ＋ Add box replaces the old\n  add-region tool",
+        "audio": [],
+        "drafts": 1,
+        "poll": true
+      },
+      "events": [
+        {
+          "id": "A",
+          "kind": "meta",
+          "query": "",
+          "method": "GET",
+          "n": 1,
+          "done": true,
+          "payload": {
+            "id": "A",
+            "name": "synthetic job A",
+            "phase": "review",
+            "progress": 0.2,
+            "error": null,
+            "stats": {},
+            "eta": null,
+            "has_output": false
+          }
+        },
+        {
+          "id": "A",
+          "kind": "log",
+          "query": "?from=0",
+          "method": "GET",
+          "n": 2,
+          "done": true,
+          "payload": {
+            "from": 0,
+            "lines": [
+              "log-A"
+            ],
+            "len": 1
+          }
+        },
+        {
+          "id": "A",
+          "kind": "detections",
+          "query": "",
+          "method": "GET",
+          "n": 3,
+          "done": true,
+          "held": true,
+          "payload": {
+            "duration": 10,
+            "detections": [
+              {
+                "i": 0,
+                "category": "mrn",
+                "text": "review-A",
+                "enabled": true,
+                "t_start": 0,
+                "t_end": 1,
+                "track": -1,
+                "person": -1,
+                "confidence": 0.9
+              }
+            ]
+          }
+        },
+        {
+          "id": "A",
+          "kind": "meta",
+          "query": "",
+          "method": "GET",
+          "n": 4,
+          "done": true,
+          "payload": {
+            "id": "A",
+            "name": "synthetic job A",
+            "phase": "done",
+            "progress": 0.2,
+            "error": null,
+            "stats": {},
+            "eta": null,
+            "has_output": false
+          }
+        },
+        {
+          "id": "A",
+          "kind": "log",
+          "query": "?from=1",
+          "method": "GET",
+          "n": 5,
+          "done": true,
+          "payload": {
+            "from": 1,
+            "lines": [],
+            "len": 1
+          }
+        },
+        {
+          "id": "A",
+          "kind": "thumb/0",
+          "query": "",
+          "method": "GET",
+          "n": 6,
+          "done": true
+        }
+      ],
+      "errors": [],
+      "console": [],
+      "unreleasedGates": 0,
+      "before": {
+        "cur": "A",
+        "gen": 1,
+        "progress": 0.2,
+        "heading": "synthetic job A\n  done",
+        "phase": "done",
+        "log": "log-A",
+        "logN": 1,
+        "detail": "synthetic job A\n  done\n \n \n \n \n log-A\n \n ",
+        "audio": [],
+        "drafts": 1,
+        "poll": true
+      }
+    },
+    {
+      "name": "http503-json-is-published-without-status-check",
+      "snapshot": {
+        "cur": "A",
+        "gen": 1,
+        "progress": 0.2,
+        "heading": "undefined\n  queued",
+        "phase": "queued",
+        "log": "log-A",
+        "logN": 1,
+        "detail": "undefined\n  queued\n \n \n \n \n log-A\n \n ",
+        "audio": [],
+        "drafts": 1,
+        "poll": true
+      },
+      "events": [
+        {
+          "id": "A",
+          "kind": "meta",
+          "query": "",
+          "method": "GET",
+          "n": 1,
+          "done": true,
+          "payload": {
+            "error": "synthetic service unavailable"
+          }
+        },
+        {
+          "id": "A",
+          "kind": "meta",
+          "query": "",
+          "method": "GET",
+          "n": 2,
+          "done": true,
+          "payload": {
+            "id": "A",
+            "name": "synthetic job A",
+            "phase": "queued",
+            "progress": 0.2,
+            "error": null,
+            "stats": {},
+            "eta": null,
+            "has_output": false
+          }
+        },
+        {
+          "id": "A",
+          "kind": "log",
+          "query": "?from=0",
+          "method": "GET",
+          "n": 3,
+          "done": true,
+          "payload": {
+            "from": 0,
+            "lines": [
+              "log-A"
+            ],
+            "len": 1
+          }
+        }
+      ],
+      "errors": [
+        "Failed to set the 'value' property on 'HTMLProgressElement': The provided double value is non-finite."
+      ],
+      "console": [
+        "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+      ],
+      "unreleasedGates": 0,
+      "failed": {
+        "cur": "A",
+        "gen": 1,
+        "progress": 0,
+        "heading": "undefined\n  ",
+        "phase": "",
+        "log": "",
+        "logN": 0,
+        "detail": "undefined\n  \n \n \n \n \n \n \n ",
+        "audio": [],
+        "drafts": 1,
+        "poll": true
+      }
+    },
+    {
+      "name": "downstream-review-after-switch",
+      "snapshot": {
+        "cur": "B",
+        "gen": 2,
+        "progress": 0.2,
+        "heading": "synthetic job B\n  review",
+        "phase": "review",
+        "log": "log-B",
+        "logN": 1,
+        "review": "Review — red = will be blurred,\n green = kept visible. Drag a box around several to bulk-set.\n \n  ▶ Preview video & edit boxes\n  (before rendering)\n \n regex 1\n  all on\n  all off\n    \n    \"review-B\" 90% 0.0–1.0s\n    Blur\n   \n \n Save edits & render\n missed something? use\n  ▶ Preview video & edit boxes above — its ＋ Add box replaces the old\n  add-region tool",
+        "detail": "synthetic job B\n  review\n \n \n \n \n log-B\n \n Review — red = will be blurred,\n green = kept visible. Drag a box around several to bulk-set.\n \n  ▶ Preview video & edit boxes\n  (before rendering)\n \n regex 1\n  all on\n  all off\n    \n    \"review-B\" 90% 0.0–1.0s\n    Blur\n   \n \n Save edits & render\n missed something? use\n  ▶ Preview video & edit boxes above — its ＋ Add box replaces the old\n  add-region tool",
+        "audio": [],
+        "drafts": 2,
+        "poll": true
+      },
+      "events": [
+        {
+          "id": "A",
+          "kind": "meta",
+          "query": "",
+          "method": "GET",
+          "n": 1,
+          "done": true,
+          "payload": {
+            "id": "A",
+            "name": "synthetic job A",
+            "phase": "review",
+            "progress": 0.2,
+            "error": null,
+            "stats": {},
+            "eta": null,
+            "has_output": false
+          }
+        },
+        {
+          "id": "A",
+          "kind": "log",
+          "query": "?from=0",
+          "method": "GET",
+          "n": 2,
+          "done": true,
+          "payload": {
+            "from": 0,
+            "lines": [
+              "log-A"
+            ],
+            "len": 1
+          }
+        },
+        {
+          "id": "A",
+          "kind": "detections",
+          "query": "",
+          "method": "GET",
+          "n": 3,
+          "done": true,
+          "held": true,
+          "payload": {
+            "duration": 10,
+            "detections": [
+              {
+                "i": 0,
+                "category": "mrn",
+                "text": "review-A",
+                "enabled": true,
+                "t_start": 0,
+                "t_end": 1,
+                "track": -1,
+                "person": -1,
+                "confidence": 0.9
+              }
+            ]
+          }
+        },
+        {
+          "id": "B",
+          "kind": "meta",
+          "query": "",
+          "method": "GET",
+          "n": 4,
+          "done": true,
+          "payload": {
+            "id": "B",
+            "name": "synthetic job B",
+            "phase": "review",
+            "progress": 0.2,
+            "error": null,
+            "stats": {},
+            "eta": null,
+            "has_output": false
+          }
+        },
+        {
+          "id": "B",
+          "kind": "log",
+          "query": "?from=0",
+          "method": "GET",
+          "n": 5,
+          "done": true,
+          "payload": {
+            "from": 0,
+            "lines": [
+              "log-B"
+            ],
+            "len": 1
+          }
+        },
+        {
+          "id": "B",
+          "kind": "detections",
+          "query": "",
+          "method": "GET",
+          "n": 6,
+          "done": true,
+          "payload": {
+            "duration": 10,
+            "detections": [
+              {
+                "i": 0,
+                "category": "mrn",
+                "text": "review-B",
+                "enabled": true,
+                "t_start": 0,
+                "t_end": 1,
+                "track": -1,
+                "person": -1,
+                "confidence": 0.9
+              }
+            ]
+          }
+        },
+        {
+          "id": "B",
+          "kind": "thumb/0",
+          "query": "",
+          "method": "GET",
+          "n": 7,
+          "done": true
+        }
+      ],
+      "errors": [],
+      "console": [],
+      "unreleasedGates": 0
+    },
+    {
+      "name": "downstream-audio-report-after-switch",
+      "snapshot": {
+        "cur": "B",
+        "gen": 2,
+        "progress": 0.2,
+        "heading": "synthetic job B\n  review",
+        "phase": "review",
+        "log": "log-B",
+        "logN": 1,
+        "review": "Review — red = will be blurred,\n green = kept visible. Drag a box around several to bulk-set.\n \n  ▶ Preview video & edit boxes\n  (before rendering)\n \n regex 1\n  all on\n  all off\n    \n    \"review-B\" 90% 0.0–1.0s\n    Blur\n   \n \n Save edits & render\n missed something? use\n  ▶ Preview video & edit boxes above — its ＋ Add box replaces the old\n  add-region tool",
+        "detail": "synthetic job B\n  review\n \n \n \n \n log-B\n \n Review — red = will be blurred,\n green = kept visible. Drag a box around several to bulk-set.\n \n  ▶ Preview video & edit boxes\n  (before rendering)\n \n regex 1\n  all on\n  all off\n    \n    \"review-B\" 90% 0.0–1.0s\n    Blur\n   \n \n Save edits & render\n missed something? use\n  ▶ Preview video & edit boxes above — its ＋ Add box replaces the old\n  add-region tool",
+        "audio": [],
+        "drafts": 2,
+        "poll": true
+      },
+      "events": [
+        {
+          "id": "A",
+          "kind": "meta",
+          "query": "",
+          "method": "GET",
+          "n": 1,
+          "done": true,
+          "payload": {
+            "id": "A",
+            "name": "synthetic job A",
+            "phase": "review",
+            "progress": 0.2,
+            "error": null,
+            "stats": {},
+            "eta": null,
+            "has_output": false
+          }
+        },
+        {
+          "id": "A",
+          "kind": "log",
+          "query": "?from=0",
+          "method": "GET",
+          "n": 2,
+          "done": true,
+          "payload": {
+            "from": 0,
+            "lines": [
+              "log-A"
+            ],
+            "len": 1
+          }
+        },
+        {
+          "id": "A",
+          "kind": "detections",
+          "query": "",
+          "method": "GET",
+          "n": 3,
+          "done": true,
+          "payload": {
+            "duration": 10,
+            "detections": [
+              {
+                "i": 0,
+                "category": "mrn",
+                "text": "review-A",
+                "enabled": true,
+                "t_start": 0,
+                "t_end": 1,
+                "track": -1,
+                "person": -1,
+                "confidence": 0.9
+              }
+            ]
+          }
+        },
+        {
+          "id": "A",
+          "kind": "thumb/0",
+          "query": "",
+          "method": "GET",
+          "n": 4,
+          "done": true
+        },
+        {
+          "id": "A",
+          "kind": "mediainfo",
+          "query": "",
+          "method": "GET",
+          "n": 5,
+          "done": true,
+          "payload": {
+            "duration": 10,
+            "width": 320,
+            "height": 180
+          }
+        },
+        {
+          "id": "A",
+          "kind": "report",
+          "query": "",
+          "method": "GET",
+          "n": 6,
+          "done": true,
+          "held": true,
+          "payload": {
+            "detections": [],
+            "audio_redactions": [
+              {
+                "t0": 7,
+                "t1": 8,
+                "mode": "bleep"
+              }
+            ]
+          }
+        },
+        {
+          "id": "B",
+          "kind": "meta",
+          "query": "",
+          "method": "GET",
+          "n": 7,
+          "done": true,
+          "payload": {
+            "id": "B",
+            "name": "synthetic job B",
+            "phase": "review",
+            "progress": 0.2,
+            "error": null,
+            "stats": {},
+            "eta": null,
+            "has_output": false
+          }
+        },
+        {
+          "id": "B",
+          "kind": "log",
+          "query": "?from=0",
+          "method": "GET",
+          "n": 8,
+          "done": true,
+          "payload": {
+            "from": 0,
+            "lines": [
+              "log-B"
+            ],
+            "len": 1
+          }
+        },
+        {
+          "id": "B",
+          "kind": "detections",
+          "query": "",
+          "method": "GET",
+          "n": 9,
+          "done": true,
+          "payload": {
+            "duration": 10,
+            "detections": [
+              {
+                "i": 0,
+                "category": "mrn",
+                "text": "review-B",
+                "enabled": true,
+                "t_start": 0,
+                "t_end": 1,
+                "track": -1,
+                "person": -1,
+                "confidence": 0.9
+              }
+            ]
+          }
+        },
+        {
+          "id": "B",
+          "kind": "thumb/0",
+          "query": "",
+          "method": "GET",
+          "n": 10,
+          "done": true
+        }
+      ],
+      "errors": [],
+      "console": [],
+      "unreleasedGates": 0
+    },
+    {
+      "name": "simulated-hidden-and-frozen-tab-resume",
+      "snapshot": {
+        "cur": "A",
+        "gen": 1,
+        "progress": 0.2,
+        "heading": "synthetic job A\n  queued",
+        "phase": "queued",
+        "log": "log-A",
+        "logN": 1,
+        "detail": "synthetic job A\n  queued\n \n \n \n \n log-A\n \n ",
+        "audio": [],
+        "drafts": 1,
+        "poll": true
+      },
+      "events": [
+        {
+          "id": "A",
+          "kind": "meta",
+          "query": "",
+          "method": "GET",
+          "n": 1,
+          "done": true,
+          "payload": {
+            "id": "A",
+            "name": "synthetic job A",
+            "phase": "queued",
+            "progress": 0.2,
+            "error": null,
+            "stats": {},
+            "eta": null,
+            "has_output": false
+          }
+        },
+        {
+          "id": "A",
+          "kind": "log",
+          "query": "?from=0",
+          "method": "GET",
+          "n": 2,
+          "done": true,
+          "payload": {
+            "from": 0,
+            "lines": [
+              "log-A"
+            ],
+            "len": 1
+          }
+        },
+        {
+          "id": "A",
+          "kind": "meta",
+          "query": "",
+          "method": "GET",
+          "n": 3,
+          "done": true,
+          "payload": {
+            "id": "A",
+            "name": "synthetic job A",
+            "phase": "queued",
+            "progress": 0.2,
+            "error": null,
+            "stats": {},
+            "eta": null,
+            "has_output": false
+          }
+        },
+        {
+          "id": "A",
+          "kind": "log",
+          "query": "?from=1",
+          "method": "GET",
+          "n": 4,
+          "done": true,
+          "payload": {
+            "from": 1,
+            "lines": [],
+            "len": 1
+          }
+        },
+        {
+          "id": "A",
+          "kind": "meta",
+          "query": "",
+          "method": "GET",
+          "n": 5,
+          "done": true,
+          "payload": {
+            "id": "A",
+            "name": "synthetic job A",
+            "phase": "queued",
+            "progress": 0.2,
+            "error": null,
+            "stats": {},
+            "eta": null,
+            "has_output": false
+          }
+        },
+        {
+          "id": "A",
+          "kind": "log",
+          "query": "?from=1",
+          "method": "GET",
+          "n": 6,
+          "done": true,
+          "payload": {
+            "from": 1,
+            "lines": [],
+            "len": 1
+          }
+        }
+      ],
+      "errors": [],
+      "console": [],
+      "unreleasedGates": 0,
+      "lifecycle": [
+        "frozen",
+        "active"
+      ],
+      "nativeVisibility": "visible",
+      "hidden": {
+        "cur": "A",
+        "gen": 1,
+        "progress": 0.2,
+        "heading": "synthetic job A\n  queued",
+        "phase": "queued",
+        "log": "log-A",
+        "logN": 1,
+        "detail": "synthetic job A\n  queued\n \n \n \n \n log-A\n \n ",
+        "audio": [],
+        "drafts": 1,
+        "poll": true
+      },
+      "visibilitySimulation": true
+    }
+  ]
+}

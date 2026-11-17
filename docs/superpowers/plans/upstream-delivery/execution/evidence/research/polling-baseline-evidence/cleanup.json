@@ -1,0 +1,10 @@
+{
+  "all_browser_route_gates_released": true,
+  "http_streaming_bodies_finished": true,
+  "browser_scenario_pages_closed": 17,
+  "browser_closed": true,
+  "browser_command_exit_code": 0,
+  "server_stop": "SIGTERM to exact task server executable/script match; exit 0",
+  "server_after_stop": "pgrep exact match returned no output; exit 1",
+  "fixture_only_initialization_noise": "Initial exploratory fixture certinfo attempted a tmp-only key path and returned 500. Corrected synthetic certinfo route before final collection; final server log clean. Initial logs retained only under /tmp, not final evidence."
+}

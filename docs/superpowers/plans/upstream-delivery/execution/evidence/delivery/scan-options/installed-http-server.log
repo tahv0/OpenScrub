@@ -1,0 +1,17 @@
+IMPORTS /tmp/openscrub-task108/install/lib/python3.12/site-packages/openscrub.py /tmp/openscrub-task108/install/lib/python3.12/site-packages/openscrub_web.py
+ENTRYPOINT /tmp/openscrub-task108/install/lib/python3.12/site-packages/bin/openscrub-web
+============================================================
+openscrub web — open from any device on your LAN:
+    http://127.0.0.1:18489/?token=task108-synthetic-token
+Jobs folder (contains PII): /tmp/openscrub-task108/installed-http/openscrub_jobs — kept forever
+Do NOT expose this port to the internet.
+============================================================
+    WARNING: plain HTTP — PII crosses the network unencrypted.
+ADMISSION {"method": "GET", "path": "/api/jobs", "status": 200, "jobs": [], "queue": [], "files": []}
+ADMISSION {"method": "POST", "path": "/api/jobs", "status": 400, "jobs": [], "queue": [], "files": []}
+ADMISSION {"method": "GET", "path": "/api/jobs", "status": 200, "jobs": [], "queue": [], "files": []}
+ADMISSION {"method": "POST", "path": "/api/jobs", "status": 200, "jobs": ["f9b32ea8ca41"], "queue": [["f9b32ea8ca41", "scan", 1]], "files": ["f9b32ea8ca41", "f9b32ea8ca41/input.avi", "f9b32ea8ca41/options.json"]}
+ADMISSION {"method": "POST", "path": "/api/jobs/f9b32ea8ca41/cancel", "status": 200, "jobs": ["f9b32ea8ca41"], "queue": [["f9b32ea8ca41", "scan", 1]], "files": ["f9b32ea8ca41", "f9b32ea8ca41/input.avi", "f9b32ea8ca41/options.json"]}
+ADMISSION {"method": "DELETE", "path": "/api/jobs/f9b32ea8ca41", "status": 200, "jobs": [], "queue": [["f9b32ea8ca41", "scan", 1]], "files": []}
+ADMISSION {"method": "GET", "path": "/api/jobs", "status": 200, "jobs": [], "queue": [["f9b32ea8ca41", "scan", 1]], "files": []}
+FINAL {"jobs": [], "queue": 0, "unfinished": 0}

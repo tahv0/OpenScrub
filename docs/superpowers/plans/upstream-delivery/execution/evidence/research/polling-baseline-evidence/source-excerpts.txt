@@ -1,0 +1,383 @@
+PIN 92124753736e287ac800af91f0ac96f3e96c01be openscrub_web.py:1060-1072
+1060: @app.route("/api/jobs/<jid>")
+1061: def job_status(jid):
+1062:     job = JOBS.get(jid) or abort(404)
+1063:     return jsonify(job_public(job))
+1064: 
+1065: 
+1066: @app.route("/api/jobs/<jid>/log")
+1067: def job_log(jid):
+1068:     job = JOBS.get(jid) or abort(404)
+1069:     frm = max(0, int(request.args.get("from", 0)))
+1070:     return jsonify({"from": frm, "lines": job["log"][frm:],
+1071:                     "len": len(job["log"])})
+1072: 
+
+PIN 92124753736e287ac800af91f0ac96f3e96c01be openscrub_web.py:2080-2273
+2080: let CUR=null, EN={}, MAN=[], DUR=0, POLL=null, PHIST=[], PHPH="", LOGN=0, SHELLPH=null, JOBSJSON="";
+2081: 
+2082: // VIEW_GEN advances on every openJob (including A -> B -> A) and removal.
+2083: // Drafts live only in this page; late acknowledgements reconcile their owner,
+2084: // but may never publish into, or start rendering from, a different view.
+2085: let VIEW_GEN=0, EDITS=null;
+2086: const REVIEW_DRAFTS=new Map();
+2087: function emptyEditor(){return {t:0,ox:0,oy:0,boxes:[],sel:-1,ov:{},dis:{},times:{},adds:[],
+2088:  add:false,addAnchor:null,drag:null,scale:1,dur:10,
+2089:  audio:[],audioSaved:[],audioLoaded:false};}
+2090: function sameEdit(a,b){return JSON.stringify(a)===JSON.stringify(b);}
+2091: function copyEdit(a){return JSON.parse(JSON.stringify(a));}
+2092: function ownsView(id,gen){return CUR===id&&VIEW_GEN===gen;}
+2093: function saveStatus(d,message){
+2094:  d.status=message;
+2095:  if(d!==EDITS)return;
+2096:  const el=document.getElementById("reviewSaveStatus");if(el)el.textContent=message;
+2097:  document.querySelectorAll("button[data-save-edits]").forEach(b=>{b.disabled=!!d.busy;});
+2098: }
+2099: function trimReviewDraft(d){
+2100:  const b=d.editor;
+2101:  // Clean audio is fetched display state even when other edit kinds are pending.
+2102:  // An in-flight audio submission may make a toggle-back a newer pending choice.
+2103:  if(!d.audioInFlight&&sameEdit(b.audio,b.audioSaved)){
+2104:   b.audio=[];b.audioSaved=[];b.audioLoaded=false;
+2105:  }
+2106:  if(!d.busy&&!hasReviewEdits(d)){
+2107:   d.en={};d.editor=emptyEditor();
+2108:  }
+2109: }
+2110: function hasReviewEdits(d){
+2111:  const b=d.editor;
+2112:  return Object.keys(d.enabled).length||d.manual.length||b.adds.length||
+2113:   Object.keys(b.ov).length||Object.keys(b.times).length||
+2114:   !sameEdit(b.audio,b.audioSaved);
+2115: }
+2116: 
+2117: async function loadJobs(){
+2118:  const r=await fetch("api/jobs");
+2119:  if(r.status===423){jobs.innerHTML='<span style="color:#f87171">&#128274; locked — unlock in the Encryption panel below</span>';JOBSJSON="";return;}
+2120:  const js=await r.json();
+2121:  const s=JSON.stringify(js);
+2122:  if(s===JOBSJSON)return;
+2123:  JOBSJSON=s;
+2124:  jobs.innerHTML=js.length?js.map(j=>
+2125:   `<div class="row" style="justify-content:space-between;padding:4px 0">
+2126:    <a href="#" onclick="openJob('${j.id}');return false">${j.name}</a>
+2127:    <span style="display:flex;gap:10px;align-items:center"><span class="badge">${j.phase}</span>
+2128:    ${(j.phase=="error"||j.phase=="cancelled")?`<a href="#" title="Retry the scan — reuses the file already on the server, nothing is re-uploaded" style="text-decoration:none;font-size:15px" onclick="retryJob('${j.id}');return false">&#8635;</a>`:""}
+2129:    <a href="#" title="Delete this job and all of its files" style="text-decoration:none;font-size:15px" onclick="delJob('${j.id}');return false">&#128465;&#65039;</a></span></div>`).join(""):"none yet";
+2130: }
+2131: 
+2132: async function retryJob(id){
+2133:  const r=await fetch("api/jobs/"+id+"/retry",{method:"POST"});
+2134:  let j={};try{j=await r.json();}catch(e){}
+2135:  if(!r.ok){alert(j.error||"could not retry the job");return;}
+2136:  JOBSJSON="";loadJobs();if(typeof openJob==="function")openJob(id);
+2137: }
+2138: async function delJob(id){
+2139:  if(!confirm("Delete this job and ALL of its files — upload, report, and rendered output?\\n\\nThis cannot be undone."))return;
+2140:  const r=await fetch("api/jobs/"+id,{method:"DELETE"});
+2141:  if(!r.ok){
+2142:   let m="could not delete the job";
+2143:   try{const e=await r.json();m=e.error||e.description||m;}catch(_){}
+2144:   alert(m);return;
+2145:  }
+2146:  REVIEW_DRAFTS.delete(id);
+2147:  if(CUR===id){VIEW_GEN++;CUR=null;EDITS=null;if(POLL)clearInterval(POLL);detail.innerHTML="";}
+2148:  JOBSJSON="";loadJobs();
+2149: }
+2150: async function openJob(id){
+2151:  const video=document.getElementById("beVid");
+2152:  if(video){try{video.pause();}catch(e){}}
+2153:  if(EDITS){
+2154:   // Retain edit bookkeeping, not fetched box/report/transcript display data.
+2155:   EDITS.en={};
+2156:   const b=EDITS.editor;delete b.raw;b.boxes=[];
+2157:   delete b.tlspans;delete b.audioSugg;delete b.audioTx;b.playing=false;
+2158:   trimReviewDraft(EDITS);
+2159:  }
+2160:  VIEW_GEN++;CUR=id;
+2161:  EDITS=REVIEW_DRAFTS.get(id);
+2162:  if(!EDITS){EDITS={en:{},enabled:{},manual:[],editor:emptyEditor(),busy:false,status:""};
+2163:   REVIEW_DRAFTS.set(id,EDITS);}
+2164:  EN=EDITS.en;MAN=EDITS.manual;BE=EDITS.editor;
+2165:  PHIST=[];PHPH="";LOGN=0;SHELLPH=null;
+2166:  detail.innerHTML='<div id="reviewSaveStatus" role="status" aria-live="polite" style="margin:8px 0;color:#fbbf24"></div>';
+2167:  saveStatus(EDITS,EDITS.status);
+2168: 
+2169:  if(POLL)clearInterval(POLL);
+2170:  POLL=setInterval(refresh,900); refresh();
+2171: }
+2172: 
+2173: function shellHtml(j){
+2174:  return `<div class="card" id="jobcard"><h2>${j.name}
+2175:   <span class="badge" id="ph"></span><small id="eta"></small></h2>
+2176:  <progress id="prog" value="0" max="1"></progress>
+2177:  <div class="row" id="actions" style="margin-top:8px"></div>
+2178:  <div style="margin-top:8px;text-align:center"><img id="pimg"
+2179:    style="max-width:100%;border-radius:8px;display:none;margin:0 auto"></div>
+2180:  <div id="pcap" style="font-size:12px;color:#94a3b8"></div>
+2181:  <div id="log" style="margin-top:8px"></div>
+2182:  <div class="warn" id="warnbox" style="display:none;margin-top:8px"></div>
+2183:  </div>`;
+2184: }
+2185: 
+2186: async function refresh(){
+2187:  if(!CUR)return;
+2188:  const id=CUR,gen=VIEW_GEN;
+2189:  const j=await (await fetch("api/jobs/"+id)).json();
+2190:  if(!ownsView(id,gen))return;
+2191:  if(SHELLPH===null){
+2192:   detail.insertAdjacentHTML("afterbegin",shellHtml(j));SHELLPH="";
+2193:   const im=document.getElementById("pimg");
+2194:   im.onload=()=>{im.style.display="block";};   // show only once a real frame arrives
+2195:   im.onerror=()=>{im.style.display="none";};   // 404 before first preview: stay hidden
+2196:  }
+2197: 
+2198:  // progress + ETA (updated in place — nothing is rebuilt).
+2199:  // The server sends a smoothed per-stage estimate (j.eta, seconds) built
+2200:  // from the stage's average processing rate — prefer it. The old
+2201:  // client-side extrapolation from bar movement stays only as a fallback
+2202:  // (rehydrated jobs mid-phase), with its history reset on phase change so
+2203:  // it never extrapolates a scan-speed rate across the render phase.
+2204:  if(PHPH!==j.phase){PHIST=[];PHPH=j.phase;}
+2205:  PHIST.push([Date.now(),j.progress]); if(PHIST.length>40)PHIST.shift();
+2206:  let sec=null;
+2207:  if(typeof j.eta==="number"&&j.progress<1)sec=j.eta;
+2208:  else if(j.progress>0&&j.progress<1&&PHIST.length>3){
+2209:   const[t0,p0]=PHIST[0],[t1,p1]=PHIST[PHIST.length-1];
+2210:   if(p1>p0)sec=(1-p1)*(t1-t0)/(p1-p0)/1000;}
+2211:  const eta=sec===null?"":` ~${sec>90?Math.round(sec/60)+" min":Math.round(sec)+" s"} left`;
+2212:  document.getElementById("ph").textContent=j.phase;
+2213:  document.getElementById("eta").textContent=eta;
+2214:  document.getElementById("prog").value=j.progress;
+2215: 
+2216:  // incremental log append with stick-to-bottom (respects manual scroll-up)
+2217:  const lg=document.getElementById("log");
+2218:  const stick=lg.scrollTop+lg.clientHeight>=lg.scrollHeight-40;
+2219:  const nl=await (await fetch(`api/jobs/${id}/log?from=${LOGN}`)).json();
+2220:  if(!ownsView(id,gen))return;
+2221:  if(LOGN===0&&nl.len>400){LOGN=nl.len-400;nl.lines=nl.lines.slice(-400);}
+2222:  if(nl.lines.length){
+2223:   const NL=String.fromCharCode(10);
+2224:   lg.textContent+=(lg.textContent?NL:"")+nl.lines.join(NL);
+2225:   LOGN=nl.len;
+2226:   if(stick)lg.scrollTop=lg.scrollHeight;
+2227:  }
+2228: 
+2229:  // live preview: swap src in place (browser keeps old frame until new loads)
+2230:  const img=document.getElementById("pimg");
+2231:  if(j.phase=="scanning"){
+2232:   img.src=`api/jobs/${CUR}/preview.jpg?x=${Date.now()}`;
+2233:  }
+2234: 
+2235:  const wb=document.getElementById("warnbox");
+2236:  if(j.error){wb.style.display="block";wb.textContent=j.error;}
+2237:  else wb.style.display="none";
+2238: 
+2239:  // action buttons rebuilt ONLY when the phase changes
+2240:  if(SHELLPH!==j.phase){
+2241:   SHELLPH=j.phase;
+2242:   let a="";
+2243:   if(j.phase=="scanning"||j.phase=="rendering")
+2244:    a=`<button class="danger" onclick="cancelJob()">Cancel</button>`;
+2245:   if(j.phase=="error"||j.phase=="cancelled")
+2246:    a=`<button onclick="retryJob(CUR)">Retry scan (no re-upload)</button>
+2247:     <div style="width:100%;font-size:12px;color:#9ca3af">The uploaded file
+2248:     is still on the server — Retry re-runs the scan without uploading it
+2249:     again. Delete the job (&#128465;&#65039; in the list) to free its disk
+2250:     space.</div>`;
+2251:   if(j.phase=="review"){
+2252:    // no interstitial button: review is the ONLY next step after a scan,
+2253:    // so open it directly — both on a live scan finishing and on
+2254:    // selecting a job that is already waiting in review
+2255:    a="";
+2256:    loadReview();
+2257:   }
+2258:   if(j.phase=="done"&&j.has_output)
+2259:    a=`<a href="api/jobs/${CUR}/download"><button>Download redacted video</button></a>
+2260:     <a href="api/jobs/${CUR}/report"><button class="sec">Download audit report</button></a>
+2261:     <button class="sec" onclick="loadReview()">Re-open review</button>
+2262:     <button class="sec" onclick="loadCompare()">Compare before/after</button>
+2263:     <button class="sec" onclick="loadBoxEdit()">Preview &amp; edit blur boxes</button>
+2264:     <div class="warn" style="width:100%">Reminder: scrub the result before
+2265:     sharing. This tool is best-effort, not a compliance guarantee.</div>
+2266:     <div id="compare" style="width:100%"></div>
+2267:     <div id="beslot_done" style="width:100%"></div>`;
+2268:   document.getElementById("actions").innerHTML=a;
+2269:   if(j.phase!="scanning")img.style.display="none";
+2270:  }
+2271:  loadJobs();
+2272: }
+2273: 
+
+PIN 92124753736e287ac800af91f0ac96f3e96c01be openscrub_web.py:2275-2288
+2275: async function loadBoxEdit(fromReview){
+2276:  const id=CUR,gen=VIEW_GEN,editor=BE;
+2277:  showPanel(fromReview?"boxedit_rev":"boxedit");
+2278:  const mi=await (await fetch(`api/jobs/${id}/mediainfo`)).json();
+2279:  if(!ownsView(id,gen)||BE!==editor)return;
+2280:  // in review: the slot right under the Preview button; on done: the actions slot
+2281:  let c=document.getElementById("beslot")||document.getElementById("beslot_done");
+2282:  if(!c){c=document.createElement("div");c.id="beslot";c.style.width="100%";
+2283:   (document.getElementById("review")||document.getElementById("jobcard")||detail)
+2284:    .appendChild(c);}
+2285:  Object.assign(BE,{dur:mi.duration,win:[0,mi.duration],trk:false,muteArm:false,tlDrag:null,
+2286:      audioSel:-1,tlspans:[]});
+2287: 
+2288:  c.innerHTML=`<div class="row" style="margin-top:8px">
+
+PIN 92124753736e287ac800af91f0ac96f3e96c01be openscrub_web.py:2324-2337
+2324:    to a frame where the object is clear, draw a box around it — it will be
+2325:    followed and blurred through the window. &#128263; Audio span: drag on the
+2326:    timeline's bottom lane to silence (or bleep) that stretch of sound.</p>`;
+2327:  const img=document.getElementById("beImg");
+2328:  img.onload=()=>{if(!ownsView(id,gen)||BE!==editor||document.getElementById("beImg")!==img||BE.playing)return;const cv=document.getElementById("beCv");
+2329:   cv.width=img.clientWidth;cv.height=img.clientHeight;
+2330:   BE.scale=img.clientWidth/(img.naturalWidth||1);beDraw();};
+2331:  const bv=document.getElementById("beVid");
+2332:  const stop=()=>{if(ownsView(id,gen)&&BE===editor&&document.getElementById("beVid")===bv&&BE.playing)bePlayStop();};
+2333:  bv.addEventListener("pause",stop);bv.addEventListener("ended",stop);
+2334:  saveStatus(EDITS,EDITS.status);
+2335:  beHook();tlHook();await tlInit();
+2336:  if(ownsView(id,gen)&&BE===editor)beScrub();
+2337: }
+
+PIN 92124753736e287ac800af91f0ac96f3e96c01be openscrub_web.py:2404-2436
+2404:  person:"#0ea5e9",manual:"#eab308"};
+2405: async function tlInit(){
+2406:  const id=CUR,gen=VIEW_GEN,editor=BE;
+2407:  // one fetch of the full report: detection spans for the lanes (dense
+2408:  // tracks collapse to one span per track) + stored audio redactions
+2409:  try{
+2410:   const response=await fetch(`api/jobs/${id}/report`);
+2411:   if(!response.ok)throw Error("could not load audio");
+2412:   const doc=await response.json();
+2413:   if(!ownsView(id,gen)||BE!==editor)return;
+2414:   const per={};
+2415:   for(const d of (doc.detections||[])){
+2416:    if(d.enabled===false)continue;
+2417:    const key=d.category+((d.track??-1)>=0?(":t"+d.track):(":i"+Math.random()));
+2418:    const s=per[key]||(per[key]={cat:d.category,t0:d.t_start,t1:d.t_end});
+2419:    s.t0=Math.min(s.t0,d.t_start);s.t1=Math.max(s.t1,d.t_end);
+2420:   }
+2421:   BE.tlspans=Object.values(per);
+2422:   if(!BE.audioLoaded){
+2423:    const stored=(doc.audio_redactions||[]).map(s=>({t0:s.t0,t1:s.t1,mode:s.mode||"mute"}));
+2424:    // Audio controls can be used while this initial report request is pending.
+2425:    BE.audio=[...stored,...BE.audio];BE.audioSaved=copyEdit(stored);BE.audioLoaded=true;
+2426:   }
+2427:   BE.audioSugg=doc.audio_suggestions||[];
+2428:   BE.audioTx=doc.audio_transcript||[];BE.txAnchor=-1;
+2429:   renderAudioSugg();renderTranscript();
+2430:  }catch(e){if(!ownsView(id,gen)||BE!==editor)return;BE.tlspans=[];}
+2431:  beTLDraw();
+2432: }
+2433: function tlX(t,w){return Math.max(0,Math.min(w,t/Math.max(0.1,BE.dur)*w));}
+2434: function beTLDraw(){
+2435:  const cv=document.getElementById("beTL");if(!cv)return;
+2436:  const w=cv.clientWidth||600;cv.width=w;cv.height=72;
+
+PIN 92124753736e287ac800af91f0ac96f3e96c01be openscrub_web.py:2548-2578
+2548:   }
+2549:  },1500);
+2550: }
+2551: async function beScrub(){
+2552:  const id=CUR,gen=VIEW_GEN,editor=BE;
+2553:  const sl=document.getElementById("beT");if(!sl)return; // editor was closed
+2554:  if(BE.playing){               // dragging the slider while playing = seek
+2555:   const v=document.getElementById("beVid");
+2556:   if(v)v.currentTime=+sl.value;
+2557:   return;                      // the rAF loop keeps label/boxes in sync
+2558:  }
+2559:  BE.sel=-1;document.getElementById("beRm").style.display="none";
+2560:  document.getElementById("beTimes").style.display="none";
+2561:  BE.t=+document.getElementById("beT").value;
+2562:  document.getElementById("beL").textContent=BE.t.toFixed(1)+"s";
+2563:  document.getElementById("beImg").src=`api/jobs/${CUR}/frame_at?t=${BE.t}`;
+2564:  const d=await (await fetch(`api/jobs/${id}/boxes_at?t=${BE.t}&all=1`)).json();
+2565:  if(!ownsView(id,gen)||BE!==editor)return;
+2566:  BE.ox=d.ox;BE.oy=d.oy;BE.raw=d.boxes;
+2567:  beFilter();beDraw();beTLDraw();
+2568: }
+2569: function beFilter(){
+2570:  BE.boxes=(BE.raw||[]).filter(b=>{
+2571:   const on=(b.i in EN)?EN[b.i]:b.enabled;   // live: review toggles apply here
+2572:   return on;
+2573:  }).map(b=>{
+2574:   let bb=b;
+2575:   if(BE.ov[b.i]){const o=BE.ov[b.i];
+2576:    bb={...b,box:[o[0]+BE.ox,o[1]+BE.oy,o[2]+BE.ox,o[3]+BE.oy]};}
+2577:   if(BE.times[b.i]){bb={...bb,t_start:BE.times[b.i][0],t_end:BE.times[b.i][1]};}
+2578:   return bb;
+
+PIN 92124753736e287ac800af91f0ac96f3e96c01be openscrub_web.py:2732-2755
+2732: async function beSave(){return saveAndRender();}
+2733: async function cancelJob(){await fetch("api/jobs/"+CUR+"/cancel",{method:"POST"})}
+2734: 
+2735: // the three post-render views (compare, review, box editor) are mutually
+2736: // exclusive: opening one closes the others instead of stacking them
+2737: function showPanel(which){
+2738:  // a playing box-editor video must be PAUSED before its DOM is wiped —
+2739:  // an element removed via innerHTML can keep its audio running
+2740:  try{const v=document.getElementById("beVid");
+2741:   if(v&&!v.paused){BE.playing=false;v.pause();}}catch(e){}
+2742:  // "boxedit_rev" = the editor button INSIDE the review card: the editor
+2743:  // mounts in the review's own slot, so the review stays. Everything else
+2744:  // is standalone and closes the other panels.
+2745:  if(which!=="compare"){
+2746:   const c=document.getElementById("compare");if(c)c.innerHTML="";}
+2747:  const b=document.getElementById("beslot_done");
+2748:  const b2=document.getElementById("beslot");
+2749:  if(which==="boxedit_rev"){if(b)b.innerHTML=""}
+2750:  else{
+2751:   if(which!=="boxedit"){if(b)b.innerHTML=""}
+2752:   if(b2)b2.innerHTML="";
+2753:   if(which!=="review"){
+2754:    const rev=document.getElementById("review");if(rev)rev.remove();}
+2755:  }
+
+PIN 92124753736e287ac800af91f0ac96f3e96c01be openscrub_web.py:2777-2784
+2777: async function loadReview(){
+2778:  const id=CUR,gen=VIEW_GEN;
+2779:  showPanel("review");
+2780:  const d=await (await fetch(`api/jobs/${id}/detections`)).json();
+2781:  if(!ownsView(id,gen))return;
+2782:  DUR=d.duration;
+2783:  const groups={}; const zdrop=[]; TRKMEM={};
+2784:  d.detections.forEach(x=>{
+
+PIN 92124753736e287ac800af91f0ac96f3e96c01be openscrub_web.py:2858-2865
+2858:  <span style="font-size:12px;color:#94a3b8">missed something? use
+2859:   ▶ Preview video &amp; edit boxes above — its ＋ Add box replaces the old
+2860:   add-region tool</span></div></div>`;
+2861:  const old=document.getElementById("review"); if(old)old.remove();
+2862:  detail.insertAdjacentHTML("beforeend",html);
+2863:  initMarquee();saveStatus(EDITS,EDITS.status);
+2864: }
+2865: 
+
+PIN 92124753736e287ac800af91f0ac96f3e96c01be openscrub_web.py:3190-3214
+3190: }
+3191: loadPersist();loadCertInfo();loadJobs();setInterval(loadJobs,5000);
+3192: function showView(){
+3193:  const s=location.hash==="#settings";
+3194:  document.getElementById("mainview").style.display=s?"none":"block";
+3195:  document.getElementById("settingsview").style.display=s?"block":"none";
+3196:  if(s)window.scrollTo(0,0);
+3197: }
+3198: window.addEventListener("hashchange",showView);
+3199: updCheck();vaultStatus();extrasStatus();showView();
+3200: """
+3201: 
+3202: PAGE = (zones_ui.ZONES_PAGE
+3203:         .replace("%%FAVICON%%", FAVICON_URI)
+3204:         .replace("%%LOGO%%", LOGO_URI)
+3205:         .replace("%%WORDMARK%%", WORDMARK_URI)
+3206:         .replace("%%APP_CSS%%", APP_CSS)
+3207:         .replace("%%JOBS_HTML%%", JOBS_HTML)
+3208:         .replace("%%SETTINGS_HTML%%", SETTINGS_HTML)
+3209:         .replace("%%FOOT_HTML%%", FOOT_HTML)
+3210:         .replace("%%APP_JS%%", APP_JS))
+3211: 
+3212: 
+3213: ASSET_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
+3214: SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))

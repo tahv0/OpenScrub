@@ -1,0 +1,116 @@
+{
+  "command": [
+    "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+    "/tmp/openscrub-task108/run_server.py",
+    "--http",
+    "--host",
+    "127.0.0.1",
+    "--port",
+    "18489",
+    "--retain-days",
+    "0",
+    "--token",
+    "task108-synthetic-token"
+  ],
+  "results": [
+    {
+      "method": "GET",
+      "path": "/api/jobs",
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json",
+        "Content-Length": "3",
+        "Cache-Control": "no-store",
+        "Date": "Tue, 17 Nov 2026 02:16:01 GMT",
+        "Server": "openscrub"
+      },
+      "body": "[]\n"
+    },
+    {
+      "method": "POST",
+      "path": "/api/jobs",
+      "status": 400,
+      "headers": {
+        "Content-Type": "application/json",
+        "Content-Length": "48",
+        "Cache-Control": "no-store",
+        "Date": "Tue, 17 Nov 2026 02:16:01 GMT",
+        "Server": "openscrub"
+      },
+      "body": "{\"error\":\"Scan options must be a JSON object.\"}\n"
+    },
+    {
+      "method": "GET",
+      "path": "/api/jobs",
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json",
+        "Content-Length": "3",
+        "Cache-Control": "no-store",
+        "Date": "Tue, 17 Nov 2026 02:16:01 GMT",
+        "Server": "openscrub"
+      },
+      "body": "[]\n"
+    },
+    {
+      "method": "POST",
+      "path": "/api/jobs",
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json",
+        "Content-Length": "26",
+        "Cache-Control": "no-store",
+        "Date": "Tue, 17 Nov 2026 02:16:01 GMT",
+        "Server": "openscrub"
+      },
+      "body": "{\"jobs\":[\"f762020060ee\"]}\n"
+    },
+    {
+      "method": "POST",
+      "path": "/api/jobs/f762020060ee/cancel",
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json",
+        "Content-Length": "12",
+        "Cache-Control": "no-store",
+        "Date": "Tue, 17 Nov 2026 02:16:01 GMT",
+        "Server": "openscrub"
+      },
+      "body": "{\"ok\":true}\n"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/jobs/f762020060ee",
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json",
+        "Content-Length": "12",
+        "Cache-Control": "no-store",
+        "Date": "Tue, 17 Nov 2026 02:16:01 GMT",
+        "Server": "openscrub"
+      },
+      "body": "{\"ok\":true}\n"
+    },
+    {
+      "method": "GET",
+      "path": "/api/jobs",
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json",
+        "Content-Length": "3",
+        "Cache-Control": "no-store",
+        "Date": "Tue, 17 Nov 2026 02:16:01 GMT",
+        "Server": "openscrub"
+      },
+      "body": "[]\n"
+    }
+  ],
+  "fixture_sha256": "3ee4f9eba8d62e039358afdd8a5cb43d672731236ded9a4977fcb16f5008d694",
+  "cleanup": {
+    "jobs": [],
+    "job_store_entries": [],
+    "queue": 0,
+    "unfinished": 0,
+    "server_exit": 0
+  }
+}

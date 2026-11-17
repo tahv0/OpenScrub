@@ -99,6 +99,8 @@ For ordinary file responses, use the valid response `Content-Length` matching th
 - [ ] **V:** Run `python -m pytest test_openscrub.py tests/test_job_polling_node.py tests/test_job_polling_browser.py -q`, build and a browser suspend/resume/job-switch exercise. Confirm polling recovery does not trigger rescans or duplicate render actions.
 - [ ] **D/R/L:** Report the actual trigger and bounded request behavior, with failure/recovery evidence. Exclude video sections and learning progress from the donor.
 
+**Execution refinement:** On reviewed P07a, the [17-scenario emitted-page baseline](execution/evidence/research/polling-baseline-research.md) confirms existing `VIEW_GEN` fences already suppress cross-view metadata/log/review/audio publication. Reuse that owner. Remaining same-view overlaps repeat log lines and regress progress; unfinished response bodies have no deadline, and HTTP errors can populate a malformed shell. A poll-triggered slow `loadReview` can also insert after a newer done phase, while intentional Re-open review must remain usable. Give automatic review publication current-phase eligibility without rejecting slow same-phase results or making its fetch an unbounded polling dependency. Reconcile server log length even on empty responses. A chained nominal 900ms healthy timer may add request duration; document that scheduling choice, use bounded failure retry, and distinguish a logical timeout from forcibly terminating an uncooperative transport. Controlled CDP/fake-visibility cases are not native OS suspension coverage. Keep save/download deadlines and the independent job-list schedule out of this PR.
+
 ## P04 — recent-rate ETA
 
 **What:** Base long-running stage ETA on a bounded recent throughput window with a startup fallback.

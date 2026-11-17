@@ -1,0 +1,782 @@
+FFFFFFFFFFFFFFFFFFFFFFFFFFFF........                                     [100%]
+=================================== FAILURES ===================================
+_____ test_invalid_options_rejected_before_job_side_effects[empty-upload] ______
+
+intake = (<FlaskClient <Flask 'openscrub_web'>>, <function intake.<locals>.post at 0x7fe6e8399a80>, PosixPath('/tmp/openscrub-t...\x00\x00\xde\x00\x00\x00', PosixPath('/tmp/openscrub-task108/red-temp/test_invalid_options_rejected_0/openscrub_jobs'))
+kind = 'upload', options = ''
+
+    @pytest.mark.parametrize("kind", ["upload", "server-path"])
+    @pytest.mark.parametrize("options", INVALID_OPTIONS)
+    def test_invalid_options_rejected_before_job_side_effects(intake, kind, options):
+        client, post, video, source, jobs_dir = intake
+        response = post(kind, options)
+        print(kind, repr(options), response.status_code, "jobs", len(web.JOBS),
+              "queued", web.WORK_Q.qsize(), "job directories", len(list(jobs_dir.iterdir())))
+>       assert response.status_code == 400
+E       assert 500 == 400
+E        +  where 500 = <WrapperTestResponse streamed [500 INTERNAL SERVER ERROR]>.status_code
+
+tests/test_scan_options.py:100: AssertionError
+----------------------------- Captured stdout call -----------------------------
+upload '' 500 jobs 0 queued 0 job directories 0
+------------------------------ Captured log call -------------------------------
+ERROR    openscrub_web:app.py:875 Exception on /api/jobs [POST]
+Traceback (most recent call last):
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", line 904, in create_job
+    options = json.loads(request.form.get("options", "{}"))
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/python/cpython-3.12.16-linux-x86_64-gnu/lib/python3.12/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/python/cpython-3.12.16-linux-x86_64-gnu/lib/python3.12/json/decoder.py", line 338, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/python/cpython-3.12.16-linux-x86_64-gnu/lib/python3.12/json/decoder.py", line 356, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+___ test_invalid_options_rejected_before_job_side_effects[empty-server-path] ___
+
+intake = (<FlaskClient <Flask 'openscrub_web'>>, <function intake.<locals>.post at 0x7fe6e839a8e0>, PosixPath('/tmp/openscrub-t...\x00\x00\xde\x00\x00\x00', PosixPath('/tmp/openscrub-task108/red-temp/test_invalid_options_rejected_1/openscrub_jobs'))
+kind = 'server-path', options = ''
+
+    @pytest.mark.parametrize("kind", ["upload", "server-path"])
+    @pytest.mark.parametrize("options", INVALID_OPTIONS)
+    def test_invalid_options_rejected_before_job_side_effects(intake, kind, options):
+        client, post, video, source, jobs_dir = intake
+        response = post(kind, options)
+        print(kind, repr(options), response.status_code, "jobs", len(web.JOBS),
+              "queued", web.WORK_Q.qsize(), "job directories", len(list(jobs_dir.iterdir())))
+>       assert response.status_code == 400
+E       assert 500 == 400
+E        +  where 500 = <WrapperTestResponse streamed [500 INTERNAL SERVER ERROR]>.status_code
+
+tests/test_scan_options.py:100: AssertionError
+----------------------------- Captured stdout call -----------------------------
+server-path '' 500 jobs 0 queued 0 job directories 0
+------------------------------ Captured log call -------------------------------
+ERROR    openscrub_web:app.py:875 Exception on /api/jobs [POST]
+Traceback (most recent call last):
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", line 904, in create_job
+    options = json.loads(request.form.get("options", "{}"))
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/python/cpython-3.12.16-linux-x86_64-gnu/lib/python3.12/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/python/cpython-3.12.16-linux-x86_64-gnu/lib/python3.12/json/decoder.py", line 338, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/python/cpython-3.12.16-linux-x86_64-gnu/lib/python3.12/json/decoder.py", line 356, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+___ test_invalid_options_rejected_before_job_side_effects[whitespace-upload] ___
+
+intake = (<FlaskClient <Flask 'openscrub_web'>>, <function intake.<locals>.post at 0x7fe6e2b29e40>, PosixPath('/tmp/openscrub-t...\x00\x00\xde\x00\x00\x00', PosixPath('/tmp/openscrub-task108/red-temp/test_invalid_options_rejected_2/openscrub_jobs'))
+kind = 'upload', options = '   '
+
+    @pytest.mark.parametrize("kind", ["upload", "server-path"])
+    @pytest.mark.parametrize("options", INVALID_OPTIONS)
+    def test_invalid_options_rejected_before_job_side_effects(intake, kind, options):
+        client, post, video, source, jobs_dir = intake
+        response = post(kind, options)
+        print(kind, repr(options), response.status_code, "jobs", len(web.JOBS),
+              "queued", web.WORK_Q.qsize(), "job directories", len(list(jobs_dir.iterdir())))
+>       assert response.status_code == 400
+E       assert 500 == 400
+E        +  where 500 = <WrapperTestResponse streamed [500 INTERNAL SERVER ERROR]>.status_code
+
+tests/test_scan_options.py:100: AssertionError
+----------------------------- Captured stdout call -----------------------------
+upload '   ' 500 jobs 0 queued 0 job directories 0
+------------------------------ Captured log call -------------------------------
+ERROR    openscrub_web:app.py:875 Exception on /api/jobs [POST]
+Traceback (most recent call last):
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", line 904, in create_job
+    options = json.loads(request.form.get("options", "{}"))
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/python/cpython-3.12.16-linux-x86_64-gnu/lib/python3.12/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/python/cpython-3.12.16-linux-x86_64-gnu/lib/python3.12/json/decoder.py", line 338, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/python/cpython-3.12.16-linux-x86_64-gnu/lib/python3.12/json/decoder.py", line 356, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 4 (char 3)
+_ test_invalid_options_rejected_before_job_side_effects[whitespace-server-path] _
+
+intake = (<FlaskClient <Flask 'openscrub_web'>>, <function intake.<locals>.post at 0x7fe6e2b299e0>, PosixPath('/tmp/openscrub-t...\x00\x00\xde\x00\x00\x00', PosixPath('/tmp/openscrub-task108/red-temp/test_invalid_options_rejected_3/openscrub_jobs'))
+kind = 'server-path', options = '   '
+
+    @pytest.mark.parametrize("kind", ["upload", "server-path"])
+    @pytest.mark.parametrize("options", INVALID_OPTIONS)
+    def test_invalid_options_rejected_before_job_side_effects(intake, kind, options):
+        client, post, video, source, jobs_dir = intake
+        response = post(kind, options)
+        print(kind, repr(options), response.status_code, "jobs", len(web.JOBS),
+              "queued", web.WORK_Q.qsize(), "job directories", len(list(jobs_dir.iterdir())))
+>       assert response.status_code == 400
+E       assert 500 == 400
+E        +  where 500 = <WrapperTestResponse streamed [500 INTERNAL SERVER ERROR]>.status_code
+
+tests/test_scan_options.py:100: AssertionError
+----------------------------- Captured stdout call -----------------------------
+server-path '   ' 500 jobs 0 queued 0 job directories 0
+------------------------------ Captured log call -------------------------------
+ERROR    openscrub_web:app.py:875 Exception on /api/jobs [POST]
+Traceback (most recent call last):
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", line 904, in create_job
+    options = json.loads(request.form.get("options", "{}"))
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/python/cpython-3.12.16-linux-x86_64-gnu/lib/python3.12/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/python/cpython-3.12.16-linux-x86_64-gnu/lib/python3.12/json/decoder.py", line 338, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/python/cpython-3.12.16-linux-x86_64-gnu/lib/python3.12/json/decoder.py", line 356, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 4 (char 3)
+_ test_invalid_options_rejected_before_job_side_effects[malformed-object-upload] _
+
+intake = (<FlaskClient <Flask 'openscrub_web'>>, <function intake.<locals>.post at 0x7fe6e2b29f80>, PosixPath('/tmp/openscrub-t...\x00\x00\xde\x00\x00\x00', PosixPath('/tmp/openscrub-task108/red-temp/test_invalid_options_rejected_4/openscrub_jobs'))
+kind = 'upload', options = '{'
+
+    @pytest.mark.parametrize("kind", ["upload", "server-path"])
+    @pytest.mark.parametrize("options", INVALID_OPTIONS)
+    def test_invalid_options_rejected_before_job_side_effects(intake, kind, options):
+        client, post, video, source, jobs_dir = intake
+        response = post(kind, options)
+        print(kind, repr(options), response.status_code, "jobs", len(web.JOBS),
+              "queued", web.WORK_Q.qsize(), "job directories", len(list(jobs_dir.iterdir())))
+>       assert response.status_code == 400
+E       assert 500 == 400
+E        +  where 500 = <WrapperTestResponse streamed [500 INTERNAL SERVER ERROR]>.status_code
+
+tests/test_scan_options.py:100: AssertionError
+----------------------------- Captured stdout call -----------------------------
+upload '{' 500 jobs 0 queued 0 job directories 0
+------------------------------ Captured log call -------------------------------
+ERROR    openscrub_web:app.py:875 Exception on /api/jobs [POST]
+Traceback (most recent call last):
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", line 904, in create_job
+    options = json.loads(request.form.get("options", "{}"))
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/python/cpython-3.12.16-linux-x86_64-gnu/lib/python3.12/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/python/cpython-3.12.16-linux-x86_64-gnu/lib/python3.12/json/decoder.py", line 338, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/python/cpython-3.12.16-linux-x86_64-gnu/lib/python3.12/json/decoder.py", line 354, in raw_decode
+    obj, end = self.scan_once(s, idx)
+               ^^^^^^^^^^^^^^^^^^^^^^
+json.decoder.JSONDecodeError: Expecting property name enclosed in double quotes: line 1 column 2 (char 1)
+_ test_invalid_options_rejected_before_job_side_effects[malformed-object-server-path] _
+
+intake = (<FlaskClient <Flask 'openscrub_web'>>, <function intake.<locals>.post at 0x7fe6e83abd80>, PosixPath('/tmp/openscrub-t...\x00\x00\xde\x00\x00\x00', PosixPath('/tmp/openscrub-task108/red-temp/test_invalid_options_rejected_5/openscrub_jobs'))
+kind = 'server-path', options = '{'
+
+    @pytest.mark.parametrize("kind", ["upload", "server-path"])
+    @pytest.mark.parametrize("options", INVALID_OPTIONS)
+    def test_invalid_options_rejected_before_job_side_effects(intake, kind, options):
+        client, post, video, source, jobs_dir = intake
+        response = post(kind, options)
+        print(kind, repr(options), response.status_code, "jobs", len(web.JOBS),
+              "queued", web.WORK_Q.qsize(), "job directories", len(list(jobs_dir.iterdir())))
+>       assert response.status_code == 400
+E       assert 500 == 400
+E        +  where 500 = <WrapperTestResponse streamed [500 INTERNAL SERVER ERROR]>.status_code
+
+tests/test_scan_options.py:100: AssertionError
+----------------------------- Captured stdout call -----------------------------
+server-path '{' 500 jobs 0 queued 0 job directories 0
+------------------------------ Captured log call -------------------------------
+ERROR    openscrub_web:app.py:875 Exception on /api/jobs [POST]
+Traceback (most recent call last):
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", line 904, in create_job
+    options = json.loads(request.form.get("options", "{}"))
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/python/cpython-3.12.16-linux-x86_64-gnu/lib/python3.12/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/python/cpython-3.12.16-linux-x86_64-gnu/lib/python3.12/json/decoder.py", line 338, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/python/cpython-3.12.16-linux-x86_64-gnu/lib/python3.12/json/decoder.py", line 354, in raw_decode
+    obj, end = self.scan_once(s, idx)
+               ^^^^^^^^^^^^^^^^^^^^^^
+json.decoder.JSONDecodeError: Expecting property name enclosed in double quotes: line 1 column 2 (char 1)
+_ test_invalid_options_rejected_before_job_side_effects[malformed-token-upload] _
+
+intake = (<FlaskClient <Flask 'openscrub_web'>>, <function intake.<locals>.post at 0x7fe6e2b2a5c0>, PosixPath('/tmp/openscrub-t...\x00\x00\xde\x00\x00\x00', PosixPath('/tmp/openscrub-task108/red-temp/test_invalid_options_rejected_6/openscrub_jobs'))
+kind = 'upload', options = 'not-json'
+
+    @pytest.mark.parametrize("kind", ["upload", "server-path"])
+    @pytest.mark.parametrize("options", INVALID_OPTIONS)
+    def test_invalid_options_rejected_before_job_side_effects(intake, kind, options):
+        client, post, video, source, jobs_dir = intake
+        response = post(kind, options)
+        print(kind, repr(options), response.status_code, "jobs", len(web.JOBS),
+              "queued", web.WORK_Q.qsize(), "job directories", len(list(jobs_dir.iterdir())))
+>       assert response.status_code == 400
+E       assert 500 == 400
+E        +  where 500 = <WrapperTestResponse streamed [500 INTERNAL SERVER ERROR]>.status_code
+
+tests/test_scan_options.py:100: AssertionError
+----------------------------- Captured stdout call -----------------------------
+upload 'not-json' 500 jobs 0 queued 0 job directories 0
+------------------------------ Captured log call -------------------------------
+ERROR    openscrub_web:app.py:875 Exception on /api/jobs [POST]
+Traceback (most recent call last):
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", line 904, in create_job
+    options = json.loads(request.form.get("options", "{}"))
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/python/cpython-3.12.16-linux-x86_64-gnu/lib/python3.12/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/python/cpython-3.12.16-linux-x86_64-gnu/lib/python3.12/json/decoder.py", line 338, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/python/cpython-3.12.16-linux-x86_64-gnu/lib/python3.12/json/decoder.py", line 356, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+_ test_invalid_options_rejected_before_job_side_effects[malformed-token-server-path] _
+
+intake = (<FlaskClient <Flask 'openscrub_web'>>, <function intake.<locals>.post at 0x7fe6e2b2b560>, PosixPath('/tmp/openscrub-t...\x00\x00\xde\x00\x00\x00', PosixPath('/tmp/openscrub-task108/red-temp/test_invalid_options_rejected_7/openscrub_jobs'))
+kind = 'server-path', options = 'not-json'
+
+    @pytest.mark.parametrize("kind", ["upload", "server-path"])
+    @pytest.mark.parametrize("options", INVALID_OPTIONS)
+    def test_invalid_options_rejected_before_job_side_effects(intake, kind, options):
+        client, post, video, source, jobs_dir = intake
+        response = post(kind, options)
+        print(kind, repr(options), response.status_code, "jobs", len(web.JOBS),
+              "queued", web.WORK_Q.qsize(), "job directories", len(list(jobs_dir.iterdir())))
+>       assert response.status_code == 400
+E       assert 500 == 400
+E        +  where 500 = <WrapperTestResponse streamed [500 INTERNAL SERVER ERROR]>.status_code
+
+tests/test_scan_options.py:100: AssertionError
+----------------------------- Captured stdout call -----------------------------
+server-path 'not-json' 500 jobs 0 queued 0 job directories 0
+------------------------------ Captured log call -------------------------------
+ERROR    openscrub_web:app.py:875 Exception on /api/jobs [POST]
+Traceback (most recent call last):
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", line 904, in create_job
+    options = json.loads(request.form.get("options", "{}"))
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/python/cpython-3.12.16-linux-x86_64-gnu/lib/python3.12/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/python/cpython-3.12.16-linux-x86_64-gnu/lib/python3.12/json/decoder.py", line 338, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/python/cpython-3.12.16-linux-x86_64-gnu/lib/python3.12/json/decoder.py", line 356, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+__ test_invalid_options_rejected_before_job_side_effects[empty-array-upload] ___
+
+intake = (<FlaskClient <Flask 'openscrub_web'>>, <function intake.<locals>.post at 0x7fe6e2b2b880>, PosixPath('/tmp/openscrub-t...\x00\x00\xde\x00\x00\x00', PosixPath('/tmp/openscrub-task108/red-temp/test_invalid_options_rejected_8/openscrub_jobs'))
+kind = 'upload', options = '[]'
+
+    @pytest.mark.parametrize("kind", ["upload", "server-path"])
+    @pytest.mark.parametrize("options", INVALID_OPTIONS)
+    def test_invalid_options_rejected_before_job_side_effects(intake, kind, options):
+        client, post, video, source, jobs_dir = intake
+        response = post(kind, options)
+        print(kind, repr(options), response.status_code, "jobs", len(web.JOBS),
+              "queued", web.WORK_Q.qsize(), "job directories", len(list(jobs_dir.iterdir())))
+>       assert response.status_code == 400
+E       assert 200 == 400
+E        +  where 200 = <WrapperTestResponse streamed [200 OK]>.status_code
+
+tests/test_scan_options.py:100: AssertionError
+----------------------------- Captured stdout call -----------------------------
+upload '[]' 200 jobs 1 queued 1 job directories 1
+_ test_invalid_options_rejected_before_job_side_effects[empty-array-server-path] _
+
+intake = (<FlaskClient <Flask 'openscrub_web'>>, <function intake.<locals>.post at 0x7fe6e2b2bc40>, PosixPath('/tmp/openscrub-t...\x00\x00\xde\x00\x00\x00', PosixPath('/tmp/openscrub-task108/red-temp/test_invalid_options_rejected_9/openscrub_jobs'))
+kind = 'server-path', options = '[]'
+
+    @pytest.mark.parametrize("kind", ["upload", "server-path"])
+    @pytest.mark.parametrize("options", INVALID_OPTIONS)
+    def test_invalid_options_rejected_before_job_side_effects(intake, kind, options):
+        client, post, video, source, jobs_dir = intake
+        response = post(kind, options)
+        print(kind, repr(options), response.status_code, "jobs", len(web.JOBS),
+              "queued", web.WORK_Q.qsize(), "job directories", len(list(jobs_dir.iterdir())))
+>       assert response.status_code == 400
+E       assert 200 == 400
+E        +  where 200 = <WrapperTestResponse streamed [200 OK]>.status_code
+
+tests/test_scan_options.py:100: AssertionError
+----------------------------- Captured stdout call -----------------------------
+server-path '[]' 200 jobs 1 queued 1 job directories 1
+_____ test_invalid_options_rejected_before_job_side_effects[array-upload] ______
+
+intake = (<FlaskClient <Flask 'openscrub_web'>>, <function intake.<locals>.post at 0x7fe6e2b64040>, PosixPath('/tmp/openscrub-t...x00\x00\xde\x00\x00\x00', PosixPath('/tmp/openscrub-task108/red-temp/test_invalid_options_rejected_10/openscrub_jobs'))
+kind = 'upload', options = '[1]'
+
+    @pytest.mark.parametrize("kind", ["upload", "server-path"])
+    @pytest.mark.parametrize("options", INVALID_OPTIONS)
+    def test_invalid_options_rejected_before_job_side_effects(intake, kind, options):
+        client, post, video, source, jobs_dir = intake
+        response = post(kind, options)
+        print(kind, repr(options), response.status_code, "jobs", len(web.JOBS),
+              "queued", web.WORK_Q.qsize(), "job directories", len(list(jobs_dir.iterdir())))
+>       assert response.status_code == 400
+E       assert 200 == 400
+E        +  where 200 = <WrapperTestResponse streamed [200 OK]>.status_code
+
+tests/test_scan_options.py:100: AssertionError
+----------------------------- Captured stdout call -----------------------------
+upload '[1]' 200 jobs 1 queued 1 job directories 1
+___ test_invalid_options_rejected_before_job_side_effects[array-server-path] ___
+
+intake = (<FlaskClient <Flask 'openscrub_web'>>, <function intake.<locals>.post at 0x7fe6e2b64180>, PosixPath('/tmp/openscrub-t...x00\x00\xde\x00\x00\x00', PosixPath('/tmp/openscrub-task108/red-temp/test_invalid_options_rejected_11/openscrub_jobs'))
+kind = 'server-path', options = '[1]'
+
+    @pytest.mark.parametrize("kind", ["upload", "server-path"])
+    @pytest.mark.parametrize("options", INVALID_OPTIONS)
+    def test_invalid_options_rejected_before_job_side_effects(intake, kind, options):
+        client, post, video, source, jobs_dir = intake
+        response = post(kind, options)
+        print(kind, repr(options), response.status_code, "jobs", len(web.JOBS),
+              "queued", web.WORK_Q.qsize(), "job directories", len(list(jobs_dir.iterdir())))
+>       assert response.status_code == 400
+E       assert 200 == 400
+E        +  where 200 = <WrapperTestResponse streamed [200 OK]>.status_code
+
+tests/test_scan_options.py:100: AssertionError
+----------------------------- Captured stdout call -----------------------------
+server-path '[1]' 200 jobs 1 queued 1 job directories 1
+______ test_invalid_options_rejected_before_job_side_effects[null-upload] ______
+
+intake = (<FlaskClient <Flask 'openscrub_web'>>, <function intake.<locals>.post at 0x7fe6e2b64900>, PosixPath('/tmp/openscrub-t...x00\x00\xde\x00\x00\x00', PosixPath('/tmp/openscrub-task108/red-temp/test_invalid_options_rejected_12/openscrub_jobs'))
+kind = 'upload', options = 'null'
+
+    @pytest.mark.parametrize("kind", ["upload", "server-path"])
+    @pytest.mark.parametrize("options", INVALID_OPTIONS)
+    def test_invalid_options_rejected_before_job_side_effects(intake, kind, options):
+        client, post, video, source, jobs_dir = intake
+        response = post(kind, options)
+        print(kind, repr(options), response.status_code, "jobs", len(web.JOBS),
+              "queued", web.WORK_Q.qsize(), "job directories", len(list(jobs_dir.iterdir())))
+>       assert response.status_code == 400
+E       assert 200 == 400
+E        +  where 200 = <WrapperTestResponse streamed [200 OK]>.status_code
+
+tests/test_scan_options.py:100: AssertionError
+----------------------------- Captured stdout call -----------------------------
+upload 'null' 200 jobs 1 queued 1 job directories 1
+___ test_invalid_options_rejected_before_job_side_effects[null-server-path] ____
+
+intake = (<FlaskClient <Flask 'openscrub_web'>>, <function intake.<locals>.post at 0x7fe6e2b64720>, PosixPath('/tmp/openscrub-t...x00\x00\xde\x00\x00\x00', PosixPath('/tmp/openscrub-task108/red-temp/test_invalid_options_rejected_13/openscrub_jobs'))
+kind = 'server-path', options = 'null'
+
+    @pytest.mark.parametrize("kind", ["upload", "server-path"])
+    @pytest.mark.parametrize("options", INVALID_OPTIONS)
+    def test_invalid_options_rejected_before_job_side_effects(intake, kind, options):
+        client, post, video, source, jobs_dir = intake
+        response = post(kind, options)
+        print(kind, repr(options), response.status_code, "jobs", len(web.JOBS),
+              "queued", web.WORK_Q.qsize(), "job directories", len(list(jobs_dir.iterdir())))
+>       assert response.status_code == 400
+E       assert 200 == 400
+E        +  where 200 = <WrapperTestResponse streamed [200 OK]>.status_code
+
+tests/test_scan_options.py:100: AssertionError
+----------------------------- Captured stdout call -----------------------------
+server-path 'null' 200 jobs 1 queued 1 job directories 1
+_____ test_invalid_options_rejected_before_job_side_effects[string-upload] _____
+
+intake = (<FlaskClient <Flask 'openscrub_web'>>, <function intake.<locals>.post at 0x7fe6e2b64680>, PosixPath('/tmp/openscrub-t...x00\x00\xde\x00\x00\x00', PosixPath('/tmp/openscrub-task108/red-temp/test_invalid_options_rejected_14/openscrub_jobs'))
+kind = 'upload', options = '"ordinary"'
+
+    @pytest.mark.parametrize("kind", ["upload", "server-path"])
+    @pytest.mark.parametrize("options", INVALID_OPTIONS)
+    def test_invalid_options_rejected_before_job_side_effects(intake, kind, options):
+        client, post, video, source, jobs_dir = intake
+        response = post(kind, options)
+        print(kind, repr(options), response.status_code, "jobs", len(web.JOBS),
+              "queued", web.WORK_Q.qsize(), "job directories", len(list(jobs_dir.iterdir())))
+>       assert response.status_code == 400
+E       assert 200 == 400
+E        +  where 200 = <WrapperTestResponse streamed [200 OK]>.status_code
+
+tests/test_scan_options.py:100: AssertionError
+----------------------------- Captured stdout call -----------------------------
+upload '"ordinary"' 200 jobs 1 queued 1 job directories 1
+__ test_invalid_options_rejected_before_job_side_effects[string-server-path] ___
+
+intake = (<FlaskClient <Flask 'openscrub_web'>>, <function intake.<locals>.post at 0x7fe6e2b2a660>, PosixPath('/tmp/openscrub-t...x00\x00\xde\x00\x00\x00', PosixPath('/tmp/openscrub-task108/red-temp/test_invalid_options_rejected_15/openscrub_jobs'))
+kind = 'server-path', options = '"ordinary"'
+
+    @pytest.mark.parametrize("kind", ["upload", "server-path"])
+    @pytest.mark.parametrize("options", INVALID_OPTIONS)
+    def test_invalid_options_rejected_before_job_side_effects(intake, kind, options):
+        client, post, video, source, jobs_dir = intake
+        response = post(kind, options)
+        print(kind, repr(options), response.status_code, "jobs", len(web.JOBS),
+              "queued", web.WORK_Q.qsize(), "job directories", len(list(jobs_dir.iterdir())))
+>       assert response.status_code == 400
+E       assert 200 == 400
+E        +  where 200 = <WrapperTestResponse streamed [200 OK]>.status_code
+
+tests/test_scan_options.py:100: AssertionError
+----------------------------- Captured stdout call -----------------------------
+server-path '"ordinary"' 200 jobs 1 queued 1 job directories 1
+__ test_invalid_options_rejected_before_job_side_effects[empty-string-upload] __
+
+intake = (<FlaskClient <Flask 'openscrub_web'>>, <function intake.<locals>.post at 0x7fe6e2b2a700>, PosixPath('/tmp/openscrub-t...x00\x00\xde\x00\x00\x00', PosixPath('/tmp/openscrub-task108/red-temp/test_invalid_options_rejected_16/openscrub_jobs'))
+kind = 'upload', options = '""'
+
+    @pytest.mark.parametrize("kind", ["upload", "server-path"])
+    @pytest.mark.parametrize("options", INVALID_OPTIONS)
+    def test_invalid_options_rejected_before_job_side_effects(intake, kind, options):
+        client, post, video, source, jobs_dir = intake
+        response = post(kind, options)
+        print(kind, repr(options), response.status_code, "jobs", len(web.JOBS),
+              "queued", web.WORK_Q.qsize(), "job directories", len(list(jobs_dir.iterdir())))
+>       assert response.status_code == 400
+E       assert 200 == 400
+E        +  where 200 = <WrapperTestResponse streamed [200 OK]>.status_code
+
+tests/test_scan_options.py:100: AssertionError
+----------------------------- Captured stdout call -----------------------------
+upload '""' 200 jobs 1 queued 1 job directories 1
+_ test_invalid_options_rejected_before_job_side_effects[empty-string-server-path] _
+
+intake = (<FlaskClient <Flask 'openscrub_web'>>, <function intake.<locals>.post at 0x7fe6e2b2aac0>, PosixPath('/tmp/openscrub-t...x00\x00\xde\x00\x00\x00', PosixPath('/tmp/openscrub-task108/red-temp/test_invalid_options_rejected_17/openscrub_jobs'))
+kind = 'server-path', options = '""'
+
+    @pytest.mark.parametrize("kind", ["upload", "server-path"])
+    @pytest.mark.parametrize("options", INVALID_OPTIONS)
+    def test_invalid_options_rejected_before_job_side_effects(intake, kind, options):
+        client, post, video, source, jobs_dir = intake
+        response = post(kind, options)
+        print(kind, repr(options), response.status_code, "jobs", len(web.JOBS),
+              "queued", web.WORK_Q.qsize(), "job directories", len(list(jobs_dir.iterdir())))
+>       assert response.status_code == 400
+E       assert 200 == 400
+E        +  where 200 = <WrapperTestResponse streamed [200 OK]>.status_code
+
+tests/test_scan_options.py:100: AssertionError
+----------------------------- Captured stdout call -----------------------------
+server-path '""' 200 jobs 1 queued 1 job directories 1
+____ test_invalid_options_rejected_before_job_side_effects[integer-upload] _____
+
+intake = (<FlaskClient <Flask 'openscrub_web'>>, <function intake.<locals>.post at 0x7fe6e2b2b560>, PosixPath('/tmp/openscrub-t...x00\x00\xde\x00\x00\x00', PosixPath('/tmp/openscrub-task108/red-temp/test_invalid_options_rejected_18/openscrub_jobs'))
+kind = 'upload', options = '7'
+
+    @pytest.mark.parametrize("kind", ["upload", "server-path"])
+    @pytest.mark.parametrize("options", INVALID_OPTIONS)
+    def test_invalid_options_rejected_before_job_side_effects(intake, kind, options):
+        client, post, video, source, jobs_dir = intake
+        response = post(kind, options)
+        print(kind, repr(options), response.status_code, "jobs", len(web.JOBS),
+              "queued", web.WORK_Q.qsize(), "job directories", len(list(jobs_dir.iterdir())))
+>       assert response.status_code == 400
+E       assert 200 == 400
+E        +  where 200 = <WrapperTestResponse streamed [200 OK]>.status_code
+
+tests/test_scan_options.py:100: AssertionError
+----------------------------- Captured stdout call -----------------------------
+upload '7' 200 jobs 1 queued 1 job directories 1
+__ test_invalid_options_rejected_before_job_side_effects[integer-server-path] __
+
+intake = (<FlaskClient <Flask 'openscrub_web'>>, <function intake.<locals>.post at 0x7fe6e2b2ade0>, PosixPath('/tmp/openscrub-t...x00\x00\xde\x00\x00\x00', PosixPath('/tmp/openscrub-task108/red-temp/test_invalid_options_rejected_19/openscrub_jobs'))
+kind = 'server-path', options = '7'
+
+    @pytest.mark.parametrize("kind", ["upload", "server-path"])
+    @pytest.mark.parametrize("options", INVALID_OPTIONS)
+    def test_invalid_options_rejected_before_job_side_effects(intake, kind, options):
+        client, post, video, source, jobs_dir = intake
+        response = post(kind, options)
+        print(kind, repr(options), response.status_code, "jobs", len(web.JOBS),
+              "queued", web.WORK_Q.qsize(), "job directories", len(list(jobs_dir.iterdir())))
+>       assert response.status_code == 400
+E       assert 200 == 400
+E        +  where 200 = <WrapperTestResponse streamed [200 OK]>.status_code
+
+tests/test_scan_options.py:100: AssertionError
+----------------------------- Captured stdout call -----------------------------
+server-path '7' 200 jobs 1 queued 1 job directories 1
+______ test_invalid_options_rejected_before_job_side_effects[zero-upload] ______
+
+intake = (<FlaskClient <Flask 'openscrub_web'>>, <function intake.<locals>.post at 0x7fe6e2b2a160>, PosixPath('/tmp/openscrub-t...x00\x00\xde\x00\x00\x00', PosixPath('/tmp/openscrub-task108/red-temp/test_invalid_options_rejected_20/openscrub_jobs'))
+kind = 'upload', options = '0'
+
+    @pytest.mark.parametrize("kind", ["upload", "server-path"])
+    @pytest.mark.parametrize("options", INVALID_OPTIONS)
+    def test_invalid_options_rejected_before_job_side_effects(intake, kind, options):
+        client, post, video, source, jobs_dir = intake
+        response = post(kind, options)
+        print(kind, repr(options), response.status_code, "jobs", len(web.JOBS),
+              "queued", web.WORK_Q.qsize(), "job directories", len(list(jobs_dir.iterdir())))
+>       assert response.status_code == 400
+E       assert 200 == 400
+E        +  where 200 = <WrapperTestResponse streamed [200 OK]>.status_code
+
+tests/test_scan_options.py:100: AssertionError
+----------------------------- Captured stdout call -----------------------------
+upload '0' 200 jobs 1 queued 1 job directories 1
+___ test_invalid_options_rejected_before_job_side_effects[zero-server-path] ____
+
+intake = (<FlaskClient <Flask 'openscrub_web'>>, <function intake.<locals>.post at 0x7fe6e2b2b740>, PosixPath('/tmp/openscrub-t...x00\x00\xde\x00\x00\x00', PosixPath('/tmp/openscrub-task108/red-temp/test_invalid_options_rejected_21/openscrub_jobs'))
+kind = 'server-path', options = '0'
+
+    @pytest.mark.parametrize("kind", ["upload", "server-path"])
+    @pytest.mark.parametrize("options", INVALID_OPTIONS)
+    def test_invalid_options_rejected_before_job_side_effects(intake, kind, options):
+        client, post, video, source, jobs_dir = intake
+        response = post(kind, options)
+        print(kind, repr(options), response.status_code, "jobs", len(web.JOBS),
+              "queued", web.WORK_Q.qsize(), "job directories", len(list(jobs_dir.iterdir())))
+>       assert response.status_code == 400
+E       assert 200 == 400
+E        +  where 200 = <WrapperTestResponse streamed [200 OK]>.status_code
+
+tests/test_scan_options.py:100: AssertionError
+----------------------------- Captured stdout call -----------------------------
+server-path '0' 200 jobs 1 queued 1 job directories 1
+____ test_invalid_options_rejected_before_job_side_effects[decimal-upload] _____
+
+intake = (<FlaskClient <Flask 'openscrub_web'>>, <function intake.<locals>.post at 0x7fe6e2b2afc0>, PosixPath('/tmp/openscrub-t...x00\x00\xde\x00\x00\x00', PosixPath('/tmp/openscrub-task108/red-temp/test_invalid_options_rejected_22/openscrub_jobs'))
+kind = 'upload', options = '1.5'
+
+    @pytest.mark.parametrize("kind", ["upload", "server-path"])
+    @pytest.mark.parametrize("options", INVALID_OPTIONS)
+    def test_invalid_options_rejected_before_job_side_effects(intake, kind, options):
+        client, post, video, source, jobs_dir = intake
+        response = post(kind, options)
+        print(kind, repr(options), response.status_code, "jobs", len(web.JOBS),
+              "queued", web.WORK_Q.qsize(), "job directories", len(list(jobs_dir.iterdir())))
+>       assert response.status_code == 400
+E       assert 200 == 400
+E        +  where 200 = <WrapperTestResponse streamed [200 OK]>.status_code
+
+tests/test_scan_options.py:100: AssertionError
+----------------------------- Captured stdout call -----------------------------
+upload '1.5' 200 jobs 1 queued 1 job directories 1
+__ test_invalid_options_rejected_before_job_side_effects[decimal-server-path] __
+
+intake = (<FlaskClient <Flask 'openscrub_web'>>, <function intake.<locals>.post at 0x7fe6e2b2b880>, PosixPath('/tmp/openscrub-t...x00\x00\xde\x00\x00\x00', PosixPath('/tmp/openscrub-task108/red-temp/test_invalid_options_rejected_23/openscrub_jobs'))
+kind = 'server-path', options = '1.5'
+
+    @pytest.mark.parametrize("kind", ["upload", "server-path"])
+    @pytest.mark.parametrize("options", INVALID_OPTIONS)
+    def test_invalid_options_rejected_before_job_side_effects(intake, kind, options):
+        client, post, video, source, jobs_dir = intake
+        response = post(kind, options)
+        print(kind, repr(options), response.status_code, "jobs", len(web.JOBS),
+              "queued", web.WORK_Q.qsize(), "job directories", len(list(jobs_dir.iterdir())))
+>       assert response.status_code == 400
+E       assert 200 == 400
+E        +  where 200 = <WrapperTestResponse streamed [200 OK]>.status_code
+
+tests/test_scan_options.py:100: AssertionError
+----------------------------- Captured stdout call -----------------------------
+server-path '1.5' 200 jobs 1 queued 1 job directories 1
+______ test_invalid_options_rejected_before_job_side_effects[true-upload] ______
+
+intake = (<FlaskClient <Flask 'openscrub_web'>>, <function intake.<locals>.post at 0x7fe6e2b2b920>, PosixPath('/tmp/openscrub-t...x00\x00\xde\x00\x00\x00', PosixPath('/tmp/openscrub-task108/red-temp/test_invalid_options_rejected_24/openscrub_jobs'))
+kind = 'upload', options = 'true'
+
+    @pytest.mark.parametrize("kind", ["upload", "server-path"])
+    @pytest.mark.parametrize("options", INVALID_OPTIONS)
+    def test_invalid_options_rejected_before_job_side_effects(intake, kind, options):
+        client, post, video, source, jobs_dir = intake
+        response = post(kind, options)
+        print(kind, repr(options), response.status_code, "jobs", len(web.JOBS),
+              "queued", web.WORK_Q.qsize(), "job directories", len(list(jobs_dir.iterdir())))
+>       assert response.status_code == 400
+E       assert 200 == 400
+E        +  where 200 = <WrapperTestResponse streamed [200 OK]>.status_code
+
+tests/test_scan_options.py:100: AssertionError
+----------------------------- Captured stdout call -----------------------------
+upload 'true' 200 jobs 1 queued 1 job directories 1
+___ test_invalid_options_rejected_before_job_side_effects[true-server-path] ____
+
+intake = (<FlaskClient <Flask 'openscrub_web'>>, <function intake.<locals>.post at 0x7fe6e2b2a200>, PosixPath('/tmp/openscrub-t...x00\x00\xde\x00\x00\x00', PosixPath('/tmp/openscrub-task108/red-temp/test_invalid_options_rejected_25/openscrub_jobs'))
+kind = 'server-path', options = 'true'
+
+    @pytest.mark.parametrize("kind", ["upload", "server-path"])
+    @pytest.mark.parametrize("options", INVALID_OPTIONS)
+    def test_invalid_options_rejected_before_job_side_effects(intake, kind, options):
+        client, post, video, source, jobs_dir = intake
+        response = post(kind, options)
+        print(kind, repr(options), response.status_code, "jobs", len(web.JOBS),
+              "queued", web.WORK_Q.qsize(), "job directories", len(list(jobs_dir.iterdir())))
+>       assert response.status_code == 400
+E       assert 200 == 400
+E        +  where 200 = <WrapperTestResponse streamed [200 OK]>.status_code
+
+tests/test_scan_options.py:100: AssertionError
+----------------------------- Captured stdout call -----------------------------
+server-path 'true' 200 jobs 1 queued 1 job directories 1
+_____ test_invalid_options_rejected_before_job_side_effects[false-upload] ______
+
+intake = (<FlaskClient <Flask 'openscrub_web'>>, <function intake.<locals>.post at 0x7fe6e2b29c60>, PosixPath('/tmp/openscrub-t...x00\x00\xde\x00\x00\x00', PosixPath('/tmp/openscrub-task108/red-temp/test_invalid_options_rejected_26/openscrub_jobs'))
+kind = 'upload', options = 'false'
+
+    @pytest.mark.parametrize("kind", ["upload", "server-path"])
+    @pytest.mark.parametrize("options", INVALID_OPTIONS)
+    def test_invalid_options_rejected_before_job_side_effects(intake, kind, options):
+        client, post, video, source, jobs_dir = intake
+        response = post(kind, options)
+        print(kind, repr(options), response.status_code, "jobs", len(web.JOBS),
+              "queued", web.WORK_Q.qsize(), "job directories", len(list(jobs_dir.iterdir())))
+>       assert response.status_code == 400
+E       assert 200 == 400
+E        +  where 200 = <WrapperTestResponse streamed [200 OK]>.status_code
+
+tests/test_scan_options.py:100: AssertionError
+----------------------------- Captured stdout call -----------------------------
+upload 'false' 200 jobs 1 queued 1 job directories 1
+___ test_invalid_options_rejected_before_job_side_effects[false-server-path] ___
+
+intake = (<FlaskClient <Flask 'openscrub_web'>>, <function intake.<locals>.post at 0x7fe6e2b2a520>, PosixPath('/tmp/openscrub-t...x00\x00\xde\x00\x00\x00', PosixPath('/tmp/openscrub-task108/red-temp/test_invalid_options_rejected_27/openscrub_jobs'))
+kind = 'server-path', options = 'false'
+
+    @pytest.mark.parametrize("kind", ["upload", "server-path"])
+    @pytest.mark.parametrize("options", INVALID_OPTIONS)
+    def test_invalid_options_rejected_before_job_side_effects(intake, kind, options):
+        client, post, video, source, jobs_dir = intake
+        response = post(kind, options)
+        print(kind, repr(options), response.status_code, "jobs", len(web.JOBS),
+              "queued", web.WORK_Q.qsize(), "job directories", len(list(jobs_dir.iterdir())))
+>       assert response.status_code == 400
+E       assert 200 == 400
+E        +  where 200 = <WrapperTestResponse streamed [200 OK]>.status_code
+
+tests/test_scan_options.py:100: AssertionError
+----------------------------- Captured stdout call -----------------------------
+server-path 'false' 200 jobs 1 queued 1 job directories 1
+=========================== short test summary info ============================
+FAILED tests/test_scan_options.py::test_invalid_options_rejected_before_job_side_effects[empty-upload]
+FAILED tests/test_scan_options.py::test_invalid_options_rejected_before_job_side_effects[empty-server-path]
+FAILED tests/test_scan_options.py::test_invalid_options_rejected_before_job_side_effects[whitespace-upload]
+FAILED tests/test_scan_options.py::test_invalid_options_rejected_before_job_side_effects[whitespace-server-path]
+FAILED tests/test_scan_options.py::test_invalid_options_rejected_before_job_side_effects[malformed-object-upload]
+FAILED tests/test_scan_options.py::test_invalid_options_rejected_before_job_side_effects[malformed-object-server-path]
+FAILED tests/test_scan_options.py::test_invalid_options_rejected_before_job_side_effects[malformed-token-upload]
+FAILED tests/test_scan_options.py::test_invalid_options_rejected_before_job_side_effects[malformed-token-server-path]
+FAILED tests/test_scan_options.py::test_invalid_options_rejected_before_job_side_effects[empty-array-upload]
+FAILED tests/test_scan_options.py::test_invalid_options_rejected_before_job_side_effects[empty-array-server-path]
+FAILED tests/test_scan_options.py::test_invalid_options_rejected_before_job_side_effects[array-upload]
+FAILED tests/test_scan_options.py::test_invalid_options_rejected_before_job_side_effects[array-server-path]
+FAILED tests/test_scan_options.py::test_invalid_options_rejected_before_job_side_effects[null-upload]
+FAILED tests/test_scan_options.py::test_invalid_options_rejected_before_job_side_effects[null-server-path]
+FAILED tests/test_scan_options.py::test_invalid_options_rejected_before_job_side_effects[string-upload]
+FAILED tests/test_scan_options.py::test_invalid_options_rejected_before_job_side_effects[string-server-path]
+FAILED tests/test_scan_options.py::test_invalid_options_rejected_before_job_side_effects[empty-string-upload]
+FAILED tests/test_scan_options.py::test_invalid_options_rejected_before_job_side_effects[empty-string-server-path]
+FAILED tests/test_scan_options.py::test_invalid_options_rejected_before_job_side_effects[integer-upload]
+FAILED tests/test_scan_options.py::test_invalid_options_rejected_before_job_side_effects[integer-server-path]
+FAILED tests/test_scan_options.py::test_invalid_options_rejected_before_job_side_effects[zero-upload]
+FAILED tests/test_scan_options.py::test_invalid_options_rejected_before_job_side_effects[zero-server-path]
+FAILED tests/test_scan_options.py::test_invalid_options_rejected_before_job_side_effects[decimal-upload]
+FAILED tests/test_scan_options.py::test_invalid_options_rejected_before_job_side_effects[decimal-server-path]
+FAILED tests/test_scan_options.py::test_invalid_options_rejected_before_job_side_effects[true-upload]
+FAILED tests/test_scan_options.py::test_invalid_options_rejected_before_job_side_effects[true-server-path]
+FAILED tests/test_scan_options.py::test_invalid_options_rejected_before_job_side_effects[false-upload]
+FAILED tests/test_scan_options.py::test_invalid_options_rejected_before_job_side_effects[false-server-path]
+28 failed, 8 passed in 0.22s
