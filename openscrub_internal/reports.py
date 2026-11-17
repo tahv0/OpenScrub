@@ -1,10 +1,12 @@
 """Publish complete report JSON without truncating the previous report."""
+from contextlib import contextmanager
 import json
 import os
 import tempfile
 
 
-def atomic_report(path, report) -> None:
+@contextmanager
+def _staged_report(path, report):
     """Stage private UTF-8 JSON beside *path*, sync, close, then replace it.
 
     A failure before replacement leaves the previous report intact and raises.
@@ -32,7 +34,7 @@ def atomic_report(path, report) -> None:
             stream.flush()
             os.fsync(stream.fileno())
         # Close first: Windows cannot rename an open staging file.
-        os.replace(staged, path)
+        yield staged
     finally:
         if staged is not None:
             try:
@@ -41,3 +43,9 @@ def atomic_report(path, report) -> None:
                 # After replace the name is gone. On cleanup failure leave a
                 # .tmp for vault crash cleanup without masking the write error.
                 pass
+
+
+def atomic_report(path, report) -> None:
+    """Publish one closed shared-serializer stage."""
+    with _staged_report(path, report) as staged:
+        os.replace(staged, os.path.abspath(path))

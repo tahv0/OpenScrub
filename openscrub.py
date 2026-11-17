@@ -38,6 +38,7 @@ import cv2
 import numpy as np
 
 from openscrub_internal.reports import atomic_report
+from openscrub_internal.render_delivery import _RenderDelivery
 
 VERSION = "1.0.96"
 
@@ -3932,7 +3933,29 @@ def _stop_render_children(children):
     return errors
 
 
+def render(src, dst, detections, cum, bands, fps, pad, mode, preview,
+           encoder="auto", band_margin=25, progress_every=60, cb=None,
+           mode_map=None, draw_scores=False, vcodec="h264",
+           face_shape="ellipse", audio_spans=None, clip=None,
+           mute_tracks=(), out_quality="archival", audio_lanes=None):
+    with _RenderDelivery(dst) as delivery:
+        result = _render_into(src, delivery.video_stage, detections, cum, bands, fps, pad, mode, preview, encoder, band_margin, progress_every, cb, mode_map, draw_scores, vcodec, face_shape, audio_spans, clip, mute_tracks, out_quality, audio_lanes)
+        delivery.prepare_rollback()
+        delivery.commit()
+        return result
+
+
 def render_hdr(src, dst, detections, cum, bands, fps, pad, mode,
+               encoder, tags, band_margin=25, progress_every=60, cb=None,
+               mode_map=None, face_shape="ellipse", audio_spans=None,
+               mute_tracks=(), out_quality="archival", audio_lanes=None):
+    with _RenderDelivery(dst) as delivery:
+        result = _render_hdr_into(src, delivery.video_stage, detections, cum, bands, fps, pad, mode, encoder, tags, band_margin, progress_every, cb, mode_map, face_shape, audio_spans, mute_tracks, out_quality, audio_lanes)
+        delivery.prepare_rollback()
+        delivery.commit()
+        return result
+
+def _render_hdr_into(src, dst, detections, cum, bands, fps, pad, mode,
                encoder, tags, band_margin=25, progress_every=60, cb=None,
                mode_map=None, face_shape="ellipse", audio_spans=None,
                mute_tracks=(), out_quality="archival", audio_lanes=None):
@@ -4143,7 +4166,7 @@ def render_hdr(src, dst, detections, cum, bands, fps, pad, mode,
                 pass
 
 
-def render(src, dst, detections, cum, bands, fps, pad, mode, preview,
+def _render_into(src, dst, detections, cum, bands, fps, pad, mode, preview,
            encoder="auto", band_margin=25, progress_every=60, cb=None,
            mode_map=None, draw_scores=False, vcodec="h264",
            face_shape="ellipse", audio_spans=None, clip=None,
@@ -6401,7 +6424,7 @@ def transcribe_audio_pii(video, cats, cb, model_size="base", nlp=None,
             pass
 
 
-def write_report(path, args, state, output_path=None, publisher=None):
+def _report_document(args, state, output_path=None, output_bytes_path=None):
     prov = {
         "tool": "openscrub", "version": VERSION,
         "timestamp": datetime.datetime.now().astimezone().isoformat(),
@@ -6417,9 +6440,10 @@ def write_report(path, args, state, output_path=None, publisher=None):
         "windows": getattr(args, "windows_data", None),
         "settings": _settings_dict(args),
     }
-    if output_path and os.path.exists(output_path):
+    output_bytes_path = output_bytes_path or output_path
+    if output_path and os.path.exists(output_bytes_path):
         prov["output"] = os.path.abspath(output_path)
-        prov["output_sha256"] = sha256_file(output_path)
+        prov["output_sha256"] = sha256_file(output_bytes_path)
     source = state.get("source_report")
     if source is not None:
         # A render consumes enabled Detection objects, but publishes the full
@@ -6461,7 +6485,11 @@ def write_report(path, args, state, output_path=None, publisher=None):
             {"t0": a, "t1": b, "mode": m} for a, b, m in (aspans or [])]
     # Construction and output hashing precede an optional caller-owned final
     # publication boundary. CLI/GUI and old callback callers keep atomic bytes.
-    (publisher or atomic_report)(path, doc)
+    return doc
+
+
+def write_report(path, args, state, output_path=None, publisher=None):
+    (publisher or atomic_report)(path, _report_document(args, state, output_path))
 
 
 def load_report(path):
@@ -8609,33 +8637,44 @@ def run_render(args, state, cb=None):
     if out_q != "archival":
         cb.log(f"      output quality: {out_q} (smaller file; archival is "
                "the visually-lossless default)")
-    if getattr(args, "hdr_source", None) and not args.preview:
-        render_hdr(args.hdr_source, dst, dets_r, state["cum"],
-                   state["bands"], state["fps"], pad=args.pad, mode=args.mode,
-                   encoder=args.hdr_encoder,
-                   tags=getattr(args, "hdr_tags", {}),
-                   face_shape=getattr(args, "face_shape", "ellipse"),
+    summary = dict(state["stats"], output=dst)
+    with _RenderDelivery(dst, args.report) as delivery:
+        if getattr(args, "hdr_source", None) and not args.preview:
+            _render_hdr_into(args.hdr_source, delivery.video_stage, dets_r, state["cum"],
+                       state["bands"], state["fps"], pad=args.pad, mode=args.mode,
+                       encoder=args.hdr_encoder,
+                       tags=getattr(args, "hdr_tags", {}),
+                       face_shape=getattr(args, "face_shape", "ellipse"),
+                       mode_map=getattr(args, "mode_map", None),
+                       audio_spans=aspans, mute_tracks=mute_tracks, cb=cb,
+                       out_quality=out_q,
+                       audio_lanes=getattr(args, "audio_lane_count", None))
+        else:
+            _render_into(args.video, delivery.video_stage, dets_r, state["cum"],
+                   state["bands"],
+                   state["fps"], pad=args.pad, mode=args.mode, preview=args.preview,
                    mode_map=getattr(args, "mode_map", None),
-                   audio_spans=aspans, mute_tracks=mute_tracks, cb=cb,
-                   out_quality=out_q,
+                   draw_scores=bool(getattr(args, "draw_scores", False)),
+                   vcodec=getattr(args, "codec", "h264"),
+                   face_shape=getattr(args, "face_shape", "ellipse"),
+                   encoder=args.encoder, audio_spans=aspans, clip=clip,
+                   mute_tracks=mute_tracks, cb=cb, out_quality=out_q,
                    audio_lanes=getattr(args, "audio_lane_count", None))
-    else:
-        render(args.video, dst, dets_r, state["cum"],
-               state["bands"],
-               state["fps"], pad=args.pad, mode=args.mode, preview=args.preview,
-               mode_map=getattr(args, "mode_map", None),
-               draw_scores=bool(getattr(args, "draw_scores", False)),
-               vcodec=getattr(args, "codec", "h264"),
-               face_shape=getattr(args, "face_shape", "ellipse"),
-               encoder=args.encoder, audio_spans=aspans, clip=clip,
-               mute_tracks=mute_tracks, cb=cb, out_quality=out_q,
-               audio_lanes=getattr(args, "audio_lane_count", None))
-    if args.report:
-        write_report(args.report, args, state, output_path=dst,
-                     publisher=getattr(cb, "publish_report", None))
-        cb.log(f"      audit report: {args.report} (contains PII text — protect it)")
-    cb.log("done.")
-    return dict(state["stats"], output=dst)
+        if args.report:
+            delivery.prepare_report(_report_document(args, state, dst, delivery.video_stage),
+                                    legacy_publisher=(None if getattr(cb, "publish_render", None)
+                                                      else getattr(cb, "publish_report", None)))
+            cb.log(f"      audit report: {args.report} (contains PII text — protect it)")
+        cb.log("done.")
+        delivery.prepare_rollback()
+        publish = getattr(cb, "publish_render", None)
+        if publish:
+            publish(delivery, summary)
+        else:
+            if cb.cancelled():
+                raise PipelineCancelled()
+            delivery.commit()
+    return summary
 
 
 def run_pipeline(args, cb=None):
