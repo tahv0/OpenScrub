@@ -1,0 +1,79 @@
+{
+  "red": {
+    "source_raw_sha256": "174c242e9bd68fe5ee9512274b5d681a990b06737ad4ff1b74221753eecd725d",
+    "source_decode_exact": true,
+    "preencoder_exact": "asserted in actual success regression read-only trace",
+    "output_sha256": "45efe5610a8b48c6b062d88a89422d7cd62deda648f01a8b10276cf5bc04c403",
+    "decoded_sha256": "9dbf6a7b145d92a65cdd24e009419ca35884a33f4bacbed50223f3ff96f2cea6",
+    "decoded_matches_source": false,
+    "metadata": {
+      "programs": [],
+      "stream_groups": [],
+      "streams": [
+        {
+          "codec_name": "hevc",
+          "width": 64,
+          "height": 64,
+          "pix_fmt": "yuv420p10le",
+          "color_space": "bt2020nc",
+          "color_transfer": "smpte2084",
+          "color_primaries": "bt2020",
+          "nb_read_frames": "3"
+        }
+      ]
+    },
+    "plane_ranges": [
+      [
+        856,
+        856
+      ],
+      [
+        560,
+        560
+      ],
+      [
+        341,
+        341
+      ]
+    ]
+  },
+  "green": {
+    "source_raw_sha256": "174c242e9bd68fe5ee9512274b5d681a990b06737ad4ff1b74221753eecd725d",
+    "source_decode_exact": true,
+    "preencoder_exact": "asserted in actual success regression read-only trace",
+    "output_sha256": "45efe5610a8b48c6b062d88a89422d7cd62deda648f01a8b10276cf5bc04c403",
+    "decoded_sha256": "9dbf6a7b145d92a65cdd24e009419ca35884a33f4bacbed50223f3ff96f2cea6",
+    "decoded_matches_source": false,
+    "metadata": {
+      "programs": [],
+      "stream_groups": [],
+      "streams": [
+        {
+          "codec_name": "hevc",
+          "width": 64,
+          "height": 64,
+          "pix_fmt": "yuv420p10le",
+          "color_space": "bt2020nc",
+          "color_transfer": "smpte2084",
+          "color_primaries": "bt2020",
+          "nb_read_frames": "3"
+        }
+      ]
+    },
+    "plane_ranges": [
+      [
+        856,
+        856
+      ],
+      [
+        560,
+        560
+      ],
+      [
+        341,
+        341
+      ]
+    ]
+  },
+  "before_after_decoded_bytes_equal": true
+}

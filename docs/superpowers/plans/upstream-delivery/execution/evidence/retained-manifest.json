@@ -2175,6 +2175,156 @@
     "sha256": "852768d1400c5c02afd8b4e709c9d4883f2d96efe66ee34f43f0eb98544e1285"
   },
   {
+    "path": "delivery/hdr-decoder-cleanup/add_tests.py",
+    "bytes": 10067,
+    "sha256": "4efe9146d9b77db843e6d971d3f5cfff70240a0853f108870e13ce3f9535b85b"
+  },
+  {
+    "path": "delivery/hdr-decoder-cleanup/build.log",
+    "bytes": 567,
+    "sha256": "dbcf3c861650333ae65cb077ca8526a7dee02349c9e638c9be816e1d0d9117cb"
+  },
+  {
+    "path": "delivery/hdr-decoder-cleanup/check_installed.py",
+    "bytes": 3414,
+    "sha256": "a74dc9b4fae7d51f1e18fe6fa7c6063e2e66ab0fa041435fc7d39a5c9177db8e"
+  },
+  {
+    "path": "delivery/hdr-decoder-cleanup/check_packaging.py",
+    "bytes": 2305,
+    "sha256": "8630bc6f67b96973a76e2445f1299f4701ec4d54abf9f25a9b5532151c4c654a"
+  },
+  {
+    "path": "delivery/hdr-decoder-cleanup/control-comparison.json",
+    "bytes": 2003,
+    "sha256": "fa809fee4d2001cf96f7dbe1ef659a8b1b2ccbeb5a1cae632324bc7fe87f599a"
+  },
+  {
+    "path": "delivery/hdr-decoder-cleanup/control-comparison.log",
+    "bytes": 2003,
+    "sha256": "fa809fee4d2001cf96f7dbe1ef659a8b1b2ccbeb5a1cae632324bc7fe87f599a"
+  },
+  {
+    "path": "delivery/hdr-decoder-cleanup/control_compare.py",
+    "bytes": 2117,
+    "sha256": "d3352b440e7b739e4274d0de5c1e6761e6fffd6a55d463ae9badfd6a1dede362"
+  },
+  {
+    "path": "delivery/hdr-decoder-cleanup/env.sh",
+    "bytes": 424,
+    "sha256": "48b8660d1805a64b301586249d903fcb589abb3aa9f5feb450fcf4251324db79"
+  },
+  {
+    "path": "delivery/hdr-decoder-cleanup/final-check.log",
+    "bytes": 109,
+    "sha256": "5279d4a7369dc582d0dabe1b1a8a7da6e7312ac0d6d3fcb28e6f751bf5ae4a4d"
+  },
+  {
+    "path": "delivery/hdr-decoder-cleanup/final-provenance.json",
+    "bytes": 1372,
+    "sha256": "cfbbbf104e119dade656281c1a2bf99a2ad201b65d67ba08ede1ddba3e612713"
+  },
+  {
+    "path": "delivery/hdr-decoder-cleanup/final_check.py",
+    "bytes": 1188,
+    "sha256": "2c0987d43cf151adf74eaad9c23e9f9f8b0d831131f0cd5ab156b68bb7363385"
+  },
+  {
+    "path": "delivery/hdr-decoder-cleanup/floor-env.sh",
+    "bytes": 350,
+    "sha256": "21bc73253096f5e15ab98bdb50b8ad1c3a65e2f41a3f31ff8b4917420d3312ba"
+  },
+  {
+    "path": "delivery/hdr-decoder-cleanup/floor.log",
+    "bytes": 1825,
+    "sha256": "3a6a9461b867da887a721907f228c382da9e0684358d1e1e9f35558e88391624"
+  },
+  {
+    "path": "delivery/hdr-decoder-cleanup/focused.log",
+    "bytes": 1826,
+    "sha256": "0318ba78308405e89bcda47cdc482234b96e7b94b9ea831fa7de2db4b9af502f"
+  },
+  {
+    "path": "delivery/hdr-decoder-cleanup/full.log",
+    "bytes": 783,
+    "sha256": "b6e7a136efb9df919f8ddac25576d9c2442c19c246e5ea90668546484cf95a75"
+  },
+  {
+    "path": "delivery/hdr-decoder-cleanup/green.log",
+    "bytes": 1384,
+    "sha256": "f80f8d787a8dd5208251d3f8ca71705e2b4ab0bd064fcab26c8f6920641ffdee"
+  },
+  {
+    "path": "delivery/hdr-decoder-cleanup/hooks/sitecustomize.py",
+    "bytes": 432,
+    "sha256": "61a5ee25a8af11c1476777ed43522530009eb734abba9c71080a7fccd8659f79"
+  },
+  {
+    "path": "delivery/hdr-decoder-cleanup/implement.py",
+    "bytes": 1283,
+    "sha256": "adfc808874efd6c07a3f835b017e94840c77df968a9036592f58a3c5ae22a0c7"
+  },
+  {
+    "path": "delivery/hdr-decoder-cleanup/install-runtime.log",
+    "bytes": 154,
+    "sha256": "af32a7260897b77332cfd57d46d4927c5f9e36d464c08ae9d475cca1eccbfb6b"
+  },
+  {
+    "path": "delivery/hdr-decoder-cleanup/installed-cli-help.txt",
+    "bytes": 18082,
+    "sha256": "eb76a71a7e1d822c66f05b008249b4f8a919606eaef552be00dc1a47381f8fc6"
+  },
+  {
+    "path": "delivery/hdr-decoder-cleanup/installed-startup.json",
+    "bytes": 486,
+    "sha256": "47b1ad8a793fe83896c29312c13e2bdf7f378ac75dd3ab5e601ffb2148a50574"
+  },
+  {
+    "path": "delivery/hdr-decoder-cleanup/installed-startup.log",
+    "bytes": 486,
+    "sha256": "47b1ad8a793fe83896c29312c13e2bdf7f378ac75dd3ab5e601ffb2148a50574"
+  },
+  {
+    "path": "delivery/hdr-decoder-cleanup/installed-web.log",
+    "bytes": 570,
+    "sha256": "3e8195f6e237a4753af8556d50979690a86a9a24adaccf1f7bb67945b7fae9fc"
+  },
+  {
+    "path": "delivery/hdr-decoder-cleanup/model-reuse.txt",
+    "bytes": 162,
+    "sha256": "128bfef89f42b5b3419be6f3a81265762b8406d37e667ee0712cf9ad557cf77d"
+  },
+  {
+    "path": "delivery/hdr-decoder-cleanup/packaging.json",
+    "bytes": 377,
+    "sha256": "958ecd8c05912d1031cc54c199e05fc65c47c86042e2a5bad3caca6a4b77dbff"
+  },
+  {
+    "path": "delivery/hdr-decoder-cleanup/packaging.log",
+    "bytes": 377,
+    "sha256": "958ecd8c05912d1031cc54c199e05fc65c47c86042e2a5bad3caca6a4b77dbff"
+  },
+  {
+    "path": "delivery/hdr-decoder-cleanup/red.log",
+    "bytes": 11414,
+    "sha256": "b29cd2252146dd8b79c887d1ee04da92ce51be0b45365f9a0b643a6477920c87"
+  },
+  {
+    "path": "delivery/hdr-decoder-cleanup/sitecustomize.py",
+    "bytes": 1449,
+    "sha256": "91fea8ce684c8cb1fc8bc8e2cfcf82432afcaaeaa7514c6dd6bf3c58d19c8a92"
+  },
+  {
+    "path": "delivery/hdr-decoder-cleanup/task109_isolation.py",
+    "bytes": 1855,
+    "sha256": "f6fb81c79854e5aaa03198b9905ca52c0c4b037db664a00eb94834991f0c6a75"
+  },
+  {
+    "path": "delivery/hdr-decoder-cleanup/tested-source-sha256.json",
+    "bytes": 11569,
+    "sha256": "94508110fa503a846b74d91a7aef6f082b4c3f58ee782a11f642dd9366b57f56"
+  },
+  {
     "path": "delivery/job-lifetimes/build-final.log",
     "bytes": 567,
     "sha256": "dbcf3c861650333ae65cb077ca8526a7dee02349c9e638c9be816e1d0d9117cb"
@@ -5033,6 +5183,26 @@
     "path": "delivery/task-108-review.md",
     "bytes": 4647,
     "sha256": "cf6df968c7399d5bcb7d8af0cbf0b8157d6a817c3e94c3b10b1ecd10f8c85301"
+  },
+  {
+    "path": "delivery/task-109-brief.md",
+    "bytes": 3729,
+    "sha256": "e4f6c9bd02eafa2362ab3b03dfc9a8c4b3c6ac9951b8c08cdc9db78b57f1439a"
+  },
+  {
+    "path": "delivery/task-109-pr.md",
+    "bytes": 2184,
+    "sha256": "f46c34edc3106445fb662b9897c1ac68fbd490f7483dedcd8582209d96365a6a"
+  },
+  {
+    "path": "delivery/task-109-report.md",
+    "bytes": 17382,
+    "sha256": "9331abd96a33bc45bee66c7fd2eac53ff6a88d6da705545cf8fd70531722a194"
+  },
+  {
+    "path": "delivery/task-109-review.md",
+    "bytes": 5735,
+    "sha256": "164f0c2f0d697b0fd559ec82018d5cb994923f97aa291105382781ce29e18ff3"
   },
   {
     "path": "delivery/task-2-brief.md",

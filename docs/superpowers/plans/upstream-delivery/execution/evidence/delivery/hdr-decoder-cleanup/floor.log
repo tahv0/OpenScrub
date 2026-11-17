@@ -1,0 +1,14 @@
+TASK109_ACTIVE_SOURCE {"python": "3.9.25 (main, Oct 31 2025, 23:00:23) \n[Clang 21.1.4 ]", "sources": {"openscrub": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py", "sha256": "dbba61eebd93d17adae37d8f1ece2d8a29170d2534734010b751d904076fc480"}, "openscrub_web": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", "sha256": "9835e1137abee62c0a78e2669ed8bae7059e36bf4bed9f5c7a44f0eb8b40ed3a"}, "zones_ui": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/zones_ui.py", "sha256": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7"}}}
+HDR_CHILDREN [{"pid": 1285388, "wait_returns": [255], "returncode": 255, "pipe_closed": true}, {"pid": 1285395, "wait_returns": [-15], "returncode": -15, "pipe_closed": true}]
+.HDR_CHILDREN [{"pid": 1285583, "wait_returns": [0], "returncode": 0, "pipe_closed": true}, {"pid": 1285606, "wait_returns": [-9, -9], "returncode": -9, "pipe_closed": true}]
+.[4/4] Rendering -> /tmp/openscrub-task109/floor-tmp/test_hdr_success_keeps_source_0/success.mp4
+      encoder: libx265 10-bit (CPU)
+      HDR preserved: 10-bit HEVC, color tags color_primaries=bt2020, color_trc=smpte2084, colorspace=bt2020nc
+done.
+HDR_CHILDREN [{"pid": 1285827, "wait_returns": [0], "returncode": 0, "pipe_closed": true}, {"pid": 1285845, "wait_returns": [0], "returncode": 0, "pipe_closed": true}]
+.      input is HDR10/PQ HDR — tone-mapping a copy to SDR (BT.709) for detection
+      HDR output: preserving HDR10/PQ — 10-bit HEVC via hevc_nvenc
+....      person detector: no model installed — person category INACTIVE this scan. Download one in Settings → Detection models (one click, hash-verified), or place a YOLO ONNX at models/person_yolov8.onnx or set $OPENSCRUB_PERSON_MODEL.
+..      encoder: libx264 (CPU)
+..
+11 passed, 126 deselected in 17.39s

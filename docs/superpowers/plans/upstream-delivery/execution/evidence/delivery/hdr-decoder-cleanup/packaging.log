@@ -1,0 +1,10 @@
+{
+  "base": "e21ebdf6e3ee46e6c65050dc956a9a3459152269",
+  "engine_sha256": "dbba61eebd93d17adae37d8f1ece2d8a29170d2534734010b751d904076fc480",
+  "source_delta_only_decoder_close": true,
+  "unchanged_encoder_defaults_and_other_engine_bytes": true,
+  "sdist_source_tests_contributor_bytes": true,
+  "wheel_source_bytes": true,
+  "python39_grammar": true,
+  "frozen_files": 114
+}

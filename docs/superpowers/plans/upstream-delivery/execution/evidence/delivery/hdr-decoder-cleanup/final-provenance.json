@@ -1,0 +1,24 @@
+{
+  "base": "e21ebdf6e3ee46e6c65050dc956a9a3459152269",
+  "head": "ded411cbec308333d1416ae3d58b4f6e918d7849",
+  "branch": "pr/hdr-decoder-cleanup",
+  "native_root": "/home/tahv0/.codex/worktrees/c832/OpenScrub",
+  "committed_bytes_match_tested_manifest": true,
+  "frozen_files": 114,
+  "clean_native_status": true,
+  "versions": {
+    "python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]",
+    "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+    "opencv": "4.14.0",
+    "opencv_file": "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/cv2/__init__.py",
+    "numpy": "2.5.5",
+    "numpy_file": "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/numpy/__init__.py",
+    "ffmpeg": "ffmpeg version 8.0.1-3ubuntu2 Copyright (c) 2000-2025 the FFmpeg developers",
+    "ffprobe": "ffprobe version 8.0.1-3ubuntu2 Copyright (c) 2007-2025 the FFmpeg developers",
+    "platform": "Linux-6.18.58.1-microsoft-standard-WSL2-x86_64-with-glibc2.43"
+  },
+  "engine_sha256": "dbba61eebd93d17adae37d8f1ece2d8a29170d2534734010b751d904076fc480",
+  "tests_sha256": "5422b3e78c8d048e93c86d82c5881e2e10296078f7c3f74f6064501d380c5f36",
+  "wheel_sha256": "071e640fcf897d698a54ef39f6e889355980b047755fc1262b8e71d51a1937ce",
+  "sdist_sha256": "a50a1bf62929f25d83edb1aebfbefc133e637307d1b8141cda3fede3ae1995de"
+}

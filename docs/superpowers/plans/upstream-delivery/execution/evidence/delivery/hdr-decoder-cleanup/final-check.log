@@ -1,0 +1,1 @@
+PASS: exact base/head, clean native worktree, all 114 tested source hashes match committed bytes, diff check
