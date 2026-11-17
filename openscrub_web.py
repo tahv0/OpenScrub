@@ -24,6 +24,8 @@ over the GPU.
 """
 
 import argparse
+import hashlib
+from io import BytesIO
 import json
 import math
 import os
@@ -32,6 +34,7 @@ import re
 import secrets
 import sys
 import socket
+import tempfile
 import threading
 import time
 import uuid
@@ -545,6 +548,33 @@ def job_public(job):
     }
 
 
+def _publish_preview_jpeg(path, image, quality) -> bool:
+    """Publish a complete disposable preview, retaining the previous one on failure."""
+    temporary = None
+    try:
+        ok, encoded = cv2.imencode(".jpg", image,
+                                  [cv2.IMWRITE_JPEG_QUALITY, quality])
+        if not ok or encoded is None or not encoded.size:
+            return False
+        # A same-directory replace keeps readers of the old generation intact.
+        # No fsync: a preview is disposable, rather than a durable scan report.
+        with tempfile.NamedTemporaryFile(dir=os.path.dirname(path),
+                                         prefix=".preview-", suffix=".jpg",
+                                         delete=False) as output:
+            temporary = output.name
+            output.write(encoded)
+        os.replace(temporary, path)
+        return True
+    except (cv2.error, OSError):
+        return False
+    finally:
+        if temporary is not None:
+            try:
+                os.unlink(temporary)
+            except OSError:
+                pass
+
+
 class WebCallbacks(openscrub.Callbacks):
     wants_frames = True
 
@@ -604,8 +634,8 @@ class WebCallbacks(openscrub.Callbacks):
         h, w = frame.shape[:2]
         scale = 720 / w
         small = cv2.resize(frame, (720, int(h * scale)))
-        cv2.imwrite(os.path.join(self.job["dir"], "preview.jpg"), small,
-                    [cv2.IMWRITE_JPEG_QUALITY, 70])
+        _publish_preview_jpeg(os.path.join(self.job["dir"], "preview.jpg"),
+                              small, 70)
 
     def cancelled(self):
         return self.cancel_event.is_set()
@@ -1475,9 +1505,17 @@ def job_log(jid):
 def job_preview(jid):
     job = JOBS.get(jid) or abort(404)
     p = os.path.join(job["dir"], "preview.jpg")
-    if not os.path.exists(p):
+    try:
+        with open(p, "rb") as preview:
+            snapshot = preview.read()
+    except FileNotFoundError:
         abort(404)
-    return send_file(p, mimetype="image/jpeg", max_age=0)
+    # Publication replaces complete files; this opened generation is immutable.
+    # Derive length and ETag from its bytes, closing the path-stat/open gap.
+    # Omit Last-Modified: second-resolution dates cannot distinguish rapid frames.
+    return send_file(BytesIO(snapshot), mimetype="image/jpeg",
+                     download_name="preview.jpg", max_age=0,
+                     etag=hashlib.sha256(snapshot).hexdigest())
 
 
 @app.route("/api/jobs/<jid>/cancel", methods=["POST"])
