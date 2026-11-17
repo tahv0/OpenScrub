@@ -1,0 +1,25 @@
+      encoder: libx264 (CPU)
+      encoder: libx264 (CPU)
+      encoder: libx264 (CPU)
+      encoder: libx264 (CPU)
+      encoder: libx264 (CPU)
+      encoder: libx264 (CPU)
+      encoder: libx264 (CPU)
+      encoder: libx264 (CPU)
+      encoder: libx265 10-bit (CPU)
+      HDR preserved: 10-bit HEVC, color tags color_primaries=bt2020, color_trc=smpte2084, colorspace=bt2020nc
+      encoder: libx265 10-bit (CPU)
+      HDR preserved: 10-bit HEVC, color tags color_primaries=bt2020, color_trc=smpte2084, colorspace=bt2020nc
+      encoder: libx265 10-bit (CPU)
+      HDR preserved: 10-bit HEVC, color tags color_primaries=bt2020, color_trc=smpte2084, colorspace=bt2020nc
+      encoder: libx265 10-bit (CPU)
+      HDR preserved: 10-bit HEVC, color tags color_primaries=bt2020, color_trc=smpte2084, colorspace=bt2020nc
+      encoder: libx265 10-bit (CPU)
+      HDR preserved: 10-bit HEVC, color tags color_primaries=bt2020, color_trc=smpte2084, colorspace=bt2020nc
+      encoder: libx265 10-bit (CPU)
+      HDR preserved: 10-bit HEVC, color tags color_primaries=bt2020, color_trc=smpte2084, colorspace=bt2020nc
+      encoder: libx265 10-bit (CPU)
+      HDR preserved: 10-bit HEVC, color tags color_primaries=bt2020, color_trc=smpte2084, colorspace=bt2020nc
+      encoder: libx265 10-bit (CPU)
+      HDR preserved: 10-bit HEVC, color tags color_primaries=bt2020, color_trc=smpte2084, colorspace=bt2020nc
+{"direct_exact_controls": 96, "actual_media_exact_controls": 8}

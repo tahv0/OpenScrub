@@ -1,0 +1,597 @@
+TASK162_ACTIVE_SOURCE {"python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]", "sources": {"openscrub": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py", "sha256": "cb08c5f74dcfc8f9a596a6fe83773d02fed583acbb097618f00bbd5c9972e0c4"}, "openscrub_web": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", "sha256": "9835e1137abee62c0a78e2669ed8bae7059e36bf4bed9f5c7a44f0eb8b40ed3a"}, "zones_ui": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/zones_ui.py", "sha256": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7"}}}
+........FFFFFFFFFFFFFFFF................................................................
+=================================== FAILURES ===================================
+______ test_invalid_poly_box_uses_separate_valid_render_box[4488-box-sdr] ______
+
+path = 'sdr', mode = 'box', poly_box = '4488'
+
+    @pytest.mark.parametrize("path", ["sdr", "hdr"])
+    @pytest.mark.parametrize("mode", MODES)
+    @pytest.mark.parametrize("poly_box", [None, "4488", {"4": 0, "5": 0, "16": 0, "17": 0}, (4, 4, 16), (4, 4, 16, 16, 20),
+        (float("nan"), 4, 16, 16), (4, 4, float("inf"), 16), ("bad", 4, 16, 16),
+        (16, 4, 4, 16), (4, 4, 4, 16), (4, 4, 16, 4)])
+    def test_invalid_poly_box_uses_separate_valid_render_box(path, mode, poly_box):
+        actual = source_planes(path)
+        expected = [p.copy() for p in actual]
+        full_box(path, expected, (2, 2, 18, 18), mode)
+        apply(path, actual, (2, 2, 18, 18), mode, SQUARE, poly_box, 2)
+        for a, e in zip(actual, expected):
+>           np.testing.assert_array_equal(a, e)
+E           AssertionError: 
+E           Arrays are not equal
+E           
+E           Mismatched elements: 525 / 3072 (17.1%)
+E           First 5 mismatches are at indices:
+E            [2, 11, 0]: 170 (ACTUAL), 0 (DESIRED)
+E            [2, 11, 1]: 165 (ACTUAL), 0 (DESIRED)
+E            [2, 11, 2]: 205 (ACTUAL), 0 (DESIRED)
+E            [2, 12, 0]: 207 (ACTUAL), 0 (DESIRED)
+E            [2, 12, 1]: 165 (ACTUAL), 0 (DESIRED)
+E           Max absolute difference among violations: 128
+E           Max relative difference among violations: inf
+E            ACTUAL: array([[[217, 105, 111],
+E                   [112,  91, 203],
+E                   [137, 111, 220],...
+E            DESIRED: array([[[217, 105, 111],
+E                   [112,  91, 203],
+E                   [137, 111, 220],...
+
+tests/test_polygon_fallback.py:96: AssertionError
+______ test_invalid_poly_box_uses_separate_valid_render_box[4488-box-hdr] ______
+
+path = 'hdr', mode = 'box', poly_box = '4488'
+
+    @pytest.mark.parametrize("path", ["sdr", "hdr"])
+    @pytest.mark.parametrize("mode", MODES)
+    @pytest.mark.parametrize("poly_box", [None, "4488", {"4": 0, "5": 0, "16": 0, "17": 0}, (4, 4, 16), (4, 4, 16, 16, 20),
+        (float("nan"), 4, 16, 16), (4, 4, float("inf"), 16), ("bad", 4, 16, 16),
+        (16, 4, 4, 16), (4, 4, 4, 16), (4, 4, 16, 4)])
+    def test_invalid_poly_box_uses_separate_valid_render_box(path, mode, poly_box):
+        actual = source_planes(path)
+        expected = [p.copy() for p in actual]
+        full_box(path, expected, (2, 2, 18, 18), mode)
+        apply(path, actual, (2, 2, 18, 18), mode, SQUARE, poly_box, 2)
+        for a, e in zip(actual, expected):
+>           np.testing.assert_array_equal(a, e)
+E           AssertionError: 
+E           Arrays are not equal
+E           
+E           Mismatched elements: 175 / 1024 (17.1%)
+E           First 5 mismatches are at indices:
+E            [2, 11]: 936 (ACTUAL), 64 (DESIRED)
+E            [2, 12]: 454 (ACTUAL), 64 (DESIRED)
+E            [2, 13]: 808 (ACTUAL), 64 (DESIRED)
+E            [2, 14]: 186 (ACTUAL), 64 (DESIRED)
+E            [2, 15]: 385 (ACTUAL), 64 (DESIRED)
+E           Max absolute difference among violations: 878
+E           Max relative difference among violations: 13.71875
+E            ACTUAL: array([[431, 437, 438, ..., 615, 549, 541],
+E                  [323, 949, 814, ..., 496, 839, 363],
+E                  [462, 303,  64, ..., 716, 917, 208],...
+E            DESIRED: array([[431, 437, 438, ..., 615, 549, 541],
+E                  [323, 949, 814, ..., 496, 839, 363],
+E                  [462, 303,  64, ..., 716, 917, 208],...
+
+tests/test_polygon_fallback.py:96: AssertionError
+_____ test_invalid_poly_box_uses_separate_valid_render_box[4488-blur-sdr] ______
+
+path = 'sdr', mode = 'blur', poly_box = '4488'
+
+    @pytest.mark.parametrize("path", ["sdr", "hdr"])
+    @pytest.mark.parametrize("mode", MODES)
+    @pytest.mark.parametrize("poly_box", [None, "4488", {"4": 0, "5": 0, "16": 0, "17": 0}, (4, 4, 16), (4, 4, 16, 16, 20),
+        (float("nan"), 4, 16, 16), (4, 4, float("inf"), 16), ("bad", 4, 16, 16),
+        (16, 4, 4, 16), (4, 4, 4, 16), (4, 4, 16, 4)])
+    def test_invalid_poly_box_uses_separate_valid_render_box(path, mode, poly_box):
+        actual = source_planes(path)
+        expected = [p.copy() for p in actual]
+        full_box(path, expected, (2, 2, 18, 18), mode)
+        apply(path, actual, (2, 2, 18, 18), mode, SQUARE, poly_box, 2)
+        for a, e in zip(actual, expected):
+>           np.testing.assert_array_equal(a, e)
+E           AssertionError: 
+E           Arrays are not equal
+E           
+E           Mismatched elements: 523 / 3072 (17%)
+E           First 5 mismatches are at indices:
+E            [2, 11, 0]: 170 (ACTUAL), 136 (DESIRED)
+E            [2, 11, 1]: 165 (ACTUAL), 124 (DESIRED)
+E            [2, 11, 2]: 205 (ACTUAL), 129 (DESIRED)
+E            [2, 12, 0]: 207 (ACTUAL), 136 (DESIRED)
+E            [2, 12, 1]: 165 (ACTUAL), 125 (DESIRED)
+E           Max absolute difference among violations: 108
+E           Max relative difference among violations: 0.89256198
+E            ACTUAL: array([[[217, 105, 111],
+E                   [112,  91, 203],
+E                   [137, 111, 220],...
+E            DESIRED: array([[[217, 105, 111],
+E                   [112,  91, 203],
+E                   [137, 111, 220],...
+
+tests/test_polygon_fallback.py:96: AssertionError
+_____ test_invalid_poly_box_uses_separate_valid_render_box[4488-blur-hdr] ______
+
+path = 'hdr', mode = 'blur', poly_box = '4488'
+
+    @pytest.mark.parametrize("path", ["sdr", "hdr"])
+    @pytest.mark.parametrize("mode", MODES)
+    @pytest.mark.parametrize("poly_box", [None, "4488", {"4": 0, "5": 0, "16": 0, "17": 0}, (4, 4, 16), (4, 4, 16, 16, 20),
+        (float("nan"), 4, 16, 16), (4, 4, float("inf"), 16), ("bad", 4, 16, 16),
+        (16, 4, 4, 16), (4, 4, 4, 16), (4, 4, 16, 4)])
+    def test_invalid_poly_box_uses_separate_valid_render_box(path, mode, poly_box):
+        actual = source_planes(path)
+        expected = [p.copy() for p in actual]
+        full_box(path, expected, (2, 2, 18, 18), mode)
+        apply(path, actual, (2, 2, 18, 18), mode, SQUARE, poly_box, 2)
+        for a, e in zip(actual, expected):
+>           np.testing.assert_array_equal(a, e)
+E           AssertionError: 
+E           Arrays are not equal
+E           
+E           Mismatched elements: 175 / 1024 (17.1%)
+E           First 5 mismatches are at indices:
+E            [2, 11]: 936 (ACTUAL), 500 (DESIRED)
+E            [2, 12]: 454 (ACTUAL), 500 (DESIRED)
+E            [2, 13]: 808 (ACTUAL), 500 (DESIRED)
+E            [2, 14]: 186 (ACTUAL), 500 (DESIRED)
+E            [2, 15]: 385 (ACTUAL), 500 (DESIRED)
+E           Max absolute difference among violations: 436
+E           Max relative difference among violations: 0.872
+E            ACTUAL: array([[431, 437, 438, ..., 615, 549, 541],
+E                  [323, 949, 814, ..., 496, 839, 363],
+E                  [462, 303, 501, ..., 716, 917, 208],...
+E            DESIRED: array([[431, 437, 438, ..., 615, 549, 541],
+E                  [323, 949, 814, ..., 496, 839, 363],
+E                  [462, 303, 501, ..., 716, 917, 208],...
+
+tests/test_polygon_fallback.py:96: AssertionError
+____ test_invalid_poly_box_uses_separate_valid_render_box[4488-mosaic-sdr] _____
+
+path = 'sdr', mode = 'mosaic', poly_box = '4488'
+
+    @pytest.mark.parametrize("path", ["sdr", "hdr"])
+    @pytest.mark.parametrize("mode", MODES)
+    @pytest.mark.parametrize("poly_box", [None, "4488", {"4": 0, "5": 0, "16": 0, "17": 0}, (4, 4, 16), (4, 4, 16, 16, 20),
+        (float("nan"), 4, 16, 16), (4, 4, float("inf"), 16), ("bad", 4, 16, 16),
+        (16, 4, 4, 16), (4, 4, 4, 16), (4, 4, 16, 4)])
+    def test_invalid_poly_box_uses_separate_valid_render_box(path, mode, poly_box):
+        actual = source_planes(path)
+        expected = [p.copy() for p in actual]
+        full_box(path, expected, (2, 2, 18, 18), mode)
+        apply(path, actual, (2, 2, 18, 18), mode, SQUARE, poly_box, 2)
+        for a, e in zip(actual, expected):
+>           np.testing.assert_array_equal(a, e)
+E           AssertionError: 
+E           Arrays are not equal
+E           
+E           Mismatched elements: 523 / 3072 (17%)
+E           First 5 mismatches are at indices:
+E            [2, 11, 0]: 170 (ACTUAL), 127 (DESIRED)
+E            [2, 11, 1]: 165 (ACTUAL), 133 (DESIRED)
+E            [2, 11, 2]: 205 (ACTUAL), 118 (DESIRED)
+E            [2, 12, 0]: 207 (ACTUAL), 127 (DESIRED)
+E            [2, 12, 1]: 165 (ACTUAL), 133 (DESIRED)
+E           Max absolute difference among violations: 124
+E           Max relative difference among violations: 1.00892857
+E            ACTUAL: array([[[217, 105, 111],
+E                   [112,  91, 203],
+E                   [137, 111, 220],...
+E            DESIRED: array([[[217, 105, 111],
+E                   [112,  91, 203],
+E                   [137, 111, 220],...
+
+tests/test_polygon_fallback.py:96: AssertionError
+____ test_invalid_poly_box_uses_separate_valid_render_box[4488-mosaic-hdr] _____
+
+path = 'hdr', mode = 'mosaic', poly_box = '4488'
+
+    @pytest.mark.parametrize("path", ["sdr", "hdr"])
+    @pytest.mark.parametrize("mode", MODES)
+    @pytest.mark.parametrize("poly_box", [None, "4488", {"4": 0, "5": 0, "16": 0, "17": 0}, (4, 4, 16), (4, 4, 16, 16, 20),
+        (float("nan"), 4, 16, 16), (4, 4, float("inf"), 16), ("bad", 4, 16, 16),
+        (16, 4, 4, 16), (4, 4, 4, 16), (4, 4, 16, 4)])
+    def test_invalid_poly_box_uses_separate_valid_render_box(path, mode, poly_box):
+        actual = source_planes(path)
+        expected = [p.copy() for p in actual]
+        full_box(path, expected, (2, 2, 18, 18), mode)
+        apply(path, actual, (2, 2, 18, 18), mode, SQUARE, poly_box, 2)
+        for a, e in zip(actual, expected):
+>           np.testing.assert_array_equal(a, e)
+E           AssertionError: 
+E           Arrays are not equal
+E           
+E           Mismatched elements: 175 / 1024 (17.1%)
+E           First 5 mismatches are at indices:
+E            [2, 11]: 936 (ACTUAL), 339 (DESIRED)
+E            [2, 12]: 454 (ACTUAL), 339 (DESIRED)
+E            [2, 13]: 808 (ACTUAL), 339 (DESIRED)
+E            [2, 14]: 186 (ACTUAL), 339 (DESIRED)
+E            [2, 15]: 385 (ACTUAL), 339 (DESIRED)
+E           Max absolute difference among violations: 597
+E           Max relative difference among violations: 1.76106195
+E            ACTUAL: array([[431, 437, 438, ..., 615, 549, 541],
+E                  [323, 949, 814, ..., 496, 839, 363],
+E                  [462, 303, 518, ..., 716, 917, 208],...
+E            DESIRED: array([[431, 437, 438, ..., 615, 549, 541],
+E                  [323, 949, 814, ..., 496, 839, 363],
+E                  [462, 303, 518, ..., 716, 917, 208],...
+
+tests/test_polygon_fallback.py:96: AssertionError
+____ test_invalid_poly_box_uses_separate_valid_render_box[4488-inpaint-sdr] ____
+
+path = 'sdr', mode = 'inpaint', poly_box = '4488'
+
+    @pytest.mark.parametrize("path", ["sdr", "hdr"])
+    @pytest.mark.parametrize("mode", MODES)
+    @pytest.mark.parametrize("poly_box", [None, "4488", {"4": 0, "5": 0, "16": 0, "17": 0}, (4, 4, 16), (4, 4, 16, 16, 20),
+        (float("nan"), 4, 16, 16), (4, 4, float("inf"), 16), ("bad", 4, 16, 16),
+        (16, 4, 4, 16), (4, 4, 4, 16), (4, 4, 16, 4)])
+    def test_invalid_poly_box_uses_separate_valid_render_box(path, mode, poly_box):
+        actual = source_planes(path)
+        expected = [p.copy() for p in actual]
+        full_box(path, expected, (2, 2, 18, 18), mode)
+        apply(path, actual, (2, 2, 18, 18), mode, SQUARE, poly_box, 2)
+        for a, e in zip(actual, expected):
+>           np.testing.assert_array_equal(a, e)
+E           AssertionError: 
+E           Arrays are not equal
+E           
+E           Mismatched elements: 523 / 3072 (17%)
+E           First 5 mismatches are at indices:
+E            [2, 11, 0]: 170 (ACTUAL), 158 (DESIRED)
+E            [2, 11, 1]: 165 (ACTUAL), 134 (DESIRED)
+E            [2, 11, 2]: 205 (ACTUAL), 117 (DESIRED)
+E            [2, 12, 0]: 207 (ACTUAL), 162 (DESIRED)
+E            [2, 12, 1]: 165 (ACTUAL), 152 (DESIRED)
+E           Max absolute difference among violations: 126
+E           Max relative difference among violations: 1.34567901
+E            ACTUAL: array([[[217, 105, 111],
+E                   [112,  91, 203],
+E                   [137, 111, 220],...
+E            DESIRED: array([[[217, 105, 111],
+E                   [112,  91, 203],
+E                   [137, 111, 220],...
+
+tests/test_polygon_fallback.py:96: AssertionError
+____ test_invalid_poly_box_uses_separate_valid_render_box[4488-inpaint-hdr] ____
+
+path = 'hdr', mode = 'inpaint', poly_box = '4488'
+
+    @pytest.mark.parametrize("path", ["sdr", "hdr"])
+    @pytest.mark.parametrize("mode", MODES)
+    @pytest.mark.parametrize("poly_box", [None, "4488", {"4": 0, "5": 0, "16": 0, "17": 0}, (4, 4, 16), (4, 4, 16, 16, 20),
+        (float("nan"), 4, 16, 16), (4, 4, float("inf"), 16), ("bad", 4, 16, 16),
+        (16, 4, 4, 16), (4, 4, 4, 16), (4, 4, 16, 4)])
+    def test_invalid_poly_box_uses_separate_valid_render_box(path, mode, poly_box):
+        actual = source_planes(path)
+        expected = [p.copy() for p in actual]
+        full_box(path, expected, (2, 2, 18, 18), mode)
+        apply(path, actual, (2, 2, 18, 18), mode, SQUARE, poly_box, 2)
+        for a, e in zip(actual, expected):
+>           np.testing.assert_array_equal(a, e)
+E           AssertionError: 
+E           Arrays are not equal
+E           
+E           Mismatched elements: 175 / 1024 (17.1%)
+E           First 5 mismatches are at indices:
+E            [2, 11]: 936 (ACTUAL), 428 (DESIRED)
+E            [2, 12]: 454 (ACTUAL), 536 (DESIRED)
+E            [2, 13]: 808 (ACTUAL), 508 (DESIRED)
+E            [2, 14]: 186 (ACTUAL), 692 (DESIRED)
+E            [2, 15]: 385 (ACTUAL), 724 (DESIRED)
+E           Max absolute difference among violations: 513
+E           Max relative difference among violations: 1.18691589
+E            ACTUAL: array([[431, 437, 438, ..., 615, 549, 541],
+E                  [323, 949, 814, ..., 496, 839, 363],
+E                  [462, 303, 584, ..., 716, 917, 208],...
+E            DESIRED: array([[431, 437, 438, ..., 615, 549, 541],
+E                  [323, 949, 814, ..., 496, 839, 363],
+E                  [462, 303, 584, ..., 716, 917, 208],...
+
+tests/test_polygon_fallback.py:96: AssertionError
+___ test_invalid_poly_box_uses_separate_valid_render_box[poly_box2-box-sdr] ____
+
+path = 'sdr', mode = 'box', poly_box = {'4': 0, '5': 0, '16': 0, '17': 0}
+
+    @pytest.mark.parametrize("path", ["sdr", "hdr"])
+    @pytest.mark.parametrize("mode", MODES)
+    @pytest.mark.parametrize("poly_box", [None, "4488", {"4": 0, "5": 0, "16": 0, "17": 0}, (4, 4, 16), (4, 4, 16, 16, 20),
+        (float("nan"), 4, 16, 16), (4, 4, float("inf"), 16), ("bad", 4, 16, 16),
+        (16, 4, 4, 16), (4, 4, 4, 16), (4, 4, 16, 4)])
+    def test_invalid_poly_box_uses_separate_valid_render_box(path, mode, poly_box):
+        actual = source_planes(path)
+        expected = [p.copy() for p in actual]
+        full_box(path, expected, (2, 2, 18, 18), mode)
+        apply(path, actual, (2, 2, 18, 18), mode, SQUARE, poly_box, 2)
+        for a, e in zip(actual, expected):
+>           np.testing.assert_array_equal(a, e)
+E           AssertionError: 
+E           Arrays are not equal
+E           
+E           Mismatched elements: 48 / 3072 (1.56%)
+E           First 5 mismatches are at indices:
+E            [2, 2, 0]: 157 (ACTUAL), 0 (DESIRED)
+E            [2, 2, 1]: 87 (ACTUAL), 0 (DESIRED)
+E            [2, 2, 2]: 100 (ACTUAL), 0 (DESIRED)
+E            [2, 3, 0]: 117 (ACTUAL), 0 (DESIRED)
+E            [2, 3, 1]: 126 (ACTUAL), 0 (DESIRED)
+E           Max absolute difference among violations: 126
+E           Max relative difference among violations: inf
+E            ACTUAL: array([[[217, 105, 111],
+E                   [112,  91, 203],
+E                   [137, 111, 220],...
+E            DESIRED: array([[[217, 105, 111],
+E                   [112,  91, 203],
+E                   [137, 111, 220],...
+
+tests/test_polygon_fallback.py:96: AssertionError
+___ test_invalid_poly_box_uses_separate_valid_render_box[poly_box2-box-hdr] ____
+
+path = 'hdr', mode = 'box', poly_box = {'4': 0, '5': 0, '16': 0, '17': 0}
+
+    @pytest.mark.parametrize("path", ["sdr", "hdr"])
+    @pytest.mark.parametrize("mode", MODES)
+    @pytest.mark.parametrize("poly_box", [None, "4488", {"4": 0, "5": 0, "16": 0, "17": 0}, (4, 4, 16), (4, 4, 16, 16, 20),
+        (float("nan"), 4, 16, 16), (4, 4, float("inf"), 16), ("bad", 4, 16, 16),
+        (16, 4, 4, 16), (4, 4, 4, 16), (4, 4, 16, 4)])
+    def test_invalid_poly_box_uses_separate_valid_render_box(path, mode, poly_box):
+        actual = source_planes(path)
+        expected = [p.copy() for p in actual]
+        full_box(path, expected, (2, 2, 18, 18), mode)
+        apply(path, actual, (2, 2, 18, 18), mode, SQUARE, poly_box, 2)
+        for a, e in zip(actual, expected):
+>           np.testing.assert_array_equal(a, e)
+E           AssertionError: 
+E           Arrays are not equal
+E           
+E           Mismatched elements: 16 / 1024 (1.56%)
+E           First 5 mismatches are at indices:
+E            [2, 2]: 544 (ACTUAL), 64 (DESIRED)
+E            [2, 3]: 216 (ACTUAL), 64 (DESIRED)
+E            [2, 4]: 678 (ACTUAL), 64 (DESIRED)
+E            [2, 5]: 262 (ACTUAL), 64 (DESIRED)
+E            [2, 6]: 209 (ACTUAL), 64 (DESIRED)
+E           Max absolute difference among violations: 872
+E           Max relative difference among violations: 13.625
+E            ACTUAL: array([[431, 437, 438, ..., 615, 549, 541],
+E                  [323, 949, 814, ..., 496, 839, 363],
+E                  [462, 303, 544, ..., 716, 917, 208],...
+E            DESIRED: array([[431, 437, 438, ..., 615, 549, 541],
+E                  [323, 949, 814, ..., 496, 839, 363],
+E                  [462, 303,  64, ..., 716, 917, 208],...
+
+tests/test_polygon_fallback.py:96: AssertionError
+___ test_invalid_poly_box_uses_separate_valid_render_box[poly_box2-blur-sdr] ___
+
+path = 'sdr', mode = 'blur', poly_box = {'4': 0, '5': 0, '16': 0, '17': 0}
+
+    @pytest.mark.parametrize("path", ["sdr", "hdr"])
+    @pytest.mark.parametrize("mode", MODES)
+    @pytest.mark.parametrize("poly_box", [None, "4488", {"4": 0, "5": 0, "16": 0, "17": 0}, (4, 4, 16), (4, 4, 16, 16, 20),
+        (float("nan"), 4, 16, 16), (4, 4, float("inf"), 16), ("bad", 4, 16, 16),
+        (16, 4, 4, 16), (4, 4, 4, 16), (4, 4, 16, 4)])
+    def test_invalid_poly_box_uses_separate_valid_render_box(path, mode, poly_box):
+        actual = source_planes(path)
+        expected = [p.copy() for p in actual]
+        full_box(path, expected, (2, 2, 18, 18), mode)
+        apply(path, actual, (2, 2, 18, 18), mode, SQUARE, poly_box, 2)
+        for a, e in zip(actual, expected):
+>           np.testing.assert_array_equal(a, e)
+E           AssertionError: 
+E           Arrays are not equal
+E           
+E           Mismatched elements: 48 / 3072 (1.56%)
+E           First 5 mismatches are at indices:
+E            [2, 2, 0]: 157 (ACTUAL), 133 (DESIRED)
+E            [2, 2, 1]: 87 (ACTUAL), 125 (DESIRED)
+E            [2, 2, 2]: 100 (ACTUAL), 142 (DESIRED)
+E            [2, 3, 0]: 117 (ACTUAL), 133 (DESIRED)
+E            [2, 3, 1]: 126 (ACTUAL), 124 (DESIRED)
+E           Max absolute difference among violations: 102
+E           Max relative difference among violations: 0.80952381
+E            ACTUAL: array([[[217, 105, 111],
+E                   [112,  91, 203],
+E                   [137, 111, 220],...
+E            DESIRED: array([[[217, 105, 111],
+E                   [112,  91, 203],
+E                   [137, 111, 220],...
+
+tests/test_polygon_fallback.py:96: AssertionError
+___ test_invalid_poly_box_uses_separate_valid_render_box[poly_box2-blur-hdr] ___
+
+path = 'hdr', mode = 'blur', poly_box = {'4': 0, '5': 0, '16': 0, '17': 0}
+
+    @pytest.mark.parametrize("path", ["sdr", "hdr"])
+    @pytest.mark.parametrize("mode", MODES)
+    @pytest.mark.parametrize("poly_box", [None, "4488", {"4": 0, "5": 0, "16": 0, "17": 0}, (4, 4, 16), (4, 4, 16, 16, 20),
+        (float("nan"), 4, 16, 16), (4, 4, float("inf"), 16), ("bad", 4, 16, 16),
+        (16, 4, 4, 16), (4, 4, 4, 16), (4, 4, 16, 4)])
+    def test_invalid_poly_box_uses_separate_valid_render_box(path, mode, poly_box):
+        actual = source_planes(path)
+        expected = [p.copy() for p in actual]
+        full_box(path, expected, (2, 2, 18, 18), mode)
+        apply(path, actual, (2, 2, 18, 18), mode, SQUARE, poly_box, 2)
+        for a, e in zip(actual, expected):
+>           np.testing.assert_array_equal(a, e)
+E           AssertionError: 
+E           Arrays are not equal
+E           
+E           Mismatched elements: 16 / 1024 (1.56%)
+E           First 5 mismatches are at indices:
+E            [2, 2]: 544 (ACTUAL), 501 (DESIRED)
+E            [2, 3]: 216 (ACTUAL), 501 (DESIRED)
+E            [2, 4]: 678 (ACTUAL), 500 (DESIRED)
+E            [2, 5]: 262 (ACTUAL), 500 (DESIRED)
+E            [2, 6]: 209 (ACTUAL), 500 (DESIRED)
+E           Max absolute difference among violations: 436
+E           Max relative difference among violations: 0.872
+E            ACTUAL: array([[431, 437, 438, ..., 615, 549, 541],
+E                  [323, 949, 814, ..., 496, 839, 363],
+E                  [462, 303, 544, ..., 716, 917, 208],...
+E            DESIRED: array([[431, 437, 438, ..., 615, 549, 541],
+E                  [323, 949, 814, ..., 496, 839, 363],
+E                  [462, 303, 501, ..., 716, 917, 208],...
+
+tests/test_polygon_fallback.py:96: AssertionError
+__ test_invalid_poly_box_uses_separate_valid_render_box[poly_box2-mosaic-sdr] __
+
+path = 'sdr', mode = 'mosaic', poly_box = {'4': 0, '5': 0, '16': 0, '17': 0}
+
+    @pytest.mark.parametrize("path", ["sdr", "hdr"])
+    @pytest.mark.parametrize("mode", MODES)
+    @pytest.mark.parametrize("poly_box", [None, "4488", {"4": 0, "5": 0, "16": 0, "17": 0}, (4, 4, 16), (4, 4, 16, 16, 20),
+        (float("nan"), 4, 16, 16), (4, 4, float("inf"), 16), ("bad", 4, 16, 16),
+        (16, 4, 4, 16), (4, 4, 4, 16), (4, 4, 16, 4)])
+    def test_invalid_poly_box_uses_separate_valid_render_box(path, mode, poly_box):
+        actual = source_planes(path)
+        expected = [p.copy() for p in actual]
+        full_box(path, expected, (2, 2, 18, 18), mode)
+        apply(path, actual, (2, 2, 18, 18), mode, SQUARE, poly_box, 2)
+        for a, e in zip(actual, expected):
+>           np.testing.assert_array_equal(a, e)
+E           AssertionError: 
+E           Arrays are not equal
+E           
+E           Mismatched elements: 48 / 3072 (1.56%)
+E           First 5 mismatches are at indices:
+E            [2, 2, 0]: 157 (ACTUAL), 124 (DESIRED)
+E            [2, 2, 1]: 87 (ACTUAL), 161 (DESIRED)
+E            [2, 2, 2]: 100 (ACTUAL), 116 (DESIRED)
+E            [2, 3, 0]: 117 (ACTUAL), 124 (DESIRED)
+E            [2, 3, 1]: 126 (ACTUAL), 161 (DESIRED)
+E           Max absolute difference among violations: 113
+E           Max relative difference among violations: 0.95689655
+E            ACTUAL: array([[[217, 105, 111],
+E                   [112,  91, 203],
+E                   [137, 111, 220],...
+E            DESIRED: array([[[217, 105, 111],
+E                   [112,  91, 203],
+E                   [137, 111, 220],...
+
+tests/test_polygon_fallback.py:96: AssertionError
+__ test_invalid_poly_box_uses_separate_valid_render_box[poly_box2-mosaic-hdr] __
+
+path = 'hdr', mode = 'mosaic', poly_box = {'4': 0, '5': 0, '16': 0, '17': 0}
+
+    @pytest.mark.parametrize("path", ["sdr", "hdr"])
+    @pytest.mark.parametrize("mode", MODES)
+    @pytest.mark.parametrize("poly_box", [None, "4488", {"4": 0, "5": 0, "16": 0, "17": 0}, (4, 4, 16), (4, 4, 16, 16, 20),
+        (float("nan"), 4, 16, 16), (4, 4, float("inf"), 16), ("bad", 4, 16, 16),
+        (16, 4, 4, 16), (4, 4, 4, 16), (4, 4, 16, 4)])
+    def test_invalid_poly_box_uses_separate_valid_render_box(path, mode, poly_box):
+        actual = source_planes(path)
+        expected = [p.copy() for p in actual]
+        full_box(path, expected, (2, 2, 18, 18), mode)
+        apply(path, actual, (2, 2, 18, 18), mode, SQUARE, poly_box, 2)
+        for a, e in zip(actual, expected):
+>           np.testing.assert_array_equal(a, e)
+E           AssertionError: 
+E           Arrays are not equal
+E           
+E           Mismatched elements: 16 / 1024 (1.56%)
+E           First 5 mismatches are at indices:
+E            [2, 2]: 544 (ACTUAL), 518 (DESIRED)
+E            [2, 3]: 216 (ACTUAL), 518 (DESIRED)
+E            [2, 4]: 678 (ACTUAL), 518 (DESIRED)
+E            [2, 5]: 262 (ACTUAL), 518 (DESIRED)
+E            [2, 6]: 209 (ACTUAL), 518 (DESIRED)
+E           Max absolute difference among violations: 597
+E           Max relative difference among violations: 1.76106195
+E            ACTUAL: array([[431, 437, 438, ..., 615, 549, 541],
+E                  [323, 949, 814, ..., 496, 839, 363],
+E                  [462, 303, 544, ..., 716, 917, 208],...
+E            DESIRED: array([[431, 437, 438, ..., 615, 549, 541],
+E                  [323, 949, 814, ..., 496, 839, 363],
+E                  [462, 303, 518, ..., 716, 917, 208],...
+
+tests/test_polygon_fallback.py:96: AssertionError
+_ test_invalid_poly_box_uses_separate_valid_render_box[poly_box2-inpaint-sdr] __
+
+path = 'sdr', mode = 'inpaint', poly_box = {'4': 0, '5': 0, '16': 0, '17': 0}
+
+    @pytest.mark.parametrize("path", ["sdr", "hdr"])
+    @pytest.mark.parametrize("mode", MODES)
+    @pytest.mark.parametrize("poly_box", [None, "4488", {"4": 0, "5": 0, "16": 0, "17": 0}, (4, 4, 16), (4, 4, 16, 16, 20),
+        (float("nan"), 4, 16, 16), (4, 4, float("inf"), 16), ("bad", 4, 16, 16),
+        (16, 4, 4, 16), (4, 4, 4, 16), (4, 4, 16, 4)])
+    def test_invalid_poly_box_uses_separate_valid_render_box(path, mode, poly_box):
+        actual = source_planes(path)
+        expected = [p.copy() for p in actual]
+        full_box(path, expected, (2, 2, 18, 18), mode)
+        apply(path, actual, (2, 2, 18, 18), mode, SQUARE, poly_box, 2)
+        for a, e in zip(actual, expected):
+>           np.testing.assert_array_equal(a, e)
+E           AssertionError: 
+E           Arrays are not equal
+E           
+E           Mismatched elements: 48 / 3072 (1.56%)
+E           First 5 mismatches are at indices:
+E            [2, 2, 0]: 157 (ACTUAL), 102 (DESIRED)
+E            [2, 2, 1]: 87 (ACTUAL), 98 (DESIRED)
+E            [2, 2, 2]: 100 (ACTUAL), 94 (DESIRED)
+E            [2, 3, 0]: 117 (ACTUAL), 144 (DESIRED)
+E            [2, 3, 1]: 126 (ACTUAL), 107 (DESIRED)
+E           Max absolute difference among violations: 126
+E           Max relative difference among violations: 1.72463768
+E            ACTUAL: array([[[217, 105, 111],
+E                   [112,  91, 203],
+E                   [137, 111, 220],...
+E            DESIRED: array([[[217, 105, 111],
+E                   [112,  91, 203],
+E                   [137, 111, 220],...
+
+tests/test_polygon_fallback.py:96: AssertionError
+_ test_invalid_poly_box_uses_separate_valid_render_box[poly_box2-inpaint-hdr] __
+
+path = 'hdr', mode = 'inpaint', poly_box = {'4': 0, '5': 0, '16': 0, '17': 0}
+
+    @pytest.mark.parametrize("path", ["sdr", "hdr"])
+    @pytest.mark.parametrize("mode", MODES)
+    @pytest.mark.parametrize("poly_box", [None, "4488", {"4": 0, "5": 0, "16": 0, "17": 0}, (4, 4, 16), (4, 4, 16, 16, 20),
+        (float("nan"), 4, 16, 16), (4, 4, float("inf"), 16), ("bad", 4, 16, 16),
+        (16, 4, 4, 16), (4, 4, 4, 16), (4, 4, 16, 4)])
+    def test_invalid_poly_box_uses_separate_valid_render_box(path, mode, poly_box):
+        actual = source_planes(path)
+        expected = [p.copy() for p in actual]
+        full_box(path, expected, (2, 2, 18, 18), mode)
+        apply(path, actual, (2, 2, 18, 18), mode, SQUARE, poly_box, 2)
+        for a, e in zip(actual, expected):
+>           np.testing.assert_array_equal(a, e)
+E           AssertionError: 
+E           Arrays are not equal
+E           
+E           Mismatched elements: 16 / 1024 (1.56%)
+E           First 5 mismatches are at indices:
+E            [2, 2]: 544 (ACTUAL), 584 (DESIRED)
+E            [2, 3]: 216 (ACTUAL), 568 (DESIRED)
+E            [2, 4]: 678 (ACTUAL), 564 (DESIRED)
+E            [2, 5]: 262 (ACTUAL), 380 (DESIRED)
+E            [2, 6]: 209 (ACTUAL), 460 (DESIRED)
+E           Max absolute difference among violations: 513
+E           Max relative difference among violations: 1.18691589
+E            ACTUAL: array([[431, 437, 438, ..., 615, 549, 541],
+E                  [323, 949, 814, ..., 496, 839, 363],
+E                  [462, 303, 544, ..., 716, 917, 208],...
+E            DESIRED: array([[431, 437, 438, ..., 615, 549, 541],
+E                  [323, 949, 814, ..., 496, 839, 363],
+E                  [462, 303, 584, ..., 716, 917, 208],...
+
+tests/test_polygon_fallback.py:96: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_polygon_fallback.py::test_invalid_poly_box_uses_separate_valid_render_box[4488-box-sdr]
+FAILED tests/test_polygon_fallback.py::test_invalid_poly_box_uses_separate_valid_render_box[4488-box-hdr]
+FAILED tests/test_polygon_fallback.py::test_invalid_poly_box_uses_separate_valid_render_box[4488-blur-sdr]
+FAILED tests/test_polygon_fallback.py::test_invalid_poly_box_uses_separate_valid_render_box[4488-blur-hdr]
+FAILED tests/test_polygon_fallback.py::test_invalid_poly_box_uses_separate_valid_render_box[4488-mosaic-sdr]
+FAILED tests/test_polygon_fallback.py::test_invalid_poly_box_uses_separate_valid_render_box[4488-mosaic-hdr]
+FAILED tests/test_polygon_fallback.py::test_invalid_poly_box_uses_separate_valid_render_box[4488-inpaint-sdr]
+FAILED tests/test_polygon_fallback.py::test_invalid_poly_box_uses_separate_valid_render_box[4488-inpaint-hdr]
+FAILED tests/test_polygon_fallback.py::test_invalid_poly_box_uses_separate_valid_render_box[poly_box2-box-sdr]
+FAILED tests/test_polygon_fallback.py::test_invalid_poly_box_uses_separate_valid_render_box[poly_box2-box-hdr]
+FAILED tests/test_polygon_fallback.py::test_invalid_poly_box_uses_separate_valid_render_box[poly_box2-blur-sdr]
+FAILED tests/test_polygon_fallback.py::test_invalid_poly_box_uses_separate_valid_render_box[poly_box2-blur-hdr]
+FAILED tests/test_polygon_fallback.py::test_invalid_poly_box_uses_separate_valid_render_box[poly_box2-mosaic-sdr]
+FAILED tests/test_polygon_fallback.py::test_invalid_poly_box_uses_separate_valid_render_box[poly_box2-mosaic-hdr]
+FAILED tests/test_polygon_fallback.py::test_invalid_poly_box_uses_separate_valid_render_box[poly_box2-inpaint-sdr]
+FAILED tests/test_polygon_fallback.py::test_invalid_poly_box_uses_separate_valid_render_box[poly_box2-inpaint-hdr]
+16 failed, 72 passed, 460 deselected in 0.25s

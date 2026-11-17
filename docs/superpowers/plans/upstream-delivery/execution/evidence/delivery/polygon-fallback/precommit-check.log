@@ -1,0 +1,21 @@
+{
+  "base": "e21ebdf6e3ee46e6c65050dc956a9a3459152269",
+  "head": "e21ebdf6e3ee46e6c65050dc956a9a3459152269",
+  "branch": "pr/invalid-polygon-fallback",
+  "worktree": "/home/tahv0/.codex/worktrees/c832/OpenScrub",
+  "python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]",
+  "opencv": "4.14.0",
+  "numpy": "2.5.5",
+  "ffmpeg": "ffmpeg version 8.0.1-3ubuntu2 Copyright (c) 2000-2025 the FFmpeg developers",
+  "status": " M CONTRIBUTING.md\n M openscrub.py\n M pyproject.toml\n?? tests/\n",
+  "engine_sha256": "d3f87fb77b8f855c730caea5c78c7e7ccb5c8c83a0c0ead40872e4c77f0d33eb",
+  "test_sha256": "7a10ad61ac994f2943b3c20a7c7bba97f1e401c0978026c05d637cc6cd1e7858",
+  "stable_files": 114,
+  "installed_source_byte_identity": true,
+  "correct_runtime_entrypoint_shebangs": true,
+  "unrelated_functions_and_defaults_ast_identical": true,
+  "artifact_sha256": {
+    "openscrub-1.0.96-py3-none-any.whl": "2ce0dea67a0dc540c1c1bb6f16bfd8da276faeb19451d526d80fa68656f98f3c",
+    "openscrub-1.0.96.tar.gz": "1cde9830e6efd468a64b67b2fc7c9bfc901206a3f21064e9e26f727762219d65"
+  }
+}

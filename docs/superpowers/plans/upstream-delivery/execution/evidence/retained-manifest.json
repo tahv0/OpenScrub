@@ -3530,6 +3530,201 @@
     "sha256": "bd4aac10e0c8e45c35978f857303d732fd5a5f85a57876e9885c12ed49dbc07c"
   },
   {
+    "path": "delivery/polygon-fallback/add_exception_tests.py",
+    "bytes": 1470,
+    "sha256": "4d738ec82663745de6eeaa7329d8420bbb3997bfd099505f6f5c3bbf39381b20"
+  },
+  {
+    "path": "delivery/polygon-fallback/build.log",
+    "bytes": 567,
+    "sha256": "dbcf3c861650333ae65cb077ca8526a7dee02349c9e638c9be816e1d0d9117cb"
+  },
+  {
+    "path": "delivery/polygon-fallback/check_installed.py",
+    "bytes": 3414,
+    "sha256": "ac5db8f91795f02b1bd0a50b83a6cb4af67354b5da1b2b8d33011a2ac6327a08"
+  },
+  {
+    "path": "delivery/polygon-fallback/check_packaging.py",
+    "bytes": 1681,
+    "sha256": "300a382f81140b8b3d9436c2b081d1178c50c6c96202c3cd960c057516b61305"
+  },
+  {
+    "path": "delivery/polygon-fallback/control-comparison.json",
+    "bytes": 13037,
+    "sha256": "fca360975522cfc813f6c025dfa5a8cd4bf62864d9c097ed46d006201776a838"
+  },
+  {
+    "path": "delivery/polygon-fallback/control-comparison.log",
+    "bytes": 1464,
+    "sha256": "00fa7d73086cb3a1eb38c600522dbcdcf146ccf5393e983b4127876b559a18f8"
+  },
+  {
+    "path": "delivery/polygon-fallback/control_compare.py",
+    "bytes": 3331,
+    "sha256": "a314ad85d96544600a4f5f6096398a24c03f921c7dbe71c994340642079287c8"
+  },
+  {
+    "path": "delivery/polygon-fallback/env.sh",
+    "bytes": 424,
+    "sha256": "9f53409237bbdb009beacf99ba2baae99342efae90682a19b349909c5bcf068c"
+  },
+  {
+    "path": "delivery/polygon-fallback/final-check.log",
+    "bytes": 1047,
+    "sha256": "790fdb4bcd8d7a6b88f7a48308f391e18413432c1d6bd3bc242170d35d2a16e7"
+  },
+  {
+    "path": "delivery/polygon-fallback/final-provenance.json",
+    "bytes": 1047,
+    "sha256": "790fdb4bcd8d7a6b88f7a48308f391e18413432c1d6bd3bc242170d35d2a16e7"
+  },
+  {
+    "path": "delivery/polygon-fallback/final_check.py",
+    "bytes": 2754,
+    "sha256": "49772d77fbe4b9ccfe3fa2115092a1b00da4c4ffb98221573c81bf7ce5366c3b"
+  },
+  {
+    "path": "delivery/polygon-fallback/floor-env.sh",
+    "bytes": 350,
+    "sha256": "0249d1e35fa3668a8aa55bcd8d0c918de933962c1d3bfa899fce7848116d4f04"
+  },
+  {
+    "path": "delivery/polygon-fallback/floor.log",
+    "bytes": 5484,
+    "sha256": "dda2e0e3d5e0cf4e2f5d0829d539d891e117b2d9dc4d246789ec03843e0da74d"
+  },
+  {
+    "path": "delivery/polygon-fallback/focused-final.log",
+    "bytes": 5467,
+    "sha256": "7b592bfd977cc09e1366d1a1439bcfc2941eb09774341e21a8fa22398f82c981"
+  },
+  {
+    "path": "delivery/polygon-fallback/focused-stable.log",
+    "bytes": 5483,
+    "sha256": "68368553ed4fa46d326dd0bf46b42b51132df5be6ca91ec35398acfb2625205c"
+  },
+  {
+    "path": "delivery/polygon-fallback/focused.log",
+    "bytes": 17579,
+    "sha256": "65598919be4b09969eaa75e5aede2e4ede1ba3db2175f0cc004291e3a98d7dd4"
+  },
+  {
+    "path": "delivery/polygon-fallback/full.log",
+    "bytes": 11775,
+    "sha256": "aa934e0649f6b8de8684a62d913b9c25a35e676d97207bc03c6044b7a91452b1"
+  },
+  {
+    "path": "delivery/polygon-fallback/green.log",
+    "bytes": 3583,
+    "sha256": "ecefdbd1538e037cf5b8b93f5604f950f790b20f33185259ee36d9cd79c41fa6"
+  },
+  {
+    "path": "delivery/polygon-fallback/implement.py",
+    "bytes": 3201,
+    "sha256": "ca1322d73c5d71147d2280b31287a5e30b04942497b4cd6596a3cbe042ae2465"
+  },
+  {
+    "path": "delivery/polygon-fallback/install-runtime.log",
+    "bytes": 154,
+    "sha256": "5a28dad0ac03a21884580d374822157c9432270be837d6d8a5615dc60e73e397"
+  },
+  {
+    "path": "delivery/polygon-fallback/installed-cli-help.txt",
+    "bytes": 18082,
+    "sha256": "eb76a71a7e1d822c66f05b008249b4f8a919606eaef552be00dc1a47381f8fc6"
+  },
+  {
+    "path": "delivery/polygon-fallback/installed-startup.json",
+    "bytes": 486,
+    "sha256": "7c1df2e4f324918b7bc9c07038a1f5d7ccd00d8e22af9608fdb7674022fad5c0"
+  },
+  {
+    "path": "delivery/polygon-fallback/installed-startup.log",
+    "bytes": 486,
+    "sha256": "7c1df2e4f324918b7bc9c07038a1f5d7ccd00d8e22af9608fdb7674022fad5c0"
+  },
+  {
+    "path": "delivery/polygon-fallback/installed-web.log",
+    "bytes": 570,
+    "sha256": "880a80c09ff10c57dc72647ae9ca5036533579b6f8ce14d12369d46c11cf552a"
+  },
+  {
+    "path": "delivery/polygon-fallback/model-reuse.txt",
+    "bytes": 162,
+    "sha256": "128bfef89f42b5b3419be6f3a81265762b8406d37e667ee0712cf9ad557cf77d"
+  },
+  {
+    "path": "delivery/polygon-fallback/packaging.json",
+    "bytes": 301,
+    "sha256": "2d0d39add71b187c5cd07c57901fe9352a99e7dbd1983fddfec7713c0569818c"
+  },
+  {
+    "path": "delivery/polygon-fallback/packaging.log",
+    "bytes": 301,
+    "sha256": "2d0d39add71b187c5cd07c57901fe9352a99e7dbd1983fddfec7713c0569818c"
+  },
+  {
+    "path": "delivery/polygon-fallback/pre-edit-replay.log",
+    "bytes": 1020036,
+    "sha256": "3a0ba5034367f081b9cbf35e4ae0a5a82fb5087f7785ba8e1e2869d6da4eae53"
+  },
+  {
+    "path": "delivery/polygon-fallback/precommit-check.log",
+    "bytes": 1077,
+    "sha256": "ea512bd1d7befe266d1e5bac550c36eb90196b746143ec25b0885017aa47af04"
+  },
+  {
+    "path": "delivery/polygon-fallback/red-container.log",
+    "bytes": 31265,
+    "sha256": "2c7f3be8adf7cb98996fba2697ed1b6d7a21aec90d98b620457a79356fae08ae"
+  },
+  {
+    "path": "delivery/polygon-fallback/red-exception.log",
+    "bytes": 11057,
+    "sha256": "84b2e71412563bdd43a0867ce361e46d3f5520cd4b68efdf07314f6cdf258260"
+  },
+  {
+    "path": "delivery/polygon-fallback/red-final.log",
+    "bytes": 1020132,
+    "sha256": "f8983e8de85a4eb3eb7a656c3fda80db1ea685901bbf55d018eb548e85e3331e"
+  },
+  {
+    "path": "delivery/polygon-fallback/red-replay.log",
+    "bytes": 1030968,
+    "sha256": "7f16a89b8885d7bed890940947f6567e22f2e3e41f0cee0e014133f968b17ae9"
+  },
+  {
+    "path": "delivery/polygon-fallback/red.log",
+    "bytes": 1046851,
+    "sha256": "a2997503caa6a8fcc0de9bb1eb93b01cd4a49eb99f04247ab3b70d73951842e4"
+  },
+  {
+    "path": "delivery/polygon-fallback/sitecustomize.py",
+    "bytes": 1449,
+    "sha256": "64bffa9ad481d49e16d3da35a8300065df4b5cd175a2b686e5de4b49c728ec05"
+  },
+  {
+    "path": "delivery/polygon-fallback/stable-source-sha256.json",
+    "bytes": 11566,
+    "sha256": "6cb08f9301ae5e8162071e744111ea870376dbd5b91baa6377c76ff6abefa8d6"
+  },
+  {
+    "path": "delivery/polygon-fallback/task162_isolation.py",
+    "bytes": 1855,
+    "sha256": "76410f20e0a4226cfaf200ab8d0aa0166a9179dc6a51d64b8df6300ffb69a853"
+  },
+  {
+    "path": "delivery/polygon-fallback/tested-source-sha256.json",
+    "bytes": 11566,
+    "sha256": "6cb08f9301ae5e8162071e744111ea870376dbd5b91baa6377c76ff6abefa8d6"
+  },
+  {
+    "path": "delivery/polygon-fallback/write_tests.py",
+    "bytes": 11912,
+    "sha256": "1c18ceeb6d5eefa95cee83bd02c06e254a9e20332c908a4033fceec6e2df8a6e"
+  },
+  {
     "path": "delivery/readable-report-serialization/add_tests.py",
     "bytes": 5449,
     "sha256": "28ea7da8f411768de273b5f4a3420346c6ef0fc9f61fb98ee2d1cfecf313c947"
@@ -5438,6 +5633,26 @@
     "path": "delivery/task-161-review.md",
     "bytes": 8821,
     "sha256": "1f31f94f7468801a3f5cf76af9c4aad4280990dcaadda9ea90982e7e936bd56f"
+  },
+  {
+    "path": "delivery/task-162-brief.md",
+    "bytes": 4879,
+    "sha256": "df701f4467fd19fc933bd5f95a4b650d7401529e1446c8c20c2557afe42531c5"
+  },
+  {
+    "path": "delivery/task-162-pr.md",
+    "bytes": 1910,
+    "sha256": "aaa76c2286d827666313291e383be5d1e8a63f5502e7f12266cd8a2225f20b9c"
+  },
+  {
+    "path": "delivery/task-162-report.md",
+    "bytes": 17207,
+    "sha256": "bec3eed5ea01fafc3809b4f53c6aad35e6fc94df4b9c9001a7b91e7b058b0752"
+  },
+  {
+    "path": "delivery/task-162-review.md",
+    "bytes": 7755,
+    "sha256": "1f93690ddeb7b9e940a5a744b2b22506a70eb5065f08d1df889b238121e6d0b0"
   },
   {
     "path": "delivery/task-2-brief.md",

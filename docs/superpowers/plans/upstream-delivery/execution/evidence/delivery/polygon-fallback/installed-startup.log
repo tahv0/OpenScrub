@@ -1,0 +1,12 @@
+{
+  "active_installed_sources": {
+    "engine": "/tmp/openscrub-task162/installed/site-packages/openscrub.py",
+    "web": "/tmp/openscrub-task162/installed/site-packages/openscrub_web.py",
+    "jobs": "/tmp/openscrub-task162/installed-profile-cv2yjg41/.local/share/OpenScrub/openscrub_jobs"
+  },
+  "cli_help": true,
+  "web_homepage_and_empty_jobs_http200": true,
+  "sigterm_rc": 0,
+  "clean_profile": "/tmp/openscrub-task162/installed-profile-cv2yjg41",
+  "cli_defaults": "unchanged"
+}

@@ -1,0 +1,62 @@
+TASK162_ACTIVE_SOURCE {"python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]", "sources": {"openscrub": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py", "sha256": "d3f87fb77b8f855c730caea5c78c7e7ccb5c8c83a0c0ead40872e4c77f0d33eb"}, "openscrub_web": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", "sha256": "9835e1137abee62c0a78e2669ed8bae7059e36bf4bed9f5c7a44f0eb8b40ed3a"}, "zones_ui": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/zones_ui.py", "sha256": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7"}}}
+......................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................      encoder: libx264 (CPU)
+      encoder: libx264 (CPU)
+.      encoder: libx265 10-bit (CPU)
+      HDR preserved: 10-bit HEVC, color tags color_primaries=bt2020, color_trc=smpte2084, colorspace=bt2020nc
+      encoder: libx265 10-bit (CPU)
+      HDR preserved: 10-bit HEVC, color tags color_primaries=bt2020, color_trc=smpte2084, colorspace=bt2020nc
+.      encoder: libx264 (CPU)
+      encoder: libx264 (CPU)
+.      encoder: libx265 10-bit (CPU)
+      HDR preserved: 10-bit HEVC, color tags color_primaries=bt2020, color_trc=smpte2084, colorspace=bt2020nc
+      encoder: libx265 10-bit (CPU)
+      HDR preserved: 10-bit HEVC, color tags color_primaries=bt2020, color_trc=smpte2084, colorspace=bt2020nc
+.      encoder: libx264 (CPU)
+      encoder: libx264 (CPU)
+.      encoder: libx265 10-bit (CPU)
+      HDR preserved: 10-bit HEVC, color tags color_primaries=bt2020, color_trc=smpte2084, colorspace=bt2020nc
+      encoder: libx265 10-bit (CPU)
+      HDR preserved: 10-bit HEVC, color tags color_primaries=bt2020, color_trc=smpte2084, colorspace=bt2020nc
+.      encoder: libx264 (CPU)
+      encoder: libx264 (CPU)
+.      encoder: libx265 10-bit (CPU)
+      HDR preserved: 10-bit HEVC, color tags color_primaries=bt2020, color_trc=smpte2084, colorspace=bt2020nc
+      encoder: libx265 10-bit (CPU)
+      HDR preserved: 10-bit HEVC, color tags color_primaries=bt2020, color_trc=smpte2084, colorspace=bt2020nc
+.      encoder: libx264 (CPU)
+      encoder: libx264 (CPU)
+.      encoder: libx265 10-bit (CPU)
+      HDR preserved: 10-bit HEVC, color tags color_primaries=bt2020, color_trc=smpte2084, colorspace=bt2020nc
+      encoder: libx265 10-bit (CPU)
+      HDR preserved: 10-bit HEVC, color tags color_primaries=bt2020, color_trc=smpte2084, colorspace=bt2020nc
+.      encoder: libx264 (CPU)
+      encoder: libx264 (CPU)
+.      encoder: libx265 10-bit (CPU)
+      HDR preserved: 10-bit HEVC, color tags color_primaries=bt2020, color_trc=smpte2084, colorspace=bt2020nc
+      encoder: libx265 10-bit (CPU)
+      HDR preserved: 10-bit HEVC, color tags color_primaries=bt2020, color_trc=smpte2084, colorspace=bt2020nc
+.      encoder: libx264 (CPU)
+      encoder: libx264 (CPU)
+.      encoder: libx265 10-bit (CPU)
+      HDR preserved: 10-bit HEVC, color tags color_primaries=bt2020, color_trc=smpte2084, colorspace=bt2020nc
+      encoder: libx265 10-bit (CPU)
+      HDR preserved: 10-bit HEVC, color tags color_primaries=bt2020, color_trc=smpte2084, colorspace=bt2020nc
+.      note: h264_nvenc failed its test encode — trying the next encoder. ffmpeg said:
+            [h264_nvenc @ 0x58c55338f6c0] dl_fn->cuda_dl->cuInit(0) failed
+      note: h264_qsv failed its test encode — trying the next encoder. ffmpeg said:
+            [h264_qsv @ 0x5faef16056c0] Error creating a MFX session: -9.
+            [vost#0:0/h264_qsv @ 0x5faef1605080] [enc:h264_qsv @ 0x5faef1605640] Error while opening encoder - maybe incorrect parameters such as bit_rate, rate, width or height.
+            [vf#0:0 @ 0x5faef1606340] Error sending frames to consumers: Unknown error occurred
+            [vf#0:0 @ 0x5faef1606340] Task finished with error code: -1313558101 (Unknown error occurred)
+            [vf#0:0 @ 0x5faef1606340] Terminating thread with return code -1313558101 (Unknown error occurred)
+            [vost#0:0/h264_qsv @ 0x5faef1605080] [enc:h264_qsv @ 0x5faef1605640] Could not open encoder before EOF
+            [vost#0:0/h264_qsv @ 0x5faef1605080] Task finished with error code: -22 (Invalid argument)
+            [vost#0:0/h264_qsv @ 0x5faef1605080] Terminating thread with return code -22 (Invalid argument)
+            [out#0/null @ 0x5faef1604c80] Nothing was written into output file, because at least one of its streams received no packets.
+      input is HDR10/PQ HDR — tone-mapping a copy to SDR (BT.709) for detection
+      HDR output: preserving HDR10/PQ — 10-bit HEVC via libx265
+      NOTE: the GPU here can't encode 10-bit HEVC — HDR will be processed on the CPU (libx265), which is MUCH slower. Choose SDR output for full speed.
+....      person detector: no model installed — person category INACTIVE this scan. Download one in Settings → Detection models (one click, hash-verified), or place a YOLO ONNX at models/person_yolov8.onnx or set $OPENSCRUB_PERSON_MODEL.
+..      encoder: libx264 (CPU)
+..
+556 passed, 126 deselected in 16.62s
