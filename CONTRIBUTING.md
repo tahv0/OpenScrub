@@ -38,6 +38,8 @@ suite. Save As behavior tests execute the real embedded JavaScript with Node.js
 The HDR chroma encoder-input regressions also use synthetic FFmpeg/libx265 media.
 
 
+The literal job-name display regressions evaluate emitted JavaScript with Node.js.
+
 For web UI changes, also boot `python openscrub_web.py` and click through
 what you touched — and note the PAGE string is a normal (non-raw) Python
 string, so backslashes in embedded JS need doubling. For engine changes,
