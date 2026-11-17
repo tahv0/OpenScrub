@@ -3882,6 +3882,56 @@ def _rate_cap_args(codec, out_quality, w, h, fps):
     return ["-maxrate", str(cap), "-bufsize", str(2 * cap)]
 
 
+def _stop_render_children(children):
+    """Abort only these render children, then close their owned pipe ends.
+
+    This bound applies after Python regains control, never to native IO.
+    Normal EOF/final encoder waits remain unbounded in the renderers.
+    """
+    children = [child for child in children if child is not None]
+    errors = []
+    # Stop every producer/consumer before closing a buffered stream, whose
+    # flush could otherwise block behind a child that has stopped reading.
+    for child in children:
+        try:
+            if child.poll() is None:
+                child.terminate()
+        except ProcessLookupError:
+            pass
+        except BaseException as error:
+            errors.append(error)
+    for child in children:
+        try:
+            child.wait(timeout=2)
+        except BaseException as error:
+            if not isinstance(error, subprocess.TimeoutExpired):
+                errors.append(error)
+            try:
+                child.kill()
+            except ProcessLookupError:
+                pass
+            except BaseException as error:
+                errors.append(error)
+            try:
+                child.wait(timeout=2)
+            except BaseException as error:
+                errors.append(error)
+        for name in ("stdin", "stdout", "stderr"):
+            stream = getattr(child, name, None)
+            if stream is not None:
+                try:
+                    if child.returncode is None and hasattr(stream, "raw"):
+                        # Failed kill/reap must not strand us in a buffered
+                        # flush to a consumer that may still be alive.
+                        stream.raw.close()
+                    stream.close()
+                except BrokenPipeError:
+                    pass  # the stopped consumer cannot accept buffered input
+                except BaseException as error:
+                    errors.append(error)
+    return errors
+
+
 def render_hdr(src, dst, detections, cum, bands, fps, pad, mode,
                encoder, tags, band_margin=25, progress_every=60, cb=None,
                mode_map=None, face_shape="ellipse", audio_spans=None,
@@ -3895,168 +3945,186 @@ def render_hdr(src, dst, detections, cum, bands, fps, pad, mode,
     def _mode_for(cat):
         return mode_map.get(cat, mode)
     cb = cb or Callbacks()
-    meta = cv2.VideoCapture(src)
-    w = int(meta.get(cv2.CAP_PROP_FRAME_WIDTH))
-    h = int(meta.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    total = int(meta.get(cv2.CAP_PROP_FRAME_COUNT))
-    meta.release()
-    cb.log(f"      encoder: {encoder} 10-bit"
-           + (" (GPU)" if encoder.endswith(("_nvenc", "_qsv")) else " (CPU)"))
-
-    dec = subprocess.Popen(
-        ["ffmpeg", "-loglevel", "error", "-i", src,
-         "-f", "rawvideo", "-pix_fmt", "yuv420p10le", "pipe:1"],
-        stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-        bufsize=w * h * 6)
-    q = _out_q(encoder, out_quality)
-    vargs = (["-c:v", "hevc_nvenc", "-preset", "p4", "-cq", q,
-              "-profile:v", "main10", "-pix_fmt", "p010le"]
-             if encoder == "hevc_nvenc" else
-             ["-c:v", "hevc_qsv", "-preset", "medium",
-              "-global_quality", q, "-profile:v", "main10",
-              "-pix_fmt", "p010le"]
-             if encoder == "hevc_qsv" else
-             ["-c:v", "libx265", "-crf", q, "-preset", "fast",
-              "-pix_fmt", "yuv420p10le"])
-    vargs += _rate_cap_args(encoder, out_quality, w, h, fps)
-
-    # Explicitly signal HDR color properties in the x265 bitstream.
-    # Generic FFmpeg color flags alone are not reliable on every build.
-    if encoder == "libx265":
-        x265_names = {
-            "-color_primaries": "colorprim",
-            "-color_trc": "transfer",
-            "-colorspace": "colormatrix",
-        }
-        x265_tags = ":".join(
-            f"{x265_names[flag]}={value}"
-            for flag, value in (tags or {}).items()
-            if flag in x265_names
-        )
-        if x265_tags:
-            vargs += ["-x265-params", x265_tags]
-
-    targs = [a for kv in (tags or {}).items() for a in kv]
-    if os.path.splitext(dst)[1].lower() in (".mp4", ".mov"):
-        targs += ["-tag:v", "hvc1"]          # QuickTime/Apple compatibility
-    amap, acodec = audio_ffmpeg_args(
-        src, audio_spans, mute_tracks=mute_tracks,
-        container=os.path.splitext(dst)[1] or ".mp4",
-        lane_count=audio_lanes, log=cb.log)
-    ff_err = tempfile.TemporaryFile()   # see render(): names the cause
-    enc = subprocess.Popen(
-        ["ffmpeg", "-y", "-loglevel", "error",
-         "-f", "rawvideo", "-pix_fmt", "yuv420p10le",
-         "-s", f"{w}x{h}", "-r", f"{fps:.6f}", "-i", "pipe:0",
-         "-i", src, "-map", "0:v:0", *amap,
-         # a redacted file must not carry the source's GPS position,
-         # capture time, or device identifiers — strip ALL container and
-         # stream metadata (the explicit color tags above are encoder
-         # flags, not metadata, so HDR signalling survives)
-         "-map_metadata", "-1", "-map_chapters", "-1",
-         *vargs, *targs, *acodec, dst],
-        stdin=subprocess.PIPE, stderr=ff_err)
-
-    buckets = {}
-    for d in detections:
-        for s in range(int(d.t_start), int(d.t_end) + 2):
-            buckets.setdefault(s, []).append(d)
-
-    ysz, csz = w * h, (w // 2) * (h // 2)
-    fbytes = (ysz + 2 * csz) * 2
-
-    def cleanup_partial():
-        for pr in (dec, enc):
-            try:
-                if pr is enc:
-                    pr.stdin.close()
-                else:
-                    pr.stdout.close()
-            except Exception:
-                pass
-            pr.terminate()
-            pr.wait()
-        if os.path.exists(dst):
-            try:
-                os.remove(dst)
-            except OSError:
-                pass
-
-    idx = 0
-    while True:
-        if idx % 30 == 0 and cb.cancelled():
-            cleanup_partial()
-            raise PipelineCancelled()
-        raw = dec.stdout.read(fbytes)
-        if len(raw) < fbytes:
-            break
-        buf = np.frombuffer(raw, dtype=np.uint16).copy()
-        y = buf[:ysz].reshape(h, w)
-        u = buf[ysz:ysz + csz].reshape(h // 2, w // 2)
-        v = buf[ysz + csz:].reshape(h // 2, w // 2)
-        t = idx / fps
-        ox, oy = cum[min(idx, len(cum) - 1)]
-
-        act = [d for d in buckets.get(int(t), [])
-               if d.t_start - 0.01 <= t <= d.t_end + 0.01]
-        for d in _dedupe_dense(act):
-            drift = min(24.0, 0.05 * (abs(ox - d.aoff[0]) + abs(oy - d.aoff[1])))
-            px = pad + drift
-            if d.poly:
-                _blur_silhouette_yuv10(
-                    y, u, v, d.cbox[0] + ox - px, d.cbox[1] + oy - px,
-                    d.cbox[2] + ox + px, d.cbox[3] + oy + px,
-                    _mode_for(d.category), d.poly,
-                    (d.cbox[0] + ox, d.cbox[1] + oy,
-                     d.cbox[2] + ox, d.cbox[3] + oy), pad_px=px)
-            else:
-                _blur_yuv10(y, u, v, d.cbox[0] + ox - px, d.cbox[1] + oy - px,
-                            d.cbox[2] + ox + px, d.cbox[3] + oy + px,
-                            _mode_for(d.category),
-                            shape=("ellipse" if d.category == "face"
-                                   and face_shape == "ellipse" else "rect"))
-
-        bx, by = bands[min(idx, len(bands) - 1)]
-        vals = set(mode_map.values()) | {mode}
-        band_mode = ("box" if ("box" in vals or "inpaint" in vals)
-                     else "mosaic" if "mosaic" in vals else "blur")
-        def band(x1, y1_, x2, y2_):
-            _blur_yuv10(y, u, v, x1, y1_, x2, y2_, band_mode)
-        if by < -2:
-            band(0, h - (abs(by) + band_margin), w, h)
-        elif by > 2:
-            band(0, 0, w, by + band_margin)
-        if bx < -2:
-            band(w - (abs(bx) + band_margin), 0, w, h)
-        elif bx > 2:
-            band(0, 0, bx + band_margin, h)
-
-        try:
-            enc.stdin.write(buf.tobytes())
-        except (BrokenPipeError, OSError):
-            rc = enc.wait()
-            err = _ffmpeg_failure(ff_err, "HDR encode", rc)
-            cleanup_partial()
-            raise err
-        idx += 1
-        if idx % progress_every == 0:
-            cb.progress("render", idx, total)
-        if idx % 300 == 0:
-            cb.log(f"  rendering… {idx}/{max(total, idx)}")
-
-    dec.stdout.close()
-    dec.wait()
-    cb.progress("render", max(total, idx), max(total, idx))
+    meta = dec = enc = ff_err = None
+    remove_partial = False
+    cleanup_errors = []
     try:
-        enc.stdin.close()
-    except (BrokenPipeError, OSError):
-        pass                        # exit code + stderr say why below
-    rc = enc.wait()
-    if rc != 0:
-        raise _ffmpeg_failure(ff_err, "HDR encode", rc)
-    cb.log(f"      HDR preserved: 10-bit HEVC, color tags "
-           + (", ".join(f"{k.lstrip('-')}={v}" for k, v in (tags or {}).items())
-              or "(none in source)"))
+        meta = cv2.VideoCapture(src)
+        w = int(meta.get(cv2.CAP_PROP_FRAME_WIDTH))
+        h = int(meta.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        total = int(meta.get(cv2.CAP_PROP_FRAME_COUNT))
+        meta.release()
+        meta = None
+        cb.log(f"      encoder: {encoder} 10-bit"
+               + (" (GPU)" if encoder.endswith(("_nvenc", "_qsv")) else " (CPU)"))
+
+        dec = subprocess.Popen(
+            ["ffmpeg", "-loglevel", "error", "-i", src,
+             "-f", "rawvideo", "-pix_fmt", "yuv420p10le", "pipe:1"],
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+            bufsize=w * h * 6)
+        q = _out_q(encoder, out_quality)
+        vargs = (["-c:v", "hevc_nvenc", "-preset", "p4", "-cq", q,
+                  "-profile:v", "main10", "-pix_fmt", "p010le"]
+                 if encoder == "hevc_nvenc" else
+                 ["-c:v", "hevc_qsv", "-preset", "medium",
+                  "-global_quality", q, "-profile:v", "main10",
+                  "-pix_fmt", "p010le"]
+                 if encoder == "hevc_qsv" else
+                 ["-c:v", "libx265", "-crf", q, "-preset", "fast",
+                  "-pix_fmt", "yuv420p10le"])
+        vargs += _rate_cap_args(encoder, out_quality, w, h, fps)
+
+        # Explicitly signal HDR color properties in the x265 bitstream.
+        # Generic FFmpeg color flags alone are not reliable on every build.
+        if encoder == "libx265":
+            x265_names = {
+                "-color_primaries": "colorprim",
+                "-color_trc": "transfer",
+                "-colorspace": "colormatrix",
+            }
+            x265_tags = ":".join(
+                f"{x265_names[flag]}={value}"
+                for flag, value in (tags or {}).items()
+                if flag in x265_names
+            )
+            if x265_tags:
+                vargs += ["-x265-params", x265_tags]
+
+        targs = [a for kv in (tags or {}).items() for a in kv]
+        if os.path.splitext(dst)[1].lower() in (".mp4", ".mov"):
+            targs += ["-tag:v", "hvc1"]          # QuickTime/Apple compatibility
+        amap, acodec = audio_ffmpeg_args(
+            src, audio_spans, mute_tracks=mute_tracks,
+            container=os.path.splitext(dst)[1] or ".mp4",
+            lane_count=audio_lanes, log=cb.log)
+        ff_err = tempfile.TemporaryFile()   # see render(): names the cause
+        enc = subprocess.Popen(
+            ["ffmpeg", "-y", "-loglevel", "error",
+             "-f", "rawvideo", "-pix_fmt", "yuv420p10le",
+             "-s", f"{w}x{h}", "-r", f"{fps:.6f}", "-i", "pipe:0",
+             "-i", src, "-map", "0:v:0", *amap,
+             # a redacted file must not carry the source's GPS position,
+             # capture time, or device identifiers — strip ALL container and
+             # stream metadata (the explicit color tags above are encoder
+             # flags, not metadata, so HDR signalling survives)
+             "-map_metadata", "-1", "-map_chapters", "-1",
+             *vargs, *targs, *acodec, dst],
+            stdin=subprocess.PIPE, stderr=ff_err)
+
+        buckets = {}
+        for d in detections:
+            for s in range(int(d.t_start), int(d.t_end) + 2):
+                buckets.setdefault(s, []).append(d)
+
+        ysz, csz = w * h, (w // 2) * (h // 2)
+        fbytes = (ysz + 2 * csz) * 2
+
+        idx = 0
+        while True:
+            if idx % 30 == 0 and cb.cancelled():
+                remove_partial = True
+                raise PipelineCancelled()
+            raw = dec.stdout.read(fbytes)
+            if len(raw) < fbytes:
+                break
+            buf = np.frombuffer(raw, dtype=np.uint16).copy()
+            y = buf[:ysz].reshape(h, w)
+            u = buf[ysz:ysz + csz].reshape(h // 2, w // 2)
+            v = buf[ysz + csz:].reshape(h // 2, w // 2)
+            t = idx / fps
+            ox, oy = cum[min(idx, len(cum) - 1)]
+
+            act = [d for d in buckets.get(int(t), [])
+                   if d.t_start - 0.01 <= t <= d.t_end + 0.01]
+            for d in _dedupe_dense(act):
+                drift = min(24.0, 0.05 * (abs(ox - d.aoff[0]) + abs(oy - d.aoff[1])))
+                px = pad + drift
+                if d.poly:
+                    _blur_silhouette_yuv10(
+                        y, u, v, d.cbox[0] + ox - px, d.cbox[1] + oy - px,
+                        d.cbox[2] + ox + px, d.cbox[3] + oy + px,
+                        _mode_for(d.category), d.poly,
+                        (d.cbox[0] + ox, d.cbox[1] + oy,
+                         d.cbox[2] + ox, d.cbox[3] + oy), pad_px=px)
+                else:
+                    _blur_yuv10(y, u, v, d.cbox[0] + ox - px, d.cbox[1] + oy - px,
+                                d.cbox[2] + ox + px, d.cbox[3] + oy + px,
+                                _mode_for(d.category),
+                                shape=("ellipse" if d.category == "face"
+                                       and face_shape == "ellipse" else "rect"))
+
+            bx, by = bands[min(idx, len(bands) - 1)]
+            vals = set(mode_map.values()) | {mode}
+            band_mode = ("box" if ("box" in vals or "inpaint" in vals)
+                         else "mosaic" if "mosaic" in vals else "blur")
+            def band(x1, y1_, x2, y2_):
+                _blur_yuv10(y, u, v, x1, y1_, x2, y2_, band_mode)
+            if by < -2:
+                band(0, h - (abs(by) + band_margin), w, h)
+            elif by > 2:
+                band(0, 0, w, by + band_margin)
+            if bx < -2:
+                band(w - (abs(bx) + band_margin), 0, w, h)
+            elif bx > 2:
+                band(0, 0, bx + band_margin, h)
+
+            try:
+                enc.stdin.write(buf.tobytes())
+            except (BrokenPipeError, OSError):
+                remove_partial = True
+                cleanup_errors.extend(_stop_render_children((dec, enc)))
+                rc = enc.returncode
+                err = _ffmpeg_failure(ff_err, "HDR encode", rc)
+                raise err
+            idx += 1
+            if idx % progress_every == 0:
+                cb.progress("render", idx, total)
+            if idx % 300 == 0:
+                cb.log(f"  rendering… {idx}/{max(total, idx)}")
+
+        dec.stdout.close()
+        dec.wait()
+        cb.progress("render", max(total, idx), max(total, idx))
+        try:
+            enc.stdin.close()
+        except (BrokenPipeError, OSError):
+            pass                        # exit code + stderr say why below
+        rc = enc.wait()
+        if rc != 0:
+            raise _ffmpeg_failure(ff_err, "HDR encode", rc)
+        cb.log(f"      HDR preserved: 10-bit HEVC, color tags "
+               + (", ".join(f"{k.lstrip('-')}={v}" for k, v in (tags or {}).items())
+                  or "(none in source)"))
+    finally:
+        primary = sys.exc_info()[1]
+        cleanup_errors.extend(_stop_render_children((dec, enc)))
+        for resource, action in ((meta, "release"), (ff_err, "close")):
+            if resource is not None:
+                try:
+                    getattr(resource, action)()
+                except BaseException as error:
+                    cleanup_errors.append(error)
+        # Closure and the existing cancellation/write-error deletion policy
+        # are separate: arbitrary setup/frame errors must not unlink dst.
+        if remove_partial:
+            for path in (dst,):
+                if path:
+                    try:
+                        os.remove(path)
+                    except OSError:
+                        pass
+        if cleanup_errors:
+            if primary is None:
+                raise cleanup_errors[0]
+            # Python 3.9 has neither add_note nor ExceptionGroup. Preserve
+            # the actual primary exception and expose bounded diagnostics.
+            try:
+                primary.render_cleanup_errors = tuple(
+                    f"{type(error).__name__}: {str(error)[:300]}"
+                    for error in cleanup_errors[:8])
+            except BaseException:
+                pass
 
 
 def render(src, dst, detections, cum, bands, fps, pad, mode, preview,
@@ -4071,232 +4139,248 @@ def render(src, dst, detections, cum, bands, fps, pad, mode, preview,
     def _mode_for(cat):
         return mode_map.get(cat, mode)
     cb = cb or Callbacks()
-    cap = cv2.VideoCapture(src)
-    w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    cap = proc = out = ff_err = tmp_video = None
+    remove_partial = False
+    cleanup_errors = []
+    try:
+        cap = cv2.VideoCapture(src)
+        w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
-    # --- output sink: single-pass ffmpeg pipe (NVENC if available) ---
-    proc = None
-    ff_err = None
-    out = None
-    tmp_video = None
-    codec = nvenc_available(encoder, cb)
-    if vcodec == "hevc" and codec:
-        henc = hevc10_encoder(encoder, cb)   # verified hevc encoder ladder
-        if henc is None:
-            cb.log("      note: no HEVC encoder available — falling back "
-                   "to H.264")
+        # --- output sink: single-pass ffmpeg pipe (NVENC if available) ---
+        codec = nvenc_available(encoder, cb)
+        if vcodec == "hevc" and codec:
+            henc = hevc10_encoder(encoder, cb)   # verified hevc encoder ladder
+            if henc is None:
+                cb.log("      note: no HEVC encoder available — falling back "
+                       "to H.264")
+            else:
+                codec = henc
+        if codec:
+            cb.log(f"      encoder: {codec}"
+                   + (" (GPU)" if codec.endswith(("_nvenc", "_qsv"))
+                      else " (CPU)"))
+            q = _out_q(codec, out_quality)
+            if codec == "h264_nvenc":
+                vargs = ["-c:v", "h264_nvenc", "-preset", "p4", "-cq", q]
+            elif codec == "hevc_nvenc":
+                vargs = ["-c:v", "hevc_nvenc", "-preset", "p4", "-cq", q]
+            elif codec == "h264_qsv":
+                vargs = ["-c:v", "h264_qsv", "-preset", "medium",
+                         "-global_quality", q]
+            elif codec == "hevc_qsv":
+                vargs = ["-c:v", "hevc_qsv", "-preset", "medium",
+                         "-global_quality", q]
+            elif codec == "libx265":
+                vargs = ["-c:v", "libx265", "-crf", q, "-preset", "fast"]
+            else:
+                vargs = ["-c:v", "libx264", "-crf", q, "-preset", "fast"]
+            vargs += _rate_cap_args(codec, out_quality, w, h, fps)
+            if codec in ("hevc_nvenc", "hevc_qsv", "libx265") \
+                    and os.path.splitext(dst)[1].lower() in (".mp4", ".mov"):
+                vargs += ["-tag:v", "hvc1"]      # QuickTime/Apple compatibility
+            # output trim ("keep bookends"): only [cs, ce] of the video reaches
+            # the output. The piped video restarts at 0, so the audio input is
+            # seeked the same way and any redaction spans shift accordingly.
+            cs, ce = (clip if clip else (0.0, None))
+            aspans_eff = audio_spans
+            ain_opts = []
+            if clip:
+                ain_opts = ["-ss", f"{cs:.3f}"] + (
+                    ["-to", f"{ce:.3f}"] if ce is not None else [])
+                aspans_eff = [(max(0.0, a - cs), b - cs, m)
+                              for a, b, m in (audio_spans or [])
+                              if b > cs and (ce is None or a < ce)]
+                cb.log(f"      output trim: keeping {cs:.1f}s"
+                       f"–{(ce if ce is not None else 'end')}"
+                       + ("s" if ce is not None else ""))
+            amap, acodec = audio_ffmpeg_args(
+                src, aspans_eff, mute_tracks=mute_tracks,
+                container=os.path.splitext(dst)[1] or ".mp4",
+                lane_count=audio_lanes, log=cb.log)
+            if aspans_eff and amap:
+                cb.log("      audio: %d span(s) redacted (%s)" % (
+                    len(aspans_eff),
+                    ", ".join(sorted({m for _, _, m in aspans_eff}))))
+            cmd = ["ffmpeg", "-y", "-loglevel", "error",
+                   "-f", "rawvideo", "-pix_fmt", "bgr24",
+                   "-s", f"{w}x{h}", "-r", f"{fps:.6f}", "-i", "pipe:0",
+                   *ain_opts, "-i", src, "-map", "0:v:0", *amap,
+                   # a redacted file must not carry the source's GPS
+                   # position, capture time, or device identifiers — strip
+                   # ALL container and stream metadata
+                   "-map_metadata", "-1", "-map_chapters", "-1",
+                   *vargs, "-pix_fmt", "yuv420p", *acodec, dst]
+            # ffmpeg's stderr goes to a temp FILE (a pipe could fill and
+            # deadlock the frame writes): when the encoder dies, its own
+            # error message is what the job log needs — a bare "[Errno 32]
+            # Broken pipe" diagnosed nothing
+            ff_err = tempfile.TemporaryFile()
+            gpu_hint = ("if it persists, try the x264 encoder"
+                        if codec.endswith(("_nvenc", "_qsv")) else "")
+            proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stderr=ff_err)
         else:
-            codec = henc
-    if codec:
-        cb.log(f"      encoder: {codec}"
-               + (" (GPU)" if codec.endswith(("_nvenc", "_qsv"))
-                  else " (CPU)"))
-        q = _out_q(codec, out_quality)
-        if codec == "h264_nvenc":
-            vargs = ["-c:v", "h264_nvenc", "-preset", "p4", "-cq", q]
-        elif codec == "hevc_nvenc":
-            vargs = ["-c:v", "hevc_nvenc", "-preset", "p4", "-cq", q]
-        elif codec == "h264_qsv":
-            vargs = ["-c:v", "h264_qsv", "-preset", "medium",
-                     "-global_quality", q]
-        elif codec == "hevc_qsv":
-            vargs = ["-c:v", "hevc_qsv", "-preset", "medium",
-                     "-global_quality", q]
-        elif codec == "libx265":
-            vargs = ["-c:v", "libx265", "-crf", q, "-preset", "fast"]
-        else:
-            vargs = ["-c:v", "libx264", "-crf", q, "-preset", "fast"]
-        vargs += _rate_cap_args(codec, out_quality, w, h, fps)
-        if codec in ("hevc_nvenc", "hevc_qsv", "libx265") \
-                and os.path.splitext(dst)[1].lower() in (".mp4", ".mov"):
-            vargs += ["-tag:v", "hvc1"]      # QuickTime/Apple compatibility
-        # output trim ("keep bookends"): only [cs, ce] of the video reaches
-        # the output. The piped video restarts at 0, so the audio input is
-        # seeked the same way and any redaction spans shift accordingly.
-        cs, ce = (clip if clip else (0.0, None))
-        aspans_eff = audio_spans
-        ain_opts = []
-        if clip:
-            ain_opts = ["-ss", f"{cs:.3f}"] + (
-                ["-to", f"{ce:.3f}"] if ce is not None else [])
-            aspans_eff = [(max(0.0, a - cs), b - cs, m)
-                          for a, b, m in (audio_spans or [])
-                          if b > cs and (ce is None or a < ce)]
-            cb.log(f"      output trim: keeping {cs:.1f}s"
-                   f"–{(ce if ce is not None else 'end')}"
-                   + ("s" if ce is not None else ""))
-        amap, acodec = audio_ffmpeg_args(
-            src, aspans_eff, mute_tracks=mute_tracks,
-            container=os.path.splitext(dst)[1] or ".mp4",
-            lane_count=audio_lanes, log=cb.log)
-        if aspans_eff and amap:
-            cb.log("      audio: %d span(s) redacted (%s)" % (
-                len(aspans_eff),
-                ", ".join(sorted({m for _, _, m in aspans_eff}))))
-        cmd = ["ffmpeg", "-y", "-loglevel", "error",
-               "-f", "rawvideo", "-pix_fmt", "bgr24",
-               "-s", f"{w}x{h}", "-r", f"{fps:.6f}", "-i", "pipe:0",
-               *ain_opts, "-i", src, "-map", "0:v:0", *amap,
-               # a redacted file must not carry the source's GPS
-               # position, capture time, or device identifiers — strip
-               # ALL container and stream metadata
-               "-map_metadata", "-1", "-map_chapters", "-1",
-               *vargs, "-pix_fmt", "yuv420p", *acodec, dst]
-        # ffmpeg's stderr goes to a temp FILE (a pipe could fill and
-        # deadlock the frame writes): when the encoder dies, its own
-        # error message is what the job log needs — a bare "[Errno 32]
-        # Broken pipe" diagnosed nothing
-        ff_err = tempfile.TemporaryFile()
-        gpu_hint = ("if it persists, try the x264 encoder"
-                    if codec.endswith(("_nvenc", "_qsv")) else "")
-        proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stderr=ff_err)
-    else:
-        if audio_spans:
-            cb.log("      WARNING: audio redaction requires ffmpeg — the "
-                   "OpenCV fallback writes NO audio at all.")
-        cb.log("      encoder: OpenCV mp4v (ffmpeg not found — no audio!)")
-        tmp_video = dst + ".noaudio.mp4"
-        out = cv2.VideoWriter(tmp_video, cv2.VideoWriter_fourcc(*"mp4v"),
-                              fps, (w, h))
+            if audio_spans:
+                cb.log("      WARNING: audio redaction requires ffmpeg — the "
+                       "OpenCV fallback writes NO audio at all.")
+            cb.log("      encoder: OpenCV mp4v (ffmpeg not found — no audio!)")
+            tmp_video = dst + ".noaudio.mp4"
+            out = cv2.VideoWriter(tmp_video, cv2.VideoWriter_fourcc(*"mp4v"),
+                                  fps, (w, h))
+            if not out.isOpened():
+                raise RuntimeError("Could not open output VideoWriter")
 
-    buckets = {}
-    for d in detections:
-        for s in range(int(d.t_start), int(d.t_end) + 2):
-            buckets.setdefault(s, []).append(d)
+        buckets = {}
+        for d in detections:
+            for s in range(int(d.t_start), int(d.t_end) + 2):
+                buckets.setdefault(s, []).append(d)
 
-    def cleanup_partial():
+        idx = 0
+        if clip and clip[0] > 0.5:
+            tgt = int(clip[0] * fps)
+            if _seek_cap(cap, tgt, fps):     # verified — a lying seek would
+                idx = tgt                    # shift the whole trimmed render
+            # unseekable: decode from 0; the undershoot guard below skips
+            # frames before the clip start one by one
+        while True:
+            if idx % 30 == 0 and cb.cancelled():
+                remove_partial = True
+                raise PipelineCancelled()
+            ok, frame = cap.read()
+            if not ok:
+                break
+            t = idx / fps
+            if clip:
+                if t < clip[0] - 1e-6:          # seek undershoot guard
+                    idx += 1
+                    continue
+                if clip[1] is not None and t > clip[1] + 1e-6:
+                    break                       # keep-window over: stop encoding
+            ox, oy = cum[min(idx, len(cum) - 1)]
+
+            # 1. tracked PII boxes, translated by scroll offset
+            act = [d for d in buckets.get(int(t), [])
+                   if d.t_start - 0.01 <= t <= d.t_end + 0.01]
+            for d in _dedupe_dense(act):
+                # drift allowance: residual tracking error grows (slowly) with
+                # distance scrolled since detection — expand the box to cover it
+                drift = min(24.0, 0.05 * (abs(ox - d.aoff[0]) + abs(oy - d.aoff[1])))
+                px = pad + drift
+                x1 = d.cbox[0] + ox - px
+                y1 = d.cbox[1] + oy - px
+                x2 = d.cbox[2] + ox + px
+                y2 = d.cbox[3] + oy + px
+                pbox = (d.cbox[0] + ox, d.cbox[1] + oy,
+                        d.cbox[2] + ox, d.cbox[3] + oy)
+                if preview:
+                    cv2.rectangle(frame, (int(max(0, x1)), int(max(0, y1))),
+                                  (int(min(w, x2)), int(min(h, y2))), (0, 0, 255), 2)
+                    for pts in (d.poly or ()):
+                        arr = np.array(
+                            [[int(float(qx) * (pbox[2] - pbox[0]) + pbox[0]),
+                              int(float(qy) * (pbox[3] - pbox[1]) + pbox[1])]
+                             for qx, qy in pts], np.int32)
+                        if len(arr) >= 3:
+                            cv2.polylines(frame, [arr], True, (0, 0, 255), 2)
+                    label = d.category
+                    if draw_scores and d.category == "face":
+                        label = f"face {d.confidence:.2f}"
+                    cv2.putText(frame, label, (int(max(0, x1)), int(max(12, y1 - 4))),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
+                elif d.poly:
+                    # segmentation silhouette: mask only the body, not the box —
+                    # px (pad+drift) becomes an outward mask dilation
+                    blur_silhouette(frame, x1, y1, x2, y2, _mode_for(d.category),
+                                    d.poly, pbox, pad_px=px)
+                else:
+                    blur_region(frame, x1, y1, x2, y2, _mode_for(d.category),
+                                shape=("ellipse" if d.category == "face"
+                                       and face_shape == "ellipse" else "rect"))
+
+            # 2. safety bands: unscanned content that scrolled into view
+            bx, by = bands[min(idx, len(bands) - 1)]
+            vals = set(mode_map.values()) | {mode}
+            band_mode = ("box" if ("box" in vals or "inpaint" in vals)
+                         else "mosaic" if "mosaic" in vals else "blur")  # never weaker
+            def band(x1, y1, x2, y2):
+                if preview:
+                    cv2.rectangle(frame, (int(x1), int(y1)), (int(x2 - 1), int(y2 - 1)), (0, 165, 255), 2)
+                else:
+                    blur_region(frame, x1, y1, x2, y2, band_mode)
+            if by < -2:      # content moved up -> unscanned strip entering at bottom
+                band(0, h - (abs(by) + band_margin), w, h)
+            elif by > 2:     # content moved down -> unscanned strip at top
+                band(0, 0, w, by + band_margin)
+            if bx < -2:      # content moved left -> strip at right
+                band(w - (abs(bx) + band_margin), 0, w, h)
+            elif bx > 2:
+                band(0, 0, bx + band_margin, h)
+
+            if proc is not None:
+                try:
+                    proc.stdin.write(frame.tobytes())
+                except (BrokenPipeError, OSError):
+                    # the encoder exited mid-stream: report ITS reason
+                    remove_partial = True
+                    cleanup_errors.extend(_stop_render_children((proc,)))
+                    rc = proc.returncode
+                    err = _ffmpeg_failure(ff_err, "video encode", rc,
+                                          hint=gpu_hint)
+                    raise err
+            else:
+                out.write(frame)
+            idx += 1
+            if idx % progress_every == 0:
+                cb.progress("render", idx, total)
+            if idx % 300 == 0:
+                cb.log(f"  rendering… {idx}/{total} ({100 * idx // max(total, 1)}%)")
+
         cap.release()
+        cap = None
+        cb.progress("render", total, total)
         if proc is not None:
             try:
                 proc.stdin.close()
-            except Exception:
-                pass
-            proc.terminate()
-            proc.wait()
-        if out is not None:
-            out.release()
-        for p in (dst, tmp_video):
-            if p and os.path.exists(p):
-                try:
-                    os.remove(p)
-                except OSError:
-                    pass
-
-    idx = 0
-    if clip and clip[0] > 0.5:
-        tgt = int(clip[0] * fps)
-        if _seek_cap(cap, tgt, fps):     # verified — a lying seek would
-            idx = tgt                    # shift the whole trimmed render
-        # unseekable: decode from 0; the undershoot guard below skips
-        # frames before the clip start one by one
-    while True:
-        if idx % 30 == 0 and cb.cancelled():
-            cleanup_partial()
-            raise PipelineCancelled()
-        ok, frame = cap.read()
-        if not ok:
-            break
-        t = idx / fps
-        if clip:
-            if t < clip[0] - 1e-6:          # seek undershoot guard
-                idx += 1
-                continue
-            if clip[1] is not None and t > clip[1] + 1e-6:
-                break                       # keep-window over: stop encoding
-        ox, oy = cum[min(idx, len(cum) - 1)]
-
-        # 1. tracked PII boxes, translated by scroll offset
-        act = [d for d in buckets.get(int(t), [])
-               if d.t_start - 0.01 <= t <= d.t_end + 0.01]
-        for d in _dedupe_dense(act):
-            # drift allowance: residual tracking error grows (slowly) with
-            # distance scrolled since detection — expand the box to cover it
-            drift = min(24.0, 0.05 * (abs(ox - d.aoff[0]) + abs(oy - d.aoff[1])))
-            px = pad + drift
-            x1 = d.cbox[0] + ox - px
-            y1 = d.cbox[1] + oy - px
-            x2 = d.cbox[2] + ox + px
-            y2 = d.cbox[3] + oy + px
-            pbox = (d.cbox[0] + ox, d.cbox[1] + oy,
-                    d.cbox[2] + ox, d.cbox[3] + oy)
-            if preview:
-                cv2.rectangle(frame, (int(max(0, x1)), int(max(0, y1))),
-                              (int(min(w, x2)), int(min(h, y2))), (0, 0, 255), 2)
-                for pts in (d.poly or ()):
-                    arr = np.array(
-                        [[int(float(qx) * (pbox[2] - pbox[0]) + pbox[0]),
-                          int(float(qy) * (pbox[3] - pbox[1]) + pbox[1])]
-                         for qx, qy in pts], np.int32)
-                    if len(arr) >= 3:
-                        cv2.polylines(frame, [arr], True, (0, 0, 255), 2)
-                label = d.category
-                if draw_scores and d.category == "face":
-                    label = f"face {d.confidence:.2f}"
-                cv2.putText(frame, label, (int(max(0, x1)), int(max(12, y1 - 4))),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
-            elif d.poly:
-                # segmentation silhouette: mask only the body, not the box —
-                # px (pad+drift) becomes an outward mask dilation
-                blur_silhouette(frame, x1, y1, x2, y2, _mode_for(d.category),
-                                d.poly, pbox, pad_px=px)
-            else:
-                blur_region(frame, x1, y1, x2, y2, _mode_for(d.category),
-                            shape=("ellipse" if d.category == "face"
-                                   and face_shape == "ellipse" else "rect"))
-
-        # 2. safety bands: unscanned content that scrolled into view
-        bx, by = bands[min(idx, len(bands) - 1)]
-        vals = set(mode_map.values()) | {mode}
-        band_mode = ("box" if ("box" in vals or "inpaint" in vals)
-                     else "mosaic" if "mosaic" in vals else "blur")  # never weaker
-        def band(x1, y1, x2, y2):
-            if preview:
-                cv2.rectangle(frame, (int(x1), int(y1)), (int(x2 - 1), int(y2 - 1)), (0, 165, 255), 2)
-            else:
-                blur_region(frame, x1, y1, x2, y2, band_mode)
-        if by < -2:      # content moved up -> unscanned strip entering at bottom
-            band(0, h - (abs(by) + band_margin), w, h)
-        elif by > 2:     # content moved down -> unscanned strip at top
-            band(0, 0, w, by + band_margin)
-        if bx < -2:      # content moved left -> strip at right
-            band(w - (abs(bx) + band_margin), 0, w, h)
-        elif bx > 2:
-            band(0, 0, bx + band_margin, h)
-
-        if proc is not None:
-            try:
-                proc.stdin.write(frame.tobytes())
             except (BrokenPipeError, OSError):
-                # the encoder exited mid-stream: report ITS reason
-                rc = proc.wait()
-                err = _ffmpeg_failure(ff_err, "video encode", rc,
+                pass                        # exit code + stderr say why below
+            rc = proc.wait()
+            if rc != 0:
+                raise _ffmpeg_failure(ff_err, "video encode", rc,
                                       hint=gpu_hint)
-                cleanup_partial()
-                raise err
         else:
-            out.write(frame)
-        idx += 1
-        if idx % progress_every == 0:
-            cb.progress("render", idx, total)
-        if idx % 300 == 0:
-            cb.log(f"  rendering… {idx}/{total} ({100 * idx // max(total, 1)}%)")
-
-    cap.release()
-    cb.progress("render", total, total)
-    if proc is not None:
-        try:
-            proc.stdin.close()
-        except (BrokenPipeError, OSError):
-            pass                        # exit code + stderr say why below
-        rc = proc.wait()
-        if rc != 0:
-            raise _ffmpeg_failure(ff_err, "video encode", rc,
-                                  hint=gpu_hint)
-    else:
-        out.release()
-        os.replace(tmp_video, dst)
+            out.release()
+            out = None
+            os.replace(tmp_video, dst)
+    finally:
+        primary = sys.exc_info()[1]
+        cleanup_errors.extend(_stop_render_children((proc,)))
+        for resource, action in ((cap, "release"), (out, "release"), (ff_err, "close")):
+            if resource is not None:
+                try:
+                    getattr(resource, action)()
+                except BaseException as error:
+                    cleanup_errors.append(error)
+        # Closure and the existing cancellation/write-error deletion policy
+        # are separate: arbitrary setup/frame errors must not unlink dst.
+        if remove_partial:
+            for path in (dst, tmp_video):
+                if path:
+                    try:
+                        os.remove(path)
+                    except OSError:
+                        pass
+        if cleanup_errors:
+            if primary is None:
+                raise cleanup_errors[0]
+            # Python 3.9 has neither add_note nor ExceptionGroup. Preserve
+            # the actual primary exception and expose bounded diagnostics.
+            try:
+                primary.render_cleanup_errors = tuple(
+                    f"{type(error).__name__}: {str(error)[:300]}"
+                    for error in cleanup_errors[:8])
+            except BaseException:
+                pass
 
 
 # ----------------------------------------------------------------------------
