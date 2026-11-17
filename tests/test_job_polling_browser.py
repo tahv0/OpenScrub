@@ -268,6 +268,11 @@ try{
  // P09 mounts cards only near the viewport; Advanced settings moved this
  // retained review below the fold. Scroll the real card window before acting.
  await q.page.locator('#detwrap').scrollIntoViewIfNeeded();
+ const schedulerState=()=>q.page.evaluate(()=>({frame:REVIEW_SCHED.frame,normal:REVIEW_SCHED.normalIds,
+  top:document.getElementById('detwrap').getBoundingClientRect().top,owns:REVIEW_SCHED.owns()}));
+ console.log(JSON.stringify({beforeClockAdvance:await schedulerState()}));
+ await advance(q,50); // the paused clock must run P09's scroll-triggered rAF
+ console.log(JSON.stringify({afterClockAdvance:await schedulerState()}));
  await q.page.locator('#det0 img').click();await wait(async()=>await q.page.locator('#lb img').evaluate(e=>e.naturalWidth>0));await q.page.locator('#lb').click();
  await q.page.getByRole('button',{name:'▶ Preview video & edit boxes (before rendering)'}).click();await wait(async()=>await q.page.locator('#beCv').count()===1);
  assert.ok(await q.page.locator('#beCv').evaluate(e=>e.width>0));
@@ -290,6 +295,8 @@ def test_emitted_page_polling_acceptance(polling_http):
         pytest.skip('Existing Playwright required; no frontend dependencies installed')
     env = dict(os.environ, POLLING_BASE=polling_http)
     result = subprocess.run([node, '-e', BROWSER], capture_output=True, text=True, env=env, timeout=120)
+    if os.environ.get('POLLING_ARTIFACTS'):
+        Path(os.environ['POLLING_ARTIFACTS'], 'polling-acceptance.log').write_text(result.stdout + result.stderr)
     assert result.returncode == 0, result.stdout + result.stderr
     if os.environ.get('POLLING_ARTIFACTS'):
         Path(os.environ['POLLING_ARTIFACTS'], 'browser-summary.log').write_text(result.stdout)
