@@ -296,3 +296,59 @@ def test_combined_report_run_render_default_coverage_exact_input(path, tiny_medi
             color_space="bt2020nc", color_transfer="smpte2084", color_primaries="bt2020")
     assert output.stat().st_size > 0
     assert report.read_text()  # orchestration does not replace the raw input report
+
+
+def test_scan_reverse_onset_and_fragment_tail_preserve_partitioned_report(tmp_path, monkeypatch):
+    """Reverse-only onset and tail-only fragments must survive both scope merges."""
+    from dataclasses import asdict
+
+    video = tmp_path / 'reverse-tail.avi'
+    frame = np.random.default_rng(1411).integers(0, 256, (96, 160, 3), dtype=np.uint8)
+    writer = cv2.VideoWriter(str(video), cv2.VideoWriter_fourcc(*'FFV1'), 6., (160, 96))
+    assert writer.isOpened(), 'lossless FFV1 fixture codec required'
+    try:
+        for _ in range(12):
+            writer.write(frame)
+    finally:
+        writer.release()
+    boxes = [(8, 8, 70, 28), (8, 55, 70, 75),
+             (90, 8, 150, 28), (90, 55, 150, 75)]
+    near = ['zzzdef#sample.invalid', 'zzzikl#sample.invalid',
+            'zzzpqr#sample.invalid', 'zzzvwx#sample.invalid']
+    exact = ['abcdef@sample.invalid', 'ghijkl@sample.invalid',
+             'mnopqr@sample.invalid', 'stuvwx@sample.invalid']
+
+    class ControlledOCR:
+        calls = 0
+        def read(self, image):
+            # No remembered PII exists at scan0. Scan1 seeds primary matches;
+            # later fragments are too short for recall but support the tail.
+            words = near if self.calls == 0 else exact if self.calls == 1 else ['sample'] * 4
+            self.calls += 1
+            return [(word, box, .99) for word, box in zip(words, boxes)]
+
+    ocr = ControlledOCR()
+    monkeypatch.setattr(openscrub, 'make_ocr', lambda *a, **kw: ocr)
+    parser = openscrub.build_parser()
+    args = openscrub._prep_args(parser.parse_args([
+        str(video), '--categories', 'email', '--engine', 'tesseract',
+        '--sample-interval', '0.3333333333333333', '--scroll-track', 'off',
+        '--adaptive', 'off', '--ocr-upscale', 'off', '--no-vfr-fix', '--no-backtrack']), parser)
+    args.zones_data = {'email': [(0., 0., .5, 1.)]}
+    state = openscrub.run_scan(args, openscrub.Callbacks())
+    expected = [dict(t_start=0., t_end=2.3, cbox=box, category='email', text=text,
+                     confidence=.99, aoff=(0., 0.), last_seen=5/3, dense=False,
+                     track=-1, person=-1, poly=()) for text, box in zip(near, boxes)]
+    assert [asdict(d) for d in state['detections']] == expected[:2]
+    assert [asdict(d) for d in state['zdropped']] == expected[2:]
+    assert state['stats'] == dict(scans=6, raw_hits=6, regions=2, recalls=0,
+                                  remembered=4, zone_dropped={'email': 6})
+    report = tmp_path / 'report.json'
+    openscrub.write_report(str(report), args, state)
+    document = json.loads(report.read_text())
+    rows = [dict(row, enabled=True) for row in expected[:2]]
+    rows += [dict(row, enabled=False, zone_dropped=True) for row in expected[2:]]
+    assert document['detections'] == json.loads(json.dumps(rows))
+    assert document['render_state'] == dict(fps=6., cum=[[0., 0.]] * 12,
+                                           bands=[[0., 0.]] * 12)
+    assert document['provenance']['input_sha256'] == hashlib.sha256(video.read_bytes()).hexdigest()
