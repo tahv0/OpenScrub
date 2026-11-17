@@ -39,8 +39,7 @@ def emitted_fragments(jobs):
         pytest.skip("Node is needed to evaluate emitted job UI JavaScript")
     # The real emitted functions, including any local name boundary, run
     # with only their HTTP and output sinks supplied by this harness.
-    script = 'let JOBSJSON="";\n' + web.APP_JS.split("// Job names are text", 1)[1].split("async function retryJob", 1)[0]
-    script = script.replace(" inside the list link and detail heading.\n", "", 1)
+    script = 'let JOBSJSON="";\nfunction jobNameHtml(name)' + web.APP_JS.split("function jobNameHtml(name)", 1)[1].split("async function retryJob", 1)[0]
     script += "function shellHtml(j)" + web.APP_JS.split("function shellHtml(j)", 1)[1].split(
         "// Save As exports", 1)[0]
     script += """
@@ -69,9 +68,10 @@ def test_emitted_job_list_and_title_preserve_literal_name(name, surface):
     assert [tag for tag, _ in listing.tags] == ["div", "a", "span", "span", "a"]
     assert listing.tags[1][1] == {
         "href": "#", "onclick": "openJob('a123456789ab');return false"}
+    assert any(attrs.get("id") == "logStatus" for _, attrs in title.tags)
     assert [tag for tag, _ in title.tags] == [
         "div", "h2", "span", "small", "progress", "div", "div", "img",
-        "div", "div", "div"]
+        "div", "div", "div", "div"]
     assert title.tags[0][1]["id"] == "jobcard"
     assert title.tags[2][1]["id"] == "ph"
 

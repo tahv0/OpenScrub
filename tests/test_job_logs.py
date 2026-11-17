@@ -211,6 +211,9 @@ def test_thumbnail_and_tracking_callbacks_stay_with_their_job(monkeypatch, tmp_p
     monkeypatch.setattr(web, 'JOBS', {})
     monkeypatch.setattr(web, 'JOBS_DIR', str(tmp_path))
     old = web.new_job('', {}, 'old')
+    source = Path(old['dir']) / 'input.mp4'
+    source.write_bytes(b'controlled decoder input')
+    old['video'] = str(source)
     deferred = []
     class DeferredThread:
         def __init__(self, target, **kwargs):
@@ -220,7 +223,12 @@ def test_thumbnail_and_tracking_callbacks_stay_with_their_job(monkeypatch, tmp_p
     monkeypatch.setattr(web.threading, 'Thread', DeferredThread)
     monkeypatch.setattr(web, 'build_args', lambda *_: object())
     monkeypatch.setattr(web.openscrub, 'run_scan', lambda *_: {'stats': {}})
-    monkeypatch.setattr(web.openscrub, 'write_report', lambda *_, **kwargs: None)
+    published = []
+    def write_report(path, args, state, *, publisher):
+        assert callable(publisher)
+        publisher(path, {'render_state': {'fps': 1, 'cum': [[0, 0]]}, 'detections': []})
+        published.append(Path(path).is_file())
+    monkeypatch.setattr(web.openscrub, 'write_report', write_report)
     monkeypatch.setattr(web, '_load_job_report', lambda *_: {'render_state': {'fps': 1, 'cum': [[0, 0]]}, 'detections': []})
     class Capture:
         def release(self):
@@ -233,9 +241,11 @@ def test_thumbnail_and_tracking_callbacks_stay_with_their_job(monkeypatch, tmp_p
     selected = old['video']
     old['video'] = 'late source must not replace lease'
     deferred.pop(0)()
-    assert sources == [selected or None]
+    assert sources == [str(source.resolve())]
+    assert published == [True]
     assert any('thumbnails pre-generated' in s for s in old['log'].snapshot()['lines'])
     assert replacement['log'].snapshot()['lines'] == []
+    replacement['phase'] = 'review'
     # Actual manual-tracking route creates its ordinary engine callback.
     def detector(cb, **kwargs):
         cb.log('tracking detector')
