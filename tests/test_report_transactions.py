@@ -338,11 +338,11 @@ def test_distinct_jobs_commit_independently(store, monkeypatch):
     path.write_bytes(store.path.read_bytes())
     staged, release = threading.Event(), threading.Event()
     real = web._publish_job_report_locked
-    def publish(target, doc):
+    def publish(job, target, doc):
         if target == str(store.path):
             staged.set()
             assert release.wait(8)
-        real(target, doc)
+        real(job, target, doc)
     monkeypatch.setattr(web, '_publish_job_report_locked', publish)
     call = start_call('post', store.url + '/detections', json={'enabled': {'0': False}})
     try:
@@ -454,19 +454,18 @@ def test_cancel_final_worker_boundary(store, monkeypatch, action, stage):
         return dict(fps=30, cum=[[0,0]], bands=[[0,0]], detections=[], stats={})
     monkeypatch.setattr(openscrub, 'run_scan', scan)
     if stage == 'constructed':
-        real_write = openscrub.write_report
-        def write(path, args, state, output_path=None, publisher=None):
-            def pause(target, doc):
-                entered.set()
-                assert release.wait(8)
-                publisher(target, doc)
-            return real_write(path, args, state, output_path, publisher=pause)
-        monkeypatch.setattr(openscrub, 'write_report', write)
+        real_document = openscrub._report_document
+        def document(*args, **kwargs):
+            doc = real_document(*args, **kwargs)
+            entered.set()
+            assert release.wait(8)
+            return doc
+        monkeypatch.setattr(openscrub, '_report_document', document)
     elif stage == 'hashed':
         real_hash = openscrub.sha256_file
         def sha(path, *args, **kwargs):
             value = real_hash(path, *args, **kwargs)
-            if Path(path).name.startswith('output.'):
+            if Path(path).name.startswith('.render-'):
                 entered.set()
                 assert release.wait(8)
             return value

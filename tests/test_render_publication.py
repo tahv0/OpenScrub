@@ -185,6 +185,8 @@ def test_rollback_or_descriptor_unlink_failure_exposes_recovery(tmp_path, monkey
 def test_pair_and_done_commit_before_cancel_ack(store, monkeypatch):
     import openscrub_web as web
     from test_job_lifecycle import request
+    store.doc['render_state']['bands'] = [[0,0]] * 30
+    store.path.write_text(json.dumps(store.doc))
     monkeypatch.setattr(app, 'normalize_vfr', lambda *args: None)
     def body(src, dst, *args, **kwargs): Path(dst).write_bytes(b'new video')
     monkeypatch.setattr(app, '_render_into', body)
