@@ -225,21 +225,24 @@ def test_real_encoding_failure_cleans_staging_file(tmp_path, exists):
 
 @pytest.fixture
 def report_work(monkeypatch):
-    """Count report operations only, leaving request/response JSON untouched."""
-    counts = dict(parse=0, dump=0, stage=0, fsync=0, replace=0, stream_writes=0)
-    load, dump = web._load_job_report, json.dump
+    """Count report operations; encoder_chunks counts encoder pieces."""
+    counts = dict(parse=0, dump=0, stage=0, fsync=0, replace=0, encoder_chunks=0)
+    load, encoder = web._load_job_report, json.JSONEncoder
     def parse(job):
         counts['parse'] += 1
         return load(job)
-    def encode(doc, stream, **kwargs):
+    def encode(**kwargs):
         counts['dump'] += 1
-        class Stream:
-            def write(self, value):
-                counts['stream_writes'] += 1
-                return stream.write(value)
-        return dump(doc, Stream(), **kwargs)
+        instance = encoder(**kwargs)
+        original = instance.iterencode
+        def chunks(doc):
+            for value in original(doc):
+                counts['encoder_chunks'] += 1  # Encoder pieces, not OS syscalls.
+                yield value
+        instance.iterencode = chunks
+        return instance
     monkeypatch.setattr(web, '_load_job_report', parse)
-    monkeypatch.setattr(reports, 'json', SimpleNamespace(dump=encode))
+    monkeypatch.setattr(reports, 'json', SimpleNamespace(JSONEncoder=encode))
     for owner, name, key in [(reports.tempfile, 'NamedTemporaryFile', 'stage'),
                              (reports.os, 'fsync', 'fsync'),
                              (reports.os, 'replace', 'replace')]:
@@ -288,7 +291,7 @@ def test_unchanged_save_preserves_exact_file_and_skips_publication(review, repor
     assert response.status_code == 200
     assert response.json == {'ok': True, 'total': 2, 'suggest_allowlist': []}
     assert file_snapshot(review.path) == before
-    assert report_work == dict(parse=1, dump=0, stage=0, fsync=0, replace=0, stream_writes=0)
+    assert report_work == dict(parse=1, dump=0, stage=0, fsync=0, replace=0, encoder_chunks=0)
     assert web.FILES.count == 0
 
 
@@ -346,7 +349,7 @@ def test_effective_changes_publish_once_with_raw_fields_preserved(review, report
     assert response.status_code == 200
     after = json.loads(review.path.read_bytes())
     assert report_work['parse'] == report_work['dump'] == report_work['stage'] == report_work['fsync'] == report_work['replace'] == 1
-    assert report_work['stream_writes'] > 0  # Python writes, not syscalls.
+    assert report_work['encoder_chunks'] > 0  # Encoder chunks, not Python writes or syscalls.
     assert after['unknown'] == doc['unknown']
     assert after['audio_transcript'] == doc['audio_transcript']
     assert after['render_state'] == doc['render_state']

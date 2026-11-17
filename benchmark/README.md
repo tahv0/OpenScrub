@@ -353,3 +353,13 @@ with the original pinned source manifests and a fresh evidence directory.
 Keep its result separate, reverify every exported source hash, and prove
 runtime-byte equality before relating timings to a tooling-only follow-up.
 Never relabel existing timing samples as another commit.
+
+For a baseline that already skips unchanged publication (for example `3457efa`),
+pass `--before-noop-publications 0`. The historical default remains 1.
+Separate counted workers report `report_encode` as publication encoding starts,
+`json_dump_calls` and `encoder_instances` as method-specific encoding starts,
+`stream_writes` as Python calls to the staging stream's `write`, and
+`stream_writelines` as calls to `writelines`. `encoder_chunks` counts pieces
+from the explicit public encoder iterator when used. TextIOWrapper's internal
+writes are not Python stream calls or measured OS syscalls. No counted latency
+is part of the uninstrumented HTTP comparison.

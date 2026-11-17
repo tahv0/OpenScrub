@@ -120,8 +120,9 @@ def instrument(web):
     """Separate counters; stream writes count Python calls, never syscalls."""
     from types import SimpleNamespace
     from openscrub_internal import reports
-    counts = dict(report_parse=0, report_dump=0, stage=0, fsync=0, replace=0,
-                  stream_writes=0, serialized_characters=0, request_json=0, response_json=0)
+    counts = dict(report_parse=0, report_encode=0, json_dump_calls=0, encoder_instances=0, stage=0, fsync=0, replace=0,
+                  stream_writes=0, stream_writelines=0, encoder_chunks=0,
+                  serialized_characters=0, request_json=0, response_json=0)
     def wrap(owner, name, key):
         original = getattr(owner, name)
         def counted(*args, **kwargs):
@@ -130,16 +131,44 @@ def instrument(web):
         setattr(owner, name, counted)
     wrap(web, '_load_job_report', 'report_parse')
     dump = reports.json.dump
+    encoder = reports.json.JSONEncoder
     def encode(doc, stream, **kwargs):
-        counts['report_dump'] += 1
-        class Stream:
-            def write(self, value):
-                counts['stream_writes'] += 1
-                counts['serialized_characters'] += len(value)
-                return stream.write(value)
-        return dump(doc, Stream(), **kwargs)
-    reports.json = SimpleNamespace(dump=encode)
-    wrap(reports.tempfile, 'NamedTemporaryFile', 'stage')
+        counts['report_encode'] += 1
+        counts['json_dump_calls'] += 1
+        return dump(doc, stream, **kwargs)
+    def make_encoder(**kwargs):
+        counts['report_encode'] += 1
+        counts['encoder_instances'] += 1
+        instance = encoder(**kwargs)
+        original = instance.iterencode
+        def chunks(doc):
+            for value in original(doc):
+                counts['encoder_chunks'] += 1
+                yield value
+        instance.iterencode = chunks
+        return instance
+    reports.json = SimpleNamespace(dump=encode, JSONEncoder=make_encoder)
+    temporary_file = reports.tempfile.NamedTemporaryFile
+    class Stream:
+        def __init__(self, stream): self.stream = stream
+        def __getattr__(self, name): return getattr(self.stream, name)
+        def __enter__(self): self.stream.__enter__(); return self
+        def __exit__(self, *args): return self.stream.__exit__(*args)
+        def write(self, value):
+            counts['stream_writes'] += 1
+            counts['serialized_characters'] += len(value)
+            return self.stream.write(value)
+        def writelines(self, values):
+            counts['stream_writelines'] += 1
+            def measured():
+                for value in values:
+                    counts['serialized_characters'] += len(value)
+                    yield value
+            return self.stream.writelines(measured())
+    def stage(*args, **kwargs):
+        counts['stage'] += 1
+        return Stream(temporary_file(*args, **kwargs))
+    reports.tempfile.NamedTemporaryFile = stage
     wrap(reports.os, 'fsync', 'fsync')
     wrap(reports.os, 'replace', 'replace')
     wrap(web.app.request_class, 'get_json', 'request_json')
@@ -297,7 +326,7 @@ def count_operations(sources, rows, evidence, before_noop_publications=1):
                 counts = result['after']['counts']
                 writes = (before_noop_publications if label == 'before' else 0) if scenario == 'noop' else 1
                 assert counts['report_parse'] == counts['request_json'] == counts['response_json'] == 1
-                assert all(counts[k] == writes for k in ('report_dump','stage','fsync','replace')), counts
+                assert all(counts[k] == writes for k in ('report_encode','stage','fsync','replace')), counts
                 counted[scenario][label] = result
         finally:
             item.close()
