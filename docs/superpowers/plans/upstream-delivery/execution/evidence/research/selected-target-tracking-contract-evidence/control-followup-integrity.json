@@ -1,0 +1,10 @@
+{
+  "original_bytes": 45313,
+  "original_sha256": "9217d6cb3b941ec6872eb77f8ff4539e921b3b4c7cb8eae7da43a66d697fc65a",
+  "final_bytes": 63224,
+  "final_sha256": "ecb43f230246dc06af88df4cc27d86130a0da3cfba06be3ad63ad5661cd76602",
+  "appendix_bytes": 17911,
+  "appendix_sha256": "a99df51a24315a5ae561d930e5c31c17af826f4628b569ced562b72ea87da5eb",
+  "original_is_exact_prefix": true,
+  "status": "source-only recommendation; root has not adopted"
+}

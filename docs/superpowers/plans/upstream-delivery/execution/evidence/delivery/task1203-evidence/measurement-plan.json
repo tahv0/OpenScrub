@@ -1,0 +1,78 @@
+{
+  "status": "declared; no timing executed; requires root exclusive grant",
+  "base": "2c7f2530893cb2ecd20dfe7803b6301ea34f9f9f",
+  "candidate_web": "04af11cce1eaf4be0dc157ba5b4d78783a85bcbbb17596078c75d9df79f46c93",
+  "frozen_manifest_sha256": "abeb6594d6a59eb81d340e07a28e804538bc67a67562db438dfb50c127930e81",
+  "recipe": [
+    "benchmark/browser_logs.py",
+    "benchmark/browser_logs.js"
+  ],
+  "source_fixture_tool_hashes": "premeasurement-hashes.json",
+  "environment": {
+    "python": "prepared actual3.12.16",
+    "node": "v22.22.1",
+    "browser": "prepared offline Playwright Chromium headless shell159.0.8154.6",
+    "viewport": [
+      1280,
+      950
+    ],
+    "device_scale_factor": 1,
+    "gc": "normal; no forced GC",
+    "warm_cache": "same prepared immutable interpreter/browser; fresh browser per source/phase, fresh page per case"
+  },
+  "cases": {
+    "short": "38-unit fixed-width synthetic progress entry with six-digit sequence",
+    "multiline": "8 newline-joined ordinary tool-output rows, six-digit sequence",
+    "long": "8192 ASCII units, six-digit prefix +8186 x characters, no LF",
+    "dense-multiline": "8192 ASCII units with255 LFs, six-digit prefix, bounded31/32-character rows"
+  },
+  "schedule": {
+    "initial_emitted": 400,
+    "batch_entries": 20,
+    "warmup_accepted_batches": 5,
+    "observed_accepted_batches_per_case_per_source": 125,
+    "total_emitted_checkpoints": [
+      1000,
+      2000,
+      3000
+    ],
+    "initial_publication_observations_per_case_per_source": 1,
+    "timing_order": [
+      "base all4 cases",
+      "candidate all4 cases"
+    ],
+    "instrumentation_order": "only after all timing, base then candidate; fresh400 +31 accepted20-entry batches to1020 for populated count/text caps; durations retained but not used as timing evidence"
+  },
+  "boundaries": {
+    "producer": "synthetic actual WebCallbacks.log before each observation; fixture/control creation outside timing",
+    "http": "native fetch through headers plus actual Response.json body/read/parse separately; actual Flask routes in ThreadingHTTPServer loopback; no CDP route replacement for metadata/log",
+    "publication": "test-only PAGE timing insertions: baseline starts before fixed logStatus note mutation, then suffix selection/whole-text append and cursor commit; candidate starts before recentLog.publish, including suffix sizing/staging/anchor/DOM/note/scroll/cursor commit; both end after forced log.scrollHeight layout read",
+    "cycle": "manual refresh to publication+forced layout end, including actual metadata/log fetch+body; completion-chained900ms wait excluded by clearing the pending timer between fixture observations; native15s body deadlines/fences remain",
+    "initial": "actual openJob latest retained snapshot; one cold population per case/source, not a percentile estimate"
+  },
+  "statistics": {
+    "median": "statistics.median of125 actual observed batches per case/source",
+    "p95": "empirical nearest rank sorted[ceil(.95*125)-1] =sorted[118], no interpolation",
+    "checkpoints": "separate raw distributions by emissions<=1000,1001..2000,2001..3000; small checkpoint buckets do not replace overall125-sample p95"
+  },
+  "correctness": "after every initial/warmup/observed/instrumented batch, independently simulate producer FIFO count/UTF8 cap and expected display suffix, compare native DOM SHA256 and UTF16 length, authoritative cursor, actual log interval/reset/count, and candidate spans/content/delimiter count+absolute first/last sequence; all raw samples and failed attempts preserved",
+  "responsiveness": "PerformanceObserver long tasks and timestamped native rAF frame gaps are correlated to recorded publication/cycle boundaries; async DOM hashing/control/validation remain outside timing. At each1000/2000/3000 checkpoint, an idle/post-batch native wheel pulse records request-start\u2192event/frame times and actual displacement with polling stopped. These idle checks do not measure input during publication or rule out stalls; held-body functional user scrolling is separate browser evidence. No whole-browser RSS, engine copy-count, throughput or universal frame claim.",
+  "instrumentation": "after every timing phase completes, test-only textContent/createTextNode/createElement/createDocumentFragment hooks collect UTF16 units passed to publication and created nodes; report attached state, conservative old+created entry/text-node transient bounds, independent DOM totals. No production instrumentation",
+  "escalation": {
+    "representative_candidate_median_publication_layout_ms": 16,
+    "candidate_empirical_p95_ms": 50,
+    "anchor_displacement_css_px": 2,
+    "repeated_missed_input_or_stall": "root disposition required even below numeric budgets"
+  },
+  "isolation": "task1203 root for every mutable path; copied task-local sitecustomize write/network/profile guard and explicit configure() for standalone driver; selected source and all frozen hashes checked before/after each source/phase. Prepared /tmp binaries/tools read-only. Base runs outside native cwd. Manifest bytes must equal the explicitly granted immutable digest before loading and after each phase; selected web expectation comes from that manifest, not a freshly derived source hash.",
+  "pregrant_refinement": "Clear healthy completion timer immediately before async DOM hash validation, preventing a900ms automatic empty poll from entering slow validation; no runtime/timing execution.",
+  "pregrant_import_refinement": "Explicitly assert selected private leaf import path/hash alongside the three top-level selected imports; product/tests unchanged.",
+  "supervisor_pregrant_safeguards": [
+    "manifest itself must equal explicitly supplied TASK1203_GRANTED_HASH before parsing and after phase; selected expected web hash derives from immutable granted manifest",
+    "assert actual log.from/base as well as len/count/reset and DOM hash",
+    "record cycle/publication start+end timestamps and timestamped rAF gaps, allowing operation-overlap attribution of long tasks/frame gaps",
+    "checkpoint native wheel is explicitly idle/post-batch after validation with polling stopped; it does not rule out publication stalls; no under-load input timing claim"
+  ],
+  "unexecuted_versions": "Original, timer, pre-review and final manifests retained; no version was executed before root grant.",
+  "failure_retention": "Every raw record enters the result array before correctness assertions with correct:false until validated; an unconditional error handler writes the full partial array and error stack, in addition to successful case flushes. No failed samples can be discarded by a mid-case assertion. On other errors, capture any uncollected browser timing/transport/frame arrays before closing (bounded1s error snapshot), retain Python timeout output, and verify frozen identity in finally for failed as well as successful phases."
+}

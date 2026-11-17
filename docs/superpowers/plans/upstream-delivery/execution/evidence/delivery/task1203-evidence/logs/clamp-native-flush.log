@@ -1,0 +1,103 @@
+TASK1203_ACTIVE_SOURCE {"python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]", "sources": {"openscrub": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py", "sha256": "0e4f0f9a7846080f591038d021aaf3ca6f01201d83ac32bbdc273f53d5067ee7"}, "openscrub_internal.job_logs": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_internal/job_logs.py", "sha256": "63d08c124db019b120bb17efc64706d910f1d831f8ccfd9c1ba124368643d1b8"}, "openscrub_web": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", "sha256": "04af11cce1eaf4be0dc157ba5b4d78783a85bcbbb17596078c75d9df79f46c93"}, "zones_ui": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/zones_ui.py", "sha256": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7"}}}
+F                                                                        [100%]
+=================================== FAILURES ===================================
+________ test_actual_layout_anchor_threshold_pending_scroll_and_reflow _________
+
+polling_http = 'http://127.0.0.1:38727'
+
+    def test_actual_layout_anchor_threshold_pending_scroll_and_reflow(polling_http):
+        # Taking stickiness before the awaited body loses the reader's final position.
+>       run_browser(polling_http, r"""
+    await open(600);
+    const geometry=()=>page.locator('#log').evaluate(e=>({top:e.scrollTop,max:e.scrollHeight-e.clientHeight,
+     anchor:[...e.children].find(s=>s.getBoundingClientRect().bottom>e.getBoundingClientRect().top+e.clientTop)?.dataset.seq}));
+    for(const distance of [39,40,41]){
+     await page.locator('#log').evaluate((e,d)=>e.scrollTop=e.scrollHeight-e.clientHeight-d,distance);
+     const before=await geometry();await append(['threshold-'+distance]);const after=await geometry();
+     if(distance<=40)assert.ok(after.max-after.top<=1,JSON.stringify({distance,before,after}));
+     else{assert.equal(after.anchor,before.anchor);assert.ok(Math.abs(after.top-before.top)<=2)}
+     records.push({case:'threshold',distance,before,after});
+    }
+    // The response body is created by Flask before the browser scrolls up.
+    await control({action:'append',lines:['held-body']});await control({kind:'log'});
+    let headers=0;page.on('response',r=>{if(r.headers()['x-qa-body-gate']==='log')headers++});
+    await page.locator('#log').evaluate(e=>e.scrollTop=e.scrollHeight);await page.clock.runFor(900);await wait(()=>headers===1);
+    await page.locator('#log').evaluate(e=>e.scrollTop=700);const pending=await geometry();
+    await control({release:true});await idle();assert.equal((await geometry()).anchor,pending.anchor);
+    assert.ok(Math.abs((await geometry()).top-pending.top)<=2);records.push({case:'scroll-during-body',pending,after:await geometry()});
+    // Retain a mid-history entry while a prefix is evicted.
+    await page.locator('#log').evaluate(e=>{const s=e.querySelector('[data-seq="400"]');e.scrollTop+=s.getBoundingClientRect().top-e.getBoundingClientRect().top+7});
+    const before=await page.locator('#log').evaluate(e=>{const s=e.querySelector('[data-seq="400"]');return s.getBoundingClientRect().top-e.getBoundingClientRect().top});
+    await append(Array.from({length:400},(_,i)=>'retained-'+i));
+    const after=await page.locator('#log').evaluate(e=>e.querySelector('[data-seq="400"]').getBoundingClientRect().top-e.getBoundingClientRect().top);
+    assert.ok(Math.abs(after-before)<=2,JSON.stringify({before,after}));
+    await page.locator('#log').evaluate(e=>e.scrollTop=0);await append(Array.from({length:400},(_,i)=>'evict-'+i));
+    assert.equal((await geometry()).top,0);assert.match(await note(),/position/);records.push({case:'evicted-anchor',...await geometry()});
+    // A genuine keyboard scroll clears the fixed lost-position notice and retains focus.
+    await page.locator('#log').focus();await page.keyboard.press('PageDown');await page.clock.runFor(300);await pause(350);console.log(JSON.stringify({keyboard:await geometry(),note:await note()}));
+    assert.equal(await page.locator('#log').evaluate(e=>document.activeElement===e),true);assert.doesNotMatch(await note(),/position/);
+    // Rewrap a tall multiline entry; position is entry+clamped pixel, not character.
+    await control({action:'replace',count:0});await poll();
+    const multiline=Array.from({length:20},(_,i)=>'wide paragraph '+i+' '+('word '.repeat(25))).join('\n');
+    await append(['prefix '+('words '.repeat(100)),multiline,'tail'+String.fromCharCode(10).repeat(500)]);
+    await page.locator('#log').evaluate(e=>{const s=e.children[1];e.scrollTop+=s.getBoundingClientRect().top-e.getBoundingClientRect().top+30});
+    const reflowBefore=await page.locator('#log').evaluate(e=>({seq:e.children[1].dataset.seq,offset:e.getBoundingClientRect().top-e.children[1].getBoundingClientRect().top}));
+    await page.setViewportSize({width:390,height:844});await pause(40);await page.clock.runFor(40);await pause(20);
+    const reflowAfter=await page.locator('#log').evaluate(e=>({seq:e.children[1].dataset.seq,offset:e.getBoundingClientRect().top-e.children[1].getBoundingClientRect().top}));
+    assert.equal(reflowAfter.seq,reflowBefore.seq);assert.ok(Math.abs(reflowAfter.offset-reflowBefore.offset)<=2,JSON.stringify({reflowBefore,reflowAfter}));
+    assert.equal(await page.locator('#log').getAttribute('aria-label'),'Job log');assert.equal(await page.locator('#log').getAttribute('aria-describedby'),'logStatus');
+    assert.equal(await page.locator('#log').getAttribute('aria-live'),null);assert.equal(await page.locator('#logStatus').getAttribute('role'),null);
+    assert.equal(await page.locator('#log').evaluate(e=>getComputedStyle(e).overflowAnchor),'none');
+    if(process.env.POLLING_ARTIFACTS){await page.locator('#log').scrollIntoViewIfNeeded();await page.screenshot({path:process.env.POLLING_ARTIFACTS+'/retention-narrow.png'})}
+    records.push({case:'narrow-reflow',reflowBefore,reflowAfter,...await geometry()});
+    await page.locator('#log').evaluate(e=>{const s=e.children[1];e.scrollTop+=s.getBoundingClientRect().top-e.getBoundingClientRect().top+1000});await pause(40);await page.clock.runFor(40);
+    const clampBefore=await page.locator('#log').evaluate(e=>e.getBoundingClientRect().top-e.children[1].getBoundingClientRect().top);
+    await page.setViewportSize({width:1280,height:950});await pause(40);await page.clock.runFor(40);await pause(20);
+    const clampAfter=await page.locator('#log').evaluate(e=>({offset:e.getBoundingClientRect().top-e.children[1].getBoundingClientRect().top,height:e.children[1].getBoundingClientRect().height}));
+    assert.ok(clampBefore>clampAfter.height,JSON.stringify({clampBefore,clampAfter}));assert.ok(Math.abs(clampAfter.offset-(clampAfter.height-1))<=2,JSON.stringify({clampBefore,clampAfter}));
+    await page.locator('#log').evaluate(e=>e.scrollTop=e.scrollHeight);await page.clock.runFor(40);await page.setViewportSize({width:390,height:844});await pause(40);await page.clock.runFor(40);await pause(20);assert.ok((await geometry()).max-(await geometry()).top<=1);
+    assert.equal(await page.locator('#log').evaluate(e=>document.activeElement===e),true,'accepted reset/reflow never moves keyboard focus');
+    records.push({case:'clamped-reflow-bottom',clampBefore,clampAfter});
+    """, 'layout')
+
+tests/test_browser_log_retention.py:98: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+polling_http = 'http://127.0.0.1:38727'
+script = "\nawait open(600);\nconst geometry=()=>page.locator('#log').evaluate(e=>({top:e.scrollTop,max:e.scrollHeight-e.client...ted reset/reflow never moves keyboard focus');\nrecords.push({case:'clamped-reflow-bottom',clampBefore,clampAfter});\n"
+name = 'layout'
+
+    def run_browser(polling_http, script, name):
+        node = shutil.which('node')
+        if not node:
+            pytest.skip('Node needed for optional Playwright acceptance')
+        available = subprocess.run([node, '-e', "require('playwright')"], capture_output=True)
+        if available.returncode:
+            pytest.skip('Existing Playwright required; no dependency installation attempted')
+        env = dict(os.environ, POLLING_BASE=polling_http, RETENTION_CASE=name)
+        result = subprocess.run([node, '-e', BROWSER_SETUP + script + BROWSER_FINISH],
+                                capture_output=True, text=True, env=env, timeout=150)
+        if os.environ.get('POLLING_ARTIFACTS'):
+            Path(os.environ['POLLING_ARTIFACTS'], name + '.log').write_text(result.stdout + result.stderr)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: {"keyboard":{"top":157,"max":13278,"anchor":"612"},"note":"Earlier log messages were omitted."}
+E         AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+E         
+E           assert.ok((await geometry()).max-(await geometry()).top<=1)
+E         
+E             at [eval]:82:214 {
+E           generatedMessage: true,
+E           code: 'ERR_ASSERTION',
+E           actual: false,
+E           expected: true,
+E           operator: '==',
+E           diff: 'simple'
+E         }
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', '\nconst {chromium}=require(\'playwright\'),assert=require(\'node:assert...ssage: true,\n  code: 'ERR_ASSERTION',\n  actual: false,\n  expected: true,\n  operator: '==',\n  diff: 'simple'\n}\n").returncode
+
+tests/test_browser_log_retention.py:71: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_browser_log_retention.py::test_actual_layout_anchor_threshold_pending_scroll_and_reflow
+1 failed, 5 deselected in 2.63s

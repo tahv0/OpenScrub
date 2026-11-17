@@ -57,6 +57,12 @@ Record only the additive state needed to distinguish explicit human choice from 
 - [ ] **V:** Run `python -m pytest test_openscrub.py tests/test_manual_target_tracking.py tests/test_manual_target_tracking_browser.py -q`, build and actual synthetic mask/render comparisons. Test cancellation, restart, source changes and export with preserved gap status; unchanged default tracker behavior must also pass.
 - [ ] **D/R/L:** State box/quad/mask capabilities separately, including where the user must correct. Show one seed → movement → loss → correction example and measured edit reduction. This is pretrained inference/tracking, not training a new model.
 
+**Source handoff and adopted boundaries:** The [selected-target contract](execution/evidence/research/selected-target-tracking-contract-research.md), including its final supervisor disposition, maps the actual C01 owners and supersedes its initial geometry-anchor proposal. Current target controls belong in the same optional raw report, while supported geometry stays in ordinary detection rows. An all-gap target retains its identity and Blur/Keep intent without forced keyframes, fabricated boxes or an export gate.
+
+- [ ] **S/I:** Add only capability-gated current target controls, typed identity/source admission, control-only touched-state publication and full raw save/reopen preservation. Keep ordinary/legacy schema and default tracking unchanged.
+- [ ] **I/V:** Start with verified box tracking that stops on unsupported continuation and resumes through an explicit exact correction. Use the one-latest-receipt/predecessor contract; a delayed old correction conflicts after a newer one instead of overwriting it. Preserve row-context drafts and current choices/audio. Unknown regenerated metadata needs an explicit owner or an unchanged-report failure.
+- [ ] **E/V:** Prove the P10/O01/P16D prerequisites and subsequent frame-reader behavior, then calibrate continuity on bounded clips. Source contracts alone establish no identity reliability, edit reduction, throughput or optional runtime acceptance.
+
 ## O03 — training-free full/partial plate-number search
 
 **What:** Retain the donor's pure OCR/matching core while replacing training/workbench orchestration, and support whole-frame discovery without a vehicle/plate detection.

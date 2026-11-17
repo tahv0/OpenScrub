@@ -1,0 +1,25 @@
+. /tmp/openscrub-baseline-20261116/env-opencv4.sh
+export TASK1203_ROOT=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1203
+export TASK1203_SOURCE=/home/tahv0/.codex/worktrees/c832/OpenScrub
+export PYTHONPATH=$TASK1203_ROOT/harness:$TASK1203_SOURCE
+export PYTEST_PLUGINS=task1203_isolation
+export PYTEST_DISABLE_PLUGIN_AUTOLOAD=1
+export PYTEST_ADDOPTS=''
+export TMPDIR=$TASK1203_ROOT/tmp
+export XDG_CACHE_HOME=$TASK1203_ROOT/cache
+export XDG_CONFIG_HOME=$TASK1203_ROOT/config
+export UV_CACHE_DIR=$TASK1203_ROOT/cache/uv
+export UV_PYTHON_INSTALL_DIR=$TASK1203_ROOT/python
+export PYTHONNOUSERSITE=1
+export PYTHONDONTWRITEBYTECODE=1
+export NODE_PATH=/tmp/openscrub-save-as-20261116/node_modules
+export PLAYWRIGHT_BROWSERS_PATH=/tmp/openscrub-save-as-20261116/browsers
+export POLLING_ARTIFACTS=$TASK1203_ROOT/browser
+export LD_LIBRARY_PATH=/tmp/openscrub-save-as-20261116/tools/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH
+
+export OPENSCRUB_BASELINE_MODEL_DIR=$TASK1203_ROOT/models
+export HF_HOME=$TASK1203_ROOT/cache/hf
+export TORCH_HOME=$TASK1203_ROOT/cache/torch
+export MPLCONFIGDIR=$TASK1203_ROOT/cache/mpl
+export HF_HUB_OFFLINE=1
+export TRANSFORMERS_OFFLINE=1

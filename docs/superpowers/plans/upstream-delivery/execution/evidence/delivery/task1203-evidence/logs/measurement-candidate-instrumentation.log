@@ -1,0 +1,4 @@
+{"kind":"short","label":"candidate","phase":"instrumentation","emitted":1020,"observations":31,"errors":[],"diagnostics":[]}
+{"kind":"multiline","label":"candidate","phase":"instrumentation","emitted":1020,"observations":31,"errors":[],"diagnostics":[]}
+{"kind":"long","label":"candidate","phase":"instrumentation","emitted":1020,"observations":31,"errors":[],"diagnostics":[]}
+{"kind":"dense-multiline","label":"candidate","phase":"instrumentation","emitted":1020,"observations":31,"errors":[],"diagnostics":[]}

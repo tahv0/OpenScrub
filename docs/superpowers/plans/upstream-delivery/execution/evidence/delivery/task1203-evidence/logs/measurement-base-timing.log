@@ -1,0 +1,4 @@
+{"kind":"short","label":"base","phase":"timing","emitted":3000,"observations":125,"errors":[],"diagnostics":[]}
+{"kind":"multiline","label":"base","phase":"timing","emitted":3000,"observations":125,"errors":[],"diagnostics":[]}
+{"kind":"long","label":"base","phase":"timing","emitted":3000,"observations":125,"errors":[],"diagnostics":[]}
+{"kind":"dense-multiline","label":"base","phase":"timing","emitted":3000,"observations":125,"errors":[],"diagnostics":[]}

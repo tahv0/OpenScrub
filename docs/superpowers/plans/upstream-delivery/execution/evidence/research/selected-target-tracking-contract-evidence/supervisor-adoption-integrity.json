@@ -1,0 +1,10 @@
+{
+  "before_bytes": 63224,
+  "before_sha256": "ecb43f230246dc06af88df4cc27d86130a0da3cfba06be3ad63ad5661cd76602",
+  "after_bytes": 67164,
+  "after_sha256": "67d2b334d26768dbe8cd2bc21cf76a8cb3b9e337ef959ed0e0d9a96dc85e693e",
+  "original_prefix_bytes": 45313,
+  "original_prefix_sha256": "9217d6cb3b941ec6872eb77f8ff4539e921b3b4c7cb8eae7da43a66d697fc65a",
+  "both_prior_prefixes_preserved": true,
+  "type": "supervisor design adoption; no runtime acceptance"
+}

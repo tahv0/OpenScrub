@@ -1,0 +1,289 @@
+Source-only follow-up; existing C01 exports only.
+
+{"blob": "71c0d47c2864a637bb53a522b14896a47b539439", "commit": "4b9bd7e576a8ae30369672b4b4722fc9752e233f", "path": "openscrub.py", "sha256": "89b3e84e28ba7065489cc1355cfeadaa4f04f0adf3bcbc19503ff01957e3f7e8"}
+
+# openscrub.py:6352-6449
+6352: def write_report(path, args, state, output_path=None, publisher=None):
+6353:     prov = {
+6354:         "tool": "openscrub", "version": VERSION,
+6355:         "timestamp": datetime.datetime.now().astimezone().isoformat(),
+6356:         "input": os.path.abspath(args.video),
+6357:         "input_sha256": state.get("input_sha256"),
+6358:         "original_input": (os.path.abspath(args.original_video)
+6359:                            if getattr(args, "original_video", None) else None),
+6360:         "vfr_normalized": bool(getattr(args, "original_video", None)),
+6361:         "hdr_tonemapped": bool(getattr(args, "hdr_tonemapped", False)),
+6362:         "hdr_output": bool(getattr(args, "hdr_source", None)),
+6363:         "metadata_stripped": True,   # renders pass -map_metadata -1
+6364:         "zones": getattr(args, "zones_data", None),
+6365:         "windows": getattr(args, "windows_data", None),
+6366:         "settings": _settings_dict(args),
+6367:     }
+6368:     if output_path and os.path.exists(output_path):
+6369:         prov["output"] = os.path.abspath(output_path)
+6370:         prov["output_sha256"] = sha256_file(output_path)
+6371:     source = state.get("source_report")
+6372:     if source is not None:
+6373:         # A render consumes enabled Detection objects, but publishes the full
+6374:         # review document: Keep choices, row positions and unknown fields are
+6375:         # user data, not a serialization of the render subset.
+6376:         doc = dict(source)
+6377:         previous = dict(source.get("provenance", {}))
+6378:         settings = dict(previous.get("settings", {}))
+6379:         settings.update(prov["settings"])
+6380:         prov["settings"] = settings
+6381:         # Output hashes/paths must describe this render, never an older one.
+6382:         previous.pop("output", None)
+6383:         previous.pop("output_sha256", None)
+6384:         previous.update(prov)
+6385:         doc["provenance"] = previous
+6386:     else:
+6387:         doc = {
+6388:             "provenance": prov,
+6389:             "render_state": {
+6390:                 "fps": state["fps"],
+6391:                 "cum": [[round(x, 1), round(y, 1)] for x, y in state["cum"]],
+6392:                 "bands": [[round(x, 1), round(y, 1)] for x, y in state["bands"]],
+6393:             },
+6394:             "detections": ([dict(asdict(d), enabled=True)
+6395:                             for d in state["detections"]]
+6396:                            + [dict(asdict(d), enabled=False, zone_dropped=True)
+6397:                               for d in state.get("zdropped", [])]),
+6398:         }
+6399:         if state.get("audio_suggestions"):
+6400:             doc["audio_suggestions"] = state["audio_suggestions"]
+6401:         if state.get("audio_transcript"):
+6402:             doc["audio_transcript"] = state["audio_transcript"]
+6403:     aspans = getattr(args, "audio_spans", None)
+6404:     if ((source is None and aspans)
+6405:             or (source is not None and state.get("audio_redactions_overridden"))):
+6406:         # An explicit empty list clears saved spans. Otherwise preserve the raw
+6407:         # saved representation, including additive fields on individual spans.
+6408:         doc["audio_redactions"] = [
+6409:             {"t0": a, "t1": b, "mode": m} for a, b, m in (aspans or [])]
+6410:     # Construction and output hashing precede an optional caller-owned final
+6411:     # publication boundary. CLI/GUI and old callback callers keep atomic bytes.
+6412:     (publisher or atomic_report)(path, doc)
+6413: 
+6414: 
+6415: def load_report(path):
+6416:     """-> (detections, render_state, provenance). Accepts v3 plain-list
+6417:     reports (no render_state) and v4 dict reports; disabled detections are
+6418:     dropped."""
+6419:     with open(path, encoding="utf-8") as f:
+6420:         doc = json.load(f)
+6421:     return _decode_report(doc)
+6422: 
+6423: 
+6424: def _decode_report(doc):
+6425:     """Decode the enabled render subset of one already-read report snapshot."""
+6426:     if isinstance(doc, list):
+6427:         rows, state, prov = doc, None, {}
+6428:     else:
+6429:         rows, state, prov = doc.get("detections", []), doc.get("render_state"), \
+6430:             doc.get("provenance", {})
+6431:     dets = []
+6432:     for r in rows:
+6433:         if not r.get("enabled", True):
+6434:             continue
+6435:         dets.append(Detection(
+6436:             t_start=float(r["t_start"]), t_end=float(r["t_end"]),
+6437:             cbox=tuple(r["cbox"]), category=r["category"], text=r["text"],
+6438:             confidence=float(r.get("confidence", 1.0)),
+6439:             aoff=tuple(r.get("aoff", (0.0, 0.0))),
+6440:             last_seen=float(r.get("last_seen", r["t_start"])),
+6441:             # Preserve grouping in the enabled subset used by the renderer.
+6442:             dense=bool(r.get("dense", False)),
+6443:             track=int(r.get("track", -1)),
+6444:             person=int(r.get("person", -1)),
+6445:             poly=tuple(copy.deepcopy(r.get("poly") or ()))))
+6446:     return dets, state, prov
+6447: 
+6448: 
+6449: # ----------------------------------------------------------------------------
+
+# openscrub.py:8580-8644
+8580:                audio_lanes=getattr(args, "audio_lane_count", None))
+8581:     if args.report:
+8582:         write_report(args.report, args, state, output_path=dst,
+8583:                      publisher=getattr(cb, "publish_report", None))
+8584:         cb.log(f"      audit report: {args.report} (contains PII text — protect it)")
+8585:     cb.log("done.")
+8586:     return dict(state["stats"], output=dst)
+8587: 
+8588: 
+8589: def run_pipeline(args, cb=None):
+8590:     """Scan + render (or render-only with --from-report). Returns a summary
+8591:     dict; raises PipelineCancelled if cb cancels."""
+8592:     cb = cb or Callbacks()
+8593:     if getattr(args, "audio_redact", ""):
+8594:         args.audio_spans = parse_audio_spans(args.audio_redact,
+8595:                                              args.audio_redact_mode)
+8596:     if getattr(args, "from_report", None):
+8597:         cb.log(f"[1/2] Loading detections from {args.from_report}")
+8598:         # Read once so geometry, choices, audio and provenance come from the
+8599:         # same snapshot. The raw document stays separate from render objects.
+8600:         with open(args.from_report, encoding="utf-8") as f:
+8601:             source = json.load(f)
+8602:         dets, rstate, prov = _decode_report(source)
+8603:         audio_overridden = getattr(args, "audio_spans", None) is not None
+8604:         if not audio_overridden and isinstance(source, dict):
+8605:             try:
+8606:                 args.audio_spans = [
+8607:                     (float(s["t0"]), float(s["t1"]), s.get("mode", "mute"))
+8608:                     for s in source.get("audio_redactions", [])]
+8609:             except (TypeError, ValueError, KeyError):
+8610:                 pass
+8611:         selected_input = getattr(args, "_report_input", None)
+8612:         if selected_input is not None:
+8613:             # An in-process caller already selected/owns this exact input.
+8614:             # Do not follow newer provenance into a source it did not admit.
+8615:             args.video = selected_input
+8616:         else:
+8617:             orig = prov.get("original_input")
+8618:             if orig and os.path.exists(orig) \
+8619:                     and os.path.abspath(orig) != os.path.abspath(args.video):
+8620:                 # re-renders must start from the TRUE original so intake can
+8621:                 # re-derive the HDR/CFR context (cached intermediates are
+8622:                 # reused). Rendering straight from the tone-mapped scan copy
+8623:                 # silently downgraded HDR jobs to SDR output.
+8624:                 args.video = orig
+8625:         normalize_vfr(args, cb)
+8626:         if rstate is None:
+8627:             raise RuntimeError("report has no render_state — re-run a scan "
+8628:                                "with --report using openscrub v4+")
+8629:         cb.log(f"      {len(dets)} enabled detections")
+8630:         in_sha = sha256_file(args.video)
+8631:         if prov.get("input_sha256") and prov["input_sha256"] != in_sha:
+8632:             cb.log("      WARNING: input file differs from the one this report "
+8633:                    "was made from (sha256 mismatch) — blur positions may be wrong")
+8634:         state = {"fps": rstate["fps"],
+8635:                  "cum": [tuple(v) for v in rstate["cum"]],
+8636:                  "bands": [tuple(v) for v in rstate["bands"]],
+8637:                  "detections": dets, "input_sha256": in_sha,
+8638:                  "source_report": source,
+8639:                  "audio_redactions_overridden": audio_overridden,
+8640:                  "audio_suggestions": copy.deepcopy(source.get("audio_suggestions")),
+8641:                  "stats": {"scans": 0, "raw_hits": 0, "regions": len(dets),
+8642:                            "recalls": 0, "remembered": 0}}
+8643:         return run_render(args, state, cb)
+8644:     state = run_scan(args, cb)
+
+{"blob": "30aca965bedeb0d41a3c3475a41603f21705086e", "commit": "4b9bd7e576a8ae30369672b4b4722fc9752e233f", "path": "openscrub_web.py", "sha256": "0fc4669a086265bc3c0dd05e895a3abfed18eda7544124f8408dfeade450a330"}
+
+# openscrub_web.py:1022-1055
+1022: def _run_job(job, action, owner=None):
+1023:     if owner is None:
+1024:         owner = _prepare_work(job, action)
+1025:         try:
+1026:             with FILES.initialize(job).report_lock:
+1027:                 _begin_operation(job, owner)
+1028:             return _run_job(job, action, owner)
+1029:         finally:
+1030:             _finish_operation(job, owner)
+1031:     jid = job["id"]
+1032:     files = FILES.initialize(job)
+1033:     with files.report_lock:
+1034:         if owner.operation is None:  # compatibility with old queue entries
+1035:             _begin_operation(job, owner)
+1036:         if not _operation_valid(job, owner):
+1037:             return
+1038:         job["phase"] = "scanning" if action == "scan" else "rendering"
+1039:     cb = WebCallbacks(job, owner.operation)
+1040:     def publish_report(path, doc):
+1041:         with files.report_lock:
+1042:             if not _operation_valid(job, owner) or owner.operation.is_set():
+1043:                 raise openscrub.PipelineCancelled()
+1044:             atomic_report(path, doc)
+1045:     cb.publish_report = publish_report
+1046:     source = owner.source if owner is not None else job["video"]
+1047:     try:
+1048:         if action == "scan":
+1049:             job["log"].append("— scan started —")
+1050:             args = build_args(dict(job, video=source))
+1051:             state = openscrub.run_scan(args, cb)
+1052:             openscrub.write_report(os.path.join(job["dir"], "report.json"),
+1053:                                   args, state, publisher=cb.publish_report)
+1054:             with files.report_lock:
+1055:                 if not _operation_valid(job, owner):
+
+# openscrub_web.py:1824-1866
+1824: def job_save_edits(jid):
+1825:     job = JOBS.get(jid) or abort(404)
+1826:     edits = request.get_json(force=True)
+1827:     path = os.path.join(job["dir"], "report.json")
+1828:     with FILES.initialize(job).report_lock:
+1829:         _edit_gate(job)
+1830:         try:
+1831:             doc = _load_job_report(job)
+1832:         except FileNotFoundError:
+1833:             abort(404, "job report not found")
+1834:         # Remember only effective assignment destinations, before their first
+1835:         # assignment. Aliased indices may change then restore the same field.
+1836:         missing = object()
+1837:         touched = {}
+1838:         def assign(target, key, value):
+1839:             destination = (id(target), key)
+1840:             if destination not in touched:
+1841:                 touched[destination] = (target, key, target.get(key, missing))
+1842:             target[key] = value
+1843: 
+1844:         original_count = len(doc["detections"])
+1845:         enabled = edits.get("enabled", {})
+1846:         for i, d in enumerate(doc["detections"]):
+1847:             if str(i) in enabled:
+1848:                 assign(d, "enabled", bool(enabled[str(i)]))
+1849:         for i, box in (edits.get("box_overrides") or {}).items():
+1850:             i = int(i)
+1851:             if 0 <= i < len(doc["detections"]) and len(box) == 4:
+1852:                 assign(doc["detections"][i], "cbox", [float(v) for v in box])
+1853:         for i, span in (edits.get("time_overrides") or {}).items():
+1854:             i = int(i)
+1855:             if 0 <= i < len(doc["detections"]) and len(span) == 2:
+1856:                 t0, t1 = float(span[0]), float(span[1])
+1857:                 if t1 > t0 >= 0:
+1858:                     assign(doc["detections"][i], "t_start", t0)
+1859:                     assign(doc["detections"][i], "t_end", t1)
+1860:                     assign(doc["detections"][i], "last_seen", min(
+1861:                         max(doc["detections"][i].get("last_seen", t0), t0), t1))
+1862:         rs = doc["render_state"]
+1863:         # Read identities from this transaction's latest raw document. Never
+1864:         # reconstruct creation from a row's mutable current geometry/choices.
+1865:         identified = {}
+1866:         for d in doc["detections"]:
+
+# openscrub_web.py:1900-1922
+1900:             row = dict(creation, category="manual", text="user-drawn", confidence=1.0,
+1901:                        last_seen=t0, enabled=True)
+1902:             if has_id:
+1903:                 # Separate lists keep later indexed edits independent of creation.
+1904:                 row.update(manual_id=identity, manual_creation={
+1905:                     **creation, "cbox": list(creation["cbox"]), "aoff": list(creation["aoff"])})
+1906:                 identified[identity] = [row]
+1907:             doc["detections"].append(row)
+1908:         if "audio" in edits:
+1909:             # audio redaction spans (mute/bleep): stored in the report so the
+1910:             # --from-report render applies them and re-renders keep them
+1911:             assign(doc, "audio_redactions", [
+1912:                 {"t0": float(s["t0"]), "t1": float(s["t1"]),
+1913:                  "mode": (s.get("mode") if s.get("mode") in ("mute", "bleep")
+1914:                           else "mute")}
+1915:                 for s in (edits.get("audio") or [])
+1916:                 if float(s.get("t1", 0)) > float(s.get("t0", 0)) >= 0])
+1917:         if (len(doc["detections"]) != original_count
+1918:                 or any(original is missing or not _same_json_value(original, target[key])
+1919:                        for target, key, original in touched.values())):
+1920:             atomic_report(path, doc)
+1921:         # suggest allowlisting any string whose EVERY instance was disabled —
+1922:         # the review just taught us it's a recurring false positive
+
+# openscrub_web.py:2005-2013
+2005:                 rs = doc["render_state"]
+2006:                 fps = float(rs["fps"]) or 30.0
+2007:                 step = 2.0 / fps
+2008:                 tid = max([d.get("track", -1) for d in doc["detections"]
+2009:                            if isinstance(d.get("track", -1), int)] + [-1]) + 1
+2010:                 new = []
+2011:                 tcls = samples[0][4] if len(samples[0]) > 4 else None
+2012:                 label = ("tracked %s" % openscrub.COCO_NAMES[tcls]
+2013:                          if tcls is not None

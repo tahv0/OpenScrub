@@ -1,0 +1,74 @@
+{"blob": "992adfb357631f69792f22e437a3b1d61e2a7ca8", "bytes": 2934, "commit": "4b9bd7e576a8ae30369672b4b4722fc9752e233f", "export": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/selected-target-tracking-research/openscrub_internal__lifetimes.py", "lines": 104, "path": "openscrub_internal/lifetimes.py", "sha256": "dbfc317c1c878b8e8a599391578504c44a8964199f2cdae6e2ed60a6336d6743"}
+
+# openscrub_internal/lifetimes.py:1-71
+1: """In-process web file ownership. Reserve/inspect only under the web guard.
+2: 
+3: Per-job state also owns the report transaction lock and operation identity.
+4: This does not coordinate other processes. A lifetime token may move to a queued task, thread, or WSGI iterable; release is idempotent.
+5: """
+6: 
+7: import threading
+8: 
+9: 
+10: class _JobFiles:
+11:     def __init__(self):
+12:         self.count = 0
+13:         self.work = 0
+14:         self.closed = False
+15:         self.queued = {}
+16:         self.tracker = None
+17:         # Initialized before a new/rehydrated job enters the registry. Never
+18:         # persisted: one stable transaction boundary per live job identity.
+19:         self.report_lock = threading.Lock()
+20:         self.operation = None
+21:         self.active = None
+22: 
+23: 
+24: class FileOwners:
+25:     def __init__(self, guard):
+26:         self.guard = guard
+27:         self.count = 0
+28: 
+29:     @staticmethod
+30:     def initialize(job):
+31:         return job.setdefault("_files", _JobFiles())
+32: 
+33:     def reserve(self, job=None, work=False):
+34:         state = self.initialize(job) if job is not None else None
+35:         self.count += 1
+36:         if state is not None:
+37:             state.count += 1
+38:             state.work += int(work)
+39:         return _Lease(self, state, work)
+40: 
+41: 
+42: class _Lease:
+43:     def __init__(self, owners, state, work):
+44:         self.owners, self.state, self.work = owners, state, work
+45:         self.released = False
+46:         self.related = []
+47:         self.source = None
+48:         self.report_input = False
+49:         self.operation = None
+50: 
+51:     def release_locked(self):
+52:         if self.released:
+53:             return
+54:         self.released = True
+55:         for lease in self.related:
+56:             lease.release_locked()
+57:         self.owners.count -= 1
+58:         if self.state is not None:
+59:             self.state.count -= 1
+60:             self.state.work -= int(self.work)
+61: 
+62:     def release(self):
+63:         with self.owners.guard:
+64:             self.release_locked()
+65: 
+66:     def __enter__(self):
+67:         return self
+68: 
+69:     def __exit__(self, *exc):
+70:         self.release()
+71: 

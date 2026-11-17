@@ -1,0 +1,10 @@
+Traceback (most recent call last):
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/benchmark/browser_logs.py", line 108, in <module>
+    main()
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/benchmark/browser_logs.py", line 39, in main
+    frozen = json.loads(verify_manifest())
+                        ^^^^^^^^^^^^^^^^^
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/benchmark/browser_logs.py", line 37, in verify_manifest
+    assert hashlib.sha256(data).hexdigest() == granted, 'granted manifest identity'
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: granted manifest identity

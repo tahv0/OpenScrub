@@ -1,0 +1,17 @@
+# Bound the active browser job log while preserving reading position
+
+Base: `2c7f2530893cb2ecd20dfe7803b6301ea34f9f9f` (independently reviewed P12B). Candidate: `f44e0b786ad065010fbfd2b8328350bde44116ec` (fix1 follows reviewed `4670641cb8e53e6daa6f77fb505397bfdb6733b8`). Separate P12C follow-up; no publication requested.
+
+An open job currently appends browser text forever even though P12B limits producer storage. Keep one mount-owned recent transcript: initial/reset/reopen last400, then at most800 entries and2,097,152 represented UTF-16 bytes. Stable content nodes preserve retained selection and entry anchors; the accepted body alone owns display/cursor progress. Preserve the final pre-mutation40px bottom threshold, keep a scrolled-up surviving entry/offset, and show the oldest retained top plus one fixed notice when its anchor is evicted. Accepted resets go to recent bottom without changing focus. View replacement/deletion disposes resize/scroll/frame ownership.
+
+Adds actual producer→HTTP→PAGE browser coverage for count/text/entry bounds, blanks/multiline/Unicode, exact bytes, clipboard/selection ownership, held-body scrolling,39/40/41px, narrow/desktop rewrap/clamping, replacement/reopen and cleanup. Keeps P03/P12B body/epoch/deadline/backoff/view fences, fixes the adjacent optional browser-artifact convention, documents recent-history policy, and ships a self-contained offline comparison recipe with its sdist files.
+
+Original-candidate validation (unchanged runtime, original source/test identities): one normal discovered suite250 pass; final strengthened browser6 pass; actual Python3.9 owning59 pass (129 deselected, optional artifacts unset); installed extracted-sdist owning54 pass; evaluated PAGE JS parse; offline sdist→wheel/exact source/tests/recipes and updater delivery; exact installed CLI/defaults and actual Cheroot/browser initial400→800/cursor2700 smoke. Portable recipe has non-timed positive and wrong-hash/path controls; historical measurements remain bound to their separately archived original recipes/test hashes.
+
+Fix1 resolves review I1: create the portable runner's process-log parent before executing a phase. New fresh-root regressions control only the external child and verify pre-child directory ownership, successful output, nonzero output and original timeout diagnostics;3/3 pass on actual Python3.12.16 and3.9.25. No Node/browser/timing or broad-suite rerun. Final sdist includes the amended recipe/new test exactly; rebuilt wheel is byte-identical to the original912bd8f5… wheel. New sdistSHA256a23d7a70….
+
+Cost limitation: dense8,192-unit/255-LF publication/layout fails the declared16/50ms median/p95 budgets at44.8/66.0ms (max82.8ms;30 overlapping long tasks). Supervisor explicitly accepted unchanged limits for this bounded-retention candidate. All four initial population observations regress (3.0→6.6,9.0→12.1,13.2→14.7,39.9→42.7ms). Other fixture publication budgets pass. Differing retained histories/fixed source order prevent equal-work/universal speed claims; idle post-batch wheel checks are not under-publication input measurements. No RSS/global memory claim. Prepared headless native suspension, other browser engines, Windows/frozen, GPU and Docker execution remain unverified.
+
+Full report and raw/derived evidence: `task-1203-report.md`, `task1203-evidence/` in the owning SDD workspace.
+
+Fix details/evidence: `task-1203-fix1-report.md`, `task1203-fix1-evidence/`.

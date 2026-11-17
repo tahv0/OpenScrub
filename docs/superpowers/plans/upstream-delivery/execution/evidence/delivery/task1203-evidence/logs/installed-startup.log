@@ -1,0 +1,14 @@
+INSTALLED_SOURCE openscrub /home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1203/installed/site-packages/openscrub.py 0e4f0f9a7846080f591038d021aaf3ca6f01201d83ac32bbdc273f53d5067ee7
+INSTALLED_SOURCE openscrub_web /home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1203/installed/site-packages/openscrub_web.py 04af11cce1eaf4be0dc157ba5b4d78783a85bcbbb17596078c75d9df79f46c93
+INSTALLED_SOURCE openscrub_internal.job_logs /home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1203/installed/site-packages/openscrub_internal/job_logs.py 63d08c124db019b120bb17efc64706d910f1d831f8ccfd9c1ba124368643d1b8
+INSTALLED_DEFAULTS /home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1203/profile/.local/share/OpenScrub/openscrub_jobs /home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1203/profile/.openscrub/models
+INSTALLED_JOB 4c2ec78cb04f
+============================================================
+openscrub web — open from any device on your LAN:
+    http://127.0.0.1:43277/
+    (open access: no token — everyone on this network can use it;
+     add --token <secret> if you ever want a gate back)
+Jobs folder (contains PII): /home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1203/profile/.local/share/OpenScrub/openscrub_jobs — kept forever
+Do NOT expose this port to the internet.
+============================================================
+    WARNING: plain HTTP — PII crosses the network unencrypted.

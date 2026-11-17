@@ -1,0 +1,4 @@
+timeout stdout�
+timeout stderr
+
+SUBPROCESS TIMEOUT

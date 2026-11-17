@@ -1,0 +1,34 @@
+{
+  "source_files": {
+    "openscrub.py": "0e4f0f9a7846080f591038d021aaf3ca6f01201d83ac32bbdc273f53d5067ee7",
+    "openscrub_web.py": "04af11cce1eaf4be0dc157ba5b4d78783a85bcbbb17596078c75d9df79f46c93",
+    "zones_ui.py": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7",
+    "openscrub_internal/__init__.py": "cddf0922db4bac37438529289d535c50114ce4e7c01fbe0aabc4e7f9345f6b44",
+    "openscrub_internal/job_logs.py": "63d08c124db019b120bb17efc64706d910f1d831f8ccfd9c1ba124368643d1b8",
+    "tests/test_job_logs.py": "f43eee820831e2850479d1cf8cf6d4ed909971a835f549ce063c3d0244d4551c",
+    "tests/test_job_polling_node.py": "b027fbde9373bbc7d2ff81dba1f9bd1ad9c6d528b00b11f8004af1b91db20636",
+    "tests/test_job_polling_browser.py": "bccef2c535f542c1e2bf3de8578ad9da934a4bea71b3ae1d3c0a74f321f8da1c",
+    "tests/test_browser_log_retention.py": "dfc32a0b9fe9a3b0de2eba669daa166d3a6ac2ca61094115ba84cc42f68938ea",
+    "test_openscrub.py": "8a755be0029508a2e71a9b3f6f798d6b2828cc7988b9a6484404b43ba8e65baa",
+    "pyproject.toml": "eeb7403ea982e232b4d81558ce0fd4789f32760fdfeb96e49c4a6a65af912553",
+    "README.md": "90560f7c6ae20a1609173e55fc64196792901f2065c1d3e15d6c93856452887d",
+    "benchmark/browser_logs.py": "722c26b00c8934f2e6ec310ba3b3031af58dba92fbe19529614907c9896563db",
+    "benchmark/browser_logs.js": "0c601ff82c363ba5161659d5e02b07aa31c84777b78d9416aaaf62cb6611d690",
+    "benchmark/browser_logs_env.py": "11a70a1ca2212b6766804731168549c7cf8a4623f9803073da7796d7193dfa6f",
+    "benchmark/browser_logs_summary.py": "7822b84a67b3a93f14bf0f9bd0eb04adb9604f776867bd8b109745ca7d606ef0",
+    "benchmark/README.md": "910bde4fecc7ef34439154028d9abbaf1f9afe24386db6e361db49c529e19677",
+    "tests/test_browser_log_benchmark.py": "44d41cc59df60fe4814756016b559e3fc83821134fe17bb37c1729dbea64c3ef"
+  },
+  "sdist": {
+    "file": "openscrub-1.0.96.tar.gz",
+    "bytes": 569239,
+    "sha256": "a23d7a70fb086ad618e67e4ae31292b8a4954201b75fc2aa0c880969c8db2703"
+  },
+  "wheel": {
+    "file": "openscrub-1.0.96-py3-none-any.whl",
+    "bytes": 443575,
+    "sha256": "912bd8f54571eb75fb41236ebc247a426d1272bc54fa7f36a46acec470e0997d"
+  },
+  "wheel_identical_to_reviewed_candidate": true,
+  "limits": "Exact source/recipe/test sdist inclusion and identical runtime wheel; no suite/browser/timing/startup rerun."
+}

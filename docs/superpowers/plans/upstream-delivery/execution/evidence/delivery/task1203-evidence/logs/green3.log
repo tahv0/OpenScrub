@@ -1,0 +1,87 @@
+TASK1203_ACTIVE_SOURCE {"python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]", "sources": {"openscrub": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py", "sha256": "0e4f0f9a7846080f591038d021aaf3ca6f01201d83ac32bbdc273f53d5067ee7"}, "openscrub_web": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", "sha256": "04af11cce1eaf4be0dc157ba5b4d78783a85bcbbb17596078c75d9df79f46c93"}, "zones_ui": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/zones_ui.py", "sha256": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7"}}}
+....F................................................                    [100%]
+=================================== FAILURES ===================================
+_____ test_view_disposal_owns_observers_frames_notes_and_native_lifecycle ______
+
+polling_http = 'http://127.0.0.1:42969'
+
+    def test_view_disposal_owns_observers_frames_notes_and_native_lifecycle(polling_http):
+        # Old view observers/frames must not publish after an A→B→A replacement.
+>       run_browser(polling_http, r"""
+    await page.addInitScript(()=>{
+     const Native=ResizeObserver;window.observers=[];window.frames=new Set();window.cancelledFrames=0;
+     window.ResizeObserver=class{constructor(callback){this.callback=callback;this.native=new Native(callback);this.active=false;window.observers.push(this)}
+     observe(e){this.element=e;this.active=true;this.native.observe(e)}disconnect(){this.active=false;this.native.disconnect()}};
+     const request=window.requestAnimationFrame.bind(window),cancel=window.cancelAnimationFrame.bind(window);
+     window.requestAnimationFrame=callback=>{let id=request(time=>{window.frames.delete(id);callback(time)});window.frames.add(id);return id};
+     window.cancelAnimationFrame=id=>{if(window.frames.delete(id))window.cancelledFrames++;cancel(id)};
+    });
+    await open(500);await page.clock.runFor(40);
+    await page.evaluate(()=>{window.oldLog=document.getElementById('log');oldLog.style.width='200px';window.observers[0].callback();});
+    assert.equal(await page.evaluate(()=>window.frames.size),1);
+    await page.evaluate(()=>openJob('B'));await wait(async()=>await cursor()===1);await idle();
+    assert.equal(await text(),'log-B');assert.equal(await page.evaluate(()=>window.observers.filter(o=>o.active).length),1);
+    assert.equal(await page.evaluate(()=>window.observers[0].active),false);assert.equal(await page.evaluate(()=>window.cancelledFrames),1);
+    await page.evaluate(()=>window.observers[0].callback());await page.clock.runFor(40);assert.equal(await text(),'log-B');assert.equal(await note(),'');
+    await page.evaluate(()=>openJob('A'));await wait(async()=>await cursor()===500);await idle();
+    assert.equal((await snap()).count,400);assert.match(await text(),/^L100
+    /);
+    // Native Chromium freezing is a distinct check from synthetic visibility schedules.
+    const cdp=await page.context().newCDPSession(page);await cdp.send('Page.enable');
+    const lifecycle=[];cdp.on('Page.lifecycleEvent',event=>lifecycle.push(event.name));await cdp.send('Page.setLifecycleEventsEnabled',{enabled:true});
+    await page.evaluate(()=>{window.nativeVisibility=[];document.addEventListener('visibilitychange',()=>window.nativeVisibility.push(document.visibilityState));document.addEventListener('freeze',()=>window.nativeFrozen=true);document.addEventListener('resume',()=>window.nativeResumed=true)});
+    await cdp.send('Page.setWebLifecycleState',{state:'frozen'});
+    const n=requests.length;await control({action:'append',lines:['while-frozen']});await pause(200);assert.equal(requests.length,n);
+    await cdp.send('Page.setWebLifecycleState',{state:'active'});await page.clock.runFor(900);await idle();
+    const native=await page.evaluate(()=>({visibility:window.nativeVisibility,frozen:window.nativeFrozen,resumed:window.nativeResumed,state:document.visibilityState}));
+    console.log(JSON.stringify({native,lifecycle}));assert.equal(native.frozen,true);assert.equal(native.resumed,true);
+    await wait(async()=>await cursor()===501);assert.ok((await text()).endsWith('while-frozen'));
+    page.once('dialog',dialog=>dialog.accept());await page.evaluate(()=>delJob('A'));await wait(()=>page.evaluate(()=>CUR===null));
+    assert.equal(await page.locator('#log').count(),0);assert.equal(await page.evaluate(()=>window.observers.filter(o=>o.active).length),0);assert.equal(await page.evaluate(()=>RECENT_LOG===null&&window.frames.size===0),true);
+    await page.evaluate(()=>{for(const observer of window.observers)observer.callback()});await page.clock.runFor(40);assert.equal(await page.locator('#logStatus').count(),0);
+    records.push({case:'owned-cleanup-native-freeze',native,lifecycle,observers:await page.evaluate(()=>window.observers.length)});
+    """, 'lifecycle')
+
+tests/test_browser_log_retention.py:195: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+polling_http = 'http://127.0.0.1:42969'
+script = "\nawait page.addInitScript(()=>{\n const Native=ResizeObserver;window.observers=[];window.frames=new Set();window.can...h({case:'owned-cleanup-native-freeze',native,lifecycle,observers:await page.evaluate(()=>window.observers.length)});\n"
+name = 'lifecycle'
+
+    def run_browser(polling_http, script, name):
+        node = shutil.which('node')
+        if not node:
+            pytest.skip('Node needed for optional Playwright acceptance')
+        available = subprocess.run([node, '-e', "require('playwright')"], capture_output=True)
+        if available.returncode:
+            pytest.skip('Existing Playwright required; no dependency installation attempted')
+        env = dict(os.environ, POLLING_BASE=polling_http, RETENTION_CASE=name)
+        result = subprocess.run([node, '-e', BROWSER_SETUP + script + BROWSER_FINISH],
+                                capture_output=True, text=True, env=env, timeout=150)
+        if os.environ.get('POLLING_ARTIFACTS'):
+            Path(os.environ['POLLING_ARTIFACTS'], name + '.log').write_text(result.stdout + result.stderr)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: [eval]:51
+E         assert.equal((await snap()).count,400);assert.match(await text(),/^L100
+E                                                                          ^
+E         
+E         SyntaxError: Invalid regular expression: missing /
+E             at makeContextifyScript (node:internal/vm:185:14)
+E             at compileScript (node:internal/process/execution:383:10)
+E             at node:internal/process/execution:447:25
+E             at [eval]-wrapper:6:24
+E             at runScriptInContext (node:internal/process/execution:444:60)
+E             at evalFunction (node:internal/process/execution:88:30)
+E             at evalScript (node:internal/process/execution:100:3)
+E             at node:internal/main/eval_string:74:3
+E         
+E         Node.js v22.22.1
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', "\nconst {chromium}=require('playwright'),assert=require('node:assert/st... evalScript (node:internal/process/execution:100:3)\n    at node:internal/main/eval_string:74:3\n\nNode.js v22.22.1\n').returncode
+
+tests/test_browser_log_retention.py:71: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_browser_log_retention.py::test_view_disposal_owns_observers_frames_notes_and_native_lifecycle
+1 failed, 52 passed in 21.70s

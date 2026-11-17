@@ -1,0 +1,179 @@
+TASK1203_ACTIVE_SOURCE {"python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]", "sources": {"openscrub": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py", "sha256": "0e4f0f9a7846080f591038d021aaf3ca6f01201d83ac32bbdc273f53d5067ee7"}, "openscrub_internal.job_logs": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_internal/job_logs.py", "sha256": "63d08c124db019b120bb17efc64706d910f1d831f8ccfd9c1ba124368643d1b8"}, "openscrub_web": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", "sha256": "04af11cce1eaf4be0dc157ba5b4d78783a85bcbbb17596078c75d9df79f46c93"}, "zones_ui": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/zones_ui.py", "sha256": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7"}}}
+FFF                                                                      [100%]
+=================================== FAILURES ===================================
+__ test_fresh_process_log_directory_and_success_failure_diagnostics[success] ___
+
+tmp_path = PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1203/fix1/red-native/test_fresh_process_log_directo0')
+mode = 'success'
+
+    @pytest.mark.parametrize('mode', ['success', 'nonzero', 'timeout'])
+    def test_fresh_process_log_directory_and_success_failure_diagnostics(tmp_path, mode):
+        # Removing runner-owned mkdir must fail before the controlled child executes;
+        # dropping either output stream or masking TimeoutExpired must also fail.
+        scratch = tmp_path / 'fresh-root'
+        scratch.mkdir()
+        assert not (scratch / 'logs').exists()
+        driver = ROOT / 'benchmark' / 'browser_logs.py'
+        python = Path(sys.executable).resolve()
+        files = [ROOT / relative for relative in (
+            'openscrub.py', 'openscrub_web.py', 'zones_ui.py',
+            'openscrub_internal/__init__.py', 'openscrub_internal/job_logs.py',
+            'tests/test_job_polling_browser.py',
+            'benchmark/browser_logs.py', 'benchmark/browser_logs.js', 'benchmark/browser_logs_env.py',
+        )] + [python]
+        manifest = scratch / 'frozen.json'
+        manifest.write_text(json.dumps({'sha256': {
+            str(path): hashlib.sha256(path.read_bytes()).hexdigest() for path in files
+        }}))
+        wrapper = scratch / 'controlled_child.py'
+        wrapper.write_text(CONTROLLED_CHILD)
+        # Python stands in for both tool paths but is never executed as Node/Chromium.
+        command = [sys.executable, str(wrapper), str(driver), mode, str(scratch),
+                   '--root', str(scratch), '--source', str(ROOT),
+                   '--node', str(python), '--chromium', str(python),
+                   '--manifest', str(manifest), '--granted-sha', hashlib.sha256(manifest.read_bytes()).hexdigest(),
+                   '--phase', 'timing', '--label', 'candidate']
+        env = dict(os.environ, PYTHONDONTWRITEBYTECODE='1')
+        env.pop('PYTEST_PLUGINS', None)  # Standalone isolation comes from the runner.
+        result = subprocess.run(command, capture_output=True, text=True, env=env, timeout=30)
+>       assert 'CONTROLLED_CHILD_LOG_PARENT_EXISTS' in result.stdout, result.stdout + result.stderr
+E       AssertionError: BROWSER_LOG_SOURCE {"python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]", "sources": {"openscrub": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py", "sha256": "0e4f0f9a7846080f591038d021aaf3ca6f01201d83ac32bbdc273f53d5067ee7"}, "openscrub_internal.job_logs": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_internal/job_logs.py", "sha256": "63d08c124db019b120bb17efc64706d910f1d831f8ccfd9c1ba124368643d1b8"}, "openscrub_web": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", "sha256": "04af11cce1eaf4be0dc157ba5b4d78783a85bcbbb17596078c75d9df79f46c93"}, "zones_ui": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/zones_ui.py", "sha256": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7"}}}
+E         Traceback (most recent call last):
+E           File "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1203/fix1/red-native/test_fresh_process_log_directo0/fresh-root/controlled_child.py", line 25, in <module>
+E             runpy.run_path(runner, run_name='__main__')
+E           File "<frozen runpy>", line 287, in run_path
+E           File "<frozen runpy>", line 98, in _run_module_code
+E           File "<frozen runpy>", line 88, in _run_code
+E           File "/home/tahv0/.codex/worktrees/c832/OpenScrub/benchmark/browser_logs.py", line 108, in <module>
+E             main()
+E           File "/home/tahv0/.codex/worktrees/c832/OpenScrub/benchmark/browser_logs.py", line 88, in main
+E             result = subprocess.run([str(args.node.resolve()), str(Path(__file__).with_suffix('.js'))], env=env,
+E                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E           File "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1203/fix1/red-native/test_fresh_process_log_directo0/fresh-root/controlled_child.py", line 15, in child
+E             assert log.parent.is_dir(), 'process-log directory must exist before the controlled child executes'
+E                    ^^^^^^^^^^^^^^^^^^^
+E         AssertionError: process-log directory must exist before the controlled child executes
+E         
+E       assert 'CONTROLLED_CHILD_LOG_PARENT_EXISTS' in 'BROWSER_LOG_SOURCE {"python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]", "sources": {"openscrub": {"fil...rktrees/c832/OpenScrub/zones_ui.py", "sha256": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7"}}}\n'
+E        +  where 'BROWSER_LOG_SOURCE {"python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]", "sources": {"openscrub": {"fil...rktrees/c832/OpenScrub/zones_ui.py", "sha256": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7"}}}\n' = CompletedProcess(args=['/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python', '/home/tahv0/src/OpenScrub/.superpo...         ^^^^^^^^^^^^^^^^^^^\nAssertionError: process-log directory must exist before the controlled child executes\n').stdout
+
+tests/test_browser_log_benchmark.py:75: AssertionError
+__ test_fresh_process_log_directory_and_success_failure_diagnostics[nonzero] ___
+
+tmp_path = PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1203/fix1/red-native/test_fresh_process_log_directo1')
+mode = 'nonzero'
+
+    @pytest.mark.parametrize('mode', ['success', 'nonzero', 'timeout'])
+    def test_fresh_process_log_directory_and_success_failure_diagnostics(tmp_path, mode):
+        # Removing runner-owned mkdir must fail before the controlled child executes;
+        # dropping either output stream or masking TimeoutExpired must also fail.
+        scratch = tmp_path / 'fresh-root'
+        scratch.mkdir()
+        assert not (scratch / 'logs').exists()
+        driver = ROOT / 'benchmark' / 'browser_logs.py'
+        python = Path(sys.executable).resolve()
+        files = [ROOT / relative for relative in (
+            'openscrub.py', 'openscrub_web.py', 'zones_ui.py',
+            'openscrub_internal/__init__.py', 'openscrub_internal/job_logs.py',
+            'tests/test_job_polling_browser.py',
+            'benchmark/browser_logs.py', 'benchmark/browser_logs.js', 'benchmark/browser_logs_env.py',
+        )] + [python]
+        manifest = scratch / 'frozen.json'
+        manifest.write_text(json.dumps({'sha256': {
+            str(path): hashlib.sha256(path.read_bytes()).hexdigest() for path in files
+        }}))
+        wrapper = scratch / 'controlled_child.py'
+        wrapper.write_text(CONTROLLED_CHILD)
+        # Python stands in for both tool paths but is never executed as Node/Chromium.
+        command = [sys.executable, str(wrapper), str(driver), mode, str(scratch),
+                   '--root', str(scratch), '--source', str(ROOT),
+                   '--node', str(python), '--chromium', str(python),
+                   '--manifest', str(manifest), '--granted-sha', hashlib.sha256(manifest.read_bytes()).hexdigest(),
+                   '--phase', 'timing', '--label', 'candidate']
+        env = dict(os.environ, PYTHONDONTWRITEBYTECODE='1')
+        env.pop('PYTEST_PLUGINS', None)  # Standalone isolation comes from the runner.
+        result = subprocess.run(command, capture_output=True, text=True, env=env, timeout=30)
+>       assert 'CONTROLLED_CHILD_LOG_PARENT_EXISTS' in result.stdout, result.stdout + result.stderr
+E       AssertionError: BROWSER_LOG_SOURCE {"python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]", "sources": {"openscrub": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py", "sha256": "0e4f0f9a7846080f591038d021aaf3ca6f01201d83ac32bbdc273f53d5067ee7"}, "openscrub_internal.job_logs": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_internal/job_logs.py", "sha256": "63d08c124db019b120bb17efc64706d910f1d831f8ccfd9c1ba124368643d1b8"}, "openscrub_web": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", "sha256": "04af11cce1eaf4be0dc157ba5b4d78783a85bcbbb17596078c75d9df79f46c93"}, "zones_ui": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/zones_ui.py", "sha256": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7"}}}
+E         Traceback (most recent call last):
+E           File "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1203/fix1/red-native/test_fresh_process_log_directo1/fresh-root/controlled_child.py", line 25, in <module>
+E             runpy.run_path(runner, run_name='__main__')
+E           File "<frozen runpy>", line 287, in run_path
+E           File "<frozen runpy>", line 98, in _run_module_code
+E           File "<frozen runpy>", line 88, in _run_code
+E           File "/home/tahv0/.codex/worktrees/c832/OpenScrub/benchmark/browser_logs.py", line 108, in <module>
+E             main()
+E           File "/home/tahv0/.codex/worktrees/c832/OpenScrub/benchmark/browser_logs.py", line 88, in main
+E             result = subprocess.run([str(args.node.resolve()), str(Path(__file__).with_suffix('.js'))], env=env,
+E                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E           File "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1203/fix1/red-native/test_fresh_process_log_directo1/fresh-root/controlled_child.py", line 15, in child
+E             assert log.parent.is_dir(), 'process-log directory must exist before the controlled child executes'
+E                    ^^^^^^^^^^^^^^^^^^^
+E         AssertionError: process-log directory must exist before the controlled child executes
+E         
+E       assert 'CONTROLLED_CHILD_LOG_PARENT_EXISTS' in 'BROWSER_LOG_SOURCE {"python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]", "sources": {"openscrub": {"fil...rktrees/c832/OpenScrub/zones_ui.py", "sha256": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7"}}}\n'
+E        +  where 'BROWSER_LOG_SOURCE {"python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]", "sources": {"openscrub": {"fil...rktrees/c832/OpenScrub/zones_ui.py", "sha256": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7"}}}\n' = CompletedProcess(args=['/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python', '/home/tahv0/src/OpenScrub/.superpo...         ^^^^^^^^^^^^^^^^^^^\nAssertionError: process-log directory must exist before the controlled child executes\n').stdout
+
+tests/test_browser_log_benchmark.py:75: AssertionError
+__ test_fresh_process_log_directory_and_success_failure_diagnostics[timeout] ___
+
+tmp_path = PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1203/fix1/red-native/test_fresh_process_log_directo2')
+mode = 'timeout'
+
+    @pytest.mark.parametrize('mode', ['success', 'nonzero', 'timeout'])
+    def test_fresh_process_log_directory_and_success_failure_diagnostics(tmp_path, mode):
+        # Removing runner-owned mkdir must fail before the controlled child executes;
+        # dropping either output stream or masking TimeoutExpired must also fail.
+        scratch = tmp_path / 'fresh-root'
+        scratch.mkdir()
+        assert not (scratch / 'logs').exists()
+        driver = ROOT / 'benchmark' / 'browser_logs.py'
+        python = Path(sys.executable).resolve()
+        files = [ROOT / relative for relative in (
+            'openscrub.py', 'openscrub_web.py', 'zones_ui.py',
+            'openscrub_internal/__init__.py', 'openscrub_internal/job_logs.py',
+            'tests/test_job_polling_browser.py',
+            'benchmark/browser_logs.py', 'benchmark/browser_logs.js', 'benchmark/browser_logs_env.py',
+        )] + [python]
+        manifest = scratch / 'frozen.json'
+        manifest.write_text(json.dumps({'sha256': {
+            str(path): hashlib.sha256(path.read_bytes()).hexdigest() for path in files
+        }}))
+        wrapper = scratch / 'controlled_child.py'
+        wrapper.write_text(CONTROLLED_CHILD)
+        # Python stands in for both tool paths but is never executed as Node/Chromium.
+        command = [sys.executable, str(wrapper), str(driver), mode, str(scratch),
+                   '--root', str(scratch), '--source', str(ROOT),
+                   '--node', str(python), '--chromium', str(python),
+                   '--manifest', str(manifest), '--granted-sha', hashlib.sha256(manifest.read_bytes()).hexdigest(),
+                   '--phase', 'timing', '--label', 'candidate']
+        env = dict(os.environ, PYTHONDONTWRITEBYTECODE='1')
+        env.pop('PYTEST_PLUGINS', None)  # Standalone isolation comes from the runner.
+        result = subprocess.run(command, capture_output=True, text=True, env=env, timeout=30)
+>       assert 'CONTROLLED_CHILD_LOG_PARENT_EXISTS' in result.stdout, result.stdout + result.stderr
+E       AssertionError: BROWSER_LOG_SOURCE {"python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]", "sources": {"openscrub": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py", "sha256": "0e4f0f9a7846080f591038d021aaf3ca6f01201d83ac32bbdc273f53d5067ee7"}, "openscrub_internal.job_logs": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_internal/job_logs.py", "sha256": "63d08c124db019b120bb17efc64706d910f1d831f8ccfd9c1ba124368643d1b8"}, "openscrub_web": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", "sha256": "04af11cce1eaf4be0dc157ba5b4d78783a85bcbbb17596078c75d9df79f46c93"}, "zones_ui": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/zones_ui.py", "sha256": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7"}}}
+E         Traceback (most recent call last):
+E           File "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1203/fix1/red-native/test_fresh_process_log_directo2/fresh-root/controlled_child.py", line 25, in <module>
+E             runpy.run_path(runner, run_name='__main__')
+E           File "<frozen runpy>", line 287, in run_path
+E           File "<frozen runpy>", line 98, in _run_module_code
+E           File "<frozen runpy>", line 88, in _run_code
+E           File "/home/tahv0/.codex/worktrees/c832/OpenScrub/benchmark/browser_logs.py", line 108, in <module>
+E             main()
+E           File "/home/tahv0/.codex/worktrees/c832/OpenScrub/benchmark/browser_logs.py", line 88, in main
+E             result = subprocess.run([str(args.node.resolve()), str(Path(__file__).with_suffix('.js'))], env=env,
+E                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E           File "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1203/fix1/red-native/test_fresh_process_log_directo2/fresh-root/controlled_child.py", line 15, in child
+E             assert log.parent.is_dir(), 'process-log directory must exist before the controlled child executes'
+E                    ^^^^^^^^^^^^^^^^^^^
+E         AssertionError: process-log directory must exist before the controlled child executes
+E         
+E       assert 'CONTROLLED_CHILD_LOG_PARENT_EXISTS' in 'BROWSER_LOG_SOURCE {"python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]", "sources": {"openscrub": {"fil...rktrees/c832/OpenScrub/zones_ui.py", "sha256": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7"}}}\n'
+E        +  where 'BROWSER_LOG_SOURCE {"python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]", "sources": {"openscrub": {"fil...rktrees/c832/OpenScrub/zones_ui.py", "sha256": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7"}}}\n' = CompletedProcess(args=['/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python', '/home/tahv0/src/OpenScrub/.superpo...         ^^^^^^^^^^^^^^^^^^^\nAssertionError: process-log directory must exist before the controlled child executes\n').stdout
+
+tests/test_browser_log_benchmark.py:75: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_browser_log_benchmark.py::test_fresh_process_log_directory_and_success_failure_diagnostics[success]
+FAILED tests/test_browser_log_benchmark.py::test_fresh_process_log_directory_and_success_failure_diagnostics[nonzero]
+FAILED tests/test_browser_log_benchmark.py::test_fresh_process_log_directory_and_success_failure_diagnostics[timeout]
+3 failed in 3.43s

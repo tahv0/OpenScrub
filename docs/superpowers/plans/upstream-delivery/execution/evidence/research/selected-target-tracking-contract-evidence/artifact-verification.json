@@ -1,0 +1,31 @@
+{
+  "status": "artifact checks passed",
+  "source_files": [
+    "openscrub.py",
+    "openscrub_web.py",
+    "openscrub_internal/lifetimes.py",
+    "openscrub_internal/reports.py"
+  ],
+  "exact_excerpt_lines": 1802,
+  "report": {
+    "bytes": 63224,
+    "sha256": "ecb43f230246dc06af88df4cc27d86130a0da3cfba06be3ad63ad5661cd76602"
+  },
+  "local_links": 9,
+  "checks": [
+    "export sizes/lines/SHA256",
+    "immutable Git blob identity",
+    "exact numbered excerpts",
+    "collector/verifier static AST",
+    "local report links",
+    "required contract proof sections",
+    "balanced code fences",
+    "no trailing whitespace",
+    "follow-up exact source excerpts",
+    "original 45313-byte prefix hash",
+    "appendix/final-report integrity"
+  ],
+  "original_prefix_sha256": "9217d6cb3b941ec6872eb77f8ff4539e921b3b4c7cb8eae7da43a66d697fc65a",
+  "followup_excerpt_lines": 272,
+  "runtime": "No product import/test/media/model/browser/build/benchmark ran."
+}

@@ -1,0 +1,7 @@
+Traceback (most recent call last):
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/benchmark/browser_logs.py", line 108, in <module>
+    main()
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/benchmark/browser_logs.py", line 40, in main
+    assert str(source / 'openscrub_web.py') in frozen['sha256'], 'selected source path is not frozen'
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: selected source path is not frozen

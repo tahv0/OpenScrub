@@ -1,0 +1,199 @@
+TASK1203_ACTIVE_SOURCE {"python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]", "sources": {"openscrub": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py", "sha256": "0e4f0f9a7846080f591038d021aaf3ca6f01201d83ac32bbdc273f53d5067ee7"}, "openscrub_web": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", "sha256": "04af11cce1eaf4be0dc157ba5b4d78783a85bcbbb17596078c75d9df79f46c93"}, "zones_ui": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/zones_ui.py", "sha256": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7"}}}
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_____ test_view_disposal_owns_observers_frames_notes_and_native_lifecycle ______
+
+polling_http = 'http://127.0.0.1:42057'
+
+    def test_view_disposal_owns_observers_frames_notes_and_native_lifecycle(polling_http):
+        # Old view observers/frames must not publish after an A→B→A replacement.
+>       run_browser(polling_http, r"""
+    await page.addInitScript(()=>{
+     const Native=ResizeObserver;window.observers=[];window.frames=new Set();window.cancelledFrames=0;
+     window.ResizeObserver=class{constructor(callback){this.callback=callback;this.native=new Native(callback);this.active=false;window.observers.push(this)}
+     observe(e){this.element=e;this.active=true;this.native.observe(e)}disconnect(){this.active=false;this.native.disconnect()}};
+     const request=window.requestAnimationFrame.bind(window),cancel=window.cancelAnimationFrame.bind(window);
+     window.requestAnimationFrame=callback=>{let id=request(time=>{window.frames.delete(id);callback(time)});window.frames.add(id);return id};
+     window.cancelAnimationFrame=id=>{if(window.frames.delete(id))window.cancelledFrames++;cancel(id)};
+    });
+    await open(500);await page.clock.runFor(40);
+    await page.evaluate(()=>{window.oldLog=document.getElementById('log');oldLog.style.width='200px';window.observers[0].callback();});
+    assert.equal(await page.evaluate(()=>window.frames.size),1);
+    await page.evaluate(()=>openJob('B'));await wait(async()=>await cursor()===1);await idle();
+    assert.equal(await text(),'log-B');assert.equal(await page.evaluate(()=>window.observers.filter(o=>o.active).length),1);
+    assert.equal(await page.evaluate(()=>window.observers[0].active),false);assert.equal(await page.evaluate(()=>window.cancelledFrames),1);
+    await page.evaluate(()=>window.observers[0].callback());await page.clock.runFor(40);assert.equal(await text(),'log-B');assert.equal(await note(),'');
+    await page.evaluate(()=>openJob('A'));await wait(async()=>await cursor()===500);await idle();
+    assert.equal((await snap()).count,400);assert.match(await text(),/^L100\n/);
+    // Native Chromium freezing is a distinct check from synthetic visibility schedules.
+    const cdp=await page.context().newCDPSession(page);await cdp.send('Page.enable');
+    const lifecycle=[];cdp.on('Page.lifecycleEvent',event=>lifecycle.push(event.name));await cdp.send('Page.setLifecycleEventsEnabled',{enabled:true});
+    await page.evaluate(()=>{window.nativeVisibility=[];document.addEventListener('visibilitychange',()=>window.nativeVisibility.push(document.visibilityState));document.addEventListener('freeze',()=>window.nativeFrozen=true);document.addEventListener('resume',()=>window.nativeResumed=true)});
+    const {windowId}=await cdp.send('Browser.getWindowForTarget');await cdp.send('Browser.setWindowBounds',{windowId,bounds:{windowState:'minimized'}});await pause(100);console.log('native-minimized',JSON.stringify(await page.evaluate(()=>({hidden:document.hidden,state:document.visibilityState}))));
+    await cdp.send('Page.setWebLifecycleState',{state:'frozen'});
+    const n=requests.length;await control({action:'append',lines:['while-frozen']});await pause(200);assert.equal(requests.length,n);
+    await cdp.send('Page.setWebLifecycleState',{state:'active'});await cdp.send('Browser.setWindowBounds',{windowId,bounds:{windowState:'normal'}});await page.bringToFront();await pause(100);await page.clock.runFor(900);await idle();
+    const native=await page.evaluate(()=>({visibility:window.nativeVisibility,frozen:window.nativeFrozen,resumed:window.nativeResumed,state:document.visibilityState}));
+    console.log(JSON.stringify({native,lifecycle}));assert.equal(native.frozen,true);assert.equal(native.resumed,true);
+    await wait(async()=>await cursor()===501);assert.ok((await text()).endsWith('while-frozen'));
+    page.once('dialog',dialog=>dialog.accept());await page.evaluate(()=>delJob('A'));await wait(()=>page.evaluate(()=>CUR===null));
+    assert.equal(await page.locator('#log').count(),0);assert.equal(await page.evaluate(()=>window.observers.filter(o=>o.active).length),0);assert.equal(await page.evaluate(()=>RECENT_LOG===null&&window.frames.size===0),true);
+    await page.evaluate(()=>{for(const observer of window.observers)observer.callback()});await page.clock.runFor(40);assert.equal(await page.locator('#logStatus').count(),0);
+    records.push({case:'owned-cleanup-native-freeze',native,lifecycle,observers:await page.evaluate(()=>window.observers.length)});
+    """, 'lifecycle')
+
+tests/test_browser_log_retention.py:200: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+polling_http = 'http://127.0.0.1:42057'
+script = "\nawait page.addInitScript(()=>{\n const Native=ResizeObserver;window.observers=[];window.frames=new Set();window.can...h({case:'owned-cleanup-native-freeze',native,lifecycle,observers:await page.evaluate(()=>window.observers.length)});\n"
+name = 'lifecycle'
+
+    def run_browser(polling_http, script, name):
+        node = shutil.which('node')
+        if not node:
+            pytest.skip('Node needed for optional Playwright acceptance')
+        available = subprocess.run([node, '-e', "require('playwright')"], capture_output=True)
+        if available.returncode:
+            pytest.skip('Existing Playwright required; no dependency installation attempted')
+        env = dict(os.environ, POLLING_BASE=polling_http, RETENTION_CASE=name)
+        result = subprocess.run([node, '-e', BROWSER_SETUP + script + BROWSER_FINISH],
+                                capture_output=True, text=True, env=env, timeout=150)
+        if os.environ.get('POLLING_ARTIFACTS'):
+            Path(os.environ['POLLING_ARTIFACTS'], name + '.log').write_text(result.stdout + result.stderr)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: browserType.launch: Target page, context or browser has been closed
+E         Browser logs:
+E         
+E         <launching> /tmp/openscrub-save-as-20261116/browsers/chromium-1255/chrome-linux64/chrome --disable-field-trial-config --disable-background-networking --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-back-forward-cache --disable-breakpad --disable-component-extensions-with-background-pages --disable-component-update --no-default-browser-check --disable-default-apps --disable-dev-shm-usage --disable-edgeupdater --disable-extensions --disable-features=AvoidUnnecessaryBeforeUnloadCheckSync,DestroyProfileOnBrowserClose,HttpsUpgrades,HttpsFirstBalancedModeAutoEnable,LensOverlay,MediaRouter,PaintHolding,ThirdPartyStoragePartitioning,AvoidCorsURLLoaderRestartOnRedirect,TcpPortRandomizationWin,OptimizationHints,NetworkTimeServiceQuerying,AimEnabled,PreconnectToSearch,msForceBrowserSignIn,msEdgeUpdateLaunchServicesPreferredVersion --enable-features=CDPScreenshotNewSurface,SkipListAccountsWithoutGaiaCookies --allow-pre-commit-input --disable-hang-monitor --disable-ipc-flooding-protection --disable-popup-blocking --disable-prompt-on-repost --disable-renderer-backgrounding --disable-updater-scheduler --force-color-profile=srgb --metrics-recording-only --no-first-run --password-store=basic --use-mock-keychain --no-service-autorun --disable-search-engine-choice-screen --unsafely-disable-devtools-self-xss-warnings --enable-unsafe-swiftshader --edge-skip-compat-layer-relaunch --disable-stack-profiler --disable-infobars --disable-sync --do-not-de-elevate --headless --hide-scrollbars --mute-audio --blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4 --no-sandbox --no-sandbox --user-data-dir=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1203/tmp/playwright_chromiumdev_profile-z3U04f --remote-debugging-pipe --no-startup-window
+E         <launched> pid=2114386
+E         [pid=2114386][err] [2114386:2114386:1117/160627.643296:FATAL:chrome/browser/process_singleton_posix.cc:315] Socket path too long: /home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1203/tmp/org.chromium.Chromium.phSkSK/SingletonSocket.
+E         [pid=2114386][err] [1117/160627.656796:ERROR:third_party/crashpad/crashpad/util/file/file_io_posix.cc:146] open /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq: No such file or directory (2)
+E         [pid=2114386][err] [1117/160627.657594:ERROR:third_party/crashpad/crashpad/util/file/file_io_posix.cc:146] open /sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq: No such file or directory (2)
+E         [pid=2114386][err] Received signal 6
+E         [pid=2114386][err] #0 0x571825aceb83 (/tmp/openscrub-save-as-20261116/browsers/chromium-1255/chrome-linux64/chrome+0x670ab82)
+E         [pid=2114386][err] #1 0x57182baf7ef4 (/tmp/openscrub-save-as-20261116/browsers/chromium-1255/chrome-linux64/chrome+0xc733ef3)
+E         [pid=2114386][err] #2 0x7b893c445cb0 (/usr/lib/x86_64-linux-gnu/libc.so.6+0x45caf)
+E         [pid=2114386][err] #3 0x7b893c445b7e (/usr/lib/x86_64-linux-gnu/libc.so.6+0x45b7d)
+E         [pid=2114386][err] #4 0x7b893c4288ec (/usr/lib/x86_64-linux-gnu/libc.so.6+0x288eb)
+E         [pid=2114386][err] #5 0x57182baee7e5 (/tmp/openscrub-save-as-20261116/browsers/chromium-1255/chrome-linux64/chrome+0xc72a7e4)
+E         [pid=2114386][err] #6 0x57182baae5cd (/tmp/openscrub-save-as-20261116/browsers/chromium-1255/chrome-linux64/chrome+0xc6ea5cc)
+E         [pid=2114386][err] #7 0x57182baae51d (/tmp/openscrub-save-as-20261116/browsers/chromium-1255/chrome-linux64/chrome+0xc6ea51c)
+E         [pid=2114386][err] #8 0x5718249fca14 (/tmp/openscrub-save-as-20261116/browsers/chromium-1255/chrome-linux64/chrome+0x5638a13)
+E         [pid=2114386][err] #9 0x571826301529 (/tmp/openscrub-save-as-20261116/browsers/chromium-1255/chrome-linux64/chrome+0x6f3d528)
+E         [pid=2114386][err] #10 0x57182588b9e6 (/tmp/openscrub-save-as-20261116/browsers/chromium-1255/chrome-linux64/chrome+0x64c79e5)
+E         [pid=2114386][err] #11 0x57182588bfbf (/tmp/openscrub-save-as-20261116/browsers/chromium-1255/chrome-linux64/chrome+0x64c7fbe)
+E         [pid=2114386][err] #12 0x57182588bf74 (/tmp/openscrub-save-as-20261116/browsers/chromium-1255/chrome-linux64/chrome+0x64c7f73)
+E         [pid=2114386][err] #13 0x57182658c72d (/tmp/openscrub-save-as-20261116/browsers/chromium-1255/chrome-linux64/chrome+0x71c872c)
+E         [pid=2114386][err] #14 0x57182658b7c3 (/tmp/openscrub-save-as-20261116/browsers/chromium-1255/chrome-linux64/chrome+0x71c77c2)
+E         [pid=2114386][err] #15 0x571825c18478 (/tmp/openscrub-save-as-20261116/browsers/chromium-1255/chrome-linux64/chrome+0x6854477)
+E         [pid=2114386][err] #16 0x57182556e81b (/tmp/openscrub-save-as-20261116/browsers/chromium-1255/chrome-linux64/chrome+0x61aa81a)
+E         [pid=2114386][err] #17 0x57182556ef44 (/tmp/openscrub-save-as-20261116/browsers/chromium-1255/chrome-linux64/chrome+0x61aaf43)
+E         [pid=2114386][err] #18 0x7b893c42a601 (/usr/lib/x86_64-linux-gnu/libc.so.6+0x2a600)
+E         [pid=2114386][err] #19 0x7b893c42a718 (/usr/lib/x86_64-linux-gnu/libc.so.6+0x2a717)
+E         [pid=2114386][err] #20 0x571826ce354a (/tmp/openscrub-save-as-20261116/browsers/chromium-1255/chrome-linux64/chrome+0x791f549)
+E         [pid=2114386][err]   r8: 0000000000000016  r9: 0000000000000001 r10: 0000015c001501e3 r11: 0000000000000246
+E         [pid=2114386][err]  r12: 0000000000000006 r13: 0000571800000000 r14: 00000000000000e3 r15: 00007fff6e601960
+E         [pid=2114386][err]   di: 0000000000204352  si: 0000000000204352  bp: 00007fff6e6012d0  bx: 0000000000204352
+E         [pid=2114386][err]   dx: 0000000000000006  ax: 0000000000000000  cx: 00007b893c4a616c  sp: 00007fff6e601290
+E         [pid=2114386][err]   ip: 00007b893c4a616c efl: 0000000000000246 cgf: 002b000000000033 erf: 0000000000000000
+E         [pid=2114386][err]  trp: 0000000000000000 msk: 0000000000000000 cr2: 0000000000000000
+E         [pid=2114386][err] [end of stack trace]
+E         Call log:
+E         [2m  - <launching> /tmp/openscrub-save-as-20261116/browsers/chromium-1255/chrome-linux64/chrome --disable-field-trial-config --disable-background-networking --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-back-forward-cache --disable-breakpad --disable-component-extensions-with-background-pages --disable-component-update --no-default-browser-check --disable-default-apps --disable-dev-shm-usage --disable-edgeupdater --disable-extensions --disable-features=AvoidUnnecessaryBeforeUnloadCheckSync,DestroyProfileOnBrowserClose,HttpsUpgrades,HttpsFirstBalancedModeAutoEnable,LensOverlay,MediaRouter,PaintHolding,ThirdPartyStoragePartitioning,AvoidCorsURLLoaderRestartOnRedirect,TcpPortRandomizationWin,OptimizationHints,NetworkTimeServiceQuerying,AimEnabled,PreconnectToSearch,msForceBrowserSignIn,msEdgeUpdateLaunchServicesPreferredVersion --enable-features=CDPScreenshotNewSurface,SkipListAccountsWithoutGaiaCookies --allow-pre-commit-input --disable-hang-monitor --disable-ipc-flooding-protection --disable-popup-blocking --disable-prompt-on-repost --disable-renderer-backgrounding --disable-updater-scheduler --force-color-profile=srgb --metrics-recording-only --no-first-run --password-store=basic --use-mock-keychain --no-service-autorun --disable-search-engine-choice-screen --unsafely-disable-devtools-self-xss-warnings --enable-unsafe-swiftshader --edge-skip-compat-layer-relaunch --disable-stack-profiler --disable-infobars --disable-sync --do-not-de-elevate --headless --hide-scrollbars --mute-audio --blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4 --no-sandbox --no-sandbox --user-data-dir=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1203/tmp/playwright_chromiumdev_profile-z3U04f --remote-debugging-pipe --no-startup-window[22m
+E         [2m  - <launched> pid=2114386[22m
+E         [2m  - [pid=2114386][err] [2114386:2114386:1117/160627.643296:FATAL:chrome/browser/process_singleton_posix.cc:315] Socket path too long: /home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1203/tmp/org.chromium.Chromium.phSkSK/SingletonSocket.[22m
+E         [2m  - [pid=2114386][err] [1117/160627.656796:ERROR:third_party/crashpad/crashpad/util/file/file_io_posix.cc:146] open /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq: No such file or directory (2)[22m
+E         [2m  - [pid=2114386][err] [1117/160627.657594:ERROR:third_party/crashpad/crashpad/util/file/file_io_posix.cc:146] open /sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq: No such file or directory (2)[22m
+E         [2m  - [pid=2114386][err] Received signal 6[22m
+E         [2m  - [pid=2114386][err] #0 0x571825aceb83 (/tmp/openscrub-save-as-20261116/browsers/chromium-1255/chrome-linux64/chrome+0x670ab82)[22m
+E         [2m  - [pid=2114386][err] #1 0x57182baf7ef4 (/tmp/openscrub-save-as-20261116/browsers/chromium-1255/chrome-linux64/chrome+0xc733ef3)[22m
+E         [2m  - [pid=2114386][err] #2 0x7b893c445cb0 (/usr/lib/x86_64-linux-gnu/libc.so.6+0x45caf)[22m
+E         [2m  - [pid=2114386][err] #3 0x7b893c445b7e (/usr/lib/x86_64-linux-gnu/libc.so.6+0x45b7d)[22m
+E         [2m  - [pid=2114386][err] #4 0x7b893c4288ec (/usr/lib/x86_64-linux-gnu/libc.so.6+0x288eb)[22m
+E         [2m  - [pid=2114386][err] #5 0x57182baee7e5 (/tmp/openscrub-save-as-20261116/browsers/chromium-1255/chrome-linux64/chrome+0xc72a7e4)[22m
+E         [2m  - [pid=2114386][err] #6 0x57182baae5cd (/tmp/openscrub-save-as-20261116/browsers/chromium-1255/chrome-linux64/chrome+0xc6ea5cc)[22m
+E         [2m  - [pid=2114386][err] #7 0x57182baae51d (/tmp/openscrub-save-as-20261116/browsers/chromium-1255/chrome-linux64/chrome+0xc6ea51c)[22m
+E         [2m  - [pid=2114386][err] #8 0x5718249fca14 (/tmp/openscrub-save-as-20261116/browsers/chromium-1255/chrome-linux64/chrome+0x5638a13)[22m
+E         [2m  - [pid=2114386][err] #9 0x571826301529 (/tmp/openscrub-save-as-20261116/browsers/chromium-1255/chrome-linux64/chrome+0x6f3d528)[22m
+E         [2m  - [pid=2114386][err] #10 0x57182588b9e6 (/tmp/openscrub-save-as-20261116/browsers/chromium-1255/chrome-linux64/chrome+0x64c79e5)[22m
+E         [2m  - [pid=2114386][err] #11 0x57182588bfbf (/tmp/openscrub-save-as-20261116/browsers/chromium-1255/chrome-linux64/chrome+0x64c7fbe)[22m
+E         [2m  - [pid=2114386][err] #12 0x57182588bf74 (/tmp/openscrub-save-as-20261116/browsers/chromium-1255/chrome-linux64/chrome+0x64c7f73)[22m
+E         [2m  - [pid=2114386][err] #13 0x57182658c72d (/tmp/openscrub-save-as-20261116/browsers/chromium-1255/chrome-linux64/chrome+0x71c872c)[22m
+E         [2m  - [pid=2114386][err] #14 0x57182658b7c3 (/tmp/openscrub-save-as-20261116/browsers/chromium-1255/chrome-linux64/chrome+0x71c77c2)[22m
+E         [2m  - [pid=2114386][err] #15 0x571825c18478 (/tmp/openscrub-save-as-20261116/browsers/chromium-1255/chrome-linux64/chrome+0x6854477)[22m
+E         [2m  - [pid=2114386][err] #16 0x57182556e81b (/tmp/openscrub-save-as-20261116/browsers/chromium-1255/chrome-linux64/chrome+0x61aa81a)[22m
+E         [2m  - [pid=2114386][err] #17 0x57182556ef44 (/tmp/openscrub-save-as-20261116/browsers/chromium-1255/chrome-linux64/chrome+0x61aaf43)[22m
+E         [2m  - [pid=2114386][err] #18 0x7b893c42a601 (/usr/lib/x86_64-linux-gnu/libc.so.6+0x2a600)[22m
+E         [2m  - [pid=2114386][err] #19 0x7b893c42a718 (/usr/lib/x86_64-linux-gnu/libc.so.6+0x2a717)[22m
+E         [2m  - [pid=2114386][err] #20 0x571826ce354a (/tmp/openscrub-save-as-20261116/browsers/chromium-1255/chrome-linux64/chrome+0x791f549)[22m
+E         [2m  - [pid=2114386][err]   r8: 0000000000000016  r9: 0000000000000001 r10: 0000015c001501e3 r11: 0000000000000246[22m
+E         [2m  - [pid=2114386][err]  r12: 0000000000000006 r13: 0000571800000000 r14: 00000000000000e3 r15: 00007fff6e601960[22m
+E         [2m  - [pid=2114386][err]   di: 0000000000204352  si: 0000000000204352  bp: 00007fff6e6012d0  bx: 0000000000204352[22m
+E         [2m  - [pid=2114386][err]   dx: 0000000000000006  ax: 0000000000000000  cx: 00007b893c4a616c  sp: 00007fff6e601290[22m
+E         [2m  - [pid=2114386][err]   ip: 00007b893c4a616c efl: 0000000000000246 cgf: 002b000000000033 erf: 0000000000000000[22m
+E         [2m  - [pid=2114386][err]  trp: 0000000000000000 msk: 0000000000000000 cr2: 0000000000000000[22m
+E         [2m  - [pid=2114386][err] [end of stack trace][22m
+E         [2m  - [pid=2114386] <gracefully close start>[22m
+E         [2m  - [pid=2114386] <kill>[22m
+E         [2m  - [pid=2114386] <will force kill>[22m
+E         [2m  - [pid=2114386] <process did exit: exitCode=null, signal=SIGABRT>[22m
+E         [2m  - [pid=2114386] starting temporary directories cleanup[22m
+E         [2m  - [pid=2114386] finished temporary directories cleanup[22m
+E         [2m  - [pid=2114386] <gracefully close end>[22m
+E         
+E             at [eval]:7:30
+E             at [eval]:72:3
+E             at [eval]-wrapper:6:24 {
+E           log: [
+E             '  - <launching> /tmp/openscrub-save-as-20261116/browsers/chromium-1255/chrome-linux64/chrome --disable-field-trial-config --disable-background-networking --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-back-forward-cache --disable-breakpad --disable-component-extensions-with-background-pages --disable-component-update --no-default-browser-check --disable-default-apps --disable-dev-shm-usage --disable-edgeupdater --disable-extensions --disable-features=AvoidUnnecessaryBeforeUnloadCheckSync,DestroyProfileOnBrowserClose,HttpsUpgrades,HttpsFirstBalancedModeAutoEnable,LensOverlay,MediaRouter,PaintHolding,ThirdPartyStoragePartitioning,AvoidCorsURLLoaderRestartOnRedirect,TcpPortRandomizationWin,OptimizationHints,NetworkTimeServiceQuerying,AimEnabled,PreconnectToSearch,msForceBrowserSignIn,msEdgeUpdateLaunchServicesPreferredVersion --enable-features=CDPScreenshotNewSurface,SkipListAccountsWithoutGaiaCookies --allow-pre-commit-input --disable-hang-monitor --disable-ipc-flooding-protection --disable-popup-blocking --disable-prompt-on-repost --disable-renderer-backgrounding --disable-updater-scheduler --force-color-profile=srgb --metrics-recording-only --no-first-run --password-store=basic --use-mock-keychain --no-service-autorun --disable-search-engine-choice-screen --unsafely-disable-devtools-self-xss-warnings --enable-unsafe-swiftshader --edge-skip-compat-layer-relaunch --disable-stack-profiler --disable-infobars --disable-sync --do-not-de-elevate --headless --hide-scrollbars --mute-audio --blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4 --no-sandbox --no-sandbox --user-data-dir=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1203/tmp/playwright_chromiumdev_profile-z3U04f --remote-debugging-pipe --no-startup-window',
+E             '  - <launched> pid=2114386',
+E             '  - [pid=2114386][err] [2114386:2114386:1117/160627.643296:FATAL:chrome/browser/process_singleton_posix.cc:315] Socket path too long: /home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1203/tmp/org.chromium.Chromium.phSkSK/SingletonSocket.',
+E             '  - [pid=2114386][err] [1117/160627.656796:ERROR:third_party/crashpad/crashpad/util/file/file_io_posix.cc:146] open /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq: No such file or directory (2)',
+E             '  - [pid=2114386][err] [1117/160627.657594:ERROR:third_party/crashpad/crashpad/util/file/file_io_posix.cc:146] open /sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq: No such file or directory (2)',
+E             '  - [pid=2114386][err] Received signal 6',
+E             '  - [pid=2114386][err] #0 0x571825aceb83 (/tmp/openscrub-save-as-20261116/browsers/chromium-1255/chrome-linux64/chrome+0x670ab82)',
+E             '  - [pid=2114386][err] #1 0x57182baf7ef4 (/tmp/openscrub-save-as-20261116/browsers/chromium-1255/chrome-linux64/chrome+0xc733ef3)',
+E             '  - [pid=2114386][err] #2 0x7b893c445cb0 (/usr/lib/x86_64-linux-gnu/libc.so.6+0x45caf)',
+E             '  - [pid=2114386][err] #3 0x7b893c445b7e (/usr/lib/x86_64-linux-gnu/libc.so.6+0x45b7d)',
+E             '  - [pid=2114386][err] #4 0x7b893c4288ec (/usr/lib/x86_64-linux-gnu/libc.so.6+0x288eb)',
+E             '  - [pid=2114386][err] #5 0x57182baee7e5 (/tmp/openscrub-save-as-20261116/browsers/chromium-1255/chrome-linux64/chrome+0xc72a7e4)',
+E             '  - [pid=2114386][err] #6 0x57182baae5cd (/tmp/openscrub-save-as-20261116/browsers/chromium-1255/chrome-linux64/chrome+0xc6ea5cc)',
+E             '  - [pid=2114386][err] #7 0x57182baae51d (/tmp/openscrub-save-as-20261116/browsers/chromium-1255/chrome-linux64/chrome+0xc6ea51c)',
+E             '  - [pid=2114386][err] #8 0x5718249fca14 (/tmp/openscrub-save-as-20261116/browsers/chromium-1255/chrome-linux64/chrome+0x5638a13)',
+E             '  - [pid=2114386][err] #9 0x571826301529 (/tmp/openscrub-save-as-20261116/browsers/chromium-1255/chrome-linux64/chrome+0x6f3d528)',
+E             '  - [pid=2114386][err] #10 0x57182588b9e6 (/tmp/openscrub-save-as-20261116/browsers/chromium-1255/chrome-linux64/chrome+0x64c79e5)',
+E             '  - [pid=2114386][err] #11 0x57182588bfbf (/tmp/openscrub-save-as-20261116/browsers/chromium-1255/chrome-linux64/chrome+0x64c7fbe)',
+E             '  - [pid=2114386][err] #12 0x57182588bf74 (/tmp/openscrub-save-as-20261116/browsers/chromium-1255/chrome-linux64/chrome+0x64c7f73)',
+E             '  - [pid=2114386][err] #13 0x57182658c72d (/tmp/openscrub-save-as-20261116/browsers/chromium-1255/chrome-linux64/chrome+0x71c872c)',
+E             '  - [pid=2114386][err] #14 0x57182658b7c3 (/tmp/openscrub-save-as-20261116/browsers/chromium-1255/chrome-linux64/chrome+0x71c77c2)',
+E             '  - [pid=2114386][err] #15 0x571825c18478 (/tmp/openscrub-save-as-20261116/browsers/chromium-1255/chrome-linux64/chrome+0x6854477)',
+E             '  - [pid=2114386][err] #16 0x57182556e81b (/tmp/openscrub-save-as-20261116/browsers/chromium-1255/chrome-linux64/chrome+0x61aa81a)',
+E             '  - [pid=2114386][err] #17 0x57182556ef44 (/tmp/openscrub-save-as-20261116/browsers/chromium-1255/chrome-linux64/chrome+0x61aaf43)',
+E             '  - [pid=2114386][err] #18 0x7b893c42a601 (/usr/lib/x86_64-linux-gnu/libc.so.6+0x2a600)',
+E             '  - [pid=2114386][err] #19 0x7b893c42a718 (/usr/lib/x86_64-linux-gnu/libc.so.6+0x2a717)',
+E             '  - [pid=2114386][err] #20 0x571826ce354a (/tmp/openscrub-save-as-20261116/browsers/chromium-1255/chrome-linux64/chrome+0x791f549)',
+E             '  - [pid=2114386][err]   r8: 0000000000000016  r9: 0000000000000001 r10: 0000015c001501e3 r11: 0000000000000246',
+E             '  - [pid=2114386][err]  r12: 0000000000000006 r13: 0000571800000000 r14: 00000000000000e3 r15: 00007fff6e601960',
+E             '  - [pid=2114386][err]   di: 0000000000204352  si: 0000000000204352  bp: 00007fff6e6012d0  bx: 0000000000204352',
+E             '  - [pid=2114386][err]   dx: 0000000000000006  ax: 0000000000000000  cx: 00007b893c4a616c  sp: 00007fff6e601290',
+E             '  - [pid=2114386][err]   ip: 00007b893c4a616c efl: 0000000000000246 cgf: 002b000000000033 erf: 0000000000000000',
+E             '  - [pid=2114386][err]  trp: 0000000000000000 msk: 0000000000000000 cr2: 0000000000000000',
+E             '  - [pid=2114386][err] [end of stack trace]',
+E             '  - [pid=2114386] <gracefully close start>',
+E             '  - [pid=2114386] <kill>',
+E             '  - [pid=2114386] <will force kill>',
+E             '  - [pid=2114386] <process did exit: exitCode=null, signal=SIGABRT>',
+E             '  - [pid=2114386] starting temporary directories cleanup',
+E             '  - [pid=2114386] finished temporary directories cleanup',
+E             '  - [pid=2114386] <gracefully close end>'
+E           ]
+E         }
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', "\nconst {chromium}=require('playwright'),assert=require('node:assert/st...'  - [pid=2114386] finished temporary directories cleanup',\n    '  - [pid=2114386] <gracefully close end>'\n  ]\n}\n").returncode
+
+tests/test_browser_log_retention.py:71: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_browser_log_retention.py::test_view_disposal_owns_observers_frames_notes_and_native_lifecycle
+1 failed, 5 deselected in 1.52s

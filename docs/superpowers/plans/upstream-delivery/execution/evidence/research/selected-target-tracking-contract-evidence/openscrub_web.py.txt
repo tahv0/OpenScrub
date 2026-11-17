@@ -1,0 +1,627 @@
+{"blob": "30aca965bedeb0d41a3c3475a41603f21705086e", "bytes": 306395, "commit": "4b9bd7e576a8ae30369672b4b4722fc9752e233f", "export": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/selected-target-tracking-research/openscrub_web.py", "lines": 5206, "path": "openscrub_web.py", "sha256": "0fc4669a086265bc3c0dd05e895a3abfed18eda7544124f8408dfeade450a330"}
+
+# openscrub_web.py:450-492
+450:         _validate_files_locked(job)
+451:         source_job = _source_job_locked(canonical)
+452:         if source_job is not None and source_job is not job:
+453:             # Reserve before following a changed normalized input. This stays
+454:             # with the worker through its final report/provenance access.
+455:             if owner is not None and all(
+456:                     token.state is not FILES.initialize(source_job)
+457:                     for token in [owner] + owner.related):
+458:                 owner.related.append(FILES.reserve(source_job))
+459:         job["video"] = canonical
+460: 
+461: 
+462: def _own_files(job=None, work=False):
+463:     with VAULT_LOCK:
+464:         _validate_files_locked(job)
+465:         return _reserve_files_locked(job, work)
+466: 
+467: 
+468: def _files_busy_locked(blocking=True):
+469:     if not JOBS_LOCK.acquire(blocking=blocking):
+470:         return True  # shutdown cannot safely inspect the registry now
+471:     try:
+472:         return bool(FILES.count or any(j.get("phase") in _ACTIVE_PHASES
+473:                                        for j in JOBS.values()))
+474:     finally:
+475:         JOBS_LOCK.release()
+476: 
+477: 
+478: def _start_owned_thread(target, lease):
+479:     def run():
+480:         try:
+481:             target()
+482:         finally:
+483:             lease.release()
+484:     try:
+485:         thread = threading.Thread(target=run, daemon=True)
+486:         thread.start()
+487:         return thread
+488:     except BaseException:
+489:         lease.release()
+490:         raise
+491: 
+492: 
+
+# openscrub_web.py:870-917
+870: def _report_current(job):
+871:     """Identity lookup only; caller owns report_lock and a file lifetime.
+872: 
+873:     Admission takes VAULT_LOCK -> JOBS_LOCK and releases both before this
+874:     boundary. Never acquire VAULT_LOCK (including lease release) inside it.
+875:     """
+876:     with JOBS_LOCK:
+877:         if not any(current is job for current in JOBS.values()):
+878:             abort(404)
+879:         if FILES.initialize(job).closed:
+880:             abort(409, "job is being deleted")
+881: 
+882: 
+883: def _edit_gate(job):
+884:     _report_current(job)
+885:     if FILES.initialize(job).active is not None or job.get("phase") in _ACTIVE_PHASES:
+886:         abort(409, "job work is queued, running or still cleaning up")
+887: 
+888: 
+889: def _operation_valid(job, owner):
+890:     files = FILES.initialize(job)
+891:     with JOBS_LOCK:
+892:         return (any(current is job for current in JOBS.values()) and not files.closed
+893:                 and owner.operation is not None
+894:                 and files.operation is owner.operation)
+895: 
+896: 
+897: def _begin_operation(job, owner):
+898:     files = FILES.initialize(job)
+899:     owner.operation = threading.Event()
+900:     files.operation = owner.operation
+901:     job["cancel"] = owner.operation
+902:     files.active = owner
+903: 
+904: 
+905: def _finish_operation(job, owner):
+906:     # Release lifecycle ownership outside the report transaction. Keep the
+907:     # mutation gate closed until actual worker cleanup/release has completed.
+908:     owner.release()
+909:     if job is None:  # a cancelled ticket's job may already have been deleted
+910:         return
+911:     files = FILES.initialize(job)
+912:     with files.report_lock:
+913:         if files.active is owner:
+914:             files.active = None
+915: 
+916: 
+917: def _reserve_queue_locked(job, action, prepared):
+
+# openscrub_web.py:1550-1585
+1550: def job_cancel(jid):
+1551:     """Cancel a job. The job the worker is RUNNING stops cooperatively at
+1552:     its next checkpoint. Any other active job (still queued, or orphaned by
+1553:     a worker that died) is cancelled on the spot — before, Cancel only set
+1554:     a flag the worker checks mid-scan, so a job the worker never picked up
+1555:     could never be cancelled (or deleted: delete refuses active jobs)."""
+1556:     job = JOBS.get(jid) or abort(404)
+1557:     files = FILES.initialize(job)
+1558:     operation = files.operation  # capture the operation this request cancels
+1559:     if operation is not None:
+1560:         operation.set()  # promptly signal compute, before waiting for report I/O
+1561:     released = []
+1562:     with files.report_lock:
+1563:         _report_current(job)
+1564:         if files.operation is not operation:
+1565:             # That attempt finished/replaced while this request waited. Do not
+1566:             # signal, invalidate or release a newer attempt's queue ownership.
+1567:             return jsonify({"ok": True})
+1568:         if operation is None:
+1569:             job["cancel"].set()  # idle/intake: no running compute to interrupt
+1570:         files.operation = None  # Event.clear cannot revive the captured attempt
+1571:         with JOBS_LOCK:
+1572:             released = list(files.queued.values())
+1573:             files.queued.clear()
+1574:             job["qgen"] = job.get("qgen", 0) + 1
+1575:         if files.active in released:
+1576:             files.active = None
+1577:         if job.get("phase") in _ACTIVE_PHASES:
+1578:             job.update(phase="cancelled", error="cancelled by user", eta=None)
+1579:             job["log"].append("— cancelled —")
+1580:         if job.get("trackbg", {}).get("state") == "running":
+1581:             job["trackbg"] = {"state": "done", "added": 0,
+1582:                               "error": "cancelled by user"}
+1583:     for lease in released:
+1584:         lease.release()
+1585:     return jsonify({"ok": True})
+
+# openscrub_web.py:1623-1641
+1623: def job_detections(jid):
+1624:     job = JOBS.get(jid) or abort(404)
+1625:     doc = _load_job_report(job)
+1626:     items = []
+1627:     for i, d in enumerate(doc["detections"]):
+1628:         items.append({"i": i, "category": d["category"], "text": d["text"],
+1629:                       "t_start": d["t_start"], "t_end": round(d["t_end"], 2),
+1630:                       "enabled": d.get("enabled", True),
+1631:                       "track": d.get("track", -1),
+1632:                       "person": d.get("person", -1),
+1633:                       "confidence": d.get("confidence", 0),
+1634:                       "zone_dropped": bool(d.get("zone_dropped"))})
+1635:     return jsonify({"detections": items,
+1636:                     "fps": doc["render_state"]["fps"],
+1637:                     "duration": len(doc["render_state"]["cum"]) /
+1638:                                 doc["render_state"]["fps"]})
+1639: 
+1640: 
+1641: @app.route("/api/jobs/<jid>/detframe/<int:i>")
+
+# openscrub_web.py:1664-1694
+1664: def job_boxes_at(jid):
+1665:     """Active blur boxes (screen coords) at time t, plus the scroll offset so
+1666:     the client can convert edited boxes back to content coordinates."""
+1667:     job = JOBS.get(jid) or abort(404)
+1668:     doc = _load_job_report(job)
+1669:     rs = doc["render_state"]
+1670:     t = float(request.args.get("t", 0))
+1671:     fidx = min(int(t * rs["fps"]), len(rs["cum"]) - 1)
+1672:     ox, oy = rs["cum"][fidx]
+1673:     boxes = []
+1674:     want_all = request.args.get("all") == "1"
+1675:     for i, d in enumerate(doc["detections"]):
+1676:         if not (d["t_start"] - 0.01 <= t <= d["t_end"] + 0.01):
+1677:             continue
+1678:         if not want_all and not d.get("enabled", True):
+1679:             continue
+1680:         if True:
+1681:             boxes.append({"i": i, "category": d["category"],
+1682:                           "enabled": d.get("enabled", True),
+1683:                           "text": d.get("text", ""),
+1684:                           "t_start": d["t_start"], "t_end": d["t_end"],
+1685:                           "box": [d["cbox"][0] + ox, d["cbox"][1] + oy,
+1686:                                   d["cbox"][2] + ox, d["cbox"][3] + oy]})
+1687:     return jsonify({"t": t, "ox": ox, "oy": oy, "boxes": boxes})
+1688: 
+1689: 
+1690: @app.route("/api/jobs/<jid>/thumb/<int:i>")
+1691: def job_thumb(jid, i):
+1692:     job = JOBS.get(jid) or abort(404)
+1693:     # i is already a Flask <int:> route var, but CodeQL doesn't trust the
+1694:     # converter — format it as an explicit non-negative integer so the
+
+# openscrub_web.py:1806-1929
+1806: def _valid_manual_creation(value):
+1807:     """Only immutable, finite creation records can establish replay equality."""
+1808:     def numbers(items, size):
+1809:         try:
+1810:             return (isinstance(items, list) and len(items) == size
+1811:                     and all(type(v) in (int, float) and math.isfinite(v)
+1812:                             for v in items))
+1813:         except OverflowError:
+1814:             return False
+1815:     return (isinstance(value, dict)
+1816:             and set(value) == {"t_start", "t_end", "cbox", "aoff"}
+1817:             and numbers([value["t_start"], value["t_end"]], 2)
+1818:             and numbers(value["cbox"], 4)
+1819:             and all(type(v) is int for v in value["cbox"])
+1820:             and numbers(value["aoff"], 2))
+1821: 
+1822: 
+1823: @app.route("/api/jobs/<jid>/detections", methods=["POST"])
+1824: def job_save_edits(jid):
+1825:     job = JOBS.get(jid) or abort(404)
+1826:     edits = request.get_json(force=True)
+1827:     path = os.path.join(job["dir"], "report.json")
+1828:     with FILES.initialize(job).report_lock:
+1829:         _edit_gate(job)
+1830:         try:
+1831:             doc = _load_job_report(job)
+1832:         except FileNotFoundError:
+1833:             abort(404, "job report not found")
+1834:         # Remember only effective assignment destinations, before their first
+1835:         # assignment. Aliased indices may change then restore the same field.
+1836:         missing = object()
+1837:         touched = {}
+1838:         def assign(target, key, value):
+1839:             destination = (id(target), key)
+1840:             if destination not in touched:
+1841:                 touched[destination] = (target, key, target.get(key, missing))
+1842:             target[key] = value
+1843: 
+1844:         original_count = len(doc["detections"])
+1845:         enabled = edits.get("enabled", {})
+1846:         for i, d in enumerate(doc["detections"]):
+1847:             if str(i) in enabled:
+1848:                 assign(d, "enabled", bool(enabled[str(i)]))
+1849:         for i, box in (edits.get("box_overrides") or {}).items():
+1850:             i = int(i)
+1851:             if 0 <= i < len(doc["detections"]) and len(box) == 4:
+1852:                 assign(doc["detections"][i], "cbox", [float(v) for v in box])
+1853:         for i, span in (edits.get("time_overrides") or {}).items():
+1854:             i = int(i)
+1855:             if 0 <= i < len(doc["detections"]) and len(span) == 2:
+1856:                 t0, t1 = float(span[0]), float(span[1])
+1857:                 if t1 > t0 >= 0:
+1858:                     assign(doc["detections"][i], "t_start", t0)
+1859:                     assign(doc["detections"][i], "t_end", t1)
+1860:                     assign(doc["detections"][i], "last_seen", min(
+1861:                         max(doc["detections"][i].get("last_seen", t0), t0), t1))
+1862:         rs = doc["render_state"]
+1863:         # Read identities from this transaction's latest raw document. Never
+1864:         # reconstruct creation from a row's mutable current geometry/choices.
+1865:         identified = {}
+1866:         for d in doc["detections"]:
+1867:             identity = d.get("manual_id")
+1868:             if isinstance(identity, str):
+1869:                 identified.setdefault(identity, []).append(d)
+1870:         for m in edits.get("manual", []):
+1871:             has_id = "manual_id" in m
+1872:             identity = m.get("manual_id")
+1873:             if has_id and (not isinstance(identity, str) or
+1874:                            re.fullmatch(r"[A-Za-z0-9._:-]{1,128}", identity) is None):
+1875:                 return jsonify(error="Invalid manual_id: expected 1–128 ASCII letters, digits or ._:-"), 400
+1876:             try:
+1877:                 t0 = float(m["t_start"]); t1 = float(m["t_end"])
+1878:                 tref = float(m.get("t_ref", t0))
+1879:                 b = m["screen_box"]
+1880:                 if has_id and (len(b) != 4 or not all(math.isfinite(v) for v in [t0, t1, tref, *b])):
+1881:                     raise ValueError("non-finite creation or invalid box")
+1882:                 fidx = min(int(tref * rs["fps"]), len(rs["cum"]) - 1)
+1883:                 ox, oy = rs["cum"][fidx]
+1884:                 creation = {"t_start": t0, "t_end": t1,
+1885:                             "cbox": [int(b[0] - ox), int(b[1] - oy),
+1886:                                      int(b[2] - ox), int(b[3] - oy)],
+1887:                             "aoff": [ox, oy]}
+1888:                 if has_id and not _valid_manual_creation(creation):
+1889:                     raise ValueError("invalid effective creation")
+1890:             except (KeyError, TypeError, ValueError, OverflowError, IndexError):
+1891:                 if has_id:
+1892:                     return jsonify(error="Invalid manual creation: finite times, four coordinates and two offsets required"), 400
+1893:                 raise
+1894:             if has_id and identity in identified:
+1895:                 rows = identified[identity]
+1896:                 if (len(rows) != 1 or not _valid_manual_creation(rows[0].get("manual_creation"))
+1897:                         or rows[0]["manual_creation"] != creation):
+1898:                     return jsonify(error="manual_id conflict: creation differs, is missing/invalid, or matches multiple rows"), 409
+1899:                 continue
+1900:             row = dict(creation, category="manual", text="user-drawn", confidence=1.0,
+1901:                        last_seen=t0, enabled=True)
+1902:             if has_id:
+1903:                 # Separate lists keep later indexed edits independent of creation.
+1904:                 row.update(manual_id=identity, manual_creation={
+1905:                     **creation, "cbox": list(creation["cbox"]), "aoff": list(creation["aoff"])})
+1906:                 identified[identity] = [row]
+1907:             doc["detections"].append(row)
+1908:         if "audio" in edits:
+1909:             # audio redaction spans (mute/bleep): stored in the report so the
+1910:             # --from-report render applies them and re-renders keep them
+1911:             assign(doc, "audio_redactions", [
+1912:                 {"t0": float(s["t0"]), "t1": float(s["t1"]),
+1913:                  "mode": (s.get("mode") if s.get("mode") in ("mute", "bleep")
+1914:                           else "mute")}
+1915:                 for s in (edits.get("audio") or [])
+1916:                 if float(s.get("t1", 0)) > float(s.get("t0", 0)) >= 0])
+1917:         if (len(doc["detections"]) != original_count
+1918:                 or any(original is missing or not _same_json_value(original, target[key])
+1919:                        for target, key, original in touched.values())):
+1920:             atomic_report(path, doc)
+1921:         # suggest allowlisting any string whose EVERY instance was disabled —
+1922:         # the review just taught us it's a recurring false positive
+1923:         per = {}
+1924:         for d in doc["detections"]:
+1925:             if d["category"] in ("name",):
+1926:                 per.setdefault(d["text"], []).append(d.get("enabled", True))
+1927:         suggest = sorted(t for t, states in per.items()
+1928:                          if len(states) >= 2 and not any(states))
+1929:         return jsonify({"ok": True, "total": len(doc["detections"]),
+
+# openscrub_web.py:1933-2060
+1933: @app.route("/api/jobs/<jid>/track_object", methods=["POST"])
+1934: def job_track_object(jid):
+1935:     """Targeted redaction: the user circled an object on one frame and
+1936:     picked a time window on the review timeline — template-track it through
+1937:     that window and add the result as a dense track in the report, so the
+1938:     review shows one card (with fan-out) and the render blurs it wherever
+1939:     it went. Runs in a background thread; poll /track_status."""
+1940:     job = JOBS.get(jid) or abort(404)
+1941:     p = request.get_json(force=True)
+1942:     try:
+1943:         box = [float(v) for v in p["box"]]
+1944:         t_ref, t0, t1 = (float(p["t_ref"]), float(p["t0"]), float(p["t1"]))
+1945:     except (KeyError, TypeError, ValueError):
+1946:         abort(400)
+1947:     if len(box) != 4 or not (t1 > t0 >= 0) or not (t0 <= t_ref <= t1):
+1948:         abort(400)
+1949:     st = {"state": "running", "added": 0, "error": None}
+1950:     files = FILES.initialize(job)
+1951:     current, operation = job.get("video"), files.operation
+1952:     lease = _own_files(job, work=True)
+1953:     try:
+1954:         with files.report_lock:
+1955:             _edit_gate(job)
+1956:             if job.get("video") != current or files.operation is not operation:
+1957:                 abort(409, "job operation or source changed — retry tracking")
+1958:             if ((files.tracker is not None and not files.tracker.released)
+1959:                     or job.get("trackbg", {}).get("state") == "running"):
+1960:                 abort(409, "tracking already in progress")
+1961:             if job["cancel"].is_set():
+1962:                 if files.work > 1:
+1963:                     abort(409, "cancelled job work is still cleaning up")
+1964:                 job["cancel"].clear()
+1965:             lease.operation = threading.Event()
+1966:             files.operation = lease.operation
+1967:             job["cancel"] = lease.operation
+1968:             files.tracker = lease
+1969:             job["trackbg"] = st
+1970:     except BaseException:
+1971:         lease.release()
+1972:         raise
+1973: 
+1974:     def _run():
+1975:         try:
+1976:             class L(openscrub.Callbacks):
+1977:                 def log(self, m):
+1978:                     job["log"].append(m)
+1979:                 def cancelled(self):
+1980:                     return lease.operation.is_set()
+1981:             det = None
+1982:             try:
+1983:                 # same person-model resolution the scan uses: the panel
+1984:                 # selection first, then the engine's default ladder
+1985:                 mid = load_model_select().get("person")
+1986:                 p = find_model_file("%s.onnx" % mid) if mid else None
+1987:                 det = openscrub.PersonDetector(L(), model_path=p,
+1988:                                                thresh=0.2)
+1989:                 if det.net is None and det.ort is None:
+1990:                     det = None
+1991:             except Exception:
+1992:                 det = None
+1993:             samples = openscrub.track_manual_region(
+1994:                 lease.source, box, t_ref, t0, t1, cb=L(), person_det=det)
+1995:             with files.report_lock:
+1996:                 if (not _operation_valid(job, lease)
+1997:                         or job.get("trackbg") is not st or lease.operation.is_set()):
+1998:                     return
+1999:                 if not samples:
+2000:                     st.update(state="done", added=0,
+2001:                               error="could not track that region — try a "
+2002:                                     "larger box or a frame where it's clearer")
+2003:                     return
+2004:                 doc = _load_job_report(job)
+2005:                 rs = doc["render_state"]
+2006:                 fps = float(rs["fps"]) or 30.0
+2007:                 step = 2.0 / fps
+2008:                 tid = max([d.get("track", -1) for d in doc["detections"]
+2009:                            if isinstance(d.get("track", -1), int)] + [-1]) + 1
+2010:                 new = []
+2011:                 tcls = samples[0][4] if len(samples[0]) > 4 else None
+2012:                 label = ("tracked %s" % openscrub.COCO_NAMES[tcls]
+2013:                          if tcls is not None
+2014:                          and 0 <= tcls < len(openscrub.COCO_NAMES)
+2015:                          else "tracked object")
+2016:                 for s in samples:
+2017:                     t, b, score = s[0], s[1], s[2]
+2018:                     poly = s[3] if len(s) > 3 and s[3] else ()
+2019:                     fidx = min(int(t * fps), len(rs["cum"]) - 1)
+2020:                     ox, oy = rs["cum"][fidx]
+2021:                     new.append({
+2022:                         "t_start": t, "t_end": t + step * 1.2,
+2023:                         "cbox": [int(b[0] - ox), int(b[1] - oy),
+2024:                                  int(b[2] - ox), int(b[3] - oy)],
+2025:                         "category": "manual", "text": label,
+2026:                         "confidence": round(float(score), 3),
+2027:                         "aoff": [ox, oy], "last_seen": t,
+2028:                         "dense": True, "track": tid, "enabled": True,
+2029:                         "poly": [[[float(x), float(y)] for x, y in c]
+2030:                                  for c in poly]})
+2031:                 # grace pads: cover the sub-sample sliver at both ends
+2032:                 new[0]["t_start"] = max(0.0, new[0]["t_start"] - 0.25)
+2033:                 new[-1]["t_end"] += 0.25
+2034:                 doc["detections"].extend(new)
+2035:                 path = os.path.join(job["dir"], "report.json")
+2036:                 atomic_report(path, doc)
+2037:                 job["log"].append(
+2038:                     "      tracked object: %d position(s), %.1f-%.1fs "
+2039:                     "(review card added)" % (len(new),
+2040:                                              new[0]["t_start"], new[-1]["t_end"]))
+2041:                 st.update(state="done", added=len(new))
+2042:         except Exception as e:
+2043:             with files.report_lock:
+2044:                 if _operation_valid(job, lease) and job.get("trackbg") is st:
+2045:                     st.update(state="done", added=0, error=str(e))
+2046: 
+2047:     try:
+2048:         _start_owned_thread(_run, lease)
+2049:     except BaseException:
+2050:         st.update(state="done", added=0, error="tracking could not start")
+2051:         raise
+2052:     return jsonify({"ok": True})
+2053: 
+2054: 
+2055: @app.route("/api/jobs/<jid>/track_status")
+2056: def job_track_status(jid):
+2057:     job = JOBS.get(jid) or abort(404)
+2058:     return jsonify(job.get("trackbg") or {"state": "idle"})
+2059: 
+2060: 
+
+# openscrub_web.py:3290-3320
+3290:  apikey:"#0891b2",ipaddr:"#65a30d",plate:"#7c3aed",face:"#ec4899",
+3291:  person:"#0ea5e9",manual:"#eab308"};
+3292: async function tlInit(){
+3293:  const id=CUR,gen=VIEW_GEN,editor=BE;
+3294:  // one fetch of the full report: detection spans for the lanes (dense
+3295:  // tracks collapse to one span per track) + stored audio redactions
+3296:  try{
+3297:   const response=await fetch(`api/jobs/${id}/report`);
+3298:   if(!response.ok)throw Error("could not load audio");
+3299:   const doc=await response.json();
+3300:   if(!ownsView(id,gen)||BE!==editor)return;
+3301:   const per={};
+3302:   for(const d of (doc.detections||[])){
+3303:    if(d.enabled===false)continue;
+3304:    const key=d.category+((d.track??-1)>=0?(":t"+d.track):(":i"+Math.random()));
+3305:    const s=per[key]||(per[key]={cat:d.category,t0:d.t_start,t1:d.t_end});
+3306:    s.t0=Math.min(s.t0,d.t_start);s.t1=Math.max(s.t1,d.t_end);
+3307:   }
+3308:   BE.tlspans=Object.values(per);
+3309:   if(!BE.audioLoaded){
+3310:    const stored=(doc.audio_redactions||[]).map(s=>({t0:s.t0,t1:s.t1,mode:s.mode||"mute"}));
+3311:    // Audio controls can be used while this initial report request is pending.
+3312:    BE.audio=[...stored,...BE.audio];BE.audioSaved=copyEdit(stored);BE.audioLoaded=true;
+3313:   }
+3314:   BE.audioSugg=doc.audio_suggestions||[];
+3315:   BE.audioTx=doc.audio_transcript||[];BE.txAnchor=-1;
+3316:   renderAudioSugg();renderTranscript();
+3317:  }catch(e){if(!ownsView(id,gen)||BE!==editor)return;BE.tlspans=[];}
+3318:  beTLDraw();
+3319: }
+3320: function tlX(t,w){return Math.max(0,Math.min(w,t/Math.max(0.1,BE.dur)*w));}
+
+# openscrub_web.py:3420-3440
+3420: async function beTrackGo(box){
+3421:  const st=document.getElementById("beTrkSt");st.style.display="inline";
+3422:  st.textContent=`tracking ${BE.win[0].toFixed(1)}–${BE.win[1].toFixed(1)}s…`;
+3423:  const r=await fetch(`api/jobs/${CUR}/track_object`,{method:"POST",
+3424:   headers:{"Content-Type":"application/json"},
+3425:   body:JSON.stringify({box,t_ref:BE.t,t0:BE.win[0],t1:BE.win[1]})});
+3426:  if(!r.ok){st.textContent="tracking failed to start";return;}
+3427:  const poll=setInterval(async()=>{
+3428:   const d=await (await fetch(`api/jobs/${CUR}/track_status`)).json();
+3429:   if(d.state!=="running"){
+3430:    clearInterval(poll);
+3431:    st.textContent=d.error?("⚠ "+d.error)
+3432:     :`tracked ✓ ${d.added} position(s) — review card added`;
+3433:    if(!d.error){await tlInit();beScrub();
+3434:     if(document.getElementById("review"))loadReview();}
+3435:   }
+3436:  },1500);
+3437: }
+3438: async function beScrub(){
+3439:  const id=CUR,gen=VIEW_GEN,editor=BE;
+3440:  const sl=document.getElementById("beT");if(!sl)return; // editor was closed
+
+# openscrub_web.py:3711-3740
+3711:      style="cursor:zoom-in" onclick="zoomDet(${x.i})" onerror="thumbRetry(this)">
+3712:     <div>"${x.text}" <br>${x.t_start.toFixed(1)}–${x.t_end.toFixed(1)}s</div>
+3713:     ${detChoices(x.i,"Outside-zone detection")}
+3714:    </div>`;
+3715:   }
+3716:   html+=`</div></details>`;
+3717:  }
+3718:  for(const[cat,rawItems] of Object.entries(groups)){
+3719:   // collapse dense tracks: one card per physical object, not per frame
+3720:   const byGroup={},items=[];
+3721:   for(const x of rawItems){
+3722:    // identity first: one card per PERSON (all their tracks); then per
+3723:    // track; ungrouped detections stand alone
+3724:    const key=x.person>=0?("p"+x.person):(x.track>=0?("t"+x.track):null);
+3725:    if(key){(byGroup[key]=byGroup[key]||[]).push(x);}
+3726:    else{TRKMEM[x.i]=[x.i];items.push(x);}
+3727:   }
+3728:   for(const [key,members] of Object.entries(byGroup)){
+3729:    members.sort((a,b)=>a.t_start-b.t_start);
+3730:    let best=members[0];             // clearest thumbnail = highest-confidence
+3731:    for(const m of members)if((m.confidence||0)>(best.confidence||0))best=m;
+3732:    const rep={...best};
+3733:    rep.t_start=members[0].t_start;
+3734:    rep.t_end=members[members.length-1].t_end;
+3735:    rep.frames=members.length;
+3736:    rep.personcard=key[0]==="p";
+3737:    TRKMEM[rep.i]=members.map(m=>m.i);
+3738:    items.push(rep);
+3739:   }
+3740:   // person cards first, then everything else chronologically
+
+# openscrub_web.py:3796-3809
+3796: function applyDet(i,blur){
+3797:  const cards=new Set();
+3798:  for(const m of (TRKMEM[i]||[i])){
+3799:   EN[m]=blur;EDITS.enabled[m]=blur;
+3800:   cards.add(ROWCARD[m]??m);
+3801:  }
+3802:  // Record explicit intent, including a choice equal to the loaded value.
+3803:  if(!EDITS.busy)saveStatus(EDITS,"Unsaved edits — save to include them in the render.");
+3804:  cards.forEach(refreshDet);
+3805:  if(document.getElementById("beCv")){beFilter();beDraw();}   // live sync
+3806: }
+3807: function setAll(cat,on){document.querySelectorAll(`.det[data-cat=${cat}]`)
+3808:  .forEach(el=>applyDet(+el.id.slice(3),on));}
+3809: function thumbRetry(img){
+
+# openscrub_web.py:3901-3977
+3901: }
+3902: function acknowledgeMap(current,submitted){
+3903:  for(const [key,value] of Object.entries(submitted))
+3904:   if(sameEdit(current[key],value))delete current[key];
+3905: }
+3906: function acknowledgeAdds(current,refs,submitted){
+3907:  for(let i=current.length-1;i>=0;i--){
+3908:   const index=refs.indexOf(current[i]);
+3909:   if(index>=0&&sameEdit(current[i],submitted[index]))current.splice(i,1);
+3910:  }
+3911: }
+3912: async function saveAndRender(){
+3913:  const id=CUR,gen=VIEW_GEN,d=EDITS;
+3914:  if(!id||!d||d.busy)return false;
+3915:  const b=d.editor;
+3916:  try{
+3917:   // Compatibility drafts acquire an identity once, on the original object.
+3918:   for(const a of [...d.manual,...b.adds])if(!Object.prototype.hasOwnProperty.call(a,"manual_id"))a.manual_id=manualId();
+3919:  }catch(e){saveStatus(d,"Could not save edits: "+e.message);return false;}
+3920:  const manRefs=[...d.manual],addRefs=[...b.adds];
+3921:  const man=copyEdit(d.manual),adds=copyEdit(b.adds);
+3922:  const payload=copyEdit({enabled:d.enabled,manual:[...man,...adds.map(a=>({
+3923:   manual_id:a.manual_id,t_start:a.t0,t_end:a.t1,t_ref:a.tref,screen_box:a.box}))],
+3924:   box_overrides:b.ov,time_overrides:b.times});
+3925:  // Plain review must never wipe audio that the editor has not loaded.
+3926:  if(b.audioLoaded&&!sameEdit(b.audio,b.audioSaved)){payload.audio=copyEdit(b.audio);}
+3927:  d.audioInFlight=payload.audio!==undefined;
+3928:  d.busy=true;saveStatus(d,"Saving edits… You can keep editing; newer edits stay pending.");
+3929:  let saved=false;
+3930:  try{
+3931:   const result=await reviewPost(`api/jobs/${id}/detections`,payload);
+3932:   saved=true;d.audioInFlight=false;
+3933:   acknowledgeMap(d.enabled,payload.enabled);
+3934:   acknowledgeMap(b.ov,payload.box_overrides);acknowledgeMap(b.times,payload.time_overrides);
+3935:   acknowledgeAdds(d.manual,manRefs,man);acknowledgeAdds(b.adds,addRefs,adds);
+3936:   if(payload.audio!==undefined)b.audioSaved=copyEdit(payload.audio);
+3937:   // A switched-away view never opens a confirmation or changes current UI.
+3938:   if(!ownsView(id,gen)){
+3939:    saveStatus(d,"Edits saved. Review pending edits, then save to render this job.");return false;
+3940:   }
+3941:   let allowError="";
+3942:   if(result.suggest_allowlist&&result.suggest_allowlist.length&&
+3943:      confirm("You disabled every instance of: "+result.suggest_allowlist.join(", ")+". Add these to the permanent allow-list so future scans skip them?")){
+3944:    try{await reviewPost("api/allowlist",{words:result.suggest_allowlist});loadPersist();}
+3945:    catch(e){allowError=" Allow-list update failed: "+e.message;}
+3946:   }
+3947:   if(!ownsView(id,gen)){
+3948:    saveStatus(d,"Edits saved. Review pending edits, then save to render this job."+allowError);return false;
+3949:   }
+3950:   if(hasReviewEdits(d)){
+3951:    saveStatus(d,"Submitted edits saved. Newer edits are still pending — save again to include them before rendering."+allowError);return false;
+3952:   }
+3953:   saveStatus(d,"Edits saved; requesting render…");
+3954:   await reviewPost(`api/jobs/${id}/render`);
+3955:   // Edits can also arrive while the render request is pending.
+3956:   if(hasReviewEdits(d)){
+3957:    saveStatus(d,"Render started with submitted edits. Newer edits are pending — save again to render them."+allowError);return true;
+3958:   }
+3959:   saveStatus(d,"Rendering with saved edits…"+allowError);
+3960:   if(ownsView(id,gen)){
+3961:    const rv=document.getElementById("review");if(rv)rv.remove();
+3962:    const c=document.getElementById("beslot_done");if(c)c.innerHTML="rendering with your edits…";
+3963:   }
+3964:   return true;
+3965:  }catch(e){
+3966:   // A failed response leaves the audio baseline uncertain. Retain even a
+3967:   // newer toggle-back to the old baseline and deliberately send it on retry.
+3968:   if(!saved&&payload.audio!==undefined)b.audioSaved=null;
+3969:   saveStatus(d,(saved?"Edits saved; render was not confirmed. Retry with Save to render. ":
+3970:    "Save was not confirmed; drafts retained. Retry with Save. ")+e.message);
+3971:   return false;
+3972:  }finally{d.audioInFlight=false;d.busy=false;saveStatus(d,d.status);if(d!==EDITS)trimReviewDraft(d);}
+3973: }
+3974: function persistFailure(error){
+3975:  const nt=document.getElementById("persistnote"),message=String(error.message||error);
+3976:  nt.style.display="block";nt.style.color="#f87171";
+3977:  nt.textContent=message.includes("HTTP 423")?

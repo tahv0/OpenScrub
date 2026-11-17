@@ -1,0 +1,28 @@
+{
+  "records": [
+    {
+      "case": "blank-anchor",
+      "before": {
+        "offset": -5.3125,
+        "height": 14
+      },
+      "oldest": 101,
+      "count": 800
+    }
+  ],
+  "requests": [
+    "/api/jobs/A",
+    "/api/jobs/A/log?from=0",
+    "/api/jobs/A",
+    "/api/jobs/A/log?from=0&epoch=c9f68cf08aaf470393272b586a5f8432",
+    "/api/jobs/A",
+    "/api/jobs/A/log?from=400&epoch=c9f68cf08aaf470393272b586a5f8432",
+    "/api/jobs/A",
+    "/api/jobs/A/log?from=800&epoch=c9f68cf08aaf470393272b586a5f8432",
+    "/api/jobs/A",
+    "/api/jobs/A/log?from=900&epoch=c9f68cf08aaf470393272b586a5f8432"
+  ],
+  "errors": [],
+  "diagnostics": [],
+  "browser": "159.0.8154.6"
+}

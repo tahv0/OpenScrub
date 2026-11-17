@@ -1,0 +1,32 @@
+{
+  "native-success.log": {
+    "bytes": 34,
+    "sha256": "6407d6dd18e182e7ef14c64155614f9f0f45f579bf50a542220ba7024f817c8a",
+    "text": "synthetic stdout\nsynthetic stderr\n"
+  },
+  "native-nonzero.log": {
+    "bytes": 34,
+    "sha256": "6407d6dd18e182e7ef14c64155614f9f0f45f579bf50a542220ba7024f817c8a",
+    "text": "synthetic stdout\nsynthetic stderr\n"
+  },
+  "native-timeout.log": {
+    "bytes": 53,
+    "sha256": "a0f501c98aafdd206917fe5fc2fae39d94e289f0d6d74f1d7149fafbe585969b",
+    "text": "timeout stdout\ufffd\ntimeout stderr\n\nSUBPROCESS TIMEOUT\n"
+  },
+  "python39-success.log": {
+    "bytes": 34,
+    "sha256": "6407d6dd18e182e7ef14c64155614f9f0f45f579bf50a542220ba7024f817c8a",
+    "text": "synthetic stdout\nsynthetic stderr\n"
+  },
+  "python39-nonzero.log": {
+    "bytes": 34,
+    "sha256": "6407d6dd18e182e7ef14c64155614f9f0f45f579bf50a542220ba7024f817c8a",
+    "text": "synthetic stdout\nsynthetic stderr\n"
+  },
+  "python39-timeout.log": {
+    "bytes": 53,
+    "sha256": "a0f501c98aafdd206917fe5fc2fae39d94e289f0d6d74f1d7149fafbe585969b",
+    "text": "timeout stdout\ufffd\ntimeout stderr\n\nSUBPROCESS TIMEOUT\n"
+  }
+}

@@ -1,0 +1,15 @@
+# Task1203 fix1 evidence
+
+Fix base4670641cb8e53e6daa6f77fb505397bfdb6733b8 → fix head f44e0b786ad065010fbfd2b8328350bde44116ec. Scope: one `log.parent.mkdir` before child execution plus `tests/test_browser_log_benchmark.py`. Full report: `../task-1203-fix1-report.md`.
+
+- `source-identities.json`: exact base/final blobs and hashes for the two changed files, with unchanged runtime/browser/test/recipe boundaries.
+- `package-identities.json`: final sdist569,239 bytes /a23d7a70…; wheel443,575 /912bd8f5…, byte-identical to the reviewed wheel. All18 required source/private/test/recipe/doc paths equal native and extracted-sdist bytes; Python>=3.9 metadata verified.
+- `logs/red-native.log`: complete expected three-case RED on actual fix-base driver; pre-child directory assertion fails after real source/configuration checks,3 failed /3.43s.
+- `logs/green-native.log`: actual3.12.16,3 passed /3.36s; `logs/green39.log`: actual3.9.25,3 passed /3.96s. Each command is `python -m pytest tests/test_browser_log_benchmark.py -q`, source the retargeted `harness/env.sh` or `env39.sh`, pin unchanged web04af11c…, distinct `--basetemp=$TASK1203_ROOT/{red-native,green-native,green39}`, distinct local pytest cache. All runs serial.
+- `outputs/{native,python39}-{success,nonzero,timeout}.log`: actual persisted files from six fresh-root GREEN cases. `controlled-output-identities.json` records exact text/hash/size. Success/nonzero store both streams (34 bytes); timeout stores replacement-decoded byte streams and fixed diagnostic (53 bytes), while the original timeout exception is asserted at the caller.
+- `logs/build-sdist.log`, `build-wheel.log`, `package-check.log`: offline `python -m build --sdist --no-isolation`; extract into task scratch; build wheel from extraction; exact archive/source checks. Existing cached backend tools reused read-only; no dependency/model downloads or installs.
+- `harness/`: exact amended runner, unchanged regression bytes across RED/GREEN/floor, retargeted env/sitecustomize/source hooks and standalone no-application-import package-check recipe.
+
+All fix runtime scratch is under `/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1203/fix1`. Real public isolation configuration, selected imports/hash validation, synthetic HTTP fixture and final cleanup run in the regression; only the external child execution boundary is controlled. Python tool paths are placeholders for required Node/Chromium arguments: neither is launched, no timing observations or browser acceptance are claimed.
+
+Original task1203 full250/browser6/floor59/installed54/JS/listening-server/calibration evidence remains in `../task1203-evidence` with original source/test/recipe/package identities. No broad gate or timing was repeated for fix1; the identical runtime wheel binds retained installed evidence. Existing dense-layout budget exception and unavailable native/platform gates remain explicit. Media, models, environments, source exports, installed/runtime trees and user data are excluded here.

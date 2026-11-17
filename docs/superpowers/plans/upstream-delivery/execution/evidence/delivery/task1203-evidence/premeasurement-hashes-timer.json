@@ -1,0 +1,26 @@
+{
+  "base": "2c7f2530893cb2ecd20dfe7803b6301ea34f9f9f",
+  "sha256": {
+    "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py": "04af11cce1eaf4be0dc157ba5b4d78783a85bcbbb17596078c75d9df79f46c93",
+    "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py": "0e4f0f9a7846080f591038d021aaf3ca6f01201d83ac32bbdc273f53d5067ee7",
+    "/home/tahv0/.codex/worktrees/c832/OpenScrub/zones_ui.py": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7",
+    "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_internal/job_logs.py": "63d08c124db019b120bb17efc64706d910f1d831f8ccfd9c1ba124368643d1b8",
+    "/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_job_polling_browser.py": "bccef2c535f542c1e2bf3de8578ad9da934a4bea71b3ae1d3c0a74f321f8da1c",
+    "/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_browser_log_retention.py": "91540d4c8ead249841e93281e76e204abeaaa03599ca7b8af515708729d0d795",
+    "/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_job_polling_node.py": "b027fbde9373bbc7d2ff81dba1f9bd1ad9c6d528b00b11f8004af1b91db20636",
+    "/home/tahv0/.codex/worktrees/c832/OpenScrub/benchmark/browser_logs.py": "a10ab311ba7d2eefbee0ffea009037ae94dd87bb14ffa76b672d9046de713772",
+    "/home/tahv0/.codex/worktrees/c832/OpenScrub/benchmark/browser_logs.js": "6ed6d7dc66332f217f31e658af7e5241913f2d8a8b2e9e1e15fdac3db54a9c00",
+    "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1203/base/openscrub_web.py": "da40c1716d17a9992815e18ceea2557b415e95e7d996b96d663e7f080d5086de",
+    "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1203/base/openscrub.py": "0e4f0f9a7846080f591038d021aaf3ca6f01201d83ac32bbdc273f53d5067ee7",
+    "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1203/base/zones_ui.py": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7",
+    "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1203/base/openscrub_internal/job_logs.py": "63d08c124db019b120bb17efc64706d910f1d831f8ccfd9c1ba124368643d1b8",
+    "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1203/base/tests/test_job_polling_browser.py": "47c80247ee27336a3d2149516bdfb3098d05b83cea543ea55d28f65187619ff5",
+    "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1203/harness/sitecustomize.py": "25bb3001e151633b49a1eeabd0aa4764811cb65c7f32618684083d80339393a4",
+    "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1203/harness/task1203_isolation.py": "d5fc76e319cfe71606ac2331e910e785601e9bcb5af528e6dc63f27880af78d7",
+    "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1203/env.sh": "58737d5e683d4d96946c1fc19d4f1ebedb2a044765e3bd72992a8c5e681d7dc3",
+    "/usr/bin/node": "d0efb6fcb9d023ba4e2b160ec2384dc28fe4f17732141ef47f676828fa960505",
+    "/tmp/openscrub-save-as-20261116/node_modules/playwright/package.json": "66a5c412c28b7fe15902da5cb5d7dd503d1c8604d0afe46797fe31aa7dc1a6e0",
+    "/tmp/openscrub-save-as-20261116/node_modules/playwright-core/package.json": "8243ae9fe675146825391eba8e2b06db88ea5ec94b8291a7394525965f3e7a32",
+    "/tmp/openscrub-save-as-20261116/browsers/chromium_headless_shell-1255/chrome-headless-shell-linux64/chrome-headless-shell": "24eb0a14de64ab0c9c2e283a5512ca817db64af8fd853cdb4d818f19a8e23b9b"
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "records": [
+    {
+      "case": "literal-content-copy-selection",
+      "entries": [
+        "",
+        "alpha\nbeta",
+        "",
+        "😀é\t漢字\r\nend",
+        ""
+      ],
+      "bytes": 52
+    }
+  ],
+  "requests": [
+    "/api/jobs/A",
+    "/api/jobs/A/log?from=0",
+    "/api/jobs/A",
+    "/api/jobs/A/log?from=0&epoch=cdfc25e2e9e74c458639ed7c16d977b5",
+    "/api/jobs/A",
+    "/api/jobs/A/log?from=5&epoch=cdfc25e2e9e74c458639ed7c16d977b5",
+    "/api/jobs/A",
+    "/api/jobs/A/log?from=6&epoch=cdfc25e2e9e74c458639ed7c16d977b5",
+    "/api/jobs/A",
+    "/api/jobs/A/log?from=7&epoch=cdfc25e2e9e74c458639ed7c16d977b5",
+    "/api/jobs/A",
+    "/api/jobs/A/log?from=2&epoch=a256e111cdd54be5bfea6d843d5f8b00",
+    "/api/jobs/A",
+    "/api/jobs/A/log?from=3&epoch=83b3e30a6021449bb4c69d59c3a49685"
+  ],
+  "errors": [],
+  "diagnostics": [],
+  "browser": "159.0.8154.6"
+}

@@ -1,0 +1,46 @@
+{"blob": "e6b6ca1403e98ac4f692c527e40f78088f3c501d", "bytes": 2095, "commit": "4b9bd7e576a8ae30369672b4b4722fc9752e233f", "export": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/selected-target-tracking-research/openscrub_internal__reports.py", "lines": 43, "path": "openscrub_internal/reports.py", "sha256": "eec9d568fc18f08ee35469ba864c5526120ae11152e8fe6f4d15007ab42d2427"}
+
+# openscrub_internal/reports.py:1-43
+1: """Publish complete report JSON without truncating the previous report."""
+2: import json
+3: import os
+4: import tempfile
+5: 
+6: 
+7: def atomic_report(path, report) -> None:
+8:     """Stage private UTF-8 JSON beside *path*, sync, close, then replace it.
+9: 
+10:     A failure before replacement leaves the previous report intact and raises.
+11:     Readers opening the path see a complete old or new report on filesystems
+12:     supporting atomic replacement. This does not serialize read/apply/write
+13:     transactions or guarantee power-loss durability: the directory is not
+14:     fsynced, and filesystem/network storage guarantees vary. On Windows an open
+15:     destination may prevent replacement; that failure is propagated. Temporary
+16:     files use the vault's .tmp crash-cleanup convention. POSIX staging permissions
+17:     are 0600; Windows access restrictions also depend on the directory ACL.
+18:     """
+19:     path = os.path.abspath(path)
+20:     staged = None
+21:     try:
+22:         # NamedTemporaryFile creates exclusively with restrictive permissions.
+23:         with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8",
+24:                                          dir=os.path.dirname(path),
+25:                                          prefix=".report-", suffix=".tmp",
+26:                                          delete=False) as stream:
+27:             staged = stream.name
+28:             # Consume the public encoder iterator in TextIOWrapper rather than
+29:             # dispatching one Python stream.write call for every JSON token.
+30:             # Tokens remain streamed; a single large string is still one token.
+31:             stream.writelines(json.JSONEncoder(indent=1).iterencode(report))
+32:             stream.flush()
+33:             os.fsync(stream.fileno())
+34:         # Close first: Windows cannot rename an open staging file.
+35:         os.replace(staged, path)
+36:     finally:
+37:         if staged is not None:
+38:             try:
+39:                 os.unlink(staged)
+40:             except OSError:
+41:                 # After replace the name is gone. On cleanup failure leave a
+42:                 # .tmp for vault crash cleanup without masking the write error.
+43:                 pass

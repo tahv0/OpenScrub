@@ -1,0 +1,34 @@
+{
+  "measurement-base-timing.json.gz": {
+    "compressed_bytes": 94965,
+    "compressed_sha256": "371898be02d05c9d3fec753982a3f133794ef742f3d7cba2af25048e58acec89",
+    "raw_bytes": 674198,
+    "raw_sha256": "424923fae7dd77bd2b39666444fbd0e214ee3cab886b2093f215dfd137513dba",
+    "records": 528,
+    "decode_reparse": "pass"
+  },
+  "measurement-base-instrumentation.json.gz": {
+    "compressed_bytes": 23155,
+    "compressed_sha256": "0b49a14c6fe0299ad7f6f58f9562102eadf7e54a595bd40811cc1d9b5e51eeee",
+    "raw_bytes": 153453,
+    "raw_sha256": "993ea2a73eb250784e434ccc4efa1e4f4f3fe68c4b8e0711bdb48fa4fbf913a5",
+    "records": 132,
+    "decode_reparse": "pass"
+  },
+  "measurement-candidate-timing.json.gz": {
+    "compressed_bytes": 70748,
+    "compressed_sha256": "d1c5055362dedb26cef829f38a2381ee44debd23dea1ef522fc8d2263dbcde7d",
+    "raw_bytes": 597915,
+    "raw_sha256": "8a46e874bd2dd1dad5ed3650973093e43c1a08f0eefd081034a329c034c115ff",
+    "records": 528,
+    "decode_reparse": "pass"
+  },
+  "measurement-candidate-instrumentation.json.gz": {
+    "compressed_bytes": 20560,
+    "compressed_sha256": "cbce196e51b07f63ed639613461cf4be137a9d659017655021ab8138c7816b0e",
+    "raw_bytes": 149507,
+    "raw_sha256": "d603d73c168561fae90bbe16339668f876f7cd80954822d3fca7fa8187a0b283",
+    "records": 132,
+    "decode_reparse": "pass"
+  }
+}

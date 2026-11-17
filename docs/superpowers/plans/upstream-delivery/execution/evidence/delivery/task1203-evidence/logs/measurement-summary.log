@@ -1,0 +1,178 @@
+{
+  "short": {
+    "base": {
+      "publication": {
+        "n": 125,
+        "min": 1.2999999970197678,
+        "median": 4.0999999940395355,
+        "p95_nearest_rank": 6.5,
+        "max": 7.200000002980232
+      },
+      "initial_ms": 3,
+      "final": {
+        "emitted": 3000,
+        "cursor": 3000,
+        "expectedEntries": 3000,
+        "entries": 0,
+        "contentNodes": 0,
+        "delimiters": 0,
+        "units": 116999,
+        "represented_bytes": 233998
+      },
+      "budget_exceeded": false
+    },
+    "candidate": {
+      "publication": {
+        "n": 125,
+        "min": 1.7000000029802322,
+        "median": 3,
+        "p95_nearest_rank": 3.7999999970197678,
+        "max": 5.899999991059303
+      },
+      "initial_ms": 6.5999999940395355,
+      "final": {
+        "emitted": 3000,
+        "cursor": 3000,
+        "expectedEntries": 800,
+        "entries": 800,
+        "contentNodes": 800,
+        "delimiters": 799,
+        "units": 31199,
+        "represented_bytes": 62398
+      },
+      "budget_exceeded": false
+    }
+  },
+  "multiline": {
+    "base": {
+      "publication": {
+        "n": 125,
+        "min": 10.400000005960464,
+        "median": 30.5,
+        "p95_nearest_rank": 47.900000005960464,
+        "max": 54.79999999701977
+      },
+      "initial_ms": 9,
+      "final": {
+        "emitted": 3000,
+        "cursor": 3000,
+        "expectedEntries": 3000,
+        "entries": 0,
+        "contentNodes": 0,
+        "delimiters": 0,
+        "units": 839999,
+        "represented_bytes": 1679998
+      },
+      "budget_exceeded": false
+    },
+    "candidate": {
+      "publication": {
+        "n": 125,
+        "min": 5.299999997019768,
+        "median": 9.899999991059303,
+        "p95_nearest_rank": 12,
+        "max": 15.099999994039536
+      },
+      "initial_ms": 12.099999994039536,
+      "final": {
+        "emitted": 3000,
+        "cursor": 3000,
+        "expectedEntries": 800,
+        "entries": 800,
+        "contentNodes": 800,
+        "delimiters": 799,
+        "units": 223999,
+        "represented_bytes": 447998
+      },
+      "budget_exceeded": false
+    }
+  },
+  "long": {
+    "base": {
+      "publication": {
+        "n": 125,
+        "min": 31.30000001192093,
+        "median": 232.29999999701977,
+        "p95_nearest_rank": 408.5,
+        "max": 431.79999999701977
+      },
+      "initial_ms": 13.200000002980232,
+      "final": {
+        "emitted": 3000,
+        "cursor": 3000,
+        "expectedEntries": 2664,
+        "entries": 0,
+        "contentNodes": 0,
+        "delimiters": 0,
+        "units": 21826151,
+        "represented_bytes": 43652302
+      },
+      "budget_exceeded": false
+    },
+    "candidate": {
+      "publication": {
+        "n": 125,
+        "min": 6.299999997019768,
+        "median": 7.600000008940697,
+        "p95_nearest_rank": 8.400000005960464,
+        "max": 11.200000002980232
+      },
+      "initial_ms": 14.700000002980232,
+      "final": {
+        "emitted": 3000,
+        "cursor": 3000,
+        "expectedEntries": 127,
+        "entries": 127,
+        "contentNodes": 127,
+        "delimiters": 126,
+        "units": 1040510,
+        "represented_bytes": 2081020
+      },
+      "budget_exceeded": false
+    }
+  },
+  "dense-multiline": {
+    "base": {
+      "publication": {
+        "n": 125,
+        "min": 101.59999999403954,
+        "median": 966.5,
+        "p95_nearest_rank": 2189.2000000029802,
+        "max": 3868.2999999970198
+      },
+      "initial_ms": 39.900000005960464,
+      "final": {
+        "emitted": 3000,
+        "cursor": 3000,
+        "expectedEntries": 2664,
+        "entries": 0,
+        "contentNodes": 0,
+        "delimiters": 0,
+        "units": 21826151,
+        "represented_bytes": 43652302
+      },
+      "budget_exceeded": false
+    },
+    "candidate": {
+      "publication": {
+        "n": 125,
+        "min": 42,
+        "median": 44.80000001192093,
+        "p95_nearest_rank": 66,
+        "max": 82.79999999701977
+      },
+      "initial_ms": 42.70000000298023,
+      "final": {
+        "emitted": 3000,
+        "cursor": 3000,
+        "expectedEntries": 127,
+        "entries": 127,
+        "contentNodes": 127,
+        "delimiters": 126,
+        "units": 1040510,
+        "represented_bytes": 2081020
+      },
+      "budget_exceeded": true
+    }
+  }
+}

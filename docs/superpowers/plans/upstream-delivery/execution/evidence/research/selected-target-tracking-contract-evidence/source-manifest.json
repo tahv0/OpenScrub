@@ -1,0 +1,162 @@
+[
+  {
+    "commit": "4b9bd7e576a8ae30369672b4b4722fc9752e233f",
+    "path": "openscrub.py",
+    "blob": "71c0d47c2864a637bb53a522b14896a47b539439",
+    "sha256": "89b3e84e28ba7065489cc1355cfeadaa4f04f0adf3bcbc19503ff01957e3f7e8",
+    "bytes": 419321,
+    "lines": 8701,
+    "export": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/selected-target-tracking-research/openscrub.py",
+    "excerpt": "openscrub.py.txt",
+    "excerpt_ranges": [
+      [
+        733,
+        751
+      ],
+      [
+        1433,
+        1445
+      ],
+      [
+        1926,
+        2058
+      ],
+      [
+        2100,
+        2190
+      ],
+      [
+        2260,
+        2444
+      ],
+      [
+        2447,
+        2738
+      ],
+      [
+        3811,
+        3838
+      ],
+      [
+        3869,
+        3885
+      ],
+      [
+        4058,
+        4088
+      ],
+      [
+        4269,
+        4317
+      ],
+      [
+        6118,
+        6128
+      ],
+      [
+        6352,
+        6449
+      ],
+      [
+        8393,
+        8459
+      ],
+      [
+        8517,
+        8568
+      ]
+    ]
+  },
+  {
+    "commit": "4b9bd7e576a8ae30369672b4b4722fc9752e233f",
+    "path": "openscrub_web.py",
+    "blob": "30aca965bedeb0d41a3c3475a41603f21705086e",
+    "sha256": "0fc4669a086265bc3c0dd05e895a3abfed18eda7544124f8408dfeade450a330",
+    "bytes": 306395,
+    "lines": 5206,
+    "export": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/selected-target-tracking-research/openscrub_web.py",
+    "excerpt": "openscrub_web.py.txt",
+    "excerpt_ranges": [
+      [
+        450,
+        492
+      ],
+      [
+        870,
+        917
+      ],
+      [
+        1550,
+        1585
+      ],
+      [
+        1623,
+        1641
+      ],
+      [
+        1664,
+        1694
+      ],
+      [
+        1806,
+        1929
+      ],
+      [
+        1933,
+        2060
+      ],
+      [
+        3290,
+        3320
+      ],
+      [
+        3420,
+        3440
+      ],
+      [
+        3711,
+        3740
+      ],
+      [
+        3796,
+        3809
+      ],
+      [
+        3901,
+        3977
+      ]
+    ]
+  },
+  {
+    "commit": "4b9bd7e576a8ae30369672b4b4722fc9752e233f",
+    "path": "openscrub_internal/lifetimes.py",
+    "blob": "992adfb357631f69792f22e437a3b1d61e2a7ca8",
+    "sha256": "dbfc317c1c878b8e8a599391578504c44a8964199f2cdae6e2ed60a6336d6743",
+    "bytes": 2934,
+    "lines": 104,
+    "export": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/selected-target-tracking-research/openscrub_internal__lifetimes.py",
+    "excerpt": "openscrub_internal__lifetimes.py.txt",
+    "excerpt_ranges": [
+      [
+        1,
+        71
+      ]
+    ]
+  },
+  {
+    "commit": "4b9bd7e576a8ae30369672b4b4722fc9752e233f",
+    "path": "openscrub_internal/reports.py",
+    "blob": "e6b6ca1403e98ac4f692c527e40f78088f3c501d",
+    "sha256": "eec9d568fc18f08ee35469ba864c5526120ae11152e8fe6f4d15007ab42d2427",
+    "bytes": 2095,
+    "lines": 43,
+    "export": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/selected-target-tracking-research/openscrub_internal__reports.py",
+    "excerpt": "openscrub_internal__reports.py.txt",
+    "excerpt_ranges": [
+      [
+        1,
+        43
+      ]
+    ]
+  }
+]

@@ -1,0 +1,17 @@
+const {chromium}=require('playwright'),assert=require('node:assert/strict'),fs=require('node:fs');
+(async()=>{const browser=await chromium.launch({headless:true,args:['--no-sandbox']});
+try{const page=await browser.newPage({viewport:{width:1280,height:950}}),errors=[],diagnostics=[];
+page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(['error','warning'].includes(m.type()))diagnostics.push(m.text())});
+const base=process.env.INSTALLED_BASE,jid=process.env.INSTALLED_JOB;
+const wait=async fn=>{for(let i=0;i<200;i++){if(await fn())return;await new Promise(r=>setTimeout(r,25))}throw Error('installed browser condition expired')};
+await page.goto(base);assert.equal(await page.title(),'OpenScrub');assert.match(await page.locator('body').innerText(),/OpenScrub/);
+await page.evaluate(id=>openJob(id),jid);await wait(()=>page.evaluate(()=>LOGN===2100&&POLL_CYCLE===null));
+assert.equal(await page.locator('#log span').count(),400);assert.equal(await page.locator('#log').textContent(),Array.from({length:400},(_,i)=>'installed-'+(1700+i)).join('\n'));
+const response=await page.request.post(base+'/__qa__/append',{data:{count:600}});assert.equal(response.status(),200);
+await page.evaluate(()=>refresh());await wait(()=>page.evaluate(()=>LOGN===2700&&POLL_CYCLE===null));
+assert.equal(await page.locator('#log span').count(),800);assert.equal(await page.locator('#log').textContent(),Array.from({length:800},(_,i)=>'installed-'+(1900+i)).join('\n'));
+assert.match(await page.locator('#logStatus').textContent(),/omitted/);assert.deepEqual(errors,[]);assert.deepEqual(diagnostics,[]);
+await page.locator('#log').focus();assert.equal(await page.locator('#log').evaluate(e=>document.activeElement===e),true);
+const result={url:page.url(),title:await page.title(),browser:browser.version(),initialEntries:400,finalEntries:800,cursor:2700,errors,diagnostics,server:'actual installed generated openscrub-web / Cheroot main; all real routes'};
+fs.writeFileSync(process.env.TASK1203_ROOT+'/installed-browser.json',JSON.stringify(result,null,2));console.log(JSON.stringify(result));
+}finally{await browser.close()}})().catch(e=>{console.error(e);process.exit(1)});

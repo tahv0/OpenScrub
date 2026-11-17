@@ -1,0 +1,65 @@
+TASK1203_ACTIVE_SOURCE {"python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]", "sources": {"openscrub": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py", "sha256": "0e4f0f9a7846080f591038d021aaf3ca6f01201d83ac32bbdc273f53d5067ee7"}, "openscrub_web": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", "sha256": "da40c1716d17a9992815e18ceea2557b415e95e7d996b96d663e7f080d5086de"}, "zones_ui": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/zones_ui.py", "sha256": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7"}}}
+F                                                                        [100%]
+=================================== FAILURES ===================================
+____ test_production_polling_bounds_recent_entries_and_keeps_content_nodes _____
+
+polling_http = 'http://127.0.0.1:35105'
+
+    def test_production_polling_bounds_recent_entries_and_keeps_content_nodes(polling_http):
+        # Removing display eviction must fail even though the producer is bounded.
+>       run_browser(polling_http, r"""
+    await open();
+    for(let batch=0;batch<6;batch++)await append(Array.from({length:100},(_,i)=>'L'+(400+batch*100+i)));
+    const s=await snap();console.log(JSON.stringify({observedEntries:s.text.split('\n').length,cursor:await cursor(),units:s.units}));
+    assert.equal(s.text.split('\n').length,800,'recent transcript must stop growing at800');
+    assert.equal(s.text,Array.from({length:800},(_,i)=>'L'+(200+i)).join('\n'));
+    assert.equal(s.count,800);assert.equal(s.nodes,1599);assert.deepEqual(s.seq,Array.from({length:800},(_,i)=>200+i));
+    assert.ok(s.bytes<=2097152);assert.match(await note(),/omitted/);
+    await page.evaluate(()=>window.retainedNode=document.querySelector('#log [data-seq="500"]').firstChild);
+    await append(['tail']);assert.equal(await cursor(),1001);
+    assert.equal(await page.evaluate(()=>window.retainedNode===document.querySelector('#log [data-seq="500"]').firstChild),true);
+    const before=await snap();await poll();assert.deepEqual(await snap(),before,'empty normal poll preserves display/scroll');
+    records.push({case:'count-bound',...s,text:undefined,first:s.seq[0],last:s.seq.at(-1)});
+    """, 'count-bound')
+
+tests/test_browser_log_retention.py:76: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+polling_http = 'http://127.0.0.1:35105'
+script = "\nawait open();\nfor(let batch=0;batch<6;batch++)await append(Array.from({length:100},(_,i)=>'L'+(400+batch*100+i)));...reserves display/scroll');\nrecords.push({case:'count-bound',...s,text:undefined,first:s.seq[0],last:s.seq.at(-1)});\n"
+name = 'count-bound'
+
+    def run_browser(polling_http, script, name):
+        node = shutil.which('node')
+        if not node:
+            pytest.skip('Node needed for optional Playwright acceptance')
+        available = subprocess.run([node, '-e', "require('playwright')"], capture_output=True)
+        if available.returncode:
+            pytest.skip('Existing Playwright required; no dependency installation attempted')
+        env = dict(os.environ, POLLING_BASE=polling_http, RETENTION_CASE=name)
+        result = subprocess.run([node, '-e', BROWSER_SETUP + script + BROWSER_FINISH],
+                                capture_output=True, text=True, env=env, timeout=150)
+        if os.environ.get('POLLING_ARTIFACTS'):
+            Path(os.environ['POLLING_ARTIFACTS'], name + '.log').write_text(result.stdout + result.stderr)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: {"observedEntries":1000,"cursor":1000,"units":4889}
+E         AssertionError [ERR_ASSERTION]: recent transcript must stop growing at800
+E         
+E         1000 !== 800
+E         
+E             at [eval]:38:8 {
+E           generatedMessage: false,
+E           code: 'ERR_ASSERTION',
+E           actual: 1000,
+E           expected: 800,
+E           operator: 'strictEqual',
+E           diff: 'simple'
+E         }
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', '\nconst {chromium}=require(\'playwright\'),assert=require(\'node:assert...alse,\n  code: 'ERR_ASSERTION',\n  actual: 1000,\n  expected: 800,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n").returncode
+
+tests/test_browser_log_retention.py:71: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_browser_log_retention.py::test_production_polling_bounds_recent_entries_and_keeps_content_nodes
+1 failed in 1.83s

@@ -1,0 +1,11 @@
+{
+  "url": "http://127.0.0.1:43277/",
+  "title": "OpenScrub",
+  "browser": "159.0.8154.6",
+  "initialEntries": 400,
+  "finalEntries": 800,
+  "cursor": 2700,
+  "errors": [],
+  "diagnostics": [],
+  "server": "actual installed generated openscrub-web / Cheroot main; all real routes"
+}

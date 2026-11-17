@@ -1,0 +1,45 @@
+{
+  "excerpt": "control-followup-owner-excerpts.txt",
+  "sha256": "1107273652e3b7672c295e2137a97e9f0338a688fcbffe60fa5864b7a93644d3",
+  "sources": [
+    {
+      "path": "openscrub.py",
+      "export": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/selected-target-tracking-research/openscrub.py",
+      "sha256": "89b3e84e28ba7065489cc1355cfeadaa4f04f0adf3bcbc19503ff01957e3f7e8",
+      "ranges": [
+        [
+          6352,
+          6449
+        ],
+        [
+          8580,
+          8644
+        ]
+      ]
+    },
+    {
+      "path": "openscrub_web.py",
+      "export": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/selected-target-tracking-research/openscrub_web.py",
+      "sha256": "0fc4669a086265bc3c0dd05e895a3abfed18eda7544124f8408dfeade450a330",
+      "ranges": [
+        [
+          1022,
+          1055
+        ],
+        [
+          1824,
+          1866
+        ],
+        [
+          1900,
+          1922
+        ],
+        [
+          2005,
+          2013
+        ]
+      ]
+    }
+  ],
+  "method": "Existing immutable export reads only; no new Git export or product execution."
+}

@@ -1,0 +1,1545 @@
+{
+  "cases": {
+    "short": {
+      "base": {
+        "identity": {
+          "kind": "short",
+          "label": "base",
+          "phase": "timing",
+          "fixtureHash": "89654c97179de342a6296b5ddac01cd07d24384cc9523b21b1f30978e58d8925",
+          "emitted": 3000,
+          "errors": [],
+          "diagnostics": [],
+          "browser": "159.0.8154.6",
+          "identity": {
+            "label": "base",
+            "phase": "timing",
+            "source": "da40c1716d17a9992815e18ceea2557b415e95e7d996b96d663e7f080d5086de",
+            "instrumented_page": "e12973a008553867e0aa5ef9bbb8271a36dc06af8809a54a9046968ca1b69714"
+          }
+        },
+        "initial_publication_ms": 3,
+        "initial_cycle_ms": 31.200000002980232,
+        "initial_entries": 400,
+        "publication_ms": {
+          "n": 125,
+          "min": 1.2999999970197678,
+          "median": 4.0999999940395355,
+          "p95_nearest_rank": 6.5,
+          "max": 7.200000002980232
+        },
+        "cycle_ms": {
+          "n": 125,
+          "min": 8.200000002980232,
+          "median": 11.5,
+          "p95_nearest_rank": 14.399999991059303,
+          "max": 21
+        },
+        "emission_buckets": {
+          "1000": {
+            "n": 25,
+            "publication_median_ms": 2
+          },
+          "2000": {
+            "n": 50,
+            "publication_median_ms": 3.7000000029802322
+          },
+          "3000": {
+            "n": 50,
+            "publication_median_ms": 5.4000000059604645
+          }
+        },
+        "transport": {
+          "meta": {
+            "headersMs": {
+              "n": 125,
+              "min": 3,
+              "median": 3.300000011920929,
+              "p95_nearest_rank": 4.399999991059303,
+              "max": 6
+            },
+            "bodyMs": {
+              "n": 125,
+              "min": 0.09999999403953552,
+              "median": 0.20000000298023224,
+              "p95_nearest_rank": 0.30000001192092896,
+              "max": 4.700000002980232
+            },
+            "totalMs": {
+              "n": 125,
+              "min": 3.2999999970197678,
+              "median": 3.5,
+              "p95_nearest_rank": 4.799999997019768,
+              "max": 8
+            },
+            "bytes": {
+              "n": 125,
+              "min": 1519,
+              "median": 1521,
+              "p95_nearest_rank": 1525,
+              "max": 1527
+            }
+          },
+          "log": {
+            "headersMs": {
+              "n": 125,
+              "min": 2.7999999970197678,
+              "median": 3.0999999940395355,
+              "p95_nearest_rank": 4.299999997019768,
+              "max": 12.399999991059303
+            },
+            "bodyMs": {
+              "n": 125,
+              "min": 0.09999999403953552,
+              "median": 0.20000000298023224,
+              "p95_nearest_rank": 0.4000000059604645,
+              "max": 2.199999988079071
+            },
+            "totalMs": {
+              "n": 125,
+              "min": 3,
+              "median": 3.2999999970197678,
+              "p95_nearest_rank": 4.700000002980232,
+              "max": 12.599999994039536
+            },
+            "bytes": {
+              "n": 125,
+              "min": 944,
+              "median": 946,
+              "p95_nearest_rank": 950,
+              "max": 952
+            }
+          }
+        },
+        "attribution": {
+          "long_tasks": {
+            "overlaps_observed_publication": {
+              "count": 0,
+              "max_whole_interval_ms": 0
+            },
+            "overlaps_other_observed_cycle": {
+              "count": 0,
+              "max_whole_interval_ms": 0
+            },
+            "outside_observed_cycles": {
+              "count": 0,
+              "max_whole_interval_ms": 0
+            }
+          },
+          "raf_gaps": {
+            "overlaps_observed_publication": {
+              "count": 127,
+              "max_whole_interval_ms": 16.800000000000182
+            },
+            "overlaps_other_observed_cycle": {
+              "count": 2,
+              "max_whole_interval_ms": 16.700000000000045
+            },
+            "outside_observed_cycles": {
+              "count": 36,
+              "max_whole_interval_ms": 16.800000000000182
+            }
+          },
+          "interpretation": "Interval overlap is not sole-cause attribution; outside includes initial/warmup/control/async validation. A frame gap can include work outside its overlapping publication."
+        },
+        "idle_post_batch_wheels": [
+          {
+            "start": 643.7999999970198,
+            "eventMs": 31,
+            "frameMs": 31,
+            "distanceFromBottom": 100
+          },
+          {
+            "start": 1693.0999999940395,
+            "eventMs": 31.599999994039536,
+            "frameMs": 31.599999994039536,
+            "distanceFromBottom": 100
+          },
+          {
+            "start": 2859.7999999970198,
+            "eventMs": 31.5,
+            "frameMs": 31.5,
+            "distanceFromBottom": 100
+          }
+        ],
+        "final": {
+          "emitted": 3000,
+          "cursor": 3000,
+          "expectedEntries": 3000,
+          "entries": 0,
+          "contentNodes": 0,
+          "delimiters": 0,
+          "units": 116999,
+          "represented_bytes": 233998
+        },
+        "budget_exceeded": false,
+        "instrumentation": {
+          "final_publication": {
+            "units": 39779,
+            "textNodes": 0,
+            "spans": 0,
+            "fragments": 0
+          },
+          "maximum_passed_units": 39779,
+          "conservative_transient_maxima": {
+            "entry_objects_nodes": 0,
+            "text_nodes": 0,
+            "represented_node_input_bytes": 157556
+          },
+          "note": "old referenced state plus created publication inputs; engine allocation/copy counts are unmeasured. Baseline implicit textContent nodes are not counted by createTextNode hooks."
+        }
+      },
+      "candidate": {
+        "identity": {
+          "kind": "short",
+          "label": "candidate",
+          "phase": "timing",
+          "fixtureHash": "89654c97179de342a6296b5ddac01cd07d24384cc9523b21b1f30978e58d8925",
+          "emitted": 3000,
+          "errors": [],
+          "diagnostics": [],
+          "browser": "159.0.8154.6",
+          "identity": {
+            "label": "candidate",
+            "phase": "timing",
+            "source": "04af11cce1eaf4be0dc157ba5b4d78783a85bcbbb17596078c75d9df79f46c93",
+            "instrumented_page": "d115eb20b919b95b1ba3fa933ad7dd6d993894ba344bb4f6727b06efc95a8b62"
+          }
+        },
+        "initial_publication_ms": 6.5999999940395355,
+        "initial_cycle_ms": 34.5,
+        "initial_entries": 400,
+        "publication_ms": {
+          "n": 125,
+          "min": 1.7000000029802322,
+          "median": 3,
+          "p95_nearest_rank": 3.7999999970197678,
+          "max": 5.899999991059303
+        },
+        "cycle_ms": {
+          "n": 125,
+          "min": 8.400000005960464,
+          "median": 10.299999997019768,
+          "p95_nearest_rank": 12.5,
+          "max": 21.099999994039536
+        },
+        "emission_buckets": {
+          "1000": {
+            "n": 25,
+            "publication_median_ms": 2.4000000059604645
+          },
+          "2000": {
+            "n": 50,
+            "publication_median_ms": 3.3999999910593033
+          },
+          "3000": {
+            "n": 50,
+            "publication_median_ms": 2.7999999970197678
+          }
+        },
+        "transport": {
+          "meta": {
+            "headersMs": {
+              "n": 125,
+              "min": 3,
+              "median": 3.300000011920929,
+              "p95_nearest_rank": 4.799999997019768,
+              "max": 5.600000008940697
+            },
+            "bodyMs": {
+              "n": 125,
+              "min": 0.09999999403953552,
+              "median": 0.20000000298023224,
+              "p95_nearest_rank": 0.30000001192092896,
+              "max": 3.5
+            },
+            "totalMs": {
+              "n": 125,
+              "min": 3.2000000029802322,
+              "median": 3.5999999940395355,
+              "p95_nearest_rank": 5.199999988079071,
+              "max": 7
+            },
+            "bytes": {
+              "n": 125,
+              "min": 1519,
+              "median": 1521,
+              "p95_nearest_rank": 1525,
+              "max": 1527
+            }
+          },
+          "log": {
+            "headersMs": {
+              "n": 125,
+              "min": 2.7999999970197678,
+              "median": 3.0999999940395355,
+              "p95_nearest_rank": 4.5,
+              "max": 14.400000005960464
+            },
+            "bodyMs": {
+              "n": 125,
+              "min": 0.09999999403953552,
+              "median": 0.20000000298023224,
+              "p95_nearest_rank": 0.30000001192092896,
+              "max": 3.2999999970197678
+            },
+            "totalMs": {
+              "n": 125,
+              "min": 3,
+              "median": 3.2999999970197678,
+              "p95_nearest_rank": 5.0999999940395355,
+              "max": 14.700000002980232
+            },
+            "bytes": {
+              "n": 125,
+              "min": 944,
+              "median": 946,
+              "p95_nearest_rank": 950,
+              "max": 952
+            }
+          }
+        },
+        "attribution": {
+          "long_tasks": {
+            "overlaps_observed_publication": {
+              "count": 0,
+              "max_whole_interval_ms": 0
+            },
+            "overlaps_other_observed_cycle": {
+              "count": 0,
+              "max_whole_interval_ms": 0
+            },
+            "outside_observed_cycles": {
+              "count": 0,
+              "max_whole_interval_ms": 0
+            }
+          },
+          "raf_gaps": {
+            "overlaps_observed_publication": {
+              "count": 124,
+              "max_whole_interval_ms": 16.800000000000182
+            },
+            "overlaps_other_observed_cycle": {
+              "count": 2,
+              "max_whole_interval_ms": 16.700000000000045
+            },
+            "outside_observed_cycles": {
+              "count": 34,
+              "max_whole_interval_ms": 16.700000000000045
+            }
+          },
+          "interpretation": "Interval overlap is not sole-cause attribution; outside includes initial/warmup/control/async validation. A frame gap can include work outside its overlapping publication."
+        },
+        "idle_post_batch_wheels": [
+          {
+            "start": 677,
+            "eventMs": 31,
+            "frameMs": 32.29999999701977,
+            "distanceFromBottom": 100
+          },
+          {
+            "start": 1726.2999999970198,
+            "eventMs": 31.299999997019768,
+            "frameMs": 32.29999999701977,
+            "distanceFromBottom": 100
+          },
+          {
+            "start": 2776,
+            "eventMs": 31.599999994039536,
+            "frameMs": 32.29999999701977,
+            "distanceFromBottom": 100
+          }
+        ],
+        "final": {
+          "emitted": 3000,
+          "cursor": 3000,
+          "expectedEntries": 800,
+          "entries": 800,
+          "contentNodes": 800,
+          "delimiters": 799,
+          "units": 31199,
+          "represented_bytes": 62398
+        },
+        "budget_exceeded": false,
+        "instrumentation": {
+          "final_publication": {
+            "units": 780,
+            "textNodes": 40,
+            "spans": 20,
+            "fragments": 1
+          },
+          "maximum_passed_units": 15599,
+          "conservative_transient_maxima": {
+            "entry_objects_nodes": 820,
+            "text_nodes": 1639,
+            "represented_node_input_bytes": 63958
+          },
+          "note": "old referenced state plus created publication inputs; engine allocation/copy counts are unmeasured. Baseline implicit textContent nodes are not counted by createTextNode hooks."
+        }
+      }
+    },
+    "multiline": {
+      "base": {
+        "identity": {
+          "kind": "multiline",
+          "label": "base",
+          "phase": "timing",
+          "fixtureHash": "6d1518c3780f708cc0aa9f58ba2e2c60c5007847674078cd70e5e97b6db4b9df",
+          "emitted": 3000,
+          "errors": [],
+          "diagnostics": [],
+          "browser": "159.0.8154.6",
+          "identity": {
+            "label": "base",
+            "phase": "timing",
+            "source": "da40c1716d17a9992815e18ceea2557b415e95e7d996b96d663e7f080d5086de",
+            "instrumented_page": "e12973a008553867e0aa5ef9bbb8271a36dc06af8809a54a9046968ca1b69714"
+          }
+        },
+        "initial_publication_ms": 9,
+        "initial_cycle_ms": 21.299999997019768,
+        "initial_entries": 400,
+        "publication_ms": {
+          "n": 125,
+          "min": 10.400000005960464,
+          "median": 30.5,
+          "p95_nearest_rank": 47.900000005960464,
+          "max": 54.79999999701977
+        },
+        "cycle_ms": {
+          "n": 125,
+          "min": 17.900000005960464,
+          "median": 38.70000000298023,
+          "p95_nearest_rank": 58.099999994039536,
+          "max": 63.400000005960464
+        },
+        "emission_buckets": {
+          "1000": {
+            "n": 25,
+            "publication_median_ms": 14.599999994039536
+          },
+          "2000": {
+            "n": 50,
+            "publication_median_ms": 26.75
+          },
+          "3000": {
+            "n": 50,
+            "publication_median_ms": 41.79999999701977
+          }
+        },
+        "transport": {
+          "meta": {
+            "headersMs": {
+              "n": 125,
+              "min": 3.0999999940395355,
+              "median": 3.5999999940395355,
+              "p95_nearest_rank": 7.199999988079071,
+              "max": 10.099999994039536
+            },
+            "bodyMs": {
+              "n": 125,
+              "min": 0.09999999403953552,
+              "median": 0.20000000298023224,
+              "p95_nearest_rank": 0.3999999910593033,
+              "max": 0.5
+            },
+            "totalMs": {
+              "n": 125,
+              "min": 3.2999999970197678,
+              "median": 3.7999999970197678,
+              "p95_nearest_rank": 7.5999999940395355,
+              "max": 10.5
+            },
+            "bytes": {
+              "n": 125,
+              "min": 8960,
+              "median": 8962,
+              "p95_nearest_rank": 8968,
+              "max": 8968
+            }
+          },
+          "log": {
+            "headersMs": {
+              "n": 125,
+              "min": 2.8999999910593033,
+              "median": 3.2000000029802322,
+              "p95_nearest_rank": 5.4000000059604645,
+              "max": 8.700000002980232
+            },
+            "bodyMs": {
+              "n": 125,
+              "min": 0.09999999403953552,
+              "median": 0.20000000298023224,
+              "p95_nearest_rank": 0.5,
+              "max": 4
+            },
+            "totalMs": {
+              "n": 125,
+              "min": 3.0999999940395355,
+              "median": 3.5,
+              "p95_nearest_rank": 6.100000008940697,
+              "max": 9.299999997019768
+            },
+            "bytes": {
+              "n": 125,
+              "min": 5904,
+              "median": 5906,
+              "p95_nearest_rank": 5912,
+              "max": 5912
+            }
+          }
+        },
+        "attribution": {
+          "long_tasks": {
+            "overlaps_observed_publication": {
+              "count": 5,
+              "max_whole_interval_ms": 55
+            },
+            "overlaps_other_observed_cycle": {
+              "count": 0,
+              "max_whole_interval_ms": 0
+            },
+            "outside_observed_cycles": {
+              "count": 0,
+              "max_whole_interval_ms": 0
+            }
+          },
+          "raf_gaps": {
+            "overlaps_observed_publication": {
+              "count": 263,
+              "max_whole_interval_ms": 66.59999999999945
+            },
+            "overlaps_other_observed_cycle": {
+              "count": 46,
+              "max_whole_interval_ms": 16.700000000000728
+            },
+            "outside_observed_cycles": {
+              "count": 55,
+              "max_whole_interval_ms": 16.800000000000182
+            }
+          },
+          "interpretation": "Interval overlap is not sole-cause attribution; outside includes initial/warmup/control/async validation. A frame gap can include work outside its overlapping publication."
+        },
+        "idle_post_batch_wheels": [
+          {
+            "start": 1071.5,
+            "eventMs": 30.899999991059303,
+            "frameMs": 31,
+            "distanceFromBottom": 100
+          },
+          {
+            "start": 3822.2999999970198,
+            "eventMs": 31.200000002980232,
+            "frameMs": 31.200000002980232,
+            "distanceFromBottom": 100
+          },
+          {
+            "start": 7693.199999988079,
+            "eventMs": 27.400000005960464,
+            "frameMs": 27.400000005960464,
+            "distanceFromBottom": 100
+          }
+        ],
+        "final": {
+          "emitted": 3000,
+          "cursor": 3000,
+          "expectedEntries": 3000,
+          "entries": 0,
+          "contentNodes": 0,
+          "delimiters": 0,
+          "units": 839999,
+          "represented_bytes": 1679998
+        },
+        "budget_exceeded": false,
+        "instrumentation": {
+          "final_publication": {
+            "units": 285599,
+            "textNodes": 0,
+            "spans": 0,
+            "fragments": 0
+          },
+          "maximum_passed_units": 285599,
+          "conservative_transient_maxima": {
+            "entry_objects_nodes": 0,
+            "text_nodes": 0,
+            "represented_node_input_bytes": 1131196
+          },
+          "note": "old referenced state plus created publication inputs; engine allocation/copy counts are unmeasured. Baseline implicit textContent nodes are not counted by createTextNode hooks."
+        }
+      },
+      "candidate": {
+        "identity": {
+          "kind": "multiline",
+          "label": "candidate",
+          "phase": "timing",
+          "fixtureHash": "6d1518c3780f708cc0aa9f58ba2e2c60c5007847674078cd70e5e97b6db4b9df",
+          "emitted": 3000,
+          "errors": [],
+          "diagnostics": [],
+          "browser": "159.0.8154.6",
+          "identity": {
+            "label": "candidate",
+            "phase": "timing",
+            "source": "04af11cce1eaf4be0dc157ba5b4d78783a85bcbbb17596078c75d9df79f46c93",
+            "instrumented_page": "d115eb20b919b95b1ba3fa933ad7dd6d993894ba344bb4f6727b06efc95a8b62"
+          }
+        },
+        "initial_publication_ms": 12.099999994039536,
+        "initial_cycle_ms": 22.599999994039536,
+        "initial_entries": 400,
+        "publication_ms": {
+          "n": 125,
+          "min": 5.299999997019768,
+          "median": 9.899999991059303,
+          "p95_nearest_rank": 12,
+          "max": 15.099999994039536
+        },
+        "cycle_ms": {
+          "n": 125,
+          "min": 12.099999994039536,
+          "median": 16.900000005960464,
+          "p95_nearest_rank": 19.900000005960464,
+          "max": 22.5
+        },
+        "emission_buckets": {
+          "1000": {
+            "n": 25,
+            "publication_median_ms": 7.600000008940697
+          },
+          "2000": {
+            "n": 50,
+            "publication_median_ms": 9.899999998509884
+          },
+          "3000": {
+            "n": 50,
+            "publication_median_ms": 10.0
+          }
+        },
+        "transport": {
+          "meta": {
+            "headersMs": {
+              "n": 125,
+              "min": 3,
+              "median": 3.2999999970197678,
+              "p95_nearest_rank": 5,
+              "max": 6
+            },
+            "bodyMs": {
+              "n": 125,
+              "min": 0.09999999403953552,
+              "median": 0.20000000298023224,
+              "p95_nearest_rank": 0.30000001192092896,
+              "max": 0.4000000059604645
+            },
+            "totalMs": {
+              "n": 125,
+              "min": 3.2999999970197678,
+              "median": 3.5,
+              "p95_nearest_rank": 5.200000002980232,
+              "max": 6.299999997019768
+            },
+            "bytes": {
+              "n": 125,
+              "min": 8960,
+              "median": 8962,
+              "p95_nearest_rank": 8968,
+              "max": 8968
+            }
+          },
+          "log": {
+            "headersMs": {
+              "n": 125,
+              "min": 2.7999999970197678,
+              "median": 3,
+              "p95_nearest_rank": 3.9000000059604645,
+              "max": 4.799999997019768
+            },
+            "bodyMs": {
+              "n": 125,
+              "min": 0.09999999403953552,
+              "median": 0.20000000298023224,
+              "p95_nearest_rank": 0.4000000059604645,
+              "max": 2.2999999970197678
+            },
+            "totalMs": {
+              "n": 125,
+              "min": 3,
+              "median": 3.2999999970197678,
+              "p95_nearest_rank": 4.299999997019768,
+              "max": 5.200000002980232
+            },
+            "bytes": {
+              "n": 125,
+              "min": 5904,
+              "median": 5906,
+              "p95_nearest_rank": 5912,
+              "max": 5912
+            }
+          }
+        },
+        "attribution": {
+          "long_tasks": {
+            "overlaps_observed_publication": {
+              "count": 0,
+              "max_whole_interval_ms": 0
+            },
+            "overlaps_other_observed_cycle": {
+              "count": 0,
+              "max_whole_interval_ms": 0
+            },
+            "outside_observed_cycles": {
+              "count": 0,
+              "max_whole_interval_ms": 0
+            }
+          },
+          "raf_gaps": {
+            "overlaps_observed_publication": {
+              "count": 187,
+              "max_whole_interval_ms": 16.800000000000182
+            },
+            "overlaps_other_observed_cycle": {
+              "count": 15,
+              "max_whole_interval_ms": 16.700000000000273
+            },
+            "outside_observed_cycles": {
+              "count": 35,
+              "max_whole_interval_ms": 16.700000000000273
+            }
+          },
+          "interpretation": "Interval overlap is not sole-cause attribution; outside includes initial/warmup/control/async validation. A frame gap can include work outside its overlapping publication."
+        },
+        "idle_post_batch_wheels": [
+          {
+            "start": 830.6000000089407,
+            "eventMs": 31.299999997019768,
+            "frameMs": 32.599999994039536,
+            "distanceFromBottom": 100
+          },
+          {
+            "start": 2430.2999999970198,
+            "eventMs": 31.5,
+            "frameMs": 32.70000000298023,
+            "distanceFromBottom": 100
+          },
+          {
+            "start": 4047.4000000059605,
+            "eventMs": 31.5,
+            "frameMs": 32.79999999701977,
+            "distanceFromBottom": 100
+          }
+        ],
+        "final": {
+          "emitted": 3000,
+          "cursor": 3000,
+          "expectedEntries": 800,
+          "entries": 800,
+          "contentNodes": 800,
+          "delimiters": 799,
+          "units": 223999,
+          "represented_bytes": 447998
+        },
+        "budget_exceeded": false,
+        "instrumentation": {
+          "final_publication": {
+            "units": 5600,
+            "textNodes": 40,
+            "spans": 20,
+            "fragments": 1
+          },
+          "maximum_passed_units": 111999,
+          "conservative_transient_maxima": {
+            "entry_objects_nodes": 820,
+            "text_nodes": 1639,
+            "represented_node_input_bytes": 459198
+          },
+          "note": "old referenced state plus created publication inputs; engine allocation/copy counts are unmeasured. Baseline implicit textContent nodes are not counted by createTextNode hooks."
+        }
+      }
+    },
+    "long": {
+      "base": {
+        "identity": {
+          "kind": "long",
+          "label": "base",
+          "phase": "timing",
+          "fixtureHash": "49548db63ee3ef26c25974adfe01be0f6751df364325b0925f8b61ef5da40ded",
+          "emitted": 3000,
+          "errors": [],
+          "diagnostics": [],
+          "browser": "159.0.8154.6",
+          "identity": {
+            "label": "base",
+            "phase": "timing",
+            "source": "da40c1716d17a9992815e18ceea2557b415e95e7d996b96d663e7f080d5086de",
+            "instrumented_page": "e12973a008553867e0aa5ef9bbb8271a36dc06af8809a54a9046968ca1b69714"
+          }
+        },
+        "initial_publication_ms": 13.200000002980232,
+        "initial_cycle_ms": 31.400000005960464,
+        "initial_entries": 64,
+        "publication_ms": {
+          "n": 125,
+          "min": 31.30000001192093,
+          "median": 232.29999999701977,
+          "p95_nearest_rank": 408.5,
+          "max": 431.79999999701977
+        },
+        "cycle_ms": {
+          "n": 125,
+          "min": 41.6000000089407,
+          "median": 243.20000000298023,
+          "p95_nearest_rank": 419.5,
+          "max": 444
+        },
+        "emission_buckets": {
+          "1000": {
+            "n": 25,
+            "publication_median_ms": 72.1000000089407
+          },
+          "2000": {
+            "n": 50,
+            "publication_median_ms": 190.69999999552965
+          },
+          "3000": {
+            "n": 50,
+            "publication_median_ms": 346.05000000447035
+          }
+        },
+        "transport": {
+          "meta": {
+            "headersMs": {
+              "n": 125,
+              "min": 4.0999999940395355,
+              "median": 4.700000002980232,
+              "p95_nearest_rank": 5.4000000059604645,
+              "max": 6.5
+            },
+            "bodyMs": {
+              "n": 125,
+              "min": 0.5,
+              "median": 0.8999999910593033,
+              "p95_nearest_rank": 1.0999999940395355,
+              "max": 1.2999999970197678
+            },
+            "totalMs": {
+              "n": 125,
+              "min": 4.899999991059303,
+              "median": 5.5999999940395355,
+              "p95_nearest_rank": 6.299999997019768,
+              "max": 7.4000000059604645
+            },
+            "bytes": {
+              "n": 125,
+              "min": 246143,
+              "median": 246146,
+              "p95_nearest_rank": 246146,
+              "max": 246146
+            }
+          },
+          "log": {
+            "headersMs": {
+              "n": 125,
+              "min": 3.5,
+              "median": 3.9000000059604645,
+              "p95_nearest_rank": 4.700000002980232,
+              "max": 5.200000002980232
+            },
+            "bodyMs": {
+              "n": 125,
+              "min": 0.29999999701976776,
+              "median": 0.6000000089406967,
+              "p95_nearest_rank": 0.9000000059604645,
+              "max": 1.2999999970197678
+            },
+            "totalMs": {
+              "n": 125,
+              "min": 4.0999999940395355,
+              "median": 4.5999999940395355,
+              "p95_nearest_rank": 5.299999997019768,
+              "max": 6
+            },
+            "bytes": {
+              "n": 125,
+              "min": 164028,
+              "median": 164032,
+              "p95_nearest_rank": 164032,
+              "max": 164032
+            }
+          }
+        },
+        "attribution": {
+          "long_tasks": {
+            "overlaps_observed_publication": {
+              "count": 119,
+              "max_whole_interval_ms": 432
+            },
+            "overlaps_other_observed_cycle": {
+              "count": 0,
+              "max_whole_interval_ms": 0
+            },
+            "outside_observed_cycles": {
+              "count": 164,
+              "max_whole_interval_ms": 187
+            }
+          },
+          "raf_gaps": {
+            "overlaps_observed_publication": {
+              "count": 243,
+              "max_whole_interval_ms": 600
+            },
+            "overlaps_other_observed_cycle": {
+              "count": 85,
+              "max_whole_interval_ms": 16.80000000000291
+            },
+            "outside_observed_cycles": {
+              "count": 532,
+              "max_whole_interval_ms": 100
+            }
+          },
+          "interpretation": "Interval overlap is not sole-cause attribution; outside includes initial/warmup/control/async validation. A frame gap can include work outside its overlapping publication."
+        },
+        "idle_post_batch_wheels": [
+          {
+            "start": 4223.5,
+            "eventMs": 31.299999997019768,
+            "frameMs": 31.399999991059303,
+            "distanceFromBottom": 100
+          },
+          {
+            "start": 22856,
+            "eventMs": 31.399999991059303,
+            "frameMs": 31.399999991059303,
+            "distanceFromBottom": 100
+          },
+          {
+            "start": 55988.29999999702,
+            "eventMs": 31.099999994039536,
+            "frameMs": 31.099999994039536,
+            "distanceFromBottom": 100
+          }
+        ],
+        "final": {
+          "emitted": 3000,
+          "cursor": 3000,
+          "expectedEntries": 2664,
+          "entries": 0,
+          "contentNodes": 0,
+          "delimiters": 0,
+          "units": 21826151,
+          "represented_bytes": 43652302
+        },
+        "budget_exceeded": false,
+        "instrumentation": {
+          "final_publication": {
+            "units": 5604011,
+            "textNodes": 0,
+            "spans": 0,
+            "fragments": 0
+          },
+          "maximum_passed_units": 5604011,
+          "conservative_transient_maxima": {
+            "entry_objects_nodes": 0,
+            "text_nodes": 0,
+            "represented_node_input_bytes": 22088324
+          },
+          "note": "old referenced state plus created publication inputs; engine allocation/copy counts are unmeasured. Baseline implicit textContent nodes are not counted by createTextNode hooks."
+        }
+      },
+      "candidate": {
+        "identity": {
+          "kind": "long",
+          "label": "candidate",
+          "phase": "timing",
+          "fixtureHash": "49548db63ee3ef26c25974adfe01be0f6751df364325b0925f8b61ef5da40ded",
+          "emitted": 3000,
+          "errors": [],
+          "diagnostics": [],
+          "browser": "159.0.8154.6",
+          "identity": {
+            "label": "candidate",
+            "phase": "timing",
+            "source": "04af11cce1eaf4be0dc157ba5b4d78783a85bcbbb17596078c75d9df79f46c93",
+            "instrumented_page": "d115eb20b919b95b1ba3fa933ad7dd6d993894ba344bb4f6727b06efc95a8b62"
+          }
+        },
+        "initial_publication_ms": 14.700000002980232,
+        "initial_cycle_ms": 33.400000005960464,
+        "initial_entries": 64,
+        "publication_ms": {
+          "n": 125,
+          "min": 6.299999997019768,
+          "median": 7.600000008940697,
+          "p95_nearest_rank": 8.400000005960464,
+          "max": 11.200000002980232
+        },
+        "cycle_ms": {
+          "n": 125,
+          "min": 16.099999994039536,
+          "median": 17.599999994039536,
+          "p95_nearest_rank": 19.400000005960464,
+          "max": 29.099999994039536
+        },
+        "emission_buckets": {
+          "1000": {
+            "n": 25,
+            "publication_median_ms": 7.5
+          },
+          "2000": {
+            "n": 50,
+            "publication_median_ms": 7.700000002980232
+          },
+          "3000": {
+            "n": 50,
+            "publication_median_ms": 7.600000001490116
+          }
+        },
+        "transport": {
+          "meta": {
+            "headersMs": {
+              "n": 125,
+              "min": 3.8999999910593033,
+              "median": 4.399999991059303,
+              "p95_nearest_rank": 6,
+              "max": 7.799999997019768
+            },
+            "bodyMs": {
+              "n": 125,
+              "min": 0.4000000059604645,
+              "median": 0.8999999910593033,
+              "p95_nearest_rank": 1.0999999940395355,
+              "max": 1.2000000029802322
+            },
+            "totalMs": {
+              "n": 125,
+              "min": 4.5999999940395355,
+              "median": 5.299999997019768,
+              "p95_nearest_rank": 6.800000011920929,
+              "max": 8.700000002980232
+            },
+            "bytes": {
+              "n": 125,
+              "min": 246143,
+              "median": 246146,
+              "p95_nearest_rank": 246146,
+              "max": 246146
+            }
+          },
+          "log": {
+            "headersMs": {
+              "n": 125,
+              "min": 3.3999999910593033,
+              "median": 3.7000000029802322,
+              "p95_nearest_rank": 4.5999999940395355,
+              "max": 11.899999991059303
+            },
+            "bodyMs": {
+              "n": 125,
+              "min": 0.5,
+              "median": 0.699999988079071,
+              "p95_nearest_rank": 0.9000000059604645,
+              "max": 1
+            },
+            "totalMs": {
+              "n": 125,
+              "min": 4,
+              "median": 4.4000000059604645,
+              "p95_nearest_rank": 5.199999988079071,
+              "max": 12.799999997019768
+            },
+            "bytes": {
+              "n": 125,
+              "min": 164028,
+              "median": 164032,
+              "p95_nearest_rank": 164032,
+              "max": 164032
+            }
+          }
+        },
+        "attribution": {
+          "long_tasks": {
+            "overlaps_observed_publication": {
+              "count": 0,
+              "max_whole_interval_ms": 0
+            },
+            "overlaps_other_observed_cycle": {
+              "count": 0,
+              "max_whole_interval_ms": 0
+            },
+            "outside_observed_cycles": {
+              "count": 0,
+              "max_whole_interval_ms": 0
+            }
+          },
+          "raf_gaps": {
+            "overlaps_observed_publication": {
+              "count": 199,
+              "max_whole_interval_ms": 16.800000000000182
+            },
+            "overlaps_other_observed_cycle": {
+              "count": 61,
+              "max_whole_interval_ms": 16.800000000000182
+            },
+            "outside_observed_cycles": {
+              "count": 123,
+              "max_whole_interval_ms": 16.800000000000182
+            }
+          },
+          "interpretation": "Interval overlap is not sole-cause attribution; outside includes initial/warmup/control/async validation. A frame gap can include work outside its overlapping publication."
+        },
+        "idle_post_batch_wheels": [
+          {
+            "start": 1531.0999999940395,
+            "eventMs": 31.299999997019768,
+            "frameMs": 31.5,
+            "distanceFromBottom": 100
+          },
+          {
+            "start": 3997.5,
+            "eventMs": 31.5,
+            "frameMs": 31.700000002980232,
+            "distanceFromBottom": 100
+          },
+          {
+            "start": 6497.70000000298,
+            "eventMs": 31.099999994039536,
+            "frameMs": 31.399999991059303,
+            "distanceFromBottom": 100
+          }
+        ],
+        "final": {
+          "emitted": 3000,
+          "cursor": 3000,
+          "expectedEntries": 127,
+          "entries": 127,
+          "contentNodes": 127,
+          "delimiters": 126,
+          "units": 1040510,
+          "represented_bytes": 2081020
+        },
+        "budget_exceeded": false,
+        "instrumentation": {
+          "final_publication": {
+            "units": 163860,
+            "textNodes": 40,
+            "spans": 20,
+            "fragments": 1
+          },
+          "maximum_passed_units": 524351,
+          "conservative_transient_maxima": {
+            "entry_objects_nodes": 147,
+            "text_nodes": 293,
+            "represented_node_input_bytes": 2408740
+          },
+          "note": "old referenced state plus created publication inputs; engine allocation/copy counts are unmeasured. Baseline implicit textContent nodes are not counted by createTextNode hooks."
+        }
+      }
+    },
+    "dense-multiline": {
+      "base": {
+        "identity": {
+          "kind": "dense-multiline",
+          "label": "base",
+          "phase": "timing",
+          "fixtureHash": "2a673d285e24e1ff03944fba844499b30973993e75ffc46887075ef82e72ec6a",
+          "emitted": 3000,
+          "errors": [],
+          "diagnostics": [],
+          "browser": "159.0.8154.6",
+          "identity": {
+            "label": "base",
+            "phase": "timing",
+            "source": "da40c1716d17a9992815e18ceea2557b415e95e7d996b96d663e7f080d5086de",
+            "instrumented_page": "e12973a008553867e0aa5ef9bbb8271a36dc06af8809a54a9046968ca1b69714"
+          }
+        },
+        "initial_publication_ms": 39.900000005960464,
+        "initial_cycle_ms": 58.79999999701977,
+        "initial_entries": 64,
+        "publication_ms": {
+          "n": 125,
+          "min": 101.59999999403954,
+          "median": 966.5,
+          "p95_nearest_rank": 2189.2000000029802,
+          "max": 3868.2999999970198
+        },
+        "cycle_ms": {
+          "n": 125,
+          "min": 113.59999999403954,
+          "median": 999.7000000029802,
+          "p95_nearest_rank": 2200.1000000089407,
+          "max": 3926.1000000089407
+        },
+        "emission_buckets": {
+          "1000": {
+            "n": 25,
+            "publication_median_ms": 242.70000000298023
+          },
+          "2000": {
+            "n": 50,
+            "publication_median_ms": 784.0999999940395
+          },
+          "3000": {
+            "n": 50,
+            "publication_median_ms": 1283.75
+          }
+        },
+        "transport": {
+          "meta": {
+            "headersMs": {
+              "n": 125,
+              "min": 4.299999997019768,
+              "median": 5.600000008940697,
+              "p95_nearest_rank": 23.099999994039536,
+              "max": 39.70000000298023
+            },
+            "bodyMs": {
+              "n": 125,
+              "min": 0.5999999940395355,
+              "median": 1,
+              "p95_nearest_rank": 1.8999999910593033,
+              "max": 4.200000002980232
+            },
+            "totalMs": {
+              "n": 125,
+              "min": 5.299999997019768,
+              "median": 6.800000011920929,
+              "p95_nearest_rank": 24.099999994039536,
+              "max": 40.3999999910593
+            },
+            "bytes": {
+              "n": 125,
+              "min": 253793,
+              "median": 253796,
+              "p95_nearest_rank": 253796,
+              "max": 253796
+            }
+          },
+          "log": {
+            "headersMs": {
+              "n": 125,
+              "min": 3.5,
+              "median": 5.399999991059303,
+              "p95_nearest_rank": 88.59999999403954,
+              "max": 147.29999999701977
+            },
+            "bodyMs": {
+              "n": 125,
+              "min": 0.5,
+              "median": 0.9000000059604645,
+              "p95_nearest_rank": 89.09999999403954,
+              "max": 118.40000000596046
+            },
+            "totalMs": {
+              "n": 125,
+              "min": 4.200000002980232,
+              "median": 7,
+              "p95_nearest_rank": 125.5,
+              "max": 168.1000000089407
+            },
+            "bytes": {
+              "n": 125,
+              "min": 169128,
+              "median": 169132,
+              "p95_nearest_rank": 169132,
+              "max": 169132
+            }
+          }
+        },
+        "attribution": {
+          "long_tasks": {
+            "overlaps_observed_publication": {
+              "count": 125,
+              "max_whole_interval_ms": 4216
+            },
+            "overlaps_other_observed_cycle": {
+              "count": 38,
+              "max_whole_interval_ms": 144
+            },
+            "outside_observed_cycles": {
+              "count": 183,
+              "max_whole_interval_ms": 534
+            }
+          },
+          "raf_gaps": {
+            "overlaps_observed_publication": {
+              "count": 242,
+              "max_whole_interval_ms": 4416.5
+            },
+            "overlaps_other_observed_cycle": {
+              "count": 184,
+              "max_whole_interval_ms": 149.90000000002328
+            },
+            "outside_observed_cycles": {
+              "count": 593,
+              "max_whole_interval_ms": 299.8999999999942
+            }
+          },
+          "interpretation": "Interval overlap is not sole-cause attribution; outside includes initial/warmup/control/async validation. A frame gap can include work outside its overlapping publication."
+        },
+        "idle_post_batch_wheels": [
+          {
+            "start": 10694.79999999702,
+            "eventMs": 41.1000000089407,
+            "frameMs": 41.20000000298023,
+            "distanceFromBottom": 100
+          },
+          {
+            "start": 82839.70000000298,
+            "eventMs": 99.90000000596046,
+            "frameMs": 99.90000000596046,
+            "distanceFromBottom": 100
+          },
+          {
+            "start": 184453.10000000894,
+            "eventMs": 150.19999998807907,
+            "frameMs": 150.29999999701977,
+            "distanceFromBottom": 100
+          }
+        ],
+        "final": {
+          "emitted": 3000,
+          "cursor": 3000,
+          "expectedEntries": 2664,
+          "entries": 0,
+          "contentNodes": 0,
+          "delimiters": 0,
+          "units": 21826151,
+          "represented_bytes": 43652302
+        },
+        "budget_exceeded": false,
+        "instrumentation": {
+          "final_publication": {
+            "units": 5604011,
+            "textNodes": 0,
+            "spans": 0,
+            "fragments": 0
+          },
+          "maximum_passed_units": 5604011,
+          "conservative_transient_maxima": {
+            "entry_objects_nodes": 0,
+            "text_nodes": 0,
+            "represented_node_input_bytes": 22088324
+          },
+          "note": "old referenced state plus created publication inputs; engine allocation/copy counts are unmeasured. Baseline implicit textContent nodes are not counted by createTextNode hooks."
+        }
+      },
+      "candidate": {
+        "identity": {
+          "kind": "dense-multiline",
+          "label": "candidate",
+          "phase": "timing",
+          "fixtureHash": "2a673d285e24e1ff03944fba844499b30973993e75ffc46887075ef82e72ec6a",
+          "emitted": 3000,
+          "errors": [],
+          "diagnostics": [],
+          "browser": "159.0.8154.6",
+          "identity": {
+            "label": "candidate",
+            "phase": "timing",
+            "source": "04af11cce1eaf4be0dc157ba5b4d78783a85bcbbb17596078c75d9df79f46c93",
+            "instrumented_page": "d115eb20b919b95b1ba3fa933ad7dd6d993894ba344bb4f6727b06efc95a8b62"
+          }
+        },
+        "initial_publication_ms": 42.70000000298023,
+        "initial_cycle_ms": 61.79999999701977,
+        "initial_entries": 64,
+        "publication_ms": {
+          "n": 125,
+          "min": 42,
+          "median": 44.80000001192093,
+          "p95_nearest_rank": 66,
+          "max": 82.79999999701977
+        },
+        "cycle_ms": {
+          "n": 125,
+          "min": 52.900000005960464,
+          "median": 57.70000000298023,
+          "p95_nearest_rank": 77.20000000298023,
+          "max": 94.20000000298023
+        },
+        "emission_buckets": {
+          "1000": {
+            "n": 25,
+            "publication_median_ms": 46.5
+          },
+          "2000": {
+            "n": 50,
+            "publication_median_ms": 44.44999999552965
+          },
+          "3000": {
+            "n": 50,
+            "publication_median_ms": 44.649999998509884
+          }
+        },
+        "transport": {
+          "meta": {
+            "headersMs": {
+              "n": 125,
+              "min": 4.0999999940395355,
+              "median": 4.700000002980232,
+              "p95_nearest_rank": 6.800000011920929,
+              "max": 12.5
+            },
+            "bodyMs": {
+              "n": 125,
+              "min": 0.7999999970197678,
+              "median": 1.1000000089406967,
+              "p95_nearest_rank": 1.5999999940395355,
+              "max": 1.9000000059604645
+            },
+            "totalMs": {
+              "n": 125,
+              "min": 5.200000002980232,
+              "median": 5.799999997019768,
+              "p95_nearest_rank": 8,
+              "max": 13.799999997019768
+            },
+            "bytes": {
+              "n": 125,
+              "min": 253793,
+              "median": 253796,
+              "p95_nearest_rank": 253796,
+              "max": 253796
+            }
+          },
+          "log": {
+            "headersMs": {
+              "n": 125,
+              "min": 3.6000000089406967,
+              "median": 4.0999999940395355,
+              "p95_nearest_rank": 7.600000008940697,
+              "max": 11.5
+            },
+            "bodyMs": {
+              "n": 125,
+              "min": 0.5,
+              "median": 0.8999999910593033,
+              "p95_nearest_rank": 3.5,
+              "max": 5.700000002980232
+            },
+            "totalMs": {
+              "n": 125,
+              "min": 4.4000000059604645,
+              "median": 5,
+              "p95_nearest_rank": 9,
+              "max": 12.5
+            },
+            "bytes": {
+              "n": 125,
+              "min": 169128,
+              "median": 169132,
+              "p95_nearest_rank": 169132,
+              "max": 169132
+            }
+          }
+        },
+        "attribution": {
+          "long_tasks": {
+            "overlaps_observed_publication": {
+              "count": 30,
+              "max_whole_interval_ms": 83
+            },
+            "overlaps_other_observed_cycle": {
+              "count": 0,
+              "max_whole_interval_ms": 0
+            },
+            "outside_observed_cycles": {
+              "count": 1,
+              "max_whole_interval_ms": 53
+            }
+          },
+          "raf_gaps": {
+            "overlaps_observed_publication": {
+              "count": 247,
+              "max_whole_interval_ms": 99.90000000000055
+            },
+            "overlaps_other_observed_cycle": {
+              "count": 85,
+              "max_whole_interval_ms": 33.400000000000546
+            },
+            "outside_observed_cycles": {
+              "count": 146,
+              "max_whole_interval_ms": 66.60000000000002
+            }
+          },
+          "interpretation": "Interval overlap is not sole-cause attribution; outside includes initial/warmup/control/async validation. A frame gap can include work outside its overlapping publication."
+        },
+        "idle_post_batch_wheels": [
+          {
+            "start": 3037.7000000029802,
+            "eventMs": 30.899999991059303,
+            "frameMs": 33.099999994039536,
+            "distanceFromBottom": 100
+          },
+          {
+            "start": 7970.70000000298,
+            "eventMs": 30.899999991059303,
+            "frameMs": 33,
+            "distanceFromBottom": 100
+          },
+          {
+            "start": 12887,
+            "eventMs": 31.200000002980232,
+            "frameMs": 33.29999999701977,
+            "distanceFromBottom": 100
+          }
+        ],
+        "final": {
+          "emitted": 3000,
+          "cursor": 3000,
+          "expectedEntries": 127,
+          "entries": 127,
+          "contentNodes": 127,
+          "delimiters": 126,
+          "units": 1040510,
+          "represented_bytes": 2081020
+        },
+        "budget_exceeded": true,
+        "instrumentation": {
+          "final_publication": {
+            "units": 163860,
+            "textNodes": 40,
+            "spans": 20,
+            "fragments": 1
+          },
+          "maximum_passed_units": 524351,
+          "conservative_transient_maxima": {
+            "entry_objects_nodes": 147,
+            "text_nodes": 293,
+            "represented_node_input_bytes": 2408740
+          },
+          "note": "old referenced state plus created publication inputs; engine allocation/copy counts are unmeasured. Baseline implicit textContent nodes are not counted by createTextNode hooks."
+        }
+      }
+    }
+  },
+  "raw_files": {
+    "measurement-base-timing.json": {
+      "bytes": 674198,
+      "sha256": "424923fae7dd77bd2b39666444fbd0e214ee3cab886b2093f215dfd137513dba",
+      "records": 528
+    },
+    "measurement-candidate-timing.json": {
+      "bytes": 597915,
+      "sha256": "8a46e874bd2dd1dad5ed3650973093e43c1a08f0eefd081034a329c034c115ff",
+      "records": 528
+    },
+    "measurement-base-instrumentation.json": {
+      "bytes": 153453,
+      "sha256": "993ea2a73eb250784e434ccc4efa1e4f4f3fe68c4b8e0711bdb48fa4fbf913a5",
+      "records": 132
+    },
+    "measurement-candidate-instrumentation.json": {
+      "bytes": 149507,
+      "sha256": "d603d73c168561fae90bbe16339668f876f7cd80954822d3fca7fa8187a0b283",
+      "records": 132
+    }
+  },
+  "method": "125 observed accepted batches per source/case; median and empirical nearest-rank p95 sorted[118]. Initial has one observation only.",
+  "limitations": [
+    "fixed base\u2192candidate source order",
+    "intentionally differing retained histories",
+    "idle post-batch wheel is not input latency during publication",
+    "represented units/node creation are not engine copies/heap/RSS"
+  ]
+}
