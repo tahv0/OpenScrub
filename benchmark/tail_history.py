@@ -44,6 +44,8 @@ def fixture(module, n, k, mode):
     for i in range(n):
         rng = random.Random(83011 + (i if mode == "unique" else 0))
         text = "".join(rng.choice("abcdefghijklmnopqrstuvwxyz") for _ in range(24)) + "@sample.invalid"
+        if i < n - k:
+            text = "pending"  # Quiet prefix consistent with email-only detection.
         scans.append((i / 3, (0., 0.), [(text, (8, 8, 150, 28), .99)]))
         if i >= n - k:
             detections.append(module.Detection(i / 3, 0., (8, 8, 150, 28), "email", text, .99))
