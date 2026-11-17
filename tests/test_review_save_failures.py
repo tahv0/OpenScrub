@@ -28,6 +28,7 @@ function el(){return {textContent:'',innerHTML:'',style:{},dataset:{},disabled:f
  addEventListener(){},querySelector(){return null},insertAdjacentHTML(){}}}
 for(const id of ['detail','beslot','review','reviewSaveStatus'])elements.set(id,el());
 const ctx=vm.createContext({elements,console,assert,Set,Map,JSON,Date,Math,Promise,crypto:require("node:crypto").webcrypto,
+ ResizeObserver:class {observe(){} disconnect(){}},
  document:{getElementById:id=>elements.get(id)||null,querySelector:s=>elements.get(s.slice(1))||null,
  querySelectorAll:()=>[],addEventListener(){},createElement:el},
  detail:elements.get('detail'),window:{addEventListener(){}},setInterval:()=>1,clearInterval(){},setTimeout(){},
@@ -240,7 +241,7 @@ def test_playback_box_response_cannot_publish_after_job_switch():
 def test_pending_playback_metadata_cannot_start_after_switch():
     run_js("""setup();requestAnimationFrame=()=>{};
     for(const id of ['beVid','beImg','beCv','bePlay'])elements.set(id,document.createElement('div'));
-    let played=false;const video=elements.get('beVid');Object.assign(video,{readyState:0,play:async()=>{played=true},pause(){}});
+    let played=false;const video=elements.get('beVid');Object.assign(video,{readyState:0,load(){},play:async()=>{played=true},pause(){}});
     const p=beTogglePlay();openJob('B');video.onloadedmetadata();await p;
     if(played)throw Error('old video started after job switch');""")
 

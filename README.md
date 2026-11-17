@@ -617,6 +617,19 @@ quoting these numbers honestly. The shipped test suite
 exercises the same end-to-end pipeline on synthetic videos — for this tool a regression is not a bug, it's a leak,
 so the suite must stay green on every change. Browser save regressions evaluate
 the shipped JavaScript with Node when available; no npm package is needed.
+The real-page editor resize regression is opt-in and uses an existing
+Playwright installation, Chromium, and FFmpeg without downloading anything:
+
+```sh
+OPENSCRUB_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright \
+OPENSCRUB_CHROMIUM=/absolute/path/to/chrome \
+python -m pytest -q tests/test_editor_resize.py
+```
+
+It checks production canvas pixels and pointer edits at desktop/mobile sizes
+and DPR 1/2, then saves, reopens, and decodes an actual synthetic SDR render.
+`OPENSCRUB_RESIZE_ARTIFACTS` optionally retains its screenshots and measurements.
+
 
 
 ## Feature notes

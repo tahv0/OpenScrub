@@ -2870,10 +2870,11 @@ async function delJob(id){
   alert(m);return;
  }
  REVIEW_DRAFTS.delete(id);
- if(CUR===id){stopPolling();VIEW_GEN++;CUR=null;EDITS=null;AUTO_REVIEW=null;REVIEW_REQUEST=null;detail.innerHTML="";}
+ if(CUR===id){beUnmount();stopPolling();VIEW_GEN++;CUR=null;EDITS=null;AUTO_REVIEW=null;REVIEW_REQUEST=null;detail.innerHTML="";}
  JOBSJSON="";loadJobs();
 }
 async function openJob(id){
+ beUnmount();
  const video=document.getElementById("beVid");
  if(video){try{video.pause();}catch(e){}}
  if(EDITS){
@@ -3164,6 +3165,59 @@ async function refreshCycle(cycle){
 }
 
 let BE=emptyEditor();
+// Display geometry belongs to this DOM mount, never to a retained draft.
+let BE_VIEW=null;
+function beEndGesture(editor,cv){
+ editor.drag=null;editor.addAnchor=null;editor.addFloat=null;
+ if(editor.pointerId!=null){
+  try{cv.releasePointerCapture(editor.pointerId);}catch(e){}
+  delete editor.pointerId;
+ }
+}
+function beUnmount(){
+ const view=BE_VIEW;if(!view)return;
+ BE_VIEW=null;view.observer.disconnect();
+ beEndGesture(view.editor,view.cv);
+}
+function beMount(img,vid,cv,id,gen,editor){
+ beUnmount();
+ const view={img,vid,cv,id,gen,editor,transform:null};
+ view.current=()=>BE_VIEW===view&&ownsView(id,gen)&&BE===editor&&
+  document.getElementById("beCv")===cv;
+ view.sync=()=>{
+  if(!view.current())return null;
+  const media=editor.playing?vid:img,r=media.getBoundingClientRect();
+  const sw=media===vid?vid.videoWidth:img.naturalWidth,
+        sh=media===vid?vid.videoHeight:img.naturalHeight;
+  const loaded=media===vid?vid.readyState>=1:img.complete;
+  const valid=loaded&&[sw,sh,r.width,r.height].every(n=>Number.isFinite(n)&&n>0);
+  const old=view.transform;
+  if(!valid){
+   if(old){beEndGesture(editor,cv);view.transform=null;}
+   cv.width=0;cv.height=0;cv.style.width="0px";cv.style.height="0px";
+   return null;
+  }
+  const changed=!old||old.media!==media||old.sw!==sw||old.sh!==sh||
+   old.width!==r.width||old.height!==r.height;
+  if(changed){
+   beEndGesture(editor,cv);
+   // CSS coordinates keep handles/strokes constant. Rounded backing sizes
+   // have their own X/Y ratio, so fractional CSS dimensions lose no scale.
+   const dpr=window.devicePixelRatio||1;
+   cv.width=Math.max(1,Math.round(r.width*dpr));
+   cv.height=Math.max(1,Math.round(r.height*dpr));
+   cv.style.width=r.width+"px";cv.style.height=r.height+"px";
+   view.transform={media,sw,sh,width:r.width,height:r.height,
+    sx:r.width/sw,sy:r.height/sh};
+   editor.scale=r.width/sw;
+   beDraw();
+  }
+  return view.transform;
+ };
+ view.observer=new ResizeObserver(()=>view.sync());
+ BE_VIEW=view;view.observer.observe(img);view.observer.observe(vid);
+ return view;
+}
 async function loadBoxEdit(fromReview){
  const id=CUR,gen=VIEW_GEN,editor=BE;
  showPanel(fromReview?"boxedit_rev":"boxedit");
@@ -3216,11 +3270,11 @@ async function loadBoxEdit(fromReview){
    to a frame where the object is clear, draw a box around it — it will be
    followed and blurred through the window. &#128263; Audio span: drag on the
    timeline's bottom lane to silence (or bleep) that stretch of sound.</p>`;
- const img=document.getElementById("beImg");
- img.onload=()=>{if(!ownsView(id,gen)||BE!==editor||document.getElementById("beImg")!==img||BE.playing)return;const cv=document.getElementById("beCv");
-  cv.width=img.clientWidth;cv.height=img.clientHeight;
-  BE.scale=img.clientWidth/(img.naturalWidth||1);beDraw();};
- const bv=document.getElementById("beVid");
+ const img=document.getElementById("beImg"),bv=document.getElementById("beVid"),
+       cv=document.getElementById("beCv");
+ const view=beMount(img,bv,cv,id,gen,editor);
+ img.onload=()=>{if(view.current()&&!BE.playing){view.sync();beDraw();}};
+ bv.addEventListener("loadedmetadata",()=>{if(view.current())view.sync();});
  const stop=()=>{if(ownsView(id,gen)&&BE===editor&&document.getElementById("beVid")===bv&&BE.playing)bePlayStop();};
  bv.addEventListener("pause",stop);bv.addEventListener("ended",stop);
  saveStatus(EDITS,EDITS.status);
@@ -3238,6 +3292,7 @@ async function beTogglePlay(){
  if(!v.src)v.src=`api/jobs/${CUR}/video`;
  BE.playing=true;
  v.style.display="block";img.style.display="none";
+ if(BE_VIEW)BE_VIEW.sync();
  // boxes are view-only while playing: freeze pointer edits so a moving
  // box can't be grabbed mid-flight
  const cv=document.getElementById("beCv");cv.style.pointerEvents="none";
@@ -3245,7 +3300,10 @@ async function beTogglePlay(){
  try{
   if(v.readyState<1)await new Promise((res,rej)=>{
    v.onloadedmetadata=res;
-   v.onerror=()=>rej(new Error("the browser cannot decode this file"));});
+   v.onerror=()=>rej(new Error("the browser cannot decode this file"));
+   // preload=none defers I/O until Play; request metadata after installing
+   // the listeners rather than waiting for a load that has not started.
+   v.load();});
   if(!current())return;
   v.currentTime=BE.t||0;
   await v.play();
@@ -3257,8 +3315,7 @@ async function beTogglePlay(){
    +") — the scrub slider still works frame by frame.");
   return;
  }
- if(v.clientWidth){cv.width=v.clientWidth;cv.height=v.clientHeight;
-  BE.scale=v.clientWidth/(v.videoWidth||1);}
+ if(BE_VIEW)BE_VIEW.sync();
  // boxes come from the server per timestamp; refresh them on a throttle
  // while rAF keeps the playhead, label and box painting per-frame smooth
  let lastQ=0,inFlight=false;
@@ -3285,6 +3342,7 @@ function bePlayStop(){
  const v=document.getElementById("beVid");
  if(v){try{v.pause();}catch(e){}v.style.display="none";}
  const img=document.getElementById("beImg");if(img)img.style.display="";
+ if(BE_VIEW)BE_VIEW.sync();
  const b=document.getElementById("bePlay");if(b)b.innerHTML="&#9654;";
  const cv=document.getElementById("beCv");if(cv)cv.style.pointerEvents="auto";
  beScrub();   // crisp frame + authoritative boxes at the pause point
@@ -3453,6 +3511,7 @@ async function beScrub(){
  BE.t=+document.getElementById("beT").value;
  document.getElementById("beL").textContent=BE.t.toFixed(1)+"s";
  document.getElementById("beImg").src=`api/jobs/${CUR}/frame_at?t=${BE.t}`;
+ if(BE_VIEW)BE_VIEW.sync();
  const d=await (await fetch(`api/jobs/${id}/boxes_at?t=${BE.t}&all=1`)).json();
  if(!ownsView(id,gen)||BE!==editor)return;
  BE.ox=d.ox;BE.oy=d.oy;BE.raw=d.boxes;
@@ -3472,22 +3531,26 @@ function beFilter(){
 }
 function beDraw(){
  const cv=document.getElementById("beCv");if(!cv)return;
- const x=cv.getContext("2d"),s=BE.scale;
- x.clearRect(0,0,cv.width,cv.height);
+ const view=BE_VIEW;if(!view||!view.current())return;
+ const x=cv.getContext("2d"),tr=view.transform;
+ x.setTransform(1,0,0,1,0,0);x.clearRect(0,0,cv.width,cv.height);
+ if(!tr)return;
+ x.setTransform(cv.width/tr.width,0,0,cv.height/tr.height,0,0);
+ const mapped=box=>box.map((v,i)=>v*(i%2?tr.sy:tr.sx));
  for(const a of BE.adds){
   if(BE.t<a.t0-0.01||BE.t>a.t1+0.01)continue;
-  const[a1,b1,a2,b2]=a.box.map(v=>v*s);
+  const[a1,b1,a2,b2]=mapped(a.box);
   x.fillStyle="rgba(245,158,11,.25)";x.strokeStyle="#f59e0b";x.lineWidth=2;
   x.fillRect(a1,b1,a2-a1,b2-b1);x.strokeRect(a1,b1,a2-a1,b2-b1);
  }
  if(BE.add&&BE.addAnchor&&BE.addFloat){
   const[p,q]=[BE.addAnchor,BE.addFloat];
   x.strokeStyle="#f59e0b";x.setLineDash([6,4]);x.lineWidth=2;
-  x.strokeRect(Math.min(p[0],q[0])*s,Math.min(p[1],q[1])*s,
-   Math.abs(q[0]-p[0])*s,Math.abs(q[1]-p[1])*s);x.setLineDash([]);
+  x.strokeRect(Math.min(p[0],q[0])*tr.sx,Math.min(p[1],q[1])*tr.sy,
+   Math.abs(q[0]-p[0])*tr.sx,Math.abs(q[1]-p[1])*tr.sy);x.setLineDash([]);
  }
  for(const b of BE.boxes){
-  const[a1,b1,a2,b2]=b.box.map(v=>v*s);
+  const[a1,b1,a2,b2]=mapped(b.box);
   x.fillStyle=b.i===BE.sel?"rgba(37,99,235,.25)":"rgba(220,38,38,.22)";
   x.strokeStyle=b.i===BE.sel?"#2563eb":"#dc2626";x.lineWidth=2;
   x.fillRect(a1,b1,a2-a1,b2-b1);x.strokeRect(a1,b1,a2-a1,b2-b1);
@@ -3533,11 +3596,14 @@ function manualId(){
  return `${h.slice(0,8)}-${h.slice(8,12)}-${h.slice(12,16)}-${h.slice(16,20)}-${h.slice(20)}`;
 }
 function beHook(){
- const cv=document.getElementById("beCv");
- const pt=e=>{const r=cv.getBoundingClientRect();
-  return[(e.clientX-r.left)/BE.scale,(e.clientY-r.top)/BE.scale];};
+ const cv=document.getElementById("beCv"),view=BE_VIEW;
+ const pt=e=>{
+  const tr=view&&view.sync();if(!tr||BE.playing)return null;
+  const r=cv.getBoundingClientRect();
+  return[(e.clientX-r.left)/tr.sx,(e.clientY-r.top)/tr.sy];};
  cv.addEventListener("pointerdown",e=>{
-  const p=pt(e);cv.setPointerCapture(e.pointerId);
+  const p=pt(e);if(!p)return;
+  cv.setPointerCapture(e.pointerId);BE.pointerId=e.pointerId;
   if(BE.trk){
    // Track object: same two-click box draw as Add box, but on completion
    // the region is template-tracked through the active timeline window
@@ -3575,10 +3641,10 @@ function beHook(){
    return;
   }
   const sel=BE.boxes.find(b=>b.i===BE.sel);
-  if(sel){const[a1,b1,a2,b2]=sel.box,hs=9/BE.scale;
+  if(sel){const[a1,b1,a2,b2]=sel.box,tr=view.transform;
    const corners=[[a1,b1,0],[a2,b1,1],[a1,b2,2],[a2,b2,3]];
    for(const[hx,hy,ci] of corners)
-    if(Math.abs(p[0]-hx)<hs&&Math.abs(p[1]-hy)<hs){
+    if(Math.abs(p[0]-hx)<9/tr.sx&&Math.abs(p[1]-hy)<9/tr.sy){
      BE.drag={kind:"corner",ci};return;}
    if(p[0]>=a1&&p[0]<=a2&&p[1]>=b1&&p[1]<=b2){
     BE.drag={kind:"move",off:[p[0]-a1,p[1]-b1]};return;}
@@ -3593,9 +3659,10 @@ function beHook(){
   beDraw();
  });
  cv.addEventListener("pointermove",e=>{
-  if(BE.add&&BE.addAnchor){BE.addFloat=pt(e);beDraw();return;}
+  const p=pt(e);if(!p)return;
+  if(BE.add&&BE.addAnchor){BE.addFloat=p;beDraw();return;}
   if(!BE.drag||BE.sel<0)return;
-  const p=pt(e),b=BE.boxes.find(x=>x.i===BE.sel);if(!b)return;
+  const b=BE.boxes.find(x=>x.i===BE.sel);if(!b)return;
   let[a1,b1,a2,b2]=b.box;
   if(BE.drag.kind==="move"){
    const w0=a2-a1,h0=b2-b1;a1=p[0]-BE.drag.off[0];b1=p[1]-BE.drag.off[1];
@@ -3610,7 +3677,10 @@ function beHook(){
   BE.ov[BE.sel]=[b.box[0]-BE.ox,b.box[1]-BE.oy,b.box[2]-BE.ox,b.box[3]-BE.oy];
   beDraw();
  });
- cv.addEventListener("pointerup",()=>{BE.drag=null;});
+ const end=()=>{if(view&&view.current()){BE.drag=null;delete BE.pointerId;}};
+ cv.addEventListener("pointerup",end);cv.addEventListener("pointercancel",()=>{
+  if(view&&view.current()){beEndGesture(BE,cv);beDraw();}
+ });
 }
 function zoomDet(i){
  let ov=document.getElementById("lb");
@@ -3639,6 +3709,7 @@ async function cancelJob(){await fetch("api/jobs/"+CUR+"/cancel",{method:"POST"}
 // the three post-render views (compare, review, box editor) are mutually
 // exclusive: opening one closes the others instead of stacking them
 function showPanel(which){
+ beUnmount();
  // a playing box-editor video must be PAUSED before its DOM is wiped —
  // an element removed via innerHTML can keep its audio running
  try{const v=document.getElementById("beVid");
