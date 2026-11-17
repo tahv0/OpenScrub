@@ -1,0 +1,2 @@
+{"base": "http://127.0.0.1:39813", "log": "200 stale/epoch", "malformed": "400", "metadata": "200 absolute2100/base100/count2000", "page": "200 no-store", "server": "actual installed openscrub-web main/cheroot"}
+installed server exit 0

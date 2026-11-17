@@ -1,0 +1,68 @@
+{
+  "base": "6ae212a35b094fc9466f1616afb2c5bb5c0497f8",
+  "head": "2c7f2530893cb2ecd20dfe7803b6301ea34f9f9f",
+  "branch": "pr/bounded-job-logs",
+  "clean_status": "",
+  "files": {
+    "Dockerfile": {
+      "sha256": "d97a3273b836f1ee2eac1159c9838681bbe4e4a92ed5ebeb3ab1f3c17fd4aa6a",
+      "head_blob": "4be609e57f36275275dd8b2de6c42baaaa43012a",
+      "base_blob": "fa72409396fffca03e21fdded251ebad63fa1089"
+    },
+    "Dockerfile.cuda": {
+      "sha256": "3e13b2e9971dd56b1b43628849688d35ed44b5ee61fb585f5b263a8556385959",
+      "head_blob": "bf672a2f05ba1058087ce97c726b096680ec391a",
+      "base_blob": "b872a49efd3bd0e57ea861b2fe19df098d2549e5"
+    },
+    "Dockerfile.intel": {
+      "sha256": "35e2852da250ffcfaafd63530d3a651933ab83bdc21b09c21e90e2edb15887ba",
+      "head_blob": "18894a936615a864a8354598e64369241ce0ed57",
+      "base_blob": "c0ddc15fbd3b2fe952510957255dcd87b43073f6"
+    },
+    "README.md": {
+      "sha256": "4f257a1b040cf3070b5c5582322ebb0fb58a2bc067798236981a97cf9a7d8fb4",
+      "head_blob": "1cc88d65efb7377d99f074824fca5d440f4bda65",
+      "base_blob": "9c8f267518e7b75f7aef0c11748092b1a550b84c"
+    },
+    "openscrub_internal/__init__.py": {
+      "sha256": "cddf0922db4bac37438529289d535c50114ce4e7c01fbe0aabc4e7f9345f6b44",
+      "head_blob": "364c69f525a307744caf7b630deae3d256099952",
+      "base_blob": null
+    },
+    "openscrub_internal/job_logs.py": {
+      "sha256": "63d08c124db019b120bb17efc64706d910f1d831f8ccfd9c1ba124368643d1b8",
+      "head_blob": "6c1e41017a195da0c790819904c67f77e47122cb",
+      "base_blob": null
+    },
+    "openscrub_web.py": {
+      "sha256": "da40c1716d17a9992815e18ceea2557b415e95e7d996b96d663e7f080d5086de",
+      "head_blob": "051488690b2bd5062cc18250aac81af72736edca",
+      "base_blob": "a8903862d00bdf068a59cf5e9c5ac3c6223884d2"
+    },
+    "pyproject.toml": {
+      "sha256": "8b01e655aac8b07a722c2ea9922d9827d65db159ce15473e766152244723ddde",
+      "head_blob": "39bb95eb5a4285e1dc1f63bdecd5b75179620c77",
+      "base_blob": "4b44d9a76d1858482ca5c6eea72387c9ca7e9f11"
+    },
+    "test_openscrub.py": {
+      "sha256": "8a755be0029508a2e71a9b3f6f798d6b2828cc7988b9a6484404b43ba8e65baa",
+      "head_blob": "e9088aeb6111a2956c210625012975d71e7837db",
+      "base_blob": "49f4daf5ffb0be34b86a0edbd39a812ab2cd30e7"
+    },
+    "tests/test_job_logs.py": {
+      "sha256": "f43eee820831e2850479d1cf8cf6d4ed909971a835f549ce063c3d0244d4551c",
+      "head_blob": "4562c3c71faac62693215f2b9a62864b20f3a432",
+      "base_blob": null
+    },
+    "tests/test_job_polling_browser.py": {
+      "sha256": "47c80247ee27336a3d2149516bdfb3098d05b83cea543ea55d28f65187619ff5",
+      "head_blob": "7506e7e6d1218d45f1a02394618289f9df61bae2",
+      "base_blob": "f18886599d1a5cc9d6ed1e12238309df724652ce"
+    },
+    "tests/test_job_polling_node.py": {
+      "sha256": "299b976d42c3e4fd57c5c703ea29a50fbdfbaf6b6a1b8435b416bf663dd0928c",
+      "head_blob": "26f053d2fe2f2ab0cdfb47a37699228967d5c18b",
+      "base_blob": "64e76e16d60fe44192e492e74bbfa93e42d956df"
+    }
+  }
+}

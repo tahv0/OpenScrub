@@ -2361,8 +2361,8 @@
   },
   {
     "path": "research/source-plans/browser-log-retention-source-plan.md.txt",
-    "bytes": 6715,
-    "sha256": "1fe41be9f9bb1de3eb37d2c8f1a809ca34b49cb275585ff9324bcb05fbfbbc0d"
+    "bytes": 6883,
+    "sha256": "ceb0732d7ef4732be55269470fad50b6d4ae9b6098c6e908b9933bbcff3b9742"
   },
   {
     "path": "research/source-plans/docker-pip-cache-source-plan.md.txt",
@@ -6975,6 +6975,26 @@
     "sha256": "37c2beef006e2ffb20415f269c2edfe4f91f026594f3c19fec295669eaa42a24"
   },
   {
+    "path": "delivery/task-1202-brief.md",
+    "bytes": 8788,
+    "sha256": "ec8855af759908c8d6b79d4fc00fea7198cf281c815ca4c445d3a306172c7667"
+  },
+  {
+    "path": "delivery/task-1202-pr.md",
+    "bytes": 2426,
+    "sha256": "6c48cb568bbe66f384ff2ced20eb8e5caacd753263094f7e0f01e1f9e96d6f8e"
+  },
+  {
+    "path": "delivery/task-1202-report.md",
+    "bytes": 16401,
+    "sha256": "b8024c2b6ce01ff31fa582a176d5c3674173737aa6c157eceb2aecf6f8a702b5"
+  },
+  {
+    "path": "delivery/task-1202-review.md",
+    "bytes": 10699,
+    "sha256": "45b1c75272444d8597fb9233b6aee549ed96aa682f738105e45c30e107c0740c"
+  },
+  {
     "path": "delivery/task-161-brief.md",
     "bytes": 3879,
     "sha256": "597166d75055a1bffabb33d2e2262f60cfdec23aa51545293804430d94006da6"
@@ -8613,6 +8633,251 @@
     "path": "delivery/task119-evidence/test_job_filename_display.py",
     "bytes": 5023,
     "sha256": "d63e48116264ea247cda2d619fd25bf641a05ce8f68a92076a657601a87346dd"
+  },
+  {
+    "path": "delivery/task1202-evidence/README.md",
+    "bytes": 7347,
+    "sha256": "072af86aa32dd53ccd981eaa21258aa1b798effb511ecab7375ceb5e37242a8f"
+  },
+  {
+    "path": "delivery/task1202-evidence/artifact-identities.json",
+    "bytes": 422,
+    "sha256": "c795987b22a42bf56e0ea24dbedc7126cd762ed8b20a73874dd93d52ef63f466"
+  },
+  {
+    "path": "delivery/task1202-evidence/bounded-browser.json",
+    "bytes": 1839,
+    "sha256": "f36fc3d47cfa95f7a56bc5be5fa86852dc1baac049a698b57cf861e1572e492d"
+  },
+  {
+    "path": "delivery/task1202-evidence/browser-results.json",
+    "bytes": 12664,
+    "sha256": "f62706c468c65912de59b72c6e09deec07388a68bb9f3f0aacb75591514ce42d"
+  },
+  {
+    "path": "delivery/task1202-evidence/browser-summary.log",
+    "bytes": 2430,
+    "sha256": "2564ff7cf22c81fc49591481f1891dda57db4c086d9e316d790c789c4ec32b60"
+  },
+  {
+    "path": "delivery/task1202-evidence/environment312.json",
+    "bytes": 339,
+    "sha256": "35448ea1c3f1c5b2cb6d1c561868404d3d6ae982e3b3cd2d97a1072f21ddab69"
+  },
+  {
+    "path": "delivery/task1202-evidence/environment39.json",
+    "bytes": 318,
+    "sha256": "caef563e838b80be073367eb5e6d39c5560a32323fae064caa9fdd1da2261f54"
+  },
+  {
+    "path": "delivery/task1202-evidence/harness/bench_driver.py",
+    "bytes": 2525,
+    "sha256": "dce2ae6366358b78a14b936c70bbe47817023a3193a6316429fa6254fa8054f0"
+  },
+  {
+    "path": "delivery/task1202-evidence/harness/bench_worker.py",
+    "bytes": 5710,
+    "sha256": "a7c0c2add6952544f86965307a8bf3d8ca171b862551be4f28192e8b21fae6ab"
+  },
+  {
+    "path": "delivery/task1202-evidence/harness/env.sh",
+    "bytes": 930,
+    "sha256": "c32e05db468a411c6d9290522d5b27672a9fa1ce7071a70ac93d159c54c64a5e"
+  },
+  {
+    "path": "delivery/task1202-evidence/harness/env39.sh",
+    "bytes": 178,
+    "sha256": "ed5225ddcfc4e40228e2f70dbb9b2b86b77091e7b6a701256966e463acec2e6b"
+  },
+  {
+    "path": "delivery/task1202-evidence/harness/installed_entry.py",
+    "bytes": 1510,
+    "sha256": "80989403db8ddf8849807a087cdefc49e35bf46e9e38253f7b92a0c0eaacd764"
+  },
+  {
+    "path": "delivery/task1202-evidence/harness/installed_http.py",
+    "bytes": 2495,
+    "sha256": "52ff4bd20bfffc58457e2d9a0f6e72b0c80be67a110bc0c5be4eef528bc38fcb"
+  },
+  {
+    "path": "delivery/task1202-evidence/harness/log_workload.py",
+    "bytes": 1102,
+    "sha256": "2e03edb2f35d8d7359a92aab98b2d8a412ced46f5d93efb2e3b15a4b14458bff"
+  },
+  {
+    "path": "delivery/task1202-evidence/harness/package_check.py",
+    "bytes": 2140,
+    "sha256": "e97f7e3a527619d0312efe0902c418f8f20b1863076a50d35027f7756ceb8464"
+  },
+  {
+    "path": "delivery/task1202-evidence/harness/sitecustomize.py",
+    "bytes": 1664,
+    "sha256": "763c6381af5e27505505163e6f68e9a385d8751e39298b8f8faa1e1c353744de"
+  },
+  {
+    "path": "delivery/task1202-evidence/harness/split_read_control.py",
+    "bytes": 808,
+    "sha256": "8f421eda4cf91e85acec0fd944843fbd8ec6c4707192055e3bba789e38c57ee8"
+  },
+  {
+    "path": "delivery/task1202-evidence/harness/summarize_measurements.py",
+    "bytes": 2503,
+    "sha256": "1b1317e3e20d53ea504603d34840e63f7b91597f1e9b6f7b3a7f168bcc25438e"
+  },
+  {
+    "path": "delivery/task1202-evidence/harness/task1202_isolation.py",
+    "bytes": 1805,
+    "sha256": "90daf50061e3392462426dc3faeba4493d6ec8598126c0878f73c96ed10c723b"
+  },
+  {
+    "path": "delivery/task1202-evidence/logs/bench-processes.log",
+    "bytes": 348652,
+    "sha256": "bee6198bcdaa6135c4d459c8a6df2e8738fa1e346c11c4b1eb577e3bc12e9a78"
+  },
+  {
+    "path": "delivery/task1202-evidence/logs/browser4.log",
+    "bytes": 691,
+    "sha256": "38d5ef389eb4e669e7df613fcfd82e33912c0171de81f2aeebbc9d4ebdfb5b27"
+  },
+  {
+    "path": "delivery/task1202-evidence/logs/build-sdist.log",
+    "bytes": 105,
+    "sha256": "698c36b11c9ccb12498a71ffd6e40daef8483f0c07231ec6b282f8eecf751f12"
+  },
+  {
+    "path": "delivery/task1202-evidence/logs/build-tools.log",
+    "bytes": 742,
+    "sha256": "c644d72e25063e8103d83706a29e11f95763d60fbc164a37ea82df9e8f5d923b"
+  },
+  {
+    "path": "delivery/task1202-evidence/logs/build-wheel.log",
+    "bytes": 115,
+    "sha256": "fcc4bde03a73ac75152fbdd6506ad27872f70d670df3da55a8e0fed6a119f4cb"
+  },
+  {
+    "path": "delivery/task1202-evidence/logs/docker-static.log",
+    "bytes": 332,
+    "sha256": "8d703d3598abef4a4a2e4f4bcc47b6927c1936d22fa812e73a6550ee69c07f88"
+  },
+  {
+    "path": "delivery/task1202-evidence/logs/floor39.log",
+    "bytes": 710,
+    "sha256": "309788fc9e90dc783540df468067b70a750f31efa09602cfb1f708e8b4f519cb"
+  },
+  {
+    "path": "delivery/task1202-evidence/logs/focused2.log",
+    "bytes": 16926,
+    "sha256": "0182fbeb64f58f8cd41728e71d0d4f5662ff14a1476ab2a422e93f5ac17a2e4a"
+  },
+  {
+    "path": "delivery/task1202-evidence/logs/focused3.log",
+    "bytes": 19388,
+    "sha256": "ac46288e5ae095d747bfdf4dc2657e62a0793249ebaf867ffd4e9dd33c82eb85"
+  },
+  {
+    "path": "delivery/task1202-evidence/logs/full.log",
+    "bytes": 944,
+    "sha256": "1f277e6455d53457776559bce0a8c3a50149eac8408b2d3710ff9456db02f6ad"
+  },
+  {
+    "path": "delivery/task1202-evidence/logs/green1.log",
+    "bytes": 692,
+    "sha256": "cb42f0acb4f97ef03ab3a28582a6bd0ae1402443455f27ba9698e323685cefe3"
+  },
+  {
+    "path": "delivery/task1202-evidence/logs/install-wheel.log",
+    "bytes": 134,
+    "sha256": "4449f487e241064d0ddb0b9d8f352a847549c4e4b3677f1bf8af45df805fa645"
+  },
+  {
+    "path": "delivery/task1202-evidence/logs/installed-cli.log",
+    "bytes": 18939,
+    "sha256": "a29928149f9555bdf835bff1f793b18f29fe4d4c5f347c3a8b402cb6f9788e8f"
+  },
+  {
+    "path": "delivery/task1202-evidence/logs/installed-http.log",
+    "bytes": 236,
+    "sha256": "43fa7d2da3bb7d5e311e65b097f5fad66038fb872146f34460e06939245f77f5"
+  },
+  {
+    "path": "delivery/task1202-evidence/logs/installed-startup.log",
+    "bytes": 1474,
+    "sha256": "ed36b02655cdf51966ab9dbc42e464da8e0f191e4da9127a4495cb162135ab9e"
+  },
+  {
+    "path": "delivery/task1202-evidence/logs/installed-tests.log",
+    "bytes": 834,
+    "sha256": "2e91ec15365af06b71c36145b4c4f073f8bec02faaa217707cabf287b6a6debe"
+  },
+  {
+    "path": "delivery/task1202-evidence/logs/js-parse.log",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "delivery/task1202-evidence/logs/measurement-driver.log",
+    "bytes": 7062,
+    "sha256": "5b15138b985b924b098c30deaf6c7c2d03b16370cc8bbd7784521c23c4e19b59"
+  },
+  {
+    "path": "delivery/task1202-evidence/logs/measurement-summary.log",
+    "bytes": 1671,
+    "sha256": "1795adfff47fa7396bc9343716a1c8d64d2c55c4555fb955307890c3bc3051ae"
+  },
+  {
+    "path": "delivery/task1202-evidence/logs/package-check.log",
+    "bytes": 1702,
+    "sha256": "2682e80d2f49d2fc63e1bd4159748db7429a436567d233ad014173b1abc1ebb5"
+  },
+  {
+    "path": "delivery/task1202-evidence/logs/red.log",
+    "bytes": 4450,
+    "sha256": "5f2e68abed9a20c8e1f11297a5a7e2e962b21f0a4024c4bd04dc536a0ed81a88"
+  },
+  {
+    "path": "delivery/task1202-evidence/logs/split-read-control.log",
+    "bytes": 752,
+    "sha256": "2be99885b4761bd4fa9270d113139f607ba301c0f37506a974620b2ef829dc04"
+  },
+  {
+    "path": "delivery/task1202-evidence/logs/thumbnail-red.log",
+    "bytes": 2754,
+    "sha256": "86f65242c74e752faee5a3aeef6122760b158c7de02621737891329107b49205"
+  },
+  {
+    "path": "delivery/task1202-evidence/measurement-plan.json",
+    "bytes": 2983,
+    "sha256": "42300a1f7ae50a814c8d01c1b2d50c10c5ee3c5b9d1d0333f9210ac12f5eb7c6"
+  },
+  {
+    "path": "delivery/task1202-evidence/measurement-summary.json",
+    "bytes": 36784,
+    "sha256": "84371ca7e0f22ae32059fe54f7327c4341464f88a5f7e61202d017a3d27d7824"
+  },
+  {
+    "path": "delivery/task1202-evidence/measurements.jsonl",
+    "bytes": 208900,
+    "sha256": "9d76e85a1dcd21aed6f9a6be7075f43faa9aa98e7c58c29bcf4d47801d9af386"
+  },
+  {
+    "path": "delivery/task1202-evidence/package-identities.json",
+    "bytes": 1702,
+    "sha256": "2682e80d2f49d2fc63e1bd4159748db7429a436567d233ad014173b1abc1ebb5"
+  },
+  {
+    "path": "delivery/task1202-evidence/premeasurement-hashes-original.json",
+    "bytes": 1683,
+    "sha256": "dd35c8335c1d426efa83749a35a55e92969e0fc9af36d3cfa1d7d209e795deb5"
+  },
+  {
+    "path": "delivery/task1202-evidence/premeasurement-hashes.json",
+    "bytes": 2581,
+    "sha256": "a8719ebaf45039fbd92fb67db079e049ea741b2d3d50d3963dc248472393c648"
+  },
+  {
+    "path": "delivery/task1202-evidence/source-identities.json",
+    "bytes": 3025,
+    "sha256": "385a384441da4a6db50b0d84fb3b2747e9387fb92505b108776f5d51d6cf33d2"
   },
   {
     "path": "delivery/task61-evidence/build-final.log",

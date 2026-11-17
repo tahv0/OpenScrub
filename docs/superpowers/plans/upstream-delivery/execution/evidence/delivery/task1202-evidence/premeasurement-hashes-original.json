@@ -1,0 +1,13 @@
+{
+  "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py": "da40c1716d17a9992815e18ceea2557b415e95e7d996b96d663e7f080d5086de",
+  "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_internal/job_logs.py": "63d08c124db019b120bb17efc64706d910f1d831f8ccfd9c1ba124368643d1b8",
+  "/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_job_logs.py": "f43eee820831e2850479d1cf8cf6d4ed909971a835f549ce063c3d0244d4551c",
+  "/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_job_polling_node.py": "299b976d42c3e4fd57c5c703ea29a50fbdfbaf6b6a1b8435b416bf663dd0928c",
+  "/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_job_polling_browser.py": "47c80247ee27336a3d2149516bdfb3098d05b83cea543ea55d28f65187619ff5",
+  "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1202/bench_worker.py": "5b57ebbc0bb7b555b16abd266bad1f87e2a9367f86fecdb1f5e8a4d85a80c009",
+  "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1202/bench_driver.py": "7f2fe3a26263840f6013b13b66cd74f5a080892b5e726f3c2fea96d5b9527f2e",
+  "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1202/fixtures/log_workload.py": "2e03edb2f35d8d7359a92aab98b2d8a412ced46f5d93efb2e3b15a4b14458bff",
+  "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1202/harness/sitecustomize.py": "763c6381af5e27505505163e6f68e9a385d8751e39298b8f8faa1e1c353744de",
+  "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1202/harness/task1202_isolation.py": "90daf50061e3392462426dc3faeba4493d6ec8598126c0878f73c96ed10c723b",
+  "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1202/env.sh": "c32e05db468a411c6d9290522d5b27672a9fa1ce7071a70ac93d159c54c64a5e"
+}

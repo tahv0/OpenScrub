@@ -1,0 +1,15 @@
+{
+  "emitted_javascript": {
+    "sha256": "8e71b60641a4f55203946876f560740471da9cd4ca8bb3d73b9376a4f04b86f0",
+    "bytes": 112979,
+    "node_check": "passed"
+  },
+  "cached_yunet": {
+    "sha256": "8f2383e4dd3cfbb4553ea8718107fc0423210dc964f9f4280604804ed2552fa4",
+    "bytes": 232589
+  },
+  "measurement_records": {
+    "count": 216,
+    "sha256": "9d76e85a1dcd21aed6f9a6be7075f43faa9aa98e7c58c29bcf4d47801d9af386"
+  }
+}

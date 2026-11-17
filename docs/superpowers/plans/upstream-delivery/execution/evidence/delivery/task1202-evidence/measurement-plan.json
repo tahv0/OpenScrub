@@ -1,0 +1,36 @@
+{
+  "base": "6ae212a35b094fc9466f1616afb2c5bb5c0497f8",
+  "source_harness_fixture_hashes": "premeasurement-hashes.json",
+  "cases": [
+    "short",
+    "unicode",
+    "multiline",
+    "maximum"
+  ],
+  "emitted_entries_per_job": [
+    500,
+    5000,
+    20000
+  ],
+  "jobs_per_fresh_observation": 3,
+  "warmup_pairs_per_case_count": 3,
+  "observed_pairs_per_case_count": 5,
+  "pair_order": "base,candidate on odd ordinal; candidate,base on even ordinal; preserve all 192 timing observations including warmups",
+  "append_boundary": "preconstructed immutable same synthetic inputs into real WebCallbacks.log, looping over three fresh new_job owners; fixture creation outside timing; includes normalization, lock, eviction and producer loop",
+  "http_boundary": "real Flask /api/jobs/<jid>/log in werkzeug make_server loopback; urllib connect, query parsing, atomic snapshot, Flask JSON encoding, complete HTTP body transfer included; JSON decode/hash outside elapsed boundary",
+  "http_samples_per_observation": "6 native full-history requests from0, then6 matched-retained-interval requests from independent expected base; rotate three jobs; one untimed matched-subset correctness GET precedes samples",
+  "equivalence": "all input strings <=8192bytes and untruncated; independent newest-to-oldest count/byte recipe computes intended subset; compare every candidate full and every base/candidate matched body to full expected lines; retain SHA256, absolute base/next/count/bytes/counters and output sizes; every decoded response also verifies exact from/len/count; every baseline full body equals the complete input sequence",
+  "cache_state": "fresh subprocess imports per observation; existing offline CPython3.12/OpenCV4/Flask env; normal GC; same offline model cache task-local, no inference/models/network fetch; three full warmup pairs, no selective rerun",
+  "settings": {
+    "max_entries": 2000,
+    "max_utf8_bytes": 524288,
+    "max_entry_utf8_bytes": 8192
+  },
+  "instrumentation_after_all_timing": "one base and candidate tracemalloc producer + actual route snapshot/JSON observation per each12 case/count; fresh mutable fixtures; allocate synthetic caller strings inside allocation workload then discard temporaries; no time interpretation of instrumented work; report current, append peak and snapshot/JSON peak separately",
+  "escalation": {
+    "candidate_median_batch_us_per_append_above": 100,
+    "candidate_median_native_full_loopback_ms_above": 50
+  },
+  "limits": "local responsiveness only; no p95, global RSS, browser retention, append speedup or model/media latency claim; inputs/caller objects, Unicode object overhead, escaping, in-flight responses, allocator and job count remain separate",
+  "frozen_identity": "premeasurement-hashes.json is checked before and after every observation; its immutable bytes/hash are captured by driver; expected web hash is passed into configure, not recomputed from source; observations record manifest and source hash"
+}

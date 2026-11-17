@@ -1,0 +1,40 @@
+TASK1202_ACTIVE_SOURCE {"python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]", "sources": {"openscrub": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py", "sha256": "0e4f0f9a7846080f591038d021aaf3ca6f01201d83ac32bbdc273f53d5067ee7"}, "openscrub_web": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", "sha256": "1928650f2a0c445b4e5c9116011a915af5d349e0a016f85273952065331b2e7e"}, "zones_ui": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/zones_ui.py", "sha256": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7"}}}
+F                                                                        [100%]
+=================================== FAILURES ===================================
+__________ test_thumbnail_and_tracking_callbacks_stay_with_their_job ___________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x78b2505549e0>
+tmp_path = PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1202/thumbnail-red/test_thumbnail_and_tracking_ca0')
+
+    def test_thumbnail_and_tracking_callbacks_stay_with_their_job(monkeypatch, tmp_path):
+        import openscrub_web as web
+        monkeypatch.setattr(web, 'JOBS', {})
+        monkeypatch.setattr(web, 'JOBS_DIR', str(tmp_path))
+        old = web.new_job('', {}, 'old')
+        deferred = []
+        class DeferredThread:
+            def __init__(self, target, **kwargs):
+                self.target = target
+            def start(self):
+                deferred.append(self.target)
+        monkeypatch.setattr(web.threading, 'Thread', DeferredThread)
+        monkeypatch.setattr(web, 'build_args', lambda *_: object())
+        monkeypatch.setattr(web.openscrub, 'run_scan', lambda *_: {'stats': {}})
+        monkeypatch.setattr(web.openscrub, 'write_report', lambda *_: None)
+        monkeypatch.setattr(web, '_load_job_report', lambda *_: {'render_state': {'fps': 1, 'cum': [[0, 0]]}, 'detections': []})
+        class Capture:
+            def release(self):
+                pass
+        monkeypatch.setattr(web.cv2, 'VideoCapture', lambda *_: Capture())
+        web._run_job(old, 'scan')
+        replacement = web.new_job('', {}, 'replacement')
+        web.JOBS[old['id']] = replacement
+        deferred.pop(0)()
+>       assert any('thumbnails pre-generated' in s for s in old['log'].snapshot()['lines'])
+E       assert False
+E        +  where False = any(<generator object test_thumbnail_and_tracking_callbacks_stay_with_their_job.<locals>.<genexpr> at 0x78b218b6b850>)
+
+tests/test_job_logs.py:225: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_job_logs.py::test_thumbnail_and_tracking_callbacks_stay_with_their_job
+1 failed in 0.06s

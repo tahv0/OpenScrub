@@ -1,0 +1,31 @@
+{
+  "sdist": {
+    "file": "openscrub-1.0.96.tar.gz",
+    "bytes": 547913,
+    "sha256": "72062d74cb23ef5c993b6191664f700cf55b58bfbb60de856f3e818d62adc3f5"
+  },
+  "wheel": {
+    "file": "openscrub-1.0.96-py3-none-any.whl",
+    "bytes": 441279,
+    "sha256": "0ebc728e9189301af5572af64fec56f4a960f68c1d110fc4a14f03c2a267fd87"
+  },
+  "source_files": {
+    "openscrub.py": "0e4f0f9a7846080f591038d021aaf3ca6f01201d83ac32bbdc273f53d5067ee7",
+    "openscrub_web.py": "da40c1716d17a9992815e18ceea2557b415e95e7d996b96d663e7f080d5086de",
+    "zones_ui.py": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7",
+    "openscrub_internal/__init__.py": "cddf0922db4bac37438529289d535c50114ce4e7c01fbe0aabc4e7f9345f6b44",
+    "openscrub_internal/job_logs.py": "63d08c124db019b120bb17efc64706d910f1d831f8ccfd9c1ba124368643d1b8",
+    "tests/test_job_logs.py": "f43eee820831e2850479d1cf8cf6d4ed909971a835f549ce063c3d0244d4551c",
+    "tests/test_job_polling_node.py": "299b976d42c3e4fd57c5c703ea29a50fbdfbaf6b6a1b8435b416bf663dd0928c",
+    "tests/test_job_polling_browser.py": "47c80247ee27336a3d2149516bdfb3098d05b83cea543ea55d28f65187619ff5",
+    "test_openscrub.py": "8a755be0029508a2e71a9b3f6f798d6b2828cc7988b9a6484404b43ba8e65baa",
+    "pyproject.toml": "8b01e655aac8b07a722c2ea9922d9827d65db159ce15473e766152244723ddde"
+  },
+  "updater": [
+    "updating folder install at /home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1202/updater-target \u2026",
+    "  downloading https://offline.invalid/sdist",
+    "  sha256 verified (72062d74cb23ef5c\u2026)",
+    "  29 file(s) updated; previous versions saved to backups/pre-update-1.0.96-20261117-152218",
+    "folder update complete."
+  ]
+}

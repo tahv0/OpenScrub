@@ -1,0 +1,19 @@
+{
+  "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py": "da40c1716d17a9992815e18ceea2557b415e95e7d996b96d663e7f080d5086de",
+  "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_internal/job_logs.py": "63d08c124db019b120bb17efc64706d910f1d831f8ccfd9c1ba124368643d1b8",
+  "/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_job_logs.py": "f43eee820831e2850479d1cf8cf6d4ed909971a835f549ce063c3d0244d4551c",
+  "/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_job_polling_node.py": "299b976d42c3e4fd57c5c703ea29a50fbdfbaf6b6a1b8435b416bf663dd0928c",
+  "/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_job_polling_browser.py": "47c80247ee27336a3d2149516bdfb3098d05b83cea543ea55d28f65187619ff5",
+  "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1202/bench_worker.py": "a7c0c2add6952544f86965307a8bf3d8ca171b862551be4f28192e8b21fae6ab",
+  "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1202/bench_driver.py": "dce2ae6366358b78a14b936c70bbe47817023a3193a6316429fa6254fa8054f0",
+  "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1202/fixtures/log_workload.py": "2e03edb2f35d8d7359a92aab98b2d8a412ced46f5d93efb2e3b15a4b14458bff",
+  "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1202/harness/sitecustomize.py": "763c6381af5e27505505163e6f68e9a385d8751e39298b8f8faa1e1c353744de",
+  "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1202/harness/task1202_isolation.py": "90daf50061e3392462426dc3faeba4493d6ec8598126c0878f73c96ed10c723b",
+  "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1202/env.sh": "c32e05db468a411c6d9290522d5b27672a9fa1ce7071a70ac93d159c54c64a5e",
+  "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1202/base/openscrub_web.py": "5c975b08b81bccb79661bac10e68ac286ac1f45aa3560b39517db4f0cc19aae0",
+  "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1202/base/openscrub.py": "0e4f0f9a7846080f591038d021aaf3ca6f01201d83ac32bbdc273f53d5067ee7",
+  "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1202/base/zones_ui.py": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7",
+  "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1202/measurement-plan.json": "42300a1f7ae50a814c8d01c1b2d50c10c5ee3c5b9d1d0333f9210ac12f5eb7c6",
+  "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py": "0e4f0f9a7846080f591038d021aaf3ca6f01201d83ac32bbdc273f53d5067ee7",
+  "/home/tahv0/.codex/worktrees/c832/OpenScrub/zones_ui.py": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7"
+}
