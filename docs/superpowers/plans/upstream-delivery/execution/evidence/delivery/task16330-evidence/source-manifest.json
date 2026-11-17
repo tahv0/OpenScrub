@@ -1,0 +1,133 @@
+{
+  "head": "8768e86dc1cd57720fd1c22eb6b539ae6bda6cde",
+  "files": {
+    "CONTRIBUTING.md": {
+      "sha256": "2149d74989dc9c86424701fed324095641da6a32a8566776b935e9d3913c229a",
+      "git_blob": "74c6ced367063d84968520b5d00bc6bbb1fbcfd7"
+    },
+    "Dockerfile": {
+      "sha256": "5758071c9c9bafe7790433745ac83d09f2d415e4bdc9212df4b8de31a244edc6",
+      "git_blob": "4fa7c30fcd70fed78cb574a1d78e384ca1dde9dd"
+    },
+    "Dockerfile.intel": {
+      "sha256": "00fa8162b3aae5821d0b9447b1a30f8c3d0cb047a2da892cf0da5a90cbe3f2fc",
+      "git_blob": "b8527e243702e91d9fa8da8d603e41a87ec5663a"
+    },
+    "benchmark/README.md": {
+      "sha256": "a631b2b51e97066c0cf9ec8d0408b7f8155d0986c5866ac768c9e289947b4b48",
+      "git_blob": "a3e103417924718538ccf8bc521227465e053834"
+    },
+    "benchmark/corpus.py": {
+      "sha256": "3e44a55997f7562a210395ccfb2ff57b8d542c98120a84f2e31551c9f768801c",
+      "git_blob": "55fae6aae7cf5873fa263e7fb0ebd85ac9bffbd4"
+    },
+    "benchmark/reid.py": {
+      "sha256": "90f897de2de600e654f73113e19bfda0818c638692fc3867e917c56d4a9bdc40",
+      "git_blob": "fa0a6c94155bbe97c491f8a1bed7d8e2e8152e3c"
+    },
+    "benchmark/review_io.py": {
+      "sha256": "a439f6a886757bb249f046d57610997ece80c22dae8bf9d9eedd51db53f203ef",
+      "git_blob": "8516c65507203939fe7eb05b4225cad7809fde08"
+    },
+    "benchmark/score.py": {
+      "sha256": "68d1c8967c8d52a9523b30497e84e47c8ea7430fcfadfef26cf1241e9bc4fb84",
+      "git_blob": "b8b1c3cffb347eb510965b2233e4f3970f413f2e"
+    },
+    "openscrub.py": {
+      "sha256": "e42e03e893ad49931454bc18ed6e18fa2ee4e4d87cb1f8806762142c8b494b1f",
+      "git_blob": "4df105d89de398c49fe6a6b3e47c22820310bb2b"
+    },
+    "openscrub_internal/__init__.py": {
+      "sha256": "c35c063c010e329c5dad13782e7b67438ed4b2d1faf975d4f01be2773a18e022",
+      "git_blob": "2ce784191b49d01ceca576ce11d6cd9422d9e0ed"
+    },
+    "openscrub_internal/lifetimes.py": {
+      "sha256": "dbfc317c1c878b8e8a599391578504c44a8964199f2cdae6e2ed60a6336d6743",
+      "git_blob": "992adfb357631f69792f22e437a3b1d61e2a7ca8"
+    },
+    "openscrub_internal/reports.py": {
+      "sha256": "eec9d568fc18f08ee35469ba864c5526120ae11152e8fe6f4d15007ab42d2427",
+      "git_blob": "e6b6ca1403e98ac4f692c527e40f78088f3c501d"
+    },
+    "openscrub_setup.py": {
+      "sha256": "d0362a038f8182e8fae510100085bb087f09f7e5cf7e11a780a24390b3037eaf",
+      "git_blob": "787df1051597f0288f4214be7500681f57ddde92"
+    },
+    "openscrub_update.py": {
+      "sha256": "4d6a20f75d985a119f8421227c3bd88b17fd1b8eed44e353b127b5b49e733d55",
+      "git_blob": "eff077ebf7785927c4aaea4b7502863e0398ea4b"
+    },
+    "openscrub_vault.py": {
+      "sha256": "da1b7fe4da389352fbc594abddcc563278b26009d8f342d4154ffa305bf4dfa4",
+      "git_blob": "f2ad09ee35849dfe497efc54a8cbd2042d117c41"
+    },
+    "openscrub_web.py": {
+      "sha256": "fc0eea772aec5b9ecba7a957b260e8e3121937f98fd6ff785c8df6dc9788c5a5",
+      "git_blob": "faf7825690c770d05105d3de4767a6b90d39e856"
+    },
+    "pyproject.toml": {
+      "sha256": "1487a10e58587058ecb8da39c260977d2c60c5397b43293bb59b97024684b9f6",
+      "git_blob": "556e03d7330e5dbeeeb92f7f91acbc17157e7dda"
+    },
+    "requirements.txt": {
+      "sha256": "9fccdf6ad2d0ea484f40906ba224881fb4f5b16ff44fdbf14819865c0d8fa6ee",
+      "git_blob": "2bca4605ea363d447b331ef52e6e22279263d4a6"
+    },
+    "test_openscrub.py": {
+      "sha256": "60282f4ab6bc9b20cc2a4d5e5ce1934cbade19f3a3186ad7bf0b9989ed7d4109",
+      "git_blob": "640df7ae94321445caed954f9823cfbc51b382d1"
+    },
+    "tests/test_hdr_decoder_cleanup.py": {
+      "sha256": "5422b3e78c8d048e93c86d82c5881e2e10296078f7c3f74f6064501d380c5f36",
+      "git_blob": "c7ce6f7f0baa005f372ad6b14c36448d7e4da8f4"
+    },
+    "tests/test_job_lifecycle.py": {
+      "sha256": "243734da91be1b0a49e7875843a87f46d2d38d64d9fff543e627b83ff6602e3c",
+      "git_blob": "49a94de379c23a0190b1680975211fd4d6f903b1"
+    },
+    "tests/test_job_response_lifetime.py": {
+      "sha256": "b30cb52c7e2e5fa3c50cb2662be35115a434008c757340faf37c50307d4ea8a0",
+      "git_blob": "5d0d9fffa5d0b50729c9b5acc2dae2a563f21d71"
+    },
+    "tests/test_job_source_allowlist_lifecycle.py": {
+      "sha256": "7efe51d6b3c37899bd7df010039a6c0ce3318f20a0b9da04216e761ecb95973a",
+      "git_blob": "7f5382bca311cae3604de87712285329164dd41f"
+    },
+    "tests/test_large_report_io.py": {
+      "sha256": "a572bd37e7dd25f9c6f93611306431f8cc1f4ff2245b86a9053d8515a1cb70b6",
+      "git_blob": "2c6cc1ae8bdb4414e409a2a8416589a1ea4c9d72"
+    },
+    "tests/test_manual_addition_replay.py": {
+      "sha256": "732e8e6403c15e6380ecd58b1a6d7ef4f0eebf598795c725e68d34e741521d23",
+      "git_blob": "2a6a09f3ef21475e80f36faf233355958db6945f"
+    },
+    "tests/test_render_resources.py": {
+      "sha256": "0d93b9eec719a73cc30a36332ef0758af767c604f6518e7f1c945cdb52a44607",
+      "git_blob": "f780b814c7fd64ace9760bf0f40fab56853a8aeb"
+    },
+    "tests/test_report_roundtrip.py": {
+      "sha256": "e39f7a933020c93ad5c3a9e3490b9628bcc476bfc5129c2fac756c24233b88b8",
+      "git_blob": "af5b54962b7cb9d4378bde3436c3de4bc1e2e528"
+    },
+    "tests/test_report_serialization.py": {
+      "sha256": "48fadb925349d240a2f09b1f870c6d79d3a096cb64d2138bfcfabb1d1073438a",
+      "git_blob": "40e80d4eb568a0a951e9f8b8d5f53061794b3e80"
+    },
+    "tests/test_report_transactions.py": {
+      "sha256": "56fda81575cb7a5fc5f2d5f2daeb5d095f3f25bdfb908d83ebd55d5590a6d160",
+      "git_blob": "ad1085b57869588321337cf66a80b9159841cc66"
+    },
+    "tests/test_review_save_failures.py": {
+      "sha256": "c47c94f206cb846edc4430d079c33130eb9f3c5755dd9e6f17c0cdf3232b10de",
+      "git_blob": "94f249ab5b3d9d84e97e7e7f634ef0b5def25187"
+    },
+    "tests/test_vault_cleanup.py": {
+      "sha256": "8a08c48d49be1ceb7c65b65088ece4db7b08e36c75398cccf9c11eb992b67489",
+      "git_blob": "97b4c5a4d9a8b5ae45d6b1d341e088b9cfe90c39"
+    },
+    "zones_ui.py": {
+      "sha256": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7",
+      "git_blob": "b26c0a810f6c985b53e4ca0d0b1ef0190a731ae5"
+    }
+  }
+}

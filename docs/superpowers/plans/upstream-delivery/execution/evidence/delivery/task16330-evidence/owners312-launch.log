@@ -1,0 +1,103 @@
+PREFLIGHT {"base": "4a62e49d2f0896b737081cc92e1f92e9bcaee93f", "files": 32, "free_bytes": 803590049792, "head": "8768e86dc1cd57720fd1c22eb6b539ae6bda6cde", "manifest_sha256": "d6a40e52f729646e49c5d7d1d706ec8f95e7be31b38ec4c2f3b9743a5222c9d2", "policy": "frozen", "prerequisites": [{"executable": true, "path": "/tmp/openscrub-baseline-20261116/tools/usr/bin/ffmpeg", "sha256": "bdf6aabffdba7411edff8d36c389d695257fcdf823d196020176e117612862f6"}, {"executable": true, "path": "/tmp/openscrub-baseline-20261116/tools/usr/bin/ffprobe", "sha256": "a6dac1e9e8631e04075d06854cc4069308aec279bb04683b4a0bca5e4f54b2fe"}, {"executable": true, "path": "/tmp/openscrub-baseline-20261116/tools/usr/bin/tesseract", "sha256": "644efa639b77a21b1096a6ced155112f0c730d05c7db871d52f4b2eb16bdf42a"}, {"path": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/task16330-evidence/adapters/prepare.py", "sha256": "ff79b80ca4f4b18e3562292d57c3531b56e2f947f3a9b51f4bc2a482499729a4"}, {"path": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/task16330-evidence/adapters/environment.py", "sha256": "ee32f2956e486338c1bba6a874a5bd3a810bf02435d5eca0f10817e5dd2a78ed"}, {"path": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/task16330-evidence/adapters/listening_smoke.py", "sha256": "e7c298def127b03a72f08003ed671fa8d402a689ed594633c1f6a1cc2ca58257"}, {"path": "/home/tahv0/src/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/verification_hook.py", "sha256": "4b25e217fcf8fc2ada1147a9c26ff5cdb51884809328854d4dafd3b36fb8e5a0"}, {"path": "/home/tahv0/src/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/sitecustomize.py", "sha256": "035c1187d46c85ce2c3f3c092822d8171c3b67e99a7270717a12169b2c3be302"}, {"path": "/home/tahv0/src/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/verify.py", "sha256": "354cf49b0c83d11f3945137fbdffc3ac6b2793f1217ac39a9b62270097940067"}], "python": {"executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python", "version": [3, 12, 16]}, "run": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task16330/runs/owners312", "source": "/home/tahv0/.codex/worktrees/c832/OpenScrub"}
+COMMAND ["/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python", "-m", "pytest", "/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_hdr_decoder_cleanup.py", "/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_job_lifecycle.py", "/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_job_response_lifetime.py", "/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_job_source_allowlist_lifecycle.py", "/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py", "/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_manual_addition_replay.py", "/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_resources.py", "/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_report_roundtrip.py", "/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_report_serialization.py", "/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_report_transactions.py", "/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_vault_cleanup.py", "-q", "-ra", "--basetemp=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task16330/runs/owners312/pytest", "-o", "cache_dir=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task16330/runs/owners312/cache/pytest"]
+DEFAULT_PATHS {"jobs": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_jobs", "models": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task16330/runs/owners312/profile/.openscrub/models"}
+ACTIVE_SOURCE {"executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python", "python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]", "sources": {"openscrub": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py", "sha256": "e42e03e893ad49931454bc18ed6e18fa2ee4e4d87cb1f8806762142c8b494b1f"}, "openscrub_internal": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_internal/__init__.py", "sha256": "c35c063c010e329c5dad13782e7b67438ed4b2d1faf975d4f01be2773a18e022"}, "openscrub_internal.lifetimes": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_internal/lifetimes.py", "sha256": "dbfc317c1c878b8e8a599391578504c44a8964199f2cdae6e2ed60a6336d6743"}, "openscrub_internal.reports": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_internal/reports.py", "sha256": "eec9d568fc18f08ee35469ba864c5526120ae11152e8fe6f4d15007ab42d2427"}, "openscrub_setup": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_setup.py", "sha256": "d0362a038f8182e8fae510100085bb087f09f7e5cf7e11a780a24390b3037eaf"}, "openscrub_update": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_update.py", "sha256": "4d6a20f75d985a119f8421227c3bd88b17fd1b8eed44e353b127b5b49e733d55"}, "openscrub_vault": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_vault.py", "sha256": "da1b7fe4da389352fbc594abddcc563278b26009d8f342d4154ffa305bf4dfa4"}, "openscrub_web": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", "sha256": "fc0eea772aec5b9ecba7a957b260e8e3121937f98fd6ff785c8df6dc9788c5a5"}, "zones_ui": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/zones_ui.py", "sha256": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7"}}}
+........................................................................ [ 24%]
+........................................................................ [ 48%]
+........................................................................ [ 73%]
+........F............................................................... [ 97%]
+.......                                                                  [100%]
+=================================== FAILURES ===================================
+__________ test_real_render_and_fresh_route_reopen_keep_all_ten_rows ___________
+
+review = namespace(video=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task16330/runs/owners312/pytest/t...enScrub/.superpowers/sdd/README/runtime/task16330/runs/owners312/pytest/test_real_render_and_fresh_rou0/rendered.mp4'))
+
+    def test_real_render_and_fresh_route_reopen_keep_all_ten_rows(review):
+        """Reconstructing a report from enabled detections loses Keep rows/indices."""
+        summary = openscrub.run_pipeline(render_args(review), Quiet())
+        assert summary['regions'] == 7
+        saved = read(review.path)
+        assert len(saved['detections']) == 10
+        assert_review_preserved(review.doc, saved)
+        provenance = saved['provenance']
+        assert provenance['output'] == str(review.output.resolve())
+        assert provenance['output_sha256'] == openscrub.sha256_file(str(review.output))
+        assert provenance['input_sha256'] == openscrub.sha256_file(str(review.video))
+        assert provenance['timestamp'] != 'old'
+        assert provenance['version'] == openscrub.VERSION
+        assert provenance['future_provenance'] == {'retain': True}
+        assert provenance['settings']['mode'] == 'box'
+        assert provenance['settings']['future_setting'] == {'x': 1}
+    
+        # Actual decoded output, every frame: disabled ordinary, zone-dropped and
+        # manual geometry must stay visible; seven enabled regions must be black.
+        cap = cv2.VideoCapture(str(review.output))
+        frames = 0
+        while True:
+            ok, frame = cap.read()
+            if not ok:
+                break
+            for i in (0, 4, 8):
+                assert frame[35, 8 + 16 * i].mean() > 100
+            for i in (1, 2, 3, 5, 6, 7, 9):
+                assert frame[35, 8 + 16 * i].mean() < 15
+            frames += 1
+        cap.release()
+        assert frames == 60
+    
+        # Fresh module imports/process, actual registered Flask GET route. No
+        # browser, server socket, models or user jobs are involved.
+        script = '''
+    import json, sys
+    from pathlib import Path
+    import openscrub_web as web
+    folder = Path(sys.argv[1])
+    web._data_root = lambda: str(folder)
+    web.JOBS_DIR = str(folder / 'jobs')
+    web.JOBS = {'reopen': {'dir': str(folder), 'video': sys.argv[2]}}
+    web.TOKEN = None
+    with web.app.test_client() as client:
+        response = client.get('/api/jobs/reopen/detections')
+        assert response.status_code == 200, response.data
+        print(json.dumps(response.get_json()))
+    '''
+        result = subprocess.run([sys.executable, '-c', script, str(review.path.parent),
+                                 str(review.video)], capture_output=True, text=True,
+                                check=True, cwd=str(Path(openscrub.__file__).parent))
+>       reopened = json.loads(result.stdout)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_report_roundtrip.py:139: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/tmp/openscrub-baseline-20261116/python/cpython-3.12.16-linux-x86_64-gnu/lib/python3.12/json/__init__.py:346: in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+/tmp/openscrub-baseline-20261116/python/cpython-3.12.16-linux-x86_64-gnu/lib/python3.12/json/decoder.py:338: in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <json.decoder.JSONDecoder object at 0x78200bc45490>
+s = 'DEFAULT_PATHS {"jobs": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_jobs", "models": "/home/tahv0/src/OpenS...d": 1.99, "t_start": 0.0, "text": "synthetic-09", "track": 109, "zone_dropped": false}], "duration": 2.0, "fps": 30}\n'
+idx = 0
+
+    def raw_decode(self, s, idx=0):
+        """Decode a JSON document from ``s`` (a ``str`` beginning with
+        a JSON document) and return a 2-tuple of the Python
+        representation and the index in ``s`` where the document ended.
+    
+        This can be used to decode a JSON document from a string that may
+        have extraneous data at the end.
+    
+        """
+        try:
+            obj, end = self.scan_once(s, idx)
+        except StopIteration as err:
+>           raise JSONDecodeError("Expecting value", s, err.value) from None
+E           json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+/tmp/openscrub-baseline-20261116/python/cpython-3.12.16-linux-x86_64-gnu/lib/python3.12/json/decoder.py:356: JSONDecodeError
+=========================== short test summary info ============================
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_report_roundtrip.py::test_real_render_and_fresh_route_reopen_keep_all_ten_rows
+1 failed, 294 passed in 37.77s
+RESULT {"exit": 1, "log": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task16330/runs/owners312/logs/command.log", "sha256": "b05378920b18f0172e5f9f164d2a62863b2295f65545e19c44929ecdcda0d0b9"}

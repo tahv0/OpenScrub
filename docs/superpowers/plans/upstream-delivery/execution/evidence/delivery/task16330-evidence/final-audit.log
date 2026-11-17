@@ -1,0 +1,1 @@
+{"changed_paths": ["CONTRIBUTING.md", "openscrub.py", "pyproject.toml", "tests/test_hdr_decoder_cleanup.py", "tests/test_render_resources.py"], "clean": true, "head": "8768e86dc1cd57720fd1c22eb6b539ae6bda6cde", "installed_members": 14, "python39_grammar": true, "sdist_unique": true}

@@ -1,0 +1,1718 @@
+diff --git a/CONTRIBUTING.md b/CONTRIBUTING.md
+index 979e0c3..74c6ced 100644
+--- a/CONTRIBUTING.md
++++ b/CONTRIBUTING.md
+@@ -22,9 +22,14 @@ Thanks for helping! A few rules keep this privacy tool trustworthy.
+ 
+ ## Before you open a PR
+ 
+-    python -m pytest test_openscrub.py tests/ -q      # must be green
++    python -m pytest -q                        # all discovered tests must be green
+     python -m build                            # full sdist->wheel build
+ 
++The discovered suite includes `test_openscrub.py` and `tests/`. The HDR
++cleanup regressions use synthetic media and real FFmpeg/ffprobe with libx265;
++they skip when those tools are unavailable. Child-reaping observations require
++POSIX, and the injected encoder-exit case also requires `waitid`/`WNOWAIT`.
++
+ For web UI changes, also boot `python openscrub_web.py` and click through
+ what you touched — and note the PAGE string is a normal (non-raw) Python
+ string, so backslashes in embedded JS need doubling. For engine changes,
+diff --git a/openscrub.py b/openscrub.py
+index 9a9c82d..4df105d 100644
+--- a/openscrub.py
++++ b/openscrub.py
+@@ -3882,6 +3882,56 @@ def _rate_cap_args(codec, out_quality, w, h, fps):
+     return ["-maxrate", str(cap), "-bufsize", str(2 * cap)]
+ 
+ 
++def _stop_render_children(children):
++    """Abort only these render children, then close their owned pipe ends.
++
++    This bound applies after Python regains control, never to native IO.
++    Normal EOF/final encoder waits remain unbounded in the renderers.
++    """
++    children = [child for child in children if child is not None]
++    errors = []
++    # Stop every producer/consumer before closing a buffered stream, whose
++    # flush could otherwise block behind a child that has stopped reading.
++    for child in children:
++        try:
++            if child.poll() is None:
++                child.terminate()
++        except ProcessLookupError:
++            pass
++        except BaseException as error:
++            errors.append(error)
++    for child in children:
++        try:
++            child.wait(timeout=2)
++        except BaseException as error:
++            if not isinstance(error, subprocess.TimeoutExpired):
++                errors.append(error)
++            try:
++                child.kill()
++            except ProcessLookupError:
++                pass
++            except BaseException as error:
++                errors.append(error)
++            try:
++                child.wait(timeout=2)
++            except BaseException as error:
++                errors.append(error)
++        for name in ("stdin", "stdout", "stderr"):
++            stream = getattr(child, name, None)
++            if stream is not None:
++                try:
++                    if child.returncode is None and hasattr(stream, "raw"):
++                        # Failed kill/reap must not strand us in a buffered
++                        # flush to a consumer that may still be alive.
++                        stream.raw.close()
++                    stream.close()
++                except BrokenPipeError:
++                    pass  # the stopped consumer cannot accept buffered input
++                except BaseException as error:
++                    errors.append(error)
++    return errors
++
++
+ def render_hdr(src, dst, detections, cum, bands, fps, pad, mode,
+                encoder, tags, band_margin=25, progress_every=60, cb=None,
+                mode_map=None, face_shape="ellipse", audio_spans=None,
+@@ -3895,166 +3945,202 @@ def render_hdr(src, dst, detections, cum, bands, fps, pad, mode,
+     def _mode_for(cat):
+         return mode_map.get(cat, mode)
+     cb = cb or Callbacks()
+-    meta = cv2.VideoCapture(src)
+-    w = int(meta.get(cv2.CAP_PROP_FRAME_WIDTH))
+-    h = int(meta.get(cv2.CAP_PROP_FRAME_HEIGHT))
+-    total = int(meta.get(cv2.CAP_PROP_FRAME_COUNT))
+-    meta.release()
+-    cb.log(f"      encoder: {encoder} 10-bit"
+-           + (" (GPU)" if encoder.endswith(("_nvenc", "_qsv")) else " (CPU)"))
+-
+-    dec = subprocess.Popen(
+-        ["ffmpeg", "-loglevel", "error", "-i", src,
+-         "-f", "rawvideo", "-pix_fmt", "yuv420p10le", "pipe:1"],
+-        stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+-        bufsize=w * h * 6)
+-    q = _out_q(encoder, out_quality)
+-    vargs = (["-c:v", "hevc_nvenc", "-preset", "p4", "-cq", q,
+-              "-profile:v", "main10", "-pix_fmt", "p010le"]
+-             if encoder == "hevc_nvenc" else
+-             ["-c:v", "hevc_qsv", "-preset", "medium",
+-              "-global_quality", q, "-profile:v", "main10",
+-              "-pix_fmt", "p010le"]
+-             if encoder == "hevc_qsv" else
+-             ["-c:v", "libx265", "-crf", q, "-preset", "fast",
+-              "-pix_fmt", "yuv420p10le"])
+-    vargs += _rate_cap_args(encoder, out_quality, w, h, fps)
+-
+-    # Explicitly signal HDR color properties in the x265 bitstream.
+-    # Generic FFmpeg color flags alone are not reliable on every build.
+-    if encoder == "libx265":
+-        x265_names = {
+-            "-color_primaries": "colorprim",
+-            "-color_trc": "transfer",
+-            "-colorspace": "colormatrix",
+-        }
+-        x265_tags = ":".join(
+-            f"{x265_names[flag]}={value}"
+-            for flag, value in (tags or {}).items()
+-            if flag in x265_names
+-        )
+-        if x265_tags:
+-            vargs += ["-x265-params", x265_tags]
+-
+-    targs = [a for kv in (tags or {}).items() for a in kv]
+-    if os.path.splitext(dst)[1].lower() in (".mp4", ".mov"):
+-        targs += ["-tag:v", "hvc1"]          # QuickTime/Apple compatibility
+-    amap, acodec = audio_ffmpeg_args(
+-        src, audio_spans, mute_tracks=mute_tracks,
+-        container=os.path.splitext(dst)[1] or ".mp4",
+-        lane_count=audio_lanes, log=cb.log)
+-    ff_err = tempfile.TemporaryFile()   # see render(): names the cause
+-    enc = subprocess.Popen(
+-        ["ffmpeg", "-y", "-loglevel", "error",
+-         "-f", "rawvideo", "-pix_fmt", "yuv420p10le",
+-         "-s", f"{w}x{h}", "-r", f"{fps:.6f}", "-i", "pipe:0",
+-         "-i", src, "-map", "0:v:0", *amap,
+-         # a redacted file must not carry the source's GPS position,
+-         # capture time, or device identifiers — strip ALL container and
+-         # stream metadata (the explicit color tags above are encoder
+-         # flags, not metadata, so HDR signalling survives)
+-         "-map_metadata", "-1", "-map_chapters", "-1",
+-         *vargs, *targs, *acodec, dst],
+-        stdin=subprocess.PIPE, stderr=ff_err)
+-
+-    buckets = {}
+-    for d in detections:
+-        for s in range(int(d.t_start), int(d.t_end) + 2):
+-            buckets.setdefault(s, []).append(d)
+-
+-    ysz, csz = w * h, (w // 2) * (h // 2)
+-    fbytes = (ysz + 2 * csz) * 2
+-
+-    def cleanup_partial():
+-        for pr in (dec, enc):
+-            try:
+-                if pr is enc:
+-                    pr.stdin.close()
+-            except Exception:
+-                pass
+-            pr.terminate()
+-            pr.wait()
+-        if os.path.exists(dst):
+-            try:
+-                os.remove(dst)
+-            except OSError:
+-                pass
++    meta = dec = enc = ff_err = None
++    remove_partial = False
++    cleanup_errors = []
++    primary = None
++    try:
++        meta = cv2.VideoCapture(src)
++        w = int(meta.get(cv2.CAP_PROP_FRAME_WIDTH))
++        h = int(meta.get(cv2.CAP_PROP_FRAME_HEIGHT))
++        total = int(meta.get(cv2.CAP_PROP_FRAME_COUNT))
++        meta.release()
++        meta = None
++        cb.log(f"      encoder: {encoder} 10-bit"
++               + (" (GPU)" if encoder.endswith(("_nvenc", "_qsv")) else " (CPU)"))
++
++        dec = subprocess.Popen(
++            ["ffmpeg", "-loglevel", "error", "-i", src,
++             "-f", "rawvideo", "-pix_fmt", "yuv420p10le", "pipe:1"],
++            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
++            bufsize=w * h * 6)
++        q = _out_q(encoder, out_quality)
++        vargs = (["-c:v", "hevc_nvenc", "-preset", "p4", "-cq", q,
++                  "-profile:v", "main10", "-pix_fmt", "p010le"]
++                 if encoder == "hevc_nvenc" else
++                 ["-c:v", "hevc_qsv", "-preset", "medium",
++                  "-global_quality", q, "-profile:v", "main10",
++                  "-pix_fmt", "p010le"]
++                 if encoder == "hevc_qsv" else
++                 ["-c:v", "libx265", "-crf", q, "-preset", "fast",
++                  "-pix_fmt", "yuv420p10le"])
++        vargs += _rate_cap_args(encoder, out_quality, w, h, fps)
++
++        # Explicitly signal HDR color properties in the x265 bitstream.
++        # Generic FFmpeg color flags alone are not reliable on every build.
++        if encoder == "libx265":
++            x265_names = {
++                "-color_primaries": "colorprim",
++                "-color_trc": "transfer",
++                "-colorspace": "colormatrix",
++            }
++            x265_tags = ":".join(
++                f"{x265_names[flag]}={value}"
++                for flag, value in (tags or {}).items()
++                if flag in x265_names
++            )
++            if x265_tags:
++                vargs += ["-x265-params", x265_tags]
+ 
+-    idx = 0
+-    while True:
+-        if idx % 30 == 0 and cb.cancelled():
+-            cleanup_partial()
+-            raise PipelineCancelled()
+-        raw = dec.stdout.read(fbytes)
+-        if len(raw) < fbytes:
+-            break
+-        buf = np.frombuffer(raw, dtype=np.uint16).copy()
+-        y = buf[:ysz].reshape(h, w)
+-        u = buf[ysz:ysz + csz].reshape(h // 2, w // 2)
+-        v = buf[ysz + csz:].reshape(h // 2, w // 2)
+-        t = idx / fps
+-        ox, oy = cum[min(idx, len(cum) - 1)]
+-
+-        act = [d for d in buckets.get(int(t), [])
+-               if d.t_start - 0.01 <= t <= d.t_end + 0.01]
+-        for d in _dedupe_dense(act):
+-            drift = min(24.0, 0.05 * (abs(ox - d.aoff[0]) + abs(oy - d.aoff[1])))
+-            px = pad + drift
+-            if d.poly:
+-                _blur_silhouette_yuv10(
+-                    y, u, v, d.cbox[0] + ox - px, d.cbox[1] + oy - px,
+-                    d.cbox[2] + ox + px, d.cbox[3] + oy + px,
+-                    _mode_for(d.category), d.poly,
+-                    (d.cbox[0] + ox, d.cbox[1] + oy,
+-                     d.cbox[2] + ox, d.cbox[3] + oy), pad_px=px)
+-            else:
+-                _blur_yuv10(y, u, v, d.cbox[0] + ox - px, d.cbox[1] + oy - px,
+-                            d.cbox[2] + ox + px, d.cbox[3] + oy + px,
+-                            _mode_for(d.category),
+-                            shape=("ellipse" if d.category == "face"
+-                                   and face_shape == "ellipse" else "rect"))
+-
+-        bx, by = bands[min(idx, len(bands) - 1)]
+-        vals = set(mode_map.values()) | {mode}
+-        band_mode = ("box" if ("box" in vals or "inpaint" in vals)
+-                     else "mosaic" if "mosaic" in vals else "blur")
+-        def band(x1, y1_, x2, y2_):
+-            _blur_yuv10(y, u, v, x1, y1_, x2, y2_, band_mode)
+-        if by < -2:
+-            band(0, h - (abs(by) + band_margin), w, h)
+-        elif by > 2:
+-            band(0, 0, w, by + band_margin)
+-        if bx < -2:
+-            band(w - (abs(bx) + band_margin), 0, w, h)
+-        elif bx > 2:
+-            band(0, 0, bx + band_margin, h)
++        targs = [a for kv in (tags or {}).items() for a in kv]
++        if os.path.splitext(dst)[1].lower() in (".mp4", ".mov"):
++            targs += ["-tag:v", "hvc1"]          # QuickTime/Apple compatibility
++        amap, acodec = audio_ffmpeg_args(
++            src, audio_spans, mute_tracks=mute_tracks,
++            container=os.path.splitext(dst)[1] or ".mp4",
++            lane_count=audio_lanes, log=cb.log)
++        ff_err = tempfile.TemporaryFile()   # see render(): names the cause
++        enc = subprocess.Popen(
++            ["ffmpeg", "-y", "-loglevel", "error",
++             "-f", "rawvideo", "-pix_fmt", "yuv420p10le",
++             "-s", f"{w}x{h}", "-r", f"{fps:.6f}", "-i", "pipe:0",
++             "-i", src, "-map", "0:v:0", *amap,
++             # a redacted file must not carry the source's GPS position,
++             # capture time, or device identifiers — strip ALL container and
++             # stream metadata (the explicit color tags above are encoder
++             # flags, not metadata, so HDR signalling survives)
++             "-map_metadata", "-1", "-map_chapters", "-1",
++             *vargs, *targs, *acodec, dst],
++            stdin=subprocess.PIPE, stderr=ff_err)
++
++        buckets = {}
++        for d in detections:
++            for s in range(int(d.t_start), int(d.t_end) + 2):
++                buckets.setdefault(s, []).append(d)
++
++        ysz, csz = w * h, (w // 2) * (h // 2)
++        fbytes = (ysz + 2 * csz) * 2
++
++        idx = 0
++        while True:
++            if idx % 30 == 0 and cb.cancelled():
++                remove_partial = True
++                raise PipelineCancelled()
++            raw = dec.stdout.read(fbytes)
++            if len(raw) < fbytes:
++                break
++            buf = np.frombuffer(raw, dtype=np.uint16).copy()
++            y = buf[:ysz].reshape(h, w)
++            u = buf[ysz:ysz + csz].reshape(h // 2, w // 2)
++            v = buf[ysz + csz:].reshape(h // 2, w // 2)
++            t = idx / fps
++            ox, oy = cum[min(idx, len(cum) - 1)]
++
++            act = [d for d in buckets.get(int(t), [])
++                   if d.t_start - 0.01 <= t <= d.t_end + 0.01]
++            for d in _dedupe_dense(act):
++                drift = min(24.0, 0.05 * (abs(ox - d.aoff[0]) + abs(oy - d.aoff[1])))
++                px = pad + drift
++                if d.poly:
++                    _blur_silhouette_yuv10(
++                        y, u, v, d.cbox[0] + ox - px, d.cbox[1] + oy - px,
++                        d.cbox[2] + ox + px, d.cbox[3] + oy + px,
++                        _mode_for(d.category), d.poly,
++                        (d.cbox[0] + ox, d.cbox[1] + oy,
++                         d.cbox[2] + ox, d.cbox[3] + oy), pad_px=px)
++                else:
++                    _blur_yuv10(y, u, v, d.cbox[0] + ox - px, d.cbox[1] + oy - px,
++                                d.cbox[2] + ox + px, d.cbox[3] + oy + px,
++                                _mode_for(d.category),
++                                shape=("ellipse" if d.category == "face"
++                                       and face_shape == "ellipse" else "rect"))
++
++            bx, by = bands[min(idx, len(bands) - 1)]
++            vals = set(mode_map.values()) | {mode}
++            band_mode = ("box" if ("box" in vals or "inpaint" in vals)
++                         else "mosaic" if "mosaic" in vals else "blur")
++            def band(x1, y1_, x2, y2_):
++                _blur_yuv10(y, u, v, x1, y1_, x2, y2_, band_mode)
++            if by < -2:
++                band(0, h - (abs(by) + band_margin), w, h)
++            elif by > 2:
++                band(0, 0, w, by + band_margin)
++            if bx < -2:
++                band(w - (abs(bx) + band_margin), 0, w, h)
++            elif bx > 2:
++                band(0, 0, bx + band_margin, h)
+ 
++            try:
++                enc.stdin.write(buf.tobytes())
++            except (BrokenPipeError, OSError):
++                remove_partial = True
++                cleanup_errors.extend(_stop_render_children((dec, enc)))
++                rc = enc.returncode
++                err = _ffmpeg_failure(ff_err, "HDR encode", rc)
++                raise err
++            idx += 1
++            if idx % progress_every == 0:
++                cb.progress("render", idx, total)
++            if idx % 300 == 0:
++                cb.log(f"  rendering… {idx}/{max(total, idx)}")
++
++        dec.stdout.close()
++        dec.wait()
++        cb.progress("render", max(total, idx), max(total, idx))
+         try:
+-            enc.stdin.write(buf.tobytes())
+-        except (BrokenPipeError, OSError):
++            enc.stdin.close()
++        except OSError as close_error:
++            # A failed close may not have delivered EOF. Bound only this
++            # exceptional status wait; healthy finalization has no timeout.
++            try:
++                rc = enc.wait(timeout=2)
++            except subprocess.TimeoutExpired:
++                cleanup_errors.extend(_stop_render_children((dec, enc)))
++                raise close_error  # forced termination is not an encoder cause
++            except Exception as wait_error:
++                cleanup_errors.append(wait_error)
++                raise close_error
++            if rc == 0:
++                raise  # retain a close error even after successful encoding
++            cleanup_errors.append(close_error)  # encoder diagnostics stay primary
++        else:
+             rc = enc.wait()
+-            err = _ffmpeg_failure(ff_err, "HDR encode", rc)
+-            cleanup_partial()
+-            raise err
+-        idx += 1
+-        if idx % progress_every == 0:
+-            cb.progress("render", idx, total)
+-        if idx % 300 == 0:
+-            cb.log(f"  rendering… {idx}/{max(total, idx)}")
+-
+-    dec.stdout.close()
+-    dec.wait()
+-    cb.progress("render", max(total, idx), max(total, idx))
+-    try:
+-        enc.stdin.close()
+-    except (BrokenPipeError, OSError):
+-        pass                        # exit code + stderr say why below
+-    rc = enc.wait()
+-    if rc != 0:
+-        raise _ffmpeg_failure(ff_err, "HDR encode", rc)
+-    cb.log(f"      HDR preserved: 10-bit HEVC, color tags "
+-           + (", ".join(f"{k.lstrip('-')}={v}" for k, v in (tags or {}).items())
+-              or "(none in source)"))
++        if rc != 0:
++            raise _ffmpeg_failure(ff_err, "HDR encode", rc)
++        cb.log(f"      HDR preserved: 10-bit HEVC, color tags "
++               + (", ".join(f"{k.lstrip('-')}={v}" for k, v in (tags or {}).items())
++                  or "(none in source)"))
++    except BaseException as error:
++        primary = error
++        raise
++    finally:
++        cleanup_errors.extend(_stop_render_children((dec, enc)))
++        for resource, action in ((meta, "release"), (ff_err, "close")):
++            if resource is not None:
++                try:
++                    getattr(resource, action)()
++                except BaseException as error:
++                    cleanup_errors.append(error)
++        # Closure and the existing cancellation/write-error deletion policy
++        # are separate: arbitrary setup/frame errors must not unlink dst.
++        if remove_partial:
++            for path in (dst,):
++                if path and os.path.exists(path):
++                    try:
++                        os.remove(path)
++                    except OSError:
++                        pass
++        if cleanup_errors:
++            if primary is None:
++                raise cleanup_errors[0]
++            # Python 3.9 has neither add_note nor ExceptionGroup. Preserve
++            # the actual primary exception and expose bounded diagnostics.
++            try:
++                primary.render_cleanup_errors = tuple(
++                    f"{type(error).__name__}: {str(error)[:300]}"
++                    for error in cleanup_errors[:8])
++            except BaseException:
++                pass
+ 
+ 
+ def render(src, dst, detections, cum, bands, fps, pad, mode, preview,
+@@ -4069,232 +4155,264 @@ def render(src, dst, detections, cum, bands, fps, pad, mode, preview,
+     def _mode_for(cat):
+         return mode_map.get(cat, mode)
+     cb = cb or Callbacks()
+-    cap = cv2.VideoCapture(src)
+-    w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+-    h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+-    total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+-
+-    # --- output sink: single-pass ffmpeg pipe (NVENC if available) ---
+-    proc = None
+-    ff_err = None
+-    out = None
+-    tmp_video = None
+-    codec = nvenc_available(encoder, cb)
+-    if vcodec == "hevc" and codec:
+-        henc = hevc10_encoder(encoder, cb)   # verified hevc encoder ladder
+-        if henc is None:
+-            cb.log("      note: no HEVC encoder available — falling back "
+-                   "to H.264")
+-        else:
+-            codec = henc
+-    if codec:
+-        cb.log(f"      encoder: {codec}"
+-               + (" (GPU)" if codec.endswith(("_nvenc", "_qsv"))
+-                  else " (CPU)"))
+-        q = _out_q(codec, out_quality)
+-        if codec == "h264_nvenc":
+-            vargs = ["-c:v", "h264_nvenc", "-preset", "p4", "-cq", q]
+-        elif codec == "hevc_nvenc":
+-            vargs = ["-c:v", "hevc_nvenc", "-preset", "p4", "-cq", q]
+-        elif codec == "h264_qsv":
+-            vargs = ["-c:v", "h264_qsv", "-preset", "medium",
+-                     "-global_quality", q]
+-        elif codec == "hevc_qsv":
+-            vargs = ["-c:v", "hevc_qsv", "-preset", "medium",
+-                     "-global_quality", q]
+-        elif codec == "libx265":
+-            vargs = ["-c:v", "libx265", "-crf", q, "-preset", "fast"]
++    cap = proc = out = ff_err = tmp_video = None
++    remove_partial = False
++    cleanup_errors = []
++    primary = None
++    try:
++        cap = cv2.VideoCapture(src)
++        w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
++        h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
++        total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
++
++        # --- output sink: single-pass ffmpeg pipe (NVENC if available) ---
++        codec = nvenc_available(encoder, cb)
++        if vcodec == "hevc" and codec:
++            henc = hevc10_encoder(encoder, cb)   # verified hevc encoder ladder
++            if henc is None:
++                cb.log("      note: no HEVC encoder available — falling back "
++                       "to H.264")
++            else:
++                codec = henc
++        if codec:
++            cb.log(f"      encoder: {codec}"
++                   + (" (GPU)" if codec.endswith(("_nvenc", "_qsv"))
++                      else " (CPU)"))
++            q = _out_q(codec, out_quality)
++            if codec == "h264_nvenc":
++                vargs = ["-c:v", "h264_nvenc", "-preset", "p4", "-cq", q]
++            elif codec == "hevc_nvenc":
++                vargs = ["-c:v", "hevc_nvenc", "-preset", "p4", "-cq", q]
++            elif codec == "h264_qsv":
++                vargs = ["-c:v", "h264_qsv", "-preset", "medium",
++                         "-global_quality", q]
++            elif codec == "hevc_qsv":
++                vargs = ["-c:v", "hevc_qsv", "-preset", "medium",
++                         "-global_quality", q]
++            elif codec == "libx265":
++                vargs = ["-c:v", "libx265", "-crf", q, "-preset", "fast"]
++            else:
++                vargs = ["-c:v", "libx264", "-crf", q, "-preset", "fast"]
++            vargs += _rate_cap_args(codec, out_quality, w, h, fps)
++            if codec in ("hevc_nvenc", "hevc_qsv", "libx265") \
++                    and os.path.splitext(dst)[1].lower() in (".mp4", ".mov"):
++                vargs += ["-tag:v", "hvc1"]      # QuickTime/Apple compatibility
++            # output trim ("keep bookends"): only [cs, ce] of the video reaches
++            # the output. The piped video restarts at 0, so the audio input is
++            # seeked the same way and any redaction spans shift accordingly.
++            cs, ce = (clip if clip else (0.0, None))
++            aspans_eff = audio_spans
++            ain_opts = []
++            if clip:
++                ain_opts = ["-ss", f"{cs:.3f}"] + (
++                    ["-to", f"{ce:.3f}"] if ce is not None else [])
++                aspans_eff = [(max(0.0, a - cs), b - cs, m)
++                              for a, b, m in (audio_spans or [])
++                              if b > cs and (ce is None or a < ce)]
++                cb.log(f"      output trim: keeping {cs:.1f}s"
++                       f"–{(ce if ce is not None else 'end')}"
++                       + ("s" if ce is not None else ""))
++            amap, acodec = audio_ffmpeg_args(
++                src, aspans_eff, mute_tracks=mute_tracks,
++                container=os.path.splitext(dst)[1] or ".mp4",
++                lane_count=audio_lanes, log=cb.log)
++            if aspans_eff and amap:
++                cb.log("      audio: %d span(s) redacted (%s)" % (
++                    len(aspans_eff),
++                    ", ".join(sorted({m for _, _, m in aspans_eff}))))
++            cmd = ["ffmpeg", "-y", "-loglevel", "error",
++                   "-f", "rawvideo", "-pix_fmt", "bgr24",
++                   "-s", f"{w}x{h}", "-r", f"{fps:.6f}", "-i", "pipe:0",
++                   *ain_opts, "-i", src, "-map", "0:v:0", *amap,
++                   # a redacted file must not carry the source's GPS
++                   # position, capture time, or device identifiers — strip
++                   # ALL container and stream metadata
++                   "-map_metadata", "-1", "-map_chapters", "-1",
++                   *vargs, "-pix_fmt", "yuv420p", *acodec, dst]
++            # ffmpeg's stderr goes to a temp FILE (a pipe could fill and
++            # deadlock the frame writes): when the encoder dies, its own
++            # error message is what the job log needs — a bare "[Errno 32]
++            # Broken pipe" diagnosed nothing
++            ff_err = tempfile.TemporaryFile()
++            gpu_hint = ("if it persists, try the x264 encoder"
++                        if codec.endswith(("_nvenc", "_qsv")) else "")
++            proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stderr=ff_err)
+         else:
+-            vargs = ["-c:v", "libx264", "-crf", q, "-preset", "fast"]
+-        vargs += _rate_cap_args(codec, out_quality, w, h, fps)
+-        if codec in ("hevc_nvenc", "hevc_qsv", "libx265") \
+-                and os.path.splitext(dst)[1].lower() in (".mp4", ".mov"):
+-            vargs += ["-tag:v", "hvc1"]      # QuickTime/Apple compatibility
+-        # output trim ("keep bookends"): only [cs, ce] of the video reaches
+-        # the output. The piped video restarts at 0, so the audio input is
+-        # seeked the same way and any redaction spans shift accordingly.
+-        cs, ce = (clip if clip else (0.0, None))
+-        aspans_eff = audio_spans
+-        ain_opts = []
+-        if clip:
+-            ain_opts = ["-ss", f"{cs:.3f}"] + (
+-                ["-to", f"{ce:.3f}"] if ce is not None else [])
+-            aspans_eff = [(max(0.0, a - cs), b - cs, m)
+-                          for a, b, m in (audio_spans or [])
+-                          if b > cs and (ce is None or a < ce)]
+-            cb.log(f"      output trim: keeping {cs:.1f}s"
+-                   f"–{(ce if ce is not None else 'end')}"
+-                   + ("s" if ce is not None else ""))
+-        amap, acodec = audio_ffmpeg_args(
+-            src, aspans_eff, mute_tracks=mute_tracks,
+-            container=os.path.splitext(dst)[1] or ".mp4",
+-            lane_count=audio_lanes, log=cb.log)
+-        if aspans_eff and amap:
+-            cb.log("      audio: %d span(s) redacted (%s)" % (
+-                len(aspans_eff),
+-                ", ".join(sorted({m for _, _, m in aspans_eff}))))
+-        cmd = ["ffmpeg", "-y", "-loglevel", "error",
+-               "-f", "rawvideo", "-pix_fmt", "bgr24",
+-               "-s", f"{w}x{h}", "-r", f"{fps:.6f}", "-i", "pipe:0",
+-               *ain_opts, "-i", src, "-map", "0:v:0", *amap,
+-               # a redacted file must not carry the source's GPS
+-               # position, capture time, or device identifiers — strip
+-               # ALL container and stream metadata
+-               "-map_metadata", "-1", "-map_chapters", "-1",
+-               *vargs, "-pix_fmt", "yuv420p", *acodec, dst]
+-        # ffmpeg's stderr goes to a temp FILE (a pipe could fill and
+-        # deadlock the frame writes): when the encoder dies, its own
+-        # error message is what the job log needs — a bare "[Errno 32]
+-        # Broken pipe" diagnosed nothing
+-        ff_err = tempfile.TemporaryFile()
+-        gpu_hint = ("if it persists, try the x264 encoder"
+-                    if codec.endswith(("_nvenc", "_qsv")) else "")
+-        proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stderr=ff_err)
+-    else:
+-        if audio_spans:
+-            cb.log("      WARNING: audio redaction requires ffmpeg — the "
+-                   "OpenCV fallback writes NO audio at all.")
+-        cb.log("      encoder: OpenCV mp4v (ffmpeg not found — no audio!)")
+-        tmp_video = dst + ".noaudio.mp4"
+-        out = cv2.VideoWriter(tmp_video, cv2.VideoWriter_fourcc(*"mp4v"),
+-                              fps, (w, h))
+-
+-    buckets = {}
+-    for d in detections:
+-        for s in range(int(d.t_start), int(d.t_end) + 2):
+-            buckets.setdefault(s, []).append(d)
+-
+-    def cleanup_partial():
++            if audio_spans:
++                cb.log("      WARNING: audio redaction requires ffmpeg — the "
++                       "OpenCV fallback writes NO audio at all.")
++            cb.log("      encoder: OpenCV mp4v (ffmpeg not found — no audio!)")
++            tmp_video = dst + ".noaudio.mp4"
++            out = cv2.VideoWriter(tmp_video, cv2.VideoWriter_fourcc(*"mp4v"),
++                                  fps, (w, h))
++            if not out.isOpened():
++                raise RuntimeError("Could not open output VideoWriter")
++
++        buckets = {}
++        for d in detections:
++            for s in range(int(d.t_start), int(d.t_end) + 2):
++                buckets.setdefault(s, []).append(d)
++
++        idx = 0
++        if clip and clip[0] > 0.5:
++            tgt = int(clip[0] * fps)
++            if _seek_cap(cap, tgt, fps):     # verified — a lying seek would
++                idx = tgt                    # shift the whole trimmed render
++            # unseekable: decode from 0; the undershoot guard below skips
++            # frames before the clip start one by one
++        while True:
++            if idx % 30 == 0 and cb.cancelled():
++                remove_partial = True
++                raise PipelineCancelled()
++            ok, frame = cap.read()
++            if not ok:
++                break
++            t = idx / fps
++            if clip:
++                if t < clip[0] - 1e-6:          # seek undershoot guard
++                    idx += 1
++                    continue
++                if clip[1] is not None and t > clip[1] + 1e-6:
++                    break                       # keep-window over: stop encoding
++            ox, oy = cum[min(idx, len(cum) - 1)]
++
++            # 1. tracked PII boxes, translated by scroll offset
++            act = [d for d in buckets.get(int(t), [])
++                   if d.t_start - 0.01 <= t <= d.t_end + 0.01]
++            for d in _dedupe_dense(act):
++                # drift allowance: residual tracking error grows (slowly) with
++                # distance scrolled since detection — expand the box to cover it
++                drift = min(24.0, 0.05 * (abs(ox - d.aoff[0]) + abs(oy - d.aoff[1])))
++                px = pad + drift
++                x1 = d.cbox[0] + ox - px
++                y1 = d.cbox[1] + oy - px
++                x2 = d.cbox[2] + ox + px
++                y2 = d.cbox[3] + oy + px
++                pbox = (d.cbox[0] + ox, d.cbox[1] + oy,
++                        d.cbox[2] + ox, d.cbox[3] + oy)
++                if preview:
++                    cv2.rectangle(frame, (int(max(0, x1)), int(max(0, y1))),
++                                  (int(min(w, x2)), int(min(h, y2))), (0, 0, 255), 2)
++                    for pts in (d.poly or ()):
++                        arr = np.array(
++                            [[int(float(qx) * (pbox[2] - pbox[0]) + pbox[0]),
++                              int(float(qy) * (pbox[3] - pbox[1]) + pbox[1])]
++                             for qx, qy in pts], np.int32)
++                        if len(arr) >= 3:
++                            cv2.polylines(frame, [arr], True, (0, 0, 255), 2)
++                    label = d.category
++                    if draw_scores and d.category == "face":
++                        label = f"face {d.confidence:.2f}"
++                    cv2.putText(frame, label, (int(max(0, x1)), int(max(12, y1 - 4))),
++                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
++                elif d.poly:
++                    # segmentation silhouette: mask only the body, not the box —
++                    # px (pad+drift) becomes an outward mask dilation
++                    blur_silhouette(frame, x1, y1, x2, y2, _mode_for(d.category),
++                                    d.poly, pbox, pad_px=px)
++                else:
++                    blur_region(frame, x1, y1, x2, y2, _mode_for(d.category),
++                                shape=("ellipse" if d.category == "face"
++                                       and face_shape == "ellipse" else "rect"))
++
++            # 2. safety bands: unscanned content that scrolled into view
++            bx, by = bands[min(idx, len(bands) - 1)]
++            vals = set(mode_map.values()) | {mode}
++            band_mode = ("box" if ("box" in vals or "inpaint" in vals)
++                         else "mosaic" if "mosaic" in vals else "blur")  # never weaker
++            def band(x1, y1, x2, y2):
++                if preview:
++                    cv2.rectangle(frame, (int(x1), int(y1)), (int(x2 - 1), int(y2 - 1)), (0, 165, 255), 2)
++                else:
++                    blur_region(frame, x1, y1, x2, y2, band_mode)
++            if by < -2:      # content moved up -> unscanned strip entering at bottom
++                band(0, h - (abs(by) + band_margin), w, h)
++            elif by > 2:     # content moved down -> unscanned strip at top
++                band(0, 0, w, by + band_margin)
++            if bx < -2:      # content moved left -> strip at right
++                band(w - (abs(bx) + band_margin), 0, w, h)
++            elif bx > 2:
++                band(0, 0, bx + band_margin, h)
++
++            if proc is not None:
++                try:
++                    proc.stdin.write(frame.tobytes())
++                except (BrokenPipeError, OSError):
++                    # the encoder exited mid-stream: report ITS reason
++                    remove_partial = True
++                    cleanup_errors.extend(_stop_render_children((proc,)))
++                    rc = proc.returncode
++                    err = _ffmpeg_failure(ff_err, "video encode", rc,
++                                          hint=gpu_hint)
++                    raise err
++            else:
++                out.write(frame)
++            idx += 1
++            if idx % progress_every == 0:
++                cb.progress("render", idx, total)
++            if idx % 300 == 0:
++                cb.log(f"  rendering… {idx}/{total} ({100 * idx // max(total, 1)}%)")
++
+         cap.release()
++        cap = None
++        cb.progress("render", total, total)
+         if proc is not None:
+             try:
+                 proc.stdin.close()
+-            except Exception:
+-                pass
+-            proc.terminate()
+-            proc.wait()
+-        if out is not None:
+-            out.release()
+-        for p in (dst, tmp_video):
+-            if p and os.path.exists(p):
++            except OSError as close_error:
++                # A failed close may not have delivered EOF. Bound only this
++                # exceptional status wait; healthy finalization has no timeout.
+                 try:
+-                    os.remove(p)
+-                except OSError:
+-                    pass
+-
+-    idx = 0
+-    if clip and clip[0] > 0.5:
+-        tgt = int(clip[0] * fps)
+-        if _seek_cap(cap, tgt, fps):     # verified — a lying seek would
+-            idx = tgt                    # shift the whole trimmed render
+-        # unseekable: decode from 0; the undershoot guard below skips
+-        # frames before the clip start one by one
+-    while True:
+-        if idx % 30 == 0 and cb.cancelled():
+-            cleanup_partial()
+-            raise PipelineCancelled()
+-        ok, frame = cap.read()
+-        if not ok:
+-            break
+-        t = idx / fps
+-        if clip:
+-            if t < clip[0] - 1e-6:          # seek undershoot guard
+-                idx += 1
+-                continue
+-            if clip[1] is not None and t > clip[1] + 1e-6:
+-                break                       # keep-window over: stop encoding
+-        ox, oy = cum[min(idx, len(cum) - 1)]
+-
+-        # 1. tracked PII boxes, translated by scroll offset
+-        act = [d for d in buckets.get(int(t), [])
+-               if d.t_start - 0.01 <= t <= d.t_end + 0.01]
+-        for d in _dedupe_dense(act):
+-            # drift allowance: residual tracking error grows (slowly) with
+-            # distance scrolled since detection — expand the box to cover it
+-            drift = min(24.0, 0.05 * (abs(ox - d.aoff[0]) + abs(oy - d.aoff[1])))
+-            px = pad + drift
+-            x1 = d.cbox[0] + ox - px
+-            y1 = d.cbox[1] + oy - px
+-            x2 = d.cbox[2] + ox + px
+-            y2 = d.cbox[3] + oy + px
+-            pbox = (d.cbox[0] + ox, d.cbox[1] + oy,
+-                    d.cbox[2] + ox, d.cbox[3] + oy)
+-            if preview:
+-                cv2.rectangle(frame, (int(max(0, x1)), int(max(0, y1))),
+-                              (int(min(w, x2)), int(min(h, y2))), (0, 0, 255), 2)
+-                for pts in (d.poly or ()):
+-                    arr = np.array(
+-                        [[int(float(qx) * (pbox[2] - pbox[0]) + pbox[0]),
+-                          int(float(qy) * (pbox[3] - pbox[1]) + pbox[1])]
+-                         for qx, qy in pts], np.int32)
+-                    if len(arr) >= 3:
+-                        cv2.polylines(frame, [arr], True, (0, 0, 255), 2)
+-                label = d.category
+-                if draw_scores and d.category == "face":
+-                    label = f"face {d.confidence:.2f}"
+-                cv2.putText(frame, label, (int(max(0, x1)), int(max(12, y1 - 4))),
+-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
+-            elif d.poly:
+-                # segmentation silhouette: mask only the body, not the box —
+-                # px (pad+drift) becomes an outward mask dilation
+-                blur_silhouette(frame, x1, y1, x2, y2, _mode_for(d.category),
+-                                d.poly, pbox, pad_px=px)
+-            else:
+-                blur_region(frame, x1, y1, x2, y2, _mode_for(d.category),
+-                            shape=("ellipse" if d.category == "face"
+-                                   and face_shape == "ellipse" else "rect"))
+-
+-        # 2. safety bands: unscanned content that scrolled into view
+-        bx, by = bands[min(idx, len(bands) - 1)]
+-        vals = set(mode_map.values()) | {mode}
+-        band_mode = ("box" if ("box" in vals or "inpaint" in vals)
+-                     else "mosaic" if "mosaic" in vals else "blur")  # never weaker
+-        def band(x1, y1, x2, y2):
+-            if preview:
+-                cv2.rectangle(frame, (int(x1), int(y1)), (int(x2 - 1), int(y2 - 1)), (0, 165, 255), 2)
++                    rc = proc.wait(timeout=2)
++                except subprocess.TimeoutExpired:
++                    cleanup_errors.extend(_stop_render_children((proc,)))
++                    raise close_error  # forced termination is not an encoder cause
++                except Exception as wait_error:
++                    cleanup_errors.append(wait_error)
++                    raise close_error
++                if rc == 0:
++                    raise  # retain a close error even after successful encoding
++                cleanup_errors.append(close_error)  # encoder diagnostics stay primary
+             else:
+-                blur_region(frame, x1, y1, x2, y2, band_mode)
+-        if by < -2:      # content moved up -> unscanned strip entering at bottom
+-            band(0, h - (abs(by) + band_margin), w, h)
+-        elif by > 2:     # content moved down -> unscanned strip at top
+-            band(0, 0, w, by + band_margin)
+-        if bx < -2:      # content moved left -> strip at right
+-            band(w - (abs(bx) + band_margin), 0, w, h)
+-        elif bx > 2:
+-            band(0, 0, bx + band_margin, h)
+-
+-        if proc is not None:
+-            try:
+-                proc.stdin.write(frame.tobytes())
+-            except (BrokenPipeError, OSError):
+-                # the encoder exited mid-stream: report ITS reason
+                 rc = proc.wait()
+-                err = _ffmpeg_failure(ff_err, "video encode", rc,
++            if rc != 0:
++                raise _ffmpeg_failure(ff_err, "video encode", rc,
+                                       hint=gpu_hint)
+-                cleanup_partial()
+-                raise err
+         else:
+-            out.write(frame)
+-        idx += 1
+-        if idx % progress_every == 0:
+-            cb.progress("render", idx, total)
+-        if idx % 300 == 0:
+-            cb.log(f"  rendering… {idx}/{total} ({100 * idx // max(total, 1)}%)")
+-
+-    cap.release()
+-    cb.progress("render", total, total)
+-    if proc is not None:
+-        try:
+-            proc.stdin.close()
+-        except (BrokenPipeError, OSError):
+-            pass                        # exit code + stderr say why below
+-        rc = proc.wait()
+-        if rc != 0:
+-            raise _ffmpeg_failure(ff_err, "video encode", rc,
+-                                  hint=gpu_hint)
+-    else:
+-        out.release()
+-        os.replace(tmp_video, dst)
++            out.release()
++            out = None
++            os.replace(tmp_video, dst)
++    except BaseException as error:
++        primary = error
++        raise
++    finally:
++        cleanup_errors.extend(_stop_render_children((proc,)))
++        for resource, action in ((cap, "release"), (out, "release"), (ff_err, "close")):
++            if resource is not None:
++                try:
++                    getattr(resource, action)()
++                except BaseException as error:
++                    cleanup_errors.append(error)
++        # Closure and the existing cancellation/write-error deletion policy
++        # are separate: arbitrary setup/frame errors must not unlink dst.
++        if remove_partial:
++            for path in (dst, tmp_video):
++                if path and os.path.exists(path):
++                    try:
++                        os.remove(path)
++                    except OSError:
++                        pass
++        if cleanup_errors:
++            if primary is None:
++                raise cleanup_errors[0]
++            # Python 3.9 has neither add_note nor ExceptionGroup. Preserve
++            # the actual primary exception and expose bounded diagnostics.
++            try:
++                primary.render_cleanup_errors = tuple(
++                    f"{type(error).__name__}: {str(error)[:300]}"
++                    for error in cleanup_errors[:8])
++            except BaseException:
++                pass
+ 
+ 
+ # ----------------------------------------------------------------------------
+diff --git a/pyproject.toml b/pyproject.toml
+index 0bd8a91..556e03d 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -120,6 +120,7 @@ include = [
+     "test_openscrub.py",
+     "tests",
+     "benchmark",
++    "CONTRIBUTING.md",
+ ]
+ 
+ [tool.pytest.ini_options]
+diff --git a/tests/test_hdr_decoder_cleanup.py b/tests/test_hdr_decoder_cleanup.py
+new file mode 100644
+index 0000000..c7ce6f7
+--- /dev/null
++++ b/tests/test_hdr_decoder_cleanup.py
+@@ -0,0 +1,243 @@
++"""Real HDR cleanup with retained owners; all media and children are test-owned.
++
++Strong process/pipe references deliberately prevent GC from masking ownership.
++They are observation effects, not evidence of a permanent application leak.
++"""
++import ast
++from contextlib import contextmanager
++import inspect
++import json
++import os
++from pathlib import Path
++import shutil
++import signal
++import subprocess
++import sys
++import time
++from types import SimpleNamespace
++
++import numpy as np
++import pytest
++
++import openscrub
++
++TAGS = {"-color_primaries": "bt2020", "-color_trc": "smpte2084",
++        "-colorspace": "bt2020nc"}
++
++
++def _command(args):
++    return subprocess.run(args, check=True, capture_output=True, timeout=30).stdout
++
++
++def _decode(path):
++    return _command(["ffmpeg", "-v", "error", "-i", str(path),
++                     "-f", "rawvideo", "-pix_fmt", "yuv420p10le", "pipe:1"])
++
++
++def _metadata(path):
++    return json.loads(_command([
++        "ffprobe", "-v", "error", "-count_frames", "-select_streams", "v:0",
++        "-show_entries", "stream=codec_name,pix_fmt,width,height,nb_read_frames,"
++        "color_transfer,color_primaries,color_space", "-of", "json", str(path)
++    ]))["streams"][0]
++
++
++@pytest.fixture
++def hdr_source(tmp_path):
++    if not (shutil.which("ffmpeg") and shutil.which("ffprobe")):
++        pytest.skip("ffmpeg/ffprobe required")
++    encoders = _command(["ffmpeg", "-hide_banner", "-encoders"])
++    if b"libx265" not in encoders:
++        pytest.skip("libx265 required for real ten-bit HDR control")
++    # Three exact native 10-bit Y/U/V frames, without inference or user media.
++    raw = np.concatenate([np.full(4096, 900, np.uint16),
++                          np.full(1024, 800, np.uint16),
++                          np.full(1024, 300, np.uint16)]).tobytes() * 3
++    source_raw = tmp_path / "source.yuv"
++    source_raw.write_bytes(raw)
++    src = tmp_path / "source.mp4"
++    colors = [a for item in TAGS.items() for a in item]
++    _command(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-f",
++              "rawvideo", "-pix_fmt", "yuv420p10le", "-s", "64x64", "-r", "3",
++              *colors, "-i", str(source_raw), "-c:v", "libx265", "-x265-params",
++              "lossless=1:pools=1:colorprim=bt2020:transfer=smpte2084:colormatrix=bt2020nc",
++              *colors, str(src)])
++    assert _decode(src) == raw
++    return src, raw
++
++
++@contextmanager
++def _observe_children(monkeypatch):
++    """Record real waits and retain owners; never replace pipe IO or commands."""
++    children, error_files = [], []
++    popen = subprocess.Popen
++    temporary_file = openscrub.tempfile.TemporaryFile
++
++    class ObservedPopen(popen):
++        def __init__(self, *args, **kwargs):
++            self.wait_returns = []
++            super().__init__(*args, **kwargs)
++            children.append(self)
++
++        def wait(self, *args, **kwargs):
++            rc = super().wait(*args, **kwargs)
++            self.wait_returns.append(rc)
++            return rc
++
++    def observe_file(*args, **kwargs):
++        file = temporary_file(*args, **kwargs)
++        error_files.append(file)
++        return file
++
++    with monkeypatch.context() as patch:
++        patch.setattr(openscrub.subprocess, "Popen", ObservedPopen)
++        patch.setattr(openscrub.tempfile, "TemporaryFile", observe_file)
++        try:
++            yield children
++        finally:
++            # Unconditional harness containment, including when a RED assertion
++            # fails. These closes do not count as production cleanup evidence.
++            for child in children:
++                if child.poll() is None:
++                    child.terminate()
++                for name in ("stdin", "stdout", "stderr"):
++                    stream = getattr(child, name)
++                    if stream is not None and not stream.closed:
++                        stream.close()
++                try:
++                    child.wait(timeout=5)
++                except subprocess.TimeoutExpired:
++                    child.kill()
++                    child.wait(timeout=5)
++            for file in error_files:
++                file.close()  # stderr lifetime belongs to separate lifecycle work
++
++
++def _args_state(source, output):
++    args = SimpleNamespace(video=str(source), output=str(output), preview=False,
++                           hdr_source=str(source), hdr_encoder="libx265",
++                           hdr_tags=TAGS, pad=0, mode="box", report=None)
++    state = {"detections": [], "cum": [(0, 0)] * 3, "bands": [(0, 0)] * 3,
++             "fps": 3.0, "stats": {"synthetic": True}}
++    return args, state
++
++
++def _render_children(children):
++    dec, = [p for p in children if "pipe:1" in p.args]
++    enc, = [p for p in children if "pipe:0" in p.args]
++    return dec, enc
++
++
++def _assert_clean(children):
++    dec, enc = _render_children(children)
++    # Check reaping independently of Popen.returncode, before harness cleanup.
++    for child in (dec, enc):
++        assert child.wait_returns and child.returncode is not None
++        with pytest.raises(ChildProcessError):
++            os.waitpid(child.pid, os.WNOHANG)
++    print("HDR_CHILDREN " + json.dumps([
++        {"pid": p.pid, "wait_returns": p.wait_returns,
++         "returncode": p.returncode, "pipe_closed": stream.closed}
++        for p, stream in ((dec, dec.stdout), (enc, enc.stdin))]))
++    assert enc.stdin.closed
++    assert dec.stdout.closed
++
++
++@pytest.mark.parametrize("failure", ["cancel", "encoder-write"])
++def test_hdr_partial_cleanup_closes_pipes_with_retained_traceback(
++        failure, hdr_source, tmp_path, monkeypatch):
++    """Missing decoder close fails while exception/traceback and owners live."""
++    if os.name != "posix":
++        pytest.skip("child-reaping observation requires POSIX waitpid")
++    if failure == "encoder-write" and not all(
++            hasattr(os, name) for name in ("waitid", "WNOWAIT", "WEXITED")):
++        pytest.skip("non-reaping exit observation requires waitid/WNOWAIT")
++    source, _ = hdr_source
++    args, state = _args_state(source, tmp_path / "partial.mp4")
++    held_errors = []
++    checkpoints = []
++    with _observe_children(monkeypatch) as children:
++        class Callbacks(openscrub.Callbacks):
++            def log(self, message):
++                pass
++
++            def cancelled(self):
++                checkpoints.append(0)
++                if failure == "encoder-write":
++                    _, enc = _render_children(children)
++                    # Kill only our actual encoder, then observe exit WITHOUT
++                    # reaping. The real first stdin.write raises BrokenPipeError.
++                    os.kill(enc.pid, signal.SIGKILL)
++                    deadline = time.monotonic() + 5
++                    while os.waitid(os.P_PID, enc.pid,
++                                    os.WEXITED | os.WNOHANG | os.WNOWAIT) is None:
++                        if time.monotonic() > deadline:
++                            raise AssertionError("test encoder did not exit")
++                        time.sleep(0.001)
++                return failure == "cancel"
++
++        try:
++            openscrub.run_render(args, state, Callbacks())
++        except Exception as error:
++            held_errors.append(error)
++        assert len(held_errors) == 1
++        error = held_errors[0]
++        assert checkpoints == [0]
++        frames = []
++        tb = error.__traceback__
++        while tb is not None:
++            frames.append(tb.tb_frame.f_code)
++            tb = tb.tb_next
++        assert openscrub.run_render.__code__ in frames
++        assert openscrub.render_hdr.__code__ in frames
++        if failure == "cancel":
++            assert type(error) is openscrub.PipelineCancelled
++        else:
++            assert type(error) is RuntimeError
++            assert "HDR encode" in str(error) and "-9" in str(error)
++            assert isinstance(error.__context__, BrokenPipeError)
++            _, enc = _render_children(children)
++            assert enc.returncode == -signal.SIGKILL
++        assert not Path(args.output).exists()
++        _assert_clean(children)  # retained traceback and strong owners still live
++
++
++def test_hdr_success_keeps_source_bytes_frames_and_tags(
++        hdr_source, tmp_path, monkeypatch):
++    """Ordinary success closes both pipes and preserves the real HDR control."""
++    source, raw = hdr_source
++    output = tmp_path / "success.mp4"
++    args, state = _args_state(source, output)
++    captured = []
++    lines, start = inspect.getsourcelines(openscrub.render_hdr)
++    tree = ast.parse("".join(lines))
++    write_line, = [start + n.lineno - 1 for n in ast.walk(tree)
++                   if isinstance(n, ast.Expr) and isinstance(n.value, ast.Call)
++                   and ast.unparse(n.value.func) == "enc.stdin.write"]
++
++    def trace(frame, event, arg):
++        if frame.f_code is openscrub.render_hdr.__code__:
++            if event == "line" and frame.f_lineno == write_line:
++                captured.append(frame.f_locals["buf"].tobytes())
++            return trace
++        return None
++
++    previous_trace = sys.gettrace()
++    with _observe_children(monkeypatch) as children:
++        try:
++            sys.settrace(trace)  # read-only pre-encoder observation, no IO wrapper
++            result = openscrub.run_render(args, state, openscrub.Callbacks())
++        finally:
++            sys.settrace(previous_trace)
++        assert result == {"synthetic": True, "output": str(output)}
++        if os.name == "posix":
++            _assert_clean(children)
++        assert b"".join(captured) == raw
++        assert len(captured) == 3
++    metadata = _metadata(output)
++    assert metadata == {"codec_name": "hevc", "width": 64, "height": 64,
++                        "pix_fmt": "yuv420p10le", "color_space": "bt2020nc",
++                        "color_transfer": "smpte2084", "color_primaries": "bt2020",
++                        "nb_read_frames": "3"}
++    decoded = _decode(output)
++    assert len(decoded) == len(raw)  # lossy output is not source-bit-identical
+diff --git a/tests/test_render_resources.py b/tests/test_render_resources.py
+new file mode 100644
+index 0000000..f780b81
+--- /dev/null
++++ b/tests/test_render_resources.py
+@@ -0,0 +1,530 @@
++"""Owned renderer handles remain observable through retained exceptions.
++
++Harness containment runs only after production assertions; no GC dependency.
++"""
++from contextlib import contextmanager
++import json
++import os
++from pathlib import Path
++import shutil
++import signal
++import subprocess
++import sys
++
++import pytest
++
++import openscrub as app
++
++
++class Sentinel(RuntimeError):
++    pass
++
++
++@pytest.fixture
++def source(tmp_path):
++    if not shutil.which('ffmpeg'):
++        pytest.skip('ffmpeg required')
++    path = tmp_path / 'input.mp4'
++    subprocess.run(['ffmpeg', '-v', 'error', '-y', '-f', 'lavfi', '-i',
++                    'color=c=blue:s=64x64:r=3:d=1', '-c:v', 'mpeg4', str(path)],
++                   check=True, capture_output=True, timeout=30)
++    return path
++
++
++@contextmanager
++def owners(monkeypatch, failure=None):
++    caps, writers, children, files = [], [], [], []
++    real_cap, real_writer = app.cv2.VideoCapture, app.cv2.VideoWriter
++    real_popen, real_file = subprocess.Popen, app.tempfile.TemporaryFile
++    sentinel = Sentinel(failure)
++
++    class Capture:
++        def __init__(self, *args, **kwargs):
++            self.actual = real_cap(*args, **kwargs)
++            caps.append(self)
++
++        def __getattr__(self, name):
++            return getattr(self.actual, name)
++
++        def get(self, prop):
++            if failure == 'metadata':
++                raise sentinel
++            return self.actual.get(prop)
++
++        def release(self):
++            self.actual.release()
++            if failure in ('release', 'cancel-release'):
++                raise OSError('capture cleanup sentinel')
++
++    def writer(*args, **kwargs):
++        obj = real_writer(*args, **kwargs)
++        writers.append(obj)
++        return obj
++
++    class Child(real_popen):
++        def __init__(self, args, *a, **kw):
++            owned = 'pipe:0' in args or 'pipe:1' in args
++            if failure == 'spawn' and 'pipe:0' in args:
++                raise sentinel
++            self.owned = owned
++            self.waited = []
++            self.wait_timeouts = []
++            super().__init__(args, *a, **kw)
++            if owned:
++                children.append(self)
++
++        def wait(self, *args, **kwargs):
++            if (failure == 'wait' and self.owned and 'pipe:0' in self.args
++                    and not args and not kwargs):
++                raise sentinel
++            rc = super().wait(*args, **kwargs)
++            self.waited.append(rc)
++            self.wait_timeouts.append(kwargs.get("timeout"))
++            return rc
++
++    def temporary(*args, **kwargs):
++        obj = real_file(*args, **kwargs)
++        files.append(obj)
++        return obj
++
++    with monkeypatch.context() as patch:
++        patch.setattr(app.cv2, 'VideoCapture', Capture)
++        patch.setattr(app.cv2, 'VideoWriter', writer)
++        patch.setattr(app.subprocess, 'Popen', Child)
++        patch.setattr(app.tempfile, 'TemporaryFile', temporary)
++        try:
++            yield caps, writers, children, files, sentinel
++        finally:
++            # Kill/reap before closing buffered pipes even when a RED fails.
++            for child in children:
++                if child.poll() is None:
++                    child.kill()
++                child.wait(timeout=5)
++                for name in ('stdin', 'stdout', 'stderr'):
++                    stream = getattr(child, name)
++                    if stream is not None:
++                        try:
++                            stream.close()
++                        except OSError:
++                            pass
++            for cap in caps:
++                cap.actual.release()
++            for obj in writers:
++                obj.release()
++            for obj in files:
++                obj.close()
++
++
++def assert_closed(observed):
++    caps, writers, children, files, _ = observed
++    assert caps and all(not cap.isOpened() for cap in caps)
++    assert all(not obj.isOpened() for obj in writers)
++    for child in children:
++        assert child.returncode is not None and child.waited
++        if os.name == 'posix':
++            with pytest.raises(ChildProcessError):
++                os.waitpid(child.pid, os.WNOHANG)
++        for name in ('stdin', 'stdout', 'stderr'):
++            stream = getattr(child, name)
++            assert stream is None or stream.closed
++    assert all(obj.closed for obj in files)
++
++
++def render(kind, source, output, cb, **kwargs):
++    common = (str(source), str(output), [], [(0, 0)] * 3,
++              [(0, 0)] * 3, 3.0, 0, 'box')
++    if kind == 'hdr':
++        return app.render_hdr(*common, 'libx265', {}, cb=cb, **kwargs)
++    return app.render(*common, False, encoder='x264', cb=cb, **kwargs)
++
++
++@pytest.mark.parametrize(('kind', 'failure'), [
++    (kind, failure)
++    for kind, failures in [
++        ('sdr', ['success', 'metadata', 'callback', 'final', 'spawn', 'wait',
++                 'release', 'cancel', 'cancel-release']),
++        ('hdr', ['success', 'metadata', 'callback', 'final', 'spawn', 'wait',
++                 'release', 'cancel', 'log']),
++        ('fallback', ['success', 'metadata', 'callback', 'final', 'release',
++                      'cancel', 'cancel-release']),
++    ]
++    for failure in failures
++])
++def test_owned_resources_across_render_lifetime(kind, failure, source,
++                                                tmp_path, monkeypatch):
++    """Missing any setup/frame/finally release is visible before harness cleanup."""
++    output = tmp_path / 'output.mp4'
++    if failure in ('metadata', 'spawn'):
++        output.write_bytes(b'previous untouched output')
++    if kind == 'fallback':
++        monkeypatch.setattr(app, 'nvenc_available', lambda *a: None)
++    held = []
++    with owners(monkeypatch, failure) as observed:
++        sentinel = observed[-1]
++
++        class Callbacks(app.Callbacks):
++            final_hits = 0
++
++            def log(self, text):
++                if failure == 'log' and 'HDR preserved' in text:
++                    raise sentinel
++
++            def cancelled(self):
++                return failure in ('cancel', 'cancel-release')
++
++            def progress(self, stage, done, total):
++                if failure in ('callback', 'release') and done == 1:
++                    raise sentinel
++                if done == total:
++                    self.final_hits += 1
++                    if failure == 'final' and self.final_hits == 2:
++                        raise sentinel
++
++        try:
++            render(kind, source, output, Callbacks(), progress_every=1)
++        except BaseException as error:
++            held.append(error)
++        if failure == 'success':
++            assert not held
++            cap = app.cv2.VideoCapture(str(output))
++            try:
++                assert cap.isOpened()
++                assert int(cap.get(app.cv2.CAP_PROP_FRAME_COUNT)) == 3
++            finally:
++                cap.release()
++            for child in observed[2]:
++                assert None in child.wait_timeouts  # normal finalization has no deadline
++        else:
++            assert len(held) == 1
++            assert held[0].__traceback__ is not None
++            if failure in ('cancel', 'cancel-release'):
++                assert type(held[0]) is app.PipelineCancelled
++                assert not output.exists()
++            elif failure == 'release' and kind == 'hdr':
++                assert str(held[0]) == 'capture cleanup sentinel'
++            else:
++                assert held[0] is sentinel
++            if failure in ('release', 'cancel-release'):
++                assert 'capture cleanup sentinel' in ' '.join(
++                    held[0].render_cleanup_errors)
++            if failure in ('metadata', 'spawn'):
++                assert output.read_bytes() == b'previous untouched output'
++        assert_closed(observed)
++
++
++@pytest.mark.parametrize('kind', ['sdr', 'hdr'])
++def test_encoder_error_keeps_stderr_and_closes_owners(kind, source, tmp_path,
++                                                      monkeypatch):
++    """Real FFmpeg rejects its task-owned destination; retain diagnostic and IO."""
++    output = tmp_path / 'missing-directory' / 'output.mp4'
++    held = []
++    with owners(monkeypatch) as observed:
++        try:
++            render(kind, source, output, app.Callbacks())
++        except BaseException as error:
++            held.append(error)
++        assert len(held) == 1
++        assert isinstance(held[0], RuntimeError)
++        assert 'encode' in str(held[0])
++        assert ('No such file or directory' in str(held[0])
++                or 'Error opening output' in str(held[0]))
++        assert_closed(observed)
++
++
++def test_failed_writer_is_released_without_deleting_previous(source, tmp_path,
++                                                             monkeypatch):
++    """A real failed-open VideoWriter must fail instead of replacing the output."""
++    monkeypatch.setattr(app, 'nvenc_available', lambda *a: None)
++    output = tmp_path / 'previous.mp4'
++    output.write_bytes(b'previous')
++    # The exact fallback destination cannot open because it is a directory.
++    Path(str(output) + '.noaudio.mp4').mkdir()
++    with owners(monkeypatch) as observed:
++        with pytest.raises(RuntimeError, match='writer|Writer|output') as held:
++            render('fallback', source, output, app.Callbacks())
++        assert held.value.__traceback__ is not None
++        assert output.read_bytes() == b'previous'
++        assert_closed(observed)
++
++
++@pytest.mark.parametrize('kind', ['sdr', 'hdr'])
++def test_nonzero_final_encoder_wait_retains_stderr(kind, tmp_path, monkeypatch):
++    """Sub-buffer frames reach EOF before FFmpeg rejects its output path."""
++    src = tmp_path / 'small.mp4'
++    subprocess.run(['ffmpeg', '-v', 'error', '-y', '-f', 'lavfi', '-i',
++                    'color=c=blue:s=16x16:r=3:d=1', '-c:v', 'mpeg4', str(src)],
++                   check=True, capture_output=True, timeout=30)
++    output = tmp_path / 'missing' / 'output.mp4'
++    progress = []
++
++    class Callbacks(app.Callbacks):
++        def progress(self, stage, done, total):
++            progress.append(done)
++
++    with owners(monkeypatch) as observed:
++        with pytest.raises(RuntimeError, match='encode.*failed') as held:
++            render(kind, src, output, Callbacks(), progress_every=1)
++        assert progress == [1, 2, 3, 3]
++        assert 'No such file or directory' in str(held.value)
++        enc, = [p for p in observed[2] if 'pipe:0' in p.args]
++        assert enc.waited[0] != 0
++        # The diagnostic is raised at final wait, outside the write handler.
++        assert not isinstance(held.value.__context__, BrokenPipeError)
++        assert_closed(observed)
++
++
++@pytest.mark.parametrize('cleanup_failure', [None, 'wait', 'terminate'])
++def test_abort_kills_and_reaps_only_owned_stubborn_child(
++        tmp_path, monkeypatch, cleanup_failure):
++    """Bounded fallback begins after Python control; this is no native watchdog."""
++    if os.name != 'posix':
++        pytest.skip('SIGTERM handler requires POSIX')
++    child = subprocess.Popen([
++        sys.executable, '-c',
++        'import signal,sys,time; signal.signal(signal.SIGTERM, signal.SIG_IGN); '
++        'print("ready", flush=True); time.sleep(30)'],
++        stdin=subprocess.PIPE, stdout=subprocess.PIPE)
++    try:
++        while True:
++            line = child.stdout.readline()
++            assert line, 'owned child exited before readiness'
++            if line == b'ready\n':
++                break
++        actual_wait = child.wait
++        injected = []
++
++        def wait(*args, **kwargs):
++            if cleanup_failure == 'wait' and not injected:
++                injected.append(True)
++                raise OSError('shutdown sentinel')
++            return actual_wait(*args, **kwargs)
++
++        def terminate():
++            raise OSError('shutdown sentinel')
++
++        monkeypatch.setattr(child, 'wait', wait)
++        if cleanup_failure == 'terminate':
++            monkeypatch.setattr(child, 'terminate', terminate)
++        errors = app._stop_render_children((child,))
++        if cleanup_failure is None:
++            assert not errors
++        else:
++            assert any('shutdown sentinel' in str(e) for e in errors)
++        assert child.returncode == -signal.SIGKILL
++        with pytest.raises(ChildProcessError):
++            os.waitpid(child.pid, os.WNOHANG)
++        assert child.stdin.closed and child.stdout.closed
++    finally:
++        if child.poll() is None:
++            child.kill()
++        child.wait(timeout=5)
++        child.stdin.close()
++        child.stdout.close()
++
++
++@pytest.mark.parametrize('kind', ['sdr', 'hdr'])
++@pytest.mark.parametrize('primary', [False, True])
++@pytest.mark.parametrize('caller_handling', [False, True])
++def test_stderr_close_failure_preserves_primary_or_fails_success(
++        kind, primary, caller_handling, source, tmp_path, monkeypatch, request):
++    """Final close failure fails success and cannot mask a callback sentinel."""
++    actual_file = app.tempfile.TemporaryFile
++    files = []
++    sentinel = Sentinel('callback primary')
++
++    class ErrorFile:
++        def __init__(self):
++            self.actual = actual_file()
++            files.append(self)
++            request.addfinalizer(self.actual.close)  # containment after assertions
++
++        def __getattr__(self, name):
++            return getattr(self.actual, name)
++
++        def close(self):
++            self.actual.close()
++            raise OSError('stderr close sentinel')
++
++    class Callbacks(app.Callbacks):
++        def progress(self, stage, done, total):
++            if primary:
++                raise sentinel
++
++    with owners(monkeypatch) as observed:
++        monkeypatch.setattr(app.tempfile, 'TemporaryFile', ErrorFile)
++        def attempt():
++            with pytest.raises((Sentinel, OSError)) as held:
++                render(kind, source, tmp_path / 'out.mp4', Callbacks())
++            return held.value
++
++        caller_error = ValueError('handled caller exception')
++        if caller_handling:
++            try:
++                raise caller_error
++            except ValueError:
++                error = attempt()
++        else:
++            error = attempt()
++        print('CALLER_PRIMARY_STATE ' + json.dumps(dict(
++            kind=kind, caller_handling=caller_handling, render_primary=primary,
++            caller_annotated=hasattr(caller_error, 'render_cleanup_errors'),
++            raised_type=type(error).__name__, callback_identity=error is sentinel)))
++        assert not hasattr(caller_error, 'render_cleanup_errors')
++        if primary:
++            assert error is sentinel
++            assert 'stderr close sentinel' in ' '.join(error.render_cleanup_errors)
++        else:
++            assert str(error) == 'stderr close sentinel'
++        assert files and all(obj.closed for obj in files)
++        assert_closed(observed)
++
++
++def test_fallback_cancel_preserves_existing_dangling_destination(
++        source, tmp_path, monkeypatch):
++    """Resource cleanup must preserve the original exists-before-unlink policy."""
++    output = tmp_path / 'previous.mp4'
++    target = tmp_path / 'absent.mp4'
++    try:
++        output.symlink_to(target)
++    except (OSError, NotImplementedError):
++        pytest.skip('symlink creation unavailable')
++    monkeypatch.setattr(app, 'nvenc_available', lambda *a: None)
++
++    class Callbacks(app.Callbacks):
++        def cancelled(self):
++            return True
++
++    with owners(monkeypatch) as observed:
++        with pytest.raises(app.PipelineCancelled) as held:
++            render('fallback', source, output, Callbacks())
++        assert held.value.__traceback__ is not None
++        assert output.is_symlink() and output.readlink() == target
++        assert not target.exists()
++        assert_closed(observed)
++
++
++@pytest.mark.parametrize('kind', ['sdr', 'hdr', 'fallback'])
++def test_setup_callback_cancellation_does_not_newly_delete_prior_output(
++        kind, source, tmp_path, monkeypatch):
++    """A setup callback exception never widens the existing checkpoint policy."""
++    output = tmp_path / 'previous.mp4'
++    output.write_bytes(b'untouched regular prior output')
++    if kind == 'fallback':
++        monkeypatch.setattr(app, 'nvenc_available', lambda *a: None)
++    sentinel = app.PipelineCancelled('setup callback')
++
++    class Callbacks(app.Callbacks):
++        def log(self, message):
++            raise sentinel
++
++    with owners(monkeypatch) as observed:
++        with pytest.raises(app.PipelineCancelled) as held:
++            render(kind, source, output, Callbacks())
++        assert held.value is sentinel and sentinel.__traceback__ is not None
++        assert output.read_bytes() == b'untouched regular prior output'
++        assert not observed[2] and not observed[1]  # pre-write acquisition
++        assert_closed(observed)
++
++
++@pytest.mark.parametrize('kind', ['sdr', 'hdr'])
++@pytest.mark.parametrize('encoder_fails', [False, True])
++def test_stdin_close_error_keeps_zero_exit_failure_or_encoder_diagnostic(
++        kind, encoder_fails, tmp_path, monkeypatch):
++    """An exact real close followed by OSError cannot silently become success."""
++    src = tmp_path / 'small.mp4'
++    subprocess.run(['ffmpeg', '-v', 'error', '-y', '-f', 'lavfi', '-i',
++                    'color=c=blue:s=16x16:r=3:d=1', '-c:v', 'mpeg4', str(src)],
++                   check=True, capture_output=True, timeout=30)
++    output = tmp_path / 'missing' / 'out.mp4' if encoder_fails else tmp_path / 'out.mp4'
++    close_error = OSError('stdin close sentinel')
++    calls = []
++    held = []
++    with owners(monkeypatch) as observed:
++        class Callbacks(app.Callbacks):
++            def progress(self, stage, done, total):
++                enc, = [p for p in observed[2] if 'pipe:0' in p.args]
++                actual_close = enc.stdin.close
++
++                def close():
++                    if calls:
++                        return actual_close()
++                    calls.append(True)
++                    try:
++                        actual_close()
++                    finally:
++                        raise close_error
++
++                monkeypatch.setattr(enc.stdin, 'close', close)
++
++        try:
++            render(kind, src, output, Callbacks())
++        except BaseException as error:
++            held.append(error)
++        assert len(held) == 1
++        assert held[0].__traceback__ is not None and calls == [True]
++        enc, = [p for p in observed[2] if 'pipe:0' in p.args]
++        if encoder_fails:
++            assert type(held[0]) is RuntimeError
++            assert 'encode' in str(held[0]) and 'No such file or directory' in str(held[0])
++            assert enc.returncode != 0
++            assert 'stdin close sentinel' in ' '.join(held[0].render_cleanup_errors)
++        else:
++            assert held[0] is close_error
++            assert enc.returncode == 0 and output.is_file()
++        print('STDIN_CLOSE_STATE ' + json.dumps(dict(
++            kind=kind, encoder_fails=encoder_fails, returncode=enc.returncode,
++            pipe_closed=enc.stdin.closed, original_close_primary=held[0] is close_error,
++            waits=enc.wait_timeouts, error=str(held[0]))))
++        # A reported close failure uses only bounded status/shutdown waits.
++        assert enc.wait_timeouts and all(t is not None for t in enc.wait_timeouts)
++        assert_closed(observed)
++
++
++@pytest.mark.parametrize('kind', ['sdr', 'hdr'])
++@pytest.mark.parametrize('wait_fails', [False, True])
++def test_stdin_close_error_before_eof_uses_bounded_abort(
++        kind, wait_fails, source, tmp_path, monkeypatch):
++    """A still-open owned endpoint must not lead to an unbounded status wait."""
++    close_error = OSError('stdin still open sentinel')
++    injected, wait_injections = [], []
++    held = []
++    with owners(monkeypatch) as observed:
++        class Callbacks(app.Callbacks):
++            def progress(self, stage, done, total):
++                enc, = [p for p in observed[2] if 'pipe:0' in p.args]
++                actual_close, actual_wait = enc.stdin.close, enc.wait
++
++                def close():
++                    if not injected:
++                        injected.append(True)
++                        raise close_error  # deliberately before real EOF
++                    return actual_close()
++
++                def wait(*args, **kwargs):
++                    # Fail fast at this exact owned operation on the old path,
++                    # rather than hanging the harness behind a missing EOF.
++                    assert kwargs.get('timeout') is not None, 'unbounded wait after close failure'
++                    if wait_fails and not wait_injections:
++                        wait_injections.append(True)
++                        raise OSError('status wait sentinel')
++                    return actual_wait(*args, **kwargs)
++
++                monkeypatch.setattr(enc.stdin, 'close', close)
++                monkeypatch.setattr(enc, 'wait', wait)
++
++        try:
++            render(kind, source, tmp_path / 'out.mp4', Callbacks())
++        except BaseException as error:
++            held.append(error)
++        assert len(held) == 1 and held[0] is close_error
++        assert close_error.__traceback__ is not None and injected == [True]
++        enc, = [p for p in observed[2] if 'pipe:0' in p.args]
++        assert enc.returncode != 0
++        if wait_fails:
++            assert 'status wait sentinel' in ' '.join(close_error.render_cleanup_errors)
++        print('STDIN_ABORT_STATE ' + json.dumps(dict(
++            kind=kind, wait_fails=wait_fails, returncode=enc.returncode,
++            pipe_closed=enc.stdin.closed, original_close_primary=held[0] is close_error,
++            waits=enc.wait_timeouts)))
++        assert enc.wait_timeouts and all(t is not None for t in enc.wait_timeouts)
++        assert_closed(observed)

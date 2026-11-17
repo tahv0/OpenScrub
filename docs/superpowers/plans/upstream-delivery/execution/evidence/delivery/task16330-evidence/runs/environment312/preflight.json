@@ -1,0 +1,90 @@
+{
+  "source": "/home/tahv0/.codex/worktrees/c832/OpenScrub",
+  "base": "4a62e49d2f0896b737081cc92e1f92e9bcaee93f",
+  "head": "8768e86dc1cd57720fd1c22eb6b539ae6bda6cde",
+  "policy": "frozen",
+  "files": {
+    "CONTRIBUTING.md": "2149d74989dc9c86424701fed324095641da6a32a8566776b935e9d3913c229a",
+    "Dockerfile": "5758071c9c9bafe7790433745ac83d09f2d415e4bdc9212df4b8de31a244edc6",
+    "Dockerfile.intel": "00fa8162b3aae5821d0b9447b1a30f8c3d0cb047a2da892cf0da5a90cbe3f2fc",
+    "benchmark/README.md": "a631b2b51e97066c0cf9ec8d0408b7f8155d0986c5866ac768c9e289947b4b48",
+    "benchmark/corpus.py": "3e44a55997f7562a210395ccfb2ff57b8d542c98120a84f2e31551c9f768801c",
+    "benchmark/reid.py": "90f897de2de600e654f73113e19bfda0818c638692fc3867e917c56d4a9bdc40",
+    "benchmark/review_io.py": "a439f6a886757bb249f046d57610997ece80c22dae8bf9d9eedd51db53f203ef",
+    "benchmark/score.py": "68d1c8967c8d52a9523b30497e84e47c8ea7430fcfadfef26cf1241e9bc4fb84",
+    "openscrub.py": "e42e03e893ad49931454bc18ed6e18fa2ee4e4d87cb1f8806762142c8b494b1f",
+    "openscrub_internal/__init__.py": "c35c063c010e329c5dad13782e7b67438ed4b2d1faf975d4f01be2773a18e022",
+    "openscrub_internal/lifetimes.py": "dbfc317c1c878b8e8a599391578504c44a8964199f2cdae6e2ed60a6336d6743",
+    "openscrub_internal/reports.py": "eec9d568fc18f08ee35469ba864c5526120ae11152e8fe6f4d15007ab42d2427",
+    "openscrub_setup.py": "d0362a038f8182e8fae510100085bb087f09f7e5cf7e11a780a24390b3037eaf",
+    "openscrub_update.py": "4d6a20f75d985a119f8421227c3bd88b17fd1b8eed44e353b127b5b49e733d55",
+    "openscrub_vault.py": "da1b7fe4da389352fbc594abddcc563278b26009d8f342d4154ffa305bf4dfa4",
+    "openscrub_web.py": "fc0eea772aec5b9ecba7a957b260e8e3121937f98fd6ff785c8df6dc9788c5a5",
+    "pyproject.toml": "1487a10e58587058ecb8da39c260977d2c60c5397b43293bb59b97024684b9f6",
+    "requirements.txt": "9fccdf6ad2d0ea484f40906ba224881fb4f5b16ff44fdbf14819865c0d8fa6ee",
+    "test_openscrub.py": "60282f4ab6bc9b20cc2a4d5e5ce1934cbade19f3a3186ad7bf0b9989ed7d4109",
+    "tests/test_hdr_decoder_cleanup.py": "5422b3e78c8d048e93c86d82c5881e2e10296078f7c3f74f6064501d380c5f36",
+    "tests/test_job_lifecycle.py": "243734da91be1b0a49e7875843a87f46d2d38d64d9fff543e627b83ff6602e3c",
+    "tests/test_job_response_lifetime.py": "b30cb52c7e2e5fa3c50cb2662be35115a434008c757340faf37c50307d4ea8a0",
+    "tests/test_job_source_allowlist_lifecycle.py": "7efe51d6b3c37899bd7df010039a6c0ce3318f20a0b9da04216e761ecb95973a",
+    "tests/test_large_report_io.py": "a572bd37e7dd25f9c6f93611306431f8cc1f4ff2245b86a9053d8515a1cb70b6",
+    "tests/test_manual_addition_replay.py": "732e8e6403c15e6380ecd58b1a6d7ef4f0eebf598795c725e68d34e741521d23",
+    "tests/test_render_resources.py": "0d93b9eec719a73cc30a36332ef0758af767c604f6518e7f1c945cdb52a44607",
+    "tests/test_report_roundtrip.py": "e39f7a933020c93ad5c3a9e3490b9628bcc476bfc5129c2fac756c24233b88b8",
+    "tests/test_report_serialization.py": "48fadb925349d240a2f09b1f870c6d79d3a096cb64d2138bfcfabb1d1073438a",
+    "tests/test_report_transactions.py": "56fda81575cb7a5fc5f2d5f2daeb5d095f3f25bdfb908d83ebd55d5590a6d160",
+    "tests/test_review_save_failures.py": "c47c94f206cb846edc4430d079c33130eb9f3c5755dd9e6f17c0cdf3232b10de",
+    "tests/test_vault_cleanup.py": "8a08c48d49be1ceb7c65b65088ece4db7b08e36c75398cccf9c11eb992b67489",
+    "zones_ui.py": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7"
+  },
+  "python": {
+    "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+    "version": [
+      3,
+      12,
+      16
+    ]
+  },
+  "free_bytes": 803513520128,
+  "prerequisites": [
+    {
+      "path": "/tmp/openscrub-baseline-20261116/tools/usr/bin/ffmpeg",
+      "sha256": "bdf6aabffdba7411edff8d36c389d695257fcdf823d196020176e117612862f6",
+      "executable": true
+    },
+    {
+      "path": "/tmp/openscrub-baseline-20261116/tools/usr/bin/ffprobe",
+      "sha256": "a6dac1e9e8631e04075d06854cc4069308aec279bb04683b4a0bca5e4f54b2fe",
+      "executable": true
+    },
+    {
+      "path": "/tmp/openscrub-baseline-20261116/tools/usr/bin/tesseract",
+      "sha256": "644efa639b77a21b1096a6ced155112f0c730d05c7db871d52f4b2eb16bdf42a",
+      "executable": true
+    },
+    {
+      "path": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/task16330-evidence/adapters/prepare.py",
+      "sha256": "ff79b80ca4f4b18e3562292d57c3531b56e2f947f3a9b51f4bc2a482499729a4"
+    },
+    {
+      "path": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/task16330-evidence/adapters/environment.py",
+      "sha256": "ee32f2956e486338c1bba6a874a5bd3a810bf02435d5eca0f10817e5dd2a78ed"
+    },
+    {
+      "path": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/task16330-evidence/adapters/listening_smoke.py",
+      "sha256": "e7c298def127b03a72f08003ed671fa8d402a689ed594633c1f6a1cc2ca58257"
+    },
+    {
+      "path": "/home/tahv0/src/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/verification_hook.py",
+      "sha256": "4b25e217fcf8fc2ada1147a9c26ff5cdb51884809328854d4dafd3b36fb8e5a0"
+    },
+    {
+      "path": "/home/tahv0/src/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/sitecustomize.py",
+      "sha256": "035c1187d46c85ce2c3f3c092822d8171c3b67e99a7270717a12169b2c3be302"
+    },
+    {
+      "path": "/home/tahv0/src/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/verify.py",
+      "sha256": "354cf49b0c83d11f3945137fbdffc3ac6b2793f1217ac39a9b62270097940067"
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+diff --cc CONTRIBUTING.md
+index 979e0c3,74c6ced..0000000
+--- a/CONTRIBUTING.md
++++ b/CONTRIBUTING.md
+diff --cc pyproject.toml
+index 0bd8a91,c8c8200..0000000
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@@ -118,9 -116,6 +118,10 @@@ include = 
+      "NOTICE",
+      "THIRD_PARTY_NOTICES.md",
+      "test_openscrub.py",
+ -    "tests/",
+ +    "tests",
+ +    "benchmark",
++     "CONTRIBUTING.md",
+  ]
+ +
+ +[tool.pytest.ini_options]
+ +testpaths = ["test_openscrub.py", "tests"]

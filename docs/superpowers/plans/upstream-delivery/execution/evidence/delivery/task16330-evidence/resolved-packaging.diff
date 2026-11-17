@@ -1,0 +1,32 @@
+diff --git a/CONTRIBUTING.md b/CONTRIBUTING.md
+index 979e0c3..74c6ced 100644
+--- a/CONTRIBUTING.md
++++ b/CONTRIBUTING.md
+@@ -22,9 +22,14 @@ Thanks for helping! A few rules keep this privacy tool trustworthy.
+ 
+ ## Before you open a PR
+ 
+-    python -m pytest test_openscrub.py tests/ -q      # must be green
++    python -m pytest -q                        # all discovered tests must be green
+     python -m build                            # full sdist->wheel build
+ 
++The discovered suite includes `test_openscrub.py` and `tests/`. The HDR
++cleanup regressions use synthetic media and real FFmpeg/ffprobe with libx265;
++they skip when those tools are unavailable. Child-reaping observations require
++POSIX, and the injected encoder-exit case also requires `waitid`/`WNOWAIT`.
++
+ For web UI changes, also boot `python openscrub_web.py` and click through
+ what you touched — and note the PAGE string is a normal (non-raw) Python
+ string, so backslashes in embedded JS need doubling. For engine changes,
+diff --git a/pyproject.toml b/pyproject.toml
+index 0bd8a91..556e03d 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -120,6 +120,7 @@ include = [
+     "test_openscrub.py",
+     "tests",
+     "benchmark",
++    "CONTRIBUTING.md",
+ ]
+ 
+ [tool.pytest.ini_options]

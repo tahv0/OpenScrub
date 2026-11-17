@@ -1,0 +1,52 @@
+diff --git a/CONTRIBUTING.md b/CONTRIBUTING.md
+index 979e0c3..74c6ced 100644
+--- a/CONTRIBUTING.md
++++ b/CONTRIBUTING.md
+@@ -22,9 +22,14 @@ Thanks for helping! A few rules keep this privacy tool trustworthy.
+ 
+ ## Before you open a PR
+ 
+-    python -m pytest test_openscrub.py tests/ -q      # must be green
++    python -m pytest -q                        # all discovered tests must be green
+     python -m build                            # full sdist->wheel build
+ 
++The discovered suite includes `test_openscrub.py` and `tests/`. The HDR
++cleanup regressions use synthetic media and real FFmpeg/ffprobe with libx265;
++they skip when those tools are unavailable. Child-reaping observations require
++POSIX, and the injected encoder-exit case also requires `waitid`/`WNOWAIT`.
++
+ For web UI changes, also boot `python openscrub_web.py` and click through
+ what you touched — and note the PAGE string is a normal (non-raw) Python
+ string, so backslashes in embedded JS need doubling. For engine changes,
+diff --git a/pyproject.toml b/pyproject.toml
+index 0bd8a91..c8c8200 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -89,7 +89,6 @@ pattern = "VERSION = \"(?P<version>[^\"]+)\""
+ 
+ [tool.hatch.build.targets.wheel]
+ include = [
+-    "openscrub_internal",
+     "openscrub.py",
+     "openscrub_web.py",
+     "zones_ui.py",
+@@ -100,7 +99,6 @@ include = [
+ 
+ [tool.hatch.build.targets.sdist]
+ include = [
+-    "openscrub_internal",
+     "plate_models.json",
+     "face_models.json",
+     "person_models.json",
+@@ -118,9 +116,6 @@ include = [
+     "NOTICE",
+     "THIRD_PARTY_NOTICES.md",
+     "test_openscrub.py",
+-    "tests",
+-    "benchmark",
++    "tests/",
++    "CONTRIBUTING.md",
+ ]
+-
+-[tool.pytest.ini_options]
+-testpaths = ["test_openscrub.py", "tests"]

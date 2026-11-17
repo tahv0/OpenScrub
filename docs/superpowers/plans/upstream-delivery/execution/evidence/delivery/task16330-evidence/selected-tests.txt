@@ -1,0 +1,11 @@
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_hdr_decoder_cleanup.py
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_job_lifecycle.py
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_job_response_lifetime.py
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_job_source_allowlist_lifecycle.py
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_manual_addition_replay.py
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_render_resources.py
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_report_roundtrip.py
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_report_serialization.py
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_report_transactions.py
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_vault_cleanup.py

@@ -1,0 +1,49 @@
+commit 8768e86dc1cd57720fd1c22eb6b539ae6bda6cde
+Author:     Tuomas Aho <tuomas.aho@outlook.com>
+AuthorDate: Tue Nov 17 19:51:07 2026 +0200
+Commit:     Tuomas Aho <tuomas.aho@outlook.com>
+CommitDate: Tue Nov 17 22:32:53 2026 +0200
+
+    fix: preserve render-local finalization failures
+    
+    (cherry picked from commit 70ec464ca70b5e49751d778890f56029dced0b8a)
+
+commit 50952532f26fcdcc2c7f9cd209399d3a9f4f01aa
+Author:     Tuomas Aho <tuomas.aho@outlook.com>
+AuthorDate: Tue Nov 17 19:27:41 2026 +0200
+Commit:     Tuomas Aho <tuomas.aho@outlook.com>
+CommitDate: Tue Nov 17 22:32:53 2026 +0200
+
+    fix: retain legacy partial-output removal guards
+    
+    (cherry picked from commit 8e70af446caa5ed37e0e36c029925d5caf08f943)
+
+commit a71742720d4a7315b9582bbdd881072d66ad99c6
+Author:     Tuomas Aho <tuomas.aho@outlook.com>
+AuthorDate: Tue Nov 17 19:20:04 2026 +0200
+Commit:     Tuomas Aho <tuomas.aho@outlook.com>
+CommitDate: Tue Nov 17 22:32:53 2026 +0200
+
+    test: select applicable renderer ownership cases
+    
+    (cherry picked from commit cb7b7ff8577aa4e7c0db48916179a1521fb4b412)
+
+commit 825be9e7f4640b5340ac414b467ca556ce0911ec
+Author:     Tuomas Aho <tuomas.aho@outlook.com>
+AuthorDate: Tue Nov 17 19:16:36 2026 +0200
+Commit:     Tuomas Aho <tuomas.aho@outlook.com>
+CommitDate: Tue Nov 17 22:32:53 2026 +0200
+
+    fix: release owned render resources across exceptional exits
+    
+    (cherry picked from commit e9fd0d39bd9c10ddbaa121e9c91cc504921c5afb)
+
+commit bce3cc327c29071d6c6c856d0f6f9a45520bfa1e
+Author:     Tuomas Aho <tuomas.aho@outlook.com>
+AuthorDate: Tue Nov 17 08:28:19 2026 +0200
+Commit:     Tuomas Aho <tuomas.aho@outlook.com>
+CommitDate: Tue Nov 17 22:32:51 2026 +0200
+
+    fix: close HDR decoder pipe during partial cleanup
+    
+    (cherry picked from commit ded411cbec308333d1416ae3d58b4f6e918d7849)

@@ -1,0 +1,42 @@
+diff --cc CONTRIBUTING.md
+index 979e0c3,74c6ced..0000000
+--- a/CONTRIBUTING.md
++++ b/CONTRIBUTING.md
+@@@ -22,9 -22,14 +22,18 @@@ Thanks for helping! A few rules keep th
+  
+  ## Before you open a PR
+  
+++<<<<<<< HEAD
+ +    python -m pytest test_openscrub.py tests/ -q      # must be green
+++=======
++     python -m pytest -q                        # all discovered tests must be green
+++>>>>>>> ded411c (fix: close HDR decoder pipe during partial cleanup)
+      python -m build                            # full sdist->wheel build
+  
++ The discovered suite includes `test_openscrub.py` and `tests/`. The HDR
++ cleanup regressions use synthetic media and real FFmpeg/ffprobe with libx265;
++ they skip when those tools are unavailable. Child-reaping observations require
++ POSIX, and the injected encoder-exit case also requires `waitid`/`WNOWAIT`.
++ 
+  For web UI changes, also boot `python openscrub_web.py` and click through
+  what you touched — and note the PAGE string is a normal (non-raw) Python
+  string, so backslashes in embedded JS need doubling. For engine changes,
+diff --cc pyproject.toml
+index 0bd8a91,c8c8200..0000000
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@@ -118,9 -116,6 +118,14 @@@ include = 
+      "NOTICE",
+      "THIRD_PARTY_NOTICES.md",
+      "test_openscrub.py",
+++<<<<<<< HEAD
+ +    "tests",
+ +    "benchmark",
+++=======
++     "tests/",
++     "CONTRIBUTING.md",
+++>>>>>>> ded411c (fix: close HDR decoder pipe during partial cleanup)
+  ]
+ +
+ +[tool.pytest.ini_options]
+ +testpaths = ["test_openscrub.py", "tests"]

@@ -1,0 +1,12 @@
+Traceback (most recent call last):
+  File "/home/tahv0/src/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/verify.py", line 256, in <module>
+    sys.exit(main())
+  File "/home/tahv0/src/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/verify.py", line 238, in main
+    with owned_run(cfg, args.run_id) as root:
+  File "/tmp/openscrub-python39-20261117/python/cpython-3.9-linux-x86_64-gnu/lib/python3.9/contextlib.py", line 119, in __enter__
+    return next(self.gen)
+  File "/home/tahv0/src/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/verify.py", line 100, in owned_run
+    fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+  File "/tmp/openscrub-python39-20261117/harness/sitecustomize.py", line 33, in _audit
+    raise RuntimeError('Python 3.9 verification: write outside task root blocked')
+RuntimeError: Python 3.9 verification: write outside task root blocked
