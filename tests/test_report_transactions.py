@@ -598,13 +598,13 @@ def test_report_download_stat_open_is_one_generation(store, socket_api, monkeypa
     lock = ObservedLock()
     web.FILES.initialize(store.job).report_lock = lock
     before = store.path.read_bytes()
-    real_send = web.send_file
+    real_send = web._send_open_file
     def send(*args, **kwargs):
         if str(args[0]) == str(store.path):
             entered.set()
             assert release.wait(8)
         return real_send(*args, **kwargs)
-    monkeypatch.setattr(web, 'send_file', send)
+    monkeypatch.setattr(web, '_send_open_file', send)
     values = []
     thread = threading.Thread(target=lambda: values.append(socket_api('GET', store.url + '/report')))
     thread.start()

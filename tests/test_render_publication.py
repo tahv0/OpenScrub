@@ -225,3 +225,107 @@ def test_recovery_marker_rehydrates_without_report_and_refuses_unsafe_routes(sto
 
 
 from test_job_lifecycle import store
+
+
+@pytest.mark.parametrize('kind',['parent-symlink','hardlink','final-symlink'])
+def test_destination_entry_alias_semantics(tmp_path,kind):
+    from openscrub_internal.render_delivery import _RenderDelivery
+    directory=tmp_path/'real';directory.mkdir();video=directory/'output.mp4';report=directory/'report.json'
+    video.write_bytes(b'old video')
+    if kind=='parent-symlink':
+        alias=tmp_path/'alias';alias.symlink_to(directory,target_is_directory=True)
+        with pytest.raises(ValueError,match='distinct destination'):
+            _RenderDelivery(str(video),str(alias/'output.mp4'))
+        return
+    target=directory/'untouched';target.write_bytes(b'link target')
+    if kind=='hardlink': os.link(video,report)
+    else: report.symlink_to(target)
+    with _RenderDelivery(str(video),str(report)) as owned:
+        Path(owned.video_stage).write_bytes(b'new video');owned.prepare_report({'new':True});owned.prepare_rollback();owned.commit()
+    assert video.read_bytes()==b'new video' and json.loads(report.read_text())=={'new':True}
+    assert target.read_bytes()==b'link target' and not report.is_symlink()
+
+
+@pytest.mark.parametrize('kind',['sdr','hdr','fallback'])
+def test_real_direct_stage_containers_and_resources(source,tmp_path,monkeypatch,kind):
+    output=tmp_path/('output.mov' if kind=='sdr' else 'output.mkv' if kind=='hdr' else 'output')
+    output.write_bytes(b'previous')
+    if kind=='fallback': monkeypatch.setattr(app,'nvenc_available',lambda *args:None)
+    class Check(Quiet):
+        def progress(self,*args): assert output.read_bytes()==b'previous'
+    with owners(monkeypatch) as observed:
+        direct_render(kind,source,output,Check())
+        assert_closed(observed)
+        assert output.read_bytes()!=b'previous'
+        assert not list(tmp_path.glob('.render-*.tmp*'))
+
+
+@pytest.mark.parametrize('role',['video','report'])
+@pytest.mark.parametrize('present',[True,False])
+def test_each_restore_attempt_failure_retains_recovery(tmp_path,monkeypatch,role,present):
+    from openscrub_internal import render_delivery as delivery
+    video,report=tmp_path/'output.mp4',tmp_path/'report.json'
+    for path in [video,report]:
+        if present:path.write_bytes(b'old')
+    real_replace,real_unlink=os.replace,os.unlink
+    target=str(video if role=='video' else report)
+    primary=RuntimeError('terminal sentinel')
+    def replace(src,dst):
+        if str(dst)==target and '.render-recovery-' in str(src):raise OSError('restore sentinel')
+        return real_replace(src,dst)
+    def unlink(path,*args,**kwargs):
+        if str(path)==target:raise OSError('absence sentinel')
+        return real_unlink(path,*args,**kwargs)
+    with delivery._RenderDelivery(str(video),str(report)) as owned:
+        Path(owned.video_stage).write_bytes(b'new');owned.prepare_report({'new':True});owned.prepare_rollback()
+        monkeypatch.setattr(os,'replace',replace);monkeypatch.setattr(os,'unlink',unlink)
+        def fail():raise primary
+        with pytest.raises(delivery._DeliveryRecoveryError) as caught:owned.commit(publish_success=fail)
+        assert caught.value.primary is primary
+    assert list(tmp_path.glob('.render-recovery-*.json'))
+    if present:assert list(tmp_path.glob('.render-recovery-*.'+role))
+
+
+def test_postcommit_notification_or_backup_cleanup_cannot_relabel_success(review,monkeypatch):
+    real_unlink=os.unlink
+    def unlink(path,*args,**kwargs):
+        if str(path).endswith('.video') and '.render-recovery-' in str(path): raise OSError('backup cleanup')
+        return real_unlink(path,*args,**kwargs)
+    review.output.write_bytes(b'previous')
+    monkeypatch.setattr(os,'unlink',unlink)
+    result=app.run_pipeline(render_args(review),Quiet())
+    assert result['output']==str(review.output)
+    assert json.loads(review.path.read_text())['provenance']['output_sha256']==app.sha256_file(review.output)
+
+
+def test_cleanup_descriptor_failure_before_commit_is_visible_to_live_job(store,monkeypatch):
+    import openscrub_web as web
+    store.doc['render_state']['bands']=[[0,0]]*30;store.path.write_text(json.dumps(store.doc))
+    monkeypatch.setattr(app,'normalize_vfr',lambda *args:None)
+    monkeypatch.setattr(app,'_render_into',lambda src,dst,*args,**kwargs:Path(dst).write_bytes(b'new'))
+    real_prepare=__import__('openscrub_internal.render_delivery',fromlist=['_RenderDelivery'])._RenderDelivery.prepare_rollback
+    def prepare(owned):
+        real_prepare(owned)
+        store.job['cancel'].set()
+    from openscrub_internal import render_delivery as delivery
+    monkeypatch.setattr(delivery._RenderDelivery,'prepare_rollback',prepare)
+    real_unlink=os.unlink
+    def unlink(path,*args,**kwargs):
+        if str(path).endswith('.json') and '.render-recovery-' in str(path): raise OSError('descriptor cleanup')
+        return real_unlink(path,*args,**kwargs)
+    monkeypatch.setattr(os,'unlink',unlink)
+    web._run_job(store.job,'render')
+    assert web.FILES.initialize(store.job).recovery_required
+    assert store.job['error']=='render delivery requires recovery'
+
+
+def test_vault_roundtrip_keeps_recovery_and_only_discards_reserved_stages(tmp_path):
+    import openscrub_vault as vault
+    key=os.urandom(32)
+    retained=['.render-recovery-'+'a'*32+'.json','.render-recovery-'+'a'*32+'.video','.render-user.tmp.mp4','.hidden']
+    discarded=['.render-'+'b'*32+'.tmp.mp4','.render-'+'c'*32+'.tmp.mov.noaudio.mp4','.report-arbitrary.tmp']
+    for name in retained+discarded:(tmp_path/name).write_bytes(b'sensitive')
+    assert vault.encrypt_tree(key,str(tmp_path))==len(retained)
+    assert all(not (tmp_path/name).exists() for name in discarded)
+    assert vault.decrypt_tree(key,str(tmp_path))==len(retained)
+    assert all((tmp_path/name).read_bytes()==b'sensitive' for name in retained)
