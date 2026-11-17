@@ -22,8 +22,11 @@ Thanks for helping! A few rules keep this privacy tool trustworthy.
 
 ## Before you open a PR
 
-    python -m pytest test_openscrub.py -q      # must be green
+    python -m pytest -q                        # full discovered suite; must be green
     python -m build                            # full sdist->wheel build
+
+The literal job-name display regressions in `tests/` evaluate emitted JavaScript
+with Node.js (skipped when Node is unavailable).
 
 For web UI changes, also boot `python openscrub_web.py` and click through
 what you touched — and note the PAGE string is a normal (non-raw) Python

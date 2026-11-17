@@ -2079,6 +2079,11 @@ async function applyTier(id){
 refreshModelPanel();renderTiers();
 let CUR=null, EN={}, MAN=[], DUR=0, POLL=null, PHIST=[], PHPH="", LOGN=0, SHELLPH=null, JOBSJSON="";
 
+// Job names are text inside the list link and detail heading.
+function jobNameHtml(name){
+ return String(name).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+
 async function loadJobs(){
  const r=await fetch("api/jobs");
  if(r.status===423){jobs.innerHTML='<span style="color:#f87171">&#128274; locked — unlock in the Encryption panel below</span>';JOBSJSON="";return;}
@@ -2088,7 +2093,7 @@ async function loadJobs(){
  JOBSJSON=s;
  jobs.innerHTML=js.length?js.map(j=>
   `<div class="row" style="justify-content:space-between;padding:4px 0">
-   <a href="#" onclick="openJob('${j.id}');return false">${j.name}</a>
+   <a href="#" onclick="openJob('${j.id}');return false">${jobNameHtml(j.name)}</a>
    <span style="display:flex;gap:10px;align-items:center"><span class="badge">${j.phase}</span>
    ${(j.phase=="error"||j.phase=="cancelled")?`<a href="#" title="Retry the scan — reuses the file already on the server, nothing is re-uploaded" style="text-decoration:none;font-size:15px" onclick="retryJob('${j.id}');return false">&#8635;</a>`:""}
    <a href="#" title="Delete this job and all of its files" style="text-decoration:none;font-size:15px" onclick="delJob('${j.id}');return false">&#128465;&#65039;</a></span></div>`).join(""):"none yet";
@@ -2119,7 +2124,7 @@ async function openJob(id){
 }
 
 function shellHtml(j){
- return `<div class="card" id="jobcard"><h2>${j.name}
+ return `<div class="card" id="jobcard"><h2>${jobNameHtml(j.name)}
   <span class="badge" id="ph"></span><small id="eta"></small></h2>
  <progress id="prog" value="0" max="1"></progress>
  <div class="row" id="actions" style="margin-top:8px"></div>
