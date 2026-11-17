@@ -3970,6 +3970,8 @@ def render_hdr(src, dst, detections, cum, bands, fps, pad, mode,
             try:
                 if pr is enc:
                     pr.stdin.close()
+                else:
+                    pr.stdout.close()
             except Exception:
                 pass
             pr.terminate()
