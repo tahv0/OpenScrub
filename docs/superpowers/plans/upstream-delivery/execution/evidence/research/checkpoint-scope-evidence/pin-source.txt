@@ -1,0 +1,1378 @@
+
+=== 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub.py:733-754 ===
+733: class Detection:
+734:     t_start: float
+735:     t_end: float
+736:     cbox: tuple          # box in CONTENT coordinates (x1,y1,x2,y2)
+737:     category: str
+738:     text: str
+739:     confidence: float
+740:     aoff: tuple = (0.0, 0.0)   # cumulative offset when detected (drift anchor)
+741:     last_seen: float = 0.0     # time of last positive sighting (t_end incl. hold)
+742:     dense: bool = False        # per-frame dense-face detection: never merged
+743:                                # across positions (it tracks a moving face)
+744:     track: int = -1            # dense detections of the same physical object
+745:                                # share a track id, so review shows ONE item
+746:                                # per face instead of hundreds of frames
+747:     person: int = -1           # face tracks clustered by facial IDENTITY
+748:                                # (SFace embeddings): one review decision per
+749:                                # PERSON, applied to all their appearances
+750:     poly: tuple = ()           # silhouette contour(s) from a segmentation
+751:                                # model, points NORMALIZED to cbox (0..1) —
+752:                                # render blurs ONLY inside them (person
+753:                                # category); empty = plain box redaction
+754: 
+
+=== 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub.py:1250-1274 ===
+1250:         self.cum = (0.0, 0.0)
+1251:         self.win = None
+1252:         self.inv_scale = 1.0
+1253: 
+1254:     def _prep(self, frame):
+1255:         h, w = frame.shape[:2]
+1256:         scale = self.width / w
+1257:         small = cv2.resize(frame, (self.width, max(2, int(h * scale))))
+1258:         gray = cv2.cvtColor(small, cv2.COLOR_BGR2GRAY).astype(np.float32)
+1259:         if self.win is None or self.win.shape != gray.shape:
+1260:             self.win = cv2.createHanningWindow(gray.shape[::-1], cv2.CV_32F)
+1261:         self.inv_scale = 1.0 / scale
+1262:         return gray
+1263: 
+1264:     def step(self, frame):
+1265:         gray = self._prep(frame)
+1266:         if self.key is None:
+1267:             self.key = gray
+1268:             self.prev = gray
+1269:             return self.cum
+1270: 
+1271:         h, w = gray.shape
+1272:         MAX_STEP = 250.0   # px/frame: above any smooth scroll. Bigger implied
+1273:                            # jumps are treated as content REPLACEMENT (dialog,
+1274:                            # page load) — blur boxes must NOT move for those.
+
+=== 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub.py:1391-1415 ===
+1391: def smooth_dense_tracks(dets, fps, video, cum=None, win_start=0.0, cb=None):
+1392:     """Make each dense track leak-free from true first appearance to exit.
+1393: 
+1394:     Dense samples are instantaneous per-frame boxes; three gaps remain
+1395:     between them and continuous cover of a moving object:
+1396:       1. detector flicker — frames mid-track where the detector missed the
+1397:          object. The box is INTERPOLATED between the surrounding samples, so
+1398:          the blur moves with the object instead of vanishing (or hanging at
+1399:          a stale position).
+1400:       2. onset — the detector needs a few clear frames before its first hit,
+1401:          exposing the object as it enters. The first sample's pixels are
+1402:          template-matched BACKWARD through the file (the same visual match
+1403:          deep backtrack uses) and synthetic samples are added down to the
+1404:          earliest frame that still matches, plus a short unconditional
+1405:          grace pad below detection threshold.
+1406:       3. exit — mirror grace pad after the last sample.
+1407:     Every addition is a dense sample on the same track id, so review still
+1408:     shows one card per physical object. Fail closed: only ever adds cover.
+1409:     Returns (interpolated_gaps, leadin_samples, leadin_seconds)."""
+1410:     GRACE = 0.25        # s of unconditional pad at track onset/exit
+1411:     CHAIN_MAX = 0.75    # s: longest flicker gap interpolated (matches the
+1412:     #                     assign_dense_tracks max_gap, with slack)
+1413:     LEAD_MAX = 4.0      # s: farthest the onset walk seeks back
+1414:     SCALE = 0.5         # match deep backtrack's working resolution
+1415:     THR = 0.58          # TM_CCOEFF_NORMED bar (same as face backtrack)
+
+=== 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub.py:1443-1464 ===
+1443:     if cap is not None and not cap.isOpened():
+1444:         cap = None
+1445: 
+1446:     _fps_g = (cap.get(cv2.CAP_PROP_FPS) or 30.0) if cap is not None else 30.0
+1447: 
+1448:     # The onset walks probe BACKWARD from each track's first sample, one
+1449:     # POS_MSEC seek per probe. On a normal file each seek decodes from a
+1450:     # nearby keyframe; a real 4K export with ONE keyframe (common from
+1451:     # screen recorders and render pipelines) decoded the file from frame
+1452:     # ZERO on every probe — ~37 probes x 75 tracks made a 10-second clip
+1453:     # take hours. Every track's onset is known BEFORE the walks start, so
+1454:     # decode the video ONCE, sequentially (the renderer's access pattern,
+1455:     # correct and fast on any file), caching half-scale grays only for
+1456:     # frames inside some track's walk span and evicting behind the
+1457:     # onset-sorted processing order. Memory stays bounded by one span
+1458:     # (~LEAD_MAX seconds of half-scale grays), not the file.
+1459:     gray_cache = {}
+1460:     _seq = {"pos": 0}
+1461:     _span_lo = {}                # frame index -> lowest span start needing it
+1462:     if cap is not None and tracks:
+1463:         for samples in tracks.values():
+1464:             t0 = min(d.t_start for d in samples)
+
+=== 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub.py:1896-1905 ===
+1896: def _seek_cap(cap, frame_idx, fps):
+1897:     """Position cap so the NEXT read() returns frame_idx — VERIFIED via
+1898:     _grab_frame's PTS check (a bare cap.set can land seconds early on
+1899:     some builds and every frame decoded after it is then mislabeled).
+1900:     Returns False when the position cannot be reached."""
+1901:     frame_idx = max(0, int(frame_idx))
+1902:     if frame_idx == 0:
+1903:         return bool(cap.set(cv2.CAP_PROP_POS_FRAMES, 0.0))
+1904:     fps = fps or 30.0
+1905:     return _grab_frame(cap, (frame_idx - 1) / fps, fps) is not None
+
+=== 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub.py:2964-2974 ===
+2964:         d.last_seen = d.t_start
+2965:         if getattr(d, 'dense', False):
+2966:             merged.append(d)
+2967:             continue
+2968:         if not getattr(d, "dense", False):
+2969:             # dense samples keep their sub-frame hold: stamping them with the
+2970:             # multi-second OCR hold leaves every PAST position blurred for
+2971:             # `hold` seconds — a trail of stale boxes marching away from a
+2972:             # moving face. Their continuity across detector flicker and the
+2973:             # onset gap is handled per-track by smooth_dense_tracks().
+2974:             d.t_end = d.t_start + hold
+
+=== 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub.py:6049-6060 ===
+6049:     return h.hexdigest()
+6050: 
+6051: 
+6052: def _settings_dict(args):
+6053:     skip = {"video", "output", "report", "from_report", "batch", "config",
+6054:             "_report_input"}
+6055:     out = {k: v for k, v in vars(args).items()
+6056:            if k not in skip and isinstance(v, (str, int, float, bool, list,
+6057:                                                tuple, type(None)))}
+6058:     mm = getattr(args, "mode_map", None)
+6059:     if isinstance(mm, dict) and mm:
+6060:         out["mode_map"] = ",".join(f"{k}={v}" for k, v in sorted(mm.items()))
+
+=== 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub.py:6285-6346 ===
+6285: 
+6286: def write_report(path, args, state, output_path=None, publisher=None):
+6287:     prov = {
+6288:         "tool": "openscrub", "version": VERSION,
+6289:         "timestamp": datetime.datetime.now().astimezone().isoformat(),
+6290:         "input": os.path.abspath(args.video),
+6291:         "input_sha256": state.get("input_sha256"),
+6292:         "original_input": (os.path.abspath(args.original_video)
+6293:                            if getattr(args, "original_video", None) else None),
+6294:         "vfr_normalized": bool(getattr(args, "original_video", None)),
+6295:         "hdr_tonemapped": bool(getattr(args, "hdr_tonemapped", False)),
+6296:         "hdr_output": bool(getattr(args, "hdr_source", None)),
+6297:         "metadata_stripped": True,   # renders pass -map_metadata -1
+6298:         "zones": getattr(args, "zones_data", None),
+6299:         "windows": getattr(args, "windows_data", None),
+6300:         "settings": _settings_dict(args),
+6301:     }
+6302:     if output_path and os.path.exists(output_path):
+6303:         prov["output"] = os.path.abspath(output_path)
+6304:         prov["output_sha256"] = sha256_file(output_path)
+6305:     source = state.get("source_report")
+6306:     if source is not None:
+6307:         # A render consumes enabled Detection objects, but publishes the full
+6308:         # review document: Keep choices, row positions and unknown fields are
+6309:         # user data, not a serialization of the render subset.
+6310:         doc = dict(source)
+6311:         previous = dict(source.get("provenance", {}))
+6312:         settings = dict(previous.get("settings", {}))
+6313:         settings.update(prov["settings"])
+6314:         prov["settings"] = settings
+6315:         # Output hashes/paths must describe this render, never an older one.
+6316:         previous.pop("output", None)
+6317:         previous.pop("output_sha256", None)
+6318:         previous.update(prov)
+6319:         doc["provenance"] = previous
+6320:     else:
+6321:         doc = {
+6322:             "provenance": prov,
+6323:             "render_state": {
+6324:                 "fps": state["fps"],
+6325:                 "cum": [[round(x, 1), round(y, 1)] for x, y in state["cum"]],
+6326:                 "bands": [[round(x, 1), round(y, 1)] for x, y in state["bands"]],
+6327:             },
+6328:             "detections": ([dict(asdict(d), enabled=True)
+6329:                             for d in state["detections"]]
+6330:                            + [dict(asdict(d), enabled=False, zone_dropped=True)
+6331:                               for d in state.get("zdropped", [])]),
+6332:         }
+6333:         if state.get("audio_suggestions"):
+6334:             doc["audio_suggestions"] = state["audio_suggestions"]
+6335:         if state.get("audio_transcript"):
+6336:             doc["audio_transcript"] = state["audio_transcript"]
+6337:     aspans = getattr(args, "audio_spans", None)
+6338:     if ((source is None and aspans)
+6339:             or (source is not None and state.get("audio_redactions_overridden"))):
+6340:         # An explicit empty list clears saved spans. Otherwise preserve the raw
+6341:         # saved representation, including additive fields on individual spans.
+6342:         doc["audio_redactions"] = [
+6343:             {"t0": a, "t1": b, "mode": m} for a, b, m in (aspans or [])]
+6344:     # Construction and output hashing precede an optional caller-owned final
+6345:     # publication boundary. CLI/GUI and old callback callers keep atomic bytes.
+6346:     (publisher or atomic_report)(path, doc)
+
+=== 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub.py:6510-6529 ===
+6510: def normalize_vfr(args, cb):
+6511:     """Intake normalization: VFR input is transcoded to CFR (frame->time
+6512:     mapping assumes CFR); HDR input additionally gets a tone-mapped SDR
+6513:     BT.709 copy for SCANNING (detectors are 8-bit, and naive decode washes
+6514:     colors out). When the output should stay HDR (--hdr-output match, the
+6515:     default), a 10-bit CFR HDR source is kept for the render and
+6516:     args.hdr_source/hdr_encoder/hdr_tags are set. Reuses NVENC when
+6517:     available. No-op for CFR SDR input."""
+6518:     if getattr(args, "no_vfr_fix", False) or getattr(args, "vfr", "auto") == "ignore":
+6519:         return
+6520:     is_vfr, avg = probe_vfr(args.video)
+6521:     is_hdr, hdesc = probe_hdr(args.video)
+6522:     if is_hdr and not (_ffmpeg_has("zscale") and _ffmpeg_has("tonemap")):
+6523:         cb.log(f"      NOTE: input looks HDR ({hdesc}) but this ffmpeg build "
+6524:                "lacks the zscale/tonemap filters — processing without tone "
+6525:                "mapping; colors may look washed out in the output.")
+6526:         is_hdr = False
+6527:     if not is_vfr and not is_hdr:
+6528:         return
+6529:     target = int(round(avg)) if avg and 10 <= avg <= 120 else 30
+
+=== 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub.py:7360-7369 ===
+7360:         args.ignore_regions = [
+7361:             (r[0] * vw, r[1] * vh, r[2] * vw, r[3] * vh)
+7362:             if max(r) <= 1.0 else tuple(r)
+7363:             for r in args.ignore_regions]
+7364:     global_zones_px = (zones_to_pixels(args.zones_data, vw, vh)
+7365:                        if getattr(args, "zones_data", None) else None)
+7366:     duration = total / fps if fps else 0
+7367:     win_start = max(0.0, float(getattr(args, "skip_start", 0) or 0))
+7368:     win_end = duration - max(0.0, float(getattr(args, "skip_end", 0) or 0))
+7369:     # Multiple detection windows ("a-b,c-d"): scan ONLY those ranges. The
+
+=== 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub.py:7592-7668 ===
+7592:     idx = 0
+7593:     dense_now = []
+7594:     # Fast-skip: when scroll tracking is off (camera footage, face/plate/
+7595:     # manual jobs — exactly the "one person 16 minutes in" case), frames
+7596:     # before the detection window carry no information we need, so SEEK past
+7597:     # them instead of decoding them. cum/bands get zero rows for the skipped
+7598:     # indices (render min-guards its lookups). With tracking ON the frames
+7599:     # must be decoded sequentially — offsets accumulate — so no skip there.
+7600:     if win_start > 1.0 and not track_on:
+7601:         skip_n = max(0, int(win_start * fps) - 1)
+7602:         if _seek_cap(cap, skip_n, fps):
+7603:             cum.extend([(0.0, 0.0)] * skip_n)
+7604:             bands.extend([(0.0, 0.0)] * skip_n)
+7605:             idx = skip_n
+7606:             cb.log(f"      fast-skip: jumped straight to {win_start:.1f}s — "
+7607:                    f"{skip_n} frame(s) before the window are not decoded")
+7608:         else:
+7609:             cap.release()
+7610:             cap = cv2.VideoCapture(args.video)  # unseekable: decode it all
+7611:             cb.log("      fast-skip unavailable on this file — decoding "
+7612:                    "from the start")
+7613:     while True:
+7614:         if idx % 30 == 0 and cb.cancelled():
+7615:             cap.release()
+7616:             raise PipelineCancelled()
+7617:         ok, frame = cap.read()
+7618:         if not ok:
+7619:             break
+7620:         cx, cy = tracker.step(frame) if track_on else (0.0, 0.0)
+7621:         cum.append((cx, cy))
+7622: 
+7623:         t_now = idx / fps
+7624:         if not any(w0 <= t_now <= w1 for w0, w1 in dwin):
+7625:             # outside every detection window: no scans, no safety bands
+7626:             # (the user has declared these spans PII-free)
+7627:             if not track_on:
+7628:                 nxt = next((w0 for w0, w1 in dwin if w0 > t_now), None)
+7629:                 if nxt is None:
+7630:                     # past the last window: stop decoding the tail entirely
+7631:                     cb.log(f"      fast-stop: last window ended at "
+7632:                            f"{win_end:.1f}s — the rest of the video is "
+7633:                            "not decoded")
+7634:                     break
+7635:                 if nxt - t_now > 1.5:
+7636:                     # gap between windows: seek instead of decoding it
+7637:                     # (verified — a lying seek would mislabel every
+7638:                     # detection after the jump; unseekable → keep
+7639:                     # decoding sequentially, just without scanning)
+7640:                     tgt = max(idx + 1, int(nxt * fps) - 1)
+7641:                     if _seek_cap(cap, tgt, fps):
+7642:                         bands.append((0.0, 0.0))
+7643:                         cum.extend([(0.0, 0.0)] * (tgt - len(cum)))
+7644:                         bands.extend([(0.0, 0.0)] * (tgt - len(bands)))
+7645:                         idx = tgt
+7646:                         cb.log(f"      fast-skip: jumped {t_now:.1f}s → "
+7647:                                f"{nxt:.1f}s (gap between windows not "
+7648:                                "decoded)")
+7649:                         continue
+7650:                     # jump failed and may have consumed frames: reopen at
+7651:                     # a KNOWN position and keep decoding sequentially
+7652:                     cap.release()
+7653:                     cap = cv2.VideoCapture(args.video)
+7654:                     if not _seek_cap(cap, idx + 1, fps):
+7655:                         break
+7656:             scan_cx, scan_cy = cx, cy
+7657:             bands.append((0.0, 0.0))
+7658:             idx += 1
+7659:             continue
+7660:         small = (cv2.resize(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY), None,
+7661:                             fx=BT_SCALE, fy=BT_SCALE) if bt_on else None)
+7662:         if idx % max(1, dense_stride) == 0:
+7663:             dense_now = []      # latest dense boxes, drawn on the preview
+7664:         face_now = []           # this frame's face boxes (head dedupe)
+7665:         person_rows = None      # person inference shared with head-blur
+7666:         # dense face detection: find faces on THIS frame at their true screen
+7667:         # position, independent of the OCR scan cadence — per-frame
+7668:         # re-detection (not tracking), so a face moving fast across the frame
+
+=== 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub.py:8128-8143 ===
+8128:                                              round(tr["conf"], 3), (cx, cy)))
+8129:                         tr["last_emit"] = t_now2
+8130:                 elif t_now2 - tr["last_ok"] > 0.8:
+8131:                     face_tracks[:] = [x for x in face_tracks if x is not tr]
+8132:         if bt_on:
+8133:             bt_buf.append((idx, cx, cy, small))
+8134:         idx += 1
+8135:     cap.release()
+8136: 
+8137:     if memory is not None:
+8138:         extra = reverse_pass(scans, memory, cats, namer,
+8139:                              lenient=72 if getattr(args, "paranoid", False) else 76)
+8140:         if args.ignore_regions:
+8141:             extra = [d for d in extra if not in_ignore_region(
+8142:                 (d.cbox[0] + d.aoff[0], d.cbox[1] + d.aoff[1],
+8143:                  d.cbox[2] + d.aoff[0], d.cbox[3] + d.aoff[1]),
+
+=== 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub.py:8298-8334 ===
+8298:                                   gap_check=_gap_check)
+8299:     zdropped = merge_detections(zdrop_raw, hold=hold, scans=scans,
+8300:                                 bridge_gap=args.bridge_gap, fuzz=_fuzz,
+8301:                                 gap_check=_gap_check) if zdrop_raw else []
+8302:     if _gap_cap["cap"] is not None:
+8303:         _gap_cap["cap"].release()
+8304:     n_tracks = assign_dense_tracks(detections)
+8305:     if n_tracks:
+8306:         cb.log(f"      dense tracking: {sum(1 for d in detections if d.dense)}"
+8307:                f" per-frame samples grouped into {n_tracks} track(s) "
+8308:                "for review")
+8309:         cb.log(f"      dense continuity: smoothing {n_tracks} track(s) — "
+8310:                "interpolating flicker gaps and walking each onset back "
+8311:                "through the video (the slow part of a dense scan)…")
+8312:         n_gaps, n_lead, lead_s = smooth_dense_tracks(
+8313:             detections, fps, args.video, cum=cum, win_start=win_start,
+8314:             cb=cb)
+8315:         if n_gaps or n_lead or lead_s:
+8316:             cb.log(f"      dense continuity: {n_gaps} flicker gap(s) "
+8317:                    f"interpolated; onsets walked back {lead_s:.2f}s total "
+8318:                    f"({n_lead} pre-detection sample(s) matched in the file)")
+8319:         try:
+8320:             n_emb, n_people = group_persons(detections, args.video, cb)
+8321:             if n_people:
+8322:                 cb.log(f"      person grouping: {n_emb} face track(s) "
+8323:                        f"identity-matched into {n_people} person(s) — "
+8324:                        "review shows one card per person")
+8325:         except Exception as e:
+8326:             cb.log(f"      person grouping unavailable ({e}) — review "
+8327:                    "shows per-track cards instead")
+8328:     if track_jobs:
+8329:         # user-marked objects from the Scan Setup editor: template-track
+8330:         # each drawn box through its window (both directions from the frame
+8331:         # it was drawn on) and add the path as a dense manual track — one
+8332:         # review card per object, blurred wherever it went. Same recipe as
+8333:         # the review-stage "Track object" tool.
+8334:         cb.log(f"      tracked objects: following {len(track_jobs)} "
+
+=== 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub.py:8423-8449 ===
+8423:                + ", ".join(f"'{k}'x{v}" for k, v in top))
+8424: 
+8425:     bands, _bsup = _suppress_textless_bands(bands, len(raw))
+8426:     if _bsup:
+8427:         cb.log("      safety bands: suppressed — the scan found no text "
+8428:                "anywhere, so edge bands (which exist to cover unscanned "
+8429:                "text) could only be camera-motion artifacts")
+8430: 
+8431:     audio_sugg, audio_tx = [], []
+8432:     if getattr(args, "audio_pii", False):
+8433:         # spoken names/numbers/addresses leak PII no matter how good the
+8434:         # visual blur is — transcribe locally and suggest mute spans
+8435:         audio_sugg, audio_tx = transcribe_audio_pii(
+8436:             getattr(args, "original_video", None) or args.video, cats, cb,
+8437:             model_size=getattr(args, "audio_pii_model", "base") or "base",
+8438:             nlp=getattr(namer, "nlp", None) if namer else None,
+8439:             custom_res=custom_res, phrases=phrases)
+8440: 
+8441:     return {"fps": fps, "cum": cum, "bands": bands, "detections": detections,
+8442:             "zdropped": zdropped, "audio_suggestions": audio_sugg,
+8443:             "audio_transcript": audio_tx,
+8444:             "input_sha256": sha256_file(args.video),
+8445:             "stats": {"scans": n_scans, "raw_hits": len(raw),
+8446:                       "regions": len(detections), "recalls": n_recalled,
+8447:                       "remembered": len(memory.items) if memory else 0,
+8448:                       "zone_dropped": zone_dropped}}
+8449: 
+
+=== 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub.py:3993-4006 ===
+3993:         u = buf[ysz:ysz + csz].reshape(h // 2, w // 2)
+3994:         v = buf[ysz + csz:].reshape(h // 2, w // 2)
+3995:         t = idx / fps
+3996:         ox, oy = cum[min(idx, len(cum) - 1)]
+3997: 
+3998:         act = [d for d in buckets.get(int(t), [])
+3999:                if d.t_start - 0.01 <= t <= d.t_end + 0.01]
+4000:         for d in _dedupe_dense(act):
+4001:             drift = min(24.0, 0.05 * (abs(ox - d.aoff[0]) + abs(oy - d.aoff[1])))
+4002:             px = pad + drift
+4003:             if d.poly:
+4004:                 _blur_silhouette_yuv10(
+4005:                     y, u, v, d.cbox[0] + ox - px, d.cbox[1] + oy - px,
+4006:                     d.cbox[2] + ox + px, d.cbox[3] + oy + px,
+
+=== 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub.py:4205-4218 ===
+4205:                 break                       # keep-window over: stop encoding
+4206:         ox, oy = cum[min(idx, len(cum) - 1)]
+4207: 
+4208:         # 1. tracked PII boxes, translated by scroll offset
+4209:         act = [d for d in buckets.get(int(t), [])
+4210:                if d.t_start - 0.01 <= t <= d.t_end + 0.01]
+4211:         for d in _dedupe_dense(act):
+4212:             # drift allowance: residual tracking error grows (slowly) with
+4213:             # distance scrolled since detection — expand the box to cover it
+4214:             drift = min(24.0, 0.05 * (abs(ox - d.aoff[0]) + abs(oy - d.aoff[1])))
+4215:             px = pad + drift
+4216:             x1 = d.cbox[0] + ox - px
+4217:             y1 = d.cbox[1] + oy - px
+4218:             x2 = d.cbox[2] + ox + px
+
+=== 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub_web.py:799-900 ===
+799: _ACTIVE_PHASES = ("queued", "scanning", "rendering", "queued_render")
+800: 
+801: 
+802: def _report_current(job):
+803:     """Identity lookup only; caller owns report_lock and a file lifetime.
+804: 
+805:     Admission takes VAULT_LOCK -> JOBS_LOCK and releases both before this
+806:     boundary. Never acquire VAULT_LOCK (including lease release) inside it.
+807:     """
+808:     with JOBS_LOCK:
+809:         if not any(current is job for current in JOBS.values()):
+810:             abort(404)
+811:         if FILES.initialize(job).closed:
+812:             abort(409, "job is being deleted")
+813: 
+814: 
+815: def _edit_gate(job):
+816:     _report_current(job)
+817:     if FILES.initialize(job).active is not None or job.get("phase") in _ACTIVE_PHASES:
+818:         abort(409, "job work is queued, running or still cleaning up")
+819: 
+820: 
+821: def _operation_valid(job, owner):
+822:     files = FILES.initialize(job)
+823:     with JOBS_LOCK:
+824:         return (any(current is job for current in JOBS.values()) and not files.closed
+825:                 and owner.operation is not None
+826:                 and files.operation is owner.operation)
+827: 
+828: 
+829: def _begin_operation(job, owner):
+830:     files = FILES.initialize(job)
+831:     owner.operation = threading.Event()
+832:     files.operation = owner.operation
+833:     job["cancel"] = owner.operation
+834:     files.active = owner
+835: 
+836: 
+837: def _finish_operation(job, owner):
+838:     # Release lifecycle ownership outside the report transaction. Keep the
+839:     # mutation gate closed until actual worker cleanup/release has completed.
+840:     owner.release()
+841:     if job is None:  # a cancelled ticket's job may already have been deleted
+842:         return
+843:     files = FILES.initialize(job)
+844:     with files.report_lock:
+845:         if files.active is owner:
+846:             files.active = None
+847: 
+848: 
+849: def _reserve_queue_locked(job, action, prepared):
+850:     """Transfer a PREPARED lifetime under report_lock, without vault nesting."""
+851:     _report_current(job)
+852:     _begin_operation(job, prepared)
+853:     with JOBS_LOCK:
+854:         job["qgen"] = job.get("qgen", 0) + 1
+855:         gen = job["qgen"]
+856:         FILES.initialize(job).queued[gen] = prepared
+857:     job["phase"] = "queued_render" if action == "render" else "queued"
+858:     return job["id"], action, gen, prepared
+859: 
+860: 
+861: def _prepare_work(job, action):
+862:     # Source selection can reserve related jobs and release provisional leases;
+863:     # all of that must finish before taking report_lock.
+864:     prepared = _own_files(job, work=True)
+865:     try:
+866:         if action == "render":
+867:             _select_render_input(job, prepared)
+868:         return prepared
+869:     except BaseException:
+870:         prepared.release()
+871:         raise
+872: 
+873: 
+874: def enqueue(job, action, ticket=None):
+875:     if ticket is None:
+876:         prepared = _prepare_work(job, action)
+877:         try:
+878:             with FILES.initialize(job).report_lock:
+879:                 # Intake may have been cancelled while upload was writing.
+880:                 # Queueing its eventual completed upload must not revive it.
+881:                 if not job["cancel"].is_set():
+882:                     ticket = _reserve_queue_locked(job, action, prepared)
+883:         finally:
+884:             if ticket is None:
+885:                 prepared.release()
+886:         if ticket is None:
+887:             return
+888:     try:
+889:         WORK_Q.put(ticket)
+890:     except BaseException:
+891:         files = FILES.initialize(job)
+892:         with files.report_lock:
+893:             with JOBS_LOCK:
+894:                 files.queued.pop(ticket[2], None)
+895:             if _operation_valid(job, ticket[3]):
+896:                 job["phase"] = "error"
+897:                 job["error"] = "could not queue job work"
+898:         _finish_operation(job, ticket[3])
+899:         raise
+900: 
+
+=== 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub_web.py:954-996 ===
+954: def _run_job(job, action, owner=None):
+955:     if owner is None:
+956:         owner = _prepare_work(job, action)
+957:         try:
+958:             with FILES.initialize(job).report_lock:
+959:                 _begin_operation(job, owner)
+960:             return _run_job(job, action, owner)
+961:         finally:
+962:             _finish_operation(job, owner)
+963:     jid = job["id"]
+964:     files = FILES.initialize(job)
+965:     with files.report_lock:
+966:         if owner.operation is None:  # compatibility with old queue entries
+967:             _begin_operation(job, owner)
+968:         if not _operation_valid(job, owner):
+969:             return
+970:         job["phase"] = "scanning" if action == "scan" else "rendering"
+971:     cb = WebCallbacks(job, owner.operation)
+972:     def publish_report(path, doc):
+973:         with files.report_lock:
+974:             if not _operation_valid(job, owner) or owner.operation.is_set():
+975:                 raise openscrub.PipelineCancelled()
+976:             atomic_report(path, doc)
+977:     cb.publish_report = publish_report
+978:     source = owner.source if owner is not None else job["video"]
+979:     try:
+980:         if action == "scan":
+981:             job["log"].append("— scan started —")
+982:             args = build_args(dict(job, video=source))
+983:             state = openscrub.run_scan(args, cb)
+984:             openscrub.write_report(os.path.join(job["dir"], "report.json"),
+985:                                   args, state, publisher=cb.publish_report)
+986:             with files.report_lock:
+987:                 if not _operation_valid(job, owner):
+988:                     return
+989:                 job["stats"] = state["stats"]
+990:             try:
+991:                 prov = _load_job_report(job).get("provenance", {})
+992:                 if (prov.get("vfr_normalized")
+993:                         and os.path.exists(prov.get("input", ""))):
+994:                     _update_job_source(job, prov["input"], owner)
+995:                     job["log"].append(
+996:                         "using CFR-normalized file for previews/thumbnails")
+
+=== 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub_web.py:1068-1119 ===
+1068:             next_owner = (_prepare_work(job, "render")
+1069:                           if job["options"].get("skip_review") else None)
+1070:             ticket = None
+1071:             try:
+1072:                 with files.report_lock:
+1073:                     if not _operation_valid(job, owner):
+1074:                         return
+1075:                     if next_owner is not None:
+1076:                         job["log"].append("review skipped — rendering all detections")
+1077:                         ticket = _reserve_queue_locked(job, "render", next_owner)
+1078:                     else:
+1079:                         job["phase"] = "review"
+1080:                     job["progress"] = 0.5
+1081:                     job["eta"] = None
+1082:             finally:
+1083:                 if next_owner is not None and ticket is None:
+1084:                     next_owner.release()
+1085:             if ticket is not None:
+1086:                 enqueue(job, "render", ticket)
+1087:         elif action == "render":
+1088:             if not owner.report_input:  # compatibility with older queue entries
+1089:                 _select_render_input(job, owner)
+1090:             args = build_args(dict(job, video=owner.source), for_render=True)
+1091:             args._report_input = owner.source
+1092:             res = openscrub.run_pipeline(args, cb)
+1093:             with files.report_lock:
+1094:                 if not _operation_valid(job, owner):
+1095:                     return
+1096:                 job["output"] = res["output"]
+1097:                 job["phase"] = "done"
+1098:                 job["progress"] = 1.0
+1099:                 job["eta"] = None
+1100:     except openscrub.PipelineCancelled:
+1101:         with files.report_lock:
+1102:             if _operation_valid(job, owner):
+1103:                 job["phase"] = "cancelled"
+1104:                 job["error"] = "cancelled by user"
+1105:     except BaseException as e:
+1106:         msg = str(e) or type(e).__name__
+1107:         if isinstance(e, SystemExit):
+1108:             msg = "the job stopped unexpectedly (exit %s)" % (e.code,)
+1109:         with files.report_lock:
+1110:             if _operation_valid(job, owner):
+1111:                 job["phase"] = "error"
+1112:                 job["error"] = msg
+1113:                 job["log"].append(f"ERROR: {msg}")
+1114:     finally:
+1115:         with files.report_lock:
+1116:             if _operation_valid(job, owner):
+1117:                 job["eta"] = None
+1118: 
+1119: 
+
+=== 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub_web.py:1414-1441 ===
+1414: @app.route("/api/jobs/<jid>/retry", methods=["POST"])
+1415: def job_retry(jid):
+1416:     """Re-run a failed or cancelled job's SCAN, reusing the file that is
+1417:     already on the server. Before this existed, the only path after an
+1418:     error was Start scan — which uploaded the same multi-GB file into a
+1419:     fresh job dir on every attempt until the disk filled (issue #16)."""
+1420:     job = JOBS.get(jid) or abort(404)
+1421:     prepared = _prepare_work(job, "scan")
+1422:     ticket = None
+1423:     try:
+1424:         video = prepared.source
+1425:         exists = bool(video and os.path.exists(video))
+1426:         with FILES.initialize(job).report_lock:
+1427:             _report_current(job)
+1428:             if (FILES.initialize(job).active is not None
+1429:                     or FILES.initialize(job).work > 1):
+1430:                 return jsonify({"error": "job work is still cleaning up"}), 409
+1431:             if job["phase"] not in ("error", "cancelled"):
+1432:                 return jsonify({"error": "only a failed or cancelled job can be retried"}), 409
+1433:             if not exists:
+1434:                 return jsonify({"error": "the job's video file is no longer on the server — start a new scan"}), 410
+1435:             job.update(error=None, output=None, progress=0.0, eta=None)
+1436:             job["log"].append("— retrying scan (reusing the file already on the server — nothing is re-uploaded) —")
+1437:             ticket = _reserve_queue_locked(job, "scan", prepared)
+1438:     finally:
+1439:         if ticket is None:
+1440:             prepared.release()
+1441:     enqueue(job, "scan", ticket)
+
+=== 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub_web.py:1468-1504 ===
+1468: @app.route("/api/jobs/<jid>/cancel", methods=["POST"])
+1469: def job_cancel(jid):
+1470:     """Cancel a job. The job the worker is RUNNING stops cooperatively at
+1471:     its next checkpoint. Any other active job (still queued, or orphaned by
+1472:     a worker that died) is cancelled on the spot — before, Cancel only set
+1473:     a flag the worker checks mid-scan, so a job the worker never picked up
+1474:     could never be cancelled (or deleted: delete refuses active jobs)."""
+1475:     job = JOBS.get(jid) or abort(404)
+1476:     files = FILES.initialize(job)
+1477:     operation = files.operation  # capture the operation this request cancels
+1478:     if operation is not None:
+1479:         operation.set()  # promptly signal compute, before waiting for report I/O
+1480:     released = []
+1481:     with files.report_lock:
+1482:         _report_current(job)
+1483:         if files.operation is not operation:
+1484:             # That attempt finished/replaced while this request waited. Do not
+1485:             # signal, invalidate or release a newer attempt's queue ownership.
+1486:             return jsonify({"ok": True})
+1487:         if operation is None:
+1488:             job["cancel"].set()  # idle/intake: no running compute to interrupt
+1489:         files.operation = None  # Event.clear cannot revive the captured attempt
+1490:         with JOBS_LOCK:
+1491:             released = list(files.queued.values())
+1492:             files.queued.clear()
+1493:             job["qgen"] = job.get("qgen", 0) + 1
+1494:         if files.active in released:
+1495:             files.active = None
+1496:         if job.get("phase") in _ACTIVE_PHASES:
+1497:             job.update(phase="cancelled", error="cancelled by user", eta=None)
+1498:             job["log"].append("— cancelled —")
+1499:         if job.get("trackbg", {}).get("state") == "running":
+1500:             job["trackbg"] = {"state": "done", "added": 0,
+1501:                               "error": "cancelled by user"}
+1502:     for lease in released:
+1503:         lease.release()
+1504:     return jsonify({"ok": True})
+
+=== 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub_web.py:1720-1762 ===
+1720: def job_save_edits(jid):
+1721:     job = JOBS.get(jid) or abort(404)
+1722:     edits = request.get_json(force=True)
+1723:     path = os.path.join(job["dir"], "report.json")
+1724:     with FILES.initialize(job).report_lock:
+1725:         _edit_gate(job)
+1726:         try:
+1727:             doc = _load_job_report(job)
+1728:         except FileNotFoundError:
+1729:             abort(404, "job report not found")
+1730:         enabled = edits.get("enabled", {})
+1731:         for i, d in enumerate(doc["detections"]):
+1732:             if str(i) in enabled:
+1733:                 d["enabled"] = bool(enabled[str(i)])
+1734:         for i, box in (edits.get("box_overrides") or {}).items():
+1735:             i = int(i)
+1736:             if 0 <= i < len(doc["detections"]) and len(box) == 4:
+1737:                 doc["detections"][i]["cbox"] = [float(v) for v in box]
+1738:         for i, span in (edits.get("time_overrides") or {}).items():
+1739:             i = int(i)
+1740:             if 0 <= i < len(doc["detections"]) and len(span) == 2:
+1741:                 t0, t1 = float(span[0]), float(span[1])
+1742:                 if t1 > t0 >= 0:
+1743:                     doc["detections"][i]["t_start"] = t0
+1744:                     doc["detections"][i]["t_end"] = t1
+1745:                     doc["detections"][i]["last_seen"] = min(
+1746:                         max(doc["detections"][i].get("last_seen", t0), t0), t1)
+1747:         rs = doc["render_state"]
+1748:         # Read identities from this transaction's latest raw document. Never
+1749:         # reconstruct creation from a row's mutable current geometry/choices.
+1750:         identified = {}
+1751:         for d in doc["detections"]:
+1752:             identity = d.get("manual_id")
+1753:             if isinstance(identity, str):
+1754:                 identified.setdefault(identity, []).append(d)
+1755:         for m in edits.get("manual", []):
+1756:             has_id = "manual_id" in m
+1757:             identity = m.get("manual_id")
+1758:             if has_id and (not isinstance(identity, str) or
+1759:                            re.fullmatch(r"[A-Za-z0-9._:-]{1,128}", identity) is None):
+1760:                 return jsonify(error="Invalid manual_id: expected 1–128 ASCII letters, digits or ._:-"), 400
+1761:             try:
+1762:                 t0 = float(m["t_start"]); t1 = float(m["t_end"])
+
+=== 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub_web.py:1780-1804 ===
+1780:                 rows = identified[identity]
+1781:                 if (len(rows) != 1 or not _valid_manual_creation(rows[0].get("manual_creation"))
+1782:                         or rows[0]["manual_creation"] != creation):
+1783:                     return jsonify(error="manual_id conflict: creation differs, is missing/invalid, or matches multiple rows"), 409
+1784:                 continue
+1785:             row = dict(creation, category="manual", text="user-drawn", confidence=1.0,
+1786:                        last_seen=t0, enabled=True)
+1787:             if has_id:
+1788:                 # Separate lists keep later indexed edits independent of creation.
+1789:                 row.update(manual_id=identity, manual_creation={
+1790:                     **creation, "cbox": list(creation["cbox"]), "aoff": list(creation["aoff"])})
+1791:                 identified[identity] = [row]
+1792:             doc["detections"].append(row)
+1793:         if "audio" in edits:
+1794:             # audio redaction spans (mute/bleep): stored in the report so the
+1795:             # --from-report render applies them and re-renders keep them
+1796:             doc["audio_redactions"] = [
+1797:                 {"t0": float(s["t0"]), "t1": float(s["t1"]),
+1798:                  "mode": (s.get("mode") if s.get("mode") in ("mute", "bleep")
+1799:                           else "mute")}
+1800:                 for s in (edits.get("audio") or [])
+1801:                 if float(s.get("t1", 0)) > float(s.get("t0", 0)) >= 0]
+1802:         atomic_report(path, doc)
+1803:         # suggest allowlisting any string whose EVERY instance was disabled —
+1804:         # the review just taught us it's a recurring false positive
+
+=== 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub_web.py:1884-1920 ===
+1884:                                     "larger box or a frame where it's clearer")
+1885:                     return
+1886:                 doc = _load_job_report(job)
+1887:                 rs = doc["render_state"]
+1888:                 fps = float(rs["fps"]) or 30.0
+1889:                 step = 2.0 / fps
+1890:                 tid = max([d.get("track", -1) for d in doc["detections"]
+1891:                            if isinstance(d.get("track", -1), int)] + [-1]) + 1
+1892:                 new = []
+1893:                 tcls = samples[0][4] if len(samples[0]) > 4 else None
+1894:                 label = ("tracked %s" % openscrub.COCO_NAMES[tcls]
+1895:                          if tcls is not None
+1896:                          and 0 <= tcls < len(openscrub.COCO_NAMES)
+1897:                          else "tracked object")
+1898:                 for s in samples:
+1899:                     t, b, score = s[0], s[1], s[2]
+1900:                     poly = s[3] if len(s) > 3 and s[3] else ()
+1901:                     fidx = min(int(t * fps), len(rs["cum"]) - 1)
+1902:                     ox, oy = rs["cum"][fidx]
+1903:                     new.append({
+1904:                         "t_start": t, "t_end": t + step * 1.2,
+1905:                         "cbox": [int(b[0] - ox), int(b[1] - oy),
+1906:                                  int(b[2] - ox), int(b[3] - oy)],
+1907:                         "category": "manual", "text": label,
+1908:                         "confidence": round(float(score), 3),
+1909:                         "aoff": [ox, oy], "last_seen": t,
+1910:                         "dense": True, "track": tid, "enabled": True,
+1911:                         "poly": [[[float(x), float(y)] for x, y in c]
+1912:                                  for c in poly]})
+1913:                 # grace pads: cover the sub-sample sliver at both ends
+1914:                 new[0]["t_start"] = max(0.0, new[0]["t_start"] - 0.25)
+1915:                 new[-1]["t_end"] += 0.25
+1916:                 doc["detections"].extend(new)
+1917:                 path = os.path.join(job["dir"], "report.json")
+1918:                 atomic_report(path, doc)
+1919:                 job["log"].append(
+1920:                     "      tracked object: %d position(s), %.1f-%.1fs "
+
+=== 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub_web.py:4445-4467 ===
+4445: def _rehydrate_jobs():
+4446:     """Re-register jobs found on disk after a restart. A job with a report
+4447:     is a reviewable job; one with an output file is a finished one — either
+4448:     way the person's work survives the server going down."""
+4449:     n = 0
+4450:     for jid in sorted(os.listdir(JOBS_DIR)):
+4451:         jdir = os.path.join(JOBS_DIR, jid)
+4452:         rep = os.path.join(jdir, "report.json")
+4453:         if not os.path.isdir(jdir):
+4454:             continue
+4455:         if os.path.exists(os.path.join(jdir, DELETE_MARKER)):
+4456:             # the user deleted this job but a file was still held open at
+4457:             # the time — finish the removal instead of resurrecting the
+4458:             # job as a zombie (restarts release whatever held the lock)
+4459:             _reap_job_dir(jdir, jid, retries=1)
+4460:             continue
+4461:         if jid in JOBS:
+4462:             continue
+4463:         if not os.path.exists(rep):
+4464:             # NO report: the scan never completed (crashed or the server
+4465:             # went down mid-scan). If the dir still holds an uploaded
+4466:             # input, surface it as a FAILED job instead of skipping it —
+4467:             # a skipped dir was an invisible orphan the UI could neither
+
+=== 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub_web.py:4505-4536 ===
+4505:             with JOBS_LOCK:
+4506:                 JOBS[jid] = job
+4507:             n += 1
+4508:             continue
+4509:         try:
+4510:             with open(rep, encoding="utf-8") as f:
+4511:                 prov = json.load(f).get("provenance", {})
+4512:             video = prov.get("input")
+4513:             if not video or not os.path.exists(video):
+4514:                 continue
+4515:             out = os.path.join(jdir, "output.mp4")
+4516:             has_out = os.path.exists(out)
+4517:             job = {
+4518:                 "id": jid, "dir": jdir, "video": video,
+4519:                 "name": os.path.basename(prov.get("original_input")
+4520:                                           or video),
+4521:                 "options": prov.get("settings", {}) or {},
+4522:                 "phase": "done" if has_out else "review",
+4523:                 "progress": 1.0 if has_out else 0.5,
+4524:                 "log": ["(recovered after server restart)"],
+4525:                 "error": None, "output": out if has_out else None,
+4526:                 "created": os.path.getmtime(jdir),
+4527:                 "cancel": threading.Event(), "stats": {},
+4528:             }
+4529:             try:
+4530:                 # original upload size, for the editor's duplicate-upload
+4531:                 # warning (prov input may be the normalized scan copy)
+4532:                 orig = next((os.path.join(jdir, "input" + e)
+4533:                              for e in sorted(MEDIA_EXTS)
+4534:                              if os.path.exists(
+4535:                                  os.path.join(jdir, "input" + e))), video)
+4536:                 job["size"] = os.path.getsize(orig)
+
+=== 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub_internal/reports.py:1-40 ===
+1: """Publish complete report JSON without truncating the previous report."""
+2: import json
+3: import os
+4: import tempfile
+5: 
+6: 
+7: def atomic_report(path, report) -> None:
+8:     """Stage private UTF-8 JSON beside *path*, sync, close, then replace it.
+9: 
+10:     A failure before replacement leaves the previous report intact and raises.
+11:     Readers opening the path see a complete old or new report on filesystems
+12:     supporting atomic replacement. This does not serialize read/apply/write
+13:     transactions or guarantee power-loss durability: the directory is not
+14:     fsynced, and filesystem/network storage guarantees vary. On Windows an open
+15:     destination may prevent replacement; that failure is propagated. Temporary
+16:     files use the vault's .tmp crash-cleanup convention. POSIX staging permissions
+17:     are 0600; Windows access restrictions also depend on the directory ACL.
+18:     """
+19:     path = os.path.abspath(path)
+20:     staged = None
+21:     try:
+22:         # NamedTemporaryFile creates exclusively with restrictive permissions.
+23:         with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8",
+24:                                          dir=os.path.dirname(path),
+25:                                          prefix=".report-", suffix=".tmp",
+26:                                          delete=False) as stream:
+27:             staged = stream.name
+28:             json.dump(report, stream, indent=1)
+29:             stream.flush()
+30:             os.fsync(stream.fileno())
+31:         # Close first: Windows cannot rename an open staging file.
+32:         os.replace(staged, path)
+33:     finally:
+34:         if staged is not None:
+35:             try:
+36:                 os.unlink(staged)
+37:             except OSError:
+38:                 # After replace the name is gone. On cleanup failure leave a
+39:                 # .tmp for vault crash cleanup without masking the write error.
+40:                 pass
+
+=== 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub_internal/lifetimes.py:1-76 ===
+1: """In-process web file ownership. Reserve/inspect only under the web guard.
+2: 
+3: Per-job state also owns the report transaction lock and operation identity.
+4: This does not coordinate other processes. A lifetime token may move to a queued task, thread, or WSGI iterable; release is idempotent.
+5: """
+6: 
+7: import threading
+8: 
+9: 
+10: class _JobFiles:
+11:     def __init__(self):
+12:         self.count = 0
+13:         self.work = 0
+14:         self.closed = False
+15:         self.queued = {}
+16:         self.tracker = None
+17:         # Initialized before a new/rehydrated job enters the registry. Never
+18:         # persisted: one stable transaction boundary per live job identity.
+19:         self.report_lock = threading.Lock()
+20:         self.operation = None
+21:         self.active = None
+22: 
+23: 
+24: class FileOwners:
+25:     def __init__(self, guard):
+26:         self.guard = guard
+27:         self.count = 0
+28: 
+29:     @staticmethod
+30:     def initialize(job):
+31:         return job.setdefault("_files", _JobFiles())
+32: 
+33:     def reserve(self, job=None, work=False):
+34:         state = self.initialize(job) if job is not None else None
+35:         self.count += 1
+36:         if state is not None:
+37:             state.count += 1
+38:             state.work += int(work)
+39:         return _Lease(self, state, work)
+40: 
+41: 
+42: class _Lease:
+43:     def __init__(self, owners, state, work):
+44:         self.owners, self.state, self.work = owners, state, work
+45:         self.released = False
+46:         self.related = []
+47:         self.source = None
+48:         self.report_input = False
+49:         self.operation = None
+50: 
+51:     def release_locked(self):
+52:         if self.released:
+53:             return
+54:         self.released = True
+55:         for lease in self.related:
+56:             lease.release_locked()
+57:         self.owners.count -= 1
+58:         if self.state is not None:
+59:             self.state.count -= 1
+60:             self.state.work -= int(self.work)
+61: 
+62:     def release(self):
+63:         with self.owners.guard:
+64:             self.release_locked()
+65: 
+66:     def __enter__(self):
+67:         return self
+68: 
+69:     def __exit__(self, *exc):
+70:         self.release()
+71: 
+72: 
+73: class OwnedIterable:
+74:     """Keep the file open/owned through WSGI close, including early disconnect.
+75: 
+76:     Deliberately hide the server's file_wrapper optimization so every server
+
+=== 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub.py:3747-3780 ===
+3747: def apply_coverage(dets, coverage, cb=None):
+3748:     """Render-time coverage level for body-shaped redactions (dense
+3749:     'person' and tracked-object 'manual' samples).
+3750: 
+3751:     'tight' (default) keeps the silhouette masks — best looking, least
+3752:     protective: body build, height, and walking gait survive, and gait
+3753:     recognizers consume exactly the silhouette sequences it produces.
+3754:     'box' blurs the full detection box — hides body shape, but a box
+3755:     that bobs with every step still leaks cadence. 'concealed' is
+3756:     witness-grade: silhouettes dropped AND each track's box becomes the
+3757:     union of its neighbours within ±0.6s plus a 12% pad, so the cover
+3758:     GLIDES instead of bobbing — body outline, build, and step cadence
+3759:     are all destroyed. Returns a NEW list (originals untouched: the
+3760:     report keeps tight samples so a re-render can change coverage)."""
+3761:     if coverage not in ("box", "concealed"):
+3762:         return dets
+3763:     out, per_track = [], {}
+3764:     for d in dets:
+3765:         if getattr(d, "dense", False) and d.category in ("person", "manual"):
+3766:             c = copy.copy(d)
+3767:             c.poly = ()
+3768:             out.append(c)
+3769:             if coverage == "concealed" and getattr(d, "track", -1) >= 0:
+3770:                 per_track.setdefault(c.track, []).append(c)
+3771:         else:
+3772:             out.append(d)
+3773:     for ds in per_track.values():
+3774:         ds.sort(key=lambda x: x.t_start)
+3775:         ts = [x.t_start for x in ds]
+3776:         boxes = [x.cbox for x in ds]
+3777:         n = len(ds)
+3778:         lo = 0
+3779:         new = []
+3780:         for i in range(n):
+
+=== 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub.py:6360-6386 ===
+6360:     if isinstance(doc, list):
+6361:         rows, state, prov = doc, None, {}
+6362:     else:
+6363:         rows, state, prov = doc.get("detections", []), doc.get("render_state"), \
+6364:             doc.get("provenance", {})
+6365:     dets = []
+6366:     for r in rows:
+6367:         if not r.get("enabled", True):
+6368:             continue
+6369:         dets.append(Detection(
+6370:             t_start=float(r["t_start"]), t_end=float(r["t_end"]),
+6371:             cbox=tuple(r["cbox"]), category=r["category"], text=r["text"],
+6372:             confidence=float(r.get("confidence", 1.0)),
+6373:             aoff=tuple(r.get("aoff", (0.0, 0.0))),
+6374:             last_seen=float(r.get("last_seen", r["t_start"])),
+6375:             # Preserve grouping in the enabled subset used by the renderer.
+6376:             dense=bool(r.get("dense", False)),
+6377:             track=int(r.get("track", -1)),
+6378:             person=int(r.get("person", -1)),
+6379:             poly=tuple(copy.deepcopy(r.get("poly") or ()))))
+6380:     return dets, state, prov
+6381: 
+6382: 
+6383: # ----------------------------------------------------------------------------
+6384: # Variable frame rate (VFR) handling
+6385: # ----------------------------------------------------------------------------
+6386: 
+
+=== 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub_web.py:1538-1610 ===
+1538:                     "width": w_, "height": h_})
+1539: 
+1540: 
+1541: @app.route("/api/jobs/<jid>/detections")
+1542: def job_detections(jid):
+1543:     job = JOBS.get(jid) or abort(404)
+1544:     doc = _load_job_report(job)
+1545:     items = []
+1546:     for i, d in enumerate(doc["detections"]):
+1547:         items.append({"i": i, "category": d["category"], "text": d["text"],
+1548:                       "t_start": d["t_start"], "t_end": round(d["t_end"], 2),
+1549:                       "enabled": d.get("enabled", True),
+1550:                       "track": d.get("track", -1),
+1551:                       "person": d.get("person", -1),
+1552:                       "confidence": d.get("confidence", 0),
+1553:                       "zone_dropped": bool(d.get("zone_dropped"))})
+1554:     return jsonify({"detections": items,
+1555:                     "fps": doc["render_state"]["fps"],
+1556:                     "duration": len(doc["render_state"]["cum"]) /
+1557:                                 doc["render_state"]["fps"]})
+1558: 
+1559: 
+1560: @app.route("/api/jobs/<jid>/detframe/<int:i>")
+1561: def job_detframe(jid, i):
+1562:     """Full video frame at a real sighting of detection i, with its box
+1563:     outlined — the review lightbox."""
+1564:     job = JOBS.get(jid) or abort(404)
+1565:     doc = _load_job_report(job)
+1566:     d = doc["detections"][i]
+1567:     rs = doc["render_state"]
+1568:     tref = min(max(d.get("last_seen", d["t_start"]), d["t_start"]), d["t_end"])
+1569:     fidx = min(int(tref * rs["fps"]), len(rs["cum"]) - 1)
+1570:     ox, oy = rs["cum"][fidx]
+1571:     frame = _frame_at(job, tref, rs)
+1572:     if frame is None:
+1573:         abort(404)
+1574:     x1, y1 = int(d["cbox"][0] + ox), int(d["cbox"][1] + oy)
+1575:     x2, y2 = int(d["cbox"][2] + ox), int(d["cbox"][3] + oy)
+1576:     cv2.rectangle(frame, (x1 - 4, y1 - 4), (x2 + 4, y2 + 4), (0, 0, 255), 3)
+1577:     ok, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 84])
+1578:     from flask import Response
+1579:     return Response(buf.tobytes(), mimetype="image/jpeg")
+1580: 
+1581: 
+1582: @app.route("/api/jobs/<jid>/boxes_at")
+1583: def job_boxes_at(jid):
+1584:     """Active blur boxes (screen coords) at time t, plus the scroll offset so
+1585:     the client can convert edited boxes back to content coordinates."""
+1586:     job = JOBS.get(jid) or abort(404)
+1587:     doc = _load_job_report(job)
+1588:     rs = doc["render_state"]
+1589:     t = float(request.args.get("t", 0))
+1590:     fidx = min(int(t * rs["fps"]), len(rs["cum"]) - 1)
+1591:     ox, oy = rs["cum"][fidx]
+1592:     boxes = []
+1593:     want_all = request.args.get("all") == "1"
+1594:     for i, d in enumerate(doc["detections"]):
+1595:         if not (d["t_start"] - 0.01 <= t <= d["t_end"] + 0.01):
+1596:             continue
+1597:         if not want_all and not d.get("enabled", True):
+1598:             continue
+1599:         if True:
+1600:             boxes.append({"i": i, "category": d["category"],
+1601:                           "enabled": d.get("enabled", True),
+1602:                           "text": d.get("text", ""),
+1603:                           "t_start": d["t_start"], "t_end": d["t_end"],
+1604:                           "box": [d["cbox"][0] + ox, d["cbox"][1] + oy,
+1605:                                   d["cbox"][2] + ox, d["cbox"][3] + oy]})
+1606:     return jsonify({"t": t, "ox": ox, "oy": oy, "boxes": boxes})
+1607: 
+1608: 
+1609: @app.route("/api/jobs/<jid>/thumb/<int:i>")
+1610: def job_thumb(jid, i):
+
+=== 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub_web.py:3094-3106 ===
+3094: function beFilter(){
+3095:  BE.boxes=(BE.raw||[]).filter(b=>{
+3096:   const on=(b.i in EN)?EN[b.i]:b.enabled;   // live: review toggles apply here
+3097:   return on;
+3098:  }).map(b=>{
+3099:   let bb=b;
+3100:   if(BE.ov[b.i]){const o=BE.ov[b.i];
+3101:    bb={...b,box:[o[0]+BE.ox,o[1]+BE.oy,o[2]+BE.ox,o[3]+BE.oy]};}
+3102:   if(BE.times[b.i]){bb={...bb,t_start:BE.times[b.i][0],t_end:BE.times[b.i][1]};}
+3103:   return bb;
+3104:  });
+3105: }
+3106: function beDraw(){
+
+=== 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub_web.py:3141-3157 ===
+3141: }
+3142: function beApplyTimes(){
+3143:  if(BE.sel<0)return;
+3144:  const t0=+document.getElementById("beT0").value,
+3145:        t1=+document.getElementById("beT1").value;
+3146:  if(!(t1>t0&&t0>=0)){alert("'to' must be after 'from'.");return;}
+3147:  BE.times[BE.sel]=[t0,Math.min(t1,BE.dur)];
+3148:  const b=BE.boxes.find(x=>x.i===BE.sel);
+3149:  if(b){b.t_start=t0;b.t_end=t1;}
+3150:  beDraw();
+3151: }
+3152: function beShowTimes(b){
+3153:  const el=document.getElementById("beTimes");
+3154:  el.style.display="inline-flex";
+3155:  document.getElementById("beT0").value=b.t_start.toFixed(1);
+3156:  document.getElementById("beT1").value=b.t_end.toFixed(1);
+3157: }
+
+=== Focused explicit-partial-render amendment evidence ===
+
+=== 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub.py:3993-4035 ===
+3993:         u = buf[ysz:ysz + csz].reshape(h // 2, w // 2)
+3994:         v = buf[ysz + csz:].reshape(h // 2, w // 2)
+3995:         t = idx / fps
+3996:         ox, oy = cum[min(idx, len(cum) - 1)]
+3997: 
+3998:         act = [d for d in buckets.get(int(t), [])
+3999:                if d.t_start - 0.01 <= t <= d.t_end + 0.01]
+4000:         for d in _dedupe_dense(act):
+4001:             drift = min(24.0, 0.05 * (abs(ox - d.aoff[0]) + abs(oy - d.aoff[1])))
+4002:             px = pad + drift
+4003:             if d.poly:
+4004:                 _blur_silhouette_yuv10(
+4005:                     y, u, v, d.cbox[0] + ox - px, d.cbox[1] + oy - px,
+4006:                     d.cbox[2] + ox + px, d.cbox[3] + oy + px,
+4007:                     _mode_for(d.category), d.poly,
+4008:                     (d.cbox[0] + ox, d.cbox[1] + oy,
+4009:                      d.cbox[2] + ox, d.cbox[3] + oy), pad_px=px)
+4010:             else:
+4011:                 _blur_yuv10(y, u, v, d.cbox[0] + ox - px, d.cbox[1] + oy - px,
+4012:                             d.cbox[2] + ox + px, d.cbox[3] + oy + px,
+4013:                             _mode_for(d.category),
+4014:                             shape=("ellipse" if d.category == "face"
+4015:                                    and face_shape == "ellipse" else "rect"))
+4016: 
+4017:         bx, by = bands[min(idx, len(bands) - 1)]
+4018:         vals = set(mode_map.values()) | {mode}
+4019:         band_mode = ("box" if ("box" in vals or "inpaint" in vals)
+4020:                      else "mosaic" if "mosaic" in vals else "blur")
+4021:         def band(x1, y1_, x2, y2_):
+4022:             _blur_yuv10(y, u, v, x1, y1_, x2, y2_, band_mode)
+4023:         if by < -2:
+4024:             band(0, h - (abs(by) + band_margin), w, h)
+4025:         elif by > 2:
+4026:             band(0, 0, w, by + band_margin)
+4027:         if bx < -2:
+4028:             band(w - (abs(bx) + band_margin), 0, w, h)
+4029:         elif bx > 2:
+4030:             band(0, 0, bx + band_margin, h)
+4031: 
+4032:         try:
+4033:             enc.stdin.write(buf.tobytes())
+4034:         except (BrokenPipeError, OSError):
+4035:             rc = enc.wait()
+
+=== 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub.py:4205-4265 ===
+4205:                 break                       # keep-window over: stop encoding
+4206:         ox, oy = cum[min(idx, len(cum) - 1)]
+4207: 
+4208:         # 1. tracked PII boxes, translated by scroll offset
+4209:         act = [d for d in buckets.get(int(t), [])
+4210:                if d.t_start - 0.01 <= t <= d.t_end + 0.01]
+4211:         for d in _dedupe_dense(act):
+4212:             # drift allowance: residual tracking error grows (slowly) with
+4213:             # distance scrolled since detection — expand the box to cover it
+4214:             drift = min(24.0, 0.05 * (abs(ox - d.aoff[0]) + abs(oy - d.aoff[1])))
+4215:             px = pad + drift
+4216:             x1 = d.cbox[0] + ox - px
+4217:             y1 = d.cbox[1] + oy - px
+4218:             x2 = d.cbox[2] + ox + px
+4219:             y2 = d.cbox[3] + oy + px
+4220:             pbox = (d.cbox[0] + ox, d.cbox[1] + oy,
+4221:                     d.cbox[2] + ox, d.cbox[3] + oy)
+4222:             if preview:
+4223:                 cv2.rectangle(frame, (int(max(0, x1)), int(max(0, y1))),
+4224:                               (int(min(w, x2)), int(min(h, y2))), (0, 0, 255), 2)
+4225:                 for pts in (d.poly or ()):
+4226:                     arr = np.array(
+4227:                         [[int(float(qx) * (pbox[2] - pbox[0]) + pbox[0]),
+4228:                           int(float(qy) * (pbox[3] - pbox[1]) + pbox[1])]
+4229:                          for qx, qy in pts], np.int32)
+4230:                     if len(arr) >= 3:
+4231:                         cv2.polylines(frame, [arr], True, (0, 0, 255), 2)
+4232:                 label = d.category
+4233:                 if draw_scores and d.category == "face":
+4234:                     label = f"face {d.confidence:.2f}"
+4235:                 cv2.putText(frame, label, (int(max(0, x1)), int(max(12, y1 - 4))),
+4236:                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
+4237:             elif d.poly:
+4238:                 # segmentation silhouette: mask only the body, not the box —
+4239:                 # px (pad+drift) becomes an outward mask dilation
+4240:                 blur_silhouette(frame, x1, y1, x2, y2, _mode_for(d.category),
+4241:                                 d.poly, pbox, pad_px=px)
+4242:             else:
+4243:                 blur_region(frame, x1, y1, x2, y2, _mode_for(d.category),
+4244:                             shape=("ellipse" if d.category == "face"
+4245:                                    and face_shape == "ellipse" else "rect"))
+4246: 
+4247:         # 2. safety bands: unscanned content that scrolled into view
+4248:         bx, by = bands[min(idx, len(bands) - 1)]
+4249:         vals = set(mode_map.values()) | {mode}
+4250:         band_mode = ("box" if ("box" in vals or "inpaint" in vals)
+4251:                      else "mosaic" if "mosaic" in vals else "blur")  # never weaker
+4252:         def band(x1, y1, x2, y2):
+4253:             if preview:
+4254:                 cv2.rectangle(frame, (int(x1), int(y1)), (int(x2 - 1), int(y2 - 1)), (0, 165, 255), 2)
+4255:             else:
+4256:                 blur_region(frame, x1, y1, x2, y2, band_mode)
+4257:         if by < -2:      # content moved up -> unscanned strip entering at bottom
+4258:             band(0, h - (abs(by) + band_margin), w, h)
+4259:         elif by > 2:     # content moved down -> unscanned strip at top
+4260:             band(0, 0, w, by + band_margin)
+4261:         if bx < -2:      # content moved left -> strip at right
+4262:             band(w - (abs(bx) + band_margin), 0, w, h)
+4263:         elif bx > 2:
+4264:             band(0, 0, bx + band_margin, h)
+4265: 
+
+=== 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub.py:8530-8578 ===
+8530:     if getattr(args, "from_report", None):
+8531:         cb.log(f"[1/2] Loading detections from {args.from_report}")
+8532:         # Read once so geometry, choices, audio and provenance come from the
+8533:         # same snapshot. The raw document stays separate from render objects.
+8534:         with open(args.from_report, encoding="utf-8") as f:
+8535:             source = json.load(f)
+8536:         dets, rstate, prov = _decode_report(source)
+8537:         audio_overridden = getattr(args, "audio_spans", None) is not None
+8538:         if not audio_overridden and isinstance(source, dict):
+8539:             try:
+8540:                 args.audio_spans = [
+8541:                     (float(s["t0"]), float(s["t1"]), s.get("mode", "mute"))
+8542:                     for s in source.get("audio_redactions", [])]
+8543:             except (TypeError, ValueError, KeyError):
+8544:                 pass
+8545:         selected_input = getattr(args, "_report_input", None)
+8546:         if selected_input is not None:
+8547:             # An in-process caller already selected/owns this exact input.
+8548:             # Do not follow newer provenance into a source it did not admit.
+8549:             args.video = selected_input
+8550:         else:
+8551:             orig = prov.get("original_input")
+8552:             if orig and os.path.exists(orig) \
+8553:                     and os.path.abspath(orig) != os.path.abspath(args.video):
+8554:                 # re-renders must start from the TRUE original so intake can
+8555:                 # re-derive the HDR/CFR context (cached intermediates are
+8556:                 # reused). Rendering straight from the tone-mapped scan copy
+8557:                 # silently downgraded HDR jobs to SDR output.
+8558:                 args.video = orig
+8559:         normalize_vfr(args, cb)
+8560:         if rstate is None:
+8561:             raise RuntimeError("report has no render_state — re-run a scan "
+8562:                                "with --report using openscrub v4+")
+8563:         cb.log(f"      {len(dets)} enabled detections")
+8564:         in_sha = sha256_file(args.video)
+8565:         if prov.get("input_sha256") and prov["input_sha256"] != in_sha:
+8566:             cb.log("      WARNING: input file differs from the one this report "
+8567:                    "was made from (sha256 mismatch) — blur positions may be wrong")
+8568:         state = {"fps": rstate["fps"],
+8569:                  "cum": [tuple(v) for v in rstate["cum"]],
+8570:                  "bands": [tuple(v) for v in rstate["bands"]],
+8571:                  "detections": dets, "input_sha256": in_sha,
+8572:                  "source_report": source,
+8573:                  "audio_redactions_overridden": audio_overridden,
+8574:                  "audio_suggestions": copy.deepcopy(source.get("audio_suggestions")),
+8575:                  "stats": {"scans": 0, "raw_hits": 0, "regions": len(dets),
+8576:                            "recalls": 0, "remembered": 0}}
+8577:         return run_render(args, state, cb)
+8578:     state = run_scan(args, cb)
+
+=== 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub_web.py:1753-1795 ===
+1753:             if isinstance(identity, str):
+1754:                 identified.setdefault(identity, []).append(d)
+1755:         for m in edits.get("manual", []):
+1756:             has_id = "manual_id" in m
+1757:             identity = m.get("manual_id")
+1758:             if has_id and (not isinstance(identity, str) or
+1759:                            re.fullmatch(r"[A-Za-z0-9._:-]{1,128}", identity) is None):
+1760:                 return jsonify(error="Invalid manual_id: expected 1–128 ASCII letters, digits or ._:-"), 400
+1761:             try:
+1762:                 t0 = float(m["t_start"]); t1 = float(m["t_end"])
+1763:                 tref = float(m.get("t_ref", t0))
+1764:                 b = m["screen_box"]
+1765:                 if has_id and (len(b) != 4 or not all(math.isfinite(v) for v in [t0, t1, tref, *b])):
+1766:                     raise ValueError("non-finite creation or invalid box")
+1767:                 fidx = min(int(tref * rs["fps"]), len(rs["cum"]) - 1)
+1768:                 ox, oy = rs["cum"][fidx]
+1769:                 creation = {"t_start": t0, "t_end": t1,
+1770:                             "cbox": [int(b[0] - ox), int(b[1] - oy),
+1771:                                      int(b[2] - ox), int(b[3] - oy)],
+1772:                             "aoff": [ox, oy]}
+1773:                 if has_id and not _valid_manual_creation(creation):
+1774:                     raise ValueError("invalid effective creation")
+1775:             except (KeyError, TypeError, ValueError, OverflowError, IndexError):
+1776:                 if has_id:
+1777:                     return jsonify(error="Invalid manual creation: finite times, four coordinates and two offsets required"), 400
+1778:                 raise
+1779:             if has_id and identity in identified:
+1780:                 rows = identified[identity]
+1781:                 if (len(rows) != 1 or not _valid_manual_creation(rows[0].get("manual_creation"))
+1782:                         or rows[0]["manual_creation"] != creation):
+1783:                     return jsonify(error="manual_id conflict: creation differs, is missing/invalid, or matches multiple rows"), 409
+1784:                 continue
+1785:             row = dict(creation, category="manual", text="user-drawn", confidence=1.0,
+1786:                        last_seen=t0, enabled=True)
+1787:             if has_id:
+1788:                 # Separate lists keep later indexed edits independent of creation.
+1789:                 row.update(manual_id=identity, manual_creation={
+1790:                     **creation, "cbox": list(creation["cbox"]), "aoff": list(creation["aoff"])})
+1791:                 identified[identity] = [row]
+1792:             doc["detections"].append(row)
+1793:         if "audio" in edits:
+1794:             # audio redaction spans (mute/bleep): stored in the report so the
+1795:             # --from-report render applies them and re-renders keep them

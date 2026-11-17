@@ -1,0 +1,180 @@
+{
+  "pin": "12919c96c6f7558136b50d7b4d85e5e6b62f1971",
+  "export": "/tmp/openscrub-thumbnail-identity-20261117/export",
+  "method": "git archive from original repository; static AST/text reads only; no product imports or schedules",
+  "files": {
+    "openscrub_web.py": {
+      "sha256": "7762f0314df5e11e46a570af54cd20e928953e7bf92d55da7d648dad36e0fce2",
+      "matches_git_show": true
+    },
+    "openscrub_internal/lifetimes.py": {
+      "sha256": "dbfc317c1c878b8e8a599391578504c44a8964199f2cdae6e2ed60a6336d6743",
+      "matches_git_show": true
+    },
+    "openscrub_internal/reports.py": {
+      "sha256": "e8a7429c0b5430ee290f6635ca5d5a93445d3f0fe9bb0f58e57fec891ee01b7f",
+      "matches_git_show": true
+    },
+    "pyproject.toml": {
+      "sha256": "190c4a010c88bff8ec83035d38760ef60ab772784c9b1fc90415327746c504a0",
+      "matches_git_show": true
+    },
+    "Dockerfile": {
+      "sha256": "5758071c9c9bafe7790433745ac83d09f2d415e4bdc9212df4b8de31a244edc6",
+      "matches_git_show": true
+    },
+    "windows/openscrub.spec": {
+      "sha256": "49d35c42ee505aae5c6d72113790aeeaa34c9d434fbe68c834d7e5c09af33221",
+      "matches_git_show": true
+    },
+    "openscrub_update.py": {
+      "sha256": "4d6a20f75d985a119f8421227c3bd88b17fd1b8eed44e353b127b5b49e733d55",
+      "matches_git_show": true
+    }
+  },
+  "reused_baseline": {
+    "pin": "e21ebdf6e3ee46e6c65050dc956a9a3459152269",
+    "results_sha256": "b004cd653940fb6a828738baaa07c384cb5cafd4ff666f05aa329a6e1edf4f4b",
+    "runtime_repeated": false
+  },
+  "anchors": [
+    {
+      "file": "openscrub_web.py",
+      "name": "_reserve_files_locked",
+      "start": 359,
+      "end": 367
+    },
+    {
+      "file": "openscrub_web.py",
+      "name": "_job_video",
+      "start": 433,
+      "end": 441
+    },
+    {
+      "file": "openscrub_web.py",
+      "name": "_update_job_source",
+      "start": 444,
+      "end": 456
+    },
+    {
+      "file": "openscrub_web.py",
+      "name": "_own_files",
+      "start": 459,
+      "end": 462
+    },
+    {
+      "file": "openscrub_web.py",
+      "name": "_report_current",
+      "start": 802,
+      "end": 812
+    },
+    {
+      "file": "openscrub_web.py",
+      "name": "_operation_valid",
+      "start": 821,
+      "end": 826
+    },
+    {
+      "file": "openscrub_web.py",
+      "name": "_begin_operation",
+      "start": 829,
+      "end": 834
+    },
+    {
+      "file": "openscrub_web.py",
+      "name": "_prepare_work",
+      "start": 861,
+      "end": 871
+    },
+    {
+      "file": "openscrub_web.py",
+      "name": "_run_job",
+      "start": 954,
+      "end": 1117
+    },
+    {
+      "file": "openscrub_web.py",
+      "name": "enforce_vault_lock",
+      "start": 1181,
+      "end": 1201
+    },
+    {
+      "file": "openscrub_web.py",
+      "name": "_finish_file_response",
+      "start": 1205,
+      "end": 1214
+    },
+    {
+      "file": "openscrub_web.py",
+      "name": "_delete_job",
+      "start": 1369,
+      "end": 1410
+    },
+    {
+      "file": "openscrub_web.py",
+      "name": "job_cancel",
+      "start": 1469,
+      "end": 1504
+    },
+    {
+      "file": "openscrub_web.py",
+      "name": "_load_job_report",
+      "start": 1507,
+      "end": 1509
+    },
+    {
+      "file": "openscrub_web.py",
+      "name": "_frame_at",
+      "start": 1512,
+      "end": 1520
+    },
+    {
+      "file": "openscrub_web.py",
+      "name": "job_detections",
+      "start": 1542,
+      "end": 1557
+    },
+    {
+      "file": "openscrub_web.py",
+      "name": "job_detframe",
+      "start": 1561,
+      "end": 1579
+    },
+    {
+      "file": "openscrub_web.py",
+      "name": "job_boxes_at",
+      "start": 1583,
+      "end": 1606
+    },
+    {
+      "file": "openscrub_web.py",
+      "name": "job_thumb",
+      "start": 1610,
+      "end": 1657
+    },
+    {
+      "file": "openscrub_web.py",
+      "name": "job_save_edits",
+      "start": 1720,
+      "end": 1812
+    },
+    {
+      "file": "openscrub_web.py",
+      "name": "job_track_object",
+      "start": 1816,
+      "end": 1934
+    },
+    {
+      "file": "openscrub_web.py",
+      "name": "job_report",
+      "start": 2242,
+      "end": 2248
+    },
+    {
+      "file": "openscrub_web.py",
+      "name": "_vault_lock_locked",
+      "start": 3917,
+      "end": 3931
+    }
+  ]
+}

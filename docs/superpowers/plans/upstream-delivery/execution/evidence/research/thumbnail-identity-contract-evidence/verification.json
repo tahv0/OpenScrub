@@ -1,0 +1,18 @@
+{
+  "status": "PASS",
+  "pin": "12919c96c6f7558136b50d7b4d85e5e6b62f1971",
+  "export_files_match_git_show": 7,
+  "baseline_results_digest_matches": true,
+  "product_imports": 0,
+  "runtime_schedules": 0,
+  "source_anchor_count": 23,
+  "amendment": {
+    "status": "PASS",
+    "report_sha256": "6dadc2f0ad6e758b1018e7f0580484375c31f23da434595ed668ececae84e2d0",
+    "source_hashes_unchanged": true,
+    "baseline_results_hash_unchanged": true,
+    "local_report_links_exist": true,
+    "runtime_checks_added": 0,
+    "recommendation": "opaque generation nonce; no full-video or full-report identity hashing; row equality fingerprints and small JPEG validators retained"
+  }
+}

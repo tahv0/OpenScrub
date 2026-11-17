@@ -1,0 +1,8 @@
+.  recovered 1 job(s) from /tmp/openscrub-task650/integration-green-tmp/test_actual_scan_review_save_r0/data/jobs
+fresh-process real HTTP report/replay/lease release: passed
+
+.  recovered 1 job(s) from /tmp/openscrub-task650/integration-green-tmp/test_thousand_row_actual_http_0/data/jobs
+fresh-process real HTTP report/replay/lease release: passed
+
+.
+3 passed in 3.84s

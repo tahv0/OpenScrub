@@ -1,0 +1,1112 @@
+........................................................................ [ 54%]
+..FFFFFFFF..F.......................FFFFFFFFFFFFFFFFFFFFFFFFF            [100%]
+=================================== FAILURES ===================================
+___ test_object_options_preserve_input_settings_and_cleanup[omitted-upload] ____
+
+intake = (<FlaskClient <Flask 'openscrub_web'>>, <function intake.<locals>.post at 0x76e52fbbe340>, PosixPath('/tmp/openscrub-t...0\x00\xde\x00\x00\x00', PosixPath('/tmp/openscrub-task650/focused-tmp/test_object_options_preserve_i0/openscrub_jobs'))
+kind = 'upload', options = None, expected = {}
+
+    @pytest.mark.parametrize("kind", ["upload", "server-path"])
+    @pytest.mark.parametrize("options,expected", [
+        pytest.param(None, {}, id="omitted"),
+        pytest.param("{}", {}, id="empty-object"),
+        pytest.param(json.dumps(SUPPORTED_OPTIONS), SUPPORTED_OPTIONS, id="supported"),
+        pytest.param(json.dumps(UNKNOWN_OPTIONS), UNKNOWN_OPTIONS, id="nested-unknown"),
+    ])
+    def test_object_options_preserve_input_settings_and_cleanup(intake, kind, options, expected):
+        client, post, video, source, jobs_dir = intake
+        response = post(kind, options)
+        assert response.status_code == 200
+        jid, = response.get_json()["jobs"]
+        assert set(web.JOBS) == {jid}
+        job = web.JOBS[jid]
+        jdir = Path(job["dir"])
+        assert list(jobs_dir.iterdir()) == [jdir]
+        assert job["phase"] == "queued"
+        assert job["options"] == expected
+        assert (jdir / "options.json").read_bytes() == json.dumps(expected).encode()
+        assert hashlib.sha256(Path(job["video"]).read_bytes()).digest() == hashlib.sha256(source).digest()
+        assert job["size"] == len(source)
+        assert Path(job["video"]) == (jdir / "input.avi" if kind == "upload" else video)
+        assert {p.name for p in jdir.iterdir()} == (
+            {"options.json", "input.avi"} if kind == "upload" else {"options.json"})
+        assert [j["id"] for j in client.get("/api/jobs").get_json()] == [jid]
+        assert web.WORK_Q.qsize() == 1
+        queued = web.WORK_Q.get_nowait()
+        web.WORK_Q.task_done()
+>       assert queued == (jid, "scan", 1)
+E       AssertionError: assert ('e93995b83d9...76e52fbf8b00>) == ('e93995b83d95', 'scan', 1)
+E         
+E         Left contains one more item: <openscrub_internal.lifetimes._Lease object at 0x76e52fbf8b00>
+E         Use -v to get more diff
+
+tests/test_scan_options.py:140: AssertionError
+_ test_object_options_preserve_input_settings_and_cleanup[omitted-server-path] _
+
+intake = (<FlaskClient <Flask 'openscrub_web'>>, <function intake.<locals>.post at 0x76e52fbbe0c0>, PosixPath('/tmp/openscrub-t...0\x00\xde\x00\x00\x00', PosixPath('/tmp/openscrub-task650/focused-tmp/test_object_options_preserve_i1/openscrub_jobs'))
+kind = 'server-path', options = None, expected = {}
+
+    @pytest.mark.parametrize("kind", ["upload", "server-path"])
+    @pytest.mark.parametrize("options,expected", [
+        pytest.param(None, {}, id="omitted"),
+        pytest.param("{}", {}, id="empty-object"),
+        pytest.param(json.dumps(SUPPORTED_OPTIONS), SUPPORTED_OPTIONS, id="supported"),
+        pytest.param(json.dumps(UNKNOWN_OPTIONS), UNKNOWN_OPTIONS, id="nested-unknown"),
+    ])
+    def test_object_options_preserve_input_settings_and_cleanup(intake, kind, options, expected):
+        client, post, video, source, jobs_dir = intake
+        response = post(kind, options)
+        assert response.status_code == 200
+        jid, = response.get_json()["jobs"]
+        assert set(web.JOBS) == {jid}
+        job = web.JOBS[jid]
+        jdir = Path(job["dir"])
+        assert list(jobs_dir.iterdir()) == [jdir]
+        assert job["phase"] == "queued"
+        assert job["options"] == expected
+        assert (jdir / "options.json").read_bytes() == json.dumps(expected).encode()
+        assert hashlib.sha256(Path(job["video"]).read_bytes()).digest() == hashlib.sha256(source).digest()
+        assert job["size"] == len(source)
+        assert Path(job["video"]) == (jdir / "input.avi" if kind == "upload" else video)
+        assert {p.name for p in jdir.iterdir()} == (
+            {"options.json", "input.avi"} if kind == "upload" else {"options.json"})
+        assert [j["id"] for j in client.get("/api/jobs").get_json()] == [jid]
+        assert web.WORK_Q.qsize() == 1
+        queued = web.WORK_Q.get_nowait()
+        web.WORK_Q.task_done()
+>       assert queued == (jid, "scan", 1)
+E       AssertionError: assert ('db9af16e673...76e52fbaedb0>) == ('db9af16e6733', 'scan', 1)
+E         
+E         Left contains one more item: <openscrub_internal.lifetimes._Lease object at 0x76e52fbaedb0>
+E         Use -v to get more diff
+
+tests/test_scan_options.py:140: AssertionError
+_ test_object_options_preserve_input_settings_and_cleanup[empty-object-upload] _
+
+intake = (<FlaskClient <Flask 'openscrub_web'>>, <function intake.<locals>.post at 0x76e52fba6d40>, PosixPath('/tmp/openscrub-t...0\x00\xde\x00\x00\x00', PosixPath('/tmp/openscrub-task650/focused-tmp/test_object_options_preserve_i2/openscrub_jobs'))
+kind = 'upload', options = '{}', expected = {}
+
+    @pytest.mark.parametrize("kind", ["upload", "server-path"])
+    @pytest.mark.parametrize("options,expected", [
+        pytest.param(None, {}, id="omitted"),
+        pytest.param("{}", {}, id="empty-object"),
+        pytest.param(json.dumps(SUPPORTED_OPTIONS), SUPPORTED_OPTIONS, id="supported"),
+        pytest.param(json.dumps(UNKNOWN_OPTIONS), UNKNOWN_OPTIONS, id="nested-unknown"),
+    ])
+    def test_object_options_preserve_input_settings_and_cleanup(intake, kind, options, expected):
+        client, post, video, source, jobs_dir = intake
+        response = post(kind, options)
+        assert response.status_code == 200
+        jid, = response.get_json()["jobs"]
+        assert set(web.JOBS) == {jid}
+        job = web.JOBS[jid]
+        jdir = Path(job["dir"])
+        assert list(jobs_dir.iterdir()) == [jdir]
+        assert job["phase"] == "queued"
+        assert job["options"] == expected
+        assert (jdir / "options.json").read_bytes() == json.dumps(expected).encode()
+        assert hashlib.sha256(Path(job["video"]).read_bytes()).digest() == hashlib.sha256(source).digest()
+        assert job["size"] == len(source)
+        assert Path(job["video"]) == (jdir / "input.avi" if kind == "upload" else video)
+        assert {p.name for p in jdir.iterdir()} == (
+            {"options.json", "input.avi"} if kind == "upload" else {"options.json"})
+        assert [j["id"] for j in client.get("/api/jobs").get_json()] == [jid]
+        assert web.WORK_Q.qsize() == 1
+        queued = web.WORK_Q.get_nowait()
+        web.WORK_Q.task_done()
+>       assert queued == (jid, "scan", 1)
+E       AssertionError: assert ('6f73d2d16ec...76e52fbad2e0>) == ('6f73d2d16ec5', 'scan', 1)
+E         
+E         Left contains one more item: <openscrub_internal.lifetimes._Lease object at 0x76e52fbad2e0>
+E         Use -v to get more diff
+
+tests/test_scan_options.py:140: AssertionError
+_ test_object_options_preserve_input_settings_and_cleanup[empty-object-server-path] _
+
+intake = (<FlaskClient <Flask 'openscrub_web'>>, <function intake.<locals>.post at 0x76e52fba7060>, PosixPath('/tmp/openscrub-t...0\x00\xde\x00\x00\x00', PosixPath('/tmp/openscrub-task650/focused-tmp/test_object_options_preserve_i3/openscrub_jobs'))
+kind = 'server-path', options = '{}', expected = {}
+
+    @pytest.mark.parametrize("kind", ["upload", "server-path"])
+    @pytest.mark.parametrize("options,expected", [
+        pytest.param(None, {}, id="omitted"),
+        pytest.param("{}", {}, id="empty-object"),
+        pytest.param(json.dumps(SUPPORTED_OPTIONS), SUPPORTED_OPTIONS, id="supported"),
+        pytest.param(json.dumps(UNKNOWN_OPTIONS), UNKNOWN_OPTIONS, id="nested-unknown"),
+    ])
+    def test_object_options_preserve_input_settings_and_cleanup(intake, kind, options, expected):
+        client, post, video, source, jobs_dir = intake
+        response = post(kind, options)
+        assert response.status_code == 200
+        jid, = response.get_json()["jobs"]
+        assert set(web.JOBS) == {jid}
+        job = web.JOBS[jid]
+        jdir = Path(job["dir"])
+        assert list(jobs_dir.iterdir()) == [jdir]
+        assert job["phase"] == "queued"
+        assert job["options"] == expected
+        assert (jdir / "options.json").read_bytes() == json.dumps(expected).encode()
+        assert hashlib.sha256(Path(job["video"]).read_bytes()).digest() == hashlib.sha256(source).digest()
+        assert job["size"] == len(source)
+        assert Path(job["video"]) == (jdir / "input.avi" if kind == "upload" else video)
+        assert {p.name for p in jdir.iterdir()} == (
+            {"options.json", "input.avi"} if kind == "upload" else {"options.json"})
+        assert [j["id"] for j in client.get("/api/jobs").get_json()] == [jid]
+        assert web.WORK_Q.qsize() == 1
+        queued = web.WORK_Q.get_nowait()
+        web.WORK_Q.task_done()
+>       assert queued == (jid, "scan", 1)
+E       AssertionError: assert ('221fd0e1e6f...76e52fbac4a0>) == ('221fd0e1e6f0', 'scan', 1)
+E         
+E         Left contains one more item: <openscrub_internal.lifetimes._Lease object at 0x76e52fbac4a0>
+E         Use -v to get more diff
+
+tests/test_scan_options.py:140: AssertionError
+__ test_object_options_preserve_input_settings_and_cleanup[supported-upload] ___
+
+intake = (<FlaskClient <Flask 'openscrub_web'>>, <function intake.<locals>.post at 0x76e52fba6c00>, PosixPath('/tmp/openscrub-t...0\x00\xde\x00\x00\x00', PosixPath('/tmp/openscrub-task650/focused-tmp/test_object_options_preserve_i4/openscrub_jobs'))
+kind = 'upload'
+options = '{"categories": "email", "mode": "box", "sample_interval": 0.75, "pad": 3, "no_ner": true, "use_zones": false}'
+expected = {'categories': 'email', 'mode': 'box', 'sample_interval': 0.75, 'pad': 3, ...}
+
+    @pytest.mark.parametrize("kind", ["upload", "server-path"])
+    @pytest.mark.parametrize("options,expected", [
+        pytest.param(None, {}, id="omitted"),
+        pytest.param("{}", {}, id="empty-object"),
+        pytest.param(json.dumps(SUPPORTED_OPTIONS), SUPPORTED_OPTIONS, id="supported"),
+        pytest.param(json.dumps(UNKNOWN_OPTIONS), UNKNOWN_OPTIONS, id="nested-unknown"),
+    ])
+    def test_object_options_preserve_input_settings_and_cleanup(intake, kind, options, expected):
+        client, post, video, source, jobs_dir = intake
+        response = post(kind, options)
+        assert response.status_code == 200
+        jid, = response.get_json()["jobs"]
+        assert set(web.JOBS) == {jid}
+        job = web.JOBS[jid]
+        jdir = Path(job["dir"])
+        assert list(jobs_dir.iterdir()) == [jdir]
+        assert job["phase"] == "queued"
+        assert job["options"] == expected
+        assert (jdir / "options.json").read_bytes() == json.dumps(expected).encode()
+        assert hashlib.sha256(Path(job["video"]).read_bytes()).digest() == hashlib.sha256(source).digest()
+        assert job["size"] == len(source)
+        assert Path(job["video"]) == (jdir / "input.avi" if kind == "upload" else video)
+        assert {p.name for p in jdir.iterdir()} == (
+            {"options.json", "input.avi"} if kind == "upload" else {"options.json"})
+        assert [j["id"] for j in client.get("/api/jobs").get_json()] == [jid]
+        assert web.WORK_Q.qsize() == 1
+        queued = web.WORK_Q.get_nowait()
+        web.WORK_Q.task_done()
+>       assert queued == (jid, "scan", 1)
+E       AssertionError: assert ('166e9bf344c...76e52fb38290>) == ('166e9bf344c6', 'scan', 1)
+E         
+E         Left contains one more item: <openscrub_internal.lifetimes._Lease object at 0x76e52fb38290>
+E         Use -v to get more diff
+
+tests/test_scan_options.py:140: AssertionError
+_ test_object_options_preserve_input_settings_and_cleanup[supported-server-path] _
+
+intake = (<FlaskClient <Flask 'openscrub_web'>>, <function intake.<locals>.post at 0x76e52fba7380>, PosixPath('/tmp/openscrub-t...0\x00\xde\x00\x00\x00', PosixPath('/tmp/openscrub-task650/focused-tmp/test_object_options_preserve_i5/openscrub_jobs'))
+kind = 'server-path'
+options = '{"categories": "email", "mode": "box", "sample_interval": 0.75, "pad": 3, "no_ner": true, "use_zones": false}'
+expected = {'categories': 'email', 'mode': 'box', 'sample_interval': 0.75, 'pad': 3, ...}
+
+    @pytest.mark.parametrize("kind", ["upload", "server-path"])
+    @pytest.mark.parametrize("options,expected", [
+        pytest.param(None, {}, id="omitted"),
+        pytest.param("{}", {}, id="empty-object"),
+        pytest.param(json.dumps(SUPPORTED_OPTIONS), SUPPORTED_OPTIONS, id="supported"),
+        pytest.param(json.dumps(UNKNOWN_OPTIONS), UNKNOWN_OPTIONS, id="nested-unknown"),
+    ])
+    def test_object_options_preserve_input_settings_and_cleanup(intake, kind, options, expected):
+        client, post, video, source, jobs_dir = intake
+        response = post(kind, options)
+        assert response.status_code == 200
+        jid, = response.get_json()["jobs"]
+        assert set(web.JOBS) == {jid}
+        job = web.JOBS[jid]
+        jdir = Path(job["dir"])
+        assert list(jobs_dir.iterdir()) == [jdir]
+        assert job["phase"] == "queued"
+        assert job["options"] == expected
+        assert (jdir / "options.json").read_bytes() == json.dumps(expected).encode()
+        assert hashlib.sha256(Path(job["video"]).read_bytes()).digest() == hashlib.sha256(source).digest()
+        assert job["size"] == len(source)
+        assert Path(job["video"]) == (jdir / "input.avi" if kind == "upload" else video)
+        assert {p.name for p in jdir.iterdir()} == (
+            {"options.json", "input.avi"} if kind == "upload" else {"options.json"})
+        assert [j["id"] for j in client.get("/api/jobs").get_json()] == [jid]
+        assert web.WORK_Q.qsize() == 1
+        queued = web.WORK_Q.get_nowait()
+        web.WORK_Q.task_done()
+>       assert queued == (jid, "scan", 1)
+E       AssertionError: assert ('ef8354f3522...76e52fb38650>) == ('ef8354f3522f', 'scan', 1)
+E         
+E         Left contains one more item: <openscrub_internal.lifetimes._Lease object at 0x76e52fb38650>
+E         Use -v to get more diff
+
+tests/test_scan_options.py:140: AssertionError
+_ test_object_options_preserve_input_settings_and_cleanup[nested-unknown-upload] _
+
+intake = (<FlaskClient <Flask 'openscrub_web'>>, <function intake.<locals>.post at 0x76e52fba7ec0>, PosixPath('/tmp/openscrub-t...0\x00\xde\x00\x00\x00', PosixPath('/tmp/openscrub-task650/focused-tmp/test_object_options_preserve_i6/openscrub_jobs'))
+kind = 'upload'
+options = '{"categories": "email", "mode": "box", "sample_interval": 0.75, "pad": 3, "no_ner": true, "use_zones": false, "ordinary_unknown_key": {"value": [7, null]}}'
+expected = {'categories': 'email', 'mode': 'box', 'sample_interval': 0.75, 'pad': 3, ...}
+
+    @pytest.mark.parametrize("kind", ["upload", "server-path"])
+    @pytest.mark.parametrize("options,expected", [
+        pytest.param(None, {}, id="omitted"),
+        pytest.param("{}", {}, id="empty-object"),
+        pytest.param(json.dumps(SUPPORTED_OPTIONS), SUPPORTED_OPTIONS, id="supported"),
+        pytest.param(json.dumps(UNKNOWN_OPTIONS), UNKNOWN_OPTIONS, id="nested-unknown"),
+    ])
+    def test_object_options_preserve_input_settings_and_cleanup(intake, kind, options, expected):
+        client, post, video, source, jobs_dir = intake
+        response = post(kind, options)
+        assert response.status_code == 200
+        jid, = response.get_json()["jobs"]
+        assert set(web.JOBS) == {jid}
+        job = web.JOBS[jid]
+        jdir = Path(job["dir"])
+        assert list(jobs_dir.iterdir()) == [jdir]
+        assert job["phase"] == "queued"
+        assert job["options"] == expected
+        assert (jdir / "options.json").read_bytes() == json.dumps(expected).encode()
+        assert hashlib.sha256(Path(job["video"]).read_bytes()).digest() == hashlib.sha256(source).digest()
+        assert job["size"] == len(source)
+        assert Path(job["video"]) == (jdir / "input.avi" if kind == "upload" else video)
+        assert {p.name for p in jdir.iterdir()} == (
+            {"options.json", "input.avi"} if kind == "upload" else {"options.json"})
+        assert [j["id"] for j in client.get("/api/jobs").get_json()] == [jid]
+        assert web.WORK_Q.qsize() == 1
+        queued = web.WORK_Q.get_nowait()
+        web.WORK_Q.task_done()
+>       assert queued == (jid, "scan", 1)
+E       AssertionError: assert ('35d919e6c80...76e52fb39370>) == ('35d919e6c802', 'scan', 1)
+E         
+E         Left contains one more item: <openscrub_internal.lifetimes._Lease object at 0x76e52fb39370>
+E         Use -v to get more diff
+
+tests/test_scan_options.py:140: AssertionError
+_ test_object_options_preserve_input_settings_and_cleanup[nested-unknown-server-path] _
+
+intake = (<FlaskClient <Flask 'openscrub_web'>>, <function intake.<locals>.post at 0x76e52fba7880>, PosixPath('/tmp/openscrub-t...0\x00\xde\x00\x00\x00', PosixPath('/tmp/openscrub-task650/focused-tmp/test_object_options_preserve_i7/openscrub_jobs'))
+kind = 'server-path'
+options = '{"categories": "email", "mode": "box", "sample_interval": 0.75, "pad": 3, "no_ner": true, "use_zones": false, "ordinary_unknown_key": {"value": [7, null]}}'
+expected = {'categories': 'email', 'mode': 'box', 'sample_interval': 0.75, 'pad': 3, ...}
+
+    @pytest.mark.parametrize("kind", ["upload", "server-path"])
+    @pytest.mark.parametrize("options,expected", [
+        pytest.param(None, {}, id="omitted"),
+        pytest.param("{}", {}, id="empty-object"),
+        pytest.param(json.dumps(SUPPORTED_OPTIONS), SUPPORTED_OPTIONS, id="supported"),
+        pytest.param(json.dumps(UNKNOWN_OPTIONS), UNKNOWN_OPTIONS, id="nested-unknown"),
+    ])
+    def test_object_options_preserve_input_settings_and_cleanup(intake, kind, options, expected):
+        client, post, video, source, jobs_dir = intake
+        response = post(kind, options)
+        assert response.status_code == 200
+        jid, = response.get_json()["jobs"]
+        assert set(web.JOBS) == {jid}
+        job = web.JOBS[jid]
+        jdir = Path(job["dir"])
+        assert list(jobs_dir.iterdir()) == [jdir]
+        assert job["phase"] == "queued"
+        assert job["options"] == expected
+        assert (jdir / "options.json").read_bytes() == json.dumps(expected).encode()
+        assert hashlib.sha256(Path(job["video"]).read_bytes()).digest() == hashlib.sha256(source).digest()
+        assert job["size"] == len(source)
+        assert Path(job["video"]) == (jdir / "input.avi" if kind == "upload" else video)
+        assert {p.name for p in jdir.iterdir()} == (
+            {"options.json", "input.avi"} if kind == "upload" else {"options.json"})
+        assert [j["id"] for j in client.get("/api/jobs").get_json()] == [jid]
+        assert web.WORK_Q.qsize() == 1
+        queued = web.WORK_Q.get_nowait()
+        web.WORK_Q.task_done()
+>       assert queued == (jid, "scan", 1)
+E       AssertionError: assert ('fef7d74a1cb...76e52fbafb90>) == ('fef7d74a1cbb', 'scan', 1)
+E         
+E         Left contains one more item: <openscrub_internal.lifetimes._Lease object at 0x76e52fbafb90>
+E         Use -v to get more diff
+
+tests/test_scan_options.py:140: AssertionError
+______ test_http_replacement_before_open_uses_same_generation_for_length _______
+
+preview = ({'id': 'preview-test', 'dir': '/tmp/openscrub-task650/focused-tmp/test_http_replacement_before_o0', 'log': [], 'cance...crx<\x16\xca\x93vr\xf9\xf4\xbf\x97\x9e\xfb\xbf\x9b\xec\x1e\xd6|\xaej\xf7[j\xd6\x9dv\xd2\xc9[\xae\x8e\xfb\xdc\xff\xd9'])
+http = <function http.<locals>.fetch at 0x76e52717df80>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x76e52fbaff50>
+
+    def test_http_replacement_before_open_uses_same_generation_for_length(preview, http,
+                                                                        monkeypatch):
+        """Replacement at the old stat/open gap must keep length and bytes together."""
+        job, path, frames, expected = preview
+        publish(job, frames[0])
+        stage = path.parent / "staged"
+        stage.mkdir()
+>       publish({"dir": str(stage)}, frames[1])
+
+tests/test_live_preview.py:148: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_live_preview.py:39: in publish
+    web.WebCallbacks(job).scan_frame(frame, 0.0, 0)
+    ^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <openscrub_web.WebCallbacks object at 0x76e527173c50>
+job = {'dir': '/tmp/openscrub-task650/focused-tmp/test_http_replacement_before_o0/staged'}
+cancel_event = None
+
+    def __init__(self, job, cancel_event=None):
+        self.job = job
+>       self.cancel_event = cancel_event if cancel_event is not None else job["cancel"]
+                                                                          ^^^^^^^^^^^^^
+E       KeyError: 'cancel'
+
+openscrub_web.py:590: KeyError
+________________ test_sustained_slow_tail_replaces_fast_prefix _________________
+
+clock = namespace(now=0.0, wall=10000.0)
+
+    def test_sustained_slow_tail_replaces_fast_prefix(clock):
+        job = {}
+>       cb = web.WebCallbacks(job)
+             ^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_scan_eta.py:21: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <openscrub_web.WebCallbacks object at 0x76e4bc763ce0>, job = {}
+cancel_event = None
+
+    def __init__(self, job, cancel_event=None):
+        self.job = job
+>       self.cancel_event = cancel_event if cancel_event is not None else job["cancel"]
+                                                                          ^^^^^^^^^^^^^
+E       KeyError: 'cancel'
+
+openscrub_web.py:590: KeyError
+__________ test_startup_waits_three_seconds_and_smooths_new_estimates __________
+
+clock = namespace(now=0.0, wall=10000.0)
+
+    def test_startup_waits_three_seconds_and_smooths_new_estimates(clock):
+>       cb = web.WebCallbacks({})
+             ^^^^^^^^^^^^^^^^^^^^
+
+tests/test_scan_eta.py:42: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <openscrub_web.WebCallbacks object at 0x76e4bc7be3c0>, job = {}
+cancel_event = None
+
+    def __init__(self, job, cancel_event=None):
+        self.job = job
+>       self.cancel_event = cancel_event if cancel_event is not None else job["cancel"]
+                                                                          ^^^^^^^^^^^^^
+E       KeyError: 'cancel'
+
+openscrub_web.py:590: KeyError
+____________________ test_steady_rate_tracks_remaining_time ____________________
+
+clock = namespace(now=0.0, wall=10000.0)
+
+    def test_steady_rate_tracks_remaining_time(clock):
+>       cb = web.WebCallbacks({})
+             ^^^^^^^^^^^^^^^^^^^^
+
+tests/test_scan_eta.py:52: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <openscrub_web.WebCallbacks object at 0x76e4bc762bd0>, job = {}
+cancel_event = None
+
+    def __init__(self, job, cancel_event=None):
+        self.job = job
+>       self.cancel_event = cancel_event if cancel_event is not None else job["cancel"]
+                                                                          ^^^^^^^^^^^^^
+E       KeyError: 'cancel'
+
+openscrub_web.py:590: KeyError
+___________ test_zero_progress_and_mature_stall_have_no_useful_rate ____________
+
+clock = namespace(now=0.0, wall=10000.0)
+
+    def test_zero_progress_and_mature_stall_have_no_useful_rate(clock):
+>       cb = web.WebCallbacks({})
+             ^^^^^^^^^^^^^^^^^^^^
+
+tests/test_scan_eta.py:60: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <openscrub_web.WebCallbacks object at 0x76e4bc7beff0>, job = {}
+cancel_event = None
+
+    def __init__(self, job, cancel_event=None):
+        self.job = job
+>       self.cancel_event = cancel_event if cancel_event is not None else job["cancel"]
+                                                                          ^^^^^^^^^^^^^
+E       KeyError: 'cancel'
+
+openscrub_web.py:590: KeyError
+_________ test_recent_window_retains_one_predecessor_for_interval_rate _________
+
+clock = namespace(now=0.0, wall=10000.0)
+
+    def test_recent_window_retains_one_predecessor_for_interval_rate(clock):
+>       cb = web.WebCallbacks({})
+             ^^^^^^^^^^^^^^^^^^^^
+
+tests/test_scan_eta.py:72: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <openscrub_web.WebCallbacks object at 0x76e4bc7bdb50>, job = {}
+cancel_event = None
+
+    def __init__(self, job, cancel_event=None):
+        self.job = job
+>       self.cancel_event = cancel_event if cancel_event is not None else job["cancel"]
+                                                                          ^^^^^^^^^^^^^
+E       KeyError: 'cancel'
+
+openscrub_web.py:590: KeyError
+_________________ test_recent_rate_is_mature_at_twenty_seconds _________________
+
+clock = namespace(now=0.0, wall=10000.0)
+
+    def test_recent_rate_is_mature_at_twenty_seconds(clock):
+>       cb = web.WebCallbacks({})
+             ^^^^^^^^^^^^^^^^^^^^
+
+tests/test_scan_eta.py:82: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <openscrub_web.WebCallbacks object at 0x76e4bc7be420>, job = {}
+cancel_event = None
+
+    def __init__(self, job, cancel_event=None):
+        self.job = job
+>       self.cancel_event = cancel_event if cancel_event is not None else job["cancel"]
+                                                                          ^^^^^^^^^^^^^
+E       KeyError: 'cancel'
+
+openscrub_web.py:590: KeyError
+_________ test_subsample_and_repeated_calls_do_not_grow_sample_storage _________
+
+clock = namespace(now=0.0, wall=10000.0)
+
+    def test_subsample_and_repeated_calls_do_not_grow_sample_storage(clock):
+>       cb = web.WebCallbacks({})
+             ^^^^^^^^^^^^^^^^^^^^
+
+tests/test_scan_eta.py:91: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <openscrub_web.WebCallbacks object at 0x76e4bc7bef60>, job = {}
+cancel_event = None
+
+    def __init__(self, job, cancel_event=None):
+        self.job = job
+>       self.cancel_event = cancel_event if cancel_event is not None else job["cancel"]
+                                                                          ^^^^^^^^^^^^^
+E       KeyError: 'cancel'
+
+openscrub_web.py:590: KeyError
+___________________ test_wall_clock_jump_does_not_change_eta ___________________
+
+clock = namespace(now=0.0, wall=10000.0)
+
+    def test_wall_clock_jump_does_not_change_eta(clock):
+>       cb = web.WebCallbacks({})
+             ^^^^^^^^^^^^^^^^^^^^
+
+tests/test_scan_eta.py:102: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <openscrub_web.WebCallbacks object at 0x76e4bc724ad0>, job = {}
+cancel_event = None
+
+    def __init__(self, job, cancel_event=None):
+        self.job = job
+>       self.cancel_event = cancel_event if cancel_event is not None else job["cancel"]
+                                                                          ^^^^^^^^^^^^^
+E       KeyError: 'cancel'
+
+openscrub_web.py:590: KeyError
+_____________ test_counter_regression_between_samples_starts_fresh _____________
+
+clock = namespace(now=0.0, wall=10000.0)
+
+    def test_counter_regression_between_samples_starts_fresh(clock):
+>       cb = web.WebCallbacks({})
+             ^^^^^^^^^^^^^^^^^^^^
+
+tests/test_scan_eta.py:111: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <openscrub_web.WebCallbacks object at 0x76e4bc7bff50>, job = {}
+cancel_event = None
+
+    def __init__(self, job, cancel_event=None):
+        self.job = job
+>       self.cancel_event = cancel_event if cancel_event is not None else job["cancel"]
+                                                                          ^^^^^^^^^^^^^
+E       KeyError: 'cancel'
+
+openscrub_web.py:590: KeyError
+_____________ test_progress_mapping_and_stage_reset[scan-0.05556] ______________
+
+clock = namespace(now=0.0, wall=10000.0), stage = 'scan', progress = 0.05556
+
+    @pytest.mark.parametrize("stage,progress", [
+        ("scan", 0.05556), ("post", 0.45617),
+        ("render", 0.56173), ("other", 0.56173),
+    ])
+    def test_progress_mapping_and_stage_reset(clock, stage, progress):
+>       cb = web.WebCallbacks({})
+             ^^^^^^^^^^^^^^^^^^^^
+
+tests/test_scan_eta.py:123: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <openscrub_web.WebCallbacks object at 0x76e4bc7be270>, job = {}
+cancel_event = None
+
+    def __init__(self, job, cancel_event=None):
+        self.job = job
+>       self.cancel_event = cancel_event if cancel_event is not None else job["cancel"]
+                                                                          ^^^^^^^^^^^^^
+E       KeyError: 'cancel'
+
+openscrub_web.py:590: KeyError
+_____________ test_progress_mapping_and_stage_reset[post-0.45617] ______________
+
+clock = namespace(now=0.0, wall=10000.0), stage = 'post', progress = 0.45617
+
+    @pytest.mark.parametrize("stage,progress", [
+        ("scan", 0.05556), ("post", 0.45617),
+        ("render", 0.56173), ("other", 0.56173),
+    ])
+    def test_progress_mapping_and_stage_reset(clock, stage, progress):
+>       cb = web.WebCallbacks({})
+             ^^^^^^^^^^^^^^^^^^^^
+
+tests/test_scan_eta.py:123: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <openscrub_web.WebCallbacks object at 0x76e4bc763ce0>, job = {}
+cancel_event = None
+
+    def __init__(self, job, cancel_event=None):
+        self.job = job
+>       self.cancel_event = cancel_event if cancel_event is not None else job["cancel"]
+                                                                          ^^^^^^^^^^^^^
+E       KeyError: 'cancel'
+
+openscrub_web.py:590: KeyError
+____________ test_progress_mapping_and_stage_reset[render-0.56173] _____________
+
+clock = namespace(now=0.0, wall=10000.0), stage = 'render', progress = 0.56173
+
+    @pytest.mark.parametrize("stage,progress", [
+        ("scan", 0.05556), ("post", 0.45617),
+        ("render", 0.56173), ("other", 0.56173),
+    ])
+    def test_progress_mapping_and_stage_reset(clock, stage, progress):
+>       cb = web.WebCallbacks({})
+             ^^^^^^^^^^^^^^^^^^^^
+
+tests/test_scan_eta.py:123: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <openscrub_web.WebCallbacks object at 0x76e4bc727e90>, job = {}
+cancel_event = None
+
+    def __init__(self, job, cancel_event=None):
+        self.job = job
+>       self.cancel_event = cancel_event if cancel_event is not None else job["cancel"]
+                                                                          ^^^^^^^^^^^^^
+E       KeyError: 'cancel'
+
+openscrub_web.py:590: KeyError
+_____________ test_progress_mapping_and_stage_reset[other-0.56173] _____________
+
+clock = namespace(now=0.0, wall=10000.0), stage = 'other', progress = 0.56173
+
+    @pytest.mark.parametrize("stage,progress", [
+        ("scan", 0.05556), ("post", 0.45617),
+        ("render", 0.56173), ("other", 0.56173),
+    ])
+    def test_progress_mapping_and_stage_reset(clock, stage, progress):
+>       cb = web.WebCallbacks({})
+             ^^^^^^^^^^^^^^^^^^^^
+
+tests/test_scan_eta.py:123: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <openscrub_web.WebCallbacks object at 0x76e4bc7249b0>, job = {}
+cancel_event = None
+
+    def __init__(self, job, cancel_event=None):
+        self.job = job
+>       self.cancel_event = cancel_event if cancel_event is not None else job["cancel"]
+                                                                          ^^^^^^^^^^^^^
+E       KeyError: 'cancel'
+
+openscrub_web.py:590: KeyError
+_________ test_completion_resets_estimator_for_same_stage_next_attempt _________
+
+clock = namespace(now=0.0, wall=10000.0)
+
+    def test_completion_resets_estimator_for_same_stage_next_attempt(clock):
+>       cb = web.WebCallbacks({})
+             ^^^^^^^^^^^^^^^^^^^^
+
+tests/test_scan_eta.py:132: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <openscrub_web.WebCallbacks object at 0x76e4bc727f20>, job = {}
+cancel_event = None
+
+    def __init__(self, job, cancel_event=None):
+        self.job = job
+>       self.cancel_event = cancel_event if cancel_event is not None else job["cancel"]
+                                                                          ^^^^^^^^^^^^^
+E       KeyError: 'cancel'
+
+openscrub_web.py:590: KeyError
+______ test_unusable_numeric_observations_never_publish_invalid_eta[0-0] _______
+
+clock = namespace(now=0.0, wall=10000.0), cur = 0, total = 0
+
+    @pytest.mark.parametrize("cur,total", [
+        (0, 0), (0, -1), (float("nan"), 100),
+        (float("inf"), 100), (1, float("inf")), (1, float("nan")),
+        (1e-308, 1e308),
+    ])
+    def test_unusable_numeric_observations_never_publish_invalid_eta(clock, cur, total):
+>       cb = web.WebCallbacks({})
+             ^^^^^^^^^^^^^^^^^^^^
+
+tests/test_scan_eta.py:149: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <openscrub_web.WebCallbacks object at 0x76e4bc7be780>, job = {}
+cancel_event = None
+
+    def __init__(self, job, cancel_event=None):
+        self.job = job
+>       self.cancel_event = cancel_event if cancel_event is not None else job["cancel"]
+                                                                          ^^^^^^^^^^^^^
+E       KeyError: 'cancel'
+
+openscrub_web.py:590: KeyError
+______ test_unusable_numeric_observations_never_publish_invalid_eta[0--1] ______
+
+clock = namespace(now=0.0, wall=10000.0), cur = 0, total = -1
+
+    @pytest.mark.parametrize("cur,total", [
+        (0, 0), (0, -1), (float("nan"), 100),
+        (float("inf"), 100), (1, float("inf")), (1, float("nan")),
+        (1e-308, 1e308),
+    ])
+    def test_unusable_numeric_observations_never_publish_invalid_eta(clock, cur, total):
+>       cb = web.WebCallbacks({})
+             ^^^^^^^^^^^^^^^^^^^^
+
+tests/test_scan_eta.py:149: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <openscrub_web.WebCallbacks object at 0x76e4bc7bf2c0>, job = {}
+cancel_event = None
+
+    def __init__(self, job, cancel_event=None):
+        self.job = job
+>       self.cancel_event = cancel_event if cancel_event is not None else job["cancel"]
+                                                                          ^^^^^^^^^^^^^
+E       KeyError: 'cancel'
+
+openscrub_web.py:590: KeyError
+____ test_unusable_numeric_observations_never_publish_invalid_eta[nan-100] _____
+
+clock = namespace(now=0.0, wall=10000.0), cur = nan, total = 100
+
+    @pytest.mark.parametrize("cur,total", [
+        (0, 0), (0, -1), (float("nan"), 100),
+        (float("inf"), 100), (1, float("inf")), (1, float("nan")),
+        (1e-308, 1e308),
+    ])
+    def test_unusable_numeric_observations_never_publish_invalid_eta(clock, cur, total):
+>       cb = web.WebCallbacks({})
+             ^^^^^^^^^^^^^^^^^^^^
+
+tests/test_scan_eta.py:149: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <openscrub_web.WebCallbacks object at 0x76e4bc725430>, job = {}
+cancel_event = None
+
+    def __init__(self, job, cancel_event=None):
+        self.job = job
+>       self.cancel_event = cancel_event if cancel_event is not None else job["cancel"]
+                                                                          ^^^^^^^^^^^^^
+E       KeyError: 'cancel'
+
+openscrub_web.py:590: KeyError
+____ test_unusable_numeric_observations_never_publish_invalid_eta[inf-100] _____
+
+clock = namespace(now=0.0, wall=10000.0), cur = inf, total = 100
+
+    @pytest.mark.parametrize("cur,total", [
+        (0, 0), (0, -1), (float("nan"), 100),
+        (float("inf"), 100), (1, float("inf")), (1, float("nan")),
+        (1e-308, 1e308),
+    ])
+    def test_unusable_numeric_observations_never_publish_invalid_eta(clock, cur, total):
+>       cb = web.WebCallbacks({})
+             ^^^^^^^^^^^^^^^^^^^^
+
+tests/test_scan_eta.py:149: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <openscrub_web.WebCallbacks object at 0x76e4bc727e90>, job = {}
+cancel_event = None
+
+    def __init__(self, job, cancel_event=None):
+        self.job = job
+>       self.cancel_event = cancel_event if cancel_event is not None else job["cancel"]
+                                                                          ^^^^^^^^^^^^^
+E       KeyError: 'cancel'
+
+openscrub_web.py:590: KeyError
+_____ test_unusable_numeric_observations_never_publish_invalid_eta[1-inf] ______
+
+clock = namespace(now=0.0, wall=10000.0), cur = 1, total = inf
+
+    @pytest.mark.parametrize("cur,total", [
+        (0, 0), (0, -1), (float("nan"), 100),
+        (float("inf"), 100), (1, float("inf")), (1, float("nan")),
+        (1e-308, 1e308),
+    ])
+    def test_unusable_numeric_observations_never_publish_invalid_eta(clock, cur, total):
+>       cb = web.WebCallbacks({})
+             ^^^^^^^^^^^^^^^^^^^^
+
+tests/test_scan_eta.py:149: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <openscrub_web.WebCallbacks object at 0x76e4bc726b10>, job = {}
+cancel_event = None
+
+    def __init__(self, job, cancel_event=None):
+        self.job = job
+>       self.cancel_event = cancel_event if cancel_event is not None else job["cancel"]
+                                                                          ^^^^^^^^^^^^^
+E       KeyError: 'cancel'
+
+openscrub_web.py:590: KeyError
+_____ test_unusable_numeric_observations_never_publish_invalid_eta[1-nan] ______
+
+clock = namespace(now=0.0, wall=10000.0), cur = 1, total = nan
+
+    @pytest.mark.parametrize("cur,total", [
+        (0, 0), (0, -1), (float("nan"), 100),
+        (float("inf"), 100), (1, float("inf")), (1, float("nan")),
+        (1e-308, 1e308),
+    ])
+    def test_unusable_numeric_observations_never_publish_invalid_eta(clock, cur, total):
+>       cb = web.WebCallbacks({})
+             ^^^^^^^^^^^^^^^^^^^^
+
+tests/test_scan_eta.py:149: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <openscrub_web.WebCallbacks object at 0x76e4bc727cb0>, job = {}
+cancel_event = None
+
+    def __init__(self, job, cancel_event=None):
+        self.job = job
+>       self.cancel_event = cancel_event if cancel_event is not None else job["cancel"]
+                                                                          ^^^^^^^^^^^^^
+E       KeyError: 'cancel'
+
+openscrub_web.py:590: KeyError
+_ test_unusable_numeric_observations_never_publish_invalid_eta[1e-308-1e+308] __
+
+clock = namespace(now=0.0, wall=10000.0), cur = 1e-308, total = 1e+308
+
+    @pytest.mark.parametrize("cur,total", [
+        (0, 0), (0, -1), (float("nan"), 100),
+        (float("inf"), 100), (1, float("inf")), (1, float("nan")),
+        (1e-308, 1e308),
+    ])
+    def test_unusable_numeric_observations_never_publish_invalid_eta(clock, cur, total):
+>       cb = web.WebCallbacks({})
+             ^^^^^^^^^^^^^^^^^^^^
+
+tests/test_scan_eta.py:149: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <openscrub_web.WebCallbacks object at 0x76e4bc725e50>, job = {}
+cancel_event = None
+
+    def __init__(self, job, cancel_event=None):
+        self.job = job
+>       self.cancel_event = cancel_event if cancel_event is not None else job["cancel"]
+                                                                          ^^^^^^^^^^^^^
+E       KeyError: 'cancel'
+
+openscrub_web.py:590: KeyError
+_________________ test_storage_stays_bounded_over_a_long_stage _________________
+
+clock = namespace(now=0.0, wall=10000.0)
+
+    def test_storage_stays_bounded_over_a_long_stage(clock):
+>       cb = web.WebCallbacks({})
+             ^^^^^^^^^^^^^^^^^^^^
+
+tests/test_scan_eta.py:156: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <openscrub_web.WebCallbacks object at 0x76e4bc724cb0>, job = {}
+cancel_event = None
+
+    def __init__(self, job, cancel_event=None):
+        self.job = job
+>       self.cancel_event = cancel_event if cancel_event is not None else job["cancel"]
+                                                                          ^^^^^^^^^^^^^
+E       KeyError: 'cancel'
+
+openscrub_web.py:590: KeyError
+________ test_worker_clears_published_eta_and_uses_fresh_callback[done] ________
+
+clock = namespace(now=0.0, wall=10000.0)
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x76e4bc7bdb80>
+tmp_path = PosixPath('/tmp/openscrub-task650/focused-tmp/test_worker_clears_published_e0')
+result = 'done'
+
+    @pytest.mark.parametrize("result", ["done", "cancelled", "error"])
+    def test_worker_clears_published_eta_and_uses_fresh_callback(
+            clock, monkeypatch, tmp_path, result):
+        job = {"id": "eta-test", "name": "synthetic.mp4", "dir": str(tmp_path), "options": {},
+               "log": [], "error": None, "stats": {}, "output": None}
+        callbacks = []
+        monkeypatch.setattr(web, "build_args", lambda *a, **kw: object())
+        monkeypatch.setattr(web.openscrub, "load_report", lambda *a: ([], {}, {}))
+    
+        def pipeline(args, cb):
+            callbacks.append(cb)
+            assert observe(cb, clock, 0, 10, stage="render") is None
+            assert observe(cb, clock, 5, 15, stage="render") == 85
+            if result == "cancelled":
+                raise web.openscrub.PipelineCancelled()
+            if result == "error":
+                raise RuntimeError("synthetic stage error")
+            return {"output": str(tmp_path / "result.mp4")}
+    
+        monkeypatch.setattr(web.openscrub, "run_pipeline", pipeline)
+        for _ in range(2):
+>           web._run_job(job, "render")
+
+tests/test_scan_eta.py:185: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+openscrub_web.py:1024: in _run_job
+    owner = _prepare_work(job, action)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+openscrub_web.py:932: in _prepare_work
+    prepared = _own_files(job, work=True)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+openscrub_web.py:464: in _own_files
+    _validate_files_locked(job)
+openscrub_web.py:342: in _validate_files_locked
+    abort(404)
+/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/helpers.py:293: in abort
+    _wz_abort(code, *args, **kwargs)
+/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/werkzeug/exceptions.py:902: in abort
+    _aborter(status, *args, **kwargs)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <werkzeug.exceptions.Aborter object at 0x76e57f5cfc80>, code = 404
+args = (), kwargs = {}
+
+    def __call__(
+        self, code: int | SansIOResponse, *args: t.Any, **kwargs: t.Any
+    ) -> t.NoReturn:
+        from .sansio.response import Response
+    
+        if isinstance(code, Response):
+            raise HTTPException(response=code)
+    
+        if code not in self.mapping:
+            raise LookupError(f"no exception for {code!r}")
+    
+>       raise self.mapping[code](*args, **kwargs)
+E       werkzeug.exceptions.NotFound: 404 Not Found: The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.
+
+/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/werkzeug/exceptions.py:887: NotFound
+_____ test_worker_clears_published_eta_and_uses_fresh_callback[cancelled] ______
+
+clock = namespace(now=0.0, wall=10000.0)
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x76e4bc71e390>
+tmp_path = PosixPath('/tmp/openscrub-task650/focused-tmp/test_worker_clears_published_e1')
+result = 'cancelled'
+
+    @pytest.mark.parametrize("result", ["done", "cancelled", "error"])
+    def test_worker_clears_published_eta_and_uses_fresh_callback(
+            clock, monkeypatch, tmp_path, result):
+        job = {"id": "eta-test", "name": "synthetic.mp4", "dir": str(tmp_path), "options": {},
+               "log": [], "error": None, "stats": {}, "output": None}
+        callbacks = []
+        monkeypatch.setattr(web, "build_args", lambda *a, **kw: object())
+        monkeypatch.setattr(web.openscrub, "load_report", lambda *a: ([], {}, {}))
+    
+        def pipeline(args, cb):
+            callbacks.append(cb)
+            assert observe(cb, clock, 0, 10, stage="render") is None
+            assert observe(cb, clock, 5, 15, stage="render") == 85
+            if result == "cancelled":
+                raise web.openscrub.PipelineCancelled()
+            if result == "error":
+                raise RuntimeError("synthetic stage error")
+            return {"output": str(tmp_path / "result.mp4")}
+    
+        monkeypatch.setattr(web.openscrub, "run_pipeline", pipeline)
+        for _ in range(2):
+>           web._run_job(job, "render")
+
+tests/test_scan_eta.py:185: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+openscrub_web.py:1024: in _run_job
+    owner = _prepare_work(job, action)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+openscrub_web.py:932: in _prepare_work
+    prepared = _own_files(job, work=True)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+openscrub_web.py:464: in _own_files
+    _validate_files_locked(job)
+openscrub_web.py:342: in _validate_files_locked
+    abort(404)
+/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/helpers.py:293: in abort
+    _wz_abort(code, *args, **kwargs)
+/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/werkzeug/exceptions.py:902: in abort
+    _aborter(status, *args, **kwargs)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <werkzeug.exceptions.Aborter object at 0x76e57f5cfc80>, code = 404
+args = (), kwargs = {}
+
+    def __call__(
+        self, code: int | SansIOResponse, *args: t.Any, **kwargs: t.Any
+    ) -> t.NoReturn:
+        from .sansio.response import Response
+    
+        if isinstance(code, Response):
+            raise HTTPException(response=code)
+    
+        if code not in self.mapping:
+            raise LookupError(f"no exception for {code!r}")
+    
+>       raise self.mapping[code](*args, **kwargs)
+E       werkzeug.exceptions.NotFound: 404 Not Found: The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.
+
+/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/werkzeug/exceptions.py:887: NotFound
+_______ test_worker_clears_published_eta_and_uses_fresh_callback[error] ________
+
+clock = namespace(now=0.0, wall=10000.0)
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x76e57e38d3d0>
+tmp_path = PosixPath('/tmp/openscrub-task650/focused-tmp/test_worker_clears_published_e2')
+result = 'error'
+
+    @pytest.mark.parametrize("result", ["done", "cancelled", "error"])
+    def test_worker_clears_published_eta_and_uses_fresh_callback(
+            clock, monkeypatch, tmp_path, result):
+        job = {"id": "eta-test", "name": "synthetic.mp4", "dir": str(tmp_path), "options": {},
+               "log": [], "error": None, "stats": {}, "output": None}
+        callbacks = []
+        monkeypatch.setattr(web, "build_args", lambda *a, **kw: object())
+        monkeypatch.setattr(web.openscrub, "load_report", lambda *a: ([], {}, {}))
+    
+        def pipeline(args, cb):
+            callbacks.append(cb)
+            assert observe(cb, clock, 0, 10, stage="render") is None
+            assert observe(cb, clock, 5, 15, stage="render") == 85
+            if result == "cancelled":
+                raise web.openscrub.PipelineCancelled()
+            if result == "error":
+                raise RuntimeError("synthetic stage error")
+            return {"output": str(tmp_path / "result.mp4")}
+    
+        monkeypatch.setattr(web.openscrub, "run_pipeline", pipeline)
+        for _ in range(2):
+>           web._run_job(job, "render")
+
+tests/test_scan_eta.py:185: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+openscrub_web.py:1024: in _run_job
+    owner = _prepare_work(job, action)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+openscrub_web.py:932: in _prepare_work
+    prepared = _own_files(job, work=True)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+openscrub_web.py:464: in _own_files
+    _validate_files_locked(job)
+openscrub_web.py:342: in _validate_files_locked
+    abort(404)
+/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/helpers.py:293: in abort
+    _wz_abort(code, *args, **kwargs)
+/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/werkzeug/exceptions.py:902: in abort
+    _aborter(status, *args, **kwargs)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <werkzeug.exceptions.Aborter object at 0x76e57f5cfc80>, code = 404
+args = (), kwargs = {}
+
+    def __call__(
+        self, code: int | SansIOResponse, *args: t.Any, **kwargs: t.Any
+    ) -> t.NoReturn:
+        from .sansio.response import Response
+    
+        if isinstance(code, Response):
+            raise HTTPException(response=code)
+    
+        if code not in self.mapping:
+            raise LookupError(f"no exception for {code!r}")
+    
+>       raise self.mapping[code](*args, **kwargs)
+E       werkzeug.exceptions.NotFound: 404 Not Found: The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.
+
+/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/werkzeug/exceptions.py:887: NotFound
+=========================== short test summary info ============================
+FAILED tests/test_scan_options.py::test_object_options_preserve_input_settings_and_cleanup[omitted-upload]
+FAILED tests/test_scan_options.py::test_object_options_preserve_input_settings_and_cleanup[omitted-server-path]
+FAILED tests/test_scan_options.py::test_object_options_preserve_input_settings_and_cleanup[empty-object-upload]
+FAILED tests/test_scan_options.py::test_object_options_preserve_input_settings_and_cleanup[empty-object-server-path]
+FAILED tests/test_scan_options.py::test_object_options_preserve_input_settings_and_cleanup[supported-upload]
+FAILED tests/test_scan_options.py::test_object_options_preserve_input_settings_and_cleanup[supported-server-path]
+FAILED tests/test_scan_options.py::test_object_options_preserve_input_settings_and_cleanup[nested-unknown-upload]
+FAILED tests/test_scan_options.py::test_object_options_preserve_input_settings_and_cleanup[nested-unknown-server-path]
+FAILED tests/test_live_preview.py::test_http_replacement_before_open_uses_same_generation_for_length
+FAILED tests/test_scan_eta.py::test_sustained_slow_tail_replaces_fast_prefix
+FAILED tests/test_scan_eta.py::test_startup_waits_three_seconds_and_smooths_new_estimates
+FAILED tests/test_scan_eta.py::test_steady_rate_tracks_remaining_time - KeyEr...
+FAILED tests/test_scan_eta.py::test_zero_progress_and_mature_stall_have_no_useful_rate
+FAILED tests/test_scan_eta.py::test_recent_window_retains_one_predecessor_for_interval_rate
+FAILED tests/test_scan_eta.py::test_recent_rate_is_mature_at_twenty_seconds
+FAILED tests/test_scan_eta.py::test_subsample_and_repeated_calls_do_not_grow_sample_storage
+FAILED tests/test_scan_eta.py::test_wall_clock_jump_does_not_change_eta - Key...
+FAILED tests/test_scan_eta.py::test_counter_regression_between_samples_starts_fresh
+FAILED tests/test_scan_eta.py::test_progress_mapping_and_stage_reset[scan-0.05556]
+FAILED tests/test_scan_eta.py::test_progress_mapping_and_stage_reset[post-0.45617]
+FAILED tests/test_scan_eta.py::test_progress_mapping_and_stage_reset[render-0.56173]
+FAILED tests/test_scan_eta.py::test_progress_mapping_and_stage_reset[other-0.56173]
+FAILED tests/test_scan_eta.py::test_completion_resets_estimator_for_same_stage_next_attempt
+FAILED tests/test_scan_eta.py::test_unusable_numeric_observations_never_publish_invalid_eta[0-0]
+FAILED tests/test_scan_eta.py::test_unusable_numeric_observations_never_publish_invalid_eta[0--1]
+FAILED tests/test_scan_eta.py::test_unusable_numeric_observations_never_publish_invalid_eta[nan-100]
+FAILED tests/test_scan_eta.py::test_unusable_numeric_observations_never_publish_invalid_eta[inf-100]
+FAILED tests/test_scan_eta.py::test_unusable_numeric_observations_never_publish_invalid_eta[1-inf]
+FAILED tests/test_scan_eta.py::test_unusable_numeric_observations_never_publish_invalid_eta[1-nan]
+FAILED tests/test_scan_eta.py::test_unusable_numeric_observations_never_publish_invalid_eta[1e-308-1e+308]
+FAILED tests/test_scan_eta.py::test_storage_stays_bounded_over_a_long_stage
+FAILED tests/test_scan_eta.py::test_worker_clears_published_eta_and_uses_fresh_callback[done]
+FAILED tests/test_scan_eta.py::test_worker_clears_published_eta_and_uses_fresh_callback[cancelled]
+FAILED tests/test_scan_eta.py::test_worker_clears_published_eta_and_uses_fresh_callback[error]
+34 failed, 99 passed in 12.64s

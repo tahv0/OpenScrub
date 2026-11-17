@@ -1,0 +1,379 @@
+
+=== 72efeb02d73ac9d0f4cb24ea483fcf0df8ed6340:stop_review.py:1-150 ===
+1: """Atomic report checkpoints and safe, review-preserving scan continuation.
+2: 
+3: Stop & Review is intentionally separate from the generic Cancel action. An
+4: ordinary cancelled scan still has no report. A cooperatively stopped scan is
+5: post-processed first, then committed here as a reviewable partial report.
+6: """
+7: import copy
+8: import json
+9: import math
+10: import os
+11: import tempfile
+12: 
+13: 
+14: class CheckpointError(ValueError):
+15:     pass
+16: 
+17: 
+18: def atomic_report(path, document):
+19:     """Publish a whole report or leave the preceding verified one unchanged."""
+20:     directory = os.path.dirname(os.path.abspath(path))
+21:     fd, tmp = tempfile.mkstemp(prefix=".report-", suffix=".json", dir=directory)
+22:     try:
+23:         with os.fdopen(fd, "w", encoding="utf-8") as out:
+24:             json.dump(document, out, indent=1)
+25:             out.flush()
+26:             os.fsync(out.fileno())
+27:         try:
+28:             os.chmod(tmp, 0o600)
+29:         except OSError:
+30:             pass
+31:         os.replace(tmp, path)
+32:     finally:
+33:         if os.path.exists(tmp):
+34:             os.remove(tmp)
+35: 
+36: 
+37: def with_checkpoint(doc, frame, total, options):
+38:     """First partial scan; source hash/length live beside report data."""
+39:     result = copy.deepcopy(doc)
+40:     fps = float(result["render_state"]["fps"])
+41:     frame, total = int(frame), int(total)
+42:     if not (math.isfinite(fps) and fps > 0 and
+43:             0 < frame < total and len(result["render_state"]["cum"]) >= frame and
+44:             len(result["render_state"]["bands"]) >= frame):
+45:         raise CheckpointError("Invalid stop frame or incomplete render timeline")
+46:     source_hash = result.get("provenance", {}).get("input_sha256")
+47:     if not source_hash:
+48:         raise CheckpointError("Missing input provenance; cannot safely resume")
+49:     result["stop_review"] = {
+50:         "schema": 1, "state": "paused",
+51:         "next_frame": frame, "total_frames": total, "fps": fps,
+52:         "input_sha256": source_hash, "options": copy.deepcopy(options),
+53:     }
+54:     return result
+55: 
+56: 
+57: def validate_resume(doc, source_sha256=None):
+58:     meta = doc.get("stop_review")
+59:     if not isinstance(meta, dict) or meta.get("state") != "paused":
+60:         raise CheckpointError("Job is not paused at a saved checkpoint")
+61:     fps = float(meta.get("fps", 0))
+62:     frame, total = int(meta.get("next_frame", -1)), int(meta.get("total_frames", 0))
+63:     if (not math.isfinite(fps) or fps <= 0 or frame <= 0 or total <= frame
+64:             or len(doc["render_state"].get("cum", [])) < frame
+65:             or len(doc["render_state"].get("bands", [])) < frame):
+66:         raise CheckpointError("Corrupt checkpoint frame/timeline")
+67:     if (source_sha256 is not None and
+68:             meta.get("input_sha256") != source_sha256):
+69:         raise CheckpointError("Source video changed after checkpoint; "
+70:                               "resume refused to avoid wrong blur positions")
+71:     return meta
+72: 
+73: 
+74: def join_reports(previous, continuation, next_frame, total_frames,
+75:                  completed=False):
+76:     """Append a resumed suffix, preserving all prior human edits and polygons.
+77: 
+78:     A small overlap is re-scanned for detector continuity. It is NOT trusted
+79:     to replace or remove prior reviewer decisions. Dense track/person IDs in
+80:     the new scan are remapped so two unrelated objects cannot inherit each
+81:     other's review decisions.
+82:     """
+83:     meta = validate_resume(previous)
+84:     cutoff = int(meta["next_frame"])
+85:     next_frame, total_frames = int(next_frame), int(total_frames)
+86:     if not (cutoff < next_frame <= total_frames or
+87:             completed and cutoff <= next_frame <= total_frames):
+88:         raise CheckpointError("Resumed scan did not advance beyond checkpoint")
+89:     if total_frames != int(meta["total_frames"]):
+90:         raise CheckpointError("Source frame count changed since checkpoint")
+91:     fps = float(meta["fps"])
+92:     rs = continuation["render_state"]
+93:     if abs(float(rs["fps"]) - fps) > 0.001:
+94:         raise CheckpointError("Source FPS changed since checkpoint")
+95:     if continuation.get("provenance", {}).get("input_sha256") != meta["input_sha256"]:
+96:         raise CheckpointError("Source hash differs; refusing report merge")
+97:     old_rs = previous["render_state"]
+98:     for key in ("cum", "bands"):
+99:         if len(old_rs[key]) < cutoff or len(rs[key]) < next_frame:
+100:             raise CheckpointError("Frame-aligned render state is incomplete")
+101:     merged = copy.deepcopy(continuation)
+102:     merged["render_state"] = {
+103:         **rs,
+104:         "cum": old_rs["cum"][:cutoff] + rs["cum"][cutoff:],
+105:         "bands": old_rs["bands"][:cutoff] + rs["bands"][cutoff:],
+106:     }
+107:     # Previously approved/denied detections and 4-corner annotations are
+108:     # retained byte-for-byte apart from the ID remap applied to the suffix.
+109:     older = copy.deepcopy(previous.get("detections", []))
+110:     track_max = max([int(d.get("track", -1)) for d in older] + [-1])
+111:     person_max = max([int(d.get("person", -1)) for d in older] + [-1])
+112:     remap_track, remap_person = {}, {}
+113:     newer = []
+114:     boundary = cutoff / fps
+115:     for det in continuation.get("detections", []):
+116:         if float(det.get("t_end", 0)) <= boundary:
+117:             continue
+118:         d = copy.deepcopy(det)
+119:         d["t_start"] = max(boundary, float(d["t_start"]))
+120:         if float(d["t_end"]) < d["t_start"]:
+121:             continue
+122:         for field, mapping, last in (("track", remap_track, track_max),
+123:                                      ("person", remap_person, person_max)):
+124:             old_id = int(d.get(field, -1))
+125:             if old_id >= 0:
+126:                 if old_id not in mapping:
+127:                     mapping[old_id] = last + 1 + len(mapping)
+128:                 d[field] = mapping[old_id]
+129:         newer.append(d)
+130:     merged["detections"] = older + newer
+131:     # Audio review, if edited, belongs to the reviewer; never wipe it.
+132:     if "audio_redactions" in previous:
+133:         merged["audio_redactions"] = copy.deepcopy(previous["audio_redactions"])
+134:     if "audio_suggestions" in previous:
+135:         merged["audio_suggestions"] = copy.deepcopy(previous["audio_suggestions"])
+136:     if "audio_transcript" in previous:
+137:         merged["audio_transcript"] = copy.deepcopy(previous["audio_transcript"])
+138:     # Custom provenance options are captured once, not replaced with the
+139:     # resume-only CLI flags.
+140:     merged["provenance"]["settings"] = copy.deepcopy(
+141:         previous.get("provenance", {}).get("settings", {}))
+142:     merged["provenance"]["windows"] = copy.deepcopy(
+143:         previous.get("provenance", {}).get("windows"))
+144:     if completed:
+145:         merged.pop("stop_review", None)
+146:     else:
+147:         fresh = copy.deepcopy(meta)
+148:         fresh["next_frame"] = next_frame
+149:         merged["stop_review"] = fresh
+150:     return merged
+
+=== ffb4ed9e3e46a6608f93797c46546ec6bc54e190:stop_review.py:130-147 ===
+130:     merged["detections"] = older + newer
+131:     # Audio review, if edited, belongs to the reviewer; never wipe it.
+132:     if "audio_redactions" in previous:
+133:         merged["audio_redactions"] = copy.deepcopy(previous["audio_redactions"])
+134:     if "audio_suggestions" in previous:
+135:         merged["audio_suggestions"] = copy.deepcopy(previous["audio_suggestions"])
+136:     if "audio_transcript" in previous:
+137:         merged["audio_transcript"] = copy.deepcopy(previous["audio_transcript"])
+138:     # Custom provenance options are captured once, not replaced with the
+139:     # resume-only CLI flags.
+140:     merged["provenance"] = copy.deepcopy(previous.get("provenance", {}))
+141:     if completed:
+142:         merged.pop("stop_review", None)
+143:     else:
+144:         fresh = copy.deepcopy(meta)
+145:         fresh["next_frame"] = next_frame
+146:         merged["stop_review"] = fresh
+147:     return merged
+
+=== ffb4ed9e3e46a6608f93797c46546ec6bc54e190:openscrub_web.py:327-355 ===
+327:     job = {
+328:         "id": jid, "dir": jdir, "video": video_path, "name": name,
+329:         "options": options, "phase": "queued", "progress": 0.0,
+330:         "eta": None, "size": 0,
+331:         "log": [], "error": None, "output": None, "created": time.time(),
+332:         "cancel": threading.Event(), "stop": threading.Event(),
+333:         "stats": {},
+334:     }
+335:     with JOBS_LOCK:
+336:         JOBS[jid] = job
+337:     return job
+338: 
+339: 
+340: def job_public(job):
+341:     return {k: job[k] for k in ("id", "name", "phase", "progress", "error",
+342:                                 "stats")} | {
+343:         "eta": job.get("eta"),      # .get(): jobs rehydrated from disk lack it
+344:         # input size: lets the editor warn before re-uploading a file that
+345:         # is ALREADY on the server (issue #16 — each retry re-uploaded the
+346:         # same 18 GB until the disk filled)
+347:         "size": job.get("size") or 0,
+348:         "log_tail": job["log"][-30:],
+349:         "log_len": len(job["log"]),
+350:         "has_output": bool(job["output"] and os.path.exists(job["output"])),
+351:         "stop_pending": bool(job.get("stop") and job["stop"].is_set()),
+352:         "checkpoint_frame": job.get("checkpoint_frame"),
+353:         "checkpoint_total": job.get("checkpoint_total"),
+354:     }
+355: 
+
+=== ffb4ed9e3e46a6608f93797c46546ec6bc54e190:openscrub_web.py:415-424 ===
+415:         cv2.imwrite(os.path.join(self.job["dir"], "preview.jpg"), small,
+416:                     [cv2.IMWRITE_JPEG_QUALITY, 70])
+417: 
+418:     def cancelled(self):
+419:         return self.job["cancel"].is_set()
+420: 
+421:     def stop_requested(self):
+422:         return self.job["stop"].is_set()
+423: 
+424: 
+
+=== ffb4ed9e3e46a6608f93797c46546ec6bc54e190:openscrub_web.py:549-616 ===
+549:             if action in ("scan", "resume"):
+550:                 resuming = action == "resume"
+551:                 job["phase"] = "scanning"
+552:                 args = build_args(job)
+553:                 previous = None
+554:                 old_frame = 0
+555:                 if resuming:
+556:                     previous = _load_job_report(job)
+557:                     meta = stop_review.validate_resume(previous)
+558:                     old_frame = int(meta["next_frame"])
+559:                     if previous["provenance"]["input_sha256"] != openscrub.sha256_file(
+560:                             job["video"]):
+561:                         raise stop_review.CheckpointError(
+562:                             "Video changed after checkpoint; resume refused")
+563:                     # Re-scan only a one-second overlap for onset continuity.
+564:                     # Already reviewed findings win on the older side.
+565:                     args.resume_start = max(0.0, old_frame / float(meta["fps"]) - 1.0)
+566:                     job["log"].append("      resuming near %.2fs (1s overlap)"
+567:                                       % (old_frame / float(meta["fps"])))
+568:                 state = openscrub.run_scan(args, cb)
+569:                 report_path = os.path.join(job["dir"], "report.json")
+570:                 staging_path = os.path.join(job["dir"], ".scan-chunk.json")
+571:                 try:
+572:                     openscrub.write_report(staging_path, args, state)
+573:                     with open(staging_path, encoding="utf-8") as f:
+574:                         chunk = json.load(f)
+575:                     end_frame = state.get("stop_at_frame")
+576:                     total_frames = int(state["total_frames"])
+577:                     if resuming:
+578:                         if end_frame is not None and end_frame <= old_frame:
+579:                             combined = previous  # stop request before new work
+580:                         else:
+581:                             combined = stop_review.join_reports(
+582:                                 previous, chunk,
+583:                                 int(end_frame) if end_frame is not None
+584:                                 else len(state["cum"]),
+585:                                 total_frames, completed=end_frame is None)
+586:                     elif end_frame is not None:
+587:                         combined = stop_review.with_checkpoint(
+588:                             chunk, end_frame, total_frames, job["options"])
+589:                     else:
+590:                         combined = chunk
+591:                     # Never replace the last good checkpoint until the
+592:                     # continuation scan AND postprocessing have both passed.
+593:                     stop_review.atomic_report(report_path, combined)
+594:                 finally:
+595:                     if os.path.exists(staging_path):
+596:                         os.remove(staging_path)
+597:                 job["stop"].clear()
+598:                 meta = combined.get("stop_review")
+599:                 job["checkpoint_frame"] = (meta or {}).get("next_frame")
+600:                 job["checkpoint_total"] = (meta or {}).get("total_frames")
+601:                 job["stats"] = state["stats"]
+602:                 if meta:
+603:                     job["log"].append(
+604:                         "      saved checkpoint %d/%d frames; prior decisions "
+605:                         "and four-corner polygons retained" %
+606:                         (meta["next_frame"], meta["total_frames"]))
+607:                 else:
+608:                     job["log"].append(
+609:                         "      full scan complete; prior review edits retained")
+610:                 def _pregen(jid=jid):
+611:                     """One pass through the video with a single decoder:
+612:                     thumbnails come out in seconds instead of minutes.
+613:                     Sorting by reference time keeps seeks short and forward-
+614:                     only, which is what codecs are fast at."""
+615:                     try:
+616:                         jb = JOBS.get(jid)
+
+=== ffb4ed9e3e46a6608f93797c46546ec6bc54e190:openscrub.py:7056-7075 ===
+7056:             dwin[-1] = (dwin[-1][0], max(dwin[-1][1], w[1]))
+7057:         else:
+7058:             dwin.append(tuple(w))
+7059:     win_start, win_end = dwin[0][0], dwin[-1][1]
+7060:     resume_at = float(getattr(args, "resume_start", 0.0) or 0.0)
+7061:     if resume_at:
+7062:         if not math.isfinite(resume_at) or resume_at < 0 or resume_at >= duration:
+7063:             raise ValueError("invalid resume-start position")
+7064:         windows_px = [(max(t0, resume_at), t1, wc, zp)
+7065:                       for t0, t1, wc, zp in windows_px if t1 > resume_at]
+7066:         dwin = [(max(t0, resume_at), t1) for t0, t1 in dwin
+7067:                 if t1 > resume_at]
+7068:         if not dwin:
+7069:             raise ValueError("nothing remains in the selected detection windows")
+7070:         win_start, win_end = dwin[0][0], dwin[-1][1]
+7071:         track_jobs = [t for t in track_jobs if t[3] >= resume_at]
+7072:         cb.log(f"      Stop & Review resume: scanning from {resume_at:.2f}s "
+7073:                "(previously reviewed findings are loaded separately)")
+7074:     if len(windows_px) > 1 or win_start > 0 or win_end < duration:
+7075:         cb.log("      detection windows: "
+
+=== ffb4ed9e3e46a6608f93797c46546ec6bc54e190:openscrub.py:7207-7246 ===
+7207:     # indices (render min-guards its lookups). With tracking ON the frames
+7208:     # must be decoded sequentially — offsets accumulate — so no skip there.
+7209:     if win_start > 1.0 and (not track_on or resume_at > 0):
+7210:         # On resume, independent tracking starts from the overlap boundary;
+7211:         # no previous scroll offsets are applied to this suffix.
+7212:         skip_n = max(0, int(win_start * fps) - 1)
+7213:         if _seek_cap(cap, skip_n, fps):
+7214:             cum.extend([(0.0, 0.0)] * skip_n)
+7215:             bands.extend([(0.0, 0.0)] * skip_n)
+7216:             idx = skip_n
+7217:             cb.log(f"      fast-skip: jumped straight to {win_start:.1f}s — "
+7218:                    f"{skip_n} frame(s) before the window are not decoded")
+7219:         else:
+7220:             cap.release()
+7221:             cap = cv2.VideoCapture(args.video)  # unseekable: decode it all
+7222:             cb.log("      fast-skip unavailable on this file — decoding "
+7223:                    "from the start")
+7224:     stopped_at = None
+7225:     while True:
+7226:         if idx % 30 == 0 and cb.cancelled():
+7227:             cap.release()
+7228:             raise PipelineCancelled()
+7229:         # Stop differs from Cancel: finish the preceding whole frame, then
+7230:         # run the regular merge/smoothing passes and publish a report.
+7231:         # A minimum of one second avoids a zero-frame invalid checkpoint.
+7232:         if (idx >= max(1, min(int(fps), total - 1))
+7233:                 and getattr(cb, "stop_requested", lambda: False)()):
+7234:             stopped_at = idx
+7235:             cb.log(f"      Stop & Review: safe scan boundary at "
+7236:                    f"{idx / fps:.2f}s; finalizing findings for review")
+7237:             break
+7238:         ok, frame = cap.read()
+7239:         if not ok:
+7240:             break
+7241:         cx, cy = tracker.step(frame) if track_on else (0.0, 0.0)
+7242:         cum.append((cx, cy))
+7243: 
+7244:         t_now = idx / fps
+7245:         if not any(w0 <= t_now <= w1 for w0, w1 in dwin):
+7246:             # outside every detection window: no scans, no safety bands
+
+=== ffb4ed9e3e46a6608f93797c46546ec6bc54e190:openscrub.py:8053-8080 ===
+8053:                "anywhere, so edge bands (which exist to cover unscanned "
+8054:                "text) could only be camera-motion artifacts")
+8055: 
+8056:     audio_sugg, audio_tx = [], []
+8057:     if stopped_at is not None and getattr(args, "audio_pii", False):
+8058:         cb.log("      Stop & Review: audio transcription deferred; "
+8059:                "partial video/audio must not be published")
+8060:     if getattr(args, "audio_pii", False) and stopped_at is None:
+8061:         # spoken names/numbers/addresses leak PII no matter how good the
+8062:         # visual blur is — transcribe locally and suggest mute spans
+8063:         audio_sugg, audio_tx = transcribe_audio_pii(
+8064:             getattr(args, "original_video", None) or args.video, cats, cb,
+8065:             model_size=getattr(args, "audio_pii_model", "base") or "base",
+8066:             nlp=getattr(namer, "nlp", None) if namer else None,
+8067:             custom_res=custom_res)
+8068: 
+8069:     return {"fps": fps, "cum": cum, "bands": bands, "detections": detections,
+8070:             "stop_at_frame": stopped_at, "total_frames": total,
+8071:             "zdropped": zdropped, "audio_suggestions": audio_sugg,
+8072:             "audio_transcript": audio_tx,
+8073:             "input_sha256": sha256_file(args.video),
+8074:             "stats": {"scans": n_scans, "raw_hits": len(raw),
+8075:                       "regions": len(detections), "recalls": n_recalled,
+8076:                       "remembered": len(memory.items) if memory else 0,
+8077:                       "zone_dropped": zone_dropped}}
+8078: 
+8079: 
+8080: def run_render(args, state, cb=None):

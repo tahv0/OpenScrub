@@ -1,0 +1,745 @@
+Pinned 12919c96c6f7558136b50d7b4d85e5e6b62f1971; excerpts, not runtime evidence.
+
+
+openscrub_web.py:359-369
+359: def _reserve_files_locked(job=None, work=False, read_source=True, source=None):
+360:     source = (os.path.realpath(source if source is not None else job["video"])
+361:               if read_source and job and (source is not None or job.get("video")) else None)
+362:     source_job = _source_job_locked(source) if source else None
+363:     lease = FILES.reserve(job, work)
+364:     lease.source = source
+365:     if source_job is not None and source_job is not job:
+366:         lease.related.append(FILES.reserve(source_job))
+367:     return lease
+368: 
+369: 
+
+openscrub_web.py:430-464
+430:     return canonical
+431: 
+432: 
+433: def _job_video(job):
+434:     # Requests use their admitted source even if scan normalization updates
+435:     # the live job while a decoder is waiting. Worker/thread callers snapshot
+436:     # their own lease's source before starting work.
+437:     if has_request_context():
+438:         lease = g.get("file_owner")
+439:         if lease is not None and lease.state is FILES.initialize(job):
+440:             return lease.source or job.get("video")
+441:     return job.get("video")
+442: 
+443: 
+444: def _update_job_source(job, path, owner):
+445:     canonical = os.path.realpath(path)
+446:     with VAULT_LOCK:
+447:         _validate_files_locked(job)
+448:         source_job = _source_job_locked(canonical)
+449:         if source_job is not None and source_job is not job:
+450:             # Reserve before following a changed normalized input. This stays
+451:             # with the worker through its final report/provenance access.
+452:             if owner is not None and all(
+453:                     token.state is not FILES.initialize(source_job)
+454:                     for token in [owner] + owner.related):
+455:                 owner.related.append(FILES.reserve(source_job))
+456:         job["video"] = canonical
+457: 
+458: 
+459: def _own_files(job=None, work=False):
+460:     with VAULT_LOCK:
+461:         _validate_files_locked(job)
+462:         return _reserve_files_locked(job, work)
+463: 
+464: 
+
+openscrub_web.py:802-845
+802: def _report_current(job):
+803:     """Identity lookup only; caller owns report_lock and a file lifetime.
+804: 
+805:     Admission takes VAULT_LOCK -> JOBS_LOCK and releases both before this
+806:     boundary. Never acquire VAULT_LOCK (including lease release) inside it.
+807:     """
+808:     with JOBS_LOCK:
+809:         if not any(current is job for current in JOBS.values()):
+810:             abort(404)
+811:         if FILES.initialize(job).closed:
+812:             abort(409, "job is being deleted")
+813: 
+814: 
+815: def _edit_gate(job):
+816:     _report_current(job)
+817:     if FILES.initialize(job).active is not None or job.get("phase") in _ACTIVE_PHASES:
+818:         abort(409, "job work is queued, running or still cleaning up")
+819: 
+820: 
+821: def _operation_valid(job, owner):
+822:     files = FILES.initialize(job)
+823:     with JOBS_LOCK:
+824:         return (any(current is job for current in JOBS.values()) and not files.closed
+825:                 and owner.operation is not None
+826:                 and files.operation is owner.operation)
+827: 
+828: 
+829: def _begin_operation(job, owner):
+830:     files = FILES.initialize(job)
+831:     owner.operation = threading.Event()
+832:     files.operation = owner.operation
+833:     job["cancel"] = owner.operation
+834:     files.active = owner
+835: 
+836: 
+837: def _finish_operation(job, owner):
+838:     # Release lifecycle ownership outside the report transaction. Keep the
+839:     # mutation gate closed until actual worker cleanup/release has completed.
+840:     owner.release()
+841:     if job is None:  # a cancelled ticket's job may already have been deleted
+842:         return
+843:     files = FILES.initialize(job)
+844:     with files.report_lock:
+845:         if files.active is owner:
+
+openscrub_web.py:965-1018
+965:     with files.report_lock:
+966:         if owner.operation is None:  # compatibility with old queue entries
+967:             _begin_operation(job, owner)
+968:         if not _operation_valid(job, owner):
+969:             return
+970:         job["phase"] = "scanning" if action == "scan" else "rendering"
+971:     cb = WebCallbacks(job, owner.operation)
+972:     def publish_report(path, doc):
+973:         with files.report_lock:
+974:             if not _operation_valid(job, owner) or owner.operation.is_set():
+975:                 raise openscrub.PipelineCancelled()
+976:             atomic_report(path, doc)
+977:     cb.publish_report = publish_report
+978:     source = owner.source if owner is not None else job["video"]
+979:     try:
+980:         if action == "scan":
+981:             job["log"].append("— scan started —")
+982:             args = build_args(dict(job, video=source))
+983:             state = openscrub.run_scan(args, cb)
+984:             openscrub.write_report(os.path.join(job["dir"], "report.json"),
+985:                                   args, state, publisher=cb.publish_report)
+986:             with files.report_lock:
+987:                 if not _operation_valid(job, owner):
+988:                     return
+989:                 job["stats"] = state["stats"]
+990:             try:
+991:                 prov = _load_job_report(job).get("provenance", {})
+992:                 if (prov.get("vfr_normalized")
+993:                         and os.path.exists(prov.get("input", ""))):
+994:                     _update_job_source(job, prov["input"], owner)
+995:                     job["log"].append(
+996:                         "using CFR-normalized file for previews/thumbnails")
+997:             except Exception:
+998:                 pass
+999:             thumbnail_owner = _own_files(job, work=True)
+1000:             def _pregen(jb=job, video=thumbnail_owner.source):
+1001:                 """One pass through the video with a single decoder:
+1002:                 thumbnails come out in seconds instead of minutes.
+1003:                 Sorting by reference time keeps seeks short and forward-
+1004:                 only, which is what codecs are fast at."""
+1005:                 cap = None
+1006:                 try:
+1007:                     doc = _load_job_report(jb)
+1008:                     rs = doc["render_state"]
+1009:                     todo = []
+1010:                     for k, d in enumerate(doc["detections"]):
+1011:                         cch = os.path.join(jb["dir"], f"thumb2_{k}.jpg")
+1012:                         if os.path.exists(cch):
+1013:                             continue
+1014:                         tref = min(max(d.get("last_seen", d["t_start"]),
+1015:                                        d["t_start"]), d["t_end"])
+1016:                         todo.append((tref, k, d, cch))
+1017:                     todo.sort()
+1018:                     cap = cv2.VideoCapture(video)
+
+openscrub_web.py:1048-1068
+1048:                         if crop.size == 0:
+1049:                             continue
+1050:                         inner = crop[pad:-pad or None, pad:-pad or None]
+1051:                         if not inner.size or float(inner.std()) <= 8:
+1052:                             continue   # blank: leave for the on-demand
+1053:                                        # path, which tries other moments
+1054:                         cv2.rectangle(crop, (pad, pad),
+1055:                                       (crop.shape[1] - pad,
+1056:                                        crop.shape[0] - pad),
+1057:                                       (0, 0, 255), 2)
+1058:                         cv2.imwrite(cch, crop,
+1059:                                     [cv2.IMWRITE_JPEG_QUALITY, 80])
+1060:                     jb["log"].append("thumbnails pre-generated "
+1061:                                      f"({len(todo)})")
+1062:                 except Exception:
+1063:                     pass
+1064:                 finally:
+1065:                     if cap is not None:
+1066:                         cap.release()
+1067:             _start_owned_thread(_pregen, thumbnail_owner)
+1068:             next_owner = (_prepare_work(job, "render")
+
+openscrub_web.py:1176-1220
+1176: def _touch_activity():
+1177:     LAST_ACTIVITY["t"] = time.time()
+1178: 
+1179: 
+1180: @app.before_request
+1181: def enforce_vault_lock():
+1182:     """Admit file work before intake parsing or a view captures a job."""
+1183:     if request.endpoint == "allowlist":
+1184:         g.file_owner = _own_files()  # shared file lives directly in JOBS_DIR
+1185:         return
+1186:     if request.path.startswith("/api/jobs"):
+1187:         # Deletion closes admissions itself, without becoming its own busy owner.
+1188:         if request.endpoint == "job_delete":
+1189:             with VAULT_LOCK:
+1190:                 _validate_files_locked()
+1191:             return
+1192:         with VAULT_LOCK:
+1193:             jid = (request.view_args or {}).get("jid")
+1194:             job = JOBS.get(jid) if jid is not None else None
+1195:             if jid is not None and job is None:
+1196:                 abort(404)
+1197:             _validate_files_locked(job)
+1198:             read_source = request.endpoint in {
+1199:                 "job_retry", "job_render", "job_track_object", "job_mediainfo",
+1200:                 "job_detframe", "job_thumb", "job_frame_at", "job_video_stream"}
+1201:             g.file_owner = _reserve_files_locked(job, read_source=read_source)
+1202: 
+1203: 
+1204: @app.after_request
+1205: def _finish_file_response(response):
+1206:     for child in g.pop("file_children", []):
+1207:         child.release()
+1208:     lease = g.pop("file_owner", None)
+1209:     if lease is not None:
+1210:         if response.direct_passthrough:
+1211:             response.response = OwnedIterable(response.response, lease)
+1212:         else:
+1213:             lease.release()  # detached JSON/JPEG bytes no longer read job files
+1214:     return response
+1215: 
+1216: 
+1217: @app.teardown_request
+1218: def _release_failed_request(error):
+1219:     for child in g.pop("file_children", []):
+1220:         child.release()
+
+openscrub_web.py:1507-1519
+1507: def _load_job_report(job):
+1508:     with open(os.path.join(job["dir"], "report.json"), encoding="utf-8") as f:
+1509:         return json.load(f)
+1510: 
+1511: 
+1512: def _frame_at(job, t, rstate):
+1513:     cap = cv2.VideoCapture(_job_video(job))
+1514:     try:
+1515:         fps = rstate["fps"]
+1516:         cap.set(cv2.CAP_PROP_POS_FRAMES, int(t * fps))
+1517:         ok, frame = cap.read()
+1518:         return frame if ok else None
+1519:     finally:
+
+openscrub_web.py:1541-1582
+1541: @app.route("/api/jobs/<jid>/detections")
+1542: def job_detections(jid):
+1543:     job = JOBS.get(jid) or abort(404)
+1544:     doc = _load_job_report(job)
+1545:     items = []
+1546:     for i, d in enumerate(doc["detections"]):
+1547:         items.append({"i": i, "category": d["category"], "text": d["text"],
+1548:                       "t_start": d["t_start"], "t_end": round(d["t_end"], 2),
+1549:                       "enabled": d.get("enabled", True),
+1550:                       "track": d.get("track", -1),
+1551:                       "person": d.get("person", -1),
+1552:                       "confidence": d.get("confidence", 0),
+1553:                       "zone_dropped": bool(d.get("zone_dropped"))})
+1554:     return jsonify({"detections": items,
+1555:                     "fps": doc["render_state"]["fps"],
+1556:                     "duration": len(doc["render_state"]["cum"]) /
+1557:                                 doc["render_state"]["fps"]})
+1558: 
+1559: 
+1560: @app.route("/api/jobs/<jid>/detframe/<int:i>")
+1561: def job_detframe(jid, i):
+1562:     """Full video frame at a real sighting of detection i, with its box
+1563:     outlined — the review lightbox."""
+1564:     job = JOBS.get(jid) or abort(404)
+1565:     doc = _load_job_report(job)
+1566:     d = doc["detections"][i]
+1567:     rs = doc["render_state"]
+1568:     tref = min(max(d.get("last_seen", d["t_start"]), d["t_start"]), d["t_end"])
+1569:     fidx = min(int(tref * rs["fps"]), len(rs["cum"]) - 1)
+1570:     ox, oy = rs["cum"][fidx]
+1571:     frame = _frame_at(job, tref, rs)
+1572:     if frame is None:
+1573:         abort(404)
+1574:     x1, y1 = int(d["cbox"][0] + ox), int(d["cbox"][1] + oy)
+1575:     x2, y2 = int(d["cbox"][2] + ox), int(d["cbox"][3] + oy)
+1576:     cv2.rectangle(frame, (x1 - 4, y1 - 4), (x2 + 4, y2 + 4), (0, 0, 255), 3)
+1577:     ok, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 84])
+1578:     from flask import Response
+1579:     return Response(buf.tobytes(), mimetype="image/jpeg")
+1580: 
+1581: 
+1582: @app.route("/api/jobs/<jid>/boxes_at")
+
+openscrub_web.py:1609-1662
+1609: @app.route("/api/jobs/<jid>/thumb/<int:i>")
+1610: def job_thumb(jid, i):
+1611:     job = JOBS.get(jid) or abort(404)
+1612:     # i is already a Flask <int:> route var, but CodeQL doesn't trust the
+1613:     # converter — format it as an explicit non-negative integer so the
+1614:     # cache filename can never carry anything but digits.
+1615:     i = int(i)
+1616:     if i < 0:
+1617:         abort(404)
+1618:     cache = os.path.join(job["dir"], "thumb2_%d.jpg" % i)
+1619:     if not os.path.exists(cache):
+1620:         doc = _load_job_report(job)
+1621:         if i >= len(doc["detections"]):
+1622:             abort(404)
+1623:         d = doc["detections"][i]
+1624:         rs = doc["render_state"]
+1625:         # cut the thumbnail at a moment the detector actually SAW the object.
+1626:         # t_start can be earlier than the object's appearance (backtracking
+1627:         # deliberately moves it to just before onset) — a frame there shows
+1628:         # nothing and made review pictures mismatch their text.
+1629:         ls = min(max(d.get("last_seen", d["t_start"]), d["t_start"]),
+1630:                  d["t_end"])
+1631:         mid = (d["t_start"] + d["t_end"]) / 2
+1632:         crop = None
+1633:         pad = 24
+1634:         for tref in (ls, mid, min(d["t_start"] + 0.2, d["t_end"])):
+1635:             fidx = min(int(tref * rs["fps"]), len(rs["cum"]) - 1)
+1636:             ox, oy = rs["cum"][fidx]
+1637:             frame = _frame_at(job, tref, rs)
+1638:             if frame is None:
+1639:                 continue
+1640:             h, w = frame.shape[:2]
+1641:             x1 = max(0, int(d["cbox"][0] + ox) - pad)
+1642:             y1 = max(0, int(d["cbox"][1] + oy) - pad)
+1643:             x2 = min(w, int(d["cbox"][2] + ox) + pad)
+1644:             y2 = min(h, int(d["cbox"][3] + oy) + pad)
+1645:             c = frame[y1:y2, x1:x2]
+1646:             if c.size == 0:
+1647:                 continue
+1648:             crop = c
+1649:             inner = c[pad:-pad or None, pad:-pad or None]
+1650:             if inner.size and float(inner.std()) > 8:
+1651:                 break   # crop shows real content — use this moment
+1652:         if crop is None:
+1653:             abort(404)
+1654:         cv2.rectangle(crop, (pad, pad), (crop.shape[1] - pad,
+1655:                                          crop.shape[0] - pad), (0, 0, 255), 2)
+1656:         cv2.imwrite(cache, crop, [cv2.IMWRITE_JPEG_QUALITY, 80])
+1657:     return send_file(cache, mimetype="image/jpeg", max_age=3600)
+1658: 
+1659: 
+1660: @app.route("/api/jobs/<jid>/frame_at")
+1661: def job_frame_at(jid):
+1662:     job = JOBS.get(jid) or abort(404)
+
+openscrub_web.py:1720-1733
+1720: def job_save_edits(jid):
+1721:     job = JOBS.get(jid) or abort(404)
+1722:     edits = request.get_json(force=True)
+1723:     path = os.path.join(job["dir"], "report.json")
+1724:     with FILES.initialize(job).report_lock:
+1725:         _edit_gate(job)
+1726:         try:
+1727:             doc = _load_job_report(job)
+1728:         except FileNotFoundError:
+1729:             abort(404, "job report not found")
+1730:         enabled = edits.get("enabled", {})
+1731:         for i, d in enumerate(doc["detections"]):
+1732:             if str(i) in enabled:
+1733:                 d["enabled"] = bool(enabled[str(i)])
+
+openscrub_web.py:1798-1807
+1798:                  "mode": (s.get("mode") if s.get("mode") in ("mute", "bleep")
+1799:                           else "mute")}
+1800:                 for s in (edits.get("audio") or [])
+1801:                 if float(s.get("t1", 0)) > float(s.get("t0", 0)) >= 0]
+1802:         atomic_report(path, doc)
+1803:         # suggest allowlisting any string whose EVERY instance was disabled —
+1804:         # the review just taught us it's a recurring false positive
+1805:         per = {}
+1806:         for d in doc["detections"]:
+1807:             if d["category"] in ("name",):
+
+openscrub_web.py:1876-1889
+1876:                 lease.source, box, t_ref, t0, t1, cb=L(), person_det=det)
+1877:             with files.report_lock:
+1878:                 if (not _operation_valid(job, lease)
+1879:                         or job.get("trackbg") is not st or lease.operation.is_set()):
+1880:                     return
+1881:                 if not samples:
+1882:                     st.update(state="done", added=0,
+1883:                               error="could not track that region — try a "
+1884:                                     "larger box or a frame where it's clearer")
+1885:                     return
+1886:                 doc = _load_job_report(job)
+1887:                 rs = doc["render_state"]
+1888:                 fps = float(rs["fps"]) or 30.0
+1889:                 step = 2.0 / fps
+
+openscrub_web.py:1914-1923
+1914:                 new[0]["t_start"] = max(0.0, new[0]["t_start"] - 0.25)
+1915:                 new[-1]["t_end"] += 0.25
+1916:                 doc["detections"].extend(new)
+1917:                 path = os.path.join(job["dir"], "report.json")
+1918:                 atomic_report(path, doc)
+1919:                 job["log"].append(
+1920:                     "      tracked object: %d position(s), %.1f-%.1fs "
+1921:                     "(review card added)" % (len(new),
+1922:                                              new[0]["t_start"], new[-1]["t_end"]))
+1923:                 st.update(state="done", added=len(new))
+
+openscrub_web.py:2241-2251
+2241: @app.route("/api/jobs/<jid>/report")
+2242: def job_report(jid):
+2243:     job = JOBS.get(jid) or abort(404)
+2244:     with FILES.initialize(job).report_lock:
+2245:         return send_file(os.path.join(job["dir"], "report.json"),
+2246:                          as_attachment=True,
+2247:                          download_name=os.path.splitext(job["name"])[0]
+2248:                          + "_audit.json")
+2249: 
+2250: 
+2251: # ----------------------------------------------------------------------------
+
+openscrub_web.py:2605-2642
+2605: let CUR=null, EN={}, MAN=[], DUR=0, POLL=null, PHIST=[], PHPH="", LOGN=0, SHELLPH=null, JOBSJSON="";
+2606: 
+2607: // VIEW_GEN advances on every openJob (including A -> B -> A) and removal.
+2608: // Drafts live only in this page; late acknowledgements reconcile their owner,
+2609: // but may never publish into, or start rendering from, a different view.
+2610: let VIEW_GEN=0, EDITS=null;
+2611: const REVIEW_DRAFTS=new Map();
+2612: function emptyEditor(){return {t:0,ox:0,oy:0,boxes:[],sel:-1,ov:{},dis:{},times:{},adds:[],
+2613:  add:false,addAnchor:null,drag:null,scale:1,dur:10,
+2614:  audio:[],audioSaved:[],audioLoaded:false};}
+2615: function sameEdit(a,b){return JSON.stringify(a)===JSON.stringify(b);}
+2616: function copyEdit(a){return JSON.parse(JSON.stringify(a));}
+2617: function ownsView(id,gen){return CUR===id&&VIEW_GEN===gen;}
+2618: function saveStatus(d,message){
+2619:  d.status=message;
+2620:  if(d!==EDITS)return;
+2621:  const el=document.getElementById("reviewSaveStatus");if(el)el.textContent=message;
+2622:  document.querySelectorAll("button[data-save-edits]").forEach(b=>{b.disabled=!!d.busy;});
+2623: }
+2624: function trimReviewDraft(d){
+2625:  const b=d.editor;
+2626:  // Clean audio is fetched display state even when other edit kinds are pending.
+2627:  // An in-flight audio submission may make a toggle-back a newer pending choice.
+2628:  if(!d.audioInFlight&&sameEdit(b.audio,b.audioSaved)){
+2629:   b.audio=[];b.audioSaved=[];b.audioLoaded=false;
+2630:  }
+2631:  if(!d.busy&&!hasReviewEdits(d)){
+2632:   d.en={};d.editor=emptyEditor();
+2633:  }
+2634: }
+2635: function hasReviewEdits(d){
+2636:  const b=d.editor;
+2637:  return Object.keys(d.enabled).length||d.manual.length||b.adds.length||
+2638:   Object.keys(b.ov).length||Object.keys(b.times).length||
+2639:   !sameEdit(b.audio,b.audioSaved);
+2640: }
+2641: 
+2642: async function loadJobs(){
+
+openscrub_web.py:3250-3261
+3250:  if(!ov){
+3251:   ov=document.createElement("div");ov.id="lb";
+3252:   ov.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.82);"+
+3253:    "z-index:100;display:flex;align-items:center;justify-content:center;"+
+3254:    "cursor:zoom-out;padding:18px";
+3255:   ov.onclick=()=>ov.remove();
+3256:   document.body.appendChild(ov);
+3257:  }
+3258:  ov.innerHTML=`<img src="api/jobs/${CUR}/detframe/${i}"
+3259:   style="max-width:96%;max-height:96%;border-radius:8px;
+3260:   box-shadow:0 12px 50px rgba(0,0,0,.6)">`;
+3261: }
+
+openscrub_web.py:3314-3326
+3314: async function loadReview(){
+3315:  const id=CUR,gen=VIEW_GEN;
+3316:  showPanel("review");
+3317:  const d=await (await fetch(`api/jobs/${id}/detections`)).json();
+3318:  if(!ownsView(id,gen))return;
+3319:  DUR=d.duration;
+3320:  const groups={}; const zdrop=[]; TRKMEM={};
+3321:  d.detections.forEach(x=>{
+3322:   EN[x.i]=(x.i in EDITS.enabled)?EDITS.enabled[x.i]:x.enabled;
+3323:   if(x.zone_dropped){zdrop.push(x);return;}
+3324:   (groups[x.category]=groups[x.category]||[]).push(x);});
+3325:  let html=`<div class="card" id="review"><h2>Review — red = will be blurred,
+3326:  green = kept visible. Drag a box around several to bulk-set.</h2>
+
+openscrub_web.py:3340-3347
+3340:     <button class="sec" onclick="setAllZd(false)">keep all</button></div>
+3341:    <div class="grid3">`;
+3342:   for(const x of zdrop){
+3343:    html+=`<div class="det ${EN[x.i]?'':'off'}" id="det${x.i}" data-cat="zdrop">
+3344:     <img src="api/jobs/${CUR}/thumb/${x.i}" loading="lazy"
+3345:      style="cursor:zoom-in" onclick="zoomDet(${x.i})" onerror="thumbRetry(this)">
+3346:     <div>"${x.text}" <br>${x.t_start.toFixed(1)}–${x.t_end.toFixed(1)}s</div>
+3347:     <button class="blurbtn ${EN[x.i]?"blur":"keep"}" id="bb${x.i}"
+
+openscrub_web.py:3381-3387
+3381:    onclick="setAll('${cat}',false)">all off</button></h3><div class="grid3">`;
+3382:   for(const x of items){
+3383:    html+=`<div class="det ${EN[x.i]?'':'off'}" id="det${x.i}" data-cat="${cat}">
+3384:     <img src="api/jobs/${CUR}/thumb/${x.i}"
+3385:      style="cursor:zoom-in" onclick="zoomDet(${x.i})"
+3386:      onerror="thumbRetry(this)">
+3387:     <div>${x.personcard?`<b>Person ${x.person+1}</b> — one decision for ALL their appearances`:`"${x.text}"`}${x.frames?` <span class="badge">×${x.frames} frames</span>`:""}${x.confidence?` <span class="badge" title="detector confidence — low values on a non-face thumbnail usually mean a false detection">${Math.round(x.confidence*100)}%</span>`:""} <br>${x.t_start.toFixed(1)}–${x.t_end.toFixed(1)}s</div>
+
+openscrub_web.py:3396-3403
+3396:   ▶ Preview video &amp; edit boxes above — its ＋ Add box replaces the old
+3397:   add-region tool</span></div></div>`;
+3398:  const old=document.getElementById("review"); if(old)old.remove();
+3399:  detail.insertAdjacentHTML("beforeend",html);
+3400:  initMarquee();saveStatus(EDITS,EDITS.status);
+3401: }
+3402: 
+3403: let TRKMEM={};
+
+openscrub_web.py:3417-3423
+3417: function thumbRetry(img){
+3418:  const n=+(img.dataset.r||0);
+3419:  if(n>=3)return;
+3420:  img.dataset.r=n+1;
+3421:  setTimeout(()=>{img.src=img.src.split("?r=")[0]+"?r="+Date.now();},
+3422:             600*(n+1));
+3423: }
+
+openscrub_web.py:3501-3519
+3501: async function reviewPost(url,payload){
+3502:  const response=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},
+3503:   ...(payload===undefined?{}:{body:JSON.stringify(payload)})});
+3504:  let body;
+3505:  try{body=await response.json();}catch(e){throw Error("Invalid server response (HTTP "+response.status+")");}
+3506:  if(!response.ok||!body||body.error||body.ok!==true)
+3507:   throw Error((body&&body.error)||("Request failed (HTTP "+response.status+")"));
+3508:  return body;
+3509: }
+3510: function acknowledgeMap(current,submitted){
+3511:  for(const [key,value] of Object.entries(submitted))
+3512:   if(sameEdit(current[key],value))delete current[key];
+3513: }
+3514: function acknowledgeAdds(current,refs,submitted){
+3515:  for(let i=current.length-1;i>=0;i--){
+3516:   const index=refs.indexOf(current[i]);
+3517:   if(index>=0&&sameEdit(current[i],submitted[index]))current.splice(i,1);
+3518:  }
+3519: }
+
+openscrub_web.py:3520-3547
+3520: async function saveAndRender(){
+3521:  const id=CUR,gen=VIEW_GEN,d=EDITS;
+3522:  if(!id||!d||d.busy)return false;
+3523:  const b=d.editor;
+3524:  try{
+3525:   // Compatibility drafts acquire an identity once, on the original object.
+3526:   for(const a of [...d.manual,...b.adds])if(!Object.prototype.hasOwnProperty.call(a,"manual_id"))a.manual_id=manualId();
+3527:  }catch(e){saveStatus(d,"Could not save edits: "+e.message);return false;}
+3528:  const manRefs=[...d.manual],addRefs=[...b.adds];
+3529:  const man=copyEdit(d.manual),adds=copyEdit(b.adds);
+3530:  const payload=copyEdit({enabled:d.enabled,manual:[...man,...adds.map(a=>({
+3531:   manual_id:a.manual_id,t_start:a.t0,t_end:a.t1,t_ref:a.tref,screen_box:a.box}))],
+3532:   box_overrides:b.ov,time_overrides:b.times});
+3533:  // Plain review must never wipe audio that the editor has not loaded.
+3534:  if(b.audioLoaded&&!sameEdit(b.audio,b.audioSaved)){payload.audio=copyEdit(b.audio);}
+3535:  d.audioInFlight=payload.audio!==undefined;
+3536:  d.busy=true;saveStatus(d,"Saving edits… You can keep editing; newer edits stay pending.");
+3537:  let saved=false;
+3538:  try{
+3539:   const result=await reviewPost(`api/jobs/${id}/detections`,payload);
+3540:   saved=true;d.audioInFlight=false;
+3541:   acknowledgeMap(d.enabled,payload.enabled);
+3542:   acknowledgeMap(b.ov,payload.box_overrides);acknowledgeMap(b.times,payload.time_overrides);
+3543:   acknowledgeAdds(d.manual,manRefs,man);acknowledgeAdds(b.adds,addRefs,adds);
+3544:   if(payload.audio!==undefined)b.audioSaved=copyEdit(payload.audio);
+3545:   // A switched-away view never opens a confirmation or changes current UI.
+3546:   if(!ownsView(id,gen)){
+3547:    saveStatus(d,"Edits saved. Review pending edits, then save to render this job.");return false;
+
+openscrub_web.py:3920-3948
+3920:     key = VAULT["key"]
+3921:     if key is None:
+3922:         return 0
+3923:     VAULT["closed"] = True
+3924:     try:
+3925:         n = vault.encrypt_tree(key, JOBS_DIR)
+3926:     except BaseException:
+3927:         VAULT["error"] = "Encryption failed; unlock to recover before accessing jobs."
+3928:         raise
+3929:     VAULT["key"] = None
+3930:     VAULT["error"] = None
+3931:     return n
+3932: 
+3933: 
+3934: def _vault_lock_now(blocking=True):
+3935:     """One guarded busy/admission decision, also used by auto-lock/shutdown."""
+3936:     if not VAULT_LOCK.acquire(blocking=blocking):
+3937:         raise FilesBusy("a lifecycle transition is in progress")
+3938:     try:
+3939:         return _vault_lock_locked(blocking_jobs=blocking)
+3940:     finally:
+3941:         VAULT_LOCK.release()
+3942: 
+3943: 
+3944: def _vault_lock_atexit():
+3945:     try:
+3946:         if vault_enabled() and VAULT["key"] is not None:
+3947:             # A Python signal can run while this very thread owns VAULT_LOCK.
+3948:             # Never join or wait for it; timeout is not permission to encrypt.
+
+openscrub_internal/lifetimes.py
+1: """In-process web file ownership. Reserve/inspect only under the web guard.
+2: 
+3: Per-job state also owns the report transaction lock and operation identity.
+4: This does not coordinate other processes. A lifetime token may move to a queued task, thread, or WSGI iterable; release is idempotent.
+5: """
+6: 
+7: import threading
+8: 
+9: 
+10: class _JobFiles:
+11:     def __init__(self):
+12:         self.count = 0
+13:         self.work = 0
+14:         self.closed = False
+15:         self.queued = {}
+16:         self.tracker = None
+17:         # Initialized before a new/rehydrated job enters the registry. Never
+18:         # persisted: one stable transaction boundary per live job identity.
+19:         self.report_lock = threading.Lock()
+20:         self.operation = None
+21:         self.active = None
+22: 
+23: 
+24: class FileOwners:
+25:     def __init__(self, guard):
+26:         self.guard = guard
+27:         self.count = 0
+28: 
+29:     @staticmethod
+30:     def initialize(job):
+31:         return job.setdefault("_files", _JobFiles())
+32: 
+33:     def reserve(self, job=None, work=False):
+34:         state = self.initialize(job) if job is not None else None
+35:         self.count += 1
+36:         if state is not None:
+37:             state.count += 1
+38:             state.work += int(work)
+39:         return _Lease(self, state, work)
+40: 
+41: 
+42: class _Lease:
+43:     def __init__(self, owners, state, work):
+44:         self.owners, self.state, self.work = owners, state, work
+45:         self.released = False
+46:         self.related = []
+47:         self.source = None
+48:         self.report_input = False
+49:         self.operation = None
+50: 
+51:     def release_locked(self):
+52:         if self.released:
+53:             return
+54:         self.released = True
+55:         for lease in self.related:
+56:             lease.release_locked()
+57:         self.owners.count -= 1
+58:         if self.state is not None:
+59:             self.state.count -= 1
+60:             self.state.work -= int(self.work)
+61: 
+62:     def release(self):
+63:         with self.owners.guard:
+64:             self.release_locked()
+65: 
+66:     def __enter__(self):
+67:         return self
+68: 
+69:     def __exit__(self, *exc):
+70:         self.release()
+71: 
+72: 
+73: class OwnedIterable:
+74:     """Keep the file open/owned through WSGI close, including early disconnect.
+75: 
+76:     Deliberately hide the server's file_wrapper optimization so every server
+77:     takes the same close path; the underlying streaming/range iterator remains
+78:     incremental and its headers/bytes are unchanged.
+79:     """
+80:     def __init__(self, iterable, lease):
+81:         self.iterable, self.iterator = iterable, iter(iterable)
+82:         self.lease = lease
+83:         self.closed = False
+84: 
+85:     def __iter__(self):
+86:         return self
+87: 
+88:     def __next__(self):
+89:         try:
+90:             return next(self.iterator)
+91:         except BaseException:
+92:             self.close()
+93:             raise
+94: 
+95:     def close(self):
+96:         if self.closed:
+97:             return
+98:         self.closed = True
+99:         try:
+100:             close = getattr(self.iterable, "close", None)
+101:             if close is not None:
+102:                 close()
+103:         finally:
+104:             self.lease.release()
+
+openscrub_internal/reports.py
+1: """Publish complete report JSON without truncating the previous report."""
+2: import json
+3: import os
+4: import tempfile
+5: 
+6: 
+7: def atomic_report(path, report) -> None:
+8:     """Stage private UTF-8 JSON beside *path*, sync, close, then replace it.
+9: 
+10:     A failure before replacement leaves the previous report intact and raises.
+11:     Readers opening the path see a complete old or new report on filesystems
+12:     supporting atomic replacement. This does not serialize read/apply/write
+13:     transactions or guarantee power-loss durability: the directory is not
+14:     fsynced, and filesystem/network storage guarantees vary. On Windows an open
+15:     destination may prevent replacement; that failure is propagated. Temporary
+16:     files use the vault's .tmp crash-cleanup convention. POSIX staging permissions
+17:     are 0600; Windows access restrictions also depend on the directory ACL.
+18:     """
+19:     path = os.path.abspath(path)
+20:     staged = None
+21:     try:
+22:         # NamedTemporaryFile creates exclusively with restrictive permissions.
+23:         with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8",
+24:                                          dir=os.path.dirname(path),
+25:                                          prefix=".report-", suffix=".tmp",
+26:                                          delete=False) as stream:
+27:             staged = stream.name
+28:             json.dump(report, stream, indent=1)
+29:             stream.flush()
+30:             os.fsync(stream.fileno())
+31:         # Close first: Windows cannot rename an open staging file.
+32:         os.replace(staged, path)
+33:     finally:
+34:         if staged is not None:
+35:             try:
+36:                 os.unlink(staged)
+37:             except OSError:
+38:                 # After replace the name is gone. On cleanup failure leave a
+39:                 # .tmp for vault crash cleanup without masking the write error.
+40:                 pass

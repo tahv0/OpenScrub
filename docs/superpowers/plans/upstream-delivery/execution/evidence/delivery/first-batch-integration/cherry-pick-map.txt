@@ -1,0 +1,33 @@
+6ccf4374c2269e600e2811cd85fddcf25ab2a688 Add streaming Save As with byte progress for exports
+Build on Tuomas Aho's Save As implementation (2900930f) with accepted-byte
+progress, elapsed time, rolling ETA, waiting and finalization feedback.
+Keep direct downloads and actual-container filenames, and bind each save
+to the job selected at the click through picker waits and UI polling.
+
+Exercise real embedded JavaScript async behavior and HTTP attachment
+contracts, include focused tests in sdists, and document test discovery.
+
+Validation: 24 new tests pass; full suite has 157 passes and the unchanged
+baseline test_track_person_size_jump_handoff logging assertion failure.
+Full sdist/wheel build, evaluated JS syntax and Chromium HTTP-to-OPFS
+256 MiB streaming/failure/fallback checks pass.
+
+(cherry picked from commit ca0f2ce7458347afd2e6156a97df580b6623767a)
+
+9cee49f383a083b4954fad657446d233c08db425 Retrieve only needed dense smoothing frames
+(cherry picked from commit f19be5fe3b9176e568ea7bf761493bd267fee95e)
+
+b76d1b2f13a2cf70a1a9ffe77ebb312000ebeeb5 Reject malformed and non-object scan options before job creation
+(cherry picked from commit e34313e1b136254fb2777cabb385f2097a54935a)
+
+7635a67eaaa78f1da047e6542376447ca1652817 Handle integer decoding limits in scan option validation
+(cherry picked from commit b26b6685b237ba1c4caffaaefb47b029a3205b51)
+
+51dbdeed0b91a3405d857241f875bef88234e6c9 fix(web): publish and serve complete preview generations
+(cherry picked from commit b70d42011168192cdf7a9ef93a5e9419a92a1cdb)
+
+7d2f812c1178601fc88618c5c4d736e77bbe0c0b Estimate stage ETA from bounded recent progress
+Use monotonic samples over 120 seconds, retaining a crossing-interval predecessor, and prefer the recent rate after 20 seconds. Keep startup fallback, progress mapping and nullable public seconds; clear estimator state on completion or counter restart. Add controlled-clock and worker coverage with shipped test discovery. Recent-rate idea from 0b2e3d1d8ec702bfa1a3a26e2c278f15b3bc69aa; 0.35/0.65 smoothing from 367148d54efaef7e49498d96ef17507f38408f64. Diagnostics and preview changes excluded.
+
+(cherry picked from commit d129e23e5fe144edb8bbd5675809c1877cfe4d0f)
+

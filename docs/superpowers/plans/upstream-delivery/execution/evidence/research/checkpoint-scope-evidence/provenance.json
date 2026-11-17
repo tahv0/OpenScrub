@@ -1,0 +1,112 @@
+{
+  "method": "Source-only, no product import or feature execution; git object export and read-only source inspection.",
+  "export": "/tmp/openscrub-checkpoint-scope-20261117",
+  "pins": {
+    "12919c96c6f7558136b50d7b4d85e5e6b62f1971": {
+      "commit": "12919c96c6f7558136b50d7b4d85e5e6b62f1971",
+      "tree": "ed743d1b79b8b3ebf8d7f65aa11a12cf0894360e"
+    },
+    "72efeb02": {
+      "commit": "72efeb02d73ac9d0f4cb24ea483fcf0df8ed6340",
+      "tree": "17cd1a476384aea7100a314814980801fa1ce7f0"
+    },
+    "ffb4ed9e": {
+      "commit": "ffb4ed9e3e46a6608f93797c46546ec6bc54e190",
+      "tree": "a38bebb309518e76e93a7138fc9f2a6a3e9d8e13"
+    },
+    "ab58d36": {
+      "commit": "ab58d36dcb698ad87cb104e6fcdca2d3df5820a6",
+      "tree": "f9cdf46091e0360a66e2f5a0f77c52a10c57f51d"
+    },
+    "0290d5e": {
+      "commit": "0290d5e5a959c54e5f4454cb6bc7e590c1cdc6f6",
+      "tree": "892fdc50a9df85331dbb03f8718dd31f1b606946"
+    },
+    "1006ef4": {
+      "commit": "1006ef44312678ee58a06a223297e092e1ca2b6f",
+      "tree": "a81123988c0cb5add65836b2adbb1c9a9cbfe4e2"
+    }
+  },
+  "files": [
+    {
+      "commit": "12919c96c6f7558136b50d7b4d85e5e6b62f1971",
+      "path": "openscrub.py",
+      "blob": "9a9c82d7eb8075510e5c2dbbbe63be3c943a399f",
+      "sha256": "275de34766d3d64592222be5633906a3dcd2557ce78e2dd7b7d6fb8075fd0355",
+      "export_matches_git_blob": true
+    },
+    {
+      "commit": "12919c96c6f7558136b50d7b4d85e5e6b62f1971",
+      "path": "openscrub_web.py",
+      "blob": "137091183f66e99350153b38ce060b02f95e55f0",
+      "sha256": "7762f0314df5e11e46a570af54cd20e928953e7bf92d55da7d648dad36e0fce2",
+      "export_matches_git_blob": true
+    },
+    {
+      "commit": "12919c96c6f7558136b50d7b4d85e5e6b62f1971",
+      "path": "openscrub_internal/reports.py",
+      "blob": "a46d324fc198d01c9e11460a506d7c77b70c1760",
+      "sha256": "e8a7429c0b5430ee290f6635ca5d5a93445d3f0fe9bb0f58e57fec891ee01b7f",
+      "export_matches_git_blob": true
+    },
+    {
+      "commit": "12919c96c6f7558136b50d7b4d85e5e6b62f1971",
+      "path": "openscrub_internal/lifetimes.py",
+      "blob": "992adfb357631f69792f22e437a3b1d61e2a7ca8",
+      "sha256": "dbfc317c1c878b8e8a599391578504c44a8964199f2cdae6e2ed60a6336d6743",
+      "export_matches_git_blob": true
+    },
+    {
+      "commit": "12919c96c6f7558136b50d7b4d85e5e6b62f1971",
+      "path": "pyproject.toml",
+      "blob": "c297247bd41669a27d505bb940d39a07c91f4315",
+      "sha256": "190c4a010c88bff8ec83035d38760ef60ab772784c9b1fc90415327746c504a0",
+      "export_matches_git_blob": true
+    },
+    {
+      "commit": "12919c96c6f7558136b50d7b4d85e5e6b62f1971",
+      "path": "tests/test_report_roundtrip.py",
+      "blob": "af5b54962b7cb9d4378bde3436c3de4bc1e2e528",
+      "sha256": "e39f7a933020c93ad5c3a9e3490b9628bcc476bfc5129c2fac756c24233b88b8",
+      "export_matches_git_blob": true
+    },
+    {
+      "commit": "12919c96c6f7558136b50d7b4d85e5e6b62f1971",
+      "path": "tests/test_report_transactions.py",
+      "blob": "5e6190f1b2409108f245d9dc143396d08dc798cc",
+      "sha256": "e07c18b6823ed79b6ac0c3e1bad74d1740655ae67054e57888871f8cdd3b6ef8",
+      "export_matches_git_blob": true
+    },
+    {
+      "commit": "12919c96c6f7558136b50d7b4d85e5e6b62f1971",
+      "path": "tests/test_review_save_failures.py",
+      "blob": "94f249ab5b3d9d84e97e7e7f634ef0b5def25187",
+      "sha256": "c47c94f206cb846edc4430d079c33130eb9f3c5755dd9e6f17c0cdf3232b10de",
+      "export_matches_git_blob": true
+    },
+    {
+      "commit": "72efeb02d73ac9d0f4cb24ea483fcf0df8ed6340",
+      "path": "stop_review.py",
+      "blob": "d4a0011d1688b8f7c69788b7dabac266a1e5a6fd",
+      "sha256": "5fdb82c81835b4b38b04ee288d2d51da2b27d339a39e786a7fa753d82e8c34cb"
+    },
+    {
+      "commit": "ffb4ed9e3e46a6608f93797c46546ec6bc54e190",
+      "path": "stop_review.py",
+      "blob": "3d92852ea62084b36490dcb6b9ec10814b045ec4",
+      "sha256": "08a7aaf57fbf24eded0240aad421023fb23466563a26796c47d1d73c5a0ef1d2"
+    },
+    {
+      "commit": "ffb4ed9e3e46a6608f93797c46546ec6bc54e190",
+      "path": "openscrub.py",
+      "blob": "76b059feb8c382faf09485333f0cf0cd857ff89b",
+      "sha256": "1a8fbc5adafc4e95d8eb4171de8ada38813508dad1ae6c584cc6753fac8cda4d"
+    },
+    {
+      "commit": "ffb4ed9e3e46a6608f93797c46546ec6bc54e190",
+      "path": "openscrub_web.py",
+      "blob": "db237ac573404a214673aabcdb5d95aac401ca74",
+      "sha256": "18d42e523dd336fe6e56edbd6c090d44066cf7660067587c9739e0042247bee7"
+    }
+  ]
+}

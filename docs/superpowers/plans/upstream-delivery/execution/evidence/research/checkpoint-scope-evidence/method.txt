@@ -1,0 +1,8 @@
+Scope: local git object reads only for product source; no GitHits/public-source tool needed.
+Pinned product source exported using git archive 12919c96c6f7558136b50d7b4d85e5e6b62f1971 into /tmp/openscrub-checkpoint-scope-20261117.
+Representative read-only queries: git grep -n -e with_checkpoint -e validate_resume -e join_reports 72efeb02 ffb4ed9e; git show <ref>:<path>; rg/sed against export.
+Relevant history inspected: git log -6 --oneline ffb4ed9e -- openscrub.py stop_review.py openscrub_web.py; git show ab58d36 -- openscrub.py; git show 0290d5e -- stop_review.py.
+No imports, synthetic scan, OCR observations, tests, browser, build, benchmark, installs, model access, training, custom code execution against product, Git ref writes, or product edits. No subagents. Source-only evidence was sufficient for ownership/index/schema findings.
+One attempted git show 72efeb02:test_stop_review.py returned missing path; no test under that root path. No claim about passing donor tests.
+Interface grep found definitions in 72efeb02:stop_review.py, and actual callers in ffb4ed9e:openscrub_web.py; none of those functions at the clean pin.
+Temporary export removed after report generation. No task processes or media resources opened. Evidence files are bounded source excerpts and provenance only.

@@ -1,0 +1,10 @@
+{
+  "head": "aa07a0664ec0b9d3d592adba19e5e1e473e906ac",
+  "clean_native_branch": true,
+  "all_39_frozen_files_match_commit": true,
+  "installed_sources_match_committed": true,
+  "artifacts": {
+    "openscrub-1.0.96-py3-none-any.whl": "1c3cc4403cee52b4017e9346c261ea1986faf50823a73bd2c10bac564d860afc",
+    "openscrub-1.0.96.tar.gz": "7a88b6febc150688e0f4d2e06a2437de6cb9a3a7a8bcafea94ef23956f78c0fd"
+  }
+}
