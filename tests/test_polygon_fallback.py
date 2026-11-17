@@ -111,7 +111,7 @@ VALID = [
 @pytest.mark.parametrize("mode", MODES)
 @pytest.mark.parametrize("polys,pixels", VALID)
 @pytest.mark.parametrize("pad", [0, 2])
-def test_usable_contours_keep_baseline_pixels(path, mode, polys, pixels, pad):
+def test_usable_contours_keep_exact_combined_pixels(path, mode, polys, pixels, pad):
     before = source_planes(path)
     filled = [p.copy() for p in before]
     full_box(path, filled, (4, 4, 16, 16), mode)
@@ -122,7 +122,11 @@ def test_usable_contours_keep_baseline_pixels(path, mode, polys, pixels, pad):
     expected = [p.copy() for p in before]
     for index, plane in enumerate(expected):
         if index:
-            m = cv2.resize(mask, (6, 6), interpolation=cv2.INTER_NEAREST)
+            # Enumerate global touched-luma cells independently of the
+            # production aligned reduction; combined P16A owns HDR mapping.
+            m = np.zeros((6, 6), np.uint8)
+            for row, col in np.argwhere(mask):
+                m[(4 + int(row)) // 2 - 2, (4 + int(col)) // 2 - 2] = 255
             roi = plane[2:8, 2:8]
             cv2.copyTo(filled[index][2:8, 2:8], m, roi)
         else:
