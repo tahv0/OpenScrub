@@ -4,6 +4,7 @@ import json
 import queue
 import threading
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 import openscrub
@@ -291,7 +292,9 @@ def test_failed_transaction_releases_waiter_and_preserves_previous_json(store, m
     if failure == 'parse':
         target, name = web, '_load_job_report'
     elif failure == 'serialization':
-        target, name = reports.json, 'dump'
+        # Keep the injected encoder failure out of client/request JSON.
+        monkeypatch.setattr(reports, 'json', SimpleNamespace(JSONEncoder=json.JSONEncoder))
+        target, name = reports.json, 'JSONEncoder'
     elif failure in ('fsync', 'replace'):
         target, name = reports.os, failure
     else:

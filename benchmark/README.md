@@ -343,3 +343,14 @@ status codes, report/payload sizes, content hashes and Linux RSS observations.
 Keep other sustained workloads idle while measuring. High-water memory includes
 imports and fixture construction; sampled RSS can miss transient peaks. These
 measurements characterize a local warm-cache workload, not production capacity.
+
+
+For a baseline that already skips unchanged publication (for example `3457efa`),
+pass `--before-noop-publications 0`. The historical default remains 1.
+Separate counted workers report `report_encode` as publication encoding starts,
+`json_dump_calls` and `encoder_instances` as method-specific encoding starts,
+`stream_writes` as Python calls to the staging stream's `write`, and
+`stream_writelines` as calls to `writelines`. `encoder_chunks` counts pieces
+from the explicit public encoder iterator when used. TextIOWrapper's internal
+writes are not Python stream calls or measured OS syscalls. No counted latency
+is part of the uninstrumented HTTP comparison.

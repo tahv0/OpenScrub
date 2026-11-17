@@ -94,7 +94,12 @@ def export_source(repository, revision, destination):
     archive = subprocess.check_output(['git', '-C', str(repository), 'archive', revision])
     import io
     with tarfile.open(fileobj=io.BytesIO(archive)) as source:
-        source.extractall(destination)
+        # data_filter was security-backported to supported Python patch releases.
+        # Older Python 3.9 builds have no filter API and no default-change warning.
+        if hasattr(tarfile, 'data_filter'):
+            source.extractall(destination, filter='data')
+        else:
+            source.extractall(destination)
     entries = subprocess.check_output(['git', '-C', str(repository), 'ls-tree', '-r', '-z', revision]).split(b'\0')
     manifest = {}
     for entry in entries:
@@ -115,8 +120,9 @@ def instrument(web):
     """Separate counters; stream writes count Python calls, never syscalls."""
     from types import SimpleNamespace
     from openscrub_internal import reports
-    counts = dict(report_parse=0, report_dump=0, stage=0, fsync=0, replace=0,
-                  stream_writes=0, serialized_characters=0, request_json=0, response_json=0)
+    counts = dict(report_parse=0, report_encode=0, json_dump_calls=0, encoder_instances=0, stage=0, fsync=0, replace=0,
+                  stream_writes=0, stream_writelines=0, encoder_chunks=0,
+                  serialized_characters=0, request_json=0, response_json=0)
     def wrap(owner, name, key):
         original = getattr(owner, name)
         def counted(*args, **kwargs):
@@ -125,16 +131,44 @@ def instrument(web):
         setattr(owner, name, counted)
     wrap(web, '_load_job_report', 'report_parse')
     dump = reports.json.dump
+    encoder = reports.json.JSONEncoder
     def encode(doc, stream, **kwargs):
-        counts['report_dump'] += 1
-        class Stream:
-            def write(self, value):
-                counts['stream_writes'] += 1
-                counts['serialized_characters'] += len(value)
-                return stream.write(value)
-        return dump(doc, Stream(), **kwargs)
-    reports.json = SimpleNamespace(dump=encode)
-    wrap(reports.tempfile, 'NamedTemporaryFile', 'stage')
+        counts['report_encode'] += 1
+        counts['json_dump_calls'] += 1
+        return dump(doc, stream, **kwargs)
+    def make_encoder(**kwargs):
+        counts['report_encode'] += 1
+        counts['encoder_instances'] += 1
+        instance = encoder(**kwargs)
+        original = instance.iterencode
+        def chunks(doc):
+            for value in original(doc):
+                counts['encoder_chunks'] += 1
+                yield value
+        instance.iterencode = chunks
+        return instance
+    reports.json = SimpleNamespace(dump=encode, JSONEncoder=make_encoder)
+    temporary_file = reports.tempfile.NamedTemporaryFile
+    class Stream:
+        def __init__(self, stream): self.stream = stream
+        def __getattr__(self, name): return getattr(self.stream, name)
+        def __enter__(self): self.stream.__enter__(); return self
+        def __exit__(self, *args): return self.stream.__exit__(*args)
+        def write(self, value):
+            counts['stream_writes'] += 1
+            counts['serialized_characters'] += len(value)
+            return self.stream.write(value)
+        def writelines(self, values):
+            counts['stream_writelines'] += 1
+            def measured():
+                for value in values:
+                    counts['serialized_characters'] += len(value)
+                    yield value
+            return self.stream.writelines(measured())
+    def stage(*args, **kwargs):
+        counts['stage'] += 1
+        return Stream(temporary_file(*args, **kwargs))
+    reports.tempfile.NamedTemporaryFile = stage
     wrap(reports.os, 'fsync', 'fsync')
     wrap(reports.os, 'replace', 'replace')
     wrap(web.app.request_class, 'get_json', 'request_json')
@@ -273,12 +307,39 @@ def distribution(values):
                 p95_ms=ordered[max(0, (95*len(values)+99)//100-1)], max_ms=max(values))
 
 
+def count_operations(sources, rows, evidence, before_noop_publications=1):
+    """Run only fresh counted workers; no latency sample from here is a timing result.
+
+    Historical pre-optimization baselines publish once for no-op saves. A pinned
+    baseline that already skips publication must explicitly request zero.
+    """
+    if before_noop_publications not in (0, 1):
+        raise ValueError('before_noop_publications must be 0 or 1')
+    counted = {scenario: {} for scenario in ('noop', 'sparse', 'bulk')}
+    for label, source in sources.items():
+        item = Worker(source, rows, evidence/('%d-counted-%s' % (rows,label)), True)
+        try:
+            for scenario in counted:
+                item.command('reset')
+                result = request(item, json.dumps(payload(rows, scenario, 1)).encode())
+                result.update(version=label, worker=item.info)
+                counts = result['after']['counts']
+                writes = (before_noop_publications if label == 'before' else 0) if scenario == 'noop' else 1
+                assert counts['report_parse'] == counts['request_json'] == counts['response_json'] == 1
+                assert all(counts[k] == writes for k in ('report_encode','stage','fsync','replace')), counts
+                counted[scenario][label] = result
+        finally:
+            item.close()
+    return counted
+
+
 def run(args):
     evidence = args.evidence_dir.resolve(); evidence.mkdir(parents=True, exist_ok=True)
     sources = {label: export_source(args.repository, revision, evidence/('export-'+label))
                for label, revision in [('before', args.before_ref), ('after', args.after_ref)]}
     results = dict(scenario='saves', sources=sources, python=sys.version, executable=sys.executable,
                    platform=platform.platform(), warmups=args.warmups, samples=args.samples,
+                   before_noop_publications=args.before_noop_publications,
                    client_initial_memory=memory(os.getpid()), runs=[],
                    limits=['Linux /proc RSS sampled every 5ms may miss peaks.',
                            'VmHWM includes imports/fixture construction; process counters are cumulative.',
@@ -322,21 +383,11 @@ def run(args):
         finally:
             for item in workers.values(): item.close()
         # Fresh workers keep instrumentation entirely out of timed request paths.
-        for label, source in sources.items():
-            item = Worker(source, rows, evidence/('%d-counted-%s' % (rows,label)), True)
-            try:
-                for scenario in ('noop','sparse','bulk'):
-                    item.command('reset')
-                    result = request(item, json.dumps(payload(rows, scenario, 1)).encode())
-                    result.update(version=label, worker=item.info)
-                    counts = result['after']['counts']
-                    writes = 0 if label == 'after' and scenario == 'noop' else 1
-                    assert counts['report_parse'] == counts['request_json'] == counts['response_json'] == 1
-                    assert all(counts[k] == writes for k in ('report_dump','stage','fsync','replace'))
-                    record = next(r for r in results['runs'] if r['rows']==rows and r['operation']==scenario)
-                    record.setdefault('instrumented', {})[label] = result
-                    save()
-            finally: item.close()
+        counted = count_operations(sources, rows, evidence, args.before_noop_publications)
+        for scenario, observations in counted.items():
+            record = next(r for r in results['runs'] if r['rows']==rows and r['operation']==scenario)
+            record['instrumented'] = observations
+        save()
     # Revalidate exports after all measurements; unexpected source writes fail.
     for source in sources.values():
         for name, expected in source['sha256'].items():
@@ -354,6 +405,8 @@ def main():
     parser.add_argument('--after-ref')
     parser.add_argument('--evidence-dir', type=Path)
     parser.add_argument('--output', type=Path)
+    parser.add_argument('--before-noop-publications', type=int, choices=[0, 1], default=1,
+                        help='expected baseline no-op publications; use 0 for an already optimized baseline')
     parser.add_argument('--warmups', type=int, default=3)
     parser.add_argument('--samples', type=int, default=5)
     parser.add_argument('--worker', type=Path, help=argparse.SUPPRESS)

@@ -25,7 +25,10 @@ def atomic_report(path, report) -> None:
                                          prefix=".report-", suffix=".tmp",
                                          delete=False) as stream:
             staged = stream.name
-            json.dump(report, stream, indent=1)
+            # Consume the public encoder iterator in TextIOWrapper rather than
+            # dispatching one Python stream.write call for every JSON token.
+            # Tokens remain streamed; a single large string is still one token.
+            stream.writelines(json.JSONEncoder(indent=1).iterencode(report))
             stream.flush()
             os.fsync(stream.fileno())
         # Close first: Windows cannot rename an open staging file.
