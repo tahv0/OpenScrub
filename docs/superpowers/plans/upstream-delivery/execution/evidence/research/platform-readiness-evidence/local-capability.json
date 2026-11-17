@@ -1,0 +1,91 @@
+{
+  "captured_utc": "2026-11-17T03:35:43.361379+00:00",
+  "tool_paths": {
+    "docker": "/usr/bin/docker",
+    "nvidia-smi": "/usr/lib/wsl/lib/nvidia-smi",
+    "cmd.exe": null,
+    "powershell.exe": null,
+    "pwsh.exe": null,
+    "cl.exe": null,
+    "msbuild.exe": null,
+    "dotnet.exe": null,
+    "pyinstaller": null,
+    "wine": null,
+    "wine64": null
+  },
+  "device_nodes": {
+    "/dev/dxg": [],
+    "/dev/nvidia[0-9]*": [],
+    "/dev/nvidiactl": [],
+    "/dev/dri/renderD*": []
+  },
+  "os_release": "PRETTY_NAME=\"Ubuntu 26.04.1 LTS\"\nNAME=\"Ubuntu\"\nVERSION_ID=\"26.04\"\nVERSION=\"26.04.1 LTS (Resolute Raccoon)\"\nVERSION_CODENAME=resolute\nID=ubuntu\nID_LIKE=debian\nHOME_URL=\"https://www.ubuntu.com/\"\nSUPPORT_URL=\"https://help.ubuntu.com/\"\nBUG_REPORT_URL=\"https://bugs.launchpad.net/ubuntu/\"\nPRIVACY_POLICY_URL=\"https://www.ubuntu.com/legal/terms-and-policies/privacy-policy\"\nUBUNTU_CODENAME=resolute\nLOGO=ubuntu-logo\n",
+  "checks": [
+    {
+      "name": "docker-client",
+      "command": [
+        "docker",
+        "--version"
+      ],
+      "returncode": 0,
+      "stdout": "Docker version 29.7.2, build a7dcaa6\n",
+      "stderr": ""
+    },
+    {
+      "name": "docker-buildx",
+      "command": [
+        "docker",
+        "buildx",
+        "version"
+      ],
+      "returncode": 0,
+      "stdout": "github.com/docker/buildx v0.38.1 0dbe87f36ed472fe36b6796c3f70b4210a731fc5\n",
+      "stderr": ""
+    },
+    {
+      "name": "docker-context",
+      "command": [
+        "docker",
+        "context",
+        "show"
+      ],
+      "returncode": 0,
+      "stdout": "default\n",
+      "stderr": ""
+    },
+    {
+      "name": "docker-info",
+      "command": [
+        "docker",
+        "info",
+        "--format",
+        "ServerVersion={{.ServerVersion}} OSType={{.OSType}} Architecture={{.Architecture}} OperatingSystem={{.OperatingSystem}} Runtimes={{json .Runtimes}}"
+      ],
+      "returncode": 1,
+      "stdout": "ServerVersion= OSType= Architecture= OperatingSystem= Runtimes=null\n",
+      "stderr": "permission denied while trying to connect to the docker API at unix:///var/run/docker.sock\n"
+    },
+    {
+      "name": "gpu-query",
+      "command": [
+        "nvidia-smi",
+        "--query-gpu=name,driver_version,memory.total",
+        "--format=csv,noheader"
+      ],
+      "returncode": 255,
+      "stdout": "Failed to initialize NVML: Generic operating system error\nFailed to properly shut down NVML: Generic operating system error\n\n",
+      "stderr": ""
+    },
+    {
+      "name": "uname",
+      "command": [
+        "uname",
+        "-srm"
+      ],
+      "returncode": 0,
+      "stdout": "Linux 6.18.58.1-microsoft-standard-WSL2 x86_64\n",
+      "stderr": ""
+    }
+  ],
+  "limits": "Read-only metadata and bounded daemon/GPU queries; no process/container/image inventory; no build or inference."
+}

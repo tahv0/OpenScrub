@@ -1,0 +1,12 @@
+{
+  "returncode": 0,
+  "checks": [
+    "JSON parse",
+    "sandbox versus external return-code distinction",
+    "daemon/GPU observations match report",
+    "seven pinned source anchors",
+    "collector scripts present",
+    "report scope and remaining gates"
+  ],
+  "limits": "Artifact consistency check only; no build, inference, cache, package or Windows runtime validation."
+}

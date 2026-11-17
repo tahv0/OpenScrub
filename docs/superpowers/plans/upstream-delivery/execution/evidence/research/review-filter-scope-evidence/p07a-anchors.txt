@@ -1,0 +1,372 @@
+ 1132  @app.route("/api/jobs/<jid>/detections")
+ 1133  def job_detections(jid):
+ 1134      job = JOBS.get(jid) or abort(404)
+ 1135      doc = _load_job_report(job)
+ 1136      items = []
+ 1137      for i, d in enumerate(doc["detections"]):
+ 1138          items.append({"i": i, "category": d["category"], "text": d["text"],
+ 1139                        "t_start": d["t_start"], "t_end": round(d["t_end"], 2),
+ 1140                        "enabled": d.get("enabled", True),
+ 1141                        "track": d.get("track", -1),
+ 1142                        "person": d.get("person", -1),
+ 1143                        "confidence": d.get("confidence", 0),
+ 1144                        "zone_dropped": bool(d.get("zone_dropped"))})
+ 1145      return jsonify({"detections": items,
+ 1146                      "fps": doc["render_state"]["fps"],
+ 1147                      "duration": len(doc["render_state"]["cum"]) /
+ 1148                                  doc["render_state"]["fps"]})
+
+ 1978  const CATDN={mrn:"regex",person:"person (full body)",manual:"tracked object",qrcode:"QR / barcode",screen:"screen (tv/laptop/phone)",anytext:"all text",bank:"bank number",crypto:"crypto address",passport:"passport / MRZ",phrase:"specific text"};   // display names — ids are a compat surface
+
+ 2080  let CUR=null, EN={}, MAN=[], DUR=0, POLL=null, PHIST=[], PHPH="", LOGN=0, SHELLPH=null, JOBSJSON="";
+ 2081  
+ 2082  // VIEW_GEN advances on every openJob (including A -> B -> A) and removal.
+ 2083  // Drafts live only in this page; late acknowledgements reconcile their owner,
+ 2084  // but may never publish into, or start rendering from, a different view.
+ 2085  let VIEW_GEN=0, EDITS=null;
+ 2086  const REVIEW_DRAFTS=new Map();
+ 2087  function emptyEditor(){return {t:0,ox:0,oy:0,boxes:[],sel:-1,ov:{},dis:{},times:{},adds:[],
+ 2088   add:false,addAnchor:null,drag:null,scale:1,dur:10,
+ 2089   audio:[],audioSaved:[],audioLoaded:false};}
+ 2090  function sameEdit(a,b){return JSON.stringify(a)===JSON.stringify(b);}
+ 2091  function copyEdit(a){return JSON.parse(JSON.stringify(a));}
+ 2092  function ownsView(id,gen){return CUR===id&&VIEW_GEN===gen;}
+ 2093  function saveStatus(d,message){
+ 2094   d.status=message;
+ 2095   if(d!==EDITS)return;
+ 2096   const el=document.getElementById("reviewSaveStatus");if(el)el.textContent=message;
+ 2097   document.querySelectorAll("button[data-save-edits]").forEach(b=>{b.disabled=!!d.busy;});
+ 2098  }
+ 2099  function trimReviewDraft(d){
+ 2100   const b=d.editor;
+ 2101   // Clean audio is fetched display state even when other edit kinds are pending.
+ 2102   // An in-flight audio submission may make a toggle-back a newer pending choice.
+ 2103   if(!d.audioInFlight&&sameEdit(b.audio,b.audioSaved)){
+ 2104    b.audio=[];b.audioSaved=[];b.audioLoaded=false;
+ 2105   }
+ 2106   if(!d.busy&&!hasReviewEdits(d)){
+ 2107    d.en={};d.editor=emptyEditor();
+ 2108   }
+ 2109  }
+ 2110  function hasReviewEdits(d){
+ 2111   const b=d.editor;
+ 2112   return Object.keys(d.enabled).length||d.manual.length||b.adds.length||
+ 2113    Object.keys(b.ov).length||Object.keys(b.times).length||
+ 2114    !sameEdit(b.audio,b.audioSaved);
+ 2115  }
+
+ 2150  async function openJob(id){
+ 2151   const video=document.getElementById("beVid");
+ 2152   if(video){try{video.pause();}catch(e){}}
+ 2153   if(EDITS){
+ 2154    // Retain edit bookkeeping, not fetched box/report/transcript display data.
+ 2155    EDITS.en={};
+ 2156    const b=EDITS.editor;delete b.raw;b.boxes=[];
+ 2157    delete b.tlspans;delete b.audioSugg;delete b.audioTx;b.playing=false;
+ 2158    trimReviewDraft(EDITS);
+ 2159   }
+ 2160   VIEW_GEN++;CUR=id;
+ 2161   EDITS=REVIEW_DRAFTS.get(id);
+ 2162   if(!EDITS){EDITS={en:{},enabled:{},manual:[],editor:emptyEditor(),busy:false,status:""};
+ 2163    REVIEW_DRAFTS.set(id,EDITS);}
+ 2164   EN=EDITS.en;MAN=EDITS.manual;BE=EDITS.editor;
+ 2165   PHIST=[];PHPH="";LOGN=0;SHELLPH=null;
+ 2166   detail.innerHTML='<div id="reviewSaveStatus" role="status" aria-live="polite" style="margin:8px 0;color:#fbbf24"></div>';
+ 2167   saveStatus(EDITS,EDITS.status);
+ 2168  
+ 2169   if(POLL)clearInterval(POLL);
+ 2170   POLL=setInterval(refresh,900); refresh();
+
+ 2405  async function tlInit(){
+ 2406   const id=CUR,gen=VIEW_GEN,editor=BE;
+ 2407   // one fetch of the full report: detection spans for the lanes (dense
+ 2408   // tracks collapse to one span per track) + stored audio redactions
+ 2409   try{
+ 2410    const response=await fetch(`api/jobs/${id}/report`);
+ 2411    if(!response.ok)throw Error("could not load audio");
+ 2412    const doc=await response.json();
+ 2413    if(!ownsView(id,gen)||BE!==editor)return;
+ 2414    const per={};
+ 2415    for(const d of (doc.detections||[])){
+ 2416     if(d.enabled===false)continue;
+ 2417     const key=d.category+((d.track??-1)>=0?(":t"+d.track):(":i"+Math.random()));
+ 2418     const s=per[key]||(per[key]={cat:d.category,t0:d.t_start,t1:d.t_end});
+ 2419     s.t0=Math.min(s.t0,d.t_start);s.t1=Math.max(s.t1,d.t_end);
+ 2420    }
+ 2421    BE.tlspans=Object.values(per);
+ 2422    if(!BE.audioLoaded){
+ 2423     const stored=(doc.audio_redactions||[]).map(s=>({t0:s.t0,t1:s.t1,mode:s.mode||"mute"}));
+ 2424     // Audio controls can be used while this initial report request is pending.
+ 2425     BE.audio=[...stored,...BE.audio];BE.audioSaved=copyEdit(stored);BE.audioLoaded=true;
+ 2426    }
+ 2427    BE.audioSugg=doc.audio_suggestions||[];
+ 2428    BE.audioTx=doc.audio_transcript||[];BE.txAnchor=-1;
+ 2429    renderAudioSugg();renderTranscript();
+ 2430   }catch(e){if(!ownsView(id,gen)||BE!==editor)return;BE.tlspans=[];}
+ 2431   beTLDraw();
+
+ 2569  function beFilter(){
+ 2570   BE.boxes=(BE.raw||[]).filter(b=>{
+ 2571    const on=(b.i in EN)?EN[b.i]:b.enabled;   // live: review toggles apply here
+ 2572    return on;
+ 2573   }).map(b=>{
+ 2574    let bb=b;
+ 2575    if(BE.ov[b.i]){const o=BE.ov[b.i];
+ 2576     bb={...b,box:[o[0]+BE.ox,o[1]+BE.oy,o[2]+BE.ox,o[3]+BE.oy]};}
+ 2577    if(BE.times[b.i]){bb={...bb,t_start:BE.times[b.i][0],t_end:BE.times[b.i][1]};}
+ 2578    return bb;
+ 2579   });
+
+ 2725  function beRemove(){
+ 2726   if(BE.sel<0)return;
+ 2727   applyDet(BE.sel,false);   // syncs thumbnail + refilters editor
+ 2728   BE.sel=-1;
+ 2729   document.getElementById("beRm").style.display="none";
+ 2730   document.getElementById("beTimes").style.display="none";
+ 2731  }
+ 2732  async function beSave(){return saveAndRender();}
+ 2733  async function cancelJob(){await fetch("api/jobs/"+CUR+"/cancel",{method:"POST"})}
+ 2734  
+ 2735  // the three post-render views (compare, review, box editor) are mutually
+ 2736  // exclusive: opening one closes the others instead of stacking them
+ 2737  function showPanel(which){
+ 2738   // a playing box-editor video must be PAUSED before its DOM is wiped —
+ 2739   // an element removed via innerHTML can keep its audio running
+ 2740   try{const v=document.getElementById("beVid");
+ 2741    if(v&&!v.paused){BE.playing=false;v.pause();}}catch(e){}
+ 2742   // "boxedit_rev" = the editor button INSIDE the review card: the editor
+ 2743   // mounts in the review's own slot, so the review stays. Everything else
+ 2744   // is standalone and closes the other panels.
+ 2745   if(which!=="compare"){
+ 2746    const c=document.getElementById("compare");if(c)c.innerHTML="";}
+ 2747   const b=document.getElementById("beslot_done");
+ 2748   const b2=document.getElementById("beslot");
+ 2749   if(which==="boxedit_rev"){if(b)b.innerHTML=""}
+ 2750   else{
+ 2751    if(which!=="boxedit"){if(b)b.innerHTML=""}
+ 2752    if(b2)b2.innerHTML="";
+ 2753    if(which!=="review"){
+ 2754     const rev=document.getElementById("review");if(rev)rev.remove();}
+ 2755   }
+ 2756  }
+
+ 2777  async function loadReview(){
+ 2778   const id=CUR,gen=VIEW_GEN;
+ 2779   showPanel("review");
+ 2780   const d=await (await fetch(`api/jobs/${id}/detections`)).json();
+ 2781   if(!ownsView(id,gen))return;
+ 2782   DUR=d.duration;
+ 2783   const groups={}; const zdrop=[]; TRKMEM={};
+ 2784   d.detections.forEach(x=>{
+ 2785    EN[x.i]=(x.i in EDITS.enabled)?EDITS.enabled[x.i]:x.enabled;
+ 2786    if(x.zone_dropped){zdrop.push(x);return;}
+ 2787    (groups[x.category]=groups[x.category]||[]).push(x);});
+ 2788   let html=`<div class="card" id="review"><h2>Review — red = will be blurred,
+ 2789   green = kept visible. Drag a box around several to bulk-set.</h2>
+ 2790   <div class="row" style="margin:0 0 8px">
+ 2791    <button class="sec" onclick="loadBoxEdit(1)">▶ Preview video &amp; edit boxes
+ 2792    (before rendering)</button></div>
+ 2793   <div id="beslot"></div>
+ 2794   <div id="detwrap" style="position:relative;user-select:none">`;
+ 2795   if(zdrop.length){
+ 2796    html+=`<details style="margin:4px 0 10px;border:1px dashed #f59e0b;border-radius:9px;padding:8px 10px;background:#26200a">
+ 2797     <summary style="cursor:pointer;color:#fbbf24;font-weight:600">
+ 2798      ⚠ ${zdrop.length} detection(s) outside your zones — NOT blurred
+ 2799      (mostly logos/labels by design; open only if something real was zoned out)
+ 2800     </summary>
+ 2801     <div class="row" style="margin:8px 0 4px">
+ 2802      <button class="sec" onclick="setAllZd(true)">blur all of these</button>
+ 2803      <button class="sec" onclick="setAllZd(false)">keep all</button></div>
+ 2804     <div class="grid3">`;
+ 2805    for(const x of zdrop){
+ 2806     html+=`<div class="det ${EN[x.i]?'':'off'}" id="det${x.i}" data-cat="zdrop">
+ 2807      <img src="api/jobs/${CUR}/thumb/${x.i}" loading="lazy"
+ 2808       style="cursor:zoom-in" onclick="zoomDet(${x.i})" onerror="thumbRetry(this)">
+ 2809      <div>"${x.text}" <br>${x.t_start.toFixed(1)}–${x.t_end.toFixed(1)}s</div>
+ 2810      <button class="blurbtn ${EN[x.i]?"blur":"keep"}" id="bb${x.i}"
+ 2811       onclick="toggleDet(${x.i})">${EN[x.i]?"Blur":"Keep"}</button>
+ 2812     </div>`;
+ 2813    }
+ 2814    html+=`</div></details>`;
+ 2815   }
+ 2816   for(const[cat,rawItems] of Object.entries(groups)){
+ 2817    // collapse dense tracks: one card per physical object, not per frame
+ 2818    const byGroup={},items=[];
+ 2819    for(const x of rawItems){
+ 2820     // identity first: one card per PERSON (all their tracks); then per
+ 2821     // track; ungrouped detections stand alone
+ 2822     const key=x.person>=0?("p"+x.person):(x.track>=0?("t"+x.track):null);
+ 2823     if(key){(byGroup[key]=byGroup[key]||[]).push(x);}
+ 2824     else{TRKMEM[x.i]=[x.i];items.push(x);}
+ 2825    }
+ 2826    for(const [key,members] of Object.entries(byGroup)){
+ 2827     members.sort((a,b)=>a.t_start-b.t_start);
+ 2828     let best=members[0];             // clearest thumbnail = highest-confidence
+ 2829     for(const m of members)if((m.confidence||0)>(best.confidence||0))best=m;
+ 2830     const rep={...best};
+ 2831     rep.t_start=members[0].t_start;
+ 2832     rep.t_end=members[members.length-1].t_end;
+ 2833     rep.frames=members.length;
+ 2834     rep.personcard=key[0]==="p";
+ 2835     TRKMEM[rep.i]=members.map(m=>m.i);
+ 2836     items.push(rep);
+ 2837    }
+ 2838    // person cards first, then everything else chronologically
+ 2839    items.sort((a,b)=>((b.personcard?1:0)-(a.personcard?1:0))||a.t_start-b.t_start);
+ 2840    html+=`<h3 style="margin:10px 0 6px">${CATDN[cat]||cat} <span class="badge">${items.length}</span>
+ 2841    <button class="sec" style="padding:3px 8px;font-size:12px"
+ 2842     onclick="setAll('${cat}',true)">all on</button>
+ 2843    <button class="sec" style="padding:3px 8px;font-size:12px"
+ 2844     onclick="setAll('${cat}',false)">all off</button></h3><div class="grid3">`;
+ 2845    for(const x of items){
+ 2846     html+=`<div class="det ${EN[x.i]?'':'off'}" id="det${x.i}" data-cat="${cat}">
+ 2847      <img src="api/jobs/${CUR}/thumb/${x.i}"
+ 2848       style="cursor:zoom-in" onclick="zoomDet(${x.i})"
+ 2849       onerror="thumbRetry(this)">
+ 2850      <div>${x.personcard?`<b>Person ${x.person+1}</b> — one decision for ALL their appearances`:`"${x.text}"`}${x.frames?` <span class="badge">×${x.frames} frames</span>`:""}${x.confidence?` <span class="badge" title="detector confidence — low values on a non-face thumbnail usually mean a false detection">${Math.round(x.confidence*100)}%</span>`:""} <br>${x.t_start.toFixed(1)}–${x.t_end.toFixed(1)}s</div>
+ 2851      <button class="blurbtn ${EN[x.i]?"blur":"keep"}" id="bb${x.i}"
+ 2852       onclick="toggleDet(${x.i})">${EN[x.i]?"Blur":"Keep"}</button>
+ 2853     </div>`}
+ 2854    html+=`</div>`}
+ 2855   html+=`</div>
+ 2856   <div class="row" style="margin-top:12px">
+ 2857   <button data-save-edits onclick="saveAndRender()">Save edits &amp; render</button>
+ 2858   <span style="font-size:12px;color:#94a3b8">missed something? use
+ 2859    ▶ Preview video &amp; edit boxes above — its ＋ Add box replaces the old
+ 2860    add-region tool</span></div></div>`;
+ 2861   const old=document.getElementById("review"); if(old)old.remove();
+ 2862   detail.insertAdjacentHTML("beforeend",html);
+ 2863   initMarquee();saveStatus(EDITS,EDITS.status);
+ 2864  }
+ 2865  
+ 2866  let TRKMEM={};
+ 2867  function applyDet(i,blur){
+ 2868   for(const m of (TRKMEM[i]||[i])){EN[m]=blur;EDITS.enabled[m]=blur;}
+ 2869   // A toggle back while a save is pending is still a deliberate next choice.
+ 2870   if(!EDITS.busy)saveStatus(EDITS,"Unsaved edits — save to include them in the render.");
+ 2871   const b=document.getElementById("bb"+i),t=document.getElementById("det"+i);
+ 2872   if(b){b.className="blurbtn "+(blur?"blur":"keep");
+ 2873         b.textContent=blur?"Blur":"Keep";}
+ 2874   if(t)t.classList.toggle("off",!blur);
+ 2875   if(document.getElementById("beCv")){beFilter();beDraw();}   // live sync
+ 2876  }
+ 2877  function toggleDet(i){applyDet(i,!EN[i]);}
+ 2878  function setAll(cat,on){document.querySelectorAll(`.det[data-cat=${cat}]`)
+ 2879   .forEach(el=>applyDet(+el.id.slice(3),on));}
+ 2880  function thumbRetry(img){
+ 2881   const n=+(img.dataset.r||0);
+ 2882   if(n>=3)return;
+ 2883   img.dataset.r=n+1;
+ 2884   setTimeout(()=>{img.src=img.src.split("?r=")[0]+"?r="+Date.now();},
+ 2885              600*(n+1));
+ 2886  }
+ 2887  function setAllZd(on){document.querySelectorAll(`.det[data-cat=zdrop]`)
+ 2888   .forEach(el=>applyDet(+el.id.slice(3),on));}
+
+ 2890  let selSet=new Set(),marqEl=null,menuEl=null,mStart=null;
+ 2891  function clearSel(){
+ 2892   selSet.forEach(i=>{const t=document.getElementById("det"+i);
+ 2893    if(t)t.classList.remove("selected");});
+ 2894   selSet.clear();
+ 2895   if(menuEl){menuEl.remove();menuEl=null;}
+ 2896  }
+ 2897  function initMarquee(){
+ 2898   const wrap=document.getElementById("detwrap");
+ 2899   if(!wrap||wrap.dataset.mq)return;
+ 2900   wrap.dataset.mq=1;
+ 2901   wrap.addEventListener("pointerdown",e=>{
+ 2902    if(e.pointerType==="touch")return;         // touch keeps normal scrolling
+ 2903    if(e.target.closest("button"))return;      // button clicks stay clicks
+ 2904    clearSel();
+ 2905    mStart=[e.pageX,e.pageY];
+ 2906    marqEl=document.createElement("div");marqEl.className="marq";
+ 2907    document.body.appendChild(marqEl);
+ 2908    const move=ev=>{
+ 2909     const x1=Math.min(mStart[0],ev.pageX),y1=Math.min(mStart[1],ev.pageY),
+ 2910           x2=Math.max(mStart[0],ev.pageX),y2=Math.max(mStart[1],ev.pageY);
+ 2911     Object.assign(marqEl.style,{left:x1+"px",top:y1+"px",
+ 2912      width:(x2-x1)+"px",height:(y2-y1)+"px"});
+ 2913    };
+ 2914    const up=ev=>{
+ 2915     document.removeEventListener("pointermove",move);
+ 2916     document.removeEventListener("pointerup",up);
+ 2917     const r=marqEl.getBoundingClientRect();
+ 2918     marqEl.remove();marqEl=null;
+ 2919     if(r.width<8&&r.height<8)return;          // just a click — not a drag
+ 2920     document.querySelectorAll("#detwrap .det").forEach(t=>{
+ 2921      const b=t.getBoundingClientRect();
+ 2922      if(b.left<r.right&&b.right>r.left&&b.top<r.bottom&&b.bottom>r.top){
+ 2923       selSet.add(+t.id.slice(3));t.classList.add("selected");}});
+ 2924     if(selSet.size)showSelMenu(ev.pageX,ev.pageY);
+ 2925    };
+ 2926    document.addEventListener("pointermove",move);
+ 2927    document.addEventListener("pointerup",up);
+ 2928    e.preventDefault();
+ 2929   });
+ 2930  }
+ 2931  function showSelMenu(x,y){
+ 2932   menuEl=document.createElement("div");menuEl.className="selmenu";
+ 2933   menuEl.innerHTML=`<span>${selSet.size} selected</span>
+ 2934    <button class="mkeep" onclick="bulkSet(false)">Keep</button>
+ 2935    <button class="mblur" onclick="bulkSet(true)">Blur</button>`;
+ 2936   Object.assign(menuEl.style,{left:x+"px",top:(y+10)+"px"});
+ 2937   document.body.appendChild(menuEl);
+ 2938  }
+ 2939  function bulkSet(blur){selSet.forEach(i=>applyDet(i,blur));clearSel();}
+
+ 2983  async function saveAndRender(){
+ 2984   const id=CUR,gen=VIEW_GEN,d=EDITS;
+ 2985   if(!id||!d||d.busy)return false;
+ 2986   const b=d.editor,manRefs=[...d.manual],addRefs=[...b.adds];
+ 2987   const man=copyEdit(d.manual),adds=copyEdit(b.adds);
+ 2988   const payload=copyEdit({enabled:d.enabled,manual:[...man,...adds.map(a=>({
+ 2989    t_start:a.t0,t_end:a.t1,t_ref:a.tref,screen_box:a.box}))],
+ 2990    box_overrides:b.ov,time_overrides:b.times});
+ 2991   // Plain review must never wipe audio that the editor has not loaded.
+ 2992   if(b.audioLoaded&&!sameEdit(b.audio,b.audioSaved)){payload.audio=copyEdit(b.audio);}
+ 2993   d.audioInFlight=payload.audio!==undefined;
+ 2994   d.busy=true;saveStatus(d,"Saving edits… You can keep editing; newer edits stay pending.");
+ 2995   let saved=false;
+ 2996   try{
+ 2997    const result=await reviewPost(`api/jobs/${id}/detections`,payload);
+ 2998    saved=true;d.audioInFlight=false;
+ 2999    acknowledgeMap(d.enabled,payload.enabled);
+ 3000    acknowledgeMap(b.ov,payload.box_overrides);acknowledgeMap(b.times,payload.time_overrides);
+ 3001    acknowledgeAdds(d.manual,manRefs,man);acknowledgeAdds(b.adds,addRefs,adds);
+ 3002    if(payload.audio!==undefined)b.audioSaved=copyEdit(payload.audio);
+ 3003    // A switched-away view never opens a confirmation or changes current UI.
+ 3004    if(!ownsView(id,gen)){
+ 3005     saveStatus(d,"Edits saved. Review pending edits, then save to render this job.");return false;
+ 3006    }
+ 3007    let allowError="";
+ 3008    if(result.suggest_allowlist&&result.suggest_allowlist.length&&
+ 3009       confirm("You disabled every instance of: "+result.suggest_allowlist.join(", ")+". Add these to the permanent allow-list so future scans skip them?")){
+ 3010     try{await reviewPost("api/allowlist",{words:result.suggest_allowlist});loadPersist();}
+ 3011     catch(e){allowError=" Allow-list update failed: "+e.message;}
+ 3012    }
+ 3013    if(!ownsView(id,gen)){
+ 3014     saveStatus(d,"Edits saved. Review pending edits, then save to render this job."+allowError);return false;
+ 3015    }
+ 3016    if(hasReviewEdits(d)){
+ 3017     saveStatus(d,"Submitted edits saved. Newer edits are still pending — save again to include them before rendering."+allowError);return false;
+ 3018    }
+ 3019    saveStatus(d,"Edits saved; requesting render…");
+ 3020    await reviewPost(`api/jobs/${id}/render`);
+ 3021    // Edits can also arrive while the render request is pending.
+ 3022    if(hasReviewEdits(d)){
+ 3023     saveStatus(d,"Render started with submitted edits. Newer edits are pending — save again to render them."+allowError);return true;
+ 3024    }
+ 3025    saveStatus(d,"Rendering with saved edits…"+allowError);
+ 3026    if(ownsView(id,gen)){
+ 3027     const rv=document.getElementById("review");if(rv)rv.remove();
+ 3028     const c=document.getElementById("beslot_done");if(c)c.innerHTML="rendering with your edits…";
+ 3029    }
+ 3030    return true;
+ 3031   }catch(e){
+ 3032    // A failed response leaves the audio baseline uncertain. Retain even a
+ 3033    // newer toggle-back to the old baseline and deliberately send it on retry.
+ 3034    if(!saved&&payload.audio!==undefined)b.audioSaved=null;
+ 3035    saveStatus(d,(saved?"Edits saved; render was not confirmed. Retry with Save to render. ":
+ 3036     "Save was not confirmed; drafts retained. Retry with Save. ")+e.message);
+ 3037    return false;
+ 3038   }finally{d.audioInFlight=false;d.busy=false;saveStatus(d,d.status);if(d!==EDITS)trimReviewDraft(d);}

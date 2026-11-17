@@ -1,0 +1,629 @@
+{
+  "detections": [
+    {
+      "category": "face",
+      "enabled": false,
+      "person": 0,
+      "track": 10,
+      "confidence": 0.4,
+      "zone_dropped": false,
+      "text": "synthetic 0",
+      "t_start": 0,
+      "t_end": 4,
+      "cbox": [
+        12,
+        20,
+        36,
+        50
+      ],
+      "aoff": [
+        0,
+        0
+      ],
+      "last_seen": 0
+    },
+    {
+      "category": "face",
+      "enabled": false,
+      "person": 0,
+      "track": 11,
+      "confidence": 0.9,
+      "zone_dropped": false,
+      "text": "synthetic 1",
+      "t_start": 0,
+      "t_end": 4,
+      "cbox": [
+        54,
+        20,
+        78,
+        50
+      ],
+      "aoff": [
+        0,
+        0
+      ],
+      "last_seen": 0
+    },
+    {
+      "category": "face",
+      "enabled": true,
+      "person": 1,
+      "track": 10,
+      "confidence": 0.8,
+      "zone_dropped": false,
+      "text": "synthetic 2",
+      "t_start": 0,
+      "t_end": 4,
+      "cbox": [
+        96,
+        20,
+        120,
+        50
+      ],
+      "aoff": [
+        0,
+        0
+      ],
+      "last_seen": 0
+    },
+    {
+      "category": "face",
+      "enabled": false,
+      "person": -1,
+      "track": 10,
+      "confidence": 0.5,
+      "zone_dropped": false,
+      "text": "synthetic 3",
+      "t_start": 0,
+      "t_end": 4,
+      "cbox": [
+        138,
+        20,
+        162,
+        50
+      ],
+      "aoff": [
+        0,
+        0
+      ],
+      "last_seen": 0
+    },
+    {
+      "category": "face",
+      "enabled": true,
+      "person": -1,
+      "track": 20,
+      "confidence": 0.7,
+      "zone_dropped": false,
+      "text": "synthetic 4",
+      "t_start": 0,
+      "t_end": 4,
+      "cbox": [
+        180,
+        20,
+        204,
+        50
+      ],
+      "aoff": [
+        0,
+        0
+      ],
+      "last_seen": 0
+    },
+    {
+      "category": "face",
+      "enabled": true,
+      "person": -1,
+      "track": 20,
+      "confidence": 0.2,
+      "zone_dropped": false,
+      "text": "synthetic 5",
+      "t_start": 0,
+      "t_end": 4,
+      "cbox": [
+        222,
+        20,
+        246,
+        50
+      ],
+      "aoff": [
+        0,
+        0
+      ],
+      "last_seen": 0
+    },
+    {
+      "category": "plate",
+      "enabled": true,
+      "person": -1,
+      "track": 20,
+      "confidence": 0.8,
+      "zone_dropped": false,
+      "text": "synthetic 6",
+      "t_start": 0,
+      "t_end": 4,
+      "cbox": [
+        264,
+        20,
+        288,
+        50
+      ],
+      "aoff": [
+        0,
+        0
+      ],
+      "last_seen": 0
+    },
+    {
+      "category": "email",
+      "enabled": true,
+      "person": -1,
+      "track": -1,
+      "confidence": 0.5,
+      "zone_dropped": false,
+      "text": "synthetic 7",
+      "t_start": 0,
+      "t_end": 4,
+      "cbox": [
+        12,
+        90,
+        36,
+        120
+      ],
+      "aoff": [
+        0,
+        0
+      ],
+      "last_seen": 0
+    },
+    {
+      "category": "face",
+      "enabled": true,
+      "person": 0,
+      "track": 11,
+      "confidence": 0.95,
+      "zone_dropped": true,
+      "text": "synthetic 8",
+      "t_start": 0,
+      "t_end": 4,
+      "cbox": [
+        54,
+        90,
+        78,
+        120
+      ],
+      "aoff": [
+        0,
+        0
+      ],
+      "last_seen": 0
+    },
+    {
+      "category": "face",
+      "enabled": false,
+      "person": -1,
+      "track": -1,
+      "confidence": 0.5,
+      "zone_dropped": true,
+      "text": "synthetic 9",
+      "t_start": 0,
+      "t_end": 4,
+      "cbox": [
+        96,
+        90,
+        120,
+        120
+      ],
+      "aoff": [
+        0,
+        0
+      ],
+      "last_seen": 0
+    },
+    {
+      "category": "face",
+      "enabled": true,
+      "person": -1,
+      "track": -1,
+      "confidence": 0.5,
+      "zone_dropped": false,
+      "text": "synthetic 10",
+      "t_start": 0,
+      "t_end": 4,
+      "cbox": [
+        138,
+        90,
+        162,
+        120
+      ],
+      "aoff": [
+        0,
+        0
+      ],
+      "last_seen": 0
+    },
+    {
+      "category": "face",
+      "enabled": false,
+      "person": 0,
+      "track": 11,
+      "confidence": 0.3,
+      "zone_dropped": false,
+      "text": "synthetic 11",
+      "t_start": 0,
+      "t_end": 4,
+      "cbox": [
+        180,
+        90,
+        204,
+        120
+      ],
+      "aoff": [
+        0,
+        0
+      ],
+      "last_seen": 0
+    },
+    {
+      "category": "person",
+      "enabled": true,
+      "person": 0,
+      "track": 11,
+      "confidence": 0.5,
+      "zone_dropped": false,
+      "text": "synthetic 12",
+      "t_start": 0,
+      "t_end": 4,
+      "cbox": [
+        222,
+        90,
+        246,
+        120
+      ],
+      "aoff": [
+        0,
+        0
+      ],
+      "last_seen": 0
+    }
+  ],
+  "render_state": {
+    "fps": 10,
+    "cum": [
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ]
+    ],
+    "bands": [
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ]
+    ]
+  },
+  "audio_redactions": [
+    {
+      "t0": 0.5,
+      "t1": 0.7,
+      "mode": "mute"
+    }
+  ],
+  "provenance": {
+    "input": "/tmp/openscrub-task20/synthetic.mp4",
+    "synthetic": "task20"
+  },
+  "settings": {}
+}

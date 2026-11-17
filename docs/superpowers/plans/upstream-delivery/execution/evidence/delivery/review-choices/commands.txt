@@ -1,0 +1,29 @@
+Working tree: /home/tahv0/.codex/worktrees/c832/OpenScrub
+Base: 92124753736e287ac800af91f0ac96f3e96c01be
+Head: 2ae3257b9752e2d976ff7a0d39955a13c133273a
+
+source /tmp/openscrub-baseline-20261116/env-opencv4.sh
+python -m pytest tests/test_review_choices.py -q -o cache_dir=/tmp/openscrub-task20/pytest-cache
+python -m pytest tests/test_review_choices.py tests/test_review_save_failures.py -q -o cache_dir=/tmp/openscrub-task20/pytest-cache
+python -m pytest -q -o cache_dir=/tmp/openscrub-task20/pytest-cache --basetemp=/tmp/openscrub-task20/full-tmp
+python3 /tmp/openscrub-task20/emit.py
+node --check /tmp/openscrub-task20/evaluated.js
+LD_LIBRARY_PATH=/tmp/openscrub-save-as-20261116/tools/usr/lib/x86_64-linux-gnu PLAYWRIGHT_BROWSERS_PATH=/tmp/openscrub-save-as-20261116/browsers node /tmp/openscrub-task20/browser.cjs
+python /tmp/openscrub-task20/serve.py
+LD_LIBRARY_PATH=/tmp/openscrub-save-as-20261116/tools/usr/lib/x86_64-linux-gnu PLAYWRIGHT_BROWSERS_PATH=/tmp/openscrub-save-as-20261116/browsers node /tmp/openscrub-task20/real.cjs
+python /tmp/openscrub-task20/check_output.py
+PYTHONPATH=/tmp/openscrub-python39-20261117/venv/lib/python3.9/site-packages:$PYTHONPATH python -m build --no-isolation --outdir /tmp/openscrub-task20/dist
+python /tmp/openscrub-task20/check_packaging.py
+UV_CACHE_DIR=/tmp/openscrub-task20/uv-cache /tmp/openscrub-baseline-20261116/bootstrap/bin/uv pip install --python /tmp/openscrub-baseline-20261116/venv-opencv4/bin/python --no-deps --offline --target /tmp/openscrub-task20/installed/site-packages /tmp/openscrub-task20/dist/openscrub-1.0.96-py3-none-any.whl
+python /tmp/openscrub-task20/check_installed.py
+
+source /tmp/openscrub-python39-20261117/env.sh
+python -m pytest tests/test_review_choices.py tests/test_review_save_failures.py test_openscrub.py -k 'review_choices or review_save_failures or report_roundtrip_preserves_tracks or render_dedupes' -q --basetemp=/tmp/openscrub-task20/python39-tmp
+# Retry only the test blocked by the existing Python3.9 write audit; allowed temp root:
+python -m pytest test_openscrub.py::test_report_roundtrip_preserves_tracks -q --basetemp=/tmp/openscrub-python39-20261117/tmp/task20-report
+
+git diff --check
+git add openscrub_web.py tests/test_review_choices.py CONTRIBUTING.md CLAUDE.md
+git commit -m 'Make review output choices explicit and show mixed group state'
+
+Notes: browser/server native runtime required authorized escalation. Browser dependencies and Python environments were reused. No global installs or model downloads. Initial failed no-isolation build lacked hatchling in the 3.12 environment; final build reuses existing pure-Python build tools from prepared 3.9 site-packages. First pip attempt unavailable; final wheel installation uses prepared uv offline.

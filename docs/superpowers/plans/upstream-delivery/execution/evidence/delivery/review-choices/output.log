@@ -1,0 +1,86 @@
+{
+  "regions": [
+    {
+      "i": 0,
+      "enabled": false,
+      "mean_absolute_error": 3.196759259259259,
+      "output_mean": 120.77314814814815
+    },
+    {
+      "i": 1,
+      "enabled": false,
+      "mean_absolute_error": 3.1450617283950617,
+      "output_mean": 120.79706790123457
+    },
+    {
+      "i": 2,
+      "enabled": true,
+      "mean_absolute_error": 121.63811728395062,
+      "output_mean": 0.014660493827160493
+    },
+    {
+      "i": 3,
+      "enabled": false,
+      "mean_absolute_error": 3.099537037037037,
+      "output_mean": 120.77391975308642
+    },
+    {
+      "i": 4,
+      "enabled": true,
+      "mean_absolute_error": 121.61265432098766,
+      "output_mean": 0.06558641975308642
+    },
+    {
+      "i": 5,
+      "enabled": true,
+      "mean_absolute_error": 121.60416666666667,
+      "output_mean": 0.10570987654320987
+    },
+    {
+      "i": 6,
+      "enabled": true,
+      "mean_absolute_error": 121.63966049382717,
+      "output_mean": 0.031635802469135804
+    },
+    {
+      "i": 7,
+      "enabled": true,
+      "mean_absolute_error": 121.5378086419753,
+      "output_mean": 0.11882716049382716
+    },
+    {
+      "i": 8,
+      "enabled": true,
+      "mean_absolute_error": 121.58179012345678,
+      "output_mean": 0.11496913580246913
+    },
+    {
+      "i": 9,
+      "enabled": false,
+      "mean_absolute_error": 3.3641975308641974,
+      "output_mean": 120.67824074074075
+    },
+    {
+      "i": 10,
+      "enabled": true,
+      "mean_absolute_error": 121.46913580246914,
+      "output_mean": 0.18518518518518517
+    },
+    {
+      "i": 11,
+      "enabled": false,
+      "mean_absolute_error": 3.067901234567901,
+      "output_mean": 120.99305555555556
+    },
+    {
+      "i": 12,
+      "enabled": true,
+      "mean_absolute_error": 121.5324074074074,
+      "output_mean": 0.14351851851851852
+    }
+  ],
+  "unrelated_region_unchanged": true,
+  "before_rows": 13,
+  "after_rows": 8,
+  "known_P06D_disabled_row_loss_observed": true
+}

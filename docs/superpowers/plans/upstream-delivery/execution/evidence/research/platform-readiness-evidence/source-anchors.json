@@ -1,0 +1,734 @@
+{
+  "pinned_ref": "5d3a15ae683c08f368d6ba4bd0d2d77b4e7b8e2f",
+  "sources": [
+    {
+      "path": "Dockerfile",
+      "ref": "5d3a15ae683c08f368d6ba4bd0d2d77b4e7b8e2f",
+      "command": [
+        "git",
+        "show",
+        "5d3a15ae683c08f368d6ba4bd0d2d77b4e7b8e2f:Dockerfile"
+      ],
+      "returncode": 0,
+      "sha256": "cb7148141b842eea809d33b05c389522124963739ef992c95c769f6d700c800c",
+      "selected_lines": [
+        {
+          "line": 25,
+          "text": "FROM python:3.12-slim"
+        },
+        {
+          "line": 57,
+          "text": "RUN python prefetch_models.py yunet sface vittrack ppdet pprec pprec_yml plate_t640"
+        },
+        {
+          "line": 73,
+          "text": "ARG SECURITY_REFRESH=0"
+        },
+        {
+          "line": 74,
+          "text": "RUN echo \"security refresh ${SECURITY_REFRESH}\" \\"
+        }
+      ]
+    },
+    {
+      "path": "Dockerfile.intel",
+      "ref": "5d3a15ae683c08f368d6ba4bd0d2d77b4e7b8e2f",
+      "command": [
+        "git",
+        "show",
+        "5d3a15ae683c08f368d6ba4bd0d2d77b4e7b8e2f:Dockerfile.intel"
+      ],
+      "returncode": 0,
+      "sha256": "d3ff7ec60107bcb2cdb1e1f72ca3ea7aadcd5b49f29da1a19402fce028aa3e6d",
+      "selected_lines": [
+        {
+          "line": 8,
+          "text": "#       --device /dev/dri:/dev/dri \\"
+        },
+        {
+          "line": 12,
+          "text": "# --device /dev/dri is REQUIRED for GPU use \u2014 without it the container"
+        },
+        {
+          "line": 36,
+          "text": "FROM python:3.12-slim-bookworm"
+        },
+        {
+          "line": 58,
+          "text": "# adds the OpenVINOExecutionProvider the engine prefers when present"
+        },
+        {
+          "line": 80,
+          "text": "assert 'OpenVINOExecutionProvider' in provs, \\"
+        },
+        {
+          "line": 107,
+          "text": "ARG SECURITY_REFRESH=0"
+        }
+      ]
+    },
+    {
+      "path": "Dockerfile.cuda",
+      "ref": "5d3a15ae683c08f368d6ba4bd0d2d77b4e7b8e2f",
+      "command": [
+        "git",
+        "show",
+        "5d3a15ae683c08f368d6ba4bd0d2d77b4e7b8e2f:Dockerfile.cuda"
+      ],
+      "returncode": 0,
+      "sha256": "c434b90d62c605520b456ff450bebec2ee9229932c0e7a71e3a54ae83d208466",
+      "selected_lines": [
+        {
+          "line": 33,
+          "text": "FROM ghcr.io/austinmabry/opencv-cuda:4.10.0-cu126"
+        },
+        {
+          "line": 58,
+          "text": "RUN grep -viE '^(opencv|numpy|onnxruntime)' requirements.txt > /tmp/req.nocv \\"
+        },
+        {
+          "line": 61,
+          "text": " # detection runs on the GPU via the CUDAExecutionProvider on cu126. The"
+        },
+        {
+          "line": 66,
+          "text": " # --no-deps + its light pure-Python deps by hand: this stops onnxruntime-gpu"
+        },
+        {
+          "line": 71,
+          "text": " && pip install --no-cache-dir --no-deps onnxruntime-gpu \\"
+        },
+        {
+          "line": 74,
+          "text": "      paddlepaddle-gpu==3.2.2 \\"
+        },
+        {
+          "line": 78,
+          "text": " # Its STOCK onnxruntime dependency would clobber onnxruntime-gpu's"
+        },
+        {
+          "line": 85,
+          "text": "      onnxruntime-gpu \\"
+        },
+        {
+          "line": 93,
+          "text": " && pip install --no-cache-dir \"numpy==1.26.4\" \\"
+        },
+        {
+          "line": 99,
+          "text": " && pip uninstall -y opencv-python opencv-contrib-python \\"
+        },
+        {
+          "line": 101,
+          "text": " && CVSRC=\"$(find /opt/opencv -type d -name cv2 | head -1)\" \\"
+        },
+        {
+          "line": 103,
+          "text": " && rm -rf \"$SITE/cv2\" && cp -r \"$CVSRC\" \"$SITE/\" \\"
+        },
+        {
+          "line": 111,
+          "text": " # fail the build if onnxruntime-gpu didn't register its CUDA provider (the"
+        },
+        {
+          "line": 117,
+          "text": "assert 'CUDAExecutionProvider' in provs, ('onnxruntime CUDA provider missing: %r' % provs); \\"
+        },
+        {
+          "line": 136,
+          "text": "RUN pip install --no-cache-dir --no-deps ."
+        },
+        {
+          "line": 145,
+          "text": "ARG SECURITY_REFRESH=0"
+        }
+      ]
+    },
+    {
+      "path": "docker/Dockerfile.opencv-cuda",
+      "ref": "5d3a15ae683c08f368d6ba4bd0d2d77b4e7b8e2f",
+      "command": [
+        "git",
+        "show",
+        "5d3a15ae683c08f368d6ba4bd0d2d77b4e7b8e2f:docker/Dockerfile.opencv-cuda"
+      ],
+      "returncode": 0,
+      "sha256": "11d0f50cbb500ccde78464bdc9983131f4057493159b287fd9bcdc740d33fae7",
+      "selected_lines": [
+        {
+          "line": 20,
+          "text": "#   - CUDA_ARCH_BIN: native machine code (SASS) is compiled for the common"
+        },
+        {
+          "line": 24,
+          "text": "#   - CUDA_ARCH_PTX=5.2: forward-compatible PTX is also embedded, which the"
+        },
+        {
+          "line": 29,
+          "text": "# build. Add an arch to CUDA_ARCH_BIN only to give that card native SASS"
+        },
+        {
+          "line": 35,
+          "text": "ARG OPENCV_VERSION=4.10.0"
+        },
+        {
+          "line": 36,
+          "text": "ARG CUDA_ARCH_BIN=\"6.1;7.5;8.6;8.9\""
+        },
+        {
+          "line": 37,
+          "text": "ARG CUDA_ARCH_PTX=\"5.2\""
+        },
+        {
+          "line": 40,
+          "text": "FROM nvidia/cuda:12.6.3-cudnn-devel-ubuntu22.04 AS build"
+        },
+        {
+          "line": 41,
+          "text": "ARG OPENCV_VERSION"
+        },
+        {
+          "line": 42,
+          "text": "ARG CUDA_ARCH_BIN"
+        },
+        {
+          "line": 43,
+          "text": "ARG CUDA_ARCH_PTX"
+        },
+        {
+          "line": 55,
+          "text": " && pip3 install --no-cache-dir numpy==1.26.4"
+        },
+        {
+          "line": 60,
+          "text": "RUN git clone --depth 1 --branch ${OPENCV_VERSION} \\"
+        },
+        {
+          "line": 62,
+          "text": " && git clone --depth 1 --branch ${OPENCV_VERSION} \\"
+        },
+        {
+          "line": 63,
+          "text": "      https://github.com/opencv/opencv_contrib.git"
+        },
+        {
+          "line": 71,
+          "text": "      -D CMAKE_INSTALL_PREFIX=/opt/opencv \\"
+        },
+        {
+          "line": 72,
+          "text": "      -D OPENCV_EXTRA_MODULES_PATH=/src/opencv_contrib/modules \\"
+        },
+        {
+          "line": 73,
+          "text": "      -D BUILD_LIST=core,imgproc,imgcodecs,videoio,dnn,objdetect,python3,cudev \\"
+        },
+        {
+          "line": 74,
+          "text": "      -D WITH_CUDA=ON \\"
+        },
+        {
+          "line": 75,
+          "text": "      -D OPENCV_DNN_CUDA=ON \\"
+        },
+        {
+          "line": 76,
+          "text": "      -D WITH_CUDNN=ON \\"
+        },
+        {
+          "line": 79,
+          "text": "      -D CUDA_ARCH_BIN=${CUDA_ARCH_BIN} \\"
+        },
+        {
+          "line": 80,
+          "text": "      -D CUDA_ARCH_PTX=${CUDA_ARCH_PTX} \\"
+        },
+        {
+          "line": 97,
+          "text": "FROM nvidia/cuda:12.6.3-cudnn-runtime-ubuntu22.04"
+        },
+        {
+          "line": 110,
+          "text": " && pip3 install --no-cache-dir numpy==1.26.4 \\"
+        },
+        {
+          "line": 114,
+          "text": "COPY --from=build /opt/opencv/lib /opt/opencv/lib"
+        },
+        {
+          "line": 116,
+          "text": " && CVDIR=$(find /opt/opencv -type d -name cv2 | head -1) \\"
+        },
+        {
+          "line": 117,
+          "text": " && cp -r \"$CVDIR\" \"$SITE\"/ \\"
+        }
+      ]
+    },
+    {
+      "path": ".github/workflows/docker-image.yml",
+      "ref": "5d3a15ae683c08f368d6ba4bd0d2d77b4e7b8e2f",
+      "command": [
+        "git",
+        "show",
+        "5d3a15ae683c08f368d6ba4bd0d2d77b4e7b8e2f:.github/workflows/docker-image.yml"
+      ],
+      "returncode": 0,
+      "sha256": "f6c0c0e236c4b9b1c5e7b686014ab737893a03ea5304ff67457f497bf93e6460",
+      "selected_lines": [
+        {
+          "line": 32,
+          "text": "    - cron: \"17 8 * * 1\""
+        },
+        {
+          "line": 45,
+          "text": "    runs-on: ubuntu-latest"
+        },
+        {
+          "line": 62,
+          "text": "            RAW=\"$(git describe --tags --abbrev=0)\""
+        },
+        {
+          "line": 63,
+          "text": "            git checkout \"$RAW\""
+        },
+        {
+          "line": 99,
+          "text": "          platforms: linux/amd64,linux/arm64"
+        },
+        {
+          "line": 101,
+          "text": "            SECURITY_REFRESH=${{ github.run_id }}"
+        },
+        {
+          "line": 107,
+          "text": "          cache-from: type=registry,ref=ghcr.io/austinmabry/openscrub:buildcache"
+        },
+        {
+          "line": 108,
+          "text": "          cache-to: type=registry,ref=ghcr.io/austinmabry/openscrub:buildcache,mode=max"
+        },
+        {
+          "line": 111,
+          "text": "    runs-on: ubuntu-latest"
+        },
+        {
+          "line": 133,
+          "text": "            RAW=\"$(git describe --tags --abbrev=0)\""
+        },
+        {
+          "line": 134,
+          "text": "            git checkout \"$RAW\""
+        },
+        {
+          "line": 166,
+          "text": "          file: Dockerfile.cuda"
+        },
+        {
+          "line": 168,
+          "text": "            SECURITY_REFRESH=${{ github.run_id }}"
+        },
+        {
+          "line": 174,
+          "text": "          cache-from: type=registry,ref=ghcr.io/austinmabry/openscrub:buildcache-cuda"
+        },
+        {
+          "line": 175,
+          "text": "          cache-to: type=registry,ref=ghcr.io/austinmabry/openscrub:buildcache-cuda,mode=max"
+        },
+        {
+          "line": 178,
+          "text": "    runs-on: ubuntu-latest"
+        },
+        {
+          "line": 195,
+          "text": "            RAW=\"$(git describe --tags --abbrev=0)\""
+        },
+        {
+          "line": 196,
+          "text": "            git checkout \"$RAW\""
+        },
+        {
+          "line": 229,
+          "text": "          file: Dockerfile.intel"
+        },
+        {
+          "line": 230,
+          "text": "          platforms: linux/amd64"
+        },
+        {
+          "line": 232,
+          "text": "            SECURITY_REFRESH=${{ github.run_id }}"
+        },
+        {
+          "line": 235,
+          "text": "          cache-from: type=registry,ref=ghcr.io/austinmabry/openscrub:buildcache-intel"
+        },
+        {
+          "line": 236,
+          "text": "          cache-to: type=registry,ref=ghcr.io/austinmabry/openscrub:buildcache-intel,mode=max"
+        }
+      ]
+    },
+    {
+      "path": ".github/workflows/windows-installer.yml",
+      "ref": "5d3a15ae683c08f368d6ba4bd0d2d77b4e7b8e2f",
+      "command": [
+        "git",
+        "show",
+        "5d3a15ae683c08f368d6ba4bd0d2d77b4e7b8e2f:.github/workflows/windows-installer.yml"
+      ],
+      "returncode": 0,
+      "sha256": "db741efaadb4e3a146c3b55dcca0fbb4a972b6d938ee754a84a0fd38daa76027",
+      "selected_lines": [
+        {
+          "line": 8,
+          "text": "# (windows\\build_installer.bat -> PyInstaller + Inno Setup), so the"
+        },
+        {
+          "line": 27,
+          "text": "    runs-on: windows-latest"
+        },
+        {
+          "line": 38,
+          "text": "          python-version: \"3.12\""
+        },
+        {
+          "line": 46,
+          "text": "          if (-not (Test-Path \"${env:ProgramFiles(x86)}\\Inno Setup 6\\ISCC.exe\")) {"
+        },
+        {
+          "line": 51,
+          "text": "        shell: cmd"
+        },
+        {
+          "line": 52,
+          "text": "        run: windows\\build_installer.bat"
+        }
+      ]
+    },
+    {
+      "path": "windows/build_installer.bat",
+      "ref": "5d3a15ae683c08f368d6ba4bd0d2d77b4e7b8e2f",
+      "command": [
+        "git",
+        "show",
+        "5d3a15ae683c08f368d6ba4bd0d2d77b4e7b8e2f:windows/build_installer.bat"
+      ],
+      "returncode": 0,
+      "sha256": "fc5f6934832afa5f756c95c53322724f1ef82680486c0bd4834f99f007161a89",
+      "selected_lines": [
+        {
+          "line": 4,
+          "text": "rem    1. PyInstaller -> dist\\OpenScrub\\{openscrub.exe, openscrub-web.exe}"
+        },
+        {
+          "line": 7,
+          "text": "rem  Run from anywhere; needs Python 3.10+ on PATH. For step 2 install"
+        },
+        {
+          "line": 24,
+          "text": "rem onnxruntime-directml, whose DmlExecutionProvider runs the ONNX"
+        },
+        {
+          "line": 28,
+          "text": "rem DirectML.dll; _ort_session prefers DmlExecutionProvider and falls"
+        },
+        {
+          "line": 31,
+          "text": "python -m pip uninstall -y onnxruntime onnxruntime-directml >nul 2>nul"
+        },
+        {
+          "line": 32,
+          "text": "python -m pip install --quiet onnxruntime-directml || exit /b 1"
+        },
+        {
+          "line": 34,
+          "text": "python -m PyInstaller --noconfirm windows\\openscrub.spec || exit /b 1"
+        },
+        {
+          "line": 35,
+          "text": "echo PyInstaller build OK: dist\\OpenScrub"
+        },
+        {
+          "line": 37,
+          "text": "set ISCC="
+        },
+        {
+          "line": 38,
+          "text": "for %%p in (\"%ProgramFiles(x86)%\\Inno Setup 6\\ISCC.exe\" \"%ProgramFiles%\\Inno Setup 6\\ISCC.exe\") do ("
+        },
+        {
+          "line": 39,
+          "text": "  if exist %%p set ISCC=%%p"
+        },
+        {
+          "line": 41,
+          "text": "where ISCC >nul 2>nul && set ISCC=ISCC"
+        },
+        {
+          "line": 42,
+          "text": "if \"%ISCC%\"==\"\" ("
+        },
+        {
+          "line": 48,
+          "text": "%ISCC% /DMyAppVersion=%VER% windows\\installer.iss || exit /b 1"
+        }
+      ]
+    }
+  ],
+  "local_sources": [
+    {
+      "path": "docs/superpowers/plans/upstream-delivery/03-packaging-and-review-features.md",
+      "line_range": [
+        49,
+        78
+      ],
+      "selected_lines": [
+        {
+          "line": 49,
+          "text": "## P13 \u2014 Docker cache and refresh improvements"
+        },
+        {
+          "line": 50,
+          "text": ""
+        },
+        {
+          "line": 51,
+          "text": "**What:** Reuse package downloads and avoid invalidating security-refresh work unnecessarily during local source-only rebuilds, preserving upstream's release/security workflow."
+        },
+        {
+          "line": 52,
+          "text": ""
+        },
+        {
+          "line": 53,
+          "text": "**Why:** Upstream already caches heavy dependency/model layers. The remaining donor benefits must be measured as deltas, not sold as a new cache architecture."
+        },
+        {
+          "line": 54,
+          "text": ""
+        },
+        {
+          "line": 55,
+          "text": "**When:** W3 or earlier independently; no dependency on product features. Donors: `36636c4`, CPU `8fb396a`, CUDA `7063167`, Intel `bcda47f`."
+        },
+        {
+          "line": 56,
+          "text": ""
+        },
+        {
+          "line": 57,
+          "text": "**Files / contract:** `.dockerignore`, affected Dockerfiles, minimal workflow/comment adjustments, `tests/test_docker_build_cache.py`, concise build documentation. Preserve current image names, architecture/provider choices and `SECURITY_REFRESH` behavior. Cache IDs separate incompatible CPU/Intel/CUDA package contexts. Do not copy training overlays or artifact/media directories into build contexts."
+        },
+        {
+          "line": 58,
+          "text": ""
+        },
+        {
+          "line": 59,
+          "text": "- [ ] **E:** Record current cold build, local source-only rebuild with the same refresh argument, dependency change and forced refresh. Separately record CI's existing registry layer cache and per-run refresh argument; local mount reuse and cross-run CI persistence are different claims."
+        },
+        {
+          "line": 60,
+          "text": "- [ ] **S/I:** Port pip cache mounts and refresh-layer positioning only where they reduce work. Preserve dependency/model layers and explicit scheduled/release refreshes. Keep container caches out of final image contents."
+        },
+        {
+          "line": 61,
+          "text": "- [ ] **V:** Run `python -m pytest tests/test_docker_build_cache.py -q`, normal suite/build, and actual affected image builds with stage timings/layer evidence. Test source-only change and changed `SECURITY_REFRESH` separately; verify startup and model-provider registration."
+        },
+        {
+          "line": 62,
+          "text": "- [ ] **D:** Document builder/cache lifetime and which layers were reused. Docker documents that cache mounts live with the builder and are not automatically persisted in GitHub Actions cache; do not assume a mount survives fresh CI runners or add a new cache-workaround action without a demonstrated need. [Cache mounts](https://docs.docker.com/reference/dockerfile/#run---mounttypecache), [CI cache behavior](https://docs.docker.com/build/ci/github-actions/cache/)."
+        },
+        {
+          "line": 63,
+          "text": "- [ ] **R/L:** Submit a focused build PR, splitting CPU/Intel/CUDA only if they differ materially. Describe security refresh preservation and untested hardware explicitly; no release/version ownership changes."
+        },
+        {
+          "line": 64,
+          "text": ""
+        },
+        {
+          "line": 65,
+          "text": "## P14 \u2014 Windows/NVIDIA inference setup"
+        },
+        {
+          "line": 66,
+          "text": ""
+        },
+        {
+          "line": 67,
+          "text": "**What:** Preserve a small, working inference-only Compose/helper path and necessary GPU compatibility fixes."
+        },
+        {
+          "line": 68,
+          "text": ""
+        },
+        {
+          "line": 69,
+          "text": "**Why:** A registered provider is not proof that the chosen plate model executes on the GPU; Windows path/context/build handoff can also fail independently of inference code."
+        },
+        {
+          "line": 70,
+          "text": ""
+        },
+        {
+          "line": 71,
+          "text": "**When:** W3 once reproducible setup/hardware evidence exists; separate from P13 cache tuning. Donors: `9f63f6e`, narrowly selected `7c47815` changes."
+        },
+        {
+          "line": 72,
+          "text": ""
+        },
+        {
+          "line": 73,
+          "text": "**Files / contract:** Appropriate existing Compose/deploy documentation, a small helper under `tools/` or the relevant platform directory only if needed, `tools/check_cuda.py`, focused tests under `tests/`. No training image or generated parallel inference Dockerfile."
+        },
+        {
+          "line": 74,
+          "text": ""
+        },
+        {
+          "line": 75,
+          "text": "- [ ] **E:** Reproduce the actual daemon/context/path or provider issue on the target setup. Compare current upstream image requirements; do not restore an old ONNX Runtime pin just because the fork used it."
+        },
+        {
+          "line": 76,
+          "text": "- [ ] **I:** Keep the minimal inference configuration and explicit fallback/error behavior. Mock command construction/path handling in tests; never treat those mocks as GPU verification."
+        },
+        {
+          "line": 77,
+          "text": "- [ ] **V:** Build/run the supported image and execute an existing registered plate model on representative synthetic input with provider evidence. Check CPU behavior remains available and the chosen model/output agrees within justified tolerance."
+        },
+        {
+          "line": 78,
+          "text": "- [ ] **D/R/L:** PR material names OS, Docker/driver/provider/model versions, the original trigger and actual hardware exercised. If no suitable GPU/Windows environment is available, keep hardware verification outstanding rather than marking the task complete."
+        }
+      ]
+    },
+    {
+      "path": ".superpowers/sdd/README/task-61-report.md",
+      "line_range": [
+        135,
+        150
+      ],
+      "selected_lines": [
+        {
+          "line": 135,
+          "text": "## Durability/platform limits and follow-up constraints"
+        },
+        {
+          "line": 136,
+          "text": ""
+        },
+        {
+          "line": 137,
+          "text": "File-fsync precedes replacement. Directory metadata is not fsynced. Atomic"
+        },
+        {
+          "line": 138,
+          "text": "replacement is not a universal power-loss guarantee; network/filesystem"
+        },
+        {
+          "line": 139,
+          "text": "semantics and storage can differ. Windows requires staging closure before"
+        },
+        {
+          "line": 140,
+          "text": "replacement, which the implementation does, but readers/antivirus holding the"
+        },
+        {
+          "line": 141,
+          "text": "destination can prevent replacement; that error propagates. POSIX modes do not"
+        },
+        {
+          "line": 142,
+          "text": "establish a Windows ACL guarantee. Actual power cuts, disk-full hardware,"
+        },
+        {
+          "line": 143,
+          "text": "Windows/frozen builds, browser interaction, network filesystems, GPU models,"
+        },
+        {
+          "line": 144,
+          "text": "TLS/production WSGI, and audible output were not tested."
+        },
+        {
+          "line": 145,
+          "text": ""
+        },
+        {
+          "line": 146,
+          "text": "`docker info --format '{{.ServerVersion}}'` failed with permission denied on"
+        },
+        {
+          "line": 147,
+          "text": "`/var/run/docker.sock`; no CPU/Intel/CUDA image builds ran. Full Docker builds"
+        },
+        {
+          "line": 148,
+          "text": "would also require model-fetching layers excluded from this task. No Windows"
+        },
+        {
+          "line": 149,
+          "text": "runtime or PyInstaller executable is available here. The Docker copy edits and"
+        },
+        {
+          "line": 150,
+          "text": "static imports are included, but their platform builds remain unverified."
+        }
+      ]
+    },
+    {
+      "path": ".superpowers/sdd/README/task-1-artifacts/environment.json",
+      "data": {
+        "python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]",
+        "executable": "/tmp/openscrub-baseline-20261116/venv/bin/python",
+        "platform": "Linux-6.18.58.1-microsoft-standard-WSL2-x86_64-with-glibc2.43",
+        "opencv": "5.0.0",
+        "cascade_classifier": false,
+        "cuda_devices": 0,
+        "onnxruntime": "1.32.0",
+        "onnxruntime_providers": [
+          "AzureExecutionProvider",
+          "CPUExecutionProvider"
+        ],
+        "node": "v22.22.1",
+        "ffmpeg": "ffmpeg version 8.0.1-3ubuntu2 Copyright (c) 2000-2025 the FFmpeg developers",
+        "tesseract": "tesseract 5.5.0",
+        "browsers": {
+          "chromium": null,
+          "chromium-browser": null,
+          "google-chrome": null,
+          "firefox": null
+        }
+      }
+    },
+    {
+      "path": ".superpowers/sdd/README/task-1-artifacts/environment-opencv4.json",
+      "data": {
+        "python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]",
+        "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+        "opencv": "4.14.0",
+        "cascade_classifier": true,
+        "onnxruntime": "1.32.0",
+        "providers": [
+          "AzureExecutionProvider",
+          "CPUExecutionProvider"
+        ]
+      }
+    }
+  ],
+  "compose": {
+    "command": [
+      "docker",
+      "compose",
+      "version"
+    ],
+    "returncode": 0,
+    "stdout": "Docker Compose version v5.7.0\n",
+    "stderr": ""
+  },
+  "limits": "Only permitted P13/P14 cards, Task61 platform limits, Task1 environment JSON and pinned Docker/workflow/Windows sources. No product worktree read or broad source audit."
+}

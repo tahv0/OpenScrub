@@ -1,0 +1,80 @@
+ 4284  let LEARNING_SELECTION=null,LEARNING_SELECTION_JOB=null,LEARNING_TERMS=false;
+ 4285  function sampleReviewGroups(rows,fraction=.1,labels={}){
+ 4286   // Same grouping/quota as video_learning.review_sample_details. Work from
+ 4287   // already loaded metadata and current draft labels, never save to filter.
+ 4288   if(!Number.isFinite(fraction)||fraction<=0||fraction>1)throw new Error("Review fraction must be in (0, 1]");
+
+ 4316  function applyReviewGroupFilter(){
+ 4317   const panel=document.getElementById("review");
+ 4318   if(!panel||panel._sampleJob!==CUR||panel._sampleView!==JOBVIEW)return false;
+ 4319   clearSel();
+ 4320   const selected=LEARNING_SELECTION;
+ 4321   let shown=0;
+ 4322   panel.querySelectorAll(".det").forEach(card=>{
+ 4323    const i=Number(card.id.slice(3));
+ 4324    card.hidden=!!selected&&(card.dataset.cat!=="plate"||!(TRKMEM[i]||[i]).some(m=>selected.has(m)));
+ 4325    if(!card.hidden)shown++;
+ 4326   });
+ 4327   panel.querySelectorAll("[data-review-category]").forEach(grid=>{
+ 4328    const count=grid.querySelectorAll(".det:not([hidden])").length;
+ 4329    grid.hidden=count===0;
+ 4330    const heading=grid.previousElementSibling;heading.hidden=count===0;
+ 4331    heading.querySelector(".badge").textContent=count;
+ 4332   });
+ 4333   const zones=panel.querySelector("#reviewZones");if(zones)zones.hidden=!!selected;
+ 4334   const all=panel.querySelector("#reviewShowAll");if(all)all.hidden=!selected;
+ 4335   const summary=panel.querySelector("#reviewSampleSummary");
+ 4336   if(summary){
+ 4337    summary.hidden=!selected;
+ 4338    if(selected){
+ 4339     const total=LEARNING_SAMPLE_INFO?.eligible_groups??selected.size;
+ 4340     summary.textContent="Showing "+shown+" of "+total+" unreviewed plate groups (10%). "+
+ 4341      "One representative image per group, not one per frame. Groups are spread across the video; "+
+ 4342      "the most uncertain in each batch is selected. This only filters the view; unsaved edits are kept.";
+ 4343    }
+ 4344   }
+ 4345   // Keep existing images/editors and autosaves alive. Drop hidden queued images
+ 4346   // without aborting unrelated requests or decoding every preview again.
+ 4347   if(REVIEW_MEDIA)pumpReviewPreviews(REVIEW_MEDIA);
+ 4348   return true;
+ 4349  }
+ 4350  function reviewUncertain(){
+ 4351   const panel=document.getElementById("review");
+ 4352   if(!panel||panel._sampleJob!==CUR||panel._sampleView!==JOBVIEW||!panel._sampleRows){
+ 4353    reviewSaveStatus("Open the review before selecting a sample.",true);return false;
+ 4354   }
+ 4355   if([...PLATE_EDITS.values()].some(s=>s.drag)){
+ 4356    reviewSaveStatus("Finish dragging the corner before changing the view.",true);return false;
+ 4357   }
+ 4358   const data=sampleReviewGroups(panel._sampleRows,.1,VLBL);
+ 4359   LEARNING_SELECTION=new Set(data.indices);LEARNING_SELECTION_JOB=CUR;LEARNING_SAMPLE_INFO=data;
+ 4360   return applyReviewGroupFilter();
+ 4361  }
+ 4362  function reviewAllFindings(){
+ 4363   LEARNING_SELECTION=null;
+ 4364   return applyReviewGroupFilter();
+
+ 4515   detail.insertAdjacentHTML("beforeend",html);
+ 4516   // Bind the snapshot to this panel/view; removing it releases the metadata.
+ 4517   const panel=document.getElementById("review");
+ 4518   if(panel){
+ 4519    panel._sampleRows=d.detections.filter(x=>x.category==="plate"&&!x.zone_dropped).map(x=>({
+ 4520     i:x.i,category:"plate",person:x.person,track:x.track,t_start:x.t_start,
+ 4521     confidence:x.confidence,verified_label:x.verified_label,
+ 4522     learning_conflict:!!x.learning_conflict,fallback_reason:!!x.fallback_reason}));
+ 4523    panel._sampleJob=job;panel._sampleView=view;
+ 4524   }
+ 4525   if(LEARNING_SELECTION)applyReviewGroupFilter();
+ 4526   initMarquee();initReviewPreviews();
+
+ 4567  function setAll(cat,on){document.querySelectorAll(`.det[data-cat=${cat}]:not([hidden])`)
+ 4568   .forEach(el=>applyDet(+el.id.slice(3),on));}
+ 4569  function thumbRetry(img){
+ 4570   const n=+(img.dataset.r||0);
+ 4571   if(n>=3)return;
+ 4572   img.dataset.r=n+1;
+ 4573   setTimeout(()=>{img.src=img.src.split("?r=")[0]+"?r="+Date.now();},
+ 4574              600*(n+1));
+ 4575  }
+ 4576  function setAllZd(on){document.querySelectorAll(`.det[data-cat=zdrop]:not([hidden])`)
+ 4577   .forEach(el=>applyDet(+el.id.slice(3),on));}

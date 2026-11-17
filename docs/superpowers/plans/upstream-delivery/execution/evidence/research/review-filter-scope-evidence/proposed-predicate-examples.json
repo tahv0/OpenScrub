@@ -1,0 +1,199 @@
+{
+  "status": "Proposed semantics only; not an executed product test",
+  "groups": [
+    {
+      "id": "A",
+      "category": "face",
+      "members": [
+        0,
+        1,
+        2
+      ],
+      "effective": [
+        true,
+        false,
+        true
+      ]
+    },
+    {
+      "id": "B",
+      "category": "face",
+      "members": [
+        3
+      ],
+      "effective": [
+        true
+      ]
+    },
+    {
+      "id": "C",
+      "category": "plate",
+      "members": [
+        4,
+        5
+      ],
+      "effective": [
+        false,
+        false
+      ]
+    },
+    {
+      "id": "D",
+      "category": "plate",
+      "members": [
+        6
+      ],
+      "effective": [
+        true
+      ]
+    },
+    {
+      "id": "E",
+      "category": "email",
+      "members": [
+        7
+      ],
+      "effective": [
+        false
+      ]
+    },
+    {
+      "id": "Z8",
+      "category": "face",
+      "section": "outside-zones",
+      "members": [
+        8
+      ],
+      "effective": [
+        false
+      ]
+    },
+    {
+      "id": "Z9",
+      "category": "plate",
+      "section": "outside-zones",
+      "members": [
+        9
+      ],
+      "effective": [
+        true
+      ]
+    }
+  ],
+  "zone_rule": "Z8 and Z9 each count as one card; preserve separate section and independent row actions.",
+  "cases": [
+    {
+      "type": "all",
+      "output": "all",
+      "matching_groups": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E",
+        "Z8",
+        "Z9"
+      ],
+      "count": 7
+    },
+    {
+      "type": "all",
+      "output": "blur",
+      "matching_groups": [
+        "A",
+        "B",
+        "D",
+        "Z9"
+      ],
+      "count": 4
+    },
+    {
+      "type": "all",
+      "output": "visible",
+      "matching_groups": [
+        "A",
+        "C",
+        "E",
+        "Z8"
+      ],
+      "count": 4
+    },
+    {
+      "type": "face",
+      "output": "all",
+      "matching_groups": [
+        "A",
+        "B",
+        "Z8"
+      ],
+      "count": 3
+    },
+    {
+      "type": "face",
+      "output": "blur",
+      "matching_groups": [
+        "A",
+        "B"
+      ],
+      "count": 2
+    },
+    {
+      "type": "face",
+      "output": "visible",
+      "matching_groups": [
+        "A",
+        "Z8"
+      ],
+      "count": 2
+    },
+    {
+      "type": "plate",
+      "output": "all",
+      "matching_groups": [
+        "C",
+        "D",
+        "Z9"
+      ],
+      "count": 3
+    },
+    {
+      "type": "plate",
+      "output": "blur",
+      "matching_groups": [
+        "D",
+        "Z9"
+      ],
+      "count": 2
+    },
+    {
+      "type": "plate",
+      "output": "visible",
+      "matching_groups": [
+        "C"
+      ],
+      "count": 1
+    },
+    {
+      "type": "email",
+      "output": "all",
+      "matching_groups": [
+        "E"
+      ],
+      "count": 1
+    },
+    {
+      "type": "email",
+      "output": "blur",
+      "matching_groups": [],
+      "count": 0
+    },
+    {
+      "type": "email",
+      "output": "visible",
+      "matching_groups": [
+        "E"
+      ],
+      "count": 1
+    }
+  ]
+}

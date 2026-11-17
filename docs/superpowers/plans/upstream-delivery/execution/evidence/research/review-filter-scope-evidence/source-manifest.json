@@ -1,0 +1,159 @@
+[
+  {
+    "name": "p07a",
+    "commit": "92124753736e287ac800af91f0ac96f3e96c01be",
+    "source": "openscrub_web.py",
+    "sha256": "cb3b5fccffb2105982a914c2002d419519bceacf2c8bf3c2bb33ea13eb43b038",
+    "ranges": [
+      [
+        1132,
+        1148
+      ],
+      [
+        1978,
+        1978
+      ],
+      [
+        2080,
+        2115
+      ],
+      [
+        2150,
+        2170
+      ],
+      [
+        2405,
+        2431
+      ],
+      [
+        2569,
+        2579
+      ],
+      [
+        2725,
+        2756
+      ],
+      [
+        2777,
+        2888
+      ],
+      [
+        2890,
+        2939
+      ],
+      [
+        2983,
+        3038
+      ]
+    ],
+    "excerpts": "p07a-anchors.txt"
+  },
+  {
+    "name": "64afc3cc",
+    "commit": "64afc3cc0bba285833ae9218cbd786918cfad2bf",
+    "source": "openscrub_web.py",
+    "sha256": "3dbec91aed8ffb8fdb5366a32ab377bf6713adb1614e2e95ec1fff3bdc76d472",
+    "ranges": [
+      [
+        5347,
+        5383
+      ],
+      [
+        5408,
+        5446
+      ],
+      [
+        5551,
+        5568
+      ],
+      [
+        6150,
+        6313
+      ],
+      [
+        6339,
+        6343
+      ],
+      [
+        6537,
+        6539
+      ],
+      [
+        6568,
+        6589
+      ],
+      [
+        6686,
+        6698
+      ],
+      [
+        7065,
+        7111
+      ]
+    ],
+    "excerpts": "64afc3cc-anchors.txt"
+  },
+  {
+    "name": "c3a8c7a5",
+    "commit": "c3a8c7a56430cedf47541685968ddfb26a4666ba",
+    "source": "openscrub_web.py",
+    "sha256": "5b3bd06c43c39269c6b084876b599eebfd7175acb6c34bb3d5dcda1d05015708",
+    "ranges": [
+      [
+        6101,
+        6175
+      ]
+    ],
+    "excerpts": "c3a8c7a5-anchors.txt"
+  },
+  {
+    "name": "8209a82",
+    "commit": "8209a82fad3dcf39057ba81d00b9aed35cdeed50",
+    "source": "openscrub_web.py",
+    "sha256": "2362e697300a5e0059ba84bffb11114153d027dd38bdf687db18d2775b7ae1f5",
+    "ranges": [
+      [
+        4284,
+        4288
+      ],
+      [
+        4316,
+        4364
+      ],
+      [
+        4515,
+        4526
+      ],
+      [
+        4567,
+        4577
+      ]
+    ],
+    "excerpts": "8209a82-anchors.txt"
+  },
+  {
+    "name": "a80a85d",
+    "commit": "a80a85da531d439953bf5359c247bc1ab314c4fd",
+    "source": "openscrub_web.py",
+    "sha256": "2362e697300a5e0059ba84bffb11114153d027dd38bdf687db18d2775b7ae1f5",
+    "ranges": [
+      [
+        4284,
+        4288
+      ],
+      [
+        4316,
+        4364
+      ],
+      [
+        4515,
+        4526
+      ],
+      [
+        4567,
+        4577
+      ]
+    ],
+    "excerpts": "a80a85d-anchors.txt"
+  }
+]

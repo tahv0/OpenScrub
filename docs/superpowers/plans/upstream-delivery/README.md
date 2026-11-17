@@ -103,6 +103,8 @@ The task cards below specify their own **what**, **why**, **when**, implementati
 
 **Completed resolver evidence:** The [bounded core resolution](execution/evidence/research/opencv-resolution-research.md) changes only the normal OpenCV requirement and resolves from fresh official PyPI metadata on the existing Linux CPython 3.12.16 and 3.9.25 targets. Both select `opencv-python==4.14.0.94`, with no other cv2 distribution; all selected Python markers/dependency edges/wheel tags were checked. No wheel archives were downloaded or packages installed. This covers the ten package-core declarations, not the extra spaCy requirement, optional Paddle/GPU commands or another platform. The implementation should compare its built metadata to that exact candidate input and reuse this evidence unless the declarations or a concrete concern change; health checks and installed runtime remain separate gates.
 
+B02b platform context: the current CUDA image deliberately bypasses ordinary wheel installation and restores a compiled OpenCV/contrib4.10.0. A healthy importable source-built4.x runtime without wheel metadata is not a missing install; diagnose its actual Haar constructor/XML capabilities and preserve that provider path. Missing required capabilities need explicit source-build guidance, not automatic replacement with pip wheels. [Readiness evidence](execution/evidence/research/platform-readiness-research.md) establishes available Docker/host GPU metadata only, with builds/inference still open.
+
 ## B03 — complete the preservation audit and scale baselines
 
 **What:** Reconcile integration changes and older/open donor references with the ledger, and start the scale evidence described in the performance plan.

@@ -1,0 +1,46 @@
+......................................................................F. [100%]
+=================================== FAILURES ===================================
+____________________ test_report_roundtrip_preserves_tracks ____________________
+
+tmp_path = PosixPath('/tmp/openscrub-task20/python39-tmp/test_report_roundtrip_preserve0')
+
+    def test_report_roundtrip_preserves_tracks(tmp_path):
+        """dense/track must survive report write -> load: rendering rewrites
+        the report through this round trip, and losing the track ids exploded
+        the re-opened review into one card per frame sample (v1.0.25 bug)."""
+        d = openscrub.Detection(1.0, 1.5, (10, 10, 50, 50), "face", "face",
+                                0.9, (0, 0), dense=True, track=3)
+        args = openscrub.build_parser().parse_args(["dummy.mp4"])
+        state = {"fps": 30.0, "cum": [(0.0, 0.0)], "bands": [(0.0, 0.0)],
+                 "detections": [d], "input_sha256": "x"}
+        rp = str(tmp_path / "r.json")
+        d.person = 2
+>       openscrub.write_report(rp, args, state)
+
+test_openscrub.py:952: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+openscrub.py:6328: in write_report
+    with open(path, "w", encoding="utf-8") as f:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+event = 'open'
+args = ('/tmp/openscrub-task20/python39-tmp/test_report_roundtrip_preserve0/r.json', 'w', 524865)
+
+    def _audit(event, args):
+        if event == 'socket.connect':
+            address = args[1]
+            if isinstance(address, tuple) and address[0] not in ('127.0.0.1', '::1', 'localhost'):
+                raise RuntimeError('Python 3.9 verification: outward network disabled')
+        if event == 'open':
+            path, mode, flags = args
+            if isinstance(path, (str, bytes)):
+                write = bool(flags & (os.O_WRONLY | os.O_RDWR | os.O_CREAT | os.O_TRUNC | os.O_APPEND))
+                resolved = Path(os.fsdecode(path)).resolve()
+                if write and str(resolved) != os.devnull and not resolved.is_relative_to(ROOT):
+>                   raise RuntimeError('Python 3.9 verification: write outside task root blocked')
+E                   RuntimeError: Python 3.9 verification: write outside task root blocked
+
+/tmp/openscrub-python39-20261117/harness/sitecustomize.py:33: RuntimeError
+=========================== short test summary info ============================
+FAILED test_openscrub.py::test_report_roundtrip_preserves_tracks - RuntimeErr...
+1 failed, 71 passed, 132 deselected in 12.63s

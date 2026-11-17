@@ -9,6 +9,8 @@ These local planning records preserve synthetic research, completed-task reports
 | [Thumbnail baseline](research/thumbnail-baseline-research.md) / [identity contract](research/thumbnail-identity-contract-research.md) | Actual stale crops and cold-work evidence; source-backed generation/lifetime/browser design with superseding no-full-video-hash amendment. |
 | [Review scheduling](research/review-scheduling-baseline-research.md) | Actual 1k/10k eager cards/requests, scroll and job-switch ordering, and reuse of P07a draft ownership. |
 | [Output-choice baseline](research/review-choices-baseline-research.md) | Repeated toggle/mixed-state behavior, existing group/editor scope and native keyboard/help controls; full emitted UI with controlled HTTP. |
+| [Explicit output choices](delivery/task-20-report.md) / [review](delivery/task-20-review.md) | Group-aware setters/state, actual accessibility/editor/browser and save/output evidence, with the standalone after-render prerequisite boundary explicit. |
+| [View-filter scope](research/review-filter-scope-research.md) | Existing versus missing controls, clean donor predicates, full-metadata mixed/zone counts and local selection/focus/editor contracts; source-only. |
 | [Polling baseline](research/polling-baseline-research.md) | Existing P07a view fences, same-view overlapping cycles/log duplicates, held HTTP bodies, error recovery and automatic review phase eligibility. |
 | [Scan history](research/scan-history-baseline-research.md) | Removed preview-cache donor closure and three distinct final-aggregation work-count candidates; controlled OCR input, no inference-throughput claim. |
 | [Diagnostics scope](research/diagnostics-scope-research.md) | Lost lifecycle/error classification after restart, donor payload exclusions and separate opt-in persistence versus bounded in-memory/cursor candidates. |
@@ -25,6 +27,7 @@ These local planning records preserve synthetic research, completed-task reports
 | [Render failure boundaries](research/render-failure-boundary-research.md) | Actual direct/worker invalid-region, cancellation and report-publication failures; separates geometry, owned-resource cleanup and prior-video preservation. |
 | [OpenCV compatibility](research/opencv-compat-research.md) / [installer scope](research/opencv-install-scope-research.md) | Matched fallback defect plus primary package metadata; no product compatibility pin or optional-stack runtime acceptance yet. |
 | [OpenCV core resolution](research/opencv-resolution-research.md) | Fresh official-index metadata resolution for the proposed bound on actual Linux Python3.12/3.9 targets; no installs, wheel archives or optional-stack/runtime certification. |
+| [Platform readiness](research/platform-readiness-research.md) | Read-only Docker/RTX3080 capability and preserved CUDA source-build/Windows paths; no image build, cache timing, handoff or inference certification. |
 | [Python 3.9 environment](research/python39-verification-setup.md) | Reusable isolated floor environment and limited smoke/build evidence; full application-floor acceptance remains separate. |
 | [Save As](delivery/task-2-report.md) | Accepted-byte progress, real HTTP/OPFS behavior and browser/platform limits. |
 | [Tracker regression](delivery/task-90-report.md) | Nonvacuous identity-protection regression with a failing mutation control. |

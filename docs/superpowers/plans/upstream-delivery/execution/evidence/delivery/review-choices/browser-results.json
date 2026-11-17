@@ -1,0 +1,368 @@
+{
+  "environment": {
+    "browser": "Playwright Chromium, existing install",
+    "browserPlugin": "not available",
+    "viewport": "1365x1000",
+    "origin": "http://127.0.0.1:18507",
+    "application": "full unmodified emitted PAGE; synthetic HTTP intercepted by Playwright",
+    "inference": false,
+    "realPersistence": false,
+    "realRender": false
+  },
+  "scenarios": [
+    {
+      "name": "pointer repeated setters and all-member state",
+      "enabled": {
+        "0": false,
+        "1": false,
+        "2": true,
+        "3": false,
+        "4": true,
+        "5": false,
+        "6": true,
+        "7": true,
+        "8": false,
+        "9": false,
+        "10": true,
+        "11": false,
+        "12": true
+      }
+    },
+    {
+      "name": "Tab Enter Space keep focus and pressed state"
+    },
+    {
+      "name": "category and real pointer marquee plus Escape"
+    },
+    {
+      "name": "independent zone controls truthful summary and enlarged preview"
+    },
+    {
+      "name": "actual editor nonrepresentative Remove blur stays row-local"
+    },
+    {
+      "name": "representative Remove blur retains group fan-out"
+    },
+    {
+      "name": "390px responsive controls and mobile help tap guard",
+      "q": {
+        "w": "250px",
+        "x": "0px"
+      }
+    },
+    {
+      "name": "native touch action and scrolling without marquee",
+      "oldScroll": 1405,
+      "newScroll": 1810
+    }
+  ],
+  "errors": [],
+  "console": [],
+  "requests": [
+    {
+      "pin": "current",
+      "method": "GET",
+      "path": "/api/model_status"
+    },
+    {
+      "pin": "current",
+      "method": "GET",
+      "path": "/api/custom_cats"
+    },
+    {
+      "pin": "current",
+      "method": "GET",
+      "path": "/api/models/face"
+    },
+    {
+      "pin": "current",
+      "method": "GET",
+      "path": "/api/quality_tier"
+    },
+    {
+      "pin": "current",
+      "method": "GET",
+      "path": "/api/allowlist"
+    },
+    {
+      "pin": "current",
+      "method": "GET",
+      "path": "/api/certinfo"
+    },
+    {
+      "pin": "current",
+      "method": "GET",
+      "path": "/api/jobs"
+    },
+    {
+      "pin": "current",
+      "method": "GET",
+      "path": "/api/update_check"
+    },
+    {
+      "pin": "current",
+      "method": "GET",
+      "path": "/api/vault"
+    },
+    {
+      "pin": "current",
+      "method": "GET",
+      "path": "/api/extras"
+    },
+    {
+      "pin": "current",
+      "method": "GET",
+      "path": "/api/models/plate"
+    },
+    {
+      "pin": "current",
+      "method": "GET",
+      "path": "/api/models/person"
+    },
+    {
+      "pin": "current",
+      "method": "GET",
+      "path": "/api/jobs/qa"
+    },
+    {
+      "pin": "current",
+      "method": "GET",
+      "path": "/api/jobs/qa/log"
+    },
+    {
+      "pin": "current",
+      "method": "GET",
+      "path": "/api/jobs/qa/detections"
+    },
+    {
+      "pin": "current",
+      "method": "GET",
+      "path": "/api/jobs"
+    },
+    {
+      "pin": "current",
+      "method": "GET",
+      "path": "/api/jobs/qa/thumb/1"
+    },
+    {
+      "pin": "current",
+      "method": "GET",
+      "path": "/api/jobs/qa/thumb/2"
+    },
+    {
+      "pin": "current",
+      "method": "GET",
+      "path": "/api/jobs/qa/thumb/3"
+    },
+    {
+      "pin": "current",
+      "method": "GET",
+      "path": "/api/jobs/qa/thumb/4"
+    },
+    {
+      "pin": "current",
+      "method": "GET",
+      "path": "/api/jobs/qa/thumb/10"
+    },
+    {
+      "pin": "current",
+      "method": "GET",
+      "path": "/api/jobs/qa/thumb/6"
+    },
+    {
+      "pin": "current",
+      "method": "GET",
+      "path": "/api/jobs/qa/thumb/7"
+    },
+    {
+      "pin": "current",
+      "method": "GET",
+      "path": "/api/jobs/qa/thumb/12"
+    },
+    {
+      "pin": "current",
+      "method": "GET",
+      "path": "/api/jobs/qa/thumb/8"
+    },
+    {
+      "pin": "current",
+      "method": "GET",
+      "path": "/api/jobs/qa/thumb/9"
+    },
+    {
+      "pin": "current",
+      "method": "GET",
+      "path": "/api/jobs/qa/detframe/8"
+    },
+    {
+      "pin": "current",
+      "method": "GET",
+      "path": "/api/jobs/qa/mediainfo"
+    },
+    {
+      "pin": "current",
+      "method": "GET",
+      "path": "/api/jobs/qa/report"
+    },
+    {
+      "pin": "current",
+      "method": "GET",
+      "path": "/api/jobs/qa/boxes_at"
+    },
+    {
+      "pin": "current",
+      "method": "GET",
+      "path": "/api/jobs/qa/frame_at"
+    },
+    {
+      "pin": "current",
+      "method": "GET",
+      "path": "/api/jobs/qa"
+    },
+    {
+      "pin": "current",
+      "method": "GET",
+      "path": "/api/jobs/qa/log"
+    },
+    {
+      "pin": "current",
+      "method": "GET",
+      "path": "/api/jobs"
+    },
+    {
+      "pin": "current",
+      "method": "GET",
+      "path": "/api/model_status"
+    },
+    {
+      "pin": "current",
+      "method": "GET",
+      "path": "/api/custom_cats"
+    },
+    {
+      "pin": "current",
+      "method": "GET",
+      "path": "/api/models/face"
+    },
+    {
+      "pin": "current",
+      "method": "GET",
+      "path": "/api/quality_tier"
+    },
+    {
+      "pin": "current",
+      "method": "GET",
+      "path": "/api/allowlist"
+    },
+    {
+      "pin": "current",
+      "method": "GET",
+      "path": "/api/certinfo"
+    },
+    {
+      "pin": "current",
+      "method": "GET",
+      "path": "/api/jobs"
+    },
+    {
+      "pin": "current",
+      "method": "GET",
+      "path": "/api/update_check"
+    },
+    {
+      "pin": "current",
+      "method": "GET",
+      "path": "/api/vault"
+    },
+    {
+      "pin": "current",
+      "method": "GET",
+      "path": "/api/extras"
+    },
+    {
+      "pin": "current",
+      "method": "GET",
+      "path": "/api/jobs/qa"
+    },
+    {
+      "pin": "current",
+      "method": "GET",
+      "path": "/api/jobs/qa/log"
+    },
+    {
+      "pin": "current",
+      "method": "GET",
+      "path": "/api/jobs"
+    },
+    {
+      "pin": "current",
+      "method": "GET",
+      "path": "/api/models/plate"
+    },
+    {
+      "pin": "current",
+      "method": "GET",
+      "path": "/api/models/person"
+    },
+    {
+      "pin": "current",
+      "method": "GET",
+      "path": "/api/jobs/qa"
+    },
+    {
+      "pin": "current",
+      "method": "GET",
+      "path": "/api/jobs/qa/log"
+    },
+    {
+      "pin": "current",
+      "method": "GET",
+      "path": "/api/jobs/qa/detections"
+    },
+    {
+      "pin": "current",
+      "method": "GET",
+      "path": "/api/jobs"
+    },
+    {
+      "pin": "current",
+      "method": "GET",
+      "path": "/api/jobs/qa/thumb/1"
+    },
+    {
+      "pin": "current",
+      "method": "GET",
+      "path": "/api/jobs/qa/thumb/2"
+    },
+    {
+      "pin": "current",
+      "method": "GET",
+      "path": "/api/jobs/qa/thumb/3"
+    },
+    {
+      "pin": "current",
+      "method": "GET",
+      "path": "/api/jobs/qa/thumb/4"
+    },
+    {
+      "pin": "current",
+      "method": "GET",
+      "path": "/api/jobs/qa/thumb/10"
+    },
+    {
+      "pin": "current",
+      "method": "GET",
+      "path": "/api/jobs/qa/thumb/6"
+    },
+    {
+      "pin": "current",
+      "method": "GET",
+      "path": "/api/jobs/qa/thumb/7"
+    },
+    {
+      "pin": "current",
+      "method": "GET",
+      "path": "/api/jobs/qa/thumb/12"
+    }
+  ]
+}

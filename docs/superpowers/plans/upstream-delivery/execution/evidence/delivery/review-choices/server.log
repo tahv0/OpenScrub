@@ -1,0 +1,63 @@
+ * Serving Flask app 'openscrub_web'
+ * Debug mode: off
+[31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:18520
+[33mPress CTRL+C to quit[0m
+127.0.0.1 - - [17/Nov/2026 05:34:58] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [17/Nov/2026 05:34:58] "GET /api/model_status HTTP/1.1" 200 -
+127.0.0.1 - - [17/Nov/2026 05:34:58] "GET /api/custom_cats HTTP/1.1" 200 -
+127.0.0.1 - - [17/Nov/2026 05:34:58] "GET /api/models/face HTTP/1.1" 200 -
+127.0.0.1 - - [17/Nov/2026 05:34:58] "GET /api/quality_tier HTTP/1.1" 200 -
+127.0.0.1 - - [17/Nov/2026 05:34:58] "GET /api/allowlist HTTP/1.1" 200 -
+127.0.0.1 - - [17/Nov/2026 05:34:58] "GET /api/jobs HTTP/1.1" 200 -
+127.0.0.1 - - [17/Nov/2026 05:34:58] "GET /api/vault HTTP/1.1" 200 -
+127.0.0.1 - - [17/Nov/2026 05:34:58] "GET /api/extras HTTP/1.1" 200 -
+127.0.0.1 - - [17/Nov/2026 05:34:58] "GET /api/models/plate HTTP/1.1" 200 -
+127.0.0.1 - - [17/Nov/2026 05:34:58] "GET /api/certinfo HTTP/1.1" 200 -
+127.0.0.1 - - [17/Nov/2026 05:34:58] "GET /api/models/person HTTP/1.1" 200 -
+127.0.0.1 - - [17/Nov/2026 05:34:58] "GET /api/update_check HTTP/1.1" 200 -
+127.0.0.1 - - [17/Nov/2026 05:34:58] "GET /api/jobs/qa HTTP/1.1" 200 -
+127.0.0.1 - - [17/Nov/2026 05:34:58] "GET /api/jobs/qa/log?from=0 HTTP/1.1" 200 -
+127.0.0.1 - - [17/Nov/2026 05:34:58] "GET /api/jobs/qa/detections HTTP/1.1" 200 -
+127.0.0.1 - - [17/Nov/2026 05:34:58] "GET /api/jobs HTTP/1.1" 200 -
+127.0.0.1 - - [17/Nov/2026 05:34:58] "GET /api/jobs/qa/thumb/1 HTTP/1.1" 200 -
+127.0.0.1 - - [17/Nov/2026 05:34:58] "GET /api/jobs/qa/thumb/2 HTTP/1.1" 200 -
+127.0.0.1 - - [17/Nov/2026 05:34:58] "GET /api/jobs/qa/thumb/3 HTTP/1.1" 200 -
+127.0.0.1 - - [17/Nov/2026 05:34:58] "GET /api/jobs/qa/thumb/10 HTTP/1.1" 200 -
+127.0.0.1 - - [17/Nov/2026 05:34:58] "GET /api/jobs/qa/thumb/6 HTTP/1.1" 200 -
+127.0.0.1 - - [17/Nov/2026 05:34:58] "GET /api/jobs/qa/thumb/4 HTTP/1.1" 200 -
+127.0.0.1 - - [17/Nov/2026 05:34:58] "GET /api/jobs/qa/thumb/12 HTTP/1.1" 200 -
+127.0.0.1 - - [17/Nov/2026 05:34:58] "GET /api/jobs/qa/thumb/7 HTTP/1.1" 200 -
+127.0.0.1 - - [17/Nov/2026 05:34:59] "GET /api/jobs/qa/thumb/9 HTTP/1.1" 200 -
+127.0.0.1 - - [17/Nov/2026 05:34:59] "GET /api/jobs/qa/thumb/8 HTTP/1.1" 200 -
+127.0.0.1 - - [17/Nov/2026 05:34:59] "POST /api/jobs/qa/detections HTTP/1.1" 200 -
+127.0.0.1 - - [17/Nov/2026 05:34:59] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [17/Nov/2026 05:34:59] "GET /api/model_status HTTP/1.1" 200 -
+127.0.0.1 - - [17/Nov/2026 05:34:59] "GET /api/custom_cats HTTP/1.1" 200 -
+127.0.0.1 - - [17/Nov/2026 05:34:59] "GET /api/models/face HTTP/1.1" 200 -
+127.0.0.1 - - [17/Nov/2026 05:34:59] "GET /api/quality_tier HTTP/1.1" 200 -
+127.0.0.1 - - [17/Nov/2026 05:34:59] "GET /api/allowlist HTTP/1.1" 200 -
+127.0.0.1 - - [17/Nov/2026 05:34:59] "GET /api/jobs HTTP/1.1" 200 -
+127.0.0.1 - - [17/Nov/2026 05:34:59] "GET /api/certinfo HTTP/1.1" 200 -
+127.0.0.1 - - [17/Nov/2026 05:34:59] "GET /api/update_check HTTP/1.1" 200 -
+127.0.0.1 - - [17/Nov/2026 05:34:59] "GET /api/vault HTTP/1.1" 200 -
+127.0.0.1 - - [17/Nov/2026 05:34:59] "GET /api/extras HTTP/1.1" 200 -
+127.0.0.1 - - [17/Nov/2026 05:34:59] "GET /api/models/plate HTTP/1.1" 200 -
+127.0.0.1 - - [17/Nov/2026 05:34:59] "GET /api/models/person HTTP/1.1" 200 -
+127.0.0.1 - - [17/Nov/2026 05:34:59] "GET /api/jobs/qa HTTP/1.1" 200 -
+127.0.0.1 - - [17/Nov/2026 05:34:59] "GET /api/jobs/qa/log?from=0 HTTP/1.1" 200 -
+127.0.0.1 - - [17/Nov/2026 05:34:59] "GET /api/jobs HTTP/1.1" 200 -
+127.0.0.1 - - [17/Nov/2026 05:34:59] "GET /api/jobs/qa/detections HTTP/1.1" 200 -
+127.0.0.1 - - [17/Nov/2026 05:34:59] "GET /api/jobs/qa/thumb/2 HTTP/1.1" 200 -
+127.0.0.1 - - [17/Nov/2026 05:34:59] "GET /api/jobs/qa/thumb/1 HTTP/1.1" 200 -
+127.0.0.1 - - [17/Nov/2026 05:34:59] "GET /api/jobs/qa/thumb/4 HTTP/1.1" 200 -
+127.0.0.1 - - [17/Nov/2026 05:34:59] "GET /api/jobs/qa/thumb/10 HTTP/1.1" 200 -
+127.0.0.1 - - [17/Nov/2026 05:34:59] "GET /api/jobs/qa/thumb/3 HTTP/1.1" 200 -
+127.0.0.1 - - [17/Nov/2026 05:34:59] "GET /api/jobs/qa/thumb/7 HTTP/1.1" 200 -
+127.0.0.1 - - [17/Nov/2026 05:34:59] "GET /api/jobs/qa/thumb/12 HTTP/1.1" 200 -
+127.0.0.1 - - [17/Nov/2026 05:34:59] "GET /api/jobs/qa/thumb/6 HTTP/1.1" 200 -
+127.0.0.1 - - [17/Nov/2026 05:34:59] "POST /api/jobs/qa/detections HTTP/1.1" 200 -
+127.0.0.1 - - [17/Nov/2026 05:34:59] "GET /api/jobs/qa HTTP/1.1" 200 -
+127.0.0.1 - - [17/Nov/2026 05:34:59] "POST /api/jobs/qa/render HTTP/1.1" 200 -
+127.0.0.1 - - [17/Nov/2026 05:34:59] "GET /api/jobs/qa HTTP/1.1" 200 -
+127.0.0.1 - - [17/Nov/2026 05:35:00] "GET /api/jobs/qa HTTP/1.1" 200 -

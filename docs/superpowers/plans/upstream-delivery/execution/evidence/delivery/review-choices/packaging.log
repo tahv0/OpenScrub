@@ -1,0 +1,20 @@
+{
+  "base": "92124753736e287ac800af91f0ac96f3e96c01be",
+  "exact_source_and_test_inclusion": true,
+  "packaged_python39_grammar": true,
+  "unchanged_engine_and_zones": true,
+  "all_server_functions_unchanged": true,
+  "sdist_tests": [
+    "test_openscrub.py",
+    "tests/test_review_choices.py",
+    "tests/test_review_save_failures.py"
+  ],
+  "source_hashes": {
+    "openscrub.py": "0e4f0f9a7846080f591038d021aaf3ca6f01201d83ac32bbdc273f53d5067ee7",
+    "openscrub_web.py": "af3b9e97b55deefa5bdeb372f66ed545d34c0517ce3df2f5e7a4870bedad4a8f",
+    "zones_ui.py": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7",
+    "openscrub_setup.py": "d0362a038f8182e8fae510100085bb087f09f7e5cf7e11a780a24390b3037eaf",
+    "openscrub_update.py": "4d6a20f75d985a119f8421227c3bd88b17fd1b8eed44e353b127b5b49e733d55",
+    "openscrub_vault.py": "cc2db6a35d0b934502f1400b0d3a5b1f23ff8f63e6d24f9fc6fc4ab7baaebf82"
+  }
+}

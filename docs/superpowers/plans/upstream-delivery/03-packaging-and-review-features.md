@@ -77,6 +77,10 @@ The [scope research](execution/evidence/research/diagnostics-scope-research.md) 
 - [ ] **V:** Build/run the supported image and execute an existing registered plate model on representative synthetic input with provider evidence. Check CPU behavior remains available and the chosen model/output agrees within justified tolerance.
 - [ ] **D/R/L:** PR material names OS, Docker/driver/provider/model versions, the original trigger and actual hardware exercised. If no suitable GPU/Windows environment is available, keep hardware verification outstanding rather than marking the task complete.
 
+**Local validation readiness:** The [bounded platform check](execution/evidence/research/platform-readiness-research.md) reaches Docker29.7.2 on Linux/x86_64 and sees an RTX3080/driver621.01/10GiB through authorized read-only execution. Earlier ordinary socket/NVML failures were sandbox restrictions, not proof of absent host capability. Actual builds, cache timing, CUDA container handoff and model execution remain pending. No Intel GPU or usable native Windows toolchain is established; CPU/driver/provider listings do not substitute for those gates.
+
+Preserve the pinned CUDA path: OpenCV and opencv_contrib4.10.0 built together under/opt/opencv, CUDA12.6/cuDNN and NumPy1.26.4, with pip OpenCV variants removed and compiled cv2 restored before no-dependency app installation. B02b's ordinary wheel bound must not replace this source build. Native Windows uses DirectML/PyInstaller/Inno separately. P13 may now proceed to scoped actual image builds when it owns the heavy workload; P14 first verifies device handoff and then actual registered-model execution. Keep scheduled SECURITY_REFRESH and existing registry layer caches intact.
+
 ## P15 — useful view-only filters
 
 **What:** Add useful detection-type/output view filters and preserve drafts/lazy loading while changing the view.
@@ -92,6 +96,13 @@ The [scope research](execution/evidence/research/diagnostics-scope-research.md) 
 - [ ] **I:** Apply filters from local metadata, updating only view/card scheduling. With P09, notify its queue of the changed visible set; without it, keep a small standalone implementation. Avoid copying the learning sample selection or similarity system.
 - [ ] **V:** Run `python -m pytest test_openscrub.py tests/test_review_view_filters.py -q`, build and S03 browser cases with many groups. Reopen/save/render to verify hidden decisions survived.
 - [ ] **D/R/L:** Describe a concrete navigation problem and view-only behavior, not a new review methodology. Keep this separate from P02's output actions and O01's uncertainty policy.
+
+**Refined filter contract:** [Source-only P15 research](execution/evidence/research/review-filter-scope-research.md) confirms the ordinary UI has category actions and a collapsed zone section, but no type/output view selectors. Implement after reviewed P02, reusing its grouping/effective choices and P07a draft owner. Both actual-category and output predicates apply to ordinary groups and independent zone cards, with Show all default/reset; no handled/training states or autosave are imported.
+
+- [ ] **I/V:** Derive complete card metadata before filtering. Mixed groups appear in both Includes blurred appearances and Includes visible appearances, once per view. Counts represent ordinary group cards plus individual zone cards, including collapsed/unmounted matches; cross-filter option counts may overlap because of mixed groups. Keep zone real category separate from its action section, its collapsed default and current collapse choice.
+- [ ] **I/V:** Category bulk still targets every ordinary group in that category; zone bulk still targets all independent zone rows. Card actions keep full original membership. Explicit filter/reset clears marquee selection; live output changes prune excluded IDs. Snapshot bulk targets before applying setters, then refresh aggregates/counts/view once, without quadratic per-member rescans.
+- [ ] **I/V:** Re-evaluate membership locally after a choice. Preserve focus if its card remains; if the focused card is hidden, move focus to Output and announce counts. Leave the active editor/gesture/media/audio/manual/pending-save state intact even when its card is filtered out. No pinned-card system or editor remount. Empty and closed-zone-only matches have truthful text/reset controls.
+- [ ] **I/V:** Filters never call save/render/full review reload or fetch metadata, and do not mutate EN/drafts. Keep a view-owned pair reset on new openJob; any future P09 hook receives complete matching IDs and owns subsequent mounting/requests. Without P09, local hiding does not claim request cancellation or metadata-memory savings. Verify actual keyboard/touch/editor/late-ACK/hidden-choice save-render paths, complete counts and390px layout.
 
 ## P16 — ordinary preview/render fidelity
 

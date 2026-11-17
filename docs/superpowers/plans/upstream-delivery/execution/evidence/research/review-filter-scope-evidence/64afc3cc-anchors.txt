@@ -1,0 +1,356 @@
+ 5347  function reviewPreviewRank(task){
+ 5348   if(!task.img.isConnected||task.img.closest?.("[hidden]"))return Infinity;
+ 5349   if(task.priority)return -1; // An explicit retry of a visible image gets priority.
+ 5350   // Old non-layout harnesses / browsers without geometry retain FIFO behavior.
+ 5351   if(!task.img.getBoundingClientRect)return 0;
+ 5352   const r=task.img.getBoundingClientRect(),h=window.innerHeight||document.documentElement.clientHeight;
+ 5353   // A card far BEHIND the viewport is obsolete until the user scrolls back.
+ 5354   // Cards AHEAD stay eligible for speculative JPEG cache reads even when they
+ 5355   // are far beyond IntersectionObserver's margin. Scroll changes re-rank work
+ 5356   // at dispatch: visible cards overtake the background queue.
+ 5357   if(r.bottom < -REVIEW_STALE_BEHIND_PX)return Infinity;
+ 5358   return r.bottom<0?-r.bottom:r.top>h?r.top-h:0;
+ 5359  }
+ 5360  function pumpReviewPreviews(state){
+ 5361   if(REVIEW_MEDIA!==state)return;
+ 5362   if(state.retryTimer){clearTimeout(state.retryTimer);state.retryTimer=null;}
+ 5363   let wake=Infinity;
+ 5364   // Cache hits overtake cold decoding. Re-rank at dispatch, not when the card
+ 5365   // first entered view: scrolling must not leave minutes of obsolete work.
+ 5366   for(const [queue,counter,limit,cached] of [
+ 5367    [state.cacheQueue,"cacheActive",3,true],[state.queue,"active",1,false]]){
+ 5368    const ranked=queue.splice(0).map(task=>({task,rank:reviewPreviewRank(task)}));
+ 5369    ranked.sort((a,b)=>a.rank-b.rank);
+ 5370    for(const {task,rank} of ranked){
+ 5371     if(rank===Infinity){task.img._previewTask=null;task.resolve(false);}
+ 5372     else queue.push(task);
+ 5373    }
+ 5374    while(state[counter]<limit&&queue.length){
+ 5375     const n=queue.findIndex(task=>
+ 5376      (!task.readyAt||task.readyAt<=Date.now()) &&
+ 5377      (cached||reviewPreviewRank(task)<=REVIEW_COLD_LOOKAHEAD_PX));
+ 5378     if(n<0)break;
+ 5379     loadReviewPreview(state,queue.splice(n,1)[0],cached);
+ 5380    }
+ 5381    for(const task of queue)if(task.readyAt>Date.now())wake=Math.min(wake,task.readyAt);
+ 5382   }
+ 5383   if(Number.isFinite(wake))state.retryTimer=setTimeout(()=>pumpReviewPreviews(state),Math.max(1,wake-Date.now()));
+
+ 5408  function appendReviewPage(cat,selectedOnly=false,targetIndex=null){
+ 5409   const panel=document.getElementById("review"),pending=REVIEW_PENDING_PAGES[cat];
+ 5410   if(!panel||!pending||!pending.length)return 0;
+ 5411   const grid=[...panel.querySelectorAll("[data-review-category]")]
+ 5412    .find(node=>node.dataset.reviewCategory===cat);
+ 5413   if(!grid)return 0;
+ 5414   const added=[];
+ 5415   for(let k=0;k<pending.length&&added.length<(selectedOnly?Infinity:REVIEW_PAGE_SIZE);){
+ 5416    const entry=pending[k];
+ 5417    if(targetIndex!==null&&entry.i!==targetIndex){k++;continue;}
+ 5418    if(!reviewMatchesFilter(entry.i,cat)){k++;continue;}
+ 5419    added.push(entry);pending.splice(k,1);
+ 5420   }
+ 5421   if(added.length){
+ 5422    grid.insertAdjacentHTML("beforeend",added.map(item=>item.html).join(""));
+ 5423    for(const item of added){
+ 5424     const i=item.i,card=document.getElementById("det"+i);
+ 5425     if(!card)continue;
+ 5426     card.hidden=!reviewMatchesFilter(i,cat);
+ 5427     card.classList.toggle("off",!EN[i]);
+ 5428     const bb=document.getElementById("bb"+i);if(bb)bb.innerHTML=detChoices(i);
+ 5429     const note=document.getElementById("vlabel"+i);if(note)note.innerHTML=findingStatus(i);
+ 5430     updateReviewOverlayLabel(i);
+ 5431     const img=card.querySelector("img[data-preview-url]");
+ 5432     if(img&&REVIEW_MEDIA){
+ 5433      if(REVIEW_MEDIA.observer)REVIEW_MEDIA.observer.observe(img);
+ 5434      // Even pages mounted *ahead* of the scroll position start warming now.
+ 5435      queueReviewPreview(img);
+ 5436     }
+ 5437    }
+ 5438   }
+ 5439   const more=[...panel.querySelectorAll(".review-more")]
+ 5440    .find(node=>node.dataset.reviewMore===cat);
+ 5441   if(more){
+ 5442    const remaining=pending.filter(item=>reviewMatchesFilter(item.i,cat)).length;
+ 5443    more.hidden=!!LEARNING_SELECTION||!remaining;
+ 5444    more.textContent="Load more "+(CATDN[cat]||cat)+" ("+remaining+" remaining)";
+ 5445   }
+ 5446   return added.length;
+
+ 5551  function markReviewChanged(){
+ 5552   REVIEW_VERSION++;reviewSaveStatus("Review choices not saved.");plateUnloadGuard();
+ 5553  }
+ 5554  function plateUnloadWarning(e){
+ 5555   if(plateEditsPending()||reviewChoicesPending()){e.preventDefault();e.returnValue="";}
+ 5556  }
+ 5557  function plateUnloadGuard(){
+ 5558   window.removeEventListener("beforeunload",plateUnloadWarning);
+ 5559   if(plateEditsPending()||reviewChoicesPending())window.addEventListener("beforeunload",plateUnloadWarning);
+ 5560  }
+ 5561  function showUnsavedPlate(i){
+ 5562   const s=PLATE_EDITS.get(i);if(!s||s.job!==CUR)return;
+ 5563   // Reveal through the normal local filter; never reload/discard an editor.
+ 5564   if(typeof reviewAllFindings==="function")reviewAllFindings();
+ 5565   const card=s.card||document.getElementById("det"+i);if(!card)return;
+ 5566   for(let el=card;el&&el.id!=="review";el=el.parentElement){
+ 5567    el.hidden=false;if(el.tagName==="DETAILS")el.open=true;
+ 5568   }
+
+ 6150  let REVIEW_STATUS_FILTER="all",REVIEW_TYPE_FILTER="all",REVIEW_OUTPUT_FILTER="all";
+ 6151  let REVIEW_STATUS_FILTER_JOB=null,REVIEW_FILTER_TIMER=null;
+ 6152  function reviewGroupStatus(i){
+ 6153   const members=TRKMEM[i]||[i];
+ 6154   const handled=members.every(m=>!!OUTPUT_CHOICES[m]||!!reviewFindingLabel(m));
+ 6155   const pending=members.some(m=>{
+ 6156    const edit=PLATE_EDITS.get(m);
+ 6157    return !!((edit&&(edit.dirty||edit.pending||edit.drag))||CONFIRM_PENDING.has(m)||CONFIRM_FAILED.has(m));
+ 6158   });
+ 6159   return {handled,pending};
+ 6160  }
+ 6161  function reviewSampleMatches(i,cat){
+ 6162   return !LEARNING_SELECTION||(cat==="plate"&&
+ 6163    (TRKMEM[i]||[i]).some(m=>LEARNING_SELECTION.has(m)));
+ 6164  }
+ 6165  function reviewTypeMatches(cat,type=REVIEW_TYPE_FILTER){
+ 6166   return type==="all"||(type==="plate"?cat==="plate":cat!=="plate");
+ 6167  }
+ 6168  function reviewOutputFlags(i){
+ 6169   const members=TRKMEM[i]||[i];
+ 6170   let blur=false,visible=false;
+ 6171   for(const m of members){
+ 6172    if(EN[m]===false)visible=true;else blur=true;
+ 6173    if(blur&&visible)break;
+ 6174   }
+ 6175   return {blur,visible};
+ 6176  }
+ 6177  function reviewOutputMatches(i,output=REVIEW_OUTPUT_FILTER){
+ 6178   if(output==="all")return true;
+ 6179   const flags=reviewOutputFlags(i);
+ 6180   return output==="blur"?flags.blur:flags.visible;
+ 6181  }
+ 6182  function reviewStatusMatches(status,mode=REVIEW_STATUS_FILTER){
+ 6183   if(mode==="unreviewed")return !status.handled||status.pending;
+ 6184   if(mode==="reviewed")return status.handled&&!status.pending;
+ 6185   if(mode==="pending")return status.pending;
+ 6186   return true;
+ 6187  }
+ 6188  function reviewMatchesFilter(i,cat){
+ 6189   if(!reviewSampleMatches(i,cat)||!reviewTypeMatches(cat)||
+ 6190      !reviewOutputMatches(i))return false;
+ 6191   return reviewStatusMatches(reviewGroupStatus(i));
+ 6192  }
+ 6193  function setReviewViewFilter(kind,mode){
+ 6194   const options={status:["all","unreviewed","reviewed","pending"],
+ 6195    type:["all","plate","other"],output:["all","blur","visible"]};
+ 6196   const controls={status:"reviewStatusFilter",type:"reviewTypeFilter",
+ 6197    output:"reviewOutputFilter"};
+ 6198   if(!options[kind]?.includes(mode))return false;
+ 6199   if([...PLATE_EDITS.values()].some(s=>s.drag)){
+ 6200    reviewSaveStatus("Finish dragging the corner before changing the view.",true);
+ 6201    const control=document.getElementById(controls[kind]);
+ 6202    if(control)control.value=kind==="status"?REVIEW_STATUS_FILTER:
+ 6203     kind==="type"?REVIEW_TYPE_FILTER:REVIEW_OUTPUT_FILTER;
+ 6204    return false;
+ 6205   }
+ 6206   if(kind==="status")REVIEW_STATUS_FILTER=mode;
+ 6207   else if(kind==="type")REVIEW_TYPE_FILTER=mode;
+ 6208   else REVIEW_OUTPUT_FILTER=mode;
+ 6209   clearSel();
+ 6210   return applyReviewGroupFilter();
+ 6211  }
+ 6212  function setReviewStatusFilter(mode){return setReviewViewFilter("status",mode);}
+ 6213  function setReviewTypeFilter(mode){return setReviewViewFilter("type",mode);}
+ 6214  function setReviewOutputFilter(mode){return setReviewViewFilter("output",mode);}
+ 6215  function reviewViewIsFiltered(){
+ 6216   return REVIEW_STATUS_FILTER!=="all"||REVIEW_TYPE_FILTER!=="all"||
+ 6217    REVIEW_OUTPUT_FILTER!=="all";
+ 6218  }
+ 6219  function scheduleReviewStatusFilter(){
+ 6220   if(!reviewViewIsFiltered()||REVIEW_FILTER_TIMER!==null)return;
+ 6221   REVIEW_FILTER_TIMER=setTimeout(()=>{REVIEW_FILTER_TIMER=null;applyReviewGroupFilter();},100);
+ 6222  }
+ 6223  function applyReviewGroupFilter(){
+ 6224   const panel=document.getElementById("review");
+ 6225   if(!panel||panel._sampleJob!==CUR||panel._sampleView!==JOBVIEW)return false;
+ 6226   const selected=LEARNING_SELECTION;
+ 6227   // Count review GROUPS from metadata, not mounted thumbnail cards.
+ 6228   // Each selector shows totals under the OTHER active selectors.
+ 6229   const statuses={all:0,unreviewed:0,reviewed:0,pending:0};
+ 6230   const types={all:0,plate:0,other:0};
+ 6231   const outputs={all:0,blur:0,visible:0};
+ 6232   const perCategory={},allGroups=Object.values(REVIEW_CATEGORY_GROUPS)
+ 6233    .reduce((n,indices)=>n+indices.length,0);
+ 6234   let matched=0;
+ 6235   for(const [cat,indices] of Object.entries(REVIEW_CATEGORY_GROUPS)){
+ 6236    for(const i of indices){
+ 6237     if(!reviewSampleMatches(i,cat))continue;
+ 6238     const state=reviewGroupStatus(i);
+ 6239     const statusOK=reviewStatusMatches(state);
+ 6240     const typeOK=reviewTypeMatches(cat);
+ 6241     const flags=reviewOutputFlags(i);
+ 6242     const outputOK=REVIEW_OUTPUT_FILTER==="all"||
+ 6243      (REVIEW_OUTPUT_FILTER==="blur"?flags.blur:flags.visible);
+ 6244     if(typeOK&&outputOK){
+ 6245      statuses.all++;
+ 6246      if(!state.handled||state.pending)statuses.unreviewed++;
+ 6247      else statuses.reviewed++;
+ 6248      if(state.pending)statuses.pending++;
+ 6249     }
+ 6250     if(statusOK&&outputOK){
+ 6251      types.all++;types[cat==="plate"?"plate":"other"]++;
+ 6252     }
+ 6253     if(statusOK&&typeOK){
+ 6254      outputs.all++;if(flags.blur)outputs.blur++;
+ 6255      if(flags.visible)outputs.visible++;
+ 6256     }
+ 6257     if(typeOK&&outputOK&&statusOK){
+ 6258      matched++;perCategory[cat]=(perCategory[cat]||0)+1;
+ 6259     }
+ 6260    }
+ 6261   }
+ 6262   // Keep lazy pagination: show matching results from deferred groups without
+ 6263   // loading the images of every excluded detection on a 271k-row review.
+ 6264   for(const cat of Object.keys(REVIEW_PENDING_PAGES)){
+ 6265    if(!reviewTypeMatches(cat))continue;
+ 6266    const mounted=[...panel.querySelectorAll("[data-review-category] .det")]
+ 6267     .filter(card=>card.dataset.cat===cat&&reviewMatchesFilter(Number(card.id.slice(3)),cat)).length;
+ 6268    if(selected)appendReviewPage(cat,true);
+ 6269    else if(reviewViewIsFiltered()&&mounted<REVIEW_PAGE_SIZE)appendReviewPage(cat);
+ 6270   }
+ 6271   let shown=0;
+ 6272   panel.querySelectorAll("[data-review-category] .det").forEach(card=>{
+ 6273    const i=Number(card.id.slice(3));
+ 6274    card.hidden=!reviewMatchesFilter(i,card.dataset.cat);
+ 6275    if(!card.hidden)shown++;
+ 6276   });
+ 6277   panel.querySelectorAll("[data-review-category]").forEach(grid=>{
+ 6278    const cat=grid.dataset.reviewCategory;
+ 6279    const n=perCategory[cat]||0;
+ 6280    grid.hidden=n===0;
+ 6281    const heading=grid.previousElementSibling;heading.hidden=n===0;
+ 6282    heading.querySelector(".badge").textContent=n;
+ 6283   });
+ 6284   panel.querySelectorAll(".review-more").forEach(button=>{
+ 6285    const cat=button.dataset.reviewMore;
+ 6286    const pending=(REVIEW_PENDING_PAGES[cat]||[]).filter(item=>reviewMatchesFilter(item.i,cat)).length;
+ 6287    button.hidden=!!selected||pending===0;
+ 6288    button.textContent="Load more "+(CATDN[cat]||cat)+" ("+pending+" remaining)";
+ 6289   });
+ 6290   const zones=panel.querySelector("#reviewZones");if(zones)zones.hidden=!!selected;
+ 6291   const all=panel.querySelector("#reviewShowAll");if(all)all.hidden=!selected&&!reviewViewIsFiltered();
+ 6292   for(const [id,chosen,options] of [
+ 6293    ["reviewStatusFilter",REVIEW_STATUS_FILTER,[
+ 6294     ["all","All"],["unreviewed","Needs review"],["reviewed","Handled"],["pending","Unsaved / failed"]
+ 6295    ]],["reviewTypeFilter",REVIEW_TYPE_FILTER,[
+ 6296     ["all","All detected types"],["plate","License plates"],["other","Other sensitive areas"]
+ 6297    ]],["reviewOutputFilter",REVIEW_OUTPUT_FILTER,[
+ 6298     ["all","All outputs"],["blur","Will be blurred"],["visible","Will remain visible"]
+ 6299    ]]
+ 6300   ]){
+ 6301    const control=panel.querySelector("#"+id);
+ 6302    if(!control)continue;
+ 6303    control.value=chosen;
+ 6304    const counts=id==="reviewStatusFilter"?statuses:
+ 6305     id==="reviewTypeFilter"?types:outputs;
+ 6306    for(const [value,label] of options){
+ 6307     const option=control.querySelector('option[value="'+value+'"]');
+ 6308     if(option)option.textContent=label+" ("+counts[value]+")";
+ 6309    }
+ 6310   }
+ 6311   const filtered=panel.querySelector("#reviewFilterSummary");
+ 6312   if(filtered)filtered.textContent=matched+" of "+allGroups+
+ 6313    " review groups match. Filters only change the view; saved choices and corner drafts stay intact.";
+
+ 6339  }
+ 6340  function reviewAllFindings(){
+ 6341   LEARNING_SELECTION=null;REVIEW_STATUS_FILTER="all";
+ 6342   REVIEW_TYPE_FILTER="all";REVIEW_OUTPUT_FILTER="all";clearSel();
+ 6343   return applyReviewGroupFilter();
+
+ 6537   if(LEARNING_SELECTION_JOB!==CUR)LEARNING_SELECTION=null;
+ 6538   if(REVIEW_STATUS_FILTER_JOB!==CUR){REVIEW_STATUS_FILTER="all";REVIEW_TYPE_FILTER="all";
+ 6539    REVIEW_OUTPUT_FILTER="all";REVIEW_STATUS_FILTER_JOB=CUR;}
+
+ 6568   <div class="row" style="margin-bottom:6px;align-items:center;flex-wrap:wrap;gap:8px 12px">
+ 6569    <label for="reviewStatusFilter">Review status</label>
+ 6570    <select id="reviewStatusFilter" style="max-width:205px" onchange="setReviewStatusFilter(this.value)">
+ 6571     <option value="all">All</option>
+ 6572     <option value="unreviewed">Needs review</option>
+ 6573     <option value="reviewed">Handled</option>
+ 6574     <option value="pending">Unsaved / failed</option>
+ 6575    </select>
+ 6576    <label for="reviewTypeFilter">Detection type</label>
+ 6577    <select id="reviewTypeFilter" style="max-width:220px" onchange="setReviewTypeFilter(this.value)">
+ 6578     <option value="all">All detected types</option>
+ 6579     <option value="plate">License plates</option>
+ 6580     <option value="other">Other sensitive areas</option>
+ 6581    </select>
+ 6582    <label for="reviewOutputFilter">Output</label>
+ 6583    <select id="reviewOutputFilter" style="max-width:220px" onchange="setReviewOutputFilter(this.value)">
+ 6584     <option value="all">All outputs</option>
+ 6585     <option value="blur">Will be blurred</option>
+ 6586     <option value="visible">Will remain visible</option>
+ 6587    </select>
+ 6588   </div>
+ 6589   <small id="reviewFilterSummary" class="review-copy" role="status" aria-live="polite"></small>
+
+ 6686     TRKMEM[rep.i]=members.map(m=>m.i);
+ 6687     items.push(rep);
+ 6688    }
+ 6689    // person cards first, then everything else chronologically
+ 6690    items.sort((a,b)=>((b.personcard?1:0)-(a.personcard?1:0))||a.t_start-b.t_start);
+ 6691    if(!items.length)continue;
+ 6692    REVIEW_CATEGORY_GROUPS[cat]=items.map(item=>item.i);
+ 6693    html+=`<h3 style="margin:10px 0 6px">${CATDN[cat]||cat} <span class="badge">${items.length}</span>
+ 6694     <button class="sec" style="padding:3px 8px;font-size:12px"
+ 6695      onclick="setAll('${cat}',true)">Blur all</button>
+ 6696     <button class="sec" style="padding:3px 8px;font-size:12px"
+ 6697      onclick="setAll('${cat}',false)">Keep all visible</button></h3><div class="grid3" data-review-category="${cat}">`;
+ 6698    const lazy=items.length>REVIEW_PAGE_THRESHOLD,pending=[];
+
+ 7065  function applyDet(i,blur,preserveLabel=false){
+ 7066   for(const m of (TRKMEM[i]||[i])){
+ 7067    EN[m]=blur;
+ 7068    OUTPUT_CHOICES[m]=true;
+ 7069    OUTPUT_VERSION[m]=(OUTPUT_VERSION[m]||0)+1;
+ 7070    const b=document.getElementById("bb"+m),t=document.getElementById("det"+m);
+ 7071    if(b)b.innerHTML=detChoices(m);
+ 7072    if(t)t.classList.toggle("off",!blur);
+ 7073    if(typeof redrawReviewOverlay==="function")redrawReviewOverlay(m);
+ 7074   }
+ 7075   markReviewChanged();if(typeof scheduleReviewStatusFilter==="function")scheduleReviewStatusFilter();
+ 7076   if(document.getElementById("beCv")){beRefresh();}
+ 7077  }
+ 7078  function setAll(cat,on){
+ 7079   // In a paged category, bulk choices must include every group, not merely
+ 7080   // the 48 currently mounted cards. Never silently omit unseen detections.
+ 7081   if(REVIEW_PENDING_PAGES[cat]&&(!LEARNING_SELECTION||REVIEW_STATUS_FILTER!=="all")){
+ 7082    for(const i of REVIEW_CATEGORY_GROUPS[cat]||[]){
+ 7083     if(!reviewMatchesFilter(i,cat))continue;
+ 7084     for(const m of TRKMEM[i]||[i]){
+ 7085      EN[m]=on;OUTPUT_CHOICES[m]=true;
+ 7086      OUTPUT_VERSION[m]=(OUTPUT_VERSION[m]||0)+1;
+ 7087     }
+ 7088    }
+ 7089    document.querySelectorAll("#review .det").forEach(card=>{
+ 7090     if(card.dataset.cat!==cat)return;
+ 7091     const i=Number(card.id.slice(3));
+ 7092     card.classList.toggle("off",!EN[i]);
+ 7093     const bb=document.getElementById("bb"+i);if(bb)bb.innerHTML=detChoices(i);
+ 7094     redrawReviewOverlay(i);
+ 7095    });
+ 7096    markReviewChanged();if(typeof scheduleReviewStatusFilter==="function")scheduleReviewStatusFilter();
+ 7097    if(document.getElementById("beCv"))beRefresh();
+ 7098    return;
+ 7099   }
+ 7100   document.querySelectorAll(`.det[data-cat=${cat}]:not([hidden])`)
+ 7101    .forEach(el=>applyDet(+el.id.slice(3),on));
+ 7102  }
+ 7103  function thumbRetry(img){
+ 7104   const n=+(img.dataset.r||0);
+ 7105   if(n>=3)return;
+ 7106   img.dataset.r=n+1;
+ 7107   setTimeout(()=>{img.src=img.src.split("?r=")[0]+"?r="+Date.now();},
+ 7108              600*(n+1));
+ 7109  }
+ 7110  function setAllZd(on){document.querySelectorAll(`.det[data-cat=zdrop]:not([hidden])`)
+ 7111   .forEach(el=>applyDet(+el.id.slice(3),on));}

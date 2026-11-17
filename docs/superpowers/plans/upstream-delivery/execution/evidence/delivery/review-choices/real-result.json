@@ -1,0 +1,41 @@
+{
+  "beforeRenderFreshReopen": true,
+  "nonOutputFieldsUnchanged": true,
+  "expected": [
+    false,
+    false,
+    true,
+    false,
+    true,
+    true,
+    true,
+    true,
+    true,
+    false,
+    true,
+    false,
+    true
+  ],
+  "job": {
+    "error": null,
+    "eta": null,
+    "has_output": true,
+    "id": "qa",
+    "log_len": 7,
+    "log_tail": [
+      "[1/2] Loading detections from /tmp/openscrub-task20/runtime/openscrub_jobs/c72c02c15c4a/report.json",
+      "      8 enabled detections",
+      "[4/4] Rendering -> /tmp/openscrub-task20/runtime/openscrub_jobs/c72c02c15c4a/output.mp4",
+      "      encoder: libx264 (CPU)",
+      "      audio: 1 span(s) redacted (mute)",
+      "      audit report: /tmp/openscrub-task20/runtime/openscrub_jobs/c72c02c15c4a/report.json (contains PII text — protect it)",
+      "done."
+    ],
+    "name": "Synthetic output choices",
+    "phase": "done",
+    "progress": 1,
+    "size": 0,
+    "stats": {}
+  },
+  "errors": []
+}

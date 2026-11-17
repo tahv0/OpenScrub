@@ -1,0 +1,59 @@
+{
+  "captured_utc": "2026-11-17T03:36:46.256222+00:00",
+  "execution": "Authorized require_escalated bounded read-only queries; no sudo, OS permission or daemon changes.",
+  "tool_paths": {
+    "cmd.exe": null,
+    "powershell.exe": null,
+    "pwsh.exe": null,
+    "cl.exe": null,
+    "msbuild.exe": null,
+    "dotnet.exe": null,
+    "pyinstaller": null,
+    "wine": null,
+    "wine64": null
+  },
+  "exact_path_exists": {
+    "/dev/dxg": true,
+    "/dev/nvidiactl": false,
+    "/mnt/c/Windows/System32/cmd.exe": false,
+    "/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe": false,
+    "/mnt/c/Program Files/Microsoft Visual Studio/Installer/vswhere.exe": false,
+    "/proc/sys/fs/binfmt_misc/WSLInterop": true
+  },
+  "gpu_device_nodes": {
+    "/dev/dxg": [
+      "/dev/dxg"
+    ],
+    "/dev/nvidia[0-9]*": [],
+    "/dev/nvidiactl": [],
+    "/dev/dri/renderD*": [
+      "/dev/dri/renderD128"
+    ]
+  },
+  "checks": [
+    {
+      "name": "docker-info",
+      "command": [
+        "docker",
+        "info",
+        "--format",
+        "ServerVersion={{.ServerVersion}} OSType={{.OSType}} Architecture={{.Architecture}} OperatingSystem={{.OperatingSystem}} RuntimeNames={{range $key, $value := .Runtimes}}{{$key}} {{end}}"
+      ],
+      "returncode": 0,
+      "stdout": "ServerVersion=29.7.2 OSType=linux Architecture=x86_64 OperatingSystem=Ubuntu 26.04.1 LTS RuntimeNames=io.containerd.runc.v2 runc \n",
+      "stderr": ""
+    },
+    {
+      "name": "gpu-query",
+      "command": [
+        "nvidia-smi",
+        "--query-gpu=name,driver_version,memory.total",
+        "--format=csv,noheader"
+      ],
+      "returncode": 0,
+      "stdout": "NVIDIA GeForce RTX 3080, 621.01, 10240 MiB\n",
+      "stderr": ""
+    }
+  ],
+  "limits": "No native Windows programs invoked. PATH and exact standard location absence do not prove no tools exist anywhere on the Windows host. No hardware serial/UUID or running workload inventory."
+}

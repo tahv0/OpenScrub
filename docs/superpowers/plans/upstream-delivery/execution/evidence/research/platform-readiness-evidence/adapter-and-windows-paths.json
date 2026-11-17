@@ -1,0 +1,27 @@
+{
+  "command": "python3 /tmp/openscrub-platform-readiness-20261117/adapter-and-windows-paths.py",
+  "returncode": 0,
+  "paths": [
+    {
+      "path": "/sys/class/drm/renderD128/device/vendor",
+      "exists": false
+    },
+    {
+      "path": "/sys/class/drm/renderD128/device/device",
+      "exists": false
+    },
+    {
+      "path": "/mnt/c/Program Files (x86)/Inno Setup 6/ISCC.exe",
+      "exists": false
+    },
+    {
+      "path": "/mnt/c/Program Files/Inno Setup 6/ISCC.exe",
+      "exists": false
+    }
+  ],
+  "tool_paths": {
+    "python.exe": null,
+    "ISCC.exe": null
+  },
+  "limits": "Only exact numeric adapter vendor/device files and standard Inno Setup path existence; no serials, UUIDs or native program execution."
+}

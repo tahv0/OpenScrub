@@ -1,0 +1,5 @@
+- img
+- text: Person 1 ×3 frames 90% 0.0–3.1s Applies to all 3 appearances in this face group Mixed — 2 will be blurred; 1 will stay visible
+- group "face output, appearance 2, 3 appearances":
+  - button "Blur"
+  - button "Keep visible"

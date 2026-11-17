@@ -1,0 +1,171 @@
+FFFF.F                                                                   [100%]
+=================================== FAILURES ===================================
+_____________ test_repeated_explicit_actions_and_all_member_state ______________
+
+    def test_repeated_explicit_actions_and_all_member_state():
+>       run("""await review(rows);
+        state(1,'Mixed — 2 will be blurred; 1 will stay visible',false,false);
+        if(elements.get('det1').classes.has('off'))throw Error('mixed group dimmed');
+        for(const i of [1,4,10,8]){
+          click('bb'+i);click('bb'+i);state(i,'Will be blurred',true,false);
+          click('kb'+i);click('kb'+i);state(i,'Will stay visible',false,true);
+          for(const m of TRKMEM[i]||[i])eq(EN[m],false);
+        }
+        eq([2,3,6,7,9,12].map(i=>EN[i]),[true,false,true,true,false,true]);
+        """)
+
+tests/test_review_choices.py:57: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "await review(rows);\n    state(1,'Mixed — 2 will be blurred; 1 will stay visible',false,false);\n    if(elements.get(... TRKMEM[i]||[i])eq(EN[m],false);\n    }\n    eq([2,3,6,7,9,12].map(i=>EN[i]),[true,false,true,true,false,true]);\n    "
+
+    def run(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        source = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(DOM + scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", source], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: TypeError: Cannot read properties of undefined (reading 'textContent')
+E             at state (evalmachine.<anonymous>:28:57)
+E             at evalmachine.<anonymous>:32:5
+E             at async [eval]:31:12
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...ent')\n    at state (evalmachine.<anonymous>:28:57)\n    at evalmachine.<anonymous>:32:5\n    at async [eval]:31:12\n").returncode
+
+tests/test_review_choices.py:53: AssertionError
+________________ test_grouping_and_context_preserve_boundaries _________________
+
+    def test_grouping_and_context_preserve_boundaries():
+>       run("""await review(rows);eq(TRKMEM[1],[0,1,11]);eq(TRKMEM[4],[4,5]);
+        for(const i of [2,3,6,7,10,12])eq(TRKMEM[i],[i]);
+        if(!mounted.includes('Applies to all 3 appearances in this face group'))throw Error('missing scope');
+        if(mounted.includes('ALL their appearances')||mounted.includes('NOT blurred'))throw Error('misleading scope');
+        for(const i of [1,4,8]){
+          const group=elements.get('dc'+i);eq(group.attrs.role,'group');
+          if(!group.attrs['aria-label'].includes(String(i+1)))throw Error('missing appearance context');
+        }
+        """)
+
+tests/test_review_choices.py:70: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "await review(rows);eq(TRKMEM[1],[0,1,11]);eq(TRKMEM[4],[4,5]);\n    for(const i of [2,3,6,7,10,12])eq(TRKMEM[i],[i]);...');\n      if(!group.attrs['aria-label'].includes(String(i+1)))throw Error('missing appearance context');\n    }\n    "
+
+    def run(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        source = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(DOM + scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", source], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: Error: missing scope
+E             at evalmachine.<anonymous>:33:83
+E             at async [eval]:31:12
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...urncode=1, stdout='', stderr='Error: missing scope\n    at evalmachine.<anonymous>:33:83\n    at async [eval]:31:12\n').returncode
+
+tests/test_review_choices.py:53: AssertionError
+_____ test_member_editor_remove_is_row_local_and_refreshes_containing_card _____
+
+    def test_member_editor_remove_is_row_local_and_refreshes_containing_card():
+>       run("""await review(rows);click('bb1');BE.sel=0;beTimesUI=()=>{};beRemove();
+        eq([EN[0],EN[1],EN[11]],[false,true,true]);eq(BE.sel,-1);
+        state(1,'Mixed — 2 will be blurred; 1 will stay visible',false,false);
+        BE.sel=1;beRemove();eq([EN[0],EN[1],EN[11]],[false,false,false]);
+        state(1,'Will stay visible',false,true);eq(BE.sel,-1);
+        """)
+
+tests/test_review_choices.py:82: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "await review(rows);click('bb1');BE.sel=0;beTimesUI=()=>{};beRemove();\n    eq([EN[0],EN[1],EN[11]],[false,true,true])...move();eq([EN[0],EN[1],EN[11]],[false,false,false]);\n    state(1,'Will stay visible',false,true);eq(BE.sel,-1);\n    "
+
+    def run(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        source = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(DOM + scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", source], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: TypeError: Cannot read properties of null (reading 'style')
+E             at beRemove (evalmachine.<anonymous>:827:33)
+E             at evalmachine.<anonymous>:31:59
+E             at async [eval]:31:12
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...\n    at beRemove (evalmachine.<anonymous>:827:33)\n    at evalmachine.<anonymous>:31:59\n    at async [eval]:31:12\n").returncode
+
+tests/test_review_choices.py:53: AssertionError
+____________ test_category_selected_and_zone_setters_preserve_scope ____________
+
+    def test_category_selected_and_zone_setters_preserve_scope():
+>       run("""await review(rows);setAll('face',false);setAll('face',false);
+        eq([0,1,2,3,4,5,10,11].map(i=>EN[i]),Array(8).fill(false));
+        eq([6,7,8,9,12].map(i=>EN[i]),[true,true,false,false,true]);
+        selSet.add(4);bulkSet(true);eq([...selSet],[]);eq([EN[4],EN[5],EN[1]],[true,true,false]);
+        setAllZd(true);setAllZd(true);eq([EN[8],EN[9],EN[1]],[true,true,false]);
+        click('kb8');eq([EN[8],EN[9]],[false,true]);
+        """)
+
+tests/test_review_choices.py:91: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "await review(rows);setAll('face',false);setAll('face',false);\n    eq([0,1,2,3,4,5,10,11].map(i=>EN[i]),Array(8).fill...rue);setAllZd(true);eq([EN[8],EN[9],EN[1]],[true,true,false]);\n    click('kb8');eq([EN[8],EN[9]],[false,true]);\n    "
+
+    def run(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        source = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(DOM + scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", source], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: Error: missing action kb8
+E             at click (evalmachine.<anonymous>:16:57)
+E             at evalmachine.<anonymous>:36:5
+E             at async [eval]:31:12
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...n kb8\n    at click (evalmachine.<anonymous>:16:57)\n    at evalmachine.<anonymous>:36:5\n    at async [eval]:31:12\n').returncode
+
+tests/test_review_choices.py:53: AssertionError
+___________ test_actions_use_p07a_same_value_and_newer_ack_ownership ___________
+
+    def test_actions_use_p07a_same_value_and_newer_ack_ownership():
+>       run("""await review(rows);click('bb10');const first=saveAndRender();
+        eq(calls.at(-1).body.enabled,{10:true});click('bb10');await reply();await first;
+        eq(EDITS.enabled[10],true);eq(calls.filter(c=>c.url.endsWith('/render')).length,0);
+        const retry=saveAndRender();await reply();await reply();await retry;
+        eq(Object.keys(EDITS.enabled),[]);
+        """)
+
+tests/test_review_choices.py:109: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "await review(rows);click('bb10');const first=saveAndRender();\n    eq(calls.at(-1).body.enabled,{10:true});click('bb1...    const retry=saveAndRender();await reply();await reply();await retry;\n    eq(Object.keys(EDITS.enabled),[]);\n    "
+
+    def run(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        source = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(DOM + scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", source], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: Error: {"10":false} != {"10":true}
+E             at eq (evalmachine.<anonymous>:27:65)
+E             at evalmachine.<anonymous>:32:5
+E             at async [eval]:31:12
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...0":true}\n    at eq (evalmachine.<anonymous>:27:65)\n    at evalmachine.<anonymous>:32:5\n    at async [eval]:31:12\n').returncode
+
+tests/test_review_choices.py:53: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_review_choices.py::test_repeated_explicit_actions_and_all_member_state
+FAILED tests/test_review_choices.py::test_grouping_and_context_preserve_boundaries
+FAILED tests/test_review_choices.py::test_member_editor_remove_is_row_local_and_refreshes_containing_card
+FAILED tests/test_review_choices.py::test_category_selected_and_zone_setters_preserve_scope
+FAILED tests/test_review_choices.py::test_actions_use_p07a_same_value_and_newer_ack_ownership
+5 failed, 1 passed in 0.72s

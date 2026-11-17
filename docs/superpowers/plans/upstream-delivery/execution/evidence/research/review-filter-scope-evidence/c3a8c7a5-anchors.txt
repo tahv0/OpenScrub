@@ -1,0 +1,75 @@
+ 6101  let REVIEW_STATUS_FILTER="all",REVIEW_STATUS_FILTER_JOB=null,REVIEW_FILTER_TIMER=null;
+ 6102  function reviewGroupStatus(i){
+ 6103   const members=TRKMEM[i]||[i];
+ 6104   const handled=members.some(m=>!!OUTPUT_CHOICES[m]||!!reviewFindingLabel(m));
+ 6105   const pending=members.some(m=>{
+ 6106    const edit=PLATE_EDITS.get(m);
+ 6107    return !!((edit&&(edit.dirty||edit.pending||edit.drag))||CONFIRM_PENDING.has(m)||CONFIRM_FAILED.has(m));
+ 6108   });
+ 6109   return {handled,pending};
+ 6110  }
+ 6111  function reviewMatchesFilter(i,cat){
+ 6112   if(LEARNING_SELECTION&&(cat!=="plate"||!(TRKMEM[i]||[i]).some(m=>LEARNING_SELECTION.has(m))))return false;
+ 6113   const status=reviewGroupStatus(i);
+ 6114   if(REVIEW_STATUS_FILTER==="unreviewed")return !status.handled||status.pending;
+ 6115   if(REVIEW_STATUS_FILTER==="reviewed")return status.handled&&!status.pending;
+ 6116   if(REVIEW_STATUS_FILTER==="pending")return status.pending;
+ 6117   return true;
+ 6118  }
+ 6119  function setReviewStatusFilter(mode){
+ 6120   if(!["all","unreviewed","reviewed","pending"].includes(mode))return false;
+ 6121   if([...PLATE_EDITS.values()].some(s=>s.drag)){
+ 6122    reviewSaveStatus("Finish dragging the corner before changing the view.",true);
+ 6123    const control=document.getElementById("reviewStatusFilter");
+ 6124    if(control)control.value=REVIEW_STATUS_FILTER;
+ 6125    return false;
+ 6126   }
+ 6127   REVIEW_STATUS_FILTER=mode;clearSel();
+ 6128   return applyReviewGroupFilter();
+ 6129  }
+ 6130  function scheduleReviewStatusFilter(){
+ 6131   if(REVIEW_STATUS_FILTER==="all"||REVIEW_FILTER_TIMER!==null)return;
+ 6132   REVIEW_FILTER_TIMER=setTimeout(()=>{REVIEW_FILTER_TIMER=null;applyReviewGroupFilter();},100);
+ 6133  }
+ 6134  function applyReviewGroupFilter(){
+ 6135   const panel=document.getElementById("review");
+ 6136   if(!panel||panel._sampleJob!==CUR||panel._sampleView!==JOBVIEW)return false;
+ 6137   const selected=LEARNING_SELECTION;
+ 6138   const totals={all:0,unreviewed:0,reviewed:0,pending:0};
+ 6139   for(const indices of Object.values(REVIEW_CATEGORY_GROUPS)){
+ 6140    for(const i of indices){
+ 6141     const group=reviewGroupStatus(i);totals.all++;
+ 6142     if(group.pending)totals.pending++;
+ 6143     if(!group.handled||group.pending)totals.unreviewed++;
+ 6144     else totals.reviewed++;
+ 6145    }
+ 6146   }
+ 6147   // Preserve unmounted cards in the lazy queue. Load only matching cards,
+ 6148   // not thousands of irrelevant previews while a reviewer is filtering.
+ 6149   for(const cat of Object.keys(REVIEW_PENDING_PAGES)){
+ 6150    const mounted=[...panel.querySelectorAll("[data-review-category] .det")]
+ 6151     .filter(card=>card.dataset.cat===cat&&reviewMatchesFilter(Number(card.id.slice(3)),cat)).length;
+ 6152    if(selected)appendReviewPage(cat,true);
+ 6153    else if(REVIEW_STATUS_FILTER!=="all"&&mounted<REVIEW_PAGE_SIZE)appendReviewPage(cat);
+ 6154   }
+ 6155   let shown=0;
+ 6156   panel.querySelectorAll("[data-review-category] .det").forEach(card=>{
+ 6157    const i=Number(card.id.slice(3));
+ 6158    card.hidden=!reviewMatchesFilter(i,card.dataset.cat);
+ 6159    if(!card.hidden)shown++;
+ 6160   });
+ 6161   panel.querySelectorAll("[data-review-category]").forEach(grid=>{
+ 6162    const cat=grid.dataset.reviewCategory;
+ 6163    const matching=(REVIEW_CATEGORY_GROUPS[cat]||[]).filter(i=>reviewMatchesFilter(i,cat)).length;
+ 6164    grid.hidden=matching===0;
+ 6165    const heading=grid.previousElementSibling;heading.hidden=matching===0;
+ 6166    heading.querySelector(".badge").textContent=matching;
+ 6167   });
+ 6168   panel.querySelectorAll(".review-more").forEach(button=>{
+ 6169    const cat=button.dataset.reviewMore;
+ 6170    const pending=(REVIEW_PENDING_PAGES[cat]||[]).filter(item=>reviewMatchesFilter(item.i,cat)).length;
+ 6171    button.hidden=!!selected||pending===0;
+ 6172    button.textContent="Load more "+(CATDN[cat]||cat)+" ("+pending+" remaining)";
+ 6173   });
+ 6174   const zones=panel.querySelector("#reviewZones");if(zones)zones.hidden=!!selected;
+ 6175   const all=panel.querySelector("#reviewShowAll");if(all)all.hidden=!selected&&REVIEW_STATUS_FILTER==="all";
