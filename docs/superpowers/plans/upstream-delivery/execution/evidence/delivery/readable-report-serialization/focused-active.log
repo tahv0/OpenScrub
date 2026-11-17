@@ -1,0 +1,117 @@
+........................................................................ [ 42%]
+..................F..................................................... [ 85%]
+.........................                                                [100%]
+=================================== FAILURES ===================================
+_ test_failed_transaction_releases_waiter_and_preserves_previous_json[serialization] _
+
+store = namespace(root=PosixPath('/tmp/openscrub-task632/focused-active-tmp/test_failed_transaction_releas2/data'), jobs=Posix...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7fb7a5cca7a0>, url='/api/jobs/e6510efed7b7')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fb7a6222d50>
+failure = 'serialization'
+
+    @pytest.mark.parametrize('failure', ['parse', 'application', 'serialization', 'fsync', 'replace'])
+    def test_failed_transaction_releases_waiter_and_preserves_previous_json(store, monkeypatch, failure):
+        two_rows(store)
+        before = store.path.read_bytes()
+        entered, release = threading.Event(), threading.Event()
+        lock = ObservedLock()
+        web.FILES.initialize(store.job).report_lock = lock
+        if failure == 'parse':
+            target, name = web, '_load_job_report'
+        elif failure == 'serialization':
+            target, name = reports.json, 'JSONEncoder'
+        elif failure in ('fsync', 'replace'):
+            target, name = reports.os, failure
+        else:
+            target, name = web, '_load_job_report'
+        real = getattr(target, name)
+        count = [0]
+        def fail_once(*args, **kwargs):
+            count[0] += 1
+            if count[0] == 1:
+                entered.set()
+                assert release.wait(8)
+                if failure == 'application':
+                    return {'detections': None}
+                if failure == 'parse':
+                    raise ValueError('synthetic parse failure')
+                raise OSError('synthetic ' + failure + ' failure')
+            return real(*args, **kwargs)
+        monkeypatch.setattr(target, name, fail_once)
+        first = start_call('post', store.url + '/detections', json={'enabled': {'0': False}})
+        second = None
+        try:
+            assert entered.wait(5)
+            second = start_call('post', store.url + '/detections', json={'enabled': {'1': False}})
+>           assert lock.waiting.wait(5)
+E           assert False
+E            +  where False = wait(5)
+E            +    where wait = <threading.Event at 0x7fb85ef37d10: unset>.wait
+E            +      where <threading.Event at 0x7fb85ef37d10: unset> = <test_report_transactions.ObservedLock object at 0x7fb85ef37200>.waiting
+
+tests/test_report_transactions.py:318: AssertionError
+
+During handling of the above exception, another exception occurred:
+
+store = namespace(root=PosixPath('/tmp/openscrub-task632/focused-active-tmp/test_failed_transaction_releas2/data'), jobs=Posix...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7fb7a5cca7a0>, url='/api/jobs/e6510efed7b7')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fb7a6222d50>
+failure = 'serialization'
+
+    @pytest.mark.parametrize('failure', ['parse', 'application', 'serialization', 'fsync', 'replace'])
+    def test_failed_transaction_releases_waiter_and_preserves_previous_json(store, monkeypatch, failure):
+        two_rows(store)
+        before = store.path.read_bytes()
+        entered, release = threading.Event(), threading.Event()
+        lock = ObservedLock()
+        web.FILES.initialize(store.job).report_lock = lock
+        if failure == 'parse':
+            target, name = web, '_load_job_report'
+        elif failure == 'serialization':
+            target, name = reports.json, 'JSONEncoder'
+        elif failure in ('fsync', 'replace'):
+            target, name = reports.os, failure
+        else:
+            target, name = web, '_load_job_report'
+        real = getattr(target, name)
+        count = [0]
+        def fail_once(*args, **kwargs):
+            count[0] += 1
+            if count[0] == 1:
+                entered.set()
+                assert release.wait(8)
+                if failure == 'application':
+                    return {'detections': None}
+                if failure == 'parse':
+                    raise ValueError('synthetic parse failure')
+                raise OSError('synthetic ' + failure + ' failure')
+            return real(*args, **kwargs)
+        monkeypatch.setattr(target, name, fail_once)
+        first = start_call('post', store.url + '/detections', json={'enabled': {'0': False}})
+        second = None
+        try:
+            assert entered.wait(5)
+            second = start_call('post', store.url + '/detections', json={'enabled': {'1': False}})
+            assert lock.waiting.wait(5)
+            assert store.path.read_bytes() == before
+            assert request('delete', store.url).status_code == 409
+        finally:
+            release.set()
+>           a = finish(first)
+                ^^^^^^^^^^^^^
+
+tests/test_report_transactions.py:323: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+call = (<Thread(Thread-23 (run), stopped 140426728109760)>, <threading.Event at 0x7fb85ef36ba0: set>, [OSError('synthetic serialization failure')], [])
+
+    def finish(call):
+        thread, done, errors, values = call
+        thread.join(8)
+        assert not thread.is_alive(), 'route did not finish'
+>       assert not errors, errors
+E       AssertionError: [OSError('synthetic serialization failure')]
+E       assert not [OSError('synthetic serialization failure')]
+
+tests/test_job_lifecycle.py:86: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_report_transactions.py::test_failed_transaction_releases_waiter_and_preserves_previous_json[serialization]
+1 failed, 168 passed in 17.63s

@@ -1,0 +1,35 @@
+{
+  "source_pin": "12919c96c6f7558136b50d7b4d85e5e6b62f1971",
+  "independent_G_base": "e21ebdf6e3ee46e6c65050dc956a9a3459152269",
+  "method": "Read Git objects only. No product imports, tests, media, probes or environment inspection.",
+  "files": {
+    "openscrub.py": {
+      "git_blob": "9a9c82d7eb8075510e5c2dbbbe63be3c943a399f",
+      "sha256": "275de34766d3d64592222be5633906a3dcd2557ce78e2dd7b7d6fb8075fd0355"
+    },
+    "openscrub_web.py": {
+      "git_blob": "137091183f66e99350153b38ce060b02f95e55f0",
+      "sha256": "7762f0314df5e11e46a570af54cd20e928953e7bf92d55da7d648dad36e0fce2"
+    },
+    "openscrub_internal/reports.py": {
+      "git_blob": "a46d324fc198d01c9e11460a506d7c77b70c1760",
+      "sha256": "e8a7429c0b5430ee290f6635ca5d5a93445d3f0fe9bb0f58e57fec891ee01b7f"
+    },
+    "openscrub_internal/lifetimes.py": {
+      "git_blob": "992adfb357631f69792f22e437a3b1d61e2a7ca8",
+      "sha256": "dbfc317c1c878b8e8a599391578504c44a8964199f2cdae6e2ed60a6336d6743"
+    },
+    "openscrub_vault.py": {
+      "git_blob": "f2ad09ee35849dfe497efc54a8cbd2042d117c41",
+      "sha256": "da1b7fe4da389352fbc594abddcc563278b26009d8f342d4154ffa305bf4dfa4"
+    },
+    "openscrub_gui.py": {
+      "git_blob": "50e21822d350595178c612ca6b07aef48ccb1205",
+      "sha256": "2fee837398620f351e6770a19c1016d5af3104350a1bec744ba42a611e2c9965"
+    }
+  },
+  "independent_G_engine": {
+    "git_blob": "f02b4d018fb0de9f906ad16d5b8b9b172dfde293",
+    "sha256": "0e4f0f9a7846080f591038d021aaf3ca6f01201d83ac32bbdc273f53d5067ee7"
+  }
+}

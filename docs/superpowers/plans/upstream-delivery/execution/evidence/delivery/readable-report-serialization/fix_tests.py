@@ -1,0 +1,13 @@
+from pathlib import Path
+root=Path('/home/tahv0/.codex/worktrees/c832/OpenScrub')
+p=root/'tests/test_report_transactions.py'; s=p.read_text().replace('from pathlib import Path','from pathlib import Path\nfrom types import SimpleNamespace')
+s=s.replace("    elif failure == 'serialization':\n        target, name = reports.json, 'JSONEncoder'", "    elif failure == 'serialization':\n        # Keep the injected encoder failure out of client/request JSON.\n        monkeypatch.setattr(reports, 'json', SimpleNamespace(JSONEncoder=json.JSONEncoder))\n        target, name = reports.json, 'JSONEncoder'")
+p.write_text(s)
+p=root/'tests/test_report_serialization.py';s=p.read_text(); a=s.index('def test_encoder_stream_uses_bulk_iterator_consumption');b=s.index('def test_exact_readable_bytes',a)
+s=s[:a]+s[b:];s=s.replace('Readable bytes, streaming dispatch and atomic failure contracts.','Readable bytes and atomic failure contracts.').replace('import os\n','');p.write_text(s)
+p=root/'benchmark/review_io.py';s=p.read_text().replace('report_parse=0, report_dump=0, stage=0','report_parse=0, report_encode=0, json_dump_calls=0, encoder_instances=0, stage=0')
+s=s.replace("counts['report_dump'] += 1\n        return dump", "counts['report_encode'] += 1\n        counts['json_dump_calls'] += 1\n        return dump")
+s=s.replace("counts['report_dump'] += 1\n        instance", "counts['report_encode'] += 1\n        counts['encoder_instances'] += 1\n        instance")
+s=s.replace("('report_dump','stage','fsync','replace')", "('report_encode','stage','fsync','replace')")
+p.write_text(s)
+p=root/'benchmark/README.md';s=p.read_text().replace('`report_dump` as publication encoding starts,','`report_encode` as publication encoding starts,\n`json_dump_calls` and `encoder_instances` as method-specific encoding starts,');p.write_text(s)

@@ -213,6 +213,8 @@ For ordinary file responses, use the valid response `Content-Length` matching th
 
 - [ ] **E/V/D:** Compare identical realistic fixtures at exact source SHAs with warmups/alternating uninstrumented HTTP samples, separate operation counts and memory observations. Include index/document/temporary-string costs and every shared publisher's compatibility. Ship only a demonstrated worthwhile gain with full owning tests/build; otherwise close the candidate without a code change. No new JSON dependency or private encoder API merely to reduce a counter.
 
+**Measured local disposition:** P06C.2 now has an independently reviewed candidate using the public encoder iterator through `writelines` in the existing publisher. Its four changed-save medians improve by 18.37–23.12% with exact readable bytes and acceptable observed RSS; the 100k unchanged-save control is +9.97% and its cause remains unknown. The [delivery record](execution/evidence/delivery/task-632-report.md) and [review](execution/evidence/delivery/task-632-review.md) retain the conditional adoption rationale, every sample and platform/memory limits. No compact encoding or aggregation buffer was adopted; combined C01 validation remains separate.
+
 ### P06D — preserve the review document through rendering
 
 **What:** Keep every review row and its original position when an existing report is rendered, including Keep choices, zone-dropped rows, manual shapes, tracking/group identifiers and additive fields. Preserve audio suggestions/transcript alongside redaction spans.

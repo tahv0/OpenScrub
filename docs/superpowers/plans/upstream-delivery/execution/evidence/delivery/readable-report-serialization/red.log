@@ -1,0 +1,55 @@
+F................                                                        [100%]
+=================================== FAILURES ===================================
+______________ test_encoder_stream_uses_bulk_iterator_consumption ______________
+
+tmp_path = PosixPath('/tmp/openscrub-task632/red-tmp/test_encoder_stream_uses_bulk_0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x743da4201c10>
+
+    def test_encoder_stream_uses_bulk_iterator_consumption(tmp_path, monkeypatch):
+        # The optimization must avoid one Python write dispatch per encoder token.
+        original = reports.tempfile.NamedTemporaryFile
+        calls = []
+        class Stream:
+            def __init__(self, stream): self.stream = stream
+            def __getattr__(self, key): return getattr(self.stream, key)
+            def __enter__(self): self.stream.__enter__(); return self
+            def __exit__(self, *args): return self.stream.__exit__(*args)
+            def write(self, value):
+                pytest.fail('per-token Python write dispatch')
+            def writelines(self, values):
+                calls.append('writelines')
+                return self.stream.writelines(values)
+        monkeypatch.setattr(reports.tempfile, 'NamedTemporaryFile',
+                            lambda **kwargs: Stream(original(**kwargs)))
+        path = tmp_path / 'report.json'
+>       reports.atomic_report(path, {'rows': [{'nested': [1, True, None]}] * 200})
+
+../../.codex/worktrees/c832/OpenScrub/tests/test_report_serialization.py:27: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+../../.codex/worktrees/c832/OpenScrub/openscrub_internal/reports.py:28: in atomic_report
+    json.dump(report, stream, indent=1)
+/tmp/openscrub-baseline-20261116/python/cpython-3.12.16-linux-x86_64-gnu/lib/python3.12/json/__init__.py:180: in dump
+    fp.write(chunk)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <test_report_serialization.test_encoder_stream_uses_bulk_iterator_consumption.<locals>.Stream object at 0x743da41a6090>
+value = '{'
+
+    def write(self, value):
+>       pytest.fail('per-token Python write dispatch')
+E       Failed: per-token Python write dispatch
+
+../../.codex/worktrees/c832/OpenScrub/tests/test_report_serialization.py:20: Failed
+=============================== warnings summary ===============================
+../../../../tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/_pytest/cacheprovider.py:487
+  /tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/_pytest/cacheprovider.py:487: PytestCacheWarning: cache could not write path /home/tahv0/.codex/worktrees/c832/OpenScrub/.pytest_cache/v/cache/nodeids: [Errno 30] Read-only file system: '/home/tahv0/.codex/worktrees/c832/OpenScrub/.pytest_cache/v/cache/nodeids'
+    config.cache.set("cache/nodeids", sorted(str(n) for n in self.cached_nodeids))
+
+../../../../tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/_pytest/cacheprovider.py:439
+  /tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/_pytest/cacheprovider.py:439: PytestCacheWarning: cache could not write path /home/tahv0/.codex/worktrees/c832/OpenScrub/.pytest_cache/v/cache/lastfailed: [Errno 30] Read-only file system: '/home/tahv0/.codex/worktrees/c832/OpenScrub/.pytest_cache/v/cache/lastfailed'
+    config.cache.set("cache/lastfailed", current_lastfailed)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED ../../.codex/worktrees/c832/OpenScrub/tests/test_report_serialization.py::test_encoder_stream_uses_bulk_iterator_consumption
+1 failed, 16 passed, 2 warnings in 0.06s

@@ -1,0 +1,407 @@
+# 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub_web.py
+
+## Lines 344-367
+  344 def _source_job_locked(canonical, missing_ok=False):
+  345     root = os.path.realpath(JOBS_DIR).rstrip(os.sep) + os.sep
+  346     if not canonical.startswith(root):
+  347         return None
+  348     jid = canonical[len(root):].split(os.sep, 1)[0]
+  349     with JOBS_LOCK:
+  350         source_job = JOBS.get(jid)
+  351     if source_job is None:
+  352         if missing_ok:
+  353             return None
+  354         abort(404, "source job is no longer available")
+  355     _validate_files_locked(source_job)
+  356     return source_job
+  357 
+  358 
+  359 def _reserve_files_locked(job=None, work=False, read_source=True, source=None):
+  360     source = (os.path.realpath(source if source is not None else job["video"])
+  361               if read_source and job and (source is not None or job.get("video")) else None)
+  362     source_job = _source_job_locked(source) if source else None
+  363     lease = FILES.reserve(job, work)
+  364     lease.source = source
+  365     if source_job is not None and source_job is not job:
+  366         lease.related.append(FILES.reserve(source_job))
+  367     return lease
+
+## Lines 418-441
+  418 def _request_source_path(path):
+  419     """Canonical path used for both admission and actual server-path I/O."""
+  420     canonical = os.path.realpath(path)
+  421     with VAULT_LOCK:
+  422         source_job = _source_job_locked(canonical)
+  423         if source_job is not None:
+  424             lease = FILES.reserve(source_job)
+  425             lease.source = canonical
+  426             if g.get("file_owner") is None:
+  427                 g.file_owner = lease
+  428             else:
+  429                 g.setdefault("file_children", []).append(lease)
+  430     return canonical
+  431 
+  432 
+  433 def _job_video(job):
+  434     # Requests use their admitted source even if scan normalization updates
+  435     # the live job while a decoder is waiting. Worker/thread callers snapshot
+  436     # their own lease's source before starting work.
+  437     if has_request_context():
+  438         lease = g.get("file_owner")
+  439         if lease is not None and lease.state is FILES.initialize(job):
+  440             return lease.source or job.get("video")
+  441     return job.get("video")
+
+## Lines 459-462
+  459 def _own_files(job=None, work=False):
+  460     with VAULT_LOCK:
+  461         _validate_files_locked(job)
+  462         return _reserve_files_locked(job, work)
+
+## Lines 648-652
+  648             "-o", os.path.join(jdir, "output."
+  649                                + (o.get("out_format", "mp4")
+  650                                   if o.get("out_format") in ("mp4", "mov", "mkv")
+  651                                   else "mp4")),
+  652             "--report", os.path.join(jdir, "report.json")]
+
+## Lines 802-846
+  802 def _report_current(job):
+  803     """Identity lookup only; caller owns report_lock and a file lifetime.
+  804 
+  805     Admission takes VAULT_LOCK -> JOBS_LOCK and releases both before this
+  806     boundary. Never acquire VAULT_LOCK (including lease release) inside it.
+  807     """
+  808     with JOBS_LOCK:
+  809         if not any(current is job for current in JOBS.values()):
+  810             abort(404)
+  811         if FILES.initialize(job).closed:
+  812             abort(409, "job is being deleted")
+  813 
+  814 
+  815 def _edit_gate(job):
+  816     _report_current(job)
+  817     if FILES.initialize(job).active is not None or job.get("phase") in _ACTIVE_PHASES:
+  818         abort(409, "job work is queued, running or still cleaning up")
+  819 
+  820 
+  821 def _operation_valid(job, owner):
+  822     files = FILES.initialize(job)
+  823     with JOBS_LOCK:
+  824         return (any(current is job for current in JOBS.values()) and not files.closed
+  825                 and owner.operation is not None
+  826                 and files.operation is owner.operation)
+  827 
+  828 
+  829 def _begin_operation(job, owner):
+  830     files = FILES.initialize(job)
+  831     owner.operation = threading.Event()
+  832     files.operation = owner.operation
+  833     job["cancel"] = owner.operation
+  834     files.active = owner
+  835 
+  836 
+  837 def _finish_operation(job, owner):
+  838     # Release lifecycle ownership outside the report transaction. Keep the
+  839     # mutation gate closed until actual worker cleanup/release has completed.
+  840     owner.release()
+  841     if job is None:  # a cancelled ticket's job may already have been deleted
+  842         return
+  843     files = FILES.initialize(job)
+  844     with files.report_lock:
+  845         if files.active is owner:
+  846             files.active = None
+
+## Lines 954-985
+  954 def _run_job(job, action, owner=None):
+  955     if owner is None:
+  956         owner = _prepare_work(job, action)
+  957         try:
+  958             with FILES.initialize(job).report_lock:
+  959                 _begin_operation(job, owner)
+  960             return _run_job(job, action, owner)
+  961         finally:
+  962             _finish_operation(job, owner)
+  963     jid = job["id"]
+  964     files = FILES.initialize(job)
+  965     with files.report_lock:
+  966         if owner.operation is None:  # compatibility with old queue entries
+  967             _begin_operation(job, owner)
+  968         if not _operation_valid(job, owner):
+  969             return
+  970         job["phase"] = "scanning" if action == "scan" else "rendering"
+  971     cb = WebCallbacks(job, owner.operation)
+  972     def publish_report(path, doc):
+  973         with files.report_lock:
+  974             if not _operation_valid(job, owner) or owner.operation.is_set():
+  975                 raise openscrub.PipelineCancelled()
+  976             atomic_report(path, doc)
+  977     cb.publish_report = publish_report
+  978     source = owner.source if owner is not None else job["video"]
+  979     try:
+  980         if action == "scan":
+  981             job["log"].append("— scan started —")
+  982             args = build_args(dict(job, video=source))
+  983             state = openscrub.run_scan(args, cb)
+  984             openscrub.write_report(os.path.join(job["dir"], "report.json"),
+  985                                   args, state, publisher=cb.publish_report)
+
+## Lines 1087-1117
+ 1087         elif action == "render":
+ 1088             if not owner.report_input:  # compatibility with older queue entries
+ 1089                 _select_render_input(job, owner)
+ 1090             args = build_args(dict(job, video=owner.source), for_render=True)
+ 1091             args._report_input = owner.source
+ 1092             res = openscrub.run_pipeline(args, cb)
+ 1093             with files.report_lock:
+ 1094                 if not _operation_valid(job, owner):
+ 1095                     return
+ 1096                 job["output"] = res["output"]
+ 1097                 job["phase"] = "done"
+ 1098                 job["progress"] = 1.0
+ 1099                 job["eta"] = None
+ 1100     except openscrub.PipelineCancelled:
+ 1101         with files.report_lock:
+ 1102             if _operation_valid(job, owner):
+ 1103                 job["phase"] = "cancelled"
+ 1104                 job["error"] = "cancelled by user"
+ 1105     except BaseException as e:
+ 1106         msg = str(e) or type(e).__name__
+ 1107         if isinstance(e, SystemExit):
+ 1108             msg = "the job stopped unexpectedly (exit %s)" % (e.code,)
+ 1109         with files.report_lock:
+ 1110             if _operation_valid(job, owner):
+ 1111                 job["phase"] = "error"
+ 1112                 job["error"] = msg
+ 1113                 job["log"].append(f"ERROR: {msg}")
+ 1114     finally:
+ 1115         with files.report_lock:
+ 1116             if _operation_valid(job, owner):
+ 1117                 job["eta"] = None
+
+## Lines 1180-1223
+ 1180 @app.before_request
+ 1181 def enforce_vault_lock():
+ 1182     """Admit file work before intake parsing or a view captures a job."""
+ 1183     if request.endpoint == "allowlist":
+ 1184         g.file_owner = _own_files()  # shared file lives directly in JOBS_DIR
+ 1185         return
+ 1186     if request.path.startswith("/api/jobs"):
+ 1187         # Deletion closes admissions itself, without becoming its own busy owner.
+ 1188         if request.endpoint == "job_delete":
+ 1189             with VAULT_LOCK:
+ 1190                 _validate_files_locked()
+ 1191             return
+ 1192         with VAULT_LOCK:
+ 1193             jid = (request.view_args or {}).get("jid")
+ 1194             job = JOBS.get(jid) if jid is not None else None
+ 1195             if jid is not None and job is None:
+ 1196                 abort(404)
+ 1197             _validate_files_locked(job)
+ 1198             read_source = request.endpoint in {
+ 1199                 "job_retry", "job_render", "job_track_object", "job_mediainfo",
+ 1200                 "job_detframe", "job_thumb", "job_frame_at", "job_video_stream"}
+ 1201             g.file_owner = _reserve_files_locked(job, read_source=read_source)
+ 1202 
+ 1203 
+ 1204 @app.after_request
+ 1205 def _finish_file_response(response):
+ 1206     for child in g.pop("file_children", []):
+ 1207         child.release()
+ 1208     lease = g.pop("file_owner", None)
+ 1209     if lease is not None:
+ 1210         if response.direct_passthrough:
+ 1211             response.response = OwnedIterable(response.response, lease)
+ 1212         else:
+ 1213             lease.release()  # detached JSON/JPEG bytes no longer read job files
+ 1214     return response
+ 1215 
+ 1216 
+ 1217 @app.teardown_request
+ 1218 def _release_failed_request(error):
+ 1219     for child in g.pop("file_children", []):
+ 1220         child.release()
+ 1221     lease = g.pop("file_owner", None)
+ 1222     if lease is not None:
+ 1223         lease.release()
+
+## Lines 1468-1504
+ 1468 @app.route("/api/jobs/<jid>/cancel", methods=["POST"])
+ 1469 def job_cancel(jid):
+ 1470     """Cancel a job. The job the worker is RUNNING stops cooperatively at
+ 1471     its next checkpoint. Any other active job (still queued, or orphaned by
+ 1472     a worker that died) is cancelled on the spot — before, Cancel only set
+ 1473     a flag the worker checks mid-scan, so a job the worker never picked up
+ 1474     could never be cancelled (or deleted: delete refuses active jobs)."""
+ 1475     job = JOBS.get(jid) or abort(404)
+ 1476     files = FILES.initialize(job)
+ 1477     operation = files.operation  # capture the operation this request cancels
+ 1478     if operation is not None:
+ 1479         operation.set()  # promptly signal compute, before waiting for report I/O
+ 1480     released = []
+ 1481     with files.report_lock:
+ 1482         _report_current(job)
+ 1483         if files.operation is not operation:
+ 1484             # That attempt finished/replaced while this request waited. Do not
+ 1485             # signal, invalidate or release a newer attempt's queue ownership.
+ 1486             return jsonify({"ok": True})
+ 1487         if operation is None:
+ 1488             job["cancel"].set()  # idle/intake: no running compute to interrupt
+ 1489         files.operation = None  # Event.clear cannot revive the captured attempt
+ 1490         with JOBS_LOCK:
+ 1491             released = list(files.queued.values())
+ 1492             files.queued.clear()
+ 1493             job["qgen"] = job.get("qgen", 0) + 1
+ 1494         if files.active in released:
+ 1495             files.active = None
+ 1496         if job.get("phase") in _ACTIVE_PHASES:
+ 1497             job.update(phase="cancelled", error="cancelled by user", eta=None)
+ 1498             job["log"].append("— cancelled —")
+ 1499         if job.get("trackbg", {}).get("state") == "running":
+ 1500             job["trackbg"] = {"state": "done", "added": 0,
+ 1501                               "error": "cancelled by user"}
+ 1502     for lease in released:
+ 1503         lease.release()
+ 1504     return jsonify({"ok": True})
+
+## Lines 1660-1699
+ 1660 @app.route("/api/jobs/<jid>/frame_at")
+ 1661 def job_frame_at(jid):
+ 1662     job = JOBS.get(jid) or abort(404)
+ 1663     t = max(0.0, float(request.args.get("t", 0)))
+ 1664     path = (job["output"] if request.args.get("src") == "output"
+ 1665             and job.get("output") else _job_video(job))
+ 1666     cap = cv2.VideoCapture(path)
+ 1667     # seek by TIMESTAMP, not frame index: the original upload is often VFR
+ 1668     # (iPhone), where index = t*fps drifts out of sync with the CFR output
+ 1669     # and can overshoot the file entirely (broken compare pane)
+ 1670     try:
+ 1671         frame = None
+ 1672         for tt in (t, max(0.0, t - 0.34), max(0.0, t - 1.0), 0.0):
+ 1673             cap.set(cv2.CAP_PROP_POS_MSEC, tt * 1000)
+ 1674             ok, fr = cap.read()
+ 1675             if ok:
+ 1676                 frame = fr
+ 1677                 break   # walk back instead of 404ing at the very end of the file
+ 1678             if tt == 0.0:
+ 1679                 break
+ 1680     finally:
+ 1681         cap.release()
+ 1682     if frame is None:
+ 1683         abort(404)
+ 1684     ok, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 82])
+ 1685     return Response(buf.tobytes(), mimetype="image/jpeg")
+ 1686 
+ 1687 
+ 1688 @app.route("/api/jobs/<jid>/video")
+ 1689 def job_video_stream(jid):
+ 1690     """Range-aware stream of the job's scan video so review can PLAY the
+ 1691     footage with live boxes (issue #17: the box editor was scrub-only,
+ 1692     'you cannot play review and see hits'). Serves the same file frame_at
+ 1693     reads — for HDR/VFR jobs that is the normalized SDR scan copy, which
+ 1694     every browser can decode."""
+ 1695     job = JOBS.get(jid) or abort(404)
+ 1696     video = _job_video(job)
+ 1697     if not (video and os.path.exists(video)):
+ 1698         abort(404)
+ 1699     return send_file(video, conditional=True)
+
+## Lines 2188-2248
+ 2188 @app.route("/api/jobs/<jid>/render", methods=["POST"])
+ 2189 def job_render(jid):
+ 2190     job = JOBS.get(jid) or abort(404)
+ 2191     files = FILES.initialize(job)
+ 2192     def refusal(prepared_work=0):
+ 2193         _report_current(job)
+ 2194         if job["phase"] in ("rendering", "queued_render"):
+ 2195             return jsonify({"ok": True, "note": "render already in progress"})
+ 2196         if files.active is not None or files.work > prepared_work:
+ 2197             return jsonify({"error": "job work is still cleaning up"}), 409
+ 2198         if files.tracker is not None and not files.tracker.released:
+ 2199             return jsonify({"error": "tracking already in progress"}), 409
+ 2200         if job["phase"] not in ("review", "done", "error", "cancelled"):
+ 2201             return jsonify({"error": f"cannot render from phase {job['phase']}"}), 400
+ 2202     with files.report_lock:
+ 2203         rejected = refusal()
+ 2204         if rejected is not None:
+ 2205             return rejected
+ 2206         current, operation = job.get("video"), files.operation
+ 2207     # Preparation can reserve/release sources under VAULT_LOCK. Revalidate its
+ 2208     # operation/source snapshot at admission, after releasing that shared guard.
+ 2209     prepared = _prepare_work(job, "render")
+ 2210     ticket = None
+ 2211     try:
+ 2212         with files.report_lock:
+ 2213             rejected = refusal(prepared_work=1)
+ 2214             if rejected is not None:
+ 2215                 return rejected
+ 2216             if job.get("video") != current or files.operation is not operation:
+ 2217                 return jsonify({"error": "job operation or source changed — retry render"}), 409
+ 2218             ticket = _reserve_queue_locked(job, "render", prepared)
+ 2219             job["error"] = None
+ 2220     finally:
+ 2221         if ticket is None:
+ 2222             prepared.release()
+ 2223     enqueue(job, "render", ticket)
+ 2224     return jsonify({"ok": True})
+ 2225 
+ 2226 
+ 2227 
+ 2228 @app.route("/api/jobs/<jid>/download")
+ 2229 def job_download(jid):
+ 2230     job = JOBS.get(jid) or abort(404)
+ 2231     if not job["output"] or not os.path.exists(job["output"]):
+ 2232         abort(404)
+ 2233     # download name must carry the REAL container extension: a .mkv render
+ 2234     # saved as "_redacted.mp4" looks like the format choice was ignored
+ 2235     ext = os.path.splitext(job["output"])[1] or ".mp4"
+ 2236     return send_file(job["output"], as_attachment=True,
+ 2237                      download_name=os.path.splitext(job["name"])[0]
+ 2238                      + "_redacted" + ext)
+ 2239 
+ 2240 
+ 2241 @app.route("/api/jobs/<jid>/report")
+ 2242 def job_report(jid):
+ 2243     job = JOBS.get(jid) or abort(404)
+ 2244     with FILES.initialize(job).report_lock:
+ 2245         return send_file(os.path.join(job["dir"], "report.json"),
+ 2246                          as_attachment=True,
+ 2247                          download_name=os.path.splitext(job["name"])[0]
+ 2248                          + "_audit.json")
+
+## Lines 4293-4312
+ 4293 @app.route("/api/server_video")
+ 4294 def server_video():
+ 4295     """Stream a server-side video for the Scan Setup preview. The path is
+ 4296     request data: the same server_path_error confinement that gates job
+ 4297     intake runs BEFORE any filesystem access. conditional=True gives Range
+ 4298     support so the <video> element can seek/scrub."""
+ 4299     p = _request_source_path(request.args.get("path", ""))
+ 4300     err = server_path_error(p)
+ 4301     if err:
+ 4302         return jsonify({"error": err}), 400
+ 4303     # Containment guard REPEATED inline: server_path_error already enforces
+ 4304     # it, but CodeQL's path-injection barrier analysis is function-local —
+ 4305     # the sink below must be dominated by the single-startswith shape in
+ 4306     # THIS function or the alert re-opens (same lesson as the models route).
+ 4307     root = os.environ.get("OPENSCRUB_MEDIA_ROOT")
+ 4308     r = os.path.realpath(root) if root else os.path.realpath(
+ 4309         os.path.splitdrive(p)[0] + os.sep)
+ 4310     if not p.startswith(r.rstrip(os.sep) + os.sep):
+ 4311         return jsonify({"error": "server path is outside OPENSCRUB_MEDIA_ROOT"}), 400
+ 4312     return send_file(p, conditional=True)
+
+## Lines 4515-4527
+ 4515             out = os.path.join(jdir, "output.mp4")
+ 4516             has_out = os.path.exists(out)
+ 4517             job = {
+ 4518                 "id": jid, "dir": jdir, "video": video,
+ 4519                 "name": os.path.basename(prov.get("original_input")
+ 4520                                           or video),
+ 4521                 "options": prov.get("settings", {}) or {},
+ 4522                 "phase": "done" if has_out else "review",
+ 4523                 "progress": 1.0 if has_out else 0.5,
+ 4524                 "log": ["(recovered after server restart)"],
+ 4525                 "error": None, "output": out if has_out else None,
+ 4526                 "created": os.path.getmtime(jdir),
+ 4527                 "cancel": threading.Event(), "stats": {},

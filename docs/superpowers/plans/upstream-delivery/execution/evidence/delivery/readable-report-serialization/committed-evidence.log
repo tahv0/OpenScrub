@@ -1,0 +1,25 @@
+{
+  "base": "3457efac574d74a7d2377cbc0d44bb0b87462c3a",
+  "head": "4a62e49d2f0896b737081cc92e1f92e9bcaee93f",
+  "expected_final_reports": {
+    "10000": {
+      "path": "/tmp/openscrub-task632/expected-final-10000.json",
+      "bytes": 6955571,
+      "sha256": "1942d80822b70f4527d81c879515421ae04a6f393b37a67626ed58238520148c"
+    },
+    "100000": {
+      "path": "/tmp/openscrub-task632/expected-final-100000.json",
+      "bytes": 69956372,
+      "sha256": "74f6909e2997cc763ecdbd8601986a5ae784217a4a7270e2863b3ffb7b814681"
+    }
+  },
+  "main_http200": 108,
+  "timed_http200": 96,
+  "counted_http200": 12,
+  "every_noop_identity_and_mtime_retained": true,
+  "every_changed_request_replaces_inode": true,
+  "all_complete_final_reports_byte_equal": true,
+  "all_pinned_exports_unchanged": true,
+  "frozen_committed_blobs": 127,
+  "clean_head": true
+}

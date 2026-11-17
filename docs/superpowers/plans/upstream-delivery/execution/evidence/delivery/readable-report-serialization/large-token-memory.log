@@ -1,0 +1,56 @@
+{
+  "before": {
+    "ready": {
+      "pid": 10,
+      "source": "/tmp/openscrub-task632/measurement/export-before/openscrub_internal/reports.py",
+      "import_memory": {
+        "VmHWM_kib": 15076,
+        "VmRSS_kib": 15076
+      },
+      "ready_memory": {
+        "VmHWM_kib": 22896,
+        "VmRSS_kib": 22896
+      }
+    },
+    "publication": {
+      "after_publication_memory": {
+        "VmHWM_kib": 46288,
+        "VmRSS_kib": 23088
+      }
+    },
+    "peak_rss_kib": 46464,
+    "peak_hwm_kib": 46464,
+    "tokens": {
+      "encoder_chunks": 22,
+      "largest_token_characters": 12000002,
+      "serialized_characters": 12000076
+    }
+  },
+  "after": {
+    "ready": {
+      "pid": 12,
+      "source": "/tmp/openscrub-task632/measurement/export-after/openscrub_internal/reports.py",
+      "import_memory": {
+        "VmHWM_kib": 15144,
+        "VmRSS_kib": 15144
+      },
+      "ready_memory": {
+        "VmHWM_kib": 22964,
+        "VmRSS_kib": 22964
+      }
+    },
+    "publication": {
+      "after_publication_memory": {
+        "VmHWM_kib": 46432,
+        "VmRSS_kib": 23156
+      }
+    },
+    "peak_rss_kib": 46532,
+    "peak_hwm_kib": 46532,
+    "tokens": {
+      "encoder_chunks": 22,
+      "largest_token_characters": 12000002,
+      "serialized_characters": 12000076
+    }
+  }
+}

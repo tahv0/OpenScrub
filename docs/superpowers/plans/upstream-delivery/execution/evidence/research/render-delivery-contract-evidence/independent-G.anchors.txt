@@ -1,0 +1,10 @@
+e21ebdf6e3ee46e6c65050dc956a9a3459152269:openscrub.py
+3117 def blur_region(frame, x1, y1, x2, y2, mode, shape="rect"):
+3181 def blur_silhouette(frame, x1, y1, x2, y2, mode, polys, poly_box,
+3620 def _blur_yuv10(y, u, v, x1, y1, x2, y2, mode, shape="rect"):
+3684 def _blur_silhouette_yuv10(y, u, v, x1, y1, x2, y2, mode, polys,
+3749 def apply_coverage(dets, coverage, cb=None):
+3887 def render_hdr(src, dst, detections, cum, bands, fps, pad, mode,
+4062 def render(src, dst, detections, cum, bands, fps, pad, mode, preview,
+6336 def load_report(path):
+8435 def run_render(args, state, cb=None):

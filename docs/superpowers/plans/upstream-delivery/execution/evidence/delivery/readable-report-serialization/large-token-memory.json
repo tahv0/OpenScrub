@@ -1,0 +1,291 @@
+{
+  "python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]",
+  "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+  "samples": {
+    "before": {
+      "ready": {
+        "pid": 10,
+        "source": "/tmp/openscrub-task632/measurement/export-before/openscrub_internal/reports.py",
+        "import_memory": {
+          "VmHWM_kib": 15076,
+          "VmRSS_kib": 15076
+        },
+        "ready_memory": {
+          "VmHWM_kib": 22896,
+          "VmRSS_kib": 22896
+        }
+      },
+      "publication": {
+        "after_publication_memory": {
+          "VmHWM_kib": 46288,
+          "VmRSS_kib": 23088
+        }
+      },
+      "rss_samples": [
+        {
+          "VmHWM_kib": 22960,
+          "VmRSS_kib": 22960
+        },
+        {
+          "VmHWM_kib": 22960,
+          "VmRSS_kib": 22960
+        },
+        {
+          "VmHWM_kib": 22960,
+          "VmRSS_kib": 22960
+        },
+        {
+          "VmHWM_kib": 23228,
+          "VmRSS_kib": 23228
+        },
+        {
+          "VmHWM_kib": 24056,
+          "VmRSS_kib": 24056
+        },
+        {
+          "VmHWM_kib": 24908,
+          "VmRSS_kib": 24908
+        },
+        {
+          "VmHWM_kib": 25708,
+          "VmRSS_kib": 25708
+        },
+        {
+          "VmHWM_kib": 26560,
+          "VmRSS_kib": 26560
+        },
+        {
+          "VmHWM_kib": 27416,
+          "VmRSS_kib": 27416
+        },
+        {
+          "VmHWM_kib": 28272,
+          "VmRSS_kib": 28272
+        },
+        {
+          "VmHWM_kib": 29112,
+          "VmRSS_kib": 29112
+        },
+        {
+          "VmHWM_kib": 29956,
+          "VmRSS_kib": 29956
+        },
+        {
+          "VmHWM_kib": 30744,
+          "VmRSS_kib": 30744
+        },
+        {
+          "VmHWM_kib": 31544,
+          "VmRSS_kib": 31544
+        },
+        {
+          "VmHWM_kib": 32360,
+          "VmRSS_kib": 32360
+        },
+        {
+          "VmHWM_kib": 33196,
+          "VmRSS_kib": 33196
+        },
+        {
+          "VmHWM_kib": 33980,
+          "VmRSS_kib": 33980
+        },
+        {
+          "VmHWM_kib": 34984,
+          "VmRSS_kib": 34984
+        },
+        {
+          "VmHWM_kib": 37560,
+          "VmRSS_kib": 37560
+        },
+        {
+          "VmHWM_kib": 40152,
+          "VmRSS_kib": 40152
+        },
+        {
+          "VmHWM_kib": 42688,
+          "VmRSS_kib": 42688
+        },
+        {
+          "VmHWM_kib": 45288,
+          "VmRSS_kib": 45288
+        },
+        {
+          "VmHWM_kib": 46464,
+          "VmRSS_kib": 46464
+        },
+        {
+          "VmHWM_kib": 46464,
+          "VmRSS_kib": 46464
+        },
+        {
+          "VmHWM_kib": 46464,
+          "VmRSS_kib": 46464
+        },
+        {
+          "VmHWM_kib": 46288,
+          "VmRSS_kib": 41076
+        },
+        {
+          "VmHWM_kib": 46288,
+          "VmRSS_kib": 23088
+        },
+        {
+          "VmHWM_kib": 46288,
+          "VmRSS_kib": 23088
+        }
+      ],
+      "tokens": {
+        "encoder_chunks": 22,
+        "largest_token_characters": 12000002,
+        "serialized_characters": 12000076
+      }
+    },
+    "after": {
+      "ready": {
+        "pid": 12,
+        "source": "/tmp/openscrub-task632/measurement/export-after/openscrub_internal/reports.py",
+        "import_memory": {
+          "VmHWM_kib": 15144,
+          "VmRSS_kib": 15144
+        },
+        "ready_memory": {
+          "VmHWM_kib": 22964,
+          "VmRSS_kib": 22964
+        }
+      },
+      "publication": {
+        "after_publication_memory": {
+          "VmHWM_kib": 46432,
+          "VmRSS_kib": 23156
+        }
+      },
+      "rss_samples": [
+        {
+          "VmHWM_kib": 23028,
+          "VmRSS_kib": 23028
+        },
+        {
+          "VmHWM_kib": 23028,
+          "VmRSS_kib": 23028
+        },
+        {
+          "VmHWM_kib": 23028,
+          "VmRSS_kib": 23028
+        },
+        {
+          "VmHWM_kib": 23208,
+          "VmRSS_kib": 23208
+        },
+        {
+          "VmHWM_kib": 24064,
+          "VmRSS_kib": 24064
+        },
+        {
+          "VmHWM_kib": 24844,
+          "VmRSS_kib": 24844
+        },
+        {
+          "VmHWM_kib": 25648,
+          "VmRSS_kib": 25648
+        },
+        {
+          "VmHWM_kib": 26416,
+          "VmRSS_kib": 26416
+        },
+        {
+          "VmHWM_kib": 27232,
+          "VmRSS_kib": 27232
+        },
+        {
+          "VmHWM_kib": 28056,
+          "VmRSS_kib": 28056
+        },
+        {
+          "VmHWM_kib": 28876,
+          "VmRSS_kib": 28876
+        },
+        {
+          "VmHWM_kib": 29708,
+          "VmRSS_kib": 29708
+        },
+        {
+          "VmHWM_kib": 30476,
+          "VmRSS_kib": 30476
+        },
+        {
+          "VmHWM_kib": 31312,
+          "VmRSS_kib": 31312
+        },
+        {
+          "VmHWM_kib": 32168,
+          "VmRSS_kib": 32168
+        },
+        {
+          "VmHWM_kib": 33012,
+          "VmRSS_kib": 33012
+        },
+        {
+          "VmHWM_kib": 33832,
+          "VmRSS_kib": 33832
+        },
+        {
+          "VmHWM_kib": 34676,
+          "VmRSS_kib": 34676
+        },
+        {
+          "VmHWM_kib": 36924,
+          "VmRSS_kib": 36924
+        },
+        {
+          "VmHWM_kib": 39296,
+          "VmRSS_kib": 39296
+        },
+        {
+          "VmHWM_kib": 41396,
+          "VmRSS_kib": 41396
+        },
+        {
+          "VmHWM_kib": 43560,
+          "VmRSS_kib": 43560
+        },
+        {
+          "VmHWM_kib": 46084,
+          "VmRSS_kib": 46084
+        },
+        {
+          "VmHWM_kib": 46532,
+          "VmRSS_kib": 46532
+        },
+        {
+          "VmHWM_kib": 46532,
+          "VmRSS_kib": 46532
+        },
+        {
+          "VmHWM_kib": 46532,
+          "VmRSS_kib": 46532
+        },
+        {
+          "VmHWM_kib": 46532,
+          "VmRSS_kib": 46532
+        },
+        {
+          "VmHWM_kib": 46432,
+          "VmRSS_kib": 23092
+        },
+        {
+          "VmHWM_kib": 46432,
+          "VmRSS_kib": 23156
+        }
+      ],
+      "tokens": {
+        "encoder_chunks": 22,
+        "largest_token_characters": 12000002,
+        "serialized_characters": 12000076
+      }
+    }
+  },
+  "complete_bytes_equal": true,
+  "sha256": "7fb91a6a5695fa37ea0e11b866f85b03694f40a3208817cfe4f1286be098fb20",
+  "bytes": 12000076
+}

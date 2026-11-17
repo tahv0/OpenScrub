@@ -1,0 +1,663 @@
+# 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub.py
+
+## Lines 733-753
+  733 class Detection:
+  734     t_start: float
+  735     t_end: float
+  736     cbox: tuple          # box in CONTENT coordinates (x1,y1,x2,y2)
+  737     category: str
+  738     text: str
+  739     confidence: float
+  740     aoff: tuple = (0.0, 0.0)   # cumulative offset when detected (drift anchor)
+  741     last_seen: float = 0.0     # time of last positive sighting (t_end incl. hold)
+  742     dense: bool = False        # per-frame dense-face detection: never merged
+  743                                # across positions (it tracks a moving face)
+  744     track: int = -1            # dense detections of the same physical object
+  745                                # share a track id, so review shows ONE item
+  746                                # per face instead of hundreds of frames
+  747     person: int = -1           # face tracks clustered by facial IDENTITY
+  748                                # (SFace embeddings): one review decision per
+  749                                # PERSON, applied to all their appearances
+  750     poly: tuple = ()           # silhouette contour(s) from a segmentation
+  751                                # model, points NORMALIZED to cbox (0..1) —
+  752                                # render blurs ONLY inside them (person
+  753                                # category); empty = plain box redaction
+
+## Lines 3115-3121
+ 3115 def blur_region(frame, x1, y1, x2, y2, mode, shape="rect"):
+ 3116     h, w = frame.shape[:2]
+ 3117     x1 = max(0, int(x1)); y1 = max(0, int(y1))
+ 3118     x2 = min(w, int(x2)); y2 = min(h, int(y2))
+ 3119     if x2 <= x1 or y2 <= y1:
+ 3120         return
+ 3121     roi = frame[y1:y2, x1:x2]
+
+## Lines 3179-3200
+ 3179 def blur_silhouette(frame, x1, y1, x2, y2, mode, polys, poly_box,
+ 3180                     pad_px=0):
+ 3181     """Redact ONLY the pixels inside a detection's silhouette polygon(s) —
+ 3182     the segmentation-model equivalent of blur_region, so a walking person's
+ 3183     body is masked without a box of blurred background around them.
+ 3184 
+ 3185     (x1..y2) is the PADDED region to operate in; poly points are normalized
+ 3186     to poly_box (the unpadded detection box). pad_px dilates the mask
+ 3187     outward — the silhouette version of the box pad: over-blur beats
+ 3188     under-blur. Any degenerate mask falls back to the full box redaction
+ 3189     (fail closed), never to nothing."""
+ 3190     h, w = frame.shape[:2]
+ 3191     x1i, y1i = max(0, int(x1)), max(0, int(y1))
+ 3192     x2i, y2i = min(w, int(x2)), min(h, int(y2))
+ 3193     if x2i <= x1i or y2i <= y1i:
+ 3194         return
+ 3195     if not polys:
+ 3196         blur_region(frame, x1, y1, x2, y2, mode)
+ 3197         return
+ 3198     pbx1, pby1, pbx2, pby2 = poly_box
+ 3199     pbw, pbh = max(1.0, pbx2 - pbx1), max(1.0, pby2 - pby1)
+ 3200     rw, rh = x2i - x1i, y2i - y1i
+
+## Lines 3398-3415
+ 3398 def _ffmpeg_failure(err_file, what, rc=None, hint=""):
+ 3399     """RuntimeError carrying the TAIL of ffmpeg's own stderr (captured to
+ 3400     a temp file), so the job log names the real cause — 'Could not find
+ 3401     tag for codec ...' — instead of the '[Errno 32] Broken pipe' Python
+ 3402     sees when the encoder exits mid-stream."""
+ 3403     tail = ""
+ 3404     try:
+ 3405         err_file.seek(0)
+ 3406         lines = [ln.strip() for ln in err_file.read().decode(
+ 3407             "utf-8", "replace").splitlines() if ln.strip()]
+ 3408         tail = " | ".join(lines[-4:])[-600:]
+ 3409     except Exception:
+ 3410         pass
+ 3411     msg = "%s failed%s" % (what, (" (ffmpeg exit %s)" % rc)
+ 3412                            if rc is not None else "")
+ 3413     return RuntimeError(msg + (": " + tail if tail else
+ 3414                                " — ffmpeg gave no error message")
+ 3415                         + (" — " + hint if hint else ""))
+
+## Lines 3618-3627
+ 3618 def _blur_yuv10(y, u, v, x1, y1, x2, y2, mode, shape="rect"):
+ 3619     """blur_region for a 10-bit planar YUV420 frame: Y full-res, U/V
+ 3620     half-res. Working in the native YUV domain means untouched pixels never
+ 3621     go through ANY colorspace conversion — the HDR signal passes straight
+ 3622     through."""
+ 3623     h, w = y.shape
+ 3624     x1 = max(0, int(x1)); y1 = max(0, int(y1))
+ 3625     x2 = min(w, int(x2)); y2 = min(h, int(y2))
+ 3626     if x2 <= x1 or y2 <= y1:
+ 3627         return
+
+## Lines 3682-3699
+ 3682 def _blur_silhouette_yuv10(y, u, v, x1, y1, x2, y2, mode, polys,
+ 3683                            poly_box, pad_px=0):
+ 3684     """blur_silhouette for the 10-bit planar HDR path: rasterize the
+ 3685     silhouette at luma resolution and redact each plane only inside the
+ 3686     (dilated) mask — untouched pixels never leave the native YUV domain.
+ 3687     Degenerate masks fall back to the full box (fail closed), exactly
+ 3688     like the SDR version."""
+ 3689     h, w = y.shape
+ 3690     x1i, y1i = max(0, int(x1)), max(0, int(y1))
+ 3691     x2i, y2i = min(w, int(x2)), min(h, int(y2))
+ 3692     if x2i <= x1i or y2i <= y1i:
+ 3693         return
+ 3694     if not polys:
+ 3695         _blur_yuv10(y, u, v, x1, y1, x2, y2, mode)
+ 3696         return
+ 3697     pbx1, pby1, pbx2, pby2 = poly_box
+ 3698     pbw, pbh = max(1.0, pbx2 - pbx1), max(1.0, pby2 - pby1)
+ 3699     rw, rh = x2i - x1i, y2i - y1i
+
+## Lines 3747-3801
+ 3747 def apply_coverage(dets, coverage, cb=None):
+ 3748     """Render-time coverage level for body-shaped redactions (dense
+ 3749     'person' and tracked-object 'manual' samples).
+ 3750 
+ 3751     'tight' (default) keeps the silhouette masks — best looking, least
+ 3752     protective: body build, height, and walking gait survive, and gait
+ 3753     recognizers consume exactly the silhouette sequences it produces.
+ 3754     'box' blurs the full detection box — hides body shape, but a box
+ 3755     that bobs with every step still leaks cadence. 'concealed' is
+ 3756     witness-grade: silhouettes dropped AND each track's box becomes the
+ 3757     union of its neighbours within ±0.6s plus a 12% pad, so the cover
+ 3758     GLIDES instead of bobbing — body outline, build, and step cadence
+ 3759     are all destroyed. Returns a NEW list (originals untouched: the
+ 3760     report keeps tight samples so a re-render can change coverage)."""
+ 3761     if coverage not in ("box", "concealed"):
+ 3762         return dets
+ 3763     out, per_track = [], {}
+ 3764     for d in dets:
+ 3765         if getattr(d, "dense", False) and d.category in ("person", "manual"):
+ 3766             c = copy.copy(d)
+ 3767             c.poly = ()
+ 3768             out.append(c)
+ 3769             if coverage == "concealed" and getattr(d, "track", -1) >= 0:
+ 3770                 per_track.setdefault(c.track, []).append(c)
+ 3771         else:
+ 3772             out.append(d)
+ 3773     for ds in per_track.values():
+ 3774         ds.sort(key=lambda x: x.t_start)
+ 3775         ts = [x.t_start for x in ds]
+ 3776         boxes = [x.cbox for x in ds]
+ 3777         n = len(ds)
+ 3778         lo = 0
+ 3779         new = []
+ 3780         for i in range(n):
+ 3781             while ts[i] - ts[lo] > 0.6:
+ 3782                 lo += 1
+ 3783             x1 = y1 = float("inf")
+ 3784             x2 = y2 = float("-inf")
+ 3785             j = lo
+ 3786             while j < n and ts[j] - ts[i] <= 0.6:
+ 3787                 b = boxes[j]
+ 3788                 x1, y1 = min(x1, b[0]), min(y1, b[1])
+ 3789                 x2, y2 = max(x2, b[2]), max(y2, b[3])
+ 3790                 j += 1
+ 3791             px, py = 0.12 * (x2 - x1), 0.12 * (y2 - y1)
+ 3792             new.append((int(x1 - px), int(y1 - py),
+ 3793                         int(x2 + px), int(y2 + py)))
+ 3794         for x, nb in zip(ds, new):
+ 3795             x.cbox = nb
+ 3796     if cb:
+ 3797         cb.log("      coverage: %s — silhouettes replaced with %s"
+ 3798                % (coverage, "full detection boxes" if coverage == "box"
+ 3799                   else "gliding oversized boxes (body shape and walking "
+ 3800                        "gait concealed)"))
+ 3801     return out
+
+## Lines 3885-3910
+ 3885 def render_hdr(src, dst, detections, cum, bands, fps, pad, mode,
+ 3886                encoder, tags, band_margin=25, progress_every=60, cb=None,
+ 3887                mode_map=None, face_shape="ellipse", audio_spans=None,
+ 3888                mute_tracks=(), out_quality="archival", audio_lanes=None):
+ 3889     """render(), but 10-bit end to end: decode the HDR source to raw
+ 3890     yuv420p10le, blur the planes in place, encode 10-bit HEVC with the
+ 3891     source's color tags (PQ/HLG + BT.2020) carried over. `hvc1` tagging
+ 3892     keeps QuickTime/Apple players happy. No preview mode — previews use
+ 3893     the SDR copy."""
+ 3894     mode_map = mode_map or {}
+ 3895     def _mode_for(cat):
+ 3896         return mode_map.get(cat, mode)
+ 3897     cb = cb or Callbacks()
+ 3898     meta = cv2.VideoCapture(src)
+ 3899     w = int(meta.get(cv2.CAP_PROP_FRAME_WIDTH))
+ 3900     h = int(meta.get(cv2.CAP_PROP_FRAME_HEIGHT))
+ 3901     total = int(meta.get(cv2.CAP_PROP_FRAME_COUNT))
+ 3902     meta.release()
+ 3903     cb.log(f"      encoder: {encoder} 10-bit"
+ 3904            + (" (GPU)" if encoder.endswith(("_nvenc", "_qsv")) else " (CPU)"))
+ 3905 
+ 3906     dec = subprocess.Popen(
+ 3907         ["ffmpeg", "-loglevel", "error", "-i", src,
+ 3908          "-f", "rawvideo", "-pix_fmt", "yuv420p10le", "pipe:1"],
+ 3909         stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+ 3910         bufsize=w * h * 6)
+
+## Lines 3939-3987
+ 3939     targs = [a for kv in (tags or {}).items() for a in kv]
+ 3940     if os.path.splitext(dst)[1].lower() in (".mp4", ".mov"):
+ 3941         targs += ["-tag:v", "hvc1"]          # QuickTime/Apple compatibility
+ 3942     amap, acodec = audio_ffmpeg_args(
+ 3943         src, audio_spans, mute_tracks=mute_tracks,
+ 3944         container=os.path.splitext(dst)[1] or ".mp4",
+ 3945         lane_count=audio_lanes, log=cb.log)
+ 3946     ff_err = tempfile.TemporaryFile()   # see render(): names the cause
+ 3947     enc = subprocess.Popen(
+ 3948         ["ffmpeg", "-y", "-loglevel", "error",
+ 3949          "-f", "rawvideo", "-pix_fmt", "yuv420p10le",
+ 3950          "-s", f"{w}x{h}", "-r", f"{fps:.6f}", "-i", "pipe:0",
+ 3951          "-i", src, "-map", "0:v:0", *amap,
+ 3952          # a redacted file must not carry the source's GPS position,
+ 3953          # capture time, or device identifiers — strip ALL container and
+ 3954          # stream metadata (the explicit color tags above are encoder
+ 3955          # flags, not metadata, so HDR signalling survives)
+ 3956          "-map_metadata", "-1", "-map_chapters", "-1",
+ 3957          *vargs, *targs, *acodec, dst],
+ 3958         stdin=subprocess.PIPE, stderr=ff_err)
+ 3959 
+ 3960     buckets = {}
+ 3961     for d in detections:
+ 3962         for s in range(int(d.t_start), int(d.t_end) + 2):
+ 3963             buckets.setdefault(s, []).append(d)
+ 3964 
+ 3965     ysz, csz = w * h, (w // 2) * (h // 2)
+ 3966     fbytes = (ysz + 2 * csz) * 2
+ 3967 
+ 3968     def cleanup_partial():
+ 3969         for pr in (dec, enc):
+ 3970             try:
+ 3971                 if pr is enc:
+ 3972                     pr.stdin.close()
+ 3973             except Exception:
+ 3974                 pass
+ 3975             pr.terminate()
+ 3976             pr.wait()
+ 3977         if os.path.exists(dst):
+ 3978             try:
+ 3979                 os.remove(dst)
+ 3980             except OSError:
+ 3981                 pass
+ 3982 
+ 3983     idx = 0
+ 3984     while True:
+ 3985         if idx % 30 == 0 and cb.cancelled():
+ 3986             cleanup_partial()
+ 3987             raise PipelineCancelled()
+
+## Lines 3995-4057
+ 3995         t = idx / fps
+ 3996         ox, oy = cum[min(idx, len(cum) - 1)]
+ 3997 
+ 3998         act = [d for d in buckets.get(int(t), [])
+ 3999                if d.t_start - 0.01 <= t <= d.t_end + 0.01]
+ 4000         for d in _dedupe_dense(act):
+ 4001             drift = min(24.0, 0.05 * (abs(ox - d.aoff[0]) + abs(oy - d.aoff[1])))
+ 4002             px = pad + drift
+ 4003             if d.poly:
+ 4004                 _blur_silhouette_yuv10(
+ 4005                     y, u, v, d.cbox[0] + ox - px, d.cbox[1] + oy - px,
+ 4006                     d.cbox[2] + ox + px, d.cbox[3] + oy + px,
+ 4007                     _mode_for(d.category), d.poly,
+ 4008                     (d.cbox[0] + ox, d.cbox[1] + oy,
+ 4009                      d.cbox[2] + ox, d.cbox[3] + oy), pad_px=px)
+ 4010             else:
+ 4011                 _blur_yuv10(y, u, v, d.cbox[0] + ox - px, d.cbox[1] + oy - px,
+ 4012                             d.cbox[2] + ox + px, d.cbox[3] + oy + px,
+ 4013                             _mode_for(d.category),
+ 4014                             shape=("ellipse" if d.category == "face"
+ 4015                                    and face_shape == "ellipse" else "rect"))
+ 4016 
+ 4017         bx, by = bands[min(idx, len(bands) - 1)]
+ 4018         vals = set(mode_map.values()) | {mode}
+ 4019         band_mode = ("box" if ("box" in vals or "inpaint" in vals)
+ 4020                      else "mosaic" if "mosaic" in vals else "blur")
+ 4021         def band(x1, y1_, x2, y2_):
+ 4022             _blur_yuv10(y, u, v, x1, y1_, x2, y2_, band_mode)
+ 4023         if by < -2:
+ 4024             band(0, h - (abs(by) + band_margin), w, h)
+ 4025         elif by > 2:
+ 4026             band(0, 0, w, by + band_margin)
+ 4027         if bx < -2:
+ 4028             band(w - (abs(bx) + band_margin), 0, w, h)
+ 4029         elif bx > 2:
+ 4030             band(0, 0, bx + band_margin, h)
+ 4031 
+ 4032         try:
+ 4033             enc.stdin.write(buf.tobytes())
+ 4034         except (BrokenPipeError, OSError):
+ 4035             rc = enc.wait()
+ 4036             err = _ffmpeg_failure(ff_err, "HDR encode", rc)
+ 4037             cleanup_partial()
+ 4038             raise err
+ 4039         idx += 1
+ 4040         if idx % progress_every == 0:
+ 4041             cb.progress("render", idx, total)
+ 4042         if idx % 300 == 0:
+ 4043             cb.log(f"  rendering… {idx}/{max(total, idx)}")
+ 4044 
+ 4045     dec.stdout.close()
+ 4046     dec.wait()
+ 4047     cb.progress("render", max(total, idx), max(total, idx))
+ 4048     try:
+ 4049         enc.stdin.close()
+ 4050     except (BrokenPipeError, OSError):
+ 4051         pass                        # exit code + stderr say why below
+ 4052     rc = enc.wait()
+ 4053     if rc != 0:
+ 4054         raise _ffmpeg_failure(ff_err, "HDR encode", rc)
+ 4055     cb.log(f"      HDR preserved: 10-bit HEVC, color tags "
+ 4056            + (", ".join(f"{k.lstrip('-')}={v}" for k, v in (tags or {}).items())
+ 4057               or "(none in source)"))
+
+## Lines 4060-4082
+ 4060 def render(src, dst, detections, cum, bands, fps, pad, mode, preview,
+ 4061            encoder="auto", band_margin=25, progress_every=60, cb=None,
+ 4062            mode_map=None, draw_scores=False, vcodec="h264",
+ 4063            face_shape="ellipse", audio_spans=None, clip=None,
+ 4064            mute_tracks=(), out_quality="archival", audio_lanes=None):
+ 4065     # mode_map: {category: "blur"|"box"} overrides the global `mode` per
+ 4066     # category. Lets you black-box the reversible-blur-vulnerable categories
+ 4067     # (SSN, MRN, account numbers) while blurring faces, in one render.
+ 4068     mode_map = mode_map or {}
+ 4069     def _mode_for(cat):
+ 4070         return mode_map.get(cat, mode)
+ 4071     cb = cb or Callbacks()
+ 4072     cap = cv2.VideoCapture(src)
+ 4073     w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+ 4074     h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+ 4075     total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+ 4076 
+ 4077     # --- output sink: single-pass ffmpeg pipe (NVENC if available) ---
+ 4078     proc = None
+ 4079     ff_err = None
+ 4080     out = None
+ 4081     tmp_video = None
+ 4082     codec = nvenc_available(encoder, cb)
+
+## Lines 4144-4183
+ 4144                *vargs, "-pix_fmt", "yuv420p", *acodec, dst]
+ 4145         # ffmpeg's stderr goes to a temp FILE (a pipe could fill and
+ 4146         # deadlock the frame writes): when the encoder dies, its own
+ 4147         # error message is what the job log needs — a bare "[Errno 32]
+ 4148         # Broken pipe" diagnosed nothing
+ 4149         ff_err = tempfile.TemporaryFile()
+ 4150         gpu_hint = ("if it persists, try the x264 encoder"
+ 4151                     if codec.endswith(("_nvenc", "_qsv")) else "")
+ 4152         proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stderr=ff_err)
+ 4153     else:
+ 4154         if audio_spans:
+ 4155             cb.log("      WARNING: audio redaction requires ffmpeg — the "
+ 4156                    "OpenCV fallback writes NO audio at all.")
+ 4157         cb.log("      encoder: OpenCV mp4v (ffmpeg not found — no audio!)")
+ 4158         tmp_video = dst + ".noaudio.mp4"
+ 4159         out = cv2.VideoWriter(tmp_video, cv2.VideoWriter_fourcc(*"mp4v"),
+ 4160                               fps, (w, h))
+ 4161 
+ 4162     buckets = {}
+ 4163     for d in detections:
+ 4164         for s in range(int(d.t_start), int(d.t_end) + 2):
+ 4165             buckets.setdefault(s, []).append(d)
+ 4166 
+ 4167     def cleanup_partial():
+ 4168         cap.release()
+ 4169         if proc is not None:
+ 4170             try:
+ 4171                 proc.stdin.close()
+ 4172             except Exception:
+ 4173                 pass
+ 4174             proc.terminate()
+ 4175             proc.wait()
+ 4176         if out is not None:
+ 4177             out.release()
+ 4178         for p in (dst, tmp_video):
+ 4179             if p and os.path.exists(p):
+ 4180                 try:
+ 4181                     os.remove(p)
+ 4182                 except OSError:
+ 4183                     pass
+
+## Lines 4206-4222
+ 4206         ox, oy = cum[min(idx, len(cum) - 1)]
+ 4207 
+ 4208         # 1. tracked PII boxes, translated by scroll offset
+ 4209         act = [d for d in buckets.get(int(t), [])
+ 4210                if d.t_start - 0.01 <= t <= d.t_end + 0.01]
+ 4211         for d in _dedupe_dense(act):
+ 4212             # drift allowance: residual tracking error grows (slowly) with
+ 4213             # distance scrolled since detection — expand the box to cover it
+ 4214             drift = min(24.0, 0.05 * (abs(ox - d.aoff[0]) + abs(oy - d.aoff[1])))
+ 4215             px = pad + drift
+ 4216             x1 = d.cbox[0] + ox - px
+ 4217             y1 = d.cbox[1] + oy - px
+ 4218             x2 = d.cbox[2] + ox + px
+ 4219             y2 = d.cbox[3] + oy + px
+ 4220             pbox = (d.cbox[0] + ox, d.cbox[1] + oy,
+ 4221                     d.cbox[2] + ox, d.cbox[3] + oy)
+ 4222             if preview:
+
+## Lines 4237-4297
+ 4237             elif d.poly:
+ 4238                 # segmentation silhouette: mask only the body, not the box —
+ 4239                 # px (pad+drift) becomes an outward mask dilation
+ 4240                 blur_silhouette(frame, x1, y1, x2, y2, _mode_for(d.category),
+ 4241                                 d.poly, pbox, pad_px=px)
+ 4242             else:
+ 4243                 blur_region(frame, x1, y1, x2, y2, _mode_for(d.category),
+ 4244                             shape=("ellipse" if d.category == "face"
+ 4245                                    and face_shape == "ellipse" else "rect"))
+ 4246 
+ 4247         # 2. safety bands: unscanned content that scrolled into view
+ 4248         bx, by = bands[min(idx, len(bands) - 1)]
+ 4249         vals = set(mode_map.values()) | {mode}
+ 4250         band_mode = ("box" if ("box" in vals or "inpaint" in vals)
+ 4251                      else "mosaic" if "mosaic" in vals else "blur")  # never weaker
+ 4252         def band(x1, y1, x2, y2):
+ 4253             if preview:
+ 4254                 cv2.rectangle(frame, (int(x1), int(y1)), (int(x2 - 1), int(y2 - 1)), (0, 165, 255), 2)
+ 4255             else:
+ 4256                 blur_region(frame, x1, y1, x2, y2, band_mode)
+ 4257         if by < -2:      # content moved up -> unscanned strip entering at bottom
+ 4258             band(0, h - (abs(by) + band_margin), w, h)
+ 4259         elif by > 2:     # content moved down -> unscanned strip at top
+ 4260             band(0, 0, w, by + band_margin)
+ 4261         if bx < -2:      # content moved left -> strip at right
+ 4262             band(w - (abs(bx) + band_margin), 0, w, h)
+ 4263         elif bx > 2:
+ 4264             band(0, 0, bx + band_margin, h)
+ 4265 
+ 4266         if proc is not None:
+ 4267             try:
+ 4268                 proc.stdin.write(frame.tobytes())
+ 4269             except (BrokenPipeError, OSError):
+ 4270                 # the encoder exited mid-stream: report ITS reason
+ 4271                 rc = proc.wait()
+ 4272                 err = _ffmpeg_failure(ff_err, "video encode", rc,
+ 4273                                       hint=gpu_hint)
+ 4274                 cleanup_partial()
+ 4275                 raise err
+ 4276         else:
+ 4277             out.write(frame)
+ 4278         idx += 1
+ 4279         if idx % progress_every == 0:
+ 4280             cb.progress("render", idx, total)
+ 4281         if idx % 300 == 0:
+ 4282             cb.log(f"  rendering… {idx}/{total} ({100 * idx // max(total, 1)}%)")
+ 4283 
+ 4284     cap.release()
+ 4285     cb.progress("render", total, total)
+ 4286     if proc is not None:
+ 4287         try:
+ 4288             proc.stdin.close()
+ 4289         except (BrokenPipeError, OSError):
+ 4290             pass                        # exit code + stderr say why below
+ 4291         rc = proc.wait()
+ 4292         if rc != 0:
+ 4293             raise _ffmpeg_failure(ff_err, "video encode", rc,
+ 4294                                   hint=gpu_hint)
+ 4295     else:
+ 4296         out.release()
+ 4297         os.replace(tmp_video, dst)
+
+## Lines 6286-6346
+ 6286 def write_report(path, args, state, output_path=None, publisher=None):
+ 6287     prov = {
+ 6288         "tool": "openscrub", "version": VERSION,
+ 6289         "timestamp": datetime.datetime.now().astimezone().isoformat(),
+ 6290         "input": os.path.abspath(args.video),
+ 6291         "input_sha256": state.get("input_sha256"),
+ 6292         "original_input": (os.path.abspath(args.original_video)
+ 6293                            if getattr(args, "original_video", None) else None),
+ 6294         "vfr_normalized": bool(getattr(args, "original_video", None)),
+ 6295         "hdr_tonemapped": bool(getattr(args, "hdr_tonemapped", False)),
+ 6296         "hdr_output": bool(getattr(args, "hdr_source", None)),
+ 6297         "metadata_stripped": True,   # renders pass -map_metadata -1
+ 6298         "zones": getattr(args, "zones_data", None),
+ 6299         "windows": getattr(args, "windows_data", None),
+ 6300         "settings": _settings_dict(args),
+ 6301     }
+ 6302     if output_path and os.path.exists(output_path):
+ 6303         prov["output"] = os.path.abspath(output_path)
+ 6304         prov["output_sha256"] = sha256_file(output_path)
+ 6305     source = state.get("source_report")
+ 6306     if source is not None:
+ 6307         # A render consumes enabled Detection objects, but publishes the full
+ 6308         # review document: Keep choices, row positions and unknown fields are
+ 6309         # user data, not a serialization of the render subset.
+ 6310         doc = dict(source)
+ 6311         previous = dict(source.get("provenance", {}))
+ 6312         settings = dict(previous.get("settings", {}))
+ 6313         settings.update(prov["settings"])
+ 6314         prov["settings"] = settings
+ 6315         # Output hashes/paths must describe this render, never an older one.
+ 6316         previous.pop("output", None)
+ 6317         previous.pop("output_sha256", None)
+ 6318         previous.update(prov)
+ 6319         doc["provenance"] = previous
+ 6320     else:
+ 6321         doc = {
+ 6322             "provenance": prov,
+ 6323             "render_state": {
+ 6324                 "fps": state["fps"],
+ 6325                 "cum": [[round(x, 1), round(y, 1)] for x, y in state["cum"]],
+ 6326                 "bands": [[round(x, 1), round(y, 1)] for x, y in state["bands"]],
+ 6327             },
+ 6328             "detections": ([dict(asdict(d), enabled=True)
+ 6329                             for d in state["detections"]]
+ 6330                            + [dict(asdict(d), enabled=False, zone_dropped=True)
+ 6331                               for d in state.get("zdropped", [])]),
+ 6332         }
+ 6333         if state.get("audio_suggestions"):
+ 6334             doc["audio_suggestions"] = state["audio_suggestions"]
+ 6335         if state.get("audio_transcript"):
+ 6336             doc["audio_transcript"] = state["audio_transcript"]
+ 6337     aspans = getattr(args, "audio_spans", None)
+ 6338     if ((source is None and aspans)
+ 6339             or (source is not None and state.get("audio_redactions_overridden"))):
+ 6340         # An explicit empty list clears saved spans. Otherwise preserve the raw
+ 6341         # saved representation, including additive fields on individual spans.
+ 6342         doc["audio_redactions"] = [
+ 6343             {"t0": a, "t1": b, "mode": m} for a, b, m in (aspans or [])]
+ 6344     # Construction and output hashing precede an optional caller-owned final
+ 6345     # publication boundary. CLI/GUI and old callback callers keep atomic bytes.
+ 6346     (publisher or atomic_report)(path, doc)
+
+## Lines 6358-6379
+ 6358 def _decode_report(doc):
+ 6359     """Decode the enabled render subset of one already-read report snapshot."""
+ 6360     if isinstance(doc, list):
+ 6361         rows, state, prov = doc, None, {}
+ 6362     else:
+ 6363         rows, state, prov = doc.get("detections", []), doc.get("render_state"), \
+ 6364             doc.get("provenance", {})
+ 6365     dets = []
+ 6366     for r in rows:
+ 6367         if not r.get("enabled", True):
+ 6368             continue
+ 6369         dets.append(Detection(
+ 6370             t_start=float(r["t_start"]), t_end=float(r["t_end"]),
+ 6371             cbox=tuple(r["cbox"]), category=r["category"], text=r["text"],
+ 6372             confidence=float(r.get("confidence", 1.0)),
+ 6373             aoff=tuple(r.get("aoff", (0.0, 0.0))),
+ 6374             last_seen=float(r.get("last_seen", r["t_start"])),
+ 6375             # Preserve grouping in the enabled subset used by the renderer.
+ 6376             dense=bool(r.get("dense", False)),
+ 6377             track=int(r.get("track", -1)),
+ 6378             person=int(r.get("person", -1)),
+ 6379             poly=tuple(copy.deepcopy(r.get("poly") or ()))))
+
+## Lines 6553-6573
+ 6553             p = subprocess.Popen(["ffmpeg", "-y", "-loglevel", "error",
+ 6554                                   "-i", inp, *cfrargs, *tmargs, *vargs,
+ 6555                                   *(extra or []), "-c:a", "copy", outp],
+ 6556                                  stdout=subprocess.PIPE,
+ 6557                                  stderr=subprocess.PIPE, text=True)
+ 6558             while True:
+ 6559                 try:
+ 6560                     _, err = p.communicate(timeout=0.5)
+ 6561                     break
+ 6562                 except subprocess.TimeoutExpired:
+ 6563                     if cb.cancelled():
+ 6564                         p.terminate()
+ 6565                         try:
+ 6566                             p.wait(timeout=5)
+ 6567                         except subprocess.TimeoutExpired:
+ 6568                             p.kill()
+ 6569                         try:
+ 6570                             os.remove(outp)
+ 6571                         except OSError:
+ 6572                             pass
+ 6573                         raise PipelineCancelled()
+
+## Lines 8451-8455
+ 8451 def run_render(args, state, cb=None):
+ 8452     cb = cb or Callbacks()
+ 8453     dst = args.output or os.path.splitext(args.video)[0] + (
+ 8454         "_preview.mp4" if args.preview else "_redacted.mp4")
+ 8455     cb.log(f"[4/4] Rendering -> {dst}")
+
+## Lines 8488-8520
+ 8488     dets_r = apply_coverage(state["detections"],
+ 8489                             getattr(args, "coverage", "tight"), cb)
+ 8490     out_q = getattr(args, "out_quality", "archival") or "archival"
+ 8491     if out_q != "archival":
+ 8492         cb.log(f"      output quality: {out_q} (smaller file; archival is "
+ 8493                "the visually-lossless default)")
+ 8494     if getattr(args, "hdr_source", None) and not args.preview:
+ 8495         render_hdr(args.hdr_source, dst, dets_r, state["cum"],
+ 8496                    state["bands"], state["fps"], pad=args.pad, mode=args.mode,
+ 8497                    encoder=args.hdr_encoder,
+ 8498                    tags=getattr(args, "hdr_tags", {}),
+ 8499                    face_shape=getattr(args, "face_shape", "ellipse"),
+ 8500                    mode_map=getattr(args, "mode_map", None),
+ 8501                    audio_spans=aspans, mute_tracks=mute_tracks, cb=cb,
+ 8502                    out_quality=out_q,
+ 8503                    audio_lanes=getattr(args, "audio_lane_count", None))
+ 8504     else:
+ 8505         render(args.video, dst, dets_r, state["cum"],
+ 8506                state["bands"],
+ 8507                state["fps"], pad=args.pad, mode=args.mode, preview=args.preview,
+ 8508                mode_map=getattr(args, "mode_map", None),
+ 8509                draw_scores=bool(getattr(args, "draw_scores", False)),
+ 8510                vcodec=getattr(args, "codec", "h264"),
+ 8511                face_shape=getattr(args, "face_shape", "ellipse"),
+ 8512                encoder=args.encoder, audio_spans=aspans, clip=clip,
+ 8513                mute_tracks=mute_tracks, cb=cb, out_quality=out_q,
+ 8514                audio_lanes=getattr(args, "audio_lane_count", None))
+ 8515     if args.report:
+ 8516         write_report(args.report, args, state, output_path=dst,
+ 8517                      publisher=getattr(cb, "publish_report", None))
+ 8518         cb.log(f"      audit report: {args.report} (contains PII text — protect it)")
+ 8519     cb.log("done.")
+ 8520     return dict(state["stats"], output=dst)
+
+## Lines 8530-8536
+ 8530     if getattr(args, "from_report", None):
+ 8531         cb.log(f"[1/2] Loading detections from {args.from_report}")
+ 8532         # Read once so geometry, choices, audio and provenance come from the
+ 8533         # same snapshot. The raw document stays separate from render objects.
+ 8534         with open(args.from_report, encoding="utf-8") as f:
+ 8535             source = json.load(f)
+ 8536         dets, rstate, prov = _decode_report(source)
+
+## Lines 8568-8579
+ 8568         state = {"fps": rstate["fps"],
+ 8569                  "cum": [tuple(v) for v in rstate["cum"]],
+ 8570                  "bands": [tuple(v) for v in rstate["bands"]],
+ 8571                  "detections": dets, "input_sha256": in_sha,
+ 8572                  "source_report": source,
+ 8573                  "audio_redactions_overridden": audio_overridden,
+ 8574                  "audio_suggestions": copy.deepcopy(source.get("audio_suggestions")),
+ 8575                  "stats": {"scans": 0, "raw_hits": 0, "regions": len(dets),
+ 8576                            "recalls": 0, "remembered": 0}}
+ 8577         return run_render(args, state, cb)
+ 8578     state = run_scan(args, cb)
+ 8579     return run_render(args, state, cb)
+
+## Lines 8582-8608
+ 8582 def _batch(args, parser):
+ 8583     exts = (".mp4", ".mkv", ".mov", ".avi", ".webm")
+ 8584     files = sorted(f for f in os.listdir(args.batch)
+ 8585                    if f.lower().endswith(exts)
+ 8586                    and "_redacted" not in f and "_preview" not in f)
+ 8587     if not files:
+ 8588         raise RuntimeError(f"no videos found in {args.batch}")
+ 8589     print(f"Batch: {len(files)} video(s) in {args.batch}")
+ 8590     summary = []
+ 8591     for i, name in enumerate(files, 1):
+ 8592         path = os.path.join(args.batch, name)
+ 8593         base = os.path.splitext(path)[0]
+ 8594         print(f"\n=== [{i}/{len(files)}] {name} ===")
+ 8595         a = argparse.Namespace(**vars(args))
+ 8596         a.video = path
+ 8597         a.output = base + "_redacted.mp4"
+ 8598         a.report = base + "_audit.json"
+ 8599         a.batch = None
+ 8600         if os.path.exists(a.output) and not args.overwrite:
+ 8601             print("skipping (output exists — use --overwrite to redo)")
+ 8602             summary.append({"file": name, "ok": True, "skipped": True})
+ 8603             continue
+ 8604         try:
+ 8605             res = run_pipeline(a)
+ 8606             summary.append(dict(res, file=name, ok=True))
+ 8607         except Exception as e:
+ 8608             print(f"FAILED: {e}")

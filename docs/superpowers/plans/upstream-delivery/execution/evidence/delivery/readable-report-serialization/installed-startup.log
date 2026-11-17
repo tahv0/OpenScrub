@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "/tmp/openscrub-task632/check_installed.py", line 20, in <module>
+    assert str(site) in probe.stdout and str(art/'installed-profile') in probe.stdout
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError

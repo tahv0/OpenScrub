@@ -1,0 +1,50 @@
+# 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub_vault.py
+
+## Lines 158-204
+  158 def _walk_files(root):
+  159     for dirpath, _dirs, files in os.walk(root):
+  160         for f in files:
+  161             yield os.path.join(dirpath, f)
+  162 
+  163 
+  164 def encrypt_tree(key, root):
+  165     """Encrypt every not-yet-encrypted file under root. Returns count."""
+  166     n = 0
+  167     for p in list(_walk_files(root)):
+  168         if p.endswith(".tmp"):
+  169             try:
+  170                 os.remove(p)                   # leftover from a crash
+  171             except FileNotFoundError:
+  172                 pass                           # published since enumeration
+  173         elif not is_encrypted(p):
+  174             encrypt_file(key, p)
+  175             n += 1
+  176     return n
+  177 
+  178 
+  179 def decrypt_tree(key, root):
+  180     """Decrypt every encrypted file under root. Returns count."""
+  181     n = 0
+  182     for p in list(_walk_files(root)):
+  183         if p.endswith(".tmp"):
+  184             try:
+  185                 os.remove(p)
+  186             except FileNotFoundError:
+  187                 pass                           # published since enumeration
+  188         elif is_encrypted(p):
+  189             decrypt_file(key, p)
+  190             n += 1
+  191     return n
+  192 
+  193 
+  194 def tree_locked_state(root):
+  195     """-> (n_encrypted, n_plain) under root (ignores .tmp leftovers)."""
+  196     enc = plain = 0
+  197     for p in _walk_files(root):
+  198         if p.endswith(".tmp"):
+  199             continue
+  200         if is_encrypted(p):
+  201             enc += 1
+  202         else:
+  203             plain += 1
+  204     return enc, plain

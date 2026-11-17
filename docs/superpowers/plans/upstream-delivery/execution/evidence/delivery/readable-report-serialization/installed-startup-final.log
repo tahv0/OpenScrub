@@ -1,0 +1,9 @@
+installed CLI/web defaults and optional publisher: passed
+
+Traceback (most recent call last):
+  File "/tmp/openscrub-task632/check_installed.py", line 23, in <module>
+    cli=subprocess.run([str(site/'bin/openscrub'),'--help'],cwd=art,env=env,text=True,capture_output=True,check=True)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/python/cpython-3.12.16-linux-x86_64-gnu/lib/python3.12/subprocess.py", line 571, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['/tmp/openscrub-task632/installed/site-packages/bin/openscrub', '--help']' returned non-zero exit status 1.

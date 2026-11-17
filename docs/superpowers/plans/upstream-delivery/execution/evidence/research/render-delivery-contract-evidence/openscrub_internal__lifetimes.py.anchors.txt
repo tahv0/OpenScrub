@@ -1,0 +1,74 @@
+# 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub_internal/lifetimes.py
+
+## Lines 10-21
+   10 class _JobFiles:
+   11     def __init__(self):
+   12         self.count = 0
+   13         self.work = 0
+   14         self.closed = False
+   15         self.queued = {}
+   16         self.tracker = None
+   17         # Initialized before a new/rehydrated job enters the registry. Never
+   18         # persisted: one stable transaction boundary per live job identity.
+   19         self.report_lock = threading.Lock()
+   20         self.operation = None
+   21         self.active = None
+
+## Lines 42-64
+   42 class _Lease:
+   43     def __init__(self, owners, state, work):
+   44         self.owners, self.state, self.work = owners, state, work
+   45         self.released = False
+   46         self.related = []
+   47         self.source = None
+   48         self.report_input = False
+   49         self.operation = None
+   50 
+   51     def release_locked(self):
+   52         if self.released:
+   53             return
+   54         self.released = True
+   55         for lease in self.related:
+   56             lease.release_locked()
+   57         self.owners.count -= 1
+   58         if self.state is not None:
+   59             self.state.count -= 1
+   60             self.state.work -= int(self.work)
+   61 
+   62     def release(self):
+   63         with self.owners.guard:
+   64             self.release_locked()
+
+## Lines 73-104
+   73 class OwnedIterable:
+   74     """Keep the file open/owned through WSGI close, including early disconnect.
+   75 
+   76     Deliberately hide the server's file_wrapper optimization so every server
+   77     takes the same close path; the underlying streaming/range iterator remains
+   78     incremental and its headers/bytes are unchanged.
+   79     """
+   80     def __init__(self, iterable, lease):
+   81         self.iterable, self.iterator = iterable, iter(iterable)
+   82         self.lease = lease
+   83         self.closed = False
+   84 
+   85     def __iter__(self):
+   86         return self
+   87 
+   88     def __next__(self):
+   89         try:
+   90             return next(self.iterator)
+   91         except BaseException:
+   92             self.close()
+   93             raise
+   94 
+   95     def close(self):
+   96         if self.closed:
+   97             return
+   98         self.closed = True
+   99         try:
+  100             close = getattr(self.iterable, "close", None)
+  101             if close is not None:
+  102                 close()
+  103         finally:
+  104             self.lease.release()

@@ -1,0 +1,20 @@
+# 12919c96c6f7558136b50d7b4d85e5e6b62f1971:openscrub_gui.py
+
+## Lines 459-475
+  459         cb = GuiCallbacks(self.q, self.cancel_event)
+  460 
+  461         def work():
+  462             try:
+  463                 res = openscrub.run_pipeline(args, cb)
+  464                 self.q.put(("log", f"SUMMARY: {res}"))
+  465                 self.q.put(("finished", res.get("output")))
+  466             except openscrub.PipelineCancelled:
+  467                 self.q.put(("log", "Cancelled — partial output removed."))
+  468             except Exception as e:
+  469                 self.q.put(("log", f"ERROR: {e}"))
+  470                 self.q.put(("error", str(e)))
+  471             finally:
+  472                 self.q.put(("done", None))
+  473 
+  474         self.worker = threading.Thread(target=work, daemon=True)
+  475         self.worker.start()
