@@ -61,7 +61,8 @@ def test_frame_two_invalidations_returns_explicit_stale(store, monkeypatch):
     assert len(handles)==2 and all(h.closed for h in handles)
 
 
-def test_frame_rejects_failed_attempt_and_successful_rollback_aba(store, monkeypatch):
+@pytest.mark.parametrize("failure", ["first", "terminal"])
+def test_frame_rejects_failed_attempt_and_successful_rollback_aba(store, monkeypatch, failure):
     from openscrub_internal.render_delivery import _RenderDelivery
     output=Path(store.job['dir'])/'output.mp4';output.write_bytes(b'old')
     store.job['output']=str(output);files=web.FILES.initialize(store.job)
@@ -75,13 +76,19 @@ def test_frame_rejects_failed_attempt_and_successful_rollback_aba(store, monkeyp
                     Path(owned.video_stage).write_bytes(b'new');owned.prepare_report({'new':True});owned.prepare_rollback()
                     def mutate(): files.output_epoch += 1
                     def fail(): raise OSError('terminal assignment')
-                    with files.report_lock,pytest.raises(OSError): owned.commit(before_mutation=mutate,publish_success=fail)
+                    real_replace=os.replace
+                    def replace(src,dst):
+                        if failure=='first' and str(src)==owned.video_stage: raise OSError('first attempt no change')
+                        return real_replace(src,dst)
+                    with monkeypatch.context() as patch:
+                        patch.setattr(os,'replace',replace)
+                        with files.report_lock,pytest.raises(OSError): owned.commit(before_mutation=mutate,publish_success=fail)
                 assert output.read_bytes()==b'old' and store.path.read_bytes()==report_before
             return True,np.full((8,8,3),len(handles)*70,np.uint8)
         def release(self): self.closed=True
     monkeypatch.setattr(web.cv2,'VideoCapture',Capture)
     assert request('get',store.url+'/frame_at?src=output').status_code==200
-    assert len(handles)==2 and files.output_epoch==4 and all(h.closed for h in handles)
+    assert len(handles)==2 and files.output_epoch==(2 if failure=="first" else 4) and all(h.closed for h in handles)
 
 
 def test_frame_stable_error_and_postvalidation_commit(store,monkeypatch):
@@ -145,6 +152,8 @@ def test_download_report_range_metadata_matches_open_generation(store,socket_api
         assert status==304 and body==b''
     status,headers,body=socket_api('GET',url,headers={'Range':'bytes=3-9','If-Range':etag})
     assert status==206 and body==payload[3:10]
+    status,headers,body=socket_api('GET',url,headers={'Range':'bytes=3-9','If-Range':modified})
+    assert status==206 and body==payload[3:10]
     status,headers,body=socket_api('GET',url,headers={'Range':'bytes=3-9','If-Range':'"older-generation"'})
     assert status==200 and body==payload
     status,headers,body=socket_api('HEAD',url)
@@ -190,3 +199,23 @@ def test_managed_alias_stream_keeps_source_lease_until_close(store):
             assert request('delete',store.url).status_code==409
         finally: response.close()
     assert source_files.count==0 and web.FILES.count==0
+
+
+def test_detached_frame_can_return_after_successful_validation_then_commit(store,monkeypatch):
+    handles=[];files=web.FILES.initialize(store.job)
+    class Capture:
+        def __init__(self,path): self.closed=False;handles.append(self)
+        def set(self,*args): pass
+        def read(self): return True,np.full((8,8,3),170,np.uint8)
+        def release(self): self.closed=True
+    monkeypatch.setattr(web.cv2,'VideoCapture',Capture)
+    real=web._frame_source_current
+    def validate(snapshot):
+        current=real(snapshot)
+        assert handles[-1].closed
+        with files.report_lock: files.output_epoch+=1
+        return current
+    monkeypatch.setattr(web,'_frame_source_current',validate)
+    response=request('get',store.url+'/frame_at')
+    assert response.status_code==200 and len(handles)==1
+    assert web.cv2.imdecode(np.frombuffer(response.data,np.uint8),1).mean()>150
