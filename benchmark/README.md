@@ -343,3 +343,13 @@ status codes, report/payload sizes, content hashes and Linux RSS observations.
 Keep other sustained workloads idle while measuring. High-water memory includes
 imports and fixture construction; sampled RSS can miss transient peaks. These
 measurements characterize a local warm-cache workload, not production capacity.
+
+For a pinned baseline that already skips unchanged-save publication, pass
+`--before-noop-publications 0`; the default `1` retains the historical
+pre-optimization comparison. This changes only counted-work expectations.
+To recover a completed timing set after a count-expectation error, import
+`count_operations(sources, rows, evidence_dir, before_noop_publications=0)`
+with the original pinned source manifests and a fresh evidence directory.
+Keep its result separate, reverify every exported source hash, and prove
+runtime-byte equality before relating timings to a tooling-only follow-up.
+Never relabel existing timing samples as another commit.

@@ -278,12 +278,39 @@ def distribution(values):
                 p95_ms=ordered[max(0, (95*len(values)+99)//100-1)], max_ms=max(values))
 
 
+def count_operations(sources, rows, evidence, before_noop_publications=1):
+    """Run only fresh counted workers; no latency sample from here is a timing result.
+
+    Historical pre-optimization baselines publish once for no-op saves. A pinned
+    baseline that already skips publication must explicitly request zero.
+    """
+    if before_noop_publications not in (0, 1):
+        raise ValueError('before_noop_publications must be 0 or 1')
+    counted = {scenario: {} for scenario in ('noop', 'sparse', 'bulk')}
+    for label, source in sources.items():
+        item = Worker(source, rows, evidence/('%d-counted-%s' % (rows,label)), True)
+        try:
+            for scenario in counted:
+                item.command('reset')
+                result = request(item, json.dumps(payload(rows, scenario, 1)).encode())
+                result.update(version=label, worker=item.info)
+                counts = result['after']['counts']
+                writes = (before_noop_publications if label == 'before' else 0) if scenario == 'noop' else 1
+                assert counts['report_parse'] == counts['request_json'] == counts['response_json'] == 1
+                assert all(counts[k] == writes for k in ('report_dump','stage','fsync','replace')), counts
+                counted[scenario][label] = result
+        finally:
+            item.close()
+    return counted
+
+
 def run(args):
     evidence = args.evidence_dir.resolve(); evidence.mkdir(parents=True, exist_ok=True)
     sources = {label: export_source(args.repository, revision, evidence/('export-'+label))
                for label, revision in [('before', args.before_ref), ('after', args.after_ref)]}
     results = dict(scenario='saves', sources=sources, python=sys.version, executable=sys.executable,
                    platform=platform.platform(), warmups=args.warmups, samples=args.samples,
+                   before_noop_publications=args.before_noop_publications,
                    client_initial_memory=memory(os.getpid()), runs=[],
                    limits=['Linux /proc RSS sampled every 5ms may miss peaks.',
                            'VmHWM includes imports/fixture construction; process counters are cumulative.',
@@ -327,21 +354,11 @@ def run(args):
         finally:
             for item in workers.values(): item.close()
         # Fresh workers keep instrumentation entirely out of timed request paths.
-        for label, source in sources.items():
-            item = Worker(source, rows, evidence/('%d-counted-%s' % (rows,label)), True)
-            try:
-                for scenario in ('noop','sparse','bulk'):
-                    item.command('reset')
-                    result = request(item, json.dumps(payload(rows, scenario, 1)).encode())
-                    result.update(version=label, worker=item.info)
-                    counts = result['after']['counts']
-                    writes = 0 if label == 'after' and scenario == 'noop' else 1
-                    assert counts['report_parse'] == counts['request_json'] == counts['response_json'] == 1
-                    assert all(counts[k] == writes for k in ('report_dump','stage','fsync','replace'))
-                    record = next(r for r in results['runs'] if r['rows']==rows and r['operation']==scenario)
-                    record.setdefault('instrumented', {})[label] = result
-                    save()
-            finally: item.close()
+        counted = count_operations(sources, rows, evidence, args.before_noop_publications)
+        for scenario, observations in counted.items():
+            record = next(r for r in results['runs'] if r['rows']==rows and r['operation']==scenario)
+            record['instrumented'] = observations
+        save()
     # Revalidate exports after all measurements; unexpected source writes fail.
     for source in sources.values():
         for name, expected in source['sha256'].items():
@@ -359,6 +376,8 @@ def main():
     parser.add_argument('--after-ref')
     parser.add_argument('--evidence-dir', type=Path)
     parser.add_argument('--output', type=Path)
+    parser.add_argument('--before-noop-publications', type=int, choices=[0, 1], default=1,
+                        help='expected baseline no-op publications; use 0 for an already optimized baseline')
     parser.add_argument('--warmups', type=int, default=3)
     parser.add_argument('--samples', type=int, default=5)
     parser.add_argument('--worker', type=Path, help=argparse.SUPPRESS)
