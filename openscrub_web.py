@@ -3340,6 +3340,13 @@ function beUnmount(){
  BE_VIEW=null;view.observer.disconnect();
  beEndGesture(view.editor,view.cv);
 }
+// A panel transition may retain the mounted editor. Dispose only its removed
+// subtree, before DOM replacement, so retained video/gestures keep their owner.
+function beUnmountIn(root){
+ const view=BE_VIEW;if(!view||!root?.contains?.(view.cv))return;
+ beUnmount();
+ try{if(view.vid&&!view.vid.paused){view.editor.playing=false;view.vid.pause();}}catch(e){}
+}
 function beMount(img,vid,cv,id,gen,editor){
  beUnmount();
  const view={img,vid,cv,id,gen,editor,transform:null};
@@ -3392,6 +3399,7 @@ async function loadBoxEdit(fromReview){
  Object.assign(BE,{dur:mi.duration,win:[0,mi.duration],trk:false,muteArm:false,tlDrag:null,
      audioSel:-1,tlspans:[]});
 
+ beUnmountIn(c);
  c.innerHTML=`<div class="row" style="margin-top:8px">
   <button class="sec" id="bePlay" style="padding:3px 11px" title="Play the video with live boxes — pause to edit them" onclick="beTogglePlay()">&#9654;</button>t=
   <input type="range" id="beT" min="0" max="${Math.max(0.2,mi.duration-0.1).toFixed(1)}"
@@ -3870,24 +3878,18 @@ async function cancelJob(){await fetch("api/jobs/"+CUR+"/cancel",{method:"POST"}
 // the three post-render views (compare, review, box editor) are mutually
 // exclusive: opening one closes the others instead of stacking them
 function showPanel(which){
- beUnmount();
- // a playing box-editor video must be PAUSED before its DOM is wiped —
- // an element removed via innerHTML can keep its audio running
- try{const v=document.getElementById("beVid");
-  if(v&&!v.paused){BE.playing=false;v.pause();}}catch(e){}
- // "boxedit_rev" = the editor button INSIDE the review card: the editor
- // mounts in the review's own slot, so the review stays. Everything else
- // is standalone and closes the other panels.
- if(which!=="compare"){
-  const c=document.getElementById("compare");if(c)c.innerHTML="";}
- const b=document.getElementById("beslot_done");
- const b2=document.getElementById("beslot");
- if(which==="boxedit_rev"){if(b)b.innerHTML=""}
+ const clear=element=>{if(element){beUnmountIn(element);element.innerHTML="";}};
+ // boxedit_rev keeps the review, its scheduler and its in-review editor slot.
+ if(which!=="compare")clear(document.getElementById("compare"));
+ const b=document.getElementById("beslot_done"),b2=document.getElementById("beslot");
+ if(which==="boxedit_rev")clear(b);
  else{
-  if(which!=="boxedit"){if(b)b.innerHTML=""}
-  if(b2)b2.innerHTML="";
+  if(which!=="boxedit")clear(b);
+  clear(b2);
   if(which!=="review"){
-   disposeReview();const rev=document.getElementById("review");if(rev)rev.remove();}
+   disposeReview();const rev=document.getElementById("review");
+   if(rev){beUnmountIn(rev);rev.remove();}
+  }
  }
 }
 
@@ -3988,7 +3990,7 @@ async function loadReview(auto=null){
  });
  html+=`</div><div class="row" style="margin-top:12px"><button data-save-edits onclick="saveAndRender()">Save edits &amp; render</button>
  <span style="font-size:12px;color:#94a3b8">missed something? use ▶ Preview video &amp; edit boxes above — its ＋ Add box replaces the old add-region tool</span></div></div>`;
- const old=document.getElementById('review');if(old)old.remove();
+ const old=document.getElementById('review');if(old){beUnmountIn(old);old.remove();}
  detail.insertAdjacentHTML('beforeend',html);
  REVIEW_SCHED=new ReviewScheduler(id,gen,document.getElementById('review'),REVIEW_META);
  REVIEW_SCHED.start();initMarquee();saveStatus(EDITS,EDITS.status);
@@ -4475,8 +4477,8 @@ async function saveAndRender(){
   }
   saveStatus(d,"Rendering with saved edits…"+allowError);
   if(ownsView(id,gen)&&REVIEW_SCHED===reviewOwner){
-   disposeReview();const rv=document.getElementById("review");if(rv)rv.remove();
-   const c=document.getElementById("beslot_done");if(c)c.innerHTML="rendering with your edits…";
+   disposeReview();const rv=document.getElementById("review");if(rv){beUnmountIn(rv);rv.remove();}
+   const c=document.getElementById("beslot_done");if(c){beUnmountIn(c);c.innerHTML="rendering with your edits…";}
   }
   return true;
  }catch(e){
