@@ -1,0 +1,41 @@
+{
+  "source_base": "6fde5ad60c6d78d69dbbd8e049a9196f15e4095f",
+  "source_head": "3547f82c027323dba8e69e8aef7be62c88438d8b",
+  "requires_python": ">=3.9",
+  "sdist": {
+    "file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task8031/runs/package-native-release-312/dist/openscrub-1.0.96.tar.gz",
+    "sha256": "e328ceb1f2c2e8888b83f4d304c9bbadb12955f7bf917838fff24c9df41d3955",
+    "bytes": 601740
+  },
+  "wheel": {
+    "file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task8031/runs/package-native-release-312/wheel/openscrub-1.0.96-py3-none-any.whl",
+    "sha256": "3ca2abf0aacd8e1404eab0e71687077c339a92b2b07a5fc37073bf54b63ae6a9",
+    "bytes": 459590
+  },
+  "bindings": {
+    "openscrub_internal/__init__.py": {
+      "source_sha256": "c35c063c010e329c5dad13782e7b67438ed4b2d1faf975d4f01be2773a18e022",
+      "sdist_sha256": "c35c063c010e329c5dad13782e7b67438ed4b2d1faf975d4f01be2773a18e022",
+      "wheel_sha256": "c35c063c010e329c5dad13782e7b67438ed4b2d1faf975d4f01be2773a18e022",
+      "installed_sha256": "c35c063c010e329c5dad13782e7b67438ed4b2d1faf975d4f01be2773a18e022"
+    },
+    "openscrub_internal/plate_search/__init__.py": {
+      "source_sha256": "fdeb0614f0c5904b0cacd2d2733ec1c85293107f91e3eda8fec73a7411b0343b",
+      "sdist_sha256": "fdeb0614f0c5904b0cacd2d2733ec1c85293107f91e3eda8fec73a7411b0343b",
+      "wheel_sha256": "fdeb0614f0c5904b0cacd2d2733ec1c85293107f91e3eda8fec73a7411b0343b",
+      "installed_sha256": "fdeb0614f0c5904b0cacd2d2733ec1c85293107f91e3eda8fec73a7411b0343b"
+    },
+    "openscrub_internal/plate_search/matching.py": {
+      "source_sha256": "2f3a8182dcc66b61e03400d11a6451575cfb4775705cc2338be0e1a00af4ee03",
+      "sdist_sha256": "2f3a8182dcc66b61e03400d11a6451575cfb4775705cc2338be0e1a00af4ee03",
+      "wheel_sha256": "2f3a8182dcc66b61e03400d11a6451575cfb4775705cc2338be0e1a00af4ee03",
+      "installed_sha256": "2f3a8182dcc66b61e03400d11a6451575cfb4775705cc2338be0e1a00af4ee03"
+    },
+    "tests/test_plate_text_matching.py": {
+      "source_sha256": "9d89fdbb753f08acc853414565df0538a55afd91bb450c7cc7642e4600bae73e",
+      "sdist_sha256": "9d89fdbb753f08acc853414565df0538a55afd91bb450c7cc7642e4600bae73e"
+    }
+  },
+  "installed_39_config_sha256": "9e31adea9619f0ee6512f49cfe8c6d7d3dfe29af0b15191cb4ae5aa9cad8eb95",
+  "installed_39_log_sha256": "81fa55c60c1eb45046aeb4a71f08be8d29ff2dd2c227628320e40b9e9e28633a"
+}

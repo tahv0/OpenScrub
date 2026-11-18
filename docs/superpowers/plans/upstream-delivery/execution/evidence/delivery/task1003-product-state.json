@@ -1,0 +1,12 @@
+{
+  "head": "07cfaa9539a2561c26b6f7280fae6702eb07137c",
+  "tree": "e621f6e4baf75f79dcfa13f9f3145cd897ebf113",
+  "clean": true,
+  "protected_refs": 158,
+  "root_read": "entire report/PR/commands; final90/90 raw logs and installed-package actualHTTP/PAGE/updater log; compact manifest verified",
+  "evidence_attribution": "348/348 at86a; 90/90 +PAGE+package at07cf; old failures preserved",
+  "original_report_sha256": "0819ac761f084a8908664d1ca79455ad7ccb728138c65aaa993469f0b7fcd8c7",
+  "original_pr_sha256": "b03131d773a20ed34b60ac8e86bf18d4d025475bc70f2765193dfb0301f0fd75",
+  "original_manifest_sha256": "bf5dfe4ade1799e89772ccfb2b060c76704b50b48e9c095f78e3f333b8da3ade",
+  "public_manifest": "task1003-evidence/manifest.json"
+}

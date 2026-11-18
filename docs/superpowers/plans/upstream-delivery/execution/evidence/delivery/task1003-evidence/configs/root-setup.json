@@ -1,0 +1,17 @@
+{
+  "source": "/home/tahv0/.codex/worktrees/bde3/OpenScrub",
+  "branch": "integration/exact-editor-prerequisites",
+  "head": "6fde5ad60c6d78d69dbbd8e049a9196f15e4095f",
+  "tree": "e5d6dfa1284f767b264fb3e68b8b0935bb8a0329",
+  "clean": true,
+  "already_linked_worktree": true,
+  "gitdir": "/home/tahv0/src/OpenScrub/.git/worktrees/OpenScrub1",
+  "common": "/home/tahv0/src/OpenScrub/.git",
+  "not_submodule": true,
+  "prior_refs": 158,
+  "all_prior_refs_preserved": true,
+  "assets_and_all_tracked_source_unchanged_at_setup": true,
+  "documentation_head": "1e7c6e2c6ecc8384d5b3a2a6590c6d89f7bcd17d",
+  "C01": "b4fc209570d3e3a81be251dfc55aa71a24ad7b82",
+  "baseline_evidence": "acceptedTask1002 final89/89+package on identical6fde; no duplicate baseline suite/environment install"
+}

@@ -1,0 +1,63 @@
+ACTIVE_SOURCE {"executable": "/tmp/openscrub-python39-20261117/venv/bin/python", "python": "3.9.25 (main, Oct 31 2025, 23:00:23) \n[Clang 21.1.4 ]", "sources": {"openscrub_internal": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/worktrees/plate-text-matching/openscrub_internal/__init__.py", "sha256": "c35c063c010e329c5dad13782e7b67438ed4b2d1faf975d4f01be2773a18e022"}, "openscrub_internal.plate_search": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/worktrees/plate-text-matching/openscrub_internal/plate_search/__init__.py", "sha256": "fdeb0614f0c5904b0cacd2d2733ec1c85293107f91e3eda8fec73a7411b0343b"}, "openscrub_internal.plate_search.matching": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/worktrees/plate-text-matching/openscrub_internal/plate_search/matching.py", "sha256": "2f3a8182dcc66b61e03400d11a6451575cfb4775705cc2338be0e1a00af4ee03"}}}
+............F                                                            [100%]
+=================================== FAILURES ===================================
+______________________ test_matcher_import_is_stdlib_only ______________________
+
+    def test_matcher_import_is_stdlib_only():
+        # Intercept imports themselves, including cached app/third-party imports.
+        code = textwrap.dedent('''
+            import builtins
+            import sys
+            import sysconfig
+            from pathlib import Path
+            import importlib.util
+            original_import = builtins.__import__
+            stdlib = Path(sysconfig.get_path("stdlib")).resolve()
+            def restricted_import(name, globals=None, locals=None, fromlist=(), level=0):
+                root = name.split(".")[0]
+                if level == 0 and root != "openscrub_internal":
+                    spec = importlib.util.find_spec(root)
+                    origin = None if spec is None else spec.origin
+                    if origin not in ("built-in", "frozen"):
+                        path = None if not origin else Path(origin).resolve()
+                        if path is None or stdlib not in path.parents or "site-packages" in path.parts:
+                            raise AssertionError("non-stdlib import attempted: " + root)
+                if name.startswith("openscrub_internal") and name not in (
+                    "openscrub_internal", "openscrub_internal.plate_search",
+                    "openscrub_internal.plate_search.matching"):
+                    raise AssertionError("other internal module attempted")
+                if name == "openscrub_internal" and any(part != "plate_search" for part in fromlist):
+                    raise AssertionError("other internal import attempted")
+                if name == "openscrub_internal.plate_search" and any(part != "matching" for part in fromlist):
+                    raise AssertionError("other plate_search import attempted")
+                return original_import(name, globals, locals, fromlist, level)
+            builtins.__import__ = restricted_import
+            from openscrub_internal.plate_search.matching import normalize_queries, match_text
+            assert match_text("ab-c123", normalize_queries("ABC123"))[0].match_kind == "full_equal"
+            assert not match_text("XABC123Y", normalize_queries("ABC123"))
+            assert match_text("XABC123Y", normalize_queries("ABC123", mode="fragment"))[0].match_kind == "fragment"
+        ''')
+        child = subprocess.run([sys.executable, "-B", "-c", code], capture_output=True, text=True)
+>       assert child.returncode == 0, child.stdout + child.stderr
+E       AssertionError: ACTIVE_SOURCE {"executable": "/tmp/openscrub-python39-20261117/venv/bin/python", "python": "3.9.25 (main, Oct 31 2025, 23:00:23) \n[Clang 21.1.4 ]", "sources": {"openscrub_internal": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/worktrees/plate-text-matching/openscrub_internal/__init__.py", "sha256": "c35c063c010e329c5dad13782e7b67438ed4b2d1faf975d4f01be2773a18e022"}, "openscrub_internal.plate_search": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/worktrees/plate-text-matching/openscrub_internal/plate_search/__init__.py", "sha256": "fdeb0614f0c5904b0cacd2d2733ec1c85293107f91e3eda8fec73a7411b0343b"}, "openscrub_internal.plate_search.matching": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/worktrees/plate-text-matching/openscrub_internal/plate_search/matching.py", "sha256": "2f3a8182dcc66b61e03400d11a6451575cfb4775705cc2338be0e1a00af4ee03"}}}
+E         Traceback (most recent call last):
+E           File "<string>", line 28, in <module>
+E           File "<string>", line 26, in restricted_import
+E           File "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/worktrees/plate-text-matching/openscrub_internal/plate_search/matching.py", line 7, in <module>
+E             from dataclasses import dataclass, field
+E           File "<string>", line 26, in restricted_import
+E           File "/tmp/openscrub-python39-20261117/python/cpython-3.9-linux-x86_64-gnu/lib/python3.9/dataclasses.py", line 3, in <module>
+E             import copy
+E           File "<string>", line 26, in restricted_import
+E           File "/tmp/openscrub-python39-20261117/python/cpython-3.9-linux-x86_64-gnu/lib/python3.9/copy.py", line 60, in <module>
+E             from org.python.core import PyStringMap
+E           File "<string>", line 17, in restricted_import
+E         AssertionError: non-stdlib import attempted: org
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/tmp/openscrub-python39-20261117/venv/bin/python', '-B', '-c', '\nimport builtins\nimport sys\...ort PyStringMap\n  File "<string>", line 17, in restricted_import\nAssertionError: non-stdlib import attempted: org\n').returncode
+
+../../../../worktrees/plate-text-matching/tests/test_plate_text_matching.py:236: AssertionError
+=========================== short test summary info ============================
+FAILED ../../../../worktrees/plate-text-matching/tests/test_plate_text_matching.py::test_matcher_import_is_stdlib_only
+1 failed, 12 passed in 0.10s

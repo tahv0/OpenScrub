@@ -1,0 +1,233 @@
+ACTIVE_SOURCE {"executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python", "python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]", "sources": {"openscrub_internal": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/worktrees/plate-text-matching/openscrub_internal/__init__.py", "sha256": "c35c063c010e329c5dad13782e7b67438ed4b2d1faf975d4f01be2773a18e022"}}}
+FFFFFFFFFFFFF                                                            [100%]
+=================================== FAILURES ===================================
+____________ test_query_normalization_bounds_and_stable_duplicates _____________
+
+    def test_query_normalization_bounds_and_stable_duplicates():
+>       m = api()
+            ^^^^^
+
+../../../../worktrees/plate-text-matching/tests/test_plate_text_matching.py:18: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def api():
+>       from openscrub_internal.plate_search import matching
+E       ModuleNotFoundError: No module named 'openscrub_internal.plate_search'
+
+../../../../worktrees/plate-text-matching/tests/test_plate_text_matching.py:13: ModuleNotFoundError
+_____________ test_query_ascii_validation_precedes_case_conversion _____________
+
+    def test_query_ascii_validation_precedes_case_conversion():
+>       m = api()
+            ^^^^^
+
+../../../../worktrees/plate-text-matching/tests/test_plate_text_matching.py:44: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def api():
+>       from openscrub_internal.plate_search import matching
+E       ModuleNotFoundError: No module named 'openscrub_internal.plate_search'
+
+../../../../worktrees/plate-text-matching/tests/test_plate_text_matching.py:13: ModuleNotFoundError
+_______________ test_full_requires_entire_normalized_observation _______________
+
+    def test_full_requires_entire_normalized_observation():
+>       m = api()
+            ^^^^^
+
+../../../../worktrees/plate-text-matching/tests/test_plate_text_matching.py:61: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def api():
+>       from openscrub_internal.plate_search import matching
+E       ModuleNotFoundError: No module named 'openscrub_internal.plate_search'
+
+../../../../worktrees/plate-text-matching/tests/test_plate_text_matching.py:13: ModuleNotFoundError
+________________ test_fragment_is_explicit_entire_literal_query ________________
+
+    def test_fragment_is_explicit_entire_literal_query():
+>       m = api()
+            ^^^^^
+
+../../../../worktrees/plate-text-matching/tests/test_plate_text_matching.py:73: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def api():
+>       from openscrub_internal.plate_search import matching
+E       ModuleNotFoundError: No module named 'openscrub_internal.plate_search'
+
+../../../../worktrees/plate-text-matching/tests/test_plate_text_matching.py:13: ModuleNotFoundError
+_______________ test_no_character_substitution_or_fuzzy_matching _______________
+
+    def test_no_character_substitution_or_fuzzy_matching():
+>       m = api()
+            ^^^^^
+
+../../../../worktrees/plate-text-matching/tests/test_plate_text_matching.py:85: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def api():
+>       from openscrub_internal.plate_search import matching
+E       ModuleNotFoundError: No module named 'openscrub_internal.plate_search'
+
+../../../../worktrees/plate-text-matching/tests/test_plate_text_matching.py:13: ModuleNotFoundError
+__________ test_all_matching_queries_keep_order_and_mode_distinction ___________
+
+    def test_all_matching_queries_keep_order_and_mode_distinction():
+>       m = api()
+            ^^^^^
+
+../../../../worktrees/plate-text-matching/tests/test_plate_text_matching.py:93: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def api():
+>       from openscrub_internal.plate_search import matching
+E       ModuleNotFoundError: No module named 'openscrub_internal.plate_search'
+
+../../../../worktrees/plate-text-matching/tests/test_plate_text_matching.py:13: ModuleNotFoundError
+__________ test_invalid_observations_do_not_coerce_strip_or_truncate ___________
+
+    def test_invalid_observations_do_not_coerce_strip_or_truncate():
+>       m = api()
+            ^^^^^
+
+../../../../worktrees/plate-text-matching/tests/test_plate_text_matching.py:115: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def api():
+>       from openscrub_internal.plate_search import matching
+E       ModuleNotFoundError: No module named 'openscrub_internal.plate_search'
+
+../../../../worktrees/plate-text-matching/tests/test_plate_text_matching.py:13: ModuleNotFoundError
+____________________ test_separate_observations_never_join _____________________
+
+    def test_separate_observations_never_join():
+>       m = api()
+            ^^^^^
+
+../../../../worktrees/plate-text-matching/tests/test_plate_text_matching.py:133: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def api():
+>       from openscrub_internal.plate_search import matching
+E       ModuleNotFoundError: No module named 'openscrub_internal.plate_search'
+
+../../../../worktrees/plate-text-matching/tests/test_plate_text_matching.py:13: ModuleNotFoundError
+__________ test_fragment_preserves_entire_original_candidate_evidence __________
+
+    def test_fragment_preserves_entire_original_candidate_evidence():
+>       m = api()
+            ^^^^^
+
+../../../../worktrees/plate-text-matching/tests/test_plate_text_matching.py:141: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def api():
+>       from openscrub_internal.plate_search import matching
+E       ModuleNotFoundError: No module named 'openscrub_internal.plate_search'
+
+../../../../worktrees/plate-text-matching/tests/test_plate_text_matching.py:13: ModuleNotFoundError
+______________ test_full_frame_observation_needs_no_detector_box _______________
+
+    def test_full_frame_observation_needs_no_detector_box():
+>       m = api()
+            ^^^^^
+
+../../../../worktrees/plate-text-matching/tests/test_plate_text_matching.py:161: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def api():
+>       from openscrub_internal.plate_search import matching
+E       ModuleNotFoundError: No module named 'openscrub_internal.plate_search'
+
+../../../../worktrees/plate-text-matching/tests/test_plate_text_matching.py:13: ModuleNotFoundError
+_____________ test_distinct_observations_remain_distinct_evidence ______________
+
+    def test_distinct_observations_remain_distinct_evidence():
+>       m = api()
+            ^^^^^
+
+../../../../worktrees/plate-text-matching/tests/test_plate_text_matching.py:172: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def api():
+>       from openscrub_internal.plate_search import matching
+E       ModuleNotFoundError: No module named 'openscrub_internal.plate_search'
+
+../../../../worktrees/plate-text-matching/tests/test_plate_text_matching.py:13: ModuleNotFoundError
+_________________ test_errors_and_reprs_exclude_sensitive_text _________________
+
+capsys = <_pytest.capture.CaptureFixture object at 0x73dbb28a1be0>
+caplog = <_pytest.logging.LogCaptureFixture object at 0x73dbb28a2270>
+
+    def test_errors_and_reprs_exclude_sensitive_text(capsys, caplog):
+>       m = api()
+            ^^^^^
+
+../../../../worktrees/plate-text-matching/tests/test_plate_text_matching.py:180: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def api():
+>       from openscrub_internal.plate_search import matching
+E       ModuleNotFoundError: No module named 'openscrub_internal.plate_search'
+
+../../../../worktrees/plate-text-matching/tests/test_plate_text_matching.py:13: ModuleNotFoundError
+______________________ test_matcher_import_is_stdlib_only ______________________
+
+    def test_matcher_import_is_stdlib_only():
+        # Intercept imports themselves, including cached app/third-party imports.
+        code = textwrap.dedent('''
+            import builtins
+            import sys
+            import sysconfig
+            from pathlib import Path
+            import importlib.util
+            original_import = builtins.__import__
+            stdlib = Path(sysconfig.get_path("stdlib")).resolve()
+            def restricted_import(name, globals=None, locals=None, fromlist=(), level=0):
+                root = name.split(".")[0]
+                if level == 0 and root != "openscrub_internal":
+                    spec = importlib.util.find_spec(root)
+                    origin = None if spec is None else spec.origin
+                    if origin not in ("built-in", "frozen"):
+                        path = None if not origin else Path(origin).resolve()
+                        if path is None or stdlib not in path.parents or "site-packages" in path.parts:
+                            raise AssertionError("non-stdlib import attempted: " + root)
+                if name.startswith("openscrub_internal") and name not in (
+                    "openscrub_internal", "openscrub_internal.plate_search",
+                    "openscrub_internal.plate_search.matching"):
+                    raise AssertionError("other internal module attempted")
+                return original_import(name, globals, locals, fromlist, level)
+            builtins.__import__ = restricted_import
+            from openscrub_internal.plate_search.matching import normalize_queries, match_text
+            assert match_text("ab-c123", normalize_queries("ABC123"))[0].match_kind == "full_equal"
+            assert not match_text("XABC123Y", normalize_queries("ABC123"))
+            assert match_text("XABC123Y", normalize_queries("ABC123", mode="fragment"))[0].match_kind == "fragment"
+        ''')
+        child = subprocess.run([sys.executable, "-B", "-c", code], capture_output=True, text=True)
+>       assert child.returncode == 0, child.stdout + child.stderr
+E       AssertionError: ACTIVE_SOURCE {"executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python", "python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]", "sources": {"openscrub_internal": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/worktrees/plate-text-matching/openscrub_internal/__init__.py", "sha256": "c35c063c010e329c5dad13782e7b67438ed4b2d1faf975d4f01be2773a18e022"}}}
+E         Traceback (most recent call last):
+E           File "<string>", line 24, in <module>
+E           File "<string>", line 22, in restricted_import
+E         ModuleNotFoundError: No module named 'openscrub_internal.plate_search'
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python', '-B', '-c', '\nimport builtins\nimp..."<string>", line 22, in restricted_import\nModuleNotFoundError: No module named \'openscrub_internal.plate_search\'\n').returncode
+
+../../../../worktrees/plate-text-matching/tests/test_plate_text_matching.py:232: AssertionError
+=========================== short test summary info ============================
+FAILED ../../../../worktrees/plate-text-matching/tests/test_plate_text_matching.py::test_query_normalization_bounds_and_stable_duplicates
+FAILED ../../../../worktrees/plate-text-matching/tests/test_plate_text_matching.py::test_query_ascii_validation_precedes_case_conversion
+FAILED ../../../../worktrees/plate-text-matching/tests/test_plate_text_matching.py::test_full_requires_entire_normalized_observation
+FAILED ../../../../worktrees/plate-text-matching/tests/test_plate_text_matching.py::test_fragment_is_explicit_entire_literal_query
+FAILED ../../../../worktrees/plate-text-matching/tests/test_plate_text_matching.py::test_no_character_substitution_or_fuzzy_matching
+FAILED ../../../../worktrees/plate-text-matching/tests/test_plate_text_matching.py::test_all_matching_queries_keep_order_and_mode_distinction
+FAILED ../../../../worktrees/plate-text-matching/tests/test_plate_text_matching.py::test_invalid_observations_do_not_coerce_strip_or_truncate
+FAILED ../../../../worktrees/plate-text-matching/tests/test_plate_text_matching.py::test_separate_observations_never_join
+FAILED ../../../../worktrees/plate-text-matching/tests/test_plate_text_matching.py::test_fragment_preserves_entire_original_candidate_evidence
+FAILED ../../../../worktrees/plate-text-matching/tests/test_plate_text_matching.py::test_full_frame_observation_needs_no_detector_box
+FAILED ../../../../worktrees/plate-text-matching/tests/test_plate_text_matching.py::test_distinct_observations_remain_distinct_evidence
+FAILED ../../../../worktrees/plate-text-matching/tests/test_plate_text_matching.py::test_errors_and_reprs_exclude_sensitive_text
+FAILED ../../../../worktrees/plate-text-matching/tests/test_plate_text_matching.py::test_matcher_import_is_stdlib_only
+13 failed in 0.12s

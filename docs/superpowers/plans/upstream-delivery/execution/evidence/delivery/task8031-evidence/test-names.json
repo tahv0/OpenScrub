@@ -1,0 +1,15 @@
+[
+  "test_query_normalization_bounds_and_stable_duplicates",
+  "test_query_ascii_validation_precedes_case_conversion",
+  "test_full_requires_entire_normalized_observation",
+  "test_fragment_is_explicit_entire_literal_query",
+  "test_no_character_substitution_or_fuzzy_matching",
+  "test_all_matching_queries_keep_order_and_mode_distinction",
+  "test_invalid_observations_do_not_coerce_strip_or_truncate",
+  "test_separate_observations_never_join",
+  "test_fragment_preserves_entire_original_candidate_evidence",
+  "test_full_frame_observation_needs_no_detector_box",
+  "test_distinct_observations_remain_distinct_evidence",
+  "test_errors_and_reprs_exclude_sensitive_text",
+  "test_matcher_import_is_stdlib_only"
+]

@@ -1,0 +1,13 @@
+{
+  "base": "6fde5ad60c6d78d69dbbd8e049a9196f15e4095f",
+  "final_head": "07cfaa9539a2561c26b6f7280fae6702eb07137c",
+  "final_tree": "e621f6e4baf75f79dcfa13f9f3145cd897ebf113",
+  "files": 135,
+  "product_modules": 10,
+  "backend_AST_equal": true,
+  "all_non_web_products_assets_package_config_equal": true,
+  "owning_reuse": "348/348 at86a1368 retain attribution; unaffected backend AST/files/tests unchanged; affected browser-state module rerun on final source",
+  "pending_red": "pending-play-red-009:1failed/1passed; actual beTogglePlay pending media, removed same-draft remount versus retained control",
+  "pending_green": "pending-play-green-010:2passed/88deselected; identical tests before/after two-line owner cleanup",
+  "scope": "no full discovery, exact UI, scheduler, source registry, backend/seed/tracking change"
+}

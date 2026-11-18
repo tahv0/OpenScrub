@@ -1,0 +1,13 @@
+{
+  "APP_JS": "973f7c12650082061d198d6f80d4f88c1233ef5f7971ce5e9e9a0971481f8306",
+  "APP_CSS": "6c324da4b20e83eb740a31150ec8d166c326c49fd8914bec09e4abe2f79b3220",
+  "PAGE": "f7162818b51f69dca93c74c69fbfecdc67eba6508fdd56a4e9ecf85657794a8d",
+  "HTTP": "actual loopback PAGE equals installed PAGE with exact max/version and observed guest disk substitution",
+  "observed_guest_free_bytes": 800235212800,
+  "updater_checks": {
+    "tests/editor_resize_browser.cjs": "82875b863994db4da6d12f96be305c8602d401841e5839d2586a0402ed3943d1",
+    "tests/editor_resize_server.py": "fe3df428340b89b8c11cb7d45061463c65dec190886b52be968074e0297e2947",
+    "tests/test_editor_resize.py": "bf84bfe36dca633c67b08775548db1c7e7a29c7219ae56904b6f1c21aa53b8b5",
+    "tests/test_review_save_failures.py": "f9f0a253a8e550b5c937c992656ab1bcb7f9cf7132fe2784b904b8d7949a8c7c"
+  }
+}

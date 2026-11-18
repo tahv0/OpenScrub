@@ -1,0 +1,231 @@
+DEFAULT_PATHS {"jobs": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_jobs", "models": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1003/runs/containment-red-001/profile/.openscrub/models"}
+ACTIVE_SOURCE {"executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python", "python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]", "sources": {"openscrub": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub.py", "sha256": "d0e26f37d3bb541302fd597931deda08b0a23048251e12b3c22e793253def048"}, "openscrub_internal": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_internal/__init__.py", "sha256": "c35c063c010e329c5dad13782e7b67438ed4b2d1faf975d4f01be2773a18e022"}, "openscrub_internal.exact_samples": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_internal/exact_samples.py", "sha256": "0b583a0a027dc397ce3835982c5367031375fdd65d9a3b5f287dea3726c02c4d"}, "openscrub_internal.lifetimes": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_internal/lifetimes.py", "sha256": "86a01f37d9bae9998161eff1d04e2ca37d66548c2a202f36003587ec3e9cee8e"}, "openscrub_internal.reports": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_internal/reports.py", "sha256": "e8a7429c0b5430ee290f6635ca5d5a93445d3f0fe9bb0f58e57fec891ee01b7f"}, "openscrub_setup": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_setup.py", "sha256": "d0362a038f8182e8fae510100085bb087f09f7e5cf7e11a780a24390b3037eaf"}, "openscrub_update": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_update.py", "sha256": "4d6a20f75d985a119f8421227c3bd88b17fd1b8eed44e353b127b5b49e733d55"}, "openscrub_vault": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_vault.py", "sha256": "da1b7fe4da389352fbc594abddcc563278b26009d8f342d4154ffa305bf4dfa4"}, "openscrub_web": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_web.py", "sha256": "42d10a092dbf54ae27d06ea93d160ec430c8aceaf84fde2c6ac80dbb9be2314a"}, "zones_ui": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/zones_ui.py", "sha256": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7"}}}
+FFFFF                                                                    [100%]
+=================================== FAILURES ===================================
+______________ test_retained_editor_keeps_mount_on_panel_reentry _______________
+
+    def test_retained_editor_keeps_mount_on_panel_reentry():
+>       run_js(MOUNT + r"""openJob('A');const m=mountIn('beslot');
+        BE.ov[0]=[11,12,33,44];BE.drag={kind:'move'};const applied=JSON.stringify(BE.ov);
+        showPanel('boxedit_rev');
+        assert.equal(BE_VIEW,m.view,'retained panel lost its mount');
+        assert.equal(document.getElementById('beCv'),m.cv);
+        assert.equal(m.view.observer.disconnected,false);assert.equal(m.vid.paused,false);
+        assert.equal(BE.drag.kind,'move');assert.equal(JSON.stringify(BE.ov),applied);
+        // Removing an unrelated comparison subtree must preserve this owner too.
+        elements.set('compare',el());showPanel('boxedit_rev');assert.equal(BE_VIEW,m.view);
+        """)
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:432: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "\nfunction mountIn(rootId){\n const root=elements.get(rootId)||el();elements.set(rootId,root);\n const img=el(),vid=e...reserve this owner too.\n    elements.set('compare',el());showPanel('boxedit_rev');assert.equal(BE_VIEW,m.view);\n    "
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: ReferenceError: el is not defined
+E             at mountIn (evalmachine.<anonymous>:4:12)
+E             at evalmachine.<anonymous>:21:22
+E             at evalmachine.<anonymous>:30:7
+E             at Script.runInContext (node:vm:149:12)
+E             at Object.runInContext (node:vm:301:6)
+E             at run ([eval]:31:38)
+E             at [eval]:33:18
+E             at [eval]:33:56
+E             at [eval]:34:4
+E             at runScriptInThisContext (node:internal/vm:209:10)
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...  at [eval]:33:18\n    at [eval]:33:56\n    at [eval]:34:4\n    at runScriptInThisContext (node:internal/vm:209:10)\n').returncode
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:65: AssertionError
+__________ test_removed_editor_subtree_releases_before_removal[panel] __________
+
+path = 'panel'
+
+    @pytest.mark.parametrize('path', ['panel', 'save'])
+    def test_removed_editor_subtree_releases_before_removal(path):
+>       run_js(MOUNT + r"""openJob('A');const m=mountIn('beslot');
+        if(PATH==='panel')showPanel('compare');
+        if(PATH==='save'){
+          const p=saveAndRender();await reply();await reply();await p;
+          // The review is the actual ancestor removed by a save acknowledgement.
+        }
+        if(PATH==='remount'){
+          const p=loadBoxEdit(true);await reply({duration:2});
+          // Stop before later box/media fixture work; the owner must already be retired.
+          await tick();
+        }
+        assert.equal(m.view.observer.disconnected,true,'removed mount observer still active');
+        assert.equal(m.vid.paused,true,'outgoing video not paused');
+        assert.equal(m.vid.pausedBeforeDetach,true,'video paused only after detach');
+        """.replace('PATH', json.dumps(path)).replace("const m=mountIn('beslot');", "const m=mountIn(PATH==='save'?'review':'beslot');".replace('PATH',json.dumps(path))))
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:446: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "\nfunction mountIn(rootId){\n const root=elements.get(rootId)||el();elements.set(rootId,root);\n const img=el(),vid=e...'outgoing video not paused');\n    assert.equal(m.vid.pausedBeforeDetach,true,'video paused only after detach');\n    "
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: ReferenceError: el is not defined
+E             at mountIn (evalmachine.<anonymous>:4:12)
+E             at evalmachine.<anonymous>:21:22
+E             at evalmachine.<anonymous>:35:7
+E             at Script.runInContext (node:vm:149:12)
+E             at Object.runInContext (node:vm:301:6)
+E             at run ([eval]:31:38)
+E             at [eval]:33:18
+E             at [eval]:33:56
+E             at [eval]:34:4
+E             at runScriptInThisContext (node:internal/vm:209:10)
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...  at [eval]:33:18\n    at [eval]:33:56\n    at [eval]:34:4\n    at runScriptInThisContext (node:internal/vm:209:10)\n').returncode
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:65: AssertionError
+__________ test_removed_editor_subtree_releases_before_removal[save] ___________
+
+path = 'save'
+
+    @pytest.mark.parametrize('path', ['panel', 'save'])
+    def test_removed_editor_subtree_releases_before_removal(path):
+>       run_js(MOUNT + r"""openJob('A');const m=mountIn('beslot');
+        if(PATH==='panel')showPanel('compare');
+        if(PATH==='save'){
+          const p=saveAndRender();await reply();await reply();await p;
+          // The review is the actual ancestor removed by a save acknowledgement.
+        }
+        if(PATH==='remount'){
+          const p=loadBoxEdit(true);await reply({duration:2});
+          // Stop before later box/media fixture work; the owner must already be retired.
+          await tick();
+        }
+        assert.equal(m.view.observer.disconnected,true,'removed mount observer still active');
+        assert.equal(m.vid.paused,true,'outgoing video not paused');
+        assert.equal(m.vid.pausedBeforeDetach,true,'video paused only after detach');
+        """.replace('PATH', json.dumps(path)).replace("const m=mountIn('beslot');", "const m=mountIn(PATH==='save'?'review':'beslot');".replace('PATH',json.dumps(path))))
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:446: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "\nfunction mountIn(rootId){\n const root=elements.get(rootId)||el();elements.set(rootId,root);\n const img=el(),vid=e...'outgoing video not paused');\n    assert.equal(m.vid.pausedBeforeDetach,true,'video paused only after detach');\n    "
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: ReferenceError: el is not defined
+E             at mountIn (evalmachine.<anonymous>:4:12)
+E             at evalmachine.<anonymous>:21:22
+E             at evalmachine.<anonymous>:35:7
+E             at Script.runInContext (node:vm:149:12)
+E             at Object.runInContext (node:vm:301:6)
+E             at run ([eval]:31:38)
+E             at [eval]:33:18
+E             at [eval]:33:56
+E             at [eval]:34:4
+E             at runScriptInThisContext (node:internal/vm:209:10)
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...  at [eval]:33:18\n    at [eval]:33:56\n    at [eval]:34:4\n    at runScriptInThisContext (node:internal/vm:209:10)\n').returncode
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:65: AssertionError
+________________ test_phase_actions_replacement_retires_editor _________________
+
+    def test_phase_actions_replacement_retires_editor():
+>       run_js(MOUNT + r"""openJob('A');const m=mountIn('actions');
+        for(const name of ['ph','eta','prog','log','pimg','warnbox'])elements.set(name,el());
+        SHELLPH='done';const p=actualRefresh();
+        await reply({phase:'rendering',progress:.25});await reply({lines:[],len:0});await p;
+        assert.equal(m.view.observer.disconnected,true,'phase replacement retained observer');
+        assert.equal(m.root.retiredBeforeDetach,true,'phase replacement detached before retirement');
+        assert.equal(m.vid.pausedBeforeDetach,true);
+        """)
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:464: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "\nfunction mountIn(rootId){\n const root=elements.get(rootId)||el();elements.set(rootId,root);\n const img=el(),vid=e...reDetach,true,'phase replacement detached before retirement');\n    assert.equal(m.vid.pausedBeforeDetach,true);\n    "
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: ReferenceError: el is not defined
+E             at mountIn (evalmachine.<anonymous>:3:22)
+E             at evalmachine.<anonymous>:21:22
+E             at evalmachine.<anonymous>:28:7
+E             at Script.runInContext (node:vm:149:12)
+E             at Object.runInContext (node:vm:301:6)
+E             at run ([eval]:31:38)
+E             at [eval]:33:18
+E             at [eval]:33:56
+E             at [eval]:34:4
+E             at runScriptInThisContext (node:internal/vm:209:10)
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...  at [eval]:33:18\n    at [eval]:33:56\n    at [eval]:34:4\n    at runScriptInThisContext (node:internal/vm:209:10)\n').returncode
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:65: AssertionError
+______________ test_old_mount_callbacks_cannot_touch_replacement _______________
+
+    def test_old_mount_callbacks_cannot_touch_replacement():
+>       run_js(MOUNT + r"""openJob('A');const old=mountIn('beslot');
+        showPanel('compare');const replacement=mountIn('beslot_done');
+        const before=replacement.paint.value;old.view.sync();
+        assert.equal(BE_VIEW,replacement.view);assert.equal(replacement.paint.value,before);
+        assert.equal(old.view.observer.disconnected,true);
+        """)
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:475: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = '\nfunction mountIn(rootId){\n const root=elements.get(rootId)||el();elements.set(rootId,root);\n const img=el(),vid=e...ment.view);assert.equal(replacement.paint.value,before);\n    assert.equal(old.view.observer.disconnected,true);\n    '
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: ReferenceError: el is not defined
+E             at mountIn (evalmachine.<anonymous>:4:12)
+E             at evalmachine.<anonymous>:21:24
+E             at evalmachine.<anonymous>:26:7
+E             at Script.runInContext (node:vm:149:12)
+E             at Object.runInContext (node:vm:301:6)
+E             at run ([eval]:31:38)
+E             at [eval]:33:18
+E             at [eval]:33:56
+E             at [eval]:34:4
+E             at runScriptInThisContext (node:internal/vm:209:10)
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...  at [eval]:33:18\n    at [eval]:33:56\n    at [eval]:34:4\n    at runScriptInThisContext (node:internal/vm:209:10)\n').returncode
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:65: AssertionError
+=========================== short test summary info ============================
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py::test_retained_editor_keeps_mount_on_panel_reentry
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py::test_removed_editor_subtree_releases_before_removal[panel]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py::test_removed_editor_subtree_releases_before_removal[save]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py::test_phase_actions_replacement_retires_editor
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py::test_old_mount_callbacks_cannot_touch_replacement
+5 failed, 83 deselected in 0.83s

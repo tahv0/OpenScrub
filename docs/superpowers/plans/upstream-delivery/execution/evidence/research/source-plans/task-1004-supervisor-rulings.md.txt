@@ -1,0 +1,61 @@
+# Task1004 supervisor adoption and concrete amendments
+
+Root adopts the complete [UI source plan](exact-editor-ui-source-plan.md) on accepted Task1003 `07cfaa9539a2561c26b6f7280fae6702eb07137c`, subject to these amendments. Its three implementation and validation milestones form one coherent editor-and-Track contribution, implemented by one fresh Sol 6.1 high worker and reviewed over the complete task range. No Track-disabled intermediate contribution is delivered.
+
+## Source, modules and validated values
+
+Work on `pr/exact-editor-ui` in the existing managed `bde3` worktree. Its initial source tree is byte-identical to accepted `07cfaa9`; all 160 earlier refs are preserved. The matcher is independent and is not integrated here. Keep the bounded sample/readiness block beside `BE_VIEW`, preserve literal `APP_JS`, and retain the ten existing runtime modules. Backend, engine, private helpers, CSS, assets, dependencies and report format stay unchanged unless an actual task requirement establishes a concrete exception for root to adjudicate.
+
+`source_ref` is opaque text of length 1–128, currently `incarnation:epoch`. Do not require it to be a hexadecimal digest. Only `timeline_eq` and `row_context_eq` require the existing 64 lowercase hexadecimal characters. Project exactly the eight existing sample-precondition fields for strict Track and manual creation; do not send the whole sample object.
+
+Existing returned row/base vectors need finite validation and consistency with their supplied offset, not blanket containment in the image. Existing boxes may extend outside the frame; do not clamp their stored geometry or reject the whole sample for that reason. Newly drawn Add/Track boxes must satisfy the existing finite, nonempty, in-frame strict bounds. Their canonical reference must lie inside the chosen window; refusal must leave the window unchanged.
+
+Every new UI-created geometry delta captures its strict evidence atomically or refuses the mutation. A failed new capture must not become a legacy submission. Preserve genuinely preexisting legacy drafts through the existing optional path or retain them for explicit reinspection; do not fabricate exact evidence.
+
+## Mounted requests and playback
+
+Capture `BE_OPEN_INTENT` before `loadBoxEdit` awaits mediainfo/report. A newer open, close, panel or job intention supersedes it. An old same-BE completion must not retire/remount a newer slot. A retained subtree stays mounted until its actual current replacement, preserving the accepted P16D containment behavior.
+
+The one page-wide sample slot stays occupied through fetch, body, detached image decode, application or failure, and URL cleanup. Keep only one latest desired request across mounts/jobs. Do not abort issued work simply to free the slot, or release it at body completion while detached decodes accumulate. Every continuation checks its exact owner and serial. Playback responses and metadata/rAF continuations need a separate captured playback serial; a late response after Pause must never replace exact geometry.
+
+## Known acknowledgement and current display
+
+Validate all required strict `geometry_rows` before clearing any submitted state. Paired box/span values and their complete baseline remain in the same owned family. Newer or different-kind values survive and advance only to the returned committed complete baseline. Scrub, reopen, unrelated metadata and arbitrary report changes never rebase pending drafts.
+
+After an ACK clears an override, the current usable row/sample must not continue offering the old baseline or visibly revert the confirmed geometry. Reconcile only the same current source/timeline/raw-index/context row whose base belongs to the submitted or returned family. A safe display patch uses the returned complete base with the **current** sample offset and canonical active-span rule; newer local overrides remain in front. If safe reconciliation is unavailable, invalidate readiness and obtain one coalesced fresh sample for the retained view. Do not leave stale base values editable or transplant an ACK into another mount/context. This is confirmed-own-write handling, not a report epoch gate or speculative draft rebase.
+
+Add owning cases for ACK-clear → next edit using the confirmed baseline, span changes making a row inactive, newer pending geometry retaining its value, and an ACK from another mount/context being unable to patch the current sample.
+
+## Explicit conflict recovery without losing other work
+
+Add one `everUncertain` boolean to the existing submitted owner. A first valid, authoritative `409 geometry_conflict`, before any uncertain attempt, proves that request was rejected: release that rejected submission snapshot but keep every pending value/baseline. A network failure, malformed/missing ACK or other unknown publication marks the owner uncertain. Explicit Save retries its identical payload first. A later `409` cannot prove that an earlier uncertain write did not commit, so retain the owner and every draft.
+
+Keep `reviewSaveStatus` text-only. Add sibling `reviewResolveActions` with two bounded actions; do not create another review subsystem.
+
+- **Abandon unconfirmed save…** is available only for an uncertain submitted owner and while no save is busy. Capture the draft/submission, explain that abandoning does not undo possible saved changes, confirm, and recheck ownership. Clear only that retry owner. Keep all current geometry/preconditions, additions/manual IDs, choices, audio and their baselines. Do not POST, acknowledge, undo, advance baselines or render.
+- A selector reaches pending position/time rows even when absent from the current frame, with **Discard geometry and inspect**. Refuse while busy or while a submission remains unresolved. Capture the selected draft/editor/view/family and current values before confirmation; recheck all of them afterward. Changed values or ownership abort deletion. Remove only that selected row's captured `ov`, `times` and geometry owner. Preserve other rows, manual additions, choices and audio. End incomplete gestures and request a fresh sample through the existing slot, opening the guarded ordinary editor if necessary. Fresh inspection grants evidence only to a subsequent deliberate edit; never find a similar row, remap a missing row, rebase other drafts or render.
+
+The same selector may list editor-created pending additions as “New box N”, keyed internally by their stable `manual_id`. The same explicit discard action removes only the selected, still-equal captured addition after confirmation; preserve every other addition and `MAN` entry. This provides an escape for stale creation evidence without adding handles or an additions editor. It does not remove a possibly committed report row; resolve or explicitly abandon an uncertain submission first, and inspect the actual saved state.
+
+Required controls: initial authoritative rejection versus uncertain retry rejection; abandon confirmation/no undo/no draft loss; busy/unresolved discard refusal; selected row/addition isolation; changed-during-confirmation retention; fresh inspection without save/render/rebase; absent-row refusal to remap; and deliberate recreation of a discarded stale addition from a new ready sample.
+
+These actions implement the existing explicit reinspection/reapplication requirement. Automatic baseline changes or broad draft resets would lose or misapply work; if this UI choice proves wrong, revise these bounded controls rather than weaken source equality.
+
+## Owning validation and delivery
+
+Use genuine behavior REDs through shipped functions and actual event paths. Update old tolerant-only fixture assumptions to coherent strict-source facts without relabeling fixture errors as product regressions. Reuse the three existing hashed media inputs and independent ordinal/PTS/pixel/offset oracles. Retain old failed attempts and source attribution.
+
+Consolidate the final normal native full suite and actual full PAGE acceptance where practical: enable prepared browser prerequisites in that final run and retain both PAGE cases as part of it. The planned native 96 MiB plus PAGE 16 MiB becomes one 112 MiB pool, not two duplicate browser acceptances. If a real gate boundary requires separation, explain the concrete need before allocating it. Use unique per-test artifact directories; never overwrite another scenario's DPR/console/render results through a shared artifact variable.
+
+The actual full recipe requires both existing plugins, not merely their JSON prerequisites:
+
+```text
+-o "pythonpath=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/task1631-evidence/adapters /home/tahv0/src/OpenScrub/.superpowers/sdd/README/task654-evidence/adapters"
+-p task1631_fixture -p roundtrip_stdout_selected
+```
+
+Pin the actual adapter and cached YuNet bytes prospectively. The stdout adapter applies only to `test_report_roundtrip.py::test_real_render_and_fresh_route_reopen_keep_all_ten_rows`; no broad output suppression. Use the proven prepared Python 3.12 build toolchain for exact sdist → extracted wheel → no-deps installation. Actual Python 3.9 exercises the affected owners and, where needed, the exact installed product separately; the cached native build-tool bundle is not a Python 3.9 build environment. No environment/tool/model downloads.
+
+T1003-M1 belongs to the changed browser oracle: read back a test-only surface marked `willReadFrequently`, preserve production rendering, then require no unexpected warnings. T1003-M2 and the identical matcher review note remain the existing D01 archive-warning item; preserve its diagnostic and do not patch the shared controller here.
+
+Document exact final source, commands, test counts, browser/pixel/Track fakes versus actual routes, package origins, failures and platform limits. Fresh independent review covers the complete editor-and-Track change before adoption or C01 composition. Root supplies private local execution controls separately; those remain outside Git and public evidence. No external publication or user working-version adoption is part of this task.

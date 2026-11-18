@@ -1,0 +1,12 @@
+[
+  "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py",
+  "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_manual_addition_replay.py",
+  "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py",
+  "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracker_seed.py",
+  "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracking_routes.py",
+  "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_job_lifecycle.py",
+  "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_report_transactions.py",
+  "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_job_response_lifetime.py::test_configured_wsgi_closes_stream_owner_exactly_once[complete-download]",
+  "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_job_response_lifetime.py::test_configured_wsgi_closes_stream_owner_exactly_once[iterator_error-report]",
+  "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_job_response_lifetime.py::test_configured_wsgi_closes_stream_owner_exactly_once[disconnect-video]"
+]

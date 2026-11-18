@@ -1,0 +1,10 @@
+{
+  "owning_gate_head": "86a13682bbf22ae9a5ac3e9b09cf5e9b007a85df",
+  "final_page_package_head": "273f14daf78d686f0e0d006d7ab6207d6bd2e7c8",
+  "only_later_changed_file": "tests/editor_resize_browser.cjs",
+  "change": "one-shot innerHTML witness avoids recording later removal of a different mount; loop short synthetic video during inspection",
+  "product_and_owning_python_test_bytes_identical": true,
+  "native": "owners-native-004:348passed",
+  "floor": "owners-floor-005:348passed",
+  "no_repeated_suite_reason": "later fixture-only commit changes no owning gate source/test/selection/environment; new PAGE/package exercise changed fixture"
+}

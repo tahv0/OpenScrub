@@ -1,0 +1,35 @@
+commit 07cfaa9539a2561c26b6f7280fae6702eb07137c
+Author:     Tuomas Aho <tuomas.aho@outlook.com>
+AuthorDate: Wed Nov 18 17:57:46 2026 +0200
+Commit:     Tuomas Aho <tuomas.aho@outlook.com>
+CommitDate: Wed Nov 18 17:57:46 2026 +0200
+
+    fix(web): clear pending Play state when its mount is retired
+
+commit 273f14daf78d686f0e0d006d7ab6207d6bd2e7c8
+Author:     Tuomas Aho <tuomas.aho@outlook.com>
+AuthorDate: Wed Nov 18 17:45:51 2026 +0200
+Commit:     Tuomas Aho <tuomas.aho@outlook.com>
+CommitDate: Wed Nov 18 17:45:51 2026 +0200
+
+    test(web): scope removal witnesses to one editor mount
+
+commit 86a13682bbf22ae9a5ac3e9b09cf5e9b007a85df
+Author:     Tuomas Aho <tuomas.aho@outlook.com>
+AuthorDate: Wed Nov 18 17:42:17 2026 +0200
+Commit:     Tuomas Aho <tuomas.aho@outlook.com>
+CommitDate: Wed Nov 18 17:42:17 2026 +0200
+
+    fix(web): retire editor mounts with their containing subtree
+    
+    Map applicable containment ownership from C01 commits 61dbb31058c49041aa820ec29e2bd6fe86ff3a84 and a4649a2b60ad95fb57b6e676af0799c19e3c873a to the current standalone paths. Preserve retained panel mounts, current draft identities, and backend interfaces.
+
+commit 70e6d045eff70745376767d08f5c9554f906856a
+Author:     Tuomas Aho <tuomas.aho@outlook.com>
+AuthorDate: Tue Nov 17 11:06:27 2026 +0200
+Commit:     Tuomas Aho <tuomas.aho@outlook.com>
+CommitDate: Wed Nov 18 17:34:01 2026 +0200
+
+    fix(web): keep editor coordinates aligned on live resize
+    
+    (cherry picked from commit 47e9f6d5614365e00d899c87df6c209cd7aaabf6)

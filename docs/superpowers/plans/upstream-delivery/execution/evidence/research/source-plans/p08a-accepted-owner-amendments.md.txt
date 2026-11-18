@@ -1,0 +1,149 @@
+# Root-adopted P08A accepted-owner amendments
+
+**Authority and status:** Root adopts these amendments on2026-11-18. Read this file together with [thumbnail-invalidation-source-plan.md](thumbnail-invalidation-source-plan.md) and [p08a-accepted-owner-handoff.md](p08a-accepted-owner-handoff.md) before Task801 coding. Those two files remain historical draft source maps; this amendment overrides their contradictory clauses. No implementation or runtime acceptance is claimed.
+
+**Frozen inputs:** Product6fde5ad60c6d78d69dbbd8e049a9196f15e4095f; original documentation1e7c6e2c6ecc8384d5b3a2a6590c6d89f7bcd17d. Source and original research were audited read-only with GIT_OPTIONAL_LOCKS=0 git show. No new public investigation, product runtime, test/build/browser/media workload, source export or source/index/HEAD/ref mutation occurred during this preparation.
+
+**Exact override map:**
+- Replace the plan Task1 ordinary files.active=None/background active-owner restriction with section1; exact editing's existing strict admission is unchanged.
+- Replace Task3's underspecified read_frame(index) and differing producer seek paths with section2's common ordinal primitive/adapter, typed failure/capture ownership, concrete recipe fallback and required actual ordinal-oracle gate.
+- Replace the broad floor pytest source/tests example and any implied repeated full response-stream matrix with section3's named affected selection plus three source-video endings. Keep one stabilized native full.
+- Replace scaffold-only/check-only delivery gates with section4's working backend and browser slices, each carrying its relevant validation.
+- Interpret browser recovery and full-row equality through section5: own legitimate saves can cause placeholders; full fingerprint and one budget remain unchanged.
+- Interpret source_report_bound/report_bound through section6: association success, not whole-request success, is the commit point.
+
+Global constraints and unaffected contracts in the original plan remain: one existing source/lifetime owner, no whole-input hash or retained report tree/P08B cache, full raw preservation and unchanged geometry/save ownership, no root production file/new dependency/model/framework, and separate upstream/C01/P09/P08B boundaries.
+
+## 1. Ordinary thumbnails remain readable during coherent active work
+
+Source anchors at6fde: web:_edit_gate818–822 and _exact_snapshot1641–1651 explicitly reject active work; enforce_vault_lock1188–1210 only reserves lifetimes and does not reject active phases. job_detections1861, job_detframe1880 and job_thumb1929 contain no active-work gate. _reserve_files_locked362 owns the job plus its actual containing source; current detections omits source admission, while thumb/detframe already include it. _prepare_work868/_select_render_input373 and _run_job's render branch allow the render worker to own an original input different from job.video; thumbnail requests continue to own job.video. refresh3249 onward changes action buttons/preview but does not remove a retained review on rendering.
+
+**Root-adopted replacement for the ordinary files.active=None and background active-owner requirements:** ordinary metadata/crop/detframe reads may select a fresh generation during scan, render, queued work, Track or cleanup whenever the last committed report and shared selected source are coherent/current. Do not call _edit_gate or copy _exact_snapshot's active refusal into _thumbnail_snapshot. Keep exact editing/admission unchanged.
+
+_thumbnail_current_locked(job,selected,fence,*,operation_owner=None) checks registered/open job, shared selected object/status/not-retired, canonical job.video, owned source/report stamps, report epoch, and captured current operation identity/Event. It does not inspect files.active. Background pregen additionally requires operation_owner.operation is the generation's current unsignalled operation and belongs to that live job; its own thumbnail source lease must own selected.path. The pipeline owner's original source may differ from normalized preview, so do not compare that original source to the thumbnail path.
+
+_begin_operation still invalidates old tickets/V. New reads can establish V against the new current operation and unchanged committed report/source immediately; a decoder started before admission cannot adopt that new V. Pending scan pair409, changed/retired source409, incoherent report/source409, missing/invalid current report and a signalled-but-not-yet-acknowledged operation still refuse. Those are real coherence/cancellation conditions, not phase-based refusal. If normalization actually changes the selected file during active work, pre/post stamp checks refuse it; a lease prevents lifecycle deletion, not concurrent file mutation. No operation-specific refusal is otherwise required by current source.
+
+Add test_thumbnail_reads_coherent_input_during_active_render_and_scan: actual routes during held production _run_job render and scan, including original-versus-normalized cross-job source leases. Hold retained review with newer pending drafts; first obsolete-image metadata recovery gets current V/images without waiting for files.active to clear and changes no draft/save state. Pause decode across operation start, successful report publication, pending pair and cancellation: old ticket refuses. Add cleanup-phase and active Track controls.
+
+**Bounded-recovery tradeoff:** render admission and final report publication may cause two generations. Removing the accidental active gate prevents the first automatic metadata attempt being wasted on an artificial busy409. The existing one-attempt-per-mount budget still intentionally does not auto-refresh a second later generation; images can remain unavailable until explicit reopen while drafts are retained. Do not silently replenish the budget or promise uninterrupted images across unlimited commits.
+
+## 2. Concrete tolerant ordinal decode, without exact timing policy
+
+Source anchors: web:_frame_at1831–1840 seeks int(t*fps) with unchecked set and one read; thumb1949–1963 and detframe1887–1892 separately clamp cum index, so end-boundary ordinal can differ. Pregen1024–1044 combines forward reads and unchecked seek. exact_samples.read_indexed_capture188–220 is unsuitable as tolerant admission: it requires FFMPEG, report fps/count/dimensions and observed PTS within an exact precision bound.
+
+Add to openscrub_internal/thumbnails.py:
+
+- ThumbnailDecodeError(ValueError), with safe detail only; web maps it to thumbnail_unavailable404 after candidate fallback is exhausted.
+- read_ordinal_capture(cap,index,*,count) -> numpy.ndarray. The caller owns/opens/releases cap. Require type(index) is int, type(count) is int, count>0 and 0<=index<count. Require isOpened(); successful cap.set(CAP_PROP_POS_FRAMES,index); finite CAP_PROP_POS_FRAMES immediately before read within1e-6 of index; exactly one successful nonempty read; finite post-read CAP_PROP_POS_FRAMES within1e-6 of index+1. Reject observed mismatch/unsupported position reporting, failed seek/open/read or empty/EOF as ThumbnailDecodeError. Let native exceptions reach the web adapter's typed boundary; this helper must not import the engine merely to recognize cancellation. Do not inspect POS_MSEC, backend name, stream metadata, report-rate equality, frame count equality or exact policy here.
+- _read_thumbnail_ordinal(selected,index,*,count,capture=None) -> numpy.ndarray in web uses a caller-borrowed capture when supplied; otherwise it opens cv2.VideoCapture(selected['path']) and owns/releases every returned capture in finally. It calls read_ordinal_capture in both cases. Preserve openscrub.PipelineCancelled, existing ThumbnailDecodeError and BaseException identity/precedence; map other Exception values (including constructor/open/native-method errors) to ThumbnailDecodeError with their cause. Borrowed capture remains the pregen caller's finally responsibility. Source/report before/after checks remain in the owning web request/ticket.
+
+Each Recipe candidate supplies k=max(0,min(floor(t*report_fps),len(cum)-1)). Pass exactly k/count to this helper; use exactly cum[k] for that returned image. Demand and pregen both invoke the **same web adapter and primitive**; pregen supplies capture=its_owned_capture and seeks through the same primitive for every attempted row, with no forward-cache/current-frame shortcut in v3. The callback seam, if retained for tests, is read_frame(index,*,count), implemented only by those two adapters. Do not convert k back to seconds and re-infer it.
+
+Tolerant fallback advances only to the next separately named recipe candidate, using that candidate's own k/cum[k]. It never searches nearby frames or uses pixels decoded for j!=k with cum[k]. Demand retains the existing last successfully decoded/clipped blank crop when all successful candidates are blank; failed ordinal attempts supply no crop. Pregen accepts only a successful nonblank first candidate; otherwise it leaves demand to try the full candidates. Detframe attempts its first candidate only and returns unavailable on failure.
+
+Add test_thumbnail_ordinal_seek_and_cum_match for last-frame/end-boundary indices and distinct per-frame pixels/offsets; mutation controls must reject ignored set, false set, pre/post ordinal mismatch, NaN position, empty/read failure and a wrong-index callback. Actual tiny CFR and retained ordinary normalized-source routes compare against an independent sequential-decoded ordinal oracle. Add a coherent source with unsupported exact policy but usable reported ordinal positions: ordinary image succeeds while edit_sample still refuses. Add backend-position-unavailable control with explicit unavailable response.
+
+**Compatibility limit/tradeoff:** this proves the requested integer equals OpenCV's reported ordinal, not exact PTS or independently certified ordinal pixels on arbitrary unsupported media/backends that lie about position. It removes silent application-level nearby fallback; it cannot certify arbitrary decoder behavior using another self-report. Backends lacking trustworthy frame-position reporting may become explicitly unavailable even though old unchecked seeking sometimes returned an image. If the product promise demands backend-independent ordinal proof, that requires a separately approved sequential-from-zero/certification design and measured cost; do not silently add an O(k) prefix decode/whole-input scan or import exact policy. The1e-6 ordinal tolerance and real backend compatibility remain implementation acceptance gates, not measured facts here.
+
+## 3. Verified filenames, launcher semantics and narrowed floor scope
+
+Read-only git show verified all15 existing tests/ paths in the published recipes plus root test_openscrub.py at6fde: test_exact_samples.py, test_exact_adoption.py, test_exact_media.py, test_exact_recovery_races.py, test_strict_tracker_seed.py, test_strict_tracking_routes.py, test_manual_addition_replay.py, test_review_save_failures.py, test_report_transactions.py, test_large_report_io.py, test_report_roundtrip.py, test_job_lifecycle.py, test_job_response_lifetime.py, test_job_source_allowlist_lifecycle.py and test_vault_cleanup.py. Planned thumbnail_io/browser files and CJS/server adapters remain new files. No missing filename was found; all six named root legacy-tracker functions in the affected command were also verified by immutable git show.
+
+Actual tooling/verify.py160–178 strips only individual -B/-u prefixes, recognizes -m pytest, appends owned basetemp/cache, and returns [cfg.python]+prefix+workload. main228–249 strips one leading -- from remainder, uses the config-selected workload interpreter and gives each invocation an owned run cwd. A Python server adapter is valid; passing .cjs directly would incorrectly invoke Python, so that adapter launches/reaps the prepared Node child. Use absolute source/test/controller paths. No supplied --basetemp/cache/xdist overrides. Runtime/workload configs, not the controller's /usr/bin/python3, select actual3.12/3.9. Read-only inspection invoked no launcher action.
+
+Replace broad floor 'pytest source/tests' with named affected owners, excluding response-lifetime file from that general invocation; then run its three actual source-video stream endings explicitly:
+
+```bash
+affected=(
+ "$TASK801_ROOT/source/tests/test_thumbnail_io.py"
+ "$TASK801_ROOT/source/tests/test_thumbnail_browser.py"
+ "$TASK801_ROOT/source/tests/test_exact_samples.py"
+ "$TASK801_ROOT/source/tests/test_exact_adoption.py"
+ "$TASK801_ROOT/source/tests/test_exact_media.py"
+ "$TASK801_ROOT/source/tests/test_exact_recovery_races.py"
+ "$TASK801_ROOT/source/tests/test_strict_tracker_seed.py"
+ "$TASK801_ROOT/source/tests/test_strict_tracking_routes.py"
+ "$TASK801_ROOT/source/tests/test_manual_addition_replay.py"
+ "$TASK801_ROOT/source/tests/test_review_save_failures.py"
+ "$TASK801_ROOT/source/tests/test_report_transactions.py"
+ "$TASK801_ROOT/source/tests/test_large_report_io.py"
+ "$TASK801_ROOT/source/tests/test_report_roundtrip.py"
+ "$TASK801_ROOT/source/tests/test_job_lifecycle.py"
+ "$TASK801_ROOT/source/tests/test_job_source_allowlist_lifecycle.py"
+ "$TASK801_ROOT/source/tests/test_vault_cleanup.py"
+ "$TASK801_ROOT/source/test_openscrub.py::test_track_manual_region"
+ "$TASK801_ROOT/source/test_openscrub.py::test_track_fail_closed_hold"
+ "$TASK801_ROOT/source/test_openscrub.py::test_track_person_detector_path"
+ "$TASK801_ROOT/source/test_openscrub.py::test_track_dormant_reacquisition"
+ "$TASK801_ROOT/source/test_openscrub.py::test_track_person_lookalike_veto"
+ "$TASK801_ROOT/source/test_openscrub.py::test_track_person_size_jump_handoff"
+)
+/usr/bin/python3 /home/tahv0/src/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/verify.py --config "$TASK801_ROOT/configs/floor.json" run -- -B -m pytest "${affected[@]}" -q
+/usr/bin/python3 /home/tahv0/src/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/verify.py --config "$TASK801_ROOT/configs/floor.json" run -- -B -m pytest "$TASK801_ROOT/source/tests/test_job_response_lifetime.py" -k video -q
+```
+
+Use the same affected selection/native config for the backend checkpoint; repeat the three selected source-video cases on native if not already covered by the final full. Source test_job_response_lifetime.py15–17 parameterizes endpoint download/report/video and ending complete/iterator_error/disconnect; -k video selects exactly its three actual video cases without relying on environment-specific parameter display order. Preserve the unchanged4MiB fixture. The six unchanged download/report permutations remain attributed to the original acceptance (and will be included in the one stabilized native full); do not rerun the entire9-case4MiB matrix on floor merely for symmetry. Existing scoped roundtrip/stdout adapter remains required only for its exact guarded JSON-probe boundary. Do not rerun S02.
+
+One normally discovered stabilized native full remains justified after lifecycle/routes/PAGE changes. Actual Python3.9 gets the named affected selection plus3source-video cases, not all tests. Package/installed/browsers stay task-specific and final-source bound. All command text here is an execution recipe, unexecuted during preparation.
+
+## 4. Working-slice delivery boundary
+
+Replace scaffolding-only Task1/Task2 and separate check-only Task5 review gates with two coherent implementation units:
+
+**Backend slice:** accepted-source/legacy marker, tolerant selection/revalidation, generation notifications/lifetime/cache, concrete ordinal recipe, actual metadata/crop/detframe/pregen routes and actual route/pixel/race/error controls land together as a working backend checkpoint. Fold focused native/floor/source-video validation into this slice; do not leave a committed 'new identity store' whose consumers still serve unchecked thumb2/public3600.
+
+**Browser slice:** versioned ordinary/zone/group/lightbox bindings, one-budget image recovery and draft-preservation controls consume the working backend. Fold evaluated-JS, actual PAGE/cache revisit/retained-render-draft tests into this slice, then freeze final source for one native full, package/installed HTTP/updater evidence and independent review. Package startup/source binding is re-run only when changed product bytes require it. Keep the overall focused P08A PR/dependency boundary; P08B/P09/C01 remain separate.
+
+The decoder compatibility/ordinal-tolerance checks above are owning implementation acceptance gates. Root adopts their conservative unavailable behavior and explicit limits; no new decoder certification is claimed. Do not silently weaken the checks or substitute an expensive prefix decode to make an unsupported backend pass.
+
+## 5. Own-save, raw-row equality and recovery budget: adopted tradeoff
+
+Original thumbnail research lines35–37 intentionally makes successful publication invalidate decision/audio-only generations; final amendment lines147–151 retains success-always-advances epoch and full raw-row equality. HTTP/browser section82–97 requires complete raw row, same raw index and one metadata attempt per mounted review; a patched V, save ACK or failure never replenishes it. It explicitly prohibits successful-save metadata/save feedback loops. Frozen P08A card116–127 repeats coarse choice/audio invalidation and one-budget/equal-row requirements. This is an intentional conservative contract, not an accidental omission that authorizes excluding enabled.
+
+At6fde:
+- web:3942–3952 applyDet writes local EN and EDITS.enabled, updates button/class and editor filter/draw. It makes no POST/metadata/image request. A local enable toggle alone changes neither report epoch/V nor the metadata raw-row fingerprint captured at mount and consumes no recovery budget.
+- web:4058–4078 saveAndRender deep-copies the submitted payload; audio is included only when loaded and dirty. Actual POST detections writes enabled at2203–2206, audio2233–2236, then unconditionally atomic_report/_report_committed_locked2237–2238. Even an otherwise equal/empty successful ordinary save currently commits and advances the report epoch; no non-writing no-op optimization exists.
+- web:4078–4083 acknowledges only equal submitted maps/referenced additions and advances audioSaved to the submitted snapshot. The response contains ok,total,suggest_allowlist and optional strict geometry_rows, **not** thumbnail V/full raw rows/raw-row equality. The ACK cannot prove a newly projected complete metadata row or update its fingerprint.
+- web:4096–4100 retains the mounted review when newer edits remain after save. web:4103–4107 retains it when newer edits arrive during the render request. Render rejection/failure also retains it. Only the normal no-newer-edit render-success path removes #review at4109–4112. Therefore ordinary successful own writes can leave a mounted view using its earlier V/fingerprints.
+- Render admission changes operation via _reserve_queue_locked/_begin_operation852–864; render's successful final publisher983–984 changes report epoch again. Render write_report preserves full source rows but updates provenance/output fields (engine6358–6372). Ordinary output/audio-only changes may keep every raw-row fingerprint equal while V changes.
+- Current img elements do not automatically refetch just because the server changes V. Already delivered pixels cannot be recalled. An old lazy-card request, conditional revalidation or later lightbox open can encounter obsolete409 and invoke recovery. Do not claim that a save ACK itself consumes budget or forces an immediate JPEG decode.
+
+Consequences under the adopted contract:
+1. A committed enabled change alters the full raw-row fingerprint even though crop geometry/pixels may be identical. That row, and a grouped card whose captured member row changed, must refuse automatic rebinding. Own confirmed writes do not grant an index-only or geometry-only exception. Other unchanged rows may patch if the single budget is still available.
+2. An audio-only/output-provenance-only/equal save changes V but leaves unchanged raw rows eligible for rebinding. It can still spend the one recovery attempt when an old binding fails. If budget was already used, those images remain unavailable pending an explicit user reopen/retry, despite unchanged image geometry.
+3. A request already accepted/materialized before a commit may finish with its old bytes. Such bytes are not evidence the old URL is still current. No proactive network subscription/refresh is implied.
+4. A held save ACK may coexist with a newer opposite enabled value, newer geometry/audio or uncertain-save owner. Those are still current pending drafts; recovery must not use them or the submitted payload as the newly authoritative metadata fingerprint.
+
+### Required source-plan clarification
+
+Keep the complete raw-row fingerprint (including enabled), coarse report/operation generation and one-attempt-per-mounted-review contract. Make the above own-save consequences explicit in plan/browser tests/README; do not promise transparent image refresh after every legitimate choice/audio save.
+
+A local toggle/save ACK does not itself reset the thumbnail budget, refetch metadata, reload image URLs or rebase its mount-time metadata binding. Preserve the original one-budget recovery only when an actual image failure occurs. On fingerprint mismatch or exhausted budget, show the existing unavailable/reopen status and retain every draft, submitted/uncertain snapshot, member binding and editor. Do not exclude enabled from the fingerprint, call exact.row_context_eq instead, overwrite thumbnail_row from geometry_rows/local EN, or treat same geometry as complete row equality. Do not reset the owner/version budget from a save callback.
+
+Do not introduce a save-response metadata projection or extra successful-save fetch in this correction. Either would be an additional contract requiring authority/equality/owner fencing and introduced O(N) cost decisions, rather than an interpretation of the frozen one-budget research. Likewise a selectively image-affecting epoch would depart from its deliberately coarse invalidation. Root adopts the legitimate-save/placeholders tradeoff unchanged. Fewer placeholders would require a separately adopted UX/identity change; no geometry-only or own-ACK exception is authorized here.
+
+Keep explicit user reopening distinct from automatic recovery. It may reset the image owner because the user initiates a new review mount; P08A must not clear/remap/rebase existing pending indexed drafts merely to make image refresh succeed. Do not claim that this amendment adds reconciliation of legacy indexed drafts across report reordering. Incompatible geometry/draft owners require explicit reinspection; no row reconciliation framework is introduced. An image-only retry within the existing mount cannot bypass full-row equality merely because it was user initiated.
+
+Named browser controls to fold into the browser slice:
+- test_thumbnail_local_enabled_toggle_does_not_fetch_or_spend_budget.
+- test_thumbnail_own_enabled_save_retains_newer_opposite_and_refuses_changed_raw_binding: hold actual save, edit again, ACK; raw enabled change makes changed row/group unavailable, untouched rows patch only if budget unused; no render/new draft loss.
+- test_thumbnail_audio_output_save_uses_one_existing_budget: unchanged raw-row equality may refresh once; a second legitimate publication with exhausted budget does not fetch/reset/loop; editor/audio/save references remain owned.
+- test_thumbnail_save_ack_does_not_forge_raw_row_equality_or_reset_budget: cover success, render refusal, lost ACK/retry, save callback after A→B→A and newer geometry/manual/audio values.
+- test_thumbnail_render_admission_then_completion_does_not_replenish_budget: allow coherent active reads, preserve retained newer drafts and document later explicit reopen boundary.
+
+These controls distinguish old already-loaded pixels, actual stale URL requests, server decode counts and metadata attempts; do not equate V invalidation with immediate browser network work.
+
+## 6. Association-marker commit point
+
+Refine the earlier 'failed/stale association' wording: source_report_bound records **successful provenance-bound source association**, not successful completion of the entire later request. Set it only after the existing source/report/path/operation authority checks permit association under report_lock. A prepared candidate or rejection before association must not set true. Once that association commits, later exact-policy refusal, invalid row request, native decode/encode failure, strict-save conflict, response failure or cancellation cannot clear true. False legacy calls never clear it; retirement/pending/replacement within the same incarnation never reset it. This prevents a later request failure from reopening the provenance-downgrade fallback.
+
+Add paired controls: rejected-before-association leaves initial legacy eligibility intact; successful provenance association followed by decode/policy/request failure leaves true and later provenance removal unavailable. Neither control requires a successful report write or sample response to establish the association bit.
+
+## Adoption and publication boundary
+
+Root has adopted all six clarifications above. Routine implementation must consume them rather than re-ask whether ordinary active reads, the conservative own-save tradeoff or the association marker are intended. Source-owner/cache/actual routes must produce one working backend; browser integration follows without importing concurrent resize/editor work.
+
+Runtime compatibility remains to be established by the named owning gates. Honest unavailability on unsupported ordinal reporting is part of this chosen contract; arbitrary media PTS, lying backend ordinal reports, unchanged-observed-attribute external mutation, Windows/network behavior and long-video latency are not certified by this source audit. Record concrete failures and limits at their actual source/environment, not as a relabelled S02/decoder investigation.
+
+This publication creates only this amendment file. The two earlier plan/handoff artifacts are unchanged.

@@ -1,0 +1,114 @@
+# Pure plate-text matching extraction handoff
+
+Status: immutable source analysis and proposed extraction contract only. No code, runtime/test/build/model work, environment mutation, Git mutation or artifact publication. Both drafts are held in memory until root explicitly opens ROOT_PUBLISH_WINDOW_ACTIVE.
+
+## Source identities and method
+
+| Role | Immutable commit |
+| --- | --- |
+| Existing O03 card/global constraints and reused research | 1e7c6e2c6ecc8384d5b3a2a6590c6d89f7bcd17d |
+| Donor OCR/matching code/tests | b4d0c75f25d91510fe1692f901d11853dc7db005 |
+| Accepted implementation/package base | 6fde5ad60c6d78d69dbbd8e049a9196f15e4095f |
+
+The mandatory task brief was read first at .superpowers/sdd/README/task-8030-brief.md. All repository evidence thereafter came from bounded GIT_OPTIONAL_LOCKS=0 git show or git ls-tree against those exact commits, with read-only stdout filtering. No moving-worktree source, checkout/export/temp file, index/ref/manifest/guard write or external research was used. Line anchors below refer only to these immutable objects.
+
+## Existing decisions reused
+
+At docs1e7c6e2c6ecc8384d5b3a2a6590c6d89f7bcd17d:
+- docs/superpowers/plans/upstream-delivery/04-optional-assistance.md L13-15: preserve off-path defaults, explicit human decisions, optional suggestions/gaps and job privacy lifecycle; no inference score guarantee or assumed upstream acceptance.
+- Its O03 card L66-82: preserve independent full-frame discovery, exact versus explicit fragment semantics, complete chosen number/plate protection and future search_frame signature. Entire jobs/worker/UI scope belongs to full O03, not this extraction.
+- decisions-and-research.md D02-D04, D08, D14, D16: unchanged ordinary defaults, no custom training/workbench, training-free independent discovery, justified module structure and evidence-led delivery.
+- R09 L107-109: private package and tests need real artifact/discovery checks; updater nested-path support does not require a rewrite.
+- R11 L115-124 and ../2026-11-16-upstream-extraction.md L391-411: reuse existing OCR adapters first; recognition, text geometry, physical boundary inference and tracking remain distinct. No additional tool-comparison exercise is needed for a stdlib string matcher.
+
+The source plan is the complete proposed contract, including all edge cases and future verification. The following dispositions explain what is extracted and what changes.
+
+## Donor function disposition
+
+All donor anchors below are b4d0c75f25d91510fe1692f901d11853dc7db005:plate_text_hints.py.
+
+| Anchor/function | Disposition | Reason |
+| --- | --- | --- |
+| L33-65 normalize_hints | Adapt into normalize_queries and PlateQuery validation | Reuse explicit ASCII policy and display separators; adopt a bounded new 3..16-character query contract (not legacy exact/partial compatibility), 128/item and 1024/payload limits, 1..10 fields and stable first-occurrence duplicate removal. Keep string comma/semicolon/CR/LF batch syntax. Explicit full/fragment mode is added. Unicode-only blank fields are rejected rather than silently discarded through generic strip(). |
+| L68-69 _ocr_text | Reject implementation; replace with strict observation normalizer | str(value), prefix truncation, Unicode upper() before filtering and stripping all unsupported symbols can fabricate literal equality. For example ß can expand into SS, slash/other punctuation can vanish, and a >512 suffix can be lost. Validate supported ASCII before normalization; malformed observations are nonmatches, with no coercion/truncation. |
+| L72-98 match_text | Retain intent and applicable examples, replace algorithm/result contract | Literal normalization and separation from OCR confidence are useful. Donor "exact" means full target contained anywhere in observed text, not equality; automatic longest-common-substring/half-target partial is not an explicitly requested fragment. Return every matching unique query in query order with full_equal or fragment; no strongest winner, ordinal strength or coverage. |
+| L101-148 _box/_quad/_ordered/_provided | Defer, do not copy | NumPy/OpenCV geometry validation, clipping and quad interpretation are outside pure matching. |
+| L151-186 _iou/_retain_proposal | Defer, do not copy | Source/time overlap deduplication and protection unions require later candidate geometry ownership. Never deduplicate physical instances by text in this helper. |
+| L189-241 _candidates | Defer, do not copy | Whole-frame/contour discovery is image processing, bounded-region selection and resolution policy. The 1280px ceiling is not imported as a matcher limit. |
+| L244-274 _rectified/_view | Defer, do not copy | Image transforms/rotations/mirroring and inverse coordinates require later reader integration tests. |
+| L277-307 _LocalTesseract | Defer, do not copy | OCR loading, executable discovery, timeouts and dependency errors are not string matching. |
+| L310-349 _token_groups | Reject from pure slice; later adapter must justify any grouping | It inspects boxes and joins nearby line tokens. No token/word/region join belongs in a literal helper. Same-region presentation separators are supported, but adapters must not concatenate unrelated words. |
+| L352-432 search_frame | Preserve future integration signature only; do not implement/copy now | It combines discovery, views, readers, evidence ranking and geometry/proposal output. No frame_bgr, reader or cancellation enters matching.py. |
+
+Precise later-integration differences:
+- L389-390 rejects every non-"exact" full_frame_text/text_contour hit. Do not replicate that origin gate. match_observation accepts explicit fragments regardless of origin or vehicle/YOLO box presence.
+- L398-418 keeps complete candidate protection and separates text boxes from protection. Preserve that intent through the opaque original-observation reference; calculate no new box or substring region in the matcher.
+- L408-418 uses plate_quad for OCR-derived protection and an ordinal literal score. The matcher supplies neither a physical-plate label nor a numeric certainty. Later geometry owners must distinguish OCR region versus plate boundary.
+- L424 and L426 use query-completion/exact-hit early exits. They are reader/search sampling policies, not guarantees that all physical instances were discovered.
+
+## Dependencies deliberately removed or not introduced
+
+The donor pure-text functions are embedded in plate_text_hints.py, whose module-level cv2/numpy imports at L24-25 make copying that module inappropriate for stdlib-only import. math/os/shutil serve partial heuristics, geometry or OCR loading; none is needed by the retained literal policy except re and small stdlib types.
+
+The donor orchestration has actual removed-system edges:
+- plate_text_web.py L18-23 imports finding_previews, learning_session, stop_review, video_learning and video_sections. L52-63 uses section coverage/ownership. Its _evidence at L111-125 copies the legacy exact/partial and numeric-strength schema.
+- plate_text_subprocess.py L102-106 imports plate_text_web, learning_session and stop_review inside the child. L124-144 reads reports, verifies learning_session source identity, handles stop-review resume, invokes _scan and publishes staged report deltas.
+- These are source observations, not a claim that the donor matcher itself imports Findings directly or trains a model. Do not copy their web registration, report/source checks, child process, section workflow, Findings links, confidence-training state or global application imports.
+
+The new helper needs no learning/sections/Findings replacement because it has no jobs, persistence or execution orchestration. Later O03 jobs/worker must use ordinary lifecycle/cancellation/progress and valid report-publication contracts; they cannot import a whole web app to reuse donor functions. No placeholder orchestration or source-identity registry is added now.
+
+## Tests worth reusing and tests not transferred
+
+At donor test_plate_text_hints.py:
+- L18-26 test_normalization_validates_limits_and_preserves_distinct_targets: retain the synthetic case/separator/dedup/order examples and invalid-input table; strengthen exact bounds, modes, Unicode and malformed types.
+- L29-41 test_exact_matches_outrank_meaningful_partial_without_character_substitution: retain equality on "ABC 1234" and the negative ABO1/AB01, short/unrelated examples. Replace score ranking and implicit partial assertions with explicit full-equality and fragment-mode tests.
+- L53-74 test_split_tokens_join_and_partial_protects_entire_candidate: retain only the whole-candidate evidence invariant as an opaque-mapping preservation test. Do not transfer the spatial token join or image fixture.
+- L155-166 test_full_frame_text_fallback_rejects_partial_evidence: reject the origin-based rejection expectation. Replace it with pure match acceptance for an explicitly requested fragment on a supplied full_frame_text observation without a YOLO box; this is not an OCR/discovery fixture.
+- L181-216 overlap/protection and distinct-instance tests: retain the principle that evidence must not shrink and identical text need not mean identical physical object. Pure tests preserve separate original mappings; they do no geometric union/dedup.
+- L78-150, L169-178, L219-269: rotation/rectification, contour discovery, invalid geometry, Tesseract availability, resolution, hit limits, cancellation and real OCR smoke belong to future reader/search integration. Do not import cv2/numpy/shutil/pytesseract or run these for the matcher slice.
+
+No historical donor pass count is a result for this extraction. Required named RED/GREEN and Python3.9/package tests are listed in the source plan; none ran during preparation.
+
+## Proposed semantic decisions and tradeoffs
+
+1. Full is normalized string equality, including all supplied candidate text. XABC123Y does not equal full ABC123. This intentionally differs from donor "exact" containment.
+2. Fragment is explicitly requested and matches the entire 3..16-character literal query contiguously within one normalized observation. It never infers a fragment of a full query and never uses O/0, I/1, regex, edit distance or half-target heuristics.
+3. Query errors raise ValueError atomically; unusable observed OCR text yields no match. That reflects user-controlled validation versus imperfect recognized input. Unicode and punctuation are rejected before normalization, not transliterated or deleted.
+4. Stable first-occurrence query ordering/dedup is retained; all matching queries are returned. Different modes remain separate pairs. Observation evidence is never deduplicated by literal text.
+5. Default dataclass reprs hide query text, observed/normalized text and the original candidate mapping via repr=False. Validation errors contain fixed rule descriptions, not raw/normalized query or candidate values; the module emits no logs or output. No numeric match_strength/target_coverage is retained. Existing OCR scores are untouched opaque evidence, separate from deterministic relation, physical identity and mask support.
+6. Space/tab/dot/hyphen removal is supported inside a single candidate observation. The helper never joins separate observations; safe spatial grouping is a future adapter responsibility. A literal matcher cannot establish whether two words grouped by a caller are related.
+7. A complete original candidate mapping is returned by reference in each ObservationMatch. No text offsets or substring mask are returned. Mapping fields such as candidate/protection geometry and OCR score are opaque and unchanged. With absent geometry, it still reports only a text relation.
+8. A full_frame_text/text_contour mapping is not rejected for origin or absent detector boxes. This removes a pure acceptance barrier without claiming recognition/discovery accuracy for detached plates.
+9. New full_equal/fragment results are deliberately not a legacy exact/partial schema. No legacy app/report consumer exists on accepted6fde for this dormant helper; later O03 integration must adapt intentionally and preserve old report behavior.
+10. Direct PlateQuery construction and prepared-batch matching are validated, so a caller cannot obtain an accidental fuzzy/empty match by bypassing normalize_queries. Mixed modes can pass through the future unchanged search_frame hints parameter as prepared query objects.
+
+These are proposed extraction corrections grounded in O03 and donor behavior, not newly discovered accepted application semantics. No user-approval pause is required; root reviews/adopts them before coding.
+
+## Smallest coherent base and packaging
+
+Use accepted6fde5ad60c6d78d69dbbd8e049a9196f15e4095f as the smallest supplied accepted implementation base. It already has an inert openscrub_internal/__init__.py, wheel/sdist includes for that directory and testpaths for tests. No report/lifetime helper is imported, and the matcher logically depends only on this package/inclusion scaffold, stdlib and its own tests; unrelated editor/tracker behavior in that base is not a semantic prerequisite. Do not choose the current moving editor head or require all C01.
+
+Immutable accepted anchors:
+- pyproject.toml requires-python >=3.9, wheel includes at L90-99, sdist at L101-122 and pytest testpaths at L124-125.
+- openscrub_update.py L157-181 walks sdist file members, makes nested directories and replaces shipped files while preserving existing update policy. No updater rewrite follows from adding a nested helper.
+- Dockerfile L60-65 includes COPY openscrub_internal/ openscrub_internal/ and installs the package. This is inclusion evidence, not an executed Docker result.
+- windows/openscrub.spec L47-64 uses app entry-point analysis and explicit hidden imports. A dormant unreferenced helper may not be in frozen executables. Do not change the spec or promise Windows UI availability until a consuming integration makes it reachable and verifies it.
+- CONTRIBUTING.md L23-31 requires full regression and sdist-to-wheel build before a PR; web/browser and real render checks apply when those behaviors change. This dormant helper changes neither.
+
+The exact code footprint is two new package files plus tests/test_plate_text_matching.py. All preexisting app/default import/report/schema/dependency bytes must remain unchanged. Actual wheel/sdist content and an installed-wheel Python3.9 import exercise must prove package availability; source-tree success alone does not.
+
+## Deferred feature and delivery boundaries
+
+Future integration, not this slice:
+- OCR/model/tool loading and checkpoint/runtime/license choices.
+- Whole-frame/tiling/full-resolution discovery, plate-on-wall/ground fixtures, small/rotated/partly unreadable text accuracy.
+- Candidate grouping, overlap unions, crop/inverse coordinate transforms, boundary inference and full-region protection decisions.
+- Exact source/frame validity, job sampling/coverage, cancellation/timeout/restart, private arguments/logs, deletion/vault/retention and stale publication.
+- Suggestion UI, manual selection, source-bound physical target identity, O02 tracking/loss/corrections, O04 masks or render output.
+- Upstream acceptance, PR submission, publication or broad optional assistance integration.
+
+The preserved future signature is search_frame(frame_bgr, hints, regions=None, reader=None, cancelled=None), implemented later outside matching.py. It can call normalize_queries and match_observation without coupling the matcher to a detector or training system.
+
+This slice may be coded only after root adopts the drafts and creates a separate isolated branch/worktree. Verification must be serialized with the editor chain. During preparation, drafts stay in memory. Root must explicitly issue ROOT_PUBLISH_WINDOW_ACTIVE before any later plan/handoff file write in the shared metadata phase. A publication window authorizes only the agreed documents, not source/Git/environment changes or verification.
+
+Passing pure matching tests proves the documented literal relations and preservation of supplied evidence. It does not implement detached-plate OCR/search/track or establish accuracy, mask coverage, privacy completion or upstream acceptance.

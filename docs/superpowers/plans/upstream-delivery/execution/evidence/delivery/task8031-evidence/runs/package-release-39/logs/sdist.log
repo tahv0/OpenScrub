@@ -1,0 +1,27 @@
+ACTIVE_SOURCE {"executable": "/tmp/openscrub-python39-20261117/venv/bin/python", "python": "3.9.25 (main, Oct 31 2025, 23:00:23) \n[Clang 21.1.4 ]", "sources": {"openscrub_internal": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/worktrees/plate-text-matching/openscrub_internal/__init__.py", "sha256": "c35c063c010e329c5dad13782e7b67438ed4b2d1faf975d4f01be2773a18e022"}, "openscrub_internal.plate_search": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/worktrees/plate-text-matching/openscrub_internal/plate_search/__init__.py", "sha256": "fdeb0614f0c5904b0cacd2d2733ec1c85293107f91e3eda8fec73a7411b0343b"}, "openscrub_internal.plate_search.matching": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/worktrees/plate-text-matching/openscrub_internal/plate_search/matching.py", "sha256": "2f3a8182dcc66b61e03400d11a6451575cfb4775705cc2338be0e1a00af4ee03"}}}
+* Getting build dependencies for sdist...
+ACTIVE_SOURCE {"executable": "/tmp/openscrub-python39-20261117/venv/bin/python", "python": "3.9.25 (main, Oct 31 2025, 23:00:23) \n[Clang 21.1.4 ]", "sources": {"openscrub_internal": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/worktrees/plate-text-matching/openscrub_internal/__init__.py", "sha256": "c35c063c010e329c5dad13782e7b67438ed4b2d1faf975d4f01be2773a18e022"}, "openscrub_internal.plate_search": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/worktrees/plate-text-matching/openscrub_internal/plate_search/__init__.py", "sha256": "fdeb0614f0c5904b0cacd2d2733ec1c85293107f91e3eda8fec73a7411b0343b"}, "openscrub_internal.plate_search.matching": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/worktrees/plate-text-matching/openscrub_internal/plate_search/matching.py", "sha256": "2f3a8182dcc66b61e03400d11a6451575cfb4775705cc2338be0e1a00af4ee03"}}}
+Traceback (most recent call last):
+  File "/tmp/openscrub-python39-20261117/venv/lib/python3.9/site-packages/pyproject_hooks/_in_process/_in_process.py", line 406, in <module>
+    main()
+  File "/tmp/openscrub-python39-20261117/venv/lib/python3.9/site-packages/pyproject_hooks/_in_process/_in_process.py", line 381, in main
+    json_out["return_val"] = hook(**hook_input["kwargs"])
+  File "/tmp/openscrub-python39-20261117/venv/lib/python3.9/site-packages/pyproject_hooks/_in_process/_in_process.py", line 323, in get_requires_for_build_sdist
+    return hook(config_settings)
+  File "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1203/build-tools/hatchling/build.py", line 21, in get_requires_for_build_sdist
+    from hatchling.builders.sdist import SdistBuilder
+  File "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1203/build-tools/hatchling/builders/sdist.py", line 14, in <module>
+    from hatchling.builders.plugin.interface import BuilderInterface
+  File "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1203/build-tools/hatchling/builders/plugin/interface.py", line 11, in <module>
+    from hatchling.plugin.manager import PluginManagerBound
+  File "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1203/build-tools/hatchling/plugin/__init__.py", line 1, in <module>
+    import pluggy
+  File "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1203/build-tools/pluggy/__init__.py", line 17, in <module>
+    from ._hooks import HookCaller
+  File "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1203/build-tools/pluggy/_hooks.py", line 10, in <module>
+    from ._caller import _HookCaller
+  File "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1203/build-tools/pluggy/_caller.py", line 15, in <module>
+    from typing import TypeAlias
+ImportError: cannot import name 'TypeAlias' from 'typing' (/tmp/openscrub-python39-20261117/python/cpython-3.9-linux-x86_64-gnu/lib/python3.9/typing.py)
+
+ERROR Backend subprocess exited when trying to invoke get_requires_for_build_sdist

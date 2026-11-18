@@ -1,0 +1,17 @@
+{
+  "source": {
+    "path": "/tmp/openscrub-frame-identity-baseline-20261117/runtime/cfr24.mp4",
+    "sha256": "3255faa79d819ad763cd1cc95c9d0f9aa5e49ade85019197220f6e5913f62c7c"
+  },
+  "results": [
+    {
+      "requested_s": 0.2,
+      "index": 4,
+      "canonical_s": 0.16666666666666666,
+      "independent_pts": "1/6",
+      "observed_s": 0.16666666666666666,
+      "indexed_reads": 2,
+      "vit_initializers": 2
+    }
+  ]
+}

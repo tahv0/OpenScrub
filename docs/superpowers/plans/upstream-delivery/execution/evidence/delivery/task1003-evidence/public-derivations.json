@@ -1,0 +1,52 @@
+[
+  {
+    "source": "task-1003-report.md",
+    "original_sha256": "0819ac761f084a8908664d1ca79455ad7ccb728138c65aaa993469f0b7fcd8c7",
+    "public_path": "execution/evidence/delivery/task-1003-report.md",
+    "public_sha256": "6aa0a47a1a4513a864634c3a460c5e6d4bb93cc0fc708726b6768c32d90bdc82",
+    "transformations": [
+      "omit local execution-accounting passages",
+      "add public provenance notice"
+    ]
+  },
+  {
+    "source": "task-1003-report.md",
+    "original_sha256": "0819ac761f084a8908664d1ca79455ad7ccb728138c65aaa993469f0b7fcd8c7",
+    "public_path": "execution/evidence/delivery/task1003-evidence/rawreport.txt",
+    "public_sha256": "37089c8b2210d3cf093572c8c1ade39efe75354ce29dc192dad3901d815d376c",
+    "transformations": [
+      "product-only rawreport derivative, not an original raw-byte match",
+      "omit local execution accounting"
+    ]
+  },
+  {
+    "source": "task1003-supervisor-pre-review.json",
+    "original_sha256": "14e2c182e41d7a478d7847021866d0dcbac9ed3e7a0b62e9b8b0d3f77d6ad115",
+    "public_path": "execution/evidence/delivery/task1003-product-state.json",
+    "public_sha256": "5b95e195da0da05deb18e5dbc2107b2108eb942379fa3451d7c6c9fd9ddb29e8",
+    "transformations": [
+      "omit local-only publication field and original archive accounting",
+      "retain product head/tree/ref/clean and attribution",
+      "point to separately derived public subset manifest"
+    ]
+  },
+  {
+    "source": "task-1003-review.md",
+    "original_sha256": "d4160c3a3f3185fb709bc27c21a0f4cf0ec538aa8f34225c1ab5e779474ad8b2",
+    "public_path": "execution/evidence/delivery/task-1003-review.md",
+    "public_sha256": "9b93806250334613721cf825d6f67e83672a0d83def32a0809d2c3d6e2db29ed",
+    "transformations": [
+      "relocate reviewer state-proof citation",
+      "omit local execution-control mention"
+    ]
+  },
+  {
+    "source": "task-1003-final-acceptance.md",
+    "original_sha256": "08932f99780cef8d40f7b106d698d5da545610edc392c0638cce96a14954fa76",
+    "public_path": "execution/evidence/delivery/task-1003-final-acceptance.md",
+    "public_sha256": "ae3a51e243ebee29b217b7fbaa384a047981bcd122f8b8b96fdc830a497be844",
+    "transformations": [
+      "distinguish original local archive audit from selected public subset"
+    ]
+  }
+]

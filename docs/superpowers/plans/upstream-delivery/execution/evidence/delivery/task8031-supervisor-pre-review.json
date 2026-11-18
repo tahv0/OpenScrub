@@ -1,0 +1,19 @@
+{
+  "base": "6fde5ad60c6d78d69dbbd8e049a9196f15e4095f",
+  "head": "3547f82c027323dba8e69e8aef7be62c88438d8b",
+  "clean": true,
+  "preexisting_files_unchanged": 132,
+  "added_files": [
+    "openscrub_internal/plate_search/__init__.py",
+    "openscrub_internal/plate_search/matching.py",
+    "tests/test_plate_text_matching.py"
+  ],
+  "prior_refs_preserved": 158,
+  "manifest_rows": 88,
+  "payload_bytes": 863615,
+  "manifest_sha256": "7471fbe319a3473bb911e3024cb48ea55825d820f8d0ae213e3f4d8227014598",
+  "product_boundaries": "dormant helper only; initialRED13, finalfloor13/nativefull573/package+installed3.9 allactualattributed; no consumerintegration claim",
+  "concerns_disposition": "Actual3.9 product installed gate satisfies floor; cached3.9 buildtoolfailure preserved, no generalfloorbuild claim. FrozenWindows deferred per originalscope; independentreview next.",
+  "root_read": "entire report/PR/14command-results/artifactbinding; rawfull573 and installed3.9 logs",
+  "private_control_scan": "absentfrom88compactpayloads"
+}

@@ -1,0 +1,108 @@
+# Pure plate-text matching source plan
+
+Status: preparation only; no implementation or verification has run.
+
+## What, why, when
+
+Add one dormant, stdlib-only matcher for already recognized candidate text. Retain the donor's useful normalization policy, correct containment-as-exact and implicit-partial matching, and keep complete supplied region evidence unchanged. This is an independently testable O03 prerequisite, not OCR/discovery/search/selection/tracking/redaction.
+
+After root adopts this scope, root creates a separate isolated branch/worktree at accepted6fde5ad60c6d78d69dbbd8e049a9196f15e4095f (suggested optional/plate-text-matching). Verification is serialized with the editor chain. No entire C01, P10/P16, O01/O02/O04 or report-publication prerequisite is required: only the accepted private-package scaffold/inclusion rules, stdlib and tests. Do not use the moving editor worktree.
+
+Evidence:
+- docs1e7c6e2c6ecc8384d5b3a2a6590c6d89f7bcd17d: docs/superpowers/plans/upstream-delivery/04-optional-assistance.md global constraints L13-15 and O03 L66-82; decisions-and-research.md D02-D04/D08/D14/D16, R09 and R11; existing tool comparison ../2026-11-16-upstream-extraction.md L391-411.
+- donor b4d0c75f25d91510fe1692f901d11853dc7db005: plate_text_hints.py L33-98 and test_plate_text_hints.py L18-41.
+- accepted6fde: pyproject.toml L90-125, openscrub_internal/__init__.py, openscrub_update.py L140-184 and CONTRIBUTING.md L23-31.
+- Exact dispositions/limits are in plate-text-matching-handoff.md. All inspection used immutable read-only git show/ls-tree with GIT_OPTIONAL_LOCKS=0.
+
+## Exact footprint and interfaces
+
+Add only openscrub_internal/plate_search/__init__.py (inert docstring), openscrub_internal/plate_search/matching.py and tests/test_plate_text_matching.py. Preserve every existing tracked source/default/schema/import/dependency/package/version file byte-for-byte. No jobs.py, worker.py, app/UI hooks or feature guide.
+
+Use Python3.9-compatible frozen dataclasses and typing; stdlib imports only. No slots=True or newer runtime API. Public data:
+- MatchMode = Literal["full", "fragment"].
+- PlateQuery(text: str, mode: MatchMode = "full"): __post_init__ validates/normalizes individual text and mode, storing normalized text. text uses field(repr=False).
+- TextMatch(query: PlateQuery, observed_text: str, normalized_observed: str, match_kind: Literal["full_equal", "fragment"]): frozen result; both text fields use repr=False.
+- ObservationMatch(observation: Mapping[str, object], text_match: TextMatch): original mapping retained by identity; observation uses repr=False. Nested evidence stays caller-owned, with no lifetime/thread-safety guarantee.
+
+Public functions:
+    normalize_queries(value: Union[str, List[str], Tuple[str, ...]], *,
+                      mode: MatchMode = "full") -> Tuple[PlateQuery, ...]
+    match_text(observed: object,
+               queries: Union[List[PlateQuery], Tuple[PlateQuery, ...]]) -> Tuple[TextMatch, ...]
+    match_observation(observation: object,
+                      queries: Union[List[PlateQuery], Tuple[PlateQuery, ...]]) -> Tuple[ObservationMatch, ...]
+
+Private helpers:
+    _normalize_query_text(value: object) -> str
+    _normalize_observed_text(value: object) -> Optional[str]
+    _validated_queries(value: object) -> Tuple[PlateQuery, ...]
+
+No legacy normalize_hints alias or exact/partial dictionary shim. normalize_queries prepares one uniform-mode batch. Mixed-mode callers combine prepared batches; matching validates the combined list/tuple, at most ten entries before deduplication. Direct PlateQuery construction also validates, and prepared-query invariants are rechecked before matching.
+
+## Bounded new query contract
+
+This deliberately uses the donor's 3..16 policy as a new explicit contract, not legacy matcher compatibility:
+- Supported originals: ASCII A-Z, a-z, 0-9 plus only space U+0020, TAB U+0009, dot U+002E and hyphen-minus U+002D. Validate before uppercasing; delete those four separators and uppercase ASCII.
+- Each query: 3..16 normalized literal characters, at most 128 raw Python string characters.
+- normalize_queries accepts string or list/tuple of strings only. String batch delimiters are comma, semicolon, CR and LF, split on one-or-more. Drop only empty/ASCII-space-or-tab-only split fields. Unicode-only whitespace is unsupported and rejected. List entries are individual queries; delimiters and empty entries are invalid.
+- String payload including delimiters is at most 1024 characters. List/tuple summed raw lengths are at most 1024. Require 1..10 nonempty fields before deduplication; eleven duplicates fail.
+- Direct PlateQuery accepts one individual query and never splits delimiters. mode must be exactly full or fragment.
+- Stable first-occurrence deduplication key is (mode, normalized text); same literal in different modes retains both semantics/order.
+- All malformed/unsupported/empty/short/overlong/oversized queries raise ValueError atomically. Errors describe rules, without embedding raw or normalized query/candidate text. No silent skipping, transliteration, Unicode casefold/normalization, regex/fuzzy/O0/I1 correction.
+
+Examples: "ab-c 123; XY987\nABC123" prepares full ABC123, full XY987; ["BC1"] with mode fragment prepares fragment BC1. AB/123, ÅBC123, ß, Unicode dashes/full-width characters/NBSP, A1 and regex operators are rejected.
+
+## Observation and result contract
+
+One observation represents one already-associated candidate text region. Never join separate tokens, mappings, lines, regions, views or frames. Supported separators within one supplied region normalize as above; grouping unrelated words into that region is forbidden at the future adapter boundary. Literal code cannot infer spatial association.
+
+Observed values must be strings of at most 512 raw characters using the same supported alphabet/separators. Empty/separator-only/<3 normalized characters, unsupported/non-string/malformed/oversized values return (). Do not str()-coerce, truncate or strip unknown characters. Query validation always occurs first.
+
+For each unique query, in first-query order:
+- full emits iff normalized_observed == query.text; match_kind is full_equal.
+- fragment emits iff the entire literal query.text occurs contiguously in normalized_observed; match_kind stays fragment even when both strings equal.
+- Emit all matching queries once each, irrespective of repeated occurrence. Never infer a fragment of a full query, compute longest-common-substring/half-target matches, rank a winner or assign a score.
+
+Thus ab-c 123 equals full ABC123; XABC123Y does not. Explicit fragment ABC123 matches XABC123Y. BC123 does not match full ABC1234; fragment BC1 matches BC123. ABO1/AB01 and ABI/AB1 stay distinct. ABC/123 is unusable observed text.
+
+match_observation accepts any Mapping with usable "text", after validating queries. Missing/invalid mapping/text returns (). All other fields are opaque. Each result wraps the identical original mapping and its TextMatch, without mutation/copying away evidence, adding/narrowing geometry or requiring a source/vehicle/YOLO box. full_frame_text/text_contour origin is not a rejection reason. Complete supplied candidate/protection/text geometry and OCR scores survive unchanged; absent geometry is not manufactured.
+
+No score/coverage, identity, mask confidence, enabled/blur output or report schema. No logging, persistence/cache/registry, filesystem/process/model/video/network work. Default reprs and validation errors exclude raw and normalized query/candidate text; no custom formatting should expose it. Evidence is available only through explicit data fields for a future lifecycle-aware caller.
+
+## One RED/GREEN task
+
+Later, in the isolated worktree, write public-interface tests first and obtain actual RED (missing module/unimplemented contract, never a skip). Implement the pure helper, then obtain GREEN and review the three-file footprint. Named meaningful tests:
+1. test_query_normalization_bounds_and_stable_duplicates: donor examples/order; exact 3/16, 128/129, 1024/1025 and 10/11 boundaries; batch blanks versus list blanks; dedupe before/after count.
+2. test_query_ascii_validation_precedes_case_conversion: ß/accents/combining/full-width/dashes/NBSP, slash/regex, invalid types/modes.
+3. test_full_requires_entire_normalized_observation: normalized equality positive; XABC123Y and BC123/full ABC1234 negative.
+4. test_fragment_is_explicit_entire_literal_query: entire explicit BC1 positive; no inferred partial; equal text still fragment; minimum three.
+5. test_no_character_substitution_or_fuzzy_matching: O0/I1 and edit negatives.
+6. test_all_matching_queries_keep_order_and_mode_distinction: all unique pairs, no winner/score sort, one per query despite repeated occurrence.
+7. test_invalid_observations_do_not_coerce_strip_or_truncate: invalid/Unicode/punctuation/>512 nonmatches; lost suffix cannot create equality; invalid queries raise first.
+8. test_separate_observations_never_join: separate ABC and 123 do not equal ABC123; one caller-associated ABC 123 can.
+9. test_fragment_preserves_entire_original_candidate_evidence: identity and deep equality of full candidate/protection/opaque nested evidence; OCR score unchanged.
+10. test_full_frame_observation_needs_no_detector_box: explicit fragment accepted without YOLO/vehicle geometry, independent of origin; pure acceptance only.
+11. test_distinct_observations_remain_distinct_evidence: same text retains separate original mappings, with no identity deduplication.
+12. test_errors_and_reprs_exclude_sensitive_text: synthetic raw and normalized sentinels absent from errors and default reprs of query/results; matching emits no logs/output.
+13. test_matcher_import_is_stdlib_only: clean subprocess exercises full/fragment while app, third-party, OCR, learning/sections/Findings imports are unavailable.
+
+## Later serialized gates
+
+Root alone schedules environments/verification after coding. Nothing runs during this preparation. Record actual interpreter paths/versions, command/status/counts; no newer interpreter or AST parser substitutes for real Python3.9.
+- Focused RED/GREEN: python -B -m pytest tests/test_plate_text_matching.py -q.
+- Actual floor: python3.9 -B -m pytest tests/test_plate_text_matching.py -q and clean stdlib-only full/fragment import subprocess under actual 3.9. If unavailable, report incomplete; no independent installation/download.
+- Accepted regression gate: python -B -m pytest test_openscrub.py tests/ -q in root's prepared environment.
+- Package: python -B -m build (default sdist then wheel from sdist). Inspect archives: existing openscrub_internal/__init__.py plus both new plate_search files are in wheel/sdist with exact source bytes; new tests are in sdist.
+- Install that wheel without dependencies into a clean target/environment and, from outside checkout, run actual3.9 import/full/fragment cases against installed files. Source-tree imports do not prove distribution.
+- Inspect unchanged updater nested-path support and Docker package-directory COPY against packaged paths. No network updater/Docker/model/PyInstaller run solely for a dormant helper; frozen Windows availability awaits consuming integration.
+- Compare final diff to the three-added-file allowlist; every preexisting runtime/default import/report/schema/dependency byte stays unchanged. No browser/video/model exercise is newly required for this unreachable helper; full O03 owns its integration gates.
+
+Require applicable actual gates and focused review before claiming completion. No past donor pass count is current evidence.
+
+## Delivery and later integration
+
+Optional downstream PR boundary: "Add isolated literal plate-text matching helper", describing only this contract, isolation and actual validation. Root chooses integration timing; no automatic upstream PR or acceptance claim.
+
+Later O03 preserves search_frame(frame_bgr, hints, regions=None, reader=None, cancelled=None) in its reader/search module; hints can carry prepared explicit queries. Its adapter attaches complete region evidence to one recognized observation and calls match_observation. Safe grouping, independent whole-frame discovery, resolution/tiling, models, source/frame validity, geometry/overlap, sampling/cancellation, stale publication and query/privacy lifecycle remain separate work. O02 owns identity/selection/tracking; O04 owns boundaries/mask support. A query match supplies no mask coordinates; a nonmatch never disables existing redaction.
+
+Draft publication requires root's explicit ROOT_PUBLISH_WINDOW_ACTIVE for the agreed documents only. Separate branch/worktree and serialized verification are required before later coding. Passing this slice proves literal matching/evidence retention only.

@@ -128,4 +128,14 @@ The [next strict-seed source handoff](research/source-plans/exact-tracker-seed-s
 
 [Main report](delivery/task-1002-report.md), [full review](delivery/task-1002-review.md), [repair report](delivery/task-1002-fix1-report.md), [scoped approval](delivery/task-1002-fix1-review.md) and [final acceptance](delivery/task-1002-final-acceptance.md) retain the focused optional adapter. Original260 payloads/indexes/report prefix/PR snapshot remain intact;70 repair payloads preserve the added native-error/legacy controls and final89/89/package gates. Used-native identities are prospective only; earlier544/269/PAGE attribution and all decoder/performance/model/platform boundaries remain explicit. No environment/media/native binaries or local development controls are archived.
 
-The [next P16D prerequisite plan](research/source-plans/exact-editor-prerequisite-source-plan.md.txt) maps the reviewed resize contribution onto the accepted seed lineage while preserving current manual/save/subtree owners. It is a source handoff, not a Task1003 runtime result.
+The [original prerequisite plan](research/source-plans/exact-editor-prerequisite-source-plan.md.txt) is now implemented and [accepted through Task1003](delivery/task-1003-final-acceptance.md).
+
+### New selected delivery checkpoint
+
+[Task1003 report](delivery/task-1003-report.md), [review](delivery/task-1003-review.md), [acceptance](delivery/task-1003-final-acceptance.md) and [product-state proof](delivery/task1003-product-state.json) distinguish348/348 at86a from final90/90/PAGE/package at07cf. The [subset](delivery/task1003-evidence/manifest.json) and [derivations](delivery/task1003-evidence/public-derivations.json) distinguish original local hashes from derived public bytes. Local originals remain unchanged. Code-review patches/logs/configs/pixels/package bindings remain; source copies/local controls are excluded.
+
+[Task8031 report](delivery/task-8031-report.md), [review](delivery/task-8031-review.md), [acceptance](delivery/task-8031-final-acceptance.md), [canonical PR](delivery/task-8031-canonical-pr.md) and [amendment](delivery/task-8031-document-amendment.json) retain all88 original manifest payloads and distinguish cached build-tool requirements from product runtime. Original snapshots remain immutable. Matcher [source plan](research/source-plans/plate-text-matching-source-plan.md.txt), [handoff](research/source-plans/plate-text-matching-handoff.md.txt) and [implementation plan](research/source-plans/plate-text-matching-implementation-plan.md.txt) retain query-contract and scope provenance; only the dormant helper is accepted.
+
+P08A/Task1004 .md.txt snapshots preserve SDD references as text. Task1004 runs on07cf; UI acceptance is open. Task10020 is documentation only.
+
+Future checkpoints use .superpowers/sdd/README/checkpoint-selected-delivery-incremental.py, copying only new selections and hashing retained trees in place. Do not rerun the historical full copier. Environments, media, installations, archive binaries and private controls remain excluded.

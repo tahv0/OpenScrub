@@ -1,0 +1,43 @@
+{
+  "base": "6fde5ad60c6d78d69dbbd8e049a9196f15e4095f",
+  "whole_donor": "47e9f6d5614365e00d899c87df6c209cd7aaabf6",
+  "pick": "70e6d045eff70745376767d08f5c9554f906856a",
+  "changed_files": [
+    "README.md",
+    "openscrub_web.py",
+    "tests/editor_resize_browser.cjs",
+    "tests/editor_resize_server.py",
+    "tests/test_editor_resize.py",
+    "tests/test_review_save_failures.py"
+  ],
+  "backend_ast_equal": true,
+  "APP_CSS_equal": true,
+  "non_web_products_assets_equal": true,
+  "per_file": {
+    "README.md": {
+      "assembled": "175fbc43a491807961f840a8b77ff811c852b9ce837b3bf634d0726791b85091",
+      "donor_equal": true
+    },
+    "openscrub_web.py": {
+      "assembled": "42d10a092dbf54ae27d06ea93d160ec430c8aceaf84fde2c6ac80dbb9be2314a",
+      "donor_equal": false
+    },
+    "tests/editor_resize_browser.cjs": {
+      "assembled": "8999449141dc4484ef01bee98959fb2799c06106da06b8afb4323dd74be6fa10",
+      "donor_equal": true
+    },
+    "tests/editor_resize_server.py": {
+      "assembled": "ebf19da6b23a88e30b8a11a6962d4c4a54fd2359bb62838cca2d7caaa2de3e93",
+      "donor_equal": true
+    },
+    "tests/test_editor_resize.py": {
+      "assembled": "bf84bfe36dca633c67b08775548db1c7e7a29c7219ae56904b6f1c21aa53b8b5",
+      "donor_equal": true
+    },
+    "tests/test_review_save_failures.py": {
+      "assembled": "4a20a09e5dbb1fb7e8135871366528f43cfc8f9d7a914f754c595fbb2a2a82e2",
+      "donor_equal": false
+    }
+  },
+  "conflict": "Only test_review_save_failures ctx: kept accepted assert+crypto; added P16D ResizeObserver. APP_JS applied cleanly, preserving current manual_id and allowlist behavior."
+}

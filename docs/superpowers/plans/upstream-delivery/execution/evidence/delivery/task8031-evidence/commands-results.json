@@ -1,0 +1,904 @@
+[
+  {
+    "run": "red-312",
+    "config": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task8031/red-312.json",
+    "config_sha256": "9bb510b0a17aeefa2bf04af3cbbc53e6f0e5e667d4ee466b1e8be5a5608aa455",
+    "declared_head": "6fde5ad60c6d78d69dbbd8e049a9196f15e4095f",
+    "policy": "development",
+    "files_manifest_sha256": "0eae56b392b9642e4fe893a5988fc96dd58b0b69eeb7df452ff431eab2b264bc",
+    "interpreter": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "configure_app": false,
+    "controller_argv": [
+      "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "-B",
+      "/home/tahv0/src/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/verify.py",
+      "--config",
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task8031/red-312.json",
+      "--run-id",
+      "red-312",
+      "run",
+      "--",
+      "-B",
+      "-m",
+      "pytest",
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/worktrees/plate-text-matching/tests/test_plate_text_matching.py",
+      "-q"
+    ],
+    "workload_argv": [
+      [
+        "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+        "-B",
+        "-m",
+        "pytest",
+        "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/worktrees/plate-text-matching/tests/test_plate_text_matching.py",
+        "-q",
+        "--basetemp=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task8031/runs/red-312/pytest",
+        "-o",
+        "cache_dir=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task8031/runs/red-312/cache/pytest"
+      ]
+    ],
+    "controller_exit": 1,
+    "workload_exits": [
+      1
+    ],
+    "result": "13 failed; expected missing module",
+    "logs": {
+      "logs/command.log": {
+        "sha256": "324310bd2fa3f33301c58febe1bbd117f29b0a71fce364b823f1c3f6c1636074",
+        "bytes": 12960
+      }
+    }
+  },
+  {
+    "run": "green-312",
+    "config": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task8031/green-312.json",
+    "config_sha256": "89fa903c66b493ae5dec2dc89d7fa65f3b43fefb56587766cccb0045139578ab",
+    "declared_head": "6fde5ad60c6d78d69dbbd8e049a9196f15e4095f",
+    "policy": "development",
+    "files_manifest_sha256": "4ec6b6c30b06e7aae5a92e88ab821ffdcb043d68c6ed7472e6f387113de82031",
+    "interpreter": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "configure_app": false,
+    "controller_argv": [
+      "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "-B",
+      "/home/tahv0/src/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/verify.py",
+      "--config",
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task8031/green-312.json",
+      "--run-id",
+      "green-312",
+      "run",
+      "--",
+      "-B",
+      "-m",
+      "pytest",
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/worktrees/plate-text-matching/tests/test_plate_text_matching.py",
+      "-q"
+    ],
+    "workload_argv": [
+      [
+        "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+        "-B",
+        "-m",
+        "pytest",
+        "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/worktrees/plate-text-matching/tests/test_plate_text_matching.py",
+        "-q",
+        "--basetemp=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task8031/runs/green-312/pytest",
+        "-o",
+        "cache_dir=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task8031/runs/green-312/cache/pytest"
+      ]
+    ],
+    "controller_exit": 0,
+    "workload_exits": [
+      0
+    ],
+    "result": "13 passed",
+    "logs": {
+      "logs/command.log": {
+        "sha256": "77568954b09815337177e6bf0ff71e7ff48162c2fbe93cf7fd6b53d9d8ab2929",
+        "bytes": 1001
+      }
+    }
+  },
+  {
+    "run": "green-final-312",
+    "config": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task8031/green-final-312.json",
+    "config_sha256": "d02074a13b7db1510a4b542866687bd4cf4f2315291afa1d66c5756d69e4500a",
+    "declared_head": "6fde5ad60c6d78d69dbbd8e049a9196f15e4095f",
+    "policy": "development",
+    "files_manifest_sha256": "f862003ffceb818686fd92aaf7b3c84f96b31f1da353f8a1e3b0530c39765cb0",
+    "interpreter": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "configure_app": false,
+    "controller_argv": [
+      "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "-B",
+      "/home/tahv0/src/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/verify.py",
+      "--config",
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task8031/green-final-312.json",
+      "--run-id",
+      "green-final-312",
+      "run",
+      "--",
+      "-B",
+      "-m",
+      "pytest",
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/worktrees/plate-text-matching/tests/test_plate_text_matching.py",
+      "-q"
+    ],
+    "workload_argv": [
+      [
+        "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+        "-B",
+        "-m",
+        "pytest",
+        "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/worktrees/plate-text-matching/tests/test_plate_text_matching.py",
+        "-q",
+        "--basetemp=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task8031/runs/green-final-312/pytest",
+        "-o",
+        "cache_dir=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task8031/runs/green-final-312/cache/pytest"
+      ]
+    ],
+    "controller_exit": 0,
+    "workload_exits": [
+      0
+    ],
+    "result": "13 passed",
+    "logs": {
+      "logs/command.log": {
+        "sha256": "77568954b09815337177e6bf0ff71e7ff48162c2fbe93cf7fd6b53d9d8ab2929",
+        "bytes": 1001
+      }
+    }
+  },
+  {
+    "run": "floor-39",
+    "config": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task8031/floor-39.json",
+    "config_sha256": "9ca02763f0a9090529402ca9eee244678b5fa4955f104383fead5f965f6676ec",
+    "declared_head": "32a6f034e588384c8d6ee5459ff06af6c17c67c1",
+    "policy": "frozen",
+    "files_manifest_sha256": "f862003ffceb818686fd92aaf7b3c84f96b31f1da353f8a1e3b0530c39765cb0",
+    "interpreter": {
+      "executable": "/tmp/openscrub-python39-20261117/venv/bin/python",
+      "version": [
+        3,
+        9,
+        25
+      ]
+    },
+    "configure_app": false,
+    "controller_argv": [
+      "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "/home/tahv0/src/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/verify.py",
+      "--config",
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task8031/floor-39.json",
+      "--run-id",
+      "floor-39",
+      "run",
+      "--",
+      "-B",
+      "-m",
+      "pytest",
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/worktrees/plate-text-matching/tests/test_plate_text_matching.py",
+      "-q"
+    ],
+    "workload_argv": [
+      [
+        "/tmp/openscrub-python39-20261117/venv/bin/python",
+        "-B",
+        "-m",
+        "pytest",
+        "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/worktrees/plate-text-matching/tests/test_plate_text_matching.py",
+        "-q",
+        "--basetemp=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task8031/runs/floor-39/pytest",
+        "-o",
+        "cache_dir=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task8031/runs/floor-39/cache/pytest"
+      ]
+    ],
+    "controller_exit": 1,
+    "workload_exits": [
+      1
+    ],
+    "result": "12 passed, 1 failed; optional stdlib Jython probe",
+    "logs": {
+      "logs/command.log": {
+        "sha256": "bcd0fc0fa551dff536f72c9b6a215fd8c71c65ba31b0ed7aee0cfef4633f55c4",
+        "bytes": 6089
+      }
+    }
+  },
+  {
+    "run": "correction-312",
+    "config": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task8031/correction-312.json",
+    "config_sha256": "3bd47cd9a71f8c20bc08bf1146e2d6a98f3124a307c66d3495c3154668a0532e",
+    "declared_head": "32a6f034e588384c8d6ee5459ff06af6c17c67c1",
+    "policy": "development",
+    "files_manifest_sha256": "e3d29a600dc153ade76cb309ff1ce44e8841e53b59aa1ff8deed5e48436df9cd",
+    "interpreter": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "configure_app": false,
+    "controller_argv": [
+      "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "-B",
+      "/home/tahv0/src/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/verify.py",
+      "--config",
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task8031/correction-312.json",
+      "--run-id",
+      "correction-312",
+      "run",
+      "--",
+      "-B",
+      "-m",
+      "pytest",
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/worktrees/plate-text-matching/tests/test_plate_text_matching.py",
+      "-q"
+    ],
+    "workload_argv": [
+      [
+        "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+        "-B",
+        "-m",
+        "pytest",
+        "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/worktrees/plate-text-matching/tests/test_plate_text_matching.py",
+        "-q",
+        "--basetemp=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task8031/runs/correction-312/pytest",
+        "-o",
+        "cache_dir=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task8031/runs/correction-312/cache/pytest"
+      ]
+    ],
+    "controller_exit": 0,
+    "workload_exits": [
+      0
+    ],
+    "result": "13 passed",
+    "logs": {
+      "logs/command.log": {
+        "sha256": "77568954b09815337177e6bf0ff71e7ff48162c2fbe93cf7fd6b53d9d8ab2929",
+        "bytes": 1001
+      }
+    }
+  },
+  {
+    "run": "floor-final-39",
+    "config": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task8031/floor-final-39.json",
+    "config_sha256": "c73bc96295396bf268807d4a2eba0c846f1507e886a63bac7ff89f630b41166d",
+    "declared_head": "086ad444c4447d36bcab8905c17225441c739140",
+    "policy": "frozen",
+    "files_manifest_sha256": "e3d29a600dc153ade76cb309ff1ce44e8841e53b59aa1ff8deed5e48436df9cd",
+    "interpreter": {
+      "executable": "/tmp/openscrub-python39-20261117/venv/bin/python",
+      "version": [
+        3,
+        9,
+        25
+      ]
+    },
+    "configure_app": false,
+    "controller_argv": [
+      "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "/home/tahv0/src/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/verify.py",
+      "--config",
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task8031/floor-final-39.json",
+      "--run-id",
+      "floor-final-39",
+      "run",
+      "--",
+      "-B",
+      "-m",
+      "pytest",
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/worktrees/plate-text-matching/tests/test_plate_text_matching.py",
+      "-q"
+    ],
+    "workload_argv": [
+      [
+        "/tmp/openscrub-python39-20261117/venv/bin/python",
+        "-B",
+        "-m",
+        "pytest",
+        "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/worktrees/plate-text-matching/tests/test_plate_text_matching.py",
+        "-q",
+        "--basetemp=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task8031/runs/floor-final-39/pytest",
+        "-o",
+        "cache_dir=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task8031/runs/floor-final-39/cache/pytest"
+      ]
+    ],
+    "controller_exit": 1,
+    "workload_exits": [
+      1
+    ],
+    "result": "12 passed, 1 failed; lexical/resolved stdlib caller path",
+    "logs": {
+      "logs/command.log": {
+        "sha256": "628e85f62ca41b497127998517d1f8aec99c7880bc5f42be70de69dc9071f10e",
+        "bytes": 7638
+      }
+    }
+  },
+  {
+    "run": "floor-final2-39",
+    "config": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task8031/floor-final2-39.json",
+    "config_sha256": "e162a1025e84500e21c5d3f665ca3196b8507344b23224e24c454ddbc9e167cf",
+    "declared_head": "46f91fddb7e0f529cac4a247a96b4c894a9f6827",
+    "policy": "frozen",
+    "files_manifest_sha256": "80a632bee2eb9b2283428cdeacdb9cd0fab2513b6a28df74fd1939e6641b2387",
+    "interpreter": {
+      "executable": "/tmp/openscrub-python39-20261117/venv/bin/python",
+      "version": [
+        3,
+        9,
+        25
+      ]
+    },
+    "configure_app": false,
+    "controller_argv": [
+      "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "/home/tahv0/src/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/verify.py",
+      "--config",
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task8031/floor-final2-39.json",
+      "--run-id",
+      "floor-final2-39",
+      "run",
+      "--",
+      "-B",
+      "-m",
+      "pytest",
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/worktrees/plate-text-matching/tests/test_plate_text_matching.py",
+      "-q"
+    ],
+    "workload_argv": [
+      [
+        "/tmp/openscrub-python39-20261117/venv/bin/python",
+        "-B",
+        "-m",
+        "pytest",
+        "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/worktrees/plate-text-matching/tests/test_plate_text_matching.py",
+        "-q",
+        "--basetemp=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task8031/runs/floor-final2-39/pytest",
+        "-o",
+        "cache_dir=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task8031/runs/floor-final2-39/cache/pytest"
+      ]
+    ],
+    "controller_exit": 0,
+    "workload_exits": [
+      0
+    ],
+    "result": "13 passed",
+    "logs": {
+      "logs/command.log": {
+        "sha256": "30c54c0e48ab3ad11335c678ec08131ed1c3babd265b2f79cf7bd3717ae3d7a6",
+        "bytes": 994
+      }
+    }
+  },
+  {
+    "run": "full-final2-312",
+    "config": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task8031/full-final2-312.json",
+    "config_sha256": "023cc1ca7ade8f449c3781f3f362b39afead483afa7c470fc0605381b1e58a3e",
+    "declared_head": "46f91fddb7e0f529cac4a247a96b4c894a9f6827",
+    "policy": "frozen",
+    "files_manifest_sha256": "80a632bee2eb9b2283428cdeacdb9cd0fab2513b6a28df74fd1939e6641b2387",
+    "interpreter": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "configure_app": true,
+    "controller_argv": [
+      "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "/home/tahv0/src/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/verify.py",
+      "--config",
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task8031/full-final2-312.json",
+      "--run-id",
+      "full-final2-312",
+      "run",
+      "--",
+      "-B",
+      "-m",
+      "pytest",
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/worktrees/plate-text-matching/test_openscrub.py",
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/worktrees/plate-text-matching/tests/",
+      "-q"
+    ],
+    "workload_argv": [
+      [
+        "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+        "-B",
+        "-m",
+        "pytest",
+        "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/worktrees/plate-text-matching/test_openscrub.py",
+        "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/worktrees/plate-text-matching/tests/",
+        "-q",
+        "--basetemp=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task8031/runs/full-final2-312/pytest",
+        "-o",
+        "cache_dir=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task8031/runs/full-final2-312/cache/pytest"
+      ]
+    ],
+    "controller_exit": 1,
+    "workload_exits": [
+      1
+    ],
+    "result": "570 passed, 3 failed; fixture activation and child stdout expectation",
+    "logs": {
+      "logs/command.log": {
+        "sha256": "80740c06bfc8ed230e99796c358ce8efc424ad66334ca8f31a8653adb7e556ff",
+        "bytes": 15279
+      },
+      "logs/media-cfr24.json": {
+        "sha256": "6bb23051bf69532830d0eb1aafb4c38cfb3d09eab2169b605ffa1fdb608823d2",
+        "bytes": 414
+      },
+      "logs/media-cfr5.json": {
+        "sha256": "d0604f0c9621317fafb969ad73c764da08c2fa8b90a82ffbe9f83be41d35f08a",
+        "bytes": 561
+      },
+      "logs/media-coarse.json": {
+        "sha256": "9246f06ff11f47959a106c10d0fd699c3542611d6bf966944a8272a9b095def9",
+        "bytes": 754
+      },
+      "logs/media-normalized.json": {
+        "sha256": "83ec76e65774fb845084d9100fd0a972b67253662e95130176eaff509a6d47f1",
+        "bytes": 1070
+      },
+      "logs/strict-media-cfr24.json": {
+        "sha256": "4bef3e7394ed08b03e56e5139c68cde4e6a0be98d58375b9dbb842cd2c0333d9",
+        "bytes": 429
+      },
+      "logs/strict-media-cfr5.json": {
+        "sha256": "5ac459ffc4d7906f5a296abdb1cb3bb90f8a3a131fe16d90bccac62be6d7f45d",
+        "bytes": 396
+      },
+      "logs/strict-media-normalized.json": {
+        "sha256": "d712c005a6aeb7d6a687a06ba47afab07d7ccb2c26e0231004aa10eee5d6a59e",
+        "bytes": 918
+      }
+    }
+  },
+  {
+    "run": "correction-window-312",
+    "config": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task8031/correction-window-312.json",
+    "config_sha256": "ed6e4a37430c74a1b339c2575eb4f89d580991e469bf4e25cbf96447687eb4a5",
+    "declared_head": "46f91fddb7e0f529cac4a247a96b4c894a9f6827",
+    "policy": "development",
+    "files_manifest_sha256": "522ed7324ef0de935b1e7131331baebdb040a05906b33e8d76e9c77107dbe5ab",
+    "interpreter": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "configure_app": false,
+    "controller_argv": [
+      "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "-B",
+      "/home/tahv0/src/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/verify.py",
+      "--config",
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task8031/correction-window-312.json",
+      "--run-id",
+      "correction-window-312",
+      "run",
+      "--",
+      "-B",
+      "-m",
+      "pytest",
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/worktrees/plate-text-matching/tests/test_plate_text_matching.py",
+      "-q"
+    ],
+    "workload_argv": [
+      [
+        "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+        "-B",
+        "-m",
+        "pytest",
+        "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/worktrees/plate-text-matching/tests/test_plate_text_matching.py",
+        "-q",
+        "--basetemp=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task8031/runs/correction-window-312/pytest",
+        "-o",
+        "cache_dir=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task8031/runs/correction-window-312/cache/pytest"
+      ]
+    ],
+    "controller_exit": 0,
+    "workload_exits": [
+      0
+    ],
+    "result": "13 passed",
+    "logs": {
+      "logs/command.log": {
+        "sha256": "b76190d42523e63ae5b50b25adbba6ca796a76aec598bdb82e461eb8662ffbde",
+        "bytes": 1001
+      }
+    }
+  },
+  {
+    "run": "floor-release-39",
+    "config": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task8031/floor-release-39.json",
+    "config_sha256": "1ee88b0b243242974948b6cb58cc1c5039fe6d208182e92d2dfe35bb34c5871a",
+    "declared_head": "3547f82c027323dba8e69e8aef7be62c88438d8b",
+    "policy": "frozen",
+    "files_manifest_sha256": "522ed7324ef0de935b1e7131331baebdb040a05906b33e8d76e9c77107dbe5ab",
+    "interpreter": {
+      "executable": "/tmp/openscrub-python39-20261117/venv/bin/python",
+      "version": [
+        3,
+        9,
+        25
+      ]
+    },
+    "configure_app": false,
+    "controller_argv": [
+      "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "/home/tahv0/src/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/verify.py",
+      "--config",
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task8031/floor-release-39.json",
+      "--run-id",
+      "floor-release-39",
+      "run",
+      "--",
+      "-B",
+      "-m",
+      "pytest",
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/worktrees/plate-text-matching/tests/test_plate_text_matching.py",
+      "-q"
+    ],
+    "workload_argv": [
+      [
+        "/tmp/openscrub-python39-20261117/venv/bin/python",
+        "-B",
+        "-m",
+        "pytest",
+        "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/worktrees/plate-text-matching/tests/test_plate_text_matching.py",
+        "-q",
+        "--basetemp=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task8031/runs/floor-release-39/pytest",
+        "-o",
+        "cache_dir=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task8031/runs/floor-release-39/cache/pytest"
+      ]
+    ],
+    "controller_exit": 0,
+    "workload_exits": [
+      0
+    ],
+    "result": "13 passed",
+    "logs": {
+      "logs/command.log": {
+        "sha256": "30c54c0e48ab3ad11335c678ec08131ed1c3babd265b2f79cf7bd3717ae3d7a6",
+        "bytes": 994
+      }
+    }
+  },
+  {
+    "run": "full-release-312",
+    "config": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task8031/full-release-312.json",
+    "config_sha256": "db081602e3145b33897bf6d8b8e36bb472b6d168b8210009d1c44670fece826c",
+    "declared_head": "3547f82c027323dba8e69e8aef7be62c88438d8b",
+    "policy": "frozen",
+    "files_manifest_sha256": "522ed7324ef0de935b1e7131331baebdb040a05906b33e8d76e9c77107dbe5ab",
+    "interpreter": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "configure_app": true,
+    "controller_argv": [
+      "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "/home/tahv0/src/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/verify.py",
+      "--config",
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task8031/full-release-312.json",
+      "--run-id",
+      "full-release-312",
+      "run",
+      "--",
+      "-B",
+      "-m",
+      "pytest",
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/worktrees/plate-text-matching/test_openscrub.py",
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/worktrees/plate-text-matching/tests/",
+      "-q",
+      "-o",
+      "pythonpath=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/task1631-evidence/adapters /home/tahv0/src/OpenScrub/.superpowers/sdd/README/task654-evidence/adapters",
+      "-p",
+      "task1631_fixture",
+      "-p",
+      "roundtrip_stdout_selected"
+    ],
+    "workload_argv": [
+      [
+        "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+        "-B",
+        "-m",
+        "pytest",
+        "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/worktrees/plate-text-matching/test_openscrub.py",
+        "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/worktrees/plate-text-matching/tests/",
+        "-q",
+        "-o",
+        "pythonpath=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/task1631-evidence/adapters /home/tahv0/src/OpenScrub/.superpowers/sdd/README/task654-evidence/adapters",
+        "-p",
+        "task1631_fixture",
+        "-p",
+        "roundtrip_stdout_selected",
+        "--basetemp=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task8031/runs/full-release-312/pytest",
+        "-o",
+        "cache_dir=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task8031/runs/full-release-312/cache/pytest"
+      ]
+    ],
+    "controller_exit": 0,
+    "workload_exits": [
+      0
+    ],
+    "result": "573 passed",
+    "logs": {
+      "logs/command.log": {
+        "sha256": "ab2e5fdd17f0dba1a7c92b5d3ffa6eae0ec4a9dc578e9e71ba0519996e237ef1",
+        "bytes": 3758
+      },
+      "logs/media-cfr24.json": {
+        "sha256": "6bb23051bf69532830d0eb1aafb4c38cfb3d09eab2169b605ffa1fdb608823d2",
+        "bytes": 414
+      },
+      "logs/media-cfr5.json": {
+        "sha256": "d0604f0c9621317fafb969ad73c764da08c2fa8b90a82ffbe9f83be41d35f08a",
+        "bytes": 561
+      },
+      "logs/media-coarse.json": {
+        "sha256": "54b3aaa54a85fb3c859f4f5407df88d4734612070696e330f8f16309dbd355af",
+        "bytes": 754
+      },
+      "logs/media-normalized.json": {
+        "sha256": "83ec76e65774fb845084d9100fd0a972b67253662e95130176eaff509a6d47f1",
+        "bytes": 1070
+      },
+      "logs/roundtrip-adapter.json": {
+        "sha256": "e86cc50df2405c50da50d781d91256d2168d516082eff8e9e00c8b663192598a",
+        "bytes": 405
+      },
+      "logs/roundtrip-child.stderr": {
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      "logs/roundtrip-child.stdout": {
+        "sha256": "524f58be4e1471b8977e3d5fe70113d634b8b4d0fe1e490579792cf4a33a7066",
+        "bytes": 4974
+      },
+      "logs/strict-media-cfr24.json": {
+        "sha256": "4bef3e7394ed08b03e56e5139c68cde4e6a0be98d58375b9dbb842cd2c0333d9",
+        "bytes": 429
+      },
+      "logs/strict-media-cfr5.json": {
+        "sha256": "5ac459ffc4d7906f5a296abdb1cb3bb90f8a3a131fe16d90bccac62be6d7f45d",
+        "bytes": 396
+      },
+      "logs/strict-media-normalized.json": {
+        "sha256": "d712c005a6aeb7d6a687a06ba47afab07d7ccb2c26e0231004aa10eee5d6a59e",
+        "bytes": 918
+      }
+    }
+  },
+  {
+    "run": "package-release-39",
+    "config": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task8031/package-release-39.json",
+    "config_sha256": "7ab4afeebf49abeb0ebfb7e1be00c53587a154605d6f635bc930df67af878e34",
+    "declared_head": "3547f82c027323dba8e69e8aef7be62c88438d8b",
+    "policy": "frozen",
+    "files_manifest_sha256": "522ed7324ef0de935b1e7131331baebdb040a05906b33e8d76e9c77107dbe5ab",
+    "interpreter": {
+      "executable": "/tmp/openscrub-python39-20261117/venv/bin/python",
+      "version": [
+        3,
+        9,
+        25
+      ]
+    },
+    "configure_app": false,
+    "controller_argv": [
+      "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "/home/tahv0/src/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/verify.py",
+      "--config",
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task8031/package-release-39.json",
+      "--run-id",
+      "package-release-39",
+      "package"
+    ],
+    "workload_argv": [
+      [
+        "/tmp/openscrub-python39-20261117/venv/bin/python",
+        "-m",
+        "build",
+        "--sdist",
+        "--no-isolation",
+        "--outdir",
+        "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task8031/runs/package-release-39/dist",
+        "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/worktrees/plate-text-matching"
+      ]
+    ],
+    "controller_exit": 78,
+    "workload_exits": [
+      1
+    ],
+    "result": "sdist workload exit 1; cached build-tool pluggy requires Python >=3.10",
+    "logs": {
+      "logs/sdist.log": {
+        "sha256": "1b7e4adb5445988c4b83511f64a19286dfae6fa3397114c9e899298239a86120",
+        "bytes": 3909
+      }
+    }
+  },
+  {
+    "run": "package-native-release-312",
+    "config": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task8031/package-native-release-312.json",
+    "config_sha256": "02f691ef5aa245bd37acebe104ab735398f1fa06929d0a2dc9b74c35c1497004",
+    "declared_head": "3547f82c027323dba8e69e8aef7be62c88438d8b",
+    "policy": "frozen",
+    "files_manifest_sha256": "522ed7324ef0de935b1e7131331baebdb040a05906b33e8d76e9c77107dbe5ab",
+    "interpreter": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "configure_app": false,
+    "controller_argv": [
+      "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "/home/tahv0/src/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/verify.py",
+      "--config",
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task8031/package-native-release-312.json",
+      "--run-id",
+      "package-native-release-312",
+      "package"
+    ],
+    "workload_argv": [
+      [
+        "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+        "-m",
+        "build",
+        "--sdist",
+        "--no-isolation",
+        "--outdir",
+        "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task8031/runs/package-native-release-312/dist",
+        "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/worktrees/plate-text-matching"
+      ],
+      [
+        "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+        "-m",
+        "build",
+        "--wheel",
+        "--no-isolation",
+        "--outdir",
+        "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task8031/runs/package-native-release-312/wheel",
+        "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task8031/runs/package-native-release-312/extracted/openscrub-1.0.96"
+      ],
+      [
+        "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+        "-m",
+        "pip",
+        "install",
+        "--no-index",
+        "--no-deps",
+        "--no-compile",
+        "--target",
+        "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task8031/runs/package-native-release-312/site-packages",
+        "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task8031/runs/package-native-release-312/wheel/openscrub-1.0.96-py3-none-any.whl"
+      ],
+      [
+        "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+        "-c",
+        "print(\"INSTALLED_IDENTITY_DEFAULTS_OK\")"
+      ],
+      [
+        "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+        "-B",
+        "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task8031/stdlib_exercise_release.py"
+      ]
+    ],
+    "controller_exit": 0,
+    "workload_exits": [
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "result": "sdist, wheel-from-sdist, no-deps install and installed stdlib exercise passed",
+    "logs": {
+      "logs/install.log": {
+        "sha256": "f582519d27ce0c4a2b552ddcba0cc8ef52a4b37f4aeec68f2e3869211f6ca829",
+        "bytes": 1036
+      },
+      "logs/installed-0.log": {
+        "sha256": "0338de4511b9f0aa930b06d57f52c266e9d125cf4d19a1a46ad0e437ceffac68",
+        "bytes": 1001
+      },
+      "logs/installed-defaults.log": {
+        "sha256": "8bb1dfcb8139e84d9327a02d407ed436c44f9e7c2ae26e5371530e8357c9e0a6",
+        "bytes": 1032
+      },
+      "logs/sdist.log": {
+        "sha256": "b76d9b0c897c63e3add7898e1a136485b3d2826defa8669d442b8578d85b9fce",
+        "bytes": 2811
+      },
+      "logs/wheel-from-sdist.log": {
+        "sha256": "d2353fc7de00f2ed30c3c7eb8506d684165e12ce857b2d13bb9e07991d11fd3a",
+        "bytes": 2821
+      }
+    }
+  },
+  {
+    "run": "installed-release-39",
+    "config": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task8031/installed-release-39.json",
+    "config_sha256": "9e31adea9619f0ee6512f49cfe8c6d7d3dfe29af0b15191cb4ae5aa9cad8eb95",
+    "declared_head": "3547f82c027323dba8e69e8aef7be62c88438d8b",
+    "policy": "frozen",
+    "files_manifest_sha256": "522ed7324ef0de935b1e7131331baebdb040a05906b33e8d76e9c77107dbe5ab",
+    "interpreter": {
+      "executable": "/tmp/openscrub-python39-20261117/venv/bin/python",
+      "version": [
+        3,
+        9,
+        25
+      ]
+    },
+    "configure_app": false,
+    "controller_argv": [
+      "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "/home/tahv0/src/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/verify.py",
+      "--config",
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task8031/installed-release-39.json",
+      "--run-id",
+      "installed-release-39",
+      "run",
+      "--",
+      "-B",
+      "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task8031/stdlib_exercise_release.py"
+    ],
+    "workload_argv": [
+      [
+        "/tmp/openscrub-python39-20261117/venv/bin/python",
+        "-B",
+        "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task8031/stdlib_exercise_release.py"
+      ]
+    ],
+    "controller_exit": 0,
+    "workload_exits": [
+      0
+    ],
+    "result": "installed actual 3.9 stdlib full/fragment exercise passed",
+    "logs": {
+      "logs/command.log": {
+        "sha256": "81fa55c60c1eb45046aeb4a71f08be8d29ff2dd2c227628320e40b9e9e28633a",
+        "bytes": 994
+      }
+    }
+  }
+]

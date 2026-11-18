@@ -1,0 +1,100 @@
+# Frozen P10 / P16D PR submission notes
+
+Prepared for the later local documentation checkpoint. These are ready-to-use local descriptions, not a publication or a claim of compatibility with Austin's current main.
+
+All documentation evidence below is pinned to `1e7c6e2c6ecc8384d5b3a2a6590c6d89f7bcd17d`. Upstream means `austinmabry/OpenScrub`; remote means the user's `tahv0/OpenScrub`. The recorded Austin baseline is `5d3a15ae683c08f368d6ba4bd0d2d77b4e7b8e2f`, observed in earlier research. Refresh upstream scope/main and the contribution requirements at actual submission; frozen local acceptance does not establish current-main compatibility.
+
+## Contribution and dependency map
+
+| Contribution | Exact focused range | Scope and immediate contract |
+| --- | --- | --- |
+| P10A exact-sample backend, Task1001 | `12919c96c6f7558136b50d7b4d85e5e6b62f1971` → `335435e1e1120de9e6773656b7dfdfabf220e27b` | Optional coherent image/geometry sampling and baseline-aware saves; consumes the existing source lifetime, report transaction/publication and identified manual-replay owners. |
+| P10A strict seeds, Task1002 | `335435e1e1120de9e6773656b7dfdfabf220e27b` → `6fde5ad60c6d78d69dbbd8e049a9196f15e4095f` | Optional Track admission and supplied-pixel initialization/priming through existing engines; depends directly on accepted Task1001. |
+| P16D standalone resize, Task164 | `92124753736e287ac800af91f0ac96f3e96c01be` → `47e9f6d5614365e00d899c87df6c209cd7aaabf6` | Mounted editor display/input ownership and explicit user-requested Play loading; depends on the reviewed P07a browser-save ownership base. |
+
+The Task1001 base is a focused lineage above Austin plus the test-only B02a correction: P06A atomic report publication/vault compatibility; P06D complete report preservation; the adapted P07a save/audio ownership commits `7f82f3a`/`3795d49`; P06B.1 lifetime ownership `4479b57`/`c697d5a`; P06B.2 report transactions `f2cdf48`; and P07b manual replay `12919c9`. This identifies inherited contracts and does not make an integrated application branch a prerequisite. An eventual Austin submission needs an explicit landing/stacking decision for those dependencies.
+
+Standalone P16D has the original P07a pair `786990d`/`9212475` plus B02a. Its browser-save base is not the Task1002 ancestry. The frozen prerequisite plan therefore calls for a separate local P16D assembly from accepted Task1002, preserving accepted backend/manual/save behavior and adapting only overlapping mounted-subtree owners. That ongoing assembly has no accepted result in this handoff and is not a fourth upstream PR. Its future evidence must name its own revision.
+
+The later ordinary editor and Track migration consumes accepted backend/strict seeds and accepted focused resize prerequisites together. No such migration, C01 assembly acceptance, tracking-quality change, or P17/HDR/original-source mapping result is supplied here.
+
+## Changed-file boundaries
+
+These names were checked with immutable range diffs, without repeating functional code review.
+
+| Range | Product files | Other changed files |
+| --- | --- | --- |
+| Task1001 | New `openscrub_internal/exact_samples.py`; `openscrub_internal/lifetimes.py`; `openscrub_web.py` | Four exact/adoption/media/recovery-race test modules. |
+| Task1002 | `openscrub.py`; `openscrub_internal/exact_samples.py`; `openscrub_web.py` | `tests/test_strict_tracker_seed.py`, `tests/test_strict_tracking_routes.py`. |
+| Standalone Task164 | Embedded editor JavaScript in `openscrub_web.py` | README guidance, three resize test/server/browser assets, save-test host adaptation. |
+
+Task1001/1002 preserve the ordinary editor payloads and upstream defaults; they add optional contracts without switching the ordinary editor. Task1002 preserves tracking algorithms, search/loss thresholds and no-seed behavior. P16D changes ordinary generic editor geometry/lifecycle on its declared base. All three exclude custom learned models, training/data collection and the expanded Findings workbench; ordinary upstream review and existing pretrained inference remain. None accepts optional OCR/confidence/lettering assistance.
+
+## PR 1 — exact-sample backend
+
+**Title:** Return coherent editor samples and validate geometry save baselines
+
+**Ready-to-use description:**
+
+At 24 fps and a requested time of 0.2 seconds, the editable image and floor-indexed boxes can describe different frames. This adds a separate `GET /api/jobs/<jid>/edit_sample` response that binds one verified indexed JPEG to its canonical/observed time, source offsets and active raw report rows.
+
+Optional geometry preconditions extend the existing latest-report save transaction with source, timeline, row-context and complete baseline/already-equal checks. Conflicting combined edits publish nothing; successful strict saves return committed geometry rows. Identified manual creations retain replay behavior. Source adoption and final sample acceptance are fenced against cancellation/replacement, and disappearance after source selection returns a conflict. Existing editor requests and legacy callers retain their behavior.
+
+This focused change is based on `12919c9` and ends at `335435e`; it uses the existing lifetime/transaction/manual-replay prerequisites. It does not require the combined application branch. Independent full and scoped repair reviews are complete.
+
+Validation on `335435e`: 157 affected checks passed on each actual Python 3.12.16 and 3.9.25, including controlled authority/cancellation/source-loss races. A final offline sdist → wheel-from-sdist and installed real HTTP strict-save → render → fresh-process reopen gate passed. Archive byte assertions cover 33 selected sdist and 13 selected wheel files within 42/21 total regular entries. Earlier full-suite 471 and affected Python 3.9 77 results remain attributed to `5acb655`; no full-suite or cost run is claimed at the repair head.
+
+Support is the declared metadata-qualified, sample-verified zero-origin CFR subset under `opencv-ffmpeg-zero-cfr-v1`, with observed-file-stamp limits. This is not whole-file CFR or immutable-byte certification. Timeline projection is O(N); the earlier 120,000-pair helper measurement was about 597 ms excluding parsing, and tiny-source request timings do not establish long-report latency. Ordinary exact-editor/Track migration, strict seeds, resized-editor integration and HDR/original-source mapping have separate acceptance gates. Route errors must be checked before assuming a JSON body; existing pre-route admission behavior remains.
+
+**Evidence:** Frozen canonical draft `execution/pr-drafts/exact-editor-samples.md`; Task1001 final acceptance, implementation/fix reports and scoped repair review. The installed HTTP/render evidence is real route/pixel/reopen evidence, not an exact-editor browser migration result.
+
+## PR 2 — strict tracker seeds
+
+**Title:** Initialize optional tracking from the verified inspected frame
+
+**Ready-to-use description:**
+
+Starting Track can replace the inspected frame with nearby initialization pixels. An optional sample precondition now carries the verified frame index and raw pixels into the existing person, Vit and NCC initializers. Existing capture owners prime through the indexed reader; strict source/prime/native-entry failures use an explicit typed error instead of nearby-frame fallback.
+
+The worker verifies source/timeline/operation ownership before model work and latest-report publication while preserving unrelated choices and audio. Ordinary model failure may choose another existing engine with the same supplied pixels. Positional/no-seed callers, ordinary editor payloads, tracking algorithms, loss policy, dependencies and upstream defaults retain their behavior.
+
+This optional adapter is based on accepted exact-sample backend `335435e` and ends at `6fde5ad`. Independent full and scoped repair reviews are complete. The ordinary editor is not migrated by this contribution.
+
+Validation on `6fde5ad`: 89 owning cases passed on each actual Python 3.12.16 and 3.9.25, comprising both complete strict modules and six real legacy tracker cases. They include real native/normalized source pixels and indexed priming, with deterministic model doubles at initializer boundaries. Final offline sdist → wheel-from-sdist, installed origins/defaults/CLI/web, actual strict/legacy listening HTTP and updater-copy bytes passed. Byte assertions cover 37 selected sdist and 13 selected wheel files within 44/21 total regular entries.
+
+Earlier full 544, affected Python 3.9 269 and corrected legacy full-PAGE Track results belong to `285f4af`. That browser smoke used real PAGE/routes/status handling with an explicit deterministic tracker control; it was not strict-editor or neural tracking-quality acceptance. New used OpenCV/NumPy extension/loader identities apply only to the repair gates; the earlier 544/269 runs lack run-specific native-binary identities.
+
+The inherited metadata-qualified/sample-verified CFR and observed-stamp limits remain. Strict success adds four O(N) timeline traversals and three latest-report loads beyond the initial snapshot, so this is not long-video latency evidence. Later propagation and real-model quality remain unchanged. Exact-editor migration, P16D/C01 composition, native interruption, HDR/source mapping and other-platform runtime acceptance remain separate.
+
+**Evidence:** Frozen canonical draft `execution/pr-drafts/exact-tracker-seeds.md`; Task1002 final acceptance, original/fix reports and scoped repair review. The typed-entry repair closes the strict API boundary; the previous web worker already refused publication, so do not describe it as repairing an observed leak, fallback or publication failure.
+
+## PR 3 — original standalone P16D
+
+**Title:** Keep editor overlays and pointer edits aligned after live resize
+
+**Ready-to-use description:**
+
+Resizing an open editor could leave its canvas and inverse pointer mapping at the previous display size. In the reproduced mobile case, the outline moved 167.8 CSS pixels from the visible target and clicking it missed. A mount-owned transform now updates painting and pointer coordinates together for the active image/video, including fractional sizes and DPR-aware backing dimensions. Resize ends the active gesture while preserving edits already applied, and stale callbacks cannot affect a replacement editor.
+
+The playback check also exposed an existing metadata-loading deadlock. The editor explicitly starts loading when the user presses Play, after installing its metadata listeners, while retaining `preload="none"`. Source/content-coordinate conventions and the existing save/audio ownership remain.
+
+This standalone contribution is based on reviewed P07a browser-save ownership at `9212475` and ends at `47e9f6d`. It does not depend on the exact-sample backend or a combined application branch. Independent spec/quality review approved it.
+
+Validation on this original standalone revision includes an exact-base painted-pixel/hit failure, real PAGE painting and pointer events at desktop/mobile sizes and DPR 1/2, fractional geometry, gesture/stale-callback/playback cases, real save/fresh reopen and decoded SDR output. All 197 discovered tests passed; 74 focused actual Python 3.9 and 74 installed-package checks passed, alongside offline packaging and installed browser acceptance. Maximum measured corrected edge error was 1.023 CSS pixels within a 2-pixel tolerance; rendered output uses a 3 source-pixel raster tolerance.
+
+Coverage is Chromium headless Linux with desktop/mobile viewports. Native touch, Firefox/Safari and live monitor-DPR changes remain unverified. The test's repeated pixel reads produce the narrowly classified Chromium `willReadFrequently` suggestion. Exact-frame sampling, complete standalone report preservation and any later P16D assembly require their own evidence.
+
+**Evidence:** Frozen canonical draft `execution/pr-drafts/editor-resize-alignment.md`; Task164 report/review. The 197/74/74 and browser/render results belong only to `47e9f6d`, not the ongoing local prerequisite assembly.
+
+## Wording corrections to carry into the later checkpoint
+
+Immutable source records were not edited.
+
+| Frozen file / claim | Proposed correction |
+| --- | --- |
+| `execution/evidence/delivery/task-1001-pr.md`: “Fresh scoped re-review is pending.” | Use the canonical draft/final acceptance: full and scoped repair reviews complete, both findings addressed. Preserve the old sentence only as explicitly historical snapshot text. |
+| `execution/evidence/delivery/task-1002-pr.md`: “Same-reviewer scoped re-review is pending.” | Full and scoped repair reviews are complete; I1 addressed at `6fde5ad`. |
+| `task-1001-report.md` opening/repair tail, `task-1002-report.md` opening/repair section and `task-1002-fix1-report.md` opening/self-review retain pending-review wording. | Treat these as implementation-time records and pair them with final acceptance; do not present the pending status as current local disposition. |
+| `execution/evidence/delivery/task-164-report.md`: “DONE, pending the supervisor's fresh independent review.” | Task164 review approved the declared standalone range; retain the recorded platform/cross-task limits. |
+
+The canonical `execution/pr-drafts/` descriptions and final acceptances already supersede these stale status sentences. No new functional defect is asserted. The material remaining dependency question is future upstream landing/stacking and current-main refresh, plus independent acceptance of the ongoing local prerequisite assembly; it is not solved by copying the whole integrated branch into a PR.

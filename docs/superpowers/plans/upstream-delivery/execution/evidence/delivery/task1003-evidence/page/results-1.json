@@ -1,0 +1,905 @@
+{
+  "dpr": 1,
+  "states": [
+    {
+      "viewport": {
+        "width": 1365,
+        "height": 1000
+      },
+      "scroll": {
+        "x": 0,
+        "y": 445
+      },
+      "image": {
+        "x": 32,
+        "y": 752,
+        "width": 640,
+        "height": 360,
+        "clientWidth": 640,
+        "clientHeight": 360,
+        "naturalWidth": 640,
+        "naturalHeight": 360,
+        "src": "http://127.0.0.1:37529/api/jobs/resize/frame_at?t=0"
+      },
+      "canvas": {
+        "x": 32,
+        "y": 752,
+        "width": 640,
+        "height": 360,
+        "clientWidth": 640,
+        "clientHeight": 360
+      },
+      "BE": {
+        "scale": 1,
+        "t": 0,
+        "ox": 20,
+        "oy": 12,
+        "sel": -1,
+        "box": [
+          140,
+          92,
+          340,
+          232
+        ],
+        "overrides": {}
+      },
+      "paint": {
+        "redStroke": {
+          "x0": 139,
+          "y0": 91,
+          "x1": 340,
+          "y1": 232,
+          "count": 1360
+        },
+        "allPixels": {
+          "x0": 139,
+          "y0": 91,
+          "x1": 340,
+          "y1": 232,
+          "count": 28684
+        },
+        "renderedCssOuterEdges": [
+          171,
+          843,
+          373,
+          985
+        ],
+        "expectedCssBoxEdges": [
+          172,
+          844,
+          372,
+          984
+        ],
+        "edgeDelta": [
+          -1,
+          -1,
+          1,
+          1
+        ],
+        "expectedCenter": [
+          272,
+          914
+        ],
+        "expectedCenterPixel": [
+          219,
+          36,
+          36,
+          56
+        ]
+      },
+      "sourceToImage": {
+        "x": 1,
+        "y": 1
+      },
+      "name": "desktop"
+    },
+    {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "scroll": {
+        "x": 0,
+        "y": 529
+      },
+      "image": {
+        "x": 32,
+        "y": 883,
+        "width": 326,
+        "height": 183.375,
+        "clientWidth": 326,
+        "clientHeight": 183,
+        "naturalWidth": 640,
+        "naturalHeight": 360,
+        "src": "http://127.0.0.1:37529/api/jobs/resize/frame_at?t=0"
+      },
+      "canvas": {
+        "x": 32,
+        "y": 883,
+        "width": 326,
+        "height": 183,
+        "clientWidth": 326,
+        "clientHeight": 183
+      },
+      "BE": {
+        "scale": 0.509375,
+        "t": 0,
+        "ox": 20,
+        "oy": 12,
+        "sel": -1,
+        "box": [
+          140,
+          92,
+          340,
+          232
+        ],
+        "overrides": {}
+      },
+      "paint": {
+        "redStroke": {
+          "x0": 71,
+          "y0": 46,
+          "x1": 173,
+          "y1": 117,
+          "count": 347
+        },
+        "allPixels": {
+          "x0": 70,
+          "y0": 45,
+          "x1": 174,
+          "y1": 118,
+          "count": 7770
+        },
+        "renderedCssOuterEdges": [
+          103,
+          929.094262295082,
+          206,
+          1001.2418032786885
+        ],
+        "expectedCssBoxEdges": [
+          103.3125,
+          929.8625,
+          205.1875,
+          1001.175
+        ],
+        "edgeDelta": [
+          -0.3125,
+          -0.768237704917965,
+          0.8125,
+          0.06680327868855329
+        ],
+        "expectedCenter": [
+          154.25,
+          965.51875
+        ],
+        "expectedCenterPixel": [
+          219,
+          36,
+          36,
+          56
+        ]
+      },
+      "sourceToImage": {
+        "x": 0.509375,
+        "y": 0.509375
+      },
+      "name": "mobile-live"
+    },
+    {
+      "viewport": {
+        "width": 1365,
+        "height": 1000
+      },
+      "scroll": {
+        "x": 0,
+        "y": 918
+      },
+      "image": {
+        "x": 32,
+        "y": 279,
+        "width": 640,
+        "height": 360,
+        "clientWidth": 640,
+        "clientHeight": 360,
+        "naturalWidth": 640,
+        "naturalHeight": 360,
+        "src": "http://127.0.0.1:37529/api/jobs/resize/frame_at?t=0"
+      },
+      "canvas": {
+        "x": 32,
+        "y": 279,
+        "width": 640,
+        "height": 360,
+        "clientWidth": 640,
+        "clientHeight": 360
+      },
+      "BE": {
+        "scale": 1,
+        "t": 0,
+        "ox": 20,
+        "oy": 12,
+        "sel": -1,
+        "box": [
+          140,
+          92,
+          340,
+          232
+        ],
+        "overrides": {}
+      },
+      "paint": {
+        "redStroke": {
+          "x0": 139,
+          "y0": 91,
+          "x1": 340,
+          "y1": 232,
+          "count": 1360
+        },
+        "allPixels": {
+          "x0": 139,
+          "y0": 91,
+          "x1": 340,
+          "y1": 232,
+          "count": 28684
+        },
+        "renderedCssOuterEdges": [
+          171,
+          370,
+          373,
+          512
+        ],
+        "expectedCssBoxEdges": [
+          172,
+          371,
+          372,
+          511
+        ],
+        "edgeDelta": [
+          -1,
+          -1,
+          1,
+          1
+        ],
+        "expectedCenter": [
+          272,
+          441
+        ],
+        "expectedCenterPixel": [
+          219,
+          36,
+          36,
+          56
+        ]
+      },
+      "sourceToImage": {
+        "x": 1,
+        "y": 1
+      },
+      "name": "desktop-grown"
+    },
+    {
+      "viewport": {
+        "width": 1365,
+        "height": 1000
+      },
+      "scroll": {
+        "x": 0,
+        "y": 918
+      },
+      "image": {
+        "x": 32,
+        "y": 279,
+        "width": 487.375,
+        "height": 274.140625,
+        "clientWidth": 487,
+        "clientHeight": 274,
+        "naturalWidth": 640,
+        "naturalHeight": 360,
+        "src": "http://127.0.0.1:37529/api/jobs/resize/frame_at?t=0"
+      },
+      "canvas": {
+        "x": 32,
+        "y": 279,
+        "width": 487,
+        "height": 274,
+        "clientWidth": 487,
+        "clientHeight": 274
+      },
+      "BE": {
+        "scale": 0.7615234375,
+        "t": 0,
+        "ox": 20,
+        "oy": 12,
+        "sel": -1,
+        "box": [
+          140,
+          92,
+          340,
+          232
+        ],
+        "overrides": {}
+      },
+      "paint": {
+        "redStroke": {
+          "x0": 106,
+          "y0": 69,
+          "x1": 258,
+          "y1": 176,
+          "count": 669
+        },
+        "allPixels": {
+          "x0": 105,
+          "y0": 69,
+          "x1": 259,
+          "y1": 177,
+          "count": 16895
+        },
+        "renderedCssOuterEdges": [
+          138.0816221765914,
+          348.0354128649635,
+          291.19943531827516,
+          456.0908416970803
+        ],
+        "expectedCssBoxEdges": [
+          138.61328125,
+          349.05815972222223,
+          290.91796875,
+          455.66840277777777
+        ],
+        "edgeDelta": [
+          -0.5316590734086049,
+          -1.02274685725871,
+          0.2814665682751638,
+          0.42243891930252175
+        ],
+        "expectedCenter": [
+          214.765625,
+          402.36328125
+        ],
+        "expectedCenterPixel": [
+          219,
+          36,
+          36,
+          56
+        ]
+      },
+      "sourceToImage": {
+        "x": 0.7615234375,
+        "y": 0.7615017361111112
+      },
+      "name": "fractional"
+    },
+    {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "scroll": {
+        "x": 0,
+        "y": 1082
+      },
+      "image": {
+        "x": 32,
+        "y": 330,
+        "width": 326,
+        "height": 183.375,
+        "clientWidth": 326,
+        "clientHeight": 183,
+        "naturalWidth": 640,
+        "naturalHeight": 360,
+        "src": "http://127.0.0.1:37529/api/jobs/resize/video"
+      },
+      "canvas": {
+        "x": 32,
+        "y": 330,
+        "width": 326,
+        "height": 183,
+        "clientWidth": 326,
+        "clientHeight": 183
+      },
+      "BE": {
+        "scale": 0.509375,
+        "t": 1.1026,
+        "ox": 20,
+        "oy": 12,
+        "sel": -1,
+        "box": [
+          186.25789465247504,
+          123.44236557312857,
+          401.50787862272387,
+          275.94235221462185
+        ],
+        "overrides": {
+          "0": [
+            166.25789465247504,
+            111.44236557312857,
+            381.50787862272387,
+            263.94235221462185
+          ]
+        }
+      },
+      "paint": {
+        "redStroke": {
+          "x0": 94,
+          "y0": 62,
+          "x1": 204,
+          "y1": 140,
+          "count": 379
+        },
+        "allPixels": {
+          "x0": 93,
+          "y0": 61,
+          "x1": 250,
+          "y1": 153,
+          "count": 11136
+        },
+        "renderedCssOuterEdges": [
+          126,
+          392.12704918032784,
+          237,
+          471.2889344262295
+        ],
+        "expectedCssBoxEdges": [
+          126.87511508860447,
+          392.8784549638124,
+          236.51807567344997,
+          470.558135659323
+        ],
+        "edgeDelta": [
+          -0.8751150886044741,
+          -0.7514057834845289,
+          0.48192432655002904,
+          0.7307987669065028
+        ],
+        "expectedCenter": [
+          181.69659538102724,
+          431.71829531156766
+        ],
+        "expectedCenterPixel": [
+          219,
+          36,
+          36,
+          56
+        ]
+      },
+      "sourceToImage": {
+        "x": 0.509375,
+        "y": 0.509375
+      },
+      "name": "video-mobile"
+    },
+    {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "scroll": {
+        "x": 0,
+        "y": 938
+      },
+      "image": {
+        "x": 32,
+        "y": 474,
+        "width": 326,
+        "height": 183.375,
+        "clientWidth": 326,
+        "clientHeight": 183,
+        "naturalWidth": 640,
+        "naturalHeight": 360,
+        "src": "http://127.0.0.1:37529/api/jobs/resize/frame_at?t=0"
+      },
+      "canvas": {
+        "x": 32,
+        "y": 474,
+        "width": 326,
+        "height": 183,
+        "clientWidth": 326,
+        "clientHeight": 183
+      },
+      "BE": {
+        "scale": 0.509375,
+        "t": 0,
+        "ox": 20,
+        "oy": 12,
+        "sel": -1,
+        "box": [
+          186.25789465247504,
+          123.44236557312857,
+          401.50787862272387,
+          275.94235221462185
+        ],
+        "overrides": {
+          "0": [
+            166.25789465247504,
+            111.44236557312857,
+            381.50787862272387,
+            263.94235221462185
+          ]
+        }
+      },
+      "paint": {
+        "redStroke": {
+          "x0": 94,
+          "y0": 62,
+          "x1": 204,
+          "y1": 140,
+          "count": 379
+        },
+        "allPixels": {
+          "x0": 93,
+          "y0": 61,
+          "x1": 250,
+          "y1": 153,
+          "count": 11136
+        },
+        "renderedCssOuterEdges": [
+          126,
+          536.1270491803278,
+          237,
+          615.2889344262295
+        ],
+        "expectedCssBoxEdges": [
+          126.87511508860447,
+          536.8784549638124,
+          236.51807567344997,
+          614.5581356593229
+        ],
+        "edgeDelta": [
+          -0.8751150886044741,
+          -0.7514057834845289,
+          0.48192432655002904,
+          0.7307987669065596
+        ],
+        "expectedCenter": [
+          181.69659538102724,
+          575.7182953115677
+        ],
+        "expectedCenterPixel": [
+          219,
+          36,
+          36,
+          56
+        ]
+      },
+      "sourceToImage": {
+        "x": 0.509375,
+        "y": 0.509375
+      },
+      "name": "mobile-edited"
+    }
+  ],
+  "liveHit": 0,
+  "edgeError": 0.8125,
+  "retainedPendingMetadata": true,
+  "remountRetiredBeforeDetach": true,
+  "pendingPlayRetiredBeforeRemount": true,
+  "video": {
+    "video": 326,
+    "canvas": 326,
+    "source": 640,
+    "owner": true
+  },
+  "phaseActionsRetiredBeforeDetach": true,
+  "errors": [],
+  "warnings": [
+    "Canvas2D: Multiple readback operations using getImageData are faster with the willReadFrequently attribute set to true. See: https://html.spec.whatwg.org/multipage/canvas.html#concept-canvas-will-read-frequently"
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/model_status"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/custom_cats"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/models/face"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/quality_tier"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/allowlist"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/certinfo"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/jobs"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/update_check"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/vault"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/extras"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/models/plate"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/models/person"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/jobs/resize"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/jobs/resize/log?from=0"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/jobs/resize/detections"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/jobs"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/jobs/resize/thumb/0"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/jobs/resize/mediainfo"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/jobs/resize/report"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/jobs/resize/boxes_at?t=0&all=1"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/jobs/resize/frame_at?t=0"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/jobs/resize/boxes_at?t=0.7&all=1"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/jobs/resize/frame_at?t=0.7"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/jobs/resize/boxes_at?t=0.7&all=1"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/jobs/resize/video"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/jobs/resize/boxes_at?t=0.70&all=1"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/jobs/resize/boxes_at?t=0.87&all=1"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/jobs/resize/boxes_at?t=1.04&all=1"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/jobs/resize/boxes_at?t=1.19&all=1"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/jobs/resize/mediainfo"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/jobs/resize/report"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/jobs/resize/boxes_at?t=0&all=1"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/jobs/resize/frame_at?t=0"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/jobs/resize/video"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/jobs/resize/mediainfo"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/jobs/resize/report"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/jobs/resize/boxes_at?t=0&all=1"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/jobs/resize/frame_at?t=0"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/jobs/resize/boxes_at?t=0.01&all=1"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/jobs/resize/boxes_at?t=0&all=1"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/jobs/resize/detections"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/jobs/resize/thumb/0"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/jobs/resize/mediainfo"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/jobs/resize/report"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/jobs/resize/boxes_at?t=0&all=1"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/jobs/other"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/jobs/other/log?from=0"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/jobs/other/detections"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/jobs"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/jobs/other/thumb/0"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/jobs/resize"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/jobs/resize/log?from=0"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/jobs/resize/detections"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/jobs"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/jobs/resize/mediainfo"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/jobs/resize/report"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/jobs/resize/boxes_at?t=0&all=1"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/jobs/resize"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/jobs/resize/log?from=0"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/jobs"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/jobs/resize/mediainfo"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/jobs/resize/report"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/jobs/resize/boxes_at?t=0&all=1"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/jobs/resize/frame_at?t=0"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/jobs/resize/video"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/jobs/resize/boxes_at?t=0.01&all=1"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/jobs/resize"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/jobs/resize/log?from=0"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/jobs"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/jobs/resize"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/jobs/resize/log?from=0"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/jobs/resize/detections"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/jobs"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/jobs/resize/thumb/0"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/jobs/resize/mediainfo"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/jobs/resize/report"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/jobs/resize/boxes_at?t=0&all=1"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:37529/api/jobs/resize/detframe/0"
+    }
+  ]
+}

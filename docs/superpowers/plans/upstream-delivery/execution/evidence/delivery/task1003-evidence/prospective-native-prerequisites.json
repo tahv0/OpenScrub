@@ -1,0 +1,76 @@
+[
+  {
+    "actual_python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "opencv_version": "4.14.0",
+    "numpy_version": "2.5.5",
+    "used_native_and_loaders": [
+      {
+        "path": "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/cv2/__init__.py",
+        "sha256": "69192904dead3ada37c8b305ee850ac7474924730881a9d5e0b2390944eb5aae",
+        "bytes": 6630
+      },
+      {
+        "path": "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/cv2/cv2.abi3.so",
+        "sha256": "8ed76bb37221f69b4670fda111e9c4746c2c8eea697af20da2f390d24e53c28c",
+        "bytes": 70818873
+      },
+      {
+        "path": "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/numpy/__init__.py",
+        "sha256": "09295a80660f17925ae23765ce8cbd7ff7ceae968d5f2f89349f1cb74c0b9e11",
+        "bytes": 25220
+      },
+      {
+        "path": "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/numpy/_core/_multiarray_umath.cpython-312-x86_64-linux-gnu.so",
+        "sha256": "1650f5b6a42b0022f9821b475725469237dbc77595f1d5c7ae7bbc0288002095",
+        "bytes": 10617201
+      }
+    ],
+    "prepared_record": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/fix1/native-312.json",
+    "prepared_record_sha256": "0173265da6fa6ffb8b2ef723af7ebf6dcf512c35bd91ccb2211d5d2562741d29",
+    "scope": "prospectively verified existing used extension/loader bytes; no new discovery/product imports/transitive native certification"
+  },
+  {
+    "actual_python": {
+      "executable": "/tmp/openscrub-python39-20261117/venv/bin/python",
+      "version": [
+        3,
+        9,
+        25
+      ]
+    },
+    "opencv_version": "4.14.0",
+    "numpy_version": "2.0.2",
+    "used_native_and_loaders": [
+      {
+        "path": "/tmp/openscrub-python39-20261117/venv/lib/python3.9/site-packages/cv2/__init__.py",
+        "sha256": "69192904dead3ada37c8b305ee850ac7474924730881a9d5e0b2390944eb5aae",
+        "bytes": 6630
+      },
+      {
+        "path": "/tmp/openscrub-python39-20261117/venv/lib/python3.9/site-packages/cv2/cv2.abi3.so",
+        "sha256": "8ed76bb37221f69b4670fda111e9c4746c2c8eea697af20da2f390d24e53c28c",
+        "bytes": 70818873
+      },
+      {
+        "path": "/tmp/openscrub-python39-20261117/venv/lib/python3.9/site-packages/numpy/__init__.py",
+        "sha256": "c09e25b58f6b2f8e2cb3c158168f902d447f8171e5ea6513c0aca41ecbda7c2b",
+        "bytes": 21817
+      },
+      {
+        "path": "/tmp/openscrub-python39-20261117/venv/lib/python3.9/site-packages/numpy/_core/_multiarray_umath.cpython-39-x86_64-linux-gnu.so",
+        "sha256": "eced012ddb862f047fb1ba62c3cf1494f07558d2f063ced4fa5fe449c2fefe12",
+        "bytes": 10373481
+      }
+    ],
+    "prepared_record": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/fix1/native-39.json",
+    "prepared_record_sha256": "00eecfcbc37b08511aba6812dae54119bcad12d6402fe29d90463f61b0898794",
+    "scope": "prospectively verified existing used extension/loader bytes; no new discovery/product imports/transitive native certification"
+  }
+]

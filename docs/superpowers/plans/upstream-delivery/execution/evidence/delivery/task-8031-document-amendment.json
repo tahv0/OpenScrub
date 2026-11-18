@@ -1,0 +1,10 @@
+{
+  "original_PR_bytes": 1684,
+  "original_PR_sha256": "1f508fdadaf5ca8796f226f6e2c7613e52638cccd122c9aff22bc3de8587a68f",
+  "canonical_PR_sha256": "aa2744cfb23502f079429429938e0f1cce928373b862bb3a026b679c960c8d9f",
+  "changes": [
+    "clarify cached build-tool bundle minimum vs product runtime/source-build promise",
+    "update final independent local review/acceptance status"
+  ],
+  "product_test_runtime_or_original_records_changed": false
+}

@@ -1,0 +1,141 @@
+# Exact editor and Track UI implementation plan
+
+> **For agentic workers:** Use superpowers:executing-plans for root-assigned supervised implementation. This source plan authorizes no execution or delegation. Complete the three owning tasks together before offering the UI+Track contribution for review.
+
+**Goal:** Ordinary paused editor mutations and Track consume one inspected exact sample while preserving pending edits and independent output/audio choices.
+
+**Architecture:** P16D BE_VIEW owns mounted coordinates/readiness, one page-wide slot coalesces samples, and REVIEW_DRAFTS owns baselines/one unresolved submission. Backend/report/engine unchanged.
+
+**Tech stack:** Existing Python>=3.9/embedded JS/Flask/Cheroot, Node VM/prepared Playwright; no new dependencies.
+
+**Spec:** task-10040 brief, adopted exact-editor contract/readiness, Task1001/1002 rulings and Task1001–1003 final acceptances. Source-only/unrun.
+
+## Delivery and constraints
+
+Base **07cfaa9539a2561c26b6f7280fae6702eb07137c** is accepted/frozen Task1003. Lines below refer to immutable git show. Backend/strict seeds/P16D are accepted. Root assigns branch and source/runtime/guard budgets later; deliver UI+Track together.
+
+Preserve Austin defaults/human review/report compatibility, P07a snapshot/equality ACK, P07b immutable manual identity, raw-row/source/timeline contexts and independent enabled/audio. No silent remap/rebase, report revision gate, custom training/review/workbench, new model/dependency/decoder/registry/root file, C01/scheduler/thumbnail/worker framework or interruption claim. Independent matcher is out of scope.
+
+Root supersedes opportunistic abort: **one unsettled exact sample cycle (fetch/body/decode/apply/cleanup) + one latest desired request across mounts/jobs**. Do not abort issued scrubs to release the slot; native decode may continue. Unavailable exact blocks geometry/Track usefully; audio/choices remain usable.
+
+## Review focus
+
+1. Same-BE old open/body/decode cannot replace the new mount (Task1).
+2. Late tolerant playback cannot overwrite paused exact geometry (Task3).
+3. Cross-kind ACK advances only owned baseline (Task2).
+4. Lost ACK retries identical unresolved payload first (Task2).
+5. Canonical reference outside window refuses creation/Track (Tasks1/3).
+
+## Immutable source and wire owners
+
+| 07cf openscrub_web.py | Owner/change |
+| --- | --- |
+| 3148–3178,3213–3235 | REVIEW_DRAFTS/emptyEditor/trim/hasReviewEdits/openJob: baseline and unresolved owner. |
+| 3340–3398 | BE_VIEW/endGesture/unmount/mount/current/sync: mount/readiness/transform. |
+| 3399–3462 | loadBoxEdit: capture open intent before mediainfo/report awaits; guard replacement plus sample-owned media/status. |
+| 3465–3528 | beTogglePlay/bePlayStop: playback serial, v.load, captured cleanup. |
+| 3534–3655 | tlInit/timeline/audio: fence mounted continuations; independent audio/window controls. |
+| 3656–3698 | beTrackMode/beTrackGo/beScrub: strict launch/polls, paused edit_sample. |
+| 3699–3863 | filter/draw/add/applyTimes/hook/manualId: readiness/first-mutation/canonical creation. |
+| 4111–4190 | reviewPost, acknowledgeMap/Adds, saveAndRender: paired geometry ACK and one unresolved snapshot. |
+| 4368–4376,4875–4894 | PAGE composition and actual index substitutions remain current paths. |
+
+Retain beUnmountIn-before-detach: delJob/openJob (3210,3214), phase actions3332, loadBoxEdit3412, showPanel3890–3903, loadReview4008, save4179–4180. Retained subtrees retain observers/media/gestures; removed pending Play clears captured editor.playing before metadata.
+
+Actual API spellings:
+- GET api/jobs/<id>/edit_sample?t=<finite seconds> returns version=1, sample={source_ref,timeline_eq,policy,index,requested_s,canonical_s,observed_s,width,height,stream,origin,offset}, image={mime:"image/jpeg",base64}, boxes=[{i,category,text,enabled,t_start,t_end,box,row_context_eq,base:{cbox,span}}] (1778–1828). policy=cfr-index-v1; origin=[0,0]; source box=content cbox+offset; span=[start,end,effective_last_seen]. Preserve disabled raw rows/concrete i.
+- Project **exactly eight precondition keys**: {version:1,source_ref,timeline_eq,policy,index,width,height,offset}. Version comes from response top-level. Whole sample is invalid as seed: strict Track rejects extra requested/canonical/observed/stream/origin fields (2275–2279).
+- Indexed row precondition adds row_context_eq and complete base. POST detections keeps enabled/manual/box_overrides/time_overrides/audio, adding geometry_preconditions keyed by decimal raw index **only for submitted strict box/span kinds** (2065–2086). No report/output epoch.
+- Strict ACK geometry_rows[key]={...submitted context,row_context_eq,base:<committed full base>} (2243–2246); validate, never derive last_seen in JS.
+- BE.adds={manual_id,box,t0,t1,tref,sample_precondition?}; save maps to manual_id/screen_box/t_start/t_end/t_ref/sample_precondition. Capture evidence at creation. MAN stays separate wire entries; never synthesize legacy evidence.
+- POST track_object={box:<source coordinates>,t_ref:<canonical_s>,t0,t1,seed:<eight keys>}; success {ok:true}. GET track_status={state,error?,added?}, with no backend launch token (2475–2478). Keep no-seed API.
+- Check HTTP before JSON (middleware refusals can be non-JSON). Exact codes: invalid_sample_request400, source_report_pending/sample_conflict409, exact_sample_unavailable422, sample_encode_failed500; save geometry_conflict409. Current error blocks readiness; stale errors are inert.
+
+## Files and recommended module boundary
+
+Keep a bounded exact-request/validation/readiness block beside BE_VIEW in **openscrub_web.py**, with DOM/painting/draft/transform ownership intact. A Python-exported editor_samples.py block adds PAGE/extraction/shipping boundaries without removing sole-consumer shared ownership; do not add it or move full APP_JS.
+
+Preserve literal APP_JS: tests/test_review_save_failures.py:16–20 ast.literal_eval depends on it; PAGE replaces %%APP_JS%% at4376. No asset/build abstraction.
+
+Ten runtime origins: openscrub/web, zones_ui, openscrub_setup/update/vault, openscrub_internal+exact_samples/lifetimes/reports. Inventory also includes utilities openscrub_gui/install/fetch_plate_models. Wheel/sdist private-dir inclusion, updater copy157–181, Docker install/Windows Analysis direct imports need no edits; source analysis is not platform execution.
+
+Extend tests/test_review_save_failures.py (app_js/run_js/HARNESS/MOUNT), test_editor_resize.py, editor_resize_server.py and editor_resize_browser.cjs. Add tests/exact_editor_browser.cjs for retained-media/Track PAGE, launched by a second existing-launcher case. Update README with completed behavior. No media/environments in source.
+
+## Proposed state/interfaces
+
+- BE_VIEW gains serial/playbackSerial/trackLaunch/readySample/imageURL; object identity owns same-BE reopening. Page-local **BE_OPEN_INTENT** is captured by loadBoxEdit before any await, superseded by a newer open/close/panel/job intent. Check before accepting mediainfo, replacing slot or report continuation; old same-BE reentry cannot retire/remount newer content. Retained subtree stays mounted until current replacement.
+- Page-local EDIT_SAMPLE_IO={active:null,wanted:null}; latest desired={view,serial,t}. Active remains occupied through fetch/body AND detached decode/apply/failure cleanup, bounding candidate images/URLs. Retirement never frees it early.
+- **beInvalidateSample(view,message)** increments serial, clears readiness, ends drag/anchor/float/selection/handles/pointer capture through beEndGesture; preserves every pending delta/precondition/audio/choice.
+- **beRequestSample(view,t)** invalidates/replaces wanted/pumps if idle. Await body, decode/apply and URL cleanup before releasing own active slot; discard stale bodies before decode. Retired decode completion cleans up then latest desired runs. All continuations check view+serial.
+- **beValidateSample(body,t)** checks version/policy, finite times, integer index/dimensions/raw i, source_ref/digests, origin/offset/boxes/full bases/JPEG and requested_s==t. Carry integer/canonical; no slider rederivation/context hashing.
+- **beApplySample(view,serial,validated)** owns candidate URL/decode. Require actual displayed image decode/complete/matching natural dimensions and view.sync's current finite positive image transform before installing boxes/offset/canonical BE.t/readySample={serial,sample,precondition,rows,imageURL}. Label requested/canonical times distinctly; stale visible pixels stay uneditable. Revoke failed/replaced/unmounted URLs; late callbacks are inert.
+- **beReady(view=BE_VIEW)** checks current view/serial, !playing, connected image/canvas, current URL/decoded dimensions and sync's applied image transform. Hidden/zero/resize cancels gestures; valid resize restores only same sample/current transform, no request/rebase.
+- **b.geometry[rawIndex]={precondition}**: beCaptureGeometry(view,row) retains existing pending owner or deep-copies full ready sample/context/base on first mutation. Gestures capture/check view/serial/row on every continuation. Selection/scrub/Save never changes baseline.
+- **d.submitted**=null or {payload,manualRefs/manualSnapshot,addRefs/addSnapshot,geometryOwners/geometrySnapshot}; deep values plus original-owner refs. hasReviewEdits/trim preserve unresolved owner.
+- **acknowledgeGeometry(editor,submission,result)** validates all strict rows/family; clears only equal submitted kinds; preserves new/different values/kinds and advances owned baseline only to returned complete row. Remove owner only when neither kind remains.
+- **beTrackCurrent(launch)** checks captured id/gen/editor/view/trackLaunch. One launch/poll at a time; no backend token/cross-client attribution claim.
+
+## Task 1 — Coherent exact editor input and owning PAGE proof
+
+**What/why/when:** First on assigned07cf branch: replace independent pixels/boxes with mounted readiness; implement and prove ordinary input together.
+
+**Owners:** web3340–3462/3680–3863/emptyEditor; VM/resize fixtures/new PAGE script. Produces sample helpers/b.geometry (Task2), readySample (Task3).
+
+- [ ] Write **test_exact_scrubs_coalesce_fetch_and_body_across_mounts**: defer fetch/body/decode separately, A1→A2→B→A3, maximum full cycles/candidate URLs=1 and only latest desired survives. **test_exact_sample_waits_for_display_decode_and_transform**: metadata alone/wrong natural size/zero or hidden canvas never ready. **test_exact_old_load_error_and_same_be_remount_are_inert**: stale success/error/decode cannot install/clear, all URLs retire.
+- [ ] Write **test_same_be_open_intent_before_metadata_cannot_replace_newer_mount**: older mediainfo/report completion cannot retire/remount newer slot; retained mount survives until actual current replacement. Write **test_exact_geometry_handlers_share_ready_sample** for hit/down/move/up, modes, second click and time apply while loading. **test_exact_scrub_cancels_gesture_keeps_pending_baseline** preserves applied ov/times/adds/audio/choices while releasing capture/anchor/drag. **test_exact_add_captures_canonical_creation_after_prompts** rejects stale prompt continuation and validates canonical tref, finite window/box, stable ID and eight-key creation evidence; a window excluding canonical reference stays unchanged and refuses creation.
+- [ ] Run named REDs on baseline; distinguish harness errors. Extend HARNESS/MOUNT with connected DOM/Image/decode/Blob/URL/deferred bodies, never substitute production functions.
+- [ ] Implement helpers; paused scrub uses edit_sample. All geometry/time input uses beReady/first-mutation capture and captured offset; enforce finite nonempty source bounds. Scrub never rebases; additions stay separate from ordinary handles.
+- [ ] Add **test_exact_editor_samples_and_track** in existing launcher with browser opt-ins/OPENSCRUB_EXACT_MEDIA. Reuse server source/runtime/port interface/cleanup; add retained-media jobs while retaining resize fixture. Acceptance supplies all inputs, no skip.
+- [ ] In actual full PAGE inspect CFR24 .2→index4/canonical4/24, CFR5 1.9→index9/canonical1.8, normalized .5→index6/canonical6/13. Reuse runtime/task1001/media.json's three hashed synthetic inputs. Independent sequential decode/FFprobe PTS/marker oracle and cum[i]=[2*i,-i] establish expected frame/offset/source boxes; expected values cannot come from edit_sample/BE.
+- [ ] Gate body/decode separately; rapid scrub/same-BE reopen/A→B→A stays blocked until ready. DPR1/2 independently measures paint/inverse pointer/source→CSS edges, shrink/grow/fractional/midgesture/hidden/zero/containment. Resize retains applied values/no request. Update obsolete frame_at interception/edit_sample rejection; retain tolerances.
+- [ ] **T1003-M1:** read pixels from test-created {willReadFrequently:true} canvas copied from production; production unchanged. Reject warnings/errors; retain diagnostics.
+
+## Task 2 — Paired save/uncertain retry and real persistence
+
+**What/why/when:** After sample capture, extend save ownership to preserve newer edits; prove actual save/render/fresh reopen with the change.
+
+**Owners:** web3148–3178/3213–3228/4111–4190, VM/PAGE persistence/verify_render. b.geometry→d.submitted/acknowledgeGeometry; backend unchanged.
+
+- [ ] RED **test_geometry_ack_retains_newer_kind_and_advances_owned_complete_base**, parameterized box→span, span→box, combined→one different and changed-away/back equality. Assert returned complete source/context/base/last_seen and retained pending values/no render. **test_geometry_ack_does_not_transplant_reinspected_family** refuses equal coordinates with another owner. **test_scrub_never_rebases_pending_geometry** keeps first complete baseline.
+- [ ] RED **test_lost_ack_retries_identical_payload_before_newer_geometry**: committed/lost response, then newer geometry/choices/audio/manual; explicit Save sends exactly original payload, its confirmed ACK advances only owned baseline, newer kinds remain and block render, next explicit Save sends them. Parameterize network/invalid JSON or success body/409/423/500; one unresolved submission survives failed/conflicting retry.
+- [ ] Keep controls test_newer_edits_survive_save_ack, test_failed_save_keeps_manual_and_audio_drafts, test_manual_id_is_generated_once_retained_and_serialized_on_retry and test_render_failure_retry_does_not_reappend_committed_manual; retain whole existing owner including audio toggle-back, allow-list, containment and crypto controls. Legacy tests deliberately create ov/times without evidence: retain optional legacy wire path, never synthesize preconditions.
+- [ ] Snapshot paired values/preconditions; retry d.submitted identically first. Assign compatibility IDs once; only captured additions send sample_precondition. Freeze enabled/audio/manual with existing audioInFlight/toggle-back ownership.
+- [ ] Validate all strict ACK rows before clearing; malformed success remains uncertain. Reconcile initiating draft/editor/same family even after view switch. Clear equal kinds/additions; retain/advance owned newer kinds only to complete returned base; confirm audio then retire submission.
+- [ ] Render only after confirmed ACK with no unresolved/pending kind. Conflicts retain all drafts/reinspection status. No timer/history/automatic render/rebase; preserve allow-list await/failure/VIEW_GEN fences.
+- [ ] Actual DPR2 save checks strict row/manual evidence, nonzero offset, IDs/immutable creation, disabled/opaque rows/audio/choices. Lose real committed response, add opposite-kind edit, prove identical retry/owned advancement before final Save.
+- [ ] Real SDR render/fresh page+process reopen recovers geometry/manual/audio/choices; verify_render independently checks dark-core/outside pixels. Save-success/render-refusal retains saved state/no duplicate additions. Coordinate evidence, not tracking quality.
+
+## Task 3 — Strict Track/playback and completed shipping proof
+
+**What/why/when:** Complete UI+Track: strict inspected launch and fenced playback/polls, validated together before shipping.
+
+**Owners:** web3455–3528/3534–3560/3656–3679, VM/PAGE/shared server/README. Consumes beReady/precondition; no-seed backend unchanged.
+
+- [ ] RED **test_track_captures_seed_window_and_job_before_await**: source box/eight-key seed/returned integer/canonical t_ref/window copied synchronously; later CUR/BE/window cannot change POST/poll URLs. **test_track_late_status_cannot_refresh_reopened_mount** covers POST/poll/tlInit continuation, same-BE reopen and A→B→A; replacement UI stays unchanged.
+- [ ] RED **test_playback_response_after_pause_cannot_replace_exact_sample**/**test_playback_restart_serial_fences_metadata_and_raf**: tolerant data never becomes ready; stale metadata/error/box/rAF inert after pause/restart. Retain pending-Play controls.
+- [ ] Before await capture ready sample/box/canonical/index/window/id/gen/editor/view/launch/status. Refuse invalid bounds/window without changing inputs. Submit seed; serial polls use captured id; unmount retires timer/launch; stale completion is inert.
+- [ ] Owned Track success invalidates sample/preserves drafts; captured-mount tlInit/review fences allow intentional beUnmountIn refresh only before replacement. Obtain fresh exact sample; never rebase pending geometry from results.
+- [ ] Play invalidates sample/gestures/serial before metadata; retain v.load/outgoing cleanup. Tolerant playback is view-only. Pause/ended captures pause time/retires serial/requests exact sample; block input through decode/transform, retain independent controls.
+- [ ] PAGE draws Add/Track on inspected fixtures; retain actual strict POST/delayed status across remount. Actual route deterministic engine fake proves seed/poll/append, **not real quality**. Reuse accepted native initializer proof; installed no-seed listening control and malformed/stale strict zero-publication remain.
+- [ ] Stable UI: entire changed owner on actual3.12/3.9, full PAGE DPR1/2 all flows above, one normally discovered full native per CONTRIBUTING, one package/installed gate. Inspect screenshots/raw console. No repeated broad floor/multi-4MiB matrix without new failure.
+
+## Validation recipes, packaging and evidence
+
+Root supplies budgets; use assigned absolute source/config/scratch. Freeze head/files/tests/adapters, ten product origins/parent and native/browser/media identities prospectively. Label development REDs; acceptance uses clean frozen source/export.
+
+Let VERIFY=/home/tahv0/src/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/verify.py. CONFIG/SOURCE denote root-assigned absolute paths. Commands:
+  /usr/bin/python3 VERIFY --config CONFIG preflight
+  /usr/bin/python3 VERIFY --config CONFIG run -- -m pytest SOURCE/tests/test_review_save_failures.py -q
+  /usr/bin/python3 VERIFY --config CONFIG run -- -m pytest SOURCE/tests/test_editor_resize.py -q
+  /usr/bin/python3 VERIFY --config CONFIG run -- -m pytest SOURCE/test_openscrub.py SOURCE/tests/ -q
+  /usr/bin/python3 VERIFY --config CONFIG package
+
+Separate native/floor/browser/package configs, serial runtime. Task1003-confirmed interpreters: /tmp/openscrub-baseline-20261116/venv-opencv4/bin/python **3.12.16**, /tmp/openscrub-python39-20261117/venv/bin/python **3.9.25**. System controller/bootstrap tools stay separate; supported run is individual -B/-u then -m pytest.
+
+Reuse final-page-312.json's pinned Node/Playwright/Chromium/LDnspr paths. Keep OPENSCRUB_PLAYWRIGHT_MODULE/OPENSCRUB_CHROMIUM/OPENSCRUB_RESIZE_ARTIFACTS. Supply OPENSCRUB_EXACT_MEDIA=runtime/task1001/media.json as absolute existing path with three source hashes; no skipped acceptance. Assigned loopback/terminate+reap and pinned task1631_fixture cached YuNet where needed; no installs/downloads.
+
+Package config: cached task1203 build-tools/bootstrap tool_paths, requires_python ">=3.9", installed_commands arrays. Sdist→extracted wheel→offline/no-deps owned site-packages. Check web/README/changed+new tests in sdist, web in wheel/installed, APP_JS/CSS/actual PAGE with exact MAXUP/VERSION/FREEDISK/custom substitutions. Retarget/freeze corrected Task1003 package_page_final.py including updater opener restoration. Exclude checkout imports; verify ten origins/defaults/CLI/installed PAGE/strict+legacy listening HTTP/updater bytes. Docker/Windows source-only; shared helper unchanged.
+
+Reuse unchanged accepted backend/seed/native proofs with original attribution, rerun affected draft/manual/transaction owners and one full native after stable UI. No feasibility/O(N)/multi-4MiB matrix replay or quality/interruption/latency claim from deterministic Track fakes. T1003-M1 belongs to Task1 test-only readback/strict console. **T1003-M2/D01 launcher tar warning stays separate**, with diagnostics; no mandatory shared verify.py edit.
+
+Report source/RED-GREEN/interpreter/PAGE/full/package identities, retained failures/limits. Fresh independent review covers complete UI+Track before adoption/C01; no external publication.

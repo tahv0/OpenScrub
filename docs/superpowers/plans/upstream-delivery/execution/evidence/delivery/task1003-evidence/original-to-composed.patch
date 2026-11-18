@@ -1,0 +1,372 @@
+diff --git a/openscrub_web.py b/openscrub_web.py
+index 83cbc3d..cd2492d 100644
+--- a/openscrub_web.py
++++ b/openscrub_web.py
+@@ -3207,11 +3207,11 @@ async function delJob(id){
+   alert(m);return;
+  }
+  REVIEW_DRAFTS.delete(id);
+- if(CUR===id){beUnmount();VIEW_GEN++;CUR=null;EDITS=null;if(POLL)clearInterval(POLL);detail.innerHTML="";}
++ if(CUR===id){beUnmountIn(detail);VIEW_GEN++;CUR=null;EDITS=null;if(POLL)clearInterval(POLL);detail.innerHTML="";}
+  JOBSJSON="";loadJobs();
+ }
+ async function openJob(id){
+- beUnmount();
++ beUnmountIn(detail);
+  const video=document.getElementById("beVid");
+  if(video){try{video.pause();}catch(e){}}
+  if(EDITS){
+@@ -3329,7 +3329,7 @@ async function refresh(){
+     sharing. This tool is best-effort, not a compliance guarantee.</div>
+     <div id="compare" style="width:100%"></div>
+     <div id="beslot_done" style="width:100%"></div>`;
+-  document.getElementById("actions").innerHTML=a;
++  const actions=document.getElementById("actions");beUnmountIn(actions);actions.innerHTML=a;
+   if(j.phase!="scanning")img.style.display="none";
+  }
+  loadJobs();
+@@ -3350,6 +3350,13 @@ function beUnmount(){
+  BE_VIEW=null;view.observer.disconnect();
+  beEndGesture(view.editor,view.cv);
+ }
++// Retained panels keep their mount. Retire only the subtree being removed,
++// before detach, so an outgoing video cannot keep playing without its owner.
++function beUnmountIn(root){
++ const view=BE_VIEW;if(!view||!root?.contains?.(view.cv))return;
++ beUnmount();view.editor.playing=false;
++ try{if(view.vid&&!view.vid.paused)view.vid.pause();}catch(e){}
++}
+ function beMount(img,vid,cv,id,gen,editor){
+  beUnmount();
+  const view={img,vid,cv,id,gen,editor,transform:null};
+@@ -3402,6 +3409,7 @@ async function loadBoxEdit(fromReview){
+  Object.assign(BE,{dur:mi.duration,win:[0,mi.duration],trk:false,muteArm:false,tlDrag:null,
+      audioSel:-1,tlspans:[]});
+ 
++ beUnmountIn(c);
+  c.innerHTML=`<div class="row" style="margin-top:8px">
+   <button class="sec" id="bePlay" style="padding:3px 11px" title="Play the video with live boxes — pause to edit them" onclick="beTogglePlay()">&#9654;</button>t=
+   <input type="range" id="beT" min="0" max="${Math.max(0.2,mi.duration-0.1).toFixed(1)}"
+@@ -3880,24 +3888,17 @@ async function cancelJob(){await fetch("api/jobs/"+CUR+"/cancel",{method:"POST"}
+ // the three post-render views (compare, review, box editor) are mutually
+ // exclusive: opening one closes the others instead of stacking them
+ function showPanel(which){
+- beUnmount();
+- // a playing box-editor video must be PAUSED before its DOM is wiped —
+- // an element removed via innerHTML can keep its audio running
+- try{const v=document.getElementById("beVid");
+-  if(v&&!v.paused){BE.playing=false;v.pause();}}catch(e){}
+- // "boxedit_rev" = the editor button INSIDE the review card: the editor
+- // mounts in the review's own slot, so the review stays. Everything else
+- // is standalone and closes the other panels.
+- if(which!=="compare"){
+-  const c=document.getElementById("compare");if(c)c.innerHTML="";}
+- const b=document.getElementById("beslot_done");
+- const b2=document.getElementById("beslot");
+- if(which==="boxedit_rev"){if(b)b.innerHTML=""}
++ const clear=element=>{if(element){beUnmountIn(element);element.innerHTML="";}};
++ // The in-review editor slot remains mounted on this retained panel path.
++ if(which!=="compare")clear(document.getElementById("compare"));
++ const b=document.getElementById("beslot_done"),b2=document.getElementById("beslot");
++ if(which==="boxedit_rev")clear(b);
+  else{
+-  if(which!=="boxedit"){if(b)b.innerHTML=""}
+-  if(b2)b2.innerHTML="";
++  if(which!=="boxedit")clear(b);
++  clear(b2);
+   if(which!=="review"){
+-   const rev=document.getElementById("review");if(rev)rev.remove();}
++   const rev=document.getElementById("review");if(rev){beUnmountIn(rev);rev.remove();}
++  }
+  }
+ }
+ 
+@@ -4004,7 +4005,7 @@ async function loadReview(){
+  <span style="font-size:12px;color:#94a3b8">missed something? use
+   ▶ Preview video &amp; edit boxes above — its ＋ Add box replaces the old
+   add-region tool</span></div></div>`;
+- const old=document.getElementById("review"); if(old)old.remove();
++ const old=document.getElementById("review");if(old){beUnmountIn(old);old.remove();}
+  detail.insertAdjacentHTML("beforeend",html);
+  initMarquee();saveStatus(EDITS,EDITS.status);
+ }
+@@ -4175,8 +4176,8 @@ async function saveAndRender(){
+   }
+   saveStatus(d,"Rendering with saved edits…"+allowError);
+   if(ownsView(id,gen)){
+-   const rv=document.getElementById("review");if(rv)rv.remove();
+-   const c=document.getElementById("beslot_done");if(c)c.innerHTML="rendering with your edits…";
++   const rv=document.getElementById("review");if(rv){beUnmountIn(rv);rv.remove();}
++   const c=document.getElementById("beslot_done");if(c){beUnmountIn(c);c.innerHTML="rendering with your edits…";}
+   }
+   return true;
+  }catch(e){
+diff --git a/tests/editor_resize_browser.cjs b/tests/editor_resize_browser.cjs
+index 49217a8..576922d 100644
+--- a/tests/editor_resize_browser.cjs
++++ b/tests/editor_resize_browser.cjs
+@@ -17,6 +17,28 @@ await page.goto(url);assert.equal(await page.title(),'OpenScrub');assert((await
+ await page.getByRole('link',{name:'synthetic-resize.mp4',exact:true}).click();await page.getByRole('button',{name:/Preview video & edit boxes/}).click();
+ await page.waitForFunction(()=>document.getElementById('beImg')?.naturalWidth===640&&BE.boxes.length===1);
+ const result={dpr,states:[]};
++// Watch the actual DOM owner immediately before its shipped removal method.
++await page.evaluate(()=>{
++ clearInterval(POLL);
++ window.retirements=[];
++ window.watchRetirement=(root,kind)=>{
++  const view=BE_VIEW;
++  const record=()=>retirements.push({kind,retired:BE_VIEW!==view,
++   disconnected:view.observer.disconnected,paused:view.vid.paused,attached:view.cv.isConnected});
++  if(kind==='remove'){
++   const remove=root.remove;root.remove=function(){record();return remove.call(this)};
++  }else{
++   const descriptor=Object.getOwnPropertyDescriptor(Element.prototype,'innerHTML');
++   Object.defineProperty(root,'innerHTML',{configurable:true,get(){return descriptor.get.call(this)},
++    set(value){record();delete this.innerHTML;descriptor.set.call(this,value)}});
++  }
++ };
++});
++function retired(records){assert(records.length>0);for(const record of records){
++ assert(record.attached,'witness must run before DOM detach');assert(record.retired);
++ assert(record.disconnected);assert(record.paused);
++}}
++
+    async function measure(name){
+     await page.evaluate(()=>{BE.sel=-1;beDraw()});
+     const data=await page.evaluate(()=>{
+@@ -111,10 +133,49 @@ assert.equal(await page.evaluate(()=>BE.drag),null);release();await page.waitFor
+ await page.locator('#bePlay').click();await page.waitForTimeout(300);
+ fs.writeFileSync(root+`/video-start-${dpr}.json`,JSON.stringify(await page.evaluate(()=>{const v=document.getElementById('beVid');return {playing:BE.playing,ready:v.readyState,network:v.networkState,src:v.src,preload:v.preload,error:v.error?.message,transform:!!BE_VIEW.transform,canPlay:v.canPlayType('video/mp4')}}),null,2));
+ await page.waitForFunction(()=>BE.playing&&BE_VIEW.transform?.media===document.getElementById('beVid'));
++// Keep the short synthetic clip alive while inspecting the retained mount.
++await page.locator('#beVid').evaluate(video=>video.loop=true);
+ await page.setViewportSize({width:390,height:844});await page.waitForTimeout(120);
+ const videoState=await page.evaluate(()=>{const v=document.getElementById('beVid'),c=document.getElementById('beCv');const r=v.getBoundingClientRect(),q=c.getBoundingClientRect();return {video:r.width,canvas:q.width,source:v.videoWidth,owner:BE_VIEW.transform.media===v}});
+ assert.equal(videoState.video,videoState.canvas);assert.equal(videoState.source,640);assert(videoState.owner);
+ const videoPixels=await measure('video-mobile');assert(Math.max(...videoPixels.paint.edgeDelta.map(Math.abs))<=2);
++// Reopening the mounted in-review editor keeps the old DOM/video/observer
++// while its real metadata response is pending, then retires just that slot.
++let releaseMetadata,startMetadata;const metadataGate=new Promise(r=>releaseMetadata=r),metadataStarted=new Promise(r=>startMetadata=r);
++await page.route('**/api/jobs/resize/mediainfo',async route=>{startMetadata();await metadataGate;await route.continue()});
++await page.evaluate(()=>{window.retainedView=BE_VIEW;window.retainedImageLoad=BE_VIEW.img.onload;
++ window.retainedApplied=JSON.stringify({ov:BE.ov,times:BE.times,adds:BE.adds});
++ watchRetirement(document.getElementById('beslot'),'innerHTML');});
++await page.getByRole('button',{name:/Preview video & edit boxes/}).click();await metadataStarted;
++assert(await page.evaluate(()=>BE_VIEW===retainedView&&document.getElementById('beCv')===retainedView.cv&&
++ !retainedView.observer.disconnected&&!retainedView.vid.paused&&BE.playing&&
++ JSON.stringify({ov:BE.ov,times:BE.times,adds:BE.adds})===retainedApplied));
++releaseMetadata();await page.waitForFunction(()=>BE_VIEW!==retainedView&&document.getElementById('beImg')?.complete&&BE_VIEW?.transform&&!BE.playing);
++await page.unroute('**/api/jobs/resize/mediainfo');retired(await page.evaluate(()=>retirements.splice(0)));
++const replacementPixels=await page.evaluate(()=>document.getElementById('beCv').toDataURL());
++await page.evaluate(()=>{retainedView.observer.callback([]);retainedImageLoad()});
++assert.equal(await page.evaluate(()=>document.getElementById('beCv').toDataURL()),replacementPixels);
++assert.equal(await page.evaluate(()=>JSON.stringify({ov:BE.ov,times:BE.times,adds:BE.adds})),await page.evaluate(()=>retainedApplied));
++result.retainedPendingMetadata=true;result.remountRetiredBeforeDetach=true;
++// A Play request still waiting for video metadata owns playing=true even
++// though the media element remains paused. Retiring that mount must clear it.
++let releaseVideo,startVideo,continuedVideo;
++const videoGate=new Promise(r=>releaseVideo=r),videoStarted=new Promise(r=>startVideo=r),videoContinued=new Promise(r=>continuedVideo=r);
++await page.route('**/api/jobs/resize/video',async route=>{startVideo();await videoGate;await route.continue();continuedVideo()});
++await page.evaluate(()=>{window.pendingVideoView=BE_VIEW;watchRetirement(document.getElementById('beslot'),'innerHTML')});
++await page.locator('#bePlay').click();await videoStarted;
++assert(await page.evaluate(()=>BE.playing&&pendingVideoView.vid.paused&&pendingVideoView.vid.readyState===0));
++await page.getByRole('button',{name:/Preview video & edit boxes/}).click();
++await page.waitForFunction(()=>BE_VIEW!==pendingVideoView&&document.getElementById('beImg')?.complete&&BE_VIEW?.transform&&!BE.playing);
++retired(await page.evaluate(()=>retirements.splice(0)));
++const afterPendingPixels=await page.evaluate(()=>document.getElementById('beCv').toDataURL());
++releaseVideo();await videoContinued;await page.unroute('**/api/jobs/resize/video');
++await page.evaluate(()=>{pendingVideoView.vid.onloadedmetadata();pendingVideoView.observer.callback([])});
++assert(await page.evaluate(()=>!BE.playing&&pendingVideoView.vid.paused));
++assert.equal(await page.evaluate(()=>document.getElementById('beCv').toDataURL()),afterPendingPixels);
++result.pendingPlayRetiredBeforeRemount=true;
++// Ordinary explicit Play/pause still switches back to the current still image.
++await page.locator('#bePlay').click();await page.waitForFunction(()=>BE.playing);
+ await page.locator('#bePlay').click();await page.waitForFunction(()=>!BE.playing&&document.getElementById('beImg').complete&&BE_VIEW.transform?.media===document.getElementById('beImg'));
+ result.video=videoState;
+ // Close/remount and job switches disconnect the observer; even deliberately
+@@ -132,6 +193,28 @@ await page.getByRole('button',{name:/Preview video & edit boxes/}).click();await
+ assert(await page.evaluate(()=>oldObserver.disconnected));const newPixels=await page.evaluate(()=>document.getElementById('beCv').toDataURL());
+ await page.evaluate(()=>oldObserver.callback([]));assert.equal(await page.evaluate(()=>document.getElementById('beCv').toDataURL()),newPixels);
+ assert.equal(await page.evaluate(()=>JSON.stringify({ov:BE.ov,times:BE.times,adds:BE.adds})),drafts);
++// Drive the actual standalone phase-actions refresh owner. Only job status
++// responses are controlled; media, PAGE, mounts, observers and painting are real.
++let phase='done';await page.route('**/api/jobs/resize',async route=>{
++ const response=await route.fetch(),body=await response.json();
++ await route.fulfill({response,json:{...body,phase,has_output:true}});
++});
++await page.evaluate(async()=>{clearInterval(POLL);await refresh();await loadBoxEdit();});
++await page.waitForFunction(()=>document.getElementById('beslot_done')?.contains(document.getElementById('beCv'))&&document.getElementById('beImg').complete&&BE_VIEW?.transform);
++await page.locator('#bePlay').click();await page.waitForFunction(()=>BE.playing&&!document.getElementById('beVid').paused);
++await page.evaluate(()=>{window.phaseView=BE_VIEW;watchRetirement(document.getElementById('actions'),'innerHTML')});
++phase='rendering';await page.evaluate(()=>refresh());
++retired(await page.evaluate(()=>retirements.splice(0)));
++assert(await page.evaluate(()=>phaseView.observer.disconnected&&phaseView.vid.paused&&BE_VIEW===null));
++await page.unroute('**/api/jobs/resize');
++await page.evaluate(()=>openJob('resize'));await page.getByRole('button',{name:/Preview video & edit boxes/}).click();
++await page.waitForFunction(()=>document.getElementById('beImg')?.complete&&BE_VIEW?.transform&&BE.boxes.length===1);
++await page.evaluate(()=>clearInterval(POLL));
++const phaseReplacement=await page.evaluate(()=>document.getElementById('beCv').toDataURL());
++await page.evaluate(()=>phaseView.observer.callback([]));
++assert.equal(await page.evaluate(()=>document.getElementById('beCv').toDataURL()),phaseReplacement);
++assert.equal(await page.evaluate(()=>JSON.stringify({ov:BE.ov,times:BE.times,adds:BE.adds})),drafts);
++result.phaseActionsRetiredBeforeDetach=true;
+ const final=await measure('mobile-edited');assert(Math.max(...final.paint.edgeDelta.map(Math.abs))<=2);
+ // Ordinary enlarged review preview and embedded editor help survive.
+ assert((await page.locator('body').innerText()).includes('drag inside to move'));
+@@ -140,9 +223,13 @@ if(dpr===2){
+  // Save via the actual endpoint. Intercept only to retain the submitted bytes.
+  let sent;await page.route('**/api/jobs/resize/detections',async route=>{if(route.request().method()==='POST')sent=route.request().postDataJSON();await route.continue()});
+  const chosen=await selectedBox(),manual=await page.evaluate(()=>BE.adds[0].box.slice());
++ await page.evaluate(()=>watchRetirement(document.getElementById('review'),'remove'));
+  await page.getByRole('button',{name:'Save changes & re-render',exact:true}).click();
+  await page.getByRole('status').filter({hasText:'Rendering with saved edits'}).waitFor();
++ retired(await page.evaluate(()=>retirements.splice(0)));
+  const saved=await(await page.request.get(url+'/api/jobs/resize/report')).json();
++ assert.equal(saved.detections[1].manual_id,sent.manual[0].manual_id);assert(sent.manual[0].manual_id);
++ assert.deepEqual(saved.detections[1].manual_creation.cbox,manual.map((n,i)=>Math.trunc(n-(i%2?12:20))));
+  near(saved.detections[0].cbox,chosen.map((n,i)=>n-(i%2?12:20)),1e-8);
+  near(sent.box_overrides['0'],saved.detections[0].cbox,1e-8);assert.equal(saved.detections.length,2);
+  fs.writeFileSync(root+'/saved-report.json',JSON.stringify(saved,null,2));
+@@ -156,6 +243,7 @@ if(dpr===2){
+ }
+ result.errors=errors;result.warnings=warnings;result.requests=requests;
+ fs.writeFileSync(root+`/results-${dpr}.json`,JSON.stringify(result,null,2));
++assert(!requests.some(r=>/edit_sample/.test(r.url)),'ordinary editor unexpectedly migrated to exact samples');
+ assert.deepEqual(errors,[]);assert(warnings.every(w=>w.includes('willReadFrequently')),warnings.join('\n'));
+ console.log(JSON.stringify({dpr,edgeError:result.edgeError,hit:result.liveHit,states:result.states.map(s=>s.name),persistence:result.persistence,errors,warnings}));
+ 
+diff --git a/tests/editor_resize_server.py b/tests/editor_resize_server.py
+index 403b945..ae48086 100644
+--- a/tests/editor_resize_server.py
++++ b/tests/editor_resize_server.py
+@@ -5,7 +5,7 @@ source=Path(sys.argv[1]).resolve()
+ runtime=Path(sys.argv[2]).resolve()
+ port=int(sys.argv[3])
+ assert Path.cwd()==source
+-label='candidate';sha='92124753736e287ac800af91f0ac96f3e96c01be + candidate changes'
++label='selected resize source';sha=json.loads(Path(os.environ['VERIFY_CONFIG']).read_text())['head'] if os.environ.get('VERIFY_CONFIG') else 'uncommitted source'
+ sys.path.insert(0,str(source))
+ os.environ['OPENSCRUB_NO_AUTOFETCH']='1'
+ os.environ['PYTHONDONTWRITEBYTECODE']='1'
+diff --git a/tests/test_review_save_failures.py b/tests/test_review_save_failures.py
+index 25c0a00..371c240 100644
+--- a/tests/test_review_save_failures.py
++++ b/tests/test_review_save_failures.py
+@@ -27,7 +27,7 @@ function el(){return {textContent:'',innerHTML:'',style:{},dataset:{},disabled:f
+  classList:{toggle(){},remove(){}},remove(){this.removed=true},
+  addEventListener(){},querySelector(){return null},insertAdjacentHTML(){}}}
+ for(const id of ['detail','beslot','review','reviewSaveStatus'])elements.set(id,el());
+-const ctx=vm.createContext({elements,console,assert,Set,Map,JSON,Date,Math,Promise,crypto:require("node:crypto").webcrypto,
++const ctx=vm.createContext({elements,el,console,assert,Set,Map,JSON,Date,Math,Promise,crypto:require("node:crypto").webcrypto,
+  ResizeObserver:class {observe(){} disconnect(){}},
+  document:{getElementById:id=>elements.get(id)||null,querySelector:s=>elements.get(s.slice(1))||null,
+  querySelectorAll:()=>[],addEventListener(){},createElement:el},
+@@ -36,7 +36,7 @@ const ctx=vm.createContext({elements,console,assert,Set,Map,JSON,Date,Math,Promi
+ // Skip startup I/O only; every function under test is evaluated from the Python string.
+ vm.runInContext(SOURCE.slice(0,SOURCE.indexOf('loadPersist();loadCertInfo();loadJobs();setInterval(loadJobs,5000);')).replace(/^refreshModelPanel\(\);renderTiers\(\);$/m,''),ctx);
+ vm.runInContext(`
+-const actualLoadPersist=loadPersist;
++const actualLoadPersist=loadPersist,actualRefresh=refresh;
+ refresh=()=>{};loadJobs=()=>{};loadPersist=()=>{};
+ var calls=[],queue=[];
+ fetch=(url,options={})=>{calls.push({url,body:options.body?JSON.parse(options.body):null});
+@@ -401,3 +401,99 @@ def test_missing_secure_randomness_retains_drafts_and_reports_error():
+     assert.equal(calls.length,0);assert.equal(BE.adds.length,1);assert.equal(MAN.length,1);
+     assert(document.getElementById('reviewSaveStatus').textContent.includes('random'));
+     assert(!EDITS.busy);""")
++
++
++# These fixtures model containment/removal ordering while executing shipped
++# showPanel/refresh/saveAndRender, never a surrogate teardown.
++MOUNT = r"""
++function mountIn(rootId){
++ const root=elements.get(rootId)||el();elements.set(rootId,root);
++ const img=el(),vid=el(),cv=el(),paint={value:'original'};
++ Object.assign(img,{complete:true,naturalWidth:640,naturalHeight:360,
++  getBoundingClientRect:()=>({width:319.5,height:179.71875})});
++ Object.assign(vid,{paused:false,pause(){this.paused=true;this.pausedBeforeDetach=!root.detached;},
++  getBoundingClientRect:img.getBoundingClientRect});
++ Object.assign(cv,{releasePointerCapture(){},getContext:()=>({setTransform(){},clearRect(){paint.value='cleared'}})});
++ elements.set('beImg',img);elements.set('beVid',vid);elements.set('beCv',cv);
++ root.contains=node=>node===cv||node===img||node===vid;
++ let html='';Object.defineProperty(root,'innerHTML',{configurable:true,get:()=>html,set:value=>{
++  root.retiredBeforeDetach=BE_VIEW===null&&vid.paused;root.detached=true;html=value;
++ }});
++ root.remove=()=>{root.retiredBeforeDetach=BE_VIEW===null&&vid.paused;root.detached=true;};
++ const view=beMount(img,vid,cv,CUR,VIEW_GEN,BE);view.observer.disconnected=false;
++ view.observer.disconnect=()=>{view.observer.disconnected=true};
++ view.transform={media:img,sw:640,sh:360,width:319.5,height:179.71875,sx:319.5/640,sy:179.71875/360};
++ return {root,img,vid,cv,view,paint};
++}
++"""
++
++
++def test_retained_editor_keeps_mount_on_panel_reentry():
++    run_js(MOUNT + r"""openJob('A');const m=mountIn('beslot');
++    BE.ov[0]=[11,12,33,44];BE.drag={kind:'move'};const applied=JSON.stringify(BE.ov);
++    showPanel('boxedit_rev');
++    assert.equal(BE_VIEW,m.view,'retained panel lost its mount');
++    assert.equal(document.getElementById('beCv'),m.cv);
++    assert.equal(m.view.observer.disconnected,false);assert.equal(m.vid.paused,false);
++    assert.equal(BE.drag.kind,'move');assert.equal(JSON.stringify(BE.ov),applied);
++    // Removing an unrelated comparison subtree must preserve this owner too.
++    elements.set('compare',el());showPanel('boxedit_rev');assert.equal(BE_VIEW,m.view);
++    """)
++
++
++@pytest.mark.parametrize('path', ['panel', 'save'])
++def test_removed_editor_subtree_releases_before_removal(path):
++    run_js(MOUNT + r"""openJob('A');const m=mountIn('beslot');
++    if(PATH==='panel')showPanel('compare');
++    if(PATH==='save'){
++      const p=saveAndRender();await reply();await reply();await p;
++      // The review is the actual ancestor removed by a save acknowledgement.
++    }
++    assert.equal(m.view.observer.disconnected,true,'removed mount observer still active');
++    assert.equal(m.vid.paused,true,'outgoing video not paused');
++    assert.equal(m.vid.pausedBeforeDetach,true,'video paused only after detach');
++    """.replace('PATH', json.dumps(path)).replace("const m=mountIn('beslot');", "const m=mountIn(PATH==='save'?'review':'beslot');".replace('PATH',json.dumps(path))))
++
++
++def test_phase_actions_replacement_retires_editor():
++    run_js(MOUNT + r"""openJob('A');const m=mountIn('actions');
++    for(const name of ['ph','eta','prog','log','pimg','warnbox'])elements.set(name,el());
++    SHELLPH='done';const p=actualRefresh();
++    await reply({phase:'rendering',progress:.25});await reply({lines:[],len:0});await p;
++    assert.equal(m.view.observer.disconnected,true,'phase replacement retained observer');
++    assert.equal(m.root.retiredBeforeDetach,true,'phase replacement detached before retirement');
++    assert.equal(m.vid.pausedBeforeDetach,true);
++    """)
++
++
++def test_old_mount_callbacks_cannot_touch_replacement():
++    run_js(MOUNT + r"""openJob('A');const old=mountIn('beslot');
++    showPanel('compare');const replacement=mountIn('beslot_done');
++    const before=replacement.paint.value;old.view.sync();
++    assert.equal(BE_VIEW,replacement.view);assert.equal(replacement.paint.value,before);
++    assert.equal(old.view.observer.disconnected,true);
++    """)
++
++
++@pytest.mark.parametrize('retained', [False, True], ids=['removed', 'retained'])
++def test_pending_playback_metadata_retirement_and_same_draft_remount(retained):
++    run_js(MOUNT + r"""openJob('A');requestAnimationFrame=()=>{};
++    const old=mountIn('beslot');elements.set('bePlay',el());let played=false;
++    Object.assign(old.vid,{readyState:0,paused:true,load(){},
++      play:async()=>{played=true;old.vid.paused=false}});
++    const pending=beTogglePlay();assert.equal(BE.playing,true);assert.equal(old.vid.paused,true);
++    if(RETAINED){
++      showPanel('boxedit_rev');assert.equal(BE_VIEW,old.view);
++      assert.equal(BE.playing,true);assert.equal(old.view.observer.disconnected,false);
++      Object.assign(old.vid,{readyState:1,videoWidth:640,videoHeight:360});
++      old.vid.onloadedmetadata();await pending;assert.equal(played,true);
++      assert.equal(BE_VIEW,old.view);showPanel('compare');return;
++    }
++    showPanel('compare');const replacement=mountIn('beslot_done');
++    assert.equal(BE.playing,false,'removed pending Play leaked into the same draft remount');
++    assert(replacement.view.sync(),'replacement still image has no transform');
++    const pixels=replacement.paint.value;
++    old.vid.onloadedmetadata();await pending;
++    assert.equal(played,false,'late old metadata started outgoing video');
++    assert.equal(BE_VIEW,replacement.view);assert.equal(replacement.paint.value,pixels);
++    """.replace('RETAINED', str(retained).lower()))
