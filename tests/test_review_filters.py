@@ -122,3 +122,19 @@ def test_selected_action_retains_explicit_matching_ids_across_virtual_unmount():
     bulkSet(false);eq([EN[0],EN[1],EN[2]],[false,false,false]);
     eq(EN[3],false);eq([...selSet],[]);
     """)
+
+
+def test_escape_uses_the_scheduler_gesture_cleanup(monkeypatch):
+    import test_review_choices as choices
+    harness = choices.HARNESS.replace(
+        'const elements=new Map();', 'const elements=new Map(),documentEvents=new Map();'
+    ).replace('({elements,console,', '({elements,documentEvents,console,').replace(
+        'querySelectorAll:()=>[],addEventListener(){},createElement:el}',
+        'querySelectorAll:()=>[],addEventListener:(name,fn)=>documentEvents.set(name,fn),createElement:el}'
+    )
+    monkeypatch.setattr(choices, 'HARNESS', harness)
+    run("""await review(fixture);let cancelled=0;
+    REVIEW_SCHED.selectionCleanup=()=>{cancelled++;REVIEW_SCHED.selectionCleanup=null};
+    selSet.add(0);documentEvents.get('keydown')({key:'Escape'});
+    eq(cancelled,1);eq([...selSet],[]);
+    """)

@@ -4700,7 +4700,7 @@ document.addEventListener("click",e=>{
  document.querySelectorAll(".qm.open").forEach(x=>{if(x!==q)x.classList.remove("open");});
  if(q){e.preventDefault();qmPlace(q);q.classList.toggle("open");}});
 document.addEventListener("keydown",e=>{
- if(e.key==="Escape"){cancelReviewMarquee();clearSel();
+ if(e.key==="Escape"){REVIEW_SCHED?.selectionCleanup?.();clearSel();
   const lb=document.getElementById("lb");if(lb)lb.remove();}});
 
 async function reviewPost(url,payload){

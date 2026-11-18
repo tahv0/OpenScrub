@@ -31,6 +31,8 @@ for jid,n in [('A',10),('B',1),('empty',0)]:
  doc['audio_redactions']=[]
  for i,r in enumerate(doc['detections']):r['unknown_fixture']={'raw_index':i,'retained':[False,'unknown',None]}
  doc['unknown_fixture']={'retained':'full document'}
+ doc['render_state']['unknown_fixture']={'retained':'render state'}
+ doc['provenance']['unknown_fixture']={'retained':'provenance'}
  with w.VAULT_LOCK:lease=w.FILES.reserve(job)
  with lease:
   with w.FILES.initialize(job).report_lock:w._publish_job_report_locked(job,str(report),doc)
@@ -59,7 +61,10 @@ try:
   assert mean<8 if blurred else mae<10,(name,mae,mean)
   regions.append(dict(name=name,blurred=blurred,mae=mae,mean=mean))
  saved=json.loads((root/'pre-render-report.json').read_text());post=json.loads((Path(job['dir'])/'report.json').read_text())
- assert post['detections']==saved['detections'];assert post['audio_redactions']==saved['audio_redactions'];assert post['unknown_fixture']==saved['unknown_fixture']
+ assert {k:v for k,v in post.items() if k!='provenance'}=={k:v for k,v in saved.items() if k!='provenance'}
+ assert post['provenance']['unknown_fixture']==saved['provenance']['unknown_fixture']
+ assert post['provenance']['input_sha256']==hashlib.sha256(video.read_bytes()).hexdigest()
+ assert post['provenance']['output_sha256']==hashlib.sha256(Path(job['output']).read_bytes()).hexdigest()
  summary=dict(regions=regions,pre_render_rows=len(saved['detections']),post_render_rows=len(post['detections']),output_bytes=Path(job['output']).stat().st_size,post_render_boundary='All raw rows, disabled/zone/manual/audio/unknown fields preserved after real render and fresh HTTP reopen.')
  (root/'output-check.json').write_text(json.dumps(summary,indent=2));cv2.imwrite(str(root/'decoded-output.png'),output);print(json.dumps(summary),flush=True)
 finally:
