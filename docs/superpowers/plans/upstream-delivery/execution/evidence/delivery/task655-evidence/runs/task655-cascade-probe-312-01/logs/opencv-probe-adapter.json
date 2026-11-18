@@ -1,0 +1,11 @@
+{
+  "test": "test_real_compatible_runtime_has_required_fallback",
+  "exit": 0,
+  "probe_sha256": "30382404e095db287126c6ec1beb4521364cc511961575c17492c73dbfccf89b",
+  "stdout_sha256": "62a379bff8ae59109a52b1c6aa37186ca54709745db58d4f85d912965f95c772",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "verified_records": [
+    "DEFAULT_PATHS",
+    "ACTIVE_SOURCE"
+  ]
+}

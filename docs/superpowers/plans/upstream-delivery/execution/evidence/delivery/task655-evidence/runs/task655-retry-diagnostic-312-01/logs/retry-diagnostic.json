@@ -1,0 +1,66 @@
+{
+  "initial": 0,
+  "steps": [
+    {
+      "action": "retry",
+      "count": 1,
+      "queued": [
+        {
+          "id": "A",
+          "current": true,
+          "tickets": 1
+        },
+        {
+          "id": "B",
+          "current": true,
+          "tickets": 0
+        }
+      ]
+    },
+    {
+      "action": "replace",
+      "count": 1,
+      "queued": [
+        {
+          "id": "A",
+          "current": false,
+          "tickets": 1
+        },
+        {
+          "id": "B",
+          "current": true,
+          "tickets": 0
+        },
+        {
+          "id": "A",
+          "current": true,
+          "tickets": 0
+        }
+      ]
+    },
+    {
+      "action": "retry",
+      "count": 2,
+      "queued": [
+        {
+          "id": "A",
+          "current": false,
+          "tickets": 1
+        },
+        {
+          "id": "B",
+          "current": true,
+          "tickets": 0
+        },
+        {
+          "id": "A",
+          "current": true,
+          "tickets": 1
+        }
+      ]
+    }
+  ],
+  "after_old_fixture_teardown": 2,
+  "explicit_harness_tickets_released": 2,
+  "after_harness_release": 0
+}

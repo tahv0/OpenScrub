@@ -1,0 +1,21 @@
+commit a4649a2b60ad95fb57b6e676af0799c19e3c873a
+Author:     Tuomas Aho <tuomas.aho@outlook.com>
+AuthorDate: Wed Nov 18 01:37:42 2026 +0200
+Commit:     Tuomas Aho <tuomas.aho@outlook.com>
+CommitDate: Wed Nov 18 01:37:42 2026 +0200
+
+    fix: release editor owner before phase actions replace its DOM
+
+diff --git a/openscrub_web.py b/openscrub_web.py
+index 5855f4d..736adff 100644
+--- a/openscrub_web.py
++++ b/openscrub_web.py
+@@ -3310,7 +3310,7 @@ async function refreshCycle(cycle){
+     sharing. This tool is best-effort, not a compliance guarantee.</div>
+     <div id="compare" style="width:100%"></div>
+     <div id="beslot_done" style="width:100%"></div>`;
+-  document.getElementById("actions").innerHTML=a;
++  const actions=document.getElementById("actions");beUnmountIn(actions);actions.innerHTML=a;
+   if(j.phase!="scanning")img.style.display="none";
+  }
+  renderExportProgress();

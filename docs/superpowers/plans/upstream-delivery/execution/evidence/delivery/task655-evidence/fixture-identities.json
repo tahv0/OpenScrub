@@ -1,0 +1,26 @@
+{
+  "adapters/reflow_trace.py": {
+    "bytes": 2209,
+    "sha256": "8043e47beac9afa41ca243329ac8ef05f3d6b0e59078a5b001ac13f99ca8b424"
+  },
+  "adapters/reflow_memory_trace.py": {
+    "bytes": 2938,
+    "sha256": "b9637471d1ecfb3d515a3e1616672597355dbb8c779ff1b075002ae2e9aad258"
+  },
+  "adapters/source_audit.py": {
+    "bytes": 707,
+    "sha256": "52af673953b6be15104113df691dceb21e8e592775d665dae8c869996f6b1018"
+  },
+  "adapters/reflow_trace_attempt1.py": {
+    "bytes": 2102,
+    "sha256": "e8a336b8587178a7058ae5154eafab74f7687240b24e8e9980d3e2ad8549e996"
+  },
+  "adapters/retry_diagnostic.py": {
+    "bytes": 2339,
+    "sha256": "4c1fd7055b1850cfb15958e38a39cde739d1b47c2c114102c6eaaa777147ac7a"
+  },
+  "adapters/opencv_stdout_selected.py": {
+    "bytes": 2770,
+    "sha256": "937ff9452f2b4627edd419d81e66ca8a45a1b01ad7d44d8c21e537e0d89b8809"
+  }
+}

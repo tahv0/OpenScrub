@@ -1,0 +1,629 @@
+commit 823be0821f91abcbaa3b8abef9d34ad39a1cc617
+Author:     Tuomas Aho <tuomas.aho@outlook.com>
+AuthorDate: Tue Nov 17 11:06:27 2026 +0200
+Commit:     Tuomas Aho <tuomas.aho@outlook.com>
+CommitDate: Wed Nov 18 01:20:54 2026 +0200
+
+    fix(web): keep editor coordinates aligned on live resize
+    
+    (cherry picked from commit 47e9f6d5614365e00d899c87df6c209cd7aaabf6)
+
+diff --git a/README.md b/README.md
+index 5b77fa8..6b09186 100644
+--- a/README.md
++++ b/README.md
+@@ -617,6 +617,19 @@ quoting these numbers honestly. The shipped test suite
+ exercises the same end-to-end pipeline on synthetic videos — for this tool a regression is not a bug, it's a leak,
+ so the suite must stay green on every change. Browser save regressions evaluate
+ the shipped JavaScript with Node when available; no npm package is needed.
++The real-page editor resize regression is opt-in and uses an existing
++Playwright installation, Chromium, and FFmpeg without downloading anything:
++
++```sh
++OPENSCRUB_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright \
++OPENSCRUB_CHROMIUM=/absolute/path/to/chrome \
++python -m pytest -q tests/test_editor_resize.py
++```
++
++It checks production canvas pixels and pointer edits at desktop/mobile sizes
++and DPR 1/2, then saves, reopens, and decodes an actual synthetic SDR render.
++`OPENSCRUB_RESIZE_ARTIFACTS` optionally retains its screenshots and measurements.
++
+ 
+ 
+ ## Feature notes
+diff --git a/openscrub_web.py b/openscrub_web.py
+index 66c7666..0cdbc87 100644
+--- a/openscrub_web.py
++++ b/openscrub_web.py
+@@ -2870,10 +2870,11 @@ async function delJob(id){
+   alert(m);return;
+  }
+  REVIEW_DRAFTS.delete(id);
+- if(CUR===id){stopPolling();VIEW_GEN++;CUR=null;EDITS=null;AUTO_REVIEW=null;REVIEW_REQUEST=null;detail.innerHTML="";}
++ if(CUR===id){beUnmount();stopPolling();VIEW_GEN++;CUR=null;EDITS=null;AUTO_REVIEW=null;REVIEW_REQUEST=null;detail.innerHTML="";}
+  JOBSJSON="";loadJobs();
+ }
+ async function openJob(id){
++ beUnmount();
+  const video=document.getElementById("beVid");
+  if(video){try{video.pause();}catch(e){}}
+  if(EDITS){
+@@ -3164,6 +3165,59 @@ async function refreshCycle(cycle){
+ }
+ 
+ let BE=emptyEditor();
++// Display geometry belongs to this DOM mount, never to a retained draft.
++let BE_VIEW=null;
++function beEndGesture(editor,cv){
++ editor.drag=null;editor.addAnchor=null;editor.addFloat=null;
++ if(editor.pointerId!=null){
++  try{cv.releasePointerCapture(editor.pointerId);}catch(e){}
++  delete editor.pointerId;
++ }
++}
++function beUnmount(){
++ const view=BE_VIEW;if(!view)return;
++ BE_VIEW=null;view.observer.disconnect();
++ beEndGesture(view.editor,view.cv);
++}
++function beMount(img,vid,cv,id,gen,editor){
++ beUnmount();
++ const view={img,vid,cv,id,gen,editor,transform:null};
++ view.current=()=>BE_VIEW===view&&ownsView(id,gen)&&BE===editor&&
++  document.getElementById("beCv")===cv;
++ view.sync=()=>{
++  if(!view.current())return null;
++  const media=editor.playing?vid:img,r=media.getBoundingClientRect();
++  const sw=media===vid?vid.videoWidth:img.naturalWidth,
++        sh=media===vid?vid.videoHeight:img.naturalHeight;
++  const loaded=media===vid?vid.readyState>=1:img.complete;
++  const valid=loaded&&[sw,sh,r.width,r.height].every(n=>Number.isFinite(n)&&n>0);
++  const old=view.transform;
++  if(!valid){
++   if(old){beEndGesture(editor,cv);view.transform=null;}
++   cv.width=0;cv.height=0;cv.style.width="0px";cv.style.height="0px";
++   return null;
++  }
++  const changed=!old||old.media!==media||old.sw!==sw||old.sh!==sh||
++   old.width!==r.width||old.height!==r.height;
++  if(changed){
++   beEndGesture(editor,cv);
++   // CSS coordinates keep handles/strokes constant. Rounded backing sizes
++   // have their own X/Y ratio, so fractional CSS dimensions lose no scale.
++   const dpr=window.devicePixelRatio||1;
++   cv.width=Math.max(1,Math.round(r.width*dpr));
++   cv.height=Math.max(1,Math.round(r.height*dpr));
++   cv.style.width=r.width+"px";cv.style.height=r.height+"px";
++   view.transform={media,sw,sh,width:r.width,height:r.height,
++    sx:r.width/sw,sy:r.height/sh};
++   editor.scale=r.width/sw;
++   beDraw();
++  }
++  return view.transform;
++ };
++ view.observer=new ResizeObserver(()=>view.sync());
++ BE_VIEW=view;view.observer.observe(img);view.observer.observe(vid);
++ return view;
++}
+ async function loadBoxEdit(fromReview){
+  const id=CUR,gen=VIEW_GEN,editor=BE;
+  showPanel(fromReview?"boxedit_rev":"boxedit");
+@@ -3216,11 +3270,11 @@ async function loadBoxEdit(fromReview){
+    to a frame where the object is clear, draw a box around it — it will be
+    followed and blurred through the window. &#128263; Audio span: drag on the
+    timeline's bottom lane to silence (or bleep) that stretch of sound.</p>`;
+- const img=document.getElementById("beImg");
+- img.onload=()=>{if(!ownsView(id,gen)||BE!==editor||document.getElementById("beImg")!==img||BE.playing)return;const cv=document.getElementById("beCv");
+-  cv.width=img.clientWidth;cv.height=img.clientHeight;
+-  BE.scale=img.clientWidth/(img.naturalWidth||1);beDraw();};
+- const bv=document.getElementById("beVid");
++ const img=document.getElementById("beImg"),bv=document.getElementById("beVid"),
++       cv=document.getElementById("beCv");
++ const view=beMount(img,bv,cv,id,gen,editor);
++ img.onload=()=>{if(view.current()&&!BE.playing){view.sync();beDraw();}};
++ bv.addEventListener("loadedmetadata",()=>{if(view.current())view.sync();});
+  const stop=()=>{if(ownsView(id,gen)&&BE===editor&&document.getElementById("beVid")===bv&&BE.playing)bePlayStop();};
+  bv.addEventListener("pause",stop);bv.addEventListener("ended",stop);
+  saveStatus(EDITS,EDITS.status);
+@@ -3238,6 +3292,7 @@ async function beTogglePlay(){
+  if(!v.src)v.src=`api/jobs/${CUR}/video`;
+  BE.playing=true;
+  v.style.display="block";img.style.display="none";
++ if(BE_VIEW)BE_VIEW.sync();
+  // boxes are view-only while playing: freeze pointer edits so a moving
+  // box can't be grabbed mid-flight
+  const cv=document.getElementById("beCv");cv.style.pointerEvents="none";
+@@ -3245,7 +3300,10 @@ async function beTogglePlay(){
+  try{
+   if(v.readyState<1)await new Promise((res,rej)=>{
+    v.onloadedmetadata=res;
+-   v.onerror=()=>rej(new Error("the browser cannot decode this file"));});
++   v.onerror=()=>rej(new Error("the browser cannot decode this file"));
++   // preload=none defers I/O until Play; request metadata after installing
++   // the listeners rather than waiting for a load that has not started.
++   v.load();});
+   if(!current())return;
+   v.currentTime=BE.t||0;
+   await v.play();
+@@ -3257,8 +3315,7 @@ async function beTogglePlay(){
+    +") — the scrub slider still works frame by frame.");
+   return;
+  }
+- if(v.clientWidth){cv.width=v.clientWidth;cv.height=v.clientHeight;
+-  BE.scale=v.clientWidth/(v.videoWidth||1);}
++ if(BE_VIEW)BE_VIEW.sync();
+  // boxes come from the server per timestamp; refresh them on a throttle
+  // while rAF keeps the playhead, label and box painting per-frame smooth
+  let lastQ=0,inFlight=false;
+@@ -3285,6 +3342,7 @@ function bePlayStop(){
+  const v=document.getElementById("beVid");
+  if(v){try{v.pause();}catch(e){}v.style.display="none";}
+  const img=document.getElementById("beImg");if(img)img.style.display="";
++ if(BE_VIEW)BE_VIEW.sync();
+  const b=document.getElementById("bePlay");if(b)b.innerHTML="&#9654;";
+  const cv=document.getElementById("beCv");if(cv)cv.style.pointerEvents="auto";
+  beScrub();   // crisp frame + authoritative boxes at the pause point
+@@ -3453,6 +3511,7 @@ async function beScrub(){
+  BE.t=+document.getElementById("beT").value;
+  document.getElementById("beL").textContent=BE.t.toFixed(1)+"s";
+  document.getElementById("beImg").src=`api/jobs/${CUR}/frame_at?t=${BE.t}`;
++ if(BE_VIEW)BE_VIEW.sync();
+  const d=await (await fetch(`api/jobs/${id}/boxes_at?t=${BE.t}&all=1`)).json();
+  if(!ownsView(id,gen)||BE!==editor)return;
+  BE.ox=d.ox;BE.oy=d.oy;BE.raw=d.boxes;
+@@ -3472,22 +3531,26 @@ function beFilter(){
+ }
+ function beDraw(){
+  const cv=document.getElementById("beCv");if(!cv)return;
+- const x=cv.getContext("2d"),s=BE.scale;
+- x.clearRect(0,0,cv.width,cv.height);
++ const view=BE_VIEW;if(!view||!view.current())return;
++ const x=cv.getContext("2d"),tr=view.transform;
++ x.setTransform(1,0,0,1,0,0);x.clearRect(0,0,cv.width,cv.height);
++ if(!tr)return;
++ x.setTransform(cv.width/tr.width,0,0,cv.height/tr.height,0,0);
++ const mapped=box=>box.map((v,i)=>v*(i%2?tr.sy:tr.sx));
+  for(const a of BE.adds){
+   if(BE.t<a.t0-0.01||BE.t>a.t1+0.01)continue;
+-  const[a1,b1,a2,b2]=a.box.map(v=>v*s);
++  const[a1,b1,a2,b2]=mapped(a.box);
+   x.fillStyle="rgba(245,158,11,.25)";x.strokeStyle="#f59e0b";x.lineWidth=2;
+   x.fillRect(a1,b1,a2-a1,b2-b1);x.strokeRect(a1,b1,a2-a1,b2-b1);
+  }
+  if(BE.add&&BE.addAnchor&&BE.addFloat){
+   const[p,q]=[BE.addAnchor,BE.addFloat];
+   x.strokeStyle="#f59e0b";x.setLineDash([6,4]);x.lineWidth=2;
+-  x.strokeRect(Math.min(p[0],q[0])*s,Math.min(p[1],q[1])*s,
+-   Math.abs(q[0]-p[0])*s,Math.abs(q[1]-p[1])*s);x.setLineDash([]);
++  x.strokeRect(Math.min(p[0],q[0])*tr.sx,Math.min(p[1],q[1])*tr.sy,
++   Math.abs(q[0]-p[0])*tr.sx,Math.abs(q[1]-p[1])*tr.sy);x.setLineDash([]);
+  }
+  for(const b of BE.boxes){
+-  const[a1,b1,a2,b2]=b.box.map(v=>v*s);
++  const[a1,b1,a2,b2]=mapped(b.box);
+   x.fillStyle=b.i===BE.sel?"rgba(37,99,235,.25)":"rgba(220,38,38,.22)";
+   x.strokeStyle=b.i===BE.sel?"#2563eb":"#dc2626";x.lineWidth=2;
+   x.fillRect(a1,b1,a2-a1,b2-b1);x.strokeRect(a1,b1,a2-a1,b2-b1);
+@@ -3533,11 +3596,14 @@ function manualId(){
+  return `${h.slice(0,8)}-${h.slice(8,12)}-${h.slice(12,16)}-${h.slice(16,20)}-${h.slice(20)}`;
+ }
+ function beHook(){
+- const cv=document.getElementById("beCv");
+- const pt=e=>{const r=cv.getBoundingClientRect();
+-  return[(e.clientX-r.left)/BE.scale,(e.clientY-r.top)/BE.scale];};
++ const cv=document.getElementById("beCv"),view=BE_VIEW;
++ const pt=e=>{
++  const tr=view&&view.sync();if(!tr||BE.playing)return null;
++  const r=cv.getBoundingClientRect();
++  return[(e.clientX-r.left)/tr.sx,(e.clientY-r.top)/tr.sy];};
+  cv.addEventListener("pointerdown",e=>{
+-  const p=pt(e);cv.setPointerCapture(e.pointerId);
++  const p=pt(e);if(!p)return;
++  cv.setPointerCapture(e.pointerId);BE.pointerId=e.pointerId;
+   if(BE.trk){
+    // Track object: same two-click box draw as Add box, but on completion
+    // the region is template-tracked through the active timeline window
+@@ -3575,10 +3641,10 @@ function beHook(){
+    return;
+   }
+   const sel=BE.boxes.find(b=>b.i===BE.sel);
+-  if(sel){const[a1,b1,a2,b2]=sel.box,hs=9/BE.scale;
++  if(sel){const[a1,b1,a2,b2]=sel.box,tr=view.transform;
+    const corners=[[a1,b1,0],[a2,b1,1],[a1,b2,2],[a2,b2,3]];
+    for(const[hx,hy,ci] of corners)
+-    if(Math.abs(p[0]-hx)<hs&&Math.abs(p[1]-hy)<hs){
++    if(Math.abs(p[0]-hx)<9/tr.sx&&Math.abs(p[1]-hy)<9/tr.sy){
+      BE.drag={kind:"corner",ci};return;}
+    if(p[0]>=a1&&p[0]<=a2&&p[1]>=b1&&p[1]<=b2){
+     BE.drag={kind:"move",off:[p[0]-a1,p[1]-b1]};return;}
+@@ -3593,9 +3659,10 @@ function beHook(){
+   beDraw();
+  });
+  cv.addEventListener("pointermove",e=>{
+-  if(BE.add&&BE.addAnchor){BE.addFloat=pt(e);beDraw();return;}
++  const p=pt(e);if(!p)return;
++  if(BE.add&&BE.addAnchor){BE.addFloat=p;beDraw();return;}
+   if(!BE.drag||BE.sel<0)return;
+-  const p=pt(e),b=BE.boxes.find(x=>x.i===BE.sel);if(!b)return;
++  const b=BE.boxes.find(x=>x.i===BE.sel);if(!b)return;
+   let[a1,b1,a2,b2]=b.box;
+   if(BE.drag.kind==="move"){
+    const w0=a2-a1,h0=b2-b1;a1=p[0]-BE.drag.off[0];b1=p[1]-BE.drag.off[1];
+@@ -3610,7 +3677,10 @@ function beHook(){
+   BE.ov[BE.sel]=[b.box[0]-BE.ox,b.box[1]-BE.oy,b.box[2]-BE.ox,b.box[3]-BE.oy];
+   beDraw();
+  });
+- cv.addEventListener("pointerup",()=>{BE.drag=null;});
++ const end=()=>{if(view&&view.current()){BE.drag=null;delete BE.pointerId;}};
++ cv.addEventListener("pointerup",end);cv.addEventListener("pointercancel",()=>{
++  if(view&&view.current()){beEndGesture(BE,cv);beDraw();}
++ });
+ }
+ function zoomDet(i){
+  let ov=document.getElementById("lb");
+@@ -3639,6 +3709,7 @@ async function cancelJob(){await fetch("api/jobs/"+CUR+"/cancel",{method:"POST"}
+ // the three post-render views (compare, review, box editor) are mutually
+ // exclusive: opening one closes the others instead of stacking them
+ function showPanel(which){
++ beUnmount();
+  // a playing box-editor video must be PAUSED before its DOM is wiped —
+  // an element removed via innerHTML can keep its audio running
+  try{const v=document.getElementById("beVid");
+diff --git a/tests/editor_resize_browser.cjs b/tests/editor_resize_browser.cjs
+new file mode 100644
+index 0000000..49217a8
+--- /dev/null
++++ b/tests/editor_resize_browser.cjs
+@@ -0,0 +1,162 @@
++const {chromium}=require(process.env.OPENSCRUB_PLAYWRIGHT_MODULE);
++const fs=require('node:fs'),assert=require('node:assert/strict');
++const [url,root]=process.argv.slice(2);
++(async()=>{const browser=await chromium.launch({headless:true,executablePath:process.env.OPENSCRUB_CHROMIUM});
++try{for(const dpr of [1,2]){const context=await browser.newContext({viewport:{width:1365,height:1000},deviceScaleFactor:dpr});
++try{const page=await context.newPage(),errors=[],requests=[],warnings=[];
++await page.addInitScript(()=>{
++ const Native=ResizeObserver;window.resizeObservers=[];
++ window.ResizeObserver=class extends Native{
++  constructor(callback){super(callback);this.callback=callback;this.disconnected=false;resizeObservers.push(this);}
++  disconnect(){this.disconnected=true;super.disconnect();}
++ };
++});
++page.on('console',m=>{if(['error','warning'].includes(m.type()))warnings.push(m.text())});page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>requests.push({method:r.method(),url:r.url()}));
++page.on('dialog',d=>{console.log('dialog: '+d.message());d.accept(d.defaultValue())});
++await page.goto(url);assert.equal(await page.title(),'OpenScrub');assert((await page.locator('body').innerText()).includes('OpenScrub'));assert.equal(await page.locator('vite-error-overlay,nextjs-portal').count(),0);
++await page.getByRole('link',{name:'synthetic-resize.mp4',exact:true}).click();await page.getByRole('button',{name:/Preview video & edit boxes/}).click();
++await page.waitForFunction(()=>document.getElementById('beImg')?.naturalWidth===640&&BE.boxes.length===1);
++const result={dpr,states:[]};
++   async function measure(name){
++    await page.evaluate(()=>{BE.sel=-1;beDraw()});
++    const data=await page.evaluate(()=>{
++     const img=document.getElementById(BE.playing?'beVid':'beImg'),cv=document.getElementById('beCv');
++     const geom=el=>{const r=el.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height,clientWidth:el.clientWidth,clientHeight:el.clientHeight}};
++     const image=geom(img),canvas=geom(cv),sourceBox=BE.boxes[0].box;
++     const boxes=BE.boxes.map(b=>b.box),extent=[Math.min(...boxes.map(b=>b[0])),Math.min(...boxes.map(b=>b[1])),Math.max(...boxes.map(b=>b[2])),Math.max(...boxes.map(b=>b[3]))];
++     const px=cv.getContext('2d').getImageData(0,0,cv.width,cv.height),a=px.data;
++     // Measure the production painting itself: bounds of the opaque red stroke,
++     // and all nontransparent pixels, with an empty/nonselected editor state.
++     function bounds(pred){let x0=Infinity,y0=Infinity,x1=-1,y1=-1,n=0;for(let y=0;y<cv.height;y++)for(let x=0;x<cv.width;x++){const i=(y*cv.width+x)*4;if(pred(a[i],a[i+1],a[i+2],a[i+3])){x0=Math.min(x0,x);y0=Math.min(y0,y);x1=Math.max(x1,x);y1=Math.max(y1,y);n++}}return n?{x0,y0,x1,y1,count:n}:null}
++     const red=bounds((r,g,b,a)=>r>190&&g<80&&b<80&&a>240),paint=bounds((r,g,b,a)=>a>0);
++     const cssEdges=b=>[canvas.x+b.x0*canvas.width/cv.width,canvas.y+b.y0*canvas.height/cv.height,canvas.x+(b.x1+1)*canvas.width/cv.width,canvas.y+(b.y1+1)*canvas.height/cv.height];
++     const expected=[image.x+extent[0]*image.width/(img.naturalWidth||img.videoWidth),image.y+extent[1]*image.height/(img.naturalHeight||img.videoHeight),image.x+extent[2]*image.width/(img.naturalWidth||img.videoWidth),image.y+extent[3]*image.height/(img.naturalHeight||img.videoHeight)];
++     const rendered=cssEdges(red),center=[(expected[0]+expected[2])/2,(expected[1]+expected[3])/2];
++     const sample=(x,y)=>{const ix=Math.floor((x-canvas.x)*cv.width/canvas.width),iy=Math.floor((y-canvas.y)*cv.height/canvas.height);if(ix<0||iy<0||ix>=cv.width||iy>=cv.height)return null;return Array.from(a.slice((iy*cv.width+ix)*4,(iy*cv.width+ix)*4+4))};
++     return {viewport:{width:innerWidth,height:innerHeight},scroll:{x:scrollX,y:scrollY},image:{...image,naturalWidth:(img.naturalWidth||img.videoWidth),naturalHeight:(img.naturalHeight||img.videoHeight),src:img.src},canvas:{...canvas,width:cv.width,height:cv.height},BE:{scale:BE.scale,t:BE.t,ox:BE.ox,oy:BE.oy,sel:BE.sel,box:sourceBox,overrides:BE.ov},paint:{redStroke: red,allPixels:paint,renderedCssOuterEdges:rendered,expectedCssBoxEdges:expected,edgeDelta:rendered.map((v,i)=>v-expected[i]),expectedCenter:center,expectedCenterPixel:sample(...center)},sourceToImage:{x:image.width/(img.naturalWidth||img.videoWidth),y:image.height/(img.naturalHeight||img.videoHeight)}};
++    });
++    data.name=name;result.states.push(data);fs.writeFileSync(root+`/results-${dpr}.json`,JSON.stringify(result,null,2));
++    await page.screenshot({path:`${root}/${dpr}-${name}.png`,fullPage:true});
++    // Crop includes entire old canvas so overflow and source target can be inspected.
++    await page.locator('#beCv').screenshot({path:`${root}/${dpr}-${name}-editor.png`});
++    return data;
++   }
++await measure('desktop');
++await page.evaluate(()=>{window.originalImg=document.getElementById('beImg');window.originalCv=document.getElementById('beCv');window.imageLoads=0;originalImg.addEventListener('load',()=>imageLoads++)});
++const originalGeometry=await page.evaluate(()=>JSON.stringify({ov:BE.ov,times:BE.times,adds:BE.adds,t:BE.t,boxes:BE.boxes}));
++const before=requests.length;
++await page.setViewportSize({width:390,height:844});await page.waitForTimeout(150);
++const live=await measure('mobile-live');
++await page.locator('#beCv').click({position:{x:(live.BE.box[0]+live.BE.box[2])/2*live.sourceToImage.x,y:(live.BE.box[1]+live.BE.box[3])/2*live.sourceToImage.y}});
++result.liveHit=await page.evaluate(()=>BE.sel);
++result.edgeError=Math.max(...live.paint.edgeDelta.map(Math.abs));
++fs.writeFileSync(root+`/results-${dpr}.json`,JSON.stringify(result,null,2));
++assert(result.edgeError<=2,`painted edge drift ${result.edgeError} CSS px; visible target hit ${result.liveHit}`);assert.equal(result.liveHit,0);
++
++assert(await page.evaluate(()=>originalImg===document.getElementById('beImg')&&originalCv===document.getElementById('beCv')&&imageLoads===0));
++assert.deepEqual(requests.slice(before).filter(r=>/frame_at|boxes_at/.test(r.url)),[]);
++assert.equal(await page.evaluate(()=>JSON.stringify({ov:BE.ov,times:BE.times,adds:BE.adds,t:BE.t,boxes:BE.boxes})),originalGeometry);
++assert.deepEqual(await page.evaluate(()=>[BE.ox,BE.oy]),[20,12]);
++async function point(x,y){return page.evaluate(([x,y])=>{const r=(BE.playing?document.getElementById('beVid'):document.getElementById('beImg')).getBoundingClientRect();return {x:r.x+x*r.width/640,y:r.y+y*r.height/360}},[x,y]);}
++async function click(x,y){const p=await point(x,y);await page.mouse.click(p.x,p.y);}
++async function drag(x,y,xx,yy){const a=await point(x,y),b=await point(xx,yy);await page.mouse.move(a.x,a.y);await page.mouse.down();await page.mouse.move(b.x,b.y,{steps:3});await page.mouse.up();}
++function near(actual,expected,tolerance=2){assert.equal(actual.length,expected.length);actual.forEach((n,i)=>assert(Math.abs(n-expected[i])<=tolerance,`${actual} != ${expected}`));}
++async function selectedBox(){return page.evaluate(()=>BE.boxes[0].box.slice());}
++// Grow without any media reload; use independent production pixel bounds again.
++await page.setViewportSize({width:1365,height:1000});await page.waitForTimeout(120);
++const grown=await measure('desktop-grown');assert(Math.max(...grown.paint.edgeDelta.map(Math.abs))<=2);
++assert.equal(await page.evaluate(()=>imageLoads),0);
++assert.deepEqual(requests.slice(before).filter(r=>/frame_at|boxes_at/.test(r.url)),[]);
++// Fractional layout plus separate X/Y backing ratios, in both DPR contexts.
++await page.locator('#beImg').evaluate(e=>e.style.width='487.375px');
++await page.waitForTimeout(120);const fractional=await measure('fractional');
++assert(Math.max(...fractional.paint.edgeDelta.map(Math.abs))<=2);
++assert.equal(fractional.image.width,487.375);
++assert(Math.abs(fractional.canvas.width-fractional.image.width*dpr)<=.5);
++const box=await selectedBox();await click((box[0]+box[2])/2,(box[1]+box[3])/2);assert.equal(await page.evaluate(()=>BE.sel),0);
++await drag(220,162,245.5,180.25);const moved=await selectedBox();near(moved,[165.5,110.25,365.5,250.25]);
++near(await page.evaluate(()=>BE.ov[0]),moved.map((n,i)=>n-(i%2?12:20)),1e-8);
++await drag(moved[2],moved[3],moved[2]+15.25,moved[3]+12.5);const corner=await selectedBox();near(corner,[moved[0],moved[1],moved[2]+15.25,moved[3]+12.5]);
++// Resize in the middle of a move: keep edits already applied, stop the old drag.
++let a=await point((corner[0]+corner[2])/2,(corner[1]+corner[3])/2);await page.mouse.move(a.x,a.y);await page.mouse.down();await page.mouse.move(a.x+12,a.y+7);
++const applied=await selectedBox();assert(await page.evaluate(()=>!!BE.drag));
++await page.setViewportSize({width:390,height:844});await page.waitForTimeout(120);
++assert.equal(await page.evaluate(()=>BE.drag),null);await page.mouse.move(a.x+80,a.y+60);await page.mouse.up();assert.deepEqual(await selectedBox(),applied);
++await click((applied[0]+applied[2])/2,(applied[1]+applied[3])/2);await drag((applied[0]+applied[2])/2,(applied[1]+applied[3])/2,(applied[0]+applied[2])/2+5,(applied[1]+applied[3])/2+4);
++const deliberate=await selectedBox();near(deliberate,applied.map((n,i)=>n+(i%2?4:5)));
++// A half-drawn addition is the only discarded draft on a resize.
++await page.locator('#beAdd').click();await click(410,240);assert(await page.evaluate(()=>!!BE.addAnchor));
++await page.setViewportSize({width:470,height:844});await page.waitForTimeout(120);
++assert.equal(await page.evaluate(()=>BE.addAnchor),null);assert.equal(await page.evaluate(()=>BE.adds.length),0);
++await click(400.25,220.5);await click(490.75,300.25);
++assert.equal(await page.evaluate(()=>BE.adds.length),1);near(await page.evaluate(()=>BE.adds[0].box),[400.25,220.5,490.75,300.25]);await page.locator('#beAdd').click();
++const drafts=await page.evaluate(()=>JSON.stringify({ov:BE.ov,times:BE.times,adds:BE.adds}));
++// Hidden/zero element geometry invalidates edits, and recovers when visible.
++await page.locator('#beImg').evaluate(e=>e.style.display='none');await page.waitForTimeout(120);
++assert.equal(await page.evaluate(()=>BE_VIEW.transform),null);
++await page.locator('#beCv').dispatchEvent('pointerdown',{clientX:100,clientY:100,pointerId:1});
++assert.equal(await page.evaluate(()=>JSON.stringify({ov:BE.ov,times:BE.times,adds:BE.adds})),drafts);
++await page.locator('#beImg').evaluate(e=>{e.style.display='';e.style.width='0px'});await page.waitForTimeout(120);
++assert.equal(await page.evaluate(()=>BE_VIEW.transform),null);
++await page.locator('#beImg').evaluate(e=>e.style.width='');await page.waitForTimeout(120);
++assert(await page.evaluate(()=>!!BE_VIEW.transform));
++// Unloaded current image must reject input while its real frame request waits.
++let release;const gate=new Promise(r=>release=r);let started;const pending=new Promise(r=>started=r);
++await page.route('**/frame_at?t=0.7',async route=>{started();await gate;await route.continue()});
++await page.locator('#beT').fill('0.7');await page.locator('#beT').dispatchEvent('input');await pending;
++assert.equal(await page.evaluate(()=>BE_VIEW.transform),null);
++await page.locator('#beCv').dispatchEvent('pointerdown',{clientX:100,clientY:100,pointerId:1});
++assert.equal(await page.evaluate(()=>BE.drag),null);release();await page.waitForFunction(()=>document.getElementById('beImg').complete&&BE_VIEW.transform!==null);await page.unroute('**/frame_at?t=0.7');
++// Actual video playback and live resize, then ordinary pause/scrub switches back.
++await page.locator('#bePlay').click();await page.waitForTimeout(300);
++fs.writeFileSync(root+`/video-start-${dpr}.json`,JSON.stringify(await page.evaluate(()=>{const v=document.getElementById('beVid');return {playing:BE.playing,ready:v.readyState,network:v.networkState,src:v.src,preload:v.preload,error:v.error?.message,transform:!!BE_VIEW.transform,canPlay:v.canPlayType('video/mp4')}}),null,2));
++await page.waitForFunction(()=>BE.playing&&BE_VIEW.transform?.media===document.getElementById('beVid'));
++await page.setViewportSize({width:390,height:844});await page.waitForTimeout(120);
++const videoState=await page.evaluate(()=>{const v=document.getElementById('beVid'),c=document.getElementById('beCv');const r=v.getBoundingClientRect(),q=c.getBoundingClientRect();return {video:r.width,canvas:q.width,source:v.videoWidth,owner:BE_VIEW.transform.media===v}});
++assert.equal(videoState.video,videoState.canvas);assert.equal(videoState.source,640);assert(videoState.owner);
++const videoPixels=await measure('video-mobile');assert(Math.max(...videoPixels.paint.edgeDelta.map(Math.abs))<=2);
++await page.locator('#bePlay').click();await page.waitForFunction(()=>!BE.playing&&document.getElementById('beImg').complete&&BE_VIEW.transform?.media===document.getElementById('beImg'));
++result.video=videoState;
++// Close/remount and job switches disconnect the observer; even deliberately
++// delivered stale callbacks cannot clear or repaint the current mount.
++await page.evaluate(()=>{window.outgoingObserver=resizeObservers.at(-1);window.outgoingImage=document.getElementById('beImg');window.lateImage=outgoingImage.onload;loadReview()});
++assert(await page.evaluate(()=>outgoingObserver.disconnected));assert.equal(await page.locator('#beCv').count(),0);
++await page.getByRole('button',{name:/Preview video & edit boxes/}).click();await page.waitForFunction(()=>document.getElementById('beImg')?.complete&&BE_VIEW?.transform&&BE.boxes.length===1);
++const currentPixels=await page.evaluate(()=>document.getElementById('beCv').toDataURL());
++await page.evaluate(()=>{outgoingObserver.callback([]);lateImage()});
++assert.equal(await page.evaluate(()=>document.getElementById('beCv').toDataURL()),currentPixels);
++await page.evaluate(()=>{window.oldView=BE_VIEW;window.oldObserver=resizeObservers.at(-1)});
++await page.getByRole('link',{name:'synthetic-other.mp4',exact:true}).click();await page.waitForFunction(()=>CUR==='other');
++await page.getByRole('link',{name:'synthetic-resize.mp4',exact:true}).click();await page.waitForFunction(()=>CUR==='resize');
++await page.getByRole('button',{name:/Preview video & edit boxes/}).click();await page.waitForFunction(()=>document.getElementById('beImg')?.complete&&BE_VIEW?.transform&&BE.boxes.length===1);
++assert(await page.evaluate(()=>oldObserver.disconnected));const newPixels=await page.evaluate(()=>document.getElementById('beCv').toDataURL());
++await page.evaluate(()=>oldObserver.callback([]));assert.equal(await page.evaluate(()=>document.getElementById('beCv').toDataURL()),newPixels);
++assert.equal(await page.evaluate(()=>JSON.stringify({ov:BE.ov,times:BE.times,adds:BE.adds})),drafts);
++const final=await measure('mobile-edited');assert(Math.max(...final.paint.edgeDelta.map(Math.abs))<=2);
++// Ordinary enlarged review preview and embedded editor help survive.
++assert((await page.locator('body').innerText()).includes('drag inside to move'));
++await page.evaluate(()=>zoomDet(0));await page.locator('#lb img').waitFor();await page.locator('#lb').click();assert.equal(await page.locator('#lb').count(),0);
++if(dpr===2){
++ // Save via the actual endpoint. Intercept only to retain the submitted bytes.
++ let sent;await page.route('**/api/jobs/resize/detections',async route=>{if(route.request().method()==='POST')sent=route.request().postDataJSON();await route.continue()});
++ const chosen=await selectedBox(),manual=await page.evaluate(()=>BE.adds[0].box.slice());
++ await page.getByRole('button',{name:'Save changes & re-render',exact:true}).click();
++ await page.getByRole('status').filter({hasText:'Rendering with saved edits'}).waitFor();
++ const saved=await(await page.request.get(url+'/api/jobs/resize/report')).json();
++ near(saved.detections[0].cbox,chosen.map((n,i)=>n-(i%2?12:20)),1e-8);
++ near(sent.box_overrides['0'],saved.detections[0].cbox,1e-8);assert.equal(saved.detections.length,2);
++ fs.writeFileSync(root+'/saved-report.json',JSON.stringify(saved,null,2));
++ let actual;for(let i=0;i<900;i++){actual=await(await page.request.get(url+'/api/jobs/resize')).json();if(actual.phase==='error')throw Error(actual.error);if(actual.phase==='done'&&actual.has_output)break;await page.waitForTimeout(100)}
++ assert.equal(actual.phase,'done');assert(actual.has_output);
++ const output=await page.request.get(url+'/api/jobs/resize/download');assert(output.ok());fs.writeFileSync(root+'/actual-output.mp4',await output.body());
++ await page.reload();await page.getByRole('link',{name:'synthetic-resize.mp4',exact:true}).click();
++ await page.getByRole('button',{name:'Preview & edit blur boxes',exact:true}).click();await page.waitForFunction(()=>document.getElementById('beImg')?.complete&&BE_VIEW?.transform&&BE.boxes.length===2);
++ near(await selectedBox(),chosen,1e-8);const reopened=await measure('saved-reopened');assert(Math.max(...reopened.paint.edgeDelta.map(Math.abs))<=2);
++ result.persistence={chosenSource:chosen,manualSource:manual,sent,savedContent:saved.detections[0].cbox,render:actual.phase,outputBytes:(await output.body()).length};
++}
++result.errors=errors;result.warnings=warnings;result.requests=requests;
++fs.writeFileSync(root+`/results-${dpr}.json`,JSON.stringify(result,null,2));
++assert.deepEqual(errors,[]);assert(warnings.every(w=>w.includes('willReadFrequently')),warnings.join('\n'));
++console.log(JSON.stringify({dpr,edgeError:result.edgeError,hit:result.liveHit,states:result.states.map(s=>s.name),persistence:result.persistence,errors,warnings}));
++
++}finally{await context.close()}}}finally{await browser.close()}})().catch(e=>{console.error(e);process.exitCode=1});
+diff --git a/tests/editor_resize_server.py b/tests/editor_resize_server.py
+new file mode 100644
+index 0000000..403b945
+--- /dev/null
++++ b/tests/editor_resize_server.py
+@@ -0,0 +1,68 @@
++"""Synthetic real-route server; imports only the explicitly selected source tree."""
++import sys, os, json, hashlib, subprocess
++from pathlib import Path
++source=Path(sys.argv[1]).resolve()
++runtime=Path(sys.argv[2]).resolve()
++port=int(sys.argv[3])
++assert Path.cwd()==source
++label='candidate';sha='92124753736e287ac800af91f0ac96f3e96c01be + candidate changes'
++sys.path.insert(0,str(source))
++os.environ['OPENSCRUB_NO_AUTOFETCH']='1'
++os.environ['PYTHONDONTWRITEBYTECODE']='1'
++import numpy as np, cv2
++import openscrub
++runtime.mkdir(parents=True,exist_ok=True)
++models=runtime/'models'; models.mkdir(exist_ok=True)
++openscrub._model_dir=lambda:str(models)
++def deny_fetch(*args,**kwargs): raise RuntimeError('Resize QA forbids model downloads')
++openscrub._fetch_model=deny_fetch
++import openscrub_web as web
++assert Path(web.__file__).resolve()==source/'openscrub_web.py'
++assert Path(openscrub.__file__).resolve()==source/'openscrub.py'
++web._data_root=lambda:str(runtime)
++for name in ('JOBS_DIR','ZONES_PATH','MODEL_SELECT_PATH','CERT_DIR','WEB_SETTINGS_PATH','CUSTOM_CATS_PATH'):
++ setattr(web,name,str(runtime/Path(getattr(web,name)).name))
++for name in ('CUSTOM_CERT','CUSTOM_KEY','AUTO_CERT','AUTO_KEY'):
++ setattr(web,name,str(Path(web.CERT_DIR)/Path(getattr(web,name)).name))
++Path(web.JOBS_DIR).mkdir(exist_ok=True)
++video=runtime/'source-mp4v.mp4'
++frame=np.full((360,640,3),235,np.uint8)
++# Content cbox [120,80,320,220] plus source offset [20,12].
++cv2.rectangle(frame,(140,92),(339,231),(255,255,0),-1)
++cv2.rectangle(frame,(140,92),(340,232),(0,200,0),2)
++for x,y in ((140,92),(340,92),(140,232),(340,232)):
++ cv2.circle(frame,(x,y),4,(255,0,0),-1)
++cv2.putText(frame,'SYNTHETIC 640x360',(350,45),cv2.FONT_HERSHEY_SIMPLEX,.55,(20,20,20),1)
++cv2.putText(frame,'SOURCE TARGET 140,92 - 340,232',(80,270),cv2.FONT_HERSHEY_SIMPLEX,.65,(20,20,20),1)
++v=cv2.VideoWriter(str(video),cv2.VideoWriter_fourcc(*'mp4v'),10,(640,360))
++assert v.isOpened()
++for _ in range(20):v.write(frame)
++v.release();cv2.imwrite(str(runtime/'source.png'),frame)
++encoded=runtime/'source.mp4'
++subprocess.run(['ffmpeg','-nostdin','-y','-loglevel','error','-i',str(video),'-c:v','libx264','-pix_fmt','yuv420p',str(encoded)],check=True)
++video=encoded
++job=web.new_job(str(video),{'categories':'email','mode':'box','pad':0},'synthetic-resize.mp4')
++web.JOBS.pop(job['id']);job['id']='resize';web.JOBS['resize']=job
++report={'provenance':{'input':str(video),'settings':{'pad':0,'mode':'box'}},
++ 'render_state':{'fps':10,'cum':[[20,12]]*20,'bands':[[0,0]]*20},
++ 'detections':[{'t_start':0,'t_end':2,'last_seen':0,'cbox':[120,80,320,220],
++ 'aoff':[0,0],'category':'name','text':'Synthetic rectangular target','confidence':1,'enabled':True}],
++ 'audio_redactions':[]}
++Path(job['dir'],'report.json').write_text(json.dumps(report))
++job['phase']='review'
++other=web.new_job(str(video),{'categories':'email','mode':'box','pad':0},'synthetic-other.mp4')
++web.JOBS.pop(other['id']);other['id']='other';web.JOBS['other']=other
++Path(other['dir'],'report.json').write_text(json.dumps(report));other['phase']='review'
++# Read-only network-independent replacement only for unrelated update metadata.
++web.app.view_functions['update_check']=lambda:web.jsonify({'current':web.openscrub.VERSION,'update_available':False})
++identity={'label':label,'sha':sha,'port':port,'cwd':os.getcwd(),'web_import':web.__file__,
++ 'engine_import':openscrub.__file__,'web_sha256':hashlib.sha256(Path(web.__file__).read_bytes()).hexdigest(),
++ 'runtime':str(runtime),'job_dir':job['dir'],'video':str(video),'pid':os.getpid(),
++ 'python':sys.version,'opencv':cv2.__version__,'model_downloads':'forbidden','scan_started':False,'real_render_worker':True}
++(runtime/'server-identity.json').write_text(json.dumps(identity,indent=2))
++web.start_worker()
++from cheroot.wsgi import Server
++print(json.dumps(identity),flush=True)
++server=Server(('127.0.0.1',port),web.app,numthreads=8)
++try:server.start()
++finally:server.stop()
+diff --git a/tests/test_editor_resize.py b/tests/test_editor_resize.py
+new file mode 100644
+index 0000000..69b72eb
+--- /dev/null
++++ b/tests/test_editor_resize.py
+@@ -0,0 +1,88 @@
++"""Real-page resize QA using an existing Playwright and Chromium; no downloads.
++
++Set OPENSCRUB_PLAYWRIGHT_MODULE and OPENSCRUB_CHROMIUM to opt in.
++"""
++import os
++import json
++from pathlib import Path
++import shutil
++import socket
++import subprocess
++import sys
++import time
++import urllib.request
++import pytest
++
++ROOT = Path(__file__).resolve().parents[1]
++
++
++def test_editor_live_resize_pixels_and_pointer(tmp_path):
++    if not os.environ.get("OPENSCRUB_PLAYWRIGHT_MODULE") or not os.environ.get("OPENSCRUB_CHROMIUM") or not shutil.which("node"):
++        pytest.skip("Set OPENSCRUB_PLAYWRIGHT_MODULE and OPENSCRUB_CHROMIUM for real-page QA")
++    artifacts = Path(os.environ.get("OPENSCRUB_RESIZE_ARTIFACTS", str(tmp_path)))
++    artifacts.mkdir(parents=True, exist_ok=True)
++    with socket.socket() as sock:
++        sock.bind(("127.0.0.1", 0))
++        port = sock.getsockname()[1]
++    log = artifacts / "server.log"
++    env = os.environ.copy()
++    env["OPENSCRUB_NO_AUTOFETCH"] = "1"
++    with log.open("w") as output:
++        server = subprocess.Popen([sys.executable, str(ROOT / "tests/editor_resize_server.py"),
++                                   str(ROOT), str(artifacts / "runtime"), str(port)],
++                                  cwd=ROOT, env=env, stdout=output, stderr=subprocess.STDOUT)
++        try:
++            for _ in range(150):
++                if server.poll() is not None:
++                    pytest.fail(log.read_text())
++                try:
++                    urllib.request.urlopen(f"http://127.0.0.1:{port}/api/jobs", timeout=.5).close()
++                    break
++                except OSError:
++                    time.sleep(.1)
++            else:
++                pytest.fail("resize server did not start: " + log.read_text())
++            result = subprocess.run(["node", str(ROOT / "tests/editor_resize_browser.cjs"),
++                                     f"http://127.0.0.1:{port}", str(artifacts)],
++                                    env=env, capture_output=True, text=True, timeout=180)
++            (artifacts / "browser.log").write_text(result.stdout + result.stderr)
++            assert result.returncode == 0, result.stdout + result.stderr
++            verify_render(artifacts)
++        finally:
++            server.terminate()
++            try:
++                server.wait(timeout=10)
++            except subprocess.TimeoutExpired:
++                server.kill()
++                server.wait()
++
++
++def verify_render(artifacts):
++    """Decode the real SDR output and independently check the edited source region."""
++    import cv2
++    import numpy as np
++
++    result = json.loads((artifacts / "results-2.json").read_text())
++    chosen = result["persistence"]["chosenSource"]
++    cap = cv2.VideoCapture(str(artifacts / "actual-output.mp4"))
++    try:
++        ok, frame = cap.read()
++    finally:
++        cap.release()
++    assert ok and frame.shape == (360, 640, 3)
++    x0, y0, x1, y1 = chosen
++    # A scanline above the added box isolates the moved/resized original box.
++    y = round((y0 + 220) / 2)
++    dark = np.flatnonzero(frame[y].max(axis=1) < 12)
++    assert abs(int(dark.min()) - x0) <= 3
++    assert abs(int(dark.max()) - x1) <= 3
++    core = frame[round(y0)+4:round(y1)-4, round(x0)+4:round(x1)-4]
++    assert float((core.max(axis=2) < 12).mean()) > .99
++    assert frame[y, round(x0)-8].mean() > 100
++    assert frame[y, round(x1)+8].mean() > 100
++    cv2.imwrite(str(artifacts / "render-frame.png"), frame)
++    evidence = {"source_box": chosen, "scanline_y": y,
++                "actual_dark_edges": [int(dark.min()), int(dark.max())],
++                "dark_core_fraction": float((core.max(axis=2) < 12).mean()),
++                "edge_tolerance_source_px": 3, "decoded_shape": list(frame.shape)}
++    (artifacts / "render-pixels.json").write_text(json.dumps(evidence, indent=2))
+diff --git a/tests/test_review_save_failures.py b/tests/test_review_save_failures.py
+index 27a527e..43663f3 100644
+--- a/tests/test_review_save_failures.py
++++ b/tests/test_review_save_failures.py
+@@ -28,6 +28,7 @@ function el(){return {textContent:'',innerHTML:'',style:{},dataset:{},disabled:f
+  addEventListener(){},querySelector(){return null},insertAdjacentHTML(){}}}
+ for(const id of ['detail','beslot','review','reviewSaveStatus'])elements.set(id,el());
+ const ctx=vm.createContext({elements,console,assert,Set,Map,JSON,Date,Math,Promise,crypto:require("node:crypto").webcrypto,
++ ResizeObserver:class {observe(){} disconnect(){}},
+  document:{getElementById:id=>elements.get(id)||null,querySelector:s=>elements.get(s.slice(1))||null,
+  querySelectorAll:()=>[],addEventListener(){},createElement:el},
+  detail:elements.get('detail'),window:{addEventListener(){}},setInterval:()=>1,clearInterval(){},setTimeout(){},
+@@ -240,7 +241,7 @@ def test_playback_box_response_cannot_publish_after_job_switch():
+ def test_pending_playback_metadata_cannot_start_after_switch():
+     run_js("""setup();requestAnimationFrame=()=>{};
+     for(const id of ['beVid','beImg','beCv','bePlay'])elements.set(id,document.createElement('div'));
+-    let played=false;const video=elements.get('beVid');Object.assign(video,{readyState:0,play:async()=>{played=true},pause(){}});
++    let played=false;const video=elements.get('beVid');Object.assign(video,{readyState:0,load(){},play:async()=>{played=true},pause(){}});
+     const p=beTogglePlay();openJob('B');video.onloadedmetadata();await p;
+     if(played)throw Error('old video started after job switch');""")
+ 

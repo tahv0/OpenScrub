@@ -1,0 +1,127 @@
+{"beforeClockAdvance":{"frame":1000000000011,"normal":[],"top":529,"owns":true}}
+{"afterClockAdvance":{"frame":1000000000012,"normal":[0],"top":529,"owns":true}}
+[
+  {
+    "name": "overlap-progress-log",
+    "requests": 4,
+    "pageErrors": [],
+    "controlledConsole": []
+  },
+  {
+    "name": "real-HTTP-meta-held-body-deadline",
+    "requests": 3,
+    "pageErrors": [],
+    "controlledConsole": []
+  },
+  {
+    "name": "real-HTTP-log-held-body-deadline",
+    "requests": 4,
+    "pageErrors": [],
+    "controlledConsole": []
+  },
+  {
+    "name": "real-HTTP-meta-body-switch",
+    "requests": 3,
+    "pageErrors": [],
+    "controlledConsole": []
+  },
+  {
+    "name": "real-HTTP-log-body-switch",
+    "requests": 4,
+    "pageErrors": [],
+    "controlledConsole": []
+  },
+  {
+    "name": "initial-network-recovery",
+    "requests": 3,
+    "pageErrors": [],
+    "controlledConsole": [
+      {
+        "text": "Failed to load resource: net::ERR_FAILED",
+        "url": "http://127.0.0.1:42479/api/jobs/A"
+      }
+    ]
+  },
+  {
+    "name": "initial-json-recovery",
+    "requests": 3,
+    "pageErrors": [],
+    "controlledConsole": []
+  },
+  {
+    "name": "initial-503-recovery",
+    "requests": 3,
+    "pageErrors": [],
+    "controlledConsole": [
+      {
+        "text": "Failed to load resource: the server responded with a status of 503 (Service Unavailable)",
+        "url": "http://127.0.0.1:42479/api/jobs/A"
+      }
+    ]
+  },
+  {
+    "name": "obsolete-same",
+    "requests": 3,
+    "pageErrors": [],
+    "controlledConsole": []
+  },
+  {
+    "name": "obsolete-aba",
+    "requests": 5,
+    "pageErrors": [],
+    "controlledConsole": []
+  },
+  {
+    "name": "obsolete-delete",
+    "requests": 2,
+    "pageErrors": [],
+    "controlledConsole": []
+  },
+  {
+    "name": "cursor-tail-scroll-reset",
+    "requests": 7,
+    "pageErrors": [],
+    "controlledConsole": []
+  },
+  {
+    "name": "automatic-review-done",
+    "requests": 5,
+    "pageErrors": [],
+    "controlledConsole": []
+  },
+  {
+    "name": "automatic-review-return",
+    "requests": 8,
+    "pageErrors": [],
+    "controlledConsole": []
+  },
+  {
+    "name": "automatic-review-same",
+    "requests": 5,
+    "pageErrors": [],
+    "controlledConsole": []
+  },
+  {
+    "name": "automatic-review-failure",
+    "requests": 9,
+    "pageErrors": [],
+    "controlledConsole": [
+      {
+        "text": "Failed to load resource: net::ERR_FAILED",
+        "url": "http://127.0.0.1:42479/api/jobs/A/detections"
+      }
+    ]
+  },
+  {
+    "name": "automatic-review-manual",
+    "requests": 6,
+    "pageErrors": [],
+    "controlledConsole": []
+  },
+  {
+    "name": "lifecycle-wake-and-Austin-help-preview",
+    "requests": 13,
+    "pageErrors": [],
+    "controlledConsole": []
+  }
+]

@@ -1,0 +1,184 @@
+diff --cc CONTRIBUTING.md
+index 380d603,3187cee..0000000
+--- a/CONTRIBUTING.md
++++ b/CONTRIBUTING.md
+@@@ -22,21 -22,11 +22,29 @@@ Thanks for helping! A few rules keep th
+  
+  ## Before you open a PR
+  
+++<<<<<<< HEAD
+ +    python -m pytest -q                        # all discovered tests must be green
+ +
+ +    python -m build                            # full sdist->wheel build
+ +
+ +The discovered suite includes `test_openscrub.py` and `tests/`. The HDR
+ +cleanup regressions use synthetic media and real FFmpeg/ffprobe with libx265;
+ +they skip when those tools are unavailable. Child-reaping observations require
+ +POSIX, and the injected encoder-exit case also requires `waitid`/`WNOWAIT`.
+ +
+ +Focused regressions belong in `tests/test_<topic>.py`; keep the existing root
+ +suite. Save As behavior tests execute the real embedded JavaScript with Node.js
+ +(18+), which must be on PATH for local and CI runs.
+ +
+ +The HDR chroma encoder-input regressions also use synthetic FFmpeg/libx265 media.
+ +
+++=======
++     python -m pytest -q                        # full discovered suite; must be green
++     python -m build                            # full sdist->wheel build
++ 
++ The literal job-name display regressions in `tests/` evaluate emitted JavaScript
++ with Node.js (skipped when Node is unavailable).
+++>>>>>>> f399ebe (fix: preserve literal filenames in job list and title)
+  
+  For web UI changes, also boot `python openscrub_web.py` and click through
+  what you touched — and note the PAGE string is a normal (non-raw) Python
+diff --cc openscrub_web.py
+index 30aca96,c128df1..0000000
+--- a/openscrub_web.py
++++ b/openscrub_web.py
+@@@ -2722,117 -2079,9 +2722,123 @@@ async function applyTier(id)
+  refreshModelPanel();renderTiers();
+  let CUR=null, EN={}, MAN=[], DUR=0, POLL=null, PHIST=[], PHPH="", LOGN=0, SHELLPH=null, JOBSJSON="";
+  
+++<<<<<<< HEAD
+ +// VIEW_GEN advances on every openJob (including A -> B -> A) and removal.
+ +// Drafts live only in this page; late acknowledgements reconcile their owner,
+ +// but may never publish into, or start rendering from, a different view.
+ +let VIEW_GEN=0, EDITS=null;
+ +// Polling owns one metadata -> log cycle, using the existing view identity.
+ +let POLL_CYCLE=null, POLL_FAILURES=0, AUTO_REVIEW=null, REVIEW_REQUEST=null;
+ +function pollStatus(message){
+ + const el=document.getElementById("pollStatus");
+ + if(el&&el.textContent!==message)el.textContent=message;
+ +}
+ +function stopPolling(){
+ + if(POLL){clearTimeout(POLL.handle);POLL=null;}
+ + const old=POLL_CYCLE;POLL_CYCLE=null;
+ + if(old)old.controller.abort();
+ +}
+ +function schedulePoll(id,gen,delay){
+ + if(!ownsView(id,gen)||document.hidden)return;
+ + if(POLL)clearTimeout(POLL.handle);
+ + const timer={id,gen};POLL=timer;
+ + timer.handle=setTimeout(()=>{
+ +  if(POLL!==timer||!ownsView(id,gen))return;
+ +  POLL=null;refresh();
+ + },delay);
+ +}
+ +// Only metadata/log use this deadline. Race body consumption too: abort alone
+ +// cannot settle a transport/body that ignores it. Losing work has no UI effects.
+ +async function pollJson(url,cycle){
+ + const controller=new AbortController(),signal=cycle.controller.signal;
+ + let deadline,onCancel;
+ + const stopped=new Promise((_,reject)=>{
+ +  const fail=message=>{controller.abort();reject(new Error(message));};
+ +  onCancel=()=>fail("Polling cancelled");
+ +  signal.addEventListener("abort",onCancel,{once:true});
+ +  deadline=setTimeout(()=>fail("Polling timed out"),15000);
+ +  if(signal.aborted)onCancel();
+ + });
+ + const operation=(async()=>{
+ +  const r=await fetch(url,{signal:controller.signal});
+ +  if(!r.ok)throw new Error("Polling HTTP "+r.status);
+ +  return await r.json();
+ + })();
+ + try{return await Promise.race([operation,stopped]);}
+ + finally{clearTimeout(deadline);signal.removeEventListener("abort",onCancel);}
+ +}
+ +function refresh(){
+ + if(!CUR||document.hidden)return;
+ + if(POLL_CYCLE)return POLL_CYCLE.promise;
+ + if(POLL){clearTimeout(POLL.handle);POLL=null;}
+ + const cycle={id:CUR,gen:VIEW_GEN,controller:new AbortController()};
+ + POLL_CYCLE=cycle;
+ + cycle.promise=(async()=>{
+ +  let delay=900;
+ +  try{
+ +   await refreshCycle(cycle);
+ +   if(POLL_CYCLE!==cycle||!ownsView(cycle.id,cycle.gen))return;
+ +   POLL_FAILURES=0;pollStatus("");
+ +  }catch(e){
+ +   if(POLL_CYCLE!==cycle||!ownsView(cycle.id,cycle.gen))return;
+ +   delay=Math.min(10000,900*Math.pow(2,Math.min(POLL_FAILURES++,4)));
+ +   pollStatus("Job updates interrupted — retrying in "+(delay/1000)+" s.");
+ +  }finally{
+ +   if(POLL_CYCLE===cycle&&ownsView(cycle.id,cycle.gen)){
+ +    POLL_CYCLE=null;
+ +    // Chained after completion: request duration adds to the healthy 900 ms.
+ +    schedulePoll(cycle.id,cycle.gen,delay);
+ +   }
+ +  }
+ + })();
+ + return cycle.promise;
+ +}
+ +function wakePolling(){
+ + if(!CUR||document.hidden)return;
+ + // A pending immediate wake already coalesces focus/pageshow/online bursts.
+ + if(POLL&&POLL.wake)return;
+ + stopPolling();
+ + schedulePoll(CUR,VIEW_GEN,0);if(POLL)POLL.wake=true;
+ +}
+ +document.addEventListener("visibilitychange",()=>{
+ + if(document.hidden)stopPolling();else wakePolling();
+ +});
+ +window.addEventListener("pagehide",stopPolling);
+ +for(const event of ["focus","pageshow","online"])window.addEventListener(event,wakePolling);
+ +const REVIEW_DRAFTS=new Map();
+ +function emptyEditor(){return {t:0,ox:0,oy:0,boxes:[],sel:-1,ov:{},dis:{},times:{},adds:[],
+ + add:false,addAnchor:null,drag:null,scale:1,dur:10,
+ + audio:[],audioSaved:[],audioLoaded:false};}
+ +function sameEdit(a,b){return JSON.stringify(a)===JSON.stringify(b);}
+ +function copyEdit(a){return JSON.parse(JSON.stringify(a));}
+ +function ownsView(id,gen){return CUR===id&&VIEW_GEN===gen;}
+ +function saveStatus(d,message){
+ + d.status=message;
+ + if(d!==EDITS)return;
+ + const el=document.getElementById("reviewSaveStatus");if(el)el.textContent=message;
+ + document.querySelectorAll("button[data-save-edits]").forEach(b=>{b.disabled=!!d.busy;});
+ +}
+ +function trimReviewDraft(d){
+ + const b=d.editor;
+ + // Clean audio is fetched display state even when other edit kinds are pending.
+ + // An in-flight audio submission may make a toggle-back a newer pending choice.
+ + if(!d.audioInFlight&&sameEdit(b.audio,b.audioSaved)){
+ +  b.audio=[];b.audioSaved=[];b.audioLoaded=false;
+ + }
+ + if(!d.busy&&!hasReviewEdits(d)){
+ +  d.en={};d.editor=emptyEditor();
+ + }
+ +}
+ +function hasReviewEdits(d){
+ + const b=d.editor;
+ + return Object.keys(d.enabled).length||d.manual.length||b.adds.length||
+ +  Object.keys(b.ov).length||Object.keys(b.times).length||
+ +  !sameEdit(b.audio,b.audioSaved);
+++=======
++ // Job names are text inside the list link and detail heading.
++ function jobNameHtml(name){
++  return String(name).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+++>>>>>>> f399ebe (fix: preserve literal filenames in job list and title)
+  }
+  
+  async function loadJobs(){
+diff --cc pyproject.toml
+index d4a51b0,5d38589..0000000
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@@ -118,13 -116,5 +118,17 @@@ include = 
+      "NOTICE",
+      "THIRD_PARTY_NOTICES.md",
+      "test_openscrub.py",
+++<<<<<<< HEAD
+ +    "tests",
+ +    "CONTRIBUTING.md",
+ +    "benchmark",
+ +
+ +
+ +
+++=======
++     "tests/",
+++>>>>>>> f399ebe (fix: preserve literal filenames in job list and title)
+  ]
+ +
+ +[tool.pytest.ini_options]
+ +testpaths = ["test_openscrub.py", "tests"]

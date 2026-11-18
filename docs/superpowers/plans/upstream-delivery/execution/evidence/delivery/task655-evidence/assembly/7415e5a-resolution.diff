@@ -1,0 +1,23 @@
+diff --cc openscrub.py
+index a64f44b,753075f..0000000
+--- a/openscrub.py
++++ b/openscrub.py
+@@@ -4162,6 -4023,8 +4162,8 @@@ def _render_hdr_into(src, dst, detectio
+      source's color tags (PQ/HLG + BT.2020) carried over. `hvc1` tagging
+      keeps QuickTime/Apple players happy. No preview mode — previews use
+      the SDR copy."""
+ -    # render_hdr() checks source extents; run_render() checks them before coverage.
+++    # Public entry checks source extents before the single delivery stage.
++     # Coverage may legally round a positive source box to an empty integer box.
+      mode_map = mode_map or {}
+      def _mode_for(cat):
+          return mode_map.get(cat, mode)
+@@@ -4362,6 -4201,8 +4364,8 @@@ def _render_into(src, dst, detections, 
+      # mode_map: {category: "blur"|"box"} overrides the global `mode` per
+      # category. Lets you black-box the reversible-blur-vulnerable categories
+      # (SSN, MRN, account numbers) while blurring faces, in one render.
+++    # Public entry checks source extents before the single delivery stage.
+++    # Coverage may legally round a positive source box to an empty integer box.
+      mode_map = mode_map or {}
+      def _mode_for(cat):
+          return mode_map.get(cat, mode)

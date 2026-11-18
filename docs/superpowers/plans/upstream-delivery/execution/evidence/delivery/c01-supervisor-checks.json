@@ -1,0 +1,21 @@
+{
+  "base": "00480c7e42ddb329f4dde9599c256555f2dabcf0",
+  "head": "c205ef5379778f63313b519411a2d5e37d07cba5",
+  "unchanged_engine_owners": [
+    "run_scan",
+    "track_manual_region"
+  ],
+  "unchanged_nested_pregen": true,
+  "unchanged_page_app_js_assignment_asts": true,
+  "unchanged_job_logs": true,
+  "unchanged_recipes": [
+    "pyproject.toml",
+    "Dockerfile",
+    "Dockerfile.cuda",
+    "Dockerfile.intel",
+    "openscrub_update.py",
+    "windows/openscrub.spec"
+  ],
+  "resolution": "Task655 unchanged-owner review item is supported by these source identities plus independently approved653/654 and actual final full/floor/browser/report/lifetime nodes. No real missing requirement found.",
+  "scope": "Source-only AST/byte checks; no imports/runtime replay/new performance claim."
+}

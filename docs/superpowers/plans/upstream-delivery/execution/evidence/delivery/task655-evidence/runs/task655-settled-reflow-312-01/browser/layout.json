@@ -1,0 +1,110 @@
+{
+  "records": [
+    {
+      "case": "threshold",
+      "distance": 39,
+      "before": {
+        "top": 6520,
+        "max": 6559,
+        "anchor": "587"
+      },
+      "after": {
+        "top": 6576,
+        "max": 6576,
+        "anchor": "591"
+      }
+    },
+    {
+      "case": "threshold",
+      "distance": 40,
+      "before": {
+        "top": 6536,
+        "max": 6576,
+        "anchor": "588"
+      },
+      "after": {
+        "top": 6592,
+        "max": 6592,
+        "anchor": "591"
+      }
+    },
+    {
+      "case": "threshold",
+      "distance": 41,
+      "before": {
+        "top": 6551,
+        "max": 6592,
+        "anchor": "589"
+      },
+      "after": {
+        "top": 6551,
+        "max": 6609,
+        "anchor": "589"
+      }
+    },
+    {
+      "case": "scroll-during-body",
+      "pending": {
+        "top": 700,
+        "max": 6609,
+        "anchor": "241"
+      },
+      "after": {
+        "top": 700,
+        "max": 6626,
+        "anchor": "241"
+      }
+    },
+    {
+      "case": "evicted-anchor",
+      "top": 0,
+      "max": 13278,
+      "anchor": "604"
+    },
+    {
+      "case": "narrow-reflow",
+      "reflowBefore": {
+        "seq": "1",
+        "offset": 29.8125
+      },
+      "reflowAfter": {
+        "seq": "1",
+        "offset": 30.046875
+      },
+      "top": 293,
+      "max": 9834,
+      "anchor": "1"
+    },
+    {
+      "case": "clamped-reflow-bottom",
+      "clampBefore": 1000.046875,
+      "clampAfter": {
+        "offset": 331.8125,
+        "height": 333.140625
+      }
+    }
+  ],
+  "requests": [
+    "/api/jobs/A",
+    "/api/jobs/A/log?from=0",
+    "/api/jobs/A",
+    "/api/jobs/A/log?from=600&epoch=d02fe1220ff848aeb7dfaec0f45acf8c",
+    "/api/jobs/A",
+    "/api/jobs/A/log?from=601&epoch=d02fe1220ff848aeb7dfaec0f45acf8c",
+    "/api/jobs/A",
+    "/api/jobs/A/log?from=602&epoch=d02fe1220ff848aeb7dfaec0f45acf8c",
+    "/api/jobs/A",
+    "/api/jobs/A/log?from=603&epoch=d02fe1220ff848aeb7dfaec0f45acf8c",
+    "/api/jobs/A",
+    "/api/jobs/A/log?from=604&epoch=d02fe1220ff848aeb7dfaec0f45acf8c",
+    "/api/jobs/A",
+    "/api/jobs/A/log?from=1004&epoch=d02fe1220ff848aeb7dfaec0f45acf8c",
+    "/api/jobs/A",
+    "/api/jobs/A/log?from=1404&epoch=d02fe1220ff848aeb7dfaec0f45acf8c",
+    "/api/jobs/A",
+    "/api/jobs/A/log?from=0&epoch=c974f135fde34d8f81862c1e33e43b15"
+  ],
+  "errors": [],
+  "diagnostics": [],
+  "browser": "159.0.8154.6"
+}

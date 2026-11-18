@@ -1,0 +1,11 @@
+# Task655 compact evidence
+
+Exact source headc205ef5379778f63313b519411a2d5e37d07cba5, base00480c7e42ddb329f4dde9599c256555f2dabcf0.
+
+Read ../task-655-report.md first. commands.md/commands.json retain the exact forwarded unchanged-helper argv and actual result/revision limits. runs/ retains complete owning workload stdout/stderr logs, each immutable preflight/runtime config and JUnit where emitted; inventories/ lists actual discovered nodes. results.json preserves all13invocations, including every diagnostic failure. Controller metadata is represented by exact manifests/command/result records; the one known extraction warning emitted outside its workload logs is transcribed in package-warning.txt.
+
+source-identities.json, old-new-identities.json, provenance.json and original-to-composed.json bind actual source, eighteen whole-x picks, four fixture-only follow-ups and preserved refs/prerequisites. assembly/ retains original conflicts and exact resolution diffs. self-review.json proves twelve runtime modules identical through all later fixture revisions and matches all44 full-run failed nodes to43 passing cascade nodes plus the separate plain reflow pass. source-audit.json and static-recipes.json bind ownership/package audits.
+
+adapters/ contains exact task-only runtime fixtures/audits and both diagnostic trace versions, with hashes in fixture-identities.json. The existing roundtrip/browser/YuNet fixture bytes remain pinned through referenced preserved Task654/Task1631 prerequisites. Evidence-generation recipes remain local; evidence-recipe-identities.json retains their exact paths/hashes. package-identities.json is the actual final package chain. Only representative visually inspected screenshots are retained; full screenshot identities/limits remain in owning runtime outputs until review.
+
+The sole whole discovered run is1982passed/44failed, not2026passed. Follow-ups explain/fix fixture/harness prerequisites on unchanged production bytes; actual3.9 affected1584passed and final package passed. No broad full repeat. Compact evidence excludes media/environment/export/install trees and private admission tooling/configuration/policy/receipts. No publication or adoption claim.

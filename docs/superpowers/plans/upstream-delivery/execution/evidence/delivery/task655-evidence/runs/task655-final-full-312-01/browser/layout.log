@@ -1,0 +1,10 @@
+{"keyboard":{"top":157,"max":13278,"anchor":"612"},"note":"Earlier log messages were omitted."}
+AssertionError [ERR_ASSERTION]: {"reflowBefore":{"seq":"1","offset":29.8125},"reflowAfter":{"seq":"1","offset":-154.953125}}
+    at [eval]:71:55 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: '==',
+  diff: 'simple'
+}

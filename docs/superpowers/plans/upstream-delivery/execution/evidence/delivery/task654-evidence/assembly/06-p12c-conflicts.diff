@@ -1,0 +1,357 @@
+diff --cc benchmark/README.md
+index 854adb8,1602f27..0000000
+--- a/benchmark/README.md
++++ b/benchmark/README.md
+@@@ -323,84 -323,85 +323,169 @@@ unassisted one
+  - Publish the failures next to the successes. A tool that says where it
+    struggles is the one worth believing.
+  
+++<<<<<<< HEAD
+ +
+ +Report save I/O can be compared independently of inference:
+ +
+ +```sh
+ +python benchmark/review_io.py --scenario saves --rows 1000 10000 100000 \
+ +  --before-ref BASE_SHA --after-ref HEAD_SHA --repository . \
+ +  --evidence-dir /tmp/openscrub-review-io --output /tmp/openscrub-review-io/results.json
+ +```
+ +
+ +Use a fresh evidence directory and a runtime with the project dependencies.
+ +Both revisions are exported and checked against their pinned Git blobs; workers
+ +assert imported module paths and hashes. The benchmark warms both versions and
+ +alternates uninstrumented loopback HTTP requests (three warmups and five samples
+ +per version/scenario by default). Sparse and bulk values alternate on every
+ +request. Fresh workers count report parse/dump/staging/fsync/replacement and Python
+ +stream writes separately from request/response JSON. Results retain all samples,
+ +status codes, report/payload sizes, content hashes and Linux RSS observations.
+ +Keep other sustained workloads idle while measuring. High-water memory includes
+ +imports and fixture construction; sampled RSS can miss transient peaks. These
+ +measurements characterize a local warm-cache workload, not production capacity.
+ +
+ +For a pinned baseline that already skips unchanged-save publication, pass
+ +`--before-noop-publications 0`; the default `1` retains the historical
+ +pre-optimization comparison. This changes only counted-work expectations.
+ +To recover a completed timing set after a count-expectation error, import
+ +`count_operations(sources, rows, evidence_dir, before_noop_publications=0)`
+ +with the original pinned source manifests and a fresh evidence directory.
+ +Keep its result separate, reverify every exported source hash, and prove
+ +runtime-byte equality before relating timings to a tooling-only follow-up.
+ +Never relabel existing timing samples as another commit.
+ +
+ +For a baseline that already skips unchanged publication (for example `3457efa`),
+ +pass `--before-noop-publications 0`. The historical default remains 1.
+ +Separate counted workers report `report_encode` as publication encoding starts,
+ +`json_dump_calls` and `encoder_instances` as method-specific encoding starts,
+ +`stream_writes` as Python calls to the staging stream's `write`, and
+ +`stream_writelines` as calls to `writelines`. `encoder_chunks` counts pieces
+ +from the explicit public encoder iterator when used. TextIOWrapper's internal
+ +writes are not Python stream calls or measured OS syscalls. No counted latency
+ +is part of the uninstrumented HTTP comparison.
+ +
+ +### Tail-history finalization comparison
+ +
+ +`python benchmark/tail_history.py --base-source /path/to/base --head-source /path/to/candidate --output /tmp/tail-history.json`
+ +
+ +This imports each complete engine and compares `merge_detections` on deterministic
+ +ordinary OCR histories, including sparse detections over long history and a
+ +repeated-text control. Run it as the sole owned runtime workload. It records
+ +three warmups, five alternating measured pairs, full detection records, and
+ +separate work counts and allocation measurements. Inputs are fresh and prepared
+ +outside timing; index construction is included in each merge. These are bounded
+ +finalization measurements, with OCR inference and decoding excluded. Process
+ +maximum RSS includes both imported modules and native heaps and cannot attribute
+ +index memory. No five-sample population or long-video throughput claim is made.
+ +
+ +Run all discovered regression controls with `python -m pytest`, including the
+ +controlled-OCR `run_scan`/report fixture in `tests/test_tail_history_index.py`.
+ +### Reverse recall finalization comparison
+ +
+ +`reverse_recall.py` compares complete modules from two offline source exports:
+ +
+ +```sh
+ +python benchmark/reverse_recall.py --base /path/to/base --head /path/to/head --output /tmp/reverse.json
+ +```
+ +
+ +It validates deterministic email primary detections and memory construction at
+ +the actual matcher boundary, then measures reverse recall and reverse plus merge
+ +separately. Fresh mutable fixtures are prepared outside timing; normal GC stays
+ +enabled. Each of three fixed cases (heterogeneous lengths with unmatched words,
+ +same-length worst case, repeated early winner) gets three warmups and five
+ +alternating base/head samples. The JSON retains every output, mutation, digest
+ +and timing; tracing/allocation observations run after all timing. Coordinate
+ +exclusive owned workloads before running. Five samples do not establish a p95.
+ +
+ +This isolates post-scan work, including the temporary index and ordering costs.
+ +The combination excludes inference, scanning, scope filtering, report writing,
+ +backtracking and dense processing; it is not an end-to-end/default/4K claim.
+ +Same-length candidates still require a full walk; a tiny repeated memory can
+ +regress. The index retains O(memory) references and insertion serials until the
+ +reverse call returns. Allocation observations exclude prebuilt inputs/strings
+ +and do not establish a process RSS ceiling.
+++=======
++ ## Optional synthetic browser-log comparison
++ 
++ `browser_logs.py` compares the P12B-only client with the bounded P12C client
++ through actual callbacks, production metadata/log routes and the emitted PAGE.
++ It uses existing OpenScrub Python dependencies, pytest, Node and an existing
++ Playwright/Chromium installation. It installs nothing and runs no media/model
++ workload. It needs loopback sockets and permission to launch the browser.
++ 
++ Use two immutable source checkouts and a fresh, short scratch path with enough
++ free space. Keep the existing Python/browser/tool installations read-only. The
++ helper redirects profile, models, cache, jobs and temporary files into scratch,
++ blocks Python writes outside it and outward Python network connections, and
++ asserts exact selected imports before creating synthetic jobs. This is a scoped
++ recipe guard, not an OS sandbox for Node/Chromium or arbitrary extensions.
++ Do not point scratch at user data or run other workloads during comparison.
++ 
++ The following names are examples; supply paths to your existing installations:
++ 
++ ```bash
++ BASE_SOURCE=/absolute/path/to/P12B-checkout
++ CANDIDATE_SOURCE=/absolute/path/to/P12C-checkout
++ BENCH_ROOT=/tmp/openscrub-browser-log-bench
++ PYTHON_BIN=/absolute/path/to/python
++ NODE_BINARY=/absolute/path/to/node
++ CHROMIUM_BINARY=/absolute/path/to/chrome-headless-shell
++ export NODE_PATH=/absolute/path/to/existing/node_modules
++ export PYTHONDONTWRITEBYTECODE=1
++ 
++ "$PYTHON_BIN" "$CANDIDATE_SOURCE/benchmark/browser_logs_env.py" \
++   --source "$BASE_SOURCE" --source "$CANDIDATE_SOURCE" \
++   --tool "$PYTHON_BIN" --tool "$NODE_BINARY" --tool "$CHROMIUM_BINARY" \
++   --tool "$NODE_PATH/playwright/package.json" \
++   --tool "$NODE_PATH/playwright-core/package.json" \
++   --output "$BENCH_ROOT/frozen.json"
++ ```
++ 
++ Copy the printed manifest SHA-256 into `GRANTED_SHA` below after checking the
++ inputs and reserving an exclusive measurement slot. The runner verifies the
++ manifest itself and every frozen file before imports and after each phase. A
++ source/tool/path/hash mismatch aborts. Sources must contain the precise P12B/P12C
++ publication markers; this is not a general benchmark for arbitrary revisions.
++ 
++ ```bash
++ GRANTED_SHA=copy_the_printed_manifest_sha256
++ "$PYTHON_BIN" "$CANDIDATE_SOURCE/benchmark/browser_logs.py" \
++   --root "$BENCH_ROOT" --source "$CANDIDATE_SOURCE" \
++   --node "$NODE_BINARY" --chromium "$CHROMIUM_BINARY" \
++   --manifest "$BENCH_ROOT/frozen.json" --granted-sha "$GRANTED_SHA" \
++   --phase timing --label candidate --check-setup
++ ```
++ 
++ `--check-setup` only checks isolated imports/guards; it runs no browser, job
++ fixture or timing. For the full comparison, run the same command without that
++ flag in this order: `--source "$BASE_SOURCE" --label base --phase timing`,
++ then candidate timing, then base instrumentation, then candidate
++ instrumentation. Keep the same root, tools and manifest. Preserve every result
++ and failure; do not selectively repeat favorable cases. The runner saves raw
++ JSON and process logs under scratch, including partial records on failure.
++ 
++ Each timing case starts at 400 emissions, uses five accepted 20-entry warmups,
++ then 125 observed batches through 3,000 emissions. The four fixtures are short
++ progress, eight-row tool output, 8,192-unit unbroken text, and 8,192-unit dense
++ multiline text with 255 LFs. Native HTTP headers/body parsing, synchronous DOM
++ publication plus forced layout, and the metadata→log cycle are separate
++ boundaries. Healthy 900ms scheduling gaps are excluded. Correctness checks and
++ async DOM hashing occur between observations. Frame/long-task timestamps allow
++ overlap classification; idle post-batch wheel checks do not measure input
++ latency during publication. Instrumentation runs only after all timing and
++ counts represented UTF-16 publication inputs/nodes, not engine copies or RSS.
++ 
++ ```bash
++ "$PYTHON_BIN" "$CANDIDATE_SOURCE/benchmark/browser_logs_summary.py" "$BENCH_ROOT"
++ ```
++ 
++ The summary checks complete records and identical fixture hashes and reports
++ median and empirical nearest-rank p95 (`sorted[118]` of 125 observations).
++ Initial population has one observation per case/source. The 16ms median/50ms
++ p95 publication budgets are local escalation thresholds: retain and discuss
++ exceedances, especially dense multiline layouts. Different retained histories
++ and fixed source order do not establish equal-work or universal speed claims.
++ The final portable recipe is a delivery revision; historical task measurements
++ remain bound to their archived original recipes and hashes.
+++>>>>>>> 4670641 (Bound active browser job log display and preserve reading position)
+diff --cc openscrub_web.py
+index c58c179,b407090..0000000
+--- a/openscrub_web.py
++++ b/openscrub_web.py
+@@@ -2896,7 -2239,7 +2897,11 @@@ async function delJob(id)
+    alert(m);return;
+   }
+   REVIEW_DRAFTS.delete(id);
+++<<<<<<< HEAD
+ + if(CUR===id){disposeReview();REVIEW_LOAD++;beUnmount();stopPolling();VIEW_GEN++;CUR=null;EDITS=null;AUTO_REVIEW=null;REVIEW_REQUEST=null;detail.innerHTML="";}
+++=======
++  if(CUR===id){stopPolling();disposeRecentLog();VIEW_GEN++;CUR=null;EDITS=null;AUTO_REVIEW=null;REVIEW_REQUEST=null;detail.innerHTML="";}
+++>>>>>>> 4670641 (Bound active browser job log display and preserve reading position)
+   JOBSJSON="";loadJobs();
+  }
+  async function openJob(id){
+@@@ -2923,8 -2265,130 +2928,130 @@@
+   refresh();
+  }
+  
++ // One mounted view owns recent entry nodes, never a second transcript string.
++ function disposeRecentLog(){
++  if(RECENT_LOG){RECENT_LOG.dispose();RECENT_LOG=null;}
++ }
++ function mountRecentLog(id,gen,element,note){
++  const MAX_ENTRIES=800,MAX_UNITS=1048576,ENTRY_UNITS=8192;
++  const SUFFIX="... [display entry truncated]",NL=String.fromCharCode(10);
++  let entries=[],units=0,saved=null,frame=null,disposed=false;
++  let omitted=false,truncated=false,displayTruncated=false,replaced=false,lost=false;
++  let width=element.clientWidth,height=element.clientHeight,ownedTop=element.scrollTop;
++  const owner={publish,dispose};
++  const current=()=>!disposed&&RECENT_LOG===owner&&ownsView(id,gen)&&document.getElementById("log")===element;
++  function status(){
++   const text=[replaced?"Log history was replaced.":"",omitted?"Earlier log messages were omitted.":"",
++    truncated?"Some log messages were truncated.":"",displayTruncated?"Some display entries were truncated.":"",
++    lost?"Reading position was omitted; showing oldest retained messages.":""].filter(Boolean).join(" ");
++   if(note.textContent!==text)note.textContent=text;
++  }
++  function capture(){
++   const bottom=element.scrollHeight-element.clientHeight-element.scrollTop<=40;
++   const top=element.getBoundingClientRect().top+element.clientTop;
++   let entry=entries.find(e=>e.node.getBoundingClientRect().bottom>top);
++   if(!entry)entry=entries[entries.length-1];
++   return {bottom,seq:entry?entry.seq:null,offset:entry?top-entry.node.getBoundingClientRect().top:0};
++  }
++  function remember(){saved=capture();ownedTop=element.scrollTop;}
++  function restore(anchor){
++   if(anchor.bottom){element.scrollTop=element.scrollHeight;}
++   else{
++    const entry=entries.find(e=>e.seq===anchor.seq);
++    if(entry){
++     const rect=entry.node.getBoundingClientRect(),top=element.getBoundingClientRect().top+element.clientTop;
++     // Preserve the entry and pixel offset, clamping an offset after rewrap.
++     const offset=Math.min(anchor.offset,Math.max(0,rect.height-1));
++     element.scrollTop=Math.max(0,Math.min(element.scrollHeight-element.clientHeight,
++      element.scrollTop+rect.top-top+offset));
++    }else{element.scrollTop=0;if(anchor.seq!==null)lost=true;}
++   }
++   remember();
++  }
++  function scroll(){
++   if(!current()||Math.abs(element.scrollTop-ownedTop)<.5)return;
++   lost=false;remember();status();
++  }
++  element.addEventListener("scroll",scroll,{passive:true});
++  const observer=typeof ResizeObserver==="undefined"?null:new ResizeObserver(()=>{
++   if(!current()||(width===element.clientWidth&&height===element.clientHeight))return;
++   width=element.clientWidth;height=element.clientHeight;
++   if(frame===null)frame=requestAnimationFrame(()=>{
++    frame=null;if(!current())return;
++    if(saved)restore(saved);status();
++   });
++  });
++  if(observer)observer.observe(element);
++  function entrySize(text){
++   if(text.length<=ENTRY_UNITS)return text.length;
++   let end=ENTRY_UNITS-SUFFIX.length;
++   const a=text.charCodeAt(end-1),b=text.charCodeAt(end);
++   if(a>=0xD800&&a<=0xDBFF&&b>=0xDC00&&b<=0xDFFF)end--;
++   return end+SUFFIX.length;
++  }
++  function clearSelection(removed){
++   if(!removed.length)return;
++   const selection=window.getSelection?.();
++   if(!selection||!element.contains(selection.anchorNode)||!element.contains(selection.focusNode))return;
++   if(removed.some(e=>e.node.contains(selection.anchorNode)||e.node.contains(selection.focusNode))||
++      selection.anchorNode===element||selection.focusNode===element)selection.removeAllRanges();
++  }
++  function publish(snapshot,replace,initial,modern){
++   if(!current())return;
++   const lines=snapshot.lines;
++   if(replace){omitted=false;truncated=false;displayTruncated=false;replaced=!initial;lost=false;}
++   if(modern){omitted=omitted||snapshot.base>0||snapshot.dropped>0;truncated=truncated||snapshot.truncated>0;}
++   if(!replace&&!lines.length){status();return;}
++   // Select only a surviving suffix, before creating or mounting its nodes.
++   const floor=replace?Math.max(0,lines.length-400):0;
++   const incoming=[];let total=0,start=lines.length;
++   while(start>floor&&incoming.length<MAX_ENTRIES){
++    const size=entrySize(lines[start-1]),next=total+size+(incoming.length?1:0);
++    if(next>MAX_UNITS)break;
++    incoming.push(size);total=next;start--;
++   }
++   let keep=entries.length;
++   if(!replace&&start===0){
++    while(keep>0&&incoming.length+entries.length-keep<MAX_ENTRIES){
++     const next=total+entries[keep-1].units+(incoming.length+entries.length-keep?1:0);
++     if(next>MAX_UNITS)break;
++     total=next;keep--;
++    }
++   }
++   // The final pre-mutation sample is after all polling awaits and validation.
++   const anchor=replace?null:capture(),removed=entries.slice(0,keep);
++   omitted=omitted||start>0||keep>0;
++   clearSelection(removed);
++   for(const entry of removed)entry.node.remove();
++   entries.splice(0,keep);
++   const fragment=document.createDocumentFragment();
++   for(let i=start;i<lines.length;i++){
++    const size=incoming[lines.length-1-i],source=lines[i];
++    const clipped=source.length>ENTRY_UNITS;
++    const node=document.createElement("span");node.dataset.seq=String(snapshot.from+i);
++    node.appendChild(document.createTextNode(clipped?source.slice(0,size-SUFFIX.length)+SUFFIX:source));
++    if(i<lines.length-1)node.appendChild(document.createTextNode(NL));
++    fragment.appendChild(node);entries.push({seq:snapshot.from+i,node,units:size});
++    displayTruncated=displayTruncated||clipped;
++   }
++   // Delimiters are distinct from stable content nodes, including empty entries.
++   if(start<lines.length&&entries.length>lines.length-start){
++    entries[entries.length-(lines.length-start)-1].node.appendChild(document.createTextNode(NL));
++   }
++   element.appendChild(fragment);units=total;
++   if(replace){element.scrollTop=element.scrollHeight;remember();}
++   else restore(anchor);
++   status();
++  }
++  function dispose(){
++   disposed=true;if(observer)observer.disconnect();if(frame!==null)cancelAnimationFrame(frame);
++   element.removeEventListener("scroll",scroll);entries.length=0;units=0;saved=null;frame=null;
++  }
++  return owner;
++ }
++ 
+  function shellHtml(j){
+ - return `<div class="card" id="jobcard"><h2>${j.name}
+ + return `<div class="card" id="jobcard"><h2>${jobNameHtml(j.name)}
+    <span class="badge" id="ph"></span><small id="eta"></small></h2>
+   <progress id="prog" value="0" max="1"></progress>
+   <div class="row" id="actions" style="margin-top:8px"></div>
+@@@ -3080,9 -2408,9 +3207,10 @@@ async function refreshCycle(cycle)
+   if(!ownsView(id,gen)||!current())return;
+   if(!j||typeof j.name!=="string"||typeof j.phase!=="string"||
+      typeof j.progress!=="number"||!Number.isFinite(j.progress))throw new Error("Invalid job update");
+ + EXPORT_NAMES={id,video:j.download_name,report:j.report_name};
+   if(SHELLPH===null){
+    detail.insertAdjacentHTML("afterbegin",shellHtml(j));SHELLPH="";
++   RECENT_LOG=mountRecentLog(id,gen,document.getElementById("log"),document.getElementById("logStatus"));
+    const im=document.getElementById("pimg");
+    im.onload=()=>{im.style.display="block";};   // show only once a real frame arrives
+    im.onerror=()=>{im.style.display="none";};   // 404 before first preview: stay hidden
+diff --cc pyproject.toml
+index d4a51b0,60bbf0f..0000000
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@@ -118,12 -118,10 +118,19 @@@ include = 
+      "NOTICE",
+      "THIRD_PARTY_NOTICES.md",
+      "test_openscrub.py",
+++<<<<<<< HEAD
+ +    "tests",
+ +    "CONTRIBUTING.md",
+ +    "benchmark",
+ +
+ +
+ +
+++=======
++     "tests/",
++     "benchmark/browser_logs*.py",
++     "benchmark/browser_logs.js",
++     "benchmark/README.md",
+++>>>>>>> 4670641 (Bound active browser job log display and preserve reading position)
+  ]
+  
+  [tool.pytest.ini_options]

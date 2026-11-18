@@ -1,0 +1,9 @@
+# Local integration record — renderer composition and C01 acceptance
+
+Compose the eighteen reviewed whole R/P/G originals onto reviewed browser head00480c7 while preserving C01 exact HDR/chroma/polygon/default/clip behavior, source/operation/replay owners and current JobLog/browser lifetimes. Public geometry validation precedes one private staged delivery; R alone closes native resources before P publication cleanup. Recovery, rollback, epochs and descriptor-coherent HTTP delivery retain their reviewed boundaries.
+
+Local branch:`integration/upstream-focused-renderer`; base:`00480c7e42ddb329f4dde9599c256555f2dabcf0`; final clean head:`c205ef5379778f63313b519411a2d5e37d07cba5`. This is a local combined acceptance record, not an upstream feature PR or publication request. Original branches and working integration ref remain preserved.
+
+Validation: focused1,207passes/two corrected seed fixtures; one discovered run1,982passes/44failures, all explained by queued-fixture ownership, exact JSON probe harness and an unsettled scroll fixture. Bounded owning follow-ups passed44plus the separate plain reflow case on unchanged runtime. ActualPython3.9 affected1,584cases, source/default/Node/grammar audits and one final offline sdist→extracted-source wheel→strict installed CLI/listening Range/HEAD/conditional/early-close gate passed. This does not claim one2,026-pass run. Complete attempts/provenance/limits:[Task655 report](task-655-report.md),[commands](task655-evidence/commands.md).
+
+Fresh independent root review is pending. Retain inherited accepted minors, Task901 tooling warning, cooperative native/platform limits and P12C/backup-copy costs. Fixture corrections accompany future focused Austin owner deliveries; Task654's editor lifetime runtime fixes remain separately visible. No user-data adoption, external publication, working-ref advancement or new task occurred.

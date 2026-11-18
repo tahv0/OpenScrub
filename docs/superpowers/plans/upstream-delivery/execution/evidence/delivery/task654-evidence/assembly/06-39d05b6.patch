@@ -1,0 +1,1184 @@
+commit 39d05b664c74960d3530e6cb5a6be3401b2edf0c
+Author:     Tuomas Aho <tuomas.aho@outlook.com>
+AuthorDate: Tue Nov 17 16:59:40 2026 +0200
+Commit:     Tuomas Aho <tuomas.aho@outlook.com>
+CommitDate: Wed Nov 18 01:21:57 2026 +0200
+
+    Bound active browser job log display and preserve reading position
+    
+    (cherry picked from commit 4670641cb8e53e6daa6f77fb505397bfdb6733b8)
+
+diff --git a/README.md b/README.md
+index 53a8384..5ad8b0d 100644
+--- a/README.md
++++ b/README.md
+@@ -891,10 +891,26 @@ nor a successful import certifies mixed flavors, GPU execution, or model accurac
+ Job messages are kept in memory as a recent history: at most 2,000 entries
+ and 512 KiB of UTF-8 payload per job, with each callback entry capped at 8 KiB
+ including `... [message truncated]`. Embedded newlines remain one entry;
+-lone surrogates become `?`. The browser shows fixed omission/truncation notes,
+-starts with the latest 400 entries, and continues appending while open.
+-This does not bound browser history or total process memory, and creates no
+-persistent callback log. Retry appends to the same history.
++lone surrogates become `?`. Retry appends to the same server history; callback
++messages are not persisted.
++
++Each open browser job starts with the latest 400 entries and then retains at
++most 800 entries and 2,097,152 represented bytes (twice the UTF-16 code-unit
++count, including separators). A defensive 8,192-code-unit display limit keeps
++a bounded prefix and `... [display entry truncated]` for oversized entries
++from older servers. Empty and multiline callbacks remain single entries.
++One fixed note explains omitted/truncated history. Polling still advances the
++server cursor over every accepted entry; older display history is not fetched
++back. These limits describe retained text, not browser or process memory.
++
++New entries follow the bottom when the reader is within 40 CSS pixels of it,
++sampled when the response is ready. Reading farther up preserves the first
++visible retained entry and its pixel offset, including through width changes.
++If that entry is evicted, the view shows the oldest retained entry and a fixed
++lost-position notice. A new view, reopen or accepted server history reset goes
++to the recent bottom without moving keyboard focus. The log supports keyboard
++scrolling and native selection/copy; surviving content nodes remain stable.
++Closing/replacing the view discards its display state and resize callbacks.
+ 
+ `GET /api/jobs/<id>/log?from=N&epoch=E` returns absolute `from`/`len` cursors,
+ `lines`, `base`, `epoch`, `reset`, `dropped` and `truncated` in one snapshot.
+diff --git a/benchmark/README.md b/benchmark/README.md
+index 854adb8..8df1dac 100644
+--- a/benchmark/README.md
++++ b/benchmark/README.md
+@@ -404,3 +404,86 @@ Same-length candidates still require a full walk; a tiny repeated memory can
+ regress. The index retains O(memory) references and insertion serials until the
+ reverse call returns. Allocation observations exclude prebuilt inputs/strings
+ and do not establish a process RSS ceiling.
++
++## Optional synthetic browser-log comparison
++
++`browser_logs.py` compares the P12B-only client with the bounded P12C client
++through actual callbacks, production metadata/log routes and the emitted PAGE.
++It uses existing OpenScrub Python dependencies, pytest, Node and an existing
++Playwright/Chromium installation. It installs nothing and runs no media/model
++workload. It needs loopback sockets and permission to launch the browser.
++
++Use two immutable source checkouts and a fresh, short scratch path with enough
++free space. Keep the existing Python/browser/tool installations read-only. The
++helper redirects profile, models, cache, jobs and temporary files into scratch,
++blocks Python writes outside it and outward Python network connections, and
++asserts exact selected imports before creating synthetic jobs. This is a scoped
++recipe guard, not an OS sandbox for Node/Chromium or arbitrary extensions.
++Do not point scratch at user data or run other workloads during comparison.
++
++The following names are examples; supply paths to your existing installations:
++
++```bash
++BASE_SOURCE=/absolute/path/to/P12B-checkout
++CANDIDATE_SOURCE=/absolute/path/to/P12C-checkout
++BENCH_ROOT=/tmp/openscrub-browser-log-bench
++PYTHON_BIN=/absolute/path/to/python
++NODE_BINARY=/absolute/path/to/node
++CHROMIUM_BINARY=/absolute/path/to/chrome-headless-shell
++export NODE_PATH=/absolute/path/to/existing/node_modules
++export PYTHONDONTWRITEBYTECODE=1
++
++"$PYTHON_BIN" "$CANDIDATE_SOURCE/benchmark/browser_logs_env.py" \
++  --source "$BASE_SOURCE" --source "$CANDIDATE_SOURCE" \
++  --tool "$PYTHON_BIN" --tool "$NODE_BINARY" --tool "$CHROMIUM_BINARY" \
++  --tool "$NODE_PATH/playwright/package.json" \
++  --tool "$NODE_PATH/playwright-core/package.json" \
++  --output "$BENCH_ROOT/frozen.json"
++```
++
++Copy the printed manifest SHA-256 into `GRANTED_SHA` below after checking the
++inputs and reserving an exclusive measurement slot. The runner verifies the
++manifest itself and every frozen file before imports and after each phase. A
++source/tool/path/hash mismatch aborts. Sources must contain the precise P12B/P12C
++publication markers; this is not a general benchmark for arbitrary revisions.
++
++```bash
++GRANTED_SHA=copy_the_printed_manifest_sha256
++"$PYTHON_BIN" "$CANDIDATE_SOURCE/benchmark/browser_logs.py" \
++  --root "$BENCH_ROOT" --source "$CANDIDATE_SOURCE" \
++  --node "$NODE_BINARY" --chromium "$CHROMIUM_BINARY" \
++  --manifest "$BENCH_ROOT/frozen.json" --granted-sha "$GRANTED_SHA" \
++  --phase timing --label candidate --check-setup
++```
++
++`--check-setup` only checks isolated imports/guards; it runs no browser, job
++fixture or timing. For the full comparison, run the same command without that
++flag in this order: `--source "$BASE_SOURCE" --label base --phase timing`,
++then candidate timing, then base instrumentation, then candidate
++instrumentation. Keep the same root, tools and manifest. Preserve every result
++and failure; do not selectively repeat favorable cases. The runner saves raw
++JSON and process logs under scratch, including partial records on failure.
++
++Each timing case starts at 400 emissions, uses five accepted 20-entry warmups,
++then 125 observed batches through 3,000 emissions. The four fixtures are short
++progress, eight-row tool output, 8,192-unit unbroken text, and 8,192-unit dense
++multiline text with 255 LFs. Native HTTP headers/body parsing, synchronous DOM
++publication plus forced layout, and the metadata→log cycle are separate
++boundaries. Healthy 900ms scheduling gaps are excluded. Correctness checks and
++async DOM hashing occur between observations. Frame/long-task timestamps allow
++overlap classification; idle post-batch wheel checks do not measure input
++latency during publication. Instrumentation runs only after all timing and
++counts represented UTF-16 publication inputs/nodes, not engine copies or RSS.
++
++```bash
++"$PYTHON_BIN" "$CANDIDATE_SOURCE/benchmark/browser_logs_summary.py" "$BENCH_ROOT"
++```
++
++The summary checks complete records and identical fixture hashes and reports
++median and empirical nearest-rank p95 (`sorted[118]` of 125 observations).
++Initial population has one observation per case/source. The 16ms median/50ms
++p95 publication budgets are local escalation thresholds: retain and discuss
++exceedances, especially dense multiline layouts. Different retained histories
++and fixed source order do not establish equal-work or universal speed claims.
++The final portable recipe is a delivery revision; historical task measurements
++remain bound to their archived original recipes and hashes.
+diff --git a/benchmark/browser_logs.js b/benchmark/browser_logs.js
+new file mode 100644
+index 0000000..15fda7e
+--- /dev/null
++++ b/benchmark/browser_logs.js
+@@ -0,0 +1,96 @@
++// Synthetic inputs and independent DOM/cursor validation; never imported by PAGE.
++const {chromium}=require('playwright'),assert=require('node:assert/strict'),fs=require('node:fs'),crypto=require('node:crypto');
++const base=process.env.OPENSCRUB_LOG_BENCH_BASE,label=process.env.OPENSCRUB_LOG_BENCH_LABEL,phase=process.env.OPENSCRUB_LOG_BENCH_PHASE;
++const identity=JSON.parse(process.env.OPENSCRUB_LOG_BENCH_IDENTITY),root=process.env.OPENSCRUB_LOG_BENCH_ROOT;
++const cases=['short','multiline','long','dense-multiline'],checkpoints=[1000,2000,3000],batchSize=20;
++function fixture(kind,i){const n=String(i).padStart(6,'0');
++ if(kind==='short')return 'progress '+n+' 50% synthetic callback';
++ if(kind==='multiline')return Array.from({length:8},(_,j)=>'tool '+n+' line '+j+' ordinary output').join('\n');
++ if(kind==='long')return n+'x'.repeat(8192-6);
++ const first=n+'x'.repeat(25);return first+'\n'+('x'.repeat(31)+'\n').repeat(254)+'x'.repeat(32);
++}
++const hash=text=>crypto.createHash('sha256').update(text).digest('hex');
++const records=[];let activePage=null;
++const pause=ms=>new Promise(r=>setTimeout(r,ms));
++async function wait(fn){for(let i=0;i<2000;i++){if(await fn())return;await pause(5)}throw Error('measurement condition expired')}
++(async()=>{
++ const browser=await chromium.launch({headless:true,args:['--no-sandbox'],executablePath:process.env.OPENSCRUB_LOG_BENCH_CHROMIUM});
++ try{for(const kind of cases){
++  const page=await browser.newPage({viewport:{width:1280,height:950},deviceScaleFactor:1}),errors=[],diagnostics=[];
++  activePage=page;page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(['error','warning'].includes(m.type()))diagnostics.push(m.text())});
++  await page.route('**/api/**',route=>{const u=new URL(route.request().url());
++   if(/^\/api\/jobs\/A(\/log)?$/.test(u.pathname))return route.continue();
++   return route.fulfill({json:u.pathname==='/api/jobs'?[]:u.pathname==='/api/quality_tier'?{tiers:[],current:'fast'}:{}})});
++  await page.addInitScript(instrument=>{
++   window.qaSamples=[];window.qaTransport=[];window.qaLongTasks=[];window.qaFrames=[];window.qaPublishing=false;window.qaCounts={units:0,textNodes:0,spans:0,fragments:0};
++   const fetchNative=fetch.bind(window);window.fetch=async(...args)=>{const url=String(args[0]),start=performance.now(),r=await fetchNative(...args),headers=performance.now();
++    if(/^api\/jobs\/A(?:\/log\?|$)/.test(url)){const json=r.json.bind(r);r.json=async()=>{const begin=performance.now(),body=await json();window.qaTransport.push({url,headersMs:headers-start,bodyMs:performance.now()-begin,totalMs:performance.now()-start,bytes:+r.headers.get('content-length'),from:body.from,len:body.len,base:body.base,reset:body.reset,count:body.lines?.length});return body}}return r};
++   new PerformanceObserver(list=>{for(const e of list.getEntries())window.qaLongTasks.push({start:e.startTime,duration:e.duration})}).observe({type:'longtask',buffered:true});
++   let previous=performance.now();function beat(now){window.qaFrames.push({start:previous,end:now,duration:now-previous});previous=now;requestAnimationFrame(beat)}requestAnimationFrame(beat);
++   if(instrument){
++    const descriptor=Object.getOwnPropertyDescriptor(Node.prototype,'textContent');Object.defineProperty(Node.prototype,'textContent',{...descriptor,set(value){if(window.qaPublishing&&this.id==='log')window.qaCounts.units+=String(value).length;descriptor.set.call(this,value)}});
++    const text=document.createTextNode.bind(document),element=document.createElement.bind(document),fragment=document.createDocumentFragment.bind(document);
++    document.createTextNode=value=>{if(window.qaPublishing){window.qaCounts.units+=String(value).length;window.qaCounts.textNodes++}return text(value)};
++    document.createElement=(name,...args)=>{if(window.qaPublishing&&name==='span')window.qaCounts.spans++;return element(name,...args)};
++    document.createDocumentFragment=()=>{if(window.qaPublishing)window.qaCounts.fragments++;return fragment()};
++   }
++  },phase==='instrumentation');
++  const control=async data=>{const r=await page.request.post(base+'/__qa__/control',{data});assert.equal(r.status(),200)};
++  await control({action:'seed',count:0});
++  let emitted=0,producer=[],producerBytes=0,expected=[];
++  const inputHash=crypto.createHash('sha256');
++  async function emit(count){const lines=Array.from({length:count},(_,j)=>fixture(kind,emitted+j));
++   for(const line of lines){const size=Buffer.byteLength(line);assert.ok(size<=8192);inputHash.update(line+'\n');
++    while(producer.length&&(producer.length>=2000||producerBytes+size>524288))producerBytes-=Buffer.byteLength(producer.shift());
++    producer.push(line);producerBytes+=size;}
++   await control({action:'append',lines});emitted+=count;return lines;
++  }
++  await emit(400);
++  await page.goto(base);assert.equal(await page.title(),'OpenScrub');
++  async function validate(stage,lines,initial=false){
++   if(initial)expected=producer.slice(-400);else expected.push(...lines);
++   if(label==='candidate')while(expected.length>800||2*(expected.reduce((n,s)=>n+s.length,0)+Math.max(0,expected.length-1))>2097152)expected.shift();
++   const record=await page.evaluate(async()=>{
++    if(POLL){clearTimeout(POLL.handle);POLL=null}
++    const e=document.getElementById('log'),text=e.textContent,buffer=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text));
++    const data={cursor:LOGN,units:text.length,hash:[...new Uint8Array(buffer)].map(x=>x.toString(16).padStart(2,'0')).join(''),entries:e.children.length,
++     contentNodes:[...e.children].filter(s=>s.firstChild?.nodeType===3).length,delimiters:[...e.children].reduce((n,s)=>n+Math.max(0,s.childNodes.length-1),0),
++     first:e.firstElementChild?.dataset.seq,last:e.lastElementChild?.dataset.seq,top:e.scrollTop,max:e.scrollHeight-e.clientHeight,
++     sample:window.qaSamples.shift(),transport:window.qaTransport.splice(0),counts:{...window.qaCounts},longTasks:window.qaLongTasks.splice(0),frames:window.qaFrames.splice(0)};
++    return data;
++   });
++   record.stage=stage;record.emitted=emitted;record.expectedEntries=expected.length;record.kind=kind;record.label=label;record.phase=phase;record.correct=false;
++   records.push(record);
++   assert.equal(record.cursor,emitted);assert.equal(record.units,expected.join('\n').length);assert.equal(record.hash,hash(expected.join('\n')));
++   assert.equal(record.sample.cursor,emitted);assert.equal(record.transport.filter(r=>r.url.includes('/log?')).length,1);
++   const log=record.transport.find(r=>r.url.includes('/log?'));assert.equal(log.len,emitted);assert.equal(log.from,emitted-(initial?producer.length:lines.length));assert.equal(log.base,emitted-producer.length);assert.equal(log.count,initial?producer.length:lines.length);assert.equal(log.reset,initial&&producer.length<emitted?'stale':null);
++   if(label==='candidate'){assert.equal(record.entries,expected.length);assert.equal(record.contentNodes,expected.length);assert.equal(record.delimiters,Math.max(0,expected.length-1));assert.equal(+record.first,emitted-expected.length);assert.equal(+record.last,emitted-1);assert.ok(2*record.units<=2097152)}
++   record.correct=true;return record;
++  }
++  await page.evaluate(()=>{window.qaCycleStart=performance.now();openJob('A')});await wait(()=>page.evaluate(n=>LOGN===n&&POLL_CYCLE===null,emitted));await validate('initial',[],true);
++  const steps=phase==='timing'?130:31;
++  for(let step=0;step<steps;step++){
++   const lines=await emit(batchSize);await page.evaluate(()=>{window.qaCounts={units:0,textNodes:0,spans:0,fragments:0};window.qaCycleStart=performance.now();refresh()});
++   await wait(()=>page.evaluate(n=>LOGN===n&&POLL_CYCLE===null,emitted));const result=await validate(step<5&&phase==='timing'?'warmup':'observed',lines);
++   if(checkpoints.includes(emitted)){
++    await page.locator('#log').scrollIntoViewIfNeeded();await page.locator('#log').hover();
++    await page.evaluate(()=>{window.qaInput={start:performance.now()};document.getElementById('log').addEventListener('wheel',()=>{window.qaInput.eventMs=performance.now()-window.qaInput.start;requestAnimationFrame(()=>window.qaInput.frameMs=performance.now()-window.qaInput.start)},{once:true,passive:true})});
++    await page.mouse.wheel(0,-100);await wait(()=>page.evaluate(()=>window.qaInput.frameMs!==undefined));await pause(80);
++    const moved=await page.locator('#log').evaluate(e=>e.scrollHeight-e.clientHeight-e.scrollTop);assert.ok(moved>=50);
++    result.idlePostBatchWheel={...await page.evaluate(()=>window.qaInput),distanceFromBottom:moved};
++    await page.locator('#log').evaluate(e=>e.scrollTop=e.scrollHeight);
++
++   }
++  }
++  assert.equal(emitted,phase==='timing'?3000:1020);assert.deepEqual(errors,[]);assert.deepEqual(diagnostics,[]);
++  records.push({kind,label,phase,fixtureHash:inputHash.digest('hex'),emitted,errors,diagnostics,browser:browser.version(),identity});
++  fs.writeFileSync(root+'/measurement-'+label+'-'+phase+'.json',JSON.stringify(records));
++  console.log(JSON.stringify({kind,label,phase,emitted,observations:phase==='timing'?125:31,errors,diagnostics}));await page.close();
++ }}catch(error){
++  if(activePage&&!activePage.isClosed()){
++   try{const pending=await Promise.race([activePage.evaluate(()=>({samples:window.qaSamples,transport:window.qaTransport,longTasks:window.qaLongTasks,frames:window.qaFrames})),pause(1000).then(()=>({unavailable:'failed-page snapshot timeout'}))]);records.push({stage:'failure-uncollected',pending})}
++   catch(snapshotError){records.push({stage:'failure-uncollected',unavailable:String(snapshotError)})}
++  }
++  throw error;
++ }finally{await browser.close()}
++})().catch(e=>{fs.writeFileSync(root+'/measurement-'+label+'-'+phase+'-failed.json',JSON.stringify({records,error:e.stack}));console.error(e);process.exit(1)});
+diff --git a/benchmark/browser_logs.py b/benchmark/browser_logs.py
+new file mode 100644
+index 0000000..163c9d4
+--- /dev/null
++++ b/benchmark/browser_logs.py
+@@ -0,0 +1,108 @@
++"""Offline actual-PAGE/HTTP browser-log comparison (explicit isolated env only).
++
++Requires existing OpenScrub Python dependencies and offline Playwright/Chromium.
++See benchmark/README.md for isolated roots and frozen source/tool inputs.
++The driver imports the real-route test fixture and serves the selected PAGE
++with two narrowly asserted timing insertions. No product timing hook ships.
++Run once per selected source with --phase timing, then instrumentation only
++AFTER every timing source/case is complete. See the frozen task declaration.
++"""
++import argparse
++import hashlib
++import json
++import os
++from pathlib import Path
++import subprocess
++import sys
++
++
++def main():
++    parser = argparse.ArgumentParser()
++    parser.add_argument('--phase', choices=('timing', 'instrumentation'), required=True)
++    parser.add_argument('--root', type=Path, required=True)
++    parser.add_argument('--node', type=Path, required=True)
++    parser.add_argument('--chromium', type=Path, required=True)
++    parser.add_argument('--source', type=Path, required=True)
++    parser.add_argument('--manifest', type=Path, required=True)
++    parser.add_argument('--granted-sha', required=True)
++    parser.add_argument('--check-setup', action='store_true', help='assert isolated imports/guards without browser, fixtures or timing')
++    parser.add_argument('--label', choices=('base', 'candidate'), required=True)
++    args = parser.parse_args()
++    root = args.root.resolve()
++    source = args.source.resolve()
++    manifest = args.manifest.resolve()
++    granted = args.granted_sha
++    def verify_manifest():
++        data = manifest.read_bytes()
++        assert hashlib.sha256(data).hexdigest() == granted, 'granted manifest identity'
++        return data
++    frozen = json.loads(verify_manifest())
++    assert str(source / 'openscrub_web.py') in frozen['sha256'], 'selected source path is not frozen'
++    for tool in (args.node.resolve(), args.chromium.resolve(), Path(sys.executable).resolve()):
++        assert str(tool) in frozen['sha256'], 'selected tool path is not frozen: ' + str(tool)
++    expected = frozen['sha256'][str(source / 'openscrub_web.py')]
++    def verify_frozen():
++        verify_manifest()
++        for name, digest in frozen['sha256'].items():
++            assert hashlib.sha256(Path(name).read_bytes()).hexdigest() == digest, name
++    verify_frozen()
++    sys.dont_write_bytecode = True
++    from browser_logs_env import configure
++    web = configure(root, source, frozen)
++    if args.check_setup:
++        verify_frozen()
++        print('ISOLATED_SETUP_PASS: no browser, producer fixture or timing executed')
++        return
++    sys.path.insert(0, str(source / 'tests'))
++    import pytest
++    from test_job_polling_browser import polling_http
++    assert hashlib.sha256(Path(web.__file__).read_bytes()).hexdigest() == expected
++    start = ('  document.getElementById("logStatus").textContent=[' if args.label == 'base'
++             else ' RECENT_LOG.publish(nl,replace,!LOGINIT,modern);')
++    end = (' LOGN=nl.len;LOGINIT=true;' if args.label == 'base'
++           else ' LOGN=nl.len;LOGE=nextEpoch;LOGINIT=true;')
++    assert web.PAGE.count(start) == web.PAGE.count(end) == 1
++    begin = ' window.qaStart=performance.now();window.qaPublishing=true;\n'
++    finish = '''
++ const qaElement=document.getElementById("log"),qaHeight=qaElement.scrollHeight;
++ const qaEnd=performance.now();window.qaPublishing=false;
++ window.qaSamples.push({publicationStart:window.qaStart,publicationEnd:qaEnd,
++  cycleStart:window.qaCycleStart,cycleEnd:qaEnd,publicationMs:qaEnd-window.qaStart,
++  cycleMs:qaEnd-window.qaCycleStart,cursor:LOGN,height:qaHeight});
++'''
++    web.PAGE = web.PAGE.replace(start, begin + start).replace(end, end + finish)
++    identity = {'label': args.label, 'phase': args.phase, 'source': expected,
++                'instrumented_page': hashlib.sha256(web.PAGE.encode()).hexdigest()}
++    fixture = root / ('measurement-' + args.label + '-' + args.phase)
++    fixture.mkdir(exist_ok=True)
++    monkeypatch = pytest.MonkeyPatch()
++    generator = polling_http.__wrapped__(monkeypatch, fixture)
++    base = next(generator)
++    env = dict(os.environ, OPENSCRUB_LOG_BENCH_BASE=base, OPENSCRUB_LOG_BENCH_PHASE=args.phase,
++               OPENSCRUB_LOG_BENCH_LABEL=args.label, OPENSCRUB_LOG_BENCH_ROOT=str(root),
++               OPENSCRUB_LOG_BENCH_IDENTITY=json.dumps(identity),
++               OPENSCRUB_LOG_BENCH_CHROMIUM=str(args.chromium.resolve()))
++    try:
++        log = root / 'logs' / ('measurement-' + args.label + '-' + args.phase + '.log')
++        try:
++            result = subprocess.run([str(args.node.resolve()), str(Path(__file__).with_suffix('.js'))], env=env,
++                                    capture_output=True, text=True, timeout=1800)
++        except subprocess.TimeoutExpired as error:
++            def decoded(value):
++                return value.decode(errors='replace') if isinstance(value, bytes) else value or ''
++            log.write_text(decoded(error.stdout) + decoded(error.stderr) + '\nSUBPROCESS TIMEOUT\n')
++            raise
++        log.write_text(result.stdout + result.stderr)
++        print(result.stdout, end='')
++        if result.returncode:
++            print(result.stderr, file=sys.stderr)
++            raise SystemExit(result.returncode)
++    finally:
++        generator.close()
++        monkeypatch.undo()
++        assert hashlib.sha256(Path(web.__file__).read_bytes()).hexdigest() == expected
++        verify_frozen()
++
++
++if __name__ == '__main__':
++    main()
+diff --git a/benchmark/browser_logs_env.py b/benchmark/browser_logs_env.py
+new file mode 100644
+index 0000000..56e9fe8
+--- /dev/null
++++ b/benchmark/browser_logs_env.py
+@@ -0,0 +1,115 @@
++"""Freeze comparison inputs and isolate the optional synthetic browser recipe.
++
++No product import occurs until configure() installs profile/write/network guards.
++This helper is specific to browser_logs.py, not an application runtime feature.
++"""
++import argparse
++import hashlib
++import json
++import os
++from pathlib import Path
++import sys
++import tempfile
++
++SOURCE_FILES = ('openscrub.py', 'openscrub_web.py', 'zones_ui.py',
++                'openscrub_internal/__init__.py', 'openscrub_internal/job_logs.py', 'tests/test_job_polling_browser.py')
++RECIPE_FILES = ('browser_logs.py', 'browser_logs.js', 'browser_logs_env.py',
++                'browser_logs_summary.py', 'README.md')
++
++
++def configure(root, source, frozen):
++    root, source = root.resolve(), source.resolve()
++    # Reject an unfrozen source selection before any product import.
++    for relative in SOURCE_FILES:
++        path = source / relative
++        assert str(path) in frozen['sha256'], 'selected source path is not frozen: ' + str(path)
++        assert hashlib.sha256(path.read_bytes()).hexdigest() == frozen['sha256'][str(path)], str(path)
++    for name in ('profile', 'tmp', 'cache', 'config', 'models', 'app'):
++        (root / name).mkdir(parents=True, exist_ok=True)
++    os.environ.update({'TMPDIR': str(root / 'tmp'), 'XDG_CACHE_HOME': str(root / 'cache'),
++                       'XDG_CONFIG_HOME': str(root / 'config'), 'HF_HOME': str(root / 'cache/hf'),
++                       'TORCH_HOME': str(root / 'cache/torch'), 'MPLCONFIGDIR': str(root / 'cache/mpl'),
++                       'UV_CACHE_DIR': str(root / 'cache/uv'), 'UV_PYTHON_INSTALL_DIR': str(root / 'python'),
++                       'OPENSCRUB_NO_AUTOFETCH': '1', 'PYTHONDONTWRITEBYTECODE': '1',
++                       'HF_HUB_OFFLINE': '1', 'TRANSFORMERS_OFFLINE': '1'})
++    sys.dont_write_bytecode = True
++    tempfile.tempdir = str(root / 'tmp')
++    original_expanduser = os.path.expanduser
++
++    def expanduser(path):
++        marker = b'~' if isinstance(path, bytes) else '~'
++        separator = b'/' if isinstance(path, bytes) else '/'
++        if path == marker or path.startswith(marker + separator):
++            return (os.fsencode(root / 'profile') if isinstance(path, bytes) else str(root / 'profile')) + path[1:]
++        return original_expanduser(path)
++
++    os.path.expanduser = expanduser
++
++    def checked(path):
++        if isinstance(path, (str, bytes)):
++            resolved = Path(os.fsdecode(path)).resolve()
++            if str(resolved) != os.devnull and not resolved.is_relative_to(root):
++                raise RuntimeError('browser-log recipe write outside root: ' + str(resolved))
++
++    def audit(event, args):
++        if event == 'socket.connect' and isinstance(args[1], tuple):
++            if args[1][0] not in ('127.0.0.1', '::1', 'localhost'):
++                raise RuntimeError('browser-log recipe outward Python network disabled')
++        if event == 'open' and args[2] & (os.O_WRONLY | os.O_RDWR | os.O_CREAT | os.O_TRUNC | os.O_APPEND):
++            checked(args[0])
++        if event in ('os.mkdir', 'os.remove', 'os.rmdir', 'os.chmod', 'os.utime'):
++            checked(args[0])
++        if event in ('os.rename', 'os.link', 'os.symlink'):
++            checked(args[0]); checked(args[1])
++
++    sys.addaudithook(audit)
++    os.chdir(root / 'app')
++    sys.path.insert(0, str(source))
++    import openscrub
++    import openscrub_web as web
++    import zones_ui
++    import openscrub_internal.job_logs as job_logs
++    identities = {}
++    for module, relative in ((openscrub, 'openscrub.py'), (web, 'openscrub_web.py'),
++                             (zones_ui, 'zones_ui.py'), (job_logs, 'openscrub_internal/job_logs.py')):
++        path = Path(module.__file__).resolve()
++        assert path == source / relative, (path, source / relative)
++        digest = hashlib.sha256(path.read_bytes()).hexdigest()
++        assert digest == frozen['sha256'][str(path)], str(path)
++        identities[module.__name__] = {'file': str(path), 'sha256': digest}
++    openscrub._model_dir = lambda: str(root / 'models')
++    original_fetch = openscrub._fetch_model
++
++    def offline(url, *args, **kwargs):
++        if not url.startswith('file://'):
++            raise RuntimeError('browser-log recipe model downloads disabled')
++        return original_fetch(url, *args, **kwargs)
++
++    openscrub._fetch_model = offline
++    web._data_root = lambda: str(root / 'app')
++    for name in ('JOBS_DIR', 'ZONES_PATH', 'MODEL_SELECT_PATH', 'CERT_DIR', 'WEB_SETTINGS_PATH', 'CUSTOM_CATS_PATH'):
++        setattr(web, name, str(root / 'app' / Path(getattr(web, name)).name))
++    for name in ('CUSTOM_CERT', 'CUSTOM_KEY', 'AUTO_CERT', 'AUTO_KEY'):
++        setattr(web, name, str(Path(web.CERT_DIR) / Path(getattr(web, name)).name))
++    Path(web.JOBS_DIR).mkdir(exist_ok=True)
++    print('BROWSER_LOG_SOURCE ' + json.dumps({'python': sys.version, 'sources': identities}, sort_keys=True), flush=True)
++    return web
++
++
++def main():
++    parser = argparse.ArgumentParser(description='Freeze exact source/recipe/existing-tool files; does not import the application or run timing.')
++    parser.add_argument('--source', type=Path, action='append', required=True)
++    parser.add_argument('--tool', type=Path, action='append', required=True)
++    parser.add_argument('--output', type=Path, required=True)
++    args = parser.parse_args()
++    files = [source.resolve() / relative for source in args.source for relative in SOURCE_FILES]
++    files += [Path(__file__).resolve().parent / relative for relative in RECIPE_FILES]
++    files += [path.resolve() for path in args.tool]
++    record = {'sha256': {str(path): hashlib.sha256(path.read_bytes()).hexdigest() for path in files}}
++    args.output.parent.mkdir(parents=True, exist_ok=True)
++    args.output.write_text(json.dumps(record, indent=2) + '\n')
++    print('Manifest SHA256: ' + hashlib.sha256(args.output.read_bytes()).hexdigest())
++
++
++if __name__ == '__main__':
++    main()
+diff --git a/benchmark/browser_logs_summary.py b/benchmark/browser_logs_summary.py
+new file mode 100644
+index 0000000..2cb5a65
+--- /dev/null
++++ b/benchmark/browser_logs_summary.py
+@@ -0,0 +1,100 @@
++"""Recompute all declared browser-log records; no application imports/timing."""
++import argparse
++import hashlib
++import json
++import math
++from pathlib import Path
++import statistics
++
++
++def distribution(values):
++    values = sorted(values)
++    return {'n': len(values), 'min': values[0], 'median': statistics.median(values),
++            'p95_nearest_rank': values[math.ceil(.95 * len(values)) - 1], 'max': values[-1]}
++
++
++def overlaps(start, end, windows):
++    return any(start < b and end > a for a, b in windows)
++
++
++def attribution(rows, observed):
++    publication = [(x['sample']['publicationStart'], x['sample']['publicationEnd']) for x in observed]
++    cycle = [(x['sample']['cycleStart'], x['sample']['cycleEnd']) for x in observed]
++    result = {}
++    for name, items in (
++        ('long_tasks', [t for x in rows for t in x['longTasks']]),
++        ('raf_gaps', [t for x in rows for t in x['frames']]),
++    ):
++        groups = {'overlaps_observed_publication': [], 'overlaps_other_observed_cycle': [], 'outside_observed_cycles': []}
++        for item in items:
++            start, end = item['start'], item.get('end', item['start'] + item['duration'])
++            key = ('overlaps_observed_publication' if overlaps(start, end, publication)
++                   else 'overlaps_other_observed_cycle' if overlaps(start, end, cycle)
++                   else 'outside_observed_cycles')
++            groups[key].append(item['duration'])
++        result[name] = {k: {'count': len(v), 'max_whole_interval_ms': max(v, default=0)} for k, v in groups.items()}
++    result['interpretation'] = 'Interval overlap is not sole-cause attribution; outside includes initial/warmup/control/async validation. A frame gap can include work outside its overlapping publication.'
++    return result
++
++
++def main():
++    parser = argparse.ArgumentParser()
++    parser.add_argument('root', type=Path)
++    args = parser.parse_args()
++    summary = {'cases': {}, 'raw_files': {}, 'method': '125 observed accepted batches per source/case; median and empirical nearest-rank p95 sorted[118]. Initial has one observation only.',
++               'limitations': ['fixed base→candidate source order', 'intentionally differing retained histories', 'idle post-batch wheel is not input latency during publication', 'represented units/node creation are not engine copies/heap/RSS']}
++    fixture_hashes = {}
++    for phase in ('timing', 'instrumentation'):
++        for label in ('base', 'candidate'):
++            path = args.root / ('measurement-' + label + '-' + phase + '.json')
++            data = json.loads(path.read_text())
++            assert len(data) == (528 if phase == 'timing' else 132)
++            summary['raw_files'][path.name] = {'bytes': path.stat().st_size, 'sha256': hashlib.sha256(path.read_bytes()).hexdigest(), 'records': len(data)}
++            for kind in ('short', 'multiline', 'long', 'dense-multiline'):
++                rows = [x for x in data if x['kind'] == kind and 'sample' in x]
++                assert all(x['correct'] for x in rows)
++                initial = [x for x in rows if x['stage'] == 'initial']
++                observed = [x for x in rows if x['stage'] == 'observed']
++                assert len(initial) == 1 and len(observed) == (125 if phase == 'timing' else 31)
++                identity = next(x for x in data if x['kind'] == kind and 'fixtureHash' in x)
++                key = (phase, kind)
++                if key in fixture_hashes:
++                    assert identity['fixtureHash'] == fixture_hashes[key]
++                fixture_hashes[key] = identity['fixtureHash']
++                case = summary['cases'].setdefault(kind, {}).setdefault(label, {})
++                if phase == 'timing':
++                    assert len([x for x in rows if x['stage'] == 'warmup']) == 5
++                    case.update({'identity': identity, 'initial_publication_ms': initial[0]['sample']['publicationMs'],
++                                 'initial_cycle_ms': initial[0]['sample']['cycleMs'], 'initial_entries': initial[0]['expectedEntries'],
++                                 'publication_ms': distribution([x['sample']['publicationMs'] for x in observed]),
++                                 'cycle_ms': distribution([x['sample']['cycleMs'] for x in observed]),
++                                 'emission_buckets': {}, 'transport': {}, 'attribution': attribution(rows, observed),
++                                 'idle_post_batch_wheels': [x['idlePostBatchWheel'] for x in observed if 'idlePostBatchWheel' in x]})
++                    for end, begin in ((1000, 500), (2000, 1000), (3000, 2000)):
++                        bucket = [x['sample']['publicationMs'] for x in observed if begin < x['emitted'] <= end]
++                        case['emission_buckets'][str(end)] = {'n': len(bucket), 'publication_median_ms': statistics.median(bucket)}
++                    for route in ('meta', 'log'):
++                        transports = [t for x in observed for t in x['transport'] if ('/log?' in t['url']) == (route == 'log')]
++                        assert len(transports) == 125
++                        case['transport'][route] = {field: distribution([t[field] for t in transports]) for field in ('headersMs', 'bodyMs', 'totalMs', 'bytes')}
++                    last = observed[-1]
++                    case['final'] = {k: last[k] for k in ('emitted', 'cursor', 'expectedEntries', 'entries', 'contentNodes', 'delimiters', 'units')}
++                    case['final']['represented_bytes'] = 2 * last['units']
++                    case['budget_exceeded'] = label == 'candidate' and (case['publication_ms']['median'] > 16 or case['publication_ms']['p95_nearest_rank'] > 50)
++                else:
++                    previous_entries = previous_nodes = previous_units = 0
++                    bounds = []
++                    for row in rows:
++                        bounds.append({'entry_objects_nodes': previous_entries + row['counts']['spans'],
++                                       'text_nodes': previous_nodes + row['counts']['textNodes'],
++                                       'represented_node_input_bytes': 2 * (previous_units + row['counts']['units'])})
++                        previous_entries, previous_nodes, previous_units = row['entries'], row['contentNodes'] + row['delimiters'], row['units']
++                    case['instrumentation'] = {'final_publication': observed[-1]['counts'], 'maximum_passed_units': max(x['counts']['units'] for x in rows),
++                                               'conservative_transient_maxima': {k: max(x[k] for x in bounds) for k in bounds[0]},
++                                               'note': 'old referenced state plus created publication inputs; engine allocation/copy counts are unmeasured. Baseline implicit textContent nodes are not counted by createTextNode hooks.'}
++    (args.root / 'measurement-summary.json').write_text(json.dumps(summary, indent=2) + '\n')
++    print(json.dumps({kind: {label: {'publication': case['publication_ms'], 'initial_ms': case['initial_publication_ms'], 'final': case['final'], 'budget_exceeded': case['budget_exceeded']} for label, case in labels.items()} for kind, labels in summary['cases'].items()}, indent=2))
++
++
++if __name__ == '__main__':
++    main()
+diff --git a/openscrub_web.py b/openscrub_web.py
+index c58c179..45f92f2 100644
+--- a/openscrub_web.py
++++ b/openscrub_web.py
+@@ -2460,7 +2460,8 @@ progress{width:100%;height:12px;accent-color:var(--acc)}
+ .badge{display:inline-block;background:#334155;color:#cbd5e1;border-radius:5px;
+  padding:1px 6px;font-size:11px;margin-left:4px}
+ #log{background:#020617;color:#cbd5e1;font:12px/1.4 ui-monospace,Consolas,monospace;
+- padding:10px;border-radius:8px;height:180px;overflow:auto;white-space:pre-wrap}
++ padding:10px;border-radius:8px;height:180px;overflow:auto;white-space:pre-wrap;overflow-anchor:none}
++#log>span:empty{display:inline-block;min-height:1em}
+ #preview img,#framewrap{max-width:100%;border-radius:8px}
+ #framewrap{position:relative;display:inline-block}
+ #framewrap canvas{position:absolute;left:0;top:0;cursor:crosshair}
+@@ -2746,7 +2747,7 @@ async function applyTier(id){
+  renderTiers();
+ }
+ refreshModelPanel();renderTiers();
+-let CUR=null, EN={}, MAN=[], DUR=0, POLL=null, PHIST=[], PHPH="", LOGN=0, LOGE=null, LOGINIT=false, LOGRESET=false, SHELLPH=null, JOBSJSON="";
++let CUR=null, EN={}, MAN=[], DUR=0, POLL=null, PHIST=[], PHPH="", LOGN=0, LOGE=null, LOGINIT=false, RECENT_LOG=null, SHELLPH=null, JOBSJSON="";
+ 
+ // VIEW_GEN advances on every openJob (including A -> B -> A) and removal.
+ // Drafts live only in this page; late acknowledgements reconcile their owner,
+@@ -2896,7 +2897,7 @@ async function delJob(id){
+   alert(m);return;
+  }
+  REVIEW_DRAFTS.delete(id);
+- if(CUR===id){disposeReview();REVIEW_LOAD++;beUnmount();stopPolling();VIEW_GEN++;CUR=null;EDITS=null;AUTO_REVIEW=null;REVIEW_REQUEST=null;detail.innerHTML="";}
++ if(CUR===id){disposeReview();REVIEW_LOAD++;beUnmount();stopPolling();disposeRecentLog();VIEW_GEN++;CUR=null;EDITS=null;AUTO_REVIEW=null;REVIEW_REQUEST=null;detail.innerHTML="";}
+  JOBSJSON="";loadJobs();
+ }
+ async function openJob(id){
+@@ -2910,19 +2911,141 @@ async function openJob(id){
+   delete b.tlspans;delete b.audioSugg;delete b.audioTx;b.playing=false;
+   trimReviewDraft(EDITS);
+  }
+- stopPolling();POLL_FAILURES=0;AUTO_REVIEW=null;REVIEW_REQUEST=null;
++ stopPolling();disposeRecentLog();POLL_FAILURES=0;AUTO_REVIEW=null;REVIEW_REQUEST=null;
+  VIEW_GEN++;CUR=id;
+  EDITS=REVIEW_DRAFTS.get(id);
+  if(!EDITS){EDITS={en:{},enabled:{},manual:[],editor:emptyEditor(),busy:false,status:""};
+   REVIEW_DRAFTS.set(id,EDITS);}
+  EN=EDITS.en;MAN=EDITS.manual;BE=EDITS.editor;
+- PHIST=[];PHPH="";LOGN=0;LOGE=null;LOGINIT=false;LOGRESET=false;SHELLPH=null;
++ PHIST=[];PHPH="";LOGN=0;LOGE=null;LOGINIT=false;SHELLPH=null;
+  detail.innerHTML='<div id="pollStatus" role="status" aria-live="polite" style="margin:8px 0;color:#fbbf24"></div><div id="reviewSaveStatus" role="status" aria-live="polite" style="margin:8px 0;color:#fbbf24"></div>';
+  saveStatus(EDITS,EDITS.status);
+ 
+  refresh();
+ }
+ 
++// One mounted view owns recent entry nodes, never a second transcript string.
++function disposeRecentLog(){
++ if(RECENT_LOG){RECENT_LOG.dispose();RECENT_LOG=null;}
++}
++function mountRecentLog(id,gen,element,note){
++ const MAX_ENTRIES=800,MAX_UNITS=1048576,ENTRY_UNITS=8192;
++ const SUFFIX="... [display entry truncated]",NL=String.fromCharCode(10);
++ let entries=[],units=0,saved=null,frame=null,disposed=false;
++ let omitted=false,truncated=false,displayTruncated=false,replaced=false,lost=false;
++ let width=element.clientWidth,height=element.clientHeight,ownedTop=element.scrollTop;
++ const owner={publish,dispose};
++ const current=()=>!disposed&&RECENT_LOG===owner&&ownsView(id,gen)&&document.getElementById("log")===element;
++ function status(){
++  const text=[replaced?"Log history was replaced.":"",omitted?"Earlier log messages were omitted.":"",
++   truncated?"Some log messages were truncated.":"",displayTruncated?"Some display entries were truncated.":"",
++   lost?"Reading position was omitted; showing oldest retained messages.":""].filter(Boolean).join(" ");
++  if(note.textContent!==text)note.textContent=text;
++ }
++ function capture(){
++  const bottom=element.scrollHeight-element.clientHeight-element.scrollTop<=40;
++  const top=element.getBoundingClientRect().top+element.clientTop;
++  let entry=entries.find(e=>e.node.getBoundingClientRect().bottom>top);
++  if(!entry)entry=entries[entries.length-1];
++  return {bottom,seq:entry?entry.seq:null,offset:entry?top-entry.node.getBoundingClientRect().top:0};
++ }
++ function remember(){saved=capture();ownedTop=element.scrollTop;}
++ function restore(anchor){
++  if(anchor.bottom){element.scrollTop=element.scrollHeight;}
++  else{
++   const entry=entries.find(e=>e.seq===anchor.seq);
++   if(entry){
++    const rect=entry.node.getBoundingClientRect(),top=element.getBoundingClientRect().top+element.clientTop;
++    // Preserve the entry and pixel offset, clamping an offset after rewrap.
++    const offset=Math.min(anchor.offset,Math.max(0,rect.height-1));
++    element.scrollTop=Math.max(0,Math.min(element.scrollHeight-element.clientHeight,
++     element.scrollTop+rect.top-top+offset));
++   }else{element.scrollTop=0;if(anchor.seq!==null)lost=true;}
++  }
++  remember();
++ }
++ function scroll(){
++  if(!current()||Math.abs(element.scrollTop-ownedTop)<.5)return;
++  lost=false;remember();status();
++ }
++ element.addEventListener("scroll",scroll,{passive:true});
++ const observer=typeof ResizeObserver==="undefined"?null:new ResizeObserver(()=>{
++  if(!current()||(width===element.clientWidth&&height===element.clientHeight))return;
++  width=element.clientWidth;height=element.clientHeight;
++  if(frame===null)frame=requestAnimationFrame(()=>{
++   frame=null;if(!current())return;
++   if(saved)restore(saved);status();
++  });
++ });
++ if(observer)observer.observe(element);
++ function entrySize(text){
++  if(text.length<=ENTRY_UNITS)return text.length;
++  let end=ENTRY_UNITS-SUFFIX.length;
++  const a=text.charCodeAt(end-1),b=text.charCodeAt(end);
++  if(a>=0xD800&&a<=0xDBFF&&b>=0xDC00&&b<=0xDFFF)end--;
++  return end+SUFFIX.length;
++ }
++ function clearSelection(removed){
++  if(!removed.length)return;
++  const selection=window.getSelection?.();
++  if(!selection||!element.contains(selection.anchorNode)||!element.contains(selection.focusNode))return;
++  if(removed.some(e=>e.node.contains(selection.anchorNode)||e.node.contains(selection.focusNode))||
++     selection.anchorNode===element||selection.focusNode===element)selection.removeAllRanges();
++ }
++ function publish(snapshot,replace,initial,modern){
++  if(!current())return;
++  const lines=snapshot.lines;
++  if(replace){omitted=false;truncated=false;displayTruncated=false;replaced=!initial;lost=false;}
++  if(modern){omitted=omitted||snapshot.base>0||snapshot.dropped>0;truncated=truncated||snapshot.truncated>0;}
++  if(!replace&&!lines.length){status();return;}
++  // Select only a surviving suffix, before creating or mounting its nodes.
++  const floor=replace?Math.max(0,lines.length-400):0;
++  const incoming=[];let total=0,start=lines.length;
++  while(start>floor&&incoming.length<MAX_ENTRIES){
++   const size=entrySize(lines[start-1]),next=total+size+(incoming.length?1:0);
++   if(next>MAX_UNITS)break;
++   incoming.push(size);total=next;start--;
++  }
++  let keep=entries.length;
++  if(!replace&&start===0){
++   while(keep>0&&incoming.length+entries.length-keep<MAX_ENTRIES){
++    const next=total+entries[keep-1].units+(incoming.length+entries.length-keep?1:0);
++    if(next>MAX_UNITS)break;
++    total=next;keep--;
++   }
++  }
++  // The final pre-mutation sample is after all polling awaits and validation.
++  const anchor=replace?null:capture(),removed=entries.slice(0,keep);
++  omitted=omitted||start>0||keep>0;
++  clearSelection(removed);
++  for(const entry of removed)entry.node.remove();
++  entries.splice(0,keep);
++  const fragment=document.createDocumentFragment();
++  for(let i=start;i<lines.length;i++){
++   const size=incoming[lines.length-1-i],source=lines[i];
++   const clipped=source.length>ENTRY_UNITS;
++   const node=document.createElement("span");node.dataset.seq=String(snapshot.from+i);
++   node.appendChild(document.createTextNode(clipped?source.slice(0,size-SUFFIX.length)+SUFFIX:source));
++   if(i<lines.length-1)node.appendChild(document.createTextNode(NL));
++   fragment.appendChild(node);entries.push({seq:snapshot.from+i,node,units:size});
++   displayTruncated=displayTruncated||clipped;
++  }
++  // Delimiters are distinct from stable content nodes, including empty entries.
++  if(start<lines.length&&entries.length>lines.length-start){
++   entries[entries.length-(lines.length-start)-1].node.appendChild(document.createTextNode(NL));
++  }
++  element.appendChild(fragment);units=total;
++  if(replace){element.scrollTop=element.scrollHeight;remember();}
++  else restore(anchor);
++  status();
++ }
++ function dispose(){
++  disposed=true;if(observer)observer.disconnect();if(frame!==null)cancelAnimationFrame(frame);
++  element.removeEventListener("scroll",scroll);entries.length=0;units=0;saved=null;frame=null;
++ }
++ return owner;
++}
++
+ function shellHtml(j){
+  return `<div class="card" id="jobcard"><h2>${jobNameHtml(j.name)}
+   <span class="badge" id="ph"></span><small id="eta"></small></h2>
+@@ -2931,8 +3054,8 @@ function shellHtml(j){
+  <div style="margin-top:8px;text-align:center"><img id="pimg"
+    style="max-width:100%;border-radius:8px;display:none;margin:0 auto"></div>
+  <div id="pcap" style="font-size:12px;color:#94a3b8"></div>
+- <div id="logStatus" role="status" style="margin-top:8px;color:#94a3b8"></div>
+- <div id="log" style="margin-top:8px"></div>
++ <div id="logStatus" style="margin-top:8px;color:#94a3b8"></div>
++ <div id="log" tabindex="0" aria-label="Job log" aria-describedby="logStatus" style="margin-top:8px"></div>
+  <div class="warn" id="warnbox" style="display:none;margin-top:8px"></div>
+  </div>`;
+ }
+@@ -3083,6 +3206,7 @@ async function refreshCycle(cycle){
+  EXPORT_NAMES={id,video:j.download_name,report:j.report_name};
+  if(SHELLPH===null){
+   detail.insertAdjacentHTML("afterbegin",shellHtml(j));SHELLPH="";
++  RECENT_LOG=mountRecentLog(id,gen,document.getElementById("log"),document.getElementById("logStatus"));
+   const im=document.getElementById("pimg");
+   im.onload=()=>{im.style.display="block";};   // show only once a real frame arrives
+   im.onerror=()=>{im.style.display="none";};   // 404 before first preview: stay hidden
+@@ -3111,9 +3235,7 @@ async function refreshCycle(cycle){
+  document.getElementById("eta").textContent=eta;
+  document.getElementById("prog").value=j.progress;
+ 
+- // incremental log append with stick-to-bottom (respects manual scroll-up)
+- const lg=document.getElementById("log");
+- const stick=lg.scrollTop+lg.clientHeight>=lg.scrollHeight-40;
++ // Only a fully accepted body publishes to the mount-owned recent transcript.
+  let nl=await pollJson(`api/jobs/${id}/log?from=${LOGN}${LOGE===null?"":"&epoch="+encodeURIComponent(LOGE)}`,cycle);
+  if(!ownsView(id,gen)||!current())return;
+  const index=n=>Number.isSafeInteger(n)&&n>=0;
+@@ -3121,7 +3243,7 @@ async function refreshCycle(cycle){
+   n.lines.every(line=>typeof line==="string");
+  if(!validLog(nl))throw new Error("Invalid log update");
+  const modern=["epoch","base","reset","dropped","truncated"].some(k=>k in nl);
+- let replace=false,lines=nl.lines;
++ let replace=false,lines=nl.lines,nextEpoch=null;
+  if(modern){
+   if(!index(nl.base)||nl.base>nl.from||nl.from>nl.len||lines.length!==nl.len-nl.from||
+      typeof nl.epoch!=="string"||!/^[A-Za-z0-9_-]{1,128}$/.test(nl.epoch)||
+@@ -3130,16 +3252,11 @@ async function refreshCycle(cycle){
+   const expected=LOGE!==null&&nl.epoch!==LOGE?"epoch":LOGN<nl.base?"stale":LOGN>nl.len?"future":null;
+   if(nl.reset!==expected||nl.from!==(expected?nl.base:LOGN))throw new Error("Invalid log reset");
+   replace=!LOGINIT||nl.reset!==null;
+-  if(nl.reset==="epoch"||nl.reset==="future")LOGRESET=true;
+-  LOGE=nl.epoch;
+-  document.getElementById("logStatus").textContent=[
+-   LOGRESET?"Log history was replaced.":"",
+-   nl.dropped?"Earlier log messages were omitted.":"",
+-   nl.truncated?"Some log messages were truncated.":""].filter(Boolean).join(" ");
++  nextEpoch=nl.epoch;
+  }else{
+   // Explicit old-backend branch: its shrink response may have from > len.
+   if(nl.len<LOGN){
+-   lg.textContent="";LOGN=0;
++   replace=true;
+    if(nl.len){
+     nl=await pollJson(`api/jobs/${id}/log?from=0`,cycle);
+     if(!ownsView(id,gen)||!current())return;
+@@ -3147,18 +3264,12 @@ async function refreshCycle(cycle){
+      throw new Error("Invalid legacy log update");
+    }
+   }
+-  if((nl.from!==LOGN&&nl.len!==0)||nl.lines.length!==Math.max(0,nl.len-nl.from))
++  if((nl.from!==(replace?0:LOGN)&&nl.len!==0)||nl.lines.length!==Math.max(0,nl.len-nl.from))
+    throw new Error("Invalid log cursor");
+-  replace=!LOGINIT||LOGN===0;lines=nl.lines;LOGE=null;
+-  document.getElementById("logStatus").textContent="";
+- }
+- if(replace){lines=lines.slice(-400);lg.textContent="";}
+- if(lines.length){
+-  const NL=String.fromCharCode(10);
+-  lg.textContent+=(lg.textContent?NL:"")+lines.join(NL);
+-  if(stick)lg.scrollTop=lg.scrollHeight;
++  replace=replace||!LOGINIT;lines=nl.lines;
+  }
+- LOGN=nl.len;LOGINIT=true;
++ RECENT_LOG.publish(nl,replace,!LOGINIT,modern);
++ LOGN=nl.len;LOGE=nextEpoch;LOGINIT=true;
+ 
+  // live preview: swap src in place (browser keeps old frame until new loads)
+  const img=document.getElementById("pimg");
+diff --git a/tests/test_browser_log_retention.py b/tests/test_browser_log_retention.py
+new file mode 100644
+index 0000000..3d2cc66
+--- /dev/null
++++ b/tests/test_browser_log_retention.py
+@@ -0,0 +1,255 @@
++"""Real Chromium layout and actual producer→HTTP→PAGE recent-log acceptance.
++
++Uses the existing optional, offline Playwright installation. Schedule controls
++are explicit; browser layout assertions never use the Node geometry doubles.
++"""
++import os
++from pathlib import Path
++import shutil
++import subprocess
++
++import pytest
++
++from test_job_polling_browser import polling_http  # noqa: F401, shared real-route fixture
++
++
++BROWSER_SETUP = r"""
++const {chromium}=require('playwright'),assert=require('node:assert/strict'),fs=require('node:fs');
++const base=process.env.POLLING_BASE,records=[],errors=[],diagnostics=[],requests=[];
++const pause=ms=>new Promise(r=>setTimeout(r,ms));
++async function wait(fn){for(let i=0;i<250;i++){if(await fn())return;await pause(20)}throw Error('condition expired')}
++(async()=>{
++const browser=await chromium.launch({headless:true,args:['--no-sandbox']});
++const page=await browser.newPage({viewport:{width:1280,height:950}});
++page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(['error','warning'].includes(m.type()))diagnostics.push(m.text())});
++await page.clock.install();
++await page.route('**/api/**',route=>{
++ const u=new URL(route.request().url());
++ if(/^\/api\/jobs\/[AB](\/log)?$/.test(u.pathname)){requests.push(u.pathname+u.search);return route.continue()}
++ let body={};if(u.pathname==='/api/jobs')body=[];
++ if(u.pathname==='/api/quality_tier')body={tiers:[],current:'fast'};
++ if(u.pathname==='/api/persist')body={enabled:false,count:0};
++ return route.fulfill({json:body});
++});
++const control=async data=>{const r=await page.request.post(base+'/__qa__/control',{data});assert.equal(r.status(),200)};
++const text=()=>page.locator('#log').textContent();
++const cursor=()=>page.evaluate(()=>LOGN);
++const note=()=>page.locator('#logStatus').textContent();
++async function idle(){await wait(()=>page.evaluate(()=>POLL_CYCLE===null))}
++async function poll(){const n=requests.length;await page.clock.runFor(900);await wait(()=>requests.length>=n+2);await idle()}
++async function append(lines){await control({action:'append',lines});await poll()}
++async function open(count=400){await control({action:'seed',count});await page.goto(base);
++ await page.clock.pauseAt(await page.evaluate(()=>Date.now()+100));
++ assert.equal(await page.title(),'OpenScrub');assert.match(await page.locator('body').innerText(),/OpenScrub/);
++ await page.evaluate(()=>openJob('A'));await wait(async()=>await cursor()===count);await idle()}
++async function snap(){return page.locator('#log').evaluate(e=>({text:e.textContent,count:e.children.length,
++ units:e.textContent.length,bytes:2*e.textContent.length,top:e.scrollTop,height:e.scrollHeight,client:e.clientHeight,
++ seq:[...e.children].map(n=>+n.dataset.seq),nodes:[...e.children].reduce((n,s)=>n+s.childNodes.length,0)}))}
++try{
++"""
++BROWSER_FINISH = r"""
++assert.deepEqual(errors,[]);assert.deepEqual(diagnostics,[]);
++console.log(JSON.stringify({records,requests,errors,diagnostics,browser:browser.version(),url:page.url(),title:await page.title()}));
++if(process.env.POLLING_ARTIFACTS)fs.writeFileSync(process.env.POLLING_ARTIFACTS+'/'+process.env.RETENTION_CASE+'.json',JSON.stringify({records,requests,errors,diagnostics,browser:browser.version()},null,2));
++}finally{await control({release:true}).catch(()=>{});await browser.close()}
++})().catch(e=>{console.error(e);process.exit(1)});
++"""
++
++
++def run_browser(polling_http, script, name):
++    node = shutil.which('node')
++    if not node:
++        pytest.skip('Node needed for optional Playwright acceptance')
++    available = subprocess.run([node, '-e', "require('playwright')"], capture_output=True)
++    if available.returncode:
++        pytest.skip('Existing Playwright required; no dependency installation attempted')
++    env = dict(os.environ, POLLING_BASE=polling_http, RETENTION_CASE=name)
++    result = subprocess.run([node, '-e', BROWSER_SETUP + script + BROWSER_FINISH],
++                            capture_output=True, text=True, env=env, timeout=150)
++    if os.environ.get('POLLING_ARTIFACTS'):
++        Path(os.environ['POLLING_ARTIFACTS'], name + '.log').write_text(result.stdout + result.stderr)
++    assert result.returncode == 0, result.stdout + result.stderr
++
++
++def test_production_polling_bounds_recent_entries_and_keeps_content_nodes(polling_http):
++    # Removing display eviction must fail even though the producer is bounded.
++    run_browser(polling_http, r"""
++await open();
++for(let batch=0;batch<6;batch++)await append(Array.from({length:100},(_,i)=>'L'+(400+batch*100+i)));
++const s=await snap();console.log(JSON.stringify({observedEntries:s.text.split('\n').length,cursor:await cursor(),units:s.units}));
++assert.equal(s.text.split('\n').length,800,'recent transcript must stop growing at800');
++assert.equal(s.text,Array.from({length:800},(_,i)=>'L'+(200+i)).join('\n'));
++assert.equal(s.count,800);assert.equal(s.nodes,1599);assert.deepEqual(s.seq,Array.from({length:800},(_,i)=>200+i));
++assert.ok(s.bytes<=2097152);assert.match(await note(),/omitted/);
++await page.evaluate(()=>window.retainedNode=document.querySelector('#log [data-seq="500"]').firstChild);
++await append(['tail']);assert.equal(await cursor(),1001);
++assert.equal(await page.evaluate(()=>window.retainedNode===document.querySelector('#log [data-seq="500"]').firstChild),true);
++const before=await snap();await poll();assert.deepEqual(await snap(),before,'empty normal poll preserves display/scroll');
++await page.locator('#log').focus();await page.evaluate(()=>{const r=document.createRange(),node=document.getElementById('log').firstChild.firstChild;r.setStart(node,0);r.setEnd(node,2);getSelection().removeAllRanges();getSelection().addRange(r)});
++await append(['selection-eviction']);assert.equal(await page.evaluate(()=>getSelection().rangeCount),0);assert.equal(await page.locator('#log').evaluate(e=>document.activeElement===e),true);
++if(process.env.POLLING_ARTIFACTS){await page.locator('#log').scrollIntoViewIfNeeded();await page.screenshot({path:process.env.POLLING_ARTIFACTS+'/retention-desktop.png'})}
++await append(Array.from({length:1000},(_,i)=>'large-batch-'+i));assert.equal(await cursor(),2002);assert.equal((await snap()).count,800);assert.equal(await text(),Array.from({length:800},(_,i)=>'large-batch-'+(200+i)).join('\n'));
++records.push({case:'count-bound',...s,text:undefined,first:s.seq[0],last:s.seq.at(-1),largeBatchCursor:2002});
++""", 'count-bound')
++
++
++def test_actual_layout_anchor_threshold_pending_scroll_and_reflow(polling_http):
++    # Taking stickiness before the awaited body loses the reader's final position.
++    run_browser(polling_http, r"""
++await open(600);
++const geometry=()=>page.locator('#log').evaluate(e=>({top:e.scrollTop,max:e.scrollHeight-e.clientHeight,
++ anchor:[...e.children].find(s=>s.getBoundingClientRect().bottom>e.getBoundingClientRect().top+e.clientTop)?.dataset.seq}));
++for(const distance of [39,40,41]){
++ await page.locator('#log').evaluate((e,d)=>e.scrollTop=e.scrollHeight-e.clientHeight-d,distance);
++ const before=await geometry();await append(['threshold-'+distance]);const after=await geometry();
++ if(distance<=40)assert.ok(after.max-after.top<=1,JSON.stringify({distance,before,after}));
++ else{assert.equal(after.anchor,before.anchor);assert.ok(Math.abs(after.top-before.top)<=2)}
++ records.push({case:'threshold',distance,before,after});
++}
++// The response body is created by Flask before the browser scrolls up.
++await control({action:'append',lines:['held-body']});await control({kind:'log'});
++let headers=0;page.on('response',r=>{if(r.headers()['x-qa-body-gate']==='log')headers++});
++await page.locator('#log').evaluate(e=>e.scrollTop=e.scrollHeight);await page.clock.runFor(900);await wait(()=>headers===1);
++await page.locator('#log').evaluate(e=>e.scrollTop=700);const pending=await geometry();
++await control({release:true});await idle();assert.equal((await geometry()).anchor,pending.anchor);
++assert.ok(Math.abs((await geometry()).top-pending.top)<=2);records.push({case:'scroll-during-body',pending,after:await geometry()});
++// Retain a mid-history entry while a prefix is evicted.
++await page.locator('#log').evaluate(e=>{const s=e.querySelector('[data-seq="400"]');e.scrollTop+=s.getBoundingClientRect().top-e.getBoundingClientRect().top+7});
++const before=await page.locator('#log').evaluate(e=>{const s=e.querySelector('[data-seq="400"]');return s.getBoundingClientRect().top-e.getBoundingClientRect().top});
++await append(Array.from({length:400},(_,i)=>'retained-'+i));
++const after=await page.locator('#log').evaluate(e=>e.querySelector('[data-seq="400"]').getBoundingClientRect().top-e.getBoundingClientRect().top);
++assert.ok(Math.abs(after-before)<=2,JSON.stringify({before,after}));
++await page.locator('#log').evaluate(e=>e.scrollTop=0);await append(Array.from({length:400},(_,i)=>'evict-'+i));
++assert.equal((await geometry()).top,0);assert.match(await note(),/position/);records.push({case:'evicted-anchor',...await geometry()});
++// A genuine keyboard scroll clears the fixed lost-position notice and retains focus.
++await page.locator('#log').focus();await page.keyboard.press('PageDown');await page.clock.runFor(300);await pause(350);console.log(JSON.stringify({keyboard:await geometry(),note:await note()}));
++assert.equal(await page.locator('#log').evaluate(e=>document.activeElement===e),true);assert.doesNotMatch(await note(),/position/);
++// Rewrap a tall multiline entry; position is entry+clamped pixel, not character.
++await control({action:'replace',count:0});await poll();
++const multiline=Array.from({length:20},(_,i)=>'wide paragraph '+i+' '+('word '.repeat(25))).join('\n');
++await append(['prefix '+('words '.repeat(100)),multiline,'tail'+String.fromCharCode(10).repeat(500)]);
++await page.locator('#log').evaluate(e=>{const s=e.children[1];e.scrollTop+=s.getBoundingClientRect().top-e.getBoundingClientRect().top+30});
++const reflowBefore=await page.locator('#log').evaluate(e=>({seq:e.children[1].dataset.seq,offset:e.getBoundingClientRect().top-e.children[1].getBoundingClientRect().top}));
++await page.setViewportSize({width:390,height:844});await pause(40);await page.clock.runFor(40);await pause(20);
++const reflowAfter=await page.locator('#log').evaluate(e=>({seq:e.children[1].dataset.seq,offset:e.getBoundingClientRect().top-e.children[1].getBoundingClientRect().top}));
++assert.equal(reflowAfter.seq,reflowBefore.seq);assert.ok(Math.abs(reflowAfter.offset-reflowBefore.offset)<=2,JSON.stringify({reflowBefore,reflowAfter}));
++assert.equal(await page.locator('#log').getAttribute('aria-label'),'Job log');assert.equal(await page.locator('#log').getAttribute('aria-describedby'),'logStatus');
++assert.equal(await page.locator('#log').getAttribute('aria-live'),null);assert.equal(await page.locator('#logStatus').getAttribute('role'),null);
++assert.equal(await page.locator('#log').evaluate(e=>getComputedStyle(e).overflowAnchor),'none');
++if(process.env.POLLING_ARTIFACTS){await page.locator('#log').scrollIntoViewIfNeeded();await page.screenshot({path:process.env.POLLING_ARTIFACTS+'/retention-narrow.png'})}
++records.push({case:'narrow-reflow',reflowBefore,reflowAfter,...await geometry()});
++await page.locator('#log').evaluate(e=>{const s=e.children[1];e.scrollTop+=s.getBoundingClientRect().top-e.getBoundingClientRect().top+1000});await pause(40);await page.clock.runFor(40);
++const clampBefore=await page.locator('#log').evaluate(e=>e.getBoundingClientRect().top-e.children[1].getBoundingClientRect().top);
++await page.setViewportSize({width:1280,height:950});await pause(40);await page.clock.runFor(40);await pause(20);
++const clampAfter=await page.locator('#log').evaluate(e=>({offset:e.getBoundingClientRect().top-e.children[1].getBoundingClientRect().top,height:e.children[1].getBoundingClientRect().height}));
++assert.ok(clampBefore>clampAfter.height,JSON.stringify({clampBefore,clampAfter}));assert.ok(Math.abs(clampAfter.offset-(clampAfter.height-1))<=2,JSON.stringify({clampBefore,clampAfter}));
++await page.locator('#log').evaluate(e=>new Promise(resolve=>{const before=e.scrollTop;e.addEventListener('scroll',()=>resolve(),{once:true});e.scrollTop=e.scrollHeight;if(e.scrollTop===before)resolve()}));await page.clock.runFor(40);await page.setViewportSize({width:390,height:844});await pause(40);await page.clock.runFor(40);await pause(20);const bottomReflow=await geometry();assert.ok(bottomReflow.max-bottomReflow.top<=1,JSON.stringify(bottomReflow));
++assert.equal(await page.locator('#log').evaluate(e=>document.activeElement===e),true,'accepted reset/reflow never moves keyboard focus');
++records.push({case:'clamped-reflow-bottom',clampBefore,clampAfter});
++""", 'layout')
++
++
++def test_blank_multiline_unicode_copy_and_selection_ownership(polling_http):
++    # Stable entry nodes must preserve literal separators and retained selection.
++    run_browser(polling_http, r"""
++await open(0);const entries=['','alpha\nbeta','','😀e\u0301\t漢字\r\nend',''];await append(entries);
++assert.equal(await text(),entries.join('\n'));let s=await snap();assert.equal(s.count,5);assert.deepEqual(s.seq,[0,1,2,3,4]);assert.equal(s.nodes,9);
++await page.evaluate(()=>{const e=document.getElementById('log'),r=document.createRange();r.selectNodeContents(e);const s=getSelection();s.removeAllRanges();s.addRange(r)});
++assert.equal(await page.evaluate(()=>getSelection().toString()),entries.join('\n'));
++// Real browser copy dispatch to clipboard, including blank and multiline entries.
++await page.context().grantPermissions(['clipboard-read','clipboard-write']);await page.locator('#log').focus();
++await page.keyboard.press('Control+c');assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),entries.join('\n'));
++await append(['after-copy']);assert.equal(await page.evaluate(()=>getSelection().rangeCount),1,'append keeps retained container selection');
++await page.evaluate(()=>{const e=document.getElementById('log'),r=document.createRange();r.setStart(e.children[1].firstChild,1);r.setEnd(e.children[3].firstChild,2);const s=getSelection();s.removeAllRanges();s.addRange(r);window.selectedStart=s.anchorNode;window.selectedEnd=s.focusNode;window.selectedText=s.toString()});
++await append(['retained']);assert.equal(await page.evaluate(()=>getSelection().anchorNode===window.selectedStart&&getSelection().focusNode===window.selectedEnd&&getSelection().toString()===window.selectedText),true);
++// Outside and mixed selections are owned by the document; no explicit clearing.
++await page.evaluate(()=>{const p=document.createElement('p');p.id='outside';p.textContent='outside text';document.body.append(p);const r=document.createRange();r.selectNodeContents(p);const s=getSelection();s.removeAllRanges();s.addRange(r);window.clearCalls=0;const old=s.removeAllRanges.bind(s);s.removeAllRanges=()=>{window.clearCalls++;old()}});
++await control({action:'replace',count:2});await poll();assert.equal(await page.evaluate(()=>getSelection().toString()),'outside text');assert.equal(await page.evaluate(()=>window.clearCalls),0);
++await page.evaluate(()=>{const r=document.createRange();r.setStart(document.querySelector('#log span').firstChild,0);r.setEnd(document.getElementById('outside').firstChild,7);getSelection().removeAllRanges();getSelection().addRange(r);window.clearCalls=0});
++assert.equal(await page.evaluate(()=>document.getElementById('log').contains(getSelection().anchorNode)&&document.getElementById('outside').contains(getSelection().focusNode)),true);
++await control({action:'replace',count:3});await poll();assert.equal(await page.evaluate(()=>window.clearCalls),0);
++await page.evaluate(()=>{const s=getSelection();s.removeAllRanges();const r=document.createRange();r.selectNodeContents(document.getElementById('log'));s.addRange(r);window.clearCalls=0});
++await control({action:'replace',count:0});await poll();assert.equal(await text(),'');assert.equal(await page.evaluate(()=>window.clearCalls),1);assert.equal(await page.evaluate(()=>getSelection().rangeCount),0);
++records.push({case:'literal-content-copy-selection',entries,bytes:s.bytes});
++""", 'selection')
++
++
++def test_text_budget_long_entries_and_legacy_defense(polling_http):
++    # A count-only cap admits more than2MiB when long accepted entries accumulate.
++    run_browser(polling_http, r"""
++await open(0);const line='x'.repeat(8192);
++for(let i=0;i<5;i++)await append(Array.from({length:50},()=>line));
++const s=await snap();assert.equal(s.count,127);assert.equal(s.bytes,2081020);assert.deepEqual(s.seq,Array.from({length:127},(_,i)=>123+i));assert.equal(await cursor(),250);
++assert.equal(s.text,Array.from({length:127},()=>line).join('\n'));assert.match(await note(),/omitted/);
++await append(['y'.repeat(8065)]);assert.equal((await snap()).count,128);assert.equal((await snap()).bytes,2097152,'exact UTF16 ceiling includes127 LFs');
++await append(['']);assert.equal((await snap()).count,128);assert.equal((await snap()).bytes,2080768,'one LF over budget evicts a complete entry');
++// A compliant producer's Unicode truncation remains byte-for-byte unchanged.
++await append(['😀'.repeat(10000)]);const response=await page.request.get(base+'/api/jobs/A/log?from=252');const body=await response.json();
++assert.equal(await page.locator('#log span').last().textContent(),body.lines[0]);assert.match(body.lines[0],/message truncated/);
++// A near-full compliant producer snapshot still admits all400 initial entries.
++await control({action:'replace',count:0});await poll();const compliant='c'.repeat(1310);await append(Array.from({length:400},()=>compliant));
++await page.evaluate(()=>openJob('A'));await wait(async()=>await cursor()===400);await idle();assert.equal((await snap()).count,400);assert.equal((await snap()).bytes,1048798);assert.doesNotMatch(await note(),/display.*truncated/);
++// Controlled old server input tests the browser defense, not the producer cap.
++await page.unroute('**/api/**');let responseIndex=0;
++const suffix='... [display entry truncated]',oversize='a'.repeat(8192-suffix.length-1)+'😀'+'z'.repeat(10000);
++await page.route('**/api/**',route=>{const u=new URL(route.request().url());
++ if(/^\/api\/jobs\/[AB](\/log)?$/.test(u.pathname))requests.push(u.pathname+u.search);
++ if(u.pathname==='/api/jobs/A')return route.fulfill({json:{id:'A',name:'legacy',phase:'queued',progress:0}});
++ if(u.pathname.endsWith('/log'))return route.fulfill({json:responseIndex++?{from:3,len:3,lines:[]}:{from:0,len:3,lines:['',oversize,'']}});
++ return route.fulfill({json:u.pathname==='/api/jobs'?[]:{}})});
++await page.evaluate(()=>openJob('A'));await wait(async()=>await cursor()===3);await idle();
++assert.equal(await page.locator('#log span').count(),3);
++const guarded=await page.locator('#log span').nth(1).evaluate(e=>e.firstChild.data);
++assert.equal(guarded,'a'.repeat(8192-suffix.length-1)+suffix);assert.equal(guarded.length,8191);assert.match(await note(),/display.*truncated/);
++assert.equal(await text(),'\n'+guarded+'\n');const emptyBefore=await snap();await poll();assert.deepEqual(await snap(),emptyBefore);
++records.push({case:'byte-budget',count:s.count,bytes:s.bytes,first:s.seq[0],last:s.seq.at(-1),guardUnits:guarded.length});
++""", 'text-budget')
++
++
++
++def test_view_disposal_owns_observers_frames_notes_and_controlled_lifecycle(polling_http):
++    # Old view observers/frames must not publish after an A→B→A replacement.
++    run_browser(polling_http, r"""
++await page.addInitScript(()=>{
++ const Native=ResizeObserver;window.observers=[];window.frames=new Set();window.cancelledFrames=0;
++ window.ResizeObserver=class{constructor(callback){this.callback=callback;this.native=new Native(callback);this.active=false;window.observers.push(this)}
++ observe(e){this.element=e;this.active=true;this.native.observe(e)}disconnect(){this.active=false;this.native.disconnect()}};
++ const request=window.requestAnimationFrame.bind(window),cancel=window.cancelAnimationFrame.bind(window);
++ window.requestAnimationFrame=callback=>{let id=request(time=>{window.frames.delete(id);callback(time)});window.frames.add(id);return id};
++ window.cancelAnimationFrame=id=>{if(window.frames.delete(id))window.cancelledFrames++;cancel(id)};
++});
++await open(500);await page.clock.runFor(40);
++await page.evaluate(()=>{window.oldLog=document.getElementById('log');oldLog.style.width='200px';window.observers[0].callback();});
++assert.equal(await page.evaluate(()=>window.frames.size),1);
++await page.evaluate(()=>openJob('B'));await wait(async()=>await cursor()===1);await idle();
++assert.equal(await text(),'log-B');assert.equal(await page.evaluate(()=>window.observers.filter(o=>o.active).length),1);
++assert.equal(await page.evaluate(()=>window.observers[0].active),false);assert.equal(await page.evaluate(()=>window.cancelledFrames),1);
++await page.evaluate(()=>window.observers[0].callback());await page.clock.runFor(40);assert.equal(await text(),'log-B');assert.equal(await note(),'');
++await page.evaluate(()=>openJob('A'));await wait(async()=>await cursor()===500);await idle();
++assert.equal((await snap()).count,400);assert.match(await text(),/^L100\n/);
++// Controlled schedule only; this does not simulate native suspension.
++await page.evaluate(()=>{window.testHidden=true;Object.defineProperty(document,'hidden',{configurable:true,get:()=>window.testHidden});document.dispatchEvent(new Event('visibilitychange'))});
++const n=requests.length;await control({action:'append',lines:['while-background']});await page.clock.runFor(20000);assert.equal(requests.length,n);
++await page.evaluate(()=>{window.testHidden=false;document.dispatchEvent(new Event('visibilitychange'));for(const name of ['focus','pageshow','online'])window.dispatchEvent(new Event(name))});
++await page.clock.runFor(0);await wait(async()=>await cursor()===501);await idle();assert.ok((await text()).endsWith('while-background'));
++assert.equal(await page.evaluate(()=>window.observers.filter(o=>o.active).length),1);
++await control({action:'cancel'});page.once('dialog',dialog=>dialog.accept());await page.evaluate(()=>delJob('A'));await wait(()=>page.evaluate(()=>CUR===null));
++assert.equal(await page.locator('#log').count(),0);assert.equal(await page.evaluate(()=>window.observers.filter(o=>o.active).length),0);assert.equal(await page.evaluate(()=>RECENT_LOG===null&&window.frames.size===0),true);
++await page.evaluate(()=>{for(const observer of window.observers)observer.callback()});await page.clock.runFor(40);assert.equal(await page.locator('#logStatus').count(),0);
++records.push({case:'owned-cleanup-controlled-background',observers:await page.evaluate(()=>window.observers.length)});
++""", 'lifecycle')
++
++
++
++def test_blank_entry_anchor_survives_trim_and_has_real_geometry(polling_http):
++    run_browser(polling_http, r"""
++await open(0);await append(Array.from({length:400},()=>''));
++assert.equal((await snap()).count,400);assert.equal(await text(),'\n'.repeat(399));
++await page.locator('#log').evaluate(e=>{const s=e.children[100];e.scrollTop+=s.getBoundingClientRect().top-e.getBoundingClientRect().top+5});
++const anchor=()=>page.locator('#log').evaluate(e=>{const s=e.querySelector('[data-seq="100"]');return s?{offset:s.getBoundingClientRect().top-e.getBoundingClientRect().top,height:s.getBoundingClientRect().height}:null});
++const before=await anchor();assert.ok(before.height>0);
++await append(Array.from({length:400},()=>''));await append(Array.from({length:100},()=>''));
++assert.ok(Math.abs((await anchor()).offset-before.offset)<=2);assert.equal((await snap()).seq[0],100);assert.equal(await text(),'\n'.repeat(799));
++await append(['']);assert.equal((await snap()).seq[0],101);assert.equal((await snap()).top,0);assert.match(await note(),/position/);
++records.push({case:'blank-anchor',before,oldest:101,count:(await snap()).count});
++""", 'blank-anchor')
+diff --git a/tests/test_job_polling_browser.py b/tests/test_job_polling_browser.py
+index 165802e..173f0da 100644
+--- a/tests/test_job_polling_browser.py
++++ b/tests/test_job_polling_browser.py
+@@ -65,6 +65,9 @@ def polling_http(monkeypatch, tmp_path):
+                 callback = web.WebCallbacks(web.JOBS[jid])
+                 for message in data['lines']:
+                     callback.log(message)
++            elif action == 'cancel':
++                with web.app.test_client() as client:
++                    assert client.post('/api/jobs/' + jid + '/cancel').status_code == 200
+             elif action == 'retry':
+                 job = web.JOBS[jid]
+                 video = Path(job['dir']) / 'input.mp4'
+@@ -83,6 +86,15 @@ def polling_http(monkeypatch, tmp_path):
+             self.end_headers()
+             self.wfile.write(payload)
+ 
++        def do_DELETE(self):
++            with web.app.test_client() as client:
++                result = client.delete(self.path)
++            self.send_response(result.status_code)
++            self.send_header('Content-Type', result.content_type)
++            self.send_header('Content-Length', str(len(result.data)))
++            self.end_headers()
++            self.wfile.write(result.data)
++
+         def do_GET(self):
+             path = urlsplit(self.path).path
+             if path == '/':
+@@ -353,9 +365,11 @@ async function wait(fn){for(let i=0;i<200;i++){if(await fn())return;await pause(
+   await control({release:true});await pause(80);assert.equal(await cursor(),4701);assert.equal(await epoch(),retryEpoch);
+   assert.match(await text(),/retrying scan/);results.push('held body across append-only retry');
+   assert.deepEqual(errors,[]);assert.deepEqual(consoleErrors,[]);
++  if(process.env.POLLING_ARTIFACTS){
+   await page.screenshot({path:process.env.POLLING_ARTIFACTS+'/bounded-logs-desktop.png'});
+   await page.setViewportSize({width:390,height:844});await page.screenshot({path:process.env.POLLING_ARTIFACTS+'/bounded-logs-mobile.png'});
+   fs.writeFileSync(process.env.POLLING_ARTIFACTS+'/bounded-browser.json',JSON.stringify({results,requests,errors,consoleErrors,url:page.url(),title:await page.title()},null,2));
++  }
+   console.log(JSON.stringify({results,requests:requests.length,errors,consoleErrors}));
+  }finally{await browser.close()}
+ })().catch(e=>{console.error(e);process.exit(1)});
+diff --git a/tests/test_job_polling_node.py b/tests/test_job_polling_node.py
+index 9d0d445..f38e568 100644
+--- a/tests/test_job_polling_node.py
++++ b/tests/test_job_polling_node.py
+@@ -10,9 +10,17 @@ from test_review_save_failures import app_js
+ HARNESS = r"""
+ const vm=require('node:vm'),assert=require('node:assert/strict');
+ const elements=new Map(), events={};
+-function el(){return {textContent:'',style:{},scrollTop:0,clientHeight:100,scrollHeight:100,
+- classList:{toggle(){},remove(){}},addEventListener(){},querySelector(){return null},
+- remove(){for(const [k,v] of elements)if(v===this)elements.delete(k)},
++// Tree/text semantics only: geometry remains a fixed schedule-test stub.
++function el(type=1,data=''){return {nodeType:type,data,dataset:{},childNodes:[],style:{},scrollTop:0,clientTop:0,clientWidth:800,clientHeight:100,scrollHeight:100,
++ get textContent(){return this.nodeType===3?this.data:this.childNodes.map(n=>n.textContent).join('')},
++ set textContent(value){if(this.nodeType===3)this.data=value;else{this.childNodes=[];if(value)this.appendChild(el(3,value))}},
++ get firstChild(){return this.childNodes[0]||null},
++ appendChild(node){if(node.nodeType===11){for(const child of [...node.childNodes])this.appendChild(child);node.childNodes=[];return node}
++ node.parentNode=this;this.childNodes.push(node);return node},
++ contains(node){return node===this||this.childNodes.some(n=>n.contains(node))},
++ getBoundingClientRect(){return {top:0,bottom:100,height:100}},
++ classList:{toggle(){},remove(){}},addEventListener(){},removeEventListener(){},querySelector(){return null},
++ remove(){if(this.parentNode)this.parentNode.childNodes=this.parentNode.childNodes.filter(n=>n!==this);for(const [k,v] of elements)if(v===this)elements.delete(k)},
+  insertAdjacentHTML(pos,html){for(const m of html.matchAll(/id="([^"]+)"/g))elements.set(m[1],el());},
+  set innerHTML(html){this._html=html;if(this===elements.get('detail')){
+  for(const k of [...elements.keys()])if(k!=='detail')elements.delete(k);}
+@@ -23,7 +31,7 @@ const listen=(type,fn)=>(events[type]??=[]).push(fn);
+ const ctx=vm.createContext({console,AbortController,Set,Map,Promise,JSON,Math,Date,
+  performance:{now:()=>now},
+  document:{hidden:false,getElementById:id=>elements.get(id)||null,querySelectorAll:()=>[],
+- addEventListener:listen,createElement:el},window:{addEventListener:listen},detail:elements.get('detail'),
++ addEventListener:listen,createElement:()=>el(),createTextNode:text=>el(3,text),createDocumentFragment:()=>el(11)},window:{addEventListener:listen},detail:elements.get('detail'),
+  setTimeout:(fn,ms)=>{const id=++seq;timers.set(id,{fn,at:now+ms});return id},clearTimeout:id=>timers.delete(id),
+  setInterval:(fn,ms)=>{const id=++seq;timers.set(id,{fn,at:now+ms,repeat:ms});return id},clearInterval:id=>timers.delete(id),
+  confirm:()=>true,alert(){},fetch(){throw Error('unexpected startup fetch')}});
+@@ -122,8 +130,8 @@ def test_authoritative_empty_shrunk_cursor_initial_tail_and_scroll():
+     const lg=elements.get('log');assert.equal(lg.textContent.split('\\n').length,400);assert.ok(lg.textContent.startsWith('L5\\n'));
+     assert.equal(LOGN,405);assert.equal(lg.scrollTop,100);lg.scrollTop=0;lg.scrollHeight=1000;
+     await advance(900);await reply(job());await reply(log([],1,405));
+-    assert.equal(lg.textContent,'');assert.equal(LOGN,0);assert.ok(queue[0].url.endsWith('from=0'));
+-    await reply(log(['new'],1,0));assert.equal(lg.textContent,'new');assert.equal(LOGN,1);assert.equal(lg.scrollTop,0);
++    assert.ok(lg.textContent.startsWith('L5\\n'));assert.equal(LOGN,405);assert.ok(queue[0].url.endsWith('from=0'));
++    await reply(log(['new'],1,0));assert.equal(lg.textContent,'new');assert.equal(LOGN,1);assert.equal(lg.scrollTop,1000,'accepted reset goes to recent bottom');
+     await advance(900);await cycle();assert.equal(LOGN,0,'empty len=0 is authoritative');""")
+ 
+ 

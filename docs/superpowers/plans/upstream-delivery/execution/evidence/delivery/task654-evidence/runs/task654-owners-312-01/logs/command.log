@@ -1,0 +1,654 @@
+DEFAULT_PATHS {"jobs": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_jobs", "models": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task654/runs/task654-owners-312-01/profile/.openscrub/models"}
+ACTIVE_SOURCE {"executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python", "python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]", "sources": {"openscrub": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py", "sha256": "a959248b4591abb819ae017d3bb5626e51af18aafbc9b48f9af1053f72852ec0"}, "openscrub_internal": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_internal/__init__.py", "sha256": "c35c063c010e329c5dad13782e7b67438ed4b2d1faf975d4f01be2773a18e022"}, "openscrub_internal.job_logs": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_internal/job_logs.py", "sha256": "63d08c124db019b120bb17efc64706d910f1d831f8ccfd9c1ba124368643d1b8"}, "openscrub_internal.lifetimes": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_internal/lifetimes.py", "sha256": "dbfc317c1c878b8e8a599391578504c44a8964199f2cdae6e2ed60a6336d6743"}, "openscrub_internal.opencv_compat": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_internal/opencv_compat.py", "sha256": "0f568ced4e60add8adacafd8670c942eac92e218725c466c6f8b35e8cfbb8dd5"}, "openscrub_internal.reports": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_internal/reports.py", "sha256": "eec9d568fc18f08ee35469ba864c5526120ae11152e8fe6f4d15007ab42d2427"}, "openscrub_setup": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_setup.py", "sha256": "7f466cee4eb53e444de8361fc5cd54f8fc7744fa01c92f4906780320c6c84091"}, "openscrub_update": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_update.py", "sha256": "4d6a20f75d985a119f8421227c3bd88b17fd1b8eed44e353b127b5b49e733d55"}, "openscrub_vault": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_vault.py", "sha256": "da1b7fe4da389352fbc594abddcc563278b26009d8f342d4154ffa305bf4dfa4"}, "openscrub_web": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", "sha256": "4ba3f35ba1076d81d4c834d78d71bd18e65090e3ebe311e81c0872cca45aedbd"}, "zones_ui": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/zones_ui.py", "sha256": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7"}}}
+........F..FFFFFFF...................F.................................. [ 20%]
+........................................................................ [ 40%]
+........................................................................ [ 60%]
+........................................................................ [ 81%]
+...................................................................      [100%]
+=================================== FAILURES ===================================
+_______________ test_negative_cursor_and_retry_keep_store_epoch ________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x77bf699bb680>
+tmp_path = PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task654/runs/task654-owners-312-01/pytest/test_negative_cursor_and_retry0')
+
+    def test_negative_cursor_and_retry_keep_store_epoch(monkeypatch, tmp_path):
+        import openscrub_web as web
+        monkeypatch.setattr(web, 'JOBS_DIR', str(tmp_path))
+        monkeypatch.setattr(web, 'enqueue', lambda *_: None)
+        video = tmp_path / 'input.mp4'
+        video.write_bytes(b'')
+        job = web.new_job(str(video), {}, 'retry')
+        web.WebCallbacks(job).log('before')
+        client = web.app.test_client()
+        before = client.get('/api/jobs/' + job['id'] + '/log?from=-2').get_json()
+        assert before['from'] == 0 and before['lines'] == ['before']
+        owner = job['log']
+        job['phase'] = 'error'
+>       assert client.post('/api/jobs/' + job['id'] + '/retry').status_code == 200
+E       AssertionError: assert 404 == 200
+E        +  where 404 = <WrapperTestResponse streamed [404 NOT FOUND]>.status_code
+E        +    where <WrapperTestResponse streamed [404 NOT FOUND]> = post((('/api/jobs/' + '1d75ba69ccc9') + '/retry'))
+E        +      where post = <FlaskClient <Flask 'openscrub_web'>>.post
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_job_logs.py:123: AssertionError
+__________ test_thumbnail_and_tracking_callbacks_stay_with_their_job ___________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x77bf60fb0dd0>
+tmp_path = PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task654/runs/task654-owners-312-01/pytest/test_thumbnail_and_tracking_ca0')
+
+    def test_thumbnail_and_tracking_callbacks_stay_with_their_job(monkeypatch, tmp_path):
+        import openscrub_web as web
+        monkeypatch.setattr(web, 'JOBS', {})
+        monkeypatch.setattr(web, 'JOBS_DIR', str(tmp_path))
+        old = web.new_job('', {}, 'old')
+        deferred = []
+        class DeferredThread:
+            def __init__(self, target, **kwargs):
+                self.target = target
+            def start(self):
+                deferred.append(self.target)
+        monkeypatch.setattr(web.threading, 'Thread', DeferredThread)
+        monkeypatch.setattr(web, 'build_args', lambda *_: object())
+        monkeypatch.setattr(web.openscrub, 'run_scan', lambda *_: {'stats': {}})
+        monkeypatch.setattr(web.openscrub, 'write_report', lambda *_: None)
+        monkeypatch.setattr(web, '_load_job_report', lambda *_: {'render_state': {'fps': 1, 'cum': [[0, 0]]}, 'detections': []})
+        class Capture:
+            def release(self):
+                pass
+        monkeypatch.setattr(web.cv2, 'VideoCapture', lambda *_: Capture())
+        web._run_job(old, 'scan')
+        replacement = web.new_job('', {}, 'replacement')
+        web.JOBS[old['id']] = replacement
+>       deferred.pop(0)()
+        ^^^^^^^^^^^^^^^
+E       IndexError: pop from empty list
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_job_logs.py:224: IndexError
+_ test_emitted_job_list_and_title_preserve_literal_name[list-Family &amp; friends \u2014 caf\xe9.mp4] _
+
+name = 'Family &amp; friends — café.mp4', surface = 'list'
+
+    @pytest.mark.parametrize("name", NAMES)
+    @pytest.mark.parametrize("surface", ["list", "title"])
+    def test_emitted_job_list_and_title_preserve_literal_name(name, surface):
+>       result = emitted_fragments([{"id": "a123456789ab", "name": name,
+                                    "phase": "queued"}])
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_job_filename_display.py:61: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_job_filename_display.py:53: in emitted_fragments
+    result = subprocess.run([node, "-e", script, json.dumps(jobs)],
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+input = None, capture_output = True, timeout = None, check = True
+popenargs = (['/usr/bin/node', '-e', 'let CUR=null, EN={}, MAN=[], DUR=0, POLL=null, PHIST=[], PHPH="", LOGN=0, LOGE=null, LOGINIT...l)}));})();\n', '[{"id": "a123456789ab", "name": "Family &amp; friends \\u2014 caf\\u00e9.mp4", "phase": "queued"}]'],)
+kwargs = {'text': True, 'stdout': -1, 'stderr': -1}
+
+    def run(*popenargs,
+            input=None, capture_output=False, timeout=None, check=False, **kwargs):
+        """Run command with arguments and return a CompletedProcess instance.
+    
+        The returned instance will have attributes args, returncode, stdout and
+        stderr. By default, stdout and stderr are not captured, and those attributes
+        will be None. Pass stdout=PIPE and/or stderr=PIPE in order to capture them,
+        or pass capture_output=True to capture both.
+    
+        If check is True and the exit code was non-zero, it raises a
+        CalledProcessError. The CalledProcessError object will have the return code
+        in the returncode attribute, and output & stderr attributes if those streams
+        were captured.
+    
+        If timeout (seconds) is given and the process takes too long,
+         a TimeoutExpired exception will be raised.
+    
+        There is an optional argument "input", allowing you to
+        pass bytes or a string to the subprocess's stdin.  If you use this argument
+        you may not also use the Popen constructor's "stdin" argument, as
+        it will be used internally.
+    
+        By default, all communication is in bytes, and therefore any "input" should
+        be bytes, and the stdout and stderr will be bytes. If in text mode, any
+        "input" should be a string, and stdout and stderr will be strings decoded
+        according to locale encoding, or by "encoding" if set. Text mode is
+        triggered by setting any of text, encoding, errors or universal_newlines.
+    
+        The other arguments are the same as for the Popen constructor.
+        """
+        if input is not None:
+            if kwargs.get('stdin') is not None:
+                raise ValueError('stdin and input arguments may not both be used.')
+            kwargs['stdin'] = PIPE
+    
+        if capture_output:
+            if kwargs.get('stdout') is not None or kwargs.get('stderr') is not None:
+                raise ValueError('stdout and stderr arguments may not be used '
+                                 'with capture_output.')
+            kwargs['stdout'] = PIPE
+            kwargs['stderr'] = PIPE
+    
+        with Popen(*popenargs, **kwargs) as process:
+            try:
+                stdout, stderr = process.communicate(input, timeout=timeout)
+            except TimeoutExpired as exc:
+                process.kill()
+                if _mswindows:
+                    # Windows accumulates the output in a single blocking
+                    # read() call run on child threads, with the timeout
+                    # being done in a join() on those threads.  communicate()
+                    # _after_ kill() is required to collect that and add it
+                    # to the exception.
+                    exc.stdout, exc.stderr = process.communicate()
+                else:
+                    # POSIX _communicate already populated the output so
+                    # far into the TimeoutExpired exception.
+                    process.wait()
+                raise
+            except:  # Including KeyboardInterrupt, communicate handled that.
+                process.kill()
+                # We don't call process.wait() as .__exit__ does that for us.
+                raise
+            retcode = process.poll()
+            if check and retcode:
+>               raise CalledProcessError(retcode, process.args,
+                                         output=stdout, stderr=stderr)
+E               subprocess.CalledProcessError: Command '['/usr/bin/node', '-e', 'let CUR=null, EN={}, MAN=[], DUR=0, POLL=null, PHIST=[], PHPH="", LOGN=0, LOGE=null, LOGINIT=false, RECENT_LOG=null, SHELLPH=null, JOBSJSON="";\n\n// VIEW_GEN advances on every openJob (including A -> B -> A) and removal.\n// Drafts live only in this page; late acknowledgements reconcile their owner,\n// but may never publish into, or start rendering from, a different view.\nlet VIEW_GEN=0, EDITS=null;\n// Polling owns one metadata -> log cycle, using the existing view identity.\nlet POLL_CYCLE=null, POLL_FAILURES=0, AUTO_REVIEW=null, REVIEW_REQUEST=null;\nfunction pollStatus(message){\n const el=document.getElementById("pollStatus");\n if(el&&el.textContent!==message)el.textContent=message;\n}\nfunction stopPolling(){\n if(POLL){clearTimeout(POLL.handle);POLL=null;}\n const old=POLL_CYCLE;POLL_CYCLE=null;\n if(old)old.controller.abort();\n}\nfunction schedulePoll(id,gen,delay){\n if(!ownsView(id,gen)||document.hidden)return;\n if(POLL)clearTimeout(POLL.handle);\n const timer={id,gen};POLL=timer;\n timer.handle=setTimeout(()=>{\n  if(POLL!==timer||!ownsView(id,gen))return;\n  POLL=null;refresh();\n },delay);\n}\n// Only metadata/log use this deadline. Race body consumption too: abort alone\n// cannot settle a transport/body that ignores it. Losing work has no UI effects.\nasync function pollJson(url,cycle){\n const controller=new AbortController(),signal=cycle.controller.signal;\n let deadline,onCancel;\n const stopped=new Promise((_,reject)=>{\n  const fail=message=>{controller.abort();reject(new Error(message));};\n  onCancel=()=>fail("Polling cancelled");\n  signal.addEventListener("abort",onCancel,{once:true});\n  deadline=setTimeout(()=>fail("Polling timed out"),15000);\n  if(signal.aborted)onCancel();\n });\n const operation=(async()=>{\n  const r=await fetch(url,{signal:controller.signal});\n  if(!r.ok)throw new Error("Polling HTTP "+r.status);\n  return await r.json();\n })();\n try{return await Promise.race([operation,stopped]);}\n finally{clearTimeout(deadline);signal.removeEventListener("abort",onCancel);}\n}\nfunction refresh(){\n if(!CUR||document.hidden)return;\n if(POLL_CYCLE)return POLL_CYCLE.promise;\n if(POLL){clearTimeout(POLL.handle);POLL=null;}\n const cycle={id:CUR,gen:VIEW_GEN,controller:new AbortController()};\n POLL_CYCLE=cycle;\n cycle.promise=(async()=>{\n  let delay=900;\n  try{\n   await refreshCycle(cycle);\n   if(POLL_CYCLE!==cycle||!ownsView(cycle.id,cycle.gen))return;\n   POLL_FAILURES=0;pollStatus("");\n  }catch(e){\n   if(POLL_CYCLE!==cycle||!ownsView(cycle.id,cycle.gen))return;\n   delay=Math.min(10000,900*Math.pow(2,Math.min(POLL_FAILURES++,4)));\n   pollStatus("Job updates interrupted — retrying in "+(delay/1000)+" s.");\n  }finally{\n   if(POLL_CYCLE===cycle&&ownsView(cycle.id,cycle.gen)){\n    POLL_CYCLE=null;\n    // Chained after completion: request duration adds to the healthy 900 ms.\n    schedulePoll(cycle.id,cycle.gen,delay);\n   }\n  }\n })();\n return cycle.promise;\n}\nfunction wakePolling(){\n if(!CUR||document.hidden)return;\n // A pending immediate wake already coalesces focus/pageshow/online bursts.\n if(POLL&&POLL.wake)return;\n stopPolling();\n schedulePoll(CUR,VIEW_GEN,0);if(POLL)POLL.wake=true;\n}\ndocument.addEventListener("visibilitychange",()=>{\n if(document.hidden)stopPolling();else wakePolling();\n});\nwindow.addEventListener("pagehide",stopPolling);\nfor(const event of ["focus","pageshow","online"])window.addEventListener(event,wakePolling);\nconst REVIEW_DRAFTS=new Map();\nfunction emptyEditor(){return {t:0,ox:0,oy:0,boxes:[],sel:-1,ov:{},dis:{},times:{},adds:[],\n add:false,addAnchor:null,drag:null,scale:1,dur:10,\n audio:[],audioSaved:[],audioLoaded:false};}\nfunction sameEdit(a,b){return JSON.stringify(a)===JSON.stringify(b);}\nfunction copyEdit(a){return JSON.parse(JSON.stringify(a));}\nfunction ownsView(id,gen){return CUR===id&&VIEW_GEN===gen;}\nfunction saveStatus(d,message){\n d.status=message;\n if(d!==EDITS)return;\n const el=document.getElementById("reviewSaveStatus");if(el)el.textContent=message;\n document.querySelectorAll("button[data-save-edits]").forEach(b=>{b.disabled=!!d.busy;});\n}\nfunction trimReviewDraft(d){\n const b=d.editor;\n // Clean audio is fetched display state even when other edit kinds are pending.\n // An in-flight audio submission may make a toggle-back a newer pending choice.\n if(!d.audioInFlight&&sameEdit(b.audio,b.audioSaved)){\n  b.audio=[];b.audioSaved=[];b.audioLoaded=false;\n }\n if(!d.busy&&!hasReviewEdits(d)){\n  d.en={};d.editor=emptyEditor();\n }\n}\nfunction hasReviewEdits(d){\n const b=d.editor;\n return Object.keys(d.enabled).length||d.manual.length||b.adds.length||\n  Object.keys(b.ov).length||Object.keys(b.times).length||\n  !sameEdit(b.audio,b.audioSaved);\n}\n\n// Job names are text inside the list link and detail heading.\nfunction jobNameHtml(name){\n return String(name).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");\n}\n\nasync function loadJobs(){\n const r=await fetch("api/jobs");\n if(r.status===423){jobs.innerHTML=\'<span style="color:#f87171">&#128274; locked — unlock in the Encryption panel below</span>\';JOBSJSON="";return;}\n const js=await r.json();\n const s=JSON.stringify(js);\n if(s===JOBSJSON)return;\n JOBSJSON=s;\n jobs.innerHTML=js.length?js.map(j=>\n  `<div class="row" style="justify-content:space-between;padding:4px 0">\n   <a href="#" onclick="openJob(\'${j.id}\');return false">${jobNameHtml(j.name)}</a>\n   <span style="display:flex;gap:10px;align-items:center"><span class="badge">${j.phase}</span>\n   ${(j.phase=="error"||j.phase=="cancelled")?`<a href="#" title="Retry the scan — reuses the file already on the server, nothing is re-uploaded" style="text-decoration:none;font-size:15px" onclick="retryJob(\'${j.id}\');return false">&#8635;</a>`:""}\n   <a href="#" title="Delete this job and all of its files" style="text-decoration:none;font-size:15px" onclick="delJob(\'${j.id}\');return false">&#128465;&#65039;</a></span></div>`).join(""):"none yet";\n}\n\nfunction shellHtml(j){\n return `<div class="card" id="jobcard"><h2>${jobNameHtml(j.name)}\n  <span class="badge" id="ph"></span><small id="eta"></small></h2>\n <progress id="prog" value="0" max="1"></progress>\n <div class="row" id="actions" style="margin-top:8px"></div>\n <div style="margin-top:8px;text-align:center"><img id="pimg"\n   style="max-width:100%;border-radius:8px;display:none;margin:0 auto"></div>\n <div id="pcap" style="font-size:12px;color:#94a3b8"></div>\n <div id="logStatus" style="margin-top:8px;color:#94a3b8"></div>\n <div id="log" tabindex="0" aria-label="Job log" aria-describedby="logStatus" style="margin-top:8px"></div>\n <div class="warn" id="warnbox" style="display:none;margin-top:8px"></div>\n </div>`;\n}\n\n// Save As exports stay bound to the clicked job even while the picker is open.\nlet EXPORT_NAMES={id:null,video:null,report:null};\nconst CAN_SAVE_AS=!!(window.isSecureContext&&window.showSaveFilePicker);\nconst EXPORTS=new Map();\nfunction exportControls(id,kind){\n const label=kind==="video"?"redacted video":"audit report";\n const path=kind==="video"?"download":"report";\n const direct=`<a href="api/jobs/${id}/${path}" onclick="exportDownloadStarted(\'${kind}\')">Download ${label}</a>`;\n return `<div id="export-${kind}" data-job="${id}" style="flex:1 1 260px;min-width:0">\n  ${CAN_SAVE_AS?`<button id="save-${kind}" class="${kind===\'report\'?\'sec\':\'\'}" onclick="saveExportAs(\'${kind}\',this)">Save ${label} as…</button>\n   <span style="font-size:12px"> · ${direct}</span>`:direct}\n  <div id="export-${kind}-feedback" hidden>\n   <progress id="export-${kind}-progress" max="1" aria-label="${label} save progress" style="width:100%"></progress>\n   <div id="export-${kind}-status" style="font-size:12px;overflow-wrap:anywhere"></div>\n   <div id="export-${kind}-live" role="status" aria-live="polite" aria-atomic="true"\n    style="position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)"></div>\n  </div></div>`;\n}\nfunction exportDownloadStarted(kind){\n if(!CUR)return;\n const key=CUR+":"+kind;\n // A direct download cannot observe disk completion or replace a running save.\n if(EXPORTS.get(key)?.active)return;\n EXPORTS.set(key,{id:CUR,kind,phase:"download",written:0,total:null,active:false});\n renderExportProgress();\n}\nfunction exportDuration(seconds){\n const s=Math.max(0,Math.floor(seconds));\n return s>=60?`${Math.floor(s/60)} min ${s%60} s`:`${s} s`;\n}\nfunction renderExportProgress(){\n const now=performance.now();\n for(const kind of ["video","report"]){\n  const box=document.getElementById("export-"+kind),state=EXPORTS.get(CUR+":"+kind);\n  if(!box||box.dataset.job!==CUR)continue;\n  const button=document.getElementById("save-"+kind);\n  if(button)button.disabled=!!state?.active;\n  if(!state)continue;\n  if(state.active&&state.renderedBox===box&&state.renderedPhase===state.phase&&now-state.renderedAt<250)continue;\n  state.renderedBox=box;state.renderedPhase=state.phase;state.renderedAt=now;\n  document.getElementById(`export-${kind}-feedback`).hidden=false;\n  const bar=document.getElementById(`export-${kind}-progress`);\n  if(state.total===null||state.phase==="download")bar.removeAttribute("value");\n  else{bar.max=state.total||1;bar.value=state.written;}\n  bar.hidden=state.phase==="download";\n  let text="Download started — see browser downloads";\n  if(state.phase!=="download"){\n   const amount=Math.max(state.total||0,state.written);\n   const power=amount>0?Math.min(3,Math.floor(Math.log10(amount)/3)):0;\n   const unit=["B","KB","MB","GB"][power],scale=1000**power;\n   const bytes=n=>`${(n/scale).toFixed(power?1:0)} ${unit}`;\n   const elapsed=(now-state.start)/1000;\n   const waiting=state.active&&state.phase!=="finalizing"&&now-state.lastWrite>=5000;\n   let label=state.phase==="saved"?"Saved":state.phase==="failed"?"Save failed":\n    state.phase==="finalizing"?"Finalizing…":state.phase==="choosing"?"Choose a destination…":\n    waiting?"Waiting for data or disk…":`Saving ${kind==="video"?"video":"audit report"}`;\n   const count=state.total===null?bytes(state.written):\n    `${bytes(state.written)} / ${bytes(state.total)} (${state.total?Math.min(100,Math.floor(state.written/state.total*100)):100}%)`;\n   text=`${label} — ${count} · ${exportDuration(((state.end??now)-state.start)/1000)} elapsed`;\n   if(state.phase==="saving"&&!waiting&&elapsed>=3&&state.samples.length>1){\n    // Retain one observation at/before the rolling ten-second boundary.\n    while(state.samples.length>2&&state.samples[1][0]<=now-10000)state.samples.shift();\n    const [t,b]=state.samples[0],rate=(state.written-b)/((now-Math.max(t,now-10000))/1000);\n    if(rate>0){text+=` · ${bytes(rate)}/s`;\n     if(state.total!==null&&state.written<state.total)\n      text+=` · about ${exportDuration((state.total-state.written)/rate)} left`;}\n   }\n   if(state.error)text+=` · ${state.error}. Try Save As again or use Download.`;\n  }\n  document.getElementById(`export-${kind}-status`).textContent=text;\n  // Visual updates run at 250ms; live announcements have their own 2s cadence.\n  if(state.announcedPhase!==state.phase||now-(state.announcedAt??-Infinity)>=2000){\n   document.getElementById(`export-${kind}-live`).textContent=text;\n   state.announcedPhase=state.phase;state.announcedAt=now;\n  }\n }\n}\nasync function saveExportAs(kind,button){\n const id=CUR,name=EXPORT_NAMES[kind],path=kind==="video"?"download":"report";\n if(!id||EXPORT_NAMES.id!==id||!name||!["video","report"].includes(kind))return;\n const key=id+":"+kind,previous=EXPORTS.get(key);\n if(previous?.active)return;\n const start=performance.now();\n const state={id,kind,phase:"choosing",active:true,written:0,total:null,start,\n  lastWrite:start,samples:[[start,0]]};\n EXPORTS.set(key,state);button.disabled=true;renderExportProgress();\n let reader,writable,timer;\n try{\n  // Invoke synchronously from the click, before the first network await.\n  let handle;\n  try{handle=await window.showSaveFilePicker({suggestedName:name});}\n  catch(e){if(e.name!=="AbortError")throw e;\n   if(previous)EXPORTS.set(key,previous);else EXPORTS.delete(key);\n   if(CUR===id){document.getElementById(`export-${kind}-feedback`).hidden=!previous;\n    renderExportProgress();}\n   return;\n  }\n  state.phase="saving";state.start=state.lastWrite=performance.now();\n  state.samples=[[state.start,0]];\n  timer=setInterval(renderExportProgress,250);\n  const response=await fetch(`api/jobs/${encodeURIComponent(id)}/${path}`);\n  if(!response.ok)throw new Error(response.status===423?"encryption vault is locked":`server returned HTTP ${response.status}`);\n  if(!response.body)throw new Error("browser did not provide a file stream");\n  reader=response.body.getReader();\n  const length=response.headers.get("Content-Length"),encoding=response.headers.get("Content-Encoding");\n  // Fetch decodes encoded responses; their transfer length is not a disk total.\n  if((!encoding||encoding.toLowerCase()==="identity")&&length!==null&&/^[0-9]+$/.test(length)){\n   const total=Number(length);if(Number.isSafeInteger(total))state.total=total;\n  }\n  writable=await handle.createWritable();\n  for(;;){\n   const {done,value}=await reader.read();if(done)break;\n   await writable.write(value); // backpressure: accepted bytes only\n   const now=performance.now();state.written+=value.byteLength;state.lastWrite=now;\n   // Coalesce observations to 250ms buckets; keep a bounded ten-second window.\n   if(state.samples.length===1||Math.floor(now/250)!==Math.floor(state.samples[state.samples.length-1][0]/250))\n    state.samples.push([now,state.written]);\n   else state.samples[state.samples.length-1]=[now,state.written];\n   while(state.samples.length>2&&state.samples[1][0]<=now-10000)state.samples.shift();\n  }\n  if(state.total!==null&&state.written!==state.total)throw new Error("received byte count does not match Content-Length");\n  state.phase="finalizing";renderExportProgress();\n  await writable.close();\n  state.phase="saved";\n }catch(e){\n  state.phase="failed";state.error=e.message||String(e);\n  if(reader)try{await reader.cancel();}catch(_){}\n  if(writable)try{await writable.abort();}catch(_){}\n }finally{\n  if(timer)clearInterval(timer);\n  if(reader)reader.releaseLock();\n  state.active=false;state.end=performance.now();\n  button.disabled=false;renderExportProgress();\n }\n}\n\n\nconst data=JSON.parse(process.argv[1]);\nconst jobs={innerHTML:\'\'};\nconst fetch=async()=>({status:200,json:async()=>data});\n(async()=>{await loadJobs();console.log(JSON.stringify({\n list:jobs.innerHTML,titles:data.map(shellHtml)}));})();\n', '[{"id": "a123456789ab", "name": "Family &amp; friends \\u2014 caf\\u00e9.mp4", "phase": "queued"}]']' returned non-zero exit status 1.
+
+/tmp/openscrub-baseline-20261116/python/cpython-3.12.16-linux-x86_64-gnu/lib/python3.12/subprocess.py:571: CalledProcessError
+_ test_emitted_job_list_and_title_preserve_literal_name[list-Friends' "summer" & snow \u2603.MOV] _
+
+name = 'Friends\' "summer" & snow ☃.MOV', surface = 'list'
+
+    @pytest.mark.parametrize("name", NAMES)
+    @pytest.mark.parametrize("surface", ["list", "title"])
+    def test_emitted_job_list_and_title_preserve_literal_name(name, surface):
+>       result = emitted_fragments([{"id": "a123456789ab", "name": name,
+                                    "phase": "queued"}])
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_job_filename_display.py:61: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_job_filename_display.py:53: in emitted_fragments
+    result = subprocess.run([node, "-e", script, json.dumps(jobs)],
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+input = None, capture_output = True, timeout = None, check = True
+popenargs = (['/usr/bin/node', '-e', 'let CUR=null, EN={}, MAN=[], DUR=0, POLL=null, PHIST=[], PHPH="", LOGN=0, LOGE=null, LOGINIT...tml)}));})();\n', '[{"id": "a123456789ab", "name": "Friends\' \\"summer\\" & snow \\u2603.MOV", "phase": "queued"}]'],)
+kwargs = {'text': True, 'stdout': -1, 'stderr': -1}
+
+    def run(*popenargs,
+            input=None, capture_output=False, timeout=None, check=False, **kwargs):
+        """Run command with arguments and return a CompletedProcess instance.
+    
+        The returned instance will have attributes args, returncode, stdout and
+        stderr. By default, stdout and stderr are not captured, and those attributes
+        will be None. Pass stdout=PIPE and/or stderr=PIPE in order to capture them,
+        or pass capture_output=True to capture both.
+    
+        If check is True and the exit code was non-zero, it raises a
+        CalledProcessError. The CalledProcessError object will have the return code
+        in the returncode attribute, and output & stderr attributes if those streams
+        were captured.
+    
+        If timeout (seconds) is given and the process takes too long,
+         a TimeoutExpired exception will be raised.
+    
+        There is an optional argument "input", allowing you to
+        pass bytes or a string to the subprocess's stdin.  If you use this argument
+        you may not also use the Popen constructor's "stdin" argument, as
+        it will be used internally.
+    
+        By default, all communication is in bytes, and therefore any "input" should
+        be bytes, and the stdout and stderr will be bytes. If in text mode, any
+        "input" should be a string, and stdout and stderr will be strings decoded
+        according to locale encoding, or by "encoding" if set. Text mode is
+        triggered by setting any of text, encoding, errors or universal_newlines.
+    
+        The other arguments are the same as for the Popen constructor.
+        """
+        if input is not None:
+            if kwargs.get('stdin') is not None:
+                raise ValueError('stdin and input arguments may not both be used.')
+            kwargs['stdin'] = PIPE
+    
+        if capture_output:
+            if kwargs.get('stdout') is not None or kwargs.get('stderr') is not None:
+                raise ValueError('stdout and stderr arguments may not be used '
+                                 'with capture_output.')
+            kwargs['stdout'] = PIPE
+            kwargs['stderr'] = PIPE
+    
+        with Popen(*popenargs, **kwargs) as process:
+            try:
+                stdout, stderr = process.communicate(input, timeout=timeout)
+            except TimeoutExpired as exc:
+                process.kill()
+                if _mswindows:
+                    # Windows accumulates the output in a single blocking
+                    # read() call run on child threads, with the timeout
+                    # being done in a join() on those threads.  communicate()
+                    # _after_ kill() is required to collect that and add it
+                    # to the exception.
+                    exc.stdout, exc.stderr = process.communicate()
+                else:
+                    # POSIX _communicate already populated the output so
+                    # far into the TimeoutExpired exception.
+                    process.wait()
+                raise
+            except:  # Including KeyboardInterrupt, communicate handled that.
+                process.kill()
+                # We don't call process.wait() as .__exit__ does that for us.
+                raise
+            retcode = process.poll()
+            if check and retcode:
+>               raise CalledProcessError(retcode, process.args,
+                                         output=stdout, stderr=stderr)
+E               subprocess.CalledProcessError: Command '['/usr/bin/node', '-e', 'let CUR=null, EN={}, MAN=[], DUR=0, POLL=null, PHIST=[], PHPH="", LOGN=0, LOGE=null, LOGINIT=false, RECENT_LOG=null, SHELLPH=null, JOBSJSON="";\n\n// VIEW_GEN advances on every openJob (including A -> B -> A) and removal.\n// Drafts live only in this page; late acknowledgements reconcile their owner,\n// but may never publish into, or start rendering from, a different view.\nlet VIEW_GEN=0, EDITS=null;\n// Polling owns one metadata -> log cycle, using the existing view identity.\nlet POLL_CYCLE=null, POLL_FAILURES=0, AUTO_REVIEW=null, REVIEW_REQUEST=null;\nfunction pollStatus(message){\n const el=document.getElementById("pollStatus");\n if(el&&el.textContent!==message)el.textContent=message;\n}\nfunction stopPolling(){\n if(POLL){clearTimeout(POLL.handle);POLL=null;}\n const old=POLL_CYCLE;POLL_CYCLE=null;\n if(old)old.controller.abort();\n}\nfunction schedulePoll(id,gen,delay){\n if(!ownsView(id,gen)||document.hidden)return;\n if(POLL)clearTimeout(POLL.handle);\n const timer={id,gen};POLL=timer;\n timer.handle=setTimeout(()=>{\n  if(POLL!==timer||!ownsView(id,gen))return;\n  POLL=null;refresh();\n },delay);\n}\n// Only metadata/log use this deadline. Race body consumption too: abort alone\n// cannot settle a transport/body that ignores it. Losing work has no UI effects.\nasync function pollJson(url,cycle){\n const controller=new AbortController(),signal=cycle.controller.signal;\n let deadline,onCancel;\n const stopped=new Promise((_,reject)=>{\n  const fail=message=>{controller.abort();reject(new Error(message));};\n  onCancel=()=>fail("Polling cancelled");\n  signal.addEventListener("abort",onCancel,{once:true});\n  deadline=setTimeout(()=>fail("Polling timed out"),15000);\n  if(signal.aborted)onCancel();\n });\n const operation=(async()=>{\n  const r=await fetch(url,{signal:controller.signal});\n  if(!r.ok)throw new Error("Polling HTTP "+r.status);\n  return await r.json();\n })();\n try{return await Promise.race([operation,stopped]);}\n finally{clearTimeout(deadline);signal.removeEventListener("abort",onCancel);}\n}\nfunction refresh(){\n if(!CUR||document.hidden)return;\n if(POLL_CYCLE)return POLL_CYCLE.promise;\n if(POLL){clearTimeout(POLL.handle);POLL=null;}\n const cycle={id:CUR,gen:VIEW_GEN,controller:new AbortController()};\n POLL_CYCLE=cycle;\n cycle.promise=(async()=>{\n  let delay=900;\n  try{\n   await refreshCycle(cycle);\n   if(POLL_CYCLE!==cycle||!ownsView(cycle.id,cycle.gen))return;\n   POLL_FAILURES=0;pollStatus("");\n  }catch(e){\n   if(POLL_CYCLE!==cycle||!ownsView(cycle.id,cycle.gen))return;\n   delay=Math.min(10000,900*Math.pow(2,Math.min(POLL_FAILURES++,4)));\n   pollStatus("Job updates interrupted — retrying in "+(delay/1000)+" s.");\n  }finally{\n   if(POLL_CYCLE===cycle&&ownsView(cycle.id,cycle.gen)){\n    POLL_CYCLE=null;\n    // Chained after completion: request duration adds to the healthy 900 ms.\n    schedulePoll(cycle.id,cycle.gen,delay);\n   }\n  }\n })();\n return cycle.promise;\n}\nfunction wakePolling(){\n if(!CUR||document.hidden)return;\n // A pending immediate wake already coalesces focus/pageshow/online bursts.\n if(POLL&&POLL.wake)return;\n stopPolling();\n schedulePoll(CUR,VIEW_GEN,0);if(POLL)POLL.wake=true;\n}\ndocument.addEventListener("visibilitychange",()=>{\n if(document.hidden)stopPolling();else wakePolling();\n});\nwindow.addEventListener("pagehide",stopPolling);\nfor(const event of ["focus","pageshow","online"])window.addEventListener(event,wakePolling);\nconst REVIEW_DRAFTS=new Map();\nfunction emptyEditor(){return {t:0,ox:0,oy:0,boxes:[],sel:-1,ov:{},dis:{},times:{},adds:[],\n add:false,addAnchor:null,drag:null,scale:1,dur:10,\n audio:[],audioSaved:[],audioLoaded:false};}\nfunction sameEdit(a,b){return JSON.stringify(a)===JSON.stringify(b);}\nfunction copyEdit(a){return JSON.parse(JSON.stringify(a));}\nfunction ownsView(id,gen){return CUR===id&&VIEW_GEN===gen;}\nfunction saveStatus(d,message){\n d.status=message;\n if(d!==EDITS)return;\n const el=document.getElementById("reviewSaveStatus");if(el)el.textContent=message;\n document.querySelectorAll("button[data-save-edits]").forEach(b=>{b.disabled=!!d.busy;});\n}\nfunction trimReviewDraft(d){\n const b=d.editor;\n // Clean audio is fetched display state even when other edit kinds are pending.\n // An in-flight audio submission may make a toggle-back a newer pending choice.\n if(!d.audioInFlight&&sameEdit(b.audio,b.audioSaved)){\n  b.audio=[];b.audioSaved=[];b.audioLoaded=false;\n }\n if(!d.busy&&!hasReviewEdits(d)){\n  d.en={};d.editor=emptyEditor();\n }\n}\nfunction hasReviewEdits(d){\n const b=d.editor;\n return Object.keys(d.enabled).length||d.manual.length||b.adds.length||\n  Object.keys(b.ov).length||Object.keys(b.times).length||\n  !sameEdit(b.audio,b.audioSaved);\n}\n\n// Job names are text inside the list link and detail heading.\nfunction jobNameHtml(name){\n return String(name).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");\n}\n\nasync function loadJobs(){\n const r=await fetch("api/jobs");\n if(r.status===423){jobs.innerHTML=\'<span style="color:#f87171">&#128274; locked — unlock in the Encryption panel below</span>\';JOBSJSON="";return;}\n const js=await r.json();\n const s=JSON.stringify(js);\n if(s===JOBSJSON)return;\n JOBSJSON=s;\n jobs.innerHTML=js.length?js.map(j=>\n  `<div class="row" style="justify-content:space-between;padding:4px 0">\n   <a href="#" onclick="openJob(\'${j.id}\');return false">${jobNameHtml(j.name)}</a>\n   <span style="display:flex;gap:10px;align-items:center"><span class="badge">${j.phase}</span>\n   ${(j.phase=="error"||j.phase=="cancelled")?`<a href="#" title="Retry the scan — reuses the file already on the server, nothing is re-uploaded" style="text-decoration:none;font-size:15px" onclick="retryJob(\'${j.id}\');return false">&#8635;</a>`:""}\n   <a href="#" title="Delete this job and all of its files" style="text-decoration:none;font-size:15px" onclick="delJob(\'${j.id}\');return false">&#128465;&#65039;</a></span></div>`).join(""):"none yet";\n}\n\nfunction shellHtml(j){\n return `<div class="card" id="jobcard"><h2>${jobNameHtml(j.name)}\n  <span class="badge" id="ph"></span><small id="eta"></small></h2>\n <progress id="prog" value="0" max="1"></progress>\n <div class="row" id="actions" style="margin-top:8px"></div>\n <div style="margin-top:8px;text-align:center"><img id="pimg"\n   style="max-width:100%;border-radius:8px;display:none;margin:0 auto"></div>\n <div id="pcap" style="font-size:12px;color:#94a3b8"></div>\n <div id="logStatus" style="margin-top:8px;color:#94a3b8"></div>\n <div id="log" tabindex="0" aria-label="Job log" aria-describedby="logStatus" style="margin-top:8px"></div>\n <div class="warn" id="warnbox" style="display:none;margin-top:8px"></div>\n </div>`;\n}\n\n// Save As exports stay bound to the clicked job even while the picker is open.\nlet EXPORT_NAMES={id:null,video:null,report:null};\nconst CAN_SAVE_AS=!!(window.isSecureContext&&window.showSaveFilePicker);\nconst EXPORTS=new Map();\nfunction exportControls(id,kind){\n const label=kind==="video"?"redacted video":"audit report";\n const path=kind==="video"?"download":"report";\n const direct=`<a href="api/jobs/${id}/${path}" onclick="exportDownloadStarted(\'${kind}\')">Download ${label}</a>`;\n return `<div id="export-${kind}" data-job="${id}" style="flex:1 1 260px;min-width:0">\n  ${CAN_SAVE_AS?`<button id="save-${kind}" class="${kind===\'report\'?\'sec\':\'\'}" onclick="saveExportAs(\'${kind}\',this)">Save ${label} as…</button>\n   <span style="font-size:12px"> · ${direct}</span>`:direct}\n  <div id="export-${kind}-feedback" hidden>\n   <progress id="export-${kind}-progress" max="1" aria-label="${label} save progress" style="width:100%"></progress>\n   <div id="export-${kind}-status" style="font-size:12px;overflow-wrap:anywhere"></div>\n   <div id="export-${kind}-live" role="status" aria-live="polite" aria-atomic="true"\n    style="position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)"></div>\n  </div></div>`;\n}\nfunction exportDownloadStarted(kind){\n if(!CUR)return;\n const key=CUR+":"+kind;\n // A direct download cannot observe disk completion or replace a running save.\n if(EXPORTS.get(key)?.active)return;\n EXPORTS.set(key,{id:CUR,kind,phase:"download",written:0,total:null,active:false});\n renderExportProgress();\n}\nfunction exportDuration(seconds){\n const s=Math.max(0,Math.floor(seconds));\n return s>=60?`${Math.floor(s/60)} min ${s%60} s`:`${s} s`;\n}\nfunction renderExportProgress(){\n const now=performance.now();\n for(const kind of ["video","report"]){\n  const box=document.getElementById("export-"+kind),state=EXPORTS.get(CUR+":"+kind);\n  if(!box||box.dataset.job!==CUR)continue;\n  const button=document.getElementById("save-"+kind);\n  if(button)button.disabled=!!state?.active;\n  if(!state)continue;\n  if(state.active&&state.renderedBox===box&&state.renderedPhase===state.phase&&now-state.renderedAt<250)continue;\n  state.renderedBox=box;state.renderedPhase=state.phase;state.renderedAt=now;\n  document.getElementById(`export-${kind}-feedback`).hidden=false;\n  const bar=document.getElementById(`export-${kind}-progress`);\n  if(state.total===null||state.phase==="download")bar.removeAttribute("value");\n  else{bar.max=state.total||1;bar.value=state.written;}\n  bar.hidden=state.phase==="download";\n  let text="Download started — see browser downloads";\n  if(state.phase!=="download"){\n   const amount=Math.max(state.total||0,state.written);\n   const power=amount>0?Math.min(3,Math.floor(Math.log10(amount)/3)):0;\n   const unit=["B","KB","MB","GB"][power],scale=1000**power;\n   const bytes=n=>`${(n/scale).toFixed(power?1:0)} ${unit}`;\n   const elapsed=(now-state.start)/1000;\n   const waiting=state.active&&state.phase!=="finalizing"&&now-state.lastWrite>=5000;\n   let label=state.phase==="saved"?"Saved":state.phase==="failed"?"Save failed":\n    state.phase==="finalizing"?"Finalizing…":state.phase==="choosing"?"Choose a destination…":\n    waiting?"Waiting for data or disk…":`Saving ${kind==="video"?"video":"audit report"}`;\n   const count=state.total===null?bytes(state.written):\n    `${bytes(state.written)} / ${bytes(state.total)} (${state.total?Math.min(100,Math.floor(state.written/state.total*100)):100}%)`;\n   text=`${label} — ${count} · ${exportDuration(((state.end??now)-state.start)/1000)} elapsed`;\n   if(state.phase==="saving"&&!waiting&&elapsed>=3&&state.samples.length>1){\n    // Retain one observation at/before the rolling ten-second boundary.\n    while(state.samples.length>2&&state.samples[1][0]<=now-10000)state.samples.shift();\n    const [t,b]=state.samples[0],rate=(state.written-b)/((now-Math.max(t,now-10000))/1000);\n    if(rate>0){text+=` · ${bytes(rate)}/s`;\n     if(state.total!==null&&state.written<state.total)\n      text+=` · about ${exportDuration((state.total-state.written)/rate)} left`;}\n   }\n   if(state.error)text+=` · ${state.error}. Try Save As again or use Download.`;\n  }\n  document.getElementById(`export-${kind}-status`).textContent=text;\n  // Visual updates run at 250ms; live announcements have their own 2s cadence.\n  if(state.announcedPhase!==state.phase||now-(state.announcedAt??-Infinity)>=2000){\n   document.getElementById(`export-${kind}-live`).textContent=text;\n   state.announcedPhase=state.phase;state.announcedAt=now;\n  }\n }\n}\nasync function saveExportAs(kind,button){\n const id=CUR,name=EXPORT_NAMES[kind],path=kind==="video"?"download":"report";\n if(!id||EXPORT_NAMES.id!==id||!name||!["video","report"].includes(kind))return;\n const key=id+":"+kind,previous=EXPORTS.get(key);\n if(previous?.active)return;\n const start=performance.now();\n const state={id,kind,phase:"choosing",active:true,written:0,total:null,start,\n  lastWrite:start,samples:[[start,0]]};\n EXPORTS.set(key,state);button.disabled=true;renderExportProgress();\n let reader,writable,timer;\n try{\n  // Invoke synchronously from the click, before the first network await.\n  let handle;\n  try{handle=await window.showSaveFilePicker({suggestedName:name});}\n  catch(e){if(e.name!=="AbortError")throw e;\n   if(previous)EXPORTS.set(key,previous);else EXPORTS.delete(key);\n   if(CUR===id){document.getElementById(`export-${kind}-feedback`).hidden=!previous;\n    renderExportProgress();}\n   return;\n  }\n  state.phase="saving";state.start=state.lastWrite=performance.now();\n  state.samples=[[state.start,0]];\n  timer=setInterval(renderExportProgress,250);\n  const response=await fetch(`api/jobs/${encodeURIComponent(id)}/${path}`);\n  if(!response.ok)throw new Error(response.status===423?"encryption vault is locked":`server returned HTTP ${response.status}`);\n  if(!response.body)throw new Error("browser did not provide a file stream");\n  reader=response.body.getReader();\n  const length=response.headers.get("Content-Length"),encoding=response.headers.get("Content-Encoding");\n  // Fetch decodes encoded responses; their transfer length is not a disk total.\n  if((!encoding||encoding.toLowerCase()==="identity")&&length!==null&&/^[0-9]+$/.test(length)){\n   const total=Number(length);if(Number.isSafeInteger(total))state.total=total;\n  }\n  writable=await handle.createWritable();\n  for(;;){\n   const {done,value}=await reader.read();if(done)break;\n   await writable.write(value); // backpressure: accepted bytes only\n   const now=performance.now();state.written+=value.byteLength;state.lastWrite=now;\n   // Coalesce observations to 250ms buckets; keep a bounded ten-second window.\n   if(state.samples.length===1||Math.floor(now/250)!==Math.floor(state.samples[state.samples.length-1][0]/250))\n    state.samples.push([now,state.written]);\n   else state.samples[state.samples.length-1]=[now,state.written];\n   while(state.samples.length>2&&state.samples[1][0]<=now-10000)state.samples.shift();\n  }\n  if(state.total!==null&&state.written!==state.total)throw new Error("received byte count does not match Content-Length");\n  state.phase="finalizing";renderExportProgress();\n  await writable.close();\n  state.phase="saved";\n }catch(e){\n  state.phase="failed";state.error=e.message||String(e);\n  if(reader)try{await reader.cancel();}catch(_){}\n  if(writable)try{await writable.abort();}catch(_){}\n }finally{\n  if(timer)clearInterval(timer);\n  if(reader)reader.releaseLock();\n  state.active=false;state.end=performance.now();\n  button.disabled=false;renderExportProgress();\n }\n}\n\n\nconst data=JSON.parse(process.argv[1]);\nconst jobs={innerHTML:\'\'};\nconst fetch=async()=>({status:200,json:async()=>data});\n(async()=>{await loadJobs();console.log(JSON.stringify({\n list:jobs.innerHTML,titles:data.map(shellHtml)}));})();\n', '[{"id": "a123456789ab", "name": "Friends\' \\"summer\\" & snow \\u2603.MOV", "phase": "queued"}]']' returned non-zero exit status 1.
+
+/tmp/openscrub-baseline-20261116/python/cpython-3.12.16-linux-x86_64-gnu/lib/python3.12/subprocess.py:571: CalledProcessError
+_ test_emitted_job_list_and_title_preserve_literal_name[list-Literal &#38; and &quot; notes.mp4] _
+
+name = 'Literal &#38; and &quot; notes.mp4', surface = 'list'
+
+    @pytest.mark.parametrize("name", NAMES)
+    @pytest.mark.parametrize("surface", ["list", "title"])
+    def test_emitted_job_list_and_title_preserve_literal_name(name, surface):
+>       result = emitted_fragments([{"id": "a123456789ab", "name": name,
+                                    "phase": "queued"}])
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_job_filename_display.py:61: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_job_filename_display.py:53: in emitted_fragments
+    result = subprocess.run([node, "-e", script, json.dumps(jobs)],
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+input = None, capture_output = True, timeout = None, check = True
+popenargs = (['/usr/bin/node', '-e', 'let CUR=null, EN={}, MAN=[], DUR=0, POLL=null, PHIST=[], PHPH="", LOGN=0, LOGE=null, LOGINIT...(shellHtml)}));})();\n', '[{"id": "a123456789ab", "name": "Literal &#38; and &quot; notes.mp4", "phase": "queued"}]'],)
+kwargs = {'text': True, 'stdout': -1, 'stderr': -1}
+
+    def run(*popenargs,
+            input=None, capture_output=False, timeout=None, check=False, **kwargs):
+        """Run command with arguments and return a CompletedProcess instance.
+    
+        The returned instance will have attributes args, returncode, stdout and
+        stderr. By default, stdout and stderr are not captured, and those attributes
+        will be None. Pass stdout=PIPE and/or stderr=PIPE in order to capture them,
+        or pass capture_output=True to capture both.
+    
+        If check is True and the exit code was non-zero, it raises a
+        CalledProcessError. The CalledProcessError object will have the return code
+        in the returncode attribute, and output & stderr attributes if those streams
+        were captured.
+    
+        If timeout (seconds) is given and the process takes too long,
+         a TimeoutExpired exception will be raised.
+    
+        There is an optional argument "input", allowing you to
+        pass bytes or a string to the subprocess's stdin.  If you use this argument
+        you may not also use the Popen constructor's "stdin" argument, as
+        it will be used internally.
+    
+        By default, all communication is in bytes, and therefore any "input" should
+        be bytes, and the stdout and stderr will be bytes. If in text mode, any
+        "input" should be a string, and stdout and stderr will be strings decoded
+        according to locale encoding, or by "encoding" if set. Text mode is
+        triggered by setting any of text, encoding, errors or universal_newlines.
+    
+        The other arguments are the same as for the Popen constructor.
+        """
+        if input is not None:
+            if kwargs.get('stdin') is not None:
+                raise ValueError('stdin and input arguments may not both be used.')
+            kwargs['stdin'] = PIPE
+    
+        if capture_output:
+            if kwargs.get('stdout') is not None or kwargs.get('stderr') is not None:
+                raise ValueError('stdout and stderr arguments may not be used '
+                                 'with capture_output.')
+            kwargs['stdout'] = PIPE
+            kwargs['stderr'] = PIPE
+    
+        with Popen(*popenargs, **kwargs) as process:
+            try:
+                stdout, stderr = process.communicate(input, timeout=timeout)
+            except TimeoutExpired as exc:
+                process.kill()
+                if _mswindows:
+                    # Windows accumulates the output in a single blocking
+                    # read() call run on child threads, with the timeout
+                    # being done in a join() on those threads.  communicate()
+                    # _after_ kill() is required to collect that and add it
+                    # to the exception.
+                    exc.stdout, exc.stderr = process.communicate()
+                else:
+                    # POSIX _communicate already populated the output so
+                    # far into the TimeoutExpired exception.
+                    process.wait()
+                raise
+            except:  # Including KeyboardInterrupt, communicate handled that.
+                process.kill()
+                # We don't call process.wait() as .__exit__ does that for us.
+                raise
+            retcode = process.poll()
+            if check and retcode:
+>               raise CalledProcessError(retcode, process.args,
+                                         output=stdout, stderr=stderr)
+E               subprocess.CalledProcessError: Command '['/usr/bin/node', '-e', 'let CUR=null, EN={}, MAN=[], DUR=0, POLL=null, PHIST=[], PHPH="", LOGN=0, LOGE=null, LOGINIT=false, RECENT_LOG=null, SHELLPH=null, JOBSJSON="";\n\n// VIEW_GEN advances on every openJob (including A -> B -> A) and removal.\n// Drafts live only in this page; late acknowledgements reconcile their owner,\n// but may never publish into, or start rendering from, a different view.\nlet VIEW_GEN=0, EDITS=null;\n// Polling owns one metadata -> log cycle, using the existing view identity.\nlet POLL_CYCLE=null, POLL_FAILURES=0, AUTO_REVIEW=null, REVIEW_REQUEST=null;\nfunction pollStatus(message){\n const el=document.getElementById("pollStatus");\n if(el&&el.textContent!==message)el.textContent=message;\n}\nfunction stopPolling(){\n if(POLL){clearTimeout(POLL.handle);POLL=null;}\n const old=POLL_CYCLE;POLL_CYCLE=null;\n if(old)old.controller.abort();\n}\nfunction schedulePoll(id,gen,delay){\n if(!ownsView(id,gen)||document.hidden)return;\n if(POLL)clearTimeout(POLL.handle);\n const timer={id,gen};POLL=timer;\n timer.handle=setTimeout(()=>{\n  if(POLL!==timer||!ownsView(id,gen))return;\n  POLL=null;refresh();\n },delay);\n}\n// Only metadata/log use this deadline. Race body consumption too: abort alone\n// cannot settle a transport/body that ignores it. Losing work has no UI effects.\nasync function pollJson(url,cycle){\n const controller=new AbortController(),signal=cycle.controller.signal;\n let deadline,onCancel;\n const stopped=new Promise((_,reject)=>{\n  const fail=message=>{controller.abort();reject(new Error(message));};\n  onCancel=()=>fail("Polling cancelled");\n  signal.addEventListener("abort",onCancel,{once:true});\n  deadline=setTimeout(()=>fail("Polling timed out"),15000);\n  if(signal.aborted)onCancel();\n });\n const operation=(async()=>{\n  const r=await fetch(url,{signal:controller.signal});\n  if(!r.ok)throw new Error("Polling HTTP "+r.status);\n  return await r.json();\n })();\n try{return await Promise.race([operation,stopped]);}\n finally{clearTimeout(deadline);signal.removeEventListener("abort",onCancel);}\n}\nfunction refresh(){\n if(!CUR||document.hidden)return;\n if(POLL_CYCLE)return POLL_CYCLE.promise;\n if(POLL){clearTimeout(POLL.handle);POLL=null;}\n const cycle={id:CUR,gen:VIEW_GEN,controller:new AbortController()};\n POLL_CYCLE=cycle;\n cycle.promise=(async()=>{\n  let delay=900;\n  try{\n   await refreshCycle(cycle);\n   if(POLL_CYCLE!==cycle||!ownsView(cycle.id,cycle.gen))return;\n   POLL_FAILURES=0;pollStatus("");\n  }catch(e){\n   if(POLL_CYCLE!==cycle||!ownsView(cycle.id,cycle.gen))return;\n   delay=Math.min(10000,900*Math.pow(2,Math.min(POLL_FAILURES++,4)));\n   pollStatus("Job updates interrupted — retrying in "+(delay/1000)+" s.");\n  }finally{\n   if(POLL_CYCLE===cycle&&ownsView(cycle.id,cycle.gen)){\n    POLL_CYCLE=null;\n    // Chained after completion: request duration adds to the healthy 900 ms.\n    schedulePoll(cycle.id,cycle.gen,delay);\n   }\n  }\n })();\n return cycle.promise;\n}\nfunction wakePolling(){\n if(!CUR||document.hidden)return;\n // A pending immediate wake already coalesces focus/pageshow/online bursts.\n if(POLL&&POLL.wake)return;\n stopPolling();\n schedulePoll(CUR,VIEW_GEN,0);if(POLL)POLL.wake=true;\n}\ndocument.addEventListener("visibilitychange",()=>{\n if(document.hidden)stopPolling();else wakePolling();\n});\nwindow.addEventListener("pagehide",stopPolling);\nfor(const event of ["focus","pageshow","online"])window.addEventListener(event,wakePolling);\nconst REVIEW_DRAFTS=new Map();\nfunction emptyEditor(){return {t:0,ox:0,oy:0,boxes:[],sel:-1,ov:{},dis:{},times:{},adds:[],\n add:false,addAnchor:null,drag:null,scale:1,dur:10,\n audio:[],audioSaved:[],audioLoaded:false};}\nfunction sameEdit(a,b){return JSON.stringify(a)===JSON.stringify(b);}\nfunction copyEdit(a){return JSON.parse(JSON.stringify(a));}\nfunction ownsView(id,gen){return CUR===id&&VIEW_GEN===gen;}\nfunction saveStatus(d,message){\n d.status=message;\n if(d!==EDITS)return;\n const el=document.getElementById("reviewSaveStatus");if(el)el.textContent=message;\n document.querySelectorAll("button[data-save-edits]").forEach(b=>{b.disabled=!!d.busy;});\n}\nfunction trimReviewDraft(d){\n const b=d.editor;\n // Clean audio is fetched display state even when other edit kinds are pending.\n // An in-flight audio submission may make a toggle-back a newer pending choice.\n if(!d.audioInFlight&&sameEdit(b.audio,b.audioSaved)){\n  b.audio=[];b.audioSaved=[];b.audioLoaded=false;\n }\n if(!d.busy&&!hasReviewEdits(d)){\n  d.en={};d.editor=emptyEditor();\n }\n}\nfunction hasReviewEdits(d){\n const b=d.editor;\n return Object.keys(d.enabled).length||d.manual.length||b.adds.length||\n  Object.keys(b.ov).length||Object.keys(b.times).length||\n  !sameEdit(b.audio,b.audioSaved);\n}\n\n// Job names are text inside the list link and detail heading.\nfunction jobNameHtml(name){\n return String(name).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");\n}\n\nasync function loadJobs(){\n const r=await fetch("api/jobs");\n if(r.status===423){jobs.innerHTML=\'<span style="color:#f87171">&#128274; locked — unlock in the Encryption panel below</span>\';JOBSJSON="";return;}\n const js=await r.json();\n const s=JSON.stringify(js);\n if(s===JOBSJSON)return;\n JOBSJSON=s;\n jobs.innerHTML=js.length?js.map(j=>\n  `<div class="row" style="justify-content:space-between;padding:4px 0">\n   <a href="#" onclick="openJob(\'${j.id}\');return false">${jobNameHtml(j.name)}</a>\n   <span style="display:flex;gap:10px;align-items:center"><span class="badge">${j.phase}</span>\n   ${(j.phase=="error"||j.phase=="cancelled")?`<a href="#" title="Retry the scan — reuses the file already on the server, nothing is re-uploaded" style="text-decoration:none;font-size:15px" onclick="retryJob(\'${j.id}\');return false">&#8635;</a>`:""}\n   <a href="#" title="Delete this job and all of its files" style="text-decoration:none;font-size:15px" onclick="delJob(\'${j.id}\');return false">&#128465;&#65039;</a></span></div>`).join(""):"none yet";\n}\n\nfunction shellHtml(j){\n return `<div class="card" id="jobcard"><h2>${jobNameHtml(j.name)}\n  <span class="badge" id="ph"></span><small id="eta"></small></h2>\n <progress id="prog" value="0" max="1"></progress>\n <div class="row" id="actions" style="margin-top:8px"></div>\n <div style="margin-top:8px;text-align:center"><img id="pimg"\n   style="max-width:100%;border-radius:8px;display:none;margin:0 auto"></div>\n <div id="pcap" style="font-size:12px;color:#94a3b8"></div>\n <div id="logStatus" style="margin-top:8px;color:#94a3b8"></div>\n <div id="log" tabindex="0" aria-label="Job log" aria-describedby="logStatus" style="margin-top:8px"></div>\n <div class="warn" id="warnbox" style="display:none;margin-top:8px"></div>\n </div>`;\n}\n\n// Save As exports stay bound to the clicked job even while the picker is open.\nlet EXPORT_NAMES={id:null,video:null,report:null};\nconst CAN_SAVE_AS=!!(window.isSecureContext&&window.showSaveFilePicker);\nconst EXPORTS=new Map();\nfunction exportControls(id,kind){\n const label=kind==="video"?"redacted video":"audit report";\n const path=kind==="video"?"download":"report";\n const direct=`<a href="api/jobs/${id}/${path}" onclick="exportDownloadStarted(\'${kind}\')">Download ${label}</a>`;\n return `<div id="export-${kind}" data-job="${id}" style="flex:1 1 260px;min-width:0">\n  ${CAN_SAVE_AS?`<button id="save-${kind}" class="${kind===\'report\'?\'sec\':\'\'}" onclick="saveExportAs(\'${kind}\',this)">Save ${label} as…</button>\n   <span style="font-size:12px"> · ${direct}</span>`:direct}\n  <div id="export-${kind}-feedback" hidden>\n   <progress id="export-${kind}-progress" max="1" aria-label="${label} save progress" style="width:100%"></progress>\n   <div id="export-${kind}-status" style="font-size:12px;overflow-wrap:anywhere"></div>\n   <div id="export-${kind}-live" role="status" aria-live="polite" aria-atomic="true"\n    style="position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)"></div>\n  </div></div>`;\n}\nfunction exportDownloadStarted(kind){\n if(!CUR)return;\n const key=CUR+":"+kind;\n // A direct download cannot observe disk completion or replace a running save.\n if(EXPORTS.get(key)?.active)return;\n EXPORTS.set(key,{id:CUR,kind,phase:"download",written:0,total:null,active:false});\n renderExportProgress();\n}\nfunction exportDuration(seconds){\n const s=Math.max(0,Math.floor(seconds));\n return s>=60?`${Math.floor(s/60)} min ${s%60} s`:`${s} s`;\n}\nfunction renderExportProgress(){\n const now=performance.now();\n for(const kind of ["video","report"]){\n  const box=document.getElementById("export-"+kind),state=EXPORTS.get(CUR+":"+kind);\n  if(!box||box.dataset.job!==CUR)continue;\n  const button=document.getElementById("save-"+kind);\n  if(button)button.disabled=!!state?.active;\n  if(!state)continue;\n  if(state.active&&state.renderedBox===box&&state.renderedPhase===state.phase&&now-state.renderedAt<250)continue;\n  state.renderedBox=box;state.renderedPhase=state.phase;state.renderedAt=now;\n  document.getElementById(`export-${kind}-feedback`).hidden=false;\n  const bar=document.getElementById(`export-${kind}-progress`);\n  if(state.total===null||state.phase==="download")bar.removeAttribute("value");\n  else{bar.max=state.total||1;bar.value=state.written;}\n  bar.hidden=state.phase==="download";\n  let text="Download started — see browser downloads";\n  if(state.phase!=="download"){\n   const amount=Math.max(state.total||0,state.written);\n   const power=amount>0?Math.min(3,Math.floor(Math.log10(amount)/3)):0;\n   const unit=["B","KB","MB","GB"][power],scale=1000**power;\n   const bytes=n=>`${(n/scale).toFixed(power?1:0)} ${unit}`;\n   const elapsed=(now-state.start)/1000;\n   const waiting=state.active&&state.phase!=="finalizing"&&now-state.lastWrite>=5000;\n   let label=state.phase==="saved"?"Saved":state.phase==="failed"?"Save failed":\n    state.phase==="finalizing"?"Finalizing…":state.phase==="choosing"?"Choose a destination…":\n    waiting?"Waiting for data or disk…":`Saving ${kind==="video"?"video":"audit report"}`;\n   const count=state.total===null?bytes(state.written):\n    `${bytes(state.written)} / ${bytes(state.total)} (${state.total?Math.min(100,Math.floor(state.written/state.total*100)):100}%)`;\n   text=`${label} — ${count} · ${exportDuration(((state.end??now)-state.start)/1000)} elapsed`;\n   if(state.phase==="saving"&&!waiting&&elapsed>=3&&state.samples.length>1){\n    // Retain one observation at/before the rolling ten-second boundary.\n    while(state.samples.length>2&&state.samples[1][0]<=now-10000)state.samples.shift();\n    const [t,b]=state.samples[0],rate=(state.written-b)/((now-Math.max(t,now-10000))/1000);\n    if(rate>0){text+=` · ${bytes(rate)}/s`;\n     if(state.total!==null&&state.written<state.total)\n      text+=` · about ${exportDuration((state.total-state.written)/rate)} left`;}\n   }\n   if(state.error)text+=` · ${state.error}. Try Save As again or use Download.`;\n  }\n  document.getElementById(`export-${kind}-status`).textContent=text;\n  // Visual updates run at 250ms; live announcements have their own 2s cadence.\n  if(state.announcedPhase!==state.phase||now-(state.announcedAt??-Infinity)>=2000){\n   document.getElementById(`export-${kind}-live`).textContent=text;\n   state.announcedPhase=state.phase;state.announcedAt=now;\n  }\n }\n}\nasync function saveExportAs(kind,button){\n const id=CUR,name=EXPORT_NAMES[kind],path=kind==="video"?"download":"report";\n if(!id||EXPORT_NAMES.id!==id||!name||!["video","report"].includes(kind))return;\n const key=id+":"+kind,previous=EXPORTS.get(key);\n if(previous?.active)return;\n const start=performance.now();\n const state={id,kind,phase:"choosing",active:true,written:0,total:null,start,\n  lastWrite:start,samples:[[start,0]]};\n EXPORTS.set(key,state);button.disabled=true;renderExportProgress();\n let reader,writable,timer;\n try{\n  // Invoke synchronously from the click, before the first network await.\n  let handle;\n  try{handle=await window.showSaveFilePicker({suggestedName:name});}\n  catch(e){if(e.name!=="AbortError")throw e;\n   if(previous)EXPORTS.set(key,previous);else EXPORTS.delete(key);\n   if(CUR===id){document.getElementById(`export-${kind}-feedback`).hidden=!previous;\n    renderExportProgress();}\n   return;\n  }\n  state.phase="saving";state.start=state.lastWrite=performance.now();\n  state.samples=[[state.start,0]];\n  timer=setInterval(renderExportProgress,250);\n  const response=await fetch(`api/jobs/${encodeURIComponent(id)}/${path}`);\n  if(!response.ok)throw new Error(response.status===423?"encryption vault is locked":`server returned HTTP ${response.status}`);\n  if(!response.body)throw new Error("browser did not provide a file stream");\n  reader=response.body.getReader();\n  const length=response.headers.get("Content-Length"),encoding=response.headers.get("Content-Encoding");\n  // Fetch decodes encoded responses; their transfer length is not a disk total.\n  if((!encoding||encoding.toLowerCase()==="identity")&&length!==null&&/^[0-9]+$/.test(length)){\n   const total=Number(length);if(Number.isSafeInteger(total))state.total=total;\n  }\n  writable=await handle.createWritable();\n  for(;;){\n   const {done,value}=await reader.read();if(done)break;\n   await writable.write(value); // backpressure: accepted bytes only\n   const now=performance.now();state.written+=value.byteLength;state.lastWrite=now;\n   // Coalesce observations to 250ms buckets; keep a bounded ten-second window.\n   if(state.samples.length===1||Math.floor(now/250)!==Math.floor(state.samples[state.samples.length-1][0]/250))\n    state.samples.push([now,state.written]);\n   else state.samples[state.samples.length-1]=[now,state.written];\n   while(state.samples.length>2&&state.samples[1][0]<=now-10000)state.samples.shift();\n  }\n  if(state.total!==null&&state.written!==state.total)throw new Error("received byte count does not match Content-Length");\n  state.phase="finalizing";renderExportProgress();\n  await writable.close();\n  state.phase="saved";\n }catch(e){\n  state.phase="failed";state.error=e.message||String(e);\n  if(reader)try{await reader.cancel();}catch(_){}\n  if(writable)try{await writable.abort();}catch(_){}\n }finally{\n  if(timer)clearInterval(timer);\n  if(reader)reader.releaseLock();\n  state.active=false;state.end=performance.now();\n  button.disabled=false;renderExportProgress();\n }\n}\n\n\nconst data=JSON.parse(process.argv[1]);\nconst jobs={innerHTML:\'\'};\nconst fetch=async()=>({status:200,json:async()=>data});\n(async()=>{await loadJobs();console.log(JSON.stringify({\n list:jobs.innerHTML,titles:data.map(shellHtml)}));})();\n', '[{"id": "a123456789ab", "name": "Literal &#38; and &quot; notes.mp4", "phase": "queued"}]']' returned non-zero exit status 1.
+
+/tmp/openscrub-baseline-20261116/python/cpython-3.12.16-linux-x86_64-gnu/lib/python3.12/subprocess.py:571: CalledProcessError
+_ test_emitted_job_list_and_title_preserve_literal_name[title-Family &amp; friends \u2014 caf\xe9.mp4] _
+
+name = 'Family &amp; friends — café.mp4', surface = 'title'
+
+    @pytest.mark.parametrize("name", NAMES)
+    @pytest.mark.parametrize("surface", ["list", "title"])
+    def test_emitted_job_list_and_title_preserve_literal_name(name, surface):
+>       result = emitted_fragments([{"id": "a123456789ab", "name": name,
+                                    "phase": "queued"}])
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_job_filename_display.py:61: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_job_filename_display.py:53: in emitted_fragments
+    result = subprocess.run([node, "-e", script, json.dumps(jobs)],
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+input = None, capture_output = True, timeout = None, check = True
+popenargs = (['/usr/bin/node', '-e', 'let CUR=null, EN={}, MAN=[], DUR=0, POLL=null, PHIST=[], PHPH="", LOGN=0, LOGE=null, LOGINIT...l)}));})();\n', '[{"id": "a123456789ab", "name": "Family &amp; friends \\u2014 caf\\u00e9.mp4", "phase": "queued"}]'],)
+kwargs = {'text': True, 'stdout': -1, 'stderr': -1}
+
+    def run(*popenargs,
+            input=None, capture_output=False, timeout=None, check=False, **kwargs):
+        """Run command with arguments and return a CompletedProcess instance.
+    
+        The returned instance will have attributes args, returncode, stdout and
+        stderr. By default, stdout and stderr are not captured, and those attributes
+        will be None. Pass stdout=PIPE and/or stderr=PIPE in order to capture them,
+        or pass capture_output=True to capture both.
+    
+        If check is True and the exit code was non-zero, it raises a
+        CalledProcessError. The CalledProcessError object will have the return code
+        in the returncode attribute, and output & stderr attributes if those streams
+        were captured.
+    
+        If timeout (seconds) is given and the process takes too long,
+         a TimeoutExpired exception will be raised.
+    
+        There is an optional argument "input", allowing you to
+        pass bytes or a string to the subprocess's stdin.  If you use this argument
+        you may not also use the Popen constructor's "stdin" argument, as
+        it will be used internally.
+    
+        By default, all communication is in bytes, and therefore any "input" should
+        be bytes, and the stdout and stderr will be bytes. If in text mode, any
+        "input" should be a string, and stdout and stderr will be strings decoded
+        according to locale encoding, or by "encoding" if set. Text mode is
+        triggered by setting any of text, encoding, errors or universal_newlines.
+    
+        The other arguments are the same as for the Popen constructor.
+        """
+        if input is not None:
+            if kwargs.get('stdin') is not None:
+                raise ValueError('stdin and input arguments may not both be used.')
+            kwargs['stdin'] = PIPE
+    
+        if capture_output:
+            if kwargs.get('stdout') is not None or kwargs.get('stderr') is not None:
+                raise ValueError('stdout and stderr arguments may not be used '
+                                 'with capture_output.')
+            kwargs['stdout'] = PIPE
+            kwargs['stderr'] = PIPE
+    
+        with Popen(*popenargs, **kwargs) as process:
+            try:
+                stdout, stderr = process.communicate(input, timeout=timeout)
+            except TimeoutExpired as exc:
+                process.kill()
+                if _mswindows:
+                    # Windows accumulates the output in a single blocking
+                    # read() call run on child threads, with the timeout
+                    # being done in a join() on those threads.  communicate()
+                    # _after_ kill() is required to collect that and add it
+                    # to the exception.
+                    exc.stdout, exc.stderr = process.communicate()
+                else:
+                    # POSIX _communicate already populated the output so
+                    # far into the TimeoutExpired exception.
+                    process.wait()
+                raise
+            except:  # Including KeyboardInterrupt, communicate handled that.
+                process.kill()
+                # We don't call process.wait() as .__exit__ does that for us.
+                raise
+            retcode = process.poll()
+            if check and retcode:
+>               raise CalledProcessError(retcode, process.args,
+                                         output=stdout, stderr=stderr)
+E               subprocess.CalledProcessError: Command '['/usr/bin/node', '-e', 'let CUR=null, EN={}, MAN=[], DUR=0, POLL=null, PHIST=[], PHPH="", LOGN=0, LOGE=null, LOGINIT=false, RECENT_LOG=null, SHELLPH=null, JOBSJSON="";\n\n// VIEW_GEN advances on every openJob (including A -> B -> A) and removal.\n// Drafts live only in this page; late acknowledgements reconcile their owner,\n// but may never publish into, or start rendering from, a different view.\nlet VIEW_GEN=0, EDITS=null;\n// Polling owns one metadata -> log cycle, using the existing view identity.\nlet POLL_CYCLE=null, POLL_FAILURES=0, AUTO_REVIEW=null, REVIEW_REQUEST=null;\nfunction pollStatus(message){\n const el=document.getElementById("pollStatus");\n if(el&&el.textContent!==message)el.textContent=message;\n}\nfunction stopPolling(){\n if(POLL){clearTimeout(POLL.handle);POLL=null;}\n const old=POLL_CYCLE;POLL_CYCLE=null;\n if(old)old.controller.abort();\n}\nfunction schedulePoll(id,gen,delay){\n if(!ownsView(id,gen)||document.hidden)return;\n if(POLL)clearTimeout(POLL.handle);\n const timer={id,gen};POLL=timer;\n timer.handle=setTimeout(()=>{\n  if(POLL!==timer||!ownsView(id,gen))return;\n  POLL=null;refresh();\n },delay);\n}\n// Only metadata/log use this deadline. Race body consumption too: abort alone\n// cannot settle a transport/body that ignores it. Losing work has no UI effects.\nasync function pollJson(url,cycle){\n const controller=new AbortController(),signal=cycle.controller.signal;\n let deadline,onCancel;\n const stopped=new Promise((_,reject)=>{\n  const fail=message=>{controller.abort();reject(new Error(message));};\n  onCancel=()=>fail("Polling cancelled");\n  signal.addEventListener("abort",onCancel,{once:true});\n  deadline=setTimeout(()=>fail("Polling timed out"),15000);\n  if(signal.aborted)onCancel();\n });\n const operation=(async()=>{\n  const r=await fetch(url,{signal:controller.signal});\n  if(!r.ok)throw new Error("Polling HTTP "+r.status);\n  return await r.json();\n })();\n try{return await Promise.race([operation,stopped]);}\n finally{clearTimeout(deadline);signal.removeEventListener("abort",onCancel);}\n}\nfunction refresh(){\n if(!CUR||document.hidden)return;\n if(POLL_CYCLE)return POLL_CYCLE.promise;\n if(POLL){clearTimeout(POLL.handle);POLL=null;}\n const cycle={id:CUR,gen:VIEW_GEN,controller:new AbortController()};\n POLL_CYCLE=cycle;\n cycle.promise=(async()=>{\n  let delay=900;\n  try{\n   await refreshCycle(cycle);\n   if(POLL_CYCLE!==cycle||!ownsView(cycle.id,cycle.gen))return;\n   POLL_FAILURES=0;pollStatus("");\n  }catch(e){\n   if(POLL_CYCLE!==cycle||!ownsView(cycle.id,cycle.gen))return;\n   delay=Math.min(10000,900*Math.pow(2,Math.min(POLL_FAILURES++,4)));\n   pollStatus("Job updates interrupted — retrying in "+(delay/1000)+" s.");\n  }finally{\n   if(POLL_CYCLE===cycle&&ownsView(cycle.id,cycle.gen)){\n    POLL_CYCLE=null;\n    // Chained after completion: request duration adds to the healthy 900 ms.\n    schedulePoll(cycle.id,cycle.gen,delay);\n   }\n  }\n })();\n return cycle.promise;\n}\nfunction wakePolling(){\n if(!CUR||document.hidden)return;\n // A pending immediate wake already coalesces focus/pageshow/online bursts.\n if(POLL&&POLL.wake)return;\n stopPolling();\n schedulePoll(CUR,VIEW_GEN,0);if(POLL)POLL.wake=true;\n}\ndocument.addEventListener("visibilitychange",()=>{\n if(document.hidden)stopPolling();else wakePolling();\n});\nwindow.addEventListener("pagehide",stopPolling);\nfor(const event of ["focus","pageshow","online"])window.addEventListener(event,wakePolling);\nconst REVIEW_DRAFTS=new Map();\nfunction emptyEditor(){return {t:0,ox:0,oy:0,boxes:[],sel:-1,ov:{},dis:{},times:{},adds:[],\n add:false,addAnchor:null,drag:null,scale:1,dur:10,\n audio:[],audioSaved:[],audioLoaded:false};}\nfunction sameEdit(a,b){return JSON.stringify(a)===JSON.stringify(b);}\nfunction copyEdit(a){return JSON.parse(JSON.stringify(a));}\nfunction ownsView(id,gen){return CUR===id&&VIEW_GEN===gen;}\nfunction saveStatus(d,message){\n d.status=message;\n if(d!==EDITS)return;\n const el=document.getElementById("reviewSaveStatus");if(el)el.textContent=message;\n document.querySelectorAll("button[data-save-edits]").forEach(b=>{b.disabled=!!d.busy;});\n}\nfunction trimReviewDraft(d){\n const b=d.editor;\n // Clean audio is fetched display state even when other edit kinds are pending.\n // An in-flight audio submission may make a toggle-back a newer pending choice.\n if(!d.audioInFlight&&sameEdit(b.audio,b.audioSaved)){\n  b.audio=[];b.audioSaved=[];b.audioLoaded=false;\n }\n if(!d.busy&&!hasReviewEdits(d)){\n  d.en={};d.editor=emptyEditor();\n }\n}\nfunction hasReviewEdits(d){\n const b=d.editor;\n return Object.keys(d.enabled).length||d.manual.length||b.adds.length||\n  Object.keys(b.ov).length||Object.keys(b.times).length||\n  !sameEdit(b.audio,b.audioSaved);\n}\n\n// Job names are text inside the list link and detail heading.\nfunction jobNameHtml(name){\n return String(name).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");\n}\n\nasync function loadJobs(){\n const r=await fetch("api/jobs");\n if(r.status===423){jobs.innerHTML=\'<span style="color:#f87171">&#128274; locked — unlock in the Encryption panel below</span>\';JOBSJSON="";return;}\n const js=await r.json();\n const s=JSON.stringify(js);\n if(s===JOBSJSON)return;\n JOBSJSON=s;\n jobs.innerHTML=js.length?js.map(j=>\n  `<div class="row" style="justify-content:space-between;padding:4px 0">\n   <a href="#" onclick="openJob(\'${j.id}\');return false">${jobNameHtml(j.name)}</a>\n   <span style="display:flex;gap:10px;align-items:center"><span class="badge">${j.phase}</span>\n   ${(j.phase=="error"||j.phase=="cancelled")?`<a href="#" title="Retry the scan — reuses the file already on the server, nothing is re-uploaded" style="text-decoration:none;font-size:15px" onclick="retryJob(\'${j.id}\');return false">&#8635;</a>`:""}\n   <a href="#" title="Delete this job and all of its files" style="text-decoration:none;font-size:15px" onclick="delJob(\'${j.id}\');return false">&#128465;&#65039;</a></span></div>`).join(""):"none yet";\n}\n\nfunction shellHtml(j){\n return `<div class="card" id="jobcard"><h2>${jobNameHtml(j.name)}\n  <span class="badge" id="ph"></span><small id="eta"></small></h2>\n <progress id="prog" value="0" max="1"></progress>\n <div class="row" id="actions" style="margin-top:8px"></div>\n <div style="margin-top:8px;text-align:center"><img id="pimg"\n   style="max-width:100%;border-radius:8px;display:none;margin:0 auto"></div>\n <div id="pcap" style="font-size:12px;color:#94a3b8"></div>\n <div id="logStatus" style="margin-top:8px;color:#94a3b8"></div>\n <div id="log" tabindex="0" aria-label="Job log" aria-describedby="logStatus" style="margin-top:8px"></div>\n <div class="warn" id="warnbox" style="display:none;margin-top:8px"></div>\n </div>`;\n}\n\n// Save As exports stay bound to the clicked job even while the picker is open.\nlet EXPORT_NAMES={id:null,video:null,report:null};\nconst CAN_SAVE_AS=!!(window.isSecureContext&&window.showSaveFilePicker);\nconst EXPORTS=new Map();\nfunction exportControls(id,kind){\n const label=kind==="video"?"redacted video":"audit report";\n const path=kind==="video"?"download":"report";\n const direct=`<a href="api/jobs/${id}/${path}" onclick="exportDownloadStarted(\'${kind}\')">Download ${label}</a>`;\n return `<div id="export-${kind}" data-job="${id}" style="flex:1 1 260px;min-width:0">\n  ${CAN_SAVE_AS?`<button id="save-${kind}" class="${kind===\'report\'?\'sec\':\'\'}" onclick="saveExportAs(\'${kind}\',this)">Save ${label} as…</button>\n   <span style="font-size:12px"> · ${direct}</span>`:direct}\n  <div id="export-${kind}-feedback" hidden>\n   <progress id="export-${kind}-progress" max="1" aria-label="${label} save progress" style="width:100%"></progress>\n   <div id="export-${kind}-status" style="font-size:12px;overflow-wrap:anywhere"></div>\n   <div id="export-${kind}-live" role="status" aria-live="polite" aria-atomic="true"\n    style="position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)"></div>\n  </div></div>`;\n}\nfunction exportDownloadStarted(kind){\n if(!CUR)return;\n const key=CUR+":"+kind;\n // A direct download cannot observe disk completion or replace a running save.\n if(EXPORTS.get(key)?.active)return;\n EXPORTS.set(key,{id:CUR,kind,phase:"download",written:0,total:null,active:false});\n renderExportProgress();\n}\nfunction exportDuration(seconds){\n const s=Math.max(0,Math.floor(seconds));\n return s>=60?`${Math.floor(s/60)} min ${s%60} s`:`${s} s`;\n}\nfunction renderExportProgress(){\n const now=performance.now();\n for(const kind of ["video","report"]){\n  const box=document.getElementById("export-"+kind),state=EXPORTS.get(CUR+":"+kind);\n  if(!box||box.dataset.job!==CUR)continue;\n  const button=document.getElementById("save-"+kind);\n  if(button)button.disabled=!!state?.active;\n  if(!state)continue;\n  if(state.active&&state.renderedBox===box&&state.renderedPhase===state.phase&&now-state.renderedAt<250)continue;\n  state.renderedBox=box;state.renderedPhase=state.phase;state.renderedAt=now;\n  document.getElementById(`export-${kind}-feedback`).hidden=false;\n  const bar=document.getElementById(`export-${kind}-progress`);\n  if(state.total===null||state.phase==="download")bar.removeAttribute("value");\n  else{bar.max=state.total||1;bar.value=state.written;}\n  bar.hidden=state.phase==="download";\n  let text="Download started — see browser downloads";\n  if(state.phase!=="download"){\n   const amount=Math.max(state.total||0,state.written);\n   const power=amount>0?Math.min(3,Math.floor(Math.log10(amount)/3)):0;\n   const unit=["B","KB","MB","GB"][power],scale=1000**power;\n   const bytes=n=>`${(n/scale).toFixed(power?1:0)} ${unit}`;\n   const elapsed=(now-state.start)/1000;\n   const waiting=state.active&&state.phase!=="finalizing"&&now-state.lastWrite>=5000;\n   let label=state.phase==="saved"?"Saved":state.phase==="failed"?"Save failed":\n    state.phase==="finalizing"?"Finalizing…":state.phase==="choosing"?"Choose a destination…":\n    waiting?"Waiting for data or disk…":`Saving ${kind==="video"?"video":"audit report"}`;\n   const count=state.total===null?bytes(state.written):\n    `${bytes(state.written)} / ${bytes(state.total)} (${state.total?Math.min(100,Math.floor(state.written/state.total*100)):100}%)`;\n   text=`${label} — ${count} · ${exportDuration(((state.end??now)-state.start)/1000)} elapsed`;\n   if(state.phase==="saving"&&!waiting&&elapsed>=3&&state.samples.length>1){\n    // Retain one observation at/before the rolling ten-second boundary.\n    while(state.samples.length>2&&state.samples[1][0]<=now-10000)state.samples.shift();\n    const [t,b]=state.samples[0],rate=(state.written-b)/((now-Math.max(t,now-10000))/1000);\n    if(rate>0){text+=` · ${bytes(rate)}/s`;\n     if(state.total!==null&&state.written<state.total)\n      text+=` · about ${exportDuration((state.total-state.written)/rate)} left`;}\n   }\n   if(state.error)text+=` · ${state.error}. Try Save As again or use Download.`;\n  }\n  document.getElementById(`export-${kind}-status`).textContent=text;\n  // Visual updates run at 250ms; live announcements have their own 2s cadence.\n  if(state.announcedPhase!==state.phase||now-(state.announcedAt??-Infinity)>=2000){\n   document.getElementById(`export-${kind}-live`).textContent=text;\n   state.announcedPhase=state.phase;state.announcedAt=now;\n  }\n }\n}\nasync function saveExportAs(kind,button){\n const id=CUR,name=EXPORT_NAMES[kind],path=kind==="video"?"download":"report";\n if(!id||EXPORT_NAMES.id!==id||!name||!["video","report"].includes(kind))return;\n const key=id+":"+kind,previous=EXPORTS.get(key);\n if(previous?.active)return;\n const start=performance.now();\n const state={id,kind,phase:"choosing",active:true,written:0,total:null,start,\n  lastWrite:start,samples:[[start,0]]};\n EXPORTS.set(key,state);button.disabled=true;renderExportProgress();\n let reader,writable,timer;\n try{\n  // Invoke synchronously from the click, before the first network await.\n  let handle;\n  try{handle=await window.showSaveFilePicker({suggestedName:name});}\n  catch(e){if(e.name!=="AbortError")throw e;\n   if(previous)EXPORTS.set(key,previous);else EXPORTS.delete(key);\n   if(CUR===id){document.getElementById(`export-${kind}-feedback`).hidden=!previous;\n    renderExportProgress();}\n   return;\n  }\n  state.phase="saving";state.start=state.lastWrite=performance.now();\n  state.samples=[[state.start,0]];\n  timer=setInterval(renderExportProgress,250);\n  const response=await fetch(`api/jobs/${encodeURIComponent(id)}/${path}`);\n  if(!response.ok)throw new Error(response.status===423?"encryption vault is locked":`server returned HTTP ${response.status}`);\n  if(!response.body)throw new Error("browser did not provide a file stream");\n  reader=response.body.getReader();\n  const length=response.headers.get("Content-Length"),encoding=response.headers.get("Content-Encoding");\n  // Fetch decodes encoded responses; their transfer length is not a disk total.\n  if((!encoding||encoding.toLowerCase()==="identity")&&length!==null&&/^[0-9]+$/.test(length)){\n   const total=Number(length);if(Number.isSafeInteger(total))state.total=total;\n  }\n  writable=await handle.createWritable();\n  for(;;){\n   const {done,value}=await reader.read();if(done)break;\n   await writable.write(value); // backpressure: accepted bytes only\n   const now=performance.now();state.written+=value.byteLength;state.lastWrite=now;\n   // Coalesce observations to 250ms buckets; keep a bounded ten-second window.\n   if(state.samples.length===1||Math.floor(now/250)!==Math.floor(state.samples[state.samples.length-1][0]/250))\n    state.samples.push([now,state.written]);\n   else state.samples[state.samples.length-1]=[now,state.written];\n   while(state.samples.length>2&&state.samples[1][0]<=now-10000)state.samples.shift();\n  }\n  if(state.total!==null&&state.written!==state.total)throw new Error("received byte count does not match Content-Length");\n  state.phase="finalizing";renderExportProgress();\n  await writable.close();\n  state.phase="saved";\n }catch(e){\n  state.phase="failed";state.error=e.message||String(e);\n  if(reader)try{await reader.cancel();}catch(_){}\n  if(writable)try{await writable.abort();}catch(_){}\n }finally{\n  if(timer)clearInterval(timer);\n  if(reader)reader.releaseLock();\n  state.active=false;state.end=performance.now();\n  button.disabled=false;renderExportProgress();\n }\n}\n\n\nconst data=JSON.parse(process.argv[1]);\nconst jobs={innerHTML:\'\'};\nconst fetch=async()=>({status:200,json:async()=>data});\n(async()=>{await loadJobs();console.log(JSON.stringify({\n list:jobs.innerHTML,titles:data.map(shellHtml)}));})();\n', '[{"id": "a123456789ab", "name": "Family &amp; friends \\u2014 caf\\u00e9.mp4", "phase": "queued"}]']' returned non-zero exit status 1.
+
+/tmp/openscrub-baseline-20261116/python/cpython-3.12.16-linux-x86_64-gnu/lib/python3.12/subprocess.py:571: CalledProcessError
+_ test_emitted_job_list_and_title_preserve_literal_name[title-Friends' "summer" & snow \u2603.MOV] _
+
+name = 'Friends\' "summer" & snow ☃.MOV', surface = 'title'
+
+    @pytest.mark.parametrize("name", NAMES)
+    @pytest.mark.parametrize("surface", ["list", "title"])
+    def test_emitted_job_list_and_title_preserve_literal_name(name, surface):
+>       result = emitted_fragments([{"id": "a123456789ab", "name": name,
+                                    "phase": "queued"}])
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_job_filename_display.py:61: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_job_filename_display.py:53: in emitted_fragments
+    result = subprocess.run([node, "-e", script, json.dumps(jobs)],
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+input = None, capture_output = True, timeout = None, check = True
+popenargs = (['/usr/bin/node', '-e', 'let CUR=null, EN={}, MAN=[], DUR=0, POLL=null, PHIST=[], PHPH="", LOGN=0, LOGE=null, LOGINIT...tml)}));})();\n', '[{"id": "a123456789ab", "name": "Friends\' \\"summer\\" & snow \\u2603.MOV", "phase": "queued"}]'],)
+kwargs = {'text': True, 'stdout': -1, 'stderr': -1}
+
+    def run(*popenargs,
+            input=None, capture_output=False, timeout=None, check=False, **kwargs):
+        """Run command with arguments and return a CompletedProcess instance.
+    
+        The returned instance will have attributes args, returncode, stdout and
+        stderr. By default, stdout and stderr are not captured, and those attributes
+        will be None. Pass stdout=PIPE and/or stderr=PIPE in order to capture them,
+        or pass capture_output=True to capture both.
+    
+        If check is True and the exit code was non-zero, it raises a
+        CalledProcessError. The CalledProcessError object will have the return code
+        in the returncode attribute, and output & stderr attributes if those streams
+        were captured.
+    
+        If timeout (seconds) is given and the process takes too long,
+         a TimeoutExpired exception will be raised.
+    
+        There is an optional argument "input", allowing you to
+        pass bytes or a string to the subprocess's stdin.  If you use this argument
+        you may not also use the Popen constructor's "stdin" argument, as
+        it will be used internally.
+    
+        By default, all communication is in bytes, and therefore any "input" should
+        be bytes, and the stdout and stderr will be bytes. If in text mode, any
+        "input" should be a string, and stdout and stderr will be strings decoded
+        according to locale encoding, or by "encoding" if set. Text mode is
+        triggered by setting any of text, encoding, errors or universal_newlines.
+    
+        The other arguments are the same as for the Popen constructor.
+        """
+        if input is not None:
+            if kwargs.get('stdin') is not None:
+                raise ValueError('stdin and input arguments may not both be used.')
+            kwargs['stdin'] = PIPE
+    
+        if capture_output:
+            if kwargs.get('stdout') is not None or kwargs.get('stderr') is not None:
+                raise ValueError('stdout and stderr arguments may not be used '
+                                 'with capture_output.')
+            kwargs['stdout'] = PIPE
+            kwargs['stderr'] = PIPE
+    
+        with Popen(*popenargs, **kwargs) as process:
+            try:
+                stdout, stderr = process.communicate(input, timeout=timeout)
+            except TimeoutExpired as exc:
+                process.kill()
+                if _mswindows:
+                    # Windows accumulates the output in a single blocking
+                    # read() call run on child threads, with the timeout
+                    # being done in a join() on those threads.  communicate()
+                    # _after_ kill() is required to collect that and add it
+                    # to the exception.
+                    exc.stdout, exc.stderr = process.communicate()
+                else:
+                    # POSIX _communicate already populated the output so
+                    # far into the TimeoutExpired exception.
+                    process.wait()
+                raise
+            except:  # Including KeyboardInterrupt, communicate handled that.
+                process.kill()
+                # We don't call process.wait() as .__exit__ does that for us.
+                raise
+            retcode = process.poll()
+            if check and retcode:
+>               raise CalledProcessError(retcode, process.args,
+                                         output=stdout, stderr=stderr)
+E               subprocess.CalledProcessError: Command '['/usr/bin/node', '-e', 'let CUR=null, EN={}, MAN=[], DUR=0, POLL=null, PHIST=[], PHPH="", LOGN=0, LOGE=null, LOGINIT=false, RECENT_LOG=null, SHELLPH=null, JOBSJSON="";\n\n// VIEW_GEN advances on every openJob (including A -> B -> A) and removal.\n// Drafts live only in this page; late acknowledgements reconcile their owner,\n// but may never publish into, or start rendering from, a different view.\nlet VIEW_GEN=0, EDITS=null;\n// Polling owns one metadata -> log cycle, using the existing view identity.\nlet POLL_CYCLE=null, POLL_FAILURES=0, AUTO_REVIEW=null, REVIEW_REQUEST=null;\nfunction pollStatus(message){\n const el=document.getElementById("pollStatus");\n if(el&&el.textContent!==message)el.textContent=message;\n}\nfunction stopPolling(){\n if(POLL){clearTimeout(POLL.handle);POLL=null;}\n const old=POLL_CYCLE;POLL_CYCLE=null;\n if(old)old.controller.abort();\n}\nfunction schedulePoll(id,gen,delay){\n if(!ownsView(id,gen)||document.hidden)return;\n if(POLL)clearTimeout(POLL.handle);\n const timer={id,gen};POLL=timer;\n timer.handle=setTimeout(()=>{\n  if(POLL!==timer||!ownsView(id,gen))return;\n  POLL=null;refresh();\n },delay);\n}\n// Only metadata/log use this deadline. Race body consumption too: abort alone\n// cannot settle a transport/body that ignores it. Losing work has no UI effects.\nasync function pollJson(url,cycle){\n const controller=new AbortController(),signal=cycle.controller.signal;\n let deadline,onCancel;\n const stopped=new Promise((_,reject)=>{\n  const fail=message=>{controller.abort();reject(new Error(message));};\n  onCancel=()=>fail("Polling cancelled");\n  signal.addEventListener("abort",onCancel,{once:true});\n  deadline=setTimeout(()=>fail("Polling timed out"),15000);\n  if(signal.aborted)onCancel();\n });\n const operation=(async()=>{\n  const r=await fetch(url,{signal:controller.signal});\n  if(!r.ok)throw new Error("Polling HTTP "+r.status);\n  return await r.json();\n })();\n try{return await Promise.race([operation,stopped]);}\n finally{clearTimeout(deadline);signal.removeEventListener("abort",onCancel);}\n}\nfunction refresh(){\n if(!CUR||document.hidden)return;\n if(POLL_CYCLE)return POLL_CYCLE.promise;\n if(POLL){clearTimeout(POLL.handle);POLL=null;}\n const cycle={id:CUR,gen:VIEW_GEN,controller:new AbortController()};\n POLL_CYCLE=cycle;\n cycle.promise=(async()=>{\n  let delay=900;\n  try{\n   await refreshCycle(cycle);\n   if(POLL_CYCLE!==cycle||!ownsView(cycle.id,cycle.gen))return;\n   POLL_FAILURES=0;pollStatus("");\n  }catch(e){\n   if(POLL_CYCLE!==cycle||!ownsView(cycle.id,cycle.gen))return;\n   delay=Math.min(10000,900*Math.pow(2,Math.min(POLL_FAILURES++,4)));\n   pollStatus("Job updates interrupted — retrying in "+(delay/1000)+" s.");\n  }finally{\n   if(POLL_CYCLE===cycle&&ownsView(cycle.id,cycle.gen)){\n    POLL_CYCLE=null;\n    // Chained after completion: request duration adds to the healthy 900 ms.\n    schedulePoll(cycle.id,cycle.gen,delay);\n   }\n  }\n })();\n return cycle.promise;\n}\nfunction wakePolling(){\n if(!CUR||document.hidden)return;\n // A pending immediate wake already coalesces focus/pageshow/online bursts.\n if(POLL&&POLL.wake)return;\n stopPolling();\n schedulePoll(CUR,VIEW_GEN,0);if(POLL)POLL.wake=true;\n}\ndocument.addEventListener("visibilitychange",()=>{\n if(document.hidden)stopPolling();else wakePolling();\n});\nwindow.addEventListener("pagehide",stopPolling);\nfor(const event of ["focus","pageshow","online"])window.addEventListener(event,wakePolling);\nconst REVIEW_DRAFTS=new Map();\nfunction emptyEditor(){return {t:0,ox:0,oy:0,boxes:[],sel:-1,ov:{},dis:{},times:{},adds:[],\n add:false,addAnchor:null,drag:null,scale:1,dur:10,\n audio:[],audioSaved:[],audioLoaded:false};}\nfunction sameEdit(a,b){return JSON.stringify(a)===JSON.stringify(b);}\nfunction copyEdit(a){return JSON.parse(JSON.stringify(a));}\nfunction ownsView(id,gen){return CUR===id&&VIEW_GEN===gen;}\nfunction saveStatus(d,message){\n d.status=message;\n if(d!==EDITS)return;\n const el=document.getElementById("reviewSaveStatus");if(el)el.textContent=message;\n document.querySelectorAll("button[data-save-edits]").forEach(b=>{b.disabled=!!d.busy;});\n}\nfunction trimReviewDraft(d){\n const b=d.editor;\n // Clean audio is fetched display state even when other edit kinds are pending.\n // An in-flight audio submission may make a toggle-back a newer pending choice.\n if(!d.audioInFlight&&sameEdit(b.audio,b.audioSaved)){\n  b.audio=[];b.audioSaved=[];b.audioLoaded=false;\n }\n if(!d.busy&&!hasReviewEdits(d)){\n  d.en={};d.editor=emptyEditor();\n }\n}\nfunction hasReviewEdits(d){\n const b=d.editor;\n return Object.keys(d.enabled).length||d.manual.length||b.adds.length||\n  Object.keys(b.ov).length||Object.keys(b.times).length||\n  !sameEdit(b.audio,b.audioSaved);\n}\n\n// Job names are text inside the list link and detail heading.\nfunction jobNameHtml(name){\n return String(name).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");\n}\n\nasync function loadJobs(){\n const r=await fetch("api/jobs");\n if(r.status===423){jobs.innerHTML=\'<span style="color:#f87171">&#128274; locked — unlock in the Encryption panel below</span>\';JOBSJSON="";return;}\n const js=await r.json();\n const s=JSON.stringify(js);\n if(s===JOBSJSON)return;\n JOBSJSON=s;\n jobs.innerHTML=js.length?js.map(j=>\n  `<div class="row" style="justify-content:space-between;padding:4px 0">\n   <a href="#" onclick="openJob(\'${j.id}\');return false">${jobNameHtml(j.name)}</a>\n   <span style="display:flex;gap:10px;align-items:center"><span class="badge">${j.phase}</span>\n   ${(j.phase=="error"||j.phase=="cancelled")?`<a href="#" title="Retry the scan — reuses the file already on the server, nothing is re-uploaded" style="text-decoration:none;font-size:15px" onclick="retryJob(\'${j.id}\');return false">&#8635;</a>`:""}\n   <a href="#" title="Delete this job and all of its files" style="text-decoration:none;font-size:15px" onclick="delJob(\'${j.id}\');return false">&#128465;&#65039;</a></span></div>`).join(""):"none yet";\n}\n\nfunction shellHtml(j){\n return `<div class="card" id="jobcard"><h2>${jobNameHtml(j.name)}\n  <span class="badge" id="ph"></span><small id="eta"></small></h2>\n <progress id="prog" value="0" max="1"></progress>\n <div class="row" id="actions" style="margin-top:8px"></div>\n <div style="margin-top:8px;text-align:center"><img id="pimg"\n   style="max-width:100%;border-radius:8px;display:none;margin:0 auto"></div>\n <div id="pcap" style="font-size:12px;color:#94a3b8"></div>\n <div id="logStatus" style="margin-top:8px;color:#94a3b8"></div>\n <div id="log" tabindex="0" aria-label="Job log" aria-describedby="logStatus" style="margin-top:8px"></div>\n <div class="warn" id="warnbox" style="display:none;margin-top:8px"></div>\n </div>`;\n}\n\n// Save As exports stay bound to the clicked job even while the picker is open.\nlet EXPORT_NAMES={id:null,video:null,report:null};\nconst CAN_SAVE_AS=!!(window.isSecureContext&&window.showSaveFilePicker);\nconst EXPORTS=new Map();\nfunction exportControls(id,kind){\n const label=kind==="video"?"redacted video":"audit report";\n const path=kind==="video"?"download":"report";\n const direct=`<a href="api/jobs/${id}/${path}" onclick="exportDownloadStarted(\'${kind}\')">Download ${label}</a>`;\n return `<div id="export-${kind}" data-job="${id}" style="flex:1 1 260px;min-width:0">\n  ${CAN_SAVE_AS?`<button id="save-${kind}" class="${kind===\'report\'?\'sec\':\'\'}" onclick="saveExportAs(\'${kind}\',this)">Save ${label} as…</button>\n   <span style="font-size:12px"> · ${direct}</span>`:direct}\n  <div id="export-${kind}-feedback" hidden>\n   <progress id="export-${kind}-progress" max="1" aria-label="${label} save progress" style="width:100%"></progress>\n   <div id="export-${kind}-status" style="font-size:12px;overflow-wrap:anywhere"></div>\n   <div id="export-${kind}-live" role="status" aria-live="polite" aria-atomic="true"\n    style="position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)"></div>\n  </div></div>`;\n}\nfunction exportDownloadStarted(kind){\n if(!CUR)return;\n const key=CUR+":"+kind;\n // A direct download cannot observe disk completion or replace a running save.\n if(EXPORTS.get(key)?.active)return;\n EXPORTS.set(key,{id:CUR,kind,phase:"download",written:0,total:null,active:false});\n renderExportProgress();\n}\nfunction exportDuration(seconds){\n const s=Math.max(0,Math.floor(seconds));\n return s>=60?`${Math.floor(s/60)} min ${s%60} s`:`${s} s`;\n}\nfunction renderExportProgress(){\n const now=performance.now();\n for(const kind of ["video","report"]){\n  const box=document.getElementById("export-"+kind),state=EXPORTS.get(CUR+":"+kind);\n  if(!box||box.dataset.job!==CUR)continue;\n  const button=document.getElementById("save-"+kind);\n  if(button)button.disabled=!!state?.active;\n  if(!state)continue;\n  if(state.active&&state.renderedBox===box&&state.renderedPhase===state.phase&&now-state.renderedAt<250)continue;\n  state.renderedBox=box;state.renderedPhase=state.phase;state.renderedAt=now;\n  document.getElementById(`export-${kind}-feedback`).hidden=false;\n  const bar=document.getElementById(`export-${kind}-progress`);\n  if(state.total===null||state.phase==="download")bar.removeAttribute("value");\n  else{bar.max=state.total||1;bar.value=state.written;}\n  bar.hidden=state.phase==="download";\n  let text="Download started — see browser downloads";\n  if(state.phase!=="download"){\n   const amount=Math.max(state.total||0,state.written);\n   const power=amount>0?Math.min(3,Math.floor(Math.log10(amount)/3)):0;\n   const unit=["B","KB","MB","GB"][power],scale=1000**power;\n   const bytes=n=>`${(n/scale).toFixed(power?1:0)} ${unit}`;\n   const elapsed=(now-state.start)/1000;\n   const waiting=state.active&&state.phase!=="finalizing"&&now-state.lastWrite>=5000;\n   let label=state.phase==="saved"?"Saved":state.phase==="failed"?"Save failed":\n    state.phase==="finalizing"?"Finalizing…":state.phase==="choosing"?"Choose a destination…":\n    waiting?"Waiting for data or disk…":`Saving ${kind==="video"?"video":"audit report"}`;\n   const count=state.total===null?bytes(state.written):\n    `${bytes(state.written)} / ${bytes(state.total)} (${state.total?Math.min(100,Math.floor(state.written/state.total*100)):100}%)`;\n   text=`${label} — ${count} · ${exportDuration(((state.end??now)-state.start)/1000)} elapsed`;\n   if(state.phase==="saving"&&!waiting&&elapsed>=3&&state.samples.length>1){\n    // Retain one observation at/before the rolling ten-second boundary.\n    while(state.samples.length>2&&state.samples[1][0]<=now-10000)state.samples.shift();\n    const [t,b]=state.samples[0],rate=(state.written-b)/((now-Math.max(t,now-10000))/1000);\n    if(rate>0){text+=` · ${bytes(rate)}/s`;\n     if(state.total!==null&&state.written<state.total)\n      text+=` · about ${exportDuration((state.total-state.written)/rate)} left`;}\n   }\n   if(state.error)text+=` · ${state.error}. Try Save As again or use Download.`;\n  }\n  document.getElementById(`export-${kind}-status`).textContent=text;\n  // Visual updates run at 250ms; live announcements have their own 2s cadence.\n  if(state.announcedPhase!==state.phase||now-(state.announcedAt??-Infinity)>=2000){\n   document.getElementById(`export-${kind}-live`).textContent=text;\n   state.announcedPhase=state.phase;state.announcedAt=now;\n  }\n }\n}\nasync function saveExportAs(kind,button){\n const id=CUR,name=EXPORT_NAMES[kind],path=kind==="video"?"download":"report";\n if(!id||EXPORT_NAMES.id!==id||!name||!["video","report"].includes(kind))return;\n const key=id+":"+kind,previous=EXPORTS.get(key);\n if(previous?.active)return;\n const start=performance.now();\n const state={id,kind,phase:"choosing",active:true,written:0,total:null,start,\n  lastWrite:start,samples:[[start,0]]};\n EXPORTS.set(key,state);button.disabled=true;renderExportProgress();\n let reader,writable,timer;\n try{\n  // Invoke synchronously from the click, before the first network await.\n  let handle;\n  try{handle=await window.showSaveFilePicker({suggestedName:name});}\n  catch(e){if(e.name!=="AbortError")throw e;\n   if(previous)EXPORTS.set(key,previous);else EXPORTS.delete(key);\n   if(CUR===id){document.getElementById(`export-${kind}-feedback`).hidden=!previous;\n    renderExportProgress();}\n   return;\n  }\n  state.phase="saving";state.start=state.lastWrite=performance.now();\n  state.samples=[[state.start,0]];\n  timer=setInterval(renderExportProgress,250);\n  const response=await fetch(`api/jobs/${encodeURIComponent(id)}/${path}`);\n  if(!response.ok)throw new Error(response.status===423?"encryption vault is locked":`server returned HTTP ${response.status}`);\n  if(!response.body)throw new Error("browser did not provide a file stream");\n  reader=response.body.getReader();\n  const length=response.headers.get("Content-Length"),encoding=response.headers.get("Content-Encoding");\n  // Fetch decodes encoded responses; their transfer length is not a disk total.\n  if((!encoding||encoding.toLowerCase()==="identity")&&length!==null&&/^[0-9]+$/.test(length)){\n   const total=Number(length);if(Number.isSafeInteger(total))state.total=total;\n  }\n  writable=await handle.createWritable();\n  for(;;){\n   const {done,value}=await reader.read();if(done)break;\n   await writable.write(value); // backpressure: accepted bytes only\n   const now=performance.now();state.written+=value.byteLength;state.lastWrite=now;\n   // Coalesce observations to 250ms buckets; keep a bounded ten-second window.\n   if(state.samples.length===1||Math.floor(now/250)!==Math.floor(state.samples[state.samples.length-1][0]/250))\n    state.samples.push([now,state.written]);\n   else state.samples[state.samples.length-1]=[now,state.written];\n   while(state.samples.length>2&&state.samples[1][0]<=now-10000)state.samples.shift();\n  }\n  if(state.total!==null&&state.written!==state.total)throw new Error("received byte count does not match Content-Length");\n  state.phase="finalizing";renderExportProgress();\n  await writable.close();\n  state.phase="saved";\n }catch(e){\n  state.phase="failed";state.error=e.message||String(e);\n  if(reader)try{await reader.cancel();}catch(_){}\n  if(writable)try{await writable.abort();}catch(_){}\n }finally{\n  if(timer)clearInterval(timer);\n  if(reader)reader.releaseLock();\n  state.active=false;state.end=performance.now();\n  button.disabled=false;renderExportProgress();\n }\n}\n\n\nconst data=JSON.parse(process.argv[1]);\nconst jobs={innerHTML:\'\'};\nconst fetch=async()=>({status:200,json:async()=>data});\n(async()=>{await loadJobs();console.log(JSON.stringify({\n list:jobs.innerHTML,titles:data.map(shellHtml)}));})();\n', '[{"id": "a123456789ab", "name": "Friends\' \\"summer\\" & snow \\u2603.MOV", "phase": "queued"}]']' returned non-zero exit status 1.
+
+/tmp/openscrub-baseline-20261116/python/cpython-3.12.16-linux-x86_64-gnu/lib/python3.12/subprocess.py:571: CalledProcessError
+_ test_emitted_job_list_and_title_preserve_literal_name[title-Literal &#38; and &quot; notes.mp4] _
+
+name = 'Literal &#38; and &quot; notes.mp4', surface = 'title'
+
+    @pytest.mark.parametrize("name", NAMES)
+    @pytest.mark.parametrize("surface", ["list", "title"])
+    def test_emitted_job_list_and_title_preserve_literal_name(name, surface):
+>       result = emitted_fragments([{"id": "a123456789ab", "name": name,
+                                    "phase": "queued"}])
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_job_filename_display.py:61: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_job_filename_display.py:53: in emitted_fragments
+    result = subprocess.run([node, "-e", script, json.dumps(jobs)],
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+input = None, capture_output = True, timeout = None, check = True
+popenargs = (['/usr/bin/node', '-e', 'let CUR=null, EN={}, MAN=[], DUR=0, POLL=null, PHIST=[], PHPH="", LOGN=0, LOGE=null, LOGINIT...(shellHtml)}));})();\n', '[{"id": "a123456789ab", "name": "Literal &#38; and &quot; notes.mp4", "phase": "queued"}]'],)
+kwargs = {'text': True, 'stdout': -1, 'stderr': -1}
+
+    def run(*popenargs,
+            input=None, capture_output=False, timeout=None, check=False, **kwargs):
+        """Run command with arguments and return a CompletedProcess instance.
+    
+        The returned instance will have attributes args, returncode, stdout and
+        stderr. By default, stdout and stderr are not captured, and those attributes
+        will be None. Pass stdout=PIPE and/or stderr=PIPE in order to capture them,
+        or pass capture_output=True to capture both.
+    
+        If check is True and the exit code was non-zero, it raises a
+        CalledProcessError. The CalledProcessError object will have the return code
+        in the returncode attribute, and output & stderr attributes if those streams
+        were captured.
+    
+        If timeout (seconds) is given and the process takes too long,
+         a TimeoutExpired exception will be raised.
+    
+        There is an optional argument "input", allowing you to
+        pass bytes or a string to the subprocess's stdin.  If you use this argument
+        you may not also use the Popen constructor's "stdin" argument, as
+        it will be used internally.
+    
+        By default, all communication is in bytes, and therefore any "input" should
+        be bytes, and the stdout and stderr will be bytes. If in text mode, any
+        "input" should be a string, and stdout and stderr will be strings decoded
+        according to locale encoding, or by "encoding" if set. Text mode is
+        triggered by setting any of text, encoding, errors or universal_newlines.
+    
+        The other arguments are the same as for the Popen constructor.
+        """
+        if input is not None:
+            if kwargs.get('stdin') is not None:
+                raise ValueError('stdin and input arguments may not both be used.')
+            kwargs['stdin'] = PIPE
+    
+        if capture_output:
+            if kwargs.get('stdout') is not None or kwargs.get('stderr') is not None:
+                raise ValueError('stdout and stderr arguments may not be used '
+                                 'with capture_output.')
+            kwargs['stdout'] = PIPE
+            kwargs['stderr'] = PIPE
+    
+        with Popen(*popenargs, **kwargs) as process:
+            try:
+                stdout, stderr = process.communicate(input, timeout=timeout)
+            except TimeoutExpired as exc:
+                process.kill()
+                if _mswindows:
+                    # Windows accumulates the output in a single blocking
+                    # read() call run on child threads, with the timeout
+                    # being done in a join() on those threads.  communicate()
+                    # _after_ kill() is required to collect that and add it
+                    # to the exception.
+                    exc.stdout, exc.stderr = process.communicate()
+                else:
+                    # POSIX _communicate already populated the output so
+                    # far into the TimeoutExpired exception.
+                    process.wait()
+                raise
+            except:  # Including KeyboardInterrupt, communicate handled that.
+                process.kill()
+                # We don't call process.wait() as .__exit__ does that for us.
+                raise
+            retcode = process.poll()
+            if check and retcode:
+>               raise CalledProcessError(retcode, process.args,
+                                         output=stdout, stderr=stderr)
+E               subprocess.CalledProcessError: Command '['/usr/bin/node', '-e', 'let CUR=null, EN={}, MAN=[], DUR=0, POLL=null, PHIST=[], PHPH="", LOGN=0, LOGE=null, LOGINIT=false, RECENT_LOG=null, SHELLPH=null, JOBSJSON="";\n\n// VIEW_GEN advances on every openJob (including A -> B -> A) and removal.\n// Drafts live only in this page; late acknowledgements reconcile their owner,\n// but may never publish into, or start rendering from, a different view.\nlet VIEW_GEN=0, EDITS=null;\n// Polling owns one metadata -> log cycle, using the existing view identity.\nlet POLL_CYCLE=null, POLL_FAILURES=0, AUTO_REVIEW=null, REVIEW_REQUEST=null;\nfunction pollStatus(message){\n const el=document.getElementById("pollStatus");\n if(el&&el.textContent!==message)el.textContent=message;\n}\nfunction stopPolling(){\n if(POLL){clearTimeout(POLL.handle);POLL=null;}\n const old=POLL_CYCLE;POLL_CYCLE=null;\n if(old)old.controller.abort();\n}\nfunction schedulePoll(id,gen,delay){\n if(!ownsView(id,gen)||document.hidden)return;\n if(POLL)clearTimeout(POLL.handle);\n const timer={id,gen};POLL=timer;\n timer.handle=setTimeout(()=>{\n  if(POLL!==timer||!ownsView(id,gen))return;\n  POLL=null;refresh();\n },delay);\n}\n// Only metadata/log use this deadline. Race body consumption too: abort alone\n// cannot settle a transport/body that ignores it. Losing work has no UI effects.\nasync function pollJson(url,cycle){\n const controller=new AbortController(),signal=cycle.controller.signal;\n let deadline,onCancel;\n const stopped=new Promise((_,reject)=>{\n  const fail=message=>{controller.abort();reject(new Error(message));};\n  onCancel=()=>fail("Polling cancelled");\n  signal.addEventListener("abort",onCancel,{once:true});\n  deadline=setTimeout(()=>fail("Polling timed out"),15000);\n  if(signal.aborted)onCancel();\n });\n const operation=(async()=>{\n  const r=await fetch(url,{signal:controller.signal});\n  if(!r.ok)throw new Error("Polling HTTP "+r.status);\n  return await r.json();\n })();\n try{return await Promise.race([operation,stopped]);}\n finally{clearTimeout(deadline);signal.removeEventListener("abort",onCancel);}\n}\nfunction refresh(){\n if(!CUR||document.hidden)return;\n if(POLL_CYCLE)return POLL_CYCLE.promise;\n if(POLL){clearTimeout(POLL.handle);POLL=null;}\n const cycle={id:CUR,gen:VIEW_GEN,controller:new AbortController()};\n POLL_CYCLE=cycle;\n cycle.promise=(async()=>{\n  let delay=900;\n  try{\n   await refreshCycle(cycle);\n   if(POLL_CYCLE!==cycle||!ownsView(cycle.id,cycle.gen))return;\n   POLL_FAILURES=0;pollStatus("");\n  }catch(e){\n   if(POLL_CYCLE!==cycle||!ownsView(cycle.id,cycle.gen))return;\n   delay=Math.min(10000,900*Math.pow(2,Math.min(POLL_FAILURES++,4)));\n   pollStatus("Job updates interrupted — retrying in "+(delay/1000)+" s.");\n  }finally{\n   if(POLL_CYCLE===cycle&&ownsView(cycle.id,cycle.gen)){\n    POLL_CYCLE=null;\n    // Chained after completion: request duration adds to the healthy 900 ms.\n    schedulePoll(cycle.id,cycle.gen,delay);\n   }\n  }\n })();\n return cycle.promise;\n}\nfunction wakePolling(){\n if(!CUR||document.hidden)return;\n // A pending immediate wake already coalesces focus/pageshow/online bursts.\n if(POLL&&POLL.wake)return;\n stopPolling();\n schedulePoll(CUR,VIEW_GEN,0);if(POLL)POLL.wake=true;\n}\ndocument.addEventListener("visibilitychange",()=>{\n if(document.hidden)stopPolling();else wakePolling();\n});\nwindow.addEventListener("pagehide",stopPolling);\nfor(const event of ["focus","pageshow","online"])window.addEventListener(event,wakePolling);\nconst REVIEW_DRAFTS=new Map();\nfunction emptyEditor(){return {t:0,ox:0,oy:0,boxes:[],sel:-1,ov:{},dis:{},times:{},adds:[],\n add:false,addAnchor:null,drag:null,scale:1,dur:10,\n audio:[],audioSaved:[],audioLoaded:false};}\nfunction sameEdit(a,b){return JSON.stringify(a)===JSON.stringify(b);}\nfunction copyEdit(a){return JSON.parse(JSON.stringify(a));}\nfunction ownsView(id,gen){return CUR===id&&VIEW_GEN===gen;}\nfunction saveStatus(d,message){\n d.status=message;\n if(d!==EDITS)return;\n const el=document.getElementById("reviewSaveStatus");if(el)el.textContent=message;\n document.querySelectorAll("button[data-save-edits]").forEach(b=>{b.disabled=!!d.busy;});\n}\nfunction trimReviewDraft(d){\n const b=d.editor;\n // Clean audio is fetched display state even when other edit kinds are pending.\n // An in-flight audio submission may make a toggle-back a newer pending choice.\n if(!d.audioInFlight&&sameEdit(b.audio,b.audioSaved)){\n  b.audio=[];b.audioSaved=[];b.audioLoaded=false;\n }\n if(!d.busy&&!hasReviewEdits(d)){\n  d.en={};d.editor=emptyEditor();\n }\n}\nfunction hasReviewEdits(d){\n const b=d.editor;\n return Object.keys(d.enabled).length||d.manual.length||b.adds.length||\n  Object.keys(b.ov).length||Object.keys(b.times).length||\n  !sameEdit(b.audio,b.audioSaved);\n}\n\n// Job names are text inside the list link and detail heading.\nfunction jobNameHtml(name){\n return String(name).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");\n}\n\nasync function loadJobs(){\n const r=await fetch("api/jobs");\n if(r.status===423){jobs.innerHTML=\'<span style="color:#f87171">&#128274; locked — unlock in the Encryption panel below</span>\';JOBSJSON="";return;}\n const js=await r.json();\n const s=JSON.stringify(js);\n if(s===JOBSJSON)return;\n JOBSJSON=s;\n jobs.innerHTML=js.length?js.map(j=>\n  `<div class="row" style="justify-content:space-between;padding:4px 0">\n   <a href="#" onclick="openJob(\'${j.id}\');return false">${jobNameHtml(j.name)}</a>\n   <span style="display:flex;gap:10px;align-items:center"><span class="badge">${j.phase}</span>\n   ${(j.phase=="error"||j.phase=="cancelled")?`<a href="#" title="Retry the scan — reuses the file already on the server, nothing is re-uploaded" style="text-decoration:none;font-size:15px" onclick="retryJob(\'${j.id}\');return false">&#8635;</a>`:""}\n   <a href="#" title="Delete this job and all of its files" style="text-decoration:none;font-size:15px" onclick="delJob(\'${j.id}\');return false">&#128465;&#65039;</a></span></div>`).join(""):"none yet";\n}\n\nfunction shellHtml(j){\n return `<div class="card" id="jobcard"><h2>${jobNameHtml(j.name)}\n  <span class="badge" id="ph"></span><small id="eta"></small></h2>\n <progress id="prog" value="0" max="1"></progress>\n <div class="row" id="actions" style="margin-top:8px"></div>\n <div style="margin-top:8px;text-align:center"><img id="pimg"\n   style="max-width:100%;border-radius:8px;display:none;margin:0 auto"></div>\n <div id="pcap" style="font-size:12px;color:#94a3b8"></div>\n <div id="logStatus" style="margin-top:8px;color:#94a3b8"></div>\n <div id="log" tabindex="0" aria-label="Job log" aria-describedby="logStatus" style="margin-top:8px"></div>\n <div class="warn" id="warnbox" style="display:none;margin-top:8px"></div>\n </div>`;\n}\n\n// Save As exports stay bound to the clicked job even while the picker is open.\nlet EXPORT_NAMES={id:null,video:null,report:null};\nconst CAN_SAVE_AS=!!(window.isSecureContext&&window.showSaveFilePicker);\nconst EXPORTS=new Map();\nfunction exportControls(id,kind){\n const label=kind==="video"?"redacted video":"audit report";\n const path=kind==="video"?"download":"report";\n const direct=`<a href="api/jobs/${id}/${path}" onclick="exportDownloadStarted(\'${kind}\')">Download ${label}</a>`;\n return `<div id="export-${kind}" data-job="${id}" style="flex:1 1 260px;min-width:0">\n  ${CAN_SAVE_AS?`<button id="save-${kind}" class="${kind===\'report\'?\'sec\':\'\'}" onclick="saveExportAs(\'${kind}\',this)">Save ${label} as…</button>\n   <span style="font-size:12px"> · ${direct}</span>`:direct}\n  <div id="export-${kind}-feedback" hidden>\n   <progress id="export-${kind}-progress" max="1" aria-label="${label} save progress" style="width:100%"></progress>\n   <div id="export-${kind}-status" style="font-size:12px;overflow-wrap:anywhere"></div>\n   <div id="export-${kind}-live" role="status" aria-live="polite" aria-atomic="true"\n    style="position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)"></div>\n  </div></div>`;\n}\nfunction exportDownloadStarted(kind){\n if(!CUR)return;\n const key=CUR+":"+kind;\n // A direct download cannot observe disk completion or replace a running save.\n if(EXPORTS.get(key)?.active)return;\n EXPORTS.set(key,{id:CUR,kind,phase:"download",written:0,total:null,active:false});\n renderExportProgress();\n}\nfunction exportDuration(seconds){\n const s=Math.max(0,Math.floor(seconds));\n return s>=60?`${Math.floor(s/60)} min ${s%60} s`:`${s} s`;\n}\nfunction renderExportProgress(){\n const now=performance.now();\n for(const kind of ["video","report"]){\n  const box=document.getElementById("export-"+kind),state=EXPORTS.get(CUR+":"+kind);\n  if(!box||box.dataset.job!==CUR)continue;\n  const button=document.getElementById("save-"+kind);\n  if(button)button.disabled=!!state?.active;\n  if(!state)continue;\n  if(state.active&&state.renderedBox===box&&state.renderedPhase===state.phase&&now-state.renderedAt<250)continue;\n  state.renderedBox=box;state.renderedPhase=state.phase;state.renderedAt=now;\n  document.getElementById(`export-${kind}-feedback`).hidden=false;\n  const bar=document.getElementById(`export-${kind}-progress`);\n  if(state.total===null||state.phase==="download")bar.removeAttribute("value");\n  else{bar.max=state.total||1;bar.value=state.written;}\n  bar.hidden=state.phase==="download";\n  let text="Download started — see browser downloads";\n  if(state.phase!=="download"){\n   const amount=Math.max(state.total||0,state.written);\n   const power=amount>0?Math.min(3,Math.floor(Math.log10(amount)/3)):0;\n   const unit=["B","KB","MB","GB"][power],scale=1000**power;\n   const bytes=n=>`${(n/scale).toFixed(power?1:0)} ${unit}`;\n   const elapsed=(now-state.start)/1000;\n   const waiting=state.active&&state.phase!=="finalizing"&&now-state.lastWrite>=5000;\n   let label=state.phase==="saved"?"Saved":state.phase==="failed"?"Save failed":\n    state.phase==="finalizing"?"Finalizing…":state.phase==="choosing"?"Choose a destination…":\n    waiting?"Waiting for data or disk…":`Saving ${kind==="video"?"video":"audit report"}`;\n   const count=state.total===null?bytes(state.written):\n    `${bytes(state.written)} / ${bytes(state.total)} (${state.total?Math.min(100,Math.floor(state.written/state.total*100)):100}%)`;\n   text=`${label} — ${count} · ${exportDuration(((state.end??now)-state.start)/1000)} elapsed`;\n   if(state.phase==="saving"&&!waiting&&elapsed>=3&&state.samples.length>1){\n    // Retain one observation at/before the rolling ten-second boundary.\n    while(state.samples.length>2&&state.samples[1][0]<=now-10000)state.samples.shift();\n    const [t,b]=state.samples[0],rate=(state.written-b)/((now-Math.max(t,now-10000))/1000);\n    if(rate>0){text+=` · ${bytes(rate)}/s`;\n     if(state.total!==null&&state.written<state.total)\n      text+=` · about ${exportDuration((state.total-state.written)/rate)} left`;}\n   }\n   if(state.error)text+=` · ${state.error}. Try Save As again or use Download.`;\n  }\n  document.getElementById(`export-${kind}-status`).textContent=text;\n  // Visual updates run at 250ms; live announcements have their own 2s cadence.\n  if(state.announcedPhase!==state.phase||now-(state.announcedAt??-Infinity)>=2000){\n   document.getElementById(`export-${kind}-live`).textContent=text;\n   state.announcedPhase=state.phase;state.announcedAt=now;\n  }\n }\n}\nasync function saveExportAs(kind,button){\n const id=CUR,name=EXPORT_NAMES[kind],path=kind==="video"?"download":"report";\n if(!id||EXPORT_NAMES.id!==id||!name||!["video","report"].includes(kind))return;\n const key=id+":"+kind,previous=EXPORTS.get(key);\n if(previous?.active)return;\n const start=performance.now();\n const state={id,kind,phase:"choosing",active:true,written:0,total:null,start,\n  lastWrite:start,samples:[[start,0]]};\n EXPORTS.set(key,state);button.disabled=true;renderExportProgress();\n let reader,writable,timer;\n try{\n  // Invoke synchronously from the click, before the first network await.\n  let handle;\n  try{handle=await window.showSaveFilePicker({suggestedName:name});}\n  catch(e){if(e.name!=="AbortError")throw e;\n   if(previous)EXPORTS.set(key,previous);else EXPORTS.delete(key);\n   if(CUR===id){document.getElementById(`export-${kind}-feedback`).hidden=!previous;\n    renderExportProgress();}\n   return;\n  }\n  state.phase="saving";state.start=state.lastWrite=performance.now();\n  state.samples=[[state.start,0]];\n  timer=setInterval(renderExportProgress,250);\n  const response=await fetch(`api/jobs/${encodeURIComponent(id)}/${path}`);\n  if(!response.ok)throw new Error(response.status===423?"encryption vault is locked":`server returned HTTP ${response.status}`);\n  if(!response.body)throw new Error("browser did not provide a file stream");\n  reader=response.body.getReader();\n  const length=response.headers.get("Content-Length"),encoding=response.headers.get("Content-Encoding");\n  // Fetch decodes encoded responses; their transfer length is not a disk total.\n  if((!encoding||encoding.toLowerCase()==="identity")&&length!==null&&/^[0-9]+$/.test(length)){\n   const total=Number(length);if(Number.isSafeInteger(total))state.total=total;\n  }\n  writable=await handle.createWritable();\n  for(;;){\n   const {done,value}=await reader.read();if(done)break;\n   await writable.write(value); // backpressure: accepted bytes only\n   const now=performance.now();state.written+=value.byteLength;state.lastWrite=now;\n   // Coalesce observations to 250ms buckets; keep a bounded ten-second window.\n   if(state.samples.length===1||Math.floor(now/250)!==Math.floor(state.samples[state.samples.length-1][0]/250))\n    state.samples.push([now,state.written]);\n   else state.samples[state.samples.length-1]=[now,state.written];\n   while(state.samples.length>2&&state.samples[1][0]<=now-10000)state.samples.shift();\n  }\n  if(state.total!==null&&state.written!==state.total)throw new Error("received byte count does not match Content-Length");\n  state.phase="finalizing";renderExportProgress();\n  await writable.close();\n  state.phase="saved";\n }catch(e){\n  state.phase="failed";state.error=e.message||String(e);\n  if(reader)try{await reader.cancel();}catch(_){}\n  if(writable)try{await writable.abort();}catch(_){}\n }finally{\n  if(timer)clearInterval(timer);\n  if(reader)reader.releaseLock();\n  state.active=false;state.end=performance.now();\n  button.disabled=false;renderExportProgress();\n }\n}\n\n\nconst data=JSON.parse(process.argv[1]);\nconst jobs={innerHTML:\'\'};\nconst fetch=async()=>({status:200,json:async()=>data});\n(async()=>{await loadJobs();console.log(JSON.stringify({\n list:jobs.innerHTML,titles:data.map(shellHtml)}));})();\n', '[{"id": "a123456789ab", "name": "Literal &#38; and &quot; notes.mp4", "phase": "queued"}]']' returned non-zero exit status 1.
+
+/tmp/openscrub-baseline-20261116/python/cpython-3.12.16-linux-x86_64-gnu/lib/python3.12/subprocess.py:571: CalledProcessError
+_____________ test_automatic_review_eligibility_and_retry[manual] ______________
+
+transition = 'manual'
+
+    @pytest.mark.parametrize('transition', ['done', 'return', 'same', 'manual', 'failure'])
+    def test_automatic_review_eligibility_and_retry(transition):
+>       run_js("""openJob('A');await cycle('review');const detections=queue.shift();
+        assert.ok(detections.url.endsWith('/detections'));await advance(900);assert.ok(queue[0].url==='api/jobs/A');
+        if(TRANSITION==='failure'){detections.reject(Error('offline'));await tick();await cycle('review');
+          assert.ok(queue[0].url.endsWith('/detections'));await reply({duration:3,detections:[]});assert.equal(DUR,3);return;}
+        await cycle(TRANSITION==='same'?'review':'done');
+        if(TRANSITION==='return'){await advance(900);await cycle('review');}
+        if(TRANSITION==='manual'){const p=loadReview();await reply({duration:3,detections:[]});await p;}
+        detections.resolve(response({duration:99,detections:[]}));await tick();
+        assert.equal(DUR,TRANSITION==='same'?99:TRANSITION==='manual'?3:0);
+        """.replace('TRANSITION', json.dumps(transition)))
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_job_polling_node.py:140: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = 'openJob(\'A\');await cycle(\'review\');const detections=queue.shift();\n    assert.ok(detections.url.endsWith(\'/dete...ation:99,detections:[]}));await tick();\n    assert.equal(DUR,"manual"===\'same\'?99:"manual"===\'manual\'?3:0);\n    '
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node needed for emitted polling JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: ReferenceError: ResizeObserver is not defined
+E             at ReviewScheduler.start (evalmachine.<anonymous>:1455:21)
+E             at loadReview (evalmachine.<anonymous>:1424:15)
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...    at ReviewScheduler.start (evalmachine.<anonymous>:1455:21)\n    at loadReview (evalmachine.<anonymous>:1424:15)\n').returncode
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_job_polling_node.py:68: AssertionError
+=========================== short test summary info ============================
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_job_logs.py::test_negative_cursor_and_retry_keep_store_epoch
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_job_logs.py::test_thumbnail_and_tracking_callbacks_stay_with_their_job
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_job_filename_display.py::test_emitted_job_list_and_title_preserve_literal_name[list-Family &amp; friends \u2014 caf\xe9.mp4]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_job_filename_display.py::test_emitted_job_list_and_title_preserve_literal_name[list-Friends' "summer" & snow \u2603.MOV]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_job_filename_display.py::test_emitted_job_list_and_title_preserve_literal_name[list-Literal &#38; and &quot; notes.mp4]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_job_filename_display.py::test_emitted_job_list_and_title_preserve_literal_name[title-Family &amp; friends \u2014 caf\xe9.mp4]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_job_filename_display.py::test_emitted_job_list_and_title_preserve_literal_name[title-Friends' "summer" & snow \u2603.MOV]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_job_filename_display.py::test_emitted_job_list_and_title_preserve_literal_name[title-Literal &#38; and &quot; notes.mp4]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_job_polling_node.py::test_automatic_review_eligibility_and_retry[manual]
+9 failed, 346 passed in 37.33s

@@ -1,0 +1,40 @@
+diff --cc openscrub_web.py
+index 0a4f3e0,5323485..0000000
+--- a/openscrub_web.py
++++ b/openscrub_web.py
+@@@ -2491,19 -2444,28 +2542,24 @@@ def job_render(jid)
+  @app.route("/api/jobs/<jid>/download")
+  def job_download(jid):
+      job = JOBS.get(jid) or abort(404)
+-     if not job["output"] or not os.path.exists(job["output"]):
+-         abort(404)
+-     return send_file(job["output"], as_attachment=True,
+-                      download_name=export_filenames(job)[0])
++     with FILES.initialize(job).report_lock:
++         _report_current(job)
++         _recovery_gate(job)
++         if not job["output"]:
++             abort(404)
+ -        ext = os.path.splitext(job["output"])[1] or ".mp4"
++         return _send_open_file(job["output"], as_attachment=True,
+ -                              download_name=os.path.splitext(job["name"])[0]
+ -                              + "_redacted" + ext)
+ -
+++                               download_name=export_filenames(job)[0])
+  
+  
+  @app.route("/api/jobs/<jid>/report")
+  def job_report(jid):
+      job = JOBS.get(jid) or abort(404)
+      with FILES.initialize(job).report_lock:
+-         return send_file(os.path.join(job["dir"], "report.json"),
++         _report_current(job)
++         _recovery_gate(job)
++         return _send_open_file(os.path.join(job["dir"], "report.json"),
+                           as_attachment=True,
+ -                         download_name=os.path.splitext(job["name"])[0]
+ -                         + "_audit.json")
+ +                         download_name=export_filenames(job)[1])
+  
+  
+  # ----------------------------------------------------------------------------

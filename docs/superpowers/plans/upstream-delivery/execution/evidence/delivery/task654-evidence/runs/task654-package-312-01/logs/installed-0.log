@@ -1,0 +1,295 @@
+DEFAULT_PATHS {"jobs": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task654/runs/task654-package-312-01/profile/.local/share/OpenScrub/openscrub_jobs", "models": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task654/runs/task654-package-312-01/profile/.openscrub/models"}
+ACTIVE_SOURCE {"executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python", "python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]", "sources": {"openscrub": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task654/runs/task654-package-312-01/site-packages/openscrub.py", "sha256": "a959248b4591abb819ae017d3bb5626e51af18aafbc9b48f9af1053f72852ec0"}, "openscrub_internal": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task654/runs/task654-package-312-01/site-packages/openscrub_internal/__init__.py", "sha256": "c35c063c010e329c5dad13782e7b67438ed4b2d1faf975d4f01be2773a18e022"}, "openscrub_internal.job_logs": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task654/runs/task654-package-312-01/site-packages/openscrub_internal/job_logs.py", "sha256": "63d08c124db019b120bb17efc64706d910f1d831f8ccfd9c1ba124368643d1b8"}, "openscrub_internal.lifetimes": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task654/runs/task654-package-312-01/site-packages/openscrub_internal/lifetimes.py", "sha256": "dbfc317c1c878b8e8a599391578504c44a8964199f2cdae6e2ed60a6336d6743"}, "openscrub_internal.opencv_compat": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task654/runs/task654-package-312-01/site-packages/openscrub_internal/opencv_compat.py", "sha256": "0f568ced4e60add8adacafd8670c942eac92e218725c466c6f8b35e8cfbb8dd5"}, "openscrub_internal.reports": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task654/runs/task654-package-312-01/site-packages/openscrub_internal/reports.py", "sha256": "eec9d568fc18f08ee35469ba864c5526120ae11152e8fe6f4d15007ab42d2427"}, "openscrub_setup": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task654/runs/task654-package-312-01/site-packages/openscrub_setup.py", "sha256": "7f466cee4eb53e444de8361fc5cd54f8fc7744fa01c92f4906780320c6c84091"}, "openscrub_update": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task654/runs/task654-package-312-01/site-packages/openscrub_update.py", "sha256": "4d6a20f75d985a119f8421227c3bd88b17fd1b8eed44e353b127b5b49e733d55"}, "openscrub_vault": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task654/runs/task654-package-312-01/site-packages/openscrub_vault.py", "sha256": "da1b7fe4da389352fbc594abddcc563278b26009d8f342d4154ffa305bf4dfa4"}, "openscrub_web": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task654/runs/task654-package-312-01/site-packages/openscrub_web.py", "sha256": "ce05392a115b7cfed11821f51b406cca7e4c5cff118d5876586ad43047897d17"}, "zones_ui": {"file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task654/runs/task654-package-312-01/site-packages/zones_ui.py", "sha256": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7"}}}
+usage: openscrub [-h] [-o OUTPUT] [--config CONFIG]
+                 [--allow-names ALLOW_NAMES] [--extra-names EXTRA_NAMES]
+                 [--engine {auto,paddle,onnx,tesseract}]
+                 [--device {auto,cpu,gpu}] [--encoder {auto,nvenc,qsv,x264}]
+                 [--no-ner] [--heuristic-names {auto,on,off}]
+                 [--sample-interval SAMPLE_INTERVAL]
+                 [--scan-trigger SCAN_TRIGGER] [--pad PAD] [--no-vfr-fix]
+                 [--out-quality {archival,balanced,share}]
+                 [--codec {h264,hevc}] [--hdr-output {match,sdr}]
+                 [--tile {auto,on,off}] [--face-heads] [--dense-faces]
+                 [--dense-face-stride DENSE_FACE_STRIDE]
+                 [--scan-speed {thorough,balanced,fast,fastest}]
+                 [--plate-model PLATE_MODEL] [--face-shape {ellipse,rect}]
+                 [--face-model FACE_MODEL] [--plate-threshold PLATE_THRESHOLD]
+                 [--person-model PERSON_MODEL]
+                 [--person-threshold PERSON_THRESHOLD]
+                 [--face-threshold FACE_THRESHOLD] [--draw-scores]
+                 [--detect-scale DETECT_SCALE] [--face-expand FACE_EXPAND]
+                 [--coverage {tight,box,concealed}]
+                 [--mode {blur,box,mosaic,inpaint}] [--mode-map MODE_MAP]
+                 [--mrn-regex MRN_REGEX] [--scroll-track {auto,on,off}]
+                 [--adaptive {on,off}] [--phrase TEXT] [--phrases FILE]
+                 [--custom-regex ID=PATTERN] [--bridge-gap BRIDGE_GAP]
+                 [--no-memory] [--preview] [--report REPORT]
+                 [--detect-windows DETECT_WINDOWS]
+                 [--detect-windows-frac DETECT_WINDOWS_FRAC]
+                 [--clip-frac CLIP_FRAC]
+                 [--mute-audio-tracks MUTE_AUDIO_TRACKS]
+                 [--audio-lane-count AUDIO_LANE_COUNT]
+                 [--clip-start CLIP_START] [--clip-end CLIP_END] [--audio-pii]
+                 [--audio-pii-model AUDIO_PII_MODEL] [--audio-pii-apply]
+                 [--audio-redact AUDIO_REDACT]
+                 [--audio-redact-mode {mute,bleep}]
+                 [--from-report FROM_REPORT] [--batch BATCH] [--overwrite]
+                 [--backtrack-window BACKTRACK_WINDOW] [--no-backtrack]
+                 [--skip-start SKIP_START] [--skip-end SKIP_END]
+                 [--zones ZONES] [--windows WINDOWS]
+                 [--ignore-region X1,Y1,X2,Y2] [--ocr-upscale {auto,on,off}]
+                 [--paranoid] [--vfr {auto,ignore}] [--categories CATEGORIES]
+                 [video]
+
+Blur PII in videos and screen recordings (scroll-aware, no name list needed).
+
+positional arguments:
+  video                 input video (omit only with --batch)
+
+options:
+  -h, --help            show this help message and exit
+  -o OUTPUT, --output OUTPUT
+  --config CONFIG       YAML config profile (CLI flags override it)
+  --allow-names ALLOW_NAMES
+                        text file of provider/staff names to KEEP visible
+  --extra-names EXTRA_NAMES
+                        text file of names to always blur
+  --engine {auto,paddle,onnx,tesseract}
+  --device {auto,cpu,gpu}
+                        PaddleOCR compute device (default: gpu if available)
+  --encoder {auto,nvenc,qsv,x264}
+                        video encoder: auto = NVENC then QSV (GPU) if
+                        available, else libx264 (CPU)
+  --no-ner              disable spaCy NER
+  --heuristic-names {auto,on,off}
+                        capitalized-pair fallback: auto = on when NER
+                        unavailable
+  --sample-interval SAMPLE_INTERVAL
+                        seconds between time-based OCR samples (default 0.5)
+  --scan-trigger SCAN_TRIGGER
+                        also OCR after this many pixels of scroll (default 60)
+  --pad PAD, --blur-buffer PAD
+                        blur buffer: pixels of blur beyond the tightly-cropped
+                        word/face (default 8)
+  --no-vfr-fix          skip automatic CFR normalization of VFR input
+  --out-quality {archival,balanced,share}
+                        output file quality/size: archival = visually lossless
+                        (largest, the default), balanced = ~1/3 the size,
+                        share = ~1/8 — still clean, sized for messaging and
+                        upload
+  --codec {h264,hevc}   video codec for the output: h264 (default, plays
+                        everywhere) or hevc (H.265, smaller files). HDR output
+                        always uses 10-bit HEVC regardless.
+  --hdr-output {match,sdr}
+                        for HDR input: 'match' (default) keeps the output HDR
+                        (10-bit HEVC, PQ/HLG preserved); 'sdr' tone-maps the
+                        output to SDR BT.709. SDR input always renders SDR —
+                        output matches the source.
+  --tile {auto,on,off}  tiled detection for small objects on high-res frames
+                        (auto: engages when the frame is >=2.6x the model
+                        input)
+  --face-heads          also cover TURNED heads: derive a head region from
+                        every person detection (needs a person model) and
+                        union it into the face category — hair and head shape
+                        identify people too
+  --dense-faces         run the face detector on EVERY frame (not just at scan
+                        intervals) so fast-moving faces stay covered.
+                        Restricted to face detection zones when zones are set,
+                        which keeps it fast. Higher render time.
+  --dense-face-stride DENSE_FACE_STRIDE
+                        run the per-frame detectors (faces, plates, person,
+                        QR, screens, all-text) on every Nth frame; skipped
+                        frames are covered by interpolating each track between
+                        samples. 1 = every frame (default). Prefer --scan-
+                        speed.
+  --scan-speed {thorough,balanced,fast,fastest}
+                        speed/coverage preset. thorough (default) = every
+                        frame, full resolution. balanced = every 2nd frame,
+                        gaps interpolated (~1.9x faster, coverage ~unchanged).
+                        fast = every 3rd frame (~2.6x; fast-moving faces and
+                        faces on screen for under 3 frames can be missed).
+                        fastest = every 3rd frame at half face-detection
+                        resolution (~8x; misses many small/distant faces —
+                        close-ups only). Never slower than explicit --dense-
+                        face-stride/--detect-scale. Always review the output.
+  --plate-model PLATE_MODEL
+                        path to a YOLOv8 license-plate ONNX model. If omitted,
+                        OpenScrub looks for models/plate_yolov8.onnx or the
+                        $OPENSCRUB_PLATE_MODEL env var. Plate category is
+                        inactive without a model.
+  --face-shape {ellipse,rect}
+                        mask shape for face redaction: ellipse hugs the face
+                        (no blurred background corners); rect is the classic
+                        box. Text regions are always rectangular.
+  --face-model FACE_MODEL
+                        path to an optional face-detection ONNX model
+                        (CenterFace or SCRFD, auto-recognized; see
+                        face_models.json). Falls back to
+                        $OPENSCRUB_FACE_MODEL, then to the built-in YuNet —
+                        face detection always works without a model file.
+  --plate-threshold PLATE_THRESHOLD
+                        license-plate detector confidence cutoff (0-1).
+                        Default 0.35.
+  --person-model PERSON_MODEL
+                        path to a YOLO person-detection ONNX model (see
+                        person_models.json). If omitted, OpenScrub looks for
+                        models/person_yolov8.onnx or $OPENSCRUB_PERSON_MODEL.
+                        The person (full-body blur) category is inactive
+                        without a model.
+  --person-threshold PERSON_THRESHOLD
+                        person detector confidence cutoff (0-1). Default 0.5.
+  --face-threshold FACE_THRESHOLD
+                        face detector confidence cutoff (0-1). Lower catches
+                        more faces but risks false positives; higher is
+                        stricter. Default 0.6 (YuNet).
+  --draw-scores         with --preview, draw each face's confidence score so
+                        you can tune --face-threshold on your own footage
+  --detect-scale DETECT_SCALE
+                        run FACE detection on a downscaled copy of each frame
+                        for speed (0.2-1.0; e.g. 0.5 = half resolution).
+                        Output quality is unaffected. Default 1.0 (off).
+  --face-expand FACE_EXPAND
+                        expand detected face boxes by this fraction before the
+                        blur buffer is applied (default 0.15). Close-up faces
+                        get more automatically: the margin ramps up to 0.45 as
+                        a face fills 15-30% of the frame (never below this
+                        value), so the neck and collar under a close-up are
+                        covered too
+  --coverage {tight,box,concealed}
+                        person/tracked-object cover: tight = silhouette (best
+                        looking), box = full detection box (hides body shape),
+                        concealed = gliding oversized box (witness-grade: also
+                        hides walking gait)
+  --mode {blur,box,mosaic,inpaint}
+                        default redaction style: blur (reversible-ish), box
+                        (solid black, irreversible), or mosaic (pixelation —
+                        censored look, not recoverable)
+  --mode-map MODE_MAP   per-category overrides, e.g. 'ssn=box,mrn=box' —
+                        override style per category, e.g.
+                        'ssn=box,face=mosaic'; a risky while blurring the
+                        rest. Categories not listed use --mode.
+  --mrn-regex MRN_REGEX
+                        your own pattern for the 'mrn' ID-number category
+                        (record/claim/account numbers — any identifier
+                        format). EMPTY (the default) leaves the category
+                        inactive: bring your own pattern, e.g. '\b\d{7}\b' or
+                        '^[A-Za-z]{0,3}\d{6,10}$'.
+  --scroll-track {auto,on,off}
+                        screen-scroll tracking + safety bands. 'auto'
+                        (default) probes the footage: camera video (continuous
+                        2-axis motion) disables them — detections stay screen-
+                        anchored and no unscanned-strip bands are drawn.
+                        'on'/'off' force it.
+  --adaptive {on,off}   self-tune scan pacing: stretch the sample interval
+                        while the screen is static, tighten it under heavy
+                        change, and scan sooner when scrolling fast. 'off'
+                        uses the fixed values.
+  --phrase TEXT         text to find and blur for the 'phrase' (specific text)
+                        category, repeatable: --categories phrase --phrase
+                        "Acme Corp". Case, spacing and punctuation are
+                        ignored; 4+ characters also match inside longer words
+  --phrases FILE        text file of phrases for the 'phrase' category, one
+                        per line (same matching as --phrase)
+  --custom-regex ID=PATTERN
+                        user-defined regex category (repeatable), e.g.
+                        --custom-regex claim=CLM-\d+ . Matches are detections
+                        in category ID: they appear in review, reports, per-
+                        category modes, and detection zones like any built-in
+                        category. Add ID to --categories to enable it.
+  --bridge-gap BRIDGE_GAP
+                        max seconds to bridge blur across OCR misses when the
+                        same PII reappears in the same region (default 4.0)
+  --no-memory           disable PII text memory (recall of previously
+                        confirmed strings)
+  --preview             draw boxes (red=PII, orange=unscanned band) instead of
+                        blurring
+  --report REPORT       write JSON audit report with provenance (contains PII
+                        text — protect it)
+  --detect-windows DETECT_WINDOWS
+                        scan ONLY these time ranges, e.g. '60-90,300-330' —
+                        multiple detection windows; the video between them is
+                        skipped entirely when possible. Empty = whole video
+                        (minus --skip-start/--skip-end).
+  --detect-windows-frac DETECT_WINDOWS_FRAC
+                        like --detect-windows but FRACTIONS of the video
+                        duration (0-1), e.g. '0.25-0.4,0.8-0.9'. The web UI
+                        sends these so the browser's reported length can never
+                        desync from the server's measurement (iPhone HEVC/VFR
+                        reported different durations). Overrides --detect-
+                        windows when set.
+  --clip-frac CLIP_FRAC
+                        output trim as FRACTIONS of the duration: 'f0-f1'
+                        (0-1). Overrides --clip-start/--clip-end. Same
+                        duration-agnostic reason as --detect-windows-frac.
+  --mute-audio-tracks MUTE_AUDIO_TRACKS
+                        audio tracks to remove from the output: comma list of
+                        1-based track numbers, or 'all'. Multi-track sources
+                        (game + mic, camera + lav) keep their other tracks.
+                        Numbers count every track unless --audio-lane-count
+                        says otherwise.
+  --audio-lane-count AUDIO_LANE_COUNT
+                        how many audio lanes the web editor showed (set by the
+                        web UI). Browsers list only playable tracks, so
+                        --mute-audio-tracks numbers are matched against all
+                        tracks or the decodable ones, whichever this count
+                        fits; an ambiguous match removes ALL audio (fail
+                        closed).
+  --clip-start CLIP_START
+                        output trim: drop everything before this second — the
+                        redacted output starts here
+  --clip-end CLIP_END   output trim: drop everything after this second (0 =
+                        keep to the end)
+  --audio-pii           transcribe the audio LOCALLY (faster-whisper) and
+                        suggest mute spans for spoken PII in the selected
+                        categories — suggestions appear in review and the
+                        report; nothing leaves the machine
+  --audio-pii-model AUDIO_PII_MODEL
+                        whisper model size for --audio-pii (tiny/base/small;
+                        larger = slower + better)
+  --audio-pii-apply     apply the spoken-PII suggestions as MUTE spans
+                        automatically instead of waiting for review
+  --audio-redact AUDIO_REDACT
+                        time spans to silence in the OUTPUT's audio track,
+                        e.g. '12.5-19.0,84-90'. Spoken names and numbers leak
+                        PII too. See --audio-redact-mode.
+  --audio-redact-mode {mute,bleep}
+                        mute = silence the spans; bleep = 1 kHz tone over them
+                        (audible edit instead of a suspicious gap)
+  --from-report FROM_REPORT
+                        skip scanning; re-render from an (edited) audit report
+                        produced by --report
+  --batch BATCH         process every video in this folder; files whose output
+                        already exists are skipped (resume)
+  --overwrite           with --batch: reprocess even if output exists
+  --backtrack-window BACKTRACK_WINDOW
+                        seconds of recent frames kept for onset backtracking
+                        (RAM: ~1MB per frame at 1440p; default 2.5)
+  --no-backtrack        disable onset backtracking (finding the exact frame
+                        where newly detected PII first appeared)
+  --skip-start SKIP_START
+                        don't detect anything during the first N seconds
+  --skip-end SKIP_END   stop detecting N seconds before the end of the video
+  --zones ZONES         JSON file of per-category detection zones (normalized
+                        0-1 coords). Categories with zones are ONLY detected
+                        inside them — detections outside are dropped and
+                        counted as a warning. Categories without zones remain
+                        full-frame.
+  --windows WINDOWS     JSON file describing per-time-window detection scope
+                        from the unified editor: a list of {"t0","t1"
+                        (FRACTIONS 0-1 of duration), "zones": {cat:
+                        [normrects]}}. Each window scans ONLY its time range,
+                        and ONLY inside its own zones (a window with no zones
+                        scans its whole frame). Supersedes --zones / --detect-
+                        windows when present. The whole-clip default is one
+                        window covering the video.
+  --ignore-region X1,Y1,X2,Y2
+                        screen region to never blur (repeatable), e.g. taskbar
+                        clock
+  --ocr-upscale {auto,on,off}
+                        re-OCR at 2x when text is small (default auto)
+  --paranoid            maximum-recall preset: dense sampling, lenient
+                        matching, forced upscale — more false positives, clean
+                        them up in review
+  --vfr {auto,ignore}   auto: detect variable frame rate and normalize to CFR
+                        before processing (default); ignore: skip check
+  --categories CATEGORIES

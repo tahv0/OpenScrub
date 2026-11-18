@@ -1,0 +1,225 @@
+DEFAULT_PATHS {"jobs": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_jobs", "models": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task654/runs/task654-fixtures-312-02/profile/.openscrub/models"}
+ACTIVE_SOURCE {"executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python", "python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]", "sources": {"openscrub": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py", "sha256": "a959248b4591abb819ae017d3bb5626e51af18aafbc9b48f9af1053f72852ec0"}, "openscrub_internal": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_internal/__init__.py", "sha256": "c35c063c010e329c5dad13782e7b67438ed4b2d1faf975d4f01be2773a18e022"}, "openscrub_internal.job_logs": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_internal/job_logs.py", "sha256": "63d08c124db019b120bb17efc64706d910f1d831f8ccfd9c1ba124368643d1b8"}, "openscrub_internal.lifetimes": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_internal/lifetimes.py", "sha256": "dbfc317c1c878b8e8a599391578504c44a8964199f2cdae6e2ed60a6336d6743"}, "openscrub_internal.opencv_compat": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_internal/opencv_compat.py", "sha256": "0f568ced4e60add8adacafd8670c942eac92e218725c466c6f8b35e8cfbb8dd5"}, "openscrub_internal.reports": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_internal/reports.py", "sha256": "eec9d568fc18f08ee35469ba864c5526120ae11152e8fe6f4d15007ab42d2427"}, "openscrub_setup": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_setup.py", "sha256": "7f466cee4eb53e444de8361fc5cd54f8fc7744fa01c92f4906780320c6c84091"}, "openscrub_update": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_update.py", "sha256": "4d6a20f75d985a119f8421227c3bd88b17fd1b8eed44e353b127b5b49e733d55"}, "openscrub_vault": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_vault.py", "sha256": "da1b7fe4da389352fbc594abddcc563278b26009d8f342d4154ffa305bf4dfa4"}, "openscrub_web": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", "sha256": "4ba3f35ba1076d81d4c834d78d71bd18e65090e3ebe311e81c0872cca45aedbd"}, "zones_ui": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/zones_ui.py", "sha256": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7"}}}
+...........FFFFFFF....................................                   [100%]
+=================================== FAILURES ===================================
+__________ test_thumbnail_and_tracking_callbacks_stay_with_their_job ___________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7c6071b6bcb0>
+tmp_path = PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task654/runs/task654-fixtures-312-02/pytest/test_thumbnail_and_tracking_ca0')
+
+    def test_thumbnail_and_tracking_callbacks_stay_with_their_job(monkeypatch, tmp_path):
+        import openscrub_web as web
+        monkeypatch.setattr(web, 'JOBS', {})
+        monkeypatch.setattr(web, 'JOBS_DIR', str(tmp_path))
+        old = web.new_job('', {}, 'old')
+        deferred = []
+        class DeferredThread:
+            def __init__(self, target, **kwargs):
+                self.target = target
+            def start(self):
+                deferred.append(self.target)
+        monkeypatch.setattr(web.threading, 'Thread', DeferredThread)
+        monkeypatch.setattr(web, 'build_args', lambda *_: object())
+        monkeypatch.setattr(web.openscrub, 'run_scan', lambda *_: {'stats': {}})
+        monkeypatch.setattr(web.openscrub, 'write_report', lambda *_, **kwargs: None)
+        monkeypatch.setattr(web, '_load_job_report', lambda *_: {'render_state': {'fps': 1, 'cum': [[0, 0]]}, 'detections': []})
+        class Capture:
+            def release(self):
+                pass
+        sources = []
+        monkeypatch.setattr(web.cv2, 'VideoCapture', lambda source: (sources.append(source), Capture())[1])
+        web._run_job(old, 'scan')
+        replacement = web.new_job('', {}, 'replacement')
+        web.JOBS[old['id']] = replacement
+        selected = old['video']
+        old['video'] = 'late source must not replace lease'
+        deferred.pop(0)()
+        assert sources == [selected or None]
+        assert any('thumbnails pre-generated' in s for s in old['log'].snapshot()['lines'])
+        assert replacement['log'].snapshot()['lines'] == []
+        # Actual manual-tracking route creates its ordinary engine callback.
+        def detector(cb, **kwargs):
+            cb.log('tracking detector')
+            raise RuntimeError('no model needed')
+        def track(*args, cb, **kwargs):
+            cb.log('tracking samples')
+            return [(0., [0, 0, 4, 4], .9)]
+        monkeypatch.setattr(web.openscrub, 'PersonDetector', detector)
+        monkeypatch.setattr(web.openscrub, 'track_manual_region', track)
+        result = web.app.test_client().post('/api/jobs/' + old['id'] + '/track_object', json={'box': [0, 0, 4, 4], 't_ref': 0, 't0': 0, 't1': 1})
+>       assert result.status_code == 200
+E       assert 409 == 200
+E        +  where 409 = <WrapperTestResponse streamed [409 CONFLICT]>.status_code
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_job_logs.py:249: AssertionError
+_ test_emitted_job_list_and_title_preserve_literal_name[list-Family &amp; friends \u2014 caf\xe9.mp4] _
+
+name = 'Family &amp; friends — café.mp4', surface = 'list'
+
+    @pytest.mark.parametrize("name", NAMES)
+    @pytest.mark.parametrize("surface", ["list", "title"])
+    def test_emitted_job_list_and_title_preserve_literal_name(name, surface):
+        result = emitted_fragments([{"id": "a123456789ab", "name": name,
+                                    "phase": "queued"}])
+        listing = Fragment(result["list"])
+        title = Fragment(result["titles"][0])
+        if surface == "list":
+            assert listing.text[1] == name
+        else:
+            assert "".join(title.text).split("\n", 1)[0] == name
+        assert [tag for tag, _ in listing.tags] == ["div", "a", "span", "span", "a"]
+        assert listing.tags[1][1] == {
+            "href": "#", "onclick": "openJob('a123456789ab');return false"}
+>       assert [tag for tag, _ in title.tags] == [
+            "div", "h2", "span", "small", "progress", "div", "div", "img",
+            "div", "div", "div"]
+E       AssertionError: assert ['div', 'h2',...', 'div', ...] == ['div', 'h2',...', 'div', ...]
+E         
+E         Left contains one more item: 'div'
+E         Use -v to get more diff
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_job_filename_display.py:72: AssertionError
+_ test_emitted_job_list_and_title_preserve_literal_name[list-Friends' "summer" & snow \u2603.MOV] _
+
+name = 'Friends\' "summer" & snow ☃.MOV', surface = 'list'
+
+    @pytest.mark.parametrize("name", NAMES)
+    @pytest.mark.parametrize("surface", ["list", "title"])
+    def test_emitted_job_list_and_title_preserve_literal_name(name, surface):
+        result = emitted_fragments([{"id": "a123456789ab", "name": name,
+                                    "phase": "queued"}])
+        listing = Fragment(result["list"])
+        title = Fragment(result["titles"][0])
+        if surface == "list":
+            assert listing.text[1] == name
+        else:
+            assert "".join(title.text).split("\n", 1)[0] == name
+        assert [tag for tag, _ in listing.tags] == ["div", "a", "span", "span", "a"]
+        assert listing.tags[1][1] == {
+            "href": "#", "onclick": "openJob('a123456789ab');return false"}
+>       assert [tag for tag, _ in title.tags] == [
+            "div", "h2", "span", "small", "progress", "div", "div", "img",
+            "div", "div", "div"]
+E       AssertionError: assert ['div', 'h2',...', 'div', ...] == ['div', 'h2',...', 'div', ...]
+E         
+E         Left contains one more item: 'div'
+E         Use -v to get more diff
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_job_filename_display.py:72: AssertionError
+_ test_emitted_job_list_and_title_preserve_literal_name[list-Literal &#38; and &quot; notes.mp4] _
+
+name = 'Literal &#38; and &quot; notes.mp4', surface = 'list'
+
+    @pytest.mark.parametrize("name", NAMES)
+    @pytest.mark.parametrize("surface", ["list", "title"])
+    def test_emitted_job_list_and_title_preserve_literal_name(name, surface):
+        result = emitted_fragments([{"id": "a123456789ab", "name": name,
+                                    "phase": "queued"}])
+        listing = Fragment(result["list"])
+        title = Fragment(result["titles"][0])
+        if surface == "list":
+            assert listing.text[1] == name
+        else:
+            assert "".join(title.text).split("\n", 1)[0] == name
+        assert [tag for tag, _ in listing.tags] == ["div", "a", "span", "span", "a"]
+        assert listing.tags[1][1] == {
+            "href": "#", "onclick": "openJob('a123456789ab');return false"}
+>       assert [tag for tag, _ in title.tags] == [
+            "div", "h2", "span", "small", "progress", "div", "div", "img",
+            "div", "div", "div"]
+E       AssertionError: assert ['div', 'h2',...', 'div', ...] == ['div', 'h2',...', 'div', ...]
+E         
+E         Left contains one more item: 'div'
+E         Use -v to get more diff
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_job_filename_display.py:72: AssertionError
+_ test_emitted_job_list_and_title_preserve_literal_name[title-Family &amp; friends \u2014 caf\xe9.mp4] _
+
+name = 'Family &amp; friends — café.mp4', surface = 'title'
+
+    @pytest.mark.parametrize("name", NAMES)
+    @pytest.mark.parametrize("surface", ["list", "title"])
+    def test_emitted_job_list_and_title_preserve_literal_name(name, surface):
+        result = emitted_fragments([{"id": "a123456789ab", "name": name,
+                                    "phase": "queued"}])
+        listing = Fragment(result["list"])
+        title = Fragment(result["titles"][0])
+        if surface == "list":
+            assert listing.text[1] == name
+        else:
+            assert "".join(title.text).split("\n", 1)[0] == name
+        assert [tag for tag, _ in listing.tags] == ["div", "a", "span", "span", "a"]
+        assert listing.tags[1][1] == {
+            "href": "#", "onclick": "openJob('a123456789ab');return false"}
+>       assert [tag for tag, _ in title.tags] == [
+            "div", "h2", "span", "small", "progress", "div", "div", "img",
+            "div", "div", "div"]
+E       AssertionError: assert ['div', 'h2',...', 'div', ...] == ['div', 'h2',...', 'div', ...]
+E         
+E         Left contains one more item: 'div'
+E         Use -v to get more diff
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_job_filename_display.py:72: AssertionError
+_ test_emitted_job_list_and_title_preserve_literal_name[title-Friends' "summer" & snow \u2603.MOV] _
+
+name = 'Friends\' "summer" & snow ☃.MOV', surface = 'title'
+
+    @pytest.mark.parametrize("name", NAMES)
+    @pytest.mark.parametrize("surface", ["list", "title"])
+    def test_emitted_job_list_and_title_preserve_literal_name(name, surface):
+        result = emitted_fragments([{"id": "a123456789ab", "name": name,
+                                    "phase": "queued"}])
+        listing = Fragment(result["list"])
+        title = Fragment(result["titles"][0])
+        if surface == "list":
+            assert listing.text[1] == name
+        else:
+            assert "".join(title.text).split("\n", 1)[0] == name
+        assert [tag for tag, _ in listing.tags] == ["div", "a", "span", "span", "a"]
+        assert listing.tags[1][1] == {
+            "href": "#", "onclick": "openJob('a123456789ab');return false"}
+>       assert [tag for tag, _ in title.tags] == [
+            "div", "h2", "span", "small", "progress", "div", "div", "img",
+            "div", "div", "div"]
+E       AssertionError: assert ['div', 'h2',...', 'div', ...] == ['div', 'h2',...', 'div', ...]
+E         
+E         Left contains one more item: 'div'
+E         Use -v to get more diff
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_job_filename_display.py:72: AssertionError
+_ test_emitted_job_list_and_title_preserve_literal_name[title-Literal &#38; and &quot; notes.mp4] _
+
+name = 'Literal &#38; and &quot; notes.mp4', surface = 'title'
+
+    @pytest.mark.parametrize("name", NAMES)
+    @pytest.mark.parametrize("surface", ["list", "title"])
+    def test_emitted_job_list_and_title_preserve_literal_name(name, surface):
+        result = emitted_fragments([{"id": "a123456789ab", "name": name,
+                                    "phase": "queued"}])
+        listing = Fragment(result["list"])
+        title = Fragment(result["titles"][0])
+        if surface == "list":
+            assert listing.text[1] == name
+        else:
+            assert "".join(title.text).split("\n", 1)[0] == name
+        assert [tag for tag, _ in listing.tags] == ["div", "a", "span", "span", "a"]
+        assert listing.tags[1][1] == {
+            "href": "#", "onclick": "openJob('a123456789ab');return false"}
+>       assert [tag for tag, _ in title.tags] == [
+            "div", "h2", "span", "small", "progress", "div", "div", "img",
+            "div", "div", "div"]
+E       AssertionError: assert ['div', 'h2',...', 'div', ...] == ['div', 'h2',...', 'div', ...]
+E         
+E         Left contains one more item: 'div'
+E         Use -v to get more diff
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_job_filename_display.py:72: AssertionError
+=========================== short test summary info ============================
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_job_logs.py::test_thumbnail_and_tracking_callbacks_stay_with_their_job
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_job_filename_display.py::test_emitted_job_list_and_title_preserve_literal_name[list-Family &amp; friends \u2014 caf\xe9.mp4]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_job_filename_display.py::test_emitted_job_list_and_title_preserve_literal_name[list-Friends' "summer" & snow \u2603.MOV]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_job_filename_display.py::test_emitted_job_list_and_title_preserve_literal_name[list-Literal &#38; and &quot; notes.mp4]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_job_filename_display.py::test_emitted_job_list_and_title_preserve_literal_name[title-Family &amp; friends \u2014 caf\xe9.mp4]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_job_filename_display.py::test_emitted_job_list_and_title_preserve_literal_name[title-Friends' "summer" & snow \u2603.MOV]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_job_filename_display.py::test_emitted_job_list_and_title_preserve_literal_name[title-Literal &#38; and &quot; notes.mp4]
+7 failed, 47 passed in 5.05s

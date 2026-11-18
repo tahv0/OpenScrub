@@ -1,0 +1,5 @@
+Preserved controller stderr from the sole final package invocation:
+/home/tahv0/src/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/verify.py:201: DeprecationWarning: Python 3.14 will, by default, filter extracted tar archives and reject files or modify their metadata. Use the filter argument to control this behavior.
+  archive.extractall(root / 'extracted')
+
+Known Task901 extraction warning; no helper edit. All package phases and installed adapters exited0.

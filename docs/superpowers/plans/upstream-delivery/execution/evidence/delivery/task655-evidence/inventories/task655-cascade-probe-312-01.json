@@ -1,0 +1,222 @@
+[
+  {
+    "class": "tests.test_job_polling_browser",
+    "name": "test_bounded_history_through_actual_page_and_backend",
+    "outcome": "passed"
+  },
+  {
+    "class": "tests.test_large_report_io",
+    "name": "test_unchanged_save_preserves_exact_file_and_skips_publication[edits0-False]",
+    "outcome": "passed"
+  },
+  {
+    "class": "tests.test_large_report_io",
+    "name": "test_unchanged_save_preserves_exact_file_and_skips_publication[edits0-True]",
+    "outcome": "passed"
+  },
+  {
+    "class": "tests.test_large_report_io",
+    "name": "test_unchanged_save_preserves_exact_file_and_skips_publication[edits1-False]",
+    "outcome": "passed"
+  },
+  {
+    "class": "tests.test_large_report_io",
+    "name": "test_unchanged_save_preserves_exact_file_and_skips_publication[edits1-True]",
+    "outcome": "passed"
+  },
+  {
+    "class": "tests.test_large_report_io",
+    "name": "test_unchanged_save_preserves_exact_file_and_skips_publication[edits2-False]",
+    "outcome": "passed"
+  },
+  {
+    "class": "tests.test_large_report_io",
+    "name": "test_unchanged_save_preserves_exact_file_and_skips_publication[edits2-True]",
+    "outcome": "passed"
+  },
+  {
+    "class": "tests.test_large_report_io",
+    "name": "test_unchanged_save_preserves_exact_file_and_skips_publication[edits3-False]",
+    "outcome": "passed"
+  },
+  {
+    "class": "tests.test_large_report_io",
+    "name": "test_unchanged_save_preserves_exact_file_and_skips_publication[edits3-True]",
+    "outcome": "passed"
+  },
+  {
+    "class": "tests.test_large_report_io",
+    "name": "test_unchanged_save_preserves_exact_file_and_skips_publication[edits4-False]",
+    "outcome": "passed"
+  },
+  {
+    "class": "tests.test_large_report_io",
+    "name": "test_unchanged_save_preserves_exact_file_and_skips_publication[edits4-True]",
+    "outcome": "passed"
+  },
+  {
+    "class": "tests.test_large_report_io",
+    "name": "test_unchanged_save_preserves_exact_file_and_skips_publication[edits5-False]",
+    "outcome": "passed"
+  },
+  {
+    "class": "tests.test_large_report_io",
+    "name": "test_unchanged_save_preserves_exact_file_and_skips_publication[edits5-True]",
+    "outcome": "passed"
+  },
+  {
+    "class": "tests.test_large_report_io",
+    "name": "test_unchanged_save_preserves_exact_file_and_skips_publication[edits6-False]",
+    "outcome": "passed"
+  },
+  {
+    "class": "tests.test_large_report_io",
+    "name": "test_unchanged_save_preserves_exact_file_and_skips_publication[edits6-True]",
+    "outcome": "passed"
+  },
+  {
+    "class": "tests.test_large_report_io",
+    "name": "test_effective_changes_publish_once_with_raw_fields_preserved[missing_enabled]",
+    "outcome": "passed"
+  },
+  {
+    "class": "tests.test_large_report_io",
+    "name": "test_effective_changes_publish_once_with_raw_fields_preserved[numeric_enabled]",
+    "outcome": "passed"
+  },
+  {
+    "class": "tests.test_large_report_io",
+    "name": "test_effective_changes_publish_once_with_raw_fields_preserved[integer_box]",
+    "outcome": "passed"
+  },
+  {
+    "class": "tests.test_large_report_io",
+    "name": "test_effective_changes_publish_once_with_raw_fields_preserved[integer_time]",
+    "outcome": "passed"
+  },
+  {
+    "class": "tests.test_large_report_io",
+    "name": "test_effective_changes_publish_once_with_raw_fields_preserved[negative_zero_box]",
+    "outcome": "passed"
+  },
+  {
+    "class": "tests.test_large_report_io",
+    "name": "test_effective_changes_publish_once_with_raw_fields_preserved[negative_zero_time]",
+    "outcome": "passed"
+  },
+  {
+    "class": "tests.test_large_report_io",
+    "name": "test_effective_changes_publish_once_with_raw_fields_preserved[missing_last_seen]",
+    "outcome": "passed"
+  },
+  {
+    "class": "tests.test_large_report_io",
+    "name": "test_effective_changes_publish_once_with_raw_fields_preserved[clamped_last_seen]",
+    "outcome": "passed"
+  },
+  {
+    "class": "tests.test_large_report_io",
+    "name": "test_effective_changes_publish_once_with_raw_fields_preserved[missing_audio]",
+    "outcome": "passed"
+  },
+  {
+    "class": "tests.test_large_report_io",
+    "name": "test_effective_changes_publish_once_with_raw_fields_preserved[audio_extra]",
+    "outcome": "passed"
+  },
+  {
+    "class": "tests.test_large_report_io",
+    "name": "test_effective_changes_publish_once_with_raw_fields_preserved[audio_bool]",
+    "outcome": "passed"
+  },
+  {
+    "class": "tests.test_large_report_io",
+    "name": "test_effective_changes_publish_once_with_raw_fields_preserved[audio_int]",
+    "outcome": "passed"
+  },
+  {
+    "class": "tests.test_large_report_io",
+    "name": "test_effective_changes_publish_once_with_raw_fields_preserved[audio_negative_zero]",
+    "outcome": "passed"
+  },
+  {
+    "class": "tests.test_large_report_io",
+    "name": "test_effective_changes_publish_once_with_raw_fields_preserved[nonfinite_box]",
+    "outcome": "passed"
+  },
+  {
+    "class": "tests.test_large_report_io",
+    "name": "test_effective_changes_publish_once_with_raw_fields_preserved[nonfinite_audio]",
+    "outcome": "passed"
+  },
+  {
+    "class": "tests.test_large_report_io",
+    "name": "test_effective_changes_publish_once_with_raw_fields_preserved[sparse]",
+    "outcome": "passed"
+  },
+  {
+    "class": "tests.test_large_report_io",
+    "name": "test_effective_changes_publish_once_with_raw_fields_preserved[combined]",
+    "outcome": "passed"
+  },
+  {
+    "class": "tests.test_large_report_io",
+    "name": "test_effective_changes_publish_once_with_raw_fields_preserved[legacy_manual]",
+    "outcome": "passed"
+  },
+  {
+    "class": "tests.test_large_report_io",
+    "name": "test_noop_candidates_still_parse_and_validate[missing-edits0-404]",
+    "outcome": "passed"
+  },
+  {
+    "class": "tests.test_large_report_io",
+    "name": "test_noop_candidates_still_parse_and_validate[malformed-edits1-500]",
+    "outcome": "passed"
+  },
+  {
+    "class": "tests.test_large_report_io",
+    "name": "test_noop_candidates_still_parse_and_validate[no_render_state-edits2-500]",
+    "outcome": "passed"
+  },
+  {
+    "class": "tests.test_large_report_io",
+    "name": "test_noop_candidates_still_parse_and_validate[no_detections-edits3-500]",
+    "outcome": "passed"
+  },
+  {
+    "class": "tests.test_large_report_io",
+    "name": "test_noop_candidates_still_parse_and_validate[None-edits4-500]",
+    "outcome": "passed"
+  },
+  {
+    "class": "tests.test_large_report_io",
+    "name": "test_noop_candidates_still_parse_and_validate[None-edits5-500]",
+    "outcome": "passed"
+  },
+  {
+    "class": "tests.test_large_report_io",
+    "name": "test_noop_candidates_still_parse_and_validate[None-edits6-500]",
+    "outcome": "passed"
+  },
+  {
+    "class": "tests.test_large_report_io",
+    "name": "test_noop_candidates_still_parse_and_validate[None-edits7-400]",
+    "outcome": "passed"
+  },
+  {
+    "class": "tests.test_large_report_io",
+    "name": "test_failed_change_releases_waiting_noop_to_fresh_snapshot",
+    "outcome": "passed"
+  },
+  {
+    "class": "tests.test_vault_cleanup",
+    "name": "test_successful_report_publication_does_not_abort_vault_lock",
+    "outcome": "passed"
+  },
+  {
+    "class": "tests.test_opencv_compat",
+    "name": "test_real_compatible_runtime_has_required_fallback",
+    "outcome": "passed"
+  }
+]

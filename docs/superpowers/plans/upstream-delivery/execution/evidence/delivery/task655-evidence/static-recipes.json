@@ -1,0 +1,26 @@
+{
+  "pyproject.toml": {
+    "sha256": "3ecd05dbda7fac26ea284a03248c321a301b8268446d94dccc32aa3073fbf652",
+    "unchanged_from_Task654": true
+  },
+  "Dockerfile": {
+    "sha256": "5758071c9c9bafe7790433745ac83d09f2d415e4bdc9212df4b8de31a244edc6",
+    "unchanged_from_Task654": true
+  },
+  "Dockerfile.cuda": {
+    "sha256": "0bafced0ec898bf1da0086a6075e6e7c332245bf28d0a8a2445d2305d050216b",
+    "unchanged_from_Task654": true
+  },
+  "Dockerfile.intel": {
+    "sha256": "00fa8162b3aae5821d0b9447b1a30f8c3d0cb047a2da892cf0da5a90cbe3f2fc",
+    "unchanged_from_Task654": true
+  },
+  "openscrub_update.py": {
+    "sha256": "4d6a20f75d985a119f8421227c3bd88b17fd1b8eed44e353b127b5b49e733d55",
+    "unchanged_from_Task654": true
+  },
+  "windows/openscrub.spec": {
+    "sha256": "49d35c42ee505aae5c6d72113790aeeaa34c9d434fbe68c834d7e5c09af33221",
+    "unchanged_from_Task654": true
+  }
+}

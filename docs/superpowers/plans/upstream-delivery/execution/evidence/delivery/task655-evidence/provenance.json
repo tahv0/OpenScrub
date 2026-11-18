@@ -1,0 +1,18 @@
+{
+  "base": "00480c7e42ddb329f4dde9599c256555f2dabcf0",
+  "head": "c205ef5379778f63313b519411a2d5e37d07cba5",
+  "branch": "integration/upstream-focused-renderer",
+  "preserved_refs": {
+    "integration/upstream-focused": "00480c7e42ddb329f4dde9599c256555f2dabcf0",
+    "pr/render-resource-cleanup": "70ec464ca70b5e49751d778890f56029dced0b8a",
+    "pr/render-output-publication": "a132081f1e609ed19deb4477044ee1c9b77871cc",
+    "pr/render-geometry-validation": "83af23b5fd3c5922d0d476ba2a6ae21a3598ced2"
+  },
+  "existing_prerequisite_mappings": {
+    "864e62857493612bd142f7c4d8bd8d6b9fb6abb6": "ded411cbec308333d1416ae3d58b4f6e918d7849",
+    "0dce3d32965449effe5876237ffc85faf74e8d89": "4a62e49d2f0896b737081cc92e1f92e9bcaee93f"
+  },
+  "commits": 22,
+  "whole_original_picks": 18,
+  "clean": true
+}

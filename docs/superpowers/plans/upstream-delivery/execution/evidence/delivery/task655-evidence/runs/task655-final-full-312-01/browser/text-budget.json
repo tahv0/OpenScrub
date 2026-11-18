@@ -1,0 +1,45 @@
+{
+  "records": [
+    {
+      "case": "byte-budget",
+      "count": 127,
+      "bytes": 2081020,
+      "first": 123,
+      "last": 249,
+      "guardUnits": 8191
+    }
+  ],
+  "requests": [
+    "/api/jobs/A",
+    "/api/jobs/A/log?from=0",
+    "/api/jobs/A",
+    "/api/jobs/A/log?from=0&epoch=d0fb2a0c66fa4b09af4ed2c38c48b287",
+    "/api/jobs/A",
+    "/api/jobs/A/log?from=50&epoch=d0fb2a0c66fa4b09af4ed2c38c48b287",
+    "/api/jobs/A",
+    "/api/jobs/A/log?from=100&epoch=d0fb2a0c66fa4b09af4ed2c38c48b287",
+    "/api/jobs/A",
+    "/api/jobs/A/log?from=150&epoch=d0fb2a0c66fa4b09af4ed2c38c48b287",
+    "/api/jobs/A",
+    "/api/jobs/A/log?from=200&epoch=d0fb2a0c66fa4b09af4ed2c38c48b287",
+    "/api/jobs/A",
+    "/api/jobs/A/log?from=250&epoch=d0fb2a0c66fa4b09af4ed2c38c48b287",
+    "/api/jobs/A",
+    "/api/jobs/A/log?from=251&epoch=d0fb2a0c66fa4b09af4ed2c38c48b287",
+    "/api/jobs/A",
+    "/api/jobs/A/log?from=252&epoch=d0fb2a0c66fa4b09af4ed2c38c48b287",
+    "/api/jobs/A",
+    "/api/jobs/A/log?from=253&epoch=d0fb2a0c66fa4b09af4ed2c38c48b287",
+    "/api/jobs/A",
+    "/api/jobs/A/log?from=0&epoch=565fc97547f3425bbac22c899bdb10ea",
+    "/api/jobs/A",
+    "/api/jobs/A/log?from=0",
+    "/api/jobs/A",
+    "/api/jobs/A/log?from=0",
+    "/api/jobs/A",
+    "/api/jobs/A/log?from=3"
+  ],
+  "errors": [],
+  "diagnostics": [],
+  "browser": "159.0.8154.6"
+}

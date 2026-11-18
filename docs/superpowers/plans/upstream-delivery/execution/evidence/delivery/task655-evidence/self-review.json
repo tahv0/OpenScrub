@@ -1,0 +1,205 @@
+{
+  "base": "00480c7e42ddb329f4dde9599c256555f2dabcf0",
+  "head": "c205ef5379778f63313b519411a2d5e37d07cba5",
+  "clean": true,
+  "diff_check_exit": 0,
+  "additional_owner_AST": {
+    "report_ast_equal": {
+      "_report_document": true,
+      "write_report": true
+    },
+    "publication_descriptor_frame_ast_equal": {
+      "_send_open_file": true,
+      "_send_job_source": true,
+      "_frame_source_current": true,
+      "_publish_job_report_locked": true,
+      "job_frame_at": true,
+      "_recovery_gate": true
+    }
+  },
+  "runtime_revision_chain": {
+    "openscrub": {
+      "2944fef": "daec4b64e43ea7ff827a0f578e5b995a2f2d57d985900a8de2e24e1ca01a33a9",
+      "6ef0b9d": "daec4b64e43ea7ff827a0f578e5b995a2f2d57d985900a8de2e24e1ca01a33a9",
+      "ea57a98": "daec4b64e43ea7ff827a0f578e5b995a2f2d57d985900a8de2e24e1ca01a33a9",
+      "c205ef5379778f63313b519411a2d5e37d07cba5": "daec4b64e43ea7ff827a0f578e5b995a2f2d57d985900a8de2e24e1ca01a33a9"
+    },
+    "openscrub_internal": {
+      "2944fef": "c35c063c010e329c5dad13782e7b67438ed4b2d1faf975d4f01be2773a18e022",
+      "6ef0b9d": "c35c063c010e329c5dad13782e7b67438ed4b2d1faf975d4f01be2773a18e022",
+      "ea57a98": "c35c063c010e329c5dad13782e7b67438ed4b2d1faf975d4f01be2773a18e022",
+      "c205ef5379778f63313b519411a2d5e37d07cba5": "c35c063c010e329c5dad13782e7b67438ed4b2d1faf975d4f01be2773a18e022"
+    },
+    "openscrub_internal.lifetimes": {
+      "2944fef": "ce97f619c3ab75b2eaad69e631ba6100b432cef2e84bc0088b8a5d2eb9cd51dc",
+      "6ef0b9d": "ce97f619c3ab75b2eaad69e631ba6100b432cef2e84bc0088b8a5d2eb9cd51dc",
+      "ea57a98": "ce97f619c3ab75b2eaad69e631ba6100b432cef2e84bc0088b8a5d2eb9cd51dc",
+      "c205ef5379778f63313b519411a2d5e37d07cba5": "ce97f619c3ab75b2eaad69e631ba6100b432cef2e84bc0088b8a5d2eb9cd51dc"
+    },
+    "openscrub_internal.opencv_compat": {
+      "2944fef": "0f568ced4e60add8adacafd8670c942eac92e218725c466c6f8b35e8cfbb8dd5",
+      "6ef0b9d": "0f568ced4e60add8adacafd8670c942eac92e218725c466c6f8b35e8cfbb8dd5",
+      "ea57a98": "0f568ced4e60add8adacafd8670c942eac92e218725c466c6f8b35e8cfbb8dd5",
+      "c205ef5379778f63313b519411a2d5e37d07cba5": "0f568ced4e60add8adacafd8670c942eac92e218725c466c6f8b35e8cfbb8dd5"
+    },
+    "openscrub_internal.reports": {
+      "2944fef": "ff8fcbbccbb6be0ce072d9416a4edab6c9d3e0d546735a50c114f564c75fc5fa",
+      "6ef0b9d": "ff8fcbbccbb6be0ce072d9416a4edab6c9d3e0d546735a50c114f564c75fc5fa",
+      "ea57a98": "ff8fcbbccbb6be0ce072d9416a4edab6c9d3e0d546735a50c114f564c75fc5fa",
+      "c205ef5379778f63313b519411a2d5e37d07cba5": "ff8fcbbccbb6be0ce072d9416a4edab6c9d3e0d546735a50c114f564c75fc5fa"
+    },
+    "openscrub_setup": {
+      "2944fef": "7f466cee4eb53e444de8361fc5cd54f8fc7744fa01c92f4906780320c6c84091",
+      "6ef0b9d": "7f466cee4eb53e444de8361fc5cd54f8fc7744fa01c92f4906780320c6c84091",
+      "ea57a98": "7f466cee4eb53e444de8361fc5cd54f8fc7744fa01c92f4906780320c6c84091",
+      "c205ef5379778f63313b519411a2d5e37d07cba5": "7f466cee4eb53e444de8361fc5cd54f8fc7744fa01c92f4906780320c6c84091"
+    },
+    "openscrub_update": {
+      "2944fef": "4d6a20f75d985a119f8421227c3bd88b17fd1b8eed44e353b127b5b49e733d55",
+      "6ef0b9d": "4d6a20f75d985a119f8421227c3bd88b17fd1b8eed44e353b127b5b49e733d55",
+      "ea57a98": "4d6a20f75d985a119f8421227c3bd88b17fd1b8eed44e353b127b5b49e733d55",
+      "c205ef5379778f63313b519411a2d5e37d07cba5": "4d6a20f75d985a119f8421227c3bd88b17fd1b8eed44e353b127b5b49e733d55"
+    },
+    "openscrub_vault": {
+      "2944fef": "616bec78a6c4ddbdea098878de2f230b7487e5e4c5714ec8e7f5bf8dbaee9c59",
+      "6ef0b9d": "616bec78a6c4ddbdea098878de2f230b7487e5e4c5714ec8e7f5bf8dbaee9c59",
+      "ea57a98": "616bec78a6c4ddbdea098878de2f230b7487e5e4c5714ec8e7f5bf8dbaee9c59",
+      "c205ef5379778f63313b519411a2d5e37d07cba5": "616bec78a6c4ddbdea098878de2f230b7487e5e4c5714ec8e7f5bf8dbaee9c59"
+    },
+    "openscrub_web": {
+      "2944fef": "b043233cb0463c04fd5e6f7dc3bb88fbb1ced19eb79038f9dc3a41976ab05856",
+      "6ef0b9d": "b043233cb0463c04fd5e6f7dc3bb88fbb1ced19eb79038f9dc3a41976ab05856",
+      "ea57a98": "b043233cb0463c04fd5e6f7dc3bb88fbb1ced19eb79038f9dc3a41976ab05856",
+      "c205ef5379778f63313b519411a2d5e37d07cba5": "b043233cb0463c04fd5e6f7dc3bb88fbb1ced19eb79038f9dc3a41976ab05856"
+    },
+    "zones_ui": {
+      "2944fef": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7",
+      "6ef0b9d": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7",
+      "ea57a98": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7",
+      "c205ef5379778f63313b519411a2d5e37d07cba5": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7"
+    },
+    "openscrub_internal.job_logs": {
+      "2944fef": "63d08c124db019b120bb17efc64706d910f1d831f8ccfd9c1ba124368643d1b8",
+      "6ef0b9d": "63d08c124db019b120bb17efc64706d910f1d831f8ccfd9c1ba124368643d1b8",
+      "ea57a98": "63d08c124db019b120bb17efc64706d910f1d831f8ccfd9c1ba124368643d1b8",
+      "c205ef5379778f63313b519411a2d5e37d07cba5": "63d08c124db019b120bb17efc64706d910f1d831f8ccfd9c1ba124368643d1b8"
+    },
+    "openscrub_internal.render_delivery": {
+      "2944fef": "82db35dff22f5f3bdcb2f4565cef8b1d87396700fbf5eb9df6816f05bc1df6d6",
+      "6ef0b9d": "82db35dff22f5f3bdcb2f4565cef8b1d87396700fbf5eb9df6816f05bc1df6d6",
+      "ea57a98": "82db35dff22f5f3bdcb2f4565cef8b1d87396700fbf5eb9df6816f05bc1df6d6",
+      "c205ef5379778f63313b519411a2d5e37d07cba5": "82db35dff22f5f3bdcb2f4565cef8b1d87396700fbf5eb9df6816f05bc1df6d6"
+    }
+  },
+  "full_failed_nodes": [
+    "test_browser_log_retention::test_actual_layout_anchor_threshold_pending_scroll_and_reflow",
+    "test_large_report_io::test_effective_changes_publish_once_with_raw_fields_preserved[audio_bool]",
+    "test_large_report_io::test_effective_changes_publish_once_with_raw_fields_preserved[audio_extra]",
+    "test_large_report_io::test_effective_changes_publish_once_with_raw_fields_preserved[audio_int]",
+    "test_large_report_io::test_effective_changes_publish_once_with_raw_fields_preserved[audio_negative_zero]",
+    "test_large_report_io::test_effective_changes_publish_once_with_raw_fields_preserved[clamped_last_seen]",
+    "test_large_report_io::test_effective_changes_publish_once_with_raw_fields_preserved[combined]",
+    "test_large_report_io::test_effective_changes_publish_once_with_raw_fields_preserved[integer_box]",
+    "test_large_report_io::test_effective_changes_publish_once_with_raw_fields_preserved[integer_time]",
+    "test_large_report_io::test_effective_changes_publish_once_with_raw_fields_preserved[legacy_manual]",
+    "test_large_report_io::test_effective_changes_publish_once_with_raw_fields_preserved[missing_audio]",
+    "test_large_report_io::test_effective_changes_publish_once_with_raw_fields_preserved[missing_enabled]",
+    "test_large_report_io::test_effective_changes_publish_once_with_raw_fields_preserved[missing_last_seen]",
+    "test_large_report_io::test_effective_changes_publish_once_with_raw_fields_preserved[negative_zero_box]",
+    "test_large_report_io::test_effective_changes_publish_once_with_raw_fields_preserved[negative_zero_time]",
+    "test_large_report_io::test_effective_changes_publish_once_with_raw_fields_preserved[nonfinite_audio]",
+    "test_large_report_io::test_effective_changes_publish_once_with_raw_fields_preserved[nonfinite_box]",
+    "test_large_report_io::test_effective_changes_publish_once_with_raw_fields_preserved[numeric_enabled]",
+    "test_large_report_io::test_effective_changes_publish_once_with_raw_fields_preserved[sparse]",
+    "test_large_report_io::test_failed_change_releases_waiting_noop_to_fresh_snapshot",
+    "test_large_report_io::test_noop_candidates_still_parse_and_validate[None-edits4-500]",
+    "test_large_report_io::test_noop_candidates_still_parse_and_validate[None-edits5-500]",
+    "test_large_report_io::test_noop_candidates_still_parse_and_validate[None-edits6-500]",
+    "test_large_report_io::test_noop_candidates_still_parse_and_validate[None-edits7-400]",
+    "test_large_report_io::test_noop_candidates_still_parse_and_validate[malformed-edits1-500]",
+    "test_large_report_io::test_noop_candidates_still_parse_and_validate[missing-edits0-404]",
+    "test_large_report_io::test_noop_candidates_still_parse_and_validate[no_detections-edits3-500]",
+    "test_large_report_io::test_noop_candidates_still_parse_and_validate[no_render_state-edits2-500]",
+    "test_large_report_io::test_unchanged_save_preserves_exact_file_and_skips_publication[edits0-False]",
+    "test_large_report_io::test_unchanged_save_preserves_exact_file_and_skips_publication[edits0-True]",
+    "test_large_report_io::test_unchanged_save_preserves_exact_file_and_skips_publication[edits1-False]",
+    "test_large_report_io::test_unchanged_save_preserves_exact_file_and_skips_publication[edits1-True]",
+    "test_large_report_io::test_unchanged_save_preserves_exact_file_and_skips_publication[edits2-False]",
+    "test_large_report_io::test_unchanged_save_preserves_exact_file_and_skips_publication[edits2-True]",
+    "test_large_report_io::test_unchanged_save_preserves_exact_file_and_skips_publication[edits3-False]",
+    "test_large_report_io::test_unchanged_save_preserves_exact_file_and_skips_publication[edits3-True]",
+    "test_large_report_io::test_unchanged_save_preserves_exact_file_and_skips_publication[edits4-False]",
+    "test_large_report_io::test_unchanged_save_preserves_exact_file_and_skips_publication[edits4-True]",
+    "test_large_report_io::test_unchanged_save_preserves_exact_file_and_skips_publication[edits5-False]",
+    "test_large_report_io::test_unchanged_save_preserves_exact_file_and_skips_publication[edits5-True]",
+    "test_large_report_io::test_unchanged_save_preserves_exact_file_and_skips_publication[edits6-False]",
+    "test_large_report_io::test_unchanged_save_preserves_exact_file_and_skips_publication[edits6-True]",
+    "test_opencv_compat::test_real_compatible_runtime_has_required_fallback",
+    "test_vault_cleanup::test_successful_report_publication_does_not_abort_vault_lock"
+  ],
+  "covered_by_cascade_followup": [
+    "test_large_report_io::test_effective_changes_publish_once_with_raw_fields_preserved[audio_bool]",
+    "test_large_report_io::test_effective_changes_publish_once_with_raw_fields_preserved[audio_extra]",
+    "test_large_report_io::test_effective_changes_publish_once_with_raw_fields_preserved[audio_int]",
+    "test_large_report_io::test_effective_changes_publish_once_with_raw_fields_preserved[audio_negative_zero]",
+    "test_large_report_io::test_effective_changes_publish_once_with_raw_fields_preserved[clamped_last_seen]",
+    "test_large_report_io::test_effective_changes_publish_once_with_raw_fields_preserved[combined]",
+    "test_large_report_io::test_effective_changes_publish_once_with_raw_fields_preserved[integer_box]",
+    "test_large_report_io::test_effective_changes_publish_once_with_raw_fields_preserved[integer_time]",
+    "test_large_report_io::test_effective_changes_publish_once_with_raw_fields_preserved[legacy_manual]",
+    "test_large_report_io::test_effective_changes_publish_once_with_raw_fields_preserved[missing_audio]",
+    "test_large_report_io::test_effective_changes_publish_once_with_raw_fields_preserved[missing_enabled]",
+    "test_large_report_io::test_effective_changes_publish_once_with_raw_fields_preserved[missing_last_seen]",
+    "test_large_report_io::test_effective_changes_publish_once_with_raw_fields_preserved[negative_zero_box]",
+    "test_large_report_io::test_effective_changes_publish_once_with_raw_fields_preserved[negative_zero_time]",
+    "test_large_report_io::test_effective_changes_publish_once_with_raw_fields_preserved[nonfinite_audio]",
+    "test_large_report_io::test_effective_changes_publish_once_with_raw_fields_preserved[nonfinite_box]",
+    "test_large_report_io::test_effective_changes_publish_once_with_raw_fields_preserved[numeric_enabled]",
+    "test_large_report_io::test_effective_changes_publish_once_with_raw_fields_preserved[sparse]",
+    "test_large_report_io::test_failed_change_releases_waiting_noop_to_fresh_snapshot",
+    "test_large_report_io::test_noop_candidates_still_parse_and_validate[None-edits4-500]",
+    "test_large_report_io::test_noop_candidates_still_parse_and_validate[None-edits5-500]",
+    "test_large_report_io::test_noop_candidates_still_parse_and_validate[None-edits6-500]",
+    "test_large_report_io::test_noop_candidates_still_parse_and_validate[None-edits7-400]",
+    "test_large_report_io::test_noop_candidates_still_parse_and_validate[malformed-edits1-500]",
+    "test_large_report_io::test_noop_candidates_still_parse_and_validate[missing-edits0-404]",
+    "test_large_report_io::test_noop_candidates_still_parse_and_validate[no_detections-edits3-500]",
+    "test_large_report_io::test_noop_candidates_still_parse_and_validate[no_render_state-edits2-500]",
+    "test_large_report_io::test_unchanged_save_preserves_exact_file_and_skips_publication[edits0-False]",
+    "test_large_report_io::test_unchanged_save_preserves_exact_file_and_skips_publication[edits0-True]",
+    "test_large_report_io::test_unchanged_save_preserves_exact_file_and_skips_publication[edits1-False]",
+    "test_large_report_io::test_unchanged_save_preserves_exact_file_and_skips_publication[edits1-True]",
+    "test_large_report_io::test_unchanged_save_preserves_exact_file_and_skips_publication[edits2-False]",
+    "test_large_report_io::test_unchanged_save_preserves_exact_file_and_skips_publication[edits2-True]",
+    "test_large_report_io::test_unchanged_save_preserves_exact_file_and_skips_publication[edits3-False]",
+    "test_large_report_io::test_unchanged_save_preserves_exact_file_and_skips_publication[edits3-True]",
+    "test_large_report_io::test_unchanged_save_preserves_exact_file_and_skips_publication[edits4-False]",
+    "test_large_report_io::test_unchanged_save_preserves_exact_file_and_skips_publication[edits4-True]",
+    "test_large_report_io::test_unchanged_save_preserves_exact_file_and_skips_publication[edits5-False]",
+    "test_large_report_io::test_unchanged_save_preserves_exact_file_and_skips_publication[edits5-True]",
+    "test_large_report_io::test_unchanged_save_preserves_exact_file_and_skips_publication[edits6-False]",
+    "test_large_report_io::test_unchanged_save_preserves_exact_file_and_skips_publication[edits6-True]",
+    "test_opencv_compat::test_real_compatible_runtime_has_required_fallback",
+    "test_vault_cleanup::test_successful_report_publication_does_not_abort_vault_lock"
+  ],
+  "remaining_plain_case": [
+    "test_browser_log_retention::test_actual_layout_anchor_threshold_pending_scroll_and_reflow"
+  ],
+  "remaining_plain_result": "task655-settled-reflow-312-01 exit0,1passed",
+  "root_ruling": "One whole discovered suite retained1982pass/44fail; only failed owners/producer-consumer schedules followed up; no broad full repeat. Later commits fixture-only, all production bytes unchanged.",
+  "deferred_minors": [
+    "P recovery M1 misleading ExitStack comment; retain reviewed helper code, future focused wording",
+    "Task901 extraction warning; separate local tooling readiness",
+    "Task119 viewport wording",
+    "Task115 key-order comment",
+    "Task164 classified canvas warning",
+    "Task652 optional ffprobe/encoder prerequisites"
+  ],
+  "limitations": [
+    "cooperative native cleanup/lifecycle",
+    "no native BFCache/suspension proof",
+    "no crash durability/long-source immutable-generation guarantee",
+    "synthetic POSIX CPU media/browser environment only",
+    "no new timing/RSS/accuracy/platform claims"
+  ]
+}

@@ -1,0 +1,2618 @@
+DEFAULT_PATHS {"jobs": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_jobs", "models": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task655/runs/task655-final-full-312-01/profile/.openscrub/models"}
+ACTIVE_SOURCE {"executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python", "python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]", "sources": {"openscrub": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub.py", "sha256": "daec4b64e43ea7ff827a0f578e5b995a2f2d57d985900a8de2e24e1ca01a33a9"}, "openscrub_internal": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_internal/__init__.py", "sha256": "c35c063c010e329c5dad13782e7b67438ed4b2d1faf975d4f01be2773a18e022"}, "openscrub_internal.job_logs": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_internal/job_logs.py", "sha256": "63d08c124db019b120bb17efc64706d910f1d831f8ccfd9c1ba124368643d1b8"}, "openscrub_internal.lifetimes": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_internal/lifetimes.py", "sha256": "ce97f619c3ab75b2eaad69e631ba6100b432cef2e84bc0088b8a5d2eb9cd51dc"}, "openscrub_internal.opencv_compat": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_internal/opencv_compat.py", "sha256": "0f568ced4e60add8adacafd8670c942eac92e218725c466c6f8b35e8cfbb8dd5"}, "openscrub_internal.render_delivery": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_internal/render_delivery.py", "sha256": "82db35dff22f5f3bdcb2f4565cef8b1d87396700fbf5eb9df6816f05bc1df6d6"}, "openscrub_internal.reports": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_internal/reports.py", "sha256": "ff8fcbbccbb6be0ce072d9416a4edab6c9d3e0d546735a50c114f564c75fc5fa"}, "openscrub_setup": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_setup.py", "sha256": "7f466cee4eb53e444de8361fc5cd54f8fc7744fa01c92f4906780320c6c84091"}, "openscrub_update": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_update.py", "sha256": "4d6a20f75d985a119f8421227c3bd88b17fd1b8eed44e353b127b5b49e733d55"}, "openscrub_vault": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_vault.py", "sha256": "616bec78a6c4ddbdea098878de2f230b7487e5e4c5714ec8e7f5bf8dbaee9c59"}, "openscrub_web": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", "sha256": "b043233cb0463c04fd5e6f7dc3bb88fbb1ced19eb79038f9dc3a41976ab05856"}, "zones_ui": {"file": "/home/tahv0/.codex/worktrees/c832/OpenScrub/zones_ui.py", "sha256": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7"}}}
+........................................................................ [  3%]
+........................................................................ [  7%]
+....F................................................................... [ 10%]
+........................................................................ [ 14%]
+........................................................................ [ 17%]
+........................................................................ [ 21%]
+........................................................................ [ 24%]
+........................................................................ [ 28%]
+........................................................................ [ 31%]
+........................................................................ [ 35%]
+..........FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF.FFFFFFFFF.................... [ 39%]
+........................................................................ [ 42%]
+...........................................F............................ [ 46%]
+........................................................................ [ 49%]
+........................................................................ [ 53%]
+........................................................................ [ 56%]
+........................................................................ [ 60%]
+........................................................................ [ 63%]
+........................................................................ [ 67%]
+........................................................................ [ 71%]
+........................................................................ [ 74%]
+........................................................................ [ 78%]
+........................................................................ [ 81%]
+........................................................................ [ 85%]
+........................................................................ [ 88%]
+........................................................................ [ 92%]
+........................................................................ [ 95%]
+........................................................................ [ 99%]
+..F.......                                                               [100%]
+=================================== FAILURES ===================================
+________ test_actual_layout_anchor_threshold_pending_scroll_and_reflow _________
+
+polling_http = 'http://127.0.0.1:34849'
+
+    def test_actual_layout_anchor_threshold_pending_scroll_and_reflow(polling_http):
+        # Taking stickiness before the awaited body loses the reader's final position.
+>       run_browser(polling_http, r"""
+    await open(600);
+    const geometry=()=>page.locator('#log').evaluate(e=>({top:e.scrollTop,max:e.scrollHeight-e.clientHeight,
+     anchor:[...e.children].find(s=>s.getBoundingClientRect().bottom>e.getBoundingClientRect().top+e.clientTop)?.dataset.seq}));
+    for(const distance of [39,40,41]){
+     await page.locator('#log').evaluate((e,d)=>e.scrollTop=e.scrollHeight-e.clientHeight-d,distance);
+     const before=await geometry();await append(['threshold-'+distance]);const after=await geometry();
+     if(distance<=40)assert.ok(after.max-after.top<=1,JSON.stringify({distance,before,after}));
+     else{assert.equal(after.anchor,before.anchor);assert.ok(Math.abs(after.top-before.top)<=2)}
+     records.push({case:'threshold',distance,before,after});
+    }
+    // The response body is created by Flask before the browser scrolls up.
+    await control({action:'append',lines:['held-body']});await control({kind:'log'});
+    let headers=0;page.on('response',r=>{if(r.headers()['x-qa-body-gate']==='log')headers++});
+    await page.locator('#log').evaluate(e=>e.scrollTop=e.scrollHeight);await page.clock.runFor(900);await wait(()=>headers===1);
+    await page.locator('#log').evaluate(e=>e.scrollTop=700);const pending=await geometry();
+    await control({release:true});await idle();assert.equal((await geometry()).anchor,pending.anchor);
+    assert.ok(Math.abs((await geometry()).top-pending.top)<=2);records.push({case:'scroll-during-body',pending,after:await geometry()});
+    // Retain a mid-history entry while a prefix is evicted.
+    await page.locator('#log').evaluate(e=>{const s=e.querySelector('[data-seq="400"]');e.scrollTop+=s.getBoundingClientRect().top-e.getBoundingClientRect().top+7});
+    const before=await page.locator('#log').evaluate(e=>{const s=e.querySelector('[data-seq="400"]');return s.getBoundingClientRect().top-e.getBoundingClientRect().top});
+    await append(Array.from({length:400},(_,i)=>'retained-'+i));
+    const after=await page.locator('#log').evaluate(e=>e.querySelector('[data-seq="400"]').getBoundingClientRect().top-e.getBoundingClientRect().top);
+    assert.ok(Math.abs(after-before)<=2,JSON.stringify({before,after}));
+    await page.locator('#log').evaluate(e=>e.scrollTop=0);await append(Array.from({length:400},(_,i)=>'evict-'+i));
+    assert.equal((await geometry()).top,0);assert.match(await note(),/position/);records.push({case:'evicted-anchor',...await geometry()});
+    // A genuine keyboard scroll clears the fixed lost-position notice and retains focus.
+    await page.locator('#log').focus();await page.keyboard.press('PageDown');await page.clock.runFor(300);await pause(350);console.log(JSON.stringify({keyboard:await geometry(),note:await note()}));
+    assert.equal(await page.locator('#log').evaluate(e=>document.activeElement===e),true);assert.doesNotMatch(await note(),/position/);
+    // Rewrap a tall multiline entry; position is entry+clamped pixel, not character.
+    await control({action:'replace',count:0});await poll();
+    const multiline=Array.from({length:20},(_,i)=>'wide paragraph '+i+' '+('word '.repeat(25))).join('\n');
+    await append(['prefix '+('words '.repeat(100)),multiline,'tail'+String.fromCharCode(10).repeat(500)]);
+    await page.locator('#log').evaluate(e=>{const s=e.children[1];e.scrollTop+=s.getBoundingClientRect().top-e.getBoundingClientRect().top+30});
+    const reflowBefore=await page.locator('#log').evaluate(e=>({seq:e.children[1].dataset.seq,offset:e.getBoundingClientRect().top-e.children[1].getBoundingClientRect().top}));
+    await page.setViewportSize({width:390,height:844});await pause(40);await page.clock.runFor(40);await pause(20);
+    const reflowAfter=await page.locator('#log').evaluate(e=>({seq:e.children[1].dataset.seq,offset:e.getBoundingClientRect().top-e.children[1].getBoundingClientRect().top}));
+    assert.equal(reflowAfter.seq,reflowBefore.seq);assert.ok(Math.abs(reflowAfter.offset-reflowBefore.offset)<=2,JSON.stringify({reflowBefore,reflowAfter}));
+    assert.equal(await page.locator('#log').getAttribute('aria-label'),'Job log');assert.equal(await page.locator('#log').getAttribute('aria-describedby'),'logStatus');
+    assert.equal(await page.locator('#log').getAttribute('aria-live'),null);assert.equal(await page.locator('#logStatus').getAttribute('role'),null);
+    assert.equal(await page.locator('#log').evaluate(e=>getComputedStyle(e).overflowAnchor),'none');
+    if(process.env.POLLING_ARTIFACTS){await page.locator('#log').scrollIntoViewIfNeeded();await page.screenshot({path:process.env.POLLING_ARTIFACTS+'/retention-narrow.png'})}
+    records.push({case:'narrow-reflow',reflowBefore,reflowAfter,...await geometry()});
+    await page.locator('#log').evaluate(e=>{const s=e.children[1];e.scrollTop+=s.getBoundingClientRect().top-e.getBoundingClientRect().top+1000});await pause(40);await page.clock.runFor(40);
+    const clampBefore=await page.locator('#log').evaluate(e=>e.getBoundingClientRect().top-e.children[1].getBoundingClientRect().top);
+    await page.setViewportSize({width:1280,height:950});await pause(40);await page.clock.runFor(40);await pause(20);
+    const clampAfter=await page.locator('#log').evaluate(e=>({offset:e.getBoundingClientRect().top-e.children[1].getBoundingClientRect().top,height:e.children[1].getBoundingClientRect().height}));
+    assert.ok(clampBefore>clampAfter.height,JSON.stringify({clampBefore,clampAfter}));assert.ok(Math.abs(clampAfter.offset-(clampAfter.height-1))<=2,JSON.stringify({clampBefore,clampAfter}));
+    await page.locator('#log').evaluate(e=>new Promise(resolve=>{const before=e.scrollTop;e.addEventListener('scroll',()=>resolve(),{once:true});e.scrollTop=e.scrollHeight;if(e.scrollTop===before)resolve()}));await page.clock.runFor(40);await page.setViewportSize({width:390,height:844});await pause(40);await page.clock.runFor(40);await pause(20);const bottomReflow=await geometry();assert.ok(bottomReflow.max-bottomReflow.top<=1,JSON.stringify(bottomReflow));
+    assert.equal(await page.locator('#log').evaluate(e=>document.activeElement===e),true,'accepted reset/reflow never moves keyboard focus');
+    records.push({case:'clamped-reflow-bottom',clampBefore,clampAfter});
+    """, 'layout')
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_browser_log_retention.py:98: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+polling_http = 'http://127.0.0.1:34849'
+script = "\nawait open(600);\nconst geometry=()=>page.locator('#log').evaluate(e=>({top:e.scrollTop,max:e.scrollHeight-e.client...ted reset/reflow never moves keyboard focus');\nrecords.push({case:'clamped-reflow-bottom',clampBefore,clampAfter});\n"
+name = 'layout'
+
+    def run_browser(polling_http, script, name):
+        node = shutil.which('node')
+        if not node:
+            pytest.skip('Node needed for optional Playwright acceptance')
+        available = subprocess.run([node, '-e', "require('playwright')"], capture_output=True)
+        if available.returncode:
+            pytest.skip('Existing Playwright required; no dependency installation attempted')
+        env = dict(os.environ, POLLING_BASE=polling_http, RETENTION_CASE=name)
+        result = subprocess.run([node, '-e', BROWSER_SETUP + script + BROWSER_FINISH],
+                                capture_output=True, text=True, env=env, timeout=150)
+        if os.environ.get('POLLING_ARTIFACTS'):
+            Path(os.environ['POLLING_ARTIFACTS'], name + '.log').write_text(result.stdout + result.stderr)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: {"keyboard":{"top":157,"max":13278,"anchor":"612"},"note":"Earlier log messages were omitted."}
+E         AssertionError [ERR_ASSERTION]: {"reflowBefore":{"seq":"1","offset":29.8125},"reflowAfter":{"seq":"1","offset":-154.953125}}
+E             at [eval]:71:55 {
+E           generatedMessage: false,
+E           code: 'ERR_ASSERTION',
+E           actual: false,
+E           expected: true,
+E           operator: '==',
+E           diff: 'simple'
+E         }
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', '\nconst {chromium}=require(\'playwright\'),assert=require(\'node:assert...false,\n  code: \'ERR_ASSERTION\',\n  actual: false,\n  expected: true,\n  operator: \'==\',\n  diff: \'simple\'\n}\n').returncode
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_browser_log_retention.py:71: AssertionError
+_ test_unchanged_save_preserves_exact_file_and_skips_publication[edits0-False] _
+
+review = namespace(path=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task655/runs/task655-final-full-31...'t1': 0.2, 'mode': 'mute'}], 'custom_future_field': {'preserved': True}}, client=<FlaskClient <Flask 'openscrub_web'>>)
+report_work = {'parse': 1, 'dump': 0, 'stage': 0, 'fsync': 0, ...}
+canonical = False, edits = {}
+
+    @pytest.mark.parametrize('canonical', [False, True])
+    @pytest.mark.parametrize('edits', [
+        {}, {'enabled': {'0': 'false', '1': True}},
+        {'box_overrides': {'0': ['1', 2, 8., 9]}},
+        {'time_overrides': {'0': ['0', 1]}},
+        {'audio': [{'t0': '.1', 't1': '.2', 'mode': 'unsupported', 'ignored': True}]},
+        {'enabled': {'00': False, '-1': False, '999': False},
+         'box_overrides': {'999': None, '0': [1]},
+         'time_overrides': {'-1': None, '0': [1, 0]}},
+        {'box_overrides': {'0': [4, 5, 6, 7], '00': [1, 2, 8, 9]},
+         'time_overrides': {'0': [.1, .9], '00': [0, 1]}},
+    ])
+    def test_unchanged_save_preserves_exact_file_and_skips_publication(review, report_work, canonical, edits):
+        # Unconditional publication loses metadata even for byte-identical JSON.
+        doc = finite_review(review)
+        review.path.write_text(json.dumps(doc, indent=1 if canonical else None))
+        if os.name != 'nt':
+            review.path.chmod(0o640)
+        os.utime(review.path, ns=(1000000000, 2000000000))
+        before = file_snapshot(review.path)
+        response = review.client.post('/api/jobs/synthetic/detections', json=edits)
+        assert response.status_code == 200
+        assert response.json == {'ok': True, 'total': 2, 'suggest_allowlist': []}
+        assert file_snapshot(review.path) == before
+        assert report_work == dict(parse=1, dump=0, stage=0, fsync=0, replace=0, encoder_chunks=0)
+>       assert web.FILES.count == 0
+E       assert 2 == 0
+E        +  where 2 = <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360>.count
+E        +    where <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360> = web.FILES
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py:295: AssertionError
+_ test_unchanged_save_preserves_exact_file_and_skips_publication[edits0-True] __
+
+review = namespace(path=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task655/runs/task655-final-full-31...'t1': 0.2, 'mode': 'mute'}], 'custom_future_field': {'preserved': True}}, client=<FlaskClient <Flask 'openscrub_web'>>)
+report_work = {'parse': 1, 'dump': 0, 'stage': 0, 'fsync': 0, ...}
+canonical = True, edits = {}
+
+    @pytest.mark.parametrize('canonical', [False, True])
+    @pytest.mark.parametrize('edits', [
+        {}, {'enabled': {'0': 'false', '1': True}},
+        {'box_overrides': {'0': ['1', 2, 8., 9]}},
+        {'time_overrides': {'0': ['0', 1]}},
+        {'audio': [{'t0': '.1', 't1': '.2', 'mode': 'unsupported', 'ignored': True}]},
+        {'enabled': {'00': False, '-1': False, '999': False},
+         'box_overrides': {'999': None, '0': [1]},
+         'time_overrides': {'-1': None, '0': [1, 0]}},
+        {'box_overrides': {'0': [4, 5, 6, 7], '00': [1, 2, 8, 9]},
+         'time_overrides': {'0': [.1, .9], '00': [0, 1]}},
+    ])
+    def test_unchanged_save_preserves_exact_file_and_skips_publication(review, report_work, canonical, edits):
+        # Unconditional publication loses metadata even for byte-identical JSON.
+        doc = finite_review(review)
+        review.path.write_text(json.dumps(doc, indent=1 if canonical else None))
+        if os.name != 'nt':
+            review.path.chmod(0o640)
+        os.utime(review.path, ns=(1000000000, 2000000000))
+        before = file_snapshot(review.path)
+        response = review.client.post('/api/jobs/synthetic/detections', json=edits)
+        assert response.status_code == 200
+        assert response.json == {'ok': True, 'total': 2, 'suggest_allowlist': []}
+        assert file_snapshot(review.path) == before
+        assert report_work == dict(parse=1, dump=0, stage=0, fsync=0, replace=0, encoder_chunks=0)
+>       assert web.FILES.count == 0
+E       assert 2 == 0
+E        +  where 2 = <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360>.count
+E        +    where <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360> = web.FILES
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py:295: AssertionError
+_ test_unchanged_save_preserves_exact_file_and_skips_publication[edits1-False] _
+
+review = namespace(path=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task655/runs/task655-final-full-31...'t1': 0.2, 'mode': 'mute'}], 'custom_future_field': {'preserved': True}}, client=<FlaskClient <Flask 'openscrub_web'>>)
+report_work = {'parse': 1, 'dump': 0, 'stage': 0, 'fsync': 0, ...}
+canonical = False, edits = {'enabled': {'0': 'false', '1': True}}
+
+    @pytest.mark.parametrize('canonical', [False, True])
+    @pytest.mark.parametrize('edits', [
+        {}, {'enabled': {'0': 'false', '1': True}},
+        {'box_overrides': {'0': ['1', 2, 8., 9]}},
+        {'time_overrides': {'0': ['0', 1]}},
+        {'audio': [{'t0': '.1', 't1': '.2', 'mode': 'unsupported', 'ignored': True}]},
+        {'enabled': {'00': False, '-1': False, '999': False},
+         'box_overrides': {'999': None, '0': [1]},
+         'time_overrides': {'-1': None, '0': [1, 0]}},
+        {'box_overrides': {'0': [4, 5, 6, 7], '00': [1, 2, 8, 9]},
+         'time_overrides': {'0': [.1, .9], '00': [0, 1]}},
+    ])
+    def test_unchanged_save_preserves_exact_file_and_skips_publication(review, report_work, canonical, edits):
+        # Unconditional publication loses metadata even for byte-identical JSON.
+        doc = finite_review(review)
+        review.path.write_text(json.dumps(doc, indent=1 if canonical else None))
+        if os.name != 'nt':
+            review.path.chmod(0o640)
+        os.utime(review.path, ns=(1000000000, 2000000000))
+        before = file_snapshot(review.path)
+        response = review.client.post('/api/jobs/synthetic/detections', json=edits)
+        assert response.status_code == 200
+        assert response.json == {'ok': True, 'total': 2, 'suggest_allowlist': []}
+        assert file_snapshot(review.path) == before
+        assert report_work == dict(parse=1, dump=0, stage=0, fsync=0, replace=0, encoder_chunks=0)
+>       assert web.FILES.count == 0
+E       assert 2 == 0
+E        +  where 2 = <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360>.count
+E        +    where <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360> = web.FILES
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py:295: AssertionError
+_ test_unchanged_save_preserves_exact_file_and_skips_publication[edits1-True] __
+
+review = namespace(path=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task655/runs/task655-final-full-31...'t1': 0.2, 'mode': 'mute'}], 'custom_future_field': {'preserved': True}}, client=<FlaskClient <Flask 'openscrub_web'>>)
+report_work = {'parse': 1, 'dump': 0, 'stage': 0, 'fsync': 0, ...}
+canonical = True, edits = {'enabled': {'0': 'false', '1': True}}
+
+    @pytest.mark.parametrize('canonical', [False, True])
+    @pytest.mark.parametrize('edits', [
+        {}, {'enabled': {'0': 'false', '1': True}},
+        {'box_overrides': {'0': ['1', 2, 8., 9]}},
+        {'time_overrides': {'0': ['0', 1]}},
+        {'audio': [{'t0': '.1', 't1': '.2', 'mode': 'unsupported', 'ignored': True}]},
+        {'enabled': {'00': False, '-1': False, '999': False},
+         'box_overrides': {'999': None, '0': [1]},
+         'time_overrides': {'-1': None, '0': [1, 0]}},
+        {'box_overrides': {'0': [4, 5, 6, 7], '00': [1, 2, 8, 9]},
+         'time_overrides': {'0': [.1, .9], '00': [0, 1]}},
+    ])
+    def test_unchanged_save_preserves_exact_file_and_skips_publication(review, report_work, canonical, edits):
+        # Unconditional publication loses metadata even for byte-identical JSON.
+        doc = finite_review(review)
+        review.path.write_text(json.dumps(doc, indent=1 if canonical else None))
+        if os.name != 'nt':
+            review.path.chmod(0o640)
+        os.utime(review.path, ns=(1000000000, 2000000000))
+        before = file_snapshot(review.path)
+        response = review.client.post('/api/jobs/synthetic/detections', json=edits)
+        assert response.status_code == 200
+        assert response.json == {'ok': True, 'total': 2, 'suggest_allowlist': []}
+        assert file_snapshot(review.path) == before
+        assert report_work == dict(parse=1, dump=0, stage=0, fsync=0, replace=0, encoder_chunks=0)
+>       assert web.FILES.count == 0
+E       assert 2 == 0
+E        +  where 2 = <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360>.count
+E        +    where <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360> = web.FILES
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py:295: AssertionError
+_ test_unchanged_save_preserves_exact_file_and_skips_publication[edits2-False] _
+
+review = namespace(path=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task655/runs/task655-final-full-31...'t1': 0.2, 'mode': 'mute'}], 'custom_future_field': {'preserved': True}}, client=<FlaskClient <Flask 'openscrub_web'>>)
+report_work = {'parse': 1, 'dump': 0, 'stage': 0, 'fsync': 0, ...}
+canonical = False, edits = {'box_overrides': {'0': ['1', 2, 8.0, 9]}}
+
+    @pytest.mark.parametrize('canonical', [False, True])
+    @pytest.mark.parametrize('edits', [
+        {}, {'enabled': {'0': 'false', '1': True}},
+        {'box_overrides': {'0': ['1', 2, 8., 9]}},
+        {'time_overrides': {'0': ['0', 1]}},
+        {'audio': [{'t0': '.1', 't1': '.2', 'mode': 'unsupported', 'ignored': True}]},
+        {'enabled': {'00': False, '-1': False, '999': False},
+         'box_overrides': {'999': None, '0': [1]},
+         'time_overrides': {'-1': None, '0': [1, 0]}},
+        {'box_overrides': {'0': [4, 5, 6, 7], '00': [1, 2, 8, 9]},
+         'time_overrides': {'0': [.1, .9], '00': [0, 1]}},
+    ])
+    def test_unchanged_save_preserves_exact_file_and_skips_publication(review, report_work, canonical, edits):
+        # Unconditional publication loses metadata even for byte-identical JSON.
+        doc = finite_review(review)
+        review.path.write_text(json.dumps(doc, indent=1 if canonical else None))
+        if os.name != 'nt':
+            review.path.chmod(0o640)
+        os.utime(review.path, ns=(1000000000, 2000000000))
+        before = file_snapshot(review.path)
+        response = review.client.post('/api/jobs/synthetic/detections', json=edits)
+        assert response.status_code == 200
+        assert response.json == {'ok': True, 'total': 2, 'suggest_allowlist': []}
+        assert file_snapshot(review.path) == before
+        assert report_work == dict(parse=1, dump=0, stage=0, fsync=0, replace=0, encoder_chunks=0)
+>       assert web.FILES.count == 0
+E       assert 2 == 0
+E        +  where 2 = <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360>.count
+E        +    where <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360> = web.FILES
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py:295: AssertionError
+_ test_unchanged_save_preserves_exact_file_and_skips_publication[edits2-True] __
+
+review = namespace(path=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task655/runs/task655-final-full-31...'t1': 0.2, 'mode': 'mute'}], 'custom_future_field': {'preserved': True}}, client=<FlaskClient <Flask 'openscrub_web'>>)
+report_work = {'parse': 1, 'dump': 0, 'stage': 0, 'fsync': 0, ...}
+canonical = True, edits = {'box_overrides': {'0': ['1', 2, 8.0, 9]}}
+
+    @pytest.mark.parametrize('canonical', [False, True])
+    @pytest.mark.parametrize('edits', [
+        {}, {'enabled': {'0': 'false', '1': True}},
+        {'box_overrides': {'0': ['1', 2, 8., 9]}},
+        {'time_overrides': {'0': ['0', 1]}},
+        {'audio': [{'t0': '.1', 't1': '.2', 'mode': 'unsupported', 'ignored': True}]},
+        {'enabled': {'00': False, '-1': False, '999': False},
+         'box_overrides': {'999': None, '0': [1]},
+         'time_overrides': {'-1': None, '0': [1, 0]}},
+        {'box_overrides': {'0': [4, 5, 6, 7], '00': [1, 2, 8, 9]},
+         'time_overrides': {'0': [.1, .9], '00': [0, 1]}},
+    ])
+    def test_unchanged_save_preserves_exact_file_and_skips_publication(review, report_work, canonical, edits):
+        # Unconditional publication loses metadata even for byte-identical JSON.
+        doc = finite_review(review)
+        review.path.write_text(json.dumps(doc, indent=1 if canonical else None))
+        if os.name != 'nt':
+            review.path.chmod(0o640)
+        os.utime(review.path, ns=(1000000000, 2000000000))
+        before = file_snapshot(review.path)
+        response = review.client.post('/api/jobs/synthetic/detections', json=edits)
+        assert response.status_code == 200
+        assert response.json == {'ok': True, 'total': 2, 'suggest_allowlist': []}
+        assert file_snapshot(review.path) == before
+        assert report_work == dict(parse=1, dump=0, stage=0, fsync=0, replace=0, encoder_chunks=0)
+>       assert web.FILES.count == 0
+E       assert 2 == 0
+E        +  where 2 = <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360>.count
+E        +    where <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360> = web.FILES
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py:295: AssertionError
+_ test_unchanged_save_preserves_exact_file_and_skips_publication[edits3-False] _
+
+review = namespace(path=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task655/runs/task655-final-full-31...'t1': 0.2, 'mode': 'mute'}], 'custom_future_field': {'preserved': True}}, client=<FlaskClient <Flask 'openscrub_web'>>)
+report_work = {'parse': 1, 'dump': 0, 'stage': 0, 'fsync': 0, ...}
+canonical = False, edits = {'time_overrides': {'0': ['0', 1]}}
+
+    @pytest.mark.parametrize('canonical', [False, True])
+    @pytest.mark.parametrize('edits', [
+        {}, {'enabled': {'0': 'false', '1': True}},
+        {'box_overrides': {'0': ['1', 2, 8., 9]}},
+        {'time_overrides': {'0': ['0', 1]}},
+        {'audio': [{'t0': '.1', 't1': '.2', 'mode': 'unsupported', 'ignored': True}]},
+        {'enabled': {'00': False, '-1': False, '999': False},
+         'box_overrides': {'999': None, '0': [1]},
+         'time_overrides': {'-1': None, '0': [1, 0]}},
+        {'box_overrides': {'0': [4, 5, 6, 7], '00': [1, 2, 8, 9]},
+         'time_overrides': {'0': [.1, .9], '00': [0, 1]}},
+    ])
+    def test_unchanged_save_preserves_exact_file_and_skips_publication(review, report_work, canonical, edits):
+        # Unconditional publication loses metadata even for byte-identical JSON.
+        doc = finite_review(review)
+        review.path.write_text(json.dumps(doc, indent=1 if canonical else None))
+        if os.name != 'nt':
+            review.path.chmod(0o640)
+        os.utime(review.path, ns=(1000000000, 2000000000))
+        before = file_snapshot(review.path)
+        response = review.client.post('/api/jobs/synthetic/detections', json=edits)
+        assert response.status_code == 200
+        assert response.json == {'ok': True, 'total': 2, 'suggest_allowlist': []}
+        assert file_snapshot(review.path) == before
+        assert report_work == dict(parse=1, dump=0, stage=0, fsync=0, replace=0, encoder_chunks=0)
+>       assert web.FILES.count == 0
+E       assert 2 == 0
+E        +  where 2 = <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360>.count
+E        +    where <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360> = web.FILES
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py:295: AssertionError
+_ test_unchanged_save_preserves_exact_file_and_skips_publication[edits3-True] __
+
+review = namespace(path=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task655/runs/task655-final-full-31...'t1': 0.2, 'mode': 'mute'}], 'custom_future_field': {'preserved': True}}, client=<FlaskClient <Flask 'openscrub_web'>>)
+report_work = {'parse': 1, 'dump': 0, 'stage': 0, 'fsync': 0, ...}
+canonical = True, edits = {'time_overrides': {'0': ['0', 1]}}
+
+    @pytest.mark.parametrize('canonical', [False, True])
+    @pytest.mark.parametrize('edits', [
+        {}, {'enabled': {'0': 'false', '1': True}},
+        {'box_overrides': {'0': ['1', 2, 8., 9]}},
+        {'time_overrides': {'0': ['0', 1]}},
+        {'audio': [{'t0': '.1', 't1': '.2', 'mode': 'unsupported', 'ignored': True}]},
+        {'enabled': {'00': False, '-1': False, '999': False},
+         'box_overrides': {'999': None, '0': [1]},
+         'time_overrides': {'-1': None, '0': [1, 0]}},
+        {'box_overrides': {'0': [4, 5, 6, 7], '00': [1, 2, 8, 9]},
+         'time_overrides': {'0': [.1, .9], '00': [0, 1]}},
+    ])
+    def test_unchanged_save_preserves_exact_file_and_skips_publication(review, report_work, canonical, edits):
+        # Unconditional publication loses metadata even for byte-identical JSON.
+        doc = finite_review(review)
+        review.path.write_text(json.dumps(doc, indent=1 if canonical else None))
+        if os.name != 'nt':
+            review.path.chmod(0o640)
+        os.utime(review.path, ns=(1000000000, 2000000000))
+        before = file_snapshot(review.path)
+        response = review.client.post('/api/jobs/synthetic/detections', json=edits)
+        assert response.status_code == 200
+        assert response.json == {'ok': True, 'total': 2, 'suggest_allowlist': []}
+        assert file_snapshot(review.path) == before
+        assert report_work == dict(parse=1, dump=0, stage=0, fsync=0, replace=0, encoder_chunks=0)
+>       assert web.FILES.count == 0
+E       assert 2 == 0
+E        +  where 2 = <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360>.count
+E        +    where <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360> = web.FILES
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py:295: AssertionError
+_ test_unchanged_save_preserves_exact_file_and_skips_publication[edits4-False] _
+
+review = namespace(path=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task655/runs/task655-final-full-31...'t1': 0.2, 'mode': 'mute'}], 'custom_future_field': {'preserved': True}}, client=<FlaskClient <Flask 'openscrub_web'>>)
+report_work = {'parse': 1, 'dump': 0, 'stage': 0, 'fsync': 0, ...}
+canonical = False
+edits = {'audio': [{'t0': '.1', 't1': '.2', 'mode': 'unsupported', 'ignored': True}]}
+
+    @pytest.mark.parametrize('canonical', [False, True])
+    @pytest.mark.parametrize('edits', [
+        {}, {'enabled': {'0': 'false', '1': True}},
+        {'box_overrides': {'0': ['1', 2, 8., 9]}},
+        {'time_overrides': {'0': ['0', 1]}},
+        {'audio': [{'t0': '.1', 't1': '.2', 'mode': 'unsupported', 'ignored': True}]},
+        {'enabled': {'00': False, '-1': False, '999': False},
+         'box_overrides': {'999': None, '0': [1]},
+         'time_overrides': {'-1': None, '0': [1, 0]}},
+        {'box_overrides': {'0': [4, 5, 6, 7], '00': [1, 2, 8, 9]},
+         'time_overrides': {'0': [.1, .9], '00': [0, 1]}},
+    ])
+    def test_unchanged_save_preserves_exact_file_and_skips_publication(review, report_work, canonical, edits):
+        # Unconditional publication loses metadata even for byte-identical JSON.
+        doc = finite_review(review)
+        review.path.write_text(json.dumps(doc, indent=1 if canonical else None))
+        if os.name != 'nt':
+            review.path.chmod(0o640)
+        os.utime(review.path, ns=(1000000000, 2000000000))
+        before = file_snapshot(review.path)
+        response = review.client.post('/api/jobs/synthetic/detections', json=edits)
+        assert response.status_code == 200
+        assert response.json == {'ok': True, 'total': 2, 'suggest_allowlist': []}
+        assert file_snapshot(review.path) == before
+        assert report_work == dict(parse=1, dump=0, stage=0, fsync=0, replace=0, encoder_chunks=0)
+>       assert web.FILES.count == 0
+E       assert 2 == 0
+E        +  where 2 = <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360>.count
+E        +    where <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360> = web.FILES
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py:295: AssertionError
+_ test_unchanged_save_preserves_exact_file_and_skips_publication[edits4-True] __
+
+review = namespace(path=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task655/runs/task655-final-full-31...'t1': 0.2, 'mode': 'mute'}], 'custom_future_field': {'preserved': True}}, client=<FlaskClient <Flask 'openscrub_web'>>)
+report_work = {'parse': 1, 'dump': 0, 'stage': 0, 'fsync': 0, ...}
+canonical = True
+edits = {'audio': [{'t0': '.1', 't1': '.2', 'mode': 'unsupported', 'ignored': True}]}
+
+    @pytest.mark.parametrize('canonical', [False, True])
+    @pytest.mark.parametrize('edits', [
+        {}, {'enabled': {'0': 'false', '1': True}},
+        {'box_overrides': {'0': ['1', 2, 8., 9]}},
+        {'time_overrides': {'0': ['0', 1]}},
+        {'audio': [{'t0': '.1', 't1': '.2', 'mode': 'unsupported', 'ignored': True}]},
+        {'enabled': {'00': False, '-1': False, '999': False},
+         'box_overrides': {'999': None, '0': [1]},
+         'time_overrides': {'-1': None, '0': [1, 0]}},
+        {'box_overrides': {'0': [4, 5, 6, 7], '00': [1, 2, 8, 9]},
+         'time_overrides': {'0': [.1, .9], '00': [0, 1]}},
+    ])
+    def test_unchanged_save_preserves_exact_file_and_skips_publication(review, report_work, canonical, edits):
+        # Unconditional publication loses metadata even for byte-identical JSON.
+        doc = finite_review(review)
+        review.path.write_text(json.dumps(doc, indent=1 if canonical else None))
+        if os.name != 'nt':
+            review.path.chmod(0o640)
+        os.utime(review.path, ns=(1000000000, 2000000000))
+        before = file_snapshot(review.path)
+        response = review.client.post('/api/jobs/synthetic/detections', json=edits)
+        assert response.status_code == 200
+        assert response.json == {'ok': True, 'total': 2, 'suggest_allowlist': []}
+        assert file_snapshot(review.path) == before
+        assert report_work == dict(parse=1, dump=0, stage=0, fsync=0, replace=0, encoder_chunks=0)
+>       assert web.FILES.count == 0
+E       assert 2 == 0
+E        +  where 2 = <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360>.count
+E        +    where <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360> = web.FILES
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py:295: AssertionError
+_ test_unchanged_save_preserves_exact_file_and_skips_publication[edits5-False] _
+
+review = namespace(path=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task655/runs/task655-final-full-31...'t1': 0.2, 'mode': 'mute'}], 'custom_future_field': {'preserved': True}}, client=<FlaskClient <Flask 'openscrub_web'>>)
+report_work = {'parse': 1, 'dump': 0, 'stage': 0, 'fsync': 0, ...}
+canonical = False
+edits = {'enabled': {'00': False, '-1': False, '999': False}, 'box_overrides': {'999': None, '0': [1]}, 'time_overrides': {'-1': None, '0': [1, 0]}}
+
+    @pytest.mark.parametrize('canonical', [False, True])
+    @pytest.mark.parametrize('edits', [
+        {}, {'enabled': {'0': 'false', '1': True}},
+        {'box_overrides': {'0': ['1', 2, 8., 9]}},
+        {'time_overrides': {'0': ['0', 1]}},
+        {'audio': [{'t0': '.1', 't1': '.2', 'mode': 'unsupported', 'ignored': True}]},
+        {'enabled': {'00': False, '-1': False, '999': False},
+         'box_overrides': {'999': None, '0': [1]},
+         'time_overrides': {'-1': None, '0': [1, 0]}},
+        {'box_overrides': {'0': [4, 5, 6, 7], '00': [1, 2, 8, 9]},
+         'time_overrides': {'0': [.1, .9], '00': [0, 1]}},
+    ])
+    def test_unchanged_save_preserves_exact_file_and_skips_publication(review, report_work, canonical, edits):
+        # Unconditional publication loses metadata even for byte-identical JSON.
+        doc = finite_review(review)
+        review.path.write_text(json.dumps(doc, indent=1 if canonical else None))
+        if os.name != 'nt':
+            review.path.chmod(0o640)
+        os.utime(review.path, ns=(1000000000, 2000000000))
+        before = file_snapshot(review.path)
+        response = review.client.post('/api/jobs/synthetic/detections', json=edits)
+        assert response.status_code == 200
+        assert response.json == {'ok': True, 'total': 2, 'suggest_allowlist': []}
+        assert file_snapshot(review.path) == before
+        assert report_work == dict(parse=1, dump=0, stage=0, fsync=0, replace=0, encoder_chunks=0)
+>       assert web.FILES.count == 0
+E       assert 2 == 0
+E        +  where 2 = <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360>.count
+E        +    where <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360> = web.FILES
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py:295: AssertionError
+_ test_unchanged_save_preserves_exact_file_and_skips_publication[edits5-True] __
+
+review = namespace(path=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task655/runs/task655-final-full-31...'t1': 0.2, 'mode': 'mute'}], 'custom_future_field': {'preserved': True}}, client=<FlaskClient <Flask 'openscrub_web'>>)
+report_work = {'parse': 1, 'dump': 0, 'stage': 0, 'fsync': 0, ...}
+canonical = True
+edits = {'enabled': {'00': False, '-1': False, '999': False}, 'box_overrides': {'999': None, '0': [1]}, 'time_overrides': {'-1': None, '0': [1, 0]}}
+
+    @pytest.mark.parametrize('canonical', [False, True])
+    @pytest.mark.parametrize('edits', [
+        {}, {'enabled': {'0': 'false', '1': True}},
+        {'box_overrides': {'0': ['1', 2, 8., 9]}},
+        {'time_overrides': {'0': ['0', 1]}},
+        {'audio': [{'t0': '.1', 't1': '.2', 'mode': 'unsupported', 'ignored': True}]},
+        {'enabled': {'00': False, '-1': False, '999': False},
+         'box_overrides': {'999': None, '0': [1]},
+         'time_overrides': {'-1': None, '0': [1, 0]}},
+        {'box_overrides': {'0': [4, 5, 6, 7], '00': [1, 2, 8, 9]},
+         'time_overrides': {'0': [.1, .9], '00': [0, 1]}},
+    ])
+    def test_unchanged_save_preserves_exact_file_and_skips_publication(review, report_work, canonical, edits):
+        # Unconditional publication loses metadata even for byte-identical JSON.
+        doc = finite_review(review)
+        review.path.write_text(json.dumps(doc, indent=1 if canonical else None))
+        if os.name != 'nt':
+            review.path.chmod(0o640)
+        os.utime(review.path, ns=(1000000000, 2000000000))
+        before = file_snapshot(review.path)
+        response = review.client.post('/api/jobs/synthetic/detections', json=edits)
+        assert response.status_code == 200
+        assert response.json == {'ok': True, 'total': 2, 'suggest_allowlist': []}
+        assert file_snapshot(review.path) == before
+        assert report_work == dict(parse=1, dump=0, stage=0, fsync=0, replace=0, encoder_chunks=0)
+>       assert web.FILES.count == 0
+E       assert 2 == 0
+E        +  where 2 = <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360>.count
+E        +    where <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360> = web.FILES
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py:295: AssertionError
+_ test_unchanged_save_preserves_exact_file_and_skips_publication[edits6-False] _
+
+review = namespace(path=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task655/runs/task655-final-full-31...'t1': 0.2, 'mode': 'mute'}], 'custom_future_field': {'preserved': True}}, client=<FlaskClient <Flask 'openscrub_web'>>)
+report_work = {'parse': 1, 'dump': 0, 'stage': 0, 'fsync': 0, ...}
+canonical = False
+edits = {'box_overrides': {'0': [4, 5, 6, 7], '00': [1, 2, 8, 9]}, 'time_overrides': {'0': [0.1, 0.9], '00': [0, 1]}}
+
+    @pytest.mark.parametrize('canonical', [False, True])
+    @pytest.mark.parametrize('edits', [
+        {}, {'enabled': {'0': 'false', '1': True}},
+        {'box_overrides': {'0': ['1', 2, 8., 9]}},
+        {'time_overrides': {'0': ['0', 1]}},
+        {'audio': [{'t0': '.1', 't1': '.2', 'mode': 'unsupported', 'ignored': True}]},
+        {'enabled': {'00': False, '-1': False, '999': False},
+         'box_overrides': {'999': None, '0': [1]},
+         'time_overrides': {'-1': None, '0': [1, 0]}},
+        {'box_overrides': {'0': [4, 5, 6, 7], '00': [1, 2, 8, 9]},
+         'time_overrides': {'0': [.1, .9], '00': [0, 1]}},
+    ])
+    def test_unchanged_save_preserves_exact_file_and_skips_publication(review, report_work, canonical, edits):
+        # Unconditional publication loses metadata even for byte-identical JSON.
+        doc = finite_review(review)
+        review.path.write_text(json.dumps(doc, indent=1 if canonical else None))
+        if os.name != 'nt':
+            review.path.chmod(0o640)
+        os.utime(review.path, ns=(1000000000, 2000000000))
+        before = file_snapshot(review.path)
+        response = review.client.post('/api/jobs/synthetic/detections', json=edits)
+        assert response.status_code == 200
+        assert response.json == {'ok': True, 'total': 2, 'suggest_allowlist': []}
+        assert file_snapshot(review.path) == before
+        assert report_work == dict(parse=1, dump=0, stage=0, fsync=0, replace=0, encoder_chunks=0)
+>       assert web.FILES.count == 0
+E       assert 2 == 0
+E        +  where 2 = <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360>.count
+E        +    where <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360> = web.FILES
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py:295: AssertionError
+_ test_unchanged_save_preserves_exact_file_and_skips_publication[edits6-True] __
+
+review = namespace(path=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task655/runs/task655-final-full-31...'t1': 0.2, 'mode': 'mute'}], 'custom_future_field': {'preserved': True}}, client=<FlaskClient <Flask 'openscrub_web'>>)
+report_work = {'parse': 1, 'dump': 0, 'stage': 0, 'fsync': 0, ...}
+canonical = True
+edits = {'box_overrides': {'0': [4, 5, 6, 7], '00': [1, 2, 8, 9]}, 'time_overrides': {'0': [0.1, 0.9], '00': [0, 1]}}
+
+    @pytest.mark.parametrize('canonical', [False, True])
+    @pytest.mark.parametrize('edits', [
+        {}, {'enabled': {'0': 'false', '1': True}},
+        {'box_overrides': {'0': ['1', 2, 8., 9]}},
+        {'time_overrides': {'0': ['0', 1]}},
+        {'audio': [{'t0': '.1', 't1': '.2', 'mode': 'unsupported', 'ignored': True}]},
+        {'enabled': {'00': False, '-1': False, '999': False},
+         'box_overrides': {'999': None, '0': [1]},
+         'time_overrides': {'-1': None, '0': [1, 0]}},
+        {'box_overrides': {'0': [4, 5, 6, 7], '00': [1, 2, 8, 9]},
+         'time_overrides': {'0': [.1, .9], '00': [0, 1]}},
+    ])
+    def test_unchanged_save_preserves_exact_file_and_skips_publication(review, report_work, canonical, edits):
+        # Unconditional publication loses metadata even for byte-identical JSON.
+        doc = finite_review(review)
+        review.path.write_text(json.dumps(doc, indent=1 if canonical else None))
+        if os.name != 'nt':
+            review.path.chmod(0o640)
+        os.utime(review.path, ns=(1000000000, 2000000000))
+        before = file_snapshot(review.path)
+        response = review.client.post('/api/jobs/synthetic/detections', json=edits)
+        assert response.status_code == 200
+        assert response.json == {'ok': True, 'total': 2, 'suggest_allowlist': []}
+        assert file_snapshot(review.path) == before
+        assert report_work == dict(parse=1, dump=0, stage=0, fsync=0, replace=0, encoder_chunks=0)
+>       assert web.FILES.count == 0
+E       assert 2 == 0
+E        +  where 2 = <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360>.count
+E        +    where <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360> = web.FILES
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py:295: AssertionError
+_ test_effective_changes_publish_once_with_raw_fields_preserved[missing_enabled] _
+
+review = namespace(path=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task655/runs/task655-final-full-31...'t1': 0.2, 'mode': 'mute'}], 'custom_future_field': {'preserved': True}}, client=<FlaskClient <Flask 'openscrub_web'>>)
+report_work = {'parse': 1, 'dump': 1, 'stage': 1, 'fsync': 1, ...}
+case = 'missing_enabled'
+
+    @pytest.mark.parametrize('case', [
+        'missing_enabled', 'numeric_enabled', 'integer_box', 'integer_time',
+        'negative_zero_box', 'negative_zero_time', 'missing_last_seen', 'clamped_last_seen',
+        'missing_audio', 'audio_extra', 'audio_bool', 'audio_int', 'audio_negative_zero',
+        'nonfinite_box', 'nonfinite_audio', 'sparse', 'combined', 'legacy_manual',
+    ])
+    def test_effective_changes_publish_once_with_raw_fields_preserved(review, report_work, case):
+        doc = finite_review(review)
+        row = doc['detections'][0]
+        edits = {}
+        if case == 'missing_enabled':
+            del row['enabled']; edits = {'enabled': {'0': True}}
+        elif case == 'numeric_enabled':
+            row['enabled'] = 1; edits = {'enabled': {'0': True}}
+        elif case == 'integer_box':
+            row['cbox'] = [1, 2, 8, 9]; edits = {'box_overrides': {'0': [1, 2, 8, 9]}}
+        elif case == 'integer_time':
+            row.update(t_start=0, t_end=1); edits = {'time_overrides': {'0': [0, 1]}}
+        elif case == 'negative_zero_box':
+            row['cbox'][0] = -0.; edits = {'box_overrides': {'0': [0., 2., 8., 9.]}}
+        elif case == 'negative_zero_time':
+            row['t_start'] = -0.; edits = {'time_overrides': {'0': [0., 1.]}}
+        elif case in ('missing_last_seen', 'clamped_last_seen'):
+            if case == 'missing_last_seen': del row['last_seen']
+            else: row['last_seen'] = 2.
+            edits = {'time_overrides': {'0': [0., 1.]}}
+        elif case == 'missing_audio':
+            del doc['audio_redactions']; edits = {'audio': []}
+        elif case == 'audio_extra':
+            doc['audio_redactions'][0]['future'] = {'nested': [True, 1, 1.]}
+            edits = {'audio': [{'t0': .1, 't1': .2}]}
+        elif case in ('audio_bool', 'audio_int', 'audio_negative_zero'):
+            value = {'audio_bool': False, 'audio_int': 0, 'audio_negative_zero': -0.}[case]
+            doc['audio_redactions'] = [{'t0': value, 't1': 1., 'mode': 'mute'}]
+            edits = {'audio': [{'t0': 0., 't1': 1.}]}
+        elif case == 'nonfinite_box':
+            row['cbox'][0] = float('inf'); edits = {'box_overrides': {'0': [float('inf'), 2, 8, 9]}}
+        elif case == 'nonfinite_audio':
+            doc['audio_redactions'][0]['t1'] = float('inf')
+            edits = {'audio': doc['audio_redactions']}
+        elif case == 'sparse': edits = {'enabled': {'0': False}}
+        elif case == 'combined':
+            edits = {'enabled': {'0': False, '1': False}, 'box_overrides': {'0': [2,3,9,10]},
+                     'time_overrides': {'0': [.2, 2]}, 'audio': []}
+        elif case == 'legacy_manual':
+            edits = {'manual': [{'t_start': 0, 't_end': 1, 'screen_box': [1,2,8,9]}]}
+        doc['unknown'] = {'ordered': [None, True, 1, 1., {'motion': [[1,2],[3,4]]}]}
+        doc['audio_transcript'] = [{'text': 'raw synthetic', 'future': [0,False]}]
+        review.path.write_text(json.dumps(doc, indent=1))
+        before = review.path.read_bytes()
+        response = review.client.post('/api/jobs/synthetic/detections', json=edits)
+        assert response.status_code == 200
+        after = json.loads(review.path.read_bytes())
+        assert report_work['parse'] == report_work['dump'] == report_work['stage'] == report_work['fsync'] == report_work['replace'] == 1
+        assert report_work['encoder_chunks'] > 0  # Encoder chunks, not Python writes or syscalls.
+        assert after['unknown'] == doc['unknown']
+        assert after['audio_transcript'] == doc['audio_transcript']
+        assert after['render_state'] == doc['render_state']
+        assert review.path.read_bytes() == json.dumps(after, indent=1).encode()
+        if not case.startswith('nonfinite'):
+            assert review.path.read_bytes() != before
+        if case == 'combined':
+            assert after['detections'][0]['cbox'] == [2.,3.,9.,10.]
+            assert after['detections'][0]['last_seen'] == .5
+            assert after['audio_redactions'] == []
+            assert response.json['suggest_allowlist'] == ['synthetic']
+        if case == 'audio_extra': assert set(after['audio_redactions'][0]) == {'t0','t1','mode'}
+>       assert web.FILES.count == 0
+E       assert 2 == 0
+E        +  where 2 = <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360>.count
+E        +    where <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360> = web.FILES
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py:365: AssertionError
+_ test_effective_changes_publish_once_with_raw_fields_preserved[numeric_enabled] _
+
+review = namespace(path=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task655/runs/task655-final-full-31...'t1': 0.2, 'mode': 'mute'}], 'custom_future_field': {'preserved': True}}, client=<FlaskClient <Flask 'openscrub_web'>>)
+report_work = {'parse': 1, 'dump': 1, 'stage': 1, 'fsync': 1, ...}
+case = 'numeric_enabled'
+
+    @pytest.mark.parametrize('case', [
+        'missing_enabled', 'numeric_enabled', 'integer_box', 'integer_time',
+        'negative_zero_box', 'negative_zero_time', 'missing_last_seen', 'clamped_last_seen',
+        'missing_audio', 'audio_extra', 'audio_bool', 'audio_int', 'audio_negative_zero',
+        'nonfinite_box', 'nonfinite_audio', 'sparse', 'combined', 'legacy_manual',
+    ])
+    def test_effective_changes_publish_once_with_raw_fields_preserved(review, report_work, case):
+        doc = finite_review(review)
+        row = doc['detections'][0]
+        edits = {}
+        if case == 'missing_enabled':
+            del row['enabled']; edits = {'enabled': {'0': True}}
+        elif case == 'numeric_enabled':
+            row['enabled'] = 1; edits = {'enabled': {'0': True}}
+        elif case == 'integer_box':
+            row['cbox'] = [1, 2, 8, 9]; edits = {'box_overrides': {'0': [1, 2, 8, 9]}}
+        elif case == 'integer_time':
+            row.update(t_start=0, t_end=1); edits = {'time_overrides': {'0': [0, 1]}}
+        elif case == 'negative_zero_box':
+            row['cbox'][0] = -0.; edits = {'box_overrides': {'0': [0., 2., 8., 9.]}}
+        elif case == 'negative_zero_time':
+            row['t_start'] = -0.; edits = {'time_overrides': {'0': [0., 1.]}}
+        elif case in ('missing_last_seen', 'clamped_last_seen'):
+            if case == 'missing_last_seen': del row['last_seen']
+            else: row['last_seen'] = 2.
+            edits = {'time_overrides': {'0': [0., 1.]}}
+        elif case == 'missing_audio':
+            del doc['audio_redactions']; edits = {'audio': []}
+        elif case == 'audio_extra':
+            doc['audio_redactions'][0]['future'] = {'nested': [True, 1, 1.]}
+            edits = {'audio': [{'t0': .1, 't1': .2}]}
+        elif case in ('audio_bool', 'audio_int', 'audio_negative_zero'):
+            value = {'audio_bool': False, 'audio_int': 0, 'audio_negative_zero': -0.}[case]
+            doc['audio_redactions'] = [{'t0': value, 't1': 1., 'mode': 'mute'}]
+            edits = {'audio': [{'t0': 0., 't1': 1.}]}
+        elif case == 'nonfinite_box':
+            row['cbox'][0] = float('inf'); edits = {'box_overrides': {'0': [float('inf'), 2, 8, 9]}}
+        elif case == 'nonfinite_audio':
+            doc['audio_redactions'][0]['t1'] = float('inf')
+            edits = {'audio': doc['audio_redactions']}
+        elif case == 'sparse': edits = {'enabled': {'0': False}}
+        elif case == 'combined':
+            edits = {'enabled': {'0': False, '1': False}, 'box_overrides': {'0': [2,3,9,10]},
+                     'time_overrides': {'0': [.2, 2]}, 'audio': []}
+        elif case == 'legacy_manual':
+            edits = {'manual': [{'t_start': 0, 't_end': 1, 'screen_box': [1,2,8,9]}]}
+        doc['unknown'] = {'ordered': [None, True, 1, 1., {'motion': [[1,2],[3,4]]}]}
+        doc['audio_transcript'] = [{'text': 'raw synthetic', 'future': [0,False]}]
+        review.path.write_text(json.dumps(doc, indent=1))
+        before = review.path.read_bytes()
+        response = review.client.post('/api/jobs/synthetic/detections', json=edits)
+        assert response.status_code == 200
+        after = json.loads(review.path.read_bytes())
+        assert report_work['parse'] == report_work['dump'] == report_work['stage'] == report_work['fsync'] == report_work['replace'] == 1
+        assert report_work['encoder_chunks'] > 0  # Encoder chunks, not Python writes or syscalls.
+        assert after['unknown'] == doc['unknown']
+        assert after['audio_transcript'] == doc['audio_transcript']
+        assert after['render_state'] == doc['render_state']
+        assert review.path.read_bytes() == json.dumps(after, indent=1).encode()
+        if not case.startswith('nonfinite'):
+            assert review.path.read_bytes() != before
+        if case == 'combined':
+            assert after['detections'][0]['cbox'] == [2.,3.,9.,10.]
+            assert after['detections'][0]['last_seen'] == .5
+            assert after['audio_redactions'] == []
+            assert response.json['suggest_allowlist'] == ['synthetic']
+        if case == 'audio_extra': assert set(after['audio_redactions'][0]) == {'t0','t1','mode'}
+>       assert web.FILES.count == 0
+E       assert 2 == 0
+E        +  where 2 = <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360>.count
+E        +    where <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360> = web.FILES
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py:365: AssertionError
+__ test_effective_changes_publish_once_with_raw_fields_preserved[integer_box] __
+
+review = namespace(path=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task655/runs/task655-final-full-31...'t1': 0.2, 'mode': 'mute'}], 'custom_future_field': {'preserved': True}}, client=<FlaskClient <Flask 'openscrub_web'>>)
+report_work = {'parse': 1, 'dump': 1, 'stage': 1, 'fsync': 1, ...}
+case = 'integer_box'
+
+    @pytest.mark.parametrize('case', [
+        'missing_enabled', 'numeric_enabled', 'integer_box', 'integer_time',
+        'negative_zero_box', 'negative_zero_time', 'missing_last_seen', 'clamped_last_seen',
+        'missing_audio', 'audio_extra', 'audio_bool', 'audio_int', 'audio_negative_zero',
+        'nonfinite_box', 'nonfinite_audio', 'sparse', 'combined', 'legacy_manual',
+    ])
+    def test_effective_changes_publish_once_with_raw_fields_preserved(review, report_work, case):
+        doc = finite_review(review)
+        row = doc['detections'][0]
+        edits = {}
+        if case == 'missing_enabled':
+            del row['enabled']; edits = {'enabled': {'0': True}}
+        elif case == 'numeric_enabled':
+            row['enabled'] = 1; edits = {'enabled': {'0': True}}
+        elif case == 'integer_box':
+            row['cbox'] = [1, 2, 8, 9]; edits = {'box_overrides': {'0': [1, 2, 8, 9]}}
+        elif case == 'integer_time':
+            row.update(t_start=0, t_end=1); edits = {'time_overrides': {'0': [0, 1]}}
+        elif case == 'negative_zero_box':
+            row['cbox'][0] = -0.; edits = {'box_overrides': {'0': [0., 2., 8., 9.]}}
+        elif case == 'negative_zero_time':
+            row['t_start'] = -0.; edits = {'time_overrides': {'0': [0., 1.]}}
+        elif case in ('missing_last_seen', 'clamped_last_seen'):
+            if case == 'missing_last_seen': del row['last_seen']
+            else: row['last_seen'] = 2.
+            edits = {'time_overrides': {'0': [0., 1.]}}
+        elif case == 'missing_audio':
+            del doc['audio_redactions']; edits = {'audio': []}
+        elif case == 'audio_extra':
+            doc['audio_redactions'][0]['future'] = {'nested': [True, 1, 1.]}
+            edits = {'audio': [{'t0': .1, 't1': .2}]}
+        elif case in ('audio_bool', 'audio_int', 'audio_negative_zero'):
+            value = {'audio_bool': False, 'audio_int': 0, 'audio_negative_zero': -0.}[case]
+            doc['audio_redactions'] = [{'t0': value, 't1': 1., 'mode': 'mute'}]
+            edits = {'audio': [{'t0': 0., 't1': 1.}]}
+        elif case == 'nonfinite_box':
+            row['cbox'][0] = float('inf'); edits = {'box_overrides': {'0': [float('inf'), 2, 8, 9]}}
+        elif case == 'nonfinite_audio':
+            doc['audio_redactions'][0]['t1'] = float('inf')
+            edits = {'audio': doc['audio_redactions']}
+        elif case == 'sparse': edits = {'enabled': {'0': False}}
+        elif case == 'combined':
+            edits = {'enabled': {'0': False, '1': False}, 'box_overrides': {'0': [2,3,9,10]},
+                     'time_overrides': {'0': [.2, 2]}, 'audio': []}
+        elif case == 'legacy_manual':
+            edits = {'manual': [{'t_start': 0, 't_end': 1, 'screen_box': [1,2,8,9]}]}
+        doc['unknown'] = {'ordered': [None, True, 1, 1., {'motion': [[1,2],[3,4]]}]}
+        doc['audio_transcript'] = [{'text': 'raw synthetic', 'future': [0,False]}]
+        review.path.write_text(json.dumps(doc, indent=1))
+        before = review.path.read_bytes()
+        response = review.client.post('/api/jobs/synthetic/detections', json=edits)
+        assert response.status_code == 200
+        after = json.loads(review.path.read_bytes())
+        assert report_work['parse'] == report_work['dump'] == report_work['stage'] == report_work['fsync'] == report_work['replace'] == 1
+        assert report_work['encoder_chunks'] > 0  # Encoder chunks, not Python writes or syscalls.
+        assert after['unknown'] == doc['unknown']
+        assert after['audio_transcript'] == doc['audio_transcript']
+        assert after['render_state'] == doc['render_state']
+        assert review.path.read_bytes() == json.dumps(after, indent=1).encode()
+        if not case.startswith('nonfinite'):
+            assert review.path.read_bytes() != before
+        if case == 'combined':
+            assert after['detections'][0]['cbox'] == [2.,3.,9.,10.]
+            assert after['detections'][0]['last_seen'] == .5
+            assert after['audio_redactions'] == []
+            assert response.json['suggest_allowlist'] == ['synthetic']
+        if case == 'audio_extra': assert set(after['audio_redactions'][0]) == {'t0','t1','mode'}
+>       assert web.FILES.count == 0
+E       assert 2 == 0
+E        +  where 2 = <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360>.count
+E        +    where <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360> = web.FILES
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py:365: AssertionError
+_ test_effective_changes_publish_once_with_raw_fields_preserved[integer_time] __
+
+review = namespace(path=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task655/runs/task655-final-full-31...'t1': 0.2, 'mode': 'mute'}], 'custom_future_field': {'preserved': True}}, client=<FlaskClient <Flask 'openscrub_web'>>)
+report_work = {'parse': 1, 'dump': 1, 'stage': 1, 'fsync': 1, ...}
+case = 'integer_time'
+
+    @pytest.mark.parametrize('case', [
+        'missing_enabled', 'numeric_enabled', 'integer_box', 'integer_time',
+        'negative_zero_box', 'negative_zero_time', 'missing_last_seen', 'clamped_last_seen',
+        'missing_audio', 'audio_extra', 'audio_bool', 'audio_int', 'audio_negative_zero',
+        'nonfinite_box', 'nonfinite_audio', 'sparse', 'combined', 'legacy_manual',
+    ])
+    def test_effective_changes_publish_once_with_raw_fields_preserved(review, report_work, case):
+        doc = finite_review(review)
+        row = doc['detections'][0]
+        edits = {}
+        if case == 'missing_enabled':
+            del row['enabled']; edits = {'enabled': {'0': True}}
+        elif case == 'numeric_enabled':
+            row['enabled'] = 1; edits = {'enabled': {'0': True}}
+        elif case == 'integer_box':
+            row['cbox'] = [1, 2, 8, 9]; edits = {'box_overrides': {'0': [1, 2, 8, 9]}}
+        elif case == 'integer_time':
+            row.update(t_start=0, t_end=1); edits = {'time_overrides': {'0': [0, 1]}}
+        elif case == 'negative_zero_box':
+            row['cbox'][0] = -0.; edits = {'box_overrides': {'0': [0., 2., 8., 9.]}}
+        elif case == 'negative_zero_time':
+            row['t_start'] = -0.; edits = {'time_overrides': {'0': [0., 1.]}}
+        elif case in ('missing_last_seen', 'clamped_last_seen'):
+            if case == 'missing_last_seen': del row['last_seen']
+            else: row['last_seen'] = 2.
+            edits = {'time_overrides': {'0': [0., 1.]}}
+        elif case == 'missing_audio':
+            del doc['audio_redactions']; edits = {'audio': []}
+        elif case == 'audio_extra':
+            doc['audio_redactions'][0]['future'] = {'nested': [True, 1, 1.]}
+            edits = {'audio': [{'t0': .1, 't1': .2}]}
+        elif case in ('audio_bool', 'audio_int', 'audio_negative_zero'):
+            value = {'audio_bool': False, 'audio_int': 0, 'audio_negative_zero': -0.}[case]
+            doc['audio_redactions'] = [{'t0': value, 't1': 1., 'mode': 'mute'}]
+            edits = {'audio': [{'t0': 0., 't1': 1.}]}
+        elif case == 'nonfinite_box':
+            row['cbox'][0] = float('inf'); edits = {'box_overrides': {'0': [float('inf'), 2, 8, 9]}}
+        elif case == 'nonfinite_audio':
+            doc['audio_redactions'][0]['t1'] = float('inf')
+            edits = {'audio': doc['audio_redactions']}
+        elif case == 'sparse': edits = {'enabled': {'0': False}}
+        elif case == 'combined':
+            edits = {'enabled': {'0': False, '1': False}, 'box_overrides': {'0': [2,3,9,10]},
+                     'time_overrides': {'0': [.2, 2]}, 'audio': []}
+        elif case == 'legacy_manual':
+            edits = {'manual': [{'t_start': 0, 't_end': 1, 'screen_box': [1,2,8,9]}]}
+        doc['unknown'] = {'ordered': [None, True, 1, 1., {'motion': [[1,2],[3,4]]}]}
+        doc['audio_transcript'] = [{'text': 'raw synthetic', 'future': [0,False]}]
+        review.path.write_text(json.dumps(doc, indent=1))
+        before = review.path.read_bytes()
+        response = review.client.post('/api/jobs/synthetic/detections', json=edits)
+        assert response.status_code == 200
+        after = json.loads(review.path.read_bytes())
+        assert report_work['parse'] == report_work['dump'] == report_work['stage'] == report_work['fsync'] == report_work['replace'] == 1
+        assert report_work['encoder_chunks'] > 0  # Encoder chunks, not Python writes or syscalls.
+        assert after['unknown'] == doc['unknown']
+        assert after['audio_transcript'] == doc['audio_transcript']
+        assert after['render_state'] == doc['render_state']
+        assert review.path.read_bytes() == json.dumps(after, indent=1).encode()
+        if not case.startswith('nonfinite'):
+            assert review.path.read_bytes() != before
+        if case == 'combined':
+            assert after['detections'][0]['cbox'] == [2.,3.,9.,10.]
+            assert after['detections'][0]['last_seen'] == .5
+            assert after['audio_redactions'] == []
+            assert response.json['suggest_allowlist'] == ['synthetic']
+        if case == 'audio_extra': assert set(after['audio_redactions'][0]) == {'t0','t1','mode'}
+>       assert web.FILES.count == 0
+E       assert 2 == 0
+E        +  where 2 = <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360>.count
+E        +    where <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360> = web.FILES
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py:365: AssertionError
+_ test_effective_changes_publish_once_with_raw_fields_preserved[negative_zero_box] _
+
+review = namespace(path=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task655/runs/task655-final-full-31...'t1': 0.2, 'mode': 'mute'}], 'custom_future_field': {'preserved': True}}, client=<FlaskClient <Flask 'openscrub_web'>>)
+report_work = {'parse': 1, 'dump': 1, 'stage': 1, 'fsync': 1, ...}
+case = 'negative_zero_box'
+
+    @pytest.mark.parametrize('case', [
+        'missing_enabled', 'numeric_enabled', 'integer_box', 'integer_time',
+        'negative_zero_box', 'negative_zero_time', 'missing_last_seen', 'clamped_last_seen',
+        'missing_audio', 'audio_extra', 'audio_bool', 'audio_int', 'audio_negative_zero',
+        'nonfinite_box', 'nonfinite_audio', 'sparse', 'combined', 'legacy_manual',
+    ])
+    def test_effective_changes_publish_once_with_raw_fields_preserved(review, report_work, case):
+        doc = finite_review(review)
+        row = doc['detections'][0]
+        edits = {}
+        if case == 'missing_enabled':
+            del row['enabled']; edits = {'enabled': {'0': True}}
+        elif case == 'numeric_enabled':
+            row['enabled'] = 1; edits = {'enabled': {'0': True}}
+        elif case == 'integer_box':
+            row['cbox'] = [1, 2, 8, 9]; edits = {'box_overrides': {'0': [1, 2, 8, 9]}}
+        elif case == 'integer_time':
+            row.update(t_start=0, t_end=1); edits = {'time_overrides': {'0': [0, 1]}}
+        elif case == 'negative_zero_box':
+            row['cbox'][0] = -0.; edits = {'box_overrides': {'0': [0., 2., 8., 9.]}}
+        elif case == 'negative_zero_time':
+            row['t_start'] = -0.; edits = {'time_overrides': {'0': [0., 1.]}}
+        elif case in ('missing_last_seen', 'clamped_last_seen'):
+            if case == 'missing_last_seen': del row['last_seen']
+            else: row['last_seen'] = 2.
+            edits = {'time_overrides': {'0': [0., 1.]}}
+        elif case == 'missing_audio':
+            del doc['audio_redactions']; edits = {'audio': []}
+        elif case == 'audio_extra':
+            doc['audio_redactions'][0]['future'] = {'nested': [True, 1, 1.]}
+            edits = {'audio': [{'t0': .1, 't1': .2}]}
+        elif case in ('audio_bool', 'audio_int', 'audio_negative_zero'):
+            value = {'audio_bool': False, 'audio_int': 0, 'audio_negative_zero': -0.}[case]
+            doc['audio_redactions'] = [{'t0': value, 't1': 1., 'mode': 'mute'}]
+            edits = {'audio': [{'t0': 0., 't1': 1.}]}
+        elif case == 'nonfinite_box':
+            row['cbox'][0] = float('inf'); edits = {'box_overrides': {'0': [float('inf'), 2, 8, 9]}}
+        elif case == 'nonfinite_audio':
+            doc['audio_redactions'][0]['t1'] = float('inf')
+            edits = {'audio': doc['audio_redactions']}
+        elif case == 'sparse': edits = {'enabled': {'0': False}}
+        elif case == 'combined':
+            edits = {'enabled': {'0': False, '1': False}, 'box_overrides': {'0': [2,3,9,10]},
+                     'time_overrides': {'0': [.2, 2]}, 'audio': []}
+        elif case == 'legacy_manual':
+            edits = {'manual': [{'t_start': 0, 't_end': 1, 'screen_box': [1,2,8,9]}]}
+        doc['unknown'] = {'ordered': [None, True, 1, 1., {'motion': [[1,2],[3,4]]}]}
+        doc['audio_transcript'] = [{'text': 'raw synthetic', 'future': [0,False]}]
+        review.path.write_text(json.dumps(doc, indent=1))
+        before = review.path.read_bytes()
+        response = review.client.post('/api/jobs/synthetic/detections', json=edits)
+        assert response.status_code == 200
+        after = json.loads(review.path.read_bytes())
+        assert report_work['parse'] == report_work['dump'] == report_work['stage'] == report_work['fsync'] == report_work['replace'] == 1
+        assert report_work['encoder_chunks'] > 0  # Encoder chunks, not Python writes or syscalls.
+        assert after['unknown'] == doc['unknown']
+        assert after['audio_transcript'] == doc['audio_transcript']
+        assert after['render_state'] == doc['render_state']
+        assert review.path.read_bytes() == json.dumps(after, indent=1).encode()
+        if not case.startswith('nonfinite'):
+            assert review.path.read_bytes() != before
+        if case == 'combined':
+            assert after['detections'][0]['cbox'] == [2.,3.,9.,10.]
+            assert after['detections'][0]['last_seen'] == .5
+            assert after['audio_redactions'] == []
+            assert response.json['suggest_allowlist'] == ['synthetic']
+        if case == 'audio_extra': assert set(after['audio_redactions'][0]) == {'t0','t1','mode'}
+>       assert web.FILES.count == 0
+E       assert 2 == 0
+E        +  where 2 = <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360>.count
+E        +    where <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360> = web.FILES
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py:365: AssertionError
+_ test_effective_changes_publish_once_with_raw_fields_preserved[negative_zero_time] _
+
+review = namespace(path=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task655/runs/task655-final-full-31...'t1': 0.2, 'mode': 'mute'}], 'custom_future_field': {'preserved': True}}, client=<FlaskClient <Flask 'openscrub_web'>>)
+report_work = {'parse': 1, 'dump': 1, 'stage': 1, 'fsync': 1, ...}
+case = 'negative_zero_time'
+
+    @pytest.mark.parametrize('case', [
+        'missing_enabled', 'numeric_enabled', 'integer_box', 'integer_time',
+        'negative_zero_box', 'negative_zero_time', 'missing_last_seen', 'clamped_last_seen',
+        'missing_audio', 'audio_extra', 'audio_bool', 'audio_int', 'audio_negative_zero',
+        'nonfinite_box', 'nonfinite_audio', 'sparse', 'combined', 'legacy_manual',
+    ])
+    def test_effective_changes_publish_once_with_raw_fields_preserved(review, report_work, case):
+        doc = finite_review(review)
+        row = doc['detections'][0]
+        edits = {}
+        if case == 'missing_enabled':
+            del row['enabled']; edits = {'enabled': {'0': True}}
+        elif case == 'numeric_enabled':
+            row['enabled'] = 1; edits = {'enabled': {'0': True}}
+        elif case == 'integer_box':
+            row['cbox'] = [1, 2, 8, 9]; edits = {'box_overrides': {'0': [1, 2, 8, 9]}}
+        elif case == 'integer_time':
+            row.update(t_start=0, t_end=1); edits = {'time_overrides': {'0': [0, 1]}}
+        elif case == 'negative_zero_box':
+            row['cbox'][0] = -0.; edits = {'box_overrides': {'0': [0., 2., 8., 9.]}}
+        elif case == 'negative_zero_time':
+            row['t_start'] = -0.; edits = {'time_overrides': {'0': [0., 1.]}}
+        elif case in ('missing_last_seen', 'clamped_last_seen'):
+            if case == 'missing_last_seen': del row['last_seen']
+            else: row['last_seen'] = 2.
+            edits = {'time_overrides': {'0': [0., 1.]}}
+        elif case == 'missing_audio':
+            del doc['audio_redactions']; edits = {'audio': []}
+        elif case == 'audio_extra':
+            doc['audio_redactions'][0]['future'] = {'nested': [True, 1, 1.]}
+            edits = {'audio': [{'t0': .1, 't1': .2}]}
+        elif case in ('audio_bool', 'audio_int', 'audio_negative_zero'):
+            value = {'audio_bool': False, 'audio_int': 0, 'audio_negative_zero': -0.}[case]
+            doc['audio_redactions'] = [{'t0': value, 't1': 1., 'mode': 'mute'}]
+            edits = {'audio': [{'t0': 0., 't1': 1.}]}
+        elif case == 'nonfinite_box':
+            row['cbox'][0] = float('inf'); edits = {'box_overrides': {'0': [float('inf'), 2, 8, 9]}}
+        elif case == 'nonfinite_audio':
+            doc['audio_redactions'][0]['t1'] = float('inf')
+            edits = {'audio': doc['audio_redactions']}
+        elif case == 'sparse': edits = {'enabled': {'0': False}}
+        elif case == 'combined':
+            edits = {'enabled': {'0': False, '1': False}, 'box_overrides': {'0': [2,3,9,10]},
+                     'time_overrides': {'0': [.2, 2]}, 'audio': []}
+        elif case == 'legacy_manual':
+            edits = {'manual': [{'t_start': 0, 't_end': 1, 'screen_box': [1,2,8,9]}]}
+        doc['unknown'] = {'ordered': [None, True, 1, 1., {'motion': [[1,2],[3,4]]}]}
+        doc['audio_transcript'] = [{'text': 'raw synthetic', 'future': [0,False]}]
+        review.path.write_text(json.dumps(doc, indent=1))
+        before = review.path.read_bytes()
+        response = review.client.post('/api/jobs/synthetic/detections', json=edits)
+        assert response.status_code == 200
+        after = json.loads(review.path.read_bytes())
+        assert report_work['parse'] == report_work['dump'] == report_work['stage'] == report_work['fsync'] == report_work['replace'] == 1
+        assert report_work['encoder_chunks'] > 0  # Encoder chunks, not Python writes or syscalls.
+        assert after['unknown'] == doc['unknown']
+        assert after['audio_transcript'] == doc['audio_transcript']
+        assert after['render_state'] == doc['render_state']
+        assert review.path.read_bytes() == json.dumps(after, indent=1).encode()
+        if not case.startswith('nonfinite'):
+            assert review.path.read_bytes() != before
+        if case == 'combined':
+            assert after['detections'][0]['cbox'] == [2.,3.,9.,10.]
+            assert after['detections'][0]['last_seen'] == .5
+            assert after['audio_redactions'] == []
+            assert response.json['suggest_allowlist'] == ['synthetic']
+        if case == 'audio_extra': assert set(after['audio_redactions'][0]) == {'t0','t1','mode'}
+>       assert web.FILES.count == 0
+E       assert 2 == 0
+E        +  where 2 = <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360>.count
+E        +    where <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360> = web.FILES
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py:365: AssertionError
+_ test_effective_changes_publish_once_with_raw_fields_preserved[missing_last_seen] _
+
+review = namespace(path=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task655/runs/task655-final-full-31...'t1': 0.2, 'mode': 'mute'}], 'custom_future_field': {'preserved': True}}, client=<FlaskClient <Flask 'openscrub_web'>>)
+report_work = {'parse': 1, 'dump': 1, 'stage': 1, 'fsync': 1, ...}
+case = 'missing_last_seen'
+
+    @pytest.mark.parametrize('case', [
+        'missing_enabled', 'numeric_enabled', 'integer_box', 'integer_time',
+        'negative_zero_box', 'negative_zero_time', 'missing_last_seen', 'clamped_last_seen',
+        'missing_audio', 'audio_extra', 'audio_bool', 'audio_int', 'audio_negative_zero',
+        'nonfinite_box', 'nonfinite_audio', 'sparse', 'combined', 'legacy_manual',
+    ])
+    def test_effective_changes_publish_once_with_raw_fields_preserved(review, report_work, case):
+        doc = finite_review(review)
+        row = doc['detections'][0]
+        edits = {}
+        if case == 'missing_enabled':
+            del row['enabled']; edits = {'enabled': {'0': True}}
+        elif case == 'numeric_enabled':
+            row['enabled'] = 1; edits = {'enabled': {'0': True}}
+        elif case == 'integer_box':
+            row['cbox'] = [1, 2, 8, 9]; edits = {'box_overrides': {'0': [1, 2, 8, 9]}}
+        elif case == 'integer_time':
+            row.update(t_start=0, t_end=1); edits = {'time_overrides': {'0': [0, 1]}}
+        elif case == 'negative_zero_box':
+            row['cbox'][0] = -0.; edits = {'box_overrides': {'0': [0., 2., 8., 9.]}}
+        elif case == 'negative_zero_time':
+            row['t_start'] = -0.; edits = {'time_overrides': {'0': [0., 1.]}}
+        elif case in ('missing_last_seen', 'clamped_last_seen'):
+            if case == 'missing_last_seen': del row['last_seen']
+            else: row['last_seen'] = 2.
+            edits = {'time_overrides': {'0': [0., 1.]}}
+        elif case == 'missing_audio':
+            del doc['audio_redactions']; edits = {'audio': []}
+        elif case == 'audio_extra':
+            doc['audio_redactions'][0]['future'] = {'nested': [True, 1, 1.]}
+            edits = {'audio': [{'t0': .1, 't1': .2}]}
+        elif case in ('audio_bool', 'audio_int', 'audio_negative_zero'):
+            value = {'audio_bool': False, 'audio_int': 0, 'audio_negative_zero': -0.}[case]
+            doc['audio_redactions'] = [{'t0': value, 't1': 1., 'mode': 'mute'}]
+            edits = {'audio': [{'t0': 0., 't1': 1.}]}
+        elif case == 'nonfinite_box':
+            row['cbox'][0] = float('inf'); edits = {'box_overrides': {'0': [float('inf'), 2, 8, 9]}}
+        elif case == 'nonfinite_audio':
+            doc['audio_redactions'][0]['t1'] = float('inf')
+            edits = {'audio': doc['audio_redactions']}
+        elif case == 'sparse': edits = {'enabled': {'0': False}}
+        elif case == 'combined':
+            edits = {'enabled': {'0': False, '1': False}, 'box_overrides': {'0': [2,3,9,10]},
+                     'time_overrides': {'0': [.2, 2]}, 'audio': []}
+        elif case == 'legacy_manual':
+            edits = {'manual': [{'t_start': 0, 't_end': 1, 'screen_box': [1,2,8,9]}]}
+        doc['unknown'] = {'ordered': [None, True, 1, 1., {'motion': [[1,2],[3,4]]}]}
+        doc['audio_transcript'] = [{'text': 'raw synthetic', 'future': [0,False]}]
+        review.path.write_text(json.dumps(doc, indent=1))
+        before = review.path.read_bytes()
+        response = review.client.post('/api/jobs/synthetic/detections', json=edits)
+        assert response.status_code == 200
+        after = json.loads(review.path.read_bytes())
+        assert report_work['parse'] == report_work['dump'] == report_work['stage'] == report_work['fsync'] == report_work['replace'] == 1
+        assert report_work['encoder_chunks'] > 0  # Encoder chunks, not Python writes or syscalls.
+        assert after['unknown'] == doc['unknown']
+        assert after['audio_transcript'] == doc['audio_transcript']
+        assert after['render_state'] == doc['render_state']
+        assert review.path.read_bytes() == json.dumps(after, indent=1).encode()
+        if not case.startswith('nonfinite'):
+            assert review.path.read_bytes() != before
+        if case == 'combined':
+            assert after['detections'][0]['cbox'] == [2.,3.,9.,10.]
+            assert after['detections'][0]['last_seen'] == .5
+            assert after['audio_redactions'] == []
+            assert response.json['suggest_allowlist'] == ['synthetic']
+        if case == 'audio_extra': assert set(after['audio_redactions'][0]) == {'t0','t1','mode'}
+>       assert web.FILES.count == 0
+E       assert 2 == 0
+E        +  where 2 = <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360>.count
+E        +    where <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360> = web.FILES
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py:365: AssertionError
+_ test_effective_changes_publish_once_with_raw_fields_preserved[clamped_last_seen] _
+
+review = namespace(path=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task655/runs/task655-final-full-31...'t1': 0.2, 'mode': 'mute'}], 'custom_future_field': {'preserved': True}}, client=<FlaskClient <Flask 'openscrub_web'>>)
+report_work = {'parse': 1, 'dump': 1, 'stage': 1, 'fsync': 1, ...}
+case = 'clamped_last_seen'
+
+    @pytest.mark.parametrize('case', [
+        'missing_enabled', 'numeric_enabled', 'integer_box', 'integer_time',
+        'negative_zero_box', 'negative_zero_time', 'missing_last_seen', 'clamped_last_seen',
+        'missing_audio', 'audio_extra', 'audio_bool', 'audio_int', 'audio_negative_zero',
+        'nonfinite_box', 'nonfinite_audio', 'sparse', 'combined', 'legacy_manual',
+    ])
+    def test_effective_changes_publish_once_with_raw_fields_preserved(review, report_work, case):
+        doc = finite_review(review)
+        row = doc['detections'][0]
+        edits = {}
+        if case == 'missing_enabled':
+            del row['enabled']; edits = {'enabled': {'0': True}}
+        elif case == 'numeric_enabled':
+            row['enabled'] = 1; edits = {'enabled': {'0': True}}
+        elif case == 'integer_box':
+            row['cbox'] = [1, 2, 8, 9]; edits = {'box_overrides': {'0': [1, 2, 8, 9]}}
+        elif case == 'integer_time':
+            row.update(t_start=0, t_end=1); edits = {'time_overrides': {'0': [0, 1]}}
+        elif case == 'negative_zero_box':
+            row['cbox'][0] = -0.; edits = {'box_overrides': {'0': [0., 2., 8., 9.]}}
+        elif case == 'negative_zero_time':
+            row['t_start'] = -0.; edits = {'time_overrides': {'0': [0., 1.]}}
+        elif case in ('missing_last_seen', 'clamped_last_seen'):
+            if case == 'missing_last_seen': del row['last_seen']
+            else: row['last_seen'] = 2.
+            edits = {'time_overrides': {'0': [0., 1.]}}
+        elif case == 'missing_audio':
+            del doc['audio_redactions']; edits = {'audio': []}
+        elif case == 'audio_extra':
+            doc['audio_redactions'][0]['future'] = {'nested': [True, 1, 1.]}
+            edits = {'audio': [{'t0': .1, 't1': .2}]}
+        elif case in ('audio_bool', 'audio_int', 'audio_negative_zero'):
+            value = {'audio_bool': False, 'audio_int': 0, 'audio_negative_zero': -0.}[case]
+            doc['audio_redactions'] = [{'t0': value, 't1': 1., 'mode': 'mute'}]
+            edits = {'audio': [{'t0': 0., 't1': 1.}]}
+        elif case == 'nonfinite_box':
+            row['cbox'][0] = float('inf'); edits = {'box_overrides': {'0': [float('inf'), 2, 8, 9]}}
+        elif case == 'nonfinite_audio':
+            doc['audio_redactions'][0]['t1'] = float('inf')
+            edits = {'audio': doc['audio_redactions']}
+        elif case == 'sparse': edits = {'enabled': {'0': False}}
+        elif case == 'combined':
+            edits = {'enabled': {'0': False, '1': False}, 'box_overrides': {'0': [2,3,9,10]},
+                     'time_overrides': {'0': [.2, 2]}, 'audio': []}
+        elif case == 'legacy_manual':
+            edits = {'manual': [{'t_start': 0, 't_end': 1, 'screen_box': [1,2,8,9]}]}
+        doc['unknown'] = {'ordered': [None, True, 1, 1., {'motion': [[1,2],[3,4]]}]}
+        doc['audio_transcript'] = [{'text': 'raw synthetic', 'future': [0,False]}]
+        review.path.write_text(json.dumps(doc, indent=1))
+        before = review.path.read_bytes()
+        response = review.client.post('/api/jobs/synthetic/detections', json=edits)
+        assert response.status_code == 200
+        after = json.loads(review.path.read_bytes())
+        assert report_work['parse'] == report_work['dump'] == report_work['stage'] == report_work['fsync'] == report_work['replace'] == 1
+        assert report_work['encoder_chunks'] > 0  # Encoder chunks, not Python writes or syscalls.
+        assert after['unknown'] == doc['unknown']
+        assert after['audio_transcript'] == doc['audio_transcript']
+        assert after['render_state'] == doc['render_state']
+        assert review.path.read_bytes() == json.dumps(after, indent=1).encode()
+        if not case.startswith('nonfinite'):
+            assert review.path.read_bytes() != before
+        if case == 'combined':
+            assert after['detections'][0]['cbox'] == [2.,3.,9.,10.]
+            assert after['detections'][0]['last_seen'] == .5
+            assert after['audio_redactions'] == []
+            assert response.json['suggest_allowlist'] == ['synthetic']
+        if case == 'audio_extra': assert set(after['audio_redactions'][0]) == {'t0','t1','mode'}
+>       assert web.FILES.count == 0
+E       assert 2 == 0
+E        +  where 2 = <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360>.count
+E        +    where <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360> = web.FILES
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py:365: AssertionError
+_ test_effective_changes_publish_once_with_raw_fields_preserved[missing_audio] _
+
+review = namespace(path=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task655/runs/task655-final-full-31...'t1': 0.2, 'mode': 'mute'}], 'custom_future_field': {'preserved': True}}, client=<FlaskClient <Flask 'openscrub_web'>>)
+report_work = {'parse': 1, 'dump': 1, 'stage': 1, 'fsync': 1, ...}
+case = 'missing_audio'
+
+    @pytest.mark.parametrize('case', [
+        'missing_enabled', 'numeric_enabled', 'integer_box', 'integer_time',
+        'negative_zero_box', 'negative_zero_time', 'missing_last_seen', 'clamped_last_seen',
+        'missing_audio', 'audio_extra', 'audio_bool', 'audio_int', 'audio_negative_zero',
+        'nonfinite_box', 'nonfinite_audio', 'sparse', 'combined', 'legacy_manual',
+    ])
+    def test_effective_changes_publish_once_with_raw_fields_preserved(review, report_work, case):
+        doc = finite_review(review)
+        row = doc['detections'][0]
+        edits = {}
+        if case == 'missing_enabled':
+            del row['enabled']; edits = {'enabled': {'0': True}}
+        elif case == 'numeric_enabled':
+            row['enabled'] = 1; edits = {'enabled': {'0': True}}
+        elif case == 'integer_box':
+            row['cbox'] = [1, 2, 8, 9]; edits = {'box_overrides': {'0': [1, 2, 8, 9]}}
+        elif case == 'integer_time':
+            row.update(t_start=0, t_end=1); edits = {'time_overrides': {'0': [0, 1]}}
+        elif case == 'negative_zero_box':
+            row['cbox'][0] = -0.; edits = {'box_overrides': {'0': [0., 2., 8., 9.]}}
+        elif case == 'negative_zero_time':
+            row['t_start'] = -0.; edits = {'time_overrides': {'0': [0., 1.]}}
+        elif case in ('missing_last_seen', 'clamped_last_seen'):
+            if case == 'missing_last_seen': del row['last_seen']
+            else: row['last_seen'] = 2.
+            edits = {'time_overrides': {'0': [0., 1.]}}
+        elif case == 'missing_audio':
+            del doc['audio_redactions']; edits = {'audio': []}
+        elif case == 'audio_extra':
+            doc['audio_redactions'][0]['future'] = {'nested': [True, 1, 1.]}
+            edits = {'audio': [{'t0': .1, 't1': .2}]}
+        elif case in ('audio_bool', 'audio_int', 'audio_negative_zero'):
+            value = {'audio_bool': False, 'audio_int': 0, 'audio_negative_zero': -0.}[case]
+            doc['audio_redactions'] = [{'t0': value, 't1': 1., 'mode': 'mute'}]
+            edits = {'audio': [{'t0': 0., 't1': 1.}]}
+        elif case == 'nonfinite_box':
+            row['cbox'][0] = float('inf'); edits = {'box_overrides': {'0': [float('inf'), 2, 8, 9]}}
+        elif case == 'nonfinite_audio':
+            doc['audio_redactions'][0]['t1'] = float('inf')
+            edits = {'audio': doc['audio_redactions']}
+        elif case == 'sparse': edits = {'enabled': {'0': False}}
+        elif case == 'combined':
+            edits = {'enabled': {'0': False, '1': False}, 'box_overrides': {'0': [2,3,9,10]},
+                     'time_overrides': {'0': [.2, 2]}, 'audio': []}
+        elif case == 'legacy_manual':
+            edits = {'manual': [{'t_start': 0, 't_end': 1, 'screen_box': [1,2,8,9]}]}
+        doc['unknown'] = {'ordered': [None, True, 1, 1., {'motion': [[1,2],[3,4]]}]}
+        doc['audio_transcript'] = [{'text': 'raw synthetic', 'future': [0,False]}]
+        review.path.write_text(json.dumps(doc, indent=1))
+        before = review.path.read_bytes()
+        response = review.client.post('/api/jobs/synthetic/detections', json=edits)
+        assert response.status_code == 200
+        after = json.loads(review.path.read_bytes())
+        assert report_work['parse'] == report_work['dump'] == report_work['stage'] == report_work['fsync'] == report_work['replace'] == 1
+        assert report_work['encoder_chunks'] > 0  # Encoder chunks, not Python writes or syscalls.
+        assert after['unknown'] == doc['unknown']
+        assert after['audio_transcript'] == doc['audio_transcript']
+        assert after['render_state'] == doc['render_state']
+        assert review.path.read_bytes() == json.dumps(after, indent=1).encode()
+        if not case.startswith('nonfinite'):
+            assert review.path.read_bytes() != before
+        if case == 'combined':
+            assert after['detections'][0]['cbox'] == [2.,3.,9.,10.]
+            assert after['detections'][0]['last_seen'] == .5
+            assert after['audio_redactions'] == []
+            assert response.json['suggest_allowlist'] == ['synthetic']
+        if case == 'audio_extra': assert set(after['audio_redactions'][0]) == {'t0','t1','mode'}
+>       assert web.FILES.count == 0
+E       assert 2 == 0
+E        +  where 2 = <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360>.count
+E        +    where <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360> = web.FILES
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py:365: AssertionError
+__ test_effective_changes_publish_once_with_raw_fields_preserved[audio_extra] __
+
+review = namespace(path=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task655/runs/task655-final-full-31...'t1': 0.2, 'mode': 'mute'}], 'custom_future_field': {'preserved': True}}, client=<FlaskClient <Flask 'openscrub_web'>>)
+report_work = {'parse': 1, 'dump': 1, 'stage': 1, 'fsync': 1, ...}
+case = 'audio_extra'
+
+    @pytest.mark.parametrize('case', [
+        'missing_enabled', 'numeric_enabled', 'integer_box', 'integer_time',
+        'negative_zero_box', 'negative_zero_time', 'missing_last_seen', 'clamped_last_seen',
+        'missing_audio', 'audio_extra', 'audio_bool', 'audio_int', 'audio_negative_zero',
+        'nonfinite_box', 'nonfinite_audio', 'sparse', 'combined', 'legacy_manual',
+    ])
+    def test_effective_changes_publish_once_with_raw_fields_preserved(review, report_work, case):
+        doc = finite_review(review)
+        row = doc['detections'][0]
+        edits = {}
+        if case == 'missing_enabled':
+            del row['enabled']; edits = {'enabled': {'0': True}}
+        elif case == 'numeric_enabled':
+            row['enabled'] = 1; edits = {'enabled': {'0': True}}
+        elif case == 'integer_box':
+            row['cbox'] = [1, 2, 8, 9]; edits = {'box_overrides': {'0': [1, 2, 8, 9]}}
+        elif case == 'integer_time':
+            row.update(t_start=0, t_end=1); edits = {'time_overrides': {'0': [0, 1]}}
+        elif case == 'negative_zero_box':
+            row['cbox'][0] = -0.; edits = {'box_overrides': {'0': [0., 2., 8., 9.]}}
+        elif case == 'negative_zero_time':
+            row['t_start'] = -0.; edits = {'time_overrides': {'0': [0., 1.]}}
+        elif case in ('missing_last_seen', 'clamped_last_seen'):
+            if case == 'missing_last_seen': del row['last_seen']
+            else: row['last_seen'] = 2.
+            edits = {'time_overrides': {'0': [0., 1.]}}
+        elif case == 'missing_audio':
+            del doc['audio_redactions']; edits = {'audio': []}
+        elif case == 'audio_extra':
+            doc['audio_redactions'][0]['future'] = {'nested': [True, 1, 1.]}
+            edits = {'audio': [{'t0': .1, 't1': .2}]}
+        elif case in ('audio_bool', 'audio_int', 'audio_negative_zero'):
+            value = {'audio_bool': False, 'audio_int': 0, 'audio_negative_zero': -0.}[case]
+            doc['audio_redactions'] = [{'t0': value, 't1': 1., 'mode': 'mute'}]
+            edits = {'audio': [{'t0': 0., 't1': 1.}]}
+        elif case == 'nonfinite_box':
+            row['cbox'][0] = float('inf'); edits = {'box_overrides': {'0': [float('inf'), 2, 8, 9]}}
+        elif case == 'nonfinite_audio':
+            doc['audio_redactions'][0]['t1'] = float('inf')
+            edits = {'audio': doc['audio_redactions']}
+        elif case == 'sparse': edits = {'enabled': {'0': False}}
+        elif case == 'combined':
+            edits = {'enabled': {'0': False, '1': False}, 'box_overrides': {'0': [2,3,9,10]},
+                     'time_overrides': {'0': [.2, 2]}, 'audio': []}
+        elif case == 'legacy_manual':
+            edits = {'manual': [{'t_start': 0, 't_end': 1, 'screen_box': [1,2,8,9]}]}
+        doc['unknown'] = {'ordered': [None, True, 1, 1., {'motion': [[1,2],[3,4]]}]}
+        doc['audio_transcript'] = [{'text': 'raw synthetic', 'future': [0,False]}]
+        review.path.write_text(json.dumps(doc, indent=1))
+        before = review.path.read_bytes()
+        response = review.client.post('/api/jobs/synthetic/detections', json=edits)
+        assert response.status_code == 200
+        after = json.loads(review.path.read_bytes())
+        assert report_work['parse'] == report_work['dump'] == report_work['stage'] == report_work['fsync'] == report_work['replace'] == 1
+        assert report_work['encoder_chunks'] > 0  # Encoder chunks, not Python writes or syscalls.
+        assert after['unknown'] == doc['unknown']
+        assert after['audio_transcript'] == doc['audio_transcript']
+        assert after['render_state'] == doc['render_state']
+        assert review.path.read_bytes() == json.dumps(after, indent=1).encode()
+        if not case.startswith('nonfinite'):
+            assert review.path.read_bytes() != before
+        if case == 'combined':
+            assert after['detections'][0]['cbox'] == [2.,3.,9.,10.]
+            assert after['detections'][0]['last_seen'] == .5
+            assert after['audio_redactions'] == []
+            assert response.json['suggest_allowlist'] == ['synthetic']
+        if case == 'audio_extra': assert set(after['audio_redactions'][0]) == {'t0','t1','mode'}
+>       assert web.FILES.count == 0
+E       assert 2 == 0
+E        +  where 2 = <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360>.count
+E        +    where <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360> = web.FILES
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py:365: AssertionError
+__ test_effective_changes_publish_once_with_raw_fields_preserved[audio_bool] ___
+
+review = namespace(path=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task655/runs/task655-final-full-31...'t1': 0.2, 'mode': 'mute'}], 'custom_future_field': {'preserved': True}}, client=<FlaskClient <Flask 'openscrub_web'>>)
+report_work = {'parse': 1, 'dump': 1, 'stage': 1, 'fsync': 1, ...}
+case = 'audio_bool'
+
+    @pytest.mark.parametrize('case', [
+        'missing_enabled', 'numeric_enabled', 'integer_box', 'integer_time',
+        'negative_zero_box', 'negative_zero_time', 'missing_last_seen', 'clamped_last_seen',
+        'missing_audio', 'audio_extra', 'audio_bool', 'audio_int', 'audio_negative_zero',
+        'nonfinite_box', 'nonfinite_audio', 'sparse', 'combined', 'legacy_manual',
+    ])
+    def test_effective_changes_publish_once_with_raw_fields_preserved(review, report_work, case):
+        doc = finite_review(review)
+        row = doc['detections'][0]
+        edits = {}
+        if case == 'missing_enabled':
+            del row['enabled']; edits = {'enabled': {'0': True}}
+        elif case == 'numeric_enabled':
+            row['enabled'] = 1; edits = {'enabled': {'0': True}}
+        elif case == 'integer_box':
+            row['cbox'] = [1, 2, 8, 9]; edits = {'box_overrides': {'0': [1, 2, 8, 9]}}
+        elif case == 'integer_time':
+            row.update(t_start=0, t_end=1); edits = {'time_overrides': {'0': [0, 1]}}
+        elif case == 'negative_zero_box':
+            row['cbox'][0] = -0.; edits = {'box_overrides': {'0': [0., 2., 8., 9.]}}
+        elif case == 'negative_zero_time':
+            row['t_start'] = -0.; edits = {'time_overrides': {'0': [0., 1.]}}
+        elif case in ('missing_last_seen', 'clamped_last_seen'):
+            if case == 'missing_last_seen': del row['last_seen']
+            else: row['last_seen'] = 2.
+            edits = {'time_overrides': {'0': [0., 1.]}}
+        elif case == 'missing_audio':
+            del doc['audio_redactions']; edits = {'audio': []}
+        elif case == 'audio_extra':
+            doc['audio_redactions'][0]['future'] = {'nested': [True, 1, 1.]}
+            edits = {'audio': [{'t0': .1, 't1': .2}]}
+        elif case in ('audio_bool', 'audio_int', 'audio_negative_zero'):
+            value = {'audio_bool': False, 'audio_int': 0, 'audio_negative_zero': -0.}[case]
+            doc['audio_redactions'] = [{'t0': value, 't1': 1., 'mode': 'mute'}]
+            edits = {'audio': [{'t0': 0., 't1': 1.}]}
+        elif case == 'nonfinite_box':
+            row['cbox'][0] = float('inf'); edits = {'box_overrides': {'0': [float('inf'), 2, 8, 9]}}
+        elif case == 'nonfinite_audio':
+            doc['audio_redactions'][0]['t1'] = float('inf')
+            edits = {'audio': doc['audio_redactions']}
+        elif case == 'sparse': edits = {'enabled': {'0': False}}
+        elif case == 'combined':
+            edits = {'enabled': {'0': False, '1': False}, 'box_overrides': {'0': [2,3,9,10]},
+                     'time_overrides': {'0': [.2, 2]}, 'audio': []}
+        elif case == 'legacy_manual':
+            edits = {'manual': [{'t_start': 0, 't_end': 1, 'screen_box': [1,2,8,9]}]}
+        doc['unknown'] = {'ordered': [None, True, 1, 1., {'motion': [[1,2],[3,4]]}]}
+        doc['audio_transcript'] = [{'text': 'raw synthetic', 'future': [0,False]}]
+        review.path.write_text(json.dumps(doc, indent=1))
+        before = review.path.read_bytes()
+        response = review.client.post('/api/jobs/synthetic/detections', json=edits)
+        assert response.status_code == 200
+        after = json.loads(review.path.read_bytes())
+        assert report_work['parse'] == report_work['dump'] == report_work['stage'] == report_work['fsync'] == report_work['replace'] == 1
+        assert report_work['encoder_chunks'] > 0  # Encoder chunks, not Python writes or syscalls.
+        assert after['unknown'] == doc['unknown']
+        assert after['audio_transcript'] == doc['audio_transcript']
+        assert after['render_state'] == doc['render_state']
+        assert review.path.read_bytes() == json.dumps(after, indent=1).encode()
+        if not case.startswith('nonfinite'):
+            assert review.path.read_bytes() != before
+        if case == 'combined':
+            assert after['detections'][0]['cbox'] == [2.,3.,9.,10.]
+            assert after['detections'][0]['last_seen'] == .5
+            assert after['audio_redactions'] == []
+            assert response.json['suggest_allowlist'] == ['synthetic']
+        if case == 'audio_extra': assert set(after['audio_redactions'][0]) == {'t0','t1','mode'}
+>       assert web.FILES.count == 0
+E       assert 2 == 0
+E        +  where 2 = <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360>.count
+E        +    where <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360> = web.FILES
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py:365: AssertionError
+___ test_effective_changes_publish_once_with_raw_fields_preserved[audio_int] ___
+
+review = namespace(path=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task655/runs/task655-final-full-31...'t1': 0.2, 'mode': 'mute'}], 'custom_future_field': {'preserved': True}}, client=<FlaskClient <Flask 'openscrub_web'>>)
+report_work = {'parse': 1, 'dump': 1, 'stage': 1, 'fsync': 1, ...}
+case = 'audio_int'
+
+    @pytest.mark.parametrize('case', [
+        'missing_enabled', 'numeric_enabled', 'integer_box', 'integer_time',
+        'negative_zero_box', 'negative_zero_time', 'missing_last_seen', 'clamped_last_seen',
+        'missing_audio', 'audio_extra', 'audio_bool', 'audio_int', 'audio_negative_zero',
+        'nonfinite_box', 'nonfinite_audio', 'sparse', 'combined', 'legacy_manual',
+    ])
+    def test_effective_changes_publish_once_with_raw_fields_preserved(review, report_work, case):
+        doc = finite_review(review)
+        row = doc['detections'][0]
+        edits = {}
+        if case == 'missing_enabled':
+            del row['enabled']; edits = {'enabled': {'0': True}}
+        elif case == 'numeric_enabled':
+            row['enabled'] = 1; edits = {'enabled': {'0': True}}
+        elif case == 'integer_box':
+            row['cbox'] = [1, 2, 8, 9]; edits = {'box_overrides': {'0': [1, 2, 8, 9]}}
+        elif case == 'integer_time':
+            row.update(t_start=0, t_end=1); edits = {'time_overrides': {'0': [0, 1]}}
+        elif case == 'negative_zero_box':
+            row['cbox'][0] = -0.; edits = {'box_overrides': {'0': [0., 2., 8., 9.]}}
+        elif case == 'negative_zero_time':
+            row['t_start'] = -0.; edits = {'time_overrides': {'0': [0., 1.]}}
+        elif case in ('missing_last_seen', 'clamped_last_seen'):
+            if case == 'missing_last_seen': del row['last_seen']
+            else: row['last_seen'] = 2.
+            edits = {'time_overrides': {'0': [0., 1.]}}
+        elif case == 'missing_audio':
+            del doc['audio_redactions']; edits = {'audio': []}
+        elif case == 'audio_extra':
+            doc['audio_redactions'][0]['future'] = {'nested': [True, 1, 1.]}
+            edits = {'audio': [{'t0': .1, 't1': .2}]}
+        elif case in ('audio_bool', 'audio_int', 'audio_negative_zero'):
+            value = {'audio_bool': False, 'audio_int': 0, 'audio_negative_zero': -0.}[case]
+            doc['audio_redactions'] = [{'t0': value, 't1': 1., 'mode': 'mute'}]
+            edits = {'audio': [{'t0': 0., 't1': 1.}]}
+        elif case == 'nonfinite_box':
+            row['cbox'][0] = float('inf'); edits = {'box_overrides': {'0': [float('inf'), 2, 8, 9]}}
+        elif case == 'nonfinite_audio':
+            doc['audio_redactions'][0]['t1'] = float('inf')
+            edits = {'audio': doc['audio_redactions']}
+        elif case == 'sparse': edits = {'enabled': {'0': False}}
+        elif case == 'combined':
+            edits = {'enabled': {'0': False, '1': False}, 'box_overrides': {'0': [2,3,9,10]},
+                     'time_overrides': {'0': [.2, 2]}, 'audio': []}
+        elif case == 'legacy_manual':
+            edits = {'manual': [{'t_start': 0, 't_end': 1, 'screen_box': [1,2,8,9]}]}
+        doc['unknown'] = {'ordered': [None, True, 1, 1., {'motion': [[1,2],[3,4]]}]}
+        doc['audio_transcript'] = [{'text': 'raw synthetic', 'future': [0,False]}]
+        review.path.write_text(json.dumps(doc, indent=1))
+        before = review.path.read_bytes()
+        response = review.client.post('/api/jobs/synthetic/detections', json=edits)
+        assert response.status_code == 200
+        after = json.loads(review.path.read_bytes())
+        assert report_work['parse'] == report_work['dump'] == report_work['stage'] == report_work['fsync'] == report_work['replace'] == 1
+        assert report_work['encoder_chunks'] > 0  # Encoder chunks, not Python writes or syscalls.
+        assert after['unknown'] == doc['unknown']
+        assert after['audio_transcript'] == doc['audio_transcript']
+        assert after['render_state'] == doc['render_state']
+        assert review.path.read_bytes() == json.dumps(after, indent=1).encode()
+        if not case.startswith('nonfinite'):
+            assert review.path.read_bytes() != before
+        if case == 'combined':
+            assert after['detections'][0]['cbox'] == [2.,3.,9.,10.]
+            assert after['detections'][0]['last_seen'] == .5
+            assert after['audio_redactions'] == []
+            assert response.json['suggest_allowlist'] == ['synthetic']
+        if case == 'audio_extra': assert set(after['audio_redactions'][0]) == {'t0','t1','mode'}
+>       assert web.FILES.count == 0
+E       assert 2 == 0
+E        +  where 2 = <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360>.count
+E        +    where <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360> = web.FILES
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py:365: AssertionError
+_ test_effective_changes_publish_once_with_raw_fields_preserved[audio_negative_zero] _
+
+review = namespace(path=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task655/runs/task655-final-full-31...'t1': 0.2, 'mode': 'mute'}], 'custom_future_field': {'preserved': True}}, client=<FlaskClient <Flask 'openscrub_web'>>)
+report_work = {'parse': 1, 'dump': 1, 'stage': 1, 'fsync': 1, ...}
+case = 'audio_negative_zero'
+
+    @pytest.mark.parametrize('case', [
+        'missing_enabled', 'numeric_enabled', 'integer_box', 'integer_time',
+        'negative_zero_box', 'negative_zero_time', 'missing_last_seen', 'clamped_last_seen',
+        'missing_audio', 'audio_extra', 'audio_bool', 'audio_int', 'audio_negative_zero',
+        'nonfinite_box', 'nonfinite_audio', 'sparse', 'combined', 'legacy_manual',
+    ])
+    def test_effective_changes_publish_once_with_raw_fields_preserved(review, report_work, case):
+        doc = finite_review(review)
+        row = doc['detections'][0]
+        edits = {}
+        if case == 'missing_enabled':
+            del row['enabled']; edits = {'enabled': {'0': True}}
+        elif case == 'numeric_enabled':
+            row['enabled'] = 1; edits = {'enabled': {'0': True}}
+        elif case == 'integer_box':
+            row['cbox'] = [1, 2, 8, 9]; edits = {'box_overrides': {'0': [1, 2, 8, 9]}}
+        elif case == 'integer_time':
+            row.update(t_start=0, t_end=1); edits = {'time_overrides': {'0': [0, 1]}}
+        elif case == 'negative_zero_box':
+            row['cbox'][0] = -0.; edits = {'box_overrides': {'0': [0., 2., 8., 9.]}}
+        elif case == 'negative_zero_time':
+            row['t_start'] = -0.; edits = {'time_overrides': {'0': [0., 1.]}}
+        elif case in ('missing_last_seen', 'clamped_last_seen'):
+            if case == 'missing_last_seen': del row['last_seen']
+            else: row['last_seen'] = 2.
+            edits = {'time_overrides': {'0': [0., 1.]}}
+        elif case == 'missing_audio':
+            del doc['audio_redactions']; edits = {'audio': []}
+        elif case == 'audio_extra':
+            doc['audio_redactions'][0]['future'] = {'nested': [True, 1, 1.]}
+            edits = {'audio': [{'t0': .1, 't1': .2}]}
+        elif case in ('audio_bool', 'audio_int', 'audio_negative_zero'):
+            value = {'audio_bool': False, 'audio_int': 0, 'audio_negative_zero': -0.}[case]
+            doc['audio_redactions'] = [{'t0': value, 't1': 1., 'mode': 'mute'}]
+            edits = {'audio': [{'t0': 0., 't1': 1.}]}
+        elif case == 'nonfinite_box':
+            row['cbox'][0] = float('inf'); edits = {'box_overrides': {'0': [float('inf'), 2, 8, 9]}}
+        elif case == 'nonfinite_audio':
+            doc['audio_redactions'][0]['t1'] = float('inf')
+            edits = {'audio': doc['audio_redactions']}
+        elif case == 'sparse': edits = {'enabled': {'0': False}}
+        elif case == 'combined':
+            edits = {'enabled': {'0': False, '1': False}, 'box_overrides': {'0': [2,3,9,10]},
+                     'time_overrides': {'0': [.2, 2]}, 'audio': []}
+        elif case == 'legacy_manual':
+            edits = {'manual': [{'t_start': 0, 't_end': 1, 'screen_box': [1,2,8,9]}]}
+        doc['unknown'] = {'ordered': [None, True, 1, 1., {'motion': [[1,2],[3,4]]}]}
+        doc['audio_transcript'] = [{'text': 'raw synthetic', 'future': [0,False]}]
+        review.path.write_text(json.dumps(doc, indent=1))
+        before = review.path.read_bytes()
+        response = review.client.post('/api/jobs/synthetic/detections', json=edits)
+        assert response.status_code == 200
+        after = json.loads(review.path.read_bytes())
+        assert report_work['parse'] == report_work['dump'] == report_work['stage'] == report_work['fsync'] == report_work['replace'] == 1
+        assert report_work['encoder_chunks'] > 0  # Encoder chunks, not Python writes or syscalls.
+        assert after['unknown'] == doc['unknown']
+        assert after['audio_transcript'] == doc['audio_transcript']
+        assert after['render_state'] == doc['render_state']
+        assert review.path.read_bytes() == json.dumps(after, indent=1).encode()
+        if not case.startswith('nonfinite'):
+            assert review.path.read_bytes() != before
+        if case == 'combined':
+            assert after['detections'][0]['cbox'] == [2.,3.,9.,10.]
+            assert after['detections'][0]['last_seen'] == .5
+            assert after['audio_redactions'] == []
+            assert response.json['suggest_allowlist'] == ['synthetic']
+        if case == 'audio_extra': assert set(after['audio_redactions'][0]) == {'t0','t1','mode'}
+>       assert web.FILES.count == 0
+E       assert 2 == 0
+E        +  where 2 = <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360>.count
+E        +    where <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360> = web.FILES
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py:365: AssertionError
+_ test_effective_changes_publish_once_with_raw_fields_preserved[nonfinite_box] _
+
+review = namespace(path=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task655/runs/task655-final-full-31...'t1': 0.2, 'mode': 'mute'}], 'custom_future_field': {'preserved': True}}, client=<FlaskClient <Flask 'openscrub_web'>>)
+report_work = {'parse': 1, 'dump': 1, 'stage': 1, 'fsync': 1, ...}
+case = 'nonfinite_box'
+
+    @pytest.mark.parametrize('case', [
+        'missing_enabled', 'numeric_enabled', 'integer_box', 'integer_time',
+        'negative_zero_box', 'negative_zero_time', 'missing_last_seen', 'clamped_last_seen',
+        'missing_audio', 'audio_extra', 'audio_bool', 'audio_int', 'audio_negative_zero',
+        'nonfinite_box', 'nonfinite_audio', 'sparse', 'combined', 'legacy_manual',
+    ])
+    def test_effective_changes_publish_once_with_raw_fields_preserved(review, report_work, case):
+        doc = finite_review(review)
+        row = doc['detections'][0]
+        edits = {}
+        if case == 'missing_enabled':
+            del row['enabled']; edits = {'enabled': {'0': True}}
+        elif case == 'numeric_enabled':
+            row['enabled'] = 1; edits = {'enabled': {'0': True}}
+        elif case == 'integer_box':
+            row['cbox'] = [1, 2, 8, 9]; edits = {'box_overrides': {'0': [1, 2, 8, 9]}}
+        elif case == 'integer_time':
+            row.update(t_start=0, t_end=1); edits = {'time_overrides': {'0': [0, 1]}}
+        elif case == 'negative_zero_box':
+            row['cbox'][0] = -0.; edits = {'box_overrides': {'0': [0., 2., 8., 9.]}}
+        elif case == 'negative_zero_time':
+            row['t_start'] = -0.; edits = {'time_overrides': {'0': [0., 1.]}}
+        elif case in ('missing_last_seen', 'clamped_last_seen'):
+            if case == 'missing_last_seen': del row['last_seen']
+            else: row['last_seen'] = 2.
+            edits = {'time_overrides': {'0': [0., 1.]}}
+        elif case == 'missing_audio':
+            del doc['audio_redactions']; edits = {'audio': []}
+        elif case == 'audio_extra':
+            doc['audio_redactions'][0]['future'] = {'nested': [True, 1, 1.]}
+            edits = {'audio': [{'t0': .1, 't1': .2}]}
+        elif case in ('audio_bool', 'audio_int', 'audio_negative_zero'):
+            value = {'audio_bool': False, 'audio_int': 0, 'audio_negative_zero': -0.}[case]
+            doc['audio_redactions'] = [{'t0': value, 't1': 1., 'mode': 'mute'}]
+            edits = {'audio': [{'t0': 0., 't1': 1.}]}
+        elif case == 'nonfinite_box':
+            row['cbox'][0] = float('inf'); edits = {'box_overrides': {'0': [float('inf'), 2, 8, 9]}}
+        elif case == 'nonfinite_audio':
+            doc['audio_redactions'][0]['t1'] = float('inf')
+            edits = {'audio': doc['audio_redactions']}
+        elif case == 'sparse': edits = {'enabled': {'0': False}}
+        elif case == 'combined':
+            edits = {'enabled': {'0': False, '1': False}, 'box_overrides': {'0': [2,3,9,10]},
+                     'time_overrides': {'0': [.2, 2]}, 'audio': []}
+        elif case == 'legacy_manual':
+            edits = {'manual': [{'t_start': 0, 't_end': 1, 'screen_box': [1,2,8,9]}]}
+        doc['unknown'] = {'ordered': [None, True, 1, 1., {'motion': [[1,2],[3,4]]}]}
+        doc['audio_transcript'] = [{'text': 'raw synthetic', 'future': [0,False]}]
+        review.path.write_text(json.dumps(doc, indent=1))
+        before = review.path.read_bytes()
+        response = review.client.post('/api/jobs/synthetic/detections', json=edits)
+        assert response.status_code == 200
+        after = json.loads(review.path.read_bytes())
+        assert report_work['parse'] == report_work['dump'] == report_work['stage'] == report_work['fsync'] == report_work['replace'] == 1
+        assert report_work['encoder_chunks'] > 0  # Encoder chunks, not Python writes or syscalls.
+        assert after['unknown'] == doc['unknown']
+        assert after['audio_transcript'] == doc['audio_transcript']
+        assert after['render_state'] == doc['render_state']
+        assert review.path.read_bytes() == json.dumps(after, indent=1).encode()
+        if not case.startswith('nonfinite'):
+            assert review.path.read_bytes() != before
+        if case == 'combined':
+            assert after['detections'][0]['cbox'] == [2.,3.,9.,10.]
+            assert after['detections'][0]['last_seen'] == .5
+            assert after['audio_redactions'] == []
+            assert response.json['suggest_allowlist'] == ['synthetic']
+        if case == 'audio_extra': assert set(after['audio_redactions'][0]) == {'t0','t1','mode'}
+>       assert web.FILES.count == 0
+E       assert 2 == 0
+E        +  where 2 = <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360>.count
+E        +    where <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360> = web.FILES
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py:365: AssertionError
+_ test_effective_changes_publish_once_with_raw_fields_preserved[nonfinite_audio] _
+
+review = namespace(path=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task655/runs/task655-final-full-31...'t1': 0.2, 'mode': 'mute'}], 'custom_future_field': {'preserved': True}}, client=<FlaskClient <Flask 'openscrub_web'>>)
+report_work = {'parse': 1, 'dump': 1, 'stage': 1, 'fsync': 1, ...}
+case = 'nonfinite_audio'
+
+    @pytest.mark.parametrize('case', [
+        'missing_enabled', 'numeric_enabled', 'integer_box', 'integer_time',
+        'negative_zero_box', 'negative_zero_time', 'missing_last_seen', 'clamped_last_seen',
+        'missing_audio', 'audio_extra', 'audio_bool', 'audio_int', 'audio_negative_zero',
+        'nonfinite_box', 'nonfinite_audio', 'sparse', 'combined', 'legacy_manual',
+    ])
+    def test_effective_changes_publish_once_with_raw_fields_preserved(review, report_work, case):
+        doc = finite_review(review)
+        row = doc['detections'][0]
+        edits = {}
+        if case == 'missing_enabled':
+            del row['enabled']; edits = {'enabled': {'0': True}}
+        elif case == 'numeric_enabled':
+            row['enabled'] = 1; edits = {'enabled': {'0': True}}
+        elif case == 'integer_box':
+            row['cbox'] = [1, 2, 8, 9]; edits = {'box_overrides': {'0': [1, 2, 8, 9]}}
+        elif case == 'integer_time':
+            row.update(t_start=0, t_end=1); edits = {'time_overrides': {'0': [0, 1]}}
+        elif case == 'negative_zero_box':
+            row['cbox'][0] = -0.; edits = {'box_overrides': {'0': [0., 2., 8., 9.]}}
+        elif case == 'negative_zero_time':
+            row['t_start'] = -0.; edits = {'time_overrides': {'0': [0., 1.]}}
+        elif case in ('missing_last_seen', 'clamped_last_seen'):
+            if case == 'missing_last_seen': del row['last_seen']
+            else: row['last_seen'] = 2.
+            edits = {'time_overrides': {'0': [0., 1.]}}
+        elif case == 'missing_audio':
+            del doc['audio_redactions']; edits = {'audio': []}
+        elif case == 'audio_extra':
+            doc['audio_redactions'][0]['future'] = {'nested': [True, 1, 1.]}
+            edits = {'audio': [{'t0': .1, 't1': .2}]}
+        elif case in ('audio_bool', 'audio_int', 'audio_negative_zero'):
+            value = {'audio_bool': False, 'audio_int': 0, 'audio_negative_zero': -0.}[case]
+            doc['audio_redactions'] = [{'t0': value, 't1': 1., 'mode': 'mute'}]
+            edits = {'audio': [{'t0': 0., 't1': 1.}]}
+        elif case == 'nonfinite_box':
+            row['cbox'][0] = float('inf'); edits = {'box_overrides': {'0': [float('inf'), 2, 8, 9]}}
+        elif case == 'nonfinite_audio':
+            doc['audio_redactions'][0]['t1'] = float('inf')
+            edits = {'audio': doc['audio_redactions']}
+        elif case == 'sparse': edits = {'enabled': {'0': False}}
+        elif case == 'combined':
+            edits = {'enabled': {'0': False, '1': False}, 'box_overrides': {'0': [2,3,9,10]},
+                     'time_overrides': {'0': [.2, 2]}, 'audio': []}
+        elif case == 'legacy_manual':
+            edits = {'manual': [{'t_start': 0, 't_end': 1, 'screen_box': [1,2,8,9]}]}
+        doc['unknown'] = {'ordered': [None, True, 1, 1., {'motion': [[1,2],[3,4]]}]}
+        doc['audio_transcript'] = [{'text': 'raw synthetic', 'future': [0,False]}]
+        review.path.write_text(json.dumps(doc, indent=1))
+        before = review.path.read_bytes()
+        response = review.client.post('/api/jobs/synthetic/detections', json=edits)
+        assert response.status_code == 200
+        after = json.loads(review.path.read_bytes())
+        assert report_work['parse'] == report_work['dump'] == report_work['stage'] == report_work['fsync'] == report_work['replace'] == 1
+        assert report_work['encoder_chunks'] > 0  # Encoder chunks, not Python writes or syscalls.
+        assert after['unknown'] == doc['unknown']
+        assert after['audio_transcript'] == doc['audio_transcript']
+        assert after['render_state'] == doc['render_state']
+        assert review.path.read_bytes() == json.dumps(after, indent=1).encode()
+        if not case.startswith('nonfinite'):
+            assert review.path.read_bytes() != before
+        if case == 'combined':
+            assert after['detections'][0]['cbox'] == [2.,3.,9.,10.]
+            assert after['detections'][0]['last_seen'] == .5
+            assert after['audio_redactions'] == []
+            assert response.json['suggest_allowlist'] == ['synthetic']
+        if case == 'audio_extra': assert set(after['audio_redactions'][0]) == {'t0','t1','mode'}
+>       assert web.FILES.count == 0
+E       assert 2 == 0
+E        +  where 2 = <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360>.count
+E        +    where <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360> = web.FILES
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py:365: AssertionError
+____ test_effective_changes_publish_once_with_raw_fields_preserved[sparse] _____
+
+review = namespace(path=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task655/runs/task655-final-full-31...'t1': 0.2, 'mode': 'mute'}], 'custom_future_field': {'preserved': True}}, client=<FlaskClient <Flask 'openscrub_web'>>)
+report_work = {'parse': 1, 'dump': 1, 'stage': 1, 'fsync': 1, ...}
+case = 'sparse'
+
+    @pytest.mark.parametrize('case', [
+        'missing_enabled', 'numeric_enabled', 'integer_box', 'integer_time',
+        'negative_zero_box', 'negative_zero_time', 'missing_last_seen', 'clamped_last_seen',
+        'missing_audio', 'audio_extra', 'audio_bool', 'audio_int', 'audio_negative_zero',
+        'nonfinite_box', 'nonfinite_audio', 'sparse', 'combined', 'legacy_manual',
+    ])
+    def test_effective_changes_publish_once_with_raw_fields_preserved(review, report_work, case):
+        doc = finite_review(review)
+        row = doc['detections'][0]
+        edits = {}
+        if case == 'missing_enabled':
+            del row['enabled']; edits = {'enabled': {'0': True}}
+        elif case == 'numeric_enabled':
+            row['enabled'] = 1; edits = {'enabled': {'0': True}}
+        elif case == 'integer_box':
+            row['cbox'] = [1, 2, 8, 9]; edits = {'box_overrides': {'0': [1, 2, 8, 9]}}
+        elif case == 'integer_time':
+            row.update(t_start=0, t_end=1); edits = {'time_overrides': {'0': [0, 1]}}
+        elif case == 'negative_zero_box':
+            row['cbox'][0] = -0.; edits = {'box_overrides': {'0': [0., 2., 8., 9.]}}
+        elif case == 'negative_zero_time':
+            row['t_start'] = -0.; edits = {'time_overrides': {'0': [0., 1.]}}
+        elif case in ('missing_last_seen', 'clamped_last_seen'):
+            if case == 'missing_last_seen': del row['last_seen']
+            else: row['last_seen'] = 2.
+            edits = {'time_overrides': {'0': [0., 1.]}}
+        elif case == 'missing_audio':
+            del doc['audio_redactions']; edits = {'audio': []}
+        elif case == 'audio_extra':
+            doc['audio_redactions'][0]['future'] = {'nested': [True, 1, 1.]}
+            edits = {'audio': [{'t0': .1, 't1': .2}]}
+        elif case in ('audio_bool', 'audio_int', 'audio_negative_zero'):
+            value = {'audio_bool': False, 'audio_int': 0, 'audio_negative_zero': -0.}[case]
+            doc['audio_redactions'] = [{'t0': value, 't1': 1., 'mode': 'mute'}]
+            edits = {'audio': [{'t0': 0., 't1': 1.}]}
+        elif case == 'nonfinite_box':
+            row['cbox'][0] = float('inf'); edits = {'box_overrides': {'0': [float('inf'), 2, 8, 9]}}
+        elif case == 'nonfinite_audio':
+            doc['audio_redactions'][0]['t1'] = float('inf')
+            edits = {'audio': doc['audio_redactions']}
+        elif case == 'sparse': edits = {'enabled': {'0': False}}
+        elif case == 'combined':
+            edits = {'enabled': {'0': False, '1': False}, 'box_overrides': {'0': [2,3,9,10]},
+                     'time_overrides': {'0': [.2, 2]}, 'audio': []}
+        elif case == 'legacy_manual':
+            edits = {'manual': [{'t_start': 0, 't_end': 1, 'screen_box': [1,2,8,9]}]}
+        doc['unknown'] = {'ordered': [None, True, 1, 1., {'motion': [[1,2],[3,4]]}]}
+        doc['audio_transcript'] = [{'text': 'raw synthetic', 'future': [0,False]}]
+        review.path.write_text(json.dumps(doc, indent=1))
+        before = review.path.read_bytes()
+        response = review.client.post('/api/jobs/synthetic/detections', json=edits)
+        assert response.status_code == 200
+        after = json.loads(review.path.read_bytes())
+        assert report_work['parse'] == report_work['dump'] == report_work['stage'] == report_work['fsync'] == report_work['replace'] == 1
+        assert report_work['encoder_chunks'] > 0  # Encoder chunks, not Python writes or syscalls.
+        assert after['unknown'] == doc['unknown']
+        assert after['audio_transcript'] == doc['audio_transcript']
+        assert after['render_state'] == doc['render_state']
+        assert review.path.read_bytes() == json.dumps(after, indent=1).encode()
+        if not case.startswith('nonfinite'):
+            assert review.path.read_bytes() != before
+        if case == 'combined':
+            assert after['detections'][0]['cbox'] == [2.,3.,9.,10.]
+            assert after['detections'][0]['last_seen'] == .5
+            assert after['audio_redactions'] == []
+            assert response.json['suggest_allowlist'] == ['synthetic']
+        if case == 'audio_extra': assert set(after['audio_redactions'][0]) == {'t0','t1','mode'}
+>       assert web.FILES.count == 0
+E       assert 2 == 0
+E        +  where 2 = <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360>.count
+E        +    where <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360> = web.FILES
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py:365: AssertionError
+___ test_effective_changes_publish_once_with_raw_fields_preserved[combined] ____
+
+review = namespace(path=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task655/runs/task655-final-full-31...'t1': 0.2, 'mode': 'mute'}], 'custom_future_field': {'preserved': True}}, client=<FlaskClient <Flask 'openscrub_web'>>)
+report_work = {'parse': 1, 'dump': 1, 'stage': 1, 'fsync': 1, ...}
+case = 'combined'
+
+    @pytest.mark.parametrize('case', [
+        'missing_enabled', 'numeric_enabled', 'integer_box', 'integer_time',
+        'negative_zero_box', 'negative_zero_time', 'missing_last_seen', 'clamped_last_seen',
+        'missing_audio', 'audio_extra', 'audio_bool', 'audio_int', 'audio_negative_zero',
+        'nonfinite_box', 'nonfinite_audio', 'sparse', 'combined', 'legacy_manual',
+    ])
+    def test_effective_changes_publish_once_with_raw_fields_preserved(review, report_work, case):
+        doc = finite_review(review)
+        row = doc['detections'][0]
+        edits = {}
+        if case == 'missing_enabled':
+            del row['enabled']; edits = {'enabled': {'0': True}}
+        elif case == 'numeric_enabled':
+            row['enabled'] = 1; edits = {'enabled': {'0': True}}
+        elif case == 'integer_box':
+            row['cbox'] = [1, 2, 8, 9]; edits = {'box_overrides': {'0': [1, 2, 8, 9]}}
+        elif case == 'integer_time':
+            row.update(t_start=0, t_end=1); edits = {'time_overrides': {'0': [0, 1]}}
+        elif case == 'negative_zero_box':
+            row['cbox'][0] = -0.; edits = {'box_overrides': {'0': [0., 2., 8., 9.]}}
+        elif case == 'negative_zero_time':
+            row['t_start'] = -0.; edits = {'time_overrides': {'0': [0., 1.]}}
+        elif case in ('missing_last_seen', 'clamped_last_seen'):
+            if case == 'missing_last_seen': del row['last_seen']
+            else: row['last_seen'] = 2.
+            edits = {'time_overrides': {'0': [0., 1.]}}
+        elif case == 'missing_audio':
+            del doc['audio_redactions']; edits = {'audio': []}
+        elif case == 'audio_extra':
+            doc['audio_redactions'][0]['future'] = {'nested': [True, 1, 1.]}
+            edits = {'audio': [{'t0': .1, 't1': .2}]}
+        elif case in ('audio_bool', 'audio_int', 'audio_negative_zero'):
+            value = {'audio_bool': False, 'audio_int': 0, 'audio_negative_zero': -0.}[case]
+            doc['audio_redactions'] = [{'t0': value, 't1': 1., 'mode': 'mute'}]
+            edits = {'audio': [{'t0': 0., 't1': 1.}]}
+        elif case == 'nonfinite_box':
+            row['cbox'][0] = float('inf'); edits = {'box_overrides': {'0': [float('inf'), 2, 8, 9]}}
+        elif case == 'nonfinite_audio':
+            doc['audio_redactions'][0]['t1'] = float('inf')
+            edits = {'audio': doc['audio_redactions']}
+        elif case == 'sparse': edits = {'enabled': {'0': False}}
+        elif case == 'combined':
+            edits = {'enabled': {'0': False, '1': False}, 'box_overrides': {'0': [2,3,9,10]},
+                     'time_overrides': {'0': [.2, 2]}, 'audio': []}
+        elif case == 'legacy_manual':
+            edits = {'manual': [{'t_start': 0, 't_end': 1, 'screen_box': [1,2,8,9]}]}
+        doc['unknown'] = {'ordered': [None, True, 1, 1., {'motion': [[1,2],[3,4]]}]}
+        doc['audio_transcript'] = [{'text': 'raw synthetic', 'future': [0,False]}]
+        review.path.write_text(json.dumps(doc, indent=1))
+        before = review.path.read_bytes()
+        response = review.client.post('/api/jobs/synthetic/detections', json=edits)
+        assert response.status_code == 200
+        after = json.loads(review.path.read_bytes())
+        assert report_work['parse'] == report_work['dump'] == report_work['stage'] == report_work['fsync'] == report_work['replace'] == 1
+        assert report_work['encoder_chunks'] > 0  # Encoder chunks, not Python writes or syscalls.
+        assert after['unknown'] == doc['unknown']
+        assert after['audio_transcript'] == doc['audio_transcript']
+        assert after['render_state'] == doc['render_state']
+        assert review.path.read_bytes() == json.dumps(after, indent=1).encode()
+        if not case.startswith('nonfinite'):
+            assert review.path.read_bytes() != before
+        if case == 'combined':
+            assert after['detections'][0]['cbox'] == [2.,3.,9.,10.]
+            assert after['detections'][0]['last_seen'] == .5
+            assert after['audio_redactions'] == []
+            assert response.json['suggest_allowlist'] == ['synthetic']
+        if case == 'audio_extra': assert set(after['audio_redactions'][0]) == {'t0','t1','mode'}
+>       assert web.FILES.count == 0
+E       assert 2 == 0
+E        +  where 2 = <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360>.count
+E        +    where <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360> = web.FILES
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py:365: AssertionError
+_ test_effective_changes_publish_once_with_raw_fields_preserved[legacy_manual] _
+
+review = namespace(path=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task655/runs/task655-final-full-31...'t1': 0.2, 'mode': 'mute'}], 'custom_future_field': {'preserved': True}}, client=<FlaskClient <Flask 'openscrub_web'>>)
+report_work = {'parse': 1, 'dump': 1, 'stage': 1, 'fsync': 1, ...}
+case = 'legacy_manual'
+
+    @pytest.mark.parametrize('case', [
+        'missing_enabled', 'numeric_enabled', 'integer_box', 'integer_time',
+        'negative_zero_box', 'negative_zero_time', 'missing_last_seen', 'clamped_last_seen',
+        'missing_audio', 'audio_extra', 'audio_bool', 'audio_int', 'audio_negative_zero',
+        'nonfinite_box', 'nonfinite_audio', 'sparse', 'combined', 'legacy_manual',
+    ])
+    def test_effective_changes_publish_once_with_raw_fields_preserved(review, report_work, case):
+        doc = finite_review(review)
+        row = doc['detections'][0]
+        edits = {}
+        if case == 'missing_enabled':
+            del row['enabled']; edits = {'enabled': {'0': True}}
+        elif case == 'numeric_enabled':
+            row['enabled'] = 1; edits = {'enabled': {'0': True}}
+        elif case == 'integer_box':
+            row['cbox'] = [1, 2, 8, 9]; edits = {'box_overrides': {'0': [1, 2, 8, 9]}}
+        elif case == 'integer_time':
+            row.update(t_start=0, t_end=1); edits = {'time_overrides': {'0': [0, 1]}}
+        elif case == 'negative_zero_box':
+            row['cbox'][0] = -0.; edits = {'box_overrides': {'0': [0., 2., 8., 9.]}}
+        elif case == 'negative_zero_time':
+            row['t_start'] = -0.; edits = {'time_overrides': {'0': [0., 1.]}}
+        elif case in ('missing_last_seen', 'clamped_last_seen'):
+            if case == 'missing_last_seen': del row['last_seen']
+            else: row['last_seen'] = 2.
+            edits = {'time_overrides': {'0': [0., 1.]}}
+        elif case == 'missing_audio':
+            del doc['audio_redactions']; edits = {'audio': []}
+        elif case == 'audio_extra':
+            doc['audio_redactions'][0]['future'] = {'nested': [True, 1, 1.]}
+            edits = {'audio': [{'t0': .1, 't1': .2}]}
+        elif case in ('audio_bool', 'audio_int', 'audio_negative_zero'):
+            value = {'audio_bool': False, 'audio_int': 0, 'audio_negative_zero': -0.}[case]
+            doc['audio_redactions'] = [{'t0': value, 't1': 1., 'mode': 'mute'}]
+            edits = {'audio': [{'t0': 0., 't1': 1.}]}
+        elif case == 'nonfinite_box':
+            row['cbox'][0] = float('inf'); edits = {'box_overrides': {'0': [float('inf'), 2, 8, 9]}}
+        elif case == 'nonfinite_audio':
+            doc['audio_redactions'][0]['t1'] = float('inf')
+            edits = {'audio': doc['audio_redactions']}
+        elif case == 'sparse': edits = {'enabled': {'0': False}}
+        elif case == 'combined':
+            edits = {'enabled': {'0': False, '1': False}, 'box_overrides': {'0': [2,3,9,10]},
+                     'time_overrides': {'0': [.2, 2]}, 'audio': []}
+        elif case == 'legacy_manual':
+            edits = {'manual': [{'t_start': 0, 't_end': 1, 'screen_box': [1,2,8,9]}]}
+        doc['unknown'] = {'ordered': [None, True, 1, 1., {'motion': [[1,2],[3,4]]}]}
+        doc['audio_transcript'] = [{'text': 'raw synthetic', 'future': [0,False]}]
+        review.path.write_text(json.dumps(doc, indent=1))
+        before = review.path.read_bytes()
+        response = review.client.post('/api/jobs/synthetic/detections', json=edits)
+        assert response.status_code == 200
+        after = json.loads(review.path.read_bytes())
+        assert report_work['parse'] == report_work['dump'] == report_work['stage'] == report_work['fsync'] == report_work['replace'] == 1
+        assert report_work['encoder_chunks'] > 0  # Encoder chunks, not Python writes or syscalls.
+        assert after['unknown'] == doc['unknown']
+        assert after['audio_transcript'] == doc['audio_transcript']
+        assert after['render_state'] == doc['render_state']
+        assert review.path.read_bytes() == json.dumps(after, indent=1).encode()
+        if not case.startswith('nonfinite'):
+            assert review.path.read_bytes() != before
+        if case == 'combined':
+            assert after['detections'][0]['cbox'] == [2.,3.,9.,10.]
+            assert after['detections'][0]['last_seen'] == .5
+            assert after['audio_redactions'] == []
+            assert response.json['suggest_allowlist'] == ['synthetic']
+        if case == 'audio_extra': assert set(after['audio_redactions'][0]) == {'t0','t1','mode'}
+>       assert web.FILES.count == 0
+E       assert 2 == 0
+E        +  where 2 = <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360>.count
+E        +    where <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360> = web.FILES
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py:365: AssertionError
+______ test_noop_candidates_still_parse_and_validate[missing-edits0-404] _______
+
+review = namespace(path=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task655/runs/task655-final-full-31...'t1': 0.2, 'mode': 'mute'}], 'custom_future_field': {'preserved': True}}, client=<FlaskClient <Flask 'openscrub_web'>>)
+report_work = {'parse': 1, 'dump': 0, 'stage': 0, 'fsync': 0, ...}
+broken = 'missing', edits = {}, status = 404
+
+    @pytest.mark.parametrize('broken,edits,status', [
+        ('missing', {}, 404), ('malformed', {}, 500), ('no_render_state', {}, 500),
+        ('no_detections', {}, 500), (None, {'enabled': None}, 500),
+        (None, {'box_overrides': {'bad': [1,2,8,9]}}, 500),
+        (None, {'time_overrides': {'0': ['bad',1]}}, 500),
+        (None, {'manual': [{'manual_id': None}]}, 400),
+    ])
+    def test_noop_candidates_still_parse_and_validate(review, report_work, broken, edits, status):
+        if broken == 'missing': review.path.unlink()
+        elif broken == 'malformed': review.path.write_bytes(b'{')
+        elif broken:
+            doc = finite_review(review); del doc[broken[3:]]
+            review.path.write_text(json.dumps(doc))
+        before = review.path.read_bytes() if review.path.exists() else None
+        assert review.client.post('/api/jobs/synthetic/detections', json=edits).status_code == status
+        assert report_work['parse'] == 1 and report_work['replace'] == report_work['dump'] == 0
+        assert (review.path.read_bytes() if review.path.exists() else None) == before
+>       assert web.FILES.count == 0
+E       assert 2 == 0
+E        +  where 2 = <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360>.count
+E        +    where <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360> = web.FILES
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py:404: AssertionError
+_____ test_noop_candidates_still_parse_and_validate[malformed-edits1-500] ______
+
+review = namespace(path=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task655/runs/task655-final-full-31...'t1': 0.2, 'mode': 'mute'}], 'custom_future_field': {'preserved': True}}, client=<FlaskClient <Flask 'openscrub_web'>>)
+report_work = {'parse': 1, 'dump': 0, 'stage': 0, 'fsync': 0, ...}
+broken = 'malformed', edits = {}, status = 500
+
+    @pytest.mark.parametrize('broken,edits,status', [
+        ('missing', {}, 404), ('malformed', {}, 500), ('no_render_state', {}, 500),
+        ('no_detections', {}, 500), (None, {'enabled': None}, 500),
+        (None, {'box_overrides': {'bad': [1,2,8,9]}}, 500),
+        (None, {'time_overrides': {'0': ['bad',1]}}, 500),
+        (None, {'manual': [{'manual_id': None}]}, 400),
+    ])
+    def test_noop_candidates_still_parse_and_validate(review, report_work, broken, edits, status):
+        if broken == 'missing': review.path.unlink()
+        elif broken == 'malformed': review.path.write_bytes(b'{')
+        elif broken:
+            doc = finite_review(review); del doc[broken[3:]]
+            review.path.write_text(json.dumps(doc))
+        before = review.path.read_bytes() if review.path.exists() else None
+        assert review.client.post('/api/jobs/synthetic/detections', json=edits).status_code == status
+        assert report_work['parse'] == 1 and report_work['replace'] == report_work['dump'] == 0
+        assert (review.path.read_bytes() if review.path.exists() else None) == before
+>       assert web.FILES.count == 0
+E       assert 2 == 0
+E        +  where 2 = <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360>.count
+E        +    where <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360> = web.FILES
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py:404: AssertionError
+------------------------------ Captured log call -------------------------------
+ERROR    openscrub_web:app.py:875 Exception on /api/jobs/synthetic/detections [POST]
+Traceback (most recent call last):
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", line 2047, in job_save_edits
+    doc = _load_job_report(job)
+          ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py", line 233, in parse
+    return load(job)
+           ^^^^^^^^^
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", line 1684, in _load_job_report
+    return json.load(f)
+           ^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/python/cpython-3.12.16-linux-x86_64-gnu/lib/python3.12/json/__init__.py", line 293, in load
+    return loads(fp.read(),
+           ^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/python/cpython-3.12.16-linux-x86_64-gnu/lib/python3.12/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/python/cpython-3.12.16-linux-x86_64-gnu/lib/python3.12/json/decoder.py", line 338, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/python/cpython-3.12.16-linux-x86_64-gnu/lib/python3.12/json/decoder.py", line 354, in raw_decode
+    obj, end = self.scan_once(s, idx)
+               ^^^^^^^^^^^^^^^^^^^^^^
+json.decoder.JSONDecodeError: Expecting property name enclosed in double quotes: line 1 column 2 (char 1)
+__ test_noop_candidates_still_parse_and_validate[no_render_state-edits2-500] ___
+
+review = namespace(path=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task655/runs/task655-final-full-31...'t1': 0.2, 'mode': 'mute'}], 'custom_future_field': {'preserved': True}}, client=<FlaskClient <Flask 'openscrub_web'>>)
+report_work = {'parse': 1, 'dump': 0, 'stage': 0, 'fsync': 0, ...}
+broken = 'no_render_state', edits = {}, status = 500
+
+    @pytest.mark.parametrize('broken,edits,status', [
+        ('missing', {}, 404), ('malformed', {}, 500), ('no_render_state', {}, 500),
+        ('no_detections', {}, 500), (None, {'enabled': None}, 500),
+        (None, {'box_overrides': {'bad': [1,2,8,9]}}, 500),
+        (None, {'time_overrides': {'0': ['bad',1]}}, 500),
+        (None, {'manual': [{'manual_id': None}]}, 400),
+    ])
+    def test_noop_candidates_still_parse_and_validate(review, report_work, broken, edits, status):
+        if broken == 'missing': review.path.unlink()
+        elif broken == 'malformed': review.path.write_bytes(b'{')
+        elif broken:
+            doc = finite_review(review); del doc[broken[3:]]
+            review.path.write_text(json.dumps(doc))
+        before = review.path.read_bytes() if review.path.exists() else None
+        assert review.client.post('/api/jobs/synthetic/detections', json=edits).status_code == status
+        assert report_work['parse'] == 1 and report_work['replace'] == report_work['dump'] == 0
+        assert (review.path.read_bytes() if review.path.exists() else None) == before
+>       assert web.FILES.count == 0
+E       assert 2 == 0
+E        +  where 2 = <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360>.count
+E        +    where <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360> = web.FILES
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py:404: AssertionError
+------------------------------ Captured log call -------------------------------
+ERROR    openscrub_web:app.py:875 Exception on /api/jobs/synthetic/detections [POST]
+Traceback (most recent call last):
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", line 2078, in job_save_edits
+    rs = doc["render_state"]
+         ~~~^^^^^^^^^^^^^^^^
+KeyError: 'render_state'
+___ test_noop_candidates_still_parse_and_validate[no_detections-edits3-500] ____
+
+review = namespace(path=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task655/runs/task655-final-full-31...'t1': 0.2, 'mode': 'mute'}], 'custom_future_field': {'preserved': True}}, client=<FlaskClient <Flask 'openscrub_web'>>)
+report_work = {'parse': 1, 'dump': 0, 'stage': 0, 'fsync': 0, ...}
+broken = 'no_detections', edits = {}, status = 500
+
+    @pytest.mark.parametrize('broken,edits,status', [
+        ('missing', {}, 404), ('malformed', {}, 500), ('no_render_state', {}, 500),
+        ('no_detections', {}, 500), (None, {'enabled': None}, 500),
+        (None, {'box_overrides': {'bad': [1,2,8,9]}}, 500),
+        (None, {'time_overrides': {'0': ['bad',1]}}, 500),
+        (None, {'manual': [{'manual_id': None}]}, 400),
+    ])
+    def test_noop_candidates_still_parse_and_validate(review, report_work, broken, edits, status):
+        if broken == 'missing': review.path.unlink()
+        elif broken == 'malformed': review.path.write_bytes(b'{')
+        elif broken:
+            doc = finite_review(review); del doc[broken[3:]]
+            review.path.write_text(json.dumps(doc))
+        before = review.path.read_bytes() if review.path.exists() else None
+        assert review.client.post('/api/jobs/synthetic/detections', json=edits).status_code == status
+        assert report_work['parse'] == 1 and report_work['replace'] == report_work['dump'] == 0
+        assert (review.path.read_bytes() if review.path.exists() else None) == before
+>       assert web.FILES.count == 0
+E       assert 2 == 0
+E        +  where 2 = <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360>.count
+E        +    where <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360> = web.FILES
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py:404: AssertionError
+------------------------------ Captured log call -------------------------------
+ERROR    openscrub_web:app.py:875 Exception on /api/jobs/synthetic/detections [POST]
+Traceback (most recent call last):
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", line 2060, in job_save_edits
+    original_count = len(doc["detections"])
+                         ~~~^^^^^^^^^^^^^^
+KeyError: 'detections'
+________ test_noop_candidates_still_parse_and_validate[None-edits4-500] ________
+
+review = namespace(path=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task655/runs/task655-final-full-31...'t1': 0.2, 'mode': 'mute'}], 'custom_future_field': {'preserved': True}}, client=<FlaskClient <Flask 'openscrub_web'>>)
+report_work = {'parse': 1, 'dump': 0, 'stage': 0, 'fsync': 0, ...}
+broken = None, edits = {'enabled': None}, status = 500
+
+    @pytest.mark.parametrize('broken,edits,status', [
+        ('missing', {}, 404), ('malformed', {}, 500), ('no_render_state', {}, 500),
+        ('no_detections', {}, 500), (None, {'enabled': None}, 500),
+        (None, {'box_overrides': {'bad': [1,2,8,9]}}, 500),
+        (None, {'time_overrides': {'0': ['bad',1]}}, 500),
+        (None, {'manual': [{'manual_id': None}]}, 400),
+    ])
+    def test_noop_candidates_still_parse_and_validate(review, report_work, broken, edits, status):
+        if broken == 'missing': review.path.unlink()
+        elif broken == 'malformed': review.path.write_bytes(b'{')
+        elif broken:
+            doc = finite_review(review); del doc[broken[3:]]
+            review.path.write_text(json.dumps(doc))
+        before = review.path.read_bytes() if review.path.exists() else None
+        assert review.client.post('/api/jobs/synthetic/detections', json=edits).status_code == status
+        assert report_work['parse'] == 1 and report_work['replace'] == report_work['dump'] == 0
+        assert (review.path.read_bytes() if review.path.exists() else None) == before
+>       assert web.FILES.count == 0
+E       assert 2 == 0
+E        +  where 2 = <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360>.count
+E        +    where <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360> = web.FILES
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py:404: AssertionError
+------------------------------ Captured log call -------------------------------
+ERROR    openscrub_web:app.py:875 Exception on /api/jobs/synthetic/detections [POST]
+Traceback (most recent call last):
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", line 2063, in job_save_edits
+    if str(i) in enabled:
+       ^^^^^^^^^^^^^^^^^
+TypeError: argument of type 'NoneType' is not iterable
+________ test_noop_candidates_still_parse_and_validate[None-edits5-500] ________
+
+review = namespace(path=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task655/runs/task655-final-full-31...'t1': 0.2, 'mode': 'mute'}], 'custom_future_field': {'preserved': True}}, client=<FlaskClient <Flask 'openscrub_web'>>)
+report_work = {'parse': 1, 'dump': 0, 'stage': 0, 'fsync': 0, ...}
+broken = None, edits = {'box_overrides': {'bad': [1, 2, 8, 9]}}, status = 500
+
+    @pytest.mark.parametrize('broken,edits,status', [
+        ('missing', {}, 404), ('malformed', {}, 500), ('no_render_state', {}, 500),
+        ('no_detections', {}, 500), (None, {'enabled': None}, 500),
+        (None, {'box_overrides': {'bad': [1,2,8,9]}}, 500),
+        (None, {'time_overrides': {'0': ['bad',1]}}, 500),
+        (None, {'manual': [{'manual_id': None}]}, 400),
+    ])
+    def test_noop_candidates_still_parse_and_validate(review, report_work, broken, edits, status):
+        if broken == 'missing': review.path.unlink()
+        elif broken == 'malformed': review.path.write_bytes(b'{')
+        elif broken:
+            doc = finite_review(review); del doc[broken[3:]]
+            review.path.write_text(json.dumps(doc))
+        before = review.path.read_bytes() if review.path.exists() else None
+        assert review.client.post('/api/jobs/synthetic/detections', json=edits).status_code == status
+        assert report_work['parse'] == 1 and report_work['replace'] == report_work['dump'] == 0
+        assert (review.path.read_bytes() if review.path.exists() else None) == before
+>       assert web.FILES.count == 0
+E       assert 2 == 0
+E        +  where 2 = <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360>.count
+E        +    where <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360> = web.FILES
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py:404: AssertionError
+------------------------------ Captured log call -------------------------------
+ERROR    openscrub_web:app.py:875 Exception on /api/jobs/synthetic/detections [POST]
+Traceback (most recent call last):
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", line 2066, in job_save_edits
+    i = int(i)
+        ^^^^^^
+ValueError: invalid literal for int() with base 10: 'bad'
+________ test_noop_candidates_still_parse_and_validate[None-edits6-500] ________
+
+review = namespace(path=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task655/runs/task655-final-full-31...'t1': 0.2, 'mode': 'mute'}], 'custom_future_field': {'preserved': True}}, client=<FlaskClient <Flask 'openscrub_web'>>)
+report_work = {'parse': 1, 'dump': 0, 'stage': 0, 'fsync': 0, ...}
+broken = None, edits = {'time_overrides': {'0': ['bad', 1]}}, status = 500
+
+    @pytest.mark.parametrize('broken,edits,status', [
+        ('missing', {}, 404), ('malformed', {}, 500), ('no_render_state', {}, 500),
+        ('no_detections', {}, 500), (None, {'enabled': None}, 500),
+        (None, {'box_overrides': {'bad': [1,2,8,9]}}, 500),
+        (None, {'time_overrides': {'0': ['bad',1]}}, 500),
+        (None, {'manual': [{'manual_id': None}]}, 400),
+    ])
+    def test_noop_candidates_still_parse_and_validate(review, report_work, broken, edits, status):
+        if broken == 'missing': review.path.unlink()
+        elif broken == 'malformed': review.path.write_bytes(b'{')
+        elif broken:
+            doc = finite_review(review); del doc[broken[3:]]
+            review.path.write_text(json.dumps(doc))
+        before = review.path.read_bytes() if review.path.exists() else None
+        assert review.client.post('/api/jobs/synthetic/detections', json=edits).status_code == status
+        assert report_work['parse'] == 1 and report_work['replace'] == report_work['dump'] == 0
+        assert (review.path.read_bytes() if review.path.exists() else None) == before
+>       assert web.FILES.count == 0
+E       assert 2 == 0
+E        +  where 2 = <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360>.count
+E        +    where <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360> = web.FILES
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py:404: AssertionError
+------------------------------ Captured log call -------------------------------
+ERROR    openscrub_web:app.py:875 Exception on /api/jobs/synthetic/detections [POST]
+Traceback (most recent call last):
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", line 2072, in job_save_edits
+    t0, t1 = float(span[0]), float(span[1])
+             ^^^^^^^^^^^^^^
+ValueError: could not convert string to float: 'bad'
+________ test_noop_candidates_still_parse_and_validate[None-edits7-400] ________
+
+review = namespace(path=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task655/runs/task655-final-full-31...'t1': 0.2, 'mode': 'mute'}], 'custom_future_field': {'preserved': True}}, client=<FlaskClient <Flask 'openscrub_web'>>)
+report_work = {'parse': 1, 'dump': 0, 'stage': 0, 'fsync': 0, ...}
+broken = None, edits = {'manual': [{'manual_id': None}]}, status = 400
+
+    @pytest.mark.parametrize('broken,edits,status', [
+        ('missing', {}, 404), ('malformed', {}, 500), ('no_render_state', {}, 500),
+        ('no_detections', {}, 500), (None, {'enabled': None}, 500),
+        (None, {'box_overrides': {'bad': [1,2,8,9]}}, 500),
+        (None, {'time_overrides': {'0': ['bad',1]}}, 500),
+        (None, {'manual': [{'manual_id': None}]}, 400),
+    ])
+    def test_noop_candidates_still_parse_and_validate(review, report_work, broken, edits, status):
+        if broken == 'missing': review.path.unlink()
+        elif broken == 'malformed': review.path.write_bytes(b'{')
+        elif broken:
+            doc = finite_review(review); del doc[broken[3:]]
+            review.path.write_text(json.dumps(doc))
+        before = review.path.read_bytes() if review.path.exists() else None
+        assert review.client.post('/api/jobs/synthetic/detections', json=edits).status_code == status
+        assert report_work['parse'] == 1 and report_work['replace'] == report_work['dump'] == 0
+        assert (review.path.read_bytes() if review.path.exists() else None) == before
+>       assert web.FILES.count == 0
+E       assert 2 == 0
+E        +  where 2 = <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360>.count
+E        +    where <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360> = web.FILES
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py:404: AssertionError
+__________ test_failed_change_releases_waiting_noop_to_fresh_snapshot __________
+
+review = namespace(path=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task655/runs/task655-final-full-31...'t1': 0.2, 'mode': 'mute'}], 'custom_future_field': {'preserved': True}}, client=<FlaskClient <Flask 'openscrub_web'>>)
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x71ced89412e0>
+report_work = {'parse': 2, 'dump': 1, 'stage': 1, 'fsync': 1, ...}
+
+    def test_failed_change_releases_waiting_noop_to_fresh_snapshot(review, monkeypatch, report_work):
+        from test_report_transactions import ObservedLock
+        from test_job_lifecycle import start_call, finish
+        lock = ObservedLock()
+        web.FILES.initialize(web.JOBS['synthetic']).report_lock = lock
+        entered, release = threading.Event(), threading.Event()
+        def fail(*args):
+            entered.set()
+            assert release.wait(5)
+            raise OSError('injected replacement failure')
+        monkeypatch.setattr(reports.os, 'replace', fail)
+        before = file_snapshot(review.path)
+        first = start_call('post', '/api/jobs/synthetic/detections', json={'enabled': {'0': False}})
+        second = None
+        try:
+            assert entered.wait(5)
+            second = start_call('post', '/api/jobs/synthetic/detections', json={})
+            assert lock.waiting.wait(5)
+        finally:
+            release.set()
+            assert finish(first).status_code == 500
+            if second: assert finish(second).status_code == 200
+        assert report_work['parse'] == 2 and report_work['dump'] == 1
+        assert file_snapshot(review.path) == before
+>       assert web.FILES.count == 0
+E       assert 2 == 0
+E        +  where 2 = <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360>.count
+E        +    where <openscrub_internal.lifetimes.FileOwners object at 0x71cf55196360> = web.FILES
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py:431: AssertionError
+------------------------------ Captured log call -------------------------------
+ERROR    openscrub_web:app.py:875 Exception on /api/jobs/synthetic/detections [POST]
+Traceback (most recent call last):
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", line 2136, in job_save_edits
+    _publish_job_report_locked(job, path, doc)
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py", line 913, in _publish_job_report_locked
+    os.replace(staged, os.path.abspath(path))
+  File "/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py", line 416, in fail
+    raise OSError('injected replacement failure')
+OSError: injected replacement failure
+______________ test_real_compatible_runtime_has_required_fallback ______________
+
+    def test_real_compatible_runtime_has_required_fallback():
+        result = probe_opencv(sys.executable)
+>       assert result["status"] == "ok", result
+E       AssertionError: {'status': 'malformed_output', 'version': None, 'path': None, 'distributions': {}, ...}
+E       assert 'malformed_output' == 'ok'
+E         
+E         - ok
+E         + malformed_output
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_opencv_compat.py:117: AssertionError
+_________ test_successful_report_publication_does_not_abort_vault_lock _________
+
+tmp_path = PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task655/runs/task655-final-full-312-01/pytest/test_successful_report_publica0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x71cecfa28290>
+
+    def test_successful_report_publication_does_not_abort_vault_lock(tmp_path, monkeypatch):
+        report = tmp_path / 'report.json'
+        report.write_bytes(b'{"synthetic": "old"}')
+        video = tmp_path / 'input.avi'
+        video.write_bytes(b'synthetic input bytes')
+        key = os.urandom(32)
+        monkeypatch.setattr(web, 'JOBS_DIR', str(tmp_path))
+        monkeypatch.setattr(web, 'VAULT', {'key': key})
+        staged, snapshotted, published = (threading.Event() for _ in range(3))
+        errors, new_bytes = [], []
+        real_replace, real_walk = os.replace, vault._walk_files
+    
+        def gated_replace(source, destination):
+            if Path(source).name.startswith('.report-'):
+                staged.set()
+                assert snapshotted.wait(5), 'vault did not snapshot the active stage'
+            return real_replace(source, destination)
+    
+        def snapshot_before_publication(root):
+            paths = list(real_walk(root))
+            assert any(p.endswith('.tmp') for p in paths)
+            # os.walk may enumerate the stage first; freeze that permitted order.
+            paths.sort(key=lambda p: not p.endswith('.tmp'))
+            snapshotted.set()
+            assert published.wait(5), 'report publication did not finish'
+            yield from paths
+    
+        def publish():
+            try:
+                reports.atomic_report(report, {'synthetic': 'new'})
+                new_bytes.append(report.read_bytes())
+            except Exception as error:
+                errors.append(error)
+            finally:
+                published.set()
+    
+        with monkeypatch.context() as gate:
+            gate.setattr(reports.os, 'replace', gated_replace)
+            gate.setattr(vault, '_walk_files', snapshot_before_publication)
+            thread = threading.Thread(target=publish)
+            thread.start()
+            try:
+                assert staged.wait(5), 'report stage was not created'
+>               encrypted = web._vault_lock_now()
+                            ^^^^^^^^^^^^^^^^^^^^^
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/tests/test_vault_cleanup.py:56: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py:5054: in _vault_lock_now
+    return _vault_lock_locked(blocking_jobs=blocking)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+blocking_jobs = True
+
+    def _vault_lock_locked(blocking_jobs=True):
+        if _files_busy_locked(blocking=blocking_jobs):
+>           raise FilesBusy("job files are still in use")
+E           openscrub_web.FilesBusy: job files are still in use
+
+/home/tahv0/.codex/worktrees/c832/OpenScrub/openscrub_web.py:5034: FilesBusy
+=========================== short test summary info ============================
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_browser_log_retention.py::test_actual_layout_anchor_threshold_pending_scroll_and_reflow
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py::test_unchanged_save_preserves_exact_file_and_skips_publication[edits0-False]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py::test_unchanged_save_preserves_exact_file_and_skips_publication[edits0-True]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py::test_unchanged_save_preserves_exact_file_and_skips_publication[edits1-False]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py::test_unchanged_save_preserves_exact_file_and_skips_publication[edits1-True]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py::test_unchanged_save_preserves_exact_file_and_skips_publication[edits2-False]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py::test_unchanged_save_preserves_exact_file_and_skips_publication[edits2-True]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py::test_unchanged_save_preserves_exact_file_and_skips_publication[edits3-False]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py::test_unchanged_save_preserves_exact_file_and_skips_publication[edits3-True]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py::test_unchanged_save_preserves_exact_file_and_skips_publication[edits4-False]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py::test_unchanged_save_preserves_exact_file_and_skips_publication[edits4-True]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py::test_unchanged_save_preserves_exact_file_and_skips_publication[edits5-False]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py::test_unchanged_save_preserves_exact_file_and_skips_publication[edits5-True]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py::test_unchanged_save_preserves_exact_file_and_skips_publication[edits6-False]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py::test_unchanged_save_preserves_exact_file_and_skips_publication[edits6-True]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py::test_effective_changes_publish_once_with_raw_fields_preserved[missing_enabled]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py::test_effective_changes_publish_once_with_raw_fields_preserved[numeric_enabled]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py::test_effective_changes_publish_once_with_raw_fields_preserved[integer_box]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py::test_effective_changes_publish_once_with_raw_fields_preserved[integer_time]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py::test_effective_changes_publish_once_with_raw_fields_preserved[negative_zero_box]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py::test_effective_changes_publish_once_with_raw_fields_preserved[negative_zero_time]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py::test_effective_changes_publish_once_with_raw_fields_preserved[missing_last_seen]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py::test_effective_changes_publish_once_with_raw_fields_preserved[clamped_last_seen]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py::test_effective_changes_publish_once_with_raw_fields_preserved[missing_audio]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py::test_effective_changes_publish_once_with_raw_fields_preserved[audio_extra]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py::test_effective_changes_publish_once_with_raw_fields_preserved[audio_bool]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py::test_effective_changes_publish_once_with_raw_fields_preserved[audio_int]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py::test_effective_changes_publish_once_with_raw_fields_preserved[audio_negative_zero]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py::test_effective_changes_publish_once_with_raw_fields_preserved[nonfinite_box]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py::test_effective_changes_publish_once_with_raw_fields_preserved[nonfinite_audio]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py::test_effective_changes_publish_once_with_raw_fields_preserved[sparse]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py::test_effective_changes_publish_once_with_raw_fields_preserved[combined]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py::test_effective_changes_publish_once_with_raw_fields_preserved[legacy_manual]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py::test_noop_candidates_still_parse_and_validate[missing-edits0-404]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py::test_noop_candidates_still_parse_and_validate[malformed-edits1-500]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py::test_noop_candidates_still_parse_and_validate[no_render_state-edits2-500]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py::test_noop_candidates_still_parse_and_validate[no_detections-edits3-500]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py::test_noop_candidates_still_parse_and_validate[None-edits4-500]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py::test_noop_candidates_still_parse_and_validate[None-edits5-500]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py::test_noop_candidates_still_parse_and_validate[None-edits6-500]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py::test_noop_candidates_still_parse_and_validate[None-edits7-400]
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_large_report_io.py::test_failed_change_releases_waiting_noop_to_fresh_snapshot
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_opencv_compat.py::test_real_compatible_runtime_has_required_fallback
+FAILED ../../../../../../../../../.codex/worktrees/c832/OpenScrub/tests/test_vault_cleanup.py::test_successful_report_publication_does_not_abort_vault_lock
+44 failed, 1982 passed in 218.19s (0:03:38)

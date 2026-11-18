@@ -1,0 +1,77 @@
+[
+  {
+    "original": "f399ebe1bd3c17561b44c06f7169a61e21becb43",
+    "composed": "e25c3f57fefdd99a653eda1dfa77a94f80d92b57",
+    "subject": "fix: preserve literal filenames in job list and title"
+  },
+  {
+    "original": "47e9f6d5614365e00d899c87df6c209cd7aaabf6",
+    "composed": "823be0821f91abcbaa3b8abef9d34ad39a1cc617",
+    "subject": "fix(web): keep editor coordinates aligned on live resize"
+  },
+  {
+    "original": "0c2b98e9e136abcd472bdda59cecaf546775ea4e",
+    "composed": "c771b907f04b42bbffe28633fcd8802a483a8d84",
+    "subject": "Prioritize visible review cards with bounded thumbnail work"
+  },
+  {
+    "original": "fe20dff7b73efb5afdbf3130e75a19c8b35ecba3",
+    "composed": "6f83046c1036169a4cca4c015b5fe0ef4bec202c",
+    "subject": "Preserve review DOM order and retry state across restoration"
+  },
+  {
+    "original": "2c7f2530893cb2ecd20dfe7803b6301ea34f9f9f",
+    "composed": "47c0e577a7546e4db63bda8da66f300066b48e0a",
+    "subject": "Bound retained job messages and make polling cursors coherent"
+  },
+  {
+    "original": "4670641cb8e53e6daa6f77fb505397bfdb6733b8",
+    "composed": "39d05b664c74960d3530e6cb5a6be3401b2edf0c",
+    "subject": "Bound active browser job log display and preserve reading position"
+  },
+  {
+    "original": "f44e0b786ad065010fbfd2b8328350bde44116ec",
+    "composed": "0d8df87042d795e59e320bb4847d7a68fcee6e05",
+    "subject": "Create browser benchmark process-log directory before child execution"
+  },
+  {
+    "original": null,
+    "composed": "fb9d59bfb475be0fda80bc10e590bda9b4da3b1e",
+    "subject": "test: bind composed lifecycle fixtures and editor teardown regressions"
+  },
+  {
+    "original": null,
+    "composed": "61dbb31058c49041aa820ec29e2bd6fe86ff3a84",
+    "subject": "fix: dispose composed editor owners only with removed subtrees"
+  },
+  {
+    "original": null,
+    "composed": "a3d0f0dfbb0e0047f5a0532581a6a9e0bfcd155f",
+    "subject": "test: adapt browser owner fixtures to composed source and scheduler APIs"
+  },
+  {
+    "original": null,
+    "composed": "20d9f290c9ae6995a9a4928bb1b21e1004222026",
+    "subject": "test: retain composed log shell and admitted tracking fixture state"
+  },
+  {
+    "original": null,
+    "composed": "46a5b42f134d6b8720da52eb7f28a43fff3662f1",
+    "subject": "test: cover editor removal by phase action replacement"
+  },
+  {
+    "original": null,
+    "composed": "a4649a2b60ad95fb57b6e676af0799c19e3c873a",
+    "subject": "fix: release editor owner before phase actions replace its DOM"
+  },
+  {
+    "original": null,
+    "composed": "66978834e3937cb170979c4f2e1a4ffe40062161",
+    "subject": "test: scroll the virtual review window before polling preview actions"
+  },
+  {
+    "original": null,
+    "composed": "00480c7e42ddb329f4dde9599c256555f2dabcf0",
+    "subject": "test: advance controlled clock for review scroll reconciliation"
+  }
+]

@@ -1,0 +1,136 @@
+commit a3d0f0dfbb0e0047f5a0532581a6a9e0bfcd155f
+Author:     Tuomas Aho <tuomas.aho@outlook.com>
+AuthorDate: Wed Nov 18 01:32:12 2026 +0200
+Commit:     Tuomas Aho <tuomas.aho@outlook.com>
+CommitDate: Wed Nov 18 01:32:12 2026 +0200
+
+    test: adapt browser owner fixtures to composed source and scheduler APIs
+
+diff --git a/tests/test_browser_composition.cjs b/tests/test_browser_composition.cjs
+index 1f3dc04..f5606db 100644
+--- a/tests/test_browser_composition.cjs
++++ b/tests/test_browser_composition.cjs
+@@ -88,11 +88,6 @@ const pause=ms=>new Promise(r=>setTimeout(r,ms));
+   assert.deepEqual(await fresh.evaluate(()=>BE.audio),[{t0:1,t1:1.2,mode:'bleep'}]);
+   records.push({heldSuccessfulAck:true,failedSave:true,freshRawAudioReopen:true,rows:saved.detections.length});
+   await fresh.screenshot({path:root+'/combined-desktop.png'});await fresh.close();
+-  // Initiating job retains written/total/finalizing UI while another view opens.
+-  await page.evaluate(()=>{window.downloadGate={};window.showSaveFilePicker=async()=>({createWritable:async()=>({write:async()=>new Promise(r=>downloadGate.write=r),close:async()=>new Promise(r=>downloadGate.close=r)})})});
+-  // Download bytes are controlled; the P01 owning Node suite checks exact
+-  // accepted-byte accounting and initiating-job finalizing statuses separately.
+-  records.push({downloadBoundary:'complete P01 emitted-JS owner suite; no duplicate socket download stub'});
+   assert.deepEqual(errors,[]);const expected=diagnostics.filter(d=>/503|423|409/.test(d.text));
+   assert.equal(diagnostics.length,expected.length,JSON.stringify(diagnostics));
+   const report={records,errors,diagnostics,browser:browser.version(),url:page.url(),title:await page.title(),viewports:[[1280,950],[390,844]],lifecycle:'controlled pagehide/pageshow; native BFCache/visibility not claimed'};
+diff --git a/tests/test_browser_composition.py b/tests/test_browser_composition.py
+index fc34d78..a8502ac 100644
+--- a/tests/test_browser_composition.py
++++ b/tests/test_browser_composition.py
+@@ -93,7 +93,15 @@ def combined_http(monkeypatch, tmp_path):
+                         lambda: web.jsonify({'current': engine.VERSION, 'update_available': False}))
+     # Render dispatch invokes the actual worker synchronously. Its processing,
+     # report/raw/source/FILES path is unchanged; no permanent worker is created.
+-    monkeypatch.setattr(web, 'enqueue', lambda job, action: web._run_job(job, action))
++    def execute(job, action, ticket):
++        owner = ticket[3]
++        with web.JOBS_LOCK:
++            web.FILES.initialize(job).queued.pop(ticket[2], None)
++        try:
++            web._run_job(job, action, owner)
++        finally:
++            web._finish_operation(job, owner)
++    monkeypatch.setattr(web, 'enqueue', execute)
+     state = {'hold_log': False, 'hold_thumb': False, 'hold_ack': False, 'fail_save': False,
+              'log_entered': 0, 'thumb_entered': 0, 'ack_entered': 0}
+     log_gate, thumb_gate, ack_gate = (threading.Event() for _ in range(3))
+diff --git a/tests/test_job_filename_display.py b/tests/test_job_filename_display.py
+index 4376585..6fd06cd 100644
+--- a/tests/test_job_filename_display.py
++++ b/tests/test_job_filename_display.py
+@@ -39,10 +39,10 @@ def emitted_fragments(jobs):
+         pytest.skip("Node is needed to evaluate emitted job UI JavaScript")
+     # The real emitted functions, including any local name boundary, run
+     # with only their HTTP and output sinks supplied by this harness.
+-    script = web.APP_JS.split("let CUR=null", 1)[1]
+-    script = "let CUR=null" + script.split("async function retryJob", 1)[0]
++    script = 'let JOBSJSON="";\n' + web.APP_JS.split("// Job names are text", 1)[1].split("async function retryJob", 1)[0]
++    script = script.replace(" inside the list link and detail heading.\n", "", 1)
+     script += "function shellHtml(j)" + web.APP_JS.split("function shellHtml(j)", 1)[1].split(
+-        "async function refresh", 1)[0]
++        "// Save As exports", 1)[0]
+     script += """
+ const data=JSON.parse(process.argv[1]);
+ const jobs={innerHTML:''};
+diff --git a/tests/test_job_logs.py b/tests/test_job_logs.py
+index 4562c3c..251d4f1 100644
+--- a/tests/test_job_logs.py
++++ b/tests/test_job_logs.py
+@@ -1,5 +1,6 @@
+ """Bounded job callbacks, atomic cursors and lifecycle ownership."""
+ import json
++from pathlib import Path
+ import threading
+ 
+ import pytest
+@@ -111,9 +112,10 @@ def test_negative_cursor_and_retry_keep_store_epoch(monkeypatch, tmp_path):
+     import openscrub_web as web
+     monkeypatch.setattr(web, 'JOBS_DIR', str(tmp_path))
+     monkeypatch.setattr(web, 'enqueue', lambda *_: None)
+-    video = tmp_path / 'input.mp4'
++    job = web.new_job('', {}, 'retry')
++    video = Path(job['dir']) / 'input.mp4'
+     video.write_bytes(b'')
+-    job = web.new_job(str(video), {}, 'retry')
++    job['video'] = str(video)
+     web.WebCallbacks(job).log('before')
+     client = web.app.test_client()
+     before = client.get('/api/jobs/' + job['id'] + '/log?from=-2').get_json()
+@@ -124,6 +126,12 @@ def test_negative_cursor_and_retry_keep_store_epoch(monkeypatch, tmp_path):
+     after = client.get('/api/jobs/' + job['id'] + '/log?from=1&epoch=' + before['epoch']).get_json()
+     assert after['epoch'] == before['epoch'] and job['log'] is owner
+     assert after['len'] == 2 and 'retrying scan' in after['lines'][0]
++    # Release the deliberately unconsumed queue reservation, like a cancelled
++    # real worker; this fixture does not execute the scan.
++    files = web.FILES.initialize(job)
++    for lease in list(files.queued.values()):
++        web._finish_operation(job, lease)
++    files.queued.clear()
+ 
+ 
+ def test_two_event_controlled_producers_and_http_readers(monkeypatch, tmp_path):
+@@ -212,16 +220,20 @@ def test_thumbnail_and_tracking_callbacks_stay_with_their_job(monkeypatch, tmp_p
+     monkeypatch.setattr(web.threading, 'Thread', DeferredThread)
+     monkeypatch.setattr(web, 'build_args', lambda *_: object())
+     monkeypatch.setattr(web.openscrub, 'run_scan', lambda *_: {'stats': {}})
+-    monkeypatch.setattr(web.openscrub, 'write_report', lambda *_: None)
++    monkeypatch.setattr(web.openscrub, 'write_report', lambda *_, **kwargs: None)
+     monkeypatch.setattr(web, '_load_job_report', lambda *_: {'render_state': {'fps': 1, 'cum': [[0, 0]]}, 'detections': []})
+     class Capture:
+         def release(self):
+             pass
+-    monkeypatch.setattr(web.cv2, 'VideoCapture', lambda *_: Capture())
++    sources = []
++    monkeypatch.setattr(web.cv2, 'VideoCapture', lambda source: (sources.append(source), Capture())[1])
+     web._run_job(old, 'scan')
+     replacement = web.new_job('', {}, 'replacement')
+     web.JOBS[old['id']] = replacement
++    selected = old['video']
++    old['video'] = 'late source must not replace lease'
+     deferred.pop(0)()
++    assert sources == [selected or None]
+     assert any('thumbnails pre-generated' in s for s in old['log'].snapshot()['lines'])
+     assert replacement['log'].snapshot()['lines'] == []
+     # Actual manual-tracking route creates its ordinary engine callback.
+diff --git a/tests/test_job_polling_node.py b/tests/test_job_polling_node.py
+index f38e568..5401df5 100644
+--- a/tests/test_job_polling_node.py
++++ b/tests/test_job_polling_node.py
+@@ -38,6 +38,8 @@ const ctx=vm.createContext({console,AbortController,Set,Map,Promise,JSON,Math,Da
+ vm.runInContext(SOURCE.slice(0,SOURCE.indexOf('loadPersist();loadCertInfo();loadJobs();setInterval(loadJobs,5000);')).replace(/^refreshModelPanel\(\);renderTiers\(\);$/m,''),ctx);
+ Object.assign(ctx,{elements,events,timers,assert});
+ vm.runInContext(`
++// Scheduling/layout is covered by its own complete owner suite and browser.
++ReviewScheduler.prototype.start=function(){};
+ loadJobs=()=>{};showPanel=()=>{};initMarquee=()=>{};
+ var calls=[],queue=[];
+ fetch=(url,options={})=>{const r={url,options};calls.push(r);return new Promise((resolve,reject)=>{

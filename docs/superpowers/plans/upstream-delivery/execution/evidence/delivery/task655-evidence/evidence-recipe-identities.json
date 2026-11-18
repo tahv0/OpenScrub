@@ -1,0 +1,17 @@
+{
+  "freeze.py": {
+    "local_path": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task655/adapters/freeze.py",
+    "bytes": 5374,
+    "sha256": "d99b9cf2d77a7357494d9c12048b4cfb897557953b5bc4db28950e880803369c"
+  },
+  "collect.py": {
+    "local_path": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task655/adapters/collect.py",
+    "bytes": 7967,
+    "sha256": "e51d2dbd4d6ae4c77de6764fa3121614b30ac83d5bc6de71a0ecc031e4ce7595"
+  },
+  "commands.py": {
+    "local_path": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task655/adapters/commands.py",
+    "bytes": 5272,
+    "sha256": "8f850d43dddfbc3679d690b58389f5d130b0ff7bc57eb3c7d17409924298178c"
+  }
+}

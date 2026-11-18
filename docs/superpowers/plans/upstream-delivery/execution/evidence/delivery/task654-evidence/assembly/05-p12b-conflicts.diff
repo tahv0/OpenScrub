@@ -1,0 +1,219 @@
+diff --cc README.md
+index 6b09186,1cc88d6..0000000
+--- a/README.md
++++ b/README.md
+@@@ -851,40 -824,25 +851,65 @@@ detection model files OpenScrub uses �
+  Docker images — are listed with their licenses, copyright notices, and
+  full license texts in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+  
+++<<<<<<< HEAD
+ +### OpenCV face fallback compatibility
+ +
+ +The normal core dependency is `opencv-python<5`. OpenCV 5's normal wheel lacks
+ +OpenScrub's existing Haar constructor/data, so an unavailable YuNet model can
+ +prevent face detection. Check this separately from whether `cv2` imports:
+ +
+ +```bash
+ +python -m openscrub_setup --check
+ +# From a source checkout (also after a source update):
+ +python install.py --check
+ +```
+ +
+ +These checks report the imported runtime/path, all four cv2 wheel distributions,
+ +and whether the frontal-face Haar cascade constructs successfully. They do not
+ +fetch models or change dependencies. For an existing **sole normal wheel** that
+ +is incompatible or broken, deliberately restore the bounded wheel using the
+ +interpreter reported by the check, then rerun the check in a fresh process:
+ +
+ +```bash
+ +python -m pip install --force-reinstall "opencv-python<5"
+ +python -m openscrub_setup --check
+ +```
+ +
+ +Source updates copy release files but do not reconcile dependencies. `--yes`
+ +does not repair an existing OpenCV installation automatically. Mixed wheel
+ +flavors need deliberate ownership reconciliation or a clean environment;
+ +reinstalling the normal wheel alone does not cure coexistence. Alternate wheels
+ +and source/distro/frozen builds are identified separately even when Haar works.
+ +For source-built CUDA OpenCV, retain the intended source build and verify its
+ +constructor and Haar XML rather than replacing it with a CPU wheel.
+ +
+ +Optional Paddle installation remains a separate cv2 flavor-policy follow-up.
+ +PaddleOCR/PaddleX can request `opencv-contrib-python` alongside the normal core
+ +wheel; the core `<5` bound cannot prevent that conflict. The standalone installer
+ +checks OpenCV again after Paddle, while desktop/web provider install commands
+ +retain their existing choices. Recheck after optional installs; neither the bound
+ +nor a successful import certifies mixed flavors, GPU execution, or model accuracy.
+++=======
++ Job messages are kept in memory as a recent history: at most 2,000 entries
++ and 512 KiB of UTF-8 payload per job, with each callback entry capped at 8 KiB
++ including `... [message truncated]`. Embedded newlines remain one entry;
++ lone surrogates become `?`. The browser shows fixed omission/truncation notes,
++ starts with the latest 400 entries, and continues appending while open.
++ This does not bound browser history or total process memory, and creates no
++ persistent callback log. Retry appends to the same history.
++ 
++ `GET /api/jobs/<id>/log?from=N&epoch=E` returns absolute `from`/`len` cursors,
++ `lines`, `base`, `epoch`, `reset`, `dropped` and `truncated` in one snapshot.
++ `len` counts all accepted entries, including evicted entries. An epoch change,
++ stale cursor or future cursor replays retained history with `reset` set to
++ `epoch`, `stale` or `future` respectively; an in-range request returns its
++ suffix with `reset: null`. For example, with retained interval `[100,103)`,
++ `from=20` returns `from=100,len=103,reset="stale"` and three entries. Send the
++ accepted epoch on later polls to detect replacement even when the new history
++ has grown past the old cursor. Numeric-only callers cannot detect every such
++ replacement; older browsers must reload to use the updated reset handling.
++ Malformed cursors return 400; `from` and `epoch` queries are limited to 64 and
++ 128 characters. Job metadata keeps its latest 30 entries and absolute
++ `log_len`, adding coherent `log_epoch`, `log_base`, `log_retained`, `log_bytes`,
++ `log_dropped` and `log_truncated` fields.
+++>>>>>>> 2c7f253 (Bound retained job messages and make polling cursors coherent)
+diff --cc openscrub_internal/__init__.py
+index 2ce7841,364c69f..0000000
+--- a/openscrub_internal/__init__.py
++++ b/openscrub_internal/__init__.py
+@@@ -1,1 -1,1 +1,5 @@@
+++<<<<<<< HEAD
+ +"""Private implementation helpers for OpenScrub's runtime entry points."""
+++=======
++ """Private implementation helpers for OpenScrub."""
+++>>>>>>> 2c7f253 (Bound retained job messages and make polling cursors coherent)
+diff --cc openscrub_web.py
+index 5785fea,0514886..0000000
+--- a/openscrub_web.py
++++ b/openscrub_web.py
+@@@ -40,12 -36,11 +40,16 @@@ import tim
+  import uuid
+  
+  import cv2
+ -from flask import (Flask, Response, abort, jsonify, redirect, request,
+ -                   send_file)
+ +from flask import (Flask, Response, abort, jsonify, redirect, request, g,
+ +                   send_file, has_request_context)
+  
+  import openscrub
+++<<<<<<< HEAD
+ +from openscrub_internal.reports import atomic_report
+ +from openscrub_internal.lifetimes import FileOwners, OwnedIterable
+++=======
++ from openscrub_internal.job_logs import JobLog
+++>>>>>>> 2c7f253 (Bound retained job messages and make polling cursors coherent)
+  import zones_ui
+  
+  
+@@@ -503,10 -331,9 +507,10 @@@ def _new_job(video_path, options, name)
+          "id": jid, "dir": jdir, "video": video_path, "name": name,
+          "options": options, "phase": "queued", "progress": 0.0,
+          "eta": None, "size": 0,
+-         "log": [], "error": None, "output": None, "created": time.time(),
++         "log": JobLog(), "error": None, "output": None, "created": time.time(),
+          "cancel": threading.Event(), "stats": {}, "qgen": 0,
+      }
+ +    FILES.initialize(job)
+      # keep the job's settings beside its upload: a scan that never finished
+      # has no report to recover them from, and a Retry after a restart then
+      # ran with DEFAULT settings (all categories) instead of the user's own
+@@@ -524,15 -348,8 +528,19 @@@
+      return job
+  
+  
+ +def export_filenames(job) -> tuple[str, str]:
+ +    """Share picker suggestions and attachment names, using the real container."""
+ +    stem = os.path.splitext(job["name"])[0]
+ +    ext = os.path.splitext(job.get("output") or "")[1] or ".mp4"
+ +    return stem + "_redacted" + ext, stem + "_audit.json"
+ +
+ +
+  def job_public(job):
+++<<<<<<< HEAD
+ +    video_name, report_name = export_filenames(job)
+++=======
++     logs = job["log"].snapshot(tail=30)
+++>>>>>>> 2c7f253 (Bound retained job messages and make polling cursors coherent)
+      return {k: job[k] for k in ("id", "name", "phase", "progress", "error",
+                                  "stats")} | {
+          "eta": job.get("eta"),      # .get(): jobs rehydrated from disk lack it
+@@@ -540,11 -357,15 +548,17 @@@
+          # is ALREADY on the server (issue #16 — each retry re-uploaded the
+          # same 18 GB until the disk filled)
+          "size": job.get("size") or 0,
+-         "log_tail": job["log"][-30:],
+-         "log_len": len(job["log"]),
++         "log_tail": logs["lines"],
++         "log_len": logs["len"],
++         "log_epoch": logs["epoch"],
++         "log_base": logs["base"],
++         "log_retained": logs["retained"],
++         "log_bytes": logs["bytes"],
++         "log_dropped": logs["dropped"],
++         "log_truncated": logs["truncated"],
+          "has_output": bool(job["output"] and os.path.exists(job["output"])),
+ +        "download_name": video_name,
+ +        "report_name": report_name,
+      }
+  
+  
+@@@ -1019,53 -679,19 +1033,59 @@@ def worker()
+              WORK_Q.task_done()
+  
+  
+ -def _run_job(job, action):
+ +def _run_job(job, action, owner=None):
+ +    if owner is None:
+ +        owner = _prepare_work(job, action)
+ +        try:
+ +            with FILES.initialize(job).report_lock:
+ +                _begin_operation(job, owner)
+ +            return _run_job(job, action, owner)
+ +        finally:
+ +            _finish_operation(job, owner)
+      jid = job["id"]
+ -    cb = WebCallbacks(job)
+ +    files = FILES.initialize(job)
+ +    with files.report_lock:
+ +        if owner.operation is None:  # compatibility with old queue entries
+ +            _begin_operation(job, owner)
+ +        if not _operation_valid(job, owner):
+ +            return
+ +        job["phase"] = "scanning" if action == "scan" else "rendering"
+ +    cb = WebCallbacks(job, owner.operation)
+ +    def publish_report(path, doc):
+ +        with files.report_lock:
+ +            if not _operation_valid(job, owner) or owner.operation.is_set():
+ +                raise openscrub.PipelineCancelled()
+ +            atomic_report(path, doc)
+ +    cb.publish_report = publish_report
+ +    source = owner.source if owner is not None else job["video"]
+      try:
+          if action == "scan":
+ -            job["phase"] = "scanning"
+              job["log"].append("— scan started —")
+ -            args = build_args(job)
+ +            args = build_args(dict(job, video=source))
+              state = openscrub.run_scan(args, cb)
+              openscrub.write_report(os.path.join(job["dir"], "report.json"),
+++<<<<<<< HEAD
+ +                                  args, state, publisher=cb.publish_report)
+ +            with files.report_lock:
+ +                if not _operation_valid(job, owner):
+ +                    return
+ +                job["stats"] = state["stats"]
+ +            try:
+ +                prov = _load_job_report(job).get("provenance", {})
+ +                if (prov.get("vfr_normalized")
+ +                        and os.path.exists(prov.get("input", ""))):
+ +                    _update_job_source(job, prov["input"], owner)
+ +                    job["log"].append(
+ +                        "using CFR-normalized file for previews/thumbnails")
+ +            except Exception:
+ +                pass
+ +            thumbnail_owner = _own_files(job, work=True)
+ +            def _pregen(jb=job, video=thumbnail_owner.source):
+++=======
++                                   args, state)
++             job["stats"] = state["stats"]
++             def _pregen(jb=job):
+++>>>>>>> 2c7f253 (Bound retained job messages and make polling cursors coherent)
+                  """One pass through the video with a single decoder:
+                  thumbnails come out in seconds instead of minutes.
+                  Sorting by reference time keeps seeks short and forward-

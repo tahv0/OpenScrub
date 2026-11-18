@@ -1,0 +1,75 @@
+commit 20d9f290c9ae6995a9a4928bb1b21e1004222026
+Author:     Tuomas Aho <tuomas.aho@outlook.com>
+AuthorDate: Wed Nov 18 01:33:45 2026 +0200
+Commit:     Tuomas Aho <tuomas.aho@outlook.com>
+CommitDate: Wed Nov 18 01:33:45 2026 +0200
+
+    test: retain composed log shell and admitted tracking fixture state
+
+diff --git a/tests/test_job_filename_display.py b/tests/test_job_filename_display.py
+index 6fd06cd..d9f80f1 100644
+--- a/tests/test_job_filename_display.py
++++ b/tests/test_job_filename_display.py
+@@ -39,8 +39,7 @@ def emitted_fragments(jobs):
+         pytest.skip("Node is needed to evaluate emitted job UI JavaScript")
+     # The real emitted functions, including any local name boundary, run
+     # with only their HTTP and output sinks supplied by this harness.
+-    script = 'let JOBSJSON="";\n' + web.APP_JS.split("// Job names are text", 1)[1].split("async function retryJob", 1)[0]
+-    script = script.replace(" inside the list link and detail heading.\n", "", 1)
++    script = 'let JOBSJSON="";\nfunction jobNameHtml(name)' + web.APP_JS.split("function jobNameHtml(name)", 1)[1].split("async function retryJob", 1)[0]
+     script += "function shellHtml(j)" + web.APP_JS.split("function shellHtml(j)", 1)[1].split(
+         "// Save As exports", 1)[0]
+     script += """
+@@ -69,9 +68,10 @@ def test_emitted_job_list_and_title_preserve_literal_name(name, surface):
+     assert [tag for tag, _ in listing.tags] == ["div", "a", "span", "span", "a"]
+     assert listing.tags[1][1] == {
+         "href": "#", "onclick": "openJob('a123456789ab');return false"}
++    assert any(attrs.get("id") == "logStatus" for _, attrs in title.tags)
+     assert [tag for tag, _ in title.tags] == [
+         "div", "h2", "span", "small", "progress", "div", "div", "img",
+-        "div", "div", "div"]
++        "div", "div", "div", "div"]
+     assert title.tags[0][1]["id"] == "jobcard"
+     assert title.tags[2][1]["id"] == "ph"
+ 
+diff --git a/tests/test_job_logs.py b/tests/test_job_logs.py
+index 251d4f1..c3638cb 100644
+--- a/tests/test_job_logs.py
++++ b/tests/test_job_logs.py
+@@ -211,6 +211,9 @@ def test_thumbnail_and_tracking_callbacks_stay_with_their_job(monkeypatch, tmp_p
+     monkeypatch.setattr(web, 'JOBS', {})
+     monkeypatch.setattr(web, 'JOBS_DIR', str(tmp_path))
+     old = web.new_job('', {}, 'old')
++    source = Path(old['dir']) / 'input.mp4'
++    source.write_bytes(b'controlled decoder input')
++    old['video'] = str(source)
+     deferred = []
+     class DeferredThread:
+         def __init__(self, target, **kwargs):
+@@ -220,7 +223,12 @@ def test_thumbnail_and_tracking_callbacks_stay_with_their_job(monkeypatch, tmp_p
+     monkeypatch.setattr(web.threading, 'Thread', DeferredThread)
+     monkeypatch.setattr(web, 'build_args', lambda *_: object())
+     monkeypatch.setattr(web.openscrub, 'run_scan', lambda *_: {'stats': {}})
+-    monkeypatch.setattr(web.openscrub, 'write_report', lambda *_, **kwargs: None)
++    published = []
++    def write_report(path, args, state, *, publisher):
++        assert callable(publisher)
++        publisher(path, {'render_state': {'fps': 1, 'cum': [[0, 0]]}, 'detections': []})
++        published.append(Path(path).is_file())
++    monkeypatch.setattr(web.openscrub, 'write_report', write_report)
+     monkeypatch.setattr(web, '_load_job_report', lambda *_: {'render_state': {'fps': 1, 'cum': [[0, 0]]}, 'detections': []})
+     class Capture:
+         def release(self):
+@@ -233,9 +241,11 @@ def test_thumbnail_and_tracking_callbacks_stay_with_their_job(monkeypatch, tmp_p
+     selected = old['video']
+     old['video'] = 'late source must not replace lease'
+     deferred.pop(0)()
+-    assert sources == [selected or None]
++    assert sources == [str(source.resolve())]
++    assert published == [True]
+     assert any('thumbnails pre-generated' in s for s in old['log'].snapshot()['lines'])
+     assert replacement['log'].snapshot()['lines'] == []
++    replacement['phase'] = 'review'
+     # Actual manual-tracking route creates its ordinary engine callback.
+     def detector(cb, **kwargs):
+         cb.log('tracking detector')

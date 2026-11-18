@@ -1,0 +1,20 @@
+{
+  "head": "00480c7e42ddb329f4dde9599c256555f2dabcf0",
+  "branch": "integration/upstream-focused-browser",
+  "base": "117e41ac5ee857a6b367caf6ccbd479d78989ff2",
+  "core_ref": "117e41ac5ee857a6b367caf6ccbd479d78989ff2",
+  "status": "",
+  "diff_check": 0,
+  "helper": {
+    "verification_hook.py": "4b25e217fcf8fc2ada1147a9c26ff5cdb51884809328854d4dafd3b36fb8e5a0",
+    "sitecustomize.py": "035c1187d46c85ce2c3f3c092822d8171c3b67e99a7270717a12169b2c3be302",
+    "verify.py": "354cf49b0c83d11f3945137fbdffc3ac6b2793f1217ac39a9b62270097940067"
+  },
+  "final_runtime": {
+    "openscrub.py": "a959248b4591abb819ae017d3bb5626e51af18aafbc9b48f9af1053f72852ec0",
+    "openscrub_web.py": "ce05392a115b7cfed11821f51b406cca7e4c5cff118d5876586ad43047897d17",
+    "openscrub_internal/job_logs.py": "63d08c124db019b120bb17efc64706d910f1d831f8ccfd9c1ba124368643d1b8"
+  },
+  "runtime_change_after_floor": "diff --git a/openscrub_web.py b/openscrub_web.py\nindex 5855f4d..736adff 100644\n--- a/openscrub_web.py\n+++ b/openscrub_web.py\n@@ -3310,7 +3310,7 @@ async function refreshCycle(cycle){\n     sharing. This tool is best-effort, not a compliance guarantee.</div>\n     <div id=\"compare\" style=\"width:100%\"></div>\n     <div id=\"beslot_done\" style=\"width:100%\"></div>`;\n-  document.getElementById(\"actions\").innerHTML=a;\n+  const actions=document.getElementById(\"actions\");beUnmountIn(actions);actions.innerHTML=a;\n   if(j.phase!=\"scanning\")img.style.display=\"none\";\n  }\n  renderExportProgress();\n",
+  "runtime_unchanged_after_a4649a2": true
+}

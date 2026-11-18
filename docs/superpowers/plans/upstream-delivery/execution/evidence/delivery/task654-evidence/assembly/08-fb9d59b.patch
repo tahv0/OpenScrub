@@ -1,0 +1,54 @@
+commit fb9d59bfb475be0fda80bc10e590bda9b4da3b1e
+Author:     Tuomas Aho <tuomas.aho@outlook.com>
+AuthorDate: Wed Nov 18 01:23:39 2026 +0200
+Commit:     Tuomas Aho <tuomas.aho@outlook.com>
+CommitDate: Wed Nov 18 01:23:39 2026 +0200
+
+    test: bind composed lifecycle fixtures and editor teardown regressions
+
+diff --git a/tests/test_browser_composition.py b/tests/test_browser_composition.py
+new file mode 100644
+index 0000000..14ad5fc
+--- /dev/null
++++ b/tests/test_browser_composition.py
+@@ -0,0 +1,27 @@
++"""Combined editor/review ownership at actual retaining/removal boundaries."""
++from test_review_save_failures import run_js
++
++
++def test_retaining_panel_keeps_editor_owner_and_gesture():
++    run_js("""setup();
++    const cv=document.createElement('canvas');elements.set('beCv',cv);
++    const slot=elements.get('beslot');slot.contains=node=>node===cv;
++    let disconnected=0;
++    BE.drag={kind:'move'};const gesture=BE.drag;
++    BE_VIEW={cv,editor:BE,observer:{disconnect(){disconnected++}}};
++    const owner=BE_VIEW;
++    showPanel('boxedit_rev');
++    assert.equal(BE_VIEW,owner);assert.equal(BE.drag,gesture);assert.equal(disconnected,0);
++    """)
++
++
++def test_successful_render_removal_releases_editor_owner():
++    run_js("""setup();
++    const cv=document.createElement('canvas');elements.set('beCv',cv);
++    const review=elements.get('review');review.contains=node=>node===cv;
++    let disconnected=0;
++    BE.drag={kind:'move'};
++    BE_VIEW={cv,editor:BE,observer:{disconnect(){disconnected++}}};
++    const p=saveAndRender();await reply();await reply();await p;
++    assert.equal(BE_VIEW,null);assert.equal(BE.drag,null);assert.equal(disconnected,1);
++    """)
+diff --git a/tests/test_thumbnail_scheduling.py b/tests/test_thumbnail_scheduling.py
+index bae5271..873c6c0 100644
+--- a/tests/test_thumbnail_scheduling.py
++++ b/tests/test_thumbnail_scheduling.py
+@@ -17,7 +17,7 @@ from test_review_save_failures import HARNESS, app_js
+ LIFECYCLE_HARNESS = HARNESS.replace(
+     'const elements=new Map();', 'const elements=new Map(),windowEvents=new Map();'
+ ).replace('({elements,console,', '({elements,windowEvents,console,').replace(
+-    'window:{},',
++    'window:{addEventListener(){}},',
+     'window:{addEventListener:(name,fn)=>windowEvents.set(name,fn),'
+     'removeEventListener:(name,fn)=>{if(windowEvents.get(name)===fn)windowEvents.delete(name)}},'
+ )

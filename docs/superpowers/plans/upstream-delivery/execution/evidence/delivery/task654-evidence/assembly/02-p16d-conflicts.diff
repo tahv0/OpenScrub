@@ -1,0 +1,67 @@
+diff --cc openscrub_web.py
+index 66c7666,25e1b93..0000000
+--- a/openscrub_web.py
++++ b/openscrub_web.py
+@@@ -2870,7 -2144,7 +2870,11 @@@ async function delJob(id)
+    alert(m);return;
+   }
+   REVIEW_DRAFTS.delete(id);
+++<<<<<<< HEAD
+ + if(CUR===id){stopPolling();VIEW_GEN++;CUR=null;EDITS=null;AUTO_REVIEW=null;REVIEW_REQUEST=null;detail.innerHTML="";}
+++=======
++  if(CUR===id){beUnmount();VIEW_GEN++;CUR=null;EDITS=null;if(POLL)clearInterval(POLL);detail.innerHTML="";}
+++>>>>>>> 47e9f6d (fix(web): keep editor coordinates aligned on live resize)
+   JOBSJSON="";loadJobs();
+  }
+  async function openJob(id){
+@@@ -3522,22 -2693,15 +3589,25 @@@ function beShowTimes(b)
+   document.getElementById("beT0").value=b.t_start.toFixed(1);
+   document.getElementById("beT1").value=b.t_end.toFixed(1);
+  }
+ +function manualId(){
+ + const c=globalThis.crypto;
+ + if(c&&typeof c.randomUUID==="function")return c.randomUUID();
+ + if(!c||typeof c.getRandomValues!=="function")
+ +  throw Error("Secure random generation is unavailable. Use a browser with crypto support to add a box.");
+ + const b=c.getRandomValues(new Uint8Array(16));
+ + b[6]=(b[6]&15)|64;b[8]=(b[8]&63)|128;
+ + const h=Array.from(b,v=>v.toString(16).padStart(2,"0")).join("");
+ + return `${h.slice(0,8)}-${h.slice(8,12)}-${h.slice(12,16)}-${h.slice(16,20)}-${h.slice(20)}`;
+ +}
+  function beHook(){
+-  const cv=document.getElementById("beCv");
+-  const pt=e=>{const r=cv.getBoundingClientRect();
+-   return[(e.clientX-r.left)/BE.scale,(e.clientY-r.top)/BE.scale];};
++  const cv=document.getElementById("beCv"),view=BE_VIEW;
++  const pt=e=>{
++   const tr=view&&view.sync();if(!tr||BE.playing)return null;
++   const r=cv.getBoundingClientRect();
++   return[(e.clientX-r.left)/tr.sx,(e.clientY-r.top)/tr.sy];};
+   cv.addEventListener("pointerdown",e=>{
+-   const p=pt(e);cv.setPointerCapture(e.pointerId);
++   const p=pt(e);if(!p)return;
++   cv.setPointerCapture(e.pointerId);BE.pointerId=e.pointerId;
+    if(BE.trk){
+     // Track object: same two-click box draw as Add box, but on completion
+     // the region is template-tracked through the active timeline window
+diff --cc tests/test_review_save_failures.py
+index 27a527e,90a18e0..0000000
+--- a/tests/test_review_save_failures.py
++++ b/tests/test_review_save_failures.py
+@@@ -27,10 -27,11 +27,15 @@@ function el(){return {textContent:'',in
+   classList:{toggle(){},remove(){}},remove(){this.removed=true},
+   addEventListener(){},querySelector(){return null},insertAdjacentHTML(){}}}
+  for(const id of ['detail','beslot','review','reviewSaveStatus'])elements.set(id,el());
+++<<<<<<< HEAD
+ +const ctx=vm.createContext({elements,console,assert,Set,Map,JSON,Date,Math,Promise,crypto:require("node:crypto").webcrypto,
+++=======
++ const ctx=vm.createContext({elements,console,Set,Map,JSON,Date,Math,Promise,
++  ResizeObserver:class {observe(){} disconnect(){}},
+++>>>>>>> 47e9f6d (fix(web): keep editor coordinates aligned on live resize)
+   document:{getElementById:id=>elements.get(id)||null,querySelector:s=>elements.get(s.slice(1))||null,
+   querySelectorAll:()=>[],addEventListener(){},createElement:el},
+ - detail:elements.get('detail'),window:{},setInterval:()=>1,clearInterval(){},setTimeout(){},
+ + detail:elements.get('detail'),window:{addEventListener(){}},setInterval:()=>1,clearInterval(){},setTimeout(){},
+   confirm:()=>false,alert(){},fetch:async()=>({ok:true,json:async()=>({})})});
+  // Skip startup I/O only; every function under test is evaluated from the Python string.
+  vm.runInContext(SOURCE.slice(0,SOURCE.indexOf('loadPersist();loadCertInfo();loadJobs();setInterval(loadJobs,5000);')).replace(/^refreshModelPanel\(\);renderTiers\(\);$/m,''),ctx);

@@ -1,0 +1,41 @@
+diff --cc openscrub_web.py
+index 736adff,f950f23..0000000
+--- a/openscrub_web.py
++++ b/openscrub_web.py
+@@@ -44,9 -41,9 +44,10 @@@ from flask import (Flask, Response, abo
+                     send_file, has_request_context)
+  
+  import openscrub
+- from openscrub_internal.reports import atomic_report
++ from openscrub_internal.reports import atomic_report, _staged_report
++ from openscrub_internal.render_delivery import _DeliveryRecoveryError, _has_render_recovery
+  from openscrub_internal.lifetimes import FileOwners, OwnedIterable
+ +from openscrub_internal.job_logs import JobLog
+  import zones_ui
+  
+  
+@@@ -542,17 -530,10 +543,24 @@@ def job_public(job)
+          # is ALREADY on the server (issue #16 — each retry re-uploaded the
+          # same 18 GB until the disk filled)
+          "size": job.get("size") or 0,
+++<<<<<<< HEAD
+ +        "log_tail": logs["lines"],
+ +        "log_len": logs["len"],
+ +        "log_epoch": logs["epoch"],
+ +        "log_base": logs["base"],
+ +        "log_retained": logs["retained"],
+ +        "log_bytes": logs["bytes"],
+ +        "log_dropped": logs["dropped"],
+ +        "log_truncated": logs["truncated"],
+ +        "has_output": bool(job["output"] and os.path.exists(job["output"])),
+ +        "download_name": video_name,
+ +        "report_name": report_name,
+++=======
++         "log_tail": job["log"][-30:],
++         "log_len": len(job["log"]),
++         "has_output": bool(not FILES.initialize(job).recovery_required and job["output"] and os.path.exists(job["output"])),
++         "recovery_required": FILES.initialize(job).recovery_required,
+++>>>>>>> 6dfcfb1 (Publish render pair and web success under one operation boundary)
+      }
+  
+  

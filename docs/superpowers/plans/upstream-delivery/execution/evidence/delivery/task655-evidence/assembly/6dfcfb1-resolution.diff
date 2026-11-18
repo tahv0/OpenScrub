@@ -1,0 +1,68 @@
+diff --cc openscrub_web.py
+index 736adff,f950f23..0000000
+--- a/openscrub_web.py
++++ b/openscrub_web.py
+@@@ -44,9 -41,9 +44,10 @@@ from flask import (Flask, Response, abo
+                     send_file, has_request_context)
+  
+  import openscrub
+- from openscrub_internal.reports import atomic_report
++ from openscrub_internal.reports import atomic_report, _staged_report
++ from openscrub_internal.render_delivery import _DeliveryRecoveryError, _has_render_recovery
+  from openscrub_internal.lifetimes import FileOwners, OwnedIterable
+ +from openscrub_internal.job_logs import JobLog
+  import zones_ui
+  
+  
+@@@ -542,17 -530,10 +543,18 @@@ def job_public(job)
+          # is ALREADY on the server (issue #16 — each retry re-uploaded the
+          # same 18 GB until the disk filled)
+          "size": job.get("size") or 0,
+ -        "log_tail": job["log"][-30:],
+ -        "log_len": len(job["log"]),
+ +        "log_tail": logs["lines"],
+ +        "log_len": logs["len"],
+ +        "log_epoch": logs["epoch"],
+ +        "log_base": logs["base"],
+ +        "log_retained": logs["retained"],
+ +        "log_bytes": logs["bytes"],
+ +        "log_dropped": logs["dropped"],
+ +        "log_truncated": logs["truncated"],
+-         "has_output": bool(job["output"] and os.path.exists(job["output"])),
++         "has_output": bool(not FILES.initialize(job).recovery_required and job["output"] and os.path.exists(job["output"])),
++         "recovery_required": FILES.initialize(job).recovery_required,
+ +        "download_name": video_name,
+ +        "report_name": report_name,
+      }
+  
+  
+@@@ -5371,6 -4550,28 +5424,28 @@@ def _rehydrate_jobs()
+              continue
+          if jid in JOBS:
+              continue
++         if _has_render_recovery(jdir):
++             # Do not follow descriptor paths or infer validity from final names.
++             up = next((os.path.join(jdir, "input" + e) for e in sorted(MEDIA_EXTS)
++                        if os.path.isfile(os.path.join(jdir, "input" + e))), None)
++             opts = {}
++             try:
++                 with open(os.path.join(jdir, OPTIONS_FILE), encoding="utf-8") as f:
++                     opts = json.load(f)
++                 if not isinstance(opts, dict):
++                     opts = {}
++             except (OSError, ValueError):
++                 pass
++             job = dict(id=jid, dir=jdir, video=up, name=os.path.basename(up) if up else jid,
++                        options=opts, phase="error", progress=0.0, size=0,
+ -                       log=["render delivery requires recovery"],
+++                       log=JobLog(["render delivery requires recovery"]),
++                        error="render delivery requires recovery", output=None,
++                        created=os.path.getmtime(jdir), cancel=threading.Event(), stats={})
++             FILES.initialize(job).recovery_required = True
++             with JOBS_LOCK:
++                 JOBS[jid] = job
++             n += 1
++             continue
+          if not os.path.exists(rep):
+              # NO report: the scan never completed (crashed or the server
+              # went down mid-scan). If the dir still holds an uploaded

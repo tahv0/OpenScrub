@@ -1,0 +1,40 @@
+{
+  "head": "c205ef5379778f63313b519411a2d5e37d07cba5",
+  "browser_assignments_Task654_equal": {
+    "PAGE": true,
+    "APP_JS": true
+  },
+  "public_private_signatures_P_equal": {
+    "render": true,
+    "render_hdr": true,
+    "run_render": true,
+    "write_report": true,
+    "_render_into": true,
+    "_render_hdr_into": true
+  },
+  "native_finally_R_P_equal": {
+    "_render_into": true,
+    "_render_hdr_into": true
+  },
+  "C01_mask_bodies_equal_without_G_entry_guards": {
+    "blur_region": true,
+    "blur_silhouette": true,
+    "_blur_yuv10": true,
+    "_blur_silhouette_yuv10": true
+  },
+  "runtime_unchanged_after_fixture": {
+    "openscrub.py": true,
+    "openscrub_internal/__init__.py": true,
+    "openscrub_internal/lifetimes.py": true,
+    "openscrub_internal/opencv_compat.py": true,
+    "openscrub_internal/reports.py": true,
+    "openscrub_setup.py": true,
+    "openscrub_update.py": true,
+    "openscrub_vault.py": true,
+    "openscrub_web.py": true,
+    "zones_ui.py": true,
+    "openscrub_internal/job_logs.py": true,
+    "openscrub_internal/render_delivery.py": true
+  },
+  "no_alternate_aliases": true
+}

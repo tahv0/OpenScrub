@@ -1,0 +1,185 @@
+commit e25c3f57fefdd99a653eda1dfa77a94f80d92b57
+Author:     Tuomas Aho <tuomas.aho@outlook.com>
+AuthorDate: Tue Nov 17 13:27:56 2026 +0200
+Commit:     Tuomas Aho <tuomas.aho@outlook.com>
+CommitDate: Wed Nov 18 01:20:30 2026 +0200
+
+    fix: preserve literal filenames in job list and title
+    
+    (cherry picked from commit f399ebe1bd3c17561b44c06f7169a61e21becb43)
+
+diff --git a/CONTRIBUTING.md b/CONTRIBUTING.md
+index 380d603..4be6237 100644
+--- a/CONTRIBUTING.md
++++ b/CONTRIBUTING.md
+@@ -38,6 +38,8 @@ suite. Save As behavior tests execute the real embedded JavaScript with Node.js
+ The HDR chroma encoder-input regressions also use synthetic FFmpeg/libx265 media.
+ 
+ 
++The literal job-name display regressions evaluate emitted JavaScript with Node.js.
++
+ For web UI changes, also boot `python openscrub_web.py` and click through
+ what you touched — and note the PAGE string is a normal (non-raw) Python
+ string, so backslashes in embedded JS need doubling. For engine changes,
+diff --git a/openscrub_web.py b/openscrub_web.py
+index 30aca96..66c7666 100644
+--- a/openscrub_web.py
++++ b/openscrub_web.py
+@@ -2835,6 +2835,11 @@ function hasReviewEdits(d){
+   !sameEdit(b.audio,b.audioSaved);
+ }
+ 
++// Job names are text inside the list link and detail heading.
++function jobNameHtml(name){
++ return String(name).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
++}
++
+ async function loadJobs(){
+  const r=await fetch("api/jobs");
+  if(r.status===423){jobs.innerHTML='<span style="color:#f87171">&#128274; locked — unlock in the Encryption panel below</span>';JOBSJSON="";return;}
+@@ -2844,7 +2849,7 @@ async function loadJobs(){
+  JOBSJSON=s;
+  jobs.innerHTML=js.length?js.map(j=>
+   `<div class="row" style="justify-content:space-between;padding:4px 0">
+-   <a href="#" onclick="openJob('${j.id}');return false">${j.name}</a>
++   <a href="#" onclick="openJob('${j.id}');return false">${jobNameHtml(j.name)}</a>
+    <span style="display:flex;gap:10px;align-items:center"><span class="badge">${j.phase}</span>
+    ${(j.phase=="error"||j.phase=="cancelled")?`<a href="#" title="Retry the scan — reuses the file already on the server, nothing is re-uploaded" style="text-decoration:none;font-size:15px" onclick="retryJob('${j.id}');return false">&#8635;</a>`:""}
+    <a href="#" title="Delete this job and all of its files" style="text-decoration:none;font-size:15px" onclick="delJob('${j.id}');return false">&#128465;&#65039;</a></span></div>`).join(""):"none yet";
+@@ -2892,7 +2897,7 @@ async function openJob(id){
+ }
+ 
+ function shellHtml(j){
+- return `<div class="card" id="jobcard"><h2>${j.name}
++ return `<div class="card" id="jobcard"><h2>${jobNameHtml(j.name)}
+   <span class="badge" id="ph"></span><small id="eta"></small></h2>
+  <progress id="prog" value="0" max="1"></progress>
+  <div class="row" id="actions" style="margin-top:8px"></div>
+diff --git a/tests/test_job_filename_display.py b/tests/test_job_filename_display.py
+new file mode 100644
+index 0000000..4376585
+--- /dev/null
++++ b/tests/test_job_filename_display.py
+@@ -0,0 +1,122 @@
++"""Literal accepted filenames at the ordinary job-list/title boundary.
++
++Node evaluates the emitted JavaScript; HTMLParser checks the resulting HTML.
++Only harmless text fixtures are used. Browser QA separately exercises the DOM.
++"""
++import io
++import json
++import shutil
++import subprocess
++from html.parser import HTMLParser
++
++import pytest
++import openscrub_web as web
++
++NAMES = [
++    "Family &amp; friends — café.mp4",
++    "Friends' \"summer\" & snow ☃.MOV",
++    "Literal &#38; and &quot; notes.mp4",
++]
++
++
++class Fragment(HTMLParser):
++    def __init__(self, html):
++        super().__init__(convert_charrefs=True)
++        self.tags = []
++        self.text = []
++        self.feed(html)
++
++    def handle_starttag(self, tag, attrs):
++        self.tags.append((tag, dict(attrs)))
++
++    def handle_data(self, data):
++        self.text.append(data)
++
++
++def emitted_fragments(jobs):
++    node = shutil.which("node")
++    if node is None:
++        pytest.skip("Node is needed to evaluate emitted job UI JavaScript")
++    # The real emitted functions, including any local name boundary, run
++    # with only their HTTP and output sinks supplied by this harness.
++    script = web.APP_JS.split("let CUR=null", 1)[1]
++    script = "let CUR=null" + script.split("async function retryJob", 1)[0]
++    script += "function shellHtml(j)" + web.APP_JS.split("function shellHtml(j)", 1)[1].split(
++        "async function refresh", 1)[0]
++    script += """
++const data=JSON.parse(process.argv[1]);
++const jobs={innerHTML:''};
++const fetch=async()=>({status:200,json:async()=>data});
++(async()=>{await loadJobs();console.log(JSON.stringify({
++ list:jobs.innerHTML,titles:data.map(shellHtml)}));})();
++"""
++    result = subprocess.run([node, "-e", script, json.dumps(jobs)],
++                            check=True, text=True, capture_output=True)
++    return json.loads(result.stdout)
++
++
++@pytest.mark.parametrize("name", NAMES)
++@pytest.mark.parametrize("surface", ["list", "title"])
++def test_emitted_job_list_and_title_preserve_literal_name(name, surface):
++    result = emitted_fragments([{"id": "a123456789ab", "name": name,
++                                "phase": "queued"}])
++    listing = Fragment(result["list"])
++    title = Fragment(result["titles"][0])
++    if surface == "list":
++        assert listing.text[1] == name
++    else:
++        assert "".join(title.text).split("\n", 1)[0] == name
++    assert [tag for tag, _ in listing.tags] == ["div", "a", "span", "span", "a"]
++    assert listing.tags[1][1] == {
++        "href": "#", "onclick": "openJob('a123456789ab');return false"}
++    assert [tag for tag, _ in title.tags] == [
++        "div", "h2", "span", "small", "progress", "div", "div", "img",
++        "div", "div", "div"]
++    assert title.tags[0][1]["id"] == "jobcard"
++    assert title.tags[2][1]["id"] == "ph"
++
++
++@pytest.mark.parametrize("intake", ["upload", "server"])
++def test_intake_keeps_accepted_name_and_ordinary_downloads(intake, monkeypatch, tmp_path):
++    # Catch changes to accepted basenames/metadata/download naming while
++    # keeping the worker out of this route-only ownership test.
++    monkeypatch.setattr(web, "JOBS_DIR", str(tmp_path / "jobs"))
++    monkeypatch.setattr(web, "JOBS", {})
++    queued = []
++    monkeypatch.setattr(web, "enqueue", lambda job, mode: queued.append((job["id"], mode)))
++    monkeypatch.setenv("OPENSCRUB_MEDIA_ROOT", str(tmp_path))
++    client = web.app.test_client()
++    name = NAMES[0]
++    submitted = "folder/" + name if intake == "upload" else str(tmp_path / name)
++    if intake == "upload":
++        data = {"video": (io.BytesIO(b"synthetic input"), submitted), "options": "{}"}
++    else:
++        (tmp_path / name).write_bytes(b"synthetic input")
++        data = {"server_path": submitted, "options": "{}"}
++    response = client.post("/api/jobs", data=data)
++    assert response.status_code == 200
++    jid, = response.get_json()["jobs"]
++    assert queued == [(jid, "scan")]
++    job = web.JOBS[jid]
++    assert job["name"] == name
++    assert client.get("/api/jobs").get_json()[0]["name"] == name
++    assert client.get("/api/jobs/" + jid).get_json()["name"] == name
++    assert json.loads((tmp_path / "jobs" / jid / "options.json").read_text()) == {}
++    if intake == "upload":
++        assert job["video"] == str(tmp_path / "jobs" / jid / "input.mp4")
++    else:
++        assert job["video"] == submitted
++    output = tmp_path / "jobs" / jid / "result.mkv"
++    output.write_bytes(b"synthetic output")
++    job["output"] = str(output)
++    (output.parent / "report.json").write_bytes(b'{}')
++    from urllib.parse import unquote
++    for route, wanted, body in [
++        ("download", "Family &amp; friends — café_redacted.mkv", b"synthetic output"),
++        ("report", "Family &amp; friends — café_audit.json", b'{}'),
++    ]:
++        response = client.get("/api/jobs/" + jid + "/" + route)
++        assert response.status_code == 200 and response.data == body
++        disposition = response.headers["Content-Disposition"]
++        assert unquote(disposition.split("filename*=UTF-8''", 1)[1]) == wanted
++        response.close()
