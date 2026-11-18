@@ -1689,6 +1689,12 @@ def _exact_snapshot(job):
                     or files.active is not None or _file_stamp(os.stat(path)) != report_stamp
                     or files.source_status == 'pending'):
                 raise exact.ExactError('source/report selection changed', 409, 'sample_conflict')
+            if recovery is not None and (
+                    files.source_pair != recovery or recovery[0] is not files.operation
+                    or recovery[0].is_set() or recovery[1] != files.committed_report_epoch
+                    or recovery[3] != report_stamp
+                    or prepared['path'] != os.path.realpath(recovery[2])):
+                raise exact.ExactError('scan recovery authority changed', 409, 'sample_conflict')
             selected = _select_observed_locked(job, prepared, authoritative=recovery is not None)
             if recovery:
                 job['video'] = selected['path']
@@ -1731,6 +1737,7 @@ def _exact_current_locked(job, selected, fence=None):
             files.source_status, files.source_reason = 'unavailable', 'observed source changed; rescan required'
             raise exact.ExactError(files.source_reason, 409, 'sample_conflict')
         if fence is not None and ((files.committed_report_epoch, files.operation) != fence[0]
+                or (fence[0][1] is not None and fence[0][1].is_set())
                 or _file_stamp(os.stat(os.path.join(job['dir'], 'report.json'))) != fence[1]):
             raise exact.ExactError('report publication overlapped sample', 409, 'sample_conflict')
     except FileNotFoundError:
@@ -1758,7 +1765,12 @@ def job_edit_sample(jid):
         fps, cum, timeline_eq, tolerance = _exact_policy(doc, selected)
         index = exact.resolve_time(requested, fps, len(cum))
         facts = selected['facts']
-        with open(selected['path'], 'rb') as opened:
+        try:
+            opened_source = open(selected['path'], 'rb')
+        except FileNotFoundError:
+            raise exact.ExactError('selected source disappeared before decode',
+                                   409, 'sample_conflict') from None
+        with opened_source as opened:
             if _file_stamp(os.fstat(opened.fileno())) != selected['stamp']:
                 raise exact.ExactError('opened source changed', 409, 'sample_conflict')
             cap = cv2.VideoCapture(selected['path'])
