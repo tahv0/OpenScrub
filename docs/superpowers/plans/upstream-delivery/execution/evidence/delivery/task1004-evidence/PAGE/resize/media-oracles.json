@@ -1,0 +1,65 @@
+{
+  "cfr24": {
+    "input": {
+      "path": "/tmp/openscrub-frame-identity-baseline-20261117/runtime/cfr24.mp4",
+      "sha256": "3255faa79d819ad763cd1cc95c9d0f9aa5e49ade85019197220f6e5913f62c7c"
+    },
+    "index": 4,
+    "pts": "1/6",
+    "canonical": 0.16666666666666666,
+    "marker": 4,
+    "shape": [
+      180,
+      320,
+      3
+    ],
+    "source_box": [
+      28,
+      26,
+      88,
+      66
+    ]
+  },
+  "cfr5": {
+    "input": {
+      "path": "/tmp/openscrub-frame-identity-baseline-20261117/runtime/cfr5.mp4",
+      "sha256": "ecc7cdc66751506e713c4dfce38fb096f5c1c0fcc8fbd73e8d5375cc94fe6bba"
+    },
+    "index": 9,
+    "pts": "9/5",
+    "canonical": 1.8,
+    "marker": 9,
+    "shape": [
+      180,
+      320,
+      3
+    ],
+    "source_box": [
+      38,
+      21,
+      98,
+      61
+    ]
+  },
+  "normalized": {
+    "input": {
+      "path": "/tmp/openscrub-frame-identity-baseline-20261117/runtime/vfr.cfr.mp4",
+      "sha256": "591cf2b749f17e12f7ae9d78d91dbf699ae5ebe28e3b89f085390dd631cb33f7"
+    },
+    "index": 6,
+    "pts": "6/13",
+    "canonical": 0.46153846153846156,
+    "marker": 5,
+    "shape": [
+      180,
+      320,
+      3
+    ],
+    "source_box": [
+      32,
+      24,
+      92,
+      64
+    ]
+  }
+}

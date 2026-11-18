@@ -1,0 +1,11 @@
+{
+  "branch": "pr/exact-editor-ui",
+  "base": "07cfaa9539a2561c26b6f7280fae6702eb07137c",
+  "head": "dcaa0e5af6aedfca8685a3e64bea86ad0262f5c2",
+  "files": 136,
+  "runtime_modules": 10,
+  "backend_ast_except_APP_JS_unchanged": true,
+  "APP_CSS_unchanged": true,
+  "APP_JS": "6eb555d4edf6500ca8f697b566f5b898e84925a8a246dd52b0c5e2233ff7ee57",
+  "APP_CSS": "6c324da4b20e83eb740a31150ec8d166c326c49fd8914bec09e4abe2f79b3220"
+}

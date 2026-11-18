@@ -1,0 +1,819 @@
+{
+  "job": "cfr24",
+  "actual": {
+    "provenance": {
+      "input": "/tmp/openscrub-frame-identity-baseline-20261117/runtime/cfr24.mp4",
+      "vfr_normalized": false,
+      "settings": {
+        "pad": 0,
+        "mode": "box"
+      }
+    },
+    "render_state": {
+      "fps": 24,
+      "cum": [
+        [
+          0,
+          0
+        ],
+        [
+          2,
+          -1
+        ],
+        [
+          4,
+          -2
+        ],
+        [
+          6,
+          -3
+        ],
+        [
+          8,
+          -4
+        ],
+        [
+          10,
+          -5
+        ],
+        [
+          12,
+          -6
+        ],
+        [
+          14,
+          -7
+        ],
+        [
+          16,
+          -8
+        ],
+        [
+          18,
+          -9
+        ],
+        [
+          20,
+          -10
+        ],
+        [
+          22,
+          -11
+        ],
+        [
+          24,
+          -12
+        ],
+        [
+          26,
+          -13
+        ],
+        [
+          28,
+          -14
+        ],
+        [
+          30,
+          -15
+        ],
+        [
+          32,
+          -16
+        ],
+        [
+          34,
+          -17
+        ],
+        [
+          36,
+          -18
+        ],
+        [
+          38,
+          -19
+        ],
+        [
+          40,
+          -20
+        ],
+        [
+          42,
+          -21
+        ],
+        [
+          44,
+          -22
+        ],
+        [
+          46,
+          -23
+        ],
+        [
+          48,
+          -24
+        ],
+        [
+          50,
+          -25
+        ],
+        [
+          52,
+          -26
+        ],
+        [
+          54,
+          -27
+        ],
+        [
+          56,
+          -28
+        ],
+        [
+          58,
+          -29
+        ],
+        [
+          60,
+          -30
+        ],
+        [
+          62,
+          -31
+        ],
+        [
+          64,
+          -32
+        ],
+        [
+          66,
+          -33
+        ],
+        [
+          68,
+          -34
+        ],
+        [
+          70,
+          -35
+        ],
+        [
+          72,
+          -36
+        ],
+        [
+          74,
+          -37
+        ],
+        [
+          76,
+          -38
+        ],
+        [
+          78,
+          -39
+        ],
+        [
+          80,
+          -40
+        ],
+        [
+          82,
+          -41
+        ],
+        [
+          84,
+          -42
+        ],
+        [
+          86,
+          -43
+        ],
+        [
+          88,
+          -44
+        ],
+        [
+          90,
+          -45
+        ],
+        [
+          92,
+          -46
+        ],
+        [
+          94,
+          -47
+        ]
+      ],
+      "bands": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ]
+      ]
+    },
+    "detections": [
+      {
+        "t_start": 0.1,
+        "t_end": 1,
+        "last_seen": 0.1,
+        "cbox": [
+          20,
+          30,
+          82,
+          71
+        ],
+        "aoff": [
+          0,
+          0
+        ],
+        "category": "name",
+        "text": "exact target",
+        "confidence": 1,
+        "enabled": true
+      },
+      {
+        "t_start": 0,
+        "t_end": 2,
+        "last_seen": 0,
+        "cbox": [
+          20,
+          30,
+          80,
+          70
+        ],
+        "aoff": [
+          0,
+          0
+        ],
+        "category": "name",
+        "text": "disabled raw row",
+        "confidence": 1,
+        "enabled": true,
+        "opaque": {
+          "kept": [
+            1,
+            2,
+            3
+          ]
+        }
+      },
+      {
+        "t_start": 0,
+        "t_end": 0.5166666666666666,
+        "cbox": [
+          2,
+          24,
+          37,
+          64
+        ],
+        "category": "manual",
+        "text": "tracked object",
+        "confidence": 1,
+        "aoff": [
+          8,
+          -4
+        ],
+        "last_seen": 0.16666666666666666,
+        "dense": true,
+        "track": 0,
+        "enabled": true,
+        "poly": []
+      },
+      {
+        "t_start": 0,
+        "t_end": 0.5166666666666666,
+        "cbox": [
+          42,
+          24,
+          77,
+          64
+        ],
+        "category": "manual",
+        "text": "tracked object",
+        "confidence": 1,
+        "aoff": [
+          8,
+          -4
+        ],
+        "last_seen": 0.16666666666666666,
+        "dense": true,
+        "track": 1,
+        "enabled": true,
+        "poly": []
+      },
+      {
+        "t_start": 0,
+        "t_end": 0.5166666666666666,
+        "cbox": [
+          2,
+          24,
+          37,
+          64
+        ],
+        "category": "manual",
+        "text": "tracked object",
+        "confidence": 1,
+        "aoff": [
+          8,
+          -4
+        ],
+        "last_seen": 0.16666666666666666,
+        "dense": true,
+        "track": 2,
+        "enabled": true,
+        "poly": []
+      },
+      {
+        "t_start": 0,
+        "t_end": 0.5166666666666666,
+        "cbox": [
+          42,
+          24,
+          77,
+          64
+        ],
+        "category": "manual",
+        "text": "tracked object",
+        "confidence": 1,
+        "aoff": [
+          8,
+          -4
+        ],
+        "last_seen": 0.16666666666666666,
+        "dense": true,
+        "track": 3,
+        "enabled": true,
+        "poly": []
+      },
+      {
+        "t_start": 0,
+        "t_end": 2,
+        "cbox": [
+          87,
+          39,
+          122,
+          79
+        ],
+        "aoff": [
+          8,
+          -4
+        ],
+        "category": "manual",
+        "text": "user-drawn",
+        "confidence": 1,
+        "last_seen": 0,
+        "enabled": true,
+        "manual_id": "6cf3bdfd-db7a-44be-b6cf-a142a28d2350",
+        "manual_creation": {
+          "t_start": 0,
+          "t_end": 2,
+          "cbox": [
+            87,
+            39,
+            122,
+            79
+          ],
+          "aoff": [
+            8,
+            -4
+          ]
+        }
+      }
+    ],
+    "audio_redactions": [
+      {
+        "t0": 0,
+        "t1": 0.1,
+        "mode": "mute"
+      }
+    ]
+  },
+  "displayed": {
+    "raw": [
+      {
+        "base": {
+          "cbox": [
+            20,
+            30,
+            82,
+            71
+          ],
+          "span": [
+            0.1,
+            1,
+            0.1
+          ]
+        },
+        "box": [
+          28,
+          26,
+          90,
+          67
+        ],
+        "category": "name",
+        "enabled": true,
+        "i": 0,
+        "row_context_eq": "71a1e99a866a7ecb928bb61483dbf4e9c2f3807f53daa690937f0921a8228c63",
+        "t_end": 1,
+        "t_start": 0.1,
+        "text": "exact target"
+      },
+      {
+        "base": {
+          "cbox": [
+            20,
+            30,
+            80,
+            70
+          ],
+          "span": [
+            0,
+            2,
+            0
+          ]
+        },
+        "box": [
+          28,
+          26,
+          88,
+          66
+        ],
+        "category": "name",
+        "enabled": true,
+        "i": 1,
+        "row_context_eq": "0c24b643533a977e33b183f5eb8e5c3f374c9a468e0df54cc0f2e765aeef41e8",
+        "t_end": 2,
+        "t_start": 0,
+        "text": "disabled raw row"
+      },
+      {
+        "base": {
+          "cbox": [
+            2,
+            24,
+            37,
+            64
+          ],
+          "span": [
+            0,
+            0.5166666666666666,
+            0.16666666666666666
+          ]
+        },
+        "box": [
+          10,
+          20,
+          45,
+          60
+        ],
+        "category": "manual",
+        "enabled": true,
+        "i": 2,
+        "row_context_eq": "509e2cfcaf2975027bd7740123c00f37aca841b38ea88c77f1240b5f5c5a3ced",
+        "t_end": 0.5166666666666666,
+        "t_start": 0,
+        "text": "tracked object"
+      },
+      {
+        "base": {
+          "cbox": [
+            42,
+            24,
+            77,
+            64
+          ],
+          "span": [
+            0,
+            0.5166666666666666,
+            0.16666666666666666
+          ]
+        },
+        "box": [
+          50,
+          20,
+          85,
+          60
+        ],
+        "category": "manual",
+        "enabled": true,
+        "i": 3,
+        "row_context_eq": "d4173378f697e8e339e978824a881ac24ba5c92dd146b04b446bf9e2e9e092c8",
+        "t_end": 0.5166666666666666,
+        "t_start": 0,
+        "text": "tracked object"
+      },
+      {
+        "base": {
+          "cbox": [
+            2,
+            24,
+            37,
+            64
+          ],
+          "span": [
+            0,
+            0.5166666666666666,
+            0.16666666666666666
+          ]
+        },
+        "box": [
+          10,
+          20,
+          45,
+          60
+        ],
+        "category": "manual",
+        "enabled": true,
+        "i": 4,
+        "row_context_eq": "2af92e84f7e30788b76839440482b6c97cee8abf594ccf09f9a1d4bb917d9a18",
+        "t_end": 0.5166666666666666,
+        "t_start": 0,
+        "text": "tracked object"
+      },
+      {
+        "base": {
+          "cbox": [
+            42,
+            24,
+            77,
+            64
+          ],
+          "span": [
+            0,
+            0.5166666666666666,
+            0.16666666666666666
+          ]
+        },
+        "box": [
+          50,
+          20,
+          85,
+          60
+        ],
+        "category": "manual",
+        "enabled": true,
+        "i": 5,
+        "row_context_eq": "c11d0ffc572d8061ee1c81cc22982ed3b33f4daffdfe7d2139aa3897bdded7e9",
+        "t_end": 0.5166666666666666,
+        "t_start": 0,
+        "text": "tracked object"
+      },
+      {
+        "base": {
+          "cbox": [
+            87,
+            39,
+            122,
+            79
+          ],
+          "span": [
+            0,
+            2,
+            0
+          ]
+        },
+        "box": [
+          95,
+          35,
+          130,
+          75
+        ],
+        "category": "manual",
+        "enabled": true,
+        "i": 6,
+        "row_context_eq": "742e311a190b70ea484f5d0055dcb2f1613487761953eb0a5075a07ad823f2dc",
+        "t_end": 2,
+        "t_start": 0,
+        "text": "user-drawn"
+      }
+    ],
+    "audio": [
+      {
+        "t0": 0,
+        "t1": 0.1,
+        "mode": "mute"
+      }
+    ],
+    "choices": {
+      "0": true,
+      "1": true,
+      "2": true,
+      "3": true,
+      "4": true,
+      "5": true,
+      "6": true
+    },
+    "sample": {
+      "canonical_s": 0.16666666666666666,
+      "height": 180,
+      "index": 4,
+      "observed_s": 0.16666666666666666,
+      "offset": [
+        8,
+        -4
+      ],
+      "origin": [
+        0,
+        0
+      ],
+      "policy": "opencv-ffmpeg-zero-cfr-v1",
+      "requested_s": 0.2,
+      "source_ref": "fd8fa8456973410a9b37191b036ab2c9:1",
+      "stream": 0,
+      "timeline_eq": "9c643f8ec38a228531c89c0fd71d9a9336f0792efa2a86da5c385c60a1a0267d",
+      "width": 320
+    }
+  },
+  "errors": [],
+  "warnings": [],
+  "writes": []
+}

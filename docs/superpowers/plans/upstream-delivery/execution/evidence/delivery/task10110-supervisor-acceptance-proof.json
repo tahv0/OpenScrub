@@ -1,0 +1,41 @@
+{
+  "base": "6fde5ad60c6d78d69dbbd8e049a9196f15e4095f",
+  "head": "d3d02770b8a42575236b11309b5a334170f7ec89",
+  "source_clean": true,
+  "source_files_verified": 134,
+  "exact_owned_paths": [
+    "tests/artifact_support.py",
+    "tests/test_artifact_support.py",
+    "tests/test_exact_media.py",
+    "tests/test_strict_tracking_routes.py"
+  ],
+  "unrelated_refs_preserved": 161,
+  "all_baseline_refs": 162,
+  "all_evidence_files": 39,
+  "evidence_bytes": 236829,
+  "all38_indexed_hashes_valid": true,
+  "inputs_match_canonical": true,
+  "private_controls_absent": true,
+  "frozen_configs_ten_origins_match_source": true,
+  "raw_actual_runs": {
+    "full-312": {
+      "summary": "566 passed in 108.41s (0:01:48)",
+      "sha256": "e80f89f1e38933bcc4e8f49cd423fd3e78b24c0d8cf6ddc2d1dc928c70bdba4b"
+    },
+    "fallback-39": {
+      "summary": "48 passed in 3.43s",
+      "sha256": "9b749accc4449eafd21258c113e93ef5c0d629affe6e7c2ea4b6aef58fa4d4b0"
+    },
+    "explicit-39": {
+      "summary": "48 passed in 3.40s",
+      "sha256": "b0a2c5444c94d18012b4ef15b1f4e17328989d5dc3816e35d55e8e915be48bc9"
+    }
+  },
+  "actual_package_archive_hashes_verified": true,
+  "four_owned_sdist_bytes_verified": true,
+  "wheel_excludes_test_helper": true,
+  "review_packet_bytes": 11030,
+  "review_packet_sha256": "387c472ef2edf5a4cbad19d2b89b5ee91cac18410bfc6dc238d33399182a3a5a",
+  "review": "Spec compliant / Quality Approved no findings",
+  "helper_collection_RED_limit": "Earlier new-test source bytes differ by reported unused-import cleanup; no separate historical snapshot retained; no final assertion-run claim for that collection error. Seven real unchanged-owner RED failures independently reproduce the defect."
+}

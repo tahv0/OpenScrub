@@ -1,0 +1,545 @@
+{
+  "dpr": 1,
+  "media": [
+    {
+      "label": "cfr24",
+      "t": 0.2,
+      "oracle": {
+        "input": {
+          "path": "/tmp/openscrub-frame-identity-baseline-20261117/runtime/cfr24.mp4",
+          "sha256": "3255faa79d819ad763cd1cc95c9d0f9aa5e49ade85019197220f6e5913f62c7c"
+        },
+        "index": 4,
+        "pts": "1/6",
+        "canonical": 0.16666666666666666,
+        "marker": 4,
+        "shape": [
+          180,
+          320,
+          3
+        ],
+        "source_box": [
+          28,
+          26,
+          88,
+          66
+        ]
+      },
+      "got": {
+        "sample": {
+          "canonical_s": 0.16666666666666666,
+          "height": 180,
+          "index": 4,
+          "observed_s": 0.16666666666666666,
+          "offset": [
+            8,
+            -4
+          ],
+          "origin": [
+            0,
+            0
+          ],
+          "policy": "opencv-ffmpeg-zero-cfr-v1",
+          "requested_s": 0.2,
+          "source_ref": "43bd7072e438491ca6f5a2dbe0123771:1",
+          "stream": 0,
+          "timeline_eq": "9c643f8ec38a228531c89c0fd71d9a9336f0792efa2a86da5c385c60a1a0267d",
+          "width": 320
+        },
+        "marker": 4,
+        "raw": [
+          {
+            "base": {
+              "cbox": [
+                20,
+                30,
+                80,
+                70
+              ],
+              "span": [
+                0,
+                2,
+                0
+              ]
+            },
+            "box": [
+              28,
+              26,
+              88,
+              66
+            ],
+            "category": "name",
+            "enabled": true,
+            "i": 0,
+            "row_context_eq": "71a1e99a866a7ecb928bb61483dbf4e9c2f3807f53daa690937f0921a8228c63",
+            "t_end": 2,
+            "t_start": 0,
+            "text": "exact target"
+          },
+          {
+            "base": {
+              "cbox": [
+                20,
+                30,
+                80,
+                70
+              ],
+              "span": [
+                0,
+                2,
+                0
+              ]
+            },
+            "box": [
+              28,
+              26,
+              88,
+              66
+            ],
+            "category": "name",
+            "enabled": false,
+            "i": 1,
+            "row_context_eq": "0c24b643533a977e33b183f5eb8e5c3f374c9a468e0df54cc0f2e765aeef41e8",
+            "t_end": 2,
+            "t_start": 0,
+            "text": "disabled raw row"
+          }
+        ],
+        "boxes": [
+          {
+            "base": {
+              "cbox": [
+                20,
+                30,
+                80,
+                70
+              ],
+              "span": [
+                0,
+                2,
+                0
+              ]
+            },
+            "box": [
+              28,
+              26,
+              88,
+              66
+            ],
+            "category": "name",
+            "enabled": true,
+            "i": 0,
+            "row_context_eq": "71a1e99a866a7ecb928bb61483dbf4e9c2f3807f53daa690937f0921a8228c63",
+            "t_end": 2,
+            "t_start": 0,
+            "text": "exact target"
+          }
+        ],
+        "ready": true,
+        "precondition": {
+          "version": 1,
+          "source_ref": "43bd7072e438491ca6f5a2dbe0123771:1",
+          "timeline_eq": "9c643f8ec38a228531c89c0fd71d9a9336f0792efa2a86da5c385c60a1a0267d",
+          "policy": "opencv-ffmpeg-zero-cfr-v1",
+          "index": 4,
+          "width": 320,
+          "height": 180,
+          "offset": [
+            8,
+            -4
+          ]
+        }
+      }
+    },
+    {
+      "label": "cfr5",
+      "t": 1.9,
+      "oracle": {
+        "input": {
+          "path": "/tmp/openscrub-frame-identity-baseline-20261117/runtime/cfr5.mp4",
+          "sha256": "ecc7cdc66751506e713c4dfce38fb096f5c1c0fcc8fbd73e8d5375cc94fe6bba"
+        },
+        "index": 9,
+        "pts": "9/5",
+        "canonical": 1.8,
+        "marker": 9,
+        "shape": [
+          180,
+          320,
+          3
+        ],
+        "source_box": [
+          38,
+          21,
+          98,
+          61
+        ]
+      },
+      "got": {
+        "sample": {
+          "canonical_s": 1.8,
+          "height": 180,
+          "index": 9,
+          "observed_s": 1.8,
+          "offset": [
+            18,
+            -9
+          ],
+          "origin": [
+            0,
+            0
+          ],
+          "policy": "opencv-ffmpeg-zero-cfr-v1",
+          "requested_s": 1.9,
+          "source_ref": "e1d8689187714ef4b0b35519a5ba44b8:1",
+          "stream": 0,
+          "timeline_eq": "059324345cfd917c8791c51323f85e0afb5d9871d10c81d3029d9099f0ea057f",
+          "width": 320
+        },
+        "marker": 9,
+        "raw": [
+          {
+            "base": {
+              "cbox": [
+                20,
+                30,
+                80,
+                70
+              ],
+              "span": [
+                0,
+                2,
+                0
+              ]
+            },
+            "box": [
+              38,
+              21,
+              98,
+              61
+            ],
+            "category": "name",
+            "enabled": true,
+            "i": 0,
+            "row_context_eq": "71a1e99a866a7ecb928bb61483dbf4e9c2f3807f53daa690937f0921a8228c63",
+            "t_end": 2,
+            "t_start": 0,
+            "text": "exact target"
+          },
+          {
+            "base": {
+              "cbox": [
+                20,
+                30,
+                80,
+                70
+              ],
+              "span": [
+                0,
+                2,
+                0
+              ]
+            },
+            "box": [
+              38,
+              21,
+              98,
+              61
+            ],
+            "category": "name",
+            "enabled": false,
+            "i": 1,
+            "row_context_eq": "0c24b643533a977e33b183f5eb8e5c3f374c9a468e0df54cc0f2e765aeef41e8",
+            "t_end": 2,
+            "t_start": 0,
+            "text": "disabled raw row"
+          }
+        ],
+        "boxes": [
+          {
+            "base": {
+              "cbox": [
+                20,
+                30,
+                80,
+                70
+              ],
+              "span": [
+                0,
+                2,
+                0
+              ]
+            },
+            "box": [
+              38,
+              21,
+              98,
+              61
+            ],
+            "category": "name",
+            "enabled": true,
+            "i": 0,
+            "row_context_eq": "71a1e99a866a7ecb928bb61483dbf4e9c2f3807f53daa690937f0921a8228c63",
+            "t_end": 2,
+            "t_start": 0,
+            "text": "exact target"
+          }
+        ],
+        "ready": true,
+        "precondition": {
+          "version": 1,
+          "source_ref": "e1d8689187714ef4b0b35519a5ba44b8:1",
+          "timeline_eq": "059324345cfd917c8791c51323f85e0afb5d9871d10c81d3029d9099f0ea057f",
+          "policy": "opencv-ffmpeg-zero-cfr-v1",
+          "index": 9,
+          "width": 320,
+          "height": 180,
+          "offset": [
+            18,
+            -9
+          ]
+        }
+      }
+    },
+    {
+      "label": "normalized",
+      "t": 0.5,
+      "oracle": {
+        "input": {
+          "path": "/tmp/openscrub-frame-identity-baseline-20261117/runtime/vfr.cfr.mp4",
+          "sha256": "591cf2b749f17e12f7ae9d78d91dbf699ae5ebe28e3b89f085390dd631cb33f7"
+        },
+        "index": 6,
+        "pts": "6/13",
+        "canonical": 0.46153846153846156,
+        "marker": 5,
+        "shape": [
+          180,
+          320,
+          3
+        ],
+        "source_box": [
+          32,
+          24,
+          92,
+          64
+        ]
+      },
+      "got": {
+        "sample": {
+          "canonical_s": 0.46153846153846156,
+          "height": 180,
+          "index": 6,
+          "observed_s": 0.46153846153846156,
+          "offset": [
+            12,
+            -6
+          ],
+          "origin": [
+            0,
+            0
+          ],
+          "policy": "opencv-ffmpeg-zero-cfr-v1",
+          "requested_s": 0.5,
+          "source_ref": "a3d8e34911a840ae85dfc71930572db2:1",
+          "stream": 0,
+          "timeline_eq": "ffe3e25a74a116ea26789bde68d6ca30938a1f8305d1d405219a15948765f7c5",
+          "width": 320
+        },
+        "marker": 5,
+        "raw": [
+          {
+            "base": {
+              "cbox": [
+                20,
+                30,
+                80,
+                70
+              ],
+              "span": [
+                0,
+                1.0769230769230769,
+                0
+              ]
+            },
+            "box": [
+              32,
+              24,
+              92,
+              64
+            ],
+            "category": "name",
+            "enabled": true,
+            "i": 0,
+            "row_context_eq": "71a1e99a866a7ecb928bb61483dbf4e9c2f3807f53daa690937f0921a8228c63",
+            "t_end": 1.0769230769230769,
+            "t_start": 0,
+            "text": "exact target"
+          },
+          {
+            "base": {
+              "cbox": [
+                20,
+                30,
+                80,
+                70
+              ],
+              "span": [
+                0,
+                1.0769230769230769,
+                0
+              ]
+            },
+            "box": [
+              32,
+              24,
+              92,
+              64
+            ],
+            "category": "name",
+            "enabled": false,
+            "i": 1,
+            "row_context_eq": "0c24b643533a977e33b183f5eb8e5c3f374c9a468e0df54cc0f2e765aeef41e8",
+            "t_end": 1.0769230769230769,
+            "t_start": 0,
+            "text": "disabled raw row"
+          }
+        ],
+        "boxes": [
+          {
+            "base": {
+              "cbox": [
+                20,
+                30,
+                80,
+                70
+              ],
+              "span": [
+                0,
+                1.0769230769230769,
+                0
+              ]
+            },
+            "box": [
+              32,
+              24,
+              92,
+              64
+            ],
+            "category": "name",
+            "enabled": true,
+            "i": 0,
+            "row_context_eq": "71a1e99a866a7ecb928bb61483dbf4e9c2f3807f53daa690937f0921a8228c63",
+            "t_end": 1.0769230769230769,
+            "t_start": 0,
+            "text": "exact target"
+          }
+        ],
+        "ready": true,
+        "precondition": {
+          "version": 1,
+          "source_ref": "a3d8e34911a840ae85dfc71930572db2:1",
+          "timeline_eq": "ffe3e25a74a116ea26789bde68d6ca30938a1f8305d1d405219a15948765f7c5",
+          "policy": "opencv-ffmpeg-zero-cfr-v1",
+          "index": 6,
+          "width": 320,
+          "height": 180,
+          "offset": [
+            12,
+            -6
+          ]
+        }
+      }
+    }
+  ],
+  "coalescing": {
+    "body": true,
+    "decode": true
+  },
+  "staleTrackInert": true,
+  "ownedTrackRefresh": true,
+  "errors": [],
+  "warnings": [],
+  "expectedConsole": [],
+  "posts": [
+    {
+      "url": "http://127.0.0.1:53449/api/jobs/cfr24/track_object",
+      "body": {
+        "box": [
+          10,
+          20,
+          45,
+          60
+        ],
+        "t_ref": 0.16666666666666666,
+        "t0": 0,
+        "t1": 2,
+        "seed": {
+          "version": 1,
+          "source_ref": "43bd7072e438491ca6f5a2dbe0123771:1",
+          "timeline_eq": "9c643f8ec38a228531c89c0fd71d9a9336f0792efa2a86da5c385c60a1a0267d",
+          "policy": "opencv-ffmpeg-zero-cfr-v1",
+          "index": 4,
+          "width": 320,
+          "height": 180,
+          "offset": [
+            8,
+            -4
+          ]
+        }
+      }
+    },
+    {
+      "url": "http://127.0.0.1:53449/api/jobs/cfr24/track_object",
+      "body": {
+        "box": [
+          50,
+          20,
+          85,
+          60
+        ],
+        "t_ref": 0.16666666666666666,
+        "t0": 0,
+        "t1": 2,
+        "seed": {
+          "version": 1,
+          "source_ref": "43bd7072e438491ca6f5a2dbe0123771:1",
+          "timeline_eq": "9c643f8ec38a228531c89c0fd71d9a9336f0792efa2a86da5c385c60a1a0267d",
+          "policy": "opencv-ffmpeg-zero-cfr-v1",
+          "index": 4,
+          "width": 320,
+          "height": 180,
+          "offset": [
+            8,
+            -4
+          ]
+        }
+      }
+    }
+  ],
+  "samples": [
+    "http://127.0.0.1:53449/api/jobs/cfr24/edit_sample?t=0",
+    "http://127.0.0.1:53449/api/jobs/cfr24/edit_sample?t=0.2",
+    "http://127.0.0.1:53449/api/jobs/cfr24/edit_sample?t=0.2",
+    "http://127.0.0.1:53449/api/jobs/cfr5/edit_sample?t=0",
+    "http://127.0.0.1:53449/api/jobs/cfr5/edit_sample?t=1.9",
+    "http://127.0.0.1:53449/api/jobs/cfr5/edit_sample?t=1.9",
+    "http://127.0.0.1:53449/api/jobs/normalized/edit_sample?t=0",
+    "http://127.0.0.1:53449/api/jobs/normalized/edit_sample?t=0.5",
+    "http://127.0.0.1:53449/api/jobs/normalized/edit_sample?t=0.5",
+    "http://127.0.0.1:53449/api/jobs/cfr24/edit_sample?t=0",
+    "http://127.0.0.1:53449/api/jobs/cfr24/edit_sample?t=0.2",
+    "http://127.0.0.1:53449/api/jobs/cfr24/edit_sample?t=0.2",
+    "http://127.0.0.1:53449/api/jobs/cfr24/edit_sample?t=0.3",
+    "http://127.0.0.1:53449/api/jobs/cfr24/edit_sample?t=0.2",
+    "http://127.0.0.1:53449/api/jobs/cfr24/edit_sample?t=0.5",
+    "http://127.0.0.1:53449/api/jobs/cfr24/edit_sample?t=0.5",
+    "http://127.0.0.1:53449/api/jobs/cfr24/edit_sample?t=0.7",
+    "http://127.0.0.1:53449/api/jobs/cfr24/edit_sample?t=0.2",
+    "http://127.0.0.1:53449/api/jobs/cfr24/edit_sample?t=0.2",
+    "http://127.0.0.1:53449/api/jobs/cfr24/edit_sample?t=0",
+    "http://127.0.0.1:53449/api/jobs/cfr24/edit_sample?t=0.2",
+    "http://127.0.0.1:53449/api/jobs/cfr24/edit_sample?t=0.2",
+    "http://127.0.0.1:53449/api/jobs/cfr24/edit_sample?t=0"
+  ]
+}

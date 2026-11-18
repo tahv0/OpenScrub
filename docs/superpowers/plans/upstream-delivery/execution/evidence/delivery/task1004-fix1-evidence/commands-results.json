@@ -1,0 +1,82 @@
+[
+  {
+    "run": "task1004-fix1-0d22e7ca429b4f6996c49bbcd0824545",
+    "base": "dcaa0e5af6aedfca8685a3e64bea86ad0262f5c2",
+    "head": "dcaa0e5af6aedfca8685a3e64bea86ad0262f5c2",
+    "policy": "development",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "web_sha256": "422ed86c602be624f17ac6f2ef7e607121552afcaff0801ce23ffc467dc02a09",
+    "test_sha256": "3ee8f7ab7a41639f85d6ad568aa4e5b01916a54424b4bbe7594ba908f506ecfb"
+  },
+  {
+    "run": "task1004-fix1-1cd1061244c54db38fb45c31b67aefde",
+    "base": "dcaa0e5af6aedfca8685a3e64bea86ad0262f5c2",
+    "head": "d1f056e86fcae2dcfaa01bbc7f97e79ca662faaa",
+    "policy": "frozen",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "web_sha256": "422ed86c602be624f17ac6f2ef7e607121552afcaff0801ce23ffc467dc02a09",
+    "test_sha256": "3ee8f7ab7a41639f85d6ad568aa4e5b01916a54424b4bbe7594ba908f506ecfb"
+  },
+  {
+    "run": "task1004-fix1-84b494de56c24532929be706ceca4ae0",
+    "base": "dcaa0e5af6aedfca8685a3e64bea86ad0262f5c2",
+    "head": "dcaa0e5af6aedfca8685a3e64bea86ad0262f5c2",
+    "policy": "development",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "web_sha256": "33cd9d19ff9ea9542d14408be7840929dafd2b9bc6c8ae240fc7aab410d8cc32",
+    "test_sha256": "3ee8f7ab7a41639f85d6ad568aa4e5b01916a54424b4bbe7594ba908f506ecfb"
+  },
+  {
+    "run": "task1004-fix1-a4f46ee09f394cbb8d47f710ecb66ccd",
+    "base": "dcaa0e5af6aedfca8685a3e64bea86ad0262f5c2",
+    "head": "d1f056e86fcae2dcfaa01bbc7f97e79ca662faaa",
+    "policy": "frozen",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "web_sha256": "422ed86c602be624f17ac6f2ef7e607121552afcaff0801ce23ffc467dc02a09",
+    "test_sha256": "3ee8f7ab7a41639f85d6ad568aa4e5b01916a54424b4bbe7594ba908f506ecfb"
+  },
+  {
+    "run": "task1004-fix1-e5af3ff6b0d6489390b45072682b025d",
+    "base": "dcaa0e5af6aedfca8685a3e64bea86ad0262f5c2",
+    "head": "dcaa0e5af6aedfca8685a3e64bea86ad0262f5c2",
+    "policy": "development",
+    "python": {
+      "executable": "/tmp/openscrub-python39-20261117/venv/bin/python",
+      "version": [
+        3,
+        9,
+        25
+      ]
+    },
+    "web_sha256": "422ed86c602be624f17ac6f2ef7e607121552afcaff0801ce23ffc467dc02a09",
+    "test_sha256": "3ee8f7ab7a41639f85d6ad568aa4e5b01916a54424b4bbe7594ba908f506ecfb"
+  }
+]

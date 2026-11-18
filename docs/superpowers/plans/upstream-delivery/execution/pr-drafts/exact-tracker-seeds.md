@@ -10,4 +10,4 @@ Source support remains the declared metadata-qualified/sample-verified CFR subse
 
 [Acceptance](../evidence/delivery/task-1002-final-acceptance.md) · [Report](../evidence/delivery/task-1002-report.md) · [Scoped review](../evidence/delivery/task-1002-fix1-review.md).
 
-Dependency335435e→6fde5ad remains separate. [Frozen notes](../evidence/research/source-plans/p10-pr-submission-notes.md.txt) distinguish the typed API repair from the already rejecting web worker. Mounted prerequisites are accepted at07cf; UI/Track migration is dispatched; acceptance open.
+Dependency335435e→6fde5ad remains separate. [Frozen notes](../evidence/research/source-plans/p10-pr-submission-notes.md.txt) distinguish the typed API repair from the already rejecting web worker. Mounted prerequisites are accepted at07cf; [Ordinary UI/Track](../evidence/delivery/task-1004-final-acceptance.md) is separately accepted d1f056e.

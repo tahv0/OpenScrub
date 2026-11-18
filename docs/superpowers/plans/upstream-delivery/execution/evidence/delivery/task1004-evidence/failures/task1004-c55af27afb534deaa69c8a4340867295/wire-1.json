@@ -1,0 +1,86 @@
+{
+  "boxes": [
+    {
+      "base": {
+        "cbox": [
+          20,
+          30,
+          80,
+          70
+        ],
+        "span": [
+          0,
+          2,
+          0
+        ]
+      },
+      "box": [
+        20,
+        30,
+        80,
+        70
+      ],
+      "category": "name",
+      "enabled": true,
+      "i": 0,
+      "row_context_eq": "71a1e99a866a7ecb928bb61483dbf4e9c2f3807f53daa690937f0921a8228c63",
+      "t_end": 2,
+      "t_start": 0,
+      "text": "exact target"
+    },
+    {
+      "base": {
+        "cbox": [
+          20,
+          30,
+          80,
+          70
+        ],
+        "span": [
+          0,
+          2,
+          0
+        ]
+      },
+      "box": [
+        20,
+        30,
+        80,
+        70
+      ],
+      "category": "name",
+      "enabled": false,
+      "i": 1,
+      "row_context_eq": "0c24b643533a977e33b183f5eb8e5c3f374c9a468e0df54cc0f2e765aeef41e8",
+      "t_end": 2,
+      "t_start": 0,
+      "text": "disabled raw row"
+    }
+  ],
+  "image": {
+    "mime": "image/jpeg",
+    "prefix": "/9j/4AAQSkZJRgABAQAAAQAB",
+    "length": 6020
+  },
+  "sample": {
+    "canonical_s": 0,
+    "height": 180,
+    "index": 0,
+    "observed_s": 0,
+    "offset": [
+      0,
+      0
+    ],
+    "origin": [
+      0,
+      0
+    ],
+    "policy": "opencv-ffmpeg-zero-cfr-v1",
+    "requested_s": 0,
+    "source_ref": "1c910b17f83f43f0a3d92e20320b8ba3:1",
+    "stream": 0,
+    "timeline_eq": "9c643f8ec38a228531c89c0fd71d9a9336f0792efa2a86da5c385c60a1a0267d",
+    "width": 320
+  },
+  "version": 1
+}

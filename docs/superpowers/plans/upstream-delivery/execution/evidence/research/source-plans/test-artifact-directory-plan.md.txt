@@ -1,0 +1,48 @@
+# Portable media-test artifacts implementation plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development. Complete the single task with a fresh independent task review.
+
+**Goal:** Let contributors run the documented retained-media tests without local evidence-controller configuration.
+
+**Architecture:** One small stdlib helper under tests selects and creates an artifact directory. Three existing write sites use it; product imports, media/PTS oracles, assertions and serialized payloads remain unchanged.
+
+**Tech Stack:** Python >=3.9, pathlib/os, existing pytest and prepared native media tools.
+
+**Spec:** [Test artifact-directory design](test-artifact-directory-design.md).
+
+## Global constraints
+
+- Base is accepted 6fde5ad60c6d78d69dbbd8e049a9196f15e4095f. Preserve all reviewed refs and the current editor branch; use a clean existing isolated checkout and a new focused branch.
+- No product code, runtime module, dependency, model, source/report format or default changes. No downloads, new test framework, blanket prerequisite, unrelated migration or historical evidence rewrite.
+- A nonempty explicit VERIFY_RUN keeps its existing logs subdirectory. Missing or empty VERIFY_RUN uses the requesting pytest tmp_path/artifacts. Preserve all three JSON filenames and payloads.
+- Tests and helper stay under tests; source distribution already includes tests. No repository-root helper, local machine path, disk guard, accounting or agent/model orchestration in upstream code.
+- Only the two owning modules and the new helper/test may change, plus a concise contributor note if useful. Defer media-oracle extraction and browser-launcher changes.
+- Supervisor prepares gates and authorizes finite local allocation separately. Those execution controls stay outside Git. Fresh independent review is required; no publication or working-version adoption.
+
+## Review focus
+
+- An ordinary contributor sets the media manifest but has no VERIFY_RUN: actual tests finish and write valid evidence beneath their pytest directory.
+- Explicit existing output-root callers retain the same logs paths and JSON payloads.
+- Separate pytest temporary directories do not overwrite one another when the local setting is absent.
+- Empty output setting behaves as absent; a real unwritable output directory raises the actual filesystem failure.
+- The sdist contains the new helper and owning tests; no production or wheel runtime import depends on it.
+
+### Task 10110: Make optional media evidence output portable
+
+**Files:**
+- Create: tests/artifact_support.py and tests/test_artifact_support.py.
+- Modify: tests/test_exact_media.py (two write sites) and tests/test_strict_tracking_routes.py (one write site).
+- Optional concise documentation: CONTRIBUTING.md, limited to these opt-in tests and temporary artifacts.
+
+**Interface:** artifact_directory(tmp_path: pathlib.Path) -> pathlib.Path chooses Path(VERIFY_RUN)/logs for a nonempty configured value, otherwise Path(tmp_path)/artifacts; mkdir(parents=True, exist_ok=True), return the selected directory. Do not swallow filesystem errors or add an environment option. Existing pytest tmp_path is passed to the three owning test functions as needed.
+
+- [ ] Write meaningful helper cases for absent/present/empty setting, independent temporary directories and filesystem failure; run the focused RED against the unchanged base. Confirm real documented-owner failure from missing VERIFY_RUN, rather than inventing a product regression.
+- [ ] Implement the small helper and replace only the three output-directory expressions. Keep independent pixels/PTS, hashes, samples, worker lifecycle and JSON names/content intact.
+- [ ] Run focused GREEN, then actual existing retained exact-media and strict-route cases with VERIFY_RUN absent after verification startup; use a prospectively pinned test-only local adapter if the existing local hook requires the variable at startup. Do not bypass the hook or stub product behavior. Exercise existing explicit output compatibility too.
+- [ ] Freeze the final commit and run required normal contribution checks once, with the proven prepared plugin/model recipe. Actual Python 3.9 covers helper cases and the affected real media owners; do not repeat unchanged browser work. Repeated full runs require a new concrete failure or uncovered risk.
+- [ ] Build using the proven prepared native toolchain and verify exact helper/owning-test bytes in the sdist and wheel-from-sdist creation. Product packaging/defaults unchanged; do not claim installed Python 3.9 building from the cached incompatible build-tool bundle.
+- [ ] Self-review, commit only owned paths, and report exact BASE/HEAD, RED/GREEN/actual commands/results, source identities, sdist reachability, retained failures and limitations. Append to task-10110-report.md; write task-10110-pr.md and compact product-only evidence. Release source/runtime explicitly for fresh independent review.
+
+**What / why / when:** This is the next small development-efficiency contribution after Task1004's safe reviewed handoff. It removes repeated machine-specific output setup for two existing test modules. Its Austin PR depends only on the owning exact/strict tests; unrelated branches need no rebase or retest. If a separate tooling submission costs more stacking than it saves, keep this patch with the relevant owning test contribution.
+
+The initial implementation pass is timeboxed to 30 minutes. A concrete larger requirement returns to the supervisor as a finite scope decision; it does not justify a framework or restart.

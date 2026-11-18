@@ -1,0 +1,337 @@
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_web.py:3370: SyntaxWarning: invalid escape sequence '\/'
+  !/^\/9j\/[A-Za-z0-9+/]*={0,2}$/.test(body.image.base64))throw Error('Invalid exact sample response');
+DEFAULT_PATHS {"jobs": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_jobs", "models": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1004/runs/task1004-c0843b7ae4744a648c90cc426fabd245/profile/.openscrub/models"}
+ACTIVE_SOURCE {"executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python", "python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]", "sources": {"openscrub": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub.py", "sha256": "d0e26f37d3bb541302fd597931deda08b0a23048251e12b3c22e793253def048"}, "openscrub_internal": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_internal/__init__.py", "sha256": "c35c063c010e329c5dad13782e7b67438ed4b2d1faf975d4f01be2773a18e022"}, "openscrub_internal.exact_samples": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_internal/exact_samples.py", "sha256": "0b583a0a027dc397ce3835982c5367031375fdd65d9a3b5f287dea3726c02c4d"}, "openscrub_internal.lifetimes": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_internal/lifetimes.py", "sha256": "86a01f37d9bae9998161eff1d04e2ca37d66548c2a202f36003587ec3e9cee8e"}, "openscrub_internal.reports": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_internal/reports.py", "sha256": "e8a7429c0b5430ee290f6635ca5d5a93445d3f0fe9bb0f58e57fec891ee01b7f"}, "openscrub_setup": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_setup.py", "sha256": "d0362a038f8182e8fae510100085bb087f09f7e5cf7e11a780a24390b3037eaf"}, "openscrub_update": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_update.py", "sha256": "4d6a20f75d985a119f8421227c3bd88b17fd1b8eed44e353b127b5b49e733d55"}, "openscrub_vault": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_vault.py", "sha256": "da1b7fe4da389352fbc594abddcc563278b26009d8f342d4154ffa305bf4dfa4"}, "openscrub_web": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_web.py", "sha256": "8c7b58fe66bdc222662af36b9437f3171387b74f2f861758f6fc650bdbdf1360"}, "zones_ui": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/zones_ui.py", "sha256": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7"}}}
+............................................................FF.......... [ 60%]
+........................FF...FFFFFFFFFFFFFFFFFFF                         [100%]
+=================================== FAILURES ===================================
+___ test_audio_toggle_back_survives_unacknowledged_save_and_revisit[network] ___
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:319: in test_audio_toggle_back_survives_unacknowledged_save_and_revisit
+    run_js(PENDING_AUDIO_SETUP.replace("KIND", json.dumps("enabled")) + """
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:65: in run_js
+    assert result.returncode == 0, result.stdout + result.stderr
+E   AssertionError: Error: unacknowledged audio toggle-back omitted
+E         at evalmachine.<anonymous>:18:86
+E         at async [eval]:33:12
+E     
+E   assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...r='Error: unacknowledged audio toggle-back omitted\n    at evalmachine.<anonymous>:18:86\n    at async [eval]:33:12\n').returncode
+_____ test_audio_toggle_back_survives_unacknowledged_save_and_revisit[423] _____
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:319: in test_audio_toggle_back_survives_unacknowledged_save_and_revisit
+    run_js(PENDING_AUDIO_SETUP.replace("KIND", json.dumps("enabled")) + """
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:65: in run_js
+    assert result.returncode == 0, result.stdout + result.stderr
+E   AssertionError: Error: unacknowledged audio toggle-back omitted
+E         at evalmachine.<anonymous>:18:86
+E         at async [eval]:33:12
+E     
+E   assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...r='Error: unacknowledged audio toggle-back omitted\n    at evalmachine.<anonymous>:18:86\n    at async [eval]:33:12\n').returncode
+_______________ test_exact_geometry_handlers_share_ready_sample ________________
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:576: in test_exact_geometry_handlers_share_ready_sample
+    run_js(EXACT+r"""const m=strictDraft();const down=(x,y)=>m.cv.events.pointerdown({clientX:x,clientY:y,pointerId:1});
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:65: in run_js
+    assert result.returncode == 0, result.stdout + result.stderr
+E   AssertionError: AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+E     + actual - expected
+E     
+E     + undefined
+E     - false
+E     
+E         at evalmachine.<anonymous>:50:26
+E         at evalmachine.<anonymous>:56:67
+E         at Script.runInContext (node:vm:149:12)
+E         at Object.runInContext (node:vm:301:6)
+E         at run ([eval]:31:38)
+E         at [eval]:33:18
+E         at [eval]:33:56
+E         at [eval]:34:4
+E         at runScriptInThisContext (node:internal/vm:209:10)
+E         at node:internal/process/execution:446:12 {
+E       generatedMessage: true,
+E       code: 'ERR_ASSERTION',
+E       actual: undefined,
+E       expected: false,
+E       operator: 'strictEqual',
+E       diff: 'simple'
+E     }
+E     
+E   assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...  code: 'ERR_ASSERTION',\n  actual: undefined,\n  expected: false,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n").returncode
+___________ test_exact_scrub_cancels_gesture_keeps_pending_baseline ____________
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:588: in test_exact_scrub_cancels_gesture_keeps_pending_baseline
+    run_js(EXACT+r"""const m=strictDraft();await inspected(m);
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:65: in run_js
+    assert result.returncode == 0, result.stdout + result.stderr
+E   AssertionError: TypeError: select.appendChild is not a function
+E         at reviewResolveActions (evalmachine.<anonymous>:1305:146)
+E         at saveStatus (evalmachine.<anonymous>:196:2)
+E         at applyDet (evalmachine.<anonymous>:1183:17)
+E         at evalmachine.<anonymous>:51:32
+E         at async [eval]:33:12
+E     
+E   assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...n    at applyDet (evalmachine.<anonymous>:1183:17)\n    at evalmachine.<anonymous>:51:32\n    at async [eval]:33:12\n').returncode
+_ test_geometry_ack_retains_newer_kind_and_advances_owned_complete_base[box-span] _
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:609: in test_geometry_ack_retains_newer_kind_and_advances_owned_complete_base
+    run_js(EXACT+r"""const m=strictDraft();await inspected(m);beCaptureGeometry(m.view,BE.raw[0]);
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:65: in run_js
+    assert result.returncode == 0, result.stdout + result.stderr
+E   AssertionError: TypeError: Cannot read properties of null (reading 'box_overrides')
+E         at evalmachine.<anonymous>:53:27
+E         at async [eval]:33:12
+E     
+E   assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme... read properties of null (reading 'box_overrides')\n    at evalmachine.<anonymous>:53:27\n    at async [eval]:33:12\n").returncode
+_ test_geometry_ack_retains_newer_kind_and_advances_owned_complete_base[span-box] _
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:609: in test_geometry_ack_retains_newer_kind_and_advances_owned_complete_base
+    run_js(EXACT+r"""const m=strictDraft();await inspected(m);beCaptureGeometry(m.view,BE.raw[0]);
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:65: in run_js
+    assert result.returncode == 0, result.stdout + result.stderr
+E   AssertionError: TypeError: Cannot read properties of null (reading 'box_overrides')
+E         at evalmachine.<anonymous>:53:27
+E         at async [eval]:33:12
+E     
+E   assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme... read properties of null (reading 'box_overrides')\n    at evalmachine.<anonymous>:53:27\n    at async [eval]:33:12\n").returncode
+_ test_geometry_ack_retains_newer_kind_and_advances_owned_complete_base[both] __
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:609: in test_geometry_ack_retains_newer_kind_and_advances_owned_complete_base
+    run_js(EXACT+r"""const m=strictDraft();await inspected(m);beCaptureGeometry(m.view,BE.raw[0]);
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:65: in run_js
+    assert result.returncode == 0, result.stdout + result.stderr
+E   AssertionError: TypeError: Cannot read properties of null (reading 'box_overrides')
+E         at evalmachine.<anonymous>:53:27
+E         at async [eval]:33:12
+E     
+E   assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme... read properties of null (reading 'box_overrides')\n    at evalmachine.<anonymous>:53:27\n    at async [eval]:33:12\n").returncode
+_ test_geometry_ack_retains_newer_kind_and_advances_owned_complete_base[away-back] _
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:609: in test_geometry_ack_retains_newer_kind_and_advances_owned_complete_base
+    run_js(EXACT+r"""const m=strictDraft();await inspected(m);beCaptureGeometry(m.view,BE.raw[0]);
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:65: in run_js
+    assert result.returncode == 0, result.stdout + result.stderr
+E   AssertionError: TypeError: Cannot read properties of null (reading 'box_overrides')
+E         at evalmachine.<anonymous>:53:27
+E         at async [eval]:33:12
+E     
+E   assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme... read properties of null (reading 'box_overrides')\n    at evalmachine.<anonymous>:53:27\n    at async [eval]:33:12\n").returncode
+___________ test_geometry_ack_does_not_transplant_reinspected_family ___________
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:622: in test_geometry_ack_does_not_transplant_reinspected_family
+    run_js(EXACT+r"""const m=strictDraft();await inspected(m);beCaptureGeometry(m.view,BE.raw[0]);BE.ov[0]=[130,85,330,225];
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:65: in run_js
+    assert result.returncode == 0, result.stdout + result.stderr
+E   AssertionError: TypeError: Cannot read properties of null (reading 'geometry_preconditions')
+E         at ack (evalmachine.<anonymous>:46:61)
+E         at evalmachine.<anonymous>:50:17
+E         at async [eval]:33:12
+E     
+E   assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...ions')\n    at ack (evalmachine.<anonymous>:46:61)\n    at evalmachine.<anonymous>:50:17\n    at async [eval]:33:12\n").returncode
+____ test_lost_ack_retries_identical_payload_before_newer_geometry[network] ____
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:629: in test_lost_ack_retries_identical_payload_before_newer_geometry
+    run_js(EXACT+r"""const m=strictDraft();await inspected(m);beCaptureGeometry(m.view,BE.raw[0]);BE.ov[0]=[130,85,330,225];
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:65: in run_js
+    assert result.returncode == 0, result.stdout + result.stderr
+E   AssertionError: TypeError: Cannot read properties of undefined (reading 'reject')
+E         at evalmachine.<anonymous>:50:34
+E         at async [eval]:33:12
+E     
+E   assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...ot read properties of undefined (reading 'reject')\n    at evalmachine.<anonymous>:50:34\n    at async [eval]:33:12\n").returncode
+_____ test_lost_ack_retries_identical_payload_before_newer_geometry[json] ______
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:629: in test_lost_ack_retries_identical_payload_before_newer_geometry
+    run_js(EXACT+r"""const m=strictDraft();await inspected(m);beCaptureGeometry(m.view,BE.raw[0]);BE.ov[0]=[130,85,330,225];
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:65: in run_js
+    assert result.returncode == 0, result.stdout + result.stderr
+E   AssertionError: TypeError: Cannot read properties of undefined (reading 'resolve')
+E         at evalmachine.<anonymous>:51:33
+E         at async [eval]:33:12
+E     
+E   assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...t read properties of undefined (reading 'resolve')\n    at evalmachine.<anonymous>:51:33\n    at async [eval]:33:12\n").returncode
+_____ test_lost_ack_retries_identical_payload_before_newer_geometry[body] ______
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:629: in test_lost_ack_retries_identical_payload_before_newer_geometry
+    run_js(EXACT+r"""const m=strictDraft();await inspected(m);beCaptureGeometry(m.view,BE.raw[0]);BE.ov[0]=[130,85,330,225];
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:65: in run_js
+    assert result.returncode == 0, result.stdout + result.stderr
+E   AssertionError: TypeError: Cannot read properties of undefined (reading 'resolve')
+E         at evalmachine.<anonymous>:52:14
+E         at async [eval]:33:12
+E     
+E   assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...t read properties of undefined (reading 'resolve')\n    at evalmachine.<anonymous>:52:14\n    at async [eval]:33:12\n").returncode
+______ test_lost_ack_retries_identical_payload_before_newer_geometry[409] ______
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:629: in test_lost_ack_retries_identical_payload_before_newer_geometry
+    run_js(EXACT+r"""const m=strictDraft();await inspected(m);beCaptureGeometry(m.view,BE.raw[0]);BE.ov[0]=[130,85,330,225];
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:65: in run_js
+    assert result.returncode == 0, result.stdout + result.stderr
+E   AssertionError: TypeError: Cannot read properties of undefined (reading 'resolve')
+E         at evalmachine.<anonymous>:52:14
+E         at async [eval]:33:12
+E     
+E   assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...t read properties of undefined (reading 'resolve')\n    at evalmachine.<anonymous>:52:14\n    at async [eval]:33:12\n").returncode
+______ test_lost_ack_retries_identical_payload_before_newer_geometry[423] ______
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:629: in test_lost_ack_retries_identical_payload_before_newer_geometry
+    run_js(EXACT+r"""const m=strictDraft();await inspected(m);beCaptureGeometry(m.view,BE.raw[0]);BE.ov[0]=[130,85,330,225];
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:65: in run_js
+    assert result.returncode == 0, result.stdout + result.stderr
+E   AssertionError: TypeError: Cannot read properties of undefined (reading 'resolve')
+E         at evalmachine.<anonymous>:52:14
+E         at async [eval]:33:12
+E     
+E   assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...t read properties of undefined (reading 'resolve')\n    at evalmachine.<anonymous>:52:14\n    at async [eval]:33:12\n").returncode
+______ test_lost_ack_retries_identical_payload_before_newer_geometry[500] ______
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:629: in test_lost_ack_retries_identical_payload_before_newer_geometry
+    run_js(EXACT+r"""const m=strictDraft();await inspected(m);beCaptureGeometry(m.view,BE.raw[0]);BE.ov[0]=[130,85,330,225];
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:65: in run_js
+    assert result.returncode == 0, result.stdout + result.stderr
+E   AssertionError: TypeError: Cannot read properties of undefined (reading 'resolve')
+E         at evalmachine.<anonymous>:52:14
+E         at async [eval]:33:12
+E     
+E   assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...t read properties of undefined (reading 'resolve')\n    at evalmachine.<anonymous>:52:14\n    at async [eval]:33:12\n").returncode
+_____ test_geometry_conflict_authority_and_abandon_preserve_drafts[False] ______
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:642: in test_geometry_conflict_authority_and_abandon_preserve_drafts
+    run_js(EXACT+r"""const m=strictDraft();await inspected(m);beCaptureGeometry(m.view,BE.raw[0]);BE.ov[0]=[130,85,330,225];
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:65: in run_js
+    assert result.returncode == 0, result.stdout + result.stderr
+E   AssertionError: TypeError: Cannot read properties of undefined (reading 'resolve')
+E         at reply (evalmachine.<anonymous>:9:62)
+E         at evalmachine.<anonymous>:50:11
+E         at async [eval]:33:12
+E     
+E   assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...lve')\n    at reply (evalmachine.<anonymous>:9:62)\n    at evalmachine.<anonymous>:50:11\n    at async [eval]:33:12\n").returncode
+______ test_geometry_conflict_authority_and_abandon_preserve_drafts[True] ______
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:642: in test_geometry_conflict_authority_and_abandon_preserve_drafts
+    run_js(EXACT+r"""const m=strictDraft();await inspected(m);beCaptureGeometry(m.view,BE.raw[0]);BE.ov[0]=[130,85,330,225];
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:65: in run_js
+    assert result.returncode == 0, result.stdout + result.stderr
+E   AssertionError: TypeError: Cannot read properties of undefined (reading 'reject')
+E         at evalmachine.<anonymous>:49:49
+E         at async [eval]:33:12
+E     
+E   assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...ot read properties of undefined (reading 'reject')\n    at evalmachine.<anonymous>:49:49\n    at async [eval]:33:12\n").returncode
+______ test_discard_geometry_and_inspect_is_selected_and_confirmed[False] ______
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:652: in test_discard_geometry_and_inspect_is_selected_and_confirmed
+    run_js(EXACT+r"""const m=strictDraft();await inspected(m);beCaptureGeometry(m.view,BE.raw[0]);BE.ov[0]=[130,85,330,225];BE.times[99]=[0,1];
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:65: in run_js
+    assert result.returncode == 0, result.stdout + result.stderr
+E   AssertionError: TypeError: select.appendChild is not a function
+E         at reviewResolveActions (evalmachine.<anonymous>:1305:146)
+E         at saveStatus (evalmachine.<anonymous>:196:2)
+E         at applyDet (evalmachine.<anonymous>:1183:17)
+E         at evalmachine.<anonymous>:49:112
+E         at async [eval]:33:12
+E     
+E   assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...    at applyDet (evalmachine.<anonymous>:1183:17)\n    at evalmachine.<anonymous>:49:112\n    at async [eval]:33:12\n').returncode
+______ test_discard_geometry_and_inspect_is_selected_and_confirmed[True] _______
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:652: in test_discard_geometry_and_inspect_is_selected_and_confirmed
+    run_js(EXACT+r"""const m=strictDraft();await inspected(m);beCaptureGeometry(m.view,BE.raw[0]);BE.ov[0]=[130,85,330,225];BE.times[99]=[0,1];
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:65: in run_js
+    assert result.returncode == 0, result.stdout + result.stderr
+E   AssertionError: TypeError: select.appendChild is not a function
+E         at reviewResolveActions (evalmachine.<anonymous>:1305:146)
+E         at saveStatus (evalmachine.<anonymous>:196:2)
+E         at applyDet (evalmachine.<anonymous>:1183:17)
+E         at evalmachine.<anonymous>:49:112
+E         at async [eval]:33:12
+E     
+E   assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...    at applyDet (evalmachine.<anonymous>:1183:17)\n    at evalmachine.<anonymous>:49:112\n    at async [eval]:33:12\n').returncode
+___________ test_ack_clear_next_edit_uses_confirmed_display_baseline ___________
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:662: in test_ack_clear_next_edit_uses_confirmed_display_baseline
+    run_js(EXACT+r"""const m=strictDraft();await inspected(m);beCaptureGeometry(m.view,BE.raw[0]);BE.ov[0]=[130,85,330,225];
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:65: in run_js
+    assert result.returncode == 0, result.stdout + result.stderr
+E   AssertionError: TypeError: Cannot read properties of null (reading 'geometry_preconditions')
+E         at ack (evalmachine.<anonymous>:46:61)
+E         at evalmachine.<anonymous>:49:82
+E         at async [eval]:33:12
+E     
+E   assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...ions')\n    at ack (evalmachine.<anonymous>:46:61)\n    at evalmachine.<anonymous>:49:82\n    at async [eval]:33:12\n").returncode
+_____________ test_track_captures_seed_window_and_job_before_await _____________
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:669: in test_track_captures_seed_window_and_job_before_await
+    run_js(EXACT+r"""const m=strictDraft();await inspected(m);const st=elements.get('beTrkSt');
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:65: in run_js
+    assert result.returncode == 0, result.stdout + result.stderr
+E   AssertionError: AssertionError [ERR_ASSERTION]: Values have same structure but are not reference-equal:
+E     
+E     [
+E       10,
+E       20,
+E       40,
+E       60
+E     ]
+E     
+E         at evalmachine.<anonymous>:50:47
+E         at async [eval]:33:12 {
+E       generatedMessage: true,
+E       code: 'ERR_ASSERTION',
+E       actual: [Array],
+E       expected: [Array],
+E       operator: 'deepStrictEqual',
+E       diff: 'simple'
+E     }
+E     
+E   assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...de: 'ERR_ASSERTION',\n  actual: [Array],\n  expected: [Array],\n  operator: 'deepStrictEqual',\n  diff: 'simple'\n}\n").returncode
+_____________ test_track_late_status_cannot_refresh_reopened_mount _____________
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:677: in test_track_late_status_cannot_refresh_reopened_mount
+    run_js(EXACT+r"""const m=strictDraft();await inspected(m);var timers=[];setInterval=f=>{timers.push(f);return 1};
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:65: in run_js
+    assert result.returncode == 0, result.stdout + result.stderr
+E   AssertionError: TypeError: poll is not a function
+E         at evalmachine.<anonymous>:49:84
+E         at async [eval]:33:12
+E     
+E   assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...dout='', stderr='TypeError: poll is not a function\n    at evalmachine.<anonymous>:49:84\n    at async [eval]:33:12\n').returncode
+________ test_playback_response_after_pause_cannot_replace_exact_sample ________
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:684: in test_playback_response_after_pause_cannot_replace_exact_sample
+    run_js(EXACT+r"""const m=strictDraft();await inspected(m);var frames=[];requestAnimationFrame=f=>frames.push(f);performance={now:()=>200};
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:65: in run_js
+    assert result.returncode == 0, result.stdout + result.stderr
+E   AssertionError: TypeError: Cannot read properties of undefined (reading 'resolve')
+E         at evalmachine.<anonymous>:51:47
+E         at async [eval]:33:12
+E     
+E   assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...t read properties of undefined (reading 'resolve')\n    at evalmachine.<anonymous>:51:47\n    at async [eval]:33:12\n").returncode
+=============================== warnings summary ===============================
+tests/test_review_save_failures.py: 120 warnings
+  <unknown>:3370: SyntaxWarning: invalid escape sequence '\/'
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py::test_audio_toggle_back_survives_unacknowledged_save_and_revisit[network]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py::test_audio_toggle_back_survives_unacknowledged_save_and_revisit[423]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py::test_exact_geometry_handlers_share_ready_sample
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py::test_exact_scrub_cancels_gesture_keeps_pending_baseline
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py::test_geometry_ack_retains_newer_kind_and_advances_owned_complete_base[box-span]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py::test_geometry_ack_retains_newer_kind_and_advances_owned_complete_base[span-box]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py::test_geometry_ack_retains_newer_kind_and_advances_owned_complete_base[both]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py::test_geometry_ack_retains_newer_kind_and_advances_owned_complete_base[away-back]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py::test_geometry_ack_does_not_transplant_reinspected_family
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py::test_lost_ack_retries_identical_payload_before_newer_geometry[network]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py::test_lost_ack_retries_identical_payload_before_newer_geometry[json]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py::test_lost_ack_retries_identical_payload_before_newer_geometry[body]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py::test_lost_ack_retries_identical_payload_before_newer_geometry[409]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py::test_lost_ack_retries_identical_payload_before_newer_geometry[423]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py::test_lost_ack_retries_identical_payload_before_newer_geometry[500]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py::test_geometry_conflict_authority_and_abandon_preserve_drafts[False]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py::test_geometry_conflict_authority_and_abandon_preserve_drafts[True]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py::test_discard_geometry_and_inspect_is_selected_and_confirmed[False]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py::test_discard_geometry_and_inspect_is_selected_and_confirmed[True]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py::test_ack_clear_next_edit_uses_confirmed_display_baseline
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py::test_track_captures_seed_window_and_job_before_await
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py::test_track_late_status_cannot_refresh_reopened_mount
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py::test_playback_response_after_pause_cannot_replace_exact_sample
+23 failed, 97 passed, 120 warnings in 16.48s

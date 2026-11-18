@@ -1,0 +1,2 @@
+{"dpr":1,"media":[{"label":"cfr24","index":4,"marker":4},{"label":"cfr5","index":9,"marker":9},{"label":"normalized","index":6,"marker":5}],"coalescing":{"body":true,"decode":true},"staleTrackInert":true,"ownedTrackRefresh":true,"persistence":false}
+{"dpr":2,"media":[{"label":"cfr24","index":4,"marker":4},{"label":"cfr5","index":9,"marker":9},{"label":"normalized","index":6,"marker":5}],"coalescing":{"body":true,"decode":true},"staleTrackInert":true,"ownedTrackRefresh":true,"persistence":true}

@@ -1,0 +1,1279 @@
+DEFAULT_PATHS {"jobs": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_jobs", "models": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1004/runs/task1004-9728b423d53a4965927588e671ecfbe7/profile/.openscrub/models"}
+ACTIVE_SOURCE {"executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python", "python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]", "sources": {"openscrub": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub.py", "sha256": "d0e26f37d3bb541302fd597931deda08b0a23048251e12b3c22e793253def048"}, "openscrub_internal": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_internal/__init__.py", "sha256": "c35c063c010e329c5dad13782e7b67438ed4b2d1faf975d4f01be2773a18e022"}, "openscrub_internal.exact_samples": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_internal/exact_samples.py", "sha256": "0b583a0a027dc397ce3835982c5367031375fdd65d9a3b5f287dea3726c02c4d"}, "openscrub_internal.lifetimes": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_internal/lifetimes.py", "sha256": "86a01f37d9bae9998161eff1d04e2ca37d66548c2a202f36003587ec3e9cee8e"}, "openscrub_internal.reports": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_internal/reports.py", "sha256": "e8a7429c0b5430ee290f6635ca5d5a93445d3f0fe9bb0f58e57fec891ee01b7f"}, "openscrub_setup": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_setup.py", "sha256": "d0362a038f8182e8fae510100085bb087f09f7e5cf7e11a780a24390b3037eaf"}, "openscrub_update": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_update.py", "sha256": "4d6a20f75d985a119f8421227c3bd88b17fd1b8eed44e353b127b5b49e733d55"}, "openscrub_vault": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_vault.py", "sha256": "da1b7fe4da389352fbc594abddcc563278b26009d8f342d4154ffa305bf4dfa4"}, "openscrub_web": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_web.py", "sha256": "75076c63205a8ea7f55da05850fd077307144674cd3c152062541e43015d56bb"}, "zones_ui": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/zones_ui.py", "sha256": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7"}}}
+FFFFFFFFFFFFFFFFFFFFFFFFFFFFF                                            [100%]
+=================================== FAILURES ===================================
+___________ test_exact_scrubs_coalesce_fetch_and_body_across_mounts ____________
+
+    def test_exact_scrubs_coalesce_fetch_and_body_across_mounts():
+>       run_js(EXACT + r"""openJob('A');const a=exactMount();beScrub();
+        let bodyResolve;const req=queue.shift();req.resolve({ok:true,status:200,json:()=>new Promise(r=>bodyResolve=r)});await tick();
+        elements.get('beT').value=.2;beScrub();openJob('B');exactMount();beScrub();
+        openJob('A');const a3=exactMount();elements.get('beT').value=.7;beScrub();
+        assert.equal(calls.length,1,'fetch/body cycle released early');bodyResolve(sample());await tick();
+        assert.equal(candidates.length,0,'stale body decoded');assert.equal(calls.length,2);
+        assert(calls[1].url.endsWith('A/edit_sample?t=0.7'));
+        await reply(sample(.7));assert.equal(candidates.length,1);
+        elements.get('beT').value=.8;beScrub();assert.equal(calls.length,2,'decode released slot early');
+        candidates.shift().resolve();await tick();assert.equal(calls.length,3);assert.equal(liveURLs.size,0);
+        await reply(sample(.8));candidates.shift().resolve();await tick();assert(beReady(a3.view));
+        assert.equal(liveURLs.size,1);beUnmount();assert.equal(liveURLs.size,0);""")
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:534: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = '\nfunction mountIn(rootId){\n const root=elements.get(rootId)||el();elements.set(rootId,root);\n const img=el(),vid=e...);await tick();assert(beReady(a3.view));\n    assert.equal(liveURLs.size,1);beUnmount();assert.equal(liveURLs.size,0);'
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: AssertionError [ERR_ASSERTION]: fetch/body cycle released early
+E         
+E         4 !== 1
+E         
+E             at evalmachine.<anonymous>:52:12
+E             at async [eval]:33:12 {
+E           generatedMessage: false,
+E           code: 'ERR_ASSERTION',
+E           actual: 4,
+E           expected: 1,
+E           operator: 'strictEqual',
+E           diff: 'simple'
+E         }
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...ge: false,\n  code: 'ERR_ASSERTION',\n  actual: 4,\n  expected: 1,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n").returncode
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:65: AssertionError
+_____ test_exact_sample_waits_for_display_decode_and_transform[dimensions] _____
+
+bad = 'dimensions'
+
+    @pytest.mark.parametrize('bad', ['dimensions','zero','hidden'])
+    def test_exact_sample_waits_for_display_decode_and_transform(bad):
+>       run_js(EXACT + r"""const m=strictDraft();beScrub();await reply(sample());assert.equal(beReady(m.view),false);
+        if(BAD==='dimensions')m.img.naturalWidth=1;
+        else m.img.getBoundingClientRect=()=>({width:0,height:0});
+        candidates.shift().resolve();await tick();assert.equal(beReady(m.view),false);
+        assert.equal(Object.keys(BE.ov).length,0);""".replace('BAD',json.dumps(bad)))
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:550: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = '\nfunction mountIn(rootId){\n const root=elements.get(rootId)||el();elements.set(rootId,root);\n const img=el(),vid=e...es.shift().resolve();await tick();assert.equal(beReady(m.view),false);\n    assert.equal(Object.keys(BE.ov).length,0);'
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: ReferenceError: beReady is not defined
+E             at evalmachine.<anonymous>:48:62
+E             at async [eval]:33:12
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...'', stderr='ReferenceError: beReady is not defined\n    at evalmachine.<anonymous>:48:62\n    at async [eval]:33:12\n').returncode
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:65: AssertionError
+________ test_exact_sample_waits_for_display_decode_and_transform[zero] ________
+
+bad = 'zero'
+
+    @pytest.mark.parametrize('bad', ['dimensions','zero','hidden'])
+    def test_exact_sample_waits_for_display_decode_and_transform(bad):
+>       run_js(EXACT + r"""const m=strictDraft();beScrub();await reply(sample());assert.equal(beReady(m.view),false);
+        if(BAD==='dimensions')m.img.naturalWidth=1;
+        else m.img.getBoundingClientRect=()=>({width:0,height:0});
+        candidates.shift().resolve();await tick();assert.equal(beReady(m.view),false);
+        assert.equal(Object.keys(BE.ov).length,0);""".replace('BAD',json.dumps(bad)))
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:550: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = '\nfunction mountIn(rootId){\n const root=elements.get(rootId)||el();elements.set(rootId,root);\n const img=el(),vid=e...es.shift().resolve();await tick();assert.equal(beReady(m.view),false);\n    assert.equal(Object.keys(BE.ov).length,0);'
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: ReferenceError: beReady is not defined
+E             at evalmachine.<anonymous>:48:62
+E             at async [eval]:33:12
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...'', stderr='ReferenceError: beReady is not defined\n    at evalmachine.<anonymous>:48:62\n    at async [eval]:33:12\n').returncode
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:65: AssertionError
+_______ test_exact_sample_waits_for_display_decode_and_transform[hidden] _______
+
+bad = 'hidden'
+
+    @pytest.mark.parametrize('bad', ['dimensions','zero','hidden'])
+    def test_exact_sample_waits_for_display_decode_and_transform(bad):
+>       run_js(EXACT + r"""const m=strictDraft();beScrub();await reply(sample());assert.equal(beReady(m.view),false);
+        if(BAD==='dimensions')m.img.naturalWidth=1;
+        else m.img.getBoundingClientRect=()=>({width:0,height:0});
+        candidates.shift().resolve();await tick();assert.equal(beReady(m.view),false);
+        assert.equal(Object.keys(BE.ov).length,0);""".replace('BAD',json.dumps(bad)))
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:550: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = '\nfunction mountIn(rootId){\n const root=elements.get(rootId)||el();elements.set(rootId,root);\n const img=el(),vid=e...es.shift().resolve();await tick();assert.equal(beReady(m.view),false);\n    assert.equal(Object.keys(BE.ov).length,0);'
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: ReferenceError: beReady is not defined
+E             at evalmachine.<anonymous>:48:62
+E             at async [eval]:33:12
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...'', stderr='ReferenceError: beReady is not defined\n    at evalmachine.<anonymous>:48:62\n    at async [eval]:33:12\n').returncode
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:65: AssertionError
+___________ test_exact_old_load_error_and_same_be_remount_are_inert ____________
+
+    def test_exact_old_load_error_and_same_be_remount_are_inert():
+>       run_js(EXACT+r"""const old=strictDraft();beScrub();await reply(sample());
+        const next=exactMount();beScrub();candidates.shift().reject(Error('old decode'));await tick();
+        assert.equal(BE_VIEW,next.view);assert.equal(next.view.readySample,null);
+        await reply(sample());candidates.shift().resolve();await tick();assert(beReady(next.view));
+        assert.equal(liveURLs.size,1);assert.equal(revoked.length,1);""")
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:558: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = '\nfunction mountIn(rootId){\n const root=elements.get(rootId)||el();elements.set(rootId,root);\n const img=el(),vid=e....resolve();await tick();assert(beReady(next.view));\n    assert.equal(liveURLs.size,1);assert.equal(revoked.length,1);'
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: TypeError: Cannot read properties of undefined (reading 'reject')
+E             at evalmachine.<anonymous>:49:57
+E             at async [eval]:33:12
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...ot read properties of undefined (reading 'reject')\n    at evalmachine.<anonymous>:49:57\n    at async [eval]:33:12\n").returncode
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:65: AssertionError
+_______________ test_exact_geometry_handlers_share_ready_sample ________________
+
+    def test_exact_geometry_handlers_share_ready_sample():
+>       run_js(EXACT+r"""const m=strictDraft();const down=(x,y)=>m.cv.events.pointerdown({clientX:x,clientY:y,pointerId:1});
+        down(100,60);assert.equal(BE.sel,-1);beAddMode();assert.equal(BE.add,false);
+        beTrackMode();assert.equal(BE.trk,false);BE.sel=0;elements.get('beT0').value=0;elements.get('beT1').value=1;
+        beApplyTimes();assert.equal(Object.keys(BE.times).length,0);
+        await inspected(m);down(100,60);assert.equal(BE.sel,0);down(100,60);
+        m.cv.events.pointermove({clientX:110,clientY:65});
+        assert(BE.ov[0]);assert.equal(BE.geometry[0].precondition.source_ref,'incarnation:7');
+        assert.deepEqual(BE.geometry[0].precondition.base.span,[0,2,0]);
+        assert.deepEqual(BE.geometry[0].precondition.offset,[8,-4]);""")
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:576: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = '\nfunction mountIn(rootId){\n const root=elements.get(rootId)||el();elements.set(rootId,root);\n const img=el(),vid=e...qual(BE.geometry[0].precondition.base.span,[0,2,0]);\n    assert.deepEqual(BE.geometry[0].precondition.offset,[8,-4]);'
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+E         
+E         true !== false
+E         
+E             at evalmachine.<anonymous>:49:61
+E             at evalmachine.<anonymous>:56:67
+E             at Script.runInContext (node:vm:149:12)
+E             at Object.runInContext (node:vm:301:6)
+E             at run ([eval]:31:38)
+E             at [eval]:33:18
+E             at [eval]:33:56
+E             at [eval]:34:4
+E             at runScriptInThisContext (node:internal/vm:209:10)
+E             at node:internal/process/execution:446:12 {
+E           generatedMessage: true,
+E           code: 'ERR_ASSERTION',
+E           actual: true,
+E           expected: false,
+E           operator: 'strictEqual',
+E           diff: 'simple'
+E         }
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...ue,\n  code: 'ERR_ASSERTION',\n  actual: true,\n  expected: false,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n").returncode
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:65: AssertionError
+___________ test_exact_scrub_cancels_gesture_keeps_pending_baseline ____________
+
+    def test_exact_scrub_cancels_gesture_keeps_pending_baseline():
+>       run_js(EXACT+r"""const m=strictDraft();await inspected(m);
+        BE.sel=0;elements.get('beT0').value=.1;elements.get('beT1').value=1;beApplyTimes();
+        const owner=BE.geometry[0],before=JSON.stringify(BE.times);BE.drag={kind:'move'};BE.addAnchor=[1,2];
+        BE.audio.push({t0:0,t1:1});applyDet(2,false);beScrub();
+        assert.equal(BE.drag,null);assert.equal(BE.addAnchor,null);assert.equal(BE.sel,-1);
+        assert.equal(BE.geometry[0],owner);assert.equal(JSON.stringify(BE.times),before);
+        assert.equal(BE.audio.length,1);assert.equal(EDITS.enabled[2],false);""")
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:588: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = '\nfunction mountIn(rootId){\n const root=elements.get(rootId)||el();elements.set(rootId,root);\n const img=el(),vid=e...ert.equal(JSON.stringify(BE.times),before);\n    assert.equal(BE.audio.length,1);assert.equal(EDITS.enabled[2],false);'
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: AssertionError [ERR_ASSERTION]: exact sample must await detached decode
+E         
+E         0 !== 1
+E         
+E             at inspected (evalmachine.<anonymous>:41:9)
+E             at async evalmachine.<anonymous>:48:23
+E             at async [eval]:33:12 {
+E           generatedMessage: false,
+E           code: 'ERR_ASSERTION',
+E           actual: 0,
+E           expected: 1,
+E           operator: 'strictEqual',
+E           diff: 'simple'
+E         }
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...ge: false,\n  code: 'ERR_ASSERTION',\n  actual: 0,\n  expected: 1,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n").returncode
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:65: AssertionError
+_______ test_exact_add_captures_canonical_creation_after_prompts[window] _______
+
+change = 'window'
+
+    @pytest.mark.parametrize('change',['window','scrub','good'])
+    def test_exact_add_captures_canonical_creation_after_prompts(change):
+>       run_js(EXACT+r"""const m=strictDraft();await inspected(m);beAddMode();let prompts=0;
+        prompt=()=>{prompts++;if(CHANGE==='scrub'&&prompts===2)beScrub();return prompts===1?(CHANGE==='window'?'1':'0'):'2'};
+        const down=(x,y)=>m.cv.events.pointerdown({clientX:x,clientY:y,pointerId:1});down(10,10);down(50,50);
+        if(CHANGE!=='good'){assert.equal(BE.adds.length,0);return;}
+        assert.equal(BE.adds.length,1);assert.equal(BE.adds[0].tref,4/24);
+        assert.equal(Object.keys(BE.adds[0].sample_precondition).length,8);assert(BE.adds[0].manual_id);""".replace('CHANGE',json.dumps(change)))
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:599: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = '\nfunction mountIn(rootId){\n const root=elements.get(rootId)||el();elements.set(rootId,root);\n const img=el(),vid=e...s[0].tref,4/24);\n    assert.equal(Object.keys(BE.adds[0].sample_precondition).length,8);assert(BE.adds[0].manual_id);'
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: AssertionError [ERR_ASSERTION]: exact sample must await detached decode
+E         
+E         0 !== 1
+E         
+E             at inspected (evalmachine.<anonymous>:41:9)
+E             at async evalmachine.<anonymous>:48:23
+E             at async [eval]:33:12 {
+E           generatedMessage: false,
+E           code: 'ERR_ASSERTION',
+E           actual: 0,
+E           expected: 1,
+E           operator: 'strictEqual',
+E           diff: 'simple'
+E         }
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...ge: false,\n  code: 'ERR_ASSERTION',\n  actual: 0,\n  expected: 1,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n").returncode
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:65: AssertionError
+_______ test_exact_add_captures_canonical_creation_after_prompts[scrub] ________
+
+change = 'scrub'
+
+    @pytest.mark.parametrize('change',['window','scrub','good'])
+    def test_exact_add_captures_canonical_creation_after_prompts(change):
+>       run_js(EXACT+r"""const m=strictDraft();await inspected(m);beAddMode();let prompts=0;
+        prompt=()=>{prompts++;if(CHANGE==='scrub'&&prompts===2)beScrub();return prompts===1?(CHANGE==='window'?'1':'0'):'2'};
+        const down=(x,y)=>m.cv.events.pointerdown({clientX:x,clientY:y,pointerId:1});down(10,10);down(50,50);
+        if(CHANGE!=='good'){assert.equal(BE.adds.length,0);return;}
+        assert.equal(BE.adds.length,1);assert.equal(BE.adds[0].tref,4/24);
+        assert.equal(Object.keys(BE.adds[0].sample_precondition).length,8);assert(BE.adds[0].manual_id);""".replace('CHANGE',json.dumps(change)))
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:599: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = '\nfunction mountIn(rootId){\n const root=elements.get(rootId)||el();elements.set(rootId,root);\n const img=el(),vid=e...s[0].tref,4/24);\n    assert.equal(Object.keys(BE.adds[0].sample_precondition).length,8);assert(BE.adds[0].manual_id);'
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: AssertionError [ERR_ASSERTION]: exact sample must await detached decode
+E         
+E         0 !== 1
+E         
+E             at inspected (evalmachine.<anonymous>:41:9)
+E             at async evalmachine.<anonymous>:48:23
+E             at async [eval]:33:12 {
+E           generatedMessage: false,
+E           code: 'ERR_ASSERTION',
+E           actual: 0,
+E           expected: 1,
+E           operator: 'strictEqual',
+E           diff: 'simple'
+E         }
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...ge: false,\n  code: 'ERR_ASSERTION',\n  actual: 0,\n  expected: 1,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n").returncode
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:65: AssertionError
+________ test_exact_add_captures_canonical_creation_after_prompts[good] ________
+
+change = 'good'
+
+    @pytest.mark.parametrize('change',['window','scrub','good'])
+    def test_exact_add_captures_canonical_creation_after_prompts(change):
+>       run_js(EXACT+r"""const m=strictDraft();await inspected(m);beAddMode();let prompts=0;
+        prompt=()=>{prompts++;if(CHANGE==='scrub'&&prompts===2)beScrub();return prompts===1?(CHANGE==='window'?'1':'0'):'2'};
+        const down=(x,y)=>m.cv.events.pointerdown({clientX:x,clientY:y,pointerId:1});down(10,10);down(50,50);
+        if(CHANGE!=='good'){assert.equal(BE.adds.length,0);return;}
+        assert.equal(BE.adds.length,1);assert.equal(BE.adds[0].tref,4/24);
+        assert.equal(Object.keys(BE.adds[0].sample_precondition).length,8);assert(BE.adds[0].manual_id);""".replace('CHANGE',json.dumps(change)))
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:599: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = '\nfunction mountIn(rootId){\n const root=elements.get(rootId)||el();elements.set(rootId,root);\n const img=el(),vid=e...s[0].tref,4/24);\n    assert.equal(Object.keys(BE.adds[0].sample_precondition).length,8);assert(BE.adds[0].manual_id);'
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: AssertionError [ERR_ASSERTION]: exact sample must await detached decode
+E         
+E         0 !== 1
+E         
+E             at inspected (evalmachine.<anonymous>:41:9)
+E             at async evalmachine.<anonymous>:48:23
+E             at async [eval]:33:12 {
+E           generatedMessage: false,
+E           code: 'ERR_ASSERTION',
+E           actual: 0,
+E           expected: 1,
+E           operator: 'strictEqual',
+E           diff: 'simple'
+E         }
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...ge: false,\n  code: 'ERR_ASSERTION',\n  actual: 0,\n  expected: 1,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n").returncode
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:65: AssertionError
+_ test_geometry_ack_retains_newer_kind_and_advances_owned_complete_base[box-span] _
+
+kind = 'box-span'
+
+    @pytest.mark.parametrize('kind',['box-span','span-box','both','away-back'])
+    def test_geometry_ack_retains_newer_kind_and_advances_owned_complete_base(kind):
+>       run_js(EXACT+r"""const m=strictDraft();await inspected(m);beCaptureGeometry(m.view,BE.raw[0]);
+        if(KIND==='span-box')BE.times[0]=[.1,1];else BE.ov[0]=[130,85,330,225];
+        if(KIND==='both')BE.times[0]=[.1,1];const p=saveAndRender(),sent=calls.at(-1).body;
+        if(KIND==='box-span')BE.times[0]=[.2,1.5];else BE.ov[0]=[140,90,340,230];
+        if(KIND==='away-back')BE.ov[0]=[130,85,330,225];
+        const base={cbox:sent.box_overrides[0]||[120,80,320,220],span:sent.time_overrides[0]?[...sent.time_overrides[0],.4]:[0,2,.4]};
+        await reply(ack(sent,base));if(KIND==='away-back')await reply();await p;
+        if(KIND!=='away-back'){assert.equal(calls.filter(c=>c.url.endsWith('/render')).length,0);
+        assert.deepEqual(BE.geometry[0].precondition.base,base);assert(BE.ov[0]||BE.times[0]);}
+        """.replace('KIND',json.dumps(kind)))
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:609: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "\nfunction mountIn(rootId){\n const root=elements.get(rootId)||el();elements.set(rootId,root);\n const img=el(),vid=e...ender')).length,0);\n    assert.deepEqual(BE.geometry[0].precondition.base,base);assert(BE.ov[0]||BE.times[0]);}\n    "
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: AssertionError [ERR_ASSERTION]: exact sample must await detached decode
+E         
+E         0 !== 1
+E         
+E             at inspected (evalmachine.<anonymous>:41:9)
+E             at async evalmachine.<anonymous>:48:23
+E             at async [eval]:33:12 {
+E           generatedMessage: false,
+E           code: 'ERR_ASSERTION',
+E           actual: 0,
+E           expected: 1,
+E           operator: 'strictEqual',
+E           diff: 'simple'
+E         }
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...ge: false,\n  code: 'ERR_ASSERTION',\n  actual: 0,\n  expected: 1,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n").returncode
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:65: AssertionError
+_ test_geometry_ack_retains_newer_kind_and_advances_owned_complete_base[span-box] _
+
+kind = 'span-box'
+
+    @pytest.mark.parametrize('kind',['box-span','span-box','both','away-back'])
+    def test_geometry_ack_retains_newer_kind_and_advances_owned_complete_base(kind):
+>       run_js(EXACT+r"""const m=strictDraft();await inspected(m);beCaptureGeometry(m.view,BE.raw[0]);
+        if(KIND==='span-box')BE.times[0]=[.1,1];else BE.ov[0]=[130,85,330,225];
+        if(KIND==='both')BE.times[0]=[.1,1];const p=saveAndRender(),sent=calls.at(-1).body;
+        if(KIND==='box-span')BE.times[0]=[.2,1.5];else BE.ov[0]=[140,90,340,230];
+        if(KIND==='away-back')BE.ov[0]=[130,85,330,225];
+        const base={cbox:sent.box_overrides[0]||[120,80,320,220],span:sent.time_overrides[0]?[...sent.time_overrides[0],.4]:[0,2,.4]};
+        await reply(ack(sent,base));if(KIND==='away-back')await reply();await p;
+        if(KIND!=='away-back'){assert.equal(calls.filter(c=>c.url.endsWith('/render')).length,0);
+        assert.deepEqual(BE.geometry[0].precondition.base,base);assert(BE.ov[0]||BE.times[0]);}
+        """.replace('KIND',json.dumps(kind)))
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:609: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "\nfunction mountIn(rootId){\n const root=elements.get(rootId)||el();elements.set(rootId,root);\n const img=el(),vid=e...ender')).length,0);\n    assert.deepEqual(BE.geometry[0].precondition.base,base);assert(BE.ov[0]||BE.times[0]);}\n    "
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: AssertionError [ERR_ASSERTION]: exact sample must await detached decode
+E         
+E         0 !== 1
+E         
+E             at inspected (evalmachine.<anonymous>:41:9)
+E             at async evalmachine.<anonymous>:48:23
+E             at async [eval]:33:12 {
+E           generatedMessage: false,
+E           code: 'ERR_ASSERTION',
+E           actual: 0,
+E           expected: 1,
+E           operator: 'strictEqual',
+E           diff: 'simple'
+E         }
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...ge: false,\n  code: 'ERR_ASSERTION',\n  actual: 0,\n  expected: 1,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n").returncode
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:65: AssertionError
+_ test_geometry_ack_retains_newer_kind_and_advances_owned_complete_base[both] __
+
+kind = 'both'
+
+    @pytest.mark.parametrize('kind',['box-span','span-box','both','away-back'])
+    def test_geometry_ack_retains_newer_kind_and_advances_owned_complete_base(kind):
+>       run_js(EXACT+r"""const m=strictDraft();await inspected(m);beCaptureGeometry(m.view,BE.raw[0]);
+        if(KIND==='span-box')BE.times[0]=[.1,1];else BE.ov[0]=[130,85,330,225];
+        if(KIND==='both')BE.times[0]=[.1,1];const p=saveAndRender(),sent=calls.at(-1).body;
+        if(KIND==='box-span')BE.times[0]=[.2,1.5];else BE.ov[0]=[140,90,340,230];
+        if(KIND==='away-back')BE.ov[0]=[130,85,330,225];
+        const base={cbox:sent.box_overrides[0]||[120,80,320,220],span:sent.time_overrides[0]?[...sent.time_overrides[0],.4]:[0,2,.4]};
+        await reply(ack(sent,base));if(KIND==='away-back')await reply();await p;
+        if(KIND!=='away-back'){assert.equal(calls.filter(c=>c.url.endsWith('/render')).length,0);
+        assert.deepEqual(BE.geometry[0].precondition.base,base);assert(BE.ov[0]||BE.times[0]);}
+        """.replace('KIND',json.dumps(kind)))
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:609: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "\nfunction mountIn(rootId){\n const root=elements.get(rootId)||el();elements.set(rootId,root);\n const img=el(),vid=e...ender')).length,0);\n    assert.deepEqual(BE.geometry[0].precondition.base,base);assert(BE.ov[0]||BE.times[0]);}\n    "
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: AssertionError [ERR_ASSERTION]: exact sample must await detached decode
+E         
+E         0 !== 1
+E         
+E             at inspected (evalmachine.<anonymous>:41:9)
+E             at async evalmachine.<anonymous>:48:23
+E             at async [eval]:33:12 {
+E           generatedMessage: false,
+E           code: 'ERR_ASSERTION',
+E           actual: 0,
+E           expected: 1,
+E           operator: 'strictEqual',
+E           diff: 'simple'
+E         }
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...ge: false,\n  code: 'ERR_ASSERTION',\n  actual: 0,\n  expected: 1,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n").returncode
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:65: AssertionError
+_ test_geometry_ack_retains_newer_kind_and_advances_owned_complete_base[away-back] _
+
+kind = 'away-back'
+
+    @pytest.mark.parametrize('kind',['box-span','span-box','both','away-back'])
+    def test_geometry_ack_retains_newer_kind_and_advances_owned_complete_base(kind):
+>       run_js(EXACT+r"""const m=strictDraft();await inspected(m);beCaptureGeometry(m.view,BE.raw[0]);
+        if(KIND==='span-box')BE.times[0]=[.1,1];else BE.ov[0]=[130,85,330,225];
+        if(KIND==='both')BE.times[0]=[.1,1];const p=saveAndRender(),sent=calls.at(-1).body;
+        if(KIND==='box-span')BE.times[0]=[.2,1.5];else BE.ov[0]=[140,90,340,230];
+        if(KIND==='away-back')BE.ov[0]=[130,85,330,225];
+        const base={cbox:sent.box_overrides[0]||[120,80,320,220],span:sent.time_overrides[0]?[...sent.time_overrides[0],.4]:[0,2,.4]};
+        await reply(ack(sent,base));if(KIND==='away-back')await reply();await p;
+        if(KIND!=='away-back'){assert.equal(calls.filter(c=>c.url.endsWith('/render')).length,0);
+        assert.deepEqual(BE.geometry[0].precondition.base,base);assert(BE.ov[0]||BE.times[0]);}
+        """.replace('KIND',json.dumps(kind)))
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:609: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "\nfunction mountIn(rootId){\n const root=elements.get(rootId)||el();elements.set(rootId,root);\n const img=el(),vid=e...ender')).length,0);\n    assert.deepEqual(BE.geometry[0].precondition.base,base);assert(BE.ov[0]||BE.times[0]);}\n    "
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: AssertionError [ERR_ASSERTION]: exact sample must await detached decode
+E         
+E         0 !== 1
+E         
+E             at inspected (evalmachine.<anonymous>:41:9)
+E             at async evalmachine.<anonymous>:48:23
+E             at async [eval]:33:12 {
+E           generatedMessage: false,
+E           code: 'ERR_ASSERTION',
+E           actual: 0,
+E           expected: 1,
+E           operator: 'strictEqual',
+E           diff: 'simple'
+E         }
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...ge: false,\n  code: 'ERR_ASSERTION',\n  actual: 0,\n  expected: 1,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n").returncode
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:65: AssertionError
+___________ test_geometry_ack_does_not_transplant_reinspected_family ___________
+
+    def test_geometry_ack_does_not_transplant_reinspected_family():
+>       run_js(EXACT+r"""const m=strictDraft();await inspected(m);beCaptureGeometry(m.view,BE.raw[0]);BE.ov[0]=[130,85,330,225];
+        const p=saveAndRender(),sent=calls.at(-1).body;BE.geometry[0]={precondition:{...BE.geometry[0].precondition,source_ref:'other:1'}};
+        await reply(ack(sent));await p;assert(BE.ov[0]);assert.equal(BE.geometry[0].precondition.source_ref,'other:1');""")
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:622: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "\nfunction mountIn(rootId){\n const root=elements.get(rootId)||el();elements.set(rootId,root);\n const img=el(),vid=e...;\n    await reply(ack(sent));await p;assert(BE.ov[0]);assert.equal(BE.geometry[0].precondition.source_ref,'other:1');"
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: AssertionError [ERR_ASSERTION]: exact sample must await detached decode
+E         
+E         0 !== 1
+E         
+E             at inspected (evalmachine.<anonymous>:41:9)
+E             at async evalmachine.<anonymous>:48:23
+E             at async [eval]:33:12 {
+E           generatedMessage: false,
+E           code: 'ERR_ASSERTION',
+E           actual: 0,
+E           expected: 1,
+E           operator: 'strictEqual',
+E           diff: 'simple'
+E         }
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...ge: false,\n  code: 'ERR_ASSERTION',\n  actual: 0,\n  expected: 1,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n").returncode
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:65: AssertionError
+____ test_lost_ack_retries_identical_payload_before_newer_geometry[network] ____
+
+failure = 'network'
+
+    @pytest.mark.parametrize('failure',['network','json','body','409','423','500'])
+    def test_lost_ack_retries_identical_payload_before_newer_geometry(failure):
+>       run_js(EXACT+r"""const m=strictDraft();await inspected(m);beCaptureGeometry(m.view,BE.raw[0]);BE.ov[0]=[130,85,330,225];
+        const p=saveAndRender(),sent=copyEdit(calls.at(-1).body),req=queue.shift();
+        if(FAILURE==='network')req.reject(Error('lost ACK'));
+        else if(FAILURE==='json')req.resolve({ok:true,status:200,json:async()=>{throw Error('bad JSON')}});
+        else req.resolve(response({error:'busy'},FAILURE==='body'?200:+FAILURE));await tick();await p;
+        BE.times[0]=[.2,1.5];BE.audioLoaded=true;BE.audio.push({t0:0,t1:1});applyDet(1,false);
+        const retry=saveAndRender();assert.deepEqual(calls.at(-1).body,sent);await reply(ack(sent));await retry;
+        assert(BE.times[0]);assert.equal(calls.filter(c=>c.url.endsWith('/render')).length,0);
+        assert.equal(EDITS.submitted,null);""".replace('FAILURE',json.dumps(failure)))
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:629: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "\nfunction mountIn(rootId){\n const root=elements.get(rootId)||el();elements.set(rootId,root);\n const img=el(),vid=e....times[0]);assert.equal(calls.filter(c=>c.url.endsWith('/render')).length,0);\n    assert.equal(EDITS.submitted,null);"
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: AssertionError [ERR_ASSERTION]: exact sample must await detached decode
+E         
+E         0 !== 1
+E         
+E             at inspected (evalmachine.<anonymous>:41:9)
+E             at async evalmachine.<anonymous>:48:23
+E             at async [eval]:33:12 {
+E           generatedMessage: false,
+E           code: 'ERR_ASSERTION',
+E           actual: 0,
+E           expected: 1,
+E           operator: 'strictEqual',
+E           diff: 'simple'
+E         }
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...ge: false,\n  code: 'ERR_ASSERTION',\n  actual: 0,\n  expected: 1,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n").returncode
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:65: AssertionError
+_____ test_lost_ack_retries_identical_payload_before_newer_geometry[json] ______
+
+failure = 'json'
+
+    @pytest.mark.parametrize('failure',['network','json','body','409','423','500'])
+    def test_lost_ack_retries_identical_payload_before_newer_geometry(failure):
+>       run_js(EXACT+r"""const m=strictDraft();await inspected(m);beCaptureGeometry(m.view,BE.raw[0]);BE.ov[0]=[130,85,330,225];
+        const p=saveAndRender(),sent=copyEdit(calls.at(-1).body),req=queue.shift();
+        if(FAILURE==='network')req.reject(Error('lost ACK'));
+        else if(FAILURE==='json')req.resolve({ok:true,status:200,json:async()=>{throw Error('bad JSON')}});
+        else req.resolve(response({error:'busy'},FAILURE==='body'?200:+FAILURE));await tick();await p;
+        BE.times[0]=[.2,1.5];BE.audioLoaded=true;BE.audio.push({t0:0,t1:1});applyDet(1,false);
+        const retry=saveAndRender();assert.deepEqual(calls.at(-1).body,sent);await reply(ack(sent));await retry;
+        assert(BE.times[0]);assert.equal(calls.filter(c=>c.url.endsWith('/render')).length,0);
+        assert.equal(EDITS.submitted,null);""".replace('FAILURE',json.dumps(failure)))
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:629: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "\nfunction mountIn(rootId){\n const root=elements.get(rootId)||el();elements.set(rootId,root);\n const img=el(),vid=e....times[0]);assert.equal(calls.filter(c=>c.url.endsWith('/render')).length,0);\n    assert.equal(EDITS.submitted,null);"
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: AssertionError [ERR_ASSERTION]: exact sample must await detached decode
+E         
+E         0 !== 1
+E         
+E             at inspected (evalmachine.<anonymous>:41:9)
+E             at async evalmachine.<anonymous>:48:23
+E             at async [eval]:33:12 {
+E           generatedMessage: false,
+E           code: 'ERR_ASSERTION',
+E           actual: 0,
+E           expected: 1,
+E           operator: 'strictEqual',
+E           diff: 'simple'
+E         }
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...ge: false,\n  code: 'ERR_ASSERTION',\n  actual: 0,\n  expected: 1,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n").returncode
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:65: AssertionError
+_____ test_lost_ack_retries_identical_payload_before_newer_geometry[body] ______
+
+failure = 'body'
+
+    @pytest.mark.parametrize('failure',['network','json','body','409','423','500'])
+    def test_lost_ack_retries_identical_payload_before_newer_geometry(failure):
+>       run_js(EXACT+r"""const m=strictDraft();await inspected(m);beCaptureGeometry(m.view,BE.raw[0]);BE.ov[0]=[130,85,330,225];
+        const p=saveAndRender(),sent=copyEdit(calls.at(-1).body),req=queue.shift();
+        if(FAILURE==='network')req.reject(Error('lost ACK'));
+        else if(FAILURE==='json')req.resolve({ok:true,status:200,json:async()=>{throw Error('bad JSON')}});
+        else req.resolve(response({error:'busy'},FAILURE==='body'?200:+FAILURE));await tick();await p;
+        BE.times[0]=[.2,1.5];BE.audioLoaded=true;BE.audio.push({t0:0,t1:1});applyDet(1,false);
+        const retry=saveAndRender();assert.deepEqual(calls.at(-1).body,sent);await reply(ack(sent));await retry;
+        assert(BE.times[0]);assert.equal(calls.filter(c=>c.url.endsWith('/render')).length,0);
+        assert.equal(EDITS.submitted,null);""".replace('FAILURE',json.dumps(failure)))
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:629: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "\nfunction mountIn(rootId){\n const root=elements.get(rootId)||el();elements.set(rootId,root);\n const img=el(),vid=e....times[0]);assert.equal(calls.filter(c=>c.url.endsWith('/render')).length,0);\n    assert.equal(EDITS.submitted,null);"
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: AssertionError [ERR_ASSERTION]: exact sample must await detached decode
+E         
+E         0 !== 1
+E         
+E             at inspected (evalmachine.<anonymous>:41:9)
+E             at async evalmachine.<anonymous>:48:23
+E             at async [eval]:33:12 {
+E           generatedMessage: false,
+E           code: 'ERR_ASSERTION',
+E           actual: 0,
+E           expected: 1,
+E           operator: 'strictEqual',
+E           diff: 'simple'
+E         }
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...ge: false,\n  code: 'ERR_ASSERTION',\n  actual: 0,\n  expected: 1,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n").returncode
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:65: AssertionError
+______ test_lost_ack_retries_identical_payload_before_newer_geometry[409] ______
+
+failure = '409'
+
+    @pytest.mark.parametrize('failure',['network','json','body','409','423','500'])
+    def test_lost_ack_retries_identical_payload_before_newer_geometry(failure):
+>       run_js(EXACT+r"""const m=strictDraft();await inspected(m);beCaptureGeometry(m.view,BE.raw[0]);BE.ov[0]=[130,85,330,225];
+        const p=saveAndRender(),sent=copyEdit(calls.at(-1).body),req=queue.shift();
+        if(FAILURE==='network')req.reject(Error('lost ACK'));
+        else if(FAILURE==='json')req.resolve({ok:true,status:200,json:async()=>{throw Error('bad JSON')}});
+        else req.resolve(response({error:'busy'},FAILURE==='body'?200:+FAILURE));await tick();await p;
+        BE.times[0]=[.2,1.5];BE.audioLoaded=true;BE.audio.push({t0:0,t1:1});applyDet(1,false);
+        const retry=saveAndRender();assert.deepEqual(calls.at(-1).body,sent);await reply(ack(sent));await retry;
+        assert(BE.times[0]);assert.equal(calls.filter(c=>c.url.endsWith('/render')).length,0);
+        assert.equal(EDITS.submitted,null);""".replace('FAILURE',json.dumps(failure)))
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:629: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "\nfunction mountIn(rootId){\n const root=elements.get(rootId)||el();elements.set(rootId,root);\n const img=el(),vid=e....times[0]);assert.equal(calls.filter(c=>c.url.endsWith('/render')).length,0);\n    assert.equal(EDITS.submitted,null);"
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: AssertionError [ERR_ASSERTION]: exact sample must await detached decode
+E         
+E         0 !== 1
+E         
+E             at inspected (evalmachine.<anonymous>:41:9)
+E             at async evalmachine.<anonymous>:48:23
+E             at async [eval]:33:12 {
+E           generatedMessage: false,
+E           code: 'ERR_ASSERTION',
+E           actual: 0,
+E           expected: 1,
+E           operator: 'strictEqual',
+E           diff: 'simple'
+E         }
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...ge: false,\n  code: 'ERR_ASSERTION',\n  actual: 0,\n  expected: 1,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n").returncode
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:65: AssertionError
+______ test_lost_ack_retries_identical_payload_before_newer_geometry[423] ______
+
+failure = '423'
+
+    @pytest.mark.parametrize('failure',['network','json','body','409','423','500'])
+    def test_lost_ack_retries_identical_payload_before_newer_geometry(failure):
+>       run_js(EXACT+r"""const m=strictDraft();await inspected(m);beCaptureGeometry(m.view,BE.raw[0]);BE.ov[0]=[130,85,330,225];
+        const p=saveAndRender(),sent=copyEdit(calls.at(-1).body),req=queue.shift();
+        if(FAILURE==='network')req.reject(Error('lost ACK'));
+        else if(FAILURE==='json')req.resolve({ok:true,status:200,json:async()=>{throw Error('bad JSON')}});
+        else req.resolve(response({error:'busy'},FAILURE==='body'?200:+FAILURE));await tick();await p;
+        BE.times[0]=[.2,1.5];BE.audioLoaded=true;BE.audio.push({t0:0,t1:1});applyDet(1,false);
+        const retry=saveAndRender();assert.deepEqual(calls.at(-1).body,sent);await reply(ack(sent));await retry;
+        assert(BE.times[0]);assert.equal(calls.filter(c=>c.url.endsWith('/render')).length,0);
+        assert.equal(EDITS.submitted,null);""".replace('FAILURE',json.dumps(failure)))
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:629: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "\nfunction mountIn(rootId){\n const root=elements.get(rootId)||el();elements.set(rootId,root);\n const img=el(),vid=e....times[0]);assert.equal(calls.filter(c=>c.url.endsWith('/render')).length,0);\n    assert.equal(EDITS.submitted,null);"
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: AssertionError [ERR_ASSERTION]: exact sample must await detached decode
+E         
+E         0 !== 1
+E         
+E             at inspected (evalmachine.<anonymous>:41:9)
+E             at async evalmachine.<anonymous>:48:23
+E             at async [eval]:33:12 {
+E           generatedMessage: false,
+E           code: 'ERR_ASSERTION',
+E           actual: 0,
+E           expected: 1,
+E           operator: 'strictEqual',
+E           diff: 'simple'
+E         }
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...ge: false,\n  code: 'ERR_ASSERTION',\n  actual: 0,\n  expected: 1,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n").returncode
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:65: AssertionError
+______ test_lost_ack_retries_identical_payload_before_newer_geometry[500] ______
+
+failure = '500'
+
+    @pytest.mark.parametrize('failure',['network','json','body','409','423','500'])
+    def test_lost_ack_retries_identical_payload_before_newer_geometry(failure):
+>       run_js(EXACT+r"""const m=strictDraft();await inspected(m);beCaptureGeometry(m.view,BE.raw[0]);BE.ov[0]=[130,85,330,225];
+        const p=saveAndRender(),sent=copyEdit(calls.at(-1).body),req=queue.shift();
+        if(FAILURE==='network')req.reject(Error('lost ACK'));
+        else if(FAILURE==='json')req.resolve({ok:true,status:200,json:async()=>{throw Error('bad JSON')}});
+        else req.resolve(response({error:'busy'},FAILURE==='body'?200:+FAILURE));await tick();await p;
+        BE.times[0]=[.2,1.5];BE.audioLoaded=true;BE.audio.push({t0:0,t1:1});applyDet(1,false);
+        const retry=saveAndRender();assert.deepEqual(calls.at(-1).body,sent);await reply(ack(sent));await retry;
+        assert(BE.times[0]);assert.equal(calls.filter(c=>c.url.endsWith('/render')).length,0);
+        assert.equal(EDITS.submitted,null);""".replace('FAILURE',json.dumps(failure)))
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:629: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "\nfunction mountIn(rootId){\n const root=elements.get(rootId)||el();elements.set(rootId,root);\n const img=el(),vid=e....times[0]);assert.equal(calls.filter(c=>c.url.endsWith('/render')).length,0);\n    assert.equal(EDITS.submitted,null);"
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: AssertionError [ERR_ASSERTION]: exact sample must await detached decode
+E         
+E         0 !== 1
+E         
+E             at inspected (evalmachine.<anonymous>:41:9)
+E             at async evalmachine.<anonymous>:48:23
+E             at async [eval]:33:12 {
+E           generatedMessage: false,
+E           code: 'ERR_ASSERTION',
+E           actual: 0,
+E           expected: 1,
+E           operator: 'strictEqual',
+E           diff: 'simple'
+E         }
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...ge: false,\n  code: 'ERR_ASSERTION',\n  actual: 0,\n  expected: 1,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n").returncode
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:65: AssertionError
+_____ test_geometry_conflict_authority_and_abandon_preserve_drafts[False] ______
+
+uncertain = False
+
+    @pytest.mark.parametrize('uncertain',[False,True])
+    def test_geometry_conflict_authority_and_abandon_preserve_drafts(uncertain):
+>       run_js(EXACT+r"""const m=strictDraft();await inspected(m);beCaptureGeometry(m.view,BE.raw[0]);BE.ov[0]=[130,85,330,225];
+        let p=saveAndRender();if(UNCERTAIN){queue.shift().reject(Error('lost'));await tick();await p;p=saveAndRender();}
+        await reply({ok:false,error:'geometry_conflict'},409);await p;
+        assert.equal(!!EDITS.submitted,UNCERTAIN);const before=JSON.stringify(BE.ov),n=calls.length;
+        if(UNCERTAIN){confirm=()=>false;reviewAbandon();assert(EDITS.submitted);confirm=()=>true;reviewAbandon();assert.equal(EDITS.submitted,null);}
+        assert.equal(JSON.stringify(BE.ov),before);assert.equal(calls.length,n);""".replace('UNCERTAIN',str(uncertain).lower()))
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:642: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = '\nfunction mountIn(rootId){\n const root=elements.get(rootId)||el();elements.set(rootId,root);\n const img=el(),vid=e...n();assert.equal(EDITS.submitted,null);}\n    assert.equal(JSON.stringify(BE.ov),before);assert.equal(calls.length,n);'
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: AssertionError [ERR_ASSERTION]: exact sample must await detached decode
+E         
+E         0 !== 1
+E         
+E             at inspected (evalmachine.<anonymous>:41:9)
+E             at async evalmachine.<anonymous>:48:23
+E             at async [eval]:33:12 {
+E           generatedMessage: false,
+E           code: 'ERR_ASSERTION',
+E           actual: 0,
+E           expected: 1,
+E           operator: 'strictEqual',
+E           diff: 'simple'
+E         }
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...ge: false,\n  code: 'ERR_ASSERTION',\n  actual: 0,\n  expected: 1,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n").returncode
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:65: AssertionError
+______ test_geometry_conflict_authority_and_abandon_preserve_drafts[True] ______
+
+uncertain = True
+
+    @pytest.mark.parametrize('uncertain',[False,True])
+    def test_geometry_conflict_authority_and_abandon_preserve_drafts(uncertain):
+>       run_js(EXACT+r"""const m=strictDraft();await inspected(m);beCaptureGeometry(m.view,BE.raw[0]);BE.ov[0]=[130,85,330,225];
+        let p=saveAndRender();if(UNCERTAIN){queue.shift().reject(Error('lost'));await tick();await p;p=saveAndRender();}
+        await reply({ok:false,error:'geometry_conflict'},409);await p;
+        assert.equal(!!EDITS.submitted,UNCERTAIN);const before=JSON.stringify(BE.ov),n=calls.length;
+        if(UNCERTAIN){confirm=()=>false;reviewAbandon();assert(EDITS.submitted);confirm=()=>true;reviewAbandon();assert.equal(EDITS.submitted,null);}
+        assert.equal(JSON.stringify(BE.ov),before);assert.equal(calls.length,n);""".replace('UNCERTAIN',str(uncertain).lower()))
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:642: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = '\nfunction mountIn(rootId){\n const root=elements.get(rootId)||el();elements.set(rootId,root);\n const img=el(),vid=e...n();assert.equal(EDITS.submitted,null);}\n    assert.equal(JSON.stringify(BE.ov),before);assert.equal(calls.length,n);'
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: AssertionError [ERR_ASSERTION]: exact sample must await detached decode
+E         
+E         0 !== 1
+E         
+E             at inspected (evalmachine.<anonymous>:41:9)
+E             at async evalmachine.<anonymous>:48:23
+E             at async [eval]:33:12 {
+E           generatedMessage: false,
+E           code: 'ERR_ASSERTION',
+E           actual: 0,
+E           expected: 1,
+E           operator: 'strictEqual',
+E           diff: 'simple'
+E         }
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...ge: false,\n  code: 'ERR_ASSERTION',\n  actual: 0,\n  expected: 1,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n").returncode
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:65: AssertionError
+______ test_discard_geometry_and_inspect_is_selected_and_confirmed[False] ______
+
+changed = False
+
+    @pytest.mark.parametrize('changed',[False,True])
+    def test_discard_geometry_and_inspect_is_selected_and_confirmed(changed):
+>       run_js(EXACT+r"""const m=strictDraft();await inspected(m);beCaptureGeometry(m.view,BE.raw[0]);BE.ov[0]=[130,85,330,225];BE.times[99]=[0,1];
+        BE.adds.push({manual_id:'keep',box:[1,2,3,4]});MAN.push({manual_id:'separate'});BE.audio.push({t0:0,t1:1});applyDet(1,false);
+        confirm=()=>{if(CHANGED)BE.ov[0]=[140,85,340,225];return true};await reviewDiscard('row:0');
+        assert.equal(!!BE.ov[0],CHANGED);assert(BE.times[99]);assert.equal(BE.adds.length,1);assert.equal(MAN.length,1);
+        assert.equal(BE.audio.length,1);assert.equal(EDITS.enabled[1],false);
+        assert.equal(calls.filter(c=>c.url.endsWith('/detections')||c.url.endsWith('/render')).length,0);
+        """.replace('CHANGED',str(changed).lower()))
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:652: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "\nfunction mountIn(rootId){\n const root=elements.get(rootId)||el();elements.set(rootId,root);\n const img=el(),vid=e...],false);\n    assert.equal(calls.filter(c=>c.url.endsWith('/detections')||c.url.endsWith('/render')).length,0);\n    "
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: AssertionError [ERR_ASSERTION]: exact sample must await detached decode
+E         
+E         0 !== 1
+E         
+E             at inspected (evalmachine.<anonymous>:41:9)
+E             at async evalmachine.<anonymous>:48:23
+E             at async [eval]:33:12 {
+E           generatedMessage: false,
+E           code: 'ERR_ASSERTION',
+E           actual: 0,
+E           expected: 1,
+E           operator: 'strictEqual',
+E           diff: 'simple'
+E         }
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...ge: false,\n  code: 'ERR_ASSERTION',\n  actual: 0,\n  expected: 1,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n").returncode
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:65: AssertionError
+______ test_discard_geometry_and_inspect_is_selected_and_confirmed[True] _______
+
+changed = True
+
+    @pytest.mark.parametrize('changed',[False,True])
+    def test_discard_geometry_and_inspect_is_selected_and_confirmed(changed):
+>       run_js(EXACT+r"""const m=strictDraft();await inspected(m);beCaptureGeometry(m.view,BE.raw[0]);BE.ov[0]=[130,85,330,225];BE.times[99]=[0,1];
+        BE.adds.push({manual_id:'keep',box:[1,2,3,4]});MAN.push({manual_id:'separate'});BE.audio.push({t0:0,t1:1});applyDet(1,false);
+        confirm=()=>{if(CHANGED)BE.ov[0]=[140,85,340,225];return true};await reviewDiscard('row:0');
+        assert.equal(!!BE.ov[0],CHANGED);assert(BE.times[99]);assert.equal(BE.adds.length,1);assert.equal(MAN.length,1);
+        assert.equal(BE.audio.length,1);assert.equal(EDITS.enabled[1],false);
+        assert.equal(calls.filter(c=>c.url.endsWith('/detections')||c.url.endsWith('/render')).length,0);
+        """.replace('CHANGED',str(changed).lower()))
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:652: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "\nfunction mountIn(rootId){\n const root=elements.get(rootId)||el();elements.set(rootId,root);\n const img=el(),vid=e...],false);\n    assert.equal(calls.filter(c=>c.url.endsWith('/detections')||c.url.endsWith('/render')).length,0);\n    "
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: AssertionError [ERR_ASSERTION]: exact sample must await detached decode
+E         
+E         0 !== 1
+E         
+E             at inspected (evalmachine.<anonymous>:41:9)
+E             at async evalmachine.<anonymous>:48:23
+E             at async [eval]:33:12 {
+E           generatedMessage: false,
+E           code: 'ERR_ASSERTION',
+E           actual: 0,
+E           expected: 1,
+E           operator: 'strictEqual',
+E           diff: 'simple'
+E         }
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...ge: false,\n  code: 'ERR_ASSERTION',\n  actual: 0,\n  expected: 1,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n").returncode
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:65: AssertionError
+___________ test_ack_clear_next_edit_uses_confirmed_display_baseline ___________
+
+    def test_ack_clear_next_edit_uses_confirmed_display_baseline():
+>       run_js(EXACT+r"""const m=strictDraft();await inspected(m);beCaptureGeometry(m.view,BE.raw[0]);BE.ov[0]=[130,85,330,225];
+        const p=saveAndRender(),sent=calls.at(-1).body;applyDet(1,false);await reply(ack(sent));await p;
+        assert.deepEqual(BE.raw[0].base.cbox,[130,85,330,225]);assert.deepEqual(BE.boxes[0].box,[138,81,338,221]);
+        beCaptureGeometry(m.view,BE.raw[0]);assert.deepEqual(BE.geometry[0].precondition.base.span,[0,2,.4]);""")
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:662: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = '\nfunction mountIn(rootId){\n const root=elements.get(rootId)||el();elements.set(rootId,root);\n const img=el(),vid=e...,338,221]);\n    beCaptureGeometry(m.view,BE.raw[0]);assert.deepEqual(BE.geometry[0].precondition.base.span,[0,2,.4]);'
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: AssertionError [ERR_ASSERTION]: exact sample must await detached decode
+E         
+E         0 !== 1
+E         
+E             at inspected (evalmachine.<anonymous>:41:9)
+E             at async evalmachine.<anonymous>:48:23
+E             at async [eval]:33:12 {
+E           generatedMessage: false,
+E           code: 'ERR_ASSERTION',
+E           actual: 0,
+E           expected: 1,
+E           operator: 'strictEqual',
+E           diff: 'simple'
+E         }
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...ge: false,\n  code: 'ERR_ASSERTION',\n  actual: 0,\n  expected: 1,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n").returncode
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:65: AssertionError
+_____________ test_track_captures_seed_window_and_job_before_await _____________
+
+    def test_track_captures_seed_window_and_job_before_await():
+>       run_js(EXACT+r"""const m=strictDraft();await inspected(m);const st=elements.get('beTrkSt');
+        const p=beTrackGo([10,20,40,60]);const sent=calls.at(-1);assert(sent.url.endsWith('A/track_object'));
+        assert.equal(sent.body.t_ref,4/24);assert.deepEqual(sent.body.box,[10,20,40,60]);
+        assert.equal(Object.keys(sent.body.seed).length,8);assert.deepEqual([sent.body.t0,sent.body.t1],[0,3]);
+        BE.win=[1,2];openJob('B');await reply({ok:true});await p;assert.equal(BE_VIEW,null);""")
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:669: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "\nfunction mountIn(rootId){\n const root=elements.get(rootId)||el();elements.set(rootId,root);\n const img=el(),vid=e...ody.t0,sent.body.t1],[0,3]);\n    BE.win=[1,2];openJob('B');await reply({ok:true});await p;assert.equal(BE_VIEW,null);"
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: AssertionError [ERR_ASSERTION]: exact sample must await detached decode
+E         
+E         0 !== 1
+E         
+E             at inspected (evalmachine.<anonymous>:41:9)
+E             at async evalmachine.<anonymous>:48:23
+E             at async [eval]:33:12 {
+E           generatedMessage: false,
+E           code: 'ERR_ASSERTION',
+E           actual: 0,
+E           expected: 1,
+E           operator: 'strictEqual',
+E           diff: 'simple'
+E         }
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...ge: false,\n  code: 'ERR_ASSERTION',\n  actual: 0,\n  expected: 1,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n").returncode
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:65: AssertionError
+_____________ test_track_late_status_cannot_refresh_reopened_mount _____________
+
+    def test_track_late_status_cannot_refresh_reopened_mount():
+>       run_js(EXACT+r"""const m=strictDraft();await inspected(m);var timers=[];setInterval=f=>{timers.push(f);return 1};
+        const p=beTrackGo([10,20,40,60]);await reply();await p;const poll=timers.pop();poll();
+        const next=exactMount();await reply({state:'done',added:2});assert.equal(BE_VIEW,next.view);
+        assert.equal(calls.filter(c=>c.url.endsWith('/report')).length,0);""")
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:677: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = "\nfunction mountIn(rootId){\n const root=elements.get(rootId)||el();elements.set(rootId,root);\n const img=el(),vid=e...ne',added:2});assert.equal(BE_VIEW,next.view);\n    assert.equal(calls.filter(c=>c.url.endsWith('/report')).length,0);"
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: AssertionError [ERR_ASSERTION]: exact sample must await detached decode
+E         
+E         0 !== 1
+E         
+E             at inspected (evalmachine.<anonymous>:41:9)
+E             at async evalmachine.<anonymous>:48:23
+E             at async [eval]:33:12 {
+E           generatedMessage: false,
+E           code: 'ERR_ASSERTION',
+E           actual: 0,
+E           expected: 1,
+E           operator: 'strictEqual',
+E           diff: 'simple'
+E         }
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...ge: false,\n  code: 'ERR_ASSERTION',\n  actual: 0,\n  expected: 1,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n").returncode
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:65: AssertionError
+________ test_playback_response_after_pause_cannot_replace_exact_sample ________
+
+    def test_playback_response_after_pause_cannot_replace_exact_sample():
+>       run_js(EXACT+r"""const m=strictDraft();await inspected(m);var frames=[];requestAnimationFrame=f=>frames.push(f);performance={now:()=>200};
+        Object.assign(m.vid,{readyState:1,currentTime:.2,videoWidth:640,videoHeight:360,play:async()=>{}});
+        await beTogglePlay();frames.shift()();const old=queue.shift();bePlayStop();
+        await reply(sample(.2));candidates.shift().resolve();await tick();const before=JSON.stringify(BE.raw);
+        old.resolve(response({ox:99,oy:99,boxes:[]}));await tick();assert.equal(JSON.stringify(BE.raw),before);assert(beReady(m.view));""")
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:684: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scenario = '\nfunction mountIn(rootId){\n const root=elements.get(rootId)||el();elements.set(rootId,root);\n const img=el(),vid=e...ve(response({ox:99,oy:99,boxes:[]}));await tick();assert.equal(JSON.stringify(BE.raw),before);assert(beReady(m.view));'
+
+    def run_js(scenario):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("Node is needed to evaluate the embedded review JavaScript")
+        script = "const SOURCE=" + json.dumps(app_js()) + ";const SCENARIO=" + json.dumps(scenario) + ";" + HARNESS
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=15)
+>       assert result.returncode == 0, result.stdout + result.stderr
+E       AssertionError: AssertionError [ERR_ASSERTION]: exact sample must await detached decode
+E         
+E         0 !== 1
+E         
+E             at inspected (evalmachine.<anonymous>:41:9)
+E             at async evalmachine.<anonymous>:48:23
+E             at async [eval]:33:12 {
+E           generatedMessage: false,
+E           code: 'ERR_ASSERTION',
+E           actual: 0,
+E           expected: 1,
+E           operator: 'strictEqual',
+E           diff: 'simple'
+E         }
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...ge: false,\n  code: 'ERR_ASSERTION',\n  actual: 0,\n  expected: 1,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n").returncode
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:65: AssertionError
+=========================== short test summary info ============================
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py::test_exact_scrubs_coalesce_fetch_and_body_across_mounts
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py::test_exact_sample_waits_for_display_decode_and_transform[dimensions]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py::test_exact_sample_waits_for_display_decode_and_transform[zero]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py::test_exact_sample_waits_for_display_decode_and_transform[hidden]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py::test_exact_old_load_error_and_same_be_remount_are_inert
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py::test_exact_geometry_handlers_share_ready_sample
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py::test_exact_scrub_cancels_gesture_keeps_pending_baseline
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py::test_exact_add_captures_canonical_creation_after_prompts[window]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py::test_exact_add_captures_canonical_creation_after_prompts[scrub]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py::test_exact_add_captures_canonical_creation_after_prompts[good]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py::test_geometry_ack_retains_newer_kind_and_advances_owned_complete_base[box-span]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py::test_geometry_ack_retains_newer_kind_and_advances_owned_complete_base[span-box]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py::test_geometry_ack_retains_newer_kind_and_advances_owned_complete_base[both]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py::test_geometry_ack_retains_newer_kind_and_advances_owned_complete_base[away-back]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py::test_geometry_ack_does_not_transplant_reinspected_family
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py::test_lost_ack_retries_identical_payload_before_newer_geometry[network]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py::test_lost_ack_retries_identical_payload_before_newer_geometry[json]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py::test_lost_ack_retries_identical_payload_before_newer_geometry[body]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py::test_lost_ack_retries_identical_payload_before_newer_geometry[409]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py::test_lost_ack_retries_identical_payload_before_newer_geometry[423]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py::test_lost_ack_retries_identical_payload_before_newer_geometry[500]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py::test_geometry_conflict_authority_and_abandon_preserve_drafts[False]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py::test_geometry_conflict_authority_and_abandon_preserve_drafts[True]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py::test_discard_geometry_and_inspect_is_selected_and_confirmed[False]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py::test_discard_geometry_and_inspect_is_selected_and_confirmed[True]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py::test_ack_clear_next_edit_uses_confirmed_display_baseline
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py::test_track_captures_seed_window_and_job_before_await
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py::test_track_late_status_cannot_refresh_reopened_mount
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py::test_playback_response_after_pause_cannot_replace_exact_sample
+29 failed, 91 deselected in 8.38s

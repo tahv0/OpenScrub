@@ -1,0 +1,61 @@
+DEFAULT_PATHS {"jobs": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_jobs", "models": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1004/runs/task1004-0406b607e6e041958edd0144145f5683/profile/.openscrub/models"}
+ACTIVE_SOURCE {"executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python", "python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]", "sources": {"openscrub": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub.py", "sha256": "d0e26f37d3bb541302fd597931deda08b0a23048251e12b3c22e793253def048"}, "openscrub_internal": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_internal/__init__.py", "sha256": "c35c063c010e329c5dad13782e7b67438ed4b2d1faf975d4f01be2773a18e022"}, "openscrub_internal.exact_samples": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_internal/exact_samples.py", "sha256": "0b583a0a027dc397ce3835982c5367031375fdd65d9a3b5f287dea3726c02c4d"}, "openscrub_internal.lifetimes": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_internal/lifetimes.py", "sha256": "86a01f37d9bae9998161eff1d04e2ca37d66548c2a202f36003587ec3e9cee8e"}, "openscrub_internal.reports": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_internal/reports.py", "sha256": "e8a7429c0b5430ee290f6635ca5d5a93445d3f0fe9bb0f58e57fec891ee01b7f"}, "openscrub_setup": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_setup.py", "sha256": "d0362a038f8182e8fae510100085bb087f09f7e5cf7e11a780a24390b3037eaf"}, "openscrub_update": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_update.py", "sha256": "4d6a20f75d985a119f8421227c3bd88b17fd1b8eed44e353b127b5b49e733d55"}, "openscrub_vault": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_vault.py", "sha256": "da1b7fe4da389352fbc594abddcc563278b26009d8f342d4154ffa305bf4dfa4"}, "openscrub_web": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_web.py", "sha256": "42b0d33617291bda4ca18a7312f4fd13f4d7169e6173699950c0692c0fef2d32"}, "zones_ui": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/zones_ui.py", "sha256": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7"}}}
+........................................................................ [ 55%]
+.....................F..........................FF........               [100%]
+=================================== FAILURES ===================================
+_______ test_exact_sample_waits_for_display_decode_and_transform[hidden] _______
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:554: in test_exact_sample_waits_for_display_decode_and_transform
+    run_js(EXACT + r"""const m=strictDraft();beScrub();await reply(sample());assert.equal(beReady(m.view),false);
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:65: in run_js
+    assert result.returncode == 0, result.stdout + result.stderr
+E   AssertionError: AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+E     
+E     true !== false
+E     
+E         at evalmachine.<anonymous>:54:54
+E         at async [eval]:33:12 {
+E       generatedMessage: true,
+E       code: 'ERR_ASSERTION',
+E       actual: true,
+E       expected: false,
+E       operator: 'strictEqual',
+E       diff: 'simple'
+E     }
+E     
+E   assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...ue,\n  code: 'ERR_ASSERTION',\n  actual: true,\n  expected: false,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n").returncode
+__________ test_exact_existing_outside_frame_rows_remain_inspectable ___________
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:698: in test_exact_existing_outside_frame_rows_remain_inspectable
+    run_js(EXACT+r"""const m=strictDraft();beScrub();const data=sample();data.boxes[0].base={cbox:[-20,-10,700,400],span:[0,2,3]};
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:65: in run_js
+    assert result.returncode == 0, result.stdout + result.stderr
+E   AssertionError: AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+E     
+E     0 !== 1
+E     
+E         at evalmachine.<anonymous>:51:66
+E         at async [eval]:33:12 {
+E       generatedMessage: true,
+E       code: 'ERR_ASSERTION',
+E       actual: 0,
+E       expected: 1,
+E       operator: 'strictEqual',
+E       diff: 'simple'
+E     }
+E     
+E   assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...age: true,\n  code: 'ERR_ASSERTION',\n  actual: 0,\n  expected: 1,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n").returncode
+_______ test_ack_span_inactive_and_other_mount_cannot_patch_current_row ________
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:704: in test_ack_span_inactive_and_other_mount_cannot_patch_current_row
+    run_js(EXACT+r"""const m=strictDraft();await inspected(m);beCaptureGeometry(m.view,BE.raw[0]);BE.times[0]=[1,2];
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py:65: in run_js
+    assert result.returncode == 0, result.stdout + result.stderr
+E   AssertionError: scenario left a pending request
+E     
+E   assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['/usr/bin/node', '-e', 'const SOURCE="function renderAudioSugg(){\\n const el=document.getEleme...catch(e=>{console.error(e);process.exit(1)});\n'], returncode=1, stdout='', stderr='scenario left a pending request\n').returncode
+=========================== short test summary info ============================
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py::test_exact_sample_waits_for_display_decode_and_transform[hidden]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py::test_exact_existing_outside_frame_rows_remain_inspectable
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_review_save_failures.py::test_ack_span_inactive_and_other_mount_cannot_patch_current_row
+3 failed, 127 passed in 21.50s

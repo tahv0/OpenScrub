@@ -1,0 +1,45 @@
+{
+  "base": "07cfaa9539a2561c26b6f7280fae6702eb07137c",
+  "head": "dcaa0e5af6aedfca8685a3e64bea86ad0262f5c2",
+  "source_clean": true,
+  "tracked_files_verified": 136,
+  "python_ast_except_APP_JS_identical": true,
+  "earlier_refs": 160,
+  "current_refs": 161,
+  "authorized_ref_changes": {
+    "refs/heads/docs/upstream-delivery-plan": {
+      "old": "1e7c6e2c6ecc8384d5b3a2a6590c6d89f7bcd17d",
+      "new": "cf044937e62fef0a08252fc863e82ce8173887c0"
+    },
+    "refs/heads/pr/exact-editor-ui": {
+      "old": null,
+      "new": "dcaa0e5af6aedfca8685a3e64bea86ad0262f5c2"
+    }
+  },
+  "worker_documents": {
+    "task-1004-report.md": "8d91b56bf30631a33943f92e9cf973de64b8ccb5b3b2ac1e449d41601e276989",
+    "task-1004-pr.md": "6a62c2dde5f76f146d8062fac7768ca0eb328d3c4cc02a3724dec4fd7407faf2",
+    "task1004-evidence/manifest.json": "cf61eda1c2134726576496d46c176f403785aafb331df663c2dc705754431c06",
+    "task1004-evidence/archive-sha256.json": "5b598010d7c863863ba05a30546e6b4f2ae92f4150c3d319393ed2dff6a798b6"
+  },
+  "manifest_rows": 178,
+  "archive_payload_files": 181,
+  "all_archive_files": 182,
+  "archive_bytes": 4887191,
+  "all_selected_inputs_byte_identical": true,
+  "all_archive_hashes_valid": true,
+  "no_unindexed_files": true,
+  "private_controls_absent": true,
+  "native_full": [
+    "620 passed in 146.63s (0:02:26)"
+  ],
+  "floor_owner": [
+    "141 passed in 19.80s"
+  ],
+  "review_packet": {
+    "file": "review-07cfaa9..dcaa0e5.diff",
+    "bytes": 126417,
+    "sha256": "2a126cd29b02e06deb696a6f687b88b610f883312c1ad5c47c7cccf95f0f8ac2"
+  },
+  "quality_review": "pending"
+}

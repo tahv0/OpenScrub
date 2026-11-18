@@ -1,0 +1,267 @@
+{
+  "source": "/home/tahv0/.codex/worktrees/bde3/OpenScrub",
+  "base": "07cfaa9539a2561c26b6f7280fae6702eb07137c",
+  "head": "07cfaa9539a2561c26b6f7280fae6702eb07137c",
+  "policy": "development",
+  "files": {
+    ".dockerignore": "44452f3b2164dce99068b1151aa7dd43a1398f30528949ef7a222acc83ceb037",
+    ".github/FUNDING.yml": "033f4083304a54bd928c002ad1675996fadc323888a5e3ee45238f1a1ea25fb6",
+    ".github/ISSUE_TEMPLATE/bug_report.md": "ef860061f5204f8a95beaeb04c1df2e1b7955b23cf47f2ee7d7f8bd0ee7c941f",
+    ".github/ISSUE_TEMPLATE/feature_request.md": "bfd65b284580d1069479d5bc545b395e3076d5727826a1e81652b06776c70ebd",
+    ".github/dependabot.yml": "713a377b3ea6842b9984a85c39ed92aaed9f251e6a0e45e988b68e774748acd8",
+    ".github/workflows/docker-image.yml": "f6c0c0e236c4b9b1c5e7b686014ab737893a03ea5304ff67457f497bf93e6460",
+    ".github/workflows/opencv-cuda-base.yml": "51c2e928dc4b59367a7f9a08fc4a1d47e82219afdc0500bca070e9ac99c98e88",
+    ".github/workflows/publish.yml": "6d5f7c2b3261f5fddf4df0b3bf9983f0bc3c55d9ca6d96757d33802eca5a7a02",
+    ".github/workflows/windows-installer.yml": "db741efaadb4e3a146c3b55dcca0fbb4a972b6d938ee754a84a0fd38daa76027",
+    ".gitignore": "7cce5d3167bce00d6e26594a9ae412f5c7dff8378ad3f28fefb28eeec97277b5",
+    "CLAUDE.md": "f19a360826e9ea084f7a8fad9f67e8f12869f25a5f00393e5be1ed0a2b545d55",
+    "CONTRIBUTING.md": "52e148265ad14d17885855d481aee734faba0848b0be2586aac9239704f160b4",
+    "Dockerfile": "5758071c9c9bafe7790433745ac83d09f2d415e4bdc9212df4b8de31a244edc6",
+    "Dockerfile.cuda": "0bafced0ec898bf1da0086a6075e6e7c332245bf28d0a8a2445d2305d050216b",
+    "Dockerfile.intel": "00fa8162b3aae5821d0b9447b1a30f8c3d0cb047a2da892cf0da5a90cbe3f2fc",
+    "LICENSE": "9d6cfd05c0c876047c6b3b390380b1dd6349b00e8b41ec7ce1ca93854abb99ca",
+    "NOTICE": "e8a30bbd58209d1a167081f4157c27a8da7b78e3fa316a878703ac9ff3cb2f02",
+    "PLATES.md": "ff24f18fdf2ff4c39ed335bd5dd0931e97f4b8e99fdfe88815af9bd8da51126e",
+    "README.md": "175fbc43a491807961f840a8b77ff811c852b9ce837b3bf634d0726791b85091",
+    "SECURITY.md": "d52e68f00b9b76f8185f30d591a65d304924f419468a8d7343b290d760ebad9b",
+    "THIRD_PARTY_NOTICES.md": "9de8481cfa91d49e0447b07927a5a781aaf99a422efa191a186f5a67782519a8",
+    "assets/badge_master.png": "4b3dbef37fd48a1a58970d7c960e0054d3be0a307b7f7a9b18411d26800577a7",
+    "assets/badge_master_blurbox_alt.png": "5d37785b454e4f8f78cc6bedba85c3cbc9780aae422b74abbf6cbebbce0344ea",
+    "assets/brand_sheet.png": "8608a376bc71176ee15993aec3b629f044e5cd90317cc3a1a2cbb2967827dcc4",
+    "assets/favicon.ico": "d044213c853417bbe6cd8edea6ec4c4c27d219cfd18596a956df4155c646f0e8",
+    "assets/fonts/OFL-NOTE.txt": "1ae0ea09f103e54602c685f14e763a92c88b460acad568fe204f769e091cc2c9",
+    "assets/fonts/Poppins-Bold.ttf": "983676516167748b74de6f4771fb384c664fd913acb8b471122ecacf5da5ea6c",
+    "assets/fonts/Poppins-SemiBold.ttf": "d3bf1bdaf0550e83da9ac0b1d1d9fe6db086835a83aa28578e609a394b9a0286",
+    "assets/icon-1024.png": "0af38e49b5f8b180ee926276e621be6a1f116c9320e00df607524f2b14661b3e",
+    "assets/icon-128.png": "cf2df42b9186562656b7b256525c8b35a282cdbda0106c5561397a9e7c0ce407",
+    "assets/icon-16.png": "dd5b9f9057eca421fe9eecd14a7d41ab8d83a6a79904afee9357e6eb6a166427",
+    "assets/icon-180.png": "cb0bfdbed588251be151040468608510813c2598e28407fb10f88cc15d20ebc3",
+    "assets/icon-192.png": "bdbbf3808ec9497e6f41366d26cfbd91b42819284a8bf0e25bd35ca8b8cf3173",
+    "assets/icon-256.png": "024299090ef7c42eb876d19d6a0a865732e291aa21afc30d2812301ae86d51ee",
+    "assets/icon-32.png": "d55b7f933d47948e67d64acac94a6b625ac5b63d05808d5dffa5961cfbe7d993",
+    "assets/icon-48.png": "7d081baeb6a9a6639590d8c341ae15645e9ff232087c1647851812eb04c02161",
+    "assets/icon-512.png": "05f714a73e4017ae1ede1384f6928248582adce83930fef5e281b188c5b28d7b",
+    "assets/icon-64.png": "d796544d896ac8f6b0f474a5ad45fd4c8a2cd32543337aec16bf9e0e7cc4ad86",
+    "assets/lockup_light.png": "6222015eb44cdbd702b4efd4091aa24271a4ab3c5f2227d2ebcc34a8505e66f8",
+    "assets/logo.png": "024299090ef7c42eb876d19d6a0a865732e291aa21afc30d2812301ae86d51ee",
+    "assets/logo_dark.png": "024299090ef7c42eb876d19d6a0a865732e291aa21afc30d2812301ae86d51ee",
+    "assets/openscrub.ico": "00c3ac6122340f637b03eec50b385d8e38fbde9e825f077ff4bfd65eeee76f36",
+    "assets/screenshots/editor-demo.gif": "7b41c0b974c615fa89de36eddc3a036b432f210b7a5c25f4d84bca4db42439c6",
+    "assets/screenshots/editor-home.png": "cb21b904c64e64ff26bd8ead590c7730c5c746928d47e5677b727290bab67f1f",
+    "assets/screenshots/redaction-demo.gif": "694a81bbb36796b86b47c05421ebed9385e568575248c5d129466706612ced54",
+    "assets/screenshots/redaction-demo.webp": "0b4e138b7d125140ce16ebf6241b3c14f390ace4ee9ff06bcca2c48654dfd79d",
+    "assets/screenshots/track-object.png": "e6181b2b2b3b6ea5f9ebe6e0f379a416723b596a0f67dad613ed5641d1675576",
+    "assets/social_preview.png": "c9cbcfe830ac7f77154a32a1b94b795b518b0d7a297fa2c168385cd448bf0c17",
+    "assets/social_preview_master.png": "fb144aeda5f8e8b9b631a0201f6a0b694e07498ae437ecd6fdab0c8d61163fde",
+    "assets/wordmark_header.png": "71463e7efd5ecf1a84c0e0baeb0572134159ee0e0e7f15c8227879d524929fa2",
+    "assets/wordmark_navy.png": "5e099a62ae9037e0d0436e6cce96064f5f0bf242a0c6afd0ae0d4df4fe7c699b",
+    "assets/wordmark_white.png": "dbea15cd4556bc403ce9f8787a117181b1ce2d7904506eaf0337182f6d62588c",
+    "benchmark/README.md": "3ddabde8f56a6d38dd690d5ed4475255f05bd0e01357a6f358480c99fb448531",
+    "benchmark/corpus.py": "3e44a55997f7562a210395ccfb2ff57b8d542c98120a84f2e31551c9f768801c",
+    "benchmark/reid.py": "90f897de2de600e654f73113e19bfda0818c638692fc3867e917c56d4a9bdc40",
+    "benchmark/score.py": "68d1c8967c8d52a9523b30497e84e47c8ea7430fcfadfef26cf1241e9bc4fb84",
+    "ca_profile.xml": "f713825ad9d82226c4e1d60cc423eaf3355eb48fc598042250e0f434ec739bb6",
+    "deploy/README.md": "0db7520a497a824c313aa752e665b2b4cedce566e4ddc40f6228053c293589d8",
+    "deploy/caprover/openscrub.yml": "eb79099b0eb058b8bd4f3c8873ffe152bd0bf9525478396f35441fc5b7fb9b18",
+    "deploy/casaos/docker-compose.yml": "874d6b758fc2054ba7c68b440216ab0a54f9d2e395d79f1962a3ad8f55b2b313",
+    "deploy/coolify/openscrub.yaml": "166a41a1a5bfe2db1b259f1b460d81682c03578470772e3a0382c0dd7f3354b6",
+    "deploy/portainer/template.json": "c4b7c7fd6d11d623a632e72be2ae2fa7d72b6ff912fa3cfeea3445ccc4e682ab",
+    "deploy/runtipi/openscrub/config.json": "3ccdfcec665dab13d74a68b43fcfe5e76423b7482c7550c7fe315f3d2d5962e6",
+    "deploy/runtipi/openscrub/docker-compose.json": "704636ca9abdb7e8a587f7661dcdb0a52498ed3961eb718337c7578143d64d65",
+    "deploy/runtipi/openscrub/metadata-description.md": "1ea22349dfc356f710d2409e28e808c40af08a401c59080147e59b930681c5b8",
+    "deploy/truenas/openscrub-intel/README.md": "53545fbe168119c1df9e6d0362207d07ac2d3d374231915e419cb84f696b530e",
+    "deploy/truenas/openscrub-intel/app.yaml": "136ff7ce03ea1c5a21ae598098ff6521efafedee575dbcae8390af7e9300ef0f",
+    "deploy/truenas/openscrub-intel/ix_values.yaml": "cca60b574cf0e34ae1ce31d0caccf4755cabdef0177b235322b60550dfabea4e",
+    "deploy/truenas/openscrub-intel/questions.yaml": "990b66bc09222f8856d219da1322e427879fc09fd110b74bc2f967d07d083057",
+    "deploy/truenas/openscrub-intel/templates/docker-compose.yaml": "619c4ef6cb2908c8423acdb43affa81ddc050e08223bf52c6bacbdc59ff810d2",
+    "deploy/truenas/openscrub-intel/templates/test_values/basic-values.yaml": "9dc22a67d57ddb1cae702b8e54206415e255643dd039e1548fd7a0d8df6b1a3e",
+    "deploy/truenas/openscrub-nvidia/README.md": "3bd49a78b0ee2323ea561dd64e91c349370cf6649faafa66ce5f6718d62ad542",
+    "deploy/truenas/openscrub-nvidia/app.yaml": "669f86c7c26219f7a387348ef288466ae406d65026308cf0cfddd4c00a5fce4c",
+    "deploy/truenas/openscrub-nvidia/ix_values.yaml": "7a67b10133a8bd29ece4a79fb2623fffd355e76a1a2f97deda9eb72fad355770",
+    "deploy/truenas/openscrub-nvidia/questions.yaml": "fda23a7e76851dd27394ea5879e31445e719bc2b91de5edb4a2d6435625813a0",
+    "deploy/truenas/openscrub-nvidia/templates/docker-compose.yaml": "619c4ef6cb2908c8423acdb43affa81ddc050e08223bf52c6bacbdc59ff810d2",
+    "deploy/truenas/openscrub-nvidia/templates/test_values/basic-values.yaml": "9dc22a67d57ddb1cae702b8e54206415e255643dd039e1548fd7a0d8df6b1a3e",
+    "deploy/truenas/openscrub/README.md": "ac515bd0350a3e83bdefaaf2fa18bddcb9577ce490bf5e9009527cf39c7033f1",
+    "deploy/truenas/openscrub/app.yaml": "6dc4917487b30ccf8fb1db55f1e552c792767cc9986f68c3341cb6f07a520842",
+    "deploy/truenas/openscrub/ix_values.yaml": "2b01a41f99e80089be4723802ab294db41b2839c7486bf9704555b3d287b8eea",
+    "deploy/truenas/openscrub/questions.yaml": "ea4d82589a427144b4614c31e85bb2223ca18755ef57c0c1f816137a81325e15",
+    "deploy/truenas/openscrub/templates/docker-compose.yaml": "619c4ef6cb2908c8423acdb43affa81ddc050e08223bf52c6bacbdc59ff810d2",
+    "deploy/truenas/openscrub/templates/test_values/basic-values.yaml": "9dc22a67d57ddb1cae702b8e54206415e255643dd039e1548fd7a0d8df6b1a3e",
+    "deploy/umbrel/openscrub/docker-compose.yml": "e5e5e69c0849ac249477cec00d590ba2e942371a64900e0e04db90be4081ea58",
+    "deploy/umbrel/openscrub/umbrel-app.yml": "8e9ba1d49fcc1deb5483d2c19f7a8450c127bf5de4dabf4ab19d9c0631b04cba",
+    "deploy/winget/AustinMabry.OpenScrub.installer.yaml": "81fc3c125166ad6527af86bee3f4faeb760e9ee636e8729f96e8b280b4db877c",
+    "deploy/winget/AustinMabry.OpenScrub.locale.en-US.yaml": "6f0f8651c44a04322f38a0569bd8e6a6f29d6edcbae03c1d8a56417a5dfa0397",
+    "deploy/winget/AustinMabry.OpenScrub.yaml": "1ec951e23f93ce43b7c8a776eede2fb7d97af4b7f81753ceaa080f5dd992b8ed",
+    "docker/Dockerfile.opencv-cuda": "11d0f50cbb500ccde78464bdc9983131f4057493159b287fd9bcdc740d33fae7",
+    "docker/prefetch_models.py": "52dccfe881be5fac26836c9e0944d7e91d3d6e5456a561443c7154a111b6c3ca",
+    "face_models.json": "406434d10478ba15845c509c3b9cc292874935e87cf2e6f07a5396598d9d700b",
+    "fetch_plate_models.py": "da0a63c3ff96d9bd2f67fad513c880d973b27a09c23080eb53f0be5fe9974ef2",
+    "install.py": "bdb1cfb39368d212c9a65384264533cbf7c825b5c261f7c2f2b42cfb8e02cbeb",
+    "openscrub.py": "d0e26f37d3bb541302fd597931deda08b0a23048251e12b3c22e793253def048",
+    "openscrub_gui.py": "2fee837398620f351e6770a19c1016d5af3104350a1bec744ba42a611e2c9965",
+    "openscrub_internal/__init__.py": "c35c063c010e329c5dad13782e7b67438ed4b2d1faf975d4f01be2773a18e022",
+    "openscrub_internal/exact_samples.py": "0b583a0a027dc397ce3835982c5367031375fdd65d9a3b5f287dea3726c02c4d",
+    "openscrub_internal/lifetimes.py": "86a01f37d9bae9998161eff1d04e2ca37d66548c2a202f36003587ec3e9cee8e",
+    "openscrub_internal/reports.py": "e8a7429c0b5430ee290f6635ca5d5a93445d3f0fe9bb0f58e57fec891ee01b7f",
+    "openscrub_setup.py": "d0362a038f8182e8fae510100085bb087f09f7e5cf7e11a780a24390b3037eaf",
+    "openscrub_update.py": "4d6a20f75d985a119f8421227c3bd88b17fd1b8eed44e353b127b5b49e733d55",
+    "openscrub_vault.py": "da1b7fe4da389352fbc594abddcc563278b26009d8f342d4154ffa305bf4dfa4",
+    "openscrub_web.py": "45e34842b4611ba641ebfa2d85ba8d493bee5d95c865525b57bc6df1b88e77c4",
+    "person_models.json": "8abc33e5c1d03e43fa4dcedb4d2052ff363f2f1c1fa3630b67b0339f6cdd0685",
+    "plate_models.json": "4637fabd1e5f7bc6f9c69f495070e071d14e381e0f0a33c63974cdb5241d6a87",
+    "pyproject.toml": "190c4a010c88bff8ec83035d38760ef60ab772784c9b1fc90415327746c504a0",
+    "requirements.txt": "9fccdf6ad2d0ea484f40906ba224881fb4f5b16ff44fdbf14819865c0d8fa6ee",
+    "templates/openscrub-intel.xml": "bd85682ade97dba79d3f73c031e31a7d5db7682508a1e3ad35df45c984c17107",
+    "templates/openscrub-nvidia.xml": "e48b86ca367d5ce7ae20adac3fb9b1504983d06e7302cc9f7fbb291f61f11eff",
+    "templates/openscrub.xml": "abc647b57e80a86d48710a8e1450822da445c4db324aaf02f8e9f470e5c8ac96",
+    "test_openscrub.py": "60282f4ab6bc9b20cc2a4d5e5ce1934cbade19f3a3186ad7bf0b9989ed7d4109",
+    "tests/editor_resize_browser.cjs": "10ee49f15d40240a0ed291c144d3e7d5b0838f51f256d712f10ea0215074625d",
+    "tests/editor_resize_server.py": "6bbf3712e22f86acbc6d649a993480d7a6c4ff1a647e0ea0f92601996fd66e12",
+    "tests/test_editor_resize.py": "af3186032547e9b7aa03b495b3ab34c47746e4c58ec0543c331621603ac83b01",
+    "tests/test_exact_adoption.py": "18b330fead515b1424f23ef448617de217bcd4ef69e9d73bed362cd48d848d61",
+    "tests/test_exact_media.py": "55daa6be00918b24638767d6909212beaa035e770c3dab0e5b84ad3aa66dfc95",
+    "tests/test_exact_recovery_races.py": "b984da2f969e72a7a792c3207c11d447eec606f5226825227475520f294b60d2",
+    "tests/test_exact_samples.py": "56a4322a443abec88fdb123ea17f124b63c73379a3480513ebd14e965fd99c30",
+    "tests/test_job_lifecycle.py": "243734da91be1b0a49e7875843a87f46d2d38d64d9fff543e627b83ff6602e3c",
+    "tests/test_job_response_lifetime.py": "b30cb52c7e2e5fa3c50cb2662be35115a434008c757340faf37c50307d4ea8a0",
+    "tests/test_job_source_allowlist_lifecycle.py": "7efe51d6b3c37899bd7df010039a6c0ce3318f20a0b9da04216e761ecb95973a",
+    "tests/test_large_report_io.py": "b179e8e617a6cd0de2e8e48c09f776c968f1bfc820728207c87ab2a43666a343",
+    "tests/test_manual_addition_replay.py": "732e8e6403c15e6380ecd58b1a6d7ef4f0eebf598795c725e68d34e741521d23",
+    "tests/test_report_roundtrip.py": "e39f7a933020c93ad5c3a9e3490b9628bcc476bfc5129c2fac756c24233b88b8",
+    "tests/test_report_transactions.py": "e07c18b6823ed79b6ac0c3e1bad74d1740655ae67054e57888871f8cdd3b6ef8",
+    "tests/test_review_save_failures.py": "315d93e34405eb7d9804d848c7004be6f49ea891245aaccac005c46b1aaaa506",
+    "tests/test_strict_tracker_seed.py": "8c1bf38c96f03e1ab303d1494449fe0b4666132c4755500c8745b801baa6428f",
+    "tests/test_strict_tracking_routes.py": "60a0e35c1c16974a634ceb05c9f53cb89861be457778c804b22970c91aeaf082",
+    "tests/test_vault_cleanup.py": "8a08c48d49be1ceb7c65b65088ece4db7b08e36c75398cccf9c11eb992b67489",
+    "tools/make_icons.py": "914205627bc4bbcbf66fcac7fc84975c84c95cbf04b6dcb4d9482a04145ad297",
+    "tools/make_wordmark.py": "e0c33edc1762cef9b75aa802bf8190bc2b044424fcaae3769438b2de28f788ed",
+    "windows/build_installer.bat": "fc5f6934832afa5f756c95c53322724f1ef82680486c0bd4834f99f007161a89",
+    "windows/installer.iss": "4ae8ae65a51881e835108c7ea1c41bd4156484e1cdbdcbb47a0a87d511f394db",
+    "windows/openscrub.spec": "49d35c42ee505aae5c6d72113790aeeaa34c9d434fbe68c834d7e5c09af33221",
+    "zones_ui.py": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7",
+    "tests/exact_editor_browser.cjs": "172327a7d4c8c6ac7b09f8b3a6e88b168485617e8c22f9a76f48a069cde5dc37"
+  },
+  "python": {
+    "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+    "version": [
+      3,
+      12,
+      16
+    ]
+  },
+  "free_bytes": 796333047808,
+  "prerequisites": [
+    {
+      "path": "/tmp/openscrub-baseline-20261116/tools/usr/bin/ffmpeg",
+      "sha256": "bdf6aabffdba7411edff8d36c389d695257fcdf823d196020176e117612862f6",
+      "executable": true
+    },
+    {
+      "path": "/tmp/openscrub-baseline-20261116/tools/usr/bin/ffprobe",
+      "sha256": "a6dac1e9e8631e04075d06854cc4069308aec279bb04683b4a0bca5e4f54b2fe",
+      "executable": true
+    },
+    {
+      "path": "/tmp/openscrub-baseline-20261116/tools/usr/bin/tesseract",
+      "sha256": "644efa639b77a21b1096a6ced155112f0c730d05c7db871d52f4b2eb16bdf42a",
+      "executable": true
+    },
+    {
+      "path": "/home/tahv0/src/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/verify.py",
+      "sha256": "354cf49b0c83d11f3945137fbdffc3ac6b2793f1217ac39a9b62270097940067"
+    },
+    {
+      "path": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "sha256": "e74c565bbccaaf3c2ec6527962890418ab6fe740c19129b02ae1b7effc322230",
+      "executable": true
+    },
+    {
+      "path": "/tmp/openscrub-frame-identity-baseline-20261117/runtime/cfr24.mp4",
+      "sha256": "3255faa79d819ad763cd1cc95c9d0f9aa5e49ade85019197220f6e5913f62c7c"
+    },
+    {
+      "path": "/tmp/openscrub-frame-identity-baseline-20261117/runtime/cfr5.mp4",
+      "sha256": "ecc7cdc66751506e713c4dfce38fb096f5c1c0fcc8fbd73e8d5375cc94fe6bba"
+    },
+    {
+      "path": "/tmp/openscrub-frame-identity-baseline-20261117/runtime/vfr.cfr.mp4",
+      "sha256": "591cf2b749f17e12f7ae9d78d91dbf699ae5ebe28e3b89f085390dd631cb33f7"
+    },
+    {
+      "path": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1001/http_smoke.py",
+      "sha256": "1fedd701a57c45424764cce40d5c7cae060178a394db1070b78b11bd4f86b0e4"
+    },
+    {
+      "path": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/task1631-evidence/adapters/task1631_fixture.py",
+      "sha256": "89ecc8bfceca7b4f10d454b7afe374dfb9e4a18a7ca0cf93a8de0a8444a9b5b3"
+    },
+    {
+      "path": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/task654-evidence/adapters/roundtrip_stdout_selected.py",
+      "sha256": "0d5a47ad5c5b54ee980473170a2177eb79d47ca6a972d0872926b0fde4d90f83"
+    },
+    {
+      "path": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1001/media.json",
+      "sha256": "d32e50fede2f0533ba11a8ad4822988170065d35d315dc839da3dcc6a4664776"
+    },
+    {
+      "path": "/tmp/openscrub-baseline-20261116/synthetic-data/models-opencv4/face_detection_yunet_2023mar.onnx",
+      "sha256": "8f2383e4dd3cfbb4553ea8718107fc0423210dc964f9f4280604804ed2552fa4"
+    },
+    {
+      "path": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1203/build-tools/hatchling/build.py",
+      "sha256": "8bdc5f386de529d512e8807b1bf47843010b142f3e61fc2d5e75f13634d7e583"
+    },
+    {
+      "path": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1203/build-tools/tomlkit/__init__.py",
+      "sha256": "2a4876d4ff9d0050d76808f1cc06a6be09228127abf5b99c5ce6bdb307d7ed7d"
+    },
+    {
+      "path": "/tmp/openscrub-baseline-20261116/bootstrap/lib/python3.14/site-packages/pip/__main__.py",
+      "sha256": "5b36e11d74db484ea0058d7d98d37d9b8b39a3fdfae4b3af4d84a0aa06dd0611"
+    },
+    {
+      "path": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/http_counts.py",
+      "sha256": "db10af3a540072dfe2a32dd328566f516a1d634c253406bdd47324b301fa4905"
+    },
+    {
+      "path": "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/cv2/cv2.abi3.so",
+      "sha256": "8ed76bb37221f69b4670fda111e9c4746c2c8eea697af20da2f390d24e53c28c"
+    },
+    {
+      "path": "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/numpy/_core/_multiarray_umath.cpython-312-x86_64-linux-gnu.so",
+      "sha256": "1650f5b6a42b0022f9821b475725469237dbc77595f1d5c7ae7bbc0288002095"
+    },
+    {
+      "path": "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/cv2/__init__.py",
+      "sha256": "69192904dead3ada37c8b305ee850ac7474924730881a9d5e0b2390944eb5aae"
+    },
+    {
+      "path": "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/numpy/__init__.py",
+      "sha256": "09295a80660f17925ae23765ce8cbd7ff7ceae968d5f2f89349f1cb74c0b9e11"
+    },
+    {
+      "path": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/fix1/native-312.json",
+      "sha256": "0173265da6fa6ffb8b2ef723af7ebf6dcf512c35bd91ccb2211d5d2562741d29"
+    },
+    {
+      "path": "/usr/bin/node",
+      "sha256": "d0efb6fcb9d023ba4e2b160ec2384dc28fe4f17732141ef47f676828fa960505"
+    },
+    {
+      "path": "/tmp/openscrub-save-as-20261116/browsers/chromium_headless_shell-1255/chrome-headless-shell-linux64/chrome-headless-shell",
+      "sha256": "24eb0a14de64ab0c9c2e283a5512ca817db64af8fd853cdb4d818f19a8e23b9b"
+    },
+    {
+      "path": "/tmp/openscrub-save-as-20261116/node_modules/playwright/package.json",
+      "sha256": "66a5c412c28b7fe15902da5cb5d7dd503d1c8604d0afe46797fe31aa7dc1a6e0"
+    },
+    {
+      "path": "/tmp/openscrub-save-as-20261116/node_modules/playwright-core/package.json",
+      "sha256": "8243ae9fe675146825391eba8e2b06db88ea5ec94b8291a7394525965f3e7a32"
+    },
+    {
+      "path": "/tmp/openscrub-save-as-20261116/tools/usr/lib/x86_64-linux-gnu/libnspr4.so",
+      "sha256": "a10c172b4eecc3b7fd6a2fbca9d3c516e0d951dce21cc91d9fc4e1d68136f7d9"
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "ref": "refs/heads/docs/upstream-delivery-plan",
+  "old": "1e7c6e2c6ecc8384d5b3a2a6590c6d89f7bcd17d",
+  "new": "cf044937e62fef0a08252fc863e82ce8173887c0",
+  "reason": "Root-owned independent documentation checkpoint; product worktree/HEAD/status/allfilebytes unchanged",
+  "primary_HEAD": "07cfaa9539a2561c26b6f7280fae6702eb07137c",
+  "primary_dirty_paths_preserved": 7,
+  "authorized_by": "user supervisedcontinuouswork; coordinatedROOTmetadatawindow afteractualACKHOLD",
+  "no_source_acceptance": true
+}

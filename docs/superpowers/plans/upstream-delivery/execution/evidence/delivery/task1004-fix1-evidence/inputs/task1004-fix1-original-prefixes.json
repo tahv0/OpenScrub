@@ -1,0 +1,22 @@
+{
+  "task-1004-report.md": {
+    "bytes": 17313,
+    "sha256": "8d91b56bf30631a33943f92e9cf973de64b8ccb5b3b2ac1e449d41601e276989"
+  },
+  "task-1004-pr.md": {
+    "bytes": 1817,
+    "sha256": "6a62c2dde5f76f146d8062fac7768ca0eb328d3c4cc02a3724dec4fd7407faf2"
+  },
+  "task-1004-review.md": {
+    "bytes": 8453,
+    "sha256": "24ca193c29f0d731cf7b0a9a73901c7fb95b6a3f1c3416329d73cdf510fad3cb"
+  },
+  "task1004-evidence/manifest.json": {
+    "bytes": 56349,
+    "sha256": "cf61eda1c2134726576496d46c176f403785aafb331df663c2dc705754431c06"
+  },
+  "task1004-evidence/archive-sha256.json": {
+    "bytes": 21247,
+    "sha256": "5b598010d7c863863ba05a30546e6b4f2ae92f4150c3d319393ed2dff6a798b6"
+  }
+}

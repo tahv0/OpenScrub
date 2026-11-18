@@ -1,0 +1,19 @@
+### Task 10110: Make optional media evidence output portable
+
+**Files:**
+- Create: tests/artifact_support.py and tests/test_artifact_support.py.
+- Modify: tests/test_exact_media.py (two write sites) and tests/test_strict_tracking_routes.py (one write site).
+- Optional concise documentation: CONTRIBUTING.md, limited to these opt-in tests and temporary artifacts.
+
+**Interface:** artifact_directory(tmp_path: pathlib.Path) -> pathlib.Path chooses Path(VERIFY_RUN)/logs for a nonempty configured value, otherwise Path(tmp_path)/artifacts; mkdir(parents=True, exist_ok=True), return the selected directory. Do not swallow filesystem errors or add an environment option. Existing pytest tmp_path is passed to the three owning test functions as needed.
+
+- [ ] Write meaningful helper cases for absent/present/empty setting, independent temporary directories and filesystem failure; run the focused RED against the unchanged base. Confirm real documented-owner failure from missing VERIFY_RUN, rather than inventing a product regression.
+- [ ] Implement the small helper and replace only the three output-directory expressions. Keep independent pixels/PTS, hashes, samples, worker lifecycle and JSON names/content intact.
+- [ ] Run focused GREEN, then actual existing retained exact-media and strict-route cases with VERIFY_RUN absent after verification startup; use a prospectively pinned test-only local adapter if the existing local hook requires the variable at startup. Do not bypass the hook or stub product behavior. Exercise existing explicit output compatibility too.
+- [ ] Freeze the final commit and run required normal contribution checks once, with the proven prepared plugin/model recipe. Actual Python 3.9 covers helper cases and the affected real media owners; do not repeat unchanged browser work. Repeated full runs require a new concrete failure or uncovered risk.
+- [ ] Build using the proven prepared native toolchain and verify exact helper/owning-test bytes in the sdist and wheel-from-sdist creation. Product packaging/defaults unchanged; do not claim installed Python 3.9 building from the cached incompatible build-tool bundle.
+- [ ] Self-review, commit only owned paths, and report exact BASE/HEAD, RED/GREEN/actual commands/results, source identities, sdist reachability, retained failures and limitations. Append to task-10110-report.md; write task-10110-pr.md and compact product-only evidence. Release source/runtime explicitly for fresh independent review.
+
+**What / why / when:** This is the next small development-efficiency contribution after Task1004's safe reviewed handoff. It removes repeated machine-specific output setup for two existing test modules. Its Austin PR depends only on the owning exact/strict tests; unrelated branches need no rebase or retest. If a separate tooling submission costs more stacking than it saves, keep this patch with the relevant owning test contribution.
+
+The initial implementation pass is timeboxed to 30 minutes. A concrete larger requirement returns to the supervisor as a finite scope decision; it does not justify a framework or restart.

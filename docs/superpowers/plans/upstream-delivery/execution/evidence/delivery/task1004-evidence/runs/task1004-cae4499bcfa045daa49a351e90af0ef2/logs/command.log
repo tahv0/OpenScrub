@@ -1,0 +1,55 @@
+DEFAULT_PATHS {"jobs": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_jobs", "models": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1004/runs/task1004-cae4499bcfa045daa49a351e90af0ef2/profile/.openscrub/models"}
+ACTIVE_SOURCE {"executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python", "python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]", "sources": {"openscrub": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub.py", "sha256": "d0e26f37d3bb541302fd597931deda08b0a23048251e12b3c22e793253def048"}, "openscrub_internal": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_internal/__init__.py", "sha256": "c35c063c010e329c5dad13782e7b67438ed4b2d1faf975d4f01be2773a18e022"}, "openscrub_internal.exact_samples": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_internal/exact_samples.py", "sha256": "0b583a0a027dc397ce3835982c5367031375fdd65d9a3b5f287dea3726c02c4d"}, "openscrub_internal.lifetimes": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_internal/lifetimes.py", "sha256": "86a01f37d9bae9998161eff1d04e2ca37d66548c2a202f36003587ec3e9cee8e"}, "openscrub_internal.reports": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_internal/reports.py", "sha256": "e8a7429c0b5430ee290f6635ca5d5a93445d3f0fe9bb0f58e57fec891ee01b7f"}, "openscrub_setup": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_setup.py", "sha256": "d0362a038f8182e8fae510100085bb087f09f7e5cf7e11a780a24390b3037eaf"}, "openscrub_update": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_update.py", "sha256": "4d6a20f75d985a119f8421227c3bd88b17fd1b8eed44e353b127b5b49e733d55"}, "openscrub_vault": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_vault.py", "sha256": "da1b7fe4da389352fbc594abddcc563278b26009d8f342d4154ffa305bf4dfa4"}, "openscrub_web": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_web.py", "sha256": "5ae7519aa14cb1d4ed10efbf96efd173f72a4555b2f48e40349f09c31192a341"}, "zones_ui": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/zones_ui.py", "sha256": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7"}}}
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+__________________ test_editor_live_resize_pixels_and_pointer __________________
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_editor_resize.py:62: in test_editor_live_resize_pixels_and_pointer
+    launch_editor_page(tmp_path, "editor_resize_browser.cjs", render=True)
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_editor_resize.py:49: in launch_editor_page
+    assert result.returncode == 0, result.stdout + result.stderr
+E   AssertionError: AssertionError [ERR_ASSERTION]: 165.50000801487562,26.205533984041026,365.5000080148757,166.20553398404104 != 165.5,110.25,365.5,250.25
+E         at /home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/editor_resize_browser.cjs:88:110
+E         at Array.forEach (<anonymous>)
+E         at near (/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/editor_resize_browser.cjs:88:95)
+E         at /home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/editor_resize_browser.cjs:102:66 {
+E       generatedMessage: false,
+E       code: 'ERR_ASSERTION',
+E       actual: false,
+E       expected: true,
+E       operator: '==',
+E       diff: 'simple'
+E     }
+E     
+E   assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['node', '/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/editor_resize_browser.cjs', 'http://...sage: false,\n  code: 'ERR_ASSERTION',\n  actual: false,\n  expected: true,\n  operator: '==',\n  diff: 'simple'\n}\n").returncode
+_____________________ test_exact_editor_samples_and_track ______________________
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_editor_resize.py:68: in test_exact_editor_samples_and_track
+    launch_editor_page(tmp_path, "exact_editor_browser.cjs")
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_editor_resize.py:49: in launch_editor_page
+    assert result.returncode == 0, result.stdout + result.stderr
+E   AssertionError: {"dpr":1,"media":[{"label":"cfr24","index":4,"marker":4},{"label":"cfr5","index":9,"marker":9},{"label":"normalized","index":6,"marker":5}],"coalescing":{"body":true,"decode":true},"staleTrackInert":true,"ownedTrackRefresh":true,"persistence":false}
+E     AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+E     + actual - expected
+E     
+E       [
+E         0,
+E         1,
+E     +   2,
+E     +   3
+E       ]
+E     
+E         at /home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/exact_editor_browser.cjs:35:62 {
+E       generatedMessage: true,
+E       code: 'ERR_ASSERTION',
+E       actual: [Array],
+E       expected: [Array],
+E       operator: 'deepStrictEqual',
+E       diff: 'simple'
+E     }
+E     
+E   assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['node', '/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/exact_editor_browser.cjs', 'http://1...de: 'ERR_ASSERTION',\n  actual: [Array],\n  expected: [Array],\n  operator: 'deepStrictEqual',\n  diff: 'simple'\n}\n").returncode
+=========================== short test summary info ============================
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_editor_resize.py::test_editor_live_resize_pixels_and_pointer
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_editor_resize.py::test_exact_editor_samples_and_track
+2 failed in 9.58s

@@ -1,0 +1,31 @@
+{
+  "report_source": {
+    "file": "task-1004-report.md",
+    "bytes": 24839,
+    "sha256": "75aa9a673ab0b51fe5848d97632ef09841df93c32aa5bc1d6cc621580a2dcab3"
+  },
+  "original_prefix": {
+    "path": "task1004-original-report.md.txt",
+    "start": 0,
+    "end_exclusive": 17313,
+    "bytes": 17313,
+    "sha256": "8d91b56bf30631a33943f92e9cf973de64b8ccb5b3b2ac1e449d41601e276989"
+  },
+  "report_suffix": {
+    "path": "task1004-fix1-evidence/report-append.md",
+    "start": 17313,
+    "end_exclusive": 24839,
+    "bytes": 7526,
+    "sha256": "85eb4a2160b180a7b5593966ba2c4d562ef194608575b1d60c9a03ccb46a6b19",
+    "input_syntax": "#byte17313 denotes a slice, not a raw file path"
+  },
+  "acceptance_link_relocation": {
+    "file": "task-1004-final-acceptance.md",
+    "original_sha256": "44b6717fe8065b9dc1f2f3cdb2dfb03967b1d37daf5df0b2aba8260298a55eb2",
+    "public_sha256": "6b510a3f6da22415e48edcc48a53ccb686de6a0135f71072026ec254d51d2e7a",
+    "change": "Only portable-plan link relocated to its exact archived .md.txt snapshot"
+  },
+  "original_compact_archives": "182 original and43 repair files/indexes preserved byte-for-byte",
+  "raw_status": "Implementation-time pending-review sentences remain historical; final acceptance/canonical drafts provide current status",
+  "portable_RED_limit": "Earlier collection-error test bytes were not separately snapshotted; no historical source is reconstructed"
+}

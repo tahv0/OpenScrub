@@ -1,0 +1,58 @@
+{
+  "boxes": [
+    {
+      "base": {
+        "cbox": [
+          120,
+          80,
+          320,
+          220
+        ],
+        "span": [
+          0,
+          2,
+          0
+        ]
+      },
+      "box": [
+        140,
+        92,
+        340,
+        232
+      ],
+      "category": "name",
+      "enabled": true,
+      "i": 0,
+      "row_context_eq": "0ddfabef340f6adabc69af643e271a3e121bd2f3f0f76bd58d2c498173dbe3ec",
+      "t_end": 2,
+      "t_start": 0,
+      "text": "Synthetic rectangular target"
+    }
+  ],
+  "image": {
+    "mime": "image/jpeg",
+    "prefix": "/9j/4AAQSkZJRgABAQAAAQAB",
+    "length": 17976
+  },
+  "sample": {
+    "canonical_s": 0,
+    "height": 360,
+    "index": 0,
+    "observed_s": 0,
+    "offset": [
+      20,
+      12
+    ],
+    "origin": [
+      0,
+      0
+    ],
+    "policy": "opencv-ffmpeg-zero-cfr-v1",
+    "requested_s": 0,
+    "source_ref": "4394652be8eb407ca0ed64cdd8f4c6ef:1",
+    "stream": 0,
+    "timeline_eq": "4adbf9be9419375b7b161b9a16dc7bea0b0402973c2880232073f6f67e8df73a",
+    "width": 640
+  },
+  "version": 1
+}

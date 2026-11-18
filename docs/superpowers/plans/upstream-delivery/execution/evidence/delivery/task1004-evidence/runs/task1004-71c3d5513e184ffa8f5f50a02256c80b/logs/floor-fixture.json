@@ -1,0 +1,115 @@
+{
+  "parent_python": "3.9.25 (main, Oct 31 2025, 23:00:23) \n[Clang 21.1.4 ]",
+  "parent_executable": "/tmp/openscrub-python39-20261117/venv/bin/python",
+  "launcher_import": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_editor_resize.py",
+  "child_argv": [
+    "/tmp/openscrub-python39-20261117/venv/bin/python",
+    "-B",
+    "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/editor_resize_server.py",
+    "/home/tahv0/.codex/worktrees/bde3/OpenScrub",
+    "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1004/runs/task1004-71c3d5513e184ffa8f5f50a02256c80b/fixture-runtime",
+    "37875"
+  ],
+  "child_identity": {
+    "label": "selected resize source",
+    "sha": "dcaa0e5af6aedfca8685a3e64bea86ad0262f5c2",
+    "port": 37875,
+    "cwd": "/home/tahv0/.codex/worktrees/bde3/OpenScrub",
+    "web_import": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_web.py",
+    "engine_import": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub.py",
+    "web_sha256": "33cd9d19ff9ea9542d14408be7840929dafd2b9bc6c8ae240fc7aab410d8cc32",
+    "runtime": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1004/runs/task1004-71c3d5513e184ffa8f5f50a02256c80b/fixture-runtime",
+    "job_dir": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1004/runs/task1004-71c3d5513e184ffa8f5f50a02256c80b/fixture-runtime/openscrub_jobs/94cd90e0565d",
+    "video": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1004/runs/task1004-71c3d5513e184ffa8f5f50a02256c80b/fixture-runtime/source.mp4",
+    "pid": 368086,
+    "reopened": null,
+    "python": "3.9.25 (main, Oct 31 2025, 23:00:23) \n[Clang 21.1.4 ]",
+    "opencv": "4.14.0",
+    "model_downloads": "forbidden",
+    "scan_started": false,
+    "real_render_worker": true
+  },
+  "sample": {
+    "version": 1,
+    "sample": {
+      "canonical_s": 0.16666666666666666,
+      "height": 180,
+      "index": 4,
+      "observed_s": 0.16666666666666666,
+      "offset": [
+        8,
+        -4
+      ],
+      "origin": [
+        0,
+        0
+      ],
+      "policy": "opencv-ffmpeg-zero-cfr-v1",
+      "requested_s": 0.2,
+      "source_ref": "086ab67bf9bf4882b8080899c8a2c8e0:1",
+      "stream": 0,
+      "timeline_eq": "9c643f8ec38a228531c89c0fd71d9a9336f0792efa2a86da5c385c60a1a0267d",
+      "width": 320
+    },
+    "boxes": [
+      {
+        "base": {
+          "cbox": [
+            20,
+            30,
+            80,
+            70
+          ],
+          "span": [
+            0,
+            2.0,
+            0
+          ]
+        },
+        "box": [
+          28,
+          26,
+          88,
+          66
+        ],
+        "category": "name",
+        "enabled": true,
+        "i": 0,
+        "row_context_eq": "71a1e99a866a7ecb928bb61483dbf4e9c2f3807f53daa690937f0921a8228c63",
+        "t_end": 2.0,
+        "t_start": 0,
+        "text": "exact target"
+      },
+      {
+        "base": {
+          "cbox": [
+            20,
+            30,
+            80,
+            70
+          ],
+          "span": [
+            0,
+            2.0,
+            0
+          ]
+        },
+        "box": [
+          28,
+          26,
+          88,
+          66
+        ],
+        "category": "name",
+        "enabled": false,
+        "i": 1,
+        "row_context_eq": "0c24b643533a977e33b183f5eb8e5c3f374c9a468e0df54cc0f2e765aeef41e8",
+        "t_end": 2.0,
+        "t_start": 0,
+        "text": "disabled raw row"
+      }
+    ]
+  },
+  "page_bytes": 233278,
+  "browser_replay": false
+}

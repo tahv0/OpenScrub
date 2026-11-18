@@ -63,6 +63,8 @@ Record only the additive state needed to distinguish explicit human choice from 
 - [ ] **I/V:** Start with verified box tracking that stops on unsupported continuation and resumes through an explicit exact correction. Use the one-latest-receipt/predecessor contract; a delayed old correction conflicts after a newer one instead of overwriting it. Preserve row-context drafts and current choices/audio. Unknown regenerated metadata needs an explicit owner or an unchanged-report failure.
 - [ ] **E/V:** Prove the P10/O01/P16D prerequisites and subsequent frame-reader behavior, then calibrate continuity on bounded clips. Source contracts alone establish no identity reliability, edit reduction, throughput or optional runtime acceptance.
 
+The ordinary [exact editor/Track prerequisite](execution/evidence/delivery/task-1004-final-acceptance.md) is now accepted locally at d1f056e, with deterministic engine controls and declared media/platform limits. O01 policy, O02 continuity/identity quality and optional OCR/search-to-track integration still need their own acceptance. The separately accepted literal matcher remains dormant; no O03 discovery, geometry or redaction integration is implied.
+
 ## O03 — training-free full/partial plate-number search
 
 **What:** Retain the donor's pure OCR/matching core while replacing training/workbench orchestration, and support whole-frame discovery without a vehicle/plate detection.

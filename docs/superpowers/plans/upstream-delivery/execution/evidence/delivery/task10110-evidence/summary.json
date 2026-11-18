@@ -1,0 +1,105 @@
+{
+  "task": 10110,
+  "branch": "pr/portable-media-tests",
+  "base": "6fde5ad60c6d78d69dbbd8e049a9196f15e4095f",
+  "head": "d3d02770b8a42575236b11309b5a334170f7ec89",
+  "source": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/worktrees/plate-text-matching",
+  "source_files": 134,
+  "base_files": 132,
+  "unaffected_base_files_identical": 130,
+  "preserved_baseline_refs": 161,
+  "total_refs": 162,
+  "owned_files": {
+    "tests/artifact_support.py": "6151d6a8dd53d148e0a9faa65705b310d964d8d23e56147b241b8409475ac06f",
+    "tests/test_artifact_support.py": "c7d67d7e4fac7d27b0da2959d6d8c175329a55ab16ab2f7399732f6e4cafa2b6",
+    "tests/test_exact_media.py": "bf0dfbcbf269ddb5fe4f57726afcbe75386085a3f748c0eb71bcac944d9862dc",
+    "tests/test_strict_tracking_routes.py": "f2ed47c3f9cdad9626bc51f1c11c85f498c92e4626d255eb723c18c7b75502ff"
+  },
+  "runtime_modules": {
+    "openscrub": "openscrub.py",
+    "openscrub_internal": "openscrub_internal/__init__.py",
+    "openscrub_internal.exact_samples": "openscrub_internal/exact_samples.py",
+    "openscrub_internal.lifetimes": "openscrub_internal/lifetimes.py",
+    "openscrub_internal.reports": "openscrub_internal/reports.py",
+    "openscrub_setup": "openscrub_setup.py",
+    "openscrub_update": "openscrub_update.py",
+    "openscrub_vault": "openscrub_vault.py",
+    "openscrub_web": "openscrub_web.py",
+    "zones_ui": "zones_ui.py"
+  },
+  "results": {
+    "owning-red": {
+      "exit": 1,
+      "failed": 7,
+      "deselected": 35,
+      "reason": "KeyError: VERIFY_RUN at original three evidence writes"
+    },
+    "helper-red": {
+      "exit": 2,
+      "errors": 1,
+      "reason": "ModuleNotFoundError: artifact_support (helper absent)"
+    },
+    "development-green": {
+      "exit": 0,
+      "passed": 48,
+      "python": [
+        3,
+        12,
+        16
+      ],
+      "policy": "development"
+    },
+    "full-312": {
+      "exit": 0,
+      "passed": 566,
+      "python": [
+        3,
+        12,
+        16
+      ],
+      "policy": "frozen"
+    },
+    "fallback-39": {
+      "exit": 0,
+      "passed": 48,
+      "python": [
+        3,
+        9,
+        25
+      ],
+      "policy": "frozen"
+    },
+    "explicit-39": {
+      "exit": 0,
+      "passed": 48,
+      "python": [
+        3,
+        9,
+        25
+      ],
+      "policy": "frozen"
+    },
+    "package-312": {
+      "exit": 0,
+      "python": [
+        3,
+        12,
+        16
+      ],
+      "sdist_owned_bytes_match": true,
+      "wheel_from_sdist": true,
+      "test_helpers_absent_from_wheel": true,
+      "requires_python": ">=3.9"
+    }
+  },
+  "payload_ast_identical": true,
+  "new_test_cases": 6,
+  "full_existing_cases": 560,
+  "limitations": [
+    "Fresh independent full-task review pending.",
+    "No Python 3.9 package build claimed.",
+    "Prepared media manifest remains opt-in; ordinary CI may skip these existing retained-media owners.",
+    "Python hook is cooperative isolation, not OS native-process containment.",
+    "D01 shared archive warning remains deferred; no warning emitted in these logs."
+  ]
+}

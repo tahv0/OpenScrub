@@ -1,0 +1,85 @@
+diff --git a/openscrub_web.py b/openscrub_web.py
+index e1cffb1..ab86286 100644
+--- a/openscrub_web.py
++++ b/openscrub_web.py
+@@ -3415,7 +3415,11 @@ function bePumpSamples(){
+   try{
+    if(!beSampleCurrent(view,serial))return;
+    const response=await fetch(`api/jobs/${view.id}/edit_sample?t=${t}`);
+-   if(!response.ok)throw Error(`Exact sample unavailable (HTTP ${response.status}). Inspect again to retry.`);
++   if(!response.ok){
++    // Error headers do not settle the cycle: retain its slot through body cleanup.
++    try{await response.text();}catch(_){}
++    throw Error(`Exact sample unavailable (HTTP ${response.status}). Inspect again to retry.`);
++   }
+    const body=await response.json();
+    if(!beSampleCurrent(view,serial))return;
+    await beApplySample(view,serial,beValidateSample(body,t));
+diff --git a/tests/test_review_save_failures.py b/tests/test_review_save_failures.py
+index ad38e52..b710c8e 100644
+--- a/tests/test_review_save_failures.py
++++ b/tests/test_review_save_failures.py
+@@ -41,7 +41,7 @@ refresh=()=>{};loadJobs=()=>{};loadPersist=()=>{};
+ var calls=[],queue=[];
+ fetch=(url,options={})=>{calls.push({url,body:options.body?JSON.parse(options.body):null});
+  return new Promise((resolve,reject)=>queue.push({resolve,reject}));};
+-function response(body={ok:true},status=200){return {ok:status>=200&&status<300,status,json:async()=>body};}
++function response(body={ok:true},status=200){return {ok:status>=200&&status<300,status,json:async()=>body,text:async()=>JSON.stringify(body)};}
+ async function tick(){for(let i=0;i<12;i++)await Promise.resolve();}
+ async function reply(body={ok:true},status=200){queue.shift().resolve(response(body,status));await tick();}
+ function setup(){openJob('A');EN[0]=true;EN[1]=true;applyDet(0,false);
+@@ -814,3 +814,54 @@ def test_geometry_pointer_continuation_owns_selected_raw_row_and_pointer():
+     m.cv.events.pointermove({clientX:120,clientY:60,pointerId:2});assert.equal(Object.keys(BE.ov).length,0,'another pointer moved the selected row');
+     m.cv.events.pointerup({pointerId:2});assert(BE.drag,'another pointer ended current drag');
+     m.cv.events.pointermove({clientX:110,clientY:65,pointerId:1});assert(BE.ov[0]);""")
++
++
++
++@pytest.mark.parametrize('status', [409, 423, 500])
++@pytest.mark.parametrize('read_failure', [False, True], ids=['body-exhausted', 'body-read-failed'])
++def test_exact_error_body_retains_slot_across_mounts(status, read_failure):
++    run_js(EXACT+r"""const old=strictDraft();const first=beScrub();
++    elements.get('beT').value=.2;beScrub();
++    let exhausted,failed,bodyReads=0,jsonReads=0;
++    queue.shift().resolve({ok:false,status:STATUS,
++      text(){bodyReads++;return new Promise((resolve,reject)=>{exhausted=resolve;failed=reject})},
++      json(){jsonReads++;throw Error('non-JSON middleware refusal must not be parsed')}});
++    await tick();
++    assert.equal(calls.length,1,'non-success headers released the slot before its delayed body settled');
++    assert.equal(EDIT_SAMPLE_IO.active.view,old.view);
++    openJob('B');exactMount();elements.get('beT').value=.4;beScrub();
++    openJob('A');const latest=exactMount();elements.get('beT').value=.7;beScrub();
++    elements.get('beT').value=.8;beScrub();const statusBefore=elements.get('beL').textContent;
++    assert.equal(calls.length,1);assert.equal(bodyReads,1);assert.equal(jsonReads,0);
++    assert.equal(candidates.length,0);assert.equal(liveURLs.size,0);assert.equal(beReady(latest.view),false);
++    if(READ_FAILURE)failed(Error('error response stream failed'));
++    else exhausted('<html>non-JSON middleware refusal</html>');
++    await tick();await first;
++    assert.equal(calls.length,2);assert(calls[1].url.endsWith('A/edit_sample?t=0.8'));
++    assert.equal(elements.get('beL').textContent,statusBefore,'stale error changed the latest mount status');
++    assert.equal(candidates.length,0);assert.equal(liveURLs.size,0);
++    await reply(sample(.8));assert.equal(candidates.length,1);candidates.shift().resolve();await tick();
++    assert(beReady(latest.view));assert.equal(latest.view.readySample.sample.requested_s,.8);
++    beUnmount();assert.equal(liveURLs.size,0);
++    """.replace('STATUS',str(status)).replace('READ_FAILURE',str(read_failure).lower()))
++
++
++@pytest.mark.parametrize('status', [409, 423, 500])
++@pytest.mark.parametrize('read_failure', [False, True], ids=['body-exhausted', 'body-read-failed'])
++def test_exact_current_error_body_settlement_keeps_http_status(status, read_failure):
++    run_js(EXACT+r"""const current=strictDraft();const pending=beScrub();let exhausted,failed;
++    queue.shift().resolve({ok:false,status:STATUS,
++      text:()=>new Promise((resolve,reject)=>{exhausted=resolve;failed=reject}),
++      json:()=>{throw Error('non-JSON middleware refusal must not be parsed')}});
++    await tick();assert(EDIT_SAMPLE_IO.active,'current error released the slot before its body settled');
++    assert.equal(calls.length,1);assert.equal(candidates.length,0);assert.equal(liveURLs.size,0);
++    assert.equal(beReady(current.view),false);
++    if(READ_FAILURE)failed(Error('error response stream failed'));
++    else exhausted('<html>non-JSON middleware refusal</html>');
++    await tick();await pending;
++    assert.equal(EDIT_SAMPLE_IO.active,null);assert.equal(EDIT_SAMPLE_IO.wanted,null);
++    assert.equal(calls.length,1);assert.equal(candidates.length,0);assert.equal(liveURLs.size,0);
++    assert.equal(beReady(current.view),false);
++    assert(elements.get('beL').textContent.includes('HTTP '+STATUS));
++    assert(elements.get('beL').textContent.includes('Inspect again to retry'));
++    """.replace('STATUS',str(status)).replace('READ_FAILURE',str(read_failure).lower()))

@@ -1,0 +1,7 @@
+PAGE_FAILURE_STATE {"label":"Invalid exact sample response","ready":null,"transform":null,"loading":true,"image":{"src":"","width":0,"height":0,"complete":true},"active":false,"wanted":false}
+page.waitForFunction: Timeout 30000ms exceeded.
+    at open (/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/exact_editor_browser.cjs:20:191)
+    at async /home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/exact_editor_browser.cjs:26:2 {
+  log: [],
+  name: 'TimeoutError'
+}

@@ -1,0 +1,323 @@
+{
+  "job": "resize",
+  "actual": {
+    "provenance": {
+      "input": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1004/runs/task1004-532cccd239cf421d9654b6493f3cb9d3/pytest/test_editor_live_resize_pixels0/editor_resize_browser/runtime/source.mp4",
+      "settings": {
+        "pad": 0,
+        "mode": "box"
+      }
+    },
+    "render_state": {
+      "fps": 10,
+      "cum": [
+        [
+          20,
+          12
+        ],
+        [
+          20,
+          12
+        ],
+        [
+          20,
+          12
+        ],
+        [
+          20,
+          12
+        ],
+        [
+          20,
+          12
+        ],
+        [
+          20,
+          12
+        ],
+        [
+          20,
+          12
+        ],
+        [
+          20,
+          12
+        ],
+        [
+          20,
+          12
+        ],
+        [
+          20,
+          12
+        ],
+        [
+          20,
+          12
+        ],
+        [
+          20,
+          12
+        ],
+        [
+          20,
+          12
+        ],
+        [
+          20,
+          12
+        ],
+        [
+          20,
+          12
+        ],
+        [
+          20,
+          12
+        ],
+        [
+          20,
+          12
+        ],
+        [
+          20,
+          12
+        ],
+        [
+          20,
+          12
+        ],
+        [
+          20,
+          12
+        ]
+      ],
+      "bands": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ]
+      ]
+    },
+    "detections": [
+      {
+        "t_start": 0,
+        "t_end": 2,
+        "last_seen": 0,
+        "cbox": [
+          166.25789465247504,
+          111.44236557312857,
+          381.50787862272387,
+          263.9423922901419
+        ],
+        "aoff": [
+          0,
+          0
+        ],
+        "category": "name",
+        "text": "Synthetic rectangular target",
+        "confidence": 1,
+        "enabled": true
+      },
+      {
+        "t_start": 0,
+        "t_end": 2,
+        "cbox": [
+          380,
+          208,
+          470,
+          288
+        ],
+        "aoff": [
+          20,
+          12
+        ],
+        "category": "manual",
+        "text": "user-drawn",
+        "confidence": 1,
+        "last_seen": 0,
+        "enabled": true,
+        "manual_id": "33ac4e13-a80d-4ad5-969f-c5c7ffbcf5b7",
+        "manual_creation": {
+          "t_start": 0,
+          "t_end": 2,
+          "cbox": [
+            380,
+            208,
+            470,
+            288
+          ],
+          "aoff": [
+            20,
+            12
+          ]
+        }
+      }
+    ],
+    "audio_redactions": []
+  },
+  "displayed": {
+    "raw": [
+      {
+        "base": {
+          "cbox": [
+            166.25789465247504,
+            111.44236557312857,
+            381.50787862272387,
+            263.9423922901419
+          ],
+          "span": [
+            0,
+            2,
+            0
+          ]
+        },
+        "box": [
+          186.25789465247504,
+          123.44236557312857,
+          401.50787862272387,
+          275.9423922901419
+        ],
+        "category": "name",
+        "enabled": true,
+        "i": 0,
+        "row_context_eq": "0ddfabef340f6adabc69af643e271a3e121bd2f3f0f76bd58d2c498173dbe3ec",
+        "t_end": 2,
+        "t_start": 0,
+        "text": "Synthetic rectangular target"
+      },
+      {
+        "base": {
+          "cbox": [
+            380,
+            208,
+            470,
+            288
+          ],
+          "span": [
+            0,
+            2,
+            0
+          ]
+        },
+        "box": [
+          400,
+          220,
+          490,
+          300
+        ],
+        "category": "manual",
+        "enabled": true,
+        "i": 1,
+        "row_context_eq": "26707daa52e8b707cf6b7a57b93036b71c1ba720ef27762541949789791129da",
+        "t_end": 2,
+        "t_start": 0,
+        "text": "user-drawn"
+      }
+    ],
+    "audio": [],
+    "choices": {
+      "0": true,
+      "1": true
+    },
+    "sample": {
+      "canonical_s": 0.2,
+      "height": 360,
+      "index": 2,
+      "observed_s": 0.2,
+      "offset": [
+        20,
+        12
+      ],
+      "origin": [
+        0,
+        0
+      ],
+      "policy": "opencv-ffmpeg-zero-cfr-v1",
+      "requested_s": 0.2,
+      "source_ref": "4be2ac3199d749ccbcda7506e359bcf9:1",
+      "stream": 0,
+      "timeline_eq": "4adbf9be9419375b7b161b9a16dc7bea0b0402973c2880232073f6f67e8df73a",
+      "width": 640
+    }
+  },
+  "errors": [],
+  "warnings": [],
+  "writes": []
+}

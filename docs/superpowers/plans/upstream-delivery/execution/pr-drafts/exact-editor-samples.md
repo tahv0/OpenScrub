@@ -14,4 +14,4 @@ Original471 full/77 affected-floor/package/cost evidence remains attributed to5a
 
 [Implementation report](../evidence/delivery/task-1001-report.md) · [Fix report](../evidence/delivery/task-1001-fix1-report.md) · [Fix evidence](../evidence/delivery/task1001-fix1-evidence/README.md). Independent full review and [scoped repair re-review](../evidence/delivery/task-1001-fix1-review.md) are complete; both findings are addressed with no new findings. Local draft only; no remote PR or publication.
 
-Focused12919c9→335435e dependencies and future upstream stacking are mapped in the [frozen submission notes](../evidence/research/source-plans/p10-pr-submission-notes.md.txt). Mounted prerequisites accepted07cf; UI acceptance open.
+Focused12919c9→335435e dependencies and future upstream stacking are mapped in the [frozen submission notes](../evidence/research/source-plans/p10-pr-submission-notes.md.txt). Mounted prerequisites accepted07cf; [ordinary UI/Track](../evidence/delivery/task-1004-final-acceptance.md) is separately accepted d1f056e.

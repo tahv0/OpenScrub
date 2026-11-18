@@ -1,0 +1,19 @@
+# Task1004 final acceptance
+
+Task1004 is COMPLETE and accepted as a focused local source candidate on `pr/exact-editor-ui` at `d1f056e86fcae2dcfaa01bbc7f97e79ca662faaa`, over task BASE `07cfaa9539a2561c26b6f7280fae6702eb07137c`. This does not compose the candidate into C01 or change the user's working version, and no publication occurred.
+
+The complete ordinary-editor-and-Track review found one Important issue: a non-success response released the page-wide sample slot before its body settled. The original implementer reproduced twelve genuine failures at `dcaa0e5`, repaired only that error branch and added the owning regressions. The SAME independent reviewer marked T1004-R1 ADDRESSED with no new Critical, Important, Minor or out-of-scope findings. See [full review](task-1004-review.md) and [scoped fix review](task-1004-fix1-review.md).
+
+Evidence attribution is retained exactly:
+
+- `dcaa0e5af6aedfca8685a3e64bea86ad0262f5c2`: native full **620 passed**, including both actual PAGE scenarios, independent SDR pixels, strict-route Track with a deterministic engine fake, lost committed-ACK retry and separate-process reopen; actual Python3.9 owner **141 passed** plus actual launcher/server HTTP compatibility.
+- Final repair web/test bytes equal `d1f056e`: complete owning JavaScript suite **153 passed** on actual Python3.12.16 and **153 passed** on actual Python3.9.25. Those prospectively pinned invocations are correctly labeled development before the clean commit; their fingerprints match final source. The isolated error-branch fix did not repeat or relabel the earlier620/PAGE/server gates.
+- Frozen final `d1f056e`: native offline sdist→extracted-source wheel→no-deps installation, ten origins/defaults/CLI, strict and legacy listening HTTP, exact PAGE/custom substitutions and updater bytes all passed. Sdist626648B SHA `770c2af3575d7e0ad05bc038ae0e6eeb1bf0de9803d9a00b524725493f723d74`; wheel464269B SHA `f23859d612b82c1036c05ddb837dccaccf70f77d863e65fc1b41ad8e93dedc7f`.
+
+Root read the complete report and both reviews, independently checked all136 frozen source files, unchanged backend AST outside literal APP_JS/CSS, actual package archives, source/ref preservation and all selected evidence. The original17313-byte report prefix and all182 original evidence files remain byte-identical. New fix evidence is43 files/462450B with38 manifest inputs; its explicit report-suffix derivation is verified. See [original audit](task1004-supervisor-pre-review.json), [fix audit](task1004-fix1-supervisor-pre-review.json), [original manifest](task1004-evidence/manifest.json), [fix manifest](task1004-fix1-evidence/manifest.json) and [appended report](task-1004-report.md).
+
+The full review's live-ref/index cannot-verify item is resolved by root's frozen byte/status/ref checks. The stated Linux headless Chromium DPR1/2, native3.12 and affected3.9 evidence does not establish Windows/Docker execution, installed3.9 building, HDR/touch or real tracking quality; these remain accurately limited, not missing requirements for this task. Existing D01 shared archive-warning readiness work remains separate; the final package emitted no such warning. No new task Minor is deferred.
+
+Detection/blur defaults, backend/engine/private modules, CSS, dependencies and report format retain the accepted upstream behavior. The [policy erratum](task-1004-protocol-erratum.md) preserves the actual backend protocol without renaming or relaxing it. Optional OCR/text discovery, custom-model removal planning, P08A and the remaining broader roadmap are separate contributions.
+
+Next deliverable is the small [portable artifact-directory task](../research/source-plans/test-artifact-directory-plan.md.txt). It has two existing test consumers, avoids unrelated branch dependencies and does not alter accepted editor evidence.

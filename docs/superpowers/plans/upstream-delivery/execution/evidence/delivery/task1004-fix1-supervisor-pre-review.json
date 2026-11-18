@@ -1,0 +1,52 @@
+{
+  "base": "dcaa0e5af6aedfca8685a3e64bea86ad0262f5c2",
+  "head": "d1f056e86fcae2dcfaa01bbc7f97e79ca662faaa",
+  "clean": true,
+  "all_source_files": 136,
+  "backend_AST_except_APP_JS_unchanged": true,
+  "original_evidence_182_unchanged": true,
+  "original_report_prefix_17313_unchanged": true,
+  "original_pr_snapshot_unchanged": true,
+  "fix_manifest_rows": 38,
+  "explicit_report_slice_derivation": [
+    "report-append.md"
+  ],
+  "fix_archive_files": 43,
+  "fix_archive_bytes": 462450,
+  "all_selected_inputs_and_archive_hashes_valid": true,
+  "private_guard_content_absent": true,
+  "raw_owner_summaries": [
+    {
+      "file": "runs/task1004-fix1-0d22e7ca429b4f6996c49bbcd0824545/logs/command.log",
+      "sha256": "f822b59137ef1e62937f708fe4b3a46f8e19394986d39d4f3f3309a0f2cc458b",
+      "summary": [
+        "153 passed in 19.55s"
+      ]
+    },
+    {
+      "file": "runs/task1004-fix1-84b494de56c24532929be706ceca4ae0/logs/command.log",
+      "sha256": "bbbe563e0ca5fee63ba12870acf490622acd56bd93a1cfdc13c83a94895deea3",
+      "summary": [
+        "12 failed, 141 deselected in 1.70s"
+      ]
+    },
+    {
+      "file": "runs/task1004-fix1-a4f46ee09f394cbb8d47f710ecb66ccd/logs/command.log",
+      "sha256": "31816293935bb20e4daa4d7697027e427b46341c8a6882252adfc8b5f0581712",
+      "summary": []
+    },
+    {
+      "file": "runs/task1004-fix1-e5af3ff6b0d6489390b45072682b025d/logs/command.log",
+      "sha256": "1a192eb2a27e0613ba7105c6b4a0fa599094bacc988201c9e481c2bb70e9de60",
+      "summary": [
+        "153 passed in 21.57s"
+      ]
+    }
+  ],
+  "final_actual_package_hashes_verified": true,
+  "review_packet": {
+    "bytes": 8271,
+    "sha256": "ac19c757a0a5cd164cb04dd3fc58d769124693e9a62055eabc94306fe9e013c7"
+  },
+  "scoped_review": "pending"
+}
