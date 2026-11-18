@@ -5,7 +5,7 @@ source=Path(sys.argv[1]).resolve()
 runtime=Path(sys.argv[2]).resolve()
 port=int(sys.argv[3])
 assert Path.cwd()==source
-label='candidate';sha='92124753736e287ac800af91f0ac96f3e96c01be + candidate changes'
+label='selected resize source';sha=json.loads(Path(os.environ['VERIFY_CONFIG']).read_text())['head'] if os.environ.get('VERIFY_CONFIG') else 'uncommitted source'
 sys.path.insert(0,str(source))
 os.environ['OPENSCRUB_NO_AUTOFETCH']='1'
 os.environ['PYTHONDONTWRITEBYTECODE']='1'

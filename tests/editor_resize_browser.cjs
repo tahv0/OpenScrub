@@ -17,6 +17,28 @@ await page.goto(url);assert.equal(await page.title(),'OpenScrub');assert((await 
 await page.getByRole('link',{name:'synthetic-resize.mp4',exact:true}).click();await page.getByRole('button',{name:/Preview video & edit boxes/}).click();
 await page.waitForFunction(()=>document.getElementById('beImg')?.naturalWidth===640&&BE.boxes.length===1);
 const result={dpr,states:[]};
+// Watch the actual DOM owner immediately before its shipped removal method.
+await page.evaluate(()=>{
+ clearInterval(POLL);
+ window.retirements=[];
+ window.watchRetirement=(root,kind)=>{
+  const view=BE_VIEW;
+  const record=()=>retirements.push({kind,retired:BE_VIEW!==view,
+   disconnected:view.observer.disconnected,paused:view.vid.paused,attached:view.cv.isConnected});
+  if(kind==='remove'){
+   const remove=root.remove;root.remove=function(){record();return remove.call(this)};
+  }else{
+   const descriptor=Object.getOwnPropertyDescriptor(Element.prototype,'innerHTML');
+   Object.defineProperty(root,'innerHTML',{configurable:true,get(){return descriptor.get.call(this)},
+    set(value){record();descriptor.set.call(this,value)}});
+  }
+ };
+});
+function retired(records){assert(records.length>0);for(const record of records){
+ assert(record.attached,'witness must run before DOM detach');assert(record.retired);
+ assert(record.disconnected);assert(record.paused);
+}}
+
    async function measure(name){
     await page.evaluate(()=>{BE.sel=-1;beDraw()});
     const data=await page.evaluate(()=>{
@@ -115,6 +137,26 @@ await page.setViewportSize({width:390,height:844});await page.waitForTimeout(120
 const videoState=await page.evaluate(()=>{const v=document.getElementById('beVid'),c=document.getElementById('beCv');const r=v.getBoundingClientRect(),q=c.getBoundingClientRect();return {video:r.width,canvas:q.width,source:v.videoWidth,owner:BE_VIEW.transform.media===v}});
 assert.equal(videoState.video,videoState.canvas);assert.equal(videoState.source,640);assert(videoState.owner);
 const videoPixels=await measure('video-mobile');assert(Math.max(...videoPixels.paint.edgeDelta.map(Math.abs))<=2);
+// Reopening the mounted in-review editor keeps the old DOM/video/observer
+// while its real metadata response is pending, then retires just that slot.
+let releaseMetadata,startMetadata;const metadataGate=new Promise(r=>releaseMetadata=r),metadataStarted=new Promise(r=>startMetadata=r);
+await page.route('**/api/jobs/resize/mediainfo',async route=>{startMetadata();await metadataGate;await route.continue()});
+await page.evaluate(()=>{window.retainedView=BE_VIEW;window.retainedImageLoad=BE_VIEW.img.onload;
+ window.retainedApplied=JSON.stringify({ov:BE.ov,times:BE.times,adds:BE.adds});
+ watchRetirement(document.getElementById('beslot'),'innerHTML');});
+await page.getByRole('button',{name:/Preview video & edit boxes/}).click();await metadataStarted;
+assert(await page.evaluate(()=>BE_VIEW===retainedView&&document.getElementById('beCv')===retainedView.cv&&
+ !retainedView.observer.disconnected&&!retainedView.vid.paused&&BE.playing&&
+ JSON.stringify({ov:BE.ov,times:BE.times,adds:BE.adds})===retainedApplied));
+releaseMetadata();await page.waitForFunction(()=>BE_VIEW!==retainedView&&document.getElementById('beImg')?.complete&&BE_VIEW?.transform&&!BE.playing);
+await page.unroute('**/api/jobs/resize/mediainfo');retired(await page.evaluate(()=>retirements.splice(0)));
+const replacementPixels=await page.evaluate(()=>document.getElementById('beCv').toDataURL());
+await page.evaluate(()=>{retainedView.observer.callback([]);retainedImageLoad()});
+assert.equal(await page.evaluate(()=>document.getElementById('beCv').toDataURL()),replacementPixels);
+assert.equal(await page.evaluate(()=>JSON.stringify({ov:BE.ov,times:BE.times,adds:BE.adds})),await page.evaluate(()=>retainedApplied));
+result.retainedPendingMetadata=true;result.remountRetiredBeforeDetach=true;
+// Ordinary explicit Play/pause still switches back to the current still image.
+await page.locator('#bePlay').click();await page.waitForFunction(()=>BE.playing);
 await page.locator('#bePlay').click();await page.waitForFunction(()=>!BE.playing&&document.getElementById('beImg').complete&&BE_VIEW.transform?.media===document.getElementById('beImg'));
 result.video=videoState;
 // Close/remount and job switches disconnect the observer; even deliberately
@@ -132,6 +174,28 @@ await page.getByRole('button',{name:/Preview video & edit boxes/}).click();await
 assert(await page.evaluate(()=>oldObserver.disconnected));const newPixels=await page.evaluate(()=>document.getElementById('beCv').toDataURL());
 await page.evaluate(()=>oldObserver.callback([]));assert.equal(await page.evaluate(()=>document.getElementById('beCv').toDataURL()),newPixels);
 assert.equal(await page.evaluate(()=>JSON.stringify({ov:BE.ov,times:BE.times,adds:BE.adds})),drafts);
+// Drive the actual standalone phase-actions refresh owner. Only job status
+// responses are controlled; media, PAGE, mounts, observers and painting are real.
+let phase='done';await page.route('**/api/jobs/resize',async route=>{
+ const response=await route.fetch(),body=await response.json();
+ await route.fulfill({response,json:{...body,phase,has_output:true}});
+});
+await page.evaluate(async()=>{clearInterval(POLL);await refresh();await loadBoxEdit();});
+await page.waitForFunction(()=>document.getElementById('beslot_done')?.contains(document.getElementById('beCv'))&&document.getElementById('beImg').complete&&BE_VIEW?.transform);
+await page.locator('#bePlay').click();await page.waitForFunction(()=>BE.playing&&!document.getElementById('beVid').paused);
+await page.evaluate(()=>{window.phaseView=BE_VIEW;watchRetirement(document.getElementById('actions'),'innerHTML')});
+phase='rendering';await page.evaluate(()=>refresh());
+retired(await page.evaluate(()=>retirements.splice(0)));
+assert(await page.evaluate(()=>phaseView.observer.disconnected&&phaseView.vid.paused&&BE_VIEW===null));
+await page.unroute('**/api/jobs/resize');
+await page.evaluate(()=>openJob('resize'));await page.getByRole('button',{name:/Preview video & edit boxes/}).click();
+await page.waitForFunction(()=>document.getElementById('beImg')?.complete&&BE_VIEW?.transform&&BE.boxes.length===1);
+await page.evaluate(()=>clearInterval(POLL));
+const phaseReplacement=await page.evaluate(()=>document.getElementById('beCv').toDataURL());
+await page.evaluate(()=>phaseView.observer.callback([]));
+assert.equal(await page.evaluate(()=>document.getElementById('beCv').toDataURL()),phaseReplacement);
+assert.equal(await page.evaluate(()=>JSON.stringify({ov:BE.ov,times:BE.times,adds:BE.adds})),drafts);
+result.phaseActionsRetiredBeforeDetach=true;
 const final=await measure('mobile-edited');assert(Math.max(...final.paint.edgeDelta.map(Math.abs))<=2);
 // Ordinary enlarged review preview and embedded editor help survive.
 assert((await page.locator('body').innerText()).includes('drag inside to move'));
@@ -140,9 +204,13 @@ if(dpr===2){
  // Save via the actual endpoint. Intercept only to retain the submitted bytes.
  let sent;await page.route('**/api/jobs/resize/detections',async route=>{if(route.request().method()==='POST')sent=route.request().postDataJSON();await route.continue()});
  const chosen=await selectedBox(),manual=await page.evaluate(()=>BE.adds[0].box.slice());
+ await page.evaluate(()=>watchRetirement(document.getElementById('review'),'remove'));
  await page.getByRole('button',{name:'Save changes & re-render',exact:true}).click();
  await page.getByRole('status').filter({hasText:'Rendering with saved edits'}).waitFor();
+ retired(await page.evaluate(()=>retirements.splice(0)));
  const saved=await(await page.request.get(url+'/api/jobs/resize/report')).json();
+ assert.equal(saved.detections[1].manual_id,sent.manual[0].manual_id);assert(sent.manual[0].manual_id);
+ assert.deepEqual(saved.detections[1].manual_creation.cbox,manual.map((n,i)=>Math.trunc(n-(i%2?12:20))));
  near(saved.detections[0].cbox,chosen.map((n,i)=>n-(i%2?12:20)),1e-8);
  near(sent.box_overrides['0'],saved.detections[0].cbox,1e-8);assert.equal(saved.detections.length,2);
  fs.writeFileSync(root+'/saved-report.json',JSON.stringify(saved,null,2));
@@ -156,6 +224,7 @@ if(dpr===2){
 }
 result.errors=errors;result.warnings=warnings;result.requests=requests;
 fs.writeFileSync(root+`/results-${dpr}.json`,JSON.stringify(result,null,2));
+assert(!requests.some(r=>/edit_sample/.test(r.url)),'ordinary editor unexpectedly migrated to exact samples');
 assert.deepEqual(errors,[]);assert(warnings.every(w=>w.includes('willReadFrequently')),warnings.join('\n'));
 console.log(JSON.stringify({dpr,edgeError:result.edgeError,hit:result.liveHit,states:result.states.map(s=>s.name),persistence:result.persistence,errors,warnings}));
 

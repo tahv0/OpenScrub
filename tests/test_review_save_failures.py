@@ -27,7 +27,7 @@ function el(){return {textContent:'',innerHTML:'',style:{},dataset:{},disabled:f
  classList:{toggle(){},remove(){}},remove(){this.removed=true},
  addEventListener(){},querySelector(){return null},insertAdjacentHTML(){}}}
 for(const id of ['detail','beslot','review','reviewSaveStatus'])elements.set(id,el());
-const ctx=vm.createContext({elements,console,assert,Set,Map,JSON,Date,Math,Promise,crypto:require("node:crypto").webcrypto,
+const ctx=vm.createContext({elements,el,console,assert,Set,Map,JSON,Date,Math,Promise,crypto:require("node:crypto").webcrypto,
  ResizeObserver:class {observe(){} disconnect(){}},
  document:{getElementById:id=>elements.get(id)||null,querySelector:s=>elements.get(s.slice(1))||null,
  querySelectorAll:()=>[],addEventListener(){},createElement:el},
@@ -36,7 +36,7 @@ const ctx=vm.createContext({elements,console,assert,Set,Map,JSON,Date,Math,Promi
 // Skip startup I/O only; every function under test is evaluated from the Python string.
 vm.runInContext(SOURCE.slice(0,SOURCE.indexOf('loadPersist();loadCertInfo();loadJobs();setInterval(loadJobs,5000);')).replace(/^refreshModelPanel\(\);renderTiers\(\);$/m,''),ctx);
 vm.runInContext(`
-const actualLoadPersist=loadPersist;
+const actualLoadPersist=loadPersist,actualRefresh=refresh;
 refresh=()=>{};loadJobs=()=>{};loadPersist=()=>{};
 var calls=[],queue=[];
 fetch=(url,options={})=>{calls.push({url,body:options.body?JSON.parse(options.body):null});
@@ -401,3 +401,75 @@ def test_missing_secure_randomness_retains_drafts_and_reports_error():
     assert.equal(calls.length,0);assert.equal(BE.adds.length,1);assert.equal(MAN.length,1);
     assert(document.getElementById('reviewSaveStatus').textContent.includes('random'));
     assert(!EDITS.busy);""")
+
+
+# These fixtures model containment/removal ordering while executing shipped
+# showPanel/refresh/saveAndRender, never a surrogate teardown.
+MOUNT = r"""
+function mountIn(rootId){
+ const root=elements.get(rootId)||el();elements.set(rootId,root);
+ const img=el(),vid=el(),cv=el(),paint={value:'original'};
+ Object.assign(img,{complete:true,naturalWidth:640,naturalHeight:360,
+  getBoundingClientRect:()=>({width:319.5,height:179.71875})});
+ Object.assign(vid,{paused:false,pause(){this.paused=true;this.pausedBeforeDetach=!root.detached;},
+  getBoundingClientRect:img.getBoundingClientRect});
+ Object.assign(cv,{releasePointerCapture(){},getContext:()=>({setTransform(){},clearRect(){paint.value='cleared'}})});
+ elements.set('beImg',img);elements.set('beVid',vid);elements.set('beCv',cv);
+ root.contains=node=>node===cv||node===img||node===vid;
+ let html='';Object.defineProperty(root,'innerHTML',{configurable:true,get:()=>html,set:value=>{
+  root.retiredBeforeDetach=BE_VIEW===null&&vid.paused;root.detached=true;html=value;
+ }});
+ root.remove=()=>{root.retiredBeforeDetach=BE_VIEW===null&&vid.paused;root.detached=true;};
+ const view=beMount(img,vid,cv,CUR,VIEW_GEN,BE);view.observer.disconnected=false;
+ view.observer.disconnect=()=>{view.observer.disconnected=true};
+ view.transform={media:img,sw:640,sh:360,width:319.5,height:179.71875,sx:319.5/640,sy:179.71875/360};
+ return {root,img,vid,cv,view,paint};
+}
+"""
+
+
+def test_retained_editor_keeps_mount_on_panel_reentry():
+    run_js(MOUNT + r"""openJob('A');const m=mountIn('beslot');
+    BE.ov[0]=[11,12,33,44];BE.drag={kind:'move'};const applied=JSON.stringify(BE.ov);
+    showPanel('boxedit_rev');
+    assert.equal(BE_VIEW,m.view,'retained panel lost its mount');
+    assert.equal(document.getElementById('beCv'),m.cv);
+    assert.equal(m.view.observer.disconnected,false);assert.equal(m.vid.paused,false);
+    assert.equal(BE.drag.kind,'move');assert.equal(JSON.stringify(BE.ov),applied);
+    // Removing an unrelated comparison subtree must preserve this owner too.
+    elements.set('compare',el());showPanel('boxedit_rev');assert.equal(BE_VIEW,m.view);
+    """)
+
+
+@pytest.mark.parametrize('path', ['panel', 'save'])
+def test_removed_editor_subtree_releases_before_removal(path):
+    run_js(MOUNT + r"""openJob('A');const m=mountIn('beslot');
+    if(PATH==='panel')showPanel('compare');
+    if(PATH==='save'){
+      const p=saveAndRender();await reply();await reply();await p;
+      // The review is the actual ancestor removed by a save acknowledgement.
+    }
+    assert.equal(m.view.observer.disconnected,true,'removed mount observer still active');
+    assert.equal(m.vid.paused,true,'outgoing video not paused');
+    assert.equal(m.vid.pausedBeforeDetach,true,'video paused only after detach');
+    """.replace('PATH', json.dumps(path)).replace("const m=mountIn('beslot');", "const m=mountIn(PATH==='save'?'review':'beslot');".replace('PATH',json.dumps(path))))
+
+
+def test_phase_actions_replacement_retires_editor():
+    run_js(MOUNT + r"""openJob('A');const m=mountIn('actions');
+    for(const name of ['ph','eta','prog','log','pimg','warnbox'])elements.set(name,el());
+    SHELLPH='done';const p=actualRefresh();
+    await reply({phase:'rendering',progress:.25});await reply({lines:[],len:0});await p;
+    assert.equal(m.view.observer.disconnected,true,'phase replacement retained observer');
+    assert.equal(m.root.retiredBeforeDetach,true,'phase replacement detached before retirement');
+    assert.equal(m.vid.pausedBeforeDetach,true);
+    """)
+
+
+def test_old_mount_callbacks_cannot_touch_replacement():
+    run_js(MOUNT + r"""openJob('A');const old=mountIn('beslot');
+    showPanel('compare');const replacement=mountIn('beslot_done');
+    const before=replacement.paint.value;old.view.sync();
+    assert.equal(BE_VIEW,replacement.view);assert.equal(replacement.paint.value,before);
+    assert.equal(old.view.observer.disconnected,true);
+    """)
