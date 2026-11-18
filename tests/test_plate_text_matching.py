@@ -215,7 +215,7 @@ def test_matcher_import_is_stdlib_only():
                 spec = importlib.util.find_spec(root)
                 if (spec is None and name == "org.python.core" and globals
                         and globals.get("__name__") == "copy"
-                        and globals.get("__file__") == str(stdlib / "copy.py")):
+                        and Path(globals.get("__file__", "")).resolve() == (stdlib / "copy.py").resolve()):
                     # CPython 3.9 copy probes Jython support and catches ImportError.
                     raise ModuleNotFoundError("optional Jython support unavailable")
                 origin = None if spec is None else spec.origin
