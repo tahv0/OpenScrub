@@ -188,10 +188,89 @@ def ffmpeg(*args):
                           capture_output=True, check=True).stdout
 
 
+def require_media_tools():
+    for tool in ("ffmpeg", "ffprobe"):
+        if not shutil.which(tool):
+            pytest.skip(f"actual render integration requires {tool}")
+    try:
+        result = subprocess.run(["ffmpeg", "-hide_banner", "-encoders"],
+                                capture_output=True, text=True, check=True, timeout=10)
+    except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
+        pytest.skip(f"actual render integration requires a working ffmpeg encoder query: {exc}")
+    encoders = {fields[1] for line in result.stdout.splitlines()
+                if len(fields := line.split()) >= 2}
+    for encoder in ("libx264", "libx265"):
+        if encoder not in encoders:
+            pytest.skip(f"actual render integration requires ffmpeg encoder {encoder}")
+
+
+@pytest.mark.parametrize("missing", ["ffmpeg", "ffprobe"])
+def test_media_tools_missing_executable_skips_before_media(missing, monkeypatch):
+    monkeypatch.setattr(shutil, "which", lambda name: None if name == missing else name)
+
+    def unexpected_query(*args, **kwargs):
+        pytest.fail("missing executable must skip before querying encoders")
+
+    monkeypatch.setattr(subprocess, "run", unexpected_query)
+    with pytest.raises(pytest.skip.Exception, match=missing):
+        require_media_tools()
+    with pytest.raises(pytest.skip.Exception, match=missing):
+        tiny_media.__wrapped__(None)  # no fixture root or raw media can be allocated
+
+
+@pytest.mark.parametrize("encoders,missing", [
+    (" V....D libx265 HEVC", "libx264"),
+    (" V....D libx264 H.264", "libx265"),
+    (" V....D libx264rgb H.264\n V....D libx265 HEVC", "libx264"),
+])
+def test_media_tools_missing_exact_encoder_skips_before_media(encoders, missing, monkeypatch):
+    monkeypatch.setattr(shutil, "which", lambda name: name)
+    monkeypatch.setattr(subprocess, "run", lambda *a, **kw:
+                        subprocess.CompletedProcess(a[0], 0, encoders, ""))
+    with pytest.raises(pytest.skip.Exception, match=missing):
+        require_media_tools()
+    with pytest.raises(pytest.skip.Exception, match=missing):
+        tiny_media.__wrapped__(None)
+
+
+@pytest.mark.parametrize("failure", [
+    subprocess.CalledProcessError(1, ["ffmpeg", "-encoders"]),
+    OSError("encoder query unavailable"),
+    subprocess.TimeoutExpired(["ffmpeg", "-encoders"], 10),
+])
+def test_media_tools_unqueryable_encoders_skip_before_media(failure, monkeypatch):
+    monkeypatch.setattr(shutil, "which", lambda name: name)
+
+    def unavailable(*args, **kwargs):
+        raise failure
+
+    monkeypatch.setattr(subprocess, "run", unavailable)
+    with pytest.raises(pytest.skip.Exception, match="ffmpeg encoder query"):
+        require_media_tools()
+    with pytest.raises(pytest.skip.Exception, match="ffmpeg encoder query"):
+        tiny_media.__wrapped__(None)
+
+
+def test_media_tools_complete_support(monkeypatch):
+    monkeypatch.setattr(shutil, "which", lambda name: name)
+    calls = []
+
+    def supported(args, **kwargs):
+        calls.append((args, kwargs))
+        return subprocess.CompletedProcess(args, 0,
+            "Encoders:\n V....D libx264 H.264\n V....D libx265 HEVC\n", "")
+
+    monkeypatch.setattr(subprocess, "run", supported)
+    require_media_tools()
+    assert len(calls) == 1
+    args, options = calls[0]
+    assert args == ["ffmpeg", "-hide_banner", "-encoders"]
+    assert options == {"capture_output": True, "text": True, "check": True, "timeout": 10}
+
+
 @pytest.fixture(scope="module")
 def tiny_media(tmp_path_factory):
-    if not shutil.which("ffmpeg"):
-        pytest.skip("actual render integration requires ffmpeg")
+    require_media_tools()
     root = tmp_path_factory.mktemp("polygon-media")
     raw = np.concatenate([np.full(4096, 900, np.uint16),
                           np.full(1024, 800, np.uint16),
