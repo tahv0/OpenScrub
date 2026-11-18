@@ -831,6 +831,10 @@ def _operation_valid(job, owner):
 
 def _begin_operation(job, owner):
     files = FILES.initialize(job)
+    if files.source_pair is not None:
+        files.source_pair = None
+        files.source_retired = True
+        files.source_status, files.source_reason = 'unavailable', 'scan source adoption replaced'
     owner.operation = threading.Event()
     files.operation = owner.operation
     job["cancel"] = owner.operation
@@ -1492,7 +1496,9 @@ def job_cancel(jid):
         if operation is None:
             job["cancel"].set()  # idle/intake: no running compute to interrupt
         files.operation = None  # Event.clear cannot revive the captured attempt
-        if files.source_status == 'pending':
+        if files.source_pair is not None:
+            files.source_pair = None
+            files.source_retired = True
             files.source_status, files.source_reason = 'unavailable', 'scan source adoption cancelled'
         with JOBS_LOCK:
             released = list(files.queued.values())
@@ -1594,6 +1600,8 @@ def _select_observed_locked(job, prepared, authoritative=False):
         prepared = dict(prepared, source_ref='%s:%d' % (files.incarnation, files.source_epoch))
         files.current_source = prepared
     files.source_retired = False
+    if authoritative:
+        files.source_pair = None
     files.source_status, files.source_reason = 'coherent', None
     return files.current_source
 
@@ -1641,9 +1649,9 @@ def _exact_snapshot(job):
             raise exact.ExactError('scan report awaits source adoption', 409, 'source_report_pending')
         if files.active is not None:
             raise exact.ExactError('job work is active', 409, 'sample_conflict')
-        if files.source_retired:
-            raise exact.ExactError(files.source_reason)
         recovery = files.source_pair if files.source_status == 'unavailable' else None
+        if files.source_retired and recovery is None:
+            raise exact.ExactError(files.source_reason)
     try:
         with open(path, encoding='utf-8') as opened:
             report_stamp = _file_stamp(os.fstat(opened.fileno()))
@@ -1681,7 +1689,7 @@ def _exact_snapshot(job):
                     or files.active is not None or _file_stamp(os.stat(path)) != report_stamp
                     or files.source_status == 'pending'):
                 raise exact.ExactError('source/report selection changed', 409, 'sample_conflict')
-            selected = _select_observed_locked(job, prepared)
+            selected = _select_observed_locked(job, prepared, authoritative=recovery is not None)
             if recovery:
                 job['video'] = selected['path']
         return doc, selected, (fence, report_stamp), lease

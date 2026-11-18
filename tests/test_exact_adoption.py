@@ -114,3 +114,30 @@ def test_report_replaced_during_adoption_never_marks_pair_coherent(scan,monkeypa
     assert files.source_status=='unavailable'
     assert not threads
     assert request('get',exact.url+'/edit_sample?t=0.2').status_code==409
+
+
+@pytest.mark.parametrize('retired_before_scan',[False,True])
+def test_observed_old_source_failed_normalized_adoption_recovers_only_committed_pair(scan,monkeypatch,retired_before_scan):
+    exact,threads=scan
+    previous=sample(exact)['sample']['source_ref']
+    source=Path(exact.job['video']);pixels=source.read_bytes()
+    if retired_before_scan:
+        replacement=source.with_name('replaced.avi');replacement.write_bytes(pixels);replacement.replace(source)
+        assert request('get',exact.url+'/edit_sample?t=0.2').status_code==422
+    normalized=source.with_name('normalized.avi')
+    def compute(args,cb):
+        args.original_video,args.video=args.video,str(normalized)
+        return dict(fps=5,cum=[[0,0]]*10,bands=[[0,0]]*10,detections=[],stats={})
+    monkeypatch.setattr(openscrub,'run_scan',compute)
+    web._run_job(exact.job,'scan')
+    files=web.FILES.initialize(exact.job)
+    assert files.source_status=='unavailable' and not threads
+    normalized.write_bytes(pixels)
+    value=sample(exact)
+    assert value['sample']['source_ref']!=previous
+    assert exact.job['video']==str(normalized)
+    assert files.source_pair is None and not files.source_retired
+    replacement=normalized.with_name('later.avi');replacement.write_bytes(pixels);replacement.replace(normalized)
+    assert request('get',exact.url+'/edit_sample?t=0.2').status_code==422
+    assert request('get',exact.url+'/edit_sample?t=0.2').status_code==422
+    assert files.source_pair is None and files.source_retired
