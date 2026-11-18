@@ -342,3 +342,191 @@ def test_shared_streams_cross_small_chunk_boundaries(tmp_path, monkeypatch):
             vault.encrypt_file(key, str(path))
             vault.decrypt_file(key, str(path) + vault.SUFFIX)
         assert path.read_bytes() == payload
+
+
+def _second_source(exact):
+    import json
+    from pathlib import Path
+    job = web.new_job('', {}, 'another.avi')
+    video = Path(job['dir']) / 'input.avi'
+    video.write_bytes(Path(exact.job['video']).read_bytes())
+    job.update(video=str(video), phase='review')
+    doc = raw(exact)
+    doc['provenance']['input'] = str(video)
+    Path(job['dir'], 'report.json').write_text(json.dumps(doc))
+    return job, '/api/jobs/' + job['id']
+
+
+def test_pending_owner_and_fresh_rehydrated_owner_keep_separate_semantics(exact):
+    exact.enable()
+    pc = precondition(sample(exact))
+    files = web.FILES.initialize(exact.job)
+    selected, old_stamp = files.current_source, files.current_source['stamp']
+    import threading
+    from types import SimpleNamespace
+    operation = threading.Event()
+    with files.report_lock:
+        files.operation = operation
+        web._report_committed_locked(exact.job, raw(exact), SimpleNamespace(operation=operation))
+        pending_pair = files.source_pair
+    other, url = _second_source(exact)
+    old_owner = web.FILES.initialize(other)
+    with web.JOBS_LOCK:
+        del web.JOBS[other['id']]
+    assert request('post', '/api/vault/lock').status_code == 200
+    assert files.vault_transition is None
+    assert request('post', '/api/vault/unlock', json={'password': 'synthetic-password'}).status_code == 200
+    assert files.source_status == 'pending' and files.source_pair == pending_pair
+    assert files.current_source is selected
+    assert selected['stamp'] == old_stamp and files.vault_transition is None
+    assert request('get', exact.url + '/edit_sample?t=0.2').status_code == 409
+    assert post(exact, geometry_preconditions={'0': pc}, box_overrides={'0': [3,4,10,11]}).status_code == 409
+    recovered = web.JOBS[other['id']]
+    new_owner = web.FILES.initialize(recovered)
+    assert recovered is not other and new_owner is not old_owner
+    assert new_owner.current_source is None and new_owner.vault_transition is None
+    assert request('get', url + '/edit_sample?t=0.2').status_code == 200
+    assert new_owner.current_source is not selected
+
+
+def test_replacement_immediately_before_open_retires_only_old_source(exact, monkeypatch):
+    from pathlib import Path
+    import openscrub_vault as vault
+    exact.enable()
+    sample(exact)
+    files = web.FILES.initialize(exact.job)
+    source = Path(exact.job['video'])
+    old_stamp = files.current_source['stamp']
+    foreign = exact.root / 'foreign'
+    foreign.write_bytes(b'outside remains intact')
+    real = vault._witnessed_file
+    changed = []
+    def replace_before_open(key, path, direction, finish):
+        if path == str(source) and direction == 'encrypt':
+            replacement = source.with_name('replacement')
+            replacement.write_bytes(source.read_bytes())
+            replacement.replace(source)
+            changed.append(web._file_stamp(os.stat(source)))
+        return real(key, path, direction, finish)
+    monkeypatch.setattr(vault, '_witnessed_file', replace_before_open)
+    assert request('post', '/api/vault/lock').status_code == 200
+    assert changed and changed[0] != old_stamp
+    assert files.source_retired and files.current_source is None and files.vault_transition is None
+    assert request('post', '/api/vault/unlock', json={'password':'synthetic-password'}).status_code == 200
+    assert request('get', exact.url + '/edit_sample?t=0.2').status_code != 200
+    assert foreign.read_bytes() == b'outside remains intact'
+
+
+def test_ciphertext_mutated_during_authenticated_decrypt_cannot_reuse_receipt(exact, monkeypatch):
+    from pathlib import Path
+    import openscrub_vault as vault
+    exact.enable()
+    pc = precondition(sample(exact))
+    files = web.FILES.initialize(exact.job)
+    assert request('post', '/api/vault/lock').status_code == 200
+    cipher = Path(exact.job['video'] + vault.SUFFIX)
+    original = cipher.read_bytes()
+    foreign = exact.root / 'foreign'
+    foreign.write_bytes(b'outside remains intact')
+    real_aes = vault.AESGCM
+    changed = []
+    class MutatingAES:
+        def __init__(self, key):
+            self.aes = real_aes(key)
+        def decrypt(self, nonce, data, associated):
+            plain = self.aes.decrypt(nonce, data, associated)
+            if associated is None and not changed:
+                with cipher.open('ab') as stream:
+                    stream.write(b'x')
+                changed.append(True)
+            return plain
+    monkeypatch.setattr(vault, 'AESGCM', MutatingAES)
+    assert request('post', '/api/vault/unlock', json={'password':'synthetic-password'}).status_code == 500
+    assert changed and cipher.exists() and not Path(exact.job['video']).exists()
+    assert web.VAULT['closed'] and files.source_retired and files.vault_transition is None
+    assert foreign.read_bytes() == b'outside remains intact'
+    monkeypatch.setattr(vault, 'AESGCM', real_aes)
+    cipher.write_bytes(original)
+    assert request('post', '/api/vault/unlock', json={'password':'synthetic-password'}).status_code == 200
+    assert request('post', '/api/vault/unlock', json={'password':'synthetic-password'}).status_code == 200
+    assert post(exact, geometry_preconditions={'0':pc}, box_overrides={'0':[3,4,10,11]}).status_code != 200
+    assert files.source_retired and files.current_source is None and files.vault_transition is None
+
+
+def test_decrypt_length_mismatch_retires_even_with_matching_cipher_and_nonce(exact, monkeypatch):
+    import openscrub_vault as vault
+    exact.enable()
+    sample(exact)
+    files = web.FILES.initialize(exact.job)
+    assert request('post', '/api/vault/lock').status_code == 200
+    marker = files.vault_transition
+    expected_stamp, expected_nonce = marker['cipher'], marker['nonce']
+    original = vault._decrypt_stream
+    measured = []
+    def short_count(aes, src, dst, path, witnessed=False):
+        actual_stamp = vault._regular_stamp(os.fstat(src.fileno()))
+        nonce, count = original(aes, src, dst, path, witnessed=witnessed)
+        if path == exact.job['video'] + vault.SUFFIX:
+            measured.append((actual_stamp, nonce, count))
+            return nonce, count - 1
+        return nonce, count
+    monkeypatch.setattr(vault, '_decrypt_stream', short_count)
+    assert request('post', '/api/vault/unlock', json={'password':'synthetic-password'}).status_code == 200
+    assert measured == [(expected_stamp, expected_nonce, marker['old_stamp'][2])]
+    assert files.source_retired and files.current_source is None and files.vault_transition is None
+    assert request('get', exact.url + '/edit_sample?t=0.2').status_code != 200
+
+
+def test_route_remove_failure_after_publication_closes_and_retry_cannot_reuse(exact, monkeypatch):
+    from pathlib import Path
+    import openscrub_vault as vault
+    exact.enable()
+    pc = precondition(sample(exact))
+    files = web.FILES.initialize(exact.job)
+    source = Path(exact.job['video'])
+    foreign = exact.root / 'foreign'
+    foreign.write_bytes(b'outside remains intact')
+    real_remove = vault.os.remove
+    def fail_source(path):
+        if str(path) == str(source):
+            assert Path(str(source) + vault.SUFFIX).is_file()
+            raise OSError('injected predecessor removal failure')
+        return real_remove(path)
+    monkeypatch.setattr(vault.os, 'remove', fail_source)
+    assert request('post', '/api/vault/lock').status_code == 500
+    assert source.exists() and Path(str(source) + vault.SUFFIX).exists()
+    assert web.VAULT['closed'] and files.source_retired and files.vault_transition is None
+    assert foreign.read_bytes() == b'outside remains intact'
+    monkeypatch.setattr(vault.os, 'remove', real_remove)
+    assert request('post', '/api/vault/unlock', json={'password':'synthetic-password'}).status_code == 200
+    assert request('post', '/api/vault/unlock', json={'password':'synthetic-password'}).status_code == 200
+    assert post(exact, geometry_preconditions={'0':pc}, box_overrides={'0':[3,4,10,11]}).status_code != 200
+    assert files.source_retired and files.current_source is None and files.vault_transition is None
+
+
+def test_later_failure_leaves_unattempted_coherent_consumer_usable(exact, monkeypatch):
+    import openscrub_vault as vault
+    exact.enable()
+    sample(exact)
+    affected = web.FILES.initialize(exact.job)
+    other, url = _second_source(exact)
+    assert request('get', url + '/edit_sample?t=0.2').status_code == 200
+    untouched = web.FILES.initialize(other)
+    selected, stamp = untouched.current_source, untouched.current_source['stamp']
+    real_walk, real_encrypt = vault._walk_files, vault.encrypt_file
+    monkeypatch.setattr(vault, '_walk_files', lambda root: iter([exact.job['video'], str(exact.path), other['video']]))
+    def fail_middle(key, path, *args):
+        if path == str(exact.path):
+            raise OSError('failure before unrelated source')
+        return real_encrypt(key, path, *args)
+    monkeypatch.setattr(vault, 'encrypt_file', fail_middle)
+    assert request('post', '/api/vault/lock').status_code == 500
+    assert web.VAULT['closed'] and affected.source_retired and affected.vault_transition is None
+    assert untouched.current_source is selected and not untouched.source_retired
+    assert selected['stamp'] == stamp == web._file_stamp(os.stat(other['video']))
+    assert untouched.vault_transition is None
+    monkeypatch.setattr(vault, '_walk_files', real_walk)
+    monkeypatch.setattr(vault, 'encrypt_file', real_encrypt)
+    assert request('post', '/api/vault/unlock', json={'password':'synthetic-password'}).status_code == 200
+    assert request('get', url + '/edit_sample?t=0.2').status_code == 200
+    assert untouched.current_source is selected
