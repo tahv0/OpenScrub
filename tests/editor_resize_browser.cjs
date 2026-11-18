@@ -30,7 +30,7 @@ await page.evaluate(()=>{
   }else{
    const descriptor=Object.getOwnPropertyDescriptor(Element.prototype,'innerHTML');
    Object.defineProperty(root,'innerHTML',{configurable:true,get(){return descriptor.get.call(this)},
-    set(value){record();descriptor.set.call(this,value)}});
+    set(value){record();delete this.innerHTML;descriptor.set.call(this,value)}});
   }
  };
 });
@@ -133,6 +133,8 @@ assert.equal(await page.evaluate(()=>BE.drag),null);release();await page.waitFor
 await page.locator('#bePlay').click();await page.waitForTimeout(300);
 fs.writeFileSync(root+`/video-start-${dpr}.json`,JSON.stringify(await page.evaluate(()=>{const v=document.getElementById('beVid');return {playing:BE.playing,ready:v.readyState,network:v.networkState,src:v.src,preload:v.preload,error:v.error?.message,transform:!!BE_VIEW.transform,canPlay:v.canPlayType('video/mp4')}}),null,2));
 await page.waitForFunction(()=>BE.playing&&BE_VIEW.transform?.media===document.getElementById('beVid'));
+// Keep the short synthetic clip alive while inspecting the retained mount.
+await page.locator('#beVid').evaluate(video=>video.loop=true);
 await page.setViewportSize({width:390,height:844});await page.waitForTimeout(120);
 const videoState=await page.evaluate(()=>{const v=document.getElementById('beVid'),c=document.getElementById('beCv');const r=v.getBoundingClientRect(),q=c.getBoundingClientRect();return {video:r.width,canvas:q.width,source:v.videoWidth,owner:BE_VIEW.transform.media===v}});
 assert.equal(videoState.video,videoState.canvas);assert.equal(videoState.source,640);assert(videoState.owner);
