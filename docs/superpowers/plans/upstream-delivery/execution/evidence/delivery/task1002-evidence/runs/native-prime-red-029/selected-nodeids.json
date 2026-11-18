@@ -1,0 +1,3 @@
+[
+  "tests/test_strict_tracker_seed.py::test_strict_native_person_prime_error_never_falls_back"
+]

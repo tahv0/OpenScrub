@@ -1,0 +1,110 @@
+# Task1002 — optional strict tracker seeds
+
+The focused candidate is committed on `pr/exact-tracker-seeds` at **285f4afd455ad6dc95a473995dee142421cdc87e**, based on the accepted exact-sample backend **335435e1e1120de9e6773656b7dfdfabf220e27b**. Commit `6a489a9` adds the optional adapter; `285f4af` closes cancellation during context reads and exceptional person-capture construction. The source is clean. All157 prior refs are preserved, including Task1001 `335435e`, C01 `b4fc209` and documentation `f4649f9`. No publication, user-data adoption or C01/UI composition occurred. Fresh independent review is pending.
+
+The final frozen head passes **544 normally discovered tests on actual Python3.12.16**, and **269 affected checks on actual Python3.9.25**, with six unchanged report/download stream permutations deselected only from the floor run. All **67 new cases** ran on both interpreters with identical new-case IDs. A native listening HTTP/count gate, a full shipped-PAGE legacy Track smoke, and one offline sdist→wheel-from-sdist/strict installed HTTP/updater gate passed. [Compact evidence](task1002-evidence/README.md) retains every workload, failed attempt, original configuration, selected test IDs and adapter identity.
+
+## Optional interfaces and unchanged behavior
+
+`POST /api/jobs/<jid>/track_object` accepts an optional `seed` containing exactly:
+
+```text
+{version:1, source_ref,timeline_eq,policy,index,width,height,offset:[ox,oy]}
+```
+
+This is the existing sample precondition, without image bytes or row context/baseline. Explicit null/malformed seeds fail rather than taking the legacy path. Consumed strict coordinates/times must be finite and nonboolean. The source-space box must satisfy `0<=x1<x2<=width`, `0<=y1<y2<=height`; the reference must equal `index/fps` and lie inside the chosen valid window. A narrow incompatible window fails without moving the seed or widening the window. Stale source/timeline/index/dimensions/offset refuses before model work. Existing accepted response and running/done/added/error polling remain unchanged.
+
+Both engine interfaces append only keyword-only `strict_seed=None`, preserving every existing positional parameter:
+
+```text
+track_manual_region(video,box,t_ref,t0,t1,cb=None,step_frames=2,
+                    thr=0.55,scale=0.5,person_det=None,*,strict_seed=None)
+_track_person_dense(video,box,t_ref,t0,t1,det,log,step_frames=2,
+                    cancelled=None,*,strict_seed=None)
+```
+
+The frozen, capture-free `exact_samples.StrictSeed` carries `pixels,source_selection,index,canonical_s,observed_s,fps,count,width,height,policy,tolerance_s`. It validates raw uint8 BGR shape and the existing finite/indexed policy facts. It contains no capture, copied timeline, browser authority, HTTP image or persistent history. The engine checks that its source agrees with the supplied selection. `count` and `tolerance_s` are the concrete facts required by the existing indexed primer.
+
+The shared web adapter `_read_exact_source(selected,index,*,fps,count,tolerance_s)` owns its short open/stamp/read/close boundary and returns `DecodedFrame`. Both exact samples and strict workers use it. Verification captures close before JPEG encoding or strict model resolution; no live web capture transfers into an engine.
+
+Ordinary UI JavaScript/CSS, all nine PAGE composition/input ASTs, `zones_ui` and assets are unchanged. Defaults, dependencies, package declarations, source/report serializers, tracker ordering/search/loss/thresholds and no-seed outputs remain unchanged. The touched person capture owner now also closes on metadata initialization failure; this is a narrow cleanup benefit, not a tracking-algorithm change. No model/training/workbench, source registry, token history, frame digest, whole-input scan, new decoder worker or root production file was added.
+
+## Pixels, integer priming and failure boundaries
+
+Strict person detection examines the supplied raw frame once, with no nearby-time loop. Its histogram and both propagation anchors receive those same supplied pixels. Both generic Vit initializers use the supplied frame. NCC derives its initial smoothed grayscale template from that frame instead of `_gray(t_ref)`.
+
+The existing generic/person capture owners establish their after-seed positions through `read_indexed_capture` with the retained integer, count and tolerance. Primer pixels cannot substitute for supplied initializer pixels. The branch spies deliberately use different supplied, tolerant-reread and primer images, compare exact arrays after the existing resize/gray operations, and assert index4/canonical1/6 and exactly-once releases. Person miss/detector error may select the existing generic engine with the same supplied frame. Strict policy/prime/source failure cannot become tolerant fallback. Unexpected native primer/person-constructor exceptions become `ExactError` with the original cause; existing `ExactError`, `PipelineCancelled`, `KeyboardInterrupt` and `SystemExit` precedence is preserved. No-seed fallback behavior is retained.
+
+Retained real native24/native5/normalized sources also pass through the actual production strict route and engine primer, using independent sequential arrays and integer PTS/time-base oracles. The five strict launches cover native24 requested`.2`→index4/canonical1/6, native5 requested`1.9`→index9/canonical1.8, and normalized requested`.5`/indices2/3→indices6/2/3. Duplicate normalized pixels retain distinct indices. Each launch performs two tracking indexed reads and two Vit initializer calls; actual initializer arrays equal the independent resized source frame. The preceding inspection GETs and test oracle decodes are excluded from those tracking counts. The old28-capture feasibility study was not rerun.
+
+A separate genuine RED showed `int((15/13)*13)==14`. Seed-time report conversion now uses retained index15 and offset`[15,-15]`; later tolerant propagation indexing is unchanged. No exact-propagation or tracking-quality claim follows from initializer acceptance.
+
+## Source, operation and latest-raw publication
+
+Strict launch prepares the coherent snapshot/observed source outside `report_lock`, then acquires a work lease owning the selected path, including a recovered selection. Extra snapshot ownership releases outside the lock. Installation revalidates source/timeline and the operation before selecting the new tracking Event. The worker verifies the retained integer, closes the verification capture, then revalidates before resolving models. Before conversion it reloads latest raw JSON, checks the same source/timeline, allocates the latest track ID, and publishes once through the existing success notifier. Unrelated enabled/audio/unknown-row changes remain legal and survive the append.
+
+Cancellation checks use existing operation identity, qgen and cancellation-Event identity/state. Cancellation arriving after preparation cannot install or advance stale work; an acknowledged earlier idle cancellation still permits a fresh strict attempt on an unchanged coherent pair. Controlled real `/cancel` requests hold the actual installation/pre-model/preappend report reads, signal the selected Event before lock acquisition, and prove final checks refuse advancement. A prior real completed tracking Event is used for the installation race; idle `operation=None` serialization is preserved. Final source/operation checks run after blocking context reads and immediately before publication. No new epoch/history or global cancellation redesign was introduced.
+
+Tests retain exceptions through cleanup, join controlled threads in finally paths, and cover decode/prime/model/thread-start/commit failure, source/timeline changes, cancellation, capture closure before models and atomic latest-raw preservation. All pre-model strict refusals produce zero model calls; strict failure publishes zero rows. Existing status ownership suppresses stale completion after cancellation/replacement.
+
+## Actual introduced work
+
+The real native and strict installed listening HTTP gates agree on these **success-path owner counts**, with a reused qualified descriptor:
+
+| Owner | Strict generic launch | Legacy control |
+|---|---:|---:|
+| Initial exact snapshot |1|0|
+| Timeline projection traversals |4|0|
+| Latest-raw report loads, besides the initial snapshot read |3|1|
+| Current-source check owner calls |7|0|
+| Web exact verification |1|0|
+| Indexed reads: verification + generic prime |2|0|
+| Person-resolution hook / Vit initializer spies |1 /2|1 /2|
+| Successful report notification |1|1|
+
+Both strict captures release exactly once at after-index10 for selected index9; raw pixels/observed time agree with the independent PTS9/5 oracle. A separate person capture adds its own indexed prime where used. Primer/error tests cover that owner independently. These are work counts with explicit no-model doubles, not real neural-inference, latency, peak-memory or universal throughput measurements.
+
+The four timeline traversals and three latest-raw loads are real introduced O(N) work on parsed timelines. `StrictSeed` and the worker retain only `seed_count`, not an initial timeline copy. No reuse optimization, old cost/touch matrix or timing benchmark was added. Future operation-local reuse would need its own source/report/projection evidence.
+
+## Verification and original result attribution
+
+All invocations use the unchanged reviewed verification launcher, pinned source/test/tool/interpreter/media/adapter inputs and owned scratch. [commands-results.json](task1002-evidence/commands-results.json) contains complete executed command vectors, real exits, original head/policy and log links. [Historical tests](task1002-evidence/historical-test-identities.json) preserve14 exact frozen test versions; the minimal [API-only production patch](task1002-evidence/red-api-only-production.patch) reproduces the meaningful pre-behavior initializer RED source hashes. No failed run is relabelled as final-head evidence.
+
+| Run | Actual result and attribution |
+|---|---|
+| red-api002 |5fail/1pass: missing type/keywords at335 before API addition |
+| red-initializers004 |4 genuine branch-oracle failures/2 controls after API-only addition: person/Vit/NCC pixels and prime-before-model |
+| red-validation006 |21fail/2pass: strict-value/window/fallback REDs plus the initializer REDs |
+| engine-green008 →009 |exit4 from an absent C01-only test filename, zero tests; corrected selection23pass |
+| red-routes011 |18fail/2pass:17 behavioral route REDs plus one fixture audio-field typo, corrected to actual `audio_redactions` |
+| routes-green013 |100pass/7fail: worker-local fps shadowing and wrong strict bool-box status |
+| ownership-red015 |108pass/6fail: report-rate key typo plus cancellation-after-snapshot gap |
+| focused-media017 → stabilized019 |204pass/1fail initial-cancel Event fence; then213pass with legacy trackers |
+| final-owner-red021 → candidate023 |3fail/1 teardown error: metadata capture leak, retained snapshot exception leak, index15→14 conversion; then216pass |
+| cancel-positive025 → final-focused027 |fresh-after-ack cancellation1 genuine RED/1 control; then217pass |
+| native-prime029 / prime-cancellation031 |native prime fallback1 RED; PipelineCancelled fallback1 RED/2 BaseException controls |
+| final-stable033 |221pass development bytes subsequently committed as6a489a9 |
+| source-context037 → context-source039 |four genuine final-boundary/source-constructor REDs on6a runtime; eight GREEN checks in bytes committed as285f4af |
+| full041 |clean285f4af: **544pass**, actual3.12.16, normal full discovery/all nine original WSGI endings |
+| floor042 |clean285f4af: **269pass/6deselected**, actual3.9.25; all67 new cases and three source-video endings |
+| http044 |clean285f4af: real listening strict/legacy HTTP, independent pixels/PTS, cleanup and count assertions pass |
+| PAGE046 → PAGE048 |same285f4af: fixture-only console failure, then corrected full PAGE legacy smoke passes; original inputs retained |
+| package049 |clean285f4af: offline archives, strict installed defaults/origins/CLI/web/HTTP and actual updater-copy bytes pass |
+
+The native full uses the exact cached YuNet seed and the reviewed stdout adapter scoped only to the unchanged JSON-only fresh-route test. No global stdout suppression or download occurred. The floor retains all affected owners, six existing legacy tracker cases and all three real source-video stream endings; the six unchanged report/download endings retain native full attribution with their original4MiB fixtures. This is an owning Python3.9 gate, not a full3.9 or platform certification.
+
+The sdist is **595429B** and wheel **457356B**. Assertions cover **37 selected sdist /13 wheel files**, within **44/21 total regular archive files**, with Python>=3.9 unchanged. The wheel is built from the safely extracted verified sdist. All ten installed module origins/default profiles, CLI/web help and actual strict+legacy HTTP pass without checkout imports. The actual folder updater copies engine/web/private seed/helper and both new tests from that verified sdist into an isolated fixture with exact matching bytes. Three app Dockerfiles and Windows Analysis/direct imports are source-inspected; no Docker/Windows runtime is claimed. The existing helper tar-extraction DeprecationWarning remains an accepted tooling Minor; the helper was not changed.
+
+## Full PAGE legacy smoke and fixture diagnosis
+
+The frontend-testing-debugging workflow found **Browser plugin not available** and reused prepared Playwright1.65.1/Chromium1255. At1280×900 the full shipped PAGE has the correct title/meaningful content/no framework overlay, and the corrected gate has zero console errors or warnings. Real two-click Track submits `{box:[12,12,44,44],t_ref:1.9,t0:0,t1:2}` with **no seed**. Real status polling observes running then done/added0/explicit deterministic tracker failure. Existing box/time/choice/manual-identity/audio drafts remain equal; the raw report stays unchanged and owners close.
+
+The initial PAGE046 gate failed its health assertion because the task fixture injected wire manual fields into `BE.adds`; shipped `beDraw` consumes editor fields `box,t0,t1,tref` and called `.map` on missing `a.box`. The actual owner/schema and screenshot establish a fixture mismatch. Original server/driver/config/log/screenshot remain intact; separately named corrected inputs use the real draft shape and retain all health/draft assertions. No product change or full/floor rerun was made. [Diagnosis](task1002-evidence/configs/page-fixture-diagnosis.json) and [corrected DOM evidence](task1002-evidence/runs/page-fixed-048/browser/legacy-dom.json) retain the distinction.
+
+Explicit doubles are PersonDetector unavailable, a tracker raising after the first real running-status poll, an offline update-notice cache and pre-existing drafts seeded into the existing editor owner. Routes, PAGE JavaScript, media, worker/status and error disclosure are real. Screenshots were visually inspected. At ordinary requested1.9 the legacy editor still displays burned **FRAME08**; that known tolerant mismatch is unchanged and is not strict-editor acceptance. No exact UI migration, resize/mobile/OS-chooser or tracking-quality claim is made.
+
+## Self-review and remaining delivery gates
+
+Self-review checked the five planned review-focus classes, full source range, preserved positional/default behavior, all67 new cases on both interpreters, original RED source/test identities, final archive/updater bytes and clean/ref integrity. No known new product issue remains within this optional adapter. This author review does not replace root's fresh independent review.
+
+The inherited metadata-qualified, sample-verified CFR subset and observed-file-stamp limits remain. There is no whole-file CFR/immutable-source certificate, frame digest, stronger equal-observed-attribute external-mutation guarantee or exact later propagation. Person/Vit behavior here uses deterministic model doubles at initializer boundaries; real tracking quality and native interruption remain separate. The ordinary editor/Track migrate together only after reviewed P16D prerequisites; O02, P17/HDR/source mapping, P08/C01 composition and long-video performance remain separate gates. No result here closes them.

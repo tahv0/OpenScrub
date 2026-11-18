@@ -1,0 +1,9 @@
+# Initialize optional strict tracking from verified indexed samples
+
+Track can currently replace the inspected frame with nearby initializer pixels. This adds an optional `seed` sample precondition to `track_object` and keyword-only capture-free seeds to the existing person/Vit/NCC engines. Strict launches verify the retained integer before models, initialize from supplied pixels, prime existing captures through the indexed reader, and revalidate source/timeline/cancellation before latest-raw conversion/publication. Strict source/prime failures cannot enter tolerant fallback; ordinary model failure may use an existing engine with the same pixels.
+
+Base335435e → candidate285f4af. Existing positional/no-seed callers, ordinary PAGE/Track payloads, defaults, dependencies and tracking algorithms remain unchanged. This does not migrate the editor or claim resize/quality/C01 support.
+
+Validation:544 normally discovered tests on actual3.12;269 affected cases on actual3.9 with six unchanged report/download endings covered by native full. All67 new cases run on both. Genuine person/Vit/NCC/prime, operation/publication and integer-conversion REDs are retained. Real tiny native/normalized pixel/PTS and listening strict/legacy HTTP gates pass. Corrected full-PAGE legacy Track launch/poll/failure/draft smoke passes; its initial draft-fixture schema error remains documented. One offline sdist→wheel-from-sdist verifies37/13 selected files, installed ten origins/defaults/CLI/web/real HTTP and actual updater-copy bytes. Docker/Windows checks are source-only. Existing declared CFR/stamp/O(N) limits remain.
+
+[Implementation/evidence report](task-1002-report.md) · [Compact commands and results](task1002-evidence/commands-results.json). Fresh independent review is pending; nothing was published.

@@ -1,0 +1,9 @@
+{
+  "payload_files": 70,
+  "payload_bytes": 646788,
+  "sha256sums_sha256": "e42f57e1471763eb3a1ca565d966167427827d18259dbb0c3949cf2a05c4bf84",
+  "base": "285f4afd455ad6dc95a473995dee142421cdc87e",
+  "head": "6fde5ad60c6d78d69dbbd8e049a9196f15e4095f",
+  "original_payloads_and_indexes_unchanged": true,
+  "report_prefix_unchanged": true
+}

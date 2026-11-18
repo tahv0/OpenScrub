@@ -1,0 +1,190 @@
+PREFLIGHT {"base": "335435e1e1120de9e6773656b7dfdfabf220e27b", "files": 132, "free_bytes": 800596934656, "head": "335435e1e1120de9e6773656b7dfdfabf220e27b", "manifest_sha256": "b1edd86f6c527fcdb11832212329d87b6c70371332eedf55b304ae977ad94cdf", "policy": "development", "prerequisites": [{"executable": true, "path": "/tmp/openscrub-baseline-20261116/tools/usr/bin/ffmpeg", "sha256": "bdf6aabffdba7411edff8d36c389d695257fcdf823d196020176e117612862f6"}, {"executable": true, "path": "/tmp/openscrub-baseline-20261116/tools/usr/bin/ffprobe", "sha256": "a6dac1e9e8631e04075d06854cc4069308aec279bb04683b4a0bca5e4f54b2fe"}, {"executable": true, "path": "/tmp/openscrub-baseline-20261116/tools/usr/bin/tesseract", "sha256": "644efa639b77a21b1096a6ced155112f0c730d05c7db871d52f4b2eb16bdf42a"}, {"path": "/home/tahv0/src/OpenScrub/docs/superpowers/plans/upstream-delivery/execution/tooling/verify.py", "sha256": "354cf49b0c83d11f3945137fbdffc3ac6b2793f1217ac39a9b62270097940067"}, {"executable": true, "path": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python", "sha256": "e74c565bbccaaf3c2ec6527962890418ab6fe740c19129b02ae1b7effc322230"}, {"path": "/tmp/openscrub-frame-identity-baseline-20261117/runtime/cfr24.mp4", "sha256": "3255faa79d819ad763cd1cc95c9d0f9aa5e49ade85019197220f6e5913f62c7c"}, {"path": "/tmp/openscrub-frame-identity-baseline-20261117/runtime/cfr5.mp4", "sha256": "ecc7cdc66751506e713c4dfce38fb096f5c1c0fcc8fbd73e8d5375cc94fe6bba"}, {"path": "/tmp/openscrub-frame-identity-baseline-20261117/runtime/vfr.cfr.mp4", "sha256": "591cf2b749f17e12f7ae9d78d91dbf699ae5ebe28e3b89f085390dd631cb33f7"}, {"path": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1001/http_smoke.py", "sha256": "1fedd701a57c45424764cce40d5c7cae060178a394db1070b78b11bd4f86b0e4"}, {"path": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/task1631-evidence/adapters/task1631_fixture.py", "sha256": "89ecc8bfceca7b4f10d454b7afe374dfb9e4a18a7ca0cf93a8de0a8444a9b5b3"}, {"path": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/task654-evidence/adapters/roundtrip_stdout_selected.py", "sha256": "0d5a47ad5c5b54ee980473170a2177eb79d47ca6a972d0872926b0fde4d90f83"}, {"path": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1001/media.json", "sha256": "d32e50fede2f0533ba11a8ad4822988170065d35d315dc839da3dcc6a4664776"}, {"path": "/tmp/openscrub-baseline-20261116/synthetic-data/models-opencv4/face_detection_yunet_2023mar.onnx", "sha256": "8f2383e4dd3cfbb4553ea8718107fc0423210dc964f9f4280604804ed2552fa4"}, {"path": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1203/build-tools/hatchling/build.py", "sha256": "8bdc5f386de529d512e8807b1bf47843010b142f3e61fc2d5e75f13634d7e583"}, {"path": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1203/build-tools/tomlkit/__init__.py", "sha256": "2a4876d4ff9d0050d76808f1cc06a6be09228127abf5b99c5ce6bdb307d7ed7d"}, {"path": "/tmp/openscrub-baseline-20261116/bootstrap/lib/python3.14/site-packages/pip/__main__.py", "sha256": "5b36e11d74db484ea0058d7d98d37d9b8b39a3fdfae4b3af4d84a0aa06dd0611"}], "python": {"executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python", "version": [3, 12, 16]}, "run": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/runs/final-owner-red-021", "source": "/home/tahv0/.codex/worktrees/bde3/OpenScrub"}
+COMMAND ["/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python", "-m", "pytest", "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracker_seed.py::test_strict_person_metadata_error_releases_capture", "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracking_routes.py::test_strict_snapshot_exception_releases_preparation", "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracking_routes.py::test_strict_publication_retains_integer_reference_offset", "-q", "--basetemp=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/runs/final-owner-red-021/pytest", "-o", "cache_dir=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/runs/final-owner-red-021/cache/pytest"]
+DEFAULT_PATHS {"jobs": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_jobs", "models": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/runs/final-owner-red-021/profile/.openscrub/models"}
+ACTIVE_SOURCE {"executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python", "python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]", "sources": {"openscrub": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub.py", "sha256": "559798c8b420577057060fca11579bcb1403e8bc635992efdb2d98731e42d312"}, "openscrub_internal": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_internal/__init__.py", "sha256": "c35c063c010e329c5dad13782e7b67438ed4b2d1faf975d4f01be2773a18e022"}, "openscrub_internal.exact_samples": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_internal/exact_samples.py", "sha256": "0b583a0a027dc397ce3835982c5367031375fdd65d9a3b5f287dea3726c02c4d"}, "openscrub_internal.lifetimes": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_internal/lifetimes.py", "sha256": "86a01f37d9bae9998161eff1d04e2ca37d66548c2a202f36003587ec3e9cee8e"}, "openscrub_internal.reports": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_internal/reports.py", "sha256": "e8a7429c0b5430ee290f6635ca5d5a93445d3f0fe9bb0f58e57fec891ee01b7f"}, "openscrub_setup": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_setup.py", "sha256": "d0362a038f8182e8fae510100085bb087f09f7e5cf7e11a780a24390b3037eaf"}, "openscrub_update": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_update.py", "sha256": "4d6a20f75d985a119f8421227c3bd88b17fd1b8eed44e353b127b5b49e733d55"}, "openscrub_vault": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_vault.py", "sha256": "da1b7fe4da389352fbc594abddcc563278b26009d8f342d4154ffa305bf4dfa4"}, "openscrub_web": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_web.py", "sha256": "d0c021cd17b75c70071288140e9da4fc3bc2ef26ce2e0046f9f3a9e972f9353f"}, "zones_ui": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/zones_ui.py", "sha256": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7"}}}
+FFEF                                                                     [100%]
+==================================== ERRORS ====================================
+___ ERROR at teardown of test_strict_snapshot_exception_releases_preparation ___
+
+tmp_path = PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/runs/final-owner-red-021/pytest/test_strict_snapshot_exception0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x77c96db6a2a0>
+
+    @pytest.fixture
+    def store(tmp_path, monkeypatch):
+        root = tmp_path / 'data'
+        root.mkdir()
+        jobs = root / 'jobs'
+        jobs.mkdir()
+        monkeypatch.setattr(web, '_data_root', lambda: str(root))
+        monkeypatch.setattr(web, 'JOBS_DIR', str(jobs))
+        monkeypatch.setattr(web, 'JOBS', {})
+        monkeypatch.setattr(web, 'WORK_Q', queue.Queue())
+        monkeypatch.setattr(web, 'WORKER', {'current': None, 'thread': None})
+        monkeypatch.setattr(web, 'VAULT', {'key': None})
+        # A fresh ownership domain isolates every route schedule, once implemented.
+        if hasattr(web, 'FILES'):
+            monkeypatch.setattr(web, 'FILES', type(web.FILES)(web.VAULT_LOCK))
+        monkeypatch.setattr(web, 'TOKEN', None)
+        monkeypatch.setitem(web.app.config, 'TESTING', False)
+        monkeypatch.setitem(web.app.config, 'PROPAGATE_EXCEPTIONS', False)
+        job = web.new_job('', {}, 'synthetic.avi')
+        video = Path(job['dir']) / 'input.avi'
+        video.write_bytes(b'synthetic video')
+        job.update(video=str(video), phase='review')
+        doc = {'provenance': {'input': str(video), 'settings': {}},
+               'render_state': {'fps': 30, 'cum': [[0, 0]] * 30},
+               'detections': [dict(t_start=0, t_end=1, cbox=[1, 2, 8, 9],
+                                  category='name', text='synthetic', confidence=.9,
+                                  aoff=[0, 0], last_seen=.5, enabled=True)],
+               'custom': {'preserved': True}}
+        path = Path(job['dir']) / 'report.json'
+        path.write_text(json.dumps(doc))
+        def enable():
+            key = vault.create_keystore(str(root), 'synthetic-password')
+            web.VAULT['key'] = key
+            return key
+        result = SimpleNamespace(root=root, jobs=jobs, job=job, path=path,
+                                 doc=doc, enable=enable,
+                                 url='/api/jobs/' + job['id'])
+        yield result
+        if hasattr(web, 'FILES'):
+>           assert web.FILES.count == 0, 'file ownership leaked'
+E           AssertionError: file ownership leaked
+E           assert 1 == 0
+E            +  where 1 = <openscrub_internal.lifetimes.FileOwners object at 0x77c96de238f0>.count
+E            +    where <openscrub_internal.lifetimes.FileOwners object at 0x77c96de238f0> = web.FILES
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_job_lifecycle.py:57: AssertionError
+------------------------------ Captured log call -------------------------------
+ERROR    openscrub_web:app.py:875 Exception on /api/jobs/e4f29de8cdaf/track_object [POST]
+Traceback (most recent call last):
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_web.py", line 2295, in job_track_object
+    fps, cum, timeline_eq, tolerance = _exact_policy(doc, selected)
+                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracking_routes.py", line 306, in policy
+    error=RuntimeError('snapshot retained oracle');errors.append(error);raise error
+                                                                        ^^^^^^^^^^^
+RuntimeError: snapshot retained oracle
+=================================== FAILURES ===================================
+______________ test_strict_person_metadata_error_releases_capture ______________
+
+rig = namespace(monkeypatch=<_pytest.monkeypatch.MonkeyPatch object at 0x77c96ddf8b60>, yy=array([[ 0,  0,  0, ...,  0,  0, ... 73],
+        ...,
+        [73, 73, 73],
+        [73, 73, 73],
+        [73, 73, 73]]], shape=(48, 64, 3), dtype=uint8))
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x77c96ddf8b60>
+
+    def test_strict_person_metadata_error_releases_capture(rig,monkeypatch):
+        errors=[]
+        def get(cap,prop):
+            error=exact.ExactError('metadata retained oracle');errors.append(error);raise error
+        monkeypatch.setattr(rig.Capture,'get',get)
+        detector=SimpleNamespace(want_any=False,find=lambda frame:[])
+        with pytest.raises(exact.ExactError,match='metadata retained oracle'):
+            engine._track_person_dense('fixture',[8,8,40,40],1/6,.16,.17,
+                detector,lambda m:None,strict_seed=rig.seed)
+>       assert len(errors)==1 and [c.releases for c in rig.captures]==[1]
+E       AssertionError: assert (1 == 1 and [0] == [1]
+E        +  where 1 = len([ExactError('metadata retained oracle')])
+E         
+E         At index 0 diff: 0 != 1
+E         Use -v to get more diff)
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracker_seed.py:219: AssertionError
+_____________ test_strict_snapshot_exception_releases_preparation ______________
+
+tracking = namespace(exact=namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/runs/fina...compute at 0x77c96d9bd760>, calls=[], models=[], original=<function _start_owned_thread at 0x77c9ea1c0ae0>, threads=[])
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x77c96db6a2a0>
+
+    def test_strict_snapshot_exception_releases_preparation(tracking,monkeypatch):
+        errors=[]
+        def policy(*a,**kw):
+            error=RuntimeError('snapshot retained oracle');errors.append(error);raise error
+        monkeypatch.setattr(web,'_exact_policy',policy)
+        before=tracking.exact.path.read_bytes()
+        response=request('post',tracking.exact.url+'/track_object',json=tracking.payload)
+        assert response.status_code==500 and len(errors)==1
+        assert tracking.models==[] and tracking.exact.path.read_bytes()==before
+>       assert web.FILES.count==0
+E       assert 1 == 0
+E        +  where 1 = <openscrub_internal.lifetimes.FileOwners object at 0x77c96de238f0>.count
+E        +    where <openscrub_internal.lifetimes.FileOwners object at 0x77c96de238f0> = web.FILES
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracking_routes.py:312: AssertionError
+------------------------------ Captured log call -------------------------------
+ERROR    openscrub_web:app.py:875 Exception on /api/jobs/e4f29de8cdaf/track_object [POST]
+Traceback (most recent call last):
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_web.py", line 2295, in job_track_object
+    fps, cum, timeline_eq, tolerance = _exact_policy(doc, selected)
+                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracking_routes.py", line 306, in policy
+    error=RuntimeError('snapshot retained oracle');errors.append(error);raise error
+                                                                        ^^^^^^^^^^^
+RuntimeError: snapshot retained oracle
+___________ test_strict_publication_retains_integer_reference_offset ___________
+
+exact = namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/runs/final-owner-red-021/...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x77c96d9bc4a0>, url='/api/jobs/d1ba26fb30a2')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x77c96dde1b20>
+
+    def test_strict_publication_retains_integer_reference_offset(exact,monkeypatch):
+        writer=web.cv2.VideoWriter(exact.job['video'],web.cv2.VideoWriter_fourcc(*'MJPG'),13,(64,48))
+        assert writer.isOpened()
+        try:
+            for i in range(26):writer.write(np.full((48,64,3),i*8,dtype=np.uint8))
+        finally:writer.release()
+        doc=raw(exact);doc['render_state']=dict(fps=13,cum=[[i,-i] for i in range(26)])
+        exact.path.write_text(json.dumps(doc))
+        pc=precondition(sample(exact,1.16),None)
+        assert pc['index']==15 and int((15/13)*13)==14
+        threads=[];real_start=web._start_owned_thread
+        def start(target,lease):
+            thread=real_start(target,lease);threads.append(thread);return thread
+        monkeypatch.setattr(web,'_start_owned_thread',start)
+        monkeypatch.setattr(engine,'PersonDetector',lambda *a,**kw:None)
+        monkeypatch.setattr(engine,'track_manual_region',lambda *a,**kw:[(15/13,[20,8,52,40],.9)])
+        try:
+            response=request('post',exact.url+'/track_object',json=dict(seed=pc,
+                box=[20,8,52,40],t_ref=15/13,t0=1.15,t1=1.16))
+            assert response.status_code==200
+        finally:
+            for thread in threads:thread.join(8);assert not thread.is_alive()
+        assert request('get',exact.url+'/track_status').json['added']==1
+>       assert raw(exact)['detections'][-1]['aoff']==[15,-15]
+E       assert [14, -14] == [15, -15]
+E         
+E         At index 0 diff: 14 != 15
+E         Use -v to get more diff
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracking_routes.py:338: AssertionError
+=========================== short test summary info ============================
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracker_seed.py::test_strict_person_metadata_error_releases_capture
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracking_routes.py::test_strict_snapshot_exception_releases_preparation
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracking_routes.py::test_strict_publication_retains_integer_reference_offset
+ERROR ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracking_routes.py::test_strict_snapshot_exception_releases_preparation
+3 failed, 1 error in 0.38s
+RESULT {"exit": 1, "log": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/runs/final-owner-red-021/logs/command.log", "sha256": "6322a6d0338ce39f2256653dd5bb704a94b6514cc85382270c3402911f1c0d33"}

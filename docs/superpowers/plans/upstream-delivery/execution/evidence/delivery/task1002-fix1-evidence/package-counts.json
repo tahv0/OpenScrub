@@ -1,0 +1,73 @@
+{
+  "sdist_regular": 44,
+  "wheel_regular": 21,
+  "sdist_checked": 37,
+  "wheel_checked": 13,
+  "identities": {
+    "sdist": {
+      "file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/fix1/runs/fix1-package-009/dist/openscrub-1.0.96.tar.gz",
+      "sha256": "480557d37c7b21954f3011c1cb53f8bdd7a4ba3da7af5a0a38c6662bd3afbff5",
+      "bytes": 596226
+    },
+    "wheel": {
+      "file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/fix1/runs/fix1-package-009/wheel/openscrub-1.0.96-py3-none-any.whl",
+      "sha256": "976df7bcaeb677b2c82e2bc8e0f959c0564404289837a3c14b965ecd64b66750",
+      "bytes": 457336
+    },
+    "sdist_files": [
+      "LICENSE",
+      "NOTICE",
+      "README.md",
+      "THIRD_PARTY_NOTICES.md",
+      "assets/openscrub.ico",
+      "face_models.json",
+      "install.py",
+      "openscrub.py",
+      "openscrub_internal/__init__.py",
+      "openscrub_internal/exact_samples.py",
+      "openscrub_internal/lifetimes.py",
+      "openscrub_internal/reports.py",
+      "openscrub_setup.py",
+      "openscrub_update.py",
+      "openscrub_vault.py",
+      "openscrub_web.py",
+      "person_models.json",
+      "plate_models.json",
+      "pyproject.toml",
+      "requirements.txt",
+      "test_openscrub.py",
+      "tests/test_exact_adoption.py",
+      "tests/test_exact_media.py",
+      "tests/test_exact_recovery_races.py",
+      "tests/test_exact_samples.py",
+      "tests/test_job_lifecycle.py",
+      "tests/test_job_response_lifetime.py",
+      "tests/test_job_source_allowlist_lifecycle.py",
+      "tests/test_large_report_io.py",
+      "tests/test_manual_addition_replay.py",
+      "tests/test_report_roundtrip.py",
+      "tests/test_report_transactions.py",
+      "tests/test_review_save_failures.py",
+      "tests/test_strict_tracker_seed.py",
+      "tests/test_strict_tracking_routes.py",
+      "tests/test_vault_cleanup.py",
+      "zones_ui.py"
+    ],
+    "wheel_files": [
+      "face_models.json",
+      "openscrub.py",
+      "openscrub_internal/__init__.py",
+      "openscrub_internal/exact_samples.py",
+      "openscrub_internal/lifetimes.py",
+      "openscrub_internal/reports.py",
+      "openscrub_setup.py",
+      "openscrub_update.py",
+      "openscrub_vault.py",
+      "openscrub_web.py",
+      "person_models.json",
+      "plate_models.json",
+      "zones_ui.py"
+    ],
+    "requires_python": ">=3.9"
+  }
+}

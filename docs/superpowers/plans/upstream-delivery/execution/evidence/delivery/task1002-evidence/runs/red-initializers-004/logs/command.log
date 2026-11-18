@@ -1,0 +1,162 @@
+DEFAULT_PATHS {"jobs": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_jobs", "models": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/runs/red-initializers-004/profile/.openscrub/models"}
+ACTIVE_SOURCE {"executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python", "python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]", "sources": {"openscrub": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub.py", "sha256": "9b431dd7e1c1940d9b9743626f2ec41683f40380c97f58b6b24b618875cac1cf"}, "openscrub_internal": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_internal/__init__.py", "sha256": "c35c063c010e329c5dad13782e7b67438ed4b2d1faf975d4f01be2773a18e022"}, "openscrub_internal.exact_samples": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_internal/exact_samples.py", "sha256": "3c7b3fb69d9816b7048df099d5c134c8a3c308939745420fa7947e43e3b02425"}, "openscrub_internal.lifetimes": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_internal/lifetimes.py", "sha256": "86a01f37d9bae9998161eff1d04e2ca37d66548c2a202f36003587ec3e9cee8e"}, "openscrub_internal.reports": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_internal/reports.py", "sha256": "e8a7429c0b5430ee290f6635ca5d5a93445d3f0fe9bb0f58e57fec891ee01b7f"}, "openscrub_setup": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_setup.py", "sha256": "d0362a038f8182e8fae510100085bb087f09f7e5cf7e11a780a24390b3037eaf"}, "openscrub_update": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_update.py", "sha256": "4d6a20f75d985a119f8421227c3bd88b17fd1b8eed44e353b127b5b49e733d55"}, "openscrub_vault": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_vault.py", "sha256": "da1b7fe4da389352fbc594abddcc563278b26009d8f342d4154ffa305bf4dfa4"}, "openscrub_web": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_web.py", "sha256": "cf5a5dbfef246f9759af4310aa2859fa65312d57d8fd4ee477d0556f70f615ef"}, "zones_ui": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/zones_ui.py", "sha256": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7"}}}
+.FFFF.                                                                   [100%]
+=================================== FAILURES ===================================
+___________________ test_strict_person_uses_supplied_pixels ____________________
+
+rig = namespace(monkeypatch=<_pytest.monkeypatch.MonkeyPatch object at 0x7a9b7bdf8ef0>, yy=array([[ 0,  0,  0, ...,  0,  0, ... 73],
+        ...,
+        [73, 73, 73],
+        [73, 73, 73],
+        [73, 73, 73]]], shape=(48, 64, 3), dtype=uint8))
+
+    def test_strict_person_uses_supplied_pixels(rig):
+        detected = []
+        class Detector:
+            want_any = False
+            def find(self, frame):
+                detected.append(frame.copy())
+                return [(8,8,40,40,.9,(),0)]
+        detector = Detector()
+        result = engine._track_person_dense('fixture', [8,8,40,40], 1/6,
+            .16,.17, detector, lambda m: None, strict_seed=rig.seed)
+        assert result[0][0] == 1/6 and len(result) == 1
+        assert len(detected) == 1 and len(rig.histograms) == 2
+        assert len(rig.initializers) == 2
+>       for frame in detected+rig.histograms: np.testing.assert_array_equal(frame, rig.pixels)
+                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AssertionError: 
+E       Arrays are not equal
+E       
+E       Mismatched elements: 9216 / 9216 (100%)
+E       First 5 mismatches are at indices:
+E        [0, 0, 0]: 255 (ACTUAL), 0 (DESIRED)
+E        [0, 0, 1]: 255 (ACTUAL), 0 (DESIRED)
+E        [0, 0, 2]: 255 (ACTUAL), 0 (DESIRED)
+E        [0, 1, 0]: 252 (ACTUAL), 3 (DESIRED)
+E        [0, 1, 1]: 255 (ACTUAL), 0 (DESIRED)
+E       Max absolute difference among violations: 127
+E       Max relative difference among violations: 2.5
+E        ACTUAL: array([[[255, 255, 255],
+E               [252, 255, 253],
+E               [249, 255, 251],...
+E        DESIRED: array([[[  0,   0,   0],
+E               [  3,   0,   2],
+E               [  6,   0,   4],...
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracker_seed.py:76: AssertionError
+___________ test_strict_vit_uses_supplied_pixels_in_both_directions ____________
+
+rig = namespace(monkeypatch=<_pytest.monkeypatch.MonkeyPatch object at 0x7a9b7be90740>, yy=array([[ 0,  0,  0, ...,  0,  0, ... 73],
+        ...,
+        [73, 73, 73],
+        [73, 73, 73],
+        [73, 73, 73]]], shape=(48, 64, 3), dtype=uint8))
+
+    def test_strict_vit_uses_supplied_pixels_in_both_directions(rig):
+        result = engine.track_manual_region('fixture', [8,8,40,40],1/6,.16,.17,
+            strict_seed=rig.seed)
+        assert result == [(1/6, (8.,8.,40.,40.),1.)]
+        assert len(rig.initializers) == 2
+        for frame in rig.initializers:
+>           np.testing.assert_array_equal(frame, cv2.resize(rig.pixels, None, fx=.5, fy=.5))
+E           AssertionError: 
+E           Arrays are not equal
+E           
+E           Mismatched elements: 2280 / 2304 (99%)
+E           First 5 mismatches are at indices:
+E            [0, 0, 0]: 254 (ACTUAL), 2 (DESIRED)
+E            [0, 0, 1]: 253 (ACTUAL), 2 (DESIRED)
+E            [0, 0, 2]: 253 (ACTUAL), 2 (DESIRED)
+E            [0, 1, 0]: 248 (ACTUAL), 8 (DESIRED)
+E            [0, 1, 1]: 253 (ACTUAL), 2 (DESIRED)
+E           Max absolute difference among violations: 125
+E           Max relative difference among violations: 2.5
+E            ACTUAL: array([[[254, 253, 253],
+E                   [248, 253, 249],
+E                   [242, 253, 245],...
+E            DESIRED: array([[[  2,   2,   2],
+E                   [  8,   2,   6],
+E                   [ 14,   2,  10],...
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracker_seed.py:91: AssertionError
+________________ test_strict_ncc_template_uses_supplied_pixels _________________
+
+rig = namespace(monkeypatch=<_pytest.monkeypatch.MonkeyPatch object at 0x7a9b7be92fc0>, yy=array([[ 0,  0,  0, ...,  0,  0, ... 73],
+        ...,
+        [73, 73, 73],
+        [73, 73, 73],
+        [73, 73, 73]]], shape=(48, 64, 3), dtype=uint8))
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7a9b7be92fc0>
+
+    def test_strict_ncc_template_uses_supplied_pixels(rig, monkeypatch):
+        monkeypatch.setattr(engine, '_vittrack_factory', lambda log: None)
+        templates = []
+        real = cv2.matchTemplate
+        def match(image, template, mode):
+            templates.append(template.copy())
+            return real(image, template, mode)
+        monkeypatch.setattr(engine.cv2, 'matchTemplate', match)
+        result = engine.track_manual_region('fixture', [8,8,40,40],1/6,1/6,.25,
+            strict_seed=rig.seed)
+        expected = cv2.GaussianBlur(cv2.resize(cv2.cvtColor(rig.pixels,
+            cv2.COLOR_BGR2GRAY), None, fx=.5, fy=.5), (3,3),0)[4:20,4:20]
+        assert result[0][0] == 1/6
+>       assert any(t.shape == expected.shape and np.array_equal(t, expected) for t in templates)
+E       assert False
+E        +  where False = any(<generator object test_strict_ncc_template_uses_supplied_pixels.<locals>.<genexpr> at 0x7a9b7bb304a0>)
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracker_seed.py:109: AssertionError
+____________ test_strict_prime_failure_never_enters_nearby_fallback ____________
+
+rig = namespace(monkeypatch=<_pytest.monkeypatch.MonkeyPatch object at 0x7a9b7be93ef0>, yy=array([[ 0,  0,  0, ...,  0,  0, ... 73],
+        ...,
+        [73, 73, 73],
+        [73, 73, 73],
+        [73, 73, 73]]], shape=(48, 64, 3), dtype=uint8))
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7a9b7be93ef0>
+
+    def test_strict_prime_failure_never_enters_nearby_fallback(rig, monkeypatch):
+        calls = []
+        def fail(*a, **kw):
+            calls.append(kw)
+            raise exact.ExactError('strict prime oracle')
+        monkeypatch.setattr(exact, 'read_indexed_capture', fail)
+        class Detector:
+            want_any = False
+            def find(self, frame): pytest.fail('model before strict prime')
+        with pytest.raises(exact.ExactError, match='strict prime oracle'):
+>           engine.track_manual_region('fixture',[8,8,40,40],1/6,.16,.17,
+                person_det=Detector(), strict_seed=rig.seed)
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracker_seed.py:125: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub.py:2499: in track_manual_region
+    ps = _track_person_dense(video, box, t_ref, t0, t1,
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub.py:1977: in _track_person_dense
+    for d in det.find(fr0):
+             ^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <test_strict_tracker_seed.test_strict_prime_failure_never_enters_nearby_fallback.<locals>.Detector object at 0x7a9b7be965a0>
+frame = array([[[255, 255, 255],
+        [252, 255, 253],
+        [249, 255, 251],
+        ...,
+        [ 72, 255, 133],
+     ...      ...,
+        [ 72,  67,  39],
+        [ 69,  67,  37],
+        [ 66,  67,  35]]], shape=(48, 64, 3), dtype=uint8)
+
+>   def find(self, frame): pytest.fail('model before strict prime')
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: model before strict prime
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracker_seed.py:123: Failed
+=========================== short test summary info ============================
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracker_seed.py::test_strict_person_uses_supplied_pixels
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracker_seed.py::test_strict_vit_uses_supplied_pixels_in_both_directions
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracker_seed.py::test_strict_ncc_template_uses_supplied_pixels
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracker_seed.py::test_strict_prime_failure_never_enters_nearby_fallback
+4 failed, 2 passed in 0.21s

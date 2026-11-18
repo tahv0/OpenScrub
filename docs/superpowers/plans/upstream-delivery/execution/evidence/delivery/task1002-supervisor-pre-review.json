@@ -1,0 +1,36 @@
+{
+  "base": "335435e1e1120de9e6773656b7dfdfabf220e27b",
+  "head": "285f4afd455ad6dc95a473995dee142421cdc87e",
+  "source_branch": "pr/exact-tracker-seeds",
+  "source_clean": true,
+  "prior_refs": 157,
+  "all_prior_ref_values_preserved": true,
+  "documentation_head": "f4649f9fa78f2b95abcdf4112f1b136e837fc017",
+  "documentation_clean": true,
+  "working_integration": "b4fc209570d3e3a81be251dfc55aa71a24ad7b82",
+  "changed_files": [
+    "openscrub.py",
+    "openscrub_internal/exact_samples.py",
+    "openscrub_web.py",
+    "tests/test_strict_tracker_seed.py",
+    "tests/test_strict_tracking_routes.py"
+  ],
+  "review_package": {
+    "bytes": 71243,
+    "sha256": "818151d965fb427c4a3066c3e8aaf4e440c8d9ffa1c314d0c58efe471de45a5d"
+  },
+  "evidence_manifest": {
+    "bytes": 27934,
+    "sha256": "5a9bd93e8ece7d30e024599de58babf719fcbe44f25205e271ae387ae4757ed5"
+  },
+  "report": {
+    "bytes": 16316,
+    "sha256": "d854b6346b90cbce8d6e04883287faa8919a2e64264d92958565e03bc9e85dd7"
+  },
+  "pr": {
+    "bytes": 1810,
+    "sha256": "e46e5d87cb5a5e8635ebb39a47efb5cb2b6981283b2caf93dd0225c42164efc1"
+  },
+  "report_snapshots_identical": true,
+  "runtime_gates": "Existing recorded evidence, not replayed by root"
+}

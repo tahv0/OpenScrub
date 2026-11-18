@@ -1,0 +1,5 @@
+[
+  "tests/test_strict_tracker_seed.py::test_strict_person_prime_preserves_cancellation[keyboard-interrupt]",
+  "tests/test_strict_tracker_seed.py::test_strict_person_prime_preserves_cancellation[pipeline-cancel]",
+  "tests/test_strict_tracker_seed.py::test_strict_person_prime_preserves_cancellation[system-exit]"
+]

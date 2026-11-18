@@ -77,7 +77,7 @@ Scripts retain their original temporary paths and pinned-source assumptions. Rep
 
 Each upstream PR should carry only its relevant recipe, concise results and required regression tests. Before publication, replace scratch-only evidence references in that PR with its attached or committed material. No external publication is recorded here.
 
-The [editor resize handoff](research/source-plans/editor-resize-source-plan.md.txt) preserves the contract used by completed Task164; the [exact editor backend handoff](research/source-plans/exact-editor-backend-source-plan.md.txt) remains unrun. Other selected source plans are retained alongside them as exact text snapshots. Contracts alone are not implementation evidence; the execution record identifies completed candidates.
+The [editor resize handoff](research/source-plans/editor-resize-source-plan.md.txt) preserves the contract used by completed Task164; the [exact editor backend handoff](research/source-plans/exact-editor-backend-source-plan.md.txt) was implemented and accepted through Task1001 at 335435e. Other selected source plans are retained alongside them as exact text snapshots. Contracts alone are not implementation evidence; the execution record identifies completed candidates.
 
 ### D01 local verification tooling
 
@@ -123,3 +123,9 @@ The source map and exact dispatch snapshot remain source preparation; the [behav
 [Original report](delivery/task-1001-report.md), [initial review](delivery/task-1001-review.md), [repair report](delivery/task-1001-fix1-report.md), [scoped approval](delivery/task-1001-fix1-review.md) and [final acceptance](delivery/task-1001-final-acceptance.md) retain the complete backend scope. Final157 native/floor checks and rebuilt installed HTTP/package evidence belong to335435e; full471/77/package/cost remain5acb655. Both original132 payloads and53 new repair payloads, all original indexes, raw report/PR snapshots and explicit diagnostic/collector aliases were independently audited. No runtime media/environment export or local development control is archived.
 
 The [next strict-seed source handoff](research/source-plans/exact-tracker-seed-source-plan.md.txt) defines the optional person/Vit/NCC initialization/prime contract, legacy compatibility, resource/operation checks and delivery order before UI/P16D/C01. This is a plan, not runtime acceptance for that next slice.
+
+### P10A optional strict tracker seeds
+
+[Main report](delivery/task-1002-report.md), [full review](delivery/task-1002-review.md), [repair report](delivery/task-1002-fix1-report.md), [scoped approval](delivery/task-1002-fix1-review.md) and [final acceptance](delivery/task-1002-final-acceptance.md) retain the focused optional adapter. Original260 payloads/indexes/report prefix/PR snapshot remain intact;70 repair payloads preserve the added native-error/legacy controls and final89/89/package gates. Used-native identities are prospective only; earlier544/269/PAGE attribution and all decoder/performance/model/platform boundaries remain explicit. No environment/media/native binaries or local development controls are archived.
+
+The [next P16D prerequisite plan](research/source-plans/exact-editor-prerequisite-source-plan.md.txt) maps the reviewed resize contribution onto the accepted seed lineage while preserving current manual/save/subtree owners. It is a source handoff, not a Task1003 runtime result.

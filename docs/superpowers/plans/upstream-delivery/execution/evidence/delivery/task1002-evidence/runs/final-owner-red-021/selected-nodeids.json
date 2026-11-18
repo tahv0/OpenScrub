@@ -1,0 +1,5 @@
+[
+  "tests/test_strict_tracker_seed.py::test_strict_person_metadata_error_releases_capture",
+  "tests/test_strict_tracking_routes.py::test_strict_publication_retains_integer_reference_offset",
+  "tests/test_strict_tracking_routes.py::test_strict_snapshot_exception_releases_preparation"
+]

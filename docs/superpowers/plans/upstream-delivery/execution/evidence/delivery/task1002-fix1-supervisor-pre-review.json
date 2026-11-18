@@ -1,0 +1,43 @@
+{
+  "fix_base": "285f4afd455ad6dc95a473995dee142421cdc87e",
+  "head": "6fde5ad60c6d78d69dbbd8e049a9196f15e4095f",
+  "source_clean": true,
+  "branch": "pr/exact-tracker-seeds",
+  "all157priorrefs_preserved": true,
+  "changed_files": [
+    "openscrub.py",
+    "tests/test_strict_tracker_seed.py",
+    "tests/test_strict_tracking_routes.py"
+  ],
+  "packet": {
+    "bytes": 10472,
+    "sha256": "a61600b25c1f338590adf2deb2ff6f394392b782764722af03c5eb5fd2074809"
+  },
+  "fix_report": {
+    "bytes": 8139,
+    "sha256": "16e6f182352d341e79ff2d075707e1a155667d3ca3ff25a1bb561c910504242d"
+  },
+  "main_report": {
+    "bytes": 24439,
+    "sha256": "6a686a1da0a48f1c5cb7932ebdd72db66417a689cb557676ba43c2dd642a7014"
+  },
+  "main_original_prefix": {
+    "bytes": 16316,
+    "sha256": "d854b6346b90cbce8d6e04883287faa8919a2e64264d92958565e03bc9e85dd7"
+  },
+  "pr": {
+    "bytes": 1869,
+    "sha256": "01e3da29c51bc9841407e6f006892756802a81ccb4d71259be966019d909be06"
+  },
+  "all_new_report_snapshots_identical": true,
+  "original_manifest": {
+    "bytes": 27934,
+    "sha256": "5a9bd93e8ece7d30e024599de58babf719fcbe44f25205e271ae387ae4757ed5"
+  },
+  "fix1_manifest": {
+    "bytes": 7189,
+    "sha256": "e42f57e1471763eb3a1ca565d966167427827d18259dbb0c3949cf2a05c4bf84"
+  },
+  "actual_recorded_covering_gates": "89actual3.12.16,89actual3.9.25,finalpackage009; not root replays",
+  "original_full_floor_attribution": "544/269 at285, no retrospective native identities"
+}

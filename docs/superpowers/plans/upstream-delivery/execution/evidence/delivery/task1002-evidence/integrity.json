@@ -1,0 +1,9 @@
+{
+  "payload_files": 260,
+  "payload_bytes": 2882790,
+  "sha256sums_sha256": "5a9bd93e8ece7d30e024599de58babf719fcbe44f25205e271ae387ae4757ed5",
+  "head": "285f4afd455ad6dc95a473995dee142421cdc87e",
+  "reports_byte_identical": true,
+  "complete_json_parse": true,
+  "complete_python_parse": true
+}

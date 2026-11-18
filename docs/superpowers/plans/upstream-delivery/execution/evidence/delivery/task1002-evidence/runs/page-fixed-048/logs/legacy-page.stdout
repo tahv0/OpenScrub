@@ -1,0 +1,1 @@
+{"url":"http://127.0.0.1:43165/","title":"OpenScrub","viewport":{"width":1280,"height":900},"meaningfulBody":true,"frameworkOverlay":false,"errors":[],"warnings":[],"responses":[{"added":0,"error":null,"state":"running"},{"added":0,"error":"deterministic legacy tracking failure","state":"done"}],"draftsRetained":true,"failureText":"⚠ deterministic legacy tracking failure"}

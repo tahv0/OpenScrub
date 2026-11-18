@@ -1,0 +1,35 @@
+{
+  "sha256": "e6809e3b7681a9099ac8fc0ad4ddbc662a64d53cff7f4ca4c85552b194a5311a",
+  "index": 4,
+  "pts": "167/1000",
+  "sample": {
+    "canonical_s": 0.16666666666666666,
+    "height": 180,
+    "index": 4,
+    "observed_s": 0.167,
+    "offset": [
+      8,
+      -4
+    ],
+    "origin": [
+      0,
+      0
+    ],
+    "policy": "opencv-ffmpeg-zero-cfr-v1",
+    "requested_s": 0.2,
+    "source_ref": "b2af87c6cbff43978ffd1d4c26f06a20:1",
+    "stream": 0,
+    "timeline_eq": "9c643f8ec38a228531c89c0fd71d9a9336f0792efa2a86da5c385c60a1a0267d",
+    "width": 320
+  },
+  "bound_s": 0.0010000000000071054,
+  "facts": {
+    "stream": 0,
+    "width": 320,
+    "height": 180,
+    "rate": 24.0,
+    "tick_s": 0.001,
+    "grid_aligned": false,
+    "count": null
+  }
+}

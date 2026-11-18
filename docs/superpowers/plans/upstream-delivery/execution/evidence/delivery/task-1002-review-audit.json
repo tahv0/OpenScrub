@@ -1,0 +1,257 @@
+{
+  "task": "Task1002 independent entire-task spec and quality review",
+  "base": "335435e1e1120de9e6773656b7dfdfabf220e27b",
+  "head": "285f4afd455ad6dc95a473995dee142421cdc87e",
+  "branch": "pr/exact-tracker-seeds",
+  "source": "/home/tahv0/.codex/worktrees/bde3/OpenScrub",
+  "source_clean_recorded": true,
+  "source_clean_authority": "task1002-supervisor-pre-review.json; no reviewer Git replay",
+  "prior_refs_preserved_recorded": 157,
+  "current_tracked_files_hashed": 132,
+  "current_source_hash_mismatches": [],
+  "packet": {
+    "file": "review-task1002-335435e..285f4af.diff",
+    "bytes": 71243,
+    "sha256": "818151d965fb427c4a3066c3e8aaf4e440c8d9ffa1c314d0c58efe471de45a5d",
+    "complete_read": true,
+    "read_once_with_bounded_clipping_recovery": true,
+    "line_chunks": [
+      "1-430",
+      "431-850",
+      "801-1120",
+      "1121-1465",
+      "781-800 (clipped header/setup recovery)"
+    ],
+    "commits": [
+      "6a489a9ae43357dcc67649994b40eff705c3a8f2",
+      "285f4afd455ad6dc95a473995dee142421cdc87e"
+    ]
+  },
+  "requirements_read": [
+    "task1002-review-instructions.md",
+    "task-1002-brief.md",
+    "task-1002-report.md",
+    "task-1002-pr.md",
+    "task-1002-supervisor-rulings.md",
+    "exact-editor-contract-research.md (all 284 lines, clipped portions recovered)",
+    "task-1001-final-acceptance.md",
+    "task-1001-supervisor-rulings.md",
+    "task-1001-fix1-review.md",
+    "superpowers/subagent-driven-development/task-reviewer-prompt.md"
+  ],
+  "evidence": {
+    "manifest_sha256": "5a9bd93e8ece7d30e024599de58babf719fcbe44f25205e271ae387ae4757ed5",
+    "payloads": 260,
+    "payload_bytes": 2882790,
+    "hash_mismatches": [],
+    "historical_tests": 14,
+    "historical_test_hashes_match": true,
+    "report_sha256": "d854b6346b90cbce8d6e04883287faa8919a2e64264d92958565e03bc9e85dd7",
+    "pr_sha256": "e46e5d87cb5a5e8635ebb39a47efb5cb2b6981283b2caf93dd0225c42164efc1",
+    "report_snapshot_identical": true,
+    "pr_snapshot_identical": true,
+    "all_25_workloads_original_attribution_read": true
+  },
+  "retained_execution": {
+    "reviewer_executed_workloads": false,
+    "full": {
+      "run": "full-041",
+      "passed": 544,
+      "python": [
+        3,
+        12,
+        16
+      ],
+      "final_head": true
+    },
+    "floor": {
+      "run": "floor-042",
+      "passed": 269,
+      "deselected": 6,
+      "python": [
+        3,
+        9,
+        25
+      ],
+      "final_head": true
+    },
+    "new_case_ids_equal": true,
+    "new_case_count": 67,
+    "all_nine_full_stream_endings_present": true,
+    "all_three_floor_source_video_endings_present": true,
+    "native_binding_identity_limitation": "No run-specific imported OpenCV/NumPy version, native-binary hash or loaded-library identity record. Actual interpreter/product origins and real native pixel/PTS behavior verified from retained evidence. Historical setup cannot prospectively pin these runs. Root confirmed this limitation; no metadata-regeneration replay authorized.",
+    "exact_old_display_aliases": [
+      {
+        "owner": "test_explicit_invalid_id_is_json_400_and_atomic",
+        "full": "identity7",
+        "floor": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      },
+      {
+        "owner": "test_valid_id_boundaries_and_report_local_scope",
+        "full": "identity1",
+        "floor": "A0._:-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      }
+    ],
+    "alias_scope": "Only these unchanged manual-ID parameters; no universal normalization. All new IDs match verbatim.",
+    "final_http": "http-counts-044 retained real listening strict/legacy gate inspected",
+    "final_page": "page-fixed-048 retained full shipped PAGE desktop gate inspected; original page-046 fixture failure preserved",
+    "final_package": "package-049 retained offline sdist -> wheel-from-sdist / installed defaults, ten origins, CLI/web/strict+legacy listening HTTP / actual updater inspected"
+  },
+  "archives_read_only_verified": {
+    "sdist": {
+      "file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/runs/package-049/dist/openscrub-1.0.96.tar.gz",
+      "sha256": "8465e44cba1883390ed8bd7d6ba82379df223f8d4162553f0891167143796371",
+      "bytes": 595429
+    },
+    "wheel": {
+      "file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/runs/package-049/wheel/openscrub-1.0.96-py3-none-any.whl",
+      "sha256": "ec3edfc1f1d82fce4523637b2ba6da8ce29bd165158ff4ac01808d1f0f215f6c",
+      "bytes": 457356
+    },
+    "checked_sdist_files": 37,
+    "checked_wheel_files": 13,
+    "sdist_regular_files": 44,
+    "wheel_regular_files": 21,
+    "archive_source_byte_mismatches": [],
+    "extraction_performed": false
+  },
+  "work_counts": {
+    "counts": {
+      "snapshots": 1,
+      "timeline_traversals": 4,
+      "source_current_checks": 7,
+      "latest_raw_loads": 3,
+      "web_verifications": 1,
+      "indexed_reads": 2,
+      "person_resolutions": 1,
+      "vit_initializers": 2,
+      "committed_notifications": 1
+    },
+    "source_index": 9,
+    "canonical_s": 1.8,
+    "independent_pts": "9/5",
+    "captures": 2,
+    "releases": [
+      1,
+      1
+    ],
+    "after_indices": [
+      10.0,
+      10.0
+    ]
+  },
+  "outside_diff_checks": [
+    {
+      "risk": "Source/report authority, coherent/recovered lease ownership and operation fences",
+      "file": "openscrub_web.py",
+      "ranges": [
+        "430-475",
+        "800-835",
+        "1470-1755",
+        "2030-2078",
+        "2130-2160",
+        "2450-2518",
+        "360-405",
+        "475-495"
+      ]
+    },
+    {
+      "risk": "Existing source lifetime and idempotent thread/source release",
+      "file": "openscrub_internal/lifetimes.py",
+      "ranges": [
+        "1-123 (whole small owner)"
+      ]
+    },
+    {
+      "risk": "Atomic report failure/publication semantics",
+      "file": "openscrub_internal/reports.py",
+      "ranges": [
+        "whole 48-line owner"
+      ]
+    },
+    {
+      "risk": "Hunks omit person seed_frame/anchor derivation and generic fallback/finally",
+      "file": "openscrub.py",
+      "ranges": [
+        "2010-2095",
+        "2580-2700",
+        "2730-2795 (includes incidental next function header)"
+      ]
+    },
+    {
+      "risk": "Shared indexed validation/prime behavior and finite error classification",
+      "file": "openscrub_internal/exact_samples.py",
+      "ranges": [
+        "15-65",
+        "193-250"
+      ]
+    },
+    {
+      "risk": "PAGE literal-versus-replace-expression and file:line references",
+      "files": [
+        "openscrub.py",
+        "openscrub_web.py",
+        "openscrub_internal/exact_samples.py",
+        "tests/test_strict_tracker_seed.py",
+        "tests/test_strict_tracking_routes.py"
+      ],
+      "method": "AST parse only; no imports or execution; changed-source bodies otherwise reviewed through packet"
+    }
+  ],
+  "adapters_inspected": [
+    "red-api-only-production.patch",
+    "adapters/http_counts.py (entire)",
+    "adapters/legacy_page_fixed.cjs (entire)",
+    "adapters/legacy_page_fixed.py (entire)",
+    "original/corrected PAGE fixture diagnosis and immutable driver identities"
+  ],
+  "visual_evidence_viewed": [
+    "runs/page-fixed-048/browser/legacy-failure.png"
+  ],
+  "set_aside_or_cannot_verify": [
+    "Native version/binary/loaded-library attribution absent from retained runs",
+    "Metadata-qualified CFR and observed-stamp external-mutation limits",
+    "Deep immutability of private array/dict not promised",
+    "Exact subsequent propagation and real model quality not certified",
+    "Native interruption and cancellation after final commit fence not guaranteed",
+    "Four O(N) traversals / three later raw loads acknowledged; no long-video latency/memory claim",
+    "Exact UI migration, success browser remount, resize/mobile/OS chooser, C01/P08/P09/P10C/P16C/P17 separate",
+    "Docker/frozen Windows runtime source-only",
+    "Pre-route non-JSON refusal compatibility retained",
+    "Known D01 archive-extraction warning retained, outside product scope",
+    "Clean index/untracked/ref state taken from root proof; tracked-file bytes independently verified"
+  ],
+  "findings": [
+    {
+      "id": "I1",
+      "severity": "Important",
+      "file": "openscrub.py",
+      "lines": [
+        2504,
+        2506
+      ],
+      "summary": "Generic strict capture constructor/initial isOpened can emit raw native Exception instead of mandatory ExactError with cause",
+      "concrete_effect": "Direct strict callers catching ExactError miss these source failures; report overstates normalized boundary. Existing web worker still reports done/added0/error; no demonstrated publication, fallback or returned-capture leak.",
+      "correction": "Apply strict-only ExactError/PipelineCancelled/Exception-with-cause precedence at construction/open-state access; retain no-seed behavior and capture owner; add generic native-edge tests.",
+      "runtime_replayed": false
+    }
+  ],
+  "SpecCompliance": "Issues found (I1)",
+  "TaskQuality": "Needs fixes",
+  "critical_count": 0,
+  "important_count": 1,
+  "new_minor_count": 0,
+  "reviewer_mutations": [
+    "task-1002-review.md",
+    "task-1002-review-audit.json"
+  ],
+  "source_index_refs_mutated": false,
+  "guard_executed_or_changed": false,
+  "nested_agents": false,
+  "product_imports": false,
+  "test_runtime_browser_build_download_replays": false,
+  "metadata_only_command_corrections": [
+    "Initial unqualified python was unavailable; used system python3 for stdlib-only evidence hashing/AST/archive reads.",
+    "Initial overbroad *.txt snapshot selection included base-refs.txt; corrected to task-*.txt. No product workload failed or ran."
+  ]
+}

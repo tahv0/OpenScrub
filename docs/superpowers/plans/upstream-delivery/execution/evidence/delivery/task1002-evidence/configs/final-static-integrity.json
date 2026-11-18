@@ -1,0 +1,23 @@
+{
+  "base": "335435e1e1120de9e6773656b7dfdfabf220e27b",
+  "head": "285f4afd455ad6dc95a473995dee142421cdc87e",
+  "clean": true,
+  "tracked_files": 132,
+  "runtime_modules": 10,
+  "unchanged_page_component_asts": [
+    "APP_CSS",
+    "APP_JS",
+    "FAVICON_URI",
+    "FOOT_HTML",
+    "JOBS_HTML",
+    "LOGO_URI",
+    "PAGE",
+    "SETTINGS_HTML",
+    "WORDMARK_URI"
+  ],
+  "literal_hashes": {
+    "APP_CSS": "6c324da4b20e83eb740a31150ec8d166c326c49fd8914bec09e4abe2f79b3220",
+    "APP_JS": "674217146976e47a6fcdb20b98241b08dcba2b7dbe892868e2437d7ee9c2b9a5"
+  },
+  "zones_ui_and_assets_unchanged": true
+}

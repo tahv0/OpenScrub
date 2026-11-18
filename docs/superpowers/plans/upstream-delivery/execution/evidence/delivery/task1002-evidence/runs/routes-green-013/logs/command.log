@@ -1,0 +1,156 @@
+DEFAULT_PATHS {"jobs": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_jobs", "models": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/runs/routes-green-013/profile/.openscrub/models"}
+ACTIVE_SOURCE {"executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python", "python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]", "sources": {"openscrub": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub.py", "sha256": "559798c8b420577057060fca11579bcb1403e8bc635992efdb2d98731e42d312"}, "openscrub_internal": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_internal/__init__.py", "sha256": "c35c063c010e329c5dad13782e7b67438ed4b2d1faf975d4f01be2773a18e022"}, "openscrub_internal.exact_samples": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_internal/exact_samples.py", "sha256": "0b583a0a027dc397ce3835982c5367031375fdd65d9a3b5f287dea3726c02c4d"}, "openscrub_internal.lifetimes": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_internal/lifetimes.py", "sha256": "86a01f37d9bae9998161eff1d04e2ca37d66548c2a202f36003587ec3e9cee8e"}, "openscrub_internal.reports": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_internal/reports.py", "sha256": "e8a7429c0b5430ee290f6635ca5d5a93445d3f0fe9bb0f58e57fec891ee01b7f"}, "openscrub_setup": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_setup.py", "sha256": "d0362a038f8182e8fae510100085bb087f09f7e5cf7e11a780a24390b3037eaf"}, "openscrub_update": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_update.py", "sha256": "4d6a20f75d985a119f8421227c3bd88b17fd1b8eed44e353b127b5b49e733d55"}, "openscrub_vault": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_vault.py", "sha256": "da1b7fe4da389352fbc594abddcc563278b26009d8f342d4154ffa305bf4dfa4"}, "openscrub_web": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_web.py", "sha256": "321d65e7c96c11f26471a804ce30957d6f33a6654a52a89472e9013c56b2706c"}, "zones_ui": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/zones_ui.py", "sha256": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7"}}}
+.......................FFFFF.......F.....F.............................. [ 67%]
+...................................                                      [100%]
+=================================== FAILURES ===================================
+__________________ test_strict_launch_verifies_before_models ___________________
+
+tracking = namespace(exact=namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/runs/rout...l=<function _start_owned_thread at 0x7043c6dd4ae0>, threads=[<Thread(Thread-1 (run), stopped daemon 123433056691904)>])
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x70434c396c30>
+
+    def test_strict_launch_verifies_before_models(tracking,monkeypatch):
+        before=tracking.exact.path.read_bytes()
+        def fail(*args,**kwargs): raise web.exact.ExactError('decode oracle')
+        monkeypatch.setattr(web.exact,'read_indexed_capture',fail)
+        launch(tracking)
+        status=joined(tracking)
+>       assert status == dict(state='done',added=0,error='decode oracle')
+E       assert {'added': 0, ...tate': 'done'} == {'state': 'do...ecode oracle'}
+E         
+E         Omitting 2 identical items, use -vv to show
+E         Differing items:
+E         {'error': "cannot access local variable 'fps' where it is not associated with a value"} != {'error': 'decode oracle'}
+E         Use -v to get more diff
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracking_routes.py:57: AssertionError
+______________ test_strict_capture_closed_before_model_resolution ______________
+
+tracking = namespace(exact=namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/runs/rout...l=<function _start_owned_thread at 0x7043c6dd4ae0>, threads=[<Thread(Thread-2 (run), stopped daemon 123433090262720)>])
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x70434c393950>
+
+    def test_strict_capture_closed_before_model_resolution(tracking,monkeypatch):
+        captures=[]; original=web.cv2.VideoCapture
+        class Capture:
+            def __init__(self,*args): self.cap=original(*args);self.releases=0;captures.append(self)
+            def __getattr__(self,key): return getattr(self.cap,key)
+            def release(self): self.releases+=1; self.cap.release()
+        def model(*a,**kw):
+            assert len(captures)==1 and captures[0].releases==1
+            tracking.models.append(True); return None
+        monkeypatch.setattr(web.cv2,'VideoCapture',Capture)
+        monkeypatch.setattr(engine,'PersonDetector',model)
+        launch(tracking); status=joined(tracking)
+>       assert status['added']==1 and status['error'] is None
+E       assert (0 == 1)
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracking_routes.py:74: AssertionError
+_________ test_strict_source_or_timeline_change_rejects_append[source] _________
+
+tracking = namespace(exact=namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/runs/rout...l=<function _start_owned_thread at 0x7043c6dd4ae0>, threads=[<Thread(Thread-3 (run), stopped daemon 123433056691904)>])
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x70434c392cc0>
+change = 'source'
+
+    @pytest.mark.parametrize('change',['source','timeline'],ids=['source','timeline'])
+    def test_strict_source_or_timeline_change_rejects_append(tracking,monkeypatch,change):
+        entered,release=threading.Event(),threading.Event();tracking.releases.append(release)
+        def compute(*args,**kwargs):
+            entered.set(); assert release.wait(8)
+            return [(.2,[8,8,40,40],.9)]
+        monkeypatch.setattr(engine,'track_manual_region',compute)
+        launch(tracking)
+        try:
+>           assert entered.wait(5)
+E           assert False
+E            +  where False = wait(5)
+E            +    where wait = <threading.Event at 0x70434c390500: unset>.wait
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracking_routes.py:92: AssertionError
+________ test_strict_source_or_timeline_change_rejects_append[timeline] ________
+
+tracking = namespace(exact=namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/runs/rout...l=<function _start_owned_thread at 0x7043c6dd4ae0>, threads=[<Thread(Thread-4 (run), stopped daemon 123433090262720)>])
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x70434c392cf0>
+change = 'timeline'
+
+    @pytest.mark.parametrize('change',['source','timeline'],ids=['source','timeline'])
+    def test_strict_source_or_timeline_change_rejects_append(tracking,monkeypatch,change):
+        entered,release=threading.Event(),threading.Event();tracking.releases.append(release)
+        def compute(*args,**kwargs):
+            entered.set(); assert release.wait(8)
+            return [(.2,[8,8,40,40],.9)]
+        monkeypatch.setattr(engine,'track_manual_region',compute)
+        launch(tracking)
+        try:
+>           assert entered.wait(5)
+E           assert False
+E            +  where False = wait(5)
+E            +    where wait = <threading.Event at 0x70434c392de0: unset>.wait
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracking_routes.py:92: AssertionError
+___________________ test_strict_unrelated_choice_audio_merge ___________________
+
+tracking = namespace(exact=namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/runs/rout...l=<function _start_owned_thread at 0x7043c6dd4ae0>, threads=[<Thread(Thread-5 (run), stopped daemon 123433056691904)>])
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x70434c3912e0>
+
+    def test_strict_unrelated_choice_audio_merge(tracking,monkeypatch):
+        entered,release=threading.Event(),threading.Event();tracking.releases.append(release)
+        def compute(*a,**kw): entered.set();assert release.wait(8);return [(.2,[8,8,40,40],.9)]
+        monkeypatch.setattr(engine,'track_manual_region',compute)
+        doc=raw(tracking.exact);doc['future']={'retained':[1,'x']}
+        doc['detections'][0]['manual_id']='existing:immutable'
+        doc['detections'][0]['manual_creation']={'opaque':'preserved'}
+        doc['detections'][1]['track']=17
+        tracking.exact.path.write_text(json.dumps(doc))
+        launch(tracking)
+        try:
+>           assert entered.wait(5)
+E           assert False
+E            +  where False = wait(5)
+E            +    where wait = <threading.Event at 0x70434c3840e0: unset>.wait
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracking_routes.py:115: AssertionError
+______________ test_invalid_explicit_seed_is_not_legacy[bool-box] ______________
+
+tracking = namespace(exact=namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/runs/rout...compute at 0x70434bf14180>, calls=[], models=[], original=<function _start_owned_thread at 0x7043c6dd4ae0>, threads=[])
+field = 'box', value = [True, 8, 40, 40]
+
+    @pytest.mark.parametrize('field,value', [('seed',None),('seed',{}),('t_ref',True),
+        ('t0',False),('t1',float('inf')),('box',[8,8,65,40]),('box',[True,8,40,40])],
+        ids=['null-seed','empty-seed','bool-reference','bool-start','infinite-end','outside-box','bool-box'])
+    def test_invalid_explicit_seed_is_not_legacy(tracking,field,value):
+        p=copy.deepcopy(tracking.payload);p[field]=value
+        before=tracking.exact.path.read_bytes()
+        response=request('post',tracking.exact.url+'/track_object',json=p)
+>       assert response.status_code==400
+E       assert 422 == 400
+E        +  where 422 = <WrapperTestResponse 93 bytes [422 UNPROCESSABLE ENTITY]>.status_code
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracking_routes.py:142: AssertionError
+__________ test_strict_timeline_change_during_decode_prevents_models ___________
+
+tracking = namespace(exact=namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/runs/rout...l=<function _start_owned_thread at 0x7043c6dd4ae0>, threads=[<Thread(Thread-6 (run), stopped daemon 123433056691904)>])
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x70434c186de0>
+
+    def test_strict_timeline_change_during_decode_prevents_models(tracking,monkeypatch):
+        entered,release=threading.Event(),threading.Event();tracking.releases.append(release)
+        original=web.exact.read_indexed_capture
+        def decode(*args,**kwargs):
+            decoded=original(*args,**kwargs)
+            entered.set();assert release.wait(8);return decoded
+        monkeypatch.setattr(web.exact,'read_indexed_capture',decode)
+        launch(tracking)
+        try:
+>           assert entered.wait(5)
+E           assert False
+E            +  where False = wait(5)
+E            +    where wait = <threading.Event at 0x70434c38e630: unset>.wait
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracking_routes.py:165: AssertionError
+=========================== short test summary info ============================
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracking_routes.py::test_strict_launch_verifies_before_models
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracking_routes.py::test_strict_capture_closed_before_model_resolution
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracking_routes.py::test_strict_source_or_timeline_change_rejects_append[source]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracking_routes.py::test_strict_source_or_timeline_change_rejects_append[timeline]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracking_routes.py::test_strict_unrelated_choice_audio_merge
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracking_routes.py::test_invalid_explicit_seed_is_not_legacy[bool-box]
+FAILED ../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracking_routes.py::test_strict_timeline_change_during_decode_prevents_models
+7 failed, 100 passed in 23.69s

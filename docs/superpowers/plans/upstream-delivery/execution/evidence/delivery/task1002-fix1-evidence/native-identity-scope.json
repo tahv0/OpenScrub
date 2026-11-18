@@ -1,0 +1,64 @@
+{
+  "observations": {
+    "312": {
+      "python": {
+        "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+        "version": [
+          3,
+          12,
+          16
+        ]
+      },
+      "opencv_version": "4.14.0",
+      "numpy_version": "2.5.5",
+      "opencv_extension": {
+        "path": "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/cv2/cv2.abi3.so",
+        "sha256": "8ed76bb37221f69b4670fda111e9c4746c2c8eea697af20da2f390d24e53c28c",
+        "bytes": 70818873
+      },
+      "numpy_multiarray_umath": {
+        "path": "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/numpy/_core/_multiarray_umath.cpython-312-x86_64-linux-gnu.so",
+        "sha256": "1650f5b6a42b0022f9821b475725469237dbc77595f1d5c7ae7bbc0288002095",
+        "bytes": 10617201
+      },
+      "backend": {
+        "opened": true,
+        "name": "FFMPEG",
+        "fps": 5.0,
+        "count": 10.0
+      },
+      "complete_record": "native/native-312.json"
+    },
+    "39": {
+      "python": {
+        "executable": "/tmp/openscrub-python39-20261117/venv/bin/python",
+        "version": [
+          3,
+          9,
+          25
+        ]
+      },
+      "opencv_version": "4.14.0",
+      "numpy_version": "2.0.2",
+      "opencv_extension": {
+        "path": "/tmp/openscrub-python39-20261117/venv/lib/python3.9/site-packages/cv2/cv2.abi3.so",
+        "sha256": "8ed76bb37221f69b4670fda111e9c4746c2c8eea697af20da2f390d24e53c28c",
+        "bytes": 70818873
+      },
+      "numpy_multiarray_umath": {
+        "path": "/tmp/openscrub-python39-20261117/venv/lib/python3.9/site-packages/numpy/_core/_multiarray_umath.cpython-39-x86_64-linux-gnu.so",
+        "sha256": "eced012ddb862f047fb1ba62c3cf1494f07558d2f063ced4fa5fe449c2fefe12",
+        "bytes": 10373481
+      },
+      "backend": {
+        "opened": true,
+        "name": "FFMPEG",
+        "fps": 5.0,
+        "count": 10.0
+      },
+      "complete_record": "native/native-39.json"
+    }
+  },
+  "scope": "Prospective used-extension/loader prerequisites for NEW repair gates only; not full transitive native or platform certification.",
+  "original_limitation": "Original544/269 had no run-specific OpenCV/NumPy native binary identities; these observations do not retroactively cover them."
+}

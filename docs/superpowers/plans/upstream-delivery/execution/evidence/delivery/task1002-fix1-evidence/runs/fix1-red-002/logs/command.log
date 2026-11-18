@@ -1,0 +1,189 @@
+DEFAULT_PATHS {"jobs": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_jobs", "models": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/fix1/runs/fix1-red-002/profile/.openscrub/models"}
+ACTIVE_SOURCE {"executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python", "python": "3.12.16 (main, Nov 11 2026, 00:15:59) [Clang 23.1.3 ]", "sources": {"openscrub": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub.py", "sha256": "b4843638492a43a71cb54a715c0d3ef7b83fe3ff5e30a8ba6dff6c1af4aca23e"}, "openscrub_internal": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_internal/__init__.py", "sha256": "c35c063c010e329c5dad13782e7b67438ed4b2d1faf975d4f01be2773a18e022"}, "openscrub_internal.exact_samples": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_internal/exact_samples.py", "sha256": "0b583a0a027dc397ce3835982c5367031375fdd65d9a3b5f287dea3726c02c4d"}, "openscrub_internal.lifetimes": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_internal/lifetimes.py", "sha256": "86a01f37d9bae9998161eff1d04e2ca37d66548c2a202f36003587ec3e9cee8e"}, "openscrub_internal.reports": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_internal/reports.py", "sha256": "e8a7429c0b5430ee290f6635ca5d5a93445d3f0fe9bb0f58e57fec891ee01b7f"}, "openscrub_setup": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_setup.py", "sha256": "d0362a038f8182e8fae510100085bb087f09f7e5cf7e11a780a24390b3037eaf"}, "openscrub_update": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_update.py", "sha256": "4d6a20f75d985a119f8421227c3bd88b17fd1b8eed44e353b127b5b49e733d55"}, "openscrub_vault": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_vault.py", "sha256": "da1b7fe4da389352fbc594abddcc563278b26009d8f342d4154ffa305bf4dfa4"}, "openscrub_web": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_web.py", "sha256": "e9fee1a34f7c59f65a3652ea5110ecaf2d77917497740b3ca1fc68b15b3c0e80"}, "zones_ui": {"file": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/zones_ui.py", "sha256": "a1cdb4e5be90cf2e4282268f7c2499ed2b00879a034f68235d35d56cd74752f7"}}}
+FF............FF                                                         [100%]
+=================================== FAILURES ===================================
+___ test_strict_generic_native_entry_error_is_exact_with_cause[constructor] ____
+
+rig = namespace(monkeypatch=<_pytest.monkeypatch.MonkeyPatch object at 0x7c14a648d3a0>, yy=array([[ 0,  0,  0, ...,  0,  0, ... 73],
+        ...,
+        [73, 73, 73],
+        [73, 73, 73],
+        [73, 73, 73]]], shape=(48, 64, 3), dtype=uint8))
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7c14a648d3a0>
+boundary = 'constructor'
+
+    @pytest.mark.parametrize('boundary',['constructor','open-state'],ids=['constructor','open-state'])
+    def test_strict_generic_native_entry_error_is_exact_with_cause(rig,monkeypatch,boundary):
+        error=RuntimeError('generic '+boundary+' retained oracle')
+        _generic_entry_fault(rig,monkeypatch,boundary,error)
+        with pytest.raises(exact.ExactError,match='retained oracle') as caught:
+>           engine.track_manual_region('fixture',[8,8,40,40],1/6,.16,.17,
+                person_det=object(),strict_seed=rig.seed)
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracker_seed.py:292: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub.py:2504: in track_manual_region
+    cap = cv2.VideoCapture(video)
+          ^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+args = ('fixture',), kwargs = {}
+
+>   def fail(*args,**kwargs):raise error
+                             ^^^^^^^^^^^
+E   RuntimeError: generic constructor retained oracle
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracker_seed.py:280: RuntimeError
+____ test_strict_generic_native_entry_error_is_exact_with_cause[open-state] ____
+
+rig = namespace(monkeypatch=<_pytest.monkeypatch.MonkeyPatch object at 0x7c14a64869f0>, yy=array([[ 0,  0,  0, ...,  0,  0, ... 73],
+        ...,
+        [73, 73, 73],
+        [73, 73, 73],
+        [73, 73, 73]]], shape=(48, 64, 3), dtype=uint8))
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7c14a64869f0>
+boundary = 'open-state'
+
+    @pytest.mark.parametrize('boundary',['constructor','open-state'],ids=['constructor','open-state'])
+    def test_strict_generic_native_entry_error_is_exact_with_cause(rig,monkeypatch,boundary):
+        error=RuntimeError('generic '+boundary+' retained oracle')
+        _generic_entry_fault(rig,monkeypatch,boundary,error)
+        with pytest.raises(exact.ExactError,match='retained oracle') as caught:
+>           engine.track_manual_region('fixture',[8,8,40,40],1/6,.16,.17,
+                person_det=object(),strict_seed=rig.seed)
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracker_seed.py:292: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub.py:2506: in track_manual_region
+    if not cap.isOpened():
+           ^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+args = (<test_strict_tracker_seed.rig.<locals>.Capture object at 0x7c14a6487230>,)
+kwargs = {}
+
+>   def fail(*args,**kwargs):raise error
+                             ^^^^^^^^^^^
+E   RuntimeError: generic open-state retained oracle
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracker_seed.py:280: RuntimeError
+_ test_strict_generic_entry_error_keeps_web_cleanup_and_no_publication[constructor] _
+
+exact = namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/fix1/runs/fix1-red-002/py...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7c14a5a139c0>, url='/api/jobs/0870b53d542e')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7c14a666e870>
+boundary = 'constructor'
+
+    @pytest.mark.parametrize('boundary',['constructor','open-state'],ids=['constructor','open-state'])
+    def test_strict_generic_entry_error_keeps_web_cleanup_and_no_publication(exact,monkeypatch,boundary):
+        pc=precondition(sample(exact,.2),None)
+        before=exact.path.read_bytes();files=web.FILES.initialize(exact.job)
+        epoch=files.committed_report_epoch
+        captures=[];threads=[];models=[];observed=[]
+        native=RuntimeError('generic web '+boundary+' retained oracle')
+        real_capture=web.cv2.VideoCapture;real_track=engine.track_manual_region
+        real_start=web._start_owned_thread;attempts=[]
+        class Capture:
+            def __init__(self,video):
+                attempts.append(video)
+                if len(attempts)==2 and boundary=='constructor':raise native
+                self.cap=real_capture(video);self.releases=0
+                captures.append(self)
+            def __getattr__(self,key):return getattr(self.cap,key)
+            def isOpened(self):
+                if len(captures)==2 and self is captures[1] and boundary=='open-state':raise native
+                return self.cap.isOpened()
+            def release(self):self.releases+=1;self.cap.release()
+        def model(*a,**kw):
+            assert captures and captures[0].releases==1
+            models.append(True);return None
+        def track(*a,**kw):
+            try:return real_track(*a,**kw)
+            except BaseException as error:observed.append(error);raise
+        def start(target,lease):
+            thread=real_start(target,lease);threads.append(thread);return thread
+        monkeypatch.setattr(web.cv2,'VideoCapture',Capture)
+        monkeypatch.setattr(engine,'PersonDetector',model)
+        monkeypatch.setattr(engine,'track_manual_region',track)
+        monkeypatch.setattr(engine,'_vittrack_factory',lambda log:pytest.fail('generic initializer fallback after source entry error'))
+        monkeypatch.setattr(engine,'_track_person_dense',lambda *a,**kw:pytest.fail('person fallback after generic source entry error'))
+        monkeypatch.setattr(web,'_start_owned_thread',start)
+        try:
+            response=request('post',exact.url+'/track_object',json=dict(seed=pc,
+                box=[8,8,40,40],t_ref=.2,t0=.199,t1=.201))
+            assert response.status_code==200
+        finally:
+            for thread in threads:thread.join(8);assert not thread.is_alive()
+        status=request('get',exact.url+'/track_status').json
+        assert status['state']=='done' and status['added']==0 and 'retained oracle' in status['error']
+        assert models==[True], 'web factory resolution is before generic capture entry'
+>       assert len(observed)==1 and isinstance(observed[0],web.exact.ExactError)
+E       AssertionError: assert (1 == 1 and False)
+E        +  where 1 = len([RuntimeError('generic web constructor retained oracle')])
+E        +  and   False = isinstance(RuntimeError('generic web constructor retained oracle'), <class 'openscrub_internal.exact_samples.ExactError'>)
+E        +    where <class 'openscrub_internal.exact_samples.ExactError'> = <module 'openscrub_internal.exact_samples' from '/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_internal/exact_samples.py'>.ExactError
+E        +      where <module 'openscrub_internal.exact_samples' from '/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_internal/exact_samples.py'> = web.exact
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracking_routes.py:447: AssertionError
+_ test_strict_generic_entry_error_keeps_web_cleanup_and_no_publication[open-state] _
+
+exact = namespace(root=PosixPath('/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/fix1/runs/fix1-red-002/py...custom': {'preserved': True}}, enable=<function store.<locals>.enable at 0x7c14a5a4dd00>, url='/api/jobs/15c18e05dd03')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7c14a66a3710>
+boundary = 'open-state'
+
+    @pytest.mark.parametrize('boundary',['constructor','open-state'],ids=['constructor','open-state'])
+    def test_strict_generic_entry_error_keeps_web_cleanup_and_no_publication(exact,monkeypatch,boundary):
+        pc=precondition(sample(exact,.2),None)
+        before=exact.path.read_bytes();files=web.FILES.initialize(exact.job)
+        epoch=files.committed_report_epoch
+        captures=[];threads=[];models=[];observed=[]
+        native=RuntimeError('generic web '+boundary+' retained oracle')
+        real_capture=web.cv2.VideoCapture;real_track=engine.track_manual_region
+        real_start=web._start_owned_thread;attempts=[]
+        class Capture:
+            def __init__(self,video):
+                attempts.append(video)
+                if len(attempts)==2 and boundary=='constructor':raise native
+                self.cap=real_capture(video);self.releases=0
+                captures.append(self)
+            def __getattr__(self,key):return getattr(self.cap,key)
+            def isOpened(self):
+                if len(captures)==2 and self is captures[1] and boundary=='open-state':raise native
+                return self.cap.isOpened()
+            def release(self):self.releases+=1;self.cap.release()
+        def model(*a,**kw):
+            assert captures and captures[0].releases==1
+            models.append(True);return None
+        def track(*a,**kw):
+            try:return real_track(*a,**kw)
+            except BaseException as error:observed.append(error);raise
+        def start(target,lease):
+            thread=real_start(target,lease);threads.append(thread);return thread
+        monkeypatch.setattr(web.cv2,'VideoCapture',Capture)
+        monkeypatch.setattr(engine,'PersonDetector',model)
+        monkeypatch.setattr(engine,'track_manual_region',track)
+        monkeypatch.setattr(engine,'_vittrack_factory',lambda log:pytest.fail('generic initializer fallback after source entry error'))
+        monkeypatch.setattr(engine,'_track_person_dense',lambda *a,**kw:pytest.fail('person fallback after generic source entry error'))
+        monkeypatch.setattr(web,'_start_owned_thread',start)
+        try:
+            response=request('post',exact.url+'/track_object',json=dict(seed=pc,
+                box=[8,8,40,40],t_ref=.2,t0=.199,t1=.201))
+            assert response.status_code==200
+        finally:
+            for thread in threads:thread.join(8);assert not thread.is_alive()
+        status=request('get',exact.url+'/track_status').json
+        assert status['state']=='done' and status['added']==0 and 'retained oracle' in status['error']
+        assert models==[True], 'web factory resolution is before generic capture entry'
+>       assert len(observed)==1 and isinstance(observed[0],web.exact.ExactError)
+E       AssertionError: assert (1 == 1 and False)
+E        +  where 1 = len([RuntimeError('generic web open-state retained oracle')])
+E        +  and   False = isinstance(RuntimeError('generic web open-state retained oracle'), <class 'openscrub_internal.exact_samples.ExactError'>)
+E        +    where <class 'openscrub_internal.exact_samples.ExactError'> = <module 'openscrub_internal.exact_samples' from '/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_internal/exact_samples.py'>.ExactError
+E        +      where <module 'openscrub_internal.exact_samples' from '/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_internal/exact_samples.py'> = web.exact
+
+/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracking_routes.py:447: AssertionError
+=========================== short test summary info ============================
+FAILED ../../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracker_seed.py::test_strict_generic_native_entry_error_is_exact_with_cause[constructor]
+FAILED ../../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracker_seed.py::test_strict_generic_native_entry_error_is_exact_with_cause[open-state]
+FAILED ../../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracking_routes.py::test_strict_generic_entry_error_keeps_web_cleanup_and_no_publication[constructor]
+FAILED ../../../../../../../../../../.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracking_routes.py::test_strict_generic_entry_error_keeps_web_cleanup_and_no_publication[open-state]
+4 failed, 12 passed, 67 deselected in 0.65s

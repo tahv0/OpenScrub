@@ -1,0 +1,18 @@
+{
+  "failed_run": "page-046",
+  "head": "285f4afd455ad6dc95a473995dee142421cdc87e",
+  "product_unchanged": true,
+  "error": "TypeError: Cannot read properties of undefined (reading 'map')",
+  "cause": "Fixture used wire manual shape in BE.adds; shipped beDraw consumes a.box.map and t0/t1.",
+  "original_driver_sha256": "e37f9e7614f4b0bd40ef74c1b74057b53500010815db7c088071b782871f9a6e",
+  "corrected_driver_sha256": "1b0930bdb0c5d04d4fe1ec1a54d7cf3edd3361e57168e2ed0f599b8da5e76078",
+  "original_draft": "BE.adds=[{manual_id:'pending:legacy',t_start:0,t_end:1,t_ref:.2,screen_box:[70,30,90,60]}];",
+  "corrected_draft": "BE.adds=[{manual_id:'pending:legacy',box:[70,30,90,60],t0:0,t1:2,tref:.2}];",
+  "source_owners": [
+    "beDraw",
+    "beHook manual addition"
+  ],
+  "source_sha256": "e9fee1a34f7c59f65a3652ea5110ecaf2d77917497740b3ca1fc68b15b3c0e80",
+  "screenshot": "runs/page-046/browser/legacy-before.png",
+  "assertions_not_relaxed": true
+}

@@ -1,0 +1,10 @@
+[
+  "tests/test_strict_tracker_seed.py::test_strict_person_constructor_failure_never_falls_back",
+  "tests/test_strict_tracking_routes.py::test_fresh_strict_track_after_acknowledged_idle_cancel",
+  "tests/test_strict_tracking_routes.py::test_legacy_route_uses_unchanged_tracker_call",
+  "tests/test_strict_tracking_routes.py::test_strict_cancel_after_snapshot_rejects_install",
+  "tests/test_strict_tracking_routes.py::test_strict_cancel_during_context_read_never_advances[installation]",
+  "tests/test_strict_tracking_routes.py::test_strict_cancel_during_context_read_never_advances[pre-model]",
+  "tests/test_strict_tracking_routes.py::test_strict_cancel_during_context_read_never_advances[preappend]",
+  "tests/test_strict_tracking_routes.py::test_strict_unrelated_choice_audio_merge"
+]

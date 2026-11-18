@@ -1,0 +1,198 @@
+[
+  {
+    "run": "fix1-floor-008",
+    "exit": 0,
+    "source_head": "6fde5ad60c6d78d69dbbd8e049a9196f15e4095f",
+    "policy": "frozen",
+    "python": {
+      "executable": "/tmp/openscrub-python39-20261117/venv/bin/python",
+      "version": [
+        3,
+        9,
+        25
+      ]
+    },
+    "commands": [
+      [
+        "/tmp/openscrub-python39-20261117/venv/bin/python",
+        "-m",
+        "pytest",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracker_seed.py",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracking_routes.py",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py::test_track_manual_region",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py::test_track_fail_closed_hold",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py::test_track_person_detector_path",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py::test_track_dormant_reacquisition",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py::test_track_person_lookalike_veto",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py::test_track_person_size_jump_handoff",
+        "-q",
+        "--basetemp=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/fix1/runs/fix1-floor-008/pytest",
+        "-o",
+        "cache_dir=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/fix1/runs/fix1-floor-008/cache/pytest"
+      ]
+    ],
+    "selected_cases": 89
+  },
+  {
+    "run": "fix1-green-004",
+    "exit": 0,
+    "source_head": "285f4afd455ad6dc95a473995dee142421cdc87e",
+    "policy": "development",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "commands": [
+      [
+        "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+        "-m",
+        "pytest",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracker_seed.py",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracking_routes.py",
+        "-q",
+        "-k",
+        "generic_native_entry_error or generic_entry_preserves_exception or generic_false_open or generic_entry_error_keeps_web",
+        "--basetemp=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/fix1/runs/fix1-green-004/pytest",
+        "-o",
+        "cache_dir=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/fix1/runs/fix1-green-004/cache/pytest"
+      ]
+    ],
+    "selected_cases": 16
+  },
+  {
+    "run": "fix1-native-007",
+    "exit": 0,
+    "source_head": "6fde5ad60c6d78d69dbbd8e049a9196f15e4095f",
+    "policy": "frozen",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "commands": [
+      [
+        "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+        "-m",
+        "pytest",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracker_seed.py",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracking_routes.py",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py::test_track_manual_region",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py::test_track_fail_closed_hold",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py::test_track_person_detector_path",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py::test_track_dormant_reacquisition",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py::test_track_person_lookalike_veto",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py::test_track_person_size_jump_handoff",
+        "-q",
+        "--basetemp=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/fix1/runs/fix1-native-007/pytest",
+        "-o",
+        "cache_dir=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/fix1/runs/fix1-native-007/cache/pytest"
+      ]
+    ],
+    "selected_cases": 89
+  },
+  {
+    "run": "fix1-package-009",
+    "exit": 0,
+    "source_head": "6fde5ad60c6d78d69dbbd8e049a9196f15e4095f",
+    "policy": "frozen",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "commands": [
+      [
+        "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+        "-m",
+        "build",
+        "--sdist",
+        "--no-isolation",
+        "--outdir",
+        "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/fix1/runs/fix1-package-009/dist",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub"
+      ],
+      [
+        "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+        "-m",
+        "build",
+        "--wheel",
+        "--no-isolation",
+        "--outdir",
+        "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/fix1/runs/fix1-package-009/wheel",
+        "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/fix1/runs/fix1-package-009/extracted/openscrub-1.0.96"
+      ],
+      [
+        "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+        "-m",
+        "pip",
+        "install",
+        "--no-index",
+        "--no-deps",
+        "--no-compile",
+        "--target",
+        "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/fix1/runs/fix1-package-009/site-packages",
+        "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/fix1/runs/fix1-package-009/wheel/openscrub-1.0.96-py3-none-any.whl"
+      ],
+      [
+        "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+        "-c",
+        "print(\"INSTALLED_IDENTITY_DEFAULTS_OK\")"
+      ],
+      [
+        "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+        "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/fix1/runs/fix1-package-009/site-packages/bin/openscrub",
+        "--help"
+      ],
+      [
+        "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+        "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/fix1/runs/fix1-package-009/site-packages/bin/openscrub-web",
+        "--help"
+      ],
+      [
+        "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+        "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/http_counts.py"
+      ]
+    ],
+    "selected_cases": 0
+  },
+  {
+    "run": "fix1-red-002",
+    "exit": 1,
+    "source_head": "285f4afd455ad6dc95a473995dee142421cdc87e",
+    "policy": "development",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "commands": [
+      [
+        "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+        "-m",
+        "pytest",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracker_seed.py",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracking_routes.py",
+        "-q",
+        "-k",
+        "generic_native_entry_error or generic_entry_preserves_exception or generic_false_open or generic_entry_error_keeps_web",
+        "--basetemp=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/fix1/runs/fix1-red-002/pytest",
+        "-o",
+        "cache_dir=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/fix1/runs/fix1-red-002/cache/pytest"
+      ]
+    ],
+    "selected_cases": 16
+  }
+]

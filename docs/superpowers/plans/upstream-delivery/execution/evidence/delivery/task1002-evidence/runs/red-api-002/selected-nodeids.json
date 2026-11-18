@@ -1,0 +1,8 @@
+[
+  "tests/test_strict_tracker_seed.py::test_legacy_tracking_keeps_nearby_behavior",
+  "tests/test_strict_tracker_seed.py::test_strict_ncc_template_uses_supplied_pixels",
+  "tests/test_strict_tracker_seed.py::test_strict_person_uses_supplied_pixels",
+  "tests/test_strict_tracker_seed.py::test_strict_prime_failure_never_enters_nearby_fallback",
+  "tests/test_strict_tracker_seed.py::test_strict_seed_is_capture_free_and_frozen",
+  "tests/test_strict_tracker_seed.py::test_strict_vit_uses_supplied_pixels_in_both_directions"
+]

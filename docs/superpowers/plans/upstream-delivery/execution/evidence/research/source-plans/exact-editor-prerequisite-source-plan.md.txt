@@ -1,0 +1,64 @@
+# Focused exact-editor prerequisite implementation plan
+
+> For agentic workers: use superpowers:subagent-driven-development. The user already selected supervised GPT-6.1 Sol high execution and authorized continuation. Execute this one coherent prerequisite task, then independent review; routine local assembly decisions do not require renewed user permission.
+
+**Goal:** Bring the reviewed live-resize editor onto the accepted exact-sample/strict-seed lineage, preserving its current backend and browser draft behavior, so the later ordinary editor/Track migration has one reliable mounted coordinate owner.
+
+**Architecture:** Reuse the reviewed P16D whole change with recorded provenance; adapt only actual overlapping owners. Reuse its BE_VIEW transform and dispose that owner only when its DOM subtree is actually removed. The original standalone P16D candidate remains a focused upstream contribution; this branch is a local prerequisite assembly, not another umbrella upstream PR.
+
+**Tech stack:** Existing Python>=3.9, embedded JavaScript/CSS, Flask/OpenCV and prepared Chromium/Playwright. No new dependencies, models, training or production root files.
+
+**Spec:** exact-editor-contract-research.md (adopted final amendments), exact-editor-readiness-adoption.md, editor-resize-source-plan.md and Task164's accepted report/review. Consume accepted Task1002 head 6fde5ad60c6d78d69dbbd8e049a9196f15e4095f (full and scoped review complete); supervisor revalidates this exact SHA at setup.
+
+## Global constraints
+
+- Preserve Austin upstream defaults, all accepted exact-sample/strict-seed APIs, current source/operation/publication/lifetime owners and legacy Track.
+- Preserve P07a equality acknowledgements/retained drafts, P07b stable manual_id/immutable manual creation and the current allowlist-save failure handling.
+- No ordinary editor strict-sample migration in this task; no P02/P03/P09/P12/P15 polling, scheduler or optional-policy import.
+- No new report schema, alternate decoder, source registry, cached timeline, tracking algorithm or model.
+- Git source mutations belong to one implementer in the existing managed source worktree; original checkout, donor/standalone/integration/docs refs and user data stay preserved.
+- Known C01 containment owners must survive future C01 composition; source resemblance alone is not proof of an actual standalone failure.
+
+## Review focus
+
+1. Opening an already-mounted editor through a retained panel path must preserve its observer, video and applied gesture values; disposing an unrelated subtree must not stop it.
+2. Removing/replacing a subtree containing the editor (including a phase-actions refresh) must disconnect its observer and stop its video before removal; deliberately late callbacks must not mutate a replacement mount.
+3. Live fractional resize/DPR coordinates must still map actual painted outlines and pointer hits to source coordinates without any new media/sample request.
+4. Job A→B→A and save acknowledgement must preserve current independent manual identity/draft ownership and reject old callbacks without dropping newer edits.
+5. P16D's explicit Play metadata-load fix must remain present while preload=none and backend exact/strict seed interfaces stay unchanged.
+
+## Task1003: one focused prerequisite assembly
+
+**What/why/when:** After accepted Task1002 and before ordinary editor/Track migration. A resize observer tied to the right mounted subtree is a correctness prerequisite for source-bound editing. The source-only comparison found P16D's original browser-save base is not an ancestor of Task1002, but APP_CSS is identical and browser differences are confined to already-accepted manual identities/allowlist handling. Do not import an unrelated combined application to solve that small overlap.
+
+**Branch/base:** Supervisor creates integration/exact-editor-prerequisites from the exact accepted Task1002 head, preserving pr/exact-tracker-seeds and all prior refs. Whole reviewed P16D commit47e9f6d5614365e00d899c87df6c209cd7aaabf6 (parent92124753736e287ac800af91f0ac96f3e96c01be) is the selected contribution. Record cherry-pick -x provenance even if a small overlap needs resolution; do not replace whole APP_JS.
+
+**Files/responsibilities:**
+- openscrub_web.py: P16D mount/transform/resize and explicit Play lifecycle; current standalone subtree-removal sites only.
+- README.md: retained focused resize explanation, adjusted only for final behavior.
+- tests/test_editor_resize.py, tests/editor_resize_browser.cjs and tests/editor_resize_server.py: existing P16D contracts and actual PAGE fixture.
+- tests/test_review_save_failures.py: retain accepted save handling and necessary P16D fixture adjustment.
+- Extend those existing focused tests for containment and same-lineage compatibility; a new tests/test_exact_editor_prerequisites.py is justified only if shared-owner assertions do not fit existing owners. No unrelated production module move.
+
+**Interfaces:**
+- Consume P16D BE_VIEW, beMount(img,vid,cv,id,gen,editor), beUnmount(), current ownership/transform helpers and existing P07a/P07b browser draft state.
+- Reuse the reviewed generic beUnmountIn(root) interface from C01 commit61dbb31058c49041aa820ec29e2bd6fe86ff3a84: if the mounted canvas belongs to root, end that mount and pause its outgoing video; otherwise preserve it.
+- Map C01 phase-actions teardown commit a4649a2b60ad95fb57b6e676af0799c19e3c873a to the actual standalone refresh owner. Its composed refreshCycle/P03 signature is not a dependency.
+- Do not blindly pick these two C01 commits: their disposeReview/REVIEW_SCHED/P09 call sites are absent here. Carry only applicable ownership behavior with provenance and genuine current-lineage evidence.
+- Produce the current P16D live mount/transform owner for the later strict editor; no new externally visible API.
+
+- [ ] **1. Assemble exactly the reviewed resize contribution.** Inspect the whole selected commit and current overlap; cherry-pick -x with automatic Git maintenance disabled. Resolve only real conflicts, preserving current manualId creation/save payload and allowlist error semantics. Record exact per-file and production/backend AST comparisons before further edits. Expected non-P16D backend/exact_samples.py/engine and all assets remain byte-identical to accepted Task1002.
+
+- [ ] **2. Establish any required containment REDs on this lineage.** Add test_retained_editor_keeps_mount_on_panel_reentry, test_removed_editor_subtree_releases_before_removal, test_phase_actions_replacement_retires_editor and test_old_mount_callbacks_cannot_touch_replacement to the actual browser owners. Assert observer identity/disconnection, actual retained DOM identity, video state, applied geometry and replacement pixels. Exercise actual shipped showPanel/loadBoxEdit/refresh/save removal paths; no direct fake call standing in for the production path. First run the new cases against the P16D-only assembly. A source-only suspicion is not a regression; if a case already passes, preserve it as a control and do not invent a product RED.
+
+- [ ] **3. Adapt only applicable subtree ownership.** Add/reuse beUnmountIn(root) in openscrub_web.py and invoke it immediately before actual affected DOM replacement/removal. Retained subtrees keep their active owner/observer/video/gestures. Removed subtrees pause before detach and late callbacks stay fenced. Preserve current standalone refresh flow rather than importing P03/P09 state. Re-run the genuine failing cases and controls; no broader editor rewrite.
+
+- [ ] **4. Verify the coherent prerequisite slice.** Run owning resize/save/manual/exact/strict/lifetime/transaction cases on actual Python3.12 and3.9 through the reviewed task-local launcher. Run one prepared full-PAGE resize/containment scenario with production painting, inverse pointer mapping, fractional widths/DPR1+2, pending image input refusal, explicit Play, stale observers, A→B→A, retained manual IDs and actual save/fresh reopen. Retain existing tiny SDR rendering only where already used by this acceptance; do not repeat all old browser/timing/media matrices. This is P16D assembly acceptance, not exact UI migration or tracking-quality certification.
+
+- [ ] **5. Freeze and verify shipping/provenance.** Build one offline exact sdist→wheel-from-sdist/installed package gate, verify current ten runtime module origins and new/changed test inclusion, actual JS/CSS and backend source bytes, Python>=3.9/defaults/CLI/HTTP. Preserve actual source→artifact bindings. No new native/Windows/BFCache/touch claim. A normal full discovery pass is conditional on a concrete uncovered combined owner; owning suite plus actual full-PAGE/package gates are the planned assembly checks, not a re-run of unchanged Task1002 full544 under a new label.
+
+- [ ] **6. Commit, self-review and hand off.** Write task-1003-report.md/task-1003-pr.md, compact task1003-evidence and original-to-composed provenance. Distinguish original standalone P16D evidence, new assembly evidence, any genuine containment REDs and already-approved C01 behavior being mapped. Release source/runtime for a fresh independent review. Do not advance working C01 or start ordinary UI migration before acceptance.
+
+## Self-review and delivery notes
+
+The five review-focus classes each have a named step2/4 owner; backend byte equality guards strict-seed/exact compatibility. This is one independently reviewable local prerequisite deliverable, not a new scheduler or an upstream umbrella. Original P16D47e remains the upstream resize candidate; the later focused UI PR can target its actual accepted backend+resize prerequisites after refreshed Austin review. C01 integration separately keeps its existing scheduler/beUnmountIn/action teardown owners. No product/runtime result is claimed by this plan.

@@ -1,0 +1,960 @@
+[
+  {
+    "run": "cancel-positive-red-025",
+    "exit": 1,
+    "head": "335435e1e1120de9e6773656b7dfdfabf220e27b",
+    "policy": "development",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "commands": [
+      [
+        "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+        "-m",
+        "pytest",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracking_routes.py::test_fresh_strict_track_after_acknowledged_idle_cancel",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracking_routes.py::test_strict_cancel_after_snapshot_rejects_install",
+        "-q",
+        "--basetemp=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/runs/cancel-positive-red-025/pytest",
+        "-o",
+        "cache_dir=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/runs/cancel-positive-red-025/cache/pytest"
+      ]
+    ],
+    "pytest_summary": [
+      "1 failed, 1 passed in 0.32s"
+    ],
+    "selected_ids": 2,
+    "files_sha256": "bf8e38aaed1494d67d16f714c4aa20d5502fb54742777bccdf13040419400d67",
+    "complete_input_configurations": [
+      "runtime-b51f5f994d5d426593c1441e44bde952.json"
+    ]
+  },
+  {
+    "run": "candidate-023",
+    "exit": 0,
+    "head": "335435e1e1120de9e6773656b7dfdfabf220e27b",
+    "policy": "development",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "commands": [
+      [
+        "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+        "-m",
+        "pytest",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracker_seed.py",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracking_routes.py",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_adoption.py",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_recovery_races.py",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_report_transactions.py",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_job_lifecycle.py",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py::test_track_manual_region",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py::test_track_fail_closed_hold",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py::test_track_person_detector_path",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py::test_track_dormant_reacquisition",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py::test_track_person_lookalike_veto",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py::test_track_person_size_jump_handoff",
+        "-q",
+        "--basetemp=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/runs/candidate-023/pytest",
+        "-o",
+        "cache_dir=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/runs/candidate-023/cache/pytest"
+      ]
+    ],
+    "pytest_summary": [
+      "216 passed in 12.77s"
+    ],
+    "selected_ids": 216,
+    "files_sha256": "65f516cacd3c1ff8a4f87914c7c2dd8640a0018694339ac920191957ad58fe46",
+    "complete_input_configurations": [
+      "runtime-f30ef0945ec5439bbebaf56afd206c7b.json"
+    ]
+  },
+  {
+    "run": "context-source-green-039",
+    "exit": 0,
+    "head": "6a489a9ae43357dcc67649994b40eff705c3a8f2",
+    "policy": "development",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "commands": [
+      [
+        "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+        "-m",
+        "pytest",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracking_routes.py::test_strict_cancel_during_context_read_never_advances",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracking_routes.py::test_fresh_strict_track_after_acknowledged_idle_cancel",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracking_routes.py::test_strict_cancel_after_snapshot_rejects_install",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracking_routes.py::test_strict_unrelated_choice_audio_merge",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracking_routes.py::test_legacy_route_uses_unchanged_tracker_call",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracker_seed.py::test_strict_person_constructor_failure_never_falls_back",
+        "-q",
+        "--basetemp=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/runs/context-source-green-039/pytest",
+        "-o",
+        "cache_dir=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/runs/context-source-green-039/cache/pytest"
+      ]
+    ],
+    "pytest_summary": [
+      "8 passed in 0.65s"
+    ],
+    "selected_ids": 8,
+    "files_sha256": "9b1a3b08b9aac63732c3abfeb4bd22d28e3e2d41c5e8ca48d416f754b6a32b27",
+    "complete_input_configurations": [
+      "runtime-7deb41d4e3b34238a8da0b31d0c95bc4.json"
+    ]
+  },
+  {
+    "run": "engine-green-008",
+    "exit": 4,
+    "head": "335435e1e1120de9e6773656b7dfdfabf220e27b",
+    "policy": "development",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "commands": [
+      [
+        "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+        "-m",
+        "pytest",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracker_seed.py",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_manual_tracker_cancel.py",
+        "-q",
+        "--basetemp=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/runs/engine-green-008/pytest",
+        "-o",
+        "cache_dir=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/runs/engine-green-008/cache/pytest"
+      ]
+    ],
+    "pytest_summary": [
+      "ERROR: file or directory not found: /home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_manual_tracker_cancel.py",
+      "no tests ran in 0.00s"
+    ],
+    "selected_ids": 0,
+    "files_sha256": "d58ba9b6cc783f884481f4d832d403d2da67636d1c63b9cedd622d7953adc811",
+    "complete_input_configurations": [
+      "runtime-887dad667eff48d4b13505e09e3f3b1c.json"
+    ]
+  },
+  {
+    "run": "engine-green-009",
+    "exit": 0,
+    "head": "335435e1e1120de9e6773656b7dfdfabf220e27b",
+    "policy": "development",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "commands": [
+      [
+        "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+        "-m",
+        "pytest",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracker_seed.py",
+        "-q",
+        "--basetemp=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/runs/engine-green-009/pytest",
+        "-o",
+        "cache_dir=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/runs/engine-green-009/cache/pytest"
+      ]
+    ],
+    "pytest_summary": [
+      "23 passed in 0.07s"
+    ],
+    "selected_ids": 23,
+    "files_sha256": "d58ba9b6cc783f884481f4d832d403d2da67636d1c63b9cedd622d7953adc811",
+    "complete_input_configurations": [
+      "runtime-504401041dd643f09ecaa894d5a346fa.json"
+    ]
+  },
+  {
+    "run": "final-focused-027",
+    "exit": 0,
+    "head": "335435e1e1120de9e6773656b7dfdfabf220e27b",
+    "policy": "development",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "commands": [
+      [
+        "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+        "-m",
+        "pytest",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracker_seed.py",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracking_routes.py",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_adoption.py",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_recovery_races.py",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_report_transactions.py",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_job_lifecycle.py",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py::test_track_manual_region",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py::test_track_fail_closed_hold",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py::test_track_person_detector_path",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py::test_track_dormant_reacquisition",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py::test_track_person_lookalike_veto",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py::test_track_person_size_jump_handoff",
+        "-q",
+        "--basetemp=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/runs/final-focused-027/pytest",
+        "-o",
+        "cache_dir=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/runs/final-focused-027/cache/pytest"
+      ]
+    ],
+    "pytest_summary": [
+      "217 passed in 13.02s"
+    ],
+    "selected_ids": 217,
+    "files_sha256": "f7f52b14e62a229b5dea70d8d8d50dfd6dcacea7f98d2ff6796bd1c5720629a2",
+    "complete_input_configurations": [
+      "runtime-e878906875ad405ab5346ee8585b0c26.json"
+    ]
+  },
+  {
+    "run": "final-owner-red-021",
+    "exit": 1,
+    "head": "335435e1e1120de9e6773656b7dfdfabf220e27b",
+    "policy": "development",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "commands": [
+      [
+        "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+        "-m",
+        "pytest",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracker_seed.py::test_strict_person_metadata_error_releases_capture",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracking_routes.py::test_strict_snapshot_exception_releases_preparation",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracking_routes.py::test_strict_publication_retains_integer_reference_offset",
+        "-q",
+        "--basetemp=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/runs/final-owner-red-021/pytest",
+        "-o",
+        "cache_dir=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/runs/final-owner-red-021/cache/pytest"
+      ]
+    ],
+    "pytest_summary": [
+      "3 failed, 1 error in 0.38s"
+    ],
+    "selected_ids": 3,
+    "files_sha256": "c570e24c94a7ba206b4dd6fd7e9df9a712d95c03791db02cbd490364e4b17a76",
+    "complete_input_configurations": [
+      "runtime-c5269df36d3448f0838d1a5a934558b8.json"
+    ]
+  },
+  {
+    "run": "final-stable-033",
+    "exit": 0,
+    "head": "335435e1e1120de9e6773656b7dfdfabf220e27b",
+    "policy": "development",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "commands": [
+      [
+        "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+        "-m",
+        "pytest",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracker_seed.py",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracking_routes.py",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_adoption.py",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_recovery_races.py",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_report_transactions.py",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_job_lifecycle.py",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py::test_track_manual_region",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py::test_track_fail_closed_hold",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py::test_track_person_detector_path",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py::test_track_dormant_reacquisition",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py::test_track_person_lookalike_veto",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py::test_track_person_size_jump_handoff",
+        "-q",
+        "--basetemp=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/runs/final-stable-033/pytest",
+        "-o",
+        "cache_dir=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/runs/final-stable-033/cache/pytest"
+      ]
+    ],
+    "pytest_summary": [
+      "221 passed in 12.90s"
+    ],
+    "selected_ids": 221,
+    "files_sha256": "5e2f82536821602c716f5e0c6a552e2fc3a9cdd31ae9277ec4735b012a1f386d",
+    "complete_input_configurations": [
+      "runtime-bca6286423a34c8fa1f44ecad4a46b5e.json"
+    ]
+  },
+  {
+    "run": "floor-042",
+    "exit": 0,
+    "head": "285f4afd455ad6dc95a473995dee142421cdc87e",
+    "policy": "frozen",
+    "python": {
+      "executable": "/tmp/openscrub-python39-20261117/venv/bin/python",
+      "version": [
+        3,
+        9,
+        25
+      ]
+    },
+    "commands": [
+      [
+        "/tmp/openscrub-python39-20261117/venv/bin/python",
+        "-m",
+        "pytest",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracker_seed.py",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracking_routes.py",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_adoption.py",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_recovery_races.py",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_media.py",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_report_transactions.py",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_manual_addition_replay.py",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_job_lifecycle.py",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_job_response_lifetime.py",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py::test_track_manual_region",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py::test_track_fail_closed_hold",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py::test_track_person_detector_path",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py::test_track_dormant_reacquisition",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py::test_track_person_lookalike_veto",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py::test_track_person_size_jump_handoff",
+        "-q",
+        "-k",
+        "not test_configured_wsgi_closes_stream_owner_exactly_once or video",
+        "--basetemp=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/runs/floor-042/pytest",
+        "-o",
+        "cache_dir=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/runs/floor-042/cache/pytest"
+      ]
+    ],
+    "pytest_summary": [
+      "269 passed, 6 deselected in 19.17s"
+    ],
+    "selected_ids": 269,
+    "files_sha256": "9b1a3b08b9aac63732c3abfeb4bd22d28e3e2d41c5e8ca48d416f754b6a32b27",
+    "complete_input_configurations": [
+      "runtime-18b9555cc96a405aae5c3dca45dc6160.json"
+    ]
+  },
+  {
+    "run": "focused-media-017",
+    "exit": 1,
+    "head": "335435e1e1120de9e6773656b7dfdfabf220e27b",
+    "policy": "development",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "commands": [
+      [
+        "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+        "-m",
+        "pytest",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracker_seed.py",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracking_routes.py",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_adoption.py",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_recovery_races.py",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_report_transactions.py",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_job_lifecycle.py",
+        "-q",
+        "--basetemp=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/runs/focused-media-017/pytest",
+        "-o",
+        "cache_dir=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/runs/focused-media-017/cache/pytest"
+      ]
+    ],
+    "pytest_summary": [
+      "1 failed, 204 passed in 10.93s"
+    ],
+    "selected_ids": 205,
+    "files_sha256": "c4705a641f175191087d3042cfa66d27017a9c87e7eac9a901f7a0d2cb35c93b",
+    "complete_input_configurations": [
+      "runtime-1cca8e3d42724011b0c41dc2de512c80.json"
+    ]
+  },
+  {
+    "run": "full-041",
+    "exit": 0,
+    "head": "285f4afd455ad6dc95a473995dee142421cdc87e",
+    "policy": "frozen",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "commands": [
+      [
+        "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+        "-m",
+        "pytest",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub",
+        "-q",
+        "-o",
+        "pythonpath=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/task1631-evidence/adapters /home/tahv0/src/OpenScrub/.superpowers/sdd/README/task654-evidence/adapters",
+        "-p",
+        "task1631_fixture",
+        "-p",
+        "roundtrip_stdout_selected",
+        "--basetemp=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/runs/full-041/pytest",
+        "-o",
+        "cache_dir=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/runs/full-041/cache/pytest"
+      ]
+    ],
+    "pytest_summary": [
+      "544 passed in 118.61s (0:01:58)"
+    ],
+    "selected_ids": 544,
+    "files_sha256": "9b1a3b08b9aac63732c3abfeb4bd22d28e3e2d41c5e8ca48d416f754b6a32b27",
+    "complete_input_configurations": [
+      "runtime-3829e0a2501a4ee7bb9354274a85dd7d.json"
+    ]
+  },
+  {
+    "run": "http-counts-044",
+    "exit": 0,
+    "head": "285f4afd455ad6dc95a473995dee142421cdc87e",
+    "policy": "frozen",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "commands": [
+      [
+        "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+        "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/http_counts.py"
+      ]
+    ],
+    "pytest_summary": [],
+    "selected_ids": 0,
+    "files_sha256": "9b1a3b08b9aac63732c3abfeb4bd22d28e3e2d41c5e8ca48d416f754b6a32b27",
+    "complete_input_configurations": [
+      "runtime-734d510b13ec4a72bacac9adabf0530c.json"
+    ]
+  },
+  {
+    "run": "native-prime-red-029",
+    "exit": 1,
+    "head": "335435e1e1120de9e6773656b7dfdfabf220e27b",
+    "policy": "development",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "commands": [
+      [
+        "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+        "-m",
+        "pytest",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracker_seed.py::test_strict_native_person_prime_error_never_falls_back",
+        "-q",
+        "--basetemp=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/runs/native-prime-red-029/pytest",
+        "-o",
+        "cache_dir=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/runs/native-prime-red-029/cache/pytest"
+      ]
+    ],
+    "pytest_summary": [
+      "1 failed in 0.07s"
+    ],
+    "selected_ids": 1,
+    "files_sha256": "2ae359bce1fa0833ca4f433f53567ff5882f240890b142c184c2fdaa4d0b68bf",
+    "complete_input_configurations": [
+      "runtime-16e9809d584e40f69ff6a2e117bc48e9.json"
+    ]
+  },
+  {
+    "run": "ownership-red-015",
+    "exit": 1,
+    "head": "335435e1e1120de9e6773656b7dfdfabf220e27b",
+    "policy": "development",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "commands": [
+      [
+        "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+        "-m",
+        "pytest",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracker_seed.py",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracking_routes.py",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py",
+        "-q",
+        "--basetemp=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/runs/ownership-red-015/pytest",
+        "-o",
+        "cache_dir=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/runs/ownership-red-015/cache/pytest"
+      ]
+    ],
+    "pytest_summary": [
+      "6 failed, 108 passed in 4.06s"
+    ],
+    "selected_ids": 114,
+    "files_sha256": "b3053e014dae1cbec1f89623d3a7cd03118ba4e7aa0a1392ef55084dd913856c",
+    "complete_input_configurations": [
+      "runtime-6889ed7506464e279b4603a9fb408630.json"
+    ]
+  },
+  {
+    "run": "package-049",
+    "exit": 0,
+    "head": "285f4afd455ad6dc95a473995dee142421cdc87e",
+    "policy": "frozen",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "commands": [
+      [
+        "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+        "-m",
+        "build",
+        "--sdist",
+        "--no-isolation",
+        "--outdir",
+        "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/runs/package-049/dist",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub"
+      ],
+      [
+        "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+        "-m",
+        "build",
+        "--wheel",
+        "--no-isolation",
+        "--outdir",
+        "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/runs/package-049/wheel",
+        "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/runs/package-049/extracted/openscrub-1.0.96"
+      ],
+      [
+        "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+        "-m",
+        "pip",
+        "install",
+        "--no-index",
+        "--no-deps",
+        "--no-compile",
+        "--target",
+        "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/runs/package-049/site-packages",
+        "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/runs/package-049/wheel/openscrub-1.0.96-py3-none-any.whl"
+      ],
+      [
+        "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+        "-c",
+        "print(\"INSTALLED_IDENTITY_DEFAULTS_OK\")"
+      ],
+      [
+        "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+        "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/runs/package-049/site-packages/bin/openscrub",
+        "--help"
+      ],
+      [
+        "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+        "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/runs/package-049/site-packages/bin/openscrub-web",
+        "--help"
+      ],
+      [
+        "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+        "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/http_counts.py"
+      ]
+    ],
+    "pytest_summary": [],
+    "selected_ids": 0,
+    "files_sha256": "9b1a3b08b9aac63732c3abfeb4bd22d28e3e2d41c5e8ca48d416f754b6a32b27",
+    "complete_input_configurations": [
+      "runtime-d0dbd50bf50c41d3bd9175c1395db00d.json",
+      "runtime-0b8c45ae4a304e9093a679eb50d8fc3d.json"
+    ]
+  },
+  {
+    "run": "page-046",
+    "exit": 1,
+    "head": "285f4afd455ad6dc95a473995dee142421cdc87e",
+    "policy": "frozen",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "commands": [
+      [
+        "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+        "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/legacy_page.py"
+      ]
+    ],
+    "pytest_summary": [],
+    "selected_ids": 0,
+    "files_sha256": "9b1a3b08b9aac63732c3abfeb4bd22d28e3e2d41c5e8ca48d416f754b6a32b27",
+    "complete_input_configurations": [
+      "runtime-e53bad8c135345bfbe8f47b104310d59.json"
+    ]
+  },
+  {
+    "run": "page-fixed-048",
+    "exit": 0,
+    "head": "285f4afd455ad6dc95a473995dee142421cdc87e",
+    "policy": "frozen",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "commands": [
+      [
+        "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+        "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/legacy_page_fixed.py"
+      ]
+    ],
+    "pytest_summary": [],
+    "selected_ids": 0,
+    "files_sha256": "9b1a3b08b9aac63732c3abfeb4bd22d28e3e2d41c5e8ca48d416f754b6a32b27",
+    "complete_input_configurations": [
+      "runtime-4b9c9c8d5778480f8545942a296d8fc0.json"
+    ]
+  },
+  {
+    "run": "prime-cancellation-red-031",
+    "exit": 1,
+    "head": "335435e1e1120de9e6773656b7dfdfabf220e27b",
+    "policy": "development",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "commands": [
+      [
+        "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+        "-m",
+        "pytest",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracker_seed.py::test_strict_person_prime_preserves_cancellation",
+        "-q",
+        "--basetemp=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/runs/prime-cancellation-red-031/pytest",
+        "-o",
+        "cache_dir=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/runs/prime-cancellation-red-031/cache/pytest"
+      ]
+    ],
+    "pytest_summary": [
+      "1 failed, 2 passed in 0.07s"
+    ],
+    "selected_ids": 3,
+    "files_sha256": "f218fbe539ffffc32ef0f7ad2ba4fc68667aa545823e8d54657a6f64a9a0c37f",
+    "complete_input_configurations": [
+      "runtime-ac6aec10384b40048573339a5e635541.json"
+    ]
+  },
+  {
+    "run": "red-api-002",
+    "exit": 1,
+    "head": "335435e1e1120de9e6773656b7dfdfabf220e27b",
+    "policy": "development",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "commands": [
+      [
+        "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+        "-m",
+        "pytest",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracker_seed.py",
+        "-q",
+        "--basetemp=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/runs/red-api-002/pytest",
+        "-o",
+        "cache_dir=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/runs/red-api-002/cache/pytest"
+      ]
+    ],
+    "pytest_summary": [
+      "5 failed, 1 passed in 0.08s"
+    ],
+    "selected_ids": 6,
+    "files_sha256": "6b03313b5ea6556c96e811ee937c25f11d33a2cd8f499a086435b3176dc4331a",
+    "complete_input_configurations": [
+      "runtime-1da1ada332df4c55b0fca5c3d6de91cb.json"
+    ]
+  },
+  {
+    "run": "red-initializers-004",
+    "exit": 1,
+    "head": "335435e1e1120de9e6773656b7dfdfabf220e27b",
+    "policy": "development",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "commands": [
+      [
+        "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+        "-m",
+        "pytest",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracker_seed.py",
+        "-q",
+        "--basetemp=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/runs/red-initializers-004/pytest",
+        "-o",
+        "cache_dir=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/runs/red-initializers-004/cache/pytest"
+      ]
+    ],
+    "pytest_summary": [
+      "4 failed, 2 passed in 0.21s"
+    ],
+    "selected_ids": 6,
+    "files_sha256": "1ad52a4e06341ec9afdd00efb95b6edaeb64312a41973194bdbaf3138efa3c26",
+    "complete_input_configurations": [
+      "runtime-039551dbb8d14bd19d86ebf5ee786652.json"
+    ]
+  },
+  {
+    "run": "red-routes-011",
+    "exit": 1,
+    "head": "335435e1e1120de9e6773656b7dfdfabf220e27b",
+    "policy": "development",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "commands": [
+      [
+        "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+        "-m",
+        "pytest",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracking_routes.py",
+        "-q",
+        "--basetemp=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/runs/red-routes-011/pytest",
+        "-o",
+        "cache_dir=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/runs/red-routes-011/cache/pytest"
+      ]
+    ],
+    "pytest_summary": [
+      "18 failed, 2 passed in 6.34s"
+    ],
+    "selected_ids": 20,
+    "files_sha256": "4f63001dfa875ff2894f144759051b7fbaaab1a45a02e140d45910b79acb5436",
+    "complete_input_configurations": [
+      "runtime-b5c6786f4e9041cf849514b168310aa9.json"
+    ]
+  },
+  {
+    "run": "red-validation-006",
+    "exit": 1,
+    "head": "335435e1e1120de9e6773656b7dfdfabf220e27b",
+    "policy": "development",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "commands": [
+      [
+        "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+        "-m",
+        "pytest",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracker_seed.py",
+        "-q",
+        "--basetemp=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/runs/red-validation-006/pytest",
+        "-o",
+        "cache_dir=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/runs/red-validation-006/cache/pytest"
+      ]
+    ],
+    "pytest_summary": [
+      "21 failed, 2 passed in 0.30s"
+    ],
+    "selected_ids": 23,
+    "files_sha256": "00dc205f34704a100672681949250a99217d40100f93bc6d73a673eee2f0e878",
+    "complete_input_configurations": [
+      "runtime-ae13314b7ff249f6ad1615be1dba3505.json"
+    ]
+  },
+  {
+    "run": "routes-green-013",
+    "exit": 1,
+    "head": "335435e1e1120de9e6773656b7dfdfabf220e27b",
+    "policy": "development",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "commands": [
+      [
+        "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+        "-m",
+        "pytest",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracker_seed.py",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracking_routes.py",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py",
+        "-q",
+        "--basetemp=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/runs/routes-green-013/pytest",
+        "-o",
+        "cache_dir=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/runs/routes-green-013/cache/pytest"
+      ]
+    ],
+    "pytest_summary": [
+      "7 failed, 100 passed in 23.69s"
+    ],
+    "selected_ids": 107,
+    "files_sha256": "6781017211ef36e8c31a9e0826ab186f6dfb989b67de6564015465884ddda94a",
+    "complete_input_configurations": [
+      "runtime-9744e859d09044aeb352cd819a48a449.json"
+    ]
+  },
+  {
+    "run": "source-context-red-037",
+    "exit": 1,
+    "head": "6a489a9ae43357dcc67649994b40eff705c3a8f2",
+    "policy": "development",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "commands": [
+      [
+        "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+        "-m",
+        "pytest",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracking_routes.py::test_strict_cancel_during_context_read_never_advances",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracker_seed.py::test_strict_person_constructor_failure_never_falls_back",
+        "-q",
+        "--basetemp=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/runs/source-context-red-037/pytest",
+        "-o",
+        "cache_dir=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/runs/source-context-red-037/cache/pytest"
+      ]
+    ],
+    "pytest_summary": [
+      "4 failed in 0.53s"
+    ],
+    "selected_ids": 4,
+    "files_sha256": "f02ff6b680fed77359321d597614daa85bea33f2e03b935cccf776f9bd1e408a",
+    "complete_input_configurations": [
+      "runtime-505d3c88d3cb49ecbeb2c38add70599b.json"
+    ]
+  },
+  {
+    "run": "stabilized-019",
+    "exit": 0,
+    "head": "335435e1e1120de9e6773656b7dfdfabf220e27b",
+    "policy": "development",
+    "python": {
+      "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+      "version": [
+        3,
+        12,
+        16
+      ]
+    },
+    "commands": [
+      [
+        "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+        "-m",
+        "pytest",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracker_seed.py",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_strict_tracking_routes.py",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_samples.py",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_adoption.py",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_exact_recovery_races.py",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_report_transactions.py",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/tests/test_job_lifecycle.py",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py::test_track_manual_region",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py::test_track_fail_closed_hold",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py::test_track_person_detector_path",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py::test_track_dormant_reacquisition",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py::test_track_person_lookalike_veto",
+        "/home/tahv0/.codex/worktrees/bde3/OpenScrub/test_openscrub.py::test_track_person_size_jump_handoff",
+        "-q",
+        "--basetemp=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/runs/stabilized-019/pytest",
+        "-o",
+        "cache_dir=/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/runs/stabilized-019/cache/pytest"
+      ]
+    ],
+    "pytest_summary": [
+      "213 passed in 12.61s"
+    ],
+    "selected_ids": 213,
+    "files_sha256": "0be867dc8a9cd9e530937a79918a19c97878697bd0e7a798d91ddcec95e82fa6",
+    "complete_input_configurations": [
+      "runtime-c662091a969f481f899f19fceba1c03a.json"
+    ]
+  }
+]

@@ -1,0 +1,233 @@
+{
+  "scope": "Task1002 fix round1: I1 plus new fix-diff breakage only",
+  "fix_base": "285f4afd455ad6dc95a473995dee142421cdc87e",
+  "head": "6fde5ad60c6d78d69dbbd8e049a9196f15e4095f",
+  "branch": "pr/exact-tracker-seeds",
+  "source": "/home/tahv0/.codex/worktrees/bde3/OpenScrub",
+  "source_clean_authority": "Root task1002-fix1-supervisor-pre-review.json; no reviewer Git replay",
+  "source_clean_recorded": true,
+  "prior157refs_preserved_recorded": true,
+  "packet": {
+    "file": "review-task1002-fix1-285f4af..6fde5ad.diff",
+    "bytes": 10472,
+    "sha256": "a61600b25c1f338590adf2deb2ff6f394392b782764722af03c5eb5fd2074809",
+    "complete_read_once": true,
+    "clipping": false
+  },
+  "files_in_scope": [
+    "openscrub.py",
+    "tests/test_strict_tracker_seed.py",
+    "tests/test_strict_tracking_routes.py"
+  ],
+  "finding_verdicts": [
+    {
+      "id": "I1",
+      "verdict": "ADDRESSED",
+      "production_locations": [
+        "openscrub.py:2504-2515",
+        "openscrub.py:1928-1936 (existing prime adapter)",
+        "openscrub.py:2769 (existing finally)"
+      ],
+      "tests": [
+        "tests/test_strict_tracker_seed.py:288",
+        "tests/test_strict_tracker_seed.py:302",
+        "tests/test_strict_tracker_seed.py:314",
+        "tests/test_strict_tracker_seed.py:325",
+        "tests/test_strict_tracking_routes.py:405"
+      ],
+      "effect": "Strict constructor/open-state native Exceptions become ExactError with cause; existing ExactError/PipelineCancelled/BaseException identity and returned-capture cleanup preserved; legacy ordering/errors/false-open retained."
+    }
+  ],
+  "new_breakage": {
+    "Critical": [],
+    "Important": [],
+    "Minor": []
+  },
+  "verdict": "APPROVED: all findings addressed, no new Critical/Important breakage",
+  "requirements_reports_read": [
+    "task1002-fix1-review-instructions.md",
+    "superpowers/subagent-driven-development/re-review-prompt.md",
+    "task-1002-fix1-brief.md",
+    "task-1002-fix1-report.md",
+    "task-1002-report.md bytes16316 onward",
+    "task-1002-pr.md",
+    "task1002-fix1-supervisor-pre-review.json"
+  ],
+  "new_evidence": {
+    "payloads": 70,
+    "payload_bytes": 646788,
+    "manifest_sha256": "e42f57e1471763eb3a1ca565d966167427827d18259dbb0c3949cf2a05c4bf84",
+    "mismatches": []
+  },
+  "original_evidence_preservation": {
+    "payloads": 260,
+    "payload_bytes": 2882790,
+    "manifest_sha256": "5a9bd93e8ece7d30e024599de58babf719fcbe44f25205e271ae387ae4757ed5",
+    "mismatches": []
+  },
+  "original_integrity_index": {
+    "sha256": "4c6d6e46dc96d7660b102c7d43b1ebc478d27fab81ff11bc63c8b51e6c63102f",
+    "comparison": "Current bytes equal reconstruction of complete index text recorded during initial review; original manifest/payload pins unchanged"
+  },
+  "original_report_prefix": {
+    "bytes": 16316,
+    "sha256": "d854b6346b90cbce8d6e04883287faa8919a2e64264d92958565e03bc9e85dd7"
+  },
+  "original_pr_snapshot": {
+    "bytes": 1810,
+    "sha256": "e46e5d87cb5a5e8635ebb39a47efb5cb2b6981283b2caf93dd0225c42164efc1"
+  },
+  "new_report_snapshots_identical": {
+    "task-1002-pr.md.txt": true,
+    "task-1002-fix1-report.md.txt": true,
+    "task-1002-report.md.txt": true
+  },
+  "current_source_file_hashes_checked": 132,
+  "current_source_hash_mismatches": [],
+  "changed_vs_previous_freeze": [
+    "openscrub.py",
+    "tests/test_strict_tracker_seed.py",
+    "tests/test_strict_tracking_routes.py"
+  ],
+  "retained_runs": {
+    "fix1-red-002": "4 failed,12 passed,67 deselected; genuine direct/raw-type and route/raw-type assertions",
+    "fix1-green-004": "16 passed,67 deselected",
+    "fix1-native-007": "89 passed, actual3.12.16, clean6fde5ad",
+    "fix1-floor-008": "89 passed, actual3.9.25, clean6fde5ad",
+    "fix1-package-009": "exit0 offlinepackage/teninstalledorigins/defaults/CLI/web/strict+legacy listeningHTTP/updater"
+  },
+  "red_green_final_test_hashes": {
+    "fix1-red-002": {
+      "tests/test_strict_tracker_seed.py": "8c1bf38c96f03e1ab303d1494449fe0b4666132c4755500c8745b801baa6428f",
+      "tests/test_strict_tracking_routes.py": "60a0e35c1c16974a634ceb05c9f53cb89861be457778c804b22970c91aeaf082"
+    },
+    "fix1-green-004": {
+      "tests/test_strict_tracker_seed.py": "8c1bf38c96f03e1ab303d1494449fe0b4666132c4755500c8745b801baa6428f",
+      "tests/test_strict_tracking_routes.py": "60a0e35c1c16974a634ceb05c9f53cb89861be457778c804b22970c91aeaf082"
+    },
+    "fix1-native-007": {
+      "tests/test_strict_tracker_seed.py": "8c1bf38c96f03e1ab303d1494449fe0b4666132c4755500c8745b801baa6428f",
+      "tests/test_strict_tracking_routes.py": "60a0e35c1c16974a634ceb05c9f53cb89861be457778c804b22970c91aeaf082"
+    },
+    "fix1-floor-008": {
+      "tests/test_strict_tracker_seed.py": "8c1bf38c96f03e1ab303d1494449fe0b4666132c4755500c8745b801baa6428f",
+      "tests/test_strict_tracking_routes.py": "60a0e35c1c16974a634ceb05c9f53cb89861be457778c804b22970c91aeaf082"
+    }
+  },
+  "red_green_final_tests_identical": true,
+  "final_ids_identical": true,
+  "final_case_count": 89,
+  "strict_cases": 83,
+  "legacy_cases": 6,
+  "native_identity": {
+    "312": {
+      "python": {
+        "executable": "/tmp/openscrub-baseline-20261116/venv-opencv4/bin/python",
+        "version": [
+          3,
+          12,
+          16
+        ]
+      },
+      "scope": "new prospective observations for repair gates; used extensions only, not transitive native certification",
+      "opencv_version": "4.14.0",
+      "numpy_version": "2.5.5",
+      "backend": {
+        "opened": true,
+        "name": "FFMPEG",
+        "fps": 5.0,
+        "count": 10.0
+      },
+      "opencv_extension": {
+        "path": "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/cv2/cv2.abi3.so",
+        "sha256": "8ed76bb37221f69b4670fda111e9c4746c2c8eea697af20da2f390d24e53c28c",
+        "bytes": 70818873
+      },
+      "numpy_extension": {
+        "path": "/tmp/openscrub-baseline-20261116/venv-opencv4/lib/python3.12/site-packages/numpy/_core/_multiarray_umath.cpython-312-x86_64-linux-gnu.so",
+        "sha256": "1650f5b6a42b0022f9821b475725469237dbc77595f1d5c7ae7bbc0288002095",
+        "bytes": 10617201
+      },
+      "observation_sha256": "0173265da6fa6ffb8b2ef723af7ebf6dcf512c35bd91ccb2211d5d2562741d29"
+    },
+    "39": {
+      "python": {
+        "executable": "/tmp/openscrub-python39-20261117/venv/bin/python",
+        "version": [
+          3,
+          9,
+          25
+        ]
+      },
+      "scope": "new prospective observations for repair gates; used extensions only, not transitive native certification",
+      "opencv_version": "4.14.0",
+      "numpy_version": "2.0.2",
+      "backend": {
+        "opened": true,
+        "name": "FFMPEG",
+        "fps": 5.0,
+        "count": 10.0
+      },
+      "opencv_extension": {
+        "path": "/tmp/openscrub-python39-20261117/venv/lib/python3.9/site-packages/cv2/cv2.abi3.so",
+        "sha256": "8ed76bb37221f69b4670fda111e9c4746c2c8eea697af20da2f390d24e53c28c",
+        "bytes": 70818873
+      },
+      "numpy_extension": {
+        "path": "/tmp/openscrub-python39-20261117/venv/lib/python3.9/site-packages/numpy/_core/_multiarray_umath.cpython-39-x86_64-linux-gnu.so",
+        "sha256": "eced012ddb862f047fb1ba62c3cf1494f07558d2f063ced4fa5fe449c2fefe12",
+        "bytes": 10373481
+      },
+      "observation_sha256": "00eecfcbc37b08511aba6812dae54119bcad12d6402fe29d90463f61b0898794"
+    }
+  },
+  "current_native_loader_extension_hash_mismatches": [],
+  "native_pin_scope": "Prospective prerequisites in each new RED/GREEN/owning/package config and matching preflight only. Used cv2/native NumPy extensions, loaders and observation record; no retrospective original544/269 identity and no full transitive library/platform certification. External libraries remain outside ten PRODUCT origins.",
+  "archives": {
+    "sdist": {
+      "file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/fix1/runs/fix1-package-009/dist/openscrub-1.0.96.tar.gz",
+      "sha256": "480557d37c7b21954f3011c1cb53f8bdd7a4ba3da7af5a0a38c6662bd3afbff5",
+      "bytes": 596226
+    },
+    "wheel": {
+      "file": "/home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/fix1/runs/fix1-package-009/wheel/openscrub-1.0.96-py3-none-any.whl",
+      "sha256": "976df7bcaeb677b2c82e2bc8e0f959c0564404289837a3c14b965ecd64b66750",
+      "bytes": 457336
+    },
+    "sdist_regular": 44,
+    "wheel_regular": 21,
+    "sdist_selected_verified": 37,
+    "wheel_selected_verified": 13,
+    "selected_file_byte_mismatches": [],
+    "reviewer_extraction": false
+  },
+  "installed_results": "Four installed log records each identify ten installed product origins with frozen hashes; actual updater five targets match. HTTP strict owner counts unchanged, captures release once, null400/staleoffset409 retained.",
+  "preparation_collision": "Retained fail-fast config filename collision: exit1 before overwrite/workload; distinct owning names used; not a product RED.",
+  "retained_limits": [
+    "Original544/269/PAGE remain285f4af attribution with original missing native identities",
+    "Used-extension pins are not all transitive native/platform certification",
+    "CFR/observedstamp/O(N)/subsequent approximate propagation boundaries unchanged",
+    "Real model quality/native interruption/UI/P16D/C01/P17/HDR/Docker/Windows/latency gates separate",
+    "Inherited D01 verify.py:201 archive-extraction warning retained as separate tooling Minor"
+  ],
+  "outside_packet_product_source_read": [
+    {
+      "file": "openscrub.py",
+      "lines": "1928-1937",
+      "reason": "Existing prime wrapper must own strict initial isOpened error precedence"
+    }
+  ],
+  "other_product_reads": "Frozen hash comparison and AST line metadata only; no new functional review of unchanged source",
+  "reviewer_execution": "Only stdlib read-only evidence/hash/archive/AST checks; no imports of product/native packages or workload execution",
+  "prohibited_actions_performed": {
+    "git_mutation": false,
+    "source_mutation": false,
+    "runtime_test_build_browser_decoder_replay": false,
+    "guard_execution_or_change": false,
+    "nested_agents": false
+  },
+  "outputs_written": [
+    "task-1002-fix1-review.md",
+    "task-1002-fix1-review-audit.json"
+  ]
+}

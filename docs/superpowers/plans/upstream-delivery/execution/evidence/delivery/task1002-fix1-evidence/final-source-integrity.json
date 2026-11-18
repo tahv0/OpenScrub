@@ -1,0 +1,20 @@
+{
+  "base": "285f4afd455ad6dc95a473995dee142421cdc87e",
+  "head": "6fde5ad60c6d78d69dbbd8e049a9196f15e4095f",
+  "clean": true,
+  "changed_files": [
+    "openscrub.py",
+    "tests/test_strict_tracker_seed.py",
+    "tests/test_strict_tracking_routes.py"
+  ],
+  "prior_refs_preserved": 157,
+  "product_modules": 10,
+  "source_files": 132,
+  "red_green_test_bytes_identical": true,
+  "original_test_prefixes_unchanged": true,
+  "web_private_seed_package_and_other_engine_asts_unchanged": true,
+  "native_owning_passed": 89,
+  "floor_owning_passed": 89,
+  "review": "same-reviewer scoped I1/new-breakage review pending",
+  "ready_for_review": true
+}

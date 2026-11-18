@@ -1,0 +1,6 @@
+[
+  "tests/test_strict_tracker_seed.py::test_strict_person_constructor_failure_never_falls_back",
+  "tests/test_strict_tracking_routes.py::test_strict_cancel_during_context_read_never_advances[installation]",
+  "tests/test_strict_tracking_routes.py::test_strict_cancel_during_context_read_never_advances[pre-model]",
+  "tests/test_strict_tracking_routes.py::test_strict_cancel_during_context_read_never_advances[preappend]"
+]

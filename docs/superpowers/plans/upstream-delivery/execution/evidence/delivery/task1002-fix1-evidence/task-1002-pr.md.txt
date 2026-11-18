@@ -1,0 +1,9 @@
+# Initialize optional strict tracking from verified indexed samples
+
+Track can currently replace the inspected frame with nearby initializer pixels. This adds an optional sample-precondition seed to track_object and capture-free keyword-only seeds to the existing person/Vit/NCC engines. Strict launches verify the retained integer before models, initialize from supplied pixels, prime existing captures through the indexed reader, and revalidate source/timeline/cancellation before latest-raw conversion/publication. Generic and person construction/open-state/prime failures use the typed strict error channel with original causes and cancellation precedence; ordinary model failure may use an existing engine with the same supplied pixels.
+
+Base335435e → final candidate6fde5ad. Existing positional/no-seed callers, ordinary PAGE/Track payloads, defaults, dependencies and tracking algorithms remain unchanged. The editor is not migrated; resize/quality/C01 support is separate.
+
+Final repair validation:89 owning cases on each actual3.12/3.9, comprising both entire strict modules plus six real legacy trackers; four genuine generic-entry REDs became16 GREEN controls. New prospective OpenCV/NumPy used-extension pins apply only to these repair gates. One final offline sdist→wheel-from-sdist verifies37/13 selected files (44/21 regular), installed ten origins/defaults/CLI/web/actual strict+legacy HTTP and actual updater bytes. Original544 full/269 affected and corrected legacy PAGE results stay attributed to285; those earlier runs lacked run-specific native binary identities. Existing declared CFR/stamp/O(N) limits remain.
+
+[Implementation report](task-1002-report.md) · [Scoped I1 repair report](task-1002-fix1-report.md) · [Repair commands/evidence](task1002-fix1-evidence/README.md). Same-reviewer scoped re-review is pending. Nothing was published.

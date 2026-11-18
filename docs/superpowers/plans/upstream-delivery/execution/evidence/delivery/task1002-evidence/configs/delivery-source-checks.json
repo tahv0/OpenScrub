@@ -1,0 +1,27 @@
+{
+  "docker": {
+    "Dockerfile": {
+      "sha256": "5758071c9c9bafe7790433745ac83d09f2d415e4bdc9212df4b8de31a244edc6",
+      "copies_private_package": true
+    },
+    "Dockerfile.cuda": {
+      "sha256": "0bafced0ec898bf1da0086a6075e6e7c332245bf28d0a8a2445d2305d050216b",
+      "copies_private_package": true
+    },
+    "Dockerfile.intel": {
+      "sha256": "00fa8162b3aae5821d0b9447b1a30f8c3d0cb047a2da892cf0da5a90cbe3f2fc",
+      "copies_private_package": true
+    }
+  },
+  "frozen": {
+    "spec_sha256": "49d35c42ee505aae5c6d72113790aeeaa34c9d434fbe68c834d7e5c09af33221",
+    "direct_private_imports": true,
+    "analysis_entry_paths": true,
+    "runtime_executed": false
+  },
+  "sdist_checked_files": 37,
+  "wheel_checked_files": 13,
+  "frontend_skill": "/home/tahv0/.codex/plugins/cache/openai-curated-remote/build-web-apps/0.1.2/skills/frontend-testing-debugging/SKILL.md",
+  "browser_availability": "Browser plugin not available",
+  "fallback": "prepared Playwright1.65.1/Chromium1255; no setup/download"
+}

@@ -1,0 +1,25 @@
+{
+  "base": "335435e1e1120de9e6773656b7dfdfabf220e27b",
+  "head": "285f4afd455ad6dc95a473995dee142421cdc87e",
+  "clean": true,
+  "tracked_files": 132,
+  "runtime_modules": 10,
+  "preserved_prior_refs": 157,
+  "changed_files": [
+    "openscrub.py",
+    "openscrub_internal/exact_samples.py",
+    "openscrub_web.py",
+    "tests/test_strict_tracker_seed.py",
+    "tests/test_strict_tracking_routes.py"
+  ],
+  "source_and_tests_match_frozen": true,
+  "new_cases_both_interpreters": 67,
+  "full_passed": 544,
+  "floor_passed": 269,
+  "floor_deselected": 6,
+  "independent_review": "pending supervisor fresh review",
+  "ready_for_independent_review": true,
+  "helper_active_lock": false,
+  "report_sha256": "d854b6346b90cbce8d6e04883287faa8919a2e64264d92958565e03bc9e85dd7",
+  "pr_sha256": "e46e5d87cb5a5e8635ebb39a47efb5cb2b6981283b2caf93dd0225c42164efc1"
+}

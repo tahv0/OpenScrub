@@ -1,0 +1,35 @@
+{
+  "page_sha256": "5af9ae186372652be07657b39c33fe8a617652343bfbb3c3f44c5043655ba59f",
+  "browser": "Browser plugin not available; prepared Playwright1.65.1/Chromium1255",
+  "payload": {
+    "box": [
+      12,
+      12,
+      44,
+      44
+    ],
+    "t_ref": 1.9,
+    "t0": 0,
+    "t1": 2
+  },
+  "polls": [
+    {
+      "added": 0,
+      "error": null,
+      "state": "running"
+    },
+    {
+      "added": 0,
+      "error": "deterministic legacy tracking failure",
+      "state": "done"
+    }
+  ],
+  "report_unchanged": true,
+  "doubles": [
+    "PersonDetector unavailable",
+    "tracker raises after first real running status poll",
+    "offline update-notice cache",
+    "pre-existing pending drafts seeded into existing editor owner"
+  ],
+  "limits": "desktop legacy protocol only; no exact UI migration/resize/quality claim"
+}

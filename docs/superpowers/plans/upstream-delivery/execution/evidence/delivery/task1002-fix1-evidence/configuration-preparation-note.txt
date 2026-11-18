@@ -1,0 +1,1 @@
+Preparation005 actual exit1 after successful clean source commit: requested native-312.json collided with existing immutable native-observation JSON. Assertion refused overwrite before any gate. Corrected new gate names owning-312.json/owning-39.json; all native discovery bytes and original configs retained.

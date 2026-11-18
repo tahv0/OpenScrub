@@ -1,0 +1,17 @@
+{
+  "kind": "author self-review; same reviewer scoped re-review pending",
+  "finding": "I1 generic strict constructor/initial isOpened typed error boundary",
+  "base": "285f4afd455ad6dc95a473995dee142421cdc87e",
+  "head": "6fde5ad60c6d78d69dbbd8e049a9196f15e4095f",
+  "checked": [
+    "Only generic capture entry changes production behavior; all other engine top-level ASTs and interface args unchanged.",
+    "Strict ordinary constructor/open-state exceptions become ExactError with original cause; existing ExactError/PipelineCancelled/BaseException identities preserved.",
+    "Returned captures release once; no capture owner is invented when construction returns no object. Legacy raw exceptions/order/false-open empty results remain.",
+    "Actual-route tests distinguish earlier web factory resolution from zero tracker initialization/fallback; done/added0/error and report/source lease cleanup remain correct.",
+    "Four genuine RED failures become16 GREEN controls with identical test bytes; both entire strict files plus six legacy owners pass89 on each actual interpreter.",
+    "New native-loader/used-extension pins apply only prospectively; ten product module origins unchanged and no transitive/retrospective certification.",
+    "Final offline package/installed strict+legacy HTTP/updater bytes verified; original260 payloads/indexes/report prefix/PR snapshot preserved."
+  ],
+  "deferred_minor": "Existing unchanged verification-helper tar extraction warning remains accepted.",
+  "known_new_fix_breakage": null
+}

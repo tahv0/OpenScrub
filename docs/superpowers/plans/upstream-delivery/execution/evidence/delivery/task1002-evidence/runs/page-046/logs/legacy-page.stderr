@@ -1,0 +1,16 @@
+AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
++ actual - expected
+
++ [
++   "TypeError: Cannot read properties of undefined (reading 'map')"
++ ]
+- []
+
+    at /home/tahv0/src/OpenScrub/.superpowers/sdd/README/runtime/task1002/legacy_page.cjs:44:10 {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: [Array],
+  expected: [],
+  operator: 'deepStrictEqual',
+  diff: 'simple'
+}

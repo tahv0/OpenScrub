@@ -1,0 +1,18 @@
+[
+  "tests/test_strict_tracker_seed.py::test_generic_false_open_keeps_strict_error_and_legacy_empty[legacy]",
+  "tests/test_strict_tracker_seed.py::test_generic_false_open_keeps_strict_error_and_legacy_empty[strict]",
+  "tests/test_strict_tracker_seed.py::test_legacy_generic_native_entry_error_is_unchanged[constructor]",
+  "tests/test_strict_tracker_seed.py::test_legacy_generic_native_entry_error_is_unchanged[open-state]",
+  "tests/test_strict_tracker_seed.py::test_strict_generic_entry_preserves_exception_identity[cancel-constructor]",
+  "tests/test_strict_tracker_seed.py::test_strict_generic_entry_preserves_exception_identity[cancel-open-state]",
+  "tests/test_strict_tracker_seed.py::test_strict_generic_entry_preserves_exception_identity[exact-constructor]",
+  "tests/test_strict_tracker_seed.py::test_strict_generic_entry_preserves_exception_identity[exact-open-state]",
+  "tests/test_strict_tracker_seed.py::test_strict_generic_entry_preserves_exception_identity[exit-constructor]",
+  "tests/test_strict_tracker_seed.py::test_strict_generic_entry_preserves_exception_identity[exit-open-state]",
+  "tests/test_strict_tracker_seed.py::test_strict_generic_entry_preserves_exception_identity[interrupt-constructor]",
+  "tests/test_strict_tracker_seed.py::test_strict_generic_entry_preserves_exception_identity[interrupt-open-state]",
+  "tests/test_strict_tracker_seed.py::test_strict_generic_native_entry_error_is_exact_with_cause[constructor]",
+  "tests/test_strict_tracker_seed.py::test_strict_generic_native_entry_error_is_exact_with_cause[open-state]",
+  "tests/test_strict_tracking_routes.py::test_strict_generic_entry_error_keeps_web_cleanup_and_no_publication[constructor]",
+  "tests/test_strict_tracking_routes.py::test_strict_generic_entry_error_keeps_web_cleanup_and_no_publication[open-state]"
+]

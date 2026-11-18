@@ -1,0 +1,45 @@
+--- a/openscrub.py
++++ b/openscrub.py
+@@ -1917,7 +1917,7 @@
+ 
+ 
+ def _track_person_dense(video, box, t_ref, t0, t1, det, log,
+-                        step_frames=2, cancelled=None):
++                        step_frames=2, cancelled=None, *, strict_seed=None):
+     """Follow the PERSON inside a user-drawn box using the person
+     detector itself: per-frame detections give body-tight boxes (and
+     silhouette polygons from -seg models), so the blur hugs the body
+@@ -2439,7 +2439,7 @@
+ 
+ def track_manual_region(video, box, t_ref, t0, t1, cb=None,
+                         step_frames=2, thr=0.55, scale=0.5,
+-                        person_det=None):
++                        person_det=None, *, strict_seed=None):
+     """Track a user-drawn screen-space box through [t0, t1], starting
+     from its appearance at t_ref and walking both directions. This powers
+     targeted redaction: circle anything the detectors don't know (a
+--- a/openscrub_internal/exact_samples.py
++++ b/openscrub_internal/exact_samples.py
+@@ -141,6 +141,22 @@
+     height: int
+ 
+ 
++@dataclass(frozen=True)
++class StrictSeed:
++    """Verified raw sample; lifetime is held by the caller, never a capture."""
++    pixels: object
++    source_selection: object
++    index: int
++    canonical_s: float
++    observed_s: float
++    fps: float
++    count: int
++    width: int
++    height: int
++    policy: str
++    tolerance_s: float
++
++
+ def read_indexed_capture(cap, index, *, fps, count, width, height, tolerance_s):
+     """Read exactly one integer; never close or transfer the caller's capture."""
+     if (type(index) is not int or not 0 <= index < count or not finite(fps) or fps <= 0

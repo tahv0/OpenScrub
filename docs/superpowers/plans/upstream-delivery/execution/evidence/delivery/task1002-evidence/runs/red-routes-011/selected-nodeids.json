@@ -1,0 +1,22 @@
+[
+  "tests/test_strict_tracking_routes.py::test_invalid_explicit_seed_is_not_legacy[bool-box]",
+  "tests/test_strict_tracking_routes.py::test_invalid_explicit_seed_is_not_legacy[bool-reference]",
+  "tests/test_strict_tracking_routes.py::test_invalid_explicit_seed_is_not_legacy[bool-start]",
+  "tests/test_strict_tracking_routes.py::test_invalid_explicit_seed_is_not_legacy[empty-seed]",
+  "tests/test_strict_tracking_routes.py::test_invalid_explicit_seed_is_not_legacy[infinite-end]",
+  "tests/test_strict_tracking_routes.py::test_invalid_explicit_seed_is_not_legacy[null-seed]",
+  "tests/test_strict_tracking_routes.py::test_invalid_explicit_seed_is_not_legacy[outside-box]",
+  "tests/test_strict_tracking_routes.py::test_legacy_route_uses_unchanged_tracker_call",
+  "tests/test_strict_tracking_routes.py::test_strict_capture_closed_before_model_resolution",
+  "tests/test_strict_tracking_routes.py::test_strict_launch_verifies_before_models",
+  "tests/test_strict_tracking_routes.py::test_strict_source_or_timeline_change_rejects_append[source]",
+  "tests/test_strict_tracking_routes.py::test_strict_source_or_timeline_change_rejects_append[timeline]",
+  "tests/test_strict_tracking_routes.py::test_strict_stale_precondition_rejected_before_launch[index]",
+  "tests/test_strict_tracking_routes.py::test_strict_stale_precondition_rejected_before_launch[offset]",
+  "tests/test_strict_tracking_routes.py::test_strict_stale_precondition_rejected_before_launch[source]",
+  "tests/test_strict_tracking_routes.py::test_strict_stale_precondition_rejected_before_launch[timeline]",
+  "tests/test_strict_tracking_routes.py::test_strict_stale_precondition_rejected_before_launch[width]",
+  "tests/test_strict_tracking_routes.py::test_strict_timeline_change_during_decode_prevents_models",
+  "tests/test_strict_tracking_routes.py::test_strict_unrelated_choice_audio_merge",
+  "tests/test_strict_tracking_routes.py::test_strict_window_rejects_uncanonical_reference"
+]

@@ -1,0 +1,155 @@
+diff --git a/openscrub.py b/openscrub.py
+index e5a6e50..cec2159 100644
+--- a/openscrub.py
++++ b/openscrub.py
+@@ -2501,14 +2501,19 @@ def track_manual_region(video, box, t_ref, t0, t1, cb=None,
+     log = (cb.log if cb else print)
+     if strict_seed is not None:
+         _validate_tracker_seed(strict_seed, video, box, t_ref, t0, t1)
+-    cap = cv2.VideoCapture(video)
+     try:
+-        if not cap.isOpened():
+-            if strict_seed is not None:
+-                raise exact.ExactError("strict tracker capture could not open")
+-            return []
++        cap = cv2.VideoCapture(video)
++    except (exact.ExactError, PipelineCancelled):
++        raise
++    except Exception as error:
++        if strict_seed is not None:
++            raise exact.ExactError('strict generic capture failed: '+str(error)) from error
++        raise
++    try:
+         if strict_seed is not None:
+             _prime_tracker_seed(cap, strict_seed)
++        elif not cap.isOpened():
++            return []
+         fps = strict_seed.fps if strict_seed is not None else (cap.get(cv2.CAP_PROP_FPS) or 30.0)
+         step = max(1, int(step_frames)) / fps
+         t_ref = min(max(t_ref, t0), t1)
+diff --git a/tests/test_strict_tracker_seed.py b/tests/test_strict_tracker_seed.py
+index 99290ca..2299f47 100644
+--- a/tests/test_strict_tracker_seed.py
++++ b/tests/test_strict_tracker_seed.py
+@@ -273,3 +273,61 @@ def test_strict_person_constructor_failure_never_falls_back(rig,monkeypatch):
+     assert calls==['fixture','fixture']
+     assert [c.releases for c in rig.captures]==[1]
+     assert rig.initializers==[] and rig.grabs==[] and detector.want_any is False
++
++
++
++def _generic_entry_fault(rig,monkeypatch,boundary,error):
++    def fail(*args,**kwargs):raise error
++    if boundary=='constructor':monkeypatch.setattr(engine.cv2,'VideoCapture',fail)
++    else:monkeypatch.setattr(rig.Capture,'isOpened',fail)
++    monkeypatch.setattr(engine,'_vittrack_factory',lambda log:pytest.fail('initializer factory after generic entry failure'))
++    monkeypatch.setattr(engine,'_track_person_dense',lambda *a,**kw:pytest.fail('person path after generic entry failure'))
++
++
++@pytest.mark.parametrize('boundary',['constructor','open-state'],ids=['constructor','open-state'])
++def test_strict_generic_native_entry_error_is_exact_with_cause(rig,monkeypatch,boundary):
++    error=RuntimeError('generic '+boundary+' retained oracle')
++    _generic_entry_fault(rig,monkeypatch,boundary,error)
++    with pytest.raises(exact.ExactError,match='retained oracle') as caught:
++        engine.track_manual_region('fixture',[8,8,40,40],1/6,.16,.17,
++            person_det=object(),strict_seed=rig.seed)
++    assert caught.value.__cause__ is error
++    assert [c.releases for c in rig.captures]==([] if boundary=='constructor' else [1])
++    assert rig.initializers==[] and rig.grabs==[]
++
++
++@pytest.mark.parametrize('boundary',['constructor','open-state'],ids=['constructor','open-state'])
++@pytest.mark.parametrize('kind',[exact.ExactError,engine.PipelineCancelled,KeyboardInterrupt,SystemExit],
++    ids=['exact','cancel','interrupt','exit'])
++def test_strict_generic_entry_preserves_exception_identity(rig,monkeypatch,boundary,kind):
++    error=kind('generic precedence oracle')
++    _generic_entry_fault(rig,monkeypatch,boundary,error)
++    with pytest.raises(kind) as caught:
++        engine.track_manual_region('fixture',[8,8,40,40],1/6,.16,.17,
++            person_det=object(),strict_seed=rig.seed)
++    assert caught.value is error and caught.value.__cause__ is None
++    assert [c.releases for c in rig.captures]==([] if boundary=='constructor' else [1])
++    assert rig.initializers==[] and rig.grabs==[]
++
++
++@pytest.mark.parametrize('boundary',['constructor','open-state'],ids=['constructor','open-state'])
++def test_legacy_generic_native_entry_error_is_unchanged(rig,monkeypatch,boundary):
++    error=RuntimeError('legacy '+boundary+' retained oracle')
++    _generic_entry_fault(rig,monkeypatch,boundary,error)
++    with pytest.raises(RuntimeError) as caught:
++        engine.track_manual_region('fixture',[8,8,40,40],1/6,.16,.17,person_det=object())
++    assert caught.value is error and caught.value.__cause__ is None
++    assert [c.releases for c in rig.captures]==([] if boundary=='constructor' else [1])
++    assert rig.initializers==[] and rig.grabs==[]
++
++
++@pytest.mark.parametrize('strict',[True,False],ids=['strict','legacy'])
++def test_generic_false_open_keeps_strict_error_and_legacy_empty(rig,monkeypatch,strict):
++    monkeypatch.setattr(rig.Capture,'isOpened',lambda cap:False)
++    monkeypatch.setattr(engine,'_vittrack_factory',lambda log:pytest.fail('factory on unopened capture'))
++    if strict:
++        with pytest.raises(exact.ExactError):
++            engine.track_manual_region('fixture',[8,8,40,40],1/6,.16,.17,strict_seed=rig.seed)
++    else:assert engine.track_manual_region('fixture',[8,8,40,40],1/6,.16,.17)==[]
++    assert [c.releases for c in rig.captures]==[1]
++    assert rig.initializers==[] and rig.grabs==[]
+diff --git a/tests/test_strict_tracking_routes.py b/tests/test_strict_tracking_routes.py
+index e3013b1..ae9fcc5 100644
+--- a/tests/test_strict_tracking_routes.py
++++ b/tests/test_strict_tracking_routes.py
+@@ -398,3 +398,55 @@ def test_strict_cancel_during_context_read_never_advances(tracking,monkeypatch,h
+     assert len(tracking.models)==(1 if hold_at==3 else 0),'model resolved after cancellation'
+     assert len(tracking.calls)==(1 if hold_at==3 else 0)
+     assert web.FILES.count==0
++
++
++
++@pytest.mark.parametrize('boundary',['constructor','open-state'],ids=['constructor','open-state'])
++def test_strict_generic_entry_error_keeps_web_cleanup_and_no_publication(exact,monkeypatch,boundary):
++    pc=precondition(sample(exact,.2),None)
++    before=exact.path.read_bytes();files=web.FILES.initialize(exact.job)
++    epoch=files.committed_report_epoch
++    captures=[];threads=[];models=[];observed=[]
++    native=RuntimeError('generic web '+boundary+' retained oracle')
++    real_capture=web.cv2.VideoCapture;real_track=engine.track_manual_region
++    real_start=web._start_owned_thread;attempts=[]
++    class Capture:
++        def __init__(self,video):
++            attempts.append(video)
++            if len(attempts)==2 and boundary=='constructor':raise native
++            self.cap=real_capture(video);self.releases=0
++            captures.append(self)
++        def __getattr__(self,key):return getattr(self.cap,key)
++        def isOpened(self):
++            if len(captures)==2 and self is captures[1] and boundary=='open-state':raise native
++            return self.cap.isOpened()
++        def release(self):self.releases+=1;self.cap.release()
++    def model(*a,**kw):
++        assert captures and captures[0].releases==1
++        models.append(True);return None
++    def track(*a,**kw):
++        try:return real_track(*a,**kw)
++        except BaseException as error:observed.append(error);raise
++    def start(target,lease):
++        thread=real_start(target,lease);threads.append(thread);return thread
++    monkeypatch.setattr(web.cv2,'VideoCapture',Capture)
++    monkeypatch.setattr(engine,'PersonDetector',model)
++    monkeypatch.setattr(engine,'track_manual_region',track)
++    monkeypatch.setattr(engine,'_vittrack_factory',lambda log:pytest.fail('generic initializer fallback after source entry error'))
++    monkeypatch.setattr(engine,'_track_person_dense',lambda *a,**kw:pytest.fail('person fallback after generic source entry error'))
++    monkeypatch.setattr(web,'_start_owned_thread',start)
++    try:
++        response=request('post',exact.url+'/track_object',json=dict(seed=pc,
++            box=[8,8,40,40],t_ref=.2,t0=.199,t1=.201))
++        assert response.status_code==200
++    finally:
++        for thread in threads:thread.join(8);assert not thread.is_alive()
++    status=request('get',exact.url+'/track_status').json
++    assert status['state']=='done' and status['added']==0 and 'retained oracle' in status['error']
++    assert models==[True], 'web factory resolution is before generic capture entry'
++    assert len(observed)==1 and isinstance(observed[0],web.exact.ExactError)
++    assert observed[0].__cause__ is native
++    assert len(attempts)==2
++    assert [cap.releases for cap in captures]==([1] if boundary=='constructor' else [1,1])
++    assert exact.path.read_bytes()==before and files.committed_report_epoch==epoch
++    assert web.FILES.count==0

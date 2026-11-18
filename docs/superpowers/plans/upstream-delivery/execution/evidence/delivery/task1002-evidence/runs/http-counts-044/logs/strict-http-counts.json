@@ -1,0 +1,70 @@
+{
+  "strict": {
+    "counts": {
+      "snapshots": 1,
+      "timeline_traversals": 4,
+      "source_current_checks": 7,
+      "latest_raw_loads": 3,
+      "web_verifications": 1,
+      "indexed_reads": 2,
+      "person_resolutions": 1,
+      "vit_initializers": 2,
+      "committed_notifications": 1
+    },
+    "source_index": 9,
+    "canonical_s": 1.8,
+    "independent_pts": "9/5",
+    "captures": 2,
+    "releases": [
+      1,
+      1
+    ],
+    "after_indices": [
+      10.0,
+      10.0
+    ]
+  },
+  "legacy": {
+    "counts": {
+      "person_resolutions": 1,
+      "vit_initializers": 2,
+      "latest_raw_loads": 1,
+      "committed_notifications": 1
+    },
+    "body": {
+      "box": [
+        8,
+        8,
+        40,
+        40
+      ],
+      "t_ref": 1.0,
+      "t0": 0.999,
+      "t1": 1.001
+    }
+  },
+  "null": {
+    "status": 400,
+    "error": {
+      "detail": "invalid geometry precondition shape",
+      "error": "invalid_sample_request"
+    },
+    "counts": {}
+  },
+  "stale_offset": {
+    "status": 409,
+    "error": {
+      "detail": "sample source/timeline differs",
+      "error": "geometry_conflict"
+    },
+    "counts": {
+      "snapshots": 1,
+      "timeline_traversals": 1
+    }
+  },
+  "source": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub_web.py",
+  "engine": "/home/tahv0/.codex/worktrees/bde3/OpenScrub/openscrub.py",
+  "mode": "source",
+  "media_sha256": "ecc7cdc66751506e713c4dfce38fb096f5c1c0fcc8fbd73e8d5375cc94fe6bba",
+  "declared_limit": "counts only; no model quality or latency claim"
+}

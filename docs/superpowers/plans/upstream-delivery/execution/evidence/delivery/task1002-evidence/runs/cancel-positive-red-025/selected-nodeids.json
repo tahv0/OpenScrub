@@ -1,0 +1,4 @@
+[
+  "tests/test_strict_tracking_routes.py::test_fresh_strict_track_after_acknowledged_idle_cancel",
+  "tests/test_strict_tracking_routes.py::test_strict_cancel_after_snapshot_rejects_install"
+]

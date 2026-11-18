@@ -1,0 +1,33 @@
+{
+  "kind": "author self-review; fresh supervisor review pending",
+  "base": "335435e1e1120de9e6773656b7dfdfabf220e27b",
+  "head": "285f4afd455ad6dc95a473995dee142421cdc87e",
+  "review_focus": [
+    "Fractional/last/duplicate indices: initializer arrays, actual integer primer and independent native/normalized PTS/pixels; index15 canonical15/13 conversion regression.",
+    "Person miss/model failure retains supplied pixels; explicit/native prime and source-constructor errors cannot enter generic fallback; cancellation/BaseException precedence.",
+    "Before-install/before-model/before-append real cancellation holds; verification/capture/lease cleanup, retained errors, zero models and zero publication on strict refusal.",
+    "Latest-raw independent enabled/audio/unknown/manual rows preserved; coordinate source/timeline changes refuse; latest track ID selected.",
+    "All old positional signatures/defaults/algorithms/PAGE bytes retained; six real legacy tracker cases, full and corrected full-PAGE legacy protocol control."
+  ],
+  "evidence": {
+    "full_passed": 544,
+    "floor_passed": 269,
+    "floor_deselected": 6,
+    "new_cases_both": 67,
+    "archive_regular_files": [
+      44,
+      21
+    ],
+    "selected_archive_checks": [
+      37,
+      13
+    ],
+    "historical_test_versions": 14
+  },
+  "deferred_minor": "Existing shared-helper tar extraction warning remains accepted; no tooling change.",
+  "limitations": [
+    "Model doubles establish initializer contracts, not real tracking quality.",
+    "Observed stamps and sample-qualified declared CFR subset do not certify arbitrary files.",
+    "Ordinary UI migration/P16D/C01/P17/native interruption/performance remain separate."
+  ]
+}
